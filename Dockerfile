@@ -8,7 +8,12 @@ FROM ${PHP_IMAGE} AS php-base
 RUN printf '%s\n' \
         'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/20221114T000000Z bullseye main' \
         'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/20221114T000000Z bullseye-security main' \
-        > /etc/apt/sources.list
+        > /etc/apt/sources.list \
+    && printf '%s\n' \
+        'Acquire::Retries "5";' \
+        'Acquire::http::Timeout "30";' \
+        'Acquire::https::Timeout "30";' \
+        > /etc/apt/apt.conf.d/80-retries
 
 FROM php-base AS extensions
 
