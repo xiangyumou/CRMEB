@@ -361,10 +361,10 @@ class StoreOrderDao extends BaseDao
                         $timeUnix = "%m-%d";
                         break;
                 }
-                $query->field("FROM_UNIXTIME(add_time,'$timeUnix') as day,count(*) as count,sum(pay_price) as price");
+                $query->field("FROM_UNIXTIME(MIN(add_time),'$timeUnix') as day,count(*) as count,sum(pay_price) as price,MIN(add_time) as sort_time");
                 $query->group("FROM_UNIXTIME(add_time, '$timeUnix')");
             })
-            ->order('add_time asc')
+            ->order('sort_time asc')
             ->select()->toArray();
     }
 
