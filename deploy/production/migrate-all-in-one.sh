@@ -15,6 +15,7 @@ mysql_uid=""
 mysql_gid=""
 redis_uid=""
 redis_gid=""
+app_container=""
 
 mkdir -p "$config_dir" "$release_dir/public"
 if ! docker image inspect "$image" >/dev/null 2>&1; then
@@ -25,13 +26,31 @@ docker pull redis:5.0.14-bullseye
 docker pull nginx:1.27.5-alpine
 sh "$project_dir/docker/verify-image.sh" "$image"
 
-if docker container inspect crmeb >/dev/null 2>&1; then
+if docker container inspect crmeb-mysql >/dev/null 2>&1; then
+    mysql_uid="$(docker exec crmeb-mysql id -u mysql)"
+    mysql_gid="$(docker exec crmeb-mysql id -g mysql)"
+elif docker container inspect crmeb >/dev/null 2>&1 && docker exec crmeb id -u mysql >/dev/null 2>&1; then
     mysql_uid="$(docker exec crmeb id -u mysql)"
     mysql_gid="$(docker exec crmeb id -g mysql)"
+fi
+
+if docker container inspect crmeb-redis >/dev/null 2>&1; then
+    redis_uid="$(docker exec crmeb-redis id -u redis)"
+    redis_gid="$(docker exec crmeb-redis id -g redis)"
+elif docker container inspect crmeb >/dev/null 2>&1 && docker exec crmeb id -u redis >/dev/null 2>&1; then
     redis_uid="$(docker exec crmeb id -u redis)"
     redis_gid="$(docker exec crmeb id -g redis)"
-    docker cp crmeb:/var/www/crmeb/.env "$config_dir/.env"
-    docker cp crmeb:/var/www/crmeb/.constant "$config_dir/.constant"
+fi
+
+if docker container inspect crmeb-php >/dev/null 2>&1; then
+    app_container="crmeb-php"
+elif docker container inspect crmeb >/dev/null 2>&1 && docker exec crmeb test -f /var/www/crmeb/.env; then
+    app_container="crmeb"
+fi
+
+if [ -n "$app_container" ]; then
+    docker cp "$app_container:/var/www/crmeb/.env" "$config_dir/.env"
+    docker cp "$app_container:/var/www/crmeb/.constant" "$config_dir/.constant"
 elif [ ! -s "$config_dir/.env" ]; then
     echo "Cannot find the running crmeb container or a saved application .env" >&2
     exit 1
