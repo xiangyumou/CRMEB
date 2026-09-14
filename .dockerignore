@@ -83,23 +83,9 @@ yarn-error.log*
 .node_repl_history
 
 # ===========================================
-# 7. PHP Composer 依赖（不使用时的清理）
+# 7. PHP Composer 依赖（镜像内从 composer.lock 重建）
 # ===========================================
-# 注意：如果 vendor 目录需要，进入镜像时不要排除
-# 如果使用 composer install 构建，则可以排除
-# vendor/test/
-# vendor/tests/
-# vendor/docs/
-# vendor/*.txt
-# vendor/*.md
-
-# ===========================================
-# 8. 大型字体文件（不必要的资源）
-# ===========================================
-# simsun.ttc
-# WenQuanZhengHei.ttf
-crmeb/vendor/dh2y/think-qrcode/src/simsun.ttc
-crmeb/vendor/fastknife/ajcaptcha/resources/fonts/WenQuanZhengHei.ttf
+crmeb/vendor/
 
 # ===========================================
 # 9. 数据库和安装文件（运行镜像时重新生成）
@@ -107,6 +93,7 @@ crmeb/vendor/fastknife/ajcaptcha/resources/fonts/WenQuanZhengHei.ttf
 *.sql
 *.sql.gz
 *.sql.bak
+!crmeb/public/install/*.sql
 
 # ===========================================
 # 10. 测试和开发文件
@@ -129,6 +116,10 @@ codesniffer.ruleset.xml
 .env
 .env.*
 !.env.example
+crmeb/.env
+crmeb/.env.*
+!crmeb/.env.example
+crmeb/.constant
 .secret
 .secrets
 *.key

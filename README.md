@@ -114,17 +114,14 @@ Theme Market：<a href="https://www.crmeb.com/theme" target="_blank">Theme Marke
 
 ---
 
-### docker one-click experience
-```
-# Pull and run the CRMEB Docker image
-docker run -d --name crmeb -p 8080:80 ccr.ccs.tencentyun.com/crmebky_php/crmebky:latest
+### Docker image
+```bash
+docker pull ghcr.io/xiangyumou/crmeb:latest
+docker run -d --name crmeb-php -p 9000:9000 ghcr.io/xiangyumou/crmeb:latest
 ```
 
-#### Access service
-- **Website**: http://localhost:8080 
-- **Backend**: http://localhost:8080/admin （Account: admin，Password: crmeb.com）
-- **MySQL**: localhost:3306（Account: root，Password: 123456）
-- **Redis**: localhost:6379
+This image provides PHP-FPM only; it does not bundle Nginx, MySQL, or Redis. Point an external Nginx FastCGI upstream at port `9000` and configure the database and Redis separately. For a source checkout, run `composer install` in the `crmeb` directory before starting the application.
+
 > Click here for detailed information [Help Documentation](/help/docker/docker.md)。
 ---
 
@@ -347,4 +344,3 @@ Technical Community：https://www.crmeb.com/ask/thread/list/147
 
 
 [Back to Top :fa-arrow-circle-up: ](https://gitee.com/ZhongBangKeJi/CRMEB#%E9%A1%B9%E7%9B%AE%E4%BB%8B%E7%BB%8D)
-

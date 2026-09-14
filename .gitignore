@@ -10,6 +10,7 @@
 /crmeb/backup/*
 /crmeb/public/install.lock
 crmeb/public/uploads/*
+/crmeb/vendor/
 
 
 # Docker数据
@@ -57,8 +58,6 @@ crmeb/php-fpm.conf
 
 
 .trae/skills/dockercompose/ALLINONE_SKILL.md
-.gitignore
-crmeb/Dockerfile
 crmeb/nginx.conf
 crmeb/.env.example
 crmeb/.dockerignore
@@ -73,6 +72,5 @@ crmeb/runtime/temp/readme.md
 
 .codebuddy/rules/git-commit-standard.mdc
 .codebuddy/rules/readme.mdc
-Dockerfile
 .codebuddy/models.json
 .codebuddy/rules/project-intro.mdc

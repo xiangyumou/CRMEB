@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "811b1384d855a195194130a727ad2e79",
+    "content-hash": "677c7b6fecbcb764c7931e5c8eff0792",
     "packages": [
         {
             "name": "adbario/php-dot-notation",
@@ -1190,11 +1190,11 @@
         },
         {
             "name": "fastknife/ajcaptcha",
-            "version": "v1.1.5",
-            "source": {
-                "type": "git",
-                "url": "https://gitee.com/fastknife/aj-captcha.git",
-                "reference": "9e8eb95c444d2ff4d78d1d1d4d5cb1d29c084609"
+            "version": "1.1.5",
+            "dist": {
+                "type": "path",
+                "url": "packages/fastknife/ajcaptcha",
+                "reference": "ffae137fe699f0eb6a188c2b43a3516ae3e2a5ac"
             },
             "require": {
                 "ext-gd": "*",
@@ -1210,7 +1210,6 @@
                     "Fastknife\\": "src"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "GPL-3.0-only"
             ],
@@ -1221,7 +1220,10 @@
                 }
             ],
             "description": "This is a behavior verification code PHP back-end implementation package",
-            "time": "2022-07-04T10:17:37+00:00"
+            "transport-options": {
+                "symlink": false,
+                "relative": true
+            }
         },
         {
             "name": "firebase/php-jwt",
@@ -5485,10 +5487,10 @@
         {
             "name": "xin/container",
             "version": "2.0.1",
-            "source": {
-                "type": "git",
-                "url": "https://gitee.com/liuxiaojinla/php-container",
-                "reference": "97bb67f87dd851545938a1f2fe0ffbd379e3ff81"
+            "dist": {
+                "type": "path",
+                "url": "packages/xin/container",
+                "reference": "93adea983b940cda0ed2e5d3a9d9de24690f58da"
             },
             "require": {
                 "ext-ctype": "*",
@@ -5507,7 +5509,6 @@
                     "xin\\container\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "Apache-2.0"
             ],
@@ -5518,15 +5519,18 @@
                 }
             ],
             "description": "严格基于PSR11规范实现基础的容器和依赖注入",
-            "time": "2019-10-21T03:51:25+00:00"
+            "transport-options": {
+                "symlink": false,
+                "relative": true
+            }
         },
         {
             "name": "xin/helper",
             "version": "1.0.0",
-            "source": {
-                "type": "git",
-                "url": "https://gitee.com/liuxiaojinla/php-helper",
-                "reference": "02a58132dae2aea2d1c0b8e66f55125969224747"
+            "dist": {
+                "type": "path",
+                "url": "packages/xin/helper",
+                "reference": "901ab89532d9ce37db235b7970f0444b7d397dbc"
             },
             "require": {
                 "ext-ctype": "*",
@@ -5543,7 +5547,6 @@
                     "xin\\helper\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "Apache-2.0"
             ],
@@ -5554,7 +5557,10 @@
                 }
             ],
             "description": "PHP项目日常开发必备基础库，数组工具类、字符串工具类、数字工具类、函数工具类、服务器工具类、加密工具类",
-            "time": "2019-06-22T08:28:23+00:00"
+            "transport-options": {
+                "symlink": false,
+                "relative": true
+            }
         }
     ],
     "packages-dev": [],
@@ -5573,5 +5579,5 @@
         "ext-simplexml": "*"
     },
     "platform-dev": [],
-    "plugin-api-version": "2.3.0"
+    "plugin-api-version": "2.2.0"
 }

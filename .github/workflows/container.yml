@@ -1,0 +1,136 @@
+name: Container
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: ghcr.io/xiangyumou/crmeb
+
+jobs:
+  validate:
+    name: Validate ${{ matrix.platform }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            slug: amd64
+          - platform: linux/arm64
+            slug: arm64
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          platforms: ${{ matrix.platform }}
+          push: false
+          tags: crmeb-ci:${{ matrix.slug }}-${{ github.sha }}
+          cache-from: type=gha,scope=validate-${{ matrix.slug }}
+          cache-to: type=gha,mode=max,scope=validate-${{ matrix.slug }}
+
+      - name: Verify image
+        run: sh docker/verify-image.sh crmeb-ci:${{ matrix.slug }}-${{ github.sha }}
+
+      - name: Scan image
+        if: matrix.platform == 'linux/amd64'
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: crmeb-ci:${{ matrix.slug }}-${{ github.sha }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+
+      - name: Upload vulnerability report
+        if: matrix.platform == 'linux/amd64' && always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+  publish:
+    name: Publish multi-architecture image
+    if: github.event_name == 'push'
+    needs:
+      - validate
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must match vX.Y.Z: $tag" >&2
+            exit 1
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/master' }}
+            type=sha,format=short,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and publish image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=publish
+          cache-to: type=gha,mode=max,scope=publish
+          provenance: mode=max
+          sbom: true

@@ -15,6 +15,29 @@
             "email": "liu21st@gmail.com"
         }
     ],
+    "repositories": [
+        {
+            "type": "path",
+            "url": "packages/fastknife/ajcaptcha",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "path",
+            "url": "packages/xin/container",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "path",
+            "url": "packages/xin/helper",
+            "options": {
+                "symlink": false
+            }
+        }
+    ],
     "require": {
         "php": ">=7.1.0",
         "ext-json": "*",
