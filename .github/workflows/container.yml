@@ -75,11 +75,34 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
 
+  regression:
+    name: Core transaction regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Run regression suite
+        run: sh docker/run-regression.sh
+
+      - name: Upload regression report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-regression-report
+          path: tests/regression/artifacts/junit.xml
+          if-no-files-found: warn
+          retention-days: 14
+
   publish:
     name: Publish multi-architecture image
     if: github.event_name == 'push'
     needs:
       - validate
+      - regression
     runs-on: ubuntu-22.04
     permissions:
       contents: read

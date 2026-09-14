@@ -472,7 +472,7 @@ abstract class BaseDao
      */
     public function bcInc($key, string $incField, string $inc, string $keyField = null, int $acc = 2)
     {
-        return $this->bc($key, $incField, $inc, $keyField, 1);
+        return $this->bc($key, $incField, $inc, $keyField, 1, $acc);
     }
 
     /**
@@ -489,7 +489,7 @@ abstract class BaseDao
      */
     public function bcDec($key, string $decField, string $dec, string $keyField = null, int $acc = 2)
     {
-        return $this->bc($key, $decField, $dec, $keyField, 2);
+        return $this->bc($key, $decField, $dec, $keyField, 2, $acc);
     }
 
     /**
@@ -507,21 +507,17 @@ abstract class BaseDao
      */
     public function bc($key, string $incField, string $inc, string $keyField = null, int $type = 1, int $acc = 2)
     {
-        if ($keyField === null) {
-            $result = $this->get($key);
-        } else {
-            $result = $this->getOne([$keyField => $key]);
+        if (bccomp($inc, '0', $acc) < 0) {
+            return false;
         }
-        if (!$result) return false;
-        $new = 0;
+        $where = [is_null($keyField) ? $this->getPk() : $keyField => $key];
+        $query = $this->getModel()->where($where);
         if ($type === 1) {
-            $new = bcadd($result[$incField], $inc, $acc);
+            return (bool)$query->inc($incField, $inc)->update();
         } else if ($type === 2) {
-            if ($result[$incField] < $inc) return false;
-            $new = bcsub($result[$incField], $inc, $acc);
+            return (bool)$query->where($incField, '>=', $inc)->dec($incField, $inc)->update();
         }
-        $result->{$incField} = $new;
-        return false !== $result->save();
+        return false;
     }
 
     /**
@@ -530,13 +526,16 @@ abstract class BaseDao
      * @param int $num
      * @param string $stock
      * @param string $sales
-     * @return false
+     * @return int|false
      * @throws \think\db\exception\DataNotFoundException
      * @throws \think\db\exception\DbException
      * @throws \think\db\exception\ModelNotFoundException
      */
     public function decStockIncSales(array $where, int $num, string $stock = 'stock', string $sales = 'sales')
     {
+        if ($num <= 0) {
+            return false;
+        }
         $isQuota = false;
         if (isset($where['type']) && $where['type']) {
             $isQuota = true;
@@ -544,14 +543,14 @@ abstract class BaseDao
                 unset($where['type']);
             }
         }
-        $field = $isQuota ? 'stock,quota' : 'stock';
-        $product = $this->getModel()->where($where)->field($field)->find();
-        if ($product) {
-            return $this->getModel()->where($where)->when($isQuota, function ($query) use ($num) {
+        return $this->getModel()->where($where)
+            ->where($stock, '>=', $num)
+            ->when($isQuota, function ($query) use ($num) {
+                $query->where('quota', '>=', $num);
+            })
+            ->when($isQuota, function ($query) use ($num) {
                 $query->dec('quota', $num);
             })->dec($stock, $num)->inc($sales, $num)->update();
-        }
-        return false;
     }
 
     /**

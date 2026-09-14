@@ -1,0 +1,44 @@
+name: crmeb-regression
+
+services:
+  mysql:
+    image: mysql:8.0.42
+    environment:
+      MYSQL_DATABASE: crmeb_regression
+      MYSQL_ROOT_PASSWORD: regression
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --sql-mode=NO_ENGINE_SUBSTITUTION
+    volumes:
+      - ../../crmeb/public/install/crmeb.sql:/docker-entrypoint-initdb.d/001-crmeb.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-pregression", "--silent"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  redis:
+    image: redis:5.0.14-bullseye
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  regression:
+    build:
+      context: ../..
+      target: vendor
+    working_dir: /build/crmeb
+    environment:
+      CRMEB_ROOT: /build/crmeb
+    volumes:
+      - ../../tests/regression:/tests/regression
+      - ./test.env:/build/crmeb/.env:ro
+      - ./install.lock:/build/crmeb/public/install.lock:ro
+    command: ["php", "/tests/regression/vendor/bin/phpunit", "--configuration", "/tests/regression/phpunit.xml"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy

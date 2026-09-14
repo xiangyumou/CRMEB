@@ -38,6 +38,16 @@ class StoreOrderDao extends BaseDao
     }
 
     /**
+     * Atomically transition an unpaid order to paid.
+     *
+     * @return int Number of updated rows
+     */
+    public function markPaid(int $id, array $data): int
+    {
+        return $this->getModel()->where(['id' => $id, 'paid' => 0])->update($data);
+    }
+
+    /**
      * 订单搜索
      * @param array $where
      * @param bool $search

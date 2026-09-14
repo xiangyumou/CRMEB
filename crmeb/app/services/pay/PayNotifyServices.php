@@ -39,7 +39,12 @@ class PayNotifyServices
             $orderInfo = $services->getOne(['order_id' => $order_id]);
             if (!$orderInfo) return true;
             if ($orderInfo->paid) return true;
-            return $services->paySuccess($orderInfo->toArray(), $payType, ['trade_no' => $trade_no]);
+            $success = $services->paySuccess($orderInfo->toArray(), $payType, ['trade_no' => $trade_no]);
+            if (!$success) {
+                $orderInfo = $services->getOne(['order_id' => $order_id]);
+                return $orderInfo && $orderInfo->paid;
+            }
+            return true;
         } catch (\Exception $e) {
             return false;
         }

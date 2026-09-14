@@ -74,3 +74,5 @@ crmeb/runtime/temp/readme.md
 .codebuddy/rules/readme.mdc
 .codebuddy/models.json
 .codebuddy/rules/project-intro.mdc
+tests/regression/vendor/
+tests/regression/artifacts/
