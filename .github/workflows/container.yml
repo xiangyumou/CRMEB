@@ -54,6 +54,9 @@ jobs:
       - name: Verify image
         run: sh docker/verify-image.sh crmeb-ci:${{ matrix.slug }}-${{ github.sha }}
 
+      - name: Verify HTTP stack
+        run: sh docker/verify-http-stack.sh crmeb-ci:${{ matrix.slug }}-${{ github.sha }}
+
       - name: Scan image
         if: matrix.platform == 'linux/amd64'
         uses: aquasecurity/trivy-action@v0.36.0
