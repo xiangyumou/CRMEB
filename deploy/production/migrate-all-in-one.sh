@@ -104,14 +104,14 @@ rollback() {
     fi
     if [ -f "$backup_compose" ]; then
         cp "$backup_compose" "$old_compose"
-        docker compose -f "$old_compose" up -d
+        docker compose --env-file "$deployment_env" -f "$old_compose" up -d
     fi
 }
 trap rollback ERR
 
 if [ -f "$old_compose" ]; then
     cp "$old_compose" "$backup_compose"
-    docker compose -f "$old_compose" down
+    docker compose --env-file "$deployment_env" -f "$old_compose" down
 fi
 
 mysql_target="$(docker run --rm --entrypoint sh mysql:8.0.42 -c 'printf "%s:%s" "$(id -u mysql)" "$(id -g mysql)"')"
