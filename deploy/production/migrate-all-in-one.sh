@@ -17,7 +17,9 @@ redis_uid=""
 redis_gid=""
 
 mkdir -p "$config_dir" "$release_dir/public"
-docker pull "$image"
+if ! docker image inspect "$image" >/dev/null 2>&1; then
+    docker pull "$image"
+fi
 docker pull mysql:8.0.42
 docker pull redis:5.0.14-bullseye
 docker pull nginx:1.27.5-alpine
@@ -38,7 +40,10 @@ fi
 cp "$config_dir/.env" "$config_dir/.env.before-sidecars"
 sed -Ei 's/^([[:space:]]*HOSTNAME[[:space:]]*=[[:space:]]*).*/\1mysql/' "$config_dir/.env"
 sed -Ei 's/^([[:space:]]*REDIS_HOSTNAME[[:space:]]*=[[:space:]]*).*/\1redis/' "$config_dir/.env"
-chmod 600 "$config_dir/.env" "$config_dir/.env.before-sidecars"
+php_gid="$(docker run --rm --entrypoint sh "$image" -c 'id -g www-data')"
+sudo chown "$(id -u):$php_gid" "$config_dir/.env"
+chmod 640 "$config_dir/.env"
+chmod 600 "$config_dir/.env.before-sidecars"
 touch "$config_dir/.constant"
 chmod 666 "$config_dir/.constant"
 
@@ -50,6 +55,9 @@ trap cleanup_source EXIT
 rm -rf "$release_dir/public"
 mkdir -p "$release_dir/public"
 docker cp "$source_container:/var/www/crmeb/public/." "$release_dir/public/"
+if [ -s "$config_dir/.constant" ]; then
+    touch "$release_dir/public/install.lock"
+fi
 cleanup_source
 source_container=""
 trap - EXIT

@@ -50,6 +50,7 @@ services:
     volumes:
       - ${CRMEB_CONFIG_DIR:?}/.env:/var/www/crmeb/.env:ro
       - ${CRMEB_CONFIG_DIR:?}/.constant:/var/www/crmeb/.constant
+      - ${CRMEB_PUBLIC_DIR:?}:/var/www/crmeb/public:ro
       - ${CRMEB_DATA_DIR:?}/uploads:/var/www/crmeb/public/uploads
       - ${CRMEB_DATA_DIR:?}/runtime:/var/www/crmeb/runtime
     depends_on:
@@ -75,6 +76,7 @@ services:
     volumes:
       - ${CRMEB_CONFIG_DIR:?}/.env:/var/www/crmeb/.env:ro
       - ${CRMEB_CONFIG_DIR:?}/.constant:/var/www/crmeb/.constant
+      - ${CRMEB_PUBLIC_DIR:?}:/var/www/crmeb/public:ro
       - ${CRMEB_DATA_DIR:?}/uploads:/var/www/crmeb/public/uploads
       - ${CRMEB_DATA_DIR:?}/runtime:/var/www/crmeb/runtime
     depends_on:
@@ -95,6 +97,7 @@ services:
     volumes:
       - ${CRMEB_CONFIG_DIR:?}/.env:/var/www/crmeb/.env:ro
       - ${CRMEB_CONFIG_DIR:?}/.constant:/var/www/crmeb/.constant
+      - ${CRMEB_PUBLIC_DIR:?}:/var/www/crmeb/public:ro
       - ${CRMEB_DATA_DIR:?}/uploads:/var/www/crmeb/public/uploads
       - ${CRMEB_DATA_DIR:?}/runtime:/var/www/crmeb/runtime
     depends_on:
@@ -115,6 +118,7 @@ services:
     volumes:
       - ${CRMEB_CONFIG_DIR:?}/.env:/var/www/crmeb/.env:ro
       - ${CRMEB_CONFIG_DIR:?}/.constant:/var/www/crmeb/.constant
+      - ${CRMEB_PUBLIC_DIR:?}:/var/www/crmeb/public:ro
       - ${CRMEB_DATA_DIR:?}/uploads:/var/www/crmeb/public/uploads
       - ${CRMEB_DATA_DIR:?}/runtime:/var/www/crmeb/runtime
     depends_on:
