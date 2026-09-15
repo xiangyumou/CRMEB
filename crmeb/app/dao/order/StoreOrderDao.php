@@ -409,7 +409,7 @@ class StoreOrderDao extends BaseDao
                 $query->field("FROM_UNIXTIME(add_time,'$timeUnix') as day,count(*) as count,sum(pay_price) as price");
                 $query->group("FROM_UNIXTIME(add_time, '$timeUnix')");
             })
-            ->order('add_time asc')
+            ->order('day asc')
             ->select()->toArray();
     }
 
@@ -515,7 +515,7 @@ class StoreOrderDao extends BaseDao
     {
         return $this->search($where)
             ->field($field)->group("FROM_UNIXTIME(add_time, '%Y-%m-%d')")
-            ->order('add_time DESC')->page($page, $limit)->select()->toArray();
+            ->order('time DESC')->page($page, $limit)->select()->toArray();
     }
 
     /**
@@ -531,7 +531,7 @@ class StoreOrderDao extends BaseDao
             ->where('add_time', '<', $stop)
             ->field('sum(pay_price) as num,FROM_UNIXTIME(add_time, \'%Y-%m-%d\') as time')
             ->group("FROM_UNIXTIME(add_time, '%Y-%m-%d')")
-            ->order('add_time ASC')->select()->toArray();
+            ->order('time ASC')->select()->toArray();
     }
 
     /**
@@ -547,7 +547,7 @@ class StoreOrderDao extends BaseDao
             ->where('add_time', '<', $stop)
             ->field('count(id) as num,FROM_UNIXTIME(add_time, \'%Y-%m-%d\') as time')
             ->group("FROM_UNIXTIME(add_time, '%Y-%m-%d')")
-            ->order('add_time ASC')->select()->toArray();
+            ->order('time ASC')->select()->toArray();
     }
 
     /**
@@ -724,7 +724,7 @@ class StoreOrderDao extends BaseDao
                 $query->field("sum($sumField) as number,FROM_UNIXTIME($group, '$timeUinx') as time");
                 $query->group("FROM_UNIXTIME($group, '$timeUinx')");
             })
-            ->order('pay_time ASC,id DESC')->select()->toArray();
+            ->order('time ASC')->select()->toArray();
     }
 
     /**时间分组订单数统计
@@ -752,7 +752,7 @@ class StoreOrderDao extends BaseDao
                 $query->field("count($sumField) as number,FROM_UNIXTIME(pay_time, '$timeUinx') as time");
                 $query->group("FROM_UNIXTIME(pay_time, '$timeUinx')");
             })
-            ->order('pay_time ASC,id DESC')->select()->toArray();
+            ->order('time ASC')->select()->toArray();
     }
 
     /**时间段支付订单人数
@@ -795,7 +795,7 @@ class StoreOrderDao extends BaseDao
                 $query->field("count(distinct uid) as number,FROM_UNIXTIME(pay_time, '$timeUinx') as time");
                 $query->group("FROM_UNIXTIME(pay_time, '$timeUinx')");
             })
-            ->order('pay_time ASC,id DESC')->select()->toArray();
+            ->order('time ASC')->select()->toArray();
     }
 
 
@@ -931,13 +931,13 @@ class StoreOrderDao extends BaseDao
             })->when($keyword != '', function ($query) use ($keyword) {
                 $query->where('real_name|uid|user_phone', 'like', '%' . $keyword . '%');
             })->where('paid', 1)->field([
-                'real_name',
+                'MAX(real_name) as real_name',
                 'uid',
-                'user_phone',
+                'MAX(user_phone) as user_phone',
                 'SUM(total_num) as goods_num',
                 'COUNT(id) as order_num',
                 'SUM(pay_price) as total_price',
-                'add_time'
+                'MAX(add_time) as add_time'
             ])->group('uid')->order("add_time desc")->when($page && $limit, function ($query) use ($page, $limit) {
                 $query->page($page, $limit);
             })->select()->toArray();
@@ -1113,17 +1113,17 @@ class StoreOrderDao extends BaseDao
             ->where('paid', 1)
             ->where('pid', '>=', 0)
             ->where('refund_status', 0)
-            ->where($field, '>', 0)->group($field)
+            ->where($field, '>', 0)
             ->when(!empty($time), function ($query) use ($time) {
                 $query->whereBetween('add_time', [strtotime($time[0]), strtotime($time[1] . ' 23:59:59')]);
             });
-        $count = $model->count();
+        $count = $model->count('DISTINCT ' . $field);
         $orderStr = $sort == '' ? 'order_sum desc' : $sort . ' ' . $order;
         $list = $model->field([
             $field,
             'COUNT(*) AS order_sum',
             'SUM(pay_price) AS order_sum_price'
-        ])->order($orderStr)->page($page, $limit)->select()->toArray();
+        ])->group($field)->order($orderStr)->page($page, $limit)->select()->toArray();
         return compact('count', 'list');
     }
 }

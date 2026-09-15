@@ -61,7 +61,7 @@ class UserSignDao extends BaseDao
      */
     public function getListGroup(array $where, string $field, int $page, int $limit, string $group)
     {
-        return $this->search($where)->field($field)->order('id desc')->group($group)->page($page, $limit)->select()->toArray();
+        return $this->search($where)->field($field)->order($group . ' desc')->group($group)->page($page, $limit)->select()->toArray();
     }
 
     /**

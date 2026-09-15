@@ -218,7 +218,7 @@ class UserController
     {
         $where['uid'] = (int)$request->uid();
         $where['type'] = 'visit';
-        $result = $services->getList($where, 'product_id', 'id,product_id,max(add_time) as add_time');
+        $result = $services->getList($where, 'product_id', 'MAX(id) as id,product_id,MAX(add_time) as add_time');
         $time_data = [];
         if ($result['list']) {
             foreach ($result['list'] as $key => &$item) {

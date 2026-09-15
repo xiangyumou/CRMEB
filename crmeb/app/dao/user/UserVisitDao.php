@@ -83,6 +83,6 @@ class UserVisitDao extends BaseDao
      */
     public function groupCount(array $where, string $group = 'uid')
     {
-        return $this->search($where)->group($group)->count();
+        return $this->search($where)->count('DISTINCT ' . $group);
     }
 }

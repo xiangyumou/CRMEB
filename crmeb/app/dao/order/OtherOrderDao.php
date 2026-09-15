@@ -39,8 +39,9 @@ class OtherOrderDao extends BaseDao
     {
         return $this->getModel()->when($channel_type != '', function ($query) use ($channel_type) {
             $query->where('channel_type', $channel_type);
-        })->field('distinct(uid),add_time')
-            ->group('uid')->having('add_time < ' . $time)
+        })->where('add_time', '<', $time)
+            ->field('uid,MAX(add_time) as add_time')
+            ->group('uid')
             ->order('add_time desc')
             ->select()->toArray();
     }
@@ -107,7 +108,7 @@ class OtherOrderDao extends BaseDao
                 $query->field("sum($field) as number,FROM_UNIXTIME($group, '$timeUinx') as time");
                 $query->group("FROM_UNIXTIME($group, '$timeUinx')");
             })
-            ->order('add_time ASC')->select()->toArray();
+            ->order('time ASC')->select()->toArray();
     }
 
     /**根据条件获取单条信息

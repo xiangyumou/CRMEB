@@ -131,7 +131,10 @@ class UserBillDao extends BaseDao
      */
     public function getType(array $where, string $filed = 'title,type')
     {
-        return $this->search($where)->distinct(true)->field($filed)->group('type')->select();
+        if ($filed === 'title,type') {
+            $filed = 'MAX(title) as title,type';
+        }
+        return $this->search($where)->field($filed)->group('type')->select();
     }
 
     /**
@@ -195,7 +198,7 @@ class UserBillDao extends BaseDao
      */
     public function getUserBillListByGroup(array $where, string $filed, string $group, int $page, int $limit)
     {
-        return $this->search($where)->field($filed)->where('number', '>', 0)->order('add_time desc')->group($group)->page($page, $limit)->select()->toArray();
+        return $this->search($where)->field($filed)->where('number', '>', 0)->order($group . ' desc')->group($group)->page($page, $limit)->select()->toArray();
     }
 
     /**
@@ -275,7 +278,7 @@ class UserBillDao extends BaseDao
                 $query->field("sum($field) as number,FROM_UNIXTIME($group, '$timeUinx') as time");
                 $query->group("FROM_UNIXTIME($group, '$timeUinx')");
             })
-            ->order('add_time ASC')->select()->toArray();
+            ->order('time ASC')->select()->toArray();
     }
 
     /**

@@ -63,7 +63,7 @@ class StoreOrderWapServices extends BaseServices
     public function getOrderDataPriceCount(array $where = [], int $store_id = 0)
     {
         [$page, $limit] = $this->getPageValue();
-        return $this->dao->getOrderDataPriceCount($where + ['pid' => 0, 'is_del' => 0, 'paid' => 1, 'refund_status' => [0, 3], 'is_system_del' => 0, 'store_id' => $store_id], ['sum(pay_price) as price', 'count(id) as count', 'FROM_UNIXTIME(add_time, \'%m-%d\') as time'], $page, $limit);
+        return $this->dao->getOrderDataPriceCount($where + ['pid' => 0, 'is_del' => 0, 'paid' => 1, 'refund_status' => [0, 3], 'is_system_del' => 0, 'store_id' => $store_id], ['sum(pay_price) as price', 'count(id) as count', 'FROM_UNIXTIME(MIN(add_time), \'%m-%d\') as time'], $page, $limit);
     }
 
     /**

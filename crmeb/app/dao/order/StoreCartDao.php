@@ -74,7 +74,7 @@ class StoreCartDao extends BaseDao
      */
     public function productIdByCartNum(array $ids, int $uid)
     {
-        return $this->search(['product_id' => $ids, 'is_pay' => 0, 'is_del' => 0, 'is_new' => 0, 'uid' => $uid])->group('product_attr_unique')->column('cart_num,product_id', 'product_attr_unique');
+        return $this->search(['product_id' => $ids, 'is_pay' => 0, 'is_del' => 0, 'is_new' => 0, 'uid' => $uid])->group('product_attr_unique')->column('SUM(cart_num) as cart_num,MAX(product_id) as product_id', 'product_attr_unique');
     }
 
     /**

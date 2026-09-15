@@ -176,7 +176,7 @@ class StoreOrderRefundDao extends BaseDao
                 $query->field("sum($sumField) as number,FROM_UNIXTIME($group, '$timeUinx') as time");
                 $query->group("FROM_UNIXTIME($group, '$timeUinx')");
             })
-            ->order('add_time ASC')->select()->toArray();
+            ->order('time ASC')->select()->toArray();
     }
 
     /**

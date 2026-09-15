@@ -99,7 +99,7 @@ class WechatReplyKeyDao extends BaseDao
      */
     public function getReplyKeyList(array $where, int $page, int $limit)
     {
-        return $this->search($where)->page($page, $limit)->group($this->alias . '.id')->field($this->alias . '.*,' . $this->joinAlis . '.keys')->select()->toArray();
+        return $this->search($where)->page($page, $limit)->distinct(true)->field($this->alias . '.*')->select()->toArray();
     }
 
     /**
@@ -110,6 +110,6 @@ class WechatReplyKeyDao extends BaseDao
      */
     public function count(array $where = [], bool $search = true)
     {
-        return $this->search($where, $search)->group($this->alias . '.id')->count();
+        return $this->search($where, $search)->count('DISTINCT ' . $this->alias . '.id');
     }
 }

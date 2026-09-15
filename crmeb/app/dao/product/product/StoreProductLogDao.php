@@ -103,7 +103,6 @@ class StoreProductLogDao extends BaseDao
     {
         return $this->getModel()->where('uid', $uid)
             ->where('type', 'visit')
-            ->group('product_id')
-            ->count();
+            ->count('DISTINCT product_id');
     }
 }

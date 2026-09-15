@@ -60,9 +60,9 @@ class LuckLotteryRecordDao extends BaseDao
      */
     public function getCount(array $where, string $group = '')
     {
-        return $this->getModel()->where($where)->when($group, function ($query) use ($group) {
-            $query->group($group);
-        })->count();
+        return $group
+            ? $this->getModel()->where($where)->count('DISTINCT ' . $group)
+            : $this->getModel()->where($where)->count();
     }
 
     public function getRecordByOrderId($uid, $order_id)

@@ -62,7 +62,14 @@ class UserUserBillDao extends BaseDao
      */
     public function getList(array $where, string $field = '', string $order = '', int $page = 0, int $limit = 0)
     {
-        return $this->getModel()->where($where)->field($field)->group('u.uid')->order($order)->order('id desc')
+        if ($field === '' || $field === '*') {
+            $field = 'u.uid,MAX(b.id) as last_bill_id';
+        } else {
+            $field .= ',MAX(b.id) as last_bill_id';
+        }
+        return $this->getModel()->where($where)->field($field)->group('u.uid')->when($order !== '', function ($query) use ($order) {
+            $query->order($order);
+        })->order('last_bill_id desc')
             ->when($page && $limit, function ($query) use ($page, $limit) {
                 $query->page($page, $limit);
             })->select()->toArray();
@@ -75,6 +82,6 @@ class UserUserBillDao extends BaseDao
      */
     public function getCount(array $where)
     {
-        return $this->getModel()->where($where)->group('u.uid')->count();
+        return $this->getModel()->where($where)->count('DISTINCT u.uid');
     }
 }

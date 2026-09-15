@@ -73,12 +73,16 @@ class ShippingTemplatesFreeCityDao extends BaseDao
      */
     public function getUniqidList(array $where, bool $group = true)
     {
+        $field = $this->alias . '.province_id,MAX(' . $this->joinAlis . '.name) as name';
+        if (!$group) {
+            $field = $this->alias . '.province_id,' . $this->joinAlis . '.name,' . $this->alias . '.city_id';
+        }
         return $this->getModel($group ? 'province_id' : 'city_id')->when(isset($where['uniqid']), function ($query) use ($where) {
             $query->where($this->alias . '.uniqid', $where['uniqid']);
         })->when(isset($where['province_id']), function ($query) use ($where) {
             $query->where($this->alias . '.province_id', $where['province_id']);
         })->when($group, function ($query) {
             $query->group($this->alias . '.province_id');
-        })->field($this->alias . '.province_id,' . $this->joinAlis . '.name,' . $this->alias . '.city_id')->select()->toArray();
+        })->field($field)->select()->toArray();
     }
 }

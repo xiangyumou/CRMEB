@@ -101,7 +101,7 @@ class StoreProductReplyStoreProductDao extends BaseDao
      */
     public function searchWhere(array $where = [])
     {
-        $model = $this->getModel()->where('r.is_del', 0)->withSearch(['time'], ['time' => $where['data'], 'timeKey' => 'r.add_time'])->field('r.*,p.store_name,p.image,r.nickname as account,SUM(r.product_score+r.service_score) as score')->group('id');
+        $model = $this->getModel()->where('r.is_del', 0)->withSearch(['time'], ['time' => $where['data'], 'timeKey' => 'r.add_time'])->field('r.*,p.store_name,p.image,r.nickname as account,(r.product_score+r.service_score) as score');
         if ($where['is_reply'] != '') $model = $model->where('r.is_reply', $where['is_reply']);
         if ($where['product_id']) $model = $model->where('r.product_id', $where['product_id']);
         if ($where['store_name']) $model = $model->where('p.store_name|r.product_id', 'Like', '%' . $where['store_name'] . '%');

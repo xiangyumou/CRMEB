@@ -108,7 +108,9 @@ class UserUserBrokerageDao extends BaseDao
                     }
                     break;
             }
-        })->where($where)->field($field)->group('u.uid')->order($order)->order('id desc')
+        })->where($where)->field($field)->group('u.uid')->when($order !== '', function ($query) use ($order) {
+            $query->order($order);
+        })->order('last_brokerage_id desc')
             ->when($page && $limit, function ($query) use ($page, $limit) {
                 $query->page($page, $limit);
             })->select()->toArray();
@@ -161,7 +163,7 @@ class UserUserBrokerageDao extends BaseDao
                     }
                     break;
             }
-        })->where($where)->group('u.uid')->count();
+        })->where($where)->count('DISTINCT u.uid');
     }
 
     /**
