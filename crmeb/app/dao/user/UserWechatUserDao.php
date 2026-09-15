@@ -70,6 +70,29 @@ class UserWechatUserDao extends BaseDao
         return parent::getModel()->alias($alias)->join($table . ' ' . $join_alias, $alias . '.uid = ' . $join_alias . '.uid', $join);
     }
 
+    /**
+     * 关联每个用户最新一条未注销的微信记录
+     * @param string $alias
+     * @param string $join_alias
+     * @return \crmeb\basic\BaseModel
+     */
+    protected function getLatestWechatModel(string $alias = 'u', string $join_alias = 'w')
+    {
+        $this->alias = $alias;
+        $this->join_alis = $join_alias;
+        /** @var WechatUser $wechatUser */
+        $wechatUser = app()->make($this->joinModel());
+        $table = $wechatUser->getName();
+        $latestWechat = $wechatUser->where('is_del', 0)
+            ->field('uid,MAX(id) AS id')
+            ->group('uid')
+            ->buildSql();
+
+        return parent::getModel()->alias($alias)
+            ->join([$latestWechat => 'latest_w'], $alias . '.uid = latest_w.uid', 'left')
+            ->join($table . ' ' . $join_alias, $join_alias . '.id = latest_w.id', 'left');
+    }
+
     public function getList(array $where, $field = '*', int $page, int $limit)
     {
         return $this->getModel()->where($where)->field($field)->page($page, $limit)->select()->toArray();
@@ -92,7 +115,7 @@ class UserWechatUserDao extends BaseDao
      */
     public function getCountByWhere(array $where): int
     {
-        return $this->searchWhere($where)->group($this->alias . '.uid')->count();
+        return $this->searchWhere($where)->count();
     }
 
     /**
@@ -102,7 +125,7 @@ class UserWechatUserDao extends BaseDao
      */
     public function getListByModel(array $where, string $field = '', string $order = '', int $page, int $limit): array
     {
-        return $this->searchWhere($where)->field($field)->page($page, $limit)->group($this->alias . '.uid')->order(($order ? $order . ' ,' : '') . $this->alias . '.uid desc')->select()->toArray();
+        return $this->searchWhere($where)->field($field)->page($page, $limit)->order(($order ? $order . ' ,' : '') . $this->alias . '.uid desc')->select()->toArray();
     }
 
     /**
@@ -113,7 +136,7 @@ class UserWechatUserDao extends BaseDao
      */
     public function searchWhere($where, ?array $field = [])
     {
-        $model = $this->getModel();
+        $model = $this->getLatestWechatModel();
         $userAlias = $this->alias . '.';
         $wechatUserAlias = $this->join_alis . '.';
         

@@ -244,16 +244,20 @@ export default {
         if (this.ruleForm.imgList.length) {
           if (this.loading) return;
           this.loading = true;
-          for (let i = 0; i < this.ruleForm.imgList.length; i++) {
-            const file = this.ruleForm.imgList[i].raw;
-            await this.uploadItem(file);
-            if (i == this.ruleForm.imgList.length - 1) {
-              this.$message.success('上传成功');
-              this.$emit('uploadSuccess');
-              this.uploadModal = false;
-              this.loading = false;
-              this.initData();
+          try {
+            while (this.ruleForm.imgList.length) {
+              const file = this.ruleForm.imgList[0].raw;
+              await this.uploadItem(file);
+              this.ruleForm.imgList.shift();
             }
+            this.$message.success('上传成功');
+            this.$emit('uploadSuccess');
+            this.uploadModal = false;
+            this.initData();
+          } catch (err) {
+            this.showUploadError(err);
+          } finally {
+            this.loading = false;
           }
         }
       } else if (this.ruleForm.type == 1) {
@@ -273,45 +277,35 @@ export default {
             })
             .catch((err) => {
               this.loading = false;
-              this.$message.error(err.msg);
+              this.showUploadError(err);
             });
         }
       } else if (this.ruleForm.type == 2) {
         let attId = this.ruleForm.imgList.map((e) => {
           return e.att_id;
         });
-        moveApi({ pid: this.ruleForm.region, images: attId }).then((res) => {
-          this.$message.success('上传成功');
-          this.$emit('uploadSuccess');
-          this.uploadModal = false;
-          this.initData();
-        });
+        moveApi({ pid: this.ruleForm.region, images: attId })
+          .then((res) => {
+            this.$message.success('上传成功');
+            this.$emit('uploadSuccess');
+            this.uploadModal = false;
+            this.initData();
+          })
+          .catch((err) => {
+            this.showUploadError(err);
+          });
       }
     },
     uploadItem(file) {
-      return new Promise((resolve, reject) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('pid', this.ruleForm.region);
-        fileUpload(formData)
-          .then((res) => {
-            if (res.status == 200) {
-              resolve();
-              // this.$emit('uploadImgSuccess', res.data);
-            } else {
-              this.loading = false;
-              this.$message({
-                message: '上传失败',
-                type: 'error',
-                duration: 1000,
-              });
-            }
-          })
-          .catch((err) => {
-            this.loading = false;
-            this.$message.error(err.msg);
-          });
-      });
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('pid', this.ruleForm.region);
+      return fileUpload(formData);
+    },
+    showUploadError(error) {
+      if (!error || !error._messageShown) {
+        this.$message.error((error && error.msg) || '上传失败，请稍后重试');
+      }
     },
     beforeUpload(file) {
       console.log(file);

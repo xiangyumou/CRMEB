@@ -18,6 +18,20 @@ const service = axios.create({
   timeout: 100000, // 请求超时时间
 });
 
+const getRequestErrorMessage = (error) => {
+  const response = error && error.response;
+  const data = response && response.data;
+  if (data && data.msg) return data.msg;
+  if (data && data.message) return data.message;
+  if (error && error.msg) return error.msg;
+  if (error && (error.code === 'ECONNABORTED' || (error.message && error.message.indexOf('timeout') !== -1))) {
+    return '请求超时，请稍后重试';
+  }
+  if (!response) return '网络连接失败，请检查网络后重试';
+  if (response.status) return `请求失败（HTTP ${response.status}）`;
+  return '请求失败，请稍后重试';
+};
+
 axios.defaults.withCredentials = true; // 携带cookie
 
 // 请求拦截器
@@ -79,13 +93,19 @@ service.interceptors.response.use(
       case 403:
         router.replace({ name: 'system_opendir_login' }).catch(() => {});
         return Promise.reject({ msg: '没有权限' });
-      default:
-        return Promise.reject(obj || { msg: '未知错误' });
+      default: {
+        const result = obj && typeof obj === 'object' ? obj : {};
+        result.msg = result.msg || '请求失败，请稍后重试';
+        return Promise.reject(result);
+      }
     }
   },
   (error) => {
-    Message.error(error.msg);
-    return Promise.reject(error);
+    const result = error && typeof error === 'object' ? error : {};
+    result.msg = getRequestErrorMessage(error);
+    result._messageShown = true;
+    Message.error(result.msg);
+    return Promise.reject(result);
   },
 );
 
