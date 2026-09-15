@@ -131,7 +131,6 @@
                 <div
                   class="img"
                   :class="item.isSelect ? 'on' : ''"
-                  v-db-click
                   @click.stop="changImage(item, index, $event)"
                 >
                   <img v-lazy="item.satt_dir" />
@@ -585,7 +584,10 @@ export default {
     // 文件列表
     getFileList() {
       this.fileData.pid = this.treeId;
-      this.lastSelectId = null; // 列表刷新后原起点已失效
+      // 列表重载后旧选中项已不在当前视图中，重置选中态，避免「删除图片/图片移动至」作用在看不见的图片上。
+      // 表格视图的勾选由 el-table 的 reserve-selection 跨页保留，这里不介入。
+      if (this.lietStyle === 'list') this.initData();
+      this.lastSelectId = null;
       fileListApi(this.fileData)
         .then(async (res) => {
           res.data.list.forEach((el) => {
@@ -660,7 +662,6 @@ export default {
     pageChange(index) {
       this.fileData.page = index;
       this.getFileList();
-      this.checkPicList = [];
     },
     // 新建分类表单
     getFrom() {
