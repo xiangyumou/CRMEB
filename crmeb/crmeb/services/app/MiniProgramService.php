@@ -591,7 +591,18 @@ class MiniProgramService
                     if (($count = strpos($notify->out_trade_no, '_')) !== false) {
                         $notify->out_trade_no = substr($notify->out_trade_no, $count + 1);
                     }
-                    (new Hook(PayNotifyServices::class, 'wechat'))->listen($notify->attach, $notify->out_trade_no, $notify->transaction_id);
+                    $payment = [
+                        'paid_amount' => bcdiv((string)$notify->total_fee, '100', 2),
+                        'currency' => $notify->fee_type ?? 'CNY',
+                        'merchant_id' => $notify->mch_id ?? null,
+                    ];
+                    (new Hook(PayNotifyServices::class, 'wechat'))->listen(
+                        $notify->attach,
+                        $notify->out_trade_no,
+                        $notify->transaction_id,
+                        PayServices::WEIXIN_PAY,
+                        $payment
+                    );
                 }
                 return false;
             }

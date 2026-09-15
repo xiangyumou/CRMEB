@@ -78,7 +78,7 @@ jobs:
   regression:
     name: Core transaction regression
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -90,12 +90,11 @@ jobs:
 
       - name: Upload regression report
         if: always()
-        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: core-regression-report
           path: tests/regression/artifacts/junit.xml
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
 
   publish:

@@ -31,13 +31,15 @@ class PayNotifyServices
      * @return bool
      * @throws \Psr\SimpleCache\InvalidArgumentException
      */
-    public function wechatProduct(string $order_id = null, string $trade_no = null, string $payType = PayServices::WEIXIN_PAY)
+    public function wechatProduct(string $order_id = null, string $trade_no = null, string $payType = PayServices::WEIXIN_PAY, array $payment = [])
     {
         try {
             /** @var StoreOrderSuccessServices $services */
             $services = app()->make(StoreOrderSuccessServices::class);
             $orderInfo = $services->getOne(['order_id' => $order_id]);
             if (!$orderInfo) return true;
+            if (array_key_exists('paid_amount', $payment)
+                && !$this->paymentMatches((string)$orderInfo->pay_price, $payment)) return false;
             if ($orderInfo->paid) return true;
             $success = $services->paySuccess($orderInfo->toArray(), $payType, ['trade_no' => $trade_no]);
             if (!$success) {
@@ -55,12 +57,19 @@ class PayNotifyServices
      * @param string|null $order_id 订单id
      * @return bool
      */
-    public function wechatUserRecharge(string $order_id = null, string $trade_no = null, string $payType = PayServices::WEIXIN_PAY)
+    public function wechatUserRecharge(string $order_id = null, string $trade_no = null, string $payType = PayServices::WEIXIN_PAY, array $payment = [])
     {
         try {
             /** @var UserRechargeServices $userRecharge */
             $userRecharge = app()->make(UserRechargeServices::class);
-            if ($userRecharge->be(['order_id' => $order_id, 'paid' => 1])) return true;
+            if (array_key_exists('paid_amount', $payment)) {
+                $recharge = $userRecharge->getOne(['order_id' => $order_id]);
+                if (!$recharge) return true;
+                if (!$this->paymentMatches((string)$recharge->price, $payment)) return false;
+                if ($recharge->paid) return true;
+            } elseif ($userRecharge->be(['order_id' => $order_id, 'paid' => 1])) {
+                return true;
+            }
             return $userRecharge->rechargeSuccess($order_id, ['trade_no' => $trade_no, 'pay_type' => $payType]);
         } catch (\Exception $e) {
             return false;
@@ -72,18 +81,33 @@ class PayNotifyServices
      * @param string|null $order_id
      * @return bool
      */
-    public function wechatMember(string $order_id = null, string $trade_no = null, string $payType = PayServices::WEIXIN_PAY)
+    public function wechatMember(string $order_id = null, string $trade_no = null, string $payType = PayServices::WEIXIN_PAY, array $payment = [])
     {
         try {
             /** @var OtherOrderServices $services */
             $services = app()->make(OtherOrderServices::class);
             $orderInfo = $services->getOne(['order_id' => $order_id]);
             if (!$orderInfo) return true;
+            if (array_key_exists('paid_amount', $payment)
+                && !$this->paymentMatches((string)$orderInfo->pay_price, $payment)) return false;
             if ($orderInfo->paid) return true;
             return $services->paySuccess($orderInfo->toArray(), $payType, ['trade_no' => $trade_no]);
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    private function paymentMatches(string $expectedAmount, array $payment): bool
+    {
+        if (!array_key_exists('paid_amount', $payment) || $payment['paid_amount'] === null) {
+            return true;
+        }
+        $amount = (string)$payment['paid_amount'];
+        $currency = strtoupper((string)($payment['currency'] ?? 'CNY'));
+        if ($currency !== 'CNY' || !preg_match('/^\d+(?:\.\d{1,2})?$/', $amount)) {
+            return false;
+        }
+        return bccomp($expectedAmount, $amount, 2) === 0;
     }
 
 }

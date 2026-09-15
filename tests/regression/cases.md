@@ -26,11 +26,11 @@
 
 ## Required follow-up coverage
 
-- [ ] PRICE-003 Ordinary item pricing, coupon thresholds and freight boundaries.
+- [x] PRICE-003 Ordinary item pricing, coupon thresholds and freight boundaries.
 - [ ] ORDER-001 Cart, confirmation, creation, payment, delivery and receipt lifecycle.
-- [ ] BALANCE-005 Competing full order payments with persisted ledger and order assertions.
+- [x] BALANCE-005 Competing full order payments with persisted ledger and order assertions.
 - [ ] GATEWAY-001 Offline WeChat V2/V3 and Alipay signature, tampering and amount checks.
 - [ ] REFUND-002 Full/partial gateway refund, rejection, cancellation, retry and cumulative amount checks.
-- [ ] AUTH-003 Token expiry and cross-user order read/write isolation through HTTP routes.
+- [x] AUTH-003 Token expiry and cross-user order read/write isolation through HTTP routes.
 - [ ] QUEUE-003 Cancellation failure injection and concurrent payment/cancellation behavior.
 - [ ] RACE-001 Concurrent payment, balance, callback, refund and cancellation races.

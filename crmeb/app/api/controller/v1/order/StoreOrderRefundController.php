@@ -58,7 +58,7 @@ class StoreOrderRefundController
      */
     public function refundDetail(Request $request, $uni)
     {
-        $orderData = $this->services->refundDetail($uni);
+        $orderData = $this->services->getUserRefundDetail((string)$uni, (int)$request->uid());
         return app('json')->success($orderData);
     }
 
@@ -114,7 +114,7 @@ class StoreOrderRefundController
             ['refund_explain', ''],
         ]);
         if ($data['id'] == '') return app('json')->fail('参数错误');
-        $res = $this->services->editRefundExpress($data);
+        $res = $this->services->editUserRefundExpress($data, (int)$request->uid());
         if ($res)
             return app('json')->success('提交成功');
         else

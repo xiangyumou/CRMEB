@@ -937,6 +937,21 @@ class StoreOrderRefundServices extends BaseServices
     }
 
     /**
+     * Write return shipment details for a refund owned by the current user.
+     */
+    public function editUserRefundExpress(array $data, int $uid): bool
+    {
+        if (empty($data['id'])) {
+            throw new ApiException('参数错误');
+        }
+        $order = $this->dao->get(['id' => $data['id'], 'uid' => $uid]);
+        if (!$order) {
+            throw new ApiException('订单不存在');
+        }
+        return $this->editRefundExpress($data);
+    }
+
+    /**
      * 订单申请退款
      * @param int $id
      * @param int $uid
@@ -1328,6 +1343,20 @@ class StoreOrderRefundServices extends BaseServices
         }
         $orderData['pay_postage'] = $pay_postage;
         return $orderData;
+    }
+
+    /**
+     * Return refund details only when the refund belongs to the current user.
+     */
+    public function getUserRefundDetail(string $uni, int $uid): array
+    {
+        if (!strlen(trim($uni))) {
+            throw new ApiException('参数错误');
+        }
+        if (!$this->dao->get(['order_id' => $uni, 'uid' => $uid], ['id'])) {
+            throw new ApiException('订单不存在');
+        }
+        return $this->refundDetail($uni);
     }
 
     /**

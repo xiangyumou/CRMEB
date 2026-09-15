@@ -11,3 +11,11 @@
 ## BALANCE-003: concurrent balance changes could overwrite each other
 
 `BaseDao::bc()` previously read a balance, calculated it in PHP, and saved the absolute value. Concurrent payments or refunds could overwrite one another. It now uses one SQL increment or a conditional decrement (`balance >= amount`). Negative changes are rejected, and the affected-row result reports insufficient funds or a missing record.
+
+## AUTH-003: refund ownership was not enforced
+
+The API refund detail and return-shipment endpoints accepted a refund identifier without constraining it to the authenticated user. User-facing service methods now verify both the refund identifier and `uid`; administration methods retain their existing unrestricted signatures. Real HTTP tests assert the standard `订单不存在` response and no database changes.
+
+## GATEWAY-001: signed callbacks discarded payment amount
+
+The WeChat V2, WeChat V3, mini-program, and Alipay adapters previously forwarded only order and trade numbers after transport-level signature verification. They now forward normalized `paid_amount`, `currency`, and `merchant_id`; product and member callbacks reject amount or currency mismatches before payment effects run. Full offline cryptographic fixture coverage remains open in `cases.md`.

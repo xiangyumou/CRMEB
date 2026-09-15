@@ -233,7 +233,10 @@ class V3WechatPay extends BasePay implements PayInterface
                 $data = [
                     'attach' => $notify->attach,
                     'out_trade_no' => $notify->out_trade_no,
-                    'transaction_id' => $notify->transaction_id
+                    'transaction_id' => $notify->transaction_id,
+                    'paid_amount' => bcdiv((string)$notify->amount->payer_total, '100', 2),
+                    'currency' => $notify->amount->payer_currency ?? $notify->amount->currency ?? 'CNY',
+                    'merchant_id' => $notify->mchid ?? null,
                 ];
 
                 return Event::until('NotifyListener', [$data, PayServices::WEIXIN_PAY]);

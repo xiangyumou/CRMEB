@@ -5,33 +5,38 @@ namespace Tests\Regression\Cases;
 
 use app\dao\product\product\StoreProductDao;
 use app\dao\product\sku\StoreProductAttrValueDao;
+use Tests\Regression\Support\FixtureFactory;
 use Tests\Regression\Support\RegressionTestCase;
 use think\facade\Db;
 
 final class InventoryTest extends RegressionTestCase
 {
-    private const PRODUCT_ID = 1;
+    /** @var array */
+    private $fixture;
 
     protected function setUp(): void
     {
         parent::setUp();
-        Db::name('store_product')->where('id', self::PRODUCT_ID)->update(['stock' => 1, 'sales' => 0]);
+        $this->fixture = (new FixtureFactory($this, $this->getName()))->createProduct(
+            ['stock' => 1, 'sales' => 0],
+            ['stock' => 3, 'quota' => 1, 'sales' => 0, 'type' => 1]
+        );
     }
 
     public function testRejectsNonPositiveAndInsufficientDeductions(): void
     {
         $dao = new StoreProductDao();
 
-        self::assertFalse($dao->decStockIncSales(['id' => self::PRODUCT_ID], 0));
-        self::assertFalse($dao->decStockIncSales(['id' => self::PRODUCT_ID], -1));
-        self::assertSame(0, $dao->decStockIncSales(['id' => self::PRODUCT_ID], 2));
+        self::assertFalse($dao->decStockIncSales(['id' => $this->fixture['id']], 0));
+        self::assertFalse($dao->decStockIncSales(['id' => $this->fixture['id']], -1));
+        self::assertSame(0, $dao->decStockIncSales(['id' => $this->fixture['id']], 2));
         self::assertSame(['stock' => 1, 'sales' => 0], $this->inventory());
     }
 
     public function testLastItemCanOnlyBeDeductedOnce(): void
     {
         for ($round = 0; $round < 20; $round++) {
-            Db::name('store_product')->where('id', self::PRODUCT_ID)->update(['stock' => 1, 'sales' => 0]);
+            Db::name('store_product')->where('id', $this->fixture['id'])->update(['stock' => 1, 'sales' => 0]);
             $this->assertOneOfTwoConcurrentDeductionsSucceeds();
         }
     }
@@ -47,7 +52,7 @@ final class InventoryTest extends RegressionTestCase
             $command = sprintf(
                 'php %s %d %s %s',
                 escapeshellarg(dirname(__DIR__) . '/Support/inventory-worker.php'),
-                self::PRODUCT_ID,
+                $this->fixture['id'],
                 escapeshellarg($start),
                 escapeshellarg($output)
             );
@@ -73,18 +78,17 @@ final class InventoryTest extends RegressionTestCase
 
     public function testActivityStockRequiresEnoughStockAndQuotaAtomically(): void
     {
-        Db::name('store_product_attr_value')->where('id', 12)->update(['stock' => 3, 'quota' => 1, 'sales' => 0]);
         $dao = new StoreProductAttrValueDao();
 
-        self::assertSame(0, $dao->decStockIncSales(['id' => 12, 'type' => 1], 2));
-        self::assertSame(1, $dao->decStockIncSales(['id' => 12, 'type' => 1], 1));
-        $row = Db::name('store_product_attr_value')->where('id', 12)->field('stock,quota,sales')->find();
+        self::assertSame(0, $dao->decStockIncSales(['id' => $this->fixture['sku_id'], 'type' => 1], 2));
+        self::assertSame(1, $dao->decStockIncSales(['id' => $this->fixture['sku_id'], 'type' => 1], 1));
+        $row = Db::name('store_product_attr_value')->where('id', $this->fixture['sku_id'])->field('stock,quota,sales')->find();
         self::assertSame(['stock' => 2, 'quota' => 0, 'sales' => 1], array_map('intval', $row));
     }
 
     private function inventory(): array
     {
-        $row = Db::name('store_product')->where('id', self::PRODUCT_ID)->field('stock,sales')->find();
+        $row = Db::name('store_product')->where('id', $this->fixture['id'])->field('stock,sales')->find();
         return ['stock' => (int) $row['stock'], 'sales' => (int) $row['sales']];
     }
 }

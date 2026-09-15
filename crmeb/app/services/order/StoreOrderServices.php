@@ -2511,7 +2511,7 @@ HTML;
     public function getUserOrderByKey(StoreOrderEconomizeServices $services, string $uni, int $uid): array
     {
         $order = $this->getUserOrderDetail($uni, $uid, ['split', 'invoice', 'user']);
-        if (!$order) throw new ApiException('商品不存在');
+        if (!$order) throw new ApiException('订单不存在');
         $order = $order->toArray();
         $splitNum = [];
         //是否开启门店自提

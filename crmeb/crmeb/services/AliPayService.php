@@ -236,7 +236,10 @@ class AliPayService
                 $data = [
                     'attach' => $notify->attach,
                     'out_trade_no' => $notify->out_trade_no,
-                    'transaction_id' => $notify->trade_no
+                    'transaction_id' => $notify->trade_no,
+                    'paid_amount' => $notify->total_amount,
+                    'currency' => 'CNY',
+                    'merchant_id' => $notify->app_id,
                 ];
 
                 return Event::until('NotifyListener', [$data, PayServices::ALIAPY_PAY]);
@@ -263,6 +266,8 @@ class AliPayService
         $postOrder['trade_no'] = $paramInfo['trade_no'] ?? '';
         //交易状态
         $postOrder['trade_status'] = $paramInfo['trade_status'] ?? '';
+        $postOrder['total_amount'] = $paramInfo['total_amount'] ?? '';
+        $postOrder['app_id'] = $paramInfo['app_id'] ?? '';
         //备注
         $postOrder['attach'] = isset($paramInfo['passback_params']) ? urldecode($paramInfo['passback_params']) : '';
         if (in_array($paramInfo['trade_status'], ['TRADE_SUCCESS', 'TRADE_FINISHED']) && $this->verifyNotify($paramInfo)) {

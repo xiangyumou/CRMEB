@@ -619,7 +619,10 @@ class WechatService
                 $data = [
                     'attach' => $notify->attach,
                     'out_trade_no' => $notify->out_trade_no,
-                    'transaction_id' => $notify->transaction_id
+                    'transaction_id' => $notify->transaction_id,
+                    'paid_amount' => bcdiv((string)$notify->total_fee, '100', 2),
+                    'currency' => $notify->fee_type ?? 'CNY',
+                    'merchant_id' => $notify->mch_id ?? null,
                 ];
 
                 return Event::until('NotifyListener', [$data, PayServices::WEIXIN_PAY]);

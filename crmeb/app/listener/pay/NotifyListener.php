@@ -46,7 +46,21 @@ class NotifyListener
                 if (($count = strpos($notify['out_trade_no'], '_')) !== false) {
                     $notify['out_trade_no'] = substr($notify['out_trade_no'], $count + 1);
                 }
-                return (new Hook(PayNotifyServices::class, 'wechat'))->listen($notify['attach'], $notify['out_trade_no'], $notify['transaction_id'], $payType);
+                $payment = [
+                    'paid_amount' => $notify['paid_amount'] ?? null,
+                    'currency' => $notify['currency'] ?? null,
+                    'merchant_id' => $notify['merchant_id'] ?? null,
+                ];
+                if (!$this->merchantMatches($payment['merchant_id'], $payType)) {
+                    return false;
+                }
+                return (new Hook(PayNotifyServices::class, 'wechat'))->listen(
+                    $notify['attach'],
+                    $notify['out_trade_no'],
+                    $notify['transaction_id'],
+                    $payType,
+                    $payment
+                );
             }
 
             if ($notify['attach'] === 'wechat' && isset($notify['out_trade_no'])) {
@@ -56,6 +70,27 @@ class NotifyListener
             }
         }
 
+        return false;
+    }
+
+    private function merchantMatches($merchantId, string $payType): bool
+    {
+        if ($merchantId === null || $merchantId === '') {
+            return true;
+        }
+        if ($payType === 'alipay') {
+            return hash_equals((string)sys_config('ali_pay_appid'), (string)$merchantId);
+        }
+        $configured = array_filter([
+            (string)sys_config('pay_weixin_mchid'),
+            (string)sys_config('pay_sub_merchant_id'),
+            (string)sys_config('pay_new_weixin_mchid'),
+        ]);
+        foreach ($configured as $expected) {
+            if (hash_equals($expected, (string)$merchantId)) {
+                return true;
+            }
+        }
         return false;
     }
 }
