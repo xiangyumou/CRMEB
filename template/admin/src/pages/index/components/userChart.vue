@@ -39,6 +39,7 @@
 
 <script>
 import { userApi, rankApi } from '@/api/index';
+import { showApiError } from '@/libs/request';
 import echartsFrom from '@/components/echarts/index';
 export default {
   name: 'user-chart',
@@ -82,7 +83,7 @@ export default {
           this.bing_xdata = res.bing_xdata;
         })
         .catch((res) => {
-          this.$message.error(res.msg);
+          showApiError(res, '用户统计加载失败，请稍后重试');
         });
     },
     getRank() {
@@ -92,7 +93,7 @@ export default {
           this.lists = data.list;
         })
         .catch((res) => {
-          this.$message.error(res.msg);
+          showApiError(res, '交易额排行加载失败，请稍后重试');
         });
     },
     // 监听页面宽度变化，刷新表格

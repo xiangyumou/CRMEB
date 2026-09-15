@@ -19,9 +19,10 @@ const resolve = (dir) => {
 // 项目部署基础
 module.exports = {
   // 打包路径
-  outputDir: 'dist',
+  // outputDir: 'dist',
   // 打包路径--线上部署文件地址
-  // outputDir: '../../crmeb/public/admin',
+  // nginx 直接从 crmeb/public/admin 提供后台 SPA，只改 src 不重新构建的话线上不会生效
+  outputDir: '../../crmeb/public/admin',
   runtimeCompiler: true,
   productionSourceMap: false, //关闭生产环境下的SourceMap映射文件
   // 如果你不需要使用eslint，把lintOnSave设为false即可
@@ -35,8 +36,9 @@ module.exports = {
         uglifyOptions: {
           compress: {
             drop_debugger: true,
-            drop_console: true, //生产环境自动删除console
-            pure_funcs: ['console.log'], //移除console
+            // 保留 console.error/warn：接口返回异常时靠它打印原始响应体，删掉就无从排查线上报错
+            drop_console: false,
+            pure_funcs: ['console.log', 'console.info', 'console.debug'], //移除调试日志
           },
         },
         sourceMap: false,

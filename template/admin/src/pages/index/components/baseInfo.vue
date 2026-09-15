@@ -35,6 +35,7 @@
 </template>
 <script>
 import { headerApi } from '@/api/index';
+import { showApiError } from '@/libs/request';
 export default {
   data() {
     return {
@@ -62,7 +63,7 @@ export default {
           this.infoList = data.info;
         })
         .catch((res) => {
-          this.$message.error(res.msg);
+          showApiError(res, '首页统计数据加载失败，请稍后重试');
         });
     },
   },
