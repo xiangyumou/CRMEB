@@ -132,7 +132,7 @@
                   class="img"
                   :class="item.isSelect ? 'on' : ''"
                   v-db-click
-                  @click.stop="changImage(item, index, pictrueList)"
+                  @click.stop="changImage(item, index, $event)"
                 >
                   <img v-lazy="item.satt_dir" />
                 </div>
@@ -311,6 +311,7 @@ export default {
       isShowPic: false,
       header: {},
       ids: [], // 选中附件的id集合
+      lastSelectId: null, // Shift 区间选择的起点附件id
       lietStyle: 'list',
       imageUrl: '',
       loading: false,
@@ -488,6 +489,7 @@ export default {
       this.checkPicList = [];
       this.ids = [];
       this.multipleSelection = [];
+      this.lastSelectId = null;
     },
     // 鼠标移入 移出
     onMouseOver(root, node, data) {
@@ -583,6 +585,7 @@ export default {
     // 文件列表
     getFileList() {
       this.fileData.pid = this.treeId;
+      this.lastSelectId = null; // 列表刷新后原起点已失效
       fileListApi(this.fileData)
         .then(async (res) => {
           res.data.list.forEach((el) => {
@@ -698,36 +701,56 @@ export default {
     cancel() {
       this.$emit('changeCancel');
     },
-    // 选中图片
-    changImage(item, index, row) {
-      let activeIndex = 0;
-      if (!item.isSelect) {
-        item.isSelect = true;
-        this.checkPicList.push(item);
-      } else {
-        item.isSelect = false;
-        this.checkPicList.map((el, index) => {
-          if (el.att_id == item.att_id) {
-            activeIndex = index;
-          }
-        });
-        this.checkPicList.splice(activeIndex, 1);
+    // 选中图片，按住 Shift 点击时按区间多选
+    changImage(item, index, event) {
+      if (event && event.shiftKey) {
+        this.shiftSelect(index);
+        return;
       }
-
-      this.ids = [];
-      this.checkPicList.map((item, i) => {
-        this.ids.push(item.att_id);
-      });
-      this.pictrueList.map((el, i) => {
-        if (el.isSelect) {
-          this.checkPicList.filter((el2, j) => {
-            if (el.att_id == el2.att_id) {
-              el.num = j + 1;
-            }
-          });
-        } else {
-          el.num = 0;
+      if (item.isSelect) {
+        const activeIndex = this.checkPicList.findIndex((el) => el.att_id == item.att_id);
+        if (activeIndex > -1) this.checkPicList.splice(activeIndex, 1);
+        this.lastSelectId = null; // 取消选中后不再作为区间起点
+      } else {
+        this.checkPicList.push(item);
+        this.lastSelectId = item.att_id;
+      }
+      this.syncSelectNum();
+    },
+    // Shift 区间选择：从上次点击的图片沿列表顺序走到本次点击的图片，途中未编号的依次编号
+    shiftSelect(index) {
+      const anchorIndex = this.pictrueList.findIndex((el) => el.att_id == this.lastSelectId);
+      if (anchorIndex === -1) {
+        // 没有起点，等同普通点击，只选中当前这张
+        const target = this.pictrueList[index];
+        if (target && !target.isSelect) {
+          target.isSelect = true;
+          this.checkPicList.push(target);
+          this.lastSelectId = target.att_id;
         }
+        this.syncSelectNum();
+        return;
+      }
+      const step = index >= anchorIndex ? 1 : -1; // 行走方向：从起点走向点击项
+      for (let i = anchorIndex; i !== index + step; i += step) {
+        const el = this.pictrueList[i];
+        if (el && !el.isSelect) {
+          el.isSelect = true;
+          this.checkPicList.push(el); // 按行走顺序追加，编号沿行走方向递增
+        }
+      }
+      if (this.pictrueList[index]) {
+        this.lastSelectId = this.pictrueList[index].att_id;
+      }
+      this.syncSelectNum();
+    },
+    // 同步选中状态与编号，编号即图片在选中集合中的位置
+    syncSelectNum() {
+      this.ids = this.checkPicList.map((el) => el.att_id);
+      const order = new Map(this.checkPicList.map((el, i) => [el.att_id, i + 1]));
+      this.pictrueList.forEach((el) => {
+        el.num = order.get(el.att_id) || 0;
+        el.isSelect = order.has(el.att_id);
       });
     },
     // 点击使用选中图片
