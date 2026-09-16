@@ -66,6 +66,10 @@ CRMEB高品质开源商城系统（PHP版）
 
 ---
 
+### 当前维护版本
+
+本项目保留 H5、微信小程序、管理后台、微信支付、优惠券、拼团、预售和仅发券的新人礼包。架构与检查见 [维护文档](docs/maintenance/architecture.md)、[检查入口](scripts/check-maintenance.sh)、[配套构建说明](docs/maintenance/build-release.md)。仓库内 `crmeb/public` 为旧发布文件，上线前必须重新构建配套前端。
+
 ### 📝 **项目介绍**
 
 **开源自由**

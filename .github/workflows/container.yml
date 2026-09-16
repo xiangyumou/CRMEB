@@ -98,12 +98,38 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  frontend:
+    name: Frontend source and admin build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+          cache: npm
+          cache-dependency-path: template/admin/package-lock.json
+      - name: Install admin dependencies
+        run: npm ci --prefix template/admin --no-audit --no-fund
+      - name: Lint maintained editor files without rewriting
+        run: npm run lint:check --prefix template/admin -- src/utils/diyRegistry.js src/pages/setting/devise/diyIndex.vue
+      - name: Validate H5 and MP-WEIXIN source
+        run: node tests/static/core-store-front.cjs
+      - name: Validate release manifest checker
+        run: node tests/static/verify-release-test.cjs
+      - name: Validate WeChat payment adapters
+        run: node tests/static/wechat-payment-test.mjs
+      - name: Build admin outside public
+        run: NODE_OPTIONS=--openssl-legacy-provider npm run build --prefix template/admin -- --dest /tmp/crmeb-admin-ci
+
   publish:
     name: Publish multi-architecture image
     if: github.event_name == 'push'
     needs:
       - validate
       - regression
+      - frontend
     runs-on: ubuntu-22.04
     permissions:
       contents: read

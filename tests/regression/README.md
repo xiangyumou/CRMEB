@@ -8,6 +8,6 @@ sh docker/run-regression.sh
 
 The command creates disposable containers and volumes. It never uses the production environment or data directories. JUnit output is written to `tests/regression/artifacts/junit.xml`.
 
-The gate covers payment and recharge idempotency, payment amount validation, balance payment, refund crediting, pricing boundaries, authentication headers, real-HTTP cross-user isolation, unpaid cancellation, and atomic inventory deductions. The Docker network is internal, so gateway, SMS, logistics, and WeChat services cannot reach the public internet during a run.
+The gate includes historic balance/recharge tests for shared financial and database behavior. These tests do not reopen retired storefront routes or allow balance payment; CoreStoreBoundaryTest checks that those requests are rejected. The Docker network is internal, so gateway, SMS, logistics, and WeChat services cannot reach the public internet during a run.
 
 A checked item in `cases.md` must have executable assertions for the response, persisted effects, and a no-side-effect failure or repeat path. HTTP tests use production routing, middleware, JWT creation, PHP-FPM, MySQL, Redis, and Nginx. Payment transports remain offline.

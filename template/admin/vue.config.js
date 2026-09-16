@@ -19,10 +19,8 @@ const resolve = (dir) => {
 // 项目部署基础
 module.exports = {
   // 打包路径
-  // outputDir: 'dist',
-  // 打包路径--线上部署文件地址
-  // nginx 直接从 crmeb/public/admin 提供后台 SPA，只改 src 不重新构建的话线上不会生效
-  outputDir: '../../crmeb/public/admin',
+  // Keep build output separate from checked-in and production public files.
+  outputDir: 'dist',
   runtimeCompiler: true,
   productionSourceMap: false, //关闭生产环境下的SourceMap映射文件
   // 如果你不需要使用eslint，把lintOnSave设为false即可

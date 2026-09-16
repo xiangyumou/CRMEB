@@ -21,10 +21,7 @@
 					<view class="iconfont" :class="item.icon"></view>
 					<view class="text">
 						<view class="name">{{$t(item.name)}}</view>
-						<view class="info" v-if="item.value == 'yue'">
-							{{$t(item.title)}} <span class="money">{{$t(`￥`)}}{{ item.number }}</span>
-						</view>
-						<view class="info" v-else>{{$t(item.title)}}</view>
+						<view class="info">{{$t(item.title)}}</view>
 					</view>
 				</view>
 				<view class="iconfont" :class="active==index?'icon-xuanzhong11 font-num':'icon-weixuan'"></view>
@@ -42,6 +39,7 @@
 <script>
 	import countDown from '@/components/countDown';
 	import numberScroll from '@/components/numberScroll.vue'
+	import { requestMiniProgramPayment, requestWechatBrowserPayment, redirectExternalBrowserPayment } from '@/utils/wechatPayment.js';
 	import {
 		getCashierOrder,
 		orderPay
@@ -64,33 +62,6 @@
 						"icon": "icon-weixin2",
 						value: 'weixin',
 						title: this.$t(`使用微信快捷支付`),
-						payStatus: 1,
-					},
-					{
-						"name": this.$t(`支付宝支付`),
-						"icon": "icon-zhifubao",
-						value: 'alipay',
-						title: this.$t(`使用支付宝支付`),
-						payStatus: 1,
-					},
-					{
-						"name": this.$t(`余额支付`),
-						"icon": "icon-yuezhifu",
-						value: 'yue',
-						title: this.$t(`可用余额`),
-						payStatus: 1,
-					},
-					{
-						"name": this.$t(`线下支付`),
-						"icon": "icon-yuezhifu1",
-						value: 'offline',
-						title: this.$t(`使用线下付款`),
-						payStatus: 2,
-					}, {
-						"name": this.$t(`好友代付`),
-						"icon": "icon-haoyoudaizhifu",
-						value: 'friend',
-						title: this.$t(`找微信好友支付`),
 						payStatus: 1,
 					}
 				],
@@ -123,8 +94,8 @@
 						}
 					});
 					this.$nextTick(e => {
-						this.active = newPayList[0].index;
-						this.paytype = newPayList[0].value;
+						this.active = newPayList.length ? newPayList[0].index : -1;
+						this.paytype = newPayList.length ? newPayList[0].value : 'weixin';
 					})
 
 				},
@@ -138,6 +109,7 @@
 			this.getBasicConfig()
 		},
 		onShow() {
+			// #ifdef MP-WEIXIN
 			let options = wx.getEnterOptionsSync();
 			if (options.scene == '1038' && options.referrerInfo.appId == 'wxef277996acc166c3' && this.initIn) {
 				// 代表从收银台小程序返回
@@ -178,26 +150,13 @@
 					}
 				}
 			}
+			// #endif
 		},
 		methods: {
 			getBasicConfig() {
 				basicConfig().then(res => {
 					//微信支付是否开启
 					this.cartArr[0].payStatus = res.data.pay_weixin_open || 0
-					//支付宝是否开启
-					this.cartArr[1].payStatus = res.data.ali_pay_status || 0;
-					//#ifdef MP
-					this.cartArr[1].payStatus = 0;
-					//#endif
-					//余额支付是否开启
-					this.cartArr[2].payStatus = res.data.yue_pay_status
-					if (res.data.offline_pay_status) {
-						this.cartArr[3].payStatus = 1
-					} else {
-						this.cartArr[3].payStatus = 0
-					}
-					//好友代付是否开启
-					this.cartArr[4].payStatus = res.data.friend_pay_status || 0;
 					this.getCashierOrder()
 				}).catch(err => {
 					uni.hideLoading();
@@ -215,8 +174,6 @@
 					this.payPostage = res.data.pay_postage
 					this.offlinePostage = res.data.offline_postage
 					this.invalidTime = res.data.invalid_time
-					this.cartArr[2].number = res.data.now_money;
-					this.number = Number(res.data.now_money) || 0;
 					this.oid = res.data.oid
 					this.is_gift = res.data.is_gift
 					uni.hideLoading();
@@ -265,6 +222,7 @@
 			},
 			goPay(number, paytype) {
 				let that = this;
+				if (paytype !== 'weixin') return that.$util.Tips({ title: that.$t(`当前商城仅支持微信支付`) });
 				if (!that.orderId) return that.$util.Tips({
 					title: that.$t(`请选择要支付的订单`)
 				});
@@ -382,18 +340,7 @@
 							that.toPay = true;
 							// #ifdef MP
 							/* that.toPay = true; */
-							let mp_pay_name = ''
-							if (uni.requestOrderPayment) {
-								mp_pay_name = 'requestOrderPayment'
-							} else {
-								mp_pay_name = 'requestPayment'
-							}
-							uni[mp_pay_name]({
-								timeStamp: jsConfig.timestamp,
-								nonceStr: jsConfig.nonceStr,
-								package: jsConfig.package,
-								signType: jsConfig.signType,
-								paySign: jsConfig.paySign,
+							requestMiniProgramPayment(jsConfig, {
 								success: function(res) {
 									uni.hideLoading();
 									if (that.BargainId || that.combinationId || that.pinkId ||
@@ -438,7 +385,7 @@
 							})
 							// #endif
 							// #ifdef H5
-							this.$wechat.pay(res.data.result.jsConfig).then(res => {
+							requestWechatBrowserPayment(this.$wechat, res.data.result.jsConfig).then(res => {
 								return that.$util.Tips({
 									title: that.$t(`支付成功`),
 									icon: 'success'
@@ -482,9 +429,7 @@
 								tab: 4,
 								url: goPages + '&status=0'
 							});
-							setTimeout(() => {
-								location.href = res.data.result.jsConfig.h5_url;
-							}, 1500);
+							redirectExternalBrowserPayment(res.data.result.jsConfig.h5_url);
 							break;
 
 						case 'ALIPAY_PAY':

@@ -58,14 +58,14 @@ NODE_OPTIONS=--openssl-legacy-provider npm run build --prefix template/admin -- 
 
 **发布前尚需验证：**HBuilderX 分别构建 H5/微信小程序并在真实客户端检查装修、下单和客服二维码；使用测试商户验证微信内/外 H5、小程序支付及原路退款；对拼团失败退款、预售完整履约执行端到端验收。静态双端语法检查不等同于客户端构建或真机验收。
 
-仓库内 `crmeb/public` 现有发布产物保持原样，不能直接把它们与新后端配对上线。发布时须构建并更新后台与 H5 文件、发布配套小程序版本；生产配置挂载独立 public 目录，替换镜像并不会自动更新这些文件。本次没有部署、提交或推送。
+仓库内 `crmeb/public` 现有发布产物保持原样，不能直接把它们与新后端配对上线。发布时须构建并更新后台与 H5 文件、发布配套小程序版本；生产配置挂载独立 public 目录，替换镜像并不会自动更新这些文件。精简版本已提交并推送，尚未部署。
 
 ## 清单与保守保留项
 
 - `core-store-baseline.json`：修改前提交及物理行数/文件体积口径；源码分类仍包含内嵌第三方代码，不能等同纯业务逻辑行数。
 - `core-store-files.json`：实际修改、删除、新增文件清单。
 - `core-store-removed-routes.json`：主要退出路由清单，路径可能相对于所属路由组。
-- `core-store-removed-pages.json`：首批用户页面与后台路由目标清单；完整文件变更以 files 清单为准。
+- `core-store-removed-pages.json`：首批用户页面与后台路由目标清单；运行时清理清单位于 `crmeb/config/core_store_removed_pages.json`；完整文件变更以 files 清单为准。
 - `core-store-shared-retained.json`：仍有共享调用或回归测试引用的旧 PHP 类及引用证据。未用强行删除的方式破坏公共商品、订单、统计和退款流程。
 - `core-store-result.json`：最终同口径源码统计。
 

@@ -243,6 +243,7 @@ import { fileUpload } from '@/api/setting';
 import vuedraggable from 'vuedraggable';
 import mPage from '@/components/mobilePage/index.js';
 import mConfig from '@/components/mobileConfig/index.js';
+import { supportsDiyComponent } from '@/utils/diyRegistry.js';
 import home_bottom_menu from '@/components/mobilePage/home_bottom_menu.vue';
 
 import footPage from '@/components/pagesFoot';
@@ -349,6 +350,9 @@ export default {
     this.pageName = this.$route.query.name;
     this.pageType = this.$route.query.type;
     this.lConfig = this.objToArr(mPage);
+    this.lConfig = this.lConfig.filter(
+      (component) => !component.defaultName || supportsDiyComponent(component.defaultName),
+    );
     let imgList = {
       imgList: [require('@/assets/images/foot-005.png'), require('@/assets/images/foot-006.png')],
       name: '购物车',

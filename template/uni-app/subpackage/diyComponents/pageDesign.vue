@@ -236,6 +236,7 @@
 
 <script>
 import newVip from "./newVip.vue";
+import { supportsDiyComponent } from "@/utils/diyRegistry.js";
 import pageFooter from "@/components/pageFooter/index.vue";
 import { HTTP_REQUEST_URL } from "@/config/app";
 import colors from "@/mixins/color";
@@ -551,7 +552,7 @@ export default {
             this.showCateNav = true;
             this.cateNavData = item;
           }
-          if (!item.isHide) {
+          if (!item.isHide && supportsDiyComponent(item.name)) {
             temp.push(item);
           }
         });

@@ -5,7 +5,7 @@
 </template>
 
 <script>
-	import uCharts from './u-charts.js';
+	import uCharts from './ucharts.js';
 	var canvases = {};
 	
 	export default {

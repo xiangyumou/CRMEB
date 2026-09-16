@@ -15,7 +15,7 @@ if (!in_array($mode, ['plan', 'apply', 'rollback'], true) || ($mode !== 'plan' &
 if ($backup && ($backup[0] !== '/' || strpos(realpath(dirname($backup)) . '/', realpath(public_path()) . '/') === 0)) {
     fwrite(STDERR, "Backup must be an absolute path outside public/.\n"); exit(1);
 }
-$removedPages = json_decode(file_get_contents(__DIR__ . '/removed-pages.json'), true);
+$removedPages = json_decode(file_get_contents(dirname(__DIR__, 2) . '/config/core_store_removed_pages.json'), true);
 function protectedFingerprint() {
     $out = [];
     foreach (['store_product','store_product_attr','store_product_attr_value','store_product_attr_result','store_product_description','store_category','system_attachment'] as $table) {
