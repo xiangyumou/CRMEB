@@ -12,7 +12,7 @@ import request from "@/utils/request.js";
 
 /**
  * 获取用户信息
- * 
+ *
  */
 export function getUserInfo() {
 	return request.get('user');
@@ -21,7 +21,7 @@ export function getUserInfo() {
 
 /**
  * 设置用户分享
- * 
+ *
  */
 export function userShare() {
 	return request.post('user/share');
@@ -105,7 +105,7 @@ export function postSignUser(sign) {
 
 /**
  * 获取签到配置
- * 
+ *
  */
 export function getSignConfig() {
 	return request.get('sign/config')
@@ -129,7 +129,7 @@ export function setSignIntegral() {
 /**
  * 签到列表(年月)
  * @param object data
- * 
+ *
  */
 export function getSignMonthList(data) {
 	return request.get('sign/month', data)
@@ -137,7 +137,7 @@ export function getSignMonthList(data) {
 
 /**
  * 活动状态
- * 
+ *
  */
 export function userActivity() {
 	return request.get('user/activity');
@@ -159,10 +159,10 @@ export function getIntegralList(q) {
 
 /**
  * 获取分销海报图片
- * 
+ *
  */
 export function spreadBanner() {
-	//#ifdef H5 || APP-PLUS
+	//#ifdef H5
 	return request.get('spread/banner', {
 		type: 2
 	});
@@ -185,7 +185,7 @@ export function spreadPeople(data) {
 }
 
 /**
- * 
+ *
  * 推广佣金/提现总和
  * @param int type
  */
@@ -202,7 +202,7 @@ export function getSpreadInfo() {
 
 
 /**
- * 
+ *
  * 推广订单
  * @param object data
  */
@@ -211,7 +211,7 @@ export function spreadOrder(data) {
 }
 
 /**
- * 
+ *
  * 事业部/推广订单
  * @param object data
  */
@@ -243,7 +243,7 @@ export function extractCash(data) {
 
 /**
  * 提现银行/提现最低金额
- * 
+ *
  */
 export function extractBank() {
 	return request.get('extract/bank');
@@ -251,7 +251,7 @@ export function extractBank() {
 
 /**
  * 会员等级列表
- * 
+ *
  */
 export function userLevelGrade() {
 	return request.get('user/level/grade');
@@ -268,14 +268,14 @@ export function userLevelTask(id) {
 
 /**
  * 检查用户是否可以成为会员
- * 
+ *
  */
 export function userLevelDetection() {
 	return request.get('user/level/detection');
 }
 
 /**
- * 
+ *
  * 地址列表
  * @param object data
  */
@@ -304,7 +304,7 @@ export function editAddress(data) {
 /**
  * 删除地址
  * @param int id
- * 
+ *
  */
 export function delAddress(id) {
 	return request.post('address/del', {
@@ -314,7 +314,7 @@ export function delAddress(id) {
 
 /**
  * 获取单个地址
- * @param int id 
+ * @param int id
  */
 export function getAddressDetail(id) {
 	return request.get('address/detail/' + id);
@@ -336,28 +336,28 @@ export function getLogout() {
 }
 /**
  * 小程序充值
- * 
+ *
  */
 export function rechargeRoutine(data) {
 	return request.post('recharge/routine', data)
 }
 /*
  * 公众号充值
- * 
+ *
  */
 export function rechargeWechat(data) {
 	return request.post("recharge/wechat", data);
 }
 /*
  * 公众号充值
- * 
+ *
  */
 export function recharge(data) {
 	return request.post("recharge/recharge", data);
 }
 /**
  * 获取默认地址
- * 
+ *
  */
 export function getAddressDefault() {
 	return request.get('address/default');
@@ -543,7 +543,7 @@ export function memberOverdueTime(data) {
 
 /**
  * 新版分享海报信息获取
- * 
+ *
  */
 export function spreadMsg() {
 	return request.get('user/spread_info');
@@ -552,7 +552,7 @@ export function spreadMsg() {
 
 /**
  * 图片链接转base64
- * 
+ *
  */
 export function imgToBase(data) {
 	return request.post('image_base64', data);
@@ -560,7 +560,7 @@ export function imgToBase(data) {
 
 /**
  * 获取小程序二维码
- * 
+ *
  */
 export function routineCode(data) {
 	return request.get('user/routine_code', data);
@@ -640,14 +640,14 @@ export function friendDetail(id) {
 /**
  * 员工列表
  * @param object data
- * 
+ *
  */
 export function clerkPeople(data) {
 	return request.get('agent/get_staff_list', data)
 }
 
 /**
- * 
+ *
  * 员工比例
  * @param object data
  */
@@ -656,7 +656,7 @@ export function setClerkPercent(data) {
 }
 
 /**
- * 
+ *
  * 删除员工
  * @param object data
  */
@@ -667,7 +667,7 @@ export function delClerkPercent(id) {
 /**
  * 注销用户
  * @param int id
- * 
+ *
  */
 export function cancelUser() {
 	return request.get('user_cancel');
@@ -703,7 +703,7 @@ export function getLangVersion() {
 }
 
 /**
- * 
+ *
  * 小程序绑定手机号
  * @param object data
  */

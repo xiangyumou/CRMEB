@@ -44,11 +44,6 @@
 					{{ resData.pay_price || 0 }}
 				</view>
 			</view>
-			<!-- #ifdef APP-PLUS -->
-			<view v-if="!resData.paid && !resData.type" class="order-btn" @click="appShare('WXSceneSession')">
-				{{ $t(`发送给微信好友`) }}
-			</view>
-			<!-- #endif -->
 			<!-- #ifdef H5 -->
 			<view v-if="!resData.paid && !resData.type" class="order-btn" @click="shareFriend">
 				{{ $t(`发送给微信好友`) }}
@@ -113,7 +108,7 @@ export default {
 					title: this.$t(`使用微信快捷支付`),
 					payStatus: true
 				}
-				// #ifdef H5 || APP-PLUS
+				// #ifdef H5
 				// {
 				// 	name: '支付宝支付',
 				// 	icon: 'icon-zhifubao',
@@ -213,36 +208,6 @@ export default {
 			}
 		},
 		//#endif
-		// #ifdef APP-PLUS
-		appShare(scene) {
-			let that = this;
-			let routes = getCurrentPages(); // 获取当前打开过的页面路由数组
-			let curRoute = routes[routes.length - 1].$page.fullPath; // 获取当前页面路由，也就是最后一个打开的页面路由
-			uni.share({
-				provider: 'weixin',
-				scene: scene,
-				type: 0,
-				href: `${HTTP_REQUEST_URL}${curRoute}`,
-				title: that.$t(`好友代付`),
-				summary: that.$t(`帮我付一下这件商品了，谢谢~`),
-				imageUrl: that.resData.paid && !that.resData.type && that.resData.pay_uid === that.$store.state.app.uid ? that.resData.pay_avatar : that.resData.avatar,
-				success: function (res) {
-					uni.showToast({
-						title: that.$t(`分享成功`),
-						icon: 'success',
-						duration: 2000
-					});
-				},
-				fail: function (err) {
-					uni.showToast({
-						title: that.$t(`分享失败`),
-						icon: 'none',
-						duration: 2000
-					});
-				}
-			});
-		},
-		// #endif
 		shareFriend() {
 			// #ifndef MP
 			this.shareModal = true;

@@ -295,9 +295,6 @@
 						'//' + location.hostname +
 						'/pages/goods/order_details/index?order_id=' + this.orderId
 					// #endif
-					// #ifdef APP-PLUS
-					quitUrl: '/pages/goods/order_details/index?order_id=' + this.orderId
-					// #endif
 				}).then(res => {
 					let goPage = '/pages/goods/order_pay_status/index?order_id=' + this.orderId + '&msg=' + res.msg + '&type=3' + '&totalPrice=' + this.payPriceShow
 					if(this.is_gift) goPage += '&is_gift=1'
@@ -345,14 +342,6 @@
 								orderId: res.data.result.order_id,
 								msg: res.msg,
 							}
-							// #endif
-							// #ifdef APP-PLUS
-							plus.runtime.openURL(jsConfig.payinfo);
-							setTimeout(e => {
-								uni.reLaunch({
-									url: goPages
-								})
-							}, 1000)
 							// #endif
 							// #ifdef H5
 							this.formpost(res.data.result.pay_url, jsConfig)
@@ -473,42 +462,6 @@
 								});
 							})
 							// #endif
-							// #ifdef APP-PLUS
-							uni.requestPayment({
-								provider: 'wxpay',
-								orderInfo: jsConfig,
-								success: (e) => {
-									let url = goPages;
-									uni.showToast({
-										title: that.$t(`支付成功`)
-									})
-									setTimeout(res => {
-										uni.redirectTo({
-											url: url
-										})
-									}, 2000)
-								},
-								fail: (e) => {
-									let url = '/pages/goods/order_pay_status/index?order_id=' +
-										orderId +
-										'&msg=' + that.$t(`支付失败`);
-									uni.showModal({
-										content: that.$t(`支付失败`),
-										showCancel: false,
-										success: function(res) {
-											if (res.confirm) {
-												uni.redirectTo({
-													url: url
-												})
-											} else if (res.cancel) {}
-										}
-									})
-								},
-								complete: () => {
-									uni.hideLoading();
-								},
-							});
-							// #endif
 							break;
 						case 'PAY_DEFICIENCY':
 							uni.hideLoading();
@@ -551,45 +504,6 @@
 							// #ifdef MP
 							uni.navigateTo({
 								url: `/pages/users/alipay_invoke/index?id=${orderId}&link=${jsConfig.qrCode}`
-							});
-							// #endif
-							// #ifdef APP-PLUS
-							uni.requestPayment({
-								provider: 'alipay',
-								orderInfo: jsConfig,
-								success: (e) => {
-									uni.showToast({
-										title: that.$t(`支付成功`)
-									})
-									let url = '/pages/goods/order_pay_status/index?order_id=' +
-										orderId +
-										'&msg=' + that.$t(`支付成功`);
-									setTimeout(res => {
-										uni.redirectTo({
-											url: url
-										})
-									}, 2000)
-
-								},
-								fail: (e) => {
-									let url = '/pages/goods/order_pay_status/index?order_id=' +
-										orderId +
-										'&msg=' + that.$t(`支付失败`);
-									uni.showModal({
-										content: that.$t(`支付失败`),
-										showCancel: false,
-										success: function(res) {
-											if (res.confirm) {
-												uni.redirectTo({
-													url: url
-												})
-											} else if (res.cancel) {}
-										}
-									})
-								},
-								complete: () => {
-									uni.hideLoading();
-								},
 							});
 							// #endif
 							break;

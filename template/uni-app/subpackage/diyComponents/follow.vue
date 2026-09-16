@@ -34,7 +34,7 @@
         <view class="code-bg">
           <image class="imgs" :src="dataConfig.codeConfig.url" mode=""></image>
         </view>
-        <!-- #ifdef MP || APP-PLUS -->
+        <!-- #ifdef MP -->
         <view class="btn" @tap="savePic">{{ $t(`保存图片`) }}</view>
         <!-- #endif -->
         <!-- #ifdef H5 -->
@@ -237,29 +237,6 @@ export default {
                   },
                 });
               }
-            },
-          });
-        },
-      });
-      // #endif
-      //#ifdef APP-PLUS
-      let thatApp = this;
-      uni.downloadFile({
-        url: thatApp.dataConfig.codeConfig.url, //图片地址
-        success: function (response) {
-          uni.saveImageToPhotosAlbum({
-            filePath: response.tempFilePath,
-            success: function (res) {
-              thatApp.posterImageClose();
-              thatApp.$util.Tips({
-                title: "保存成功",
-                icon: "success",
-              });
-            },
-            fail: function (res) {
-              thatApp.$util.Tips({
-                title: "保存失败",
-              });
             },
           });
         },

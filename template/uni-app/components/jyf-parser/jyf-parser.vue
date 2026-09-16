@@ -46,9 +46,6 @@
 		name: 'parser',
 		data() {
 			return {
-				// #ifdef APP-PLUS
-				loadVideo: false,
-				// #endif
 				// #ifdef H5
 				uid: this._uid,
 				// #endif
@@ -90,7 +87,7 @@
 			// #ifndef MP-BAIDU || MP-ALIPAY || APP-PLUS
 			'gestureZoom': Boolean,
 			// #endif
-			// #ifdef MP-WEIXIN || MP-QQ || H5 || APP-PLUS
+			// #ifdef MP-WEIXIN || MP-QQ || H5
 			'lazyLoad': Boolean,
 			// #endif
 			'selectable': Boolean,
@@ -138,16 +135,6 @@
 						success: () => this[i] = filePath
 					})
 					// #endif
-					// #ifdef APP-PLUS
-					filePath = `_doc/parser_tmp/${Date.now()}.${info[1]}`;
-					var bitmap = new plus.nativeObj.Bitmap();
-					bitmap.loadBase64Data(src, () => {
-						bitmap.save(filePath, {}, () => {
-							bitmap.clear()
-							this[i] = filePath;
-						})
-					})
-					// #endif
 				}
 			}
 			if (this.html) this.setContent(this.html);
@@ -157,13 +144,6 @@
 			if (this._observer) this._observer.disconnect();
 			// #endif
 			this.imgList.each(src => {
-				// #ifdef APP-PLUS
-				if (src && src.includes('_doc')) {
-					plus.io.resolveLocalFileSystemURL(src, entry => {
-						entry.remove();
-					});
-				}
-				// #endif
 				// #ifdef MP-WEIXIN || MP-TOUTIAO
 				if (src && src.includes(uni.env.USER_DATA_PATH))
 					fs && fs.unlink({
@@ -433,9 +413,6 @@
 					console.warn('错误的 html 类型：object 类型已废弃');
 				} else
 					return console.warn('错误的 html 类型：' + typeof html);
-				// #ifdef APP-PLUS
-				this.loadVideo = false;
-				// #endif
 				if (document) this.document = new document(this.nodes, 'nodes', this);
 				if (append) this.nodes = this.nodes.concat(nodes);
 				else this.nodes = nodes;
@@ -479,7 +456,7 @@
 											this.videoContexts.push(ctx);
 										}
 										// #endif
-										// #ifdef MP-BAIDU || MP-ALIPAY || APP-PLUS
+										// #ifdef MP-BAIDU || MP-ALIPAY
 										if (item.attrs && item.attrs.id) {
 											this.anchors = this.anchors || [];
 											this.anchors.push({
@@ -499,11 +476,6 @@
 					}, 200)
 					this.$emit('load');
 					// #endif
-					// #ifdef APP-PLUS
-					setTimeout(() => {
-						this.loadVideo = true;
-					}, 3000);
-					// #endif
 				})
 				// #endif
 				// #ifndef APP-PLUS-NVUE
@@ -514,12 +486,7 @@
 					var res = [this.rtf.getBoundingClientRect()];
 					// #endif
 					// #ifndef H5
-					// #ifdef APP-PLUS
-					uni.createSelectorQuery().in(this)
-					// #endif
-					// #ifndef APP-PLUS
 					this.createSelectorQuery()
-						// #endif
 						.select('#top').boundingClientRect().exec(res => {
 							// #endif
 							if (res && res[0]) {
@@ -610,7 +577,7 @@
 					// #ifndef MP-BAIDU || MP-ALIPAY || APP-PLUS
 					Scroll('#top >>> #' + obj.id + ', #top >>> .' + obj.id);
 					// #endif
-					// #ifdef MP-BAIDU || MP-ALIPAY || APP-PLUS
+					// #ifdef MP-BAIDU || MP-ALIPAY
 					for (var anchor of this.anchors)
 						if (anchor.id == obj.id)
 							Scroll('#' + obj.id + ', .' + obj.id, anchor.node);

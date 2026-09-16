@@ -140,12 +140,6 @@
 			}
 		},
 		methods: {
-			// #ifdef APP-PLUS
-			// 获取选择的地区
-			handleGetRegion(region) {
-				this.region = region
-			},
-			// #endif
 			// 回去地址数据
 			getCityList: function() {
 				let that = this;
@@ -236,12 +230,12 @@
 
 						break;
 				}
-				// #ifdef MP || APP-PLUS
+				// #ifdef MP
 				this.$set(this.multiArray, 0, multiArray[0]);
 				this.$set(this.multiArray, 1, multiArray[1]);
 				this.$set(this.multiArray, 2, multiArray[2]);
 				// #endif
-				// #ifdef H5 
+				// #ifdef H5
 				this.multiArray = multiArray;
 				// #endif
 
@@ -407,7 +401,7 @@
 												res.data
 												.id) + '&pinkId=' + pinkId +
 											'&couponId=' +
-											couponId + '&new=' + that.news + '&is_gift=' + that.is_gift + 
+											couponId + '&new=' + that.news + '&is_gift=' + that.is_gift +
 						'&order_id=' + that.orderId
 									});
 								} else {
@@ -428,7 +422,7 @@
 			},
 			/**
 			 * 提交用户添加地址
-			 * 
+			 *
 			 */
 			formSubmit: function(e) {
 				let that = this,
@@ -487,7 +481,7 @@
 										res.data.id) + '&pinkId=' + pinkId + '&couponId=' +
 									couponId +
 									'&noCoupon=' + that
-									.noCoupon + '&is_gift=' + that.is_gift + 
+									.noCoupon + '&is_gift=' + that.is_gift +
 									'&order_id=' + that.orderId
 							});
 						} else {

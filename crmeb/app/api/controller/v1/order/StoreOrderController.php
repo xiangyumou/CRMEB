@@ -11,7 +11,6 @@
 namespace app\api\controller\v1\order;
 
 use app\Request;
-use app\services\pay\PayServices;
 use app\services\shipping\ExpressServices;
 use app\services\system\admin\SystemAdminServices;
 use app\services\activity\{lottery\LuckLotteryServices,
@@ -31,7 +30,6 @@ use app\services\order\{StoreCartServices,
     StoreOrderTakeServices
 };
 use app\services\pay\OrderPayServices;
-use app\services\pay\YuePayServices;
 use app\services\product\product\StoreProductReplyServices;
 use app\services\shipping\ShippingTemplatesServices;
 use crmeb\services\CacheService;
@@ -99,6 +97,7 @@ class StoreOrderController
      */
     public function confirm(Request $request, ShippingTemplatesServices $services)
     {
+        \app\services\CoreStore::assertOrder($request->post());
         if (!$services->get(1, ['id'])) {
             return app('json')->fail('默认运费模板未配置，无法下单');
         }
@@ -125,6 +124,7 @@ class StoreOrderController
      */
     public function computedOrder(Request $request, StoreOrderComputedServices $computedServices, $key)
     {
+        \app\services\CoreStore::assertOrder($request->post());
         if (!$key) return app('json')->fail('参数错误');
         $uid = $request->uid();
         if ($this->services->be(['order_id|unique' => $key, 'uid' => $uid, 'is_del' => 0]))
@@ -169,6 +169,7 @@ class StoreOrderController
      */
     public function create(Request $request, StoreOrderCreateServices $createServices, $key)
     {
+        \app\services\CoreStore::assertOrder($request->post());
         if (!$key) return app('json')->fail('参数错误');
         $userInfo = $request->user()->toArray();
         if ($checkOrder = $this->services->getOne(['order_id|unique' => $key, 'uid' => $userInfo['uid'], 'is_del' => 0]))
@@ -245,8 +246,9 @@ class StoreOrderController
      * @param YuePayServices $yuePayServices
      * @return mixed
      */
-    public function pay(Request $request, StorePinkServices $services, OrderPayServices $payServices, YuePayServices $yuePayServices)
+    public function pay(Request $request, StorePinkServices $services, OrderPayServices $payServices)
     {
+        \app\services\CoreStore::assertPayment($request->post('paytype', ''));
         [$uni, $paytype, $quitUrl, $type] = $request->postMore([
             ['uni', ''],
             ['paytype', ''],
@@ -286,28 +288,8 @@ class StoreOrderController
                 return app('json')->status('pay_error', '支付失败');
         }
 
-        switch ($paytype) {
-            case PayServices::YUE_PAY:
-                $pay = $yuePayServices->yueOrderPay($order->toArray(), $request->uid());
-                if ($pay['status'] === true)
-                    return app('json')->status('success', '余额支付成功');
-                else {
-                    if (is_array($pay))
-                        return app('json')->status($pay['status'], $pay['msg']);
-                    else
-                        return app('json')->status('pay_error', $pay);
-                }
-            case PayServices::OFFLINE_PAY:
-                if ($this->services->setOrderTypePayOffline($order['order_id'])) {
-                    event('NoticeListener', [$order->toArray(), 'admin_pay_success_code']);
-                    return app('json')->status('success', '订单创建成功');
-                } else {
-                    return app('json')->status('success', '支付失败');
-                }
-            default:
-                $payInfo = $payServices->beforePay($order->toArray(), $paytype, ['quitUrl' => $quitUrl]);
-                return app('json')->status($payInfo['status'], $payInfo['payInfo']);
-        }
+        $payInfo = $payServices->beforePay($order->toArray(), $paytype, ['quitUrl' => $quitUrl]);
+        return app('json')->status($payInfo['status'], $payInfo['payInfo']);
     }
 
     /**
@@ -971,6 +953,7 @@ class StoreOrderController
 
     public function receiveGift(Request $request, $oid)
     {
+        \app\services\CoreStore::assertOrder($request->post());
         [$gift_key, $shipping_type, $name, $phone, $address_id, $store_id] = $request->postMore([
             ['gift_key', ''],
             ['shipping_type', 1],

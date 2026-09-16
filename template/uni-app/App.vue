@@ -144,18 +144,15 @@ export default {
       uni.setStorageSync("LANG_VERSION", version);
     });
 
-    // #ifdef APP-PLUS || H5
+    // #ifdef H5
     uni.getSystemInfo({
       success: function (res) {
         // 首页没有title获取的整个页面的高度，里面的页面有原生标题要减掉就是视口的高度
         // 状态栏是动态的可以拿到 标题栏是固定写死的是44px
         let height = res.windowHeight - res.statusBarHeight - 44;
-        // #ifdef H5 || APP-PLUS
+        // #ifdef H5
         that.globalData.windowHeight = res.windowHeight + "px";
         // #endif
-        // // #ifdef APP-PLUS
-        // that.globalData.windowHeight = height + 'px'
-        // // #endif
       },
     });
     // #endif

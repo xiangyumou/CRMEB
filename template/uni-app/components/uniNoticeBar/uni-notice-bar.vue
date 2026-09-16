@@ -180,17 +180,6 @@ export default {
     };
   },
   mounted() {
-    // #ifdef APP-PLUS
-    var pages = getCurrentPages();
-    var page = pages[pages.length - 1];
-    var currentWebview = page.$getAppWebview();
-    currentWebview.addEventListener("hide", () => {
-      this.webviewHide = true;
-    });
-    currentWebview.addEventListener("show", () => {
-      this.webviewHide = false;
-    });
-    // #endif
     this.$nextTick(() => {
       this.initSize();
     });

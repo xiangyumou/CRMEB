@@ -1,6 +1,6 @@
 <template>
 	<view class="pos-order-list" ref="container">
-		<!-- #ifdef MP || APP-PLUS -->
+		<!-- #ifdef MP -->
 		<NavBar titleText="售后订单" bagColor="#F5F5F5" :iconColor="iconColor" :textColor="iconColor" :isScrolling="isScrolling" showBack></NavBar>
 		<!-- #endif -->
 		<view class="searchCon acea-row">

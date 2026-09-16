@@ -23,8 +23,8 @@ import { mapState, mapMutations, mapActions } from 'vuex';
 import { categoryList } from '@/api/diy';
 import { cmsListApi } from '@/api/cms';
 export default {
-  name: 'c_home_bargain',
-  componentsName: 'home_bargain',
+  name: 'c_new_list',
+  componentsName: 'home_new_list',
   components: {
     ...toolCom,
     rightBtn,

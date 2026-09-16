@@ -1,6 +1,6 @@
 <template>
 	<view>
-		<!-- #ifdef MP || APP-PLUS -->
+		<!-- #ifdef MP -->
 <!-- 		<NavBar titleText="订单详情" :iconColor="iconColor" :textColor="iconColor" :isScrolling="isScrolling" showBack></NavBar> -->
 		<!-- #endif -->
 		<view class="headerBg">
@@ -264,7 +264,7 @@
 <script>
 	import PriceChange from "../components/PriceChange/index.vue";
 	import customForm from "../components/customForm";
-	// #ifdef MP || APP-PLUS
+	// #ifdef MP
 	import NavBar from "@/components/NavBar.vue";
 	// #endif
 	import {
@@ -287,7 +287,7 @@
 		components: {
 			PriceChange,
 			customForm,
-			// #ifdef MP || APP-PLUS
+			// #ifdef MP
 			NavBar,
 			// #endif
 		},
@@ -315,7 +315,7 @@
 				clickNum: 1,
 				goname: '',
 				isRefund: 0, //1是仅退款;0是同意退货退款
-				// #ifdef MP || APP-PLUS
+				// #ifdef MP
 				iconColor: '#FFFFFF',
 				isScrolling: false,
 				// #endif
@@ -341,7 +341,7 @@
 			// this.getErpConfig();
 		},
 		onPageScroll(e) {
-			// #ifdef MP || APP-PLUS
+			// #ifdef MP
 			if (e.scrollTop > 50) {
 				this.iconColor = '#333333';
 				this.isScrolling = true;

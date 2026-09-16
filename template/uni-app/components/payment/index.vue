@@ -5,7 +5,7 @@
 				{{$t(`选择付款方式`)}}<text class="iconfont icon-guanbi" @click='close'></text>
 			</view>
 			<view class="item acea-row row-between-wrapper" v-for="(item,index) in payMode" :key="index"
-				v-show='item.payStatus' @click="payType(item.number || 0 , item.value,index)">
+				v-show="item.payStatus && item.value === 'weixin'" @click="payType(item.number || 0 , item.value,index)">
 				<view class="left acea-row row-between-wrapper">
 					<view class="iconfont" :class="item.icon"></view>
 					<view class="text">
@@ -76,11 +76,12 @@
 				handler(newV, oldValue) {
 					let newPayList = [];
 					newV.forEach((item, index) => {
-						if (item.payStatus) {
+						if (item.payStatus && item.value === 'weixin') {
 							item.index = index;
 							newPayList.push(item)
 						}
 					});
+					if (!newPayList.length) { this.paytype = ''; return; }
 					this.active = newPayList[0].index;
 					this.paytype = newPayList[0].value;
 					this.number = newPayList[0].number || 0;
@@ -139,7 +140,7 @@
 					uni: that.order_id,
 					paytype: paytype,
 					type: that.friendPay ? 1 : 0,
-					// #ifdef MP 
+					// #ifdef MP
 					'from': 'routine',
 					// #endif
 					// #ifdef H5
@@ -151,9 +152,6 @@
 						'/pages/goods/order_details/index?order_id=' + this.order_id : location.protocol +
 						'//' + location.hostname +
 						'/pages/goods/order_details/index?order_id=' + this.order_id
-					// #endif
-					// #ifdef APP-PLUS
-					quitUrl: '/pages/goods/order_details/index?order_id=' + this.order_id
 					// #endif
 				}).then(res => {
 					let jsConfig = res.data.result.jsConfig;
@@ -182,9 +180,6 @@
 							orderId: res.data.result.orderId,
 							msg: res.msg,
 						}
-						// #endif
-						// #ifdef APP-PLUS
-						plus.runtime.openURL(jsConfig.payinfo);
 						// #endif
 						// #ifdef H5
 						this.formpost(res.data.result.pay_url, jsConfig)
@@ -280,41 +275,6 @@
 										});
 								}
 								// #endif
-								// #ifdef APP-PLUS
-								uni.requestPayment({
-									provider: 'wxpay',
-									orderInfo: jsConfig,
-									success: (e) => {
-										let url = '/pages/goods/order_pay_status/index?order_id=' +
-											orderId +
-											'&msg=支付成功';
-										uni.showToast({
-											title: that.$t(`支付成功`)
-										})
-										setTimeout(res => {
-											that.$emit('onChangeFun', {
-												action: 'pay_complete'
-											});
-										}, 2000)
-									},
-									fail: (e) => {
-										uni.showModal({
-											content: that.$t(`支付失败`),
-											showCancel: false,
-											success: function(res) {
-												if (res.confirm) {
-													that.$emit('onChangeFun', {
-														action: 'pay_fail'
-													});
-												} else if (res.cancel) {}
-											}
-										})
-									},
-									complete: () => {
-										uni.hideLoading();
-									},
-								});
-								// #endif
 								break;
 							case 'yue':
 								uni.hideLoading();
@@ -368,38 +328,6 @@
 								// #ifdef MP
 								uni.navigateTo({
 									url: `/pages/users/alipay_invoke/index?id=${res.data.result.order_id}&link=${res.data.result.jsConfig.qrCode}`
-								});
-								// #endif
-								// #ifdef APP-PLUS
-								uni.requestPayment({
-									provider: 'alipay',
-									orderInfo: jsConfig,
-									success: (e) => {
-										uni.showToast({
-											title: that.$t(`支付成功`)
-										})
-										setTimeout(res => {
-											that.$emit('onChangeFun', {
-												action: 'pay_complete'
-											});
-										}, 2000)
-									},
-									fail: (e) => {
-										uni.showModal({
-											content: that.$t(`支付失败`),
-											showCancel: false,
-											success: function(res) {
-												if (res.confirm) {
-													that.$emit('onChangeFun', {
-														action: 'pay_fail'
-													});
-												} else if (res.cancel) {}
-											}
-										})
-									},
-									complete: () => {
-										uni.hideLoading();
-									},
 								});
 								// #endif
 								break;

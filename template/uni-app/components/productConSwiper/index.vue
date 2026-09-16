@@ -2,7 +2,6 @@
 	<view class='product-bg'>
 		<swiper :indicator-dots="imgUrls.length > 1 ? true : false" indicator-active-color="var(--view-theme)" :autoplay="autoplay"
 			:circular="circular" :interval="interval" :duration="duration" @change="change" v-if="isPlay">
-			<!-- #ifndef APP-PLUS -->
 			<swiper-item v-if="videoline">
 				<view class="item">
 					<view v-show="!controls" style="width:100%;height:100% ">
@@ -18,32 +17,12 @@
 					</view>
 				</view>
 			</swiper-item>
-			<!-- #endif -->
-			<!-- #ifdef APP-PLUS -->
-			<swiper-item v-if="videoline">
-				<view class="item">
-					<view class="poster" v-show="controls">
-						<image class="image" :src="imgUrls[0]"></image>
-					</view>
-					<view class="stop" v-show="controls" @tap="bindPause">
-						<image class="image" src="../../static/images/stop.png"></image>
-					</view>
-				</view>
-			</swiper-item>
-			<!-- #endif -->
 			<block v-for="(item,index) in imgUrls" :key='index'>
 				<swiper-item v-if="videoline?index>=1:index>=0">
 					<image :src="item" class="slide-image" @click.stop="openImage(index)" />
 				</swiper-item>
 			</block>
 		</swiper>
-		<!-- #ifdef APP-PLUS -->
-		<view v-if="!isPlay" style="width: 750rpx; height: 750rpx;">
-			<video id="myVideo" class="goods-video" :src='videoline' controls show-center-play-btn show-mute-btn="true"
-				autoplay="true" auto-pause-if-navigate :custom-cache="false" :enable-progress-gesture="false"
-				:poster="imgUrls[0]" @pause="videoPause"></video>
-		</view>
-		<!-- #endif -->
 	</view>
 </template>
 
@@ -78,32 +57,19 @@
 			if (this.videoline) {
 				this.imgUrls.shift()
 			}
-			// #ifndef APP-PLUS
 			this.videoContext = uni.createVideoContext('myVideo', this);
-			// #endif
 		},
 		methods: {
 			videoPause(e) {
-				// #ifdef APP-PLUS
-				this.isPlay = true
-				this.autoplay = true
-				// #endif
 			},
 			videoIsPause() {
 				this.videoContext = uni.createVideoContext('myVideo', this);
 				this.videoContext.pause();
 			},
 			bindPause: function() {
-				// #ifndef APP-PLUS
 				this.$set(this, 'controls', false)
 				this.videoContext.play();
 				this.autoplay = false
-				// #endif
-				// #ifdef APP-PLUS
-				this.isPlay = false
-				this.videoContext = uni.createVideoContext('myVideo', this);
-				this.videoContext.play();
-				// #endif
 			},
 			change: function(e) {
 				this.$set(this, 'currents', e.detail.current + 1);

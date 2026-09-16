@@ -1,6 +1,6 @@
 <template>
   <view>
-    <!-- #ifdef MP || APP-PLUS -->
+    <!-- #ifdef MP -->
 <!--    <NavBar
       titleText="订单详情"
       :iconColor="iconColor"
@@ -615,7 +615,7 @@
 import PriceChange from "../components/PriceChange/index.vue";
 import customForm from "../components/customForm";
 import countDown from "@/components/countDown/index.vue";
-// #ifdef MP || APP-PLUS
+// #ifdef MP
 import NavBar from "@/components/NavBar.vue";
 // #endif
 import {
@@ -641,7 +641,7 @@ export default {
     PriceChange,
     customForm,
     countDown,
-    // #ifdef MP || APP-PLUS
+    // #ifdef MP
     NavBar,
     // #endif
   },
@@ -700,7 +700,7 @@ export default {
     // this.getErpConfig();
   },
   onPageScroll(e) {
-    // #ifdef MP || APP-PLUS
+    // #ifdef MP
     if (e.scrollTop > 50) {
       this.iconColor = "#333333";
       this.isScrolling = true;

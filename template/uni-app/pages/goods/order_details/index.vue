@@ -250,7 +250,7 @@
 				:gift_uid="orderInfo.gift_uid"
 				@openSubcribe="openSubcribe"
 			></orderGoods>
-			<!-- #ifdef H5 || APP-PLUS -->
+			<!-- #ifdef H5 -->
 			<div class="goodCall" @click="goGoodCall">
 				<span class="iconfont icon-kefu"></span>
 				<span>{{ $t(`联系客服`) }}</span>
@@ -643,7 +643,7 @@ export default {
 					title: this.$t(`使用微信快捷支付`),
 					payStatus: true
 				},
-				// #ifdef H5 || APP-PLUS
+				// #ifdef H5
 				{
 					name: this.$t(`支付宝支付`),
 					icon: 'icon-zhifubao',
@@ -953,9 +953,6 @@ export default {
 				// #ifdef H5
 				that.payMode[2].number = res.data.now_money;
 				// #endif
-				// #ifdef APP-PLUS
-				that.payMode[2].number = res.data.now_money;
-				// #endif
 				// #ifdef MP
 				that.payMode[1].number = res.data.now_money;
 				// #endif
@@ -1028,7 +1025,7 @@ export default {
 						//#ifdef H5
 						that.setOpenShare();
 						//#endif
-					} 
+					}
 					if(!res.data.is_gift || this.is_gift == 2) {
 						uni.hideShareMenu();
 					}
@@ -1038,7 +1035,7 @@ export default {
 					that.$set(that, 'invoice_func', res.data.invoice_func);
 					that.$set(that, 'special_invoice', res.data.special_invoice);
 					that.$set(that, 'routineContact', Number(res.data.routine_contact_type));
-					// #ifdef H5 || APP-PLUS
+					// #ifdef H5
 					this.$nextTick(() => {
 						that.val = HTTP_REQUEST_URL + '/pages/admin/order_cancellation/index?verify_code=' + that.orderInfo.verify_code;
 					});
@@ -1794,11 +1791,6 @@ export default {
 		-moz-box-shadow: 0px 0px 3px 0px rgba(200, 200, 200, 0.75);
 		box-shadow: 0px 0px 3px 0px rgba(200, 200, 200, 0.75);
 		bottom: 110rpx;
-		/* #ifdef APP-PLUS */
-		bottom: calc(110rpx + constant(safe-area-inset-bottom)); ///兼容 IOS<11.2/
-		bottom: calc(110rpx + env(safe-area-inset-bottom)); ///兼容 IOS>11.2/
-
-		/* #endif */
 		.more-btn {
 			color: #333;
 			padding: 4rpx;

@@ -1,7 +1,7 @@
 <template>
   <!-- 商品分类 -->
   <view>
-    <!-- #ifdef MP || APP-PLUS -->
+    <!-- #ifdef MP -->
     <!-- <view :style="{height: (40+dataConfig.topConfig.val*2+dataConfig.bottomConfig.val*2) + 'rpx'}" v-if="!fromType"></view> -->
     <!-- #endif -->
     <view
@@ -236,7 +236,7 @@ export default {
         cate_name: "首页",
       });
       this.tabTitle = data;
-      // #ifdef MP || APP-PLUS
+      // #ifdef MP
       this.isTop = uni.getWindowInfo().statusBarHeight + 43 + "px";
       // #endif
       // #ifdef H5

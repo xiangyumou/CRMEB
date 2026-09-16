@@ -18,7 +18,7 @@ Route::group(function () {
     Route::any('wechat/serve', 'v1.wechat.WechatController/serve')->option(['real_name' => '公众号服务']);//公众号服务
     Route::any('wechat/miniServe', 'v1.wechat.WechatController/miniServe')->option(['real_name' => '小程序服务']);//公众号服务
     Route::any('pay/notify/:type', 'v1.PayController/notify')->option(['real_name' => '支付回调']);//支付回调
-    Route::any('transfer/notify/:type', 'v1.PayController/transferNotify')->option(['real_name' => '商户转账回调']);//商户转账回调
+//商户转账回调
     Route::any('order_call_back', 'v1.order.StoreOrderController/callBack')->option(['real_name' => '商家寄件回调']);//商家寄件回调
     Route::get('get_script', 'v1.PublicController/getScript')->option(['real_name' => '移动端自定义JS']);//移动端自定义JS
     Route::get('custom_pc_js', 'v1.PublicController/customPcJs')->option(['real_name' => 'PC端自定义JS']);//PC端自定义JS
@@ -28,7 +28,7 @@ Route::group(function () {
 
 Route::group(function () {
     //apple快捷登陆
-    Route::post('apple_login', 'v1.LoginController/appleLogin')->name('appleLogin')->option(['real_name' => '微信APP授权']);//微信APP授权
+//微信APP授权
     //账号密码登录
     Route::post('login', 'v1.LoginController/login')->name('login')->option(['real_name' => '账号密码登录']);
     // 获取发短信的key
@@ -80,10 +80,10 @@ Route::group(function () {
     Route::post('admin/order/agreeExpress', 'v1.admin.StoreOrderController/agreeExpress')->name('adminOrderAgreeExpress')->option(['real_name' => '订单同意退货']);//订单同意退货
     Route::post('admin/refund_order/remark', 'v1.admin.StoreOrderController/refundRemark')->name('refundRemark')->option(['real_name' => '退款订单备注']);//退款订单备注
     Route::get('admin/order/time', 'v1.admin.StoreOrderController/time')->name('adminOrderTime')->option(['real_name' => '订单交易额时间统计']);//订单交易额时间统计
-    Route::post('admin/order/offline', 'v1.admin.StoreOrderController/offline')->name('adminOrderOffline')->option(['real_name' => '订单支付']);//订单支付
+//订单支付
     Route::post('admin/order/refund', 'v1.admin.StoreOrderController/refund')->name('adminOrderRefund')->option(['real_name' => '订单退款']);//订单退款
-    Route::post('order/order_verific', 'v1.admin.StoreOrderController/order_verific')->name('order')->option(['real_name' => '订单核销']);//订单核销
-    Route::get('admin/order/delivery', 'v1.admin.StoreOrderController/getDeliveryAll')->name('getDeliveryAll')->option(['real_name' => '获取配送员']);//获取配送员
+//订单核销
+//获取配送员
     Route::get('admin/order/delivery_info', 'v1.admin.StoreOrderController/getDeliveryInfo')->name('getDeliveryInfo')->option(['real_name' => '获取电子面单默认信息']);//获取电子面单默认信息
     Route::get('admin/order/export_temp', 'v1.admin.StoreOrderController/getExportTemp')->name('getExportTemp')->option(['real_name' => '获取电子面单模板获取']);//获取电子面单模板获取
     Route::get('admin/order/export_all', 'v1.admin.StoreOrderController/getExportAll')->name('getExportAll')->option(['real_name' => '获取物流公司']);//获取物流公司
@@ -105,7 +105,7 @@ Route::group(function () {
     // 商家管理用户管理
     Route::get('admin/manage/user', 'v1.admin.StoreManageController/user');
     Route::get('admin/manage/user/group', 'v1.admin.StoreManageController/userGroup');
-    Route::get('admin/manage/user/level', 'v1.admin.StoreManageController/userLevel');
+
     Route::get('admin/manage/user/label/[:uid]', 'v1.admin.StoreManageController/userLabel');
     Route::get('admin/manage/user/coupon', 'v1.admin.StoreManageController/userCoupon');
     Route::post('admin/manage/user/update/:uid', 'v1.admin.StoreManageController/userUpdate');
@@ -126,7 +126,7 @@ Route::group(function () {
         //用户修改手机号
         Route::post('user/updatePhone', 'v1.LoginController/update_binding_phone')->name('updateBindingPhone')->option(['real_name' => '用户修改手机号']);
         //设置登录code
-        Route::post('user/code', 'v1.user.StoreService/setLoginCode')->name('setLoginCode')->option(['real_name' => '设置登录code']);
+
         //查看code是否可用
         Route::get('user/code', 'v1.LoginController/setLoginKey')->name('getLoginKey')->option(['real_name' => '查看code是否可用']);
         //用户绑定手机号
@@ -142,19 +142,19 @@ Route::group(function () {
 
     Route::group(function () {
         //用户类 客服聊天记录
-        Route::get('user/service/list', 'v1.user.StoreService/lst')->name('userServiceList')->option(['real_name' => '客服列表']);//客服列表
-        Route::get('user/service/record', 'v1.user.StoreService/record')->name('userServiceRecord')->option(['real_name' => '客服聊天记录']);//客服聊天记录
-        Route::post('user/service/feedback', 'v1.user.StoreService/saveFeedback')->name('saveFeedback')->option(['real_name' => '保存客服反馈信息']);//保存客服反馈信息
-        Route::get('user/service/feedback', 'v1.user.StoreService/getFeedbackInfo')->name('getFeedbackInfo')->option(['real_name' => '获得客服反馈头部信息']);//获得客服反馈头部信息
-        Route::get('user/service/get_adv', 'v1.user.StoreService/getKfAdv')->name('userServiceGetKfAdv')->option(['real_name' => '获取客服页面广告']);//获取客服页面广告
+//客服列表
+//客服聊天记录
+//保存客服反馈信息
+//获得客服反馈头部信息
+//获取客服页面广告
     })->option(['parent' => 'user', 'cate_name' => '客服']);
 
     Route::group(function () {
         //用户类  用户coupons/order
         Route::get('user', 'v1.user.UserController/user')->name('user')->option(['real_name' => '个人中心']);//个人中心
-        Route::post('user/spread', 'v1.user.UserController/spread')->name('userSpread')->option(['real_name' => '静默绑定授权']);//静默绑定授权
+//静默绑定授权
         Route::post('user/edit', 'v1.user.UserController/edit')->name('userEdit')->option(['real_name' => '用户修改信息']);//用户修改信息
-        Route::get('user/balance', 'v1.user.UserController/balance')->name('userBalance')->option(['real_name' => '用户资金统计']);//用户资金统计
+//用户资金统计
         Route::get('userinfo', 'v1.user.UserController/userinfo')->name('userinfo')->option(['real_name' => '用户信息']);// 用户信息
     })->option(['parent' => 'user', 'cate_name' => '用户中心']);
 
@@ -184,12 +184,12 @@ Route::group(function () {
 
     Route::group(function () {
         //用户类 签到
-        Route::get('sign/config', 'v1.user.UserSignController/sign_config')->name('signConfig')->option(['real_name' => '签到配置']);//签到配置
-        Route::get('sign/list', 'v1.user.UserSignController/sign_list')->name('signList')->option(['real_name' => '签到列表']);//签到列表
-        Route::get('sign/month', 'v1.user.UserSignController/sign_month')->name('signIntegral')->option(['real_name' => '签到列表（年月）']);//签到列表（年月）
-        Route::get('sign/remind/:status', 'v1.user.UserSignController/sign_remind')->name('signRemind')->option(['real_name' => '签到提醒开关']);//签到列表（年月）
-        Route::post('sign/user', 'v1.user.UserSignController/sign_user')->name('signUser')->option(['real_name' => '签到用户信息']);//签到用户信息
-        Route::post('sign/integral', 'v1.user.UserSignController/sign_integral')->name('signIntegral')->option(['real_name' => '公众号授权登录'])->middleware(BlockerMiddleware::class);//签到
+//签到配置
+//签到列表
+//签到列表（年月）
+//签到列表（年月）
+//签到用户信息
+//签到
     })->option(['mark' => 'sign', 'mark_name' => '签到']);
 
     Route::group(function () {
@@ -238,18 +238,18 @@ Route::group(function () {
 
     Route::group(function () {
         //活动---砍价
-        Route::get('bargain/detail/:id', 'v1.activity.StoreBargainController/detail')->name('bargainDetail')->option(['real_name' => '砍价商品详情']);//砍价商品详情
-        Route::post('bargain/start', 'v1.activity.StoreBargainController/start')->name('bargainStart')->option(['real_name' => '砍价开启']);//砍价开启
-        Route::post('bargain/start/user', 'v1.activity.StoreBargainController/start_user')->name('bargainStartUser')->option(['real_name' => '砍价用户信息']);//砍价 开启砍价用户信息
-        Route::post('bargain/share', 'v1.activity.StoreBargainController/share')->name('bargainShare')->option(['real_name' => '砍价分享']);//砍价 观看/分享/参与次数
-        Route::post('bargain/help', 'v1.activity.StoreBargainController/help')->name('bargainHelp')->option(['real_name' => '帮好友砍价']);//砍价 帮助好友砍价
-        Route::post('bargain/help/price', 'v1.activity.StoreBargainController/help_price')->name('bargainHelpPrice')->option(['real_name' => '砍价砍掉金额']);//砍价 砍掉金额
-        Route::post('bargain/help/count', 'v1.activity.StoreBargainController/help_count')->name('bargainHelpCount')->option(['real_name' => '砍价帮统计']);//砍价 砍价帮总人数、剩余金额、进度条、已经砍掉的价格
-        Route::post('bargain/help/list', 'v1.activity.StoreBargainController/help_list')->name('bargainHelpList')->option(['real_name' => '砍价 砍价帮']);//砍价 砍价帮
-        Route::post('bargain/poster', 'v1.activity.StoreBargainController/poster')->name('bargainPoster')->option(['real_name' => '砍价海报']);//砍价海报
-        Route::get('bargain/user/list', 'v1.activity.StoreBargainController/user_list')->name('bargainUserList')->option(['real_name' => '砍价列表']);//砍价列表(已参与)
-        Route::post('bargain/user/cancel', 'v1.activity.StoreBargainController/user_cancel')->name('bargainUserCancel')->option(['real_name' => '砍价取消']);//砍价取消
-        Route::get('bargain/poster_info/:bargainId', 'v1.activity.StoreBargainController/posterInfo')->name('posterInfo')->option(['real_name' => '砍价海报详细信息']);//砍价海报详细信息
+//砍价商品详情
+//砍价开启
+//砍价 开启砍价用户信息
+//砍价 观看/分享/参与次数
+//砍价 帮助好友砍价
+//砍价 砍掉金额
+//砍价 砍价帮总人数、剩余金额、进度条、已经砍掉的价格
+//砍价 砍价帮
+//砍价海报
+//砍价列表(已参与)
+//砍价取消
+//砍价海报详细信息
     })->option(['parent' => 'activity_nologin', 'cate_name' => '砍价']);
 
     Route::group(function () {
@@ -259,60 +259,60 @@ Route::group(function () {
         Route::post('combination/poster', 'v1.activity.StoreCombinationController/poster')->name('combinationPoster')->option(['real_name' => '拼团海报']);//拼团海报
         Route::get('combination/poster_info/:id', 'v1.activity.StoreCombinationController/posterInfo')->name('pinkPosterInfo')->option(['real_name' => '拼团海报详细获取']);//拼团海报详细获取
         Route::get('combination/code/:id', 'v1.activity.StoreCombinationController/code')->name('combinationCode')->option(['real_name' => '拼团商品海报']);//拼团商品海报
-        Route::get('seckill/code/:id', 'v1.activity.StoreSeckillController/code')->name('seckillCode')->option(['real_name' => '秒杀商品海报']);//秒杀商品海报
+//秒杀商品海报
     })->option(['parent' => 'activity_nologin', 'cate_name' => '拼团']);;
 
     Route::group(function () {
         //账单类
-        Route::post('spread/people', 'v1.user.UserController/spread_people')->name('spreadPeople')->option(['real_name' => '推荐用户']);//推荐用户
-        Route::post('spread/order', 'v1.user.UserBillController/spread_order')->name('spreadOrder')->option(['real_name' => '推广订单']);//推广订单
-        Route::get('spread/commission/:type', 'v1.user.UserBillController/spread_commission')->name('spreadCommission')->option(['real_name' => '推广佣金明细']);//推广佣金明细
-        Route::get('spread/count/:type', 'v1.user.UserBillController/spread_count')->name('spreadCount')->option(['real_name' => '推广佣金']);//推广 佣金 3/提现 4 总和
-        Route::get('spread/banner', 'v1.user.UserBillController/spread_banner')->name('spreadBanner')->option(['real_name' => '推广分销二维码海报生成']);//推广分销二维码海报生成
-        Route::get('integral/list', 'v1.user.UserBillController/integral_list')->name('integralList')->option(['real_name' => '积分记录']);//积分记录
-        Route::get('user/routine_code', 'v1.user.UserBillController/getRoutineCode')->name('getRoutineCode')->option(['real_name' => '小程序二维码']);//小程序二维码
-        Route::get('user/spread_info', 'v1.user.UserBillController/getSpreadInfo')->name('getSpreadInfo')->option(['real_name' => '获取分销背景等信息']);//获取分销背景等信息
-        Route::post('division/order', 'v1.user.UserBillController/divisionOrder')->name('divisionOrder')->option(['real_name' => '事业部推广订单']);//事业部推广订单
+//推荐用户
+//推广订单
+//推广佣金明细
+//推广 佣金 3/提现 4 总和
+//推广分销二维码海报生成
+//积分记录
+//小程序二维码
+//获取分销背景等信息
+//事业部推广订单
     })->option(['mark' => 'division', 'mark_name' => '账单']);
 
     Route::group(function () {
         //提现类
-        Route::get('extract/bank', 'v1.user.UserExtractController/bank')->name('extractBank')->option(['real_name' => '提现银行']);//提现银行/提现最低金额
-        Route::post('extract/cash', 'v1.user.UserExtractController/cash')->name('extractCash')->option(['real_name' => '提现申请']);//提现申请
+//提现银行/提现最低金额
+//提现申请
     })->option(['mark' => 'extract', 'mark_name' => '提现']);
 
     Route::group(function () {
         //充值类
-        Route::post('recharge/recharge', 'v1.user.UserRechargeController/recharge')->name('rechargeRecharge')->option(['real_name' => '统一充值']);//统一充值
-        Route::post('recharge/routine', 'v1.user.UserRechargeController/routine')->name('rechargeRoutine')->option(['real_name' => '小程序充值']);//小程序充值
-        Route::post('recharge/wechat', 'v1.user.UserRechargeController/wechat')->name('rechargeWechat')->option(['real_name' => '公众号充值']);//公众号充值
-        Route::get('recharge/index', 'v1.user.UserRechargeController/index')->name('rechargeQuota')->option(['real_name' => '充值余额选择']);//充值余额选择
+//统一充值
+//小程序充值
+//公众号充值
+//充值余额选择
     })->option(['mark' => 'recharge', 'mark_name' => '充值']);
 
     Route::group(function () {
         //会员等级类
-        Route::get('user/level/detection', 'v1.user.UserLevelController/detection')->name('userLevelDetection')->option(['real_name' => '检测用户是否可以成为会员']);//检测用户是否可以成为会员
-        Route::get('user/level/grade', 'v1.user.UserLevelController/grade')->name('userLevelGrade')->option(['real_name' => '会员等级列表']);//会员等级列表
-        Route::get('user/level/task/:id', 'v1.user.UserLevelController/task')->name('userLevelTask')->option(['real_name' => '获取等级任务']);//获取等级任务
-        Route::get('user/level/info', 'v1.user.UserLevelController/userLevelInfo')->name('levelInfo')->option(['real_name' => '获取等级任务']);//获取等级任务
-        Route::get('user/level/expList', 'v1.user.UserLevelController/expList')->name('expList')->option(['real_name' => '获取等级任务']);//获取等级任务
-        Route::get('user/record', 'v1.user.StoreService/recordList')->name('recordList')->option(['real_name' => '获取用户和客服的消息列表']);//获取用户和客服的消息列表
+//检测用户是否可以成为会员
+//会员等级列表
+//获取等级任务
+//获取等级任务
+//获取等级任务
+//获取用户和客服的消息列表
     })->option(['mark' => 'user_level', 'mark_name' => '会员等级']);
 
     Route::group(function () {
         //会员卡
-        Route::get('user/member/card/index', 'v1.user.MemberCardController/index')->name('userMemberCardIndex')->option(['real_name' => '主页会员权益介绍页']);// 主页会员权益介绍页
-        Route::post('user/member/card/draw', 'v1.user.MemberCardController/draw_member_card')->name('userMemberCardDraw')->option(['real_name' => '卡密领取会员卡']);//卡密领取会员卡
-        Route::post('user/member/card/create', 'v1.order.OtherOrderController/create')->name('userMemberCardCreate')->option(['real_name' => '购买卡创建订单']);//购买卡创建订单
-        Route::get('user/member/coupons/list', 'v1.user.MemberCardController/memberCouponList')->name('userMemberCouponsList')->option(['real_name' => '会员券列表']);//会员券列表
-        Route::get('user/member/overdue/time', 'v1.user.MemberCardController/getOverdueTime')->name('userMemberOverdueTime')->option(['real_name' => '会员时间']);//会员时间
+// 主页会员权益介绍页
+//卡密领取会员卡
+//购买卡创建订单
+//会员券列表
+//会员时间
     })->option(['parent' => 'user', 'cate_name' => '会员卡']);
 
     Route::group(function () {
         //线下付款
-        Route::post('order/offline/check/price', 'v1.order.OtherOrderController/computed_offline_pay_price')->name('orderOfflineCheckPrice')->option(['real_name' => '检测线下付款金额']); //检测线下付款金额
-        Route::post('order/offline/create', 'v1.order.OtherOrderController/create')->name('orderOfflineCreate')->option(['real_name' => '检测线下付款金额']); //检测线下付款金额
-        Route::get('order/offline/pay/type', 'v1.order.OtherOrderController/pay_type')->name('orderOfflineCreate')->option(['real_name' => '线下付款支付方式']); //线下付款支付方式
+ //检测线下付款金额
+ //检测线下付款金额
+ //线下付款支付方式
     })->option(['mark' => 'offline', 'mark_name' => '线下付款']);
 
     Route::group(function () {
@@ -324,13 +324,13 @@ Route::group(function () {
 
     Route::group(function () {
         //积分商城订单
-        Route::post('store_integral/order/confirm', 'v1.order.StoreIntegralOrderController/confirm')->name('storeIntegralOrderConfirm')->option(['real_name' => '订单确认']); //订单确认
-        Route::post('store_integral/order/create', 'v1.order.StoreIntegralOrderController/create')->name('storeIntegralOrderCreate')->option(['real_name' => '订单创建']); //订单创建
-        Route::get('store_integral/order/detail/:uni', 'v1.order.StoreIntegralOrderController/detail')->name('storeIntegralOrderDetail')->option(['real_name' => '订单详情']); //订单详情
-        Route::get('store_integral/order/list', 'v1.order.StoreIntegralOrderController/lst')->name('storeIntegralOrderList')->option(['real_name' => '订单列表']); //订单列表
-        Route::post('store_integral/order/take', 'v1.order.StoreIntegralOrderController/take')->name('storeIntegralOrderTake')->option(['real_name' => '订单收货']); //订单收货
-        Route::get('store_integral/order/express/:uni', 'v1.order.StoreIntegralOrderController/express')->name('storeIntegralOrderExpress')->option(['real_name' => '订单查看物流']); //订单查看物流
-        Route::post('store_integral/order/del', 'v1.order.StoreIntegralOrderController/del')->name('storeIntegralOrderDel')->option(['real_name' => '订单删除']); //订单删除
+ //订单确认
+ //订单创建
+ //订单详情
+ //订单列表
+ //订单收货
+ //订单查看物流
+ //订单删除
     })->option(['mark' => 'order_integral', 'mark_name' => '积分订单']);;
 
     Route::group(function () {
@@ -347,19 +347,19 @@ Route::group(function () {
 
     Route::group(function () {
         /** 代理商相关 */
-        Route::get('agent/apply/info', 'v1.user.DivisionController/applyInfo')->name('申请详情')->option(['real_name' => '申请详情']);//申请详情
-        Route::post('agent/apply/:id', 'v1.user.DivisionController/applyAgent')->name('applyAgent')->option(['real_name' => '申请代理商']);//申请代理商
-        Route::get('agent/get_agent_agreement', 'v1.user.DivisionController/getAgentAgreement')->name('getAgentAgreement')->option(['real_name' => '代理商规则']);//代理商规则
-        Route::get('agent/get_staff_list', 'v1.user.DivisionController/getStaffList')->name('getStaffList')->option(['real_name' => '员工列表']);//员工列表
-        Route::post('agent/set_staff_percent', 'v1.user.DivisionController/setStaffPercent')->name('setStaffPercent')->option(['real_name' => '设置员工分佣比例']);//设置员工分佣比例
-        Route::get('agent/del_staff/:uid', 'v1.user.DivisionController/delStaff')->name('delStaff')->option(['real_name' => '删除员工']);//删除员工
-        Route::post('agent/spread', 'v1.user.DivisionController/agentSpread')->name('agentSpread')->option(['real_name' => '代理商绑定员工']);//代理商绑定员工
+//申请详情
+//申请代理商
+//代理商规则
+//员工列表
+//设置员工分佣比例
+//删除员工
+//代理商绑定员工
     })->option(['mark' => 'agent', 'mark_name' => '代理商']);
 
     Route::group(function () {
         /** 佣金相关 */
-        Route::get('commission', 'v1.user.UserBrokerageController/commission')->name('commission')->option(['real_name' => '推广数据']);//推广数据 昨天的佣金 累计提现金额 当前佣金
-        Route::get('brokerage_rank', 'v1.user.UserBrokerageController/brokerageRank')->name('brokerageRank')->option(['real_name' => '佣金排行']);//佣金排行
+//推广数据 昨天的佣金 累计提现金额 当前佣金
+//佣金排行
         /** 用户注销 */
         Route::get('user_cancel', 'v1.user.UserController/SetUserCancel')->name('SetUserCancel')->option(['real_name' => '用户注销']);//用户注销
         /** 用户浏览记录 */
@@ -369,8 +369,8 @@ Route::group(function () {
 
     Route::group(function () {
         /** 分销员申请 */
-        Route::get('user/spread/apply/info', 'v1.user.SpreadApplyController/applyInfo')->name('申请信息');//申请信息
-        Route::post('user/spread/apply/:id', 'v1.user.SpreadApplyController/applyPromoter')->name('申请分销员');//申请分销员
+//申请信息
+//申请分销员
     })->option(['mark' => 'spread', 'mark_name' => '分销员申请']);
 
 })->middleware(\app\http\middleware\AllowOriginMiddleware::class)->middleware(\app\api\middleware\StationOpenMiddleware::class)->middleware(\app\api\middleware\AuthTokenMiddleware::class, true);
@@ -429,15 +429,15 @@ Route::group(function () {
 
         Route::group(function () {
             //活动---秒杀
-            Route::get('seckill/index', 'v1.activity.StoreSeckillController/index')->name('seckillIndex')->option(['real_name' => '秒杀商品时间区间']);//秒杀商品时间区间
-            Route::get('seckill/list/:time', 'v1.activity.StoreSeckillController/lst')->name('seckillList')->option(['real_name' => '秒杀商品列表']);//秒杀商品列表
-            Route::get('seckill/detail/:id', 'v1.activity.StoreSeckillController/detail')->name('seckillDetail')->option(['real_name' => '秒杀商品详情']);//秒杀商品详情
+//秒杀商品时间区间
+//秒杀商品列表
+//秒杀商品详情
         })->option(['parent' => 'activity_nologin', 'cate_name' => '秒杀(未授权)']);
 
         Route::group(function () {
             //活动---砍价
-            Route::get('bargain/config', 'v1.activity.StoreBargainController/config')->name('bargainConfig')->option(['real_name' => '砍价商品列表配置']);//砍价商品列表配置
-            Route::get('bargain/list', 'v1.activity.StoreBargainController/lst')->name('bargainList')->option(['real_name' => '砍价商品列表']);//砍价商品列表
+//砍价商品列表配置
+//砍价商品列表
         })->option(['parent' => 'activity_nologin', 'cate_name' => '砍价(未授权)']);
 
         Route::group(function () {
@@ -459,7 +459,7 @@ Route::group(function () {
         //微信
         Route::get('wechat/config', 'v1.wechat.WechatController/config')->name('wechatConfig')->option(['real_name' => '微信 sdk 配置']);//微信 sdk 配置
         Route::get('wechat/auth', 'v1.wechat.WechatController/auth')->name('wechatAuth')->option(['real_name' => '微信授权']);//微信授权
-        Route::post('wechat/app_auth', 'v1.wechat.WechatController/appAuth')->name('appAuth')->option(['real_name' => '微信APP授权']);//微信APP授权
+//微信APP授权
 
     })->option(['mark' => 'wechat', 'mark_name' => '微信']);
 
@@ -468,8 +468,8 @@ Route::group(function () {
         Route::post('wechat/mp_auth', 'v1.wechat.AuthController/mp_auth')->name('mpAuth')->option(['real_name' => '小程序登陆']);//小程序登陆
         Route::get('wechat/get_logo', 'v1.wechat.AuthController/get_logo')->name('getLogo')->option(['real_name' => '小程序登陆授权展示logo']);//小程序登陆授权展示logo
         Route::get('wechat/temp_ids', 'v1.wechat.AuthController/temp_ids')->name('wechatTempIds')->option(['real_name' => '小程序订阅消息']);//小程序订阅消息
-        Route::get('wechat/live', 'v1.wechat.AuthController/live')->name('wechatLive')->option(['real_name' => '小程序直播列表']);//小程序直播列表
-        Route::get('wechat/livePlaybacks/:id', 'v1.wechat.AuthController/livePlaybacks')->name('livePlaybacks')->option(['real_name' => '小程序直播回放']);//小程序直播回放
+//小程序直播列表
+//小程序直播回放
     })->option(['mark' => 'mini', 'mark_name' => '小程序']);
 
     Route::group(function () {
@@ -490,7 +490,7 @@ Route::group(function () {
         //用户是否关注
         Route::get('subscribe', 'v1.user.UserController/subscribe')->name('Subscribe')->option(['real_name' => '用户是否关注']);
         //门店列表
-        Route::get('store_list', 'v1.PublicController/store_list')->name('storeList')->option(['real_name' => '门店列表']);
+
         //获取城市列表
         Route::get('city_list', 'v1.PublicController/city_list')->name('cityList')->option(['real_name' => '获取城市列表']);
         //拼团数据
@@ -507,15 +507,15 @@ Route::group(function () {
 
     Route::group(function () {
         //活动---积分商城
-        Route::get('store_integral/index', 'v1.activity.StoreIntegralController/index')->name('storeIntegralIndex')->option(['real_name' => '积分商城首页数据']);//积分商城首页数据
-        Route::get('store_integral/list', 'v1.activity.StoreIntegralController/lst')->name('storeIntegralList')->option(['real_name' => '积分商品列表']);//积分商品列表
-        Route::get('store_integral/detail/:id', 'v1.activity.StoreIntegralController/detail')->name('storeIntegralDetail')->option(['real_name' => '积分商品详情']);//积分商品详情
+//积分商城首页数据
+//积分商品列表
+//积分商品详情
 
     })->option(['mark' => 'integral_nologin', 'mark_name' => '积分商城(未授权)']);
 
     Route::group(function () {
         //获取app最新版本
-        Route::get('get_new_app/:platform', 'v1.PublicController/getNewAppVersion')->name('getNewAppVersion')->option(['real_name' => '获取app最新版本']);//获取app最新版本
+//获取app最新版本
         //获取客服类型
         Route::get('get_customer_type', 'v1.PublicController/getCustomerType')->name('getCustomerType')->option(['real_name' => '获取客服类型']);//获取客服类型
         //长链接设置
@@ -551,11 +551,11 @@ Route::group(function () {
         //拼团到期订单处理
         Route::get('crontab/pink_expiration', 'v1.CrontabController/pinkExpiration')->name('pinkExpiration')->option(['real_name' => '拼团到期订单处理']);
         //自动解绑上级绑定
-        Route::get('crontab/agent_unbind', 'v1.CrontabController/agentUnbind')->name('agentUnbind')->option(['real_name' => '自动解绑上级绑定']);
+
         //更新直播商品状态
-        Route::get('crontab/live_product_status', 'v1.CrontabController/syncGoodStatus')->name('syncGoodStatus')->option(['real_name' => '更新直播商品状态']);
+
         //更新直播间状态
-        Route::get('crontab/live_room_status', 'v1.CrontabController/syncRoomStatus')->name('syncRoomStatus')->option(['real_name' => '更新直播间状态']);
+
         //自动收货
         Route::get('crontab/take_delivery', 'v1.CrontabController/autoTakeOrder')->name('autoTakeOrder')->option(['real_name' => '自动收货']);
         //查询预售到期商品自动下架

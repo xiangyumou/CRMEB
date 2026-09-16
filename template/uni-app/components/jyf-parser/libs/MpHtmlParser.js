@@ -148,7 +148,7 @@ class MpHtmlParser {
             text.substr(0, i) + String.fromCharCode(en) + text.substring(j + 1);
       } else {
         en = text.substring(i + 1, j);
-        // #ifdef MP-WEIXIN || MP-QQ || APP-PLUS
+        // #ifdef MP-WEIXIN || MP-QQ
         if (en == "nbsp")
           text = text.substr(0, i) + "\xA0" + text.substr(j + 1);
         // 解决 &nbsp; 失效
@@ -320,10 +320,6 @@ class MpHtmlParser {
         break;
       case "a":
       case "ad":
-      // #ifdef APP-PLUS
-      case "iframe":
-      case "embed":
-        // #endif
         this.bubble();
         break;
       case "font":

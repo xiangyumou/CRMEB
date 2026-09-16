@@ -1,0 +1,41 @@
+{
+  "baseline_commit": "66681c07d76ce79c6794721563029f8ea4af023b",
+  "categories": {
+    "source-including-vendored": {
+      "files": 2563,
+      "bytes": 38536244,
+      "lines": 552584
+    },
+    "published-and-assets": {
+      "files": 2541,
+      "bytes": 112456995,
+      "lines": 22438
+    },
+    "vendored": {
+      "files": 100,
+      "bytes": 14665301,
+      "lines": 5486
+    },
+    "other": {
+      "files": 236,
+      "bytes": 16327125,
+      "lines": 4168
+    }
+  },
+  "source_reduction": {
+    "files": 163,
+    "bytes": 11498654,
+    "lines": 94444
+  },
+  "source_physical_line_reduction_percent": 14.6,
+  "validation": {
+    "regression_tests": 86,
+    "regression_assertions": 552,
+    "admin_build": "passed with warnings",
+    "php_lint": "passed",
+    "uni_app_static_files_per_target": 275,
+    "uni_app_actual_build": "not run; HBuilderX required",
+    "production_migration": "not run"
+  },
+  "unchanged_public": true
+}

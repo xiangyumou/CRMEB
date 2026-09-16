@@ -22,9 +22,7 @@ module.exports = {
 		// #ifdef MP-WEIXIN
 		+ (canIUse ? ',rp' : '')
 		// #endif
-		// #ifndef APP-PLUS
 		+ ',embed,iframe'
-		// #endif
 	),
 	// 只能被 rich-text 显示的标签
 	richOnlyTags: makeMap('a,colgroup,fieldset,legend,picture,table'
@@ -47,9 +45,6 @@ module.exports = {
 		'a,abbr,ad,audio,b,blockquote,br,code,col,colgroup,dd,del,dl,dt,div,em,fieldset,h1,h2,h3,h4,h5,h6,hr,i,img,ins,label,legend,li,ol,p,q,source,span,strong,sub,sup,table,tbody,td,tfoot,th,thead,tr,title,ul,video'
 		// #ifdef MP-WEIXIN
 		+ (canIUse ? ',bdi,bdo,caption,pre,rt,ruby' : '')
-		// #endif
-		// #ifdef APP-PLUS
-		+ ',embed,iframe'
 		// #endif
 	),
 	// 默认的标签样式

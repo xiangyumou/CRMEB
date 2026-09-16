@@ -15,7 +15,6 @@ use app\dao\order\StoreOrderDao;
 use app\jobs\AutoCommentJob;
 use app\services\activity\combination\StorePinkServices;
 use app\services\activity\coupon\StoreCouponUserServices;
-use app\services\activity\seckill\StoreSeckillServices;
 use app\services\BaseServices;
 use app\services\other\PosterServices;
 use app\services\other\QrcodeServices;

@@ -194,15 +194,7 @@ export default {
       },
       component: () => import('@/pages/system/auth/index'),
     },
-    {
-      path: 'onlineUpgrade/index',
-      name: `${pre}upgradeclient`,
-      meta: {
-        auth: ['system-onlineUpgrade-index'],
-        title: '在线升级',
-      },
-      component: () => import('@/pages/system/onlineUpgrade/index'),
-    },
+
     {
       path: 'crossVersionUpgrade/index',
       name: `${pre}crossVersionUpgrade`,

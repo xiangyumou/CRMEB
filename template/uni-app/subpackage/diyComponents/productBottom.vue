@@ -40,39 +40,10 @@
               </view>
               <view class="p_center">{{ $t(`购物车`) }}</view>
             </view>
-            <!-- #ifdef APP-PLUS || H5 -->
-            <view
-              v-if="item_id === 0"
-              class="item"
-              @click="goCustomer"
-            >
+            <view v-if="item_id === 0 && customerQrcode" class="item" @click="goCustomer">
               <view class="iconfont icon-kefu"></view>
               <view class="p_center">{{ $t(`客服`) }}</view>
             </view>
-            <!-- #endif -->
-            <!-- #ifdef MP -->
-            <view
-              v-if="item_id === 0 && routineContact == 0"
-              class="item"
-              @click="goCustomer"
-            >
-              <view class="iconfont icon-kefu"></view>
-              <view class="p_center">{{ $t(`客服`) }}</view>
-            </view>
-            <button
-              v-else-if="item_id === 0 && routineContact == 1"
-              class="item"
-              open-type="contact"
-              :send-message-title="storeInfo.store_name"
-              :send-message-img="storeInfo.image"
-              :send-message-path="`/pages/goods_details/index?id=${storeInfo.id}`"
-              show-message-card
-              hover-class="none"
-            >
-              <view class="iconfont icon-kefu"></view>
-              <view class="p_center">{{ $t(`客服`) }}</view>
-            </button>
-            <!-- #endif -->
             <view v-if="item_id === 4" class="item" @click="goShare">
               <view class="iconfont icon-fenxiang4"></view>
               <view class="p_center">{{ $t(`分享`) }}</view>
@@ -227,6 +198,7 @@
 </template>
 
 <script>
+import { getCustomerType } from '@/api/api.js';
 import commonWrapper from "./commonWrapper.vue";
 import { getCustomer } from "@/utils/index.js";
 export default {
@@ -274,6 +246,8 @@ export default {
       default: 0,
     },
   },
+  data() { return { customerQrcode: '' }; },
+  mounted() { getCustomerType().then(res => { this.customerQrcode = res.data.customer_qrcode || ''; }).catch(() => {}); },
   computed: {
     bottomConfig() {
       if (!this.diyData || !this.diyData.value) return null;

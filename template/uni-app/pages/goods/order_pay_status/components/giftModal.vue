@@ -35,7 +35,7 @@
       <view class="keep">{{ $t(`长按图片可以保存到手机`) }}</view>
       <!-- #endif -->
     </template>
-    <!-- #ifdef H5 || APP-PLUS -->
+    <!-- #ifdef H5 -->
     <zb-code
       ref="qrcode"
       :show="codeShow"
@@ -106,14 +106,6 @@ export default {
           "&spid=" +
           this.$store.state.app.uid;
         // #endif
-        // #ifdef APP-PLUS
-        this.codeVal =
-          HTTP_REQUEST_URL +
-          "/pages/goods/receive_gift/index?id=" +
-          this.giftData.id +
-          "&spid=" +
-          this.$store.state.app.uid;
-        // #endif
         // #ifdef MP
         this.PromotionCode = this.giftData.code;
         // #endif
@@ -131,9 +123,6 @@ export default {
       if (!this.$wechat.isWeixin() || this.shareQrcode != "1") {
         this.PromotionCode = res;
       }
-      // #endif
-      // #ifdef APP-PLUS
-      this.PromotionCode = res;
       // #endif
     },
     //隐藏弹窗
@@ -335,7 +324,7 @@ export default {
     goPoster(postImg) {
       this.drawPoster(postImg, this.giftData.nickname, this.giftData.title)
         .then((posterPath) => {
-          // #ifdef APP-PLUS || MP
+          // #ifdef MP
           this.savePosterPathMp(posterPath);
           // #endif
           // #ifdef H5
@@ -347,7 +336,7 @@ export default {
           console.error("海报生成失败:", err);
         });
     },
-    // #ifdef APP-PLUS || MP
+    // #ifdef MP
     savePosterPathMp(url) {
       let that = this;
       uni.saveImageToPhotosAlbum({

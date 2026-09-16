@@ -8,12 +8,7 @@
 				<view class='item'><text class='iconfont icon-liulan'></text>{{articleInfo.visit || ''}}</view>
 			</view>
 			<view class='conters' v-if="description">
-				<!-- #ifndef APP-PLUS -->
 				<parser :html="description" ref="article" :tag-style="tagStyle"></parser>
-				<!-- #endif -->
-				<!-- #ifdef APP-PLUS -->
-				<view v-html="description"></view>
-				<!-- #endif -->
 			</view>
 			<navigator class="picTxt acea-row row-between-wrapper" v-if="store_info.id"
 				:url="'/pages/goods_details/index?id='+store_info.id" hover-class="none">

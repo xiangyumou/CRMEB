@@ -1,82 +1,132 @@
 <template>
-  <common_wrapper :config="configObj">
-    <div class="member-card" :class="'style' + (styleConfig + 1)">
-      <!-- 信息样式 共五种 -->
-      <template v-if="styleConfig == 0">
+<common_wrapper :config="configObj">
+  <div class="member-card" :class="'style' + (styleConfig + 1)">
+    <!-- 信息样式 共五种 -->
+    <template v-if="styleConfig == 0">
+      <div
+        class="card-header acea-row row-between-wrapper"
+        :class="{
+          'style-0': styleConfig == 0,
+        }"
+      >
+        <div class="user-info acea-row row-middle">
+          <div class="avatar">
+            <img :src="logoConfig" v-if="logoConfig" />
+            <div class="empty-box" v-else>
+              <img src="@/assets/images/shan.png" />
+            </div>
+          </div>
+          <div class="text">
+            <div class="name" :style="{ color: nameColor, fontSize: nameSize + 'px' }">这里是昵称</div>
+            <!-- 可以切换显示手机号或ID -->
+            <div v-if="userInfoConfig == 0" class="level" :style="{ color: numColor, fontSize: numSize + 'px' }">
+              14512349876
+            </div>
+            <div v-else class="level" :style="{ color: numColor, fontSize: numSize + 'px' }">ID: 9527</div>
+          </div>
+        </div>
+        <!-- 菜单入口 -->
         <div
-          class="card-header acea-row row-between-wrapper"
-          :class="{
-            'style-0': styleConfig == 0,
-          }"
+          class="menu-entry"
+          v-if="menuList.length"
+          style="position: absolute; right: 10px; top: 14px; z-index: 10"
         >
+          <div class="item" v-for="(item, index) in menuList" :key="index" :style="{ marginLeft: '10px' }">
+            <template v-if="menuStyle == 0">
+              <img :src="item.img" v-if="item.img" class="menu-img" />
+            </template>
+            <template v-else>
+              <span
+                class="mb-iconfont"
+                :class="item.icon"
+                :style="{
+                  display: 'inline-block',
+                  color: iconStyle.color.color[0].item,
+                  fontSize: iconStyle.size.val + 'px',
+                  padding: iconStyle.padding.val + 'px',
+                  transform: 'rotate(' + iconStyle.rotate.val + 'deg)',
+                }"
+                v-if="item.icon"
+              ></span>
+            </template>
+          </div>
+        </div>
+      </div>
+    </template>
+    <!-- Style 2: Simple Card (No Data) -->
+    <template v-if="styleConfig == 1">
+      <div class="card-header acea-row row-between-wrapper">
+        <div class="user-info style-2 acea-row row-between-wrapper">
+          <div class="text">
+            <div class="name" :style="{ color: nameColor, fontSize: nameSize + 'px' }">这里是昵称</div>
+            <div class="level" v-if="userInfoConfig == 0" :style="{ color: numColor, fontSize: numSize + 'px' }">
+              14512349876
+            </div>
+            <div class="level" v-else :style="{ color: numColor, fontSize: numSize + 'px' }">9527</div>
+          </div>
+          <div class="avatar">
+            <img :src="logoConfig" v-if="logoConfig" />
+            <div class="empty-box" v-else>
+              <img src="@/assets/images/shan.png" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+    <!-- Style 3: Centered Vertical Layout -->
+    <template v-if="styleConfig == 2">
+      <div class="card-header acea-row row-center-wrapper">
+        <div class="user-info style-3">
+          <div class="avatar">
+            <img :src="logoConfig" v-if="logoConfig" />
+            <div class="empty-box" v-else>
+              <img src="@/assets/images/shan.png" />
+            </div>
+          </div>
+          <div class="text">
+            <div class="name" :style="{ color: nameColor, fontSize: nameSize + 'px' }">这里是昵称</div>
+            <div class="level" v-if="userInfoConfig == 0" :style="{ color: numColor, fontSize: numSize + 'px' }">
+              14512349876
+            </div>
+            <div class="level" v-else :style="{ color: numColor, fontSize: numSize + 'px' }">ID: 9527</div>
+          </div>
+        </div>
+        <!-- Menu Entry -->
+        <div
+          class="menu-entry"
+          v-if="menuList.length"
+          style="position: absolute; right: 10px; top: 14px; z-index: 10"
+        >
+          <div class="item" v-for="(item, index) in menuList" :key="index" :style="{ marginLeft: '10px' }">
+            <template v-if="menuStyle == 0">
+              <img :src="item.img" v-if="item.img" class="menu-img" />
+              <div class="empty-icon" v-else>
+                <img src="@/assets/images/shan.png" />
+              </div>
+            </template>
+            <template v-else>
+              <span
+                class="mb-iconfont"
+                :class="item.icon"
+                :style="{
+                  display: 'inline-block',
+                  color: iconStyle.color.color[0].item,
+                  fontSize: iconStyle.size.val + 'px',
+                  padding: iconStyle.padding.val + 'px',
+                  transform: 'rotate(' + iconStyle.rotate.val + 'deg)',
+                }"
+                v-if="item.icon"
+              ></span>
+            </template>
+          </div>
+        </div>
+      </div>
+    </template>
+    <!-- Style 4: Split Layout -->
+    <template v-if="styleConfig == 3">
+      <div class="style-4-container acea-row row-between-wrapper">
+        <div class="left-card" :style="moduleCardStyle">
           <div class="user-info acea-row row-middle">
-            <div class="avatar">
-              <img :src="logoConfig" v-if="logoConfig" />
-              <div class="empty-box" v-else>
-                <img src="@/assets/images/shan.png" />
-              </div>
-            </div>
-            <div class="text">
-              <div class="name" :style="{ color: nameColor, fontSize: nameSize + 'px' }">这里是昵称</div>
-              <!-- 可以切换显示手机号或ID -->
-              <div v-if="userInfoConfig == 0" class="level" :style="{ color: numColor, fontSize: numSize + 'px' }">
-                14512349876
-              </div>
-              <div v-else class="level" :style="{ color: numColor, fontSize: numSize + 'px' }">ID: 9527</div>
-            </div>
-          </div>
-          <!-- 菜单入口 -->
-          <div
-            class="menu-entry"
-            v-if="menuList.length"
-            style="position: absolute; right: 10px; top: 14px; z-index: 10"
-          >
-            <div class="item" v-for="(item, index) in menuList" :key="index" :style="{ marginLeft: '10px' }">
-              <template v-if="menuStyle == 0">
-                <img :src="item.img" v-if="item.img" class="menu-img" />
-              </template>
-              <template v-else>
-                <span
-                  class="mb-iconfont"
-                  :class="item.icon"
-                  :style="{
-                    display: 'inline-block',
-                    color: iconStyle.color.color[0].item,
-                    fontSize: iconStyle.size.val + 'px',
-                    padding: iconStyle.padding.val + 'px',
-                    transform: 'rotate(' + iconStyle.rotate.val + 'deg)',
-                  }"
-                  v-if="item.icon"
-                ></span>
-              </template>
-            </div>
-          </div>
-        </div>
-      </template>
-      <!-- Style 2: Simple Card (No Data) -->
-      <template v-if="styleConfig == 1">
-        <div class="card-header acea-row row-between-wrapper">
-          <div class="user-info style-2 acea-row row-between-wrapper">
-            <div class="text">
-              <div class="name" :style="{ color: nameColor, fontSize: nameSize + 'px' }">这里是昵称</div>
-              <div class="level" v-if="userInfoConfig == 0" :style="{ color: numColor, fontSize: numSize + 'px' }">
-                14512349876
-              </div>
-              <div class="level" v-else :style="{ color: numColor, fontSize: numSize + 'px' }">9527</div>
-            </div>
-            <div class="avatar">
-              <img :src="logoConfig" v-if="logoConfig" />
-              <div class="empty-box" v-else>
-                <img src="@/assets/images/shan.png" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-      <!-- Style 3: Centered Vertical Layout -->
-      <template v-if="styleConfig == 2">
-        <div class="card-header acea-row row-center-wrapper">
-          <div class="user-info style-3">
             <div class="avatar">
               <img :src="logoConfig" v-if="logoConfig" />
               <div class="empty-box" v-else>
@@ -91,164 +141,7 @@
               <div class="level" v-else :style="{ color: numColor, fontSize: numSize + 'px' }">ID: 9527</div>
             </div>
           </div>
-          <!-- Menu Entry -->
-          <div
-            class="menu-entry"
-            v-if="menuList.length"
-            style="position: absolute; right: 10px; top: 14px; z-index: 10"
-          >
-            <div class="item" v-for="(item, index) in menuList" :key="index" :style="{ marginLeft: '10px' }">
-              <template v-if="menuStyle == 0">
-                <img :src="item.img" v-if="item.img" class="menu-img" />
-                <div class="empty-icon" v-else>
-                  <img src="@/assets/images/shan.png" />
-                </div>
-              </template>
-              <template v-else>
-                <span
-                  class="mb-iconfont"
-                  :class="item.icon"
-                  :style="{
-                    display: 'inline-block',
-                    color: iconStyle.color.color[0].item,
-                    fontSize: iconStyle.size.val + 'px',
-                    padding: iconStyle.padding.val + 'px',
-                    transform: 'rotate(' + iconStyle.rotate.val + 'deg)',
-                  }"
-                  v-if="item.icon"
-                ></span>
-              </template>
-            </div>
-          </div>
-        </div>
-      </template>
-      <!-- Style 4: Split Layout -->
-      <template v-if="styleConfig == 3">
-        <div class="style-4-container acea-row row-between-wrapper">
-          <div class="left-card" :style="moduleCardStyle">
-            <div class="user-info acea-row row-middle">
-              <div class="avatar">
-                <img :src="logoConfig" v-if="logoConfig" />
-                <div class="empty-box" v-else>
-                  <img src="@/assets/images/shan.png" />
-                </div>
-              </div>
-              <div class="text">
-                <div class="name" :style="{ color: nameColor, fontSize: nameSize + 'px' }">这里是昵称</div>
-                <div class="level" v-if="userInfoConfig == 0" :style="{ color: numColor, fontSize: numSize + 'px' }">
-                  14512349876
-                </div>
-                <div class="level" v-else :style="{ color: numColor, fontSize: numSize + 'px' }">ID: 9527</div>
-              </div>
-            </div>
-            <div class="stats-row card-data acea-row row-around">
-              <template v-if="assetMode == 0">
-                <div
-                  class="item"
-                  v-for="(item, index) in dataList"
-                  :key="index"
-                  :class="{
-                    'style-vert': dataStyle == 0,
-                    'style-horiz': dataStyle == 1,
-                    'style-vert-2': dataStyle == 2,
-                  }"
-                >
-                  <template v-if="dataStyle == 0">
-                    <div class="num" :style="{ color: dataNumColor }">{{ item.val }}</div>
-                    <div class="label" :style="{ color: dataTitleColor }">{{ item.name }}</div>
-                  </template>
-                  <template v-if="dataStyle == 1 || dataStyle == 2">
-                    <div class="label" :style="{ color: dataTitleColor }">{{ item.name }}</div>
-                    <div class="num" :style="{ color: dataNumColor }">{{ item.val }}</div>
-                  </template>
-                </div>
-              </template>
-              <template v-if="assetMode == 1">
-                <div class="item style-icon" v-for="(item, index) in assetList" :key="index">
-                  <div class="icon-box">
-                    <img :src="item.img" v-if="assetStyle == 0 && item.img" class="img-icon" />
-                    <span
-                      class="iconfont"
-                      :class="item.icon"
-                      :style="{ fontSize: assetIconSize + 'px', color: assetIconColor }"
-                      v-else-if="assetStyle == 1 && item.icon"
-                    ></span>
-                    <div class="empty-icon" v-else><img src="@/assets/images/shan.png" /></div>
-                  </div>
-                  <div class="label" :style="{ fontSize: assetTextSize + 'px', color: assetTextColor }">
-                    {{ item.info[0].value }}
-                  </div>
-                </div>
-              </template>
-            </div>
-          </div>
-          <div class="right-card" :style="moduleCardStyle">
-            <div class="entry-content" v-if="rightEntryList.length">
-              <div
-                class="title"
-                :style="{ fontSize: '14px', fontWeight: 'bold', marginBottom: '5px', color: moduleTitleColor }"
-              >
-                {{ rightEntryList[0].info[0].value }}
-              </div>
-              <div
-                class="subtitle"
-                style="font-size: 12px; color: #ff9900; margin-bottom: 10px; display: flex; align-items: center"
-              >
-                {{ rightEntryList[0].info[1].value }}
-                <span class="iconfont iconyou" style="font-size: 12px"></span>
-              </div>
-              <div class="img-box">
-                <img :src="rightEntryList[0].img" v-if="rightEntryList[0].img" />
-                <div class="empty-icon" v-else><img src="@/assets/images/shan.png" /></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-      <!-- Style 5: White Card Layout -->
-      <template v-if="styleConfig == 4">
-        <div class="style-5-container">
-          <div class="header acea-row row-between-wrapper">
-            <div class="left">
-              <div class="avatar">
-                <img :src="logoConfig" v-if="logoConfig" />
-                <div class="empty-box" v-else>
-                  <img src="@/assets/images/shan.png" />
-                </div>
-              </div>
-              <div class="text">
-                <div class="name" :style="{ color: nameColor, fontSize: nameSize + 'px' }">这里是昵称</div>
-                <div class="level" v-if="userInfoConfig == 0" :style="{ color: numColor, fontSize: numSize + 'px' }">
-                  14512349876
-                </div>
-                <div class="level" v-else :style="{ color: numColor, fontSize: numSize + 'px' }">ID: 9527</div>
-              </div>
-            </div>
-            <!-- Menu Entry -->
-            <div class="menu-entry" v-if="menuList.length">
-              <div class="item" v-for="(item, index) in menuList" :key="index" :style="{ marginLeft: '10px' }">
-                <template v-if="menuStyle == 0">
-                  <img :src="item.img" v-if="item.img" class="menu-img" />
-                </template>
-                <template v-else>
-                  <span
-                    class="mb-iconfont"
-                    :class="item.icon"
-                    :style="{
-                      display: 'inline-block',
-                      color: iconStyle.color.color[0].item,
-                      fontSize: iconStyle.size.val + 'px',
-                      padding: iconStyle.padding.val + 'px',
-                      transform: 'rotate(' + iconStyle.rotate.val + 'deg)',
-                    }"
-                    v-if="item.icon"
-                  ></span>
-                </template>
-              </div>
-            </div>
-          </div>
-          <!-- Asset Grid -->
-          <div class="card-data acea-row row-around" v-if="assetList.length">
+          <div class="stats-row card-data acea-row row-around">
             <template v-if="assetMode == 0">
               <div
                 class="item"
@@ -270,8 +163,6 @@
                 </template>
               </div>
             </template>
-
-            <!-- Graphic Mode -->
             <template v-if="assetMode == 1">
               <div class="item style-icon" v-for="(item, index) in assetList" :key="index">
                 <div class="icon-box">
@@ -284,23 +175,80 @@
                   ></span>
                   <div class="empty-icon" v-else><img src="@/assets/images/shan.png" /></div>
                 </div>
-                <div class="label">{{ item.info[0].value }}</div>
+                <div class="label" :style="{ fontSize: assetTextSize + 'px', color: assetTextColor }">
+                  {{ item.info[0].value }}
+                </div>
               </div>
             </template>
           </div>
         </div>
-      </template>
-      <!-- 快捷入口 -->
-      <template
-        v-if="
-          ((assetMode == 0 && checkType.length) || (assetMode == 1 && assetList.length)) &&
-          styleConfig != 3 &&
-          styleConfig != 4
-        "
-      >
-        <!-- 快捷入口 -->
-        <div class="card-data acea-row row-around">
-          <!-- Data Mode -->
+        <div class="right-card" :style="moduleCardStyle">
+          <div class="entry-content" v-if="rightEntryList.length">
+            <div
+              class="title"
+              :style="{ fontSize: '14px', fontWeight: 'bold', marginBottom: '5px', color: moduleTitleColor }"
+            >
+              {{ rightEntryList[0].info[0].value }}
+            </div>
+            <div
+              class="subtitle"
+              style="font-size: 12px; color: #ff9900; margin-bottom: 10px; display: flex; align-items: center"
+            >
+              {{ rightEntryList[0].info[1].value }}
+              <span class="iconfont iconyou" style="font-size: 12px"></span>
+            </div>
+            <div class="img-box">
+              <img :src="rightEntryList[0].img" v-if="rightEntryList[0].img" />
+              <div class="empty-icon" v-else><img src="@/assets/images/shan.png" /></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+    <!-- Style 5: White Card Layout -->
+    <template v-if="styleConfig == 4">
+      <div class="style-5-container">
+        <div class="header acea-row row-between-wrapper">
+          <div class="left">
+            <div class="avatar">
+              <img :src="logoConfig" v-if="logoConfig" />
+              <div class="empty-box" v-else>
+                <img src="@/assets/images/shan.png" />
+              </div>
+            </div>
+            <div class="text">
+              <div class="name" :style="{ color: nameColor, fontSize: nameSize + 'px' }">这里是昵称</div>
+              <div class="level" v-if="userInfoConfig == 0" :style="{ color: numColor, fontSize: numSize + 'px' }">
+                14512349876
+              </div>
+              <div class="level" v-else :style="{ color: numColor, fontSize: numSize + 'px' }">ID: 9527</div>
+            </div>
+          </div>
+          <!-- Menu Entry -->
+          <div class="menu-entry" v-if="menuList.length">
+            <div class="item" v-for="(item, index) in menuList" :key="index" :style="{ marginLeft: '10px' }">
+              <template v-if="menuStyle == 0">
+                <img :src="item.img" v-if="item.img" class="menu-img" />
+              </template>
+              <template v-else>
+                <span
+                  class="mb-iconfont"
+                  :class="item.icon"
+                  :style="{
+                    display: 'inline-block',
+                    color: iconStyle.color.color[0].item,
+                    fontSize: iconStyle.size.val + 'px',
+                    padding: iconStyle.padding.val + 'px',
+                    transform: 'rotate(' + iconStyle.rotate.val + 'deg)',
+                  }"
+                  v-if="item.icon"
+                ></span>
+              </template>
+            </div>
+          </div>
+        </div>
+        <!-- Asset Grid -->
+        <div class="card-data acea-row row-around" v-if="assetList.length">
           <template v-if="assetMode == 0">
             <div
               class="item"
@@ -336,120 +284,77 @@
                 ></span>
                 <div class="empty-icon" v-else><img src="@/assets/images/shan.png" /></div>
               </div>
-              <div class="label" :style="{ color: assetTextColor, fontSize: assetTextSize + 'px' }">
-                {{ item.info[0].value }}
-              </div>
+              <div class="label">{{ item.info[0].value }}</div>
             </div>
           </template>
         </div>
-      </template>
-      <!-- 会员样式 共四种 -->
-      <template v-if="memberStyleConfig == 0">
-        <div class="member-style-1" :style="[cardStyle, { marginTop: memberTopMargin }]">
-          <div class="item" v-for="(item, index) in memberList" :key="index">
-            <div class="text-box">
-              <div class="title">{{ item.info[0].value }}</div>
-              <div class="subtitle">{{ item.info[1].value }} <span class="iconfont iconyou"></span></div>
-            </div>
-            <div class="img-box">
-              <img :src="item.img" v-if="item.img" />
+      </div>
+    </template>
+    <!-- 快捷入口 -->
+    <template
+      v-if="
+        ((assetMode == 0 && checkType.length) || (assetMode == 1 && assetList.length)) &&
+        styleConfig != 3 &&
+        styleConfig != 4
+      "
+    >
+      <!-- 快捷入口 -->
+      <div class="card-data acea-row row-around">
+        <!-- Data Mode -->
+        <template v-if="assetMode == 0">
+          <div
+            class="item"
+            v-for="(item, index) in dataList"
+            :key="index"
+            :class="{
+              'style-vert': dataStyle == 0,
+              'style-horiz': dataStyle == 1,
+              'style-vert-2': dataStyle == 2,
+            }"
+          >
+            <template v-if="dataStyle == 0">
+              <div class="num" :style="{ color: dataNumColor }">{{ item.val }}</div>
+              <div class="label" :style="{ color: dataTitleColor }">{{ item.name }}</div>
+            </template>
+            <template v-if="dataStyle == 1 || dataStyle == 2">
+              <div class="label" :style="{ color: dataTitleColor }">{{ item.name }}</div>
+              <div class="num" :style="{ color: dataNumColor }">{{ item.val }}</div>
+            </template>
+          </div>
+        </template>
+
+        <!-- Graphic Mode -->
+        <template v-if="assetMode == 1">
+          <div class="item style-icon" v-for="(item, index) in assetList" :key="index">
+            <div class="icon-box">
+              <img :src="item.img" v-if="assetStyle == 0 && item.img" class="img-icon" />
+              <span
+                class="iconfont"
+                :class="item.icon"
+                :style="{ fontSize: assetIconSize + 'px', color: assetIconColor }"
+                v-else-if="assetStyle == 1 && item.icon"
+              ></span>
               <div class="empty-icon" v-else><img src="@/assets/images/shan.png" /></div>
             </div>
-            <div class="line" v-if="index < memberList.length - 1"></div>
+            <div class="label" :style="{ color: assetTextColor, fontSize: assetTextSize + 'px' }">
+              {{ item.info[0].value }}
+            </div>
           </div>
-        </div>
-      </template>
+        </template>
+      </div>
+    </template>
+    <!-- 会员样式 共四种 -->
+   >
 
-      <!-- Member Style 2 -->
-      <template v-if="memberStyleConfig == 1">
-        <div class="member-style-2" :style="[cardStyle, { marginTop: memberTopMargin }]">
-          <div class="top-row">
-            <div class="left-info">
-              <div class="title-area">
-                <img :src="ms2TitleImage" v-if="ms2TitleType == 1 && ms2TitleImage" class="title-img" />
-                <span class="title-text" v-else :style="{ color: ms2TitleColor }">{{ ms2TitleText }}</span>
-              </div>
-              <div class="intro-text" :style="{ color: ms2IntroColor }">{{ ms2IntroText }}</div>
-            </div>
-            <div class="right-rights">
-              <div class="right-item" v-for="(item, index) in ms2RightsList" :key="index">
-                <div class="icon-wrap">
-                  <img :src="item.img" v-if="item.img" />
-                  <span
-                    class="iconfont"
-                    :class="item.icon"
-                    v-else-if="item.icon"
-                    :style="{ color: ms2RightsColor }"
-                  ></span>
-                  <div class="empty-icon" v-else><img src="@/assets/images/shan.png" /></div>
-                </div>
-                <span class="text" :style="{ color: ms2RightsColor }">{{ item.info[0].value }}</span>
-              </div>
-              <span class="iconfont iconyou" :style="{ color: ms2RightsColor }"></span>
-            </div>
-          </div>
-          <div class="divider"></div>
-          <div class="bottom-row">
-            <div class="explain-list">
-              <div class="icons" v-if="ms2ExplainIcons">
-                <img :src="ms2ExplainIcons" />
-              </div>
-              <div class="explain-text" :style="{ color: ms2ExplainColor }">{{ ms2ExplainText }}</div>
-            </div>
-            <div class="action-btn" :style="{ color: ms2ButtonColor, background: ms2ButtonBgColor }">
-              {{ ms2ButtonText }}
-            </div>
-          </div>
-        </div>
-      </template>
+    <!-- Member Style 2 -->
+   >
 
-      <!-- Member Style 3 -->
-      <template v-if="memberStyleConfig == 2">
-        <div class="member-style-3" :style="[cardStyle]">
-          <div class="content-wrapper" :style="ms3ContainerStyle">
-            <div class="desc" :style="{ color: ms3TitleColor, fontSize: '12px' }">
-              {{ ms3TitleText }}
-            </div>
-            <div
-              class="btn"
-              :style="{
-                color: ms3ButtonColor,
-                borderColor: ms3ButtonColor,
-                border: '1px solid',
-                padding: '4px 12px',
-                borderRadius: '14px',
-                fontSize: '12px',
-              }"
-            >
-              {{ ms3ButtonText }}
-            </div>
-          </div>
-        </div>
-      </template>
-      <!-- Member Style 4 -->
-      <template v-if="memberStyleConfig == 3">
-        <div class="member-style-4" :style="[cardStyle, { marginTop: memberTopMargin }]">
-          <div class="left-box">
-            <div class="label" style="color: #999; font-size: 12px; margin-bottom: 5px">可提现(元)</div>
-            <div class="value" style="color: #f6d99d; font-size: 24px; font-weight: bold">200.00</div>
-          </div>
-          <div
-            class="right-box"
-            style="
-              background: #f6d99d;
-              color: #5a350c;
-              padding: 5px 15px;
-              border-radius: 20px;
-              font-size: 12px;
-              font-weight: bold;
-            "
-          >
-            立即提现
-          </div>
-        </div>
-      </template>
-    </div>
-  </common_wrapper>
+    <!-- Member Style 3 -->
+   >
+    <!-- Member Style 4 -->
+   >
+  </div>
+</common_wrapper>
 </template>
 
 <script>
@@ -478,14 +383,14 @@ export default {
     ...mapState('mobildConfig', ['defaultArray']),
     dataList() {
       let list = [
-        { id: 1, name: '余额', val: '200' },
+
         { id: 3, name: '优惠券', val: '2888' },
-        { id: 2, name: '积分', val: '3000' },
+
         { id: 5, name: '收藏商品', val: '1660' },
         { id: 6, name: '浏览记录', val: '1660' },
-        { id: 8, name: '推广佣金', val: '666' },
-        { id: 9, name: '推广人', val: '1660' },
-        { id: 10, name: '推广订单', val: '1660' },
+
+
+
       ];
       return list.filter((item) => this.checkType.indexOf(item.id) != -1);
     },
@@ -691,14 +596,14 @@ export default {
           maxList: 5,
           type: [1, 2, 3],
           list: [
-            { id: 1, name: '余额' },
+
             { id: 3, name: '优惠券' },
-            { id: 2, name: '积分' },
+
             { id: 5, name: '收藏商品' },
             { id: 6, name: '浏览记录' },
-            { id: 8, name: '推广佣金' },
-            { id: 9, name: '推广人' },
-            { id: 10, name: '推广订单' },
+
+
+
           ],
         },
         logoConfig: {

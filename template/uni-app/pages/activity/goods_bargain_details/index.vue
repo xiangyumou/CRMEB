@@ -254,12 +254,6 @@
 				<view class="">{{ $t(`发送给朋友`) }}</view>
 			</button>
 			<!-- #endif -->
-			<!-- #ifdef APP-PLUS -->
-			<view class="item" @click="appShare('WXSceneSession')">
-				<view class="iconfont icon-weixin3"></view>
-				<view class="">{{ $t(`微信好友`) }}</view>
-			</view>
-			<!-- #endif -->
 			<button class="item" hover-class="none" @click="getBargainUserBargainPricePoster">
 				<view class="iconfont icon-haibao"></view>
 				<view class="">{{ $t(`生成海报`) }}</view>
@@ -522,40 +516,6 @@ export default {
 			}
 		},
 		// app分享
-		// #ifdef APP-PLUS
-		appShare(scene) {
-			let that = this;
-			let routes = getCurrentPages(); // 获取当前打开过的页面路由数组
-			let curRoute = routes[routes.length - 1].$page.fullPath; // 获取当前页面路由，也就是最后一个打开的页面路由
-
-			uni.share({
-				provider: 'weixin',
-				scene: scene,
-				type: 0,
-				href: `${HTTP_REQUEST_URL}${curRoute}`,
-				title: that.bargainInfo.title,
-				imageUrl: that.bargainInfo.small_image,
-				success: function (res) {
-					uni.showToast({
-						title: this.$t(`分享成功`),
-						icon: 'success'
-					});
-					that.posters = false;
-				},
-				fail: function (err) {
-					uni.showToast({
-						title: this.$t(`分享失败`),
-						icon: 'none',
-						duration: 2000
-					});
-					that.posters = false;
-				}
-			});
-		},
-		qrR(res) {
-			this.codeSrc = res;
-		},
-		// #endif
 		/**
 		 * 分享打开
 		 *
@@ -1007,7 +967,7 @@ page {
 	font-size: 20rpx;
 	position: absolute;
 	width: 100%;
-	/* #ifdef MP || APP-PLUS */
+	/* #ifdef MP */
 	height: 44px;
 	line-height: 44px;
 	top: 40rpx;

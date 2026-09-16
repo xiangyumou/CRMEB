@@ -348,8 +348,7 @@ class SystemConfig extends AuthController
             @copy($from, $toPublic);
         }
         if (isset($post['reward_integral']) || isset($post['reward_money'])) {
-            if ($post['reward_money'] < 0) return app('json')->fail('赠送余额不能小于0元');
-            if ($post['reward_integral'] < 0) return app('json')->fail('赠送积分不能小于0');
+            \app\services\CoreStore::assertGift($post);
         }
 
         if (isset($post['sign_give_point'])) {

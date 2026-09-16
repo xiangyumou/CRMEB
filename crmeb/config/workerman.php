@@ -30,15 +30,4 @@ return [
         'serverCount' => 1,
     ],
 
-    // msg 客户或者客服发送消息给程序，客服消息通知
-    'chat' => [
-        //协议
-        'protocol' => 'websocket',
-        //监听地址
-        'ip' => '0.0.0.0',
-        //监听端口
-        'port' => 40002,
-        //设置当前Worker实例启动多少个进程
-        'serverCount' => 1,
-    ],
 ];

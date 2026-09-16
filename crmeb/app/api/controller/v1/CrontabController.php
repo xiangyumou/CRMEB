@@ -11,9 +11,6 @@
 namespace app\api\controller\v1;
 
 use app\services\activity\combination\StorePinkServices;
-use app\services\activity\live\LiveGoodsServices;
-use app\services\activity\live\LiveRoomServices;
-use app\services\agent\AgentManageServices;
 use app\services\order\StoreOrderServices;
 use app\services\order\StoreOrderTakeServices;
 use app\services\product\product\StoreProductServices;
@@ -75,32 +72,17 @@ class CrontabController
     /**
      * 自动解绑上级绑定
      */
-    public function agentUnbind()
-    {
-        /** @var AgentManageServices $agentManage */
-        $agentManage = app()->make(AgentManageServices::class);
-        $agentManage->removeSpread();
-    }
+
 
     /**
      * 更新直播商品状态
      */
-    public function syncGoodStatus()
-    {
-        /** @var LiveGoodsServices $liveGoods */
-        $liveGoods = app()->make(LiveGoodsServices::class);
-        $liveGoods->syncGoodStatus();
-    }
+
 
     /**
      * 更新直播间状态
      */
-    public function syncRoomStatus()
-    {
-        /** @var LiveRoomServices $liveRoom */
-        $liveRoom = app()->make(LiveRoomServices::class);
-        $liveRoom->syncRoomStatus();
-    }
+
 
     /**
      * 自动收货

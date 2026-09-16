@@ -128,7 +128,7 @@ export default {
 	},
 	onLoad() {
 		if (this.isLogin) {
-			// #ifdef H5 || APP-PLUS
+			// #ifdef H5
 			this.getUseCoupons();
 			// #endif
 		} else {
@@ -272,7 +272,7 @@ export default {
 .coupon-list .item .text .condition .name {
 	font-size: 28rpx;
 	font-weight: 500;
-	/* 
+	/*
 	display: flex;
 	align-items: center; */
 }

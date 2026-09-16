@@ -16,7 +16,6 @@ use app\services\activity\advance\StoreAdvanceServices;
 use app\services\activity\combination\StorePinkServices;
 use app\services\agent\AgentLevelServices;
 use app\services\activity\coupon\StoreCouponUserServices;
-use app\services\agent\DivisionServices;
 use app\services\product\product\StoreCategoryServices;
 use app\services\shipping\ShippingTemplatesFreeServices;
 use app\services\shipping\ShippingTemplatesRegionServices;
@@ -29,7 +28,6 @@ use crmeb\exceptions\ApiStatusException;
 use crmeb\services\CacheService;
 use app\dao\order\StoreOrderDao;
 use app\services\user\UserServices;
-use app\services\user\UserBillServices;
 use app\services\user\UserAddressServices;
 use app\services\activity\bargain\StoreBargainServices;
 use app\services\activity\seckill\StoreSeckillServices;
@@ -145,6 +143,7 @@ class StoreOrderCreateServices extends BaseServices
      */
     public function createOrder($uid, $key, $userInfo, $addressId, $payType, $useIntegral = false, $couponId = 0, $mark = '', $combinationId = 0, $pinkId = 0, $seckillId = 0, $bargainId = 0, $shippingType = 1, $real_name = '', $phone = '', $storeId = 0, $news = false, $advanceId = 0, $customForm = [], $invoice_id = 0, $is_gift = 0, $gift_mark = '')
     {
+        \app\services\CoreStore::assertOrder(compact('payType', 'useIntegral', 'seckillId', 'bargainId', 'shippingType', 'storeId'));
         /** @var StoreOrderServices $orderService */
         $storeOrderServices = app()->make(StoreOrderServices::class);
         $bargainServices = app()->make(StoreBargainServices::class);
@@ -358,27 +357,8 @@ class StoreOrderCreateServices extends BaseServices
      */
     public function deductIntegral(array $userInfo, bool $useIntegral, array $priceData, int $uid, $orderId)
     {
-        $res2 = true;
-        if ($useIntegral && $userInfo['integral'] > 0) {
-            /** @var UserServices $userServices */
-            $userServices = app()->make(UserServices::class);
-            if (!$priceData['SurplusIntegral']) {
-                $res2 = false !== $userServices->update($uid, ['integral' => 0]);
-            } else {
-                $res2 = false !== $userServices->bcDec($userInfo['uid'], 'integral', $priceData['usedIntegral'], 'uid');
-            }
-            /** @var UserBillServices $userBillServices */
-            $userBillServices = app()->make(UserBillServices::class);
-            $res3 = $userBillServices->income('deduction', $uid, [
-                'number' => $priceData['usedIntegral'],
-                'deductionPrice' => $priceData['deduction_price']
-            ], $userInfo['integral'] - $priceData['usedIntegral'], $orderId);
-
-            $res2 = $res2 && false != $res3;
-        }
-        if (!$res2) {
-            throw new ApiException('使用积分抵扣失败');
-        }
+        if ($useIntegral) throw new ApiException('当前商城不支持该业务');
+        return true;
     }
 
     /**
@@ -810,69 +790,10 @@ class StoreOrderCreateServices extends BaseServices
      */
     public function computeOrderProductBrokerage(int $uid, array $cartInfo)
     {
-
-        [$storeBrokerageRatio, $storeBrokerageTwo, $spread_one_uid, $spread_two_uid] = $this->getSpreadDate($uid);
-
-        /** @var DivisionServices $divisionService */
-        $divisionService = app()->make(DivisionServices::class);
-        [$storeBrokerageRatio, $storeBrokerageTwo, $staffPercent, $agentPercent, $divisionPercent] = $divisionService->getDivisionPercent($uid, $storeBrokerageRatio, $storeBrokerageTwo, sys_config('is_self_brokerage', 0));
-
         foreach ($cartInfo as &$cart) {
-            $oneBrokerage = '0';//一级返佣金额
-            $twoBrokerage = '0';//二级返佣金额
-            $staffBrokerage = '0';//店员返佣金额
-            $agentBrokerage = '0';//代理商返佣金额
-            $divisionBrokerage = '0';//事业部返佣金额
-            $cartNum = (string)$cart['cart_num'] ?? '0';
-            if (isset($cart['productInfo'])) {
-                $productInfo = $cart['productInfo'];
-
-                //计算商品金额
-                if (sys_config('user_brokerage_type') == 1) {
-                    //按照实际支付价格返佣
-                    $price = bcmul((string)bcadd((string)$cart['truePrice'], (string)$cart['postage_price'], 2), $cartNum, 4);
-                } else {
-                    //按照商品价格返佣
-                    if (isset($productInfo['attrInfo'])) {
-                        $price = bcmul((string)($productInfo['attrInfo']['price'] ?? '0'), $cartNum, 4);
-                    } else {
-                        $price = bcmul((string)($productInfo['price'] ?? '0'), $cartNum, 4);
-                    }
-                }
-
-                //指定返佣金额
-                if (isset($productInfo['is_sub']) && $productInfo['is_sub'] == 1) {
-                    $oneBrokerage = bcmul((string)($productInfo['attrInfo']['brokerage'] ?? '0'), $cartNum, 2);
-                    $twoBrokerage = bcmul((string)($productInfo['attrInfo']['brokerage_two'] ?? '0'), $cartNum, 2);
-                } else {
-                    if ($price) {
-                        //一级返佣比例 小于等于零时直接返回 不返佣
-                        if ($storeBrokerageRatio > 0) {
-                            //计算获取一级返佣比例
-                            $brokerageRatio = bcdiv($storeBrokerageRatio, 100, 4);
-                            $oneBrokerage = bcmul((string)$price, (string)$brokerageRatio, 2);
-                        }
-                        //二级返佣比例小于等于0 直接返回
-                        if ($storeBrokerageTwo > 0) {
-                            //计算获取二级返佣比例
-                            $brokerageTwo = bcdiv($storeBrokerageTwo, 100, 4);
-                            $twoBrokerage = bcmul((string)$price, (string)$brokerageTwo, 2);
-                        }
-                    }
-                    $staffBrokerage = bcmul((string)$price, (string)bcdiv($staffPercent, 100, 4), 2);
-                    $agentBrokerage = bcmul((string)$price, (string)bcdiv($agentPercent, 100, 4), 2);
-                    $divisionBrokerage = bcmul((string)$price, (string)bcdiv($divisionPercent, 100, 4), 2);
-                }
-            }
-
-            $cart['one_brokerage'] = $oneBrokerage;
-            $cart['two_brokerage'] = $twoBrokerage;
-            $cart['staff_brokerage'] = $staffBrokerage;
-            $cart['agent_brokerage'] = $agentBrokerage;
-            $cart['division_brokerage'] = $divisionBrokerage;
+            foreach (['one_brokerage','two_brokerage','staff_brokerage','agent_brokerage','division_brokerage'] as $field) $cart[$field] = '0.00';
         }
-
-        return [$cartInfo, [$spread_one_uid, $spread_two_uid]];
+        return $cartInfo;
     }
 
 

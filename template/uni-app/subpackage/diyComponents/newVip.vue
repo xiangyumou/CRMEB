@@ -1,217 +1,68 @@
 <template>
-  <view v-if="couponList.length || productList.length || newcomer_integral">
-    <common-wrapper :config="configData">
-      <view
-        class="newVip2"
-        :style="[newVip2Background, newVipBorderRadius]"
-        v-if="dataConfig.styleConfig.tabVal"
-      >
-        <view class="header acea-row row-between row-middle">
-          <view class="title-box acea-row row-middle">
-            <image
-              :src="`${imgHost}/statics/images/newVip1.png`"
-              class="image"
-            ></image>
-            <view class="info">{{ $t(`超值优惠 限时专享`) }}</view>
-          </view>
-          <view class="more" @click="goNewList"
-            >{{ $t(`去逛逛`) }}<text class="iconfont icon-ic_rightarrow"></text
-          ></view>
-        </view>
-        <view class="wrapper">
-          <view
-            class="coupon"
-            v-if="couponList.length && dataConfig.checkboxInfo.type.includes(1)"
-          >
-            <view class="title">{{ $t(`新人红包`) }}</view>
-            <view class="content">
-              <scroll-view scroll-x="true">
-                <view class="list acea-row">
-                  <view v-for="item in couponList" :key="item.id" class="item">
-                    <view class="back" :style="[couponStyle]"></view>
-                    <view class="money" :style="[moneyStyle]">
-                      <view v-if="item.coupon_type == 1"
-                        >{{ $t(`¥`)
-                        }}<text class="number">{{
-                          item.coupon_price
-                        }}</text></view
-                      >
-                      <view v-else-if="item.coupon_type == 2"
-                        ><text class="number">{{
-                          parseFloat(item.coupon_price) / 10
-                        }}</text
-                        >{{ $t(`折`) }}</view
-                      >
-                    </view>
-                    <view
-                      v-if="item.use_min_price"
-                      class="info"
-                      :style="[couponInfoStyle]"
-                      >{{ $t(`满`) }}{{ item.use_min_price
-                      }}{{ $t(`可用`) }}</view
-                    >
-                    <view v-else class="info" :style="[couponInfoStyle]">{{
-                      $t(`无门槛券`)
-                    }}</view>
-                  </view>
-                </view>
-              </scroll-view>
-            </view>
-          </view>
-          <view
-            class="product"
-            v-if="
-              productList.length && dataConfig.checkboxInfo.type.includes(2)
-            "
-          >
-            <view class="title">{{ $t(`新人商品专区`) }}</view>
-            <view class="content">
-              <scroll-view scroll-x="true">
-                <view class="list acea-row">
-                  <view
-                    class="item"
-                    v-for="item in productList"
-                    :key="item.id"
-                    @click="goDetail(item)"
-                  >
-                    <easy-loadimage
-                      mode="widthFix"
-                      :image-src="item.image"
-                      width="144rpx"
-                      height="144rpx"
-                      borderRadius="12rpx"
-                    ></easy-loadimage>
-                    <view class="money"
-                      >{{ $t(`¥`)
-                      }}<text class="number">{{ item.price }}</text></view
-                    >
-                    <view class="name line1">{{ item.store_name }}</view>
-                  </view>
-                </view>
-              </scroll-view>
-            </view>
-          </view>
-        </view>
-        <view
-          class="bonus acea-row row-middle"
-          v-if="dataConfig.checkboxInfo.type.includes(0)"
-        >
+<view v-if="couponList.length || productList.length">
+  <common-wrapper :config="configData">
+    <view
+      class="newVip2"
+      :style="[newVip2Background, newVipBorderRadius]"
+      v-if="dataConfig.styleConfig.tabVal"
+    >
+      <view class="header acea-row row-between row-middle">
+        <view class="title-box acea-row row-middle">
           <image
-            :src="`${imgHost}/statics/images/newVip2.png`"
+            :src="`${imgHost}/statics/images/newVip1.png`"
             class="image"
           ></image>
-          <view class="text">
-            <view class="info acea-row row-middle">
-              {{ $t(`新用户注册领积分`) }}
-              <view class="red" :style="[bonusRedStyle]">
-                <view class="inner acea-row row-middle">
-                  <image
-                    :src="`${imgHost}/statics/images/newVip3.png`"
-                    class="image"
-                  ></image>
-                  +{{ newcomer_integral }}
-                </view>
-              </view>
-            </view>
-            <view class="">{{ $t(`新用户注册后即可获得积分`) }}</view>
-          </view>
-          <view class="button" :style="[buttonStyle]" @click="goNewList">{{
-            $t(`去看看`)
-          }}</view>
+          <view class="info">{{ $t(`超值优惠 限时专享`) }}</view>
         </view>
+        <view class="more" @click="goNewList"
+          >{{ $t(`去逛逛`) }}<text class="iconfont icon-ic_rightarrow"></text
+        ></view>
       </view>
-      <view class="newVip" :style="[newVipBorderRadius]" v-else>
-        <view class="header acea-row row-between row-middle">
-          <view class="title">{{ $t(`新人专享福利`) }}</view>
-          <view class="more" @click="goNewList"
-            >{{ $t(`更多优惠`)
-            }}<text class="iconfont icon-ic_rightarrow"></text
-          ></view>
-        </view>
-        <view
-          class="bonus"
-          :style="[bonusStyle]"
-          v-if="dataConfig.checkboxInfo.type.includes(0)"
-        >
-          <view class="inner acea-row row-middle">
-            <image
-              :src="`${imgHost}/statics/images/newVip3.png`"
-              class="image"
-            ></image>
-            {{ $t(`新用户注册即可`) }}
-            <text class="red" :style="[bonusRedStyle]">{{
-              $t(`赠送积分`)
-            }}</text>
-          </view>
-        </view>
+      <view class="wrapper">
         <view
           class="coupon"
-          v-if="dataConfig.checkboxInfo.type.includes(1) && couponList.length"
+          v-if="couponList.length && dataConfig.checkboxInfo.type.includes(1)"
         >
-          <view class="title">{{ $t(`专属优惠券`) }}</view>
-          <view class="content acea-row" :style="[couponContentStyle]">
+          <view class="title">{{ $t(`新人红包`) }}</view>
+          <view class="content">
             <scroll-view scroll-x="true">
               <view class="list acea-row">
-                <view
-                  v-for="item in couponList"
-                  :key="item.id"
-                  class="item"
-                  :style="[couponStyle]"
-                >
-                  <view class="item-top acea-row row-center row-middle">
-                    <view class="money" :style="[moneyStyle]">
-                      <view v-if="item.coupon_type == 1"
-                        >{{ $t(`¥`)
-                        }}<text class="number">{{
-                          item.coupon_price
-                        }}</text></view
-                      >
-                      <view v-else-if="item.coupon_type == 2"
-                        ><text class="number">{{
-                          parseFloat(item.coupon_price) / 10
-                        }}</text
-                        >折</view
-                      >
-                    </view>
+                <view v-for="item in couponList" :key="item.id" class="item">
+                  <view class="back" :style="[couponStyle]"></view>
+                  <view class="money" :style="[moneyStyle]">
+                    <view v-if="item.coupon_type == 1"
+                      >{{ $t(`¥`)
+                      }}<text class="number">{{
+                        item.coupon_price
+                      }}</text></view
+                    >
+                    <view v-else-if="item.coupon_type == 2"
+                      ><text class="number">{{
+                        parseFloat(item.coupon_price) / 10
+                      }}</text
+                      >{{ $t(`折`) }}</view
+                    >
                   </view>
                   <view
-                    class="item-bottom acea-row row-column row-center row-middle"
+                    v-if="item.use_min_price"
+                    class="info"
+                    :style="[couponInfoStyle]"
+                    >{{ $t(`满`) }}{{ item.use_min_price
+                    }}{{ $t(`可用`) }}</view
                   >
-                    <view class="name" :style="[couponTypeStyle]">
-                      <text v-if="item.coupon_type == 1">{{
-                        $t(`品类券`)
-                      }}</text>
-                      <text v-else-if="item.coupon_type == 2">{{
-                        $t(`商品券`)
-                      }}</text>
-                      <text v-else-if="item.coupon_type == 3">{{
-                        $t(`品牌券`)
-                      }}</text>
-                      <text v-else>{{ $t(`通用券`) }}</text>
-                    </view>
-                    <view v-if="item.use_min_price" class="info"
-                      >{{ $t(`满`) }}{{ item.use_min_price
-                      }}{{ $t(`可用`) }}</view
-                    >
-                    <view v-else class="info">{{ $t(`无门槛券`) }}</view>
-                  </view>
+                  <view v-else class="info" :style="[couponInfoStyle]">{{
+                    $t(`无门槛券`)
+                  }}</view>
                 </view>
               </view>
             </scroll-view>
-            <view class="station" :style="[stationStyle]">
-              <view class="money"
-                >{{ $t(`¥`) }}<text class="number">{{ totalPrice }}</text></view
-              >
-              <view class="info">{{ $t(`新人专享优惠券`) }}</view>
-              <view class="button" :style="[buttonStyle]" @click="goUser">{{
-                $t(`一键领取`)
-              }}</view>
-            </view>
           </view>
         </view>
         <view
           class="product"
-          v-if="productList.length && dataConfig.checkboxInfo.type.includes(2)"
+          v-if="
+            productList.length && dataConfig.checkboxInfo.type.includes(2)
+          "
         >
           <view class="title">{{ $t(`新人商品专区`) }}</view>
           <view class="content">
@@ -226,23 +77,131 @@
                   <easy-loadimage
                     mode="widthFix"
                     :image-src="item.image"
-                    width="158rpx"
-                    height="158rpx"
+                    width="144rpx"
+                    height="144rpx"
                     borderRadius="12rpx"
                   ></easy-loadimage>
-                  <view class="name line1">{{ item.store_name }}</view>
-                  <view class="money" :style="[productMoneyStyle]"
+                  <view class="money"
                     >{{ $t(`¥`)
                     }}<text class="number">{{ item.price }}</text></view
                   >
+                  <view class="name line1">{{ item.store_name }}</view>
                 </view>
               </view>
             </scroll-view>
           </view>
         </view>
       </view>
-    </common-wrapper>
-  </view>
+     >
+    </view>
+    <view class="newVip" :style="[newVipBorderRadius]" v-else>
+      <view class="header acea-row row-between row-middle">
+        <view class="title">{{ $t(`新人专享福利`) }}</view>
+        <view class="more" @click="goNewList"
+          >{{ $t(`更多优惠`)
+          }}<text class="iconfont icon-ic_rightarrow"></text
+        ></view>
+      </view>
+     >
+      <view
+        class="coupon"
+        v-if="dataConfig.checkboxInfo.type.includes(1) && couponList.length"
+      >
+        <view class="title">{{ $t(`专属优惠券`) }}</view>
+        <view class="content acea-row" :style="[couponContentStyle]">
+          <scroll-view scroll-x="true">
+            <view class="list acea-row">
+              <view
+                v-for="item in couponList"
+                :key="item.id"
+                class="item"
+                :style="[couponStyle]"
+              >
+                <view class="item-top acea-row row-center row-middle">
+                  <view class="money" :style="[moneyStyle]">
+                    <view v-if="item.coupon_type == 1"
+                      >{{ $t(`¥`)
+                      }}<text class="number">{{
+                        item.coupon_price
+                      }}</text></view
+                    >
+                    <view v-else-if="item.coupon_type == 2"
+                      ><text class="number">{{
+                        parseFloat(item.coupon_price) / 10
+                      }}</text
+                      >折</view
+                    >
+                  </view>
+                </view>
+                <view
+                  class="item-bottom acea-row row-column row-center row-middle"
+                >
+                  <view class="name" :style="[couponTypeStyle]">
+                    <text v-if="item.coupon_type == 1">{{
+                      $t(`品类券`)
+                    }}</text>
+                    <text v-else-if="item.coupon_type == 2">{{
+                      $t(`商品券`)
+                    }}</text>
+                    <text v-else-if="item.coupon_type == 3">{{
+                      $t(`品牌券`)
+                    }}</text>
+                    <text v-else>{{ $t(`通用券`) }}</text>
+                  </view>
+                  <view v-if="item.use_min_price" class="info"
+                    >{{ $t(`满`) }}{{ item.use_min_price
+                    }}{{ $t(`可用`) }}</view
+                  >
+                  <view v-else class="info">{{ $t(`无门槛券`) }}</view>
+                </view>
+              </view>
+            </view>
+          </scroll-view>
+          <view class="station" :style="[stationStyle]">
+            <view class="money"
+              >{{ $t(`¥`) }}<text class="number">{{ totalPrice }}</text></view
+            >
+            <view class="info">{{ $t(`新人专享优惠券`) }}</view>
+            <view class="button" :style="[buttonStyle]" @click="goUser">{{
+              $t(`一键领取`)
+            }}</view>
+          </view>
+        </view>
+      </view>
+      <view
+        class="product"
+        v-if="productList.length && dataConfig.checkboxInfo.type.includes(2)"
+      >
+        <view class="title">{{ $t(`新人商品专区`) }}</view>
+        <view class="content">
+          <scroll-view scroll-x="true">
+            <view class="list acea-row">
+              <view
+                class="item"
+                v-for="item in productList"
+                :key="item.id"
+                @click="goDetail(item)"
+              >
+                <easy-loadimage
+                  mode="widthFix"
+                  :image-src="item.image"
+                  width="158rpx"
+                  height="158rpx"
+                  borderRadius="12rpx"
+                ></easy-loadimage>
+                <view class="name line1">{{ item.store_name }}</view>
+                <view class="money" :style="[productMoneyStyle]"
+                  >{{ $t(`¥`)
+                  }}<text class="number">{{ item.price }}</text></view
+                >
+              </view>
+            </view>
+          </scroll-view>
+        </view>
+      </view>
+    </view>
+  </common-wrapper>
+</view>
 </template>
 
 <script>

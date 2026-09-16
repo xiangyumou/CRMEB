@@ -146,15 +146,7 @@ export default {
       },
       component: () => import('@/pages/app/routine/link/index'),
     },
-    {
-      path: 'app/version',
-      name: `${pre}version`,
-      meta: {
-        auth: ['admin-app-version'],
-        title: 'APP版本管理',
-      },
-      component: () => import('@/pages/app/version/index'),
-    },
+
     {
       path: 'app/agreement',
       name: `${pre}agreement `,

@@ -11,23 +11,14 @@
 namespace app\listener\order;
 
 
-use app\jobs\AgentJob;
 use app\jobs\notice\PrintJob;
 use app\jobs\OrderInvoiceJob;
 use app\jobs\OrderJob;
 use app\jobs\ProductLogJob;
-use app\services\activity\seckill\StoreSeckillServices;
-use app\services\activity\coupon\StoreCouponIssueServices;
-use app\services\order\StoreOrderCartInfoServices;
 use app\services\order\StoreOrderDeliveryServices;
 use app\services\order\StoreOrderInvoiceServices;
-use app\services\order\StoreOrderServices;
 use app\services\order\StoreOrderStatusServices;
-use app\services\pay\PayServices;
 use app\services\product\product\StoreProductCouponServices;
-use app\services\product\sku\StoreProductAttrValueServices;
-use app\services\product\sku\StoreProductVirtualServices;
-use app\services\message\MessageSystemServices;
 use app\services\statistic\CapitalFlowServices;
 use app\services\user\UserServices;
 use crmeb\exceptions\AdminException;
@@ -99,7 +90,6 @@ class OrderPaySuccessListener implements ListenerInterface
         OrderJob::dispatch([$orderInfo]);
 
         //支付成功处理自己、上级分销等级升级
-        AgentJob::dispatch([(int)$orderInfo['uid']]);
 
         //商品日志记录支付记录
         ProductLogJob::dispatch(['pay', ['uid' => $orderInfo['uid'], 'order_id' => $orderInfo['id']]]);

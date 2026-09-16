@@ -731,24 +731,6 @@
 						setTimeout(function() {
 							that.infoScroll();
 						}, 500);
-						// #ifdef APP-PLUS
-						uni.downloadFile({
-							url: that.setDomain(res.data.storeInfo.code_base),
-							success: function(res) {
-								that.PromotionCode = res.tempFilePath;
-							},
-							fail: function() {
-								return that.$util.Tips({
-									title: that.$t(`二维码获取失败`)
-								});
-							},
-						});
-
-
-						// that.PromotionCode = res.data.storeInfo.code_base
-
-						that.downloadFilestoreImage();
-						// #endif
 						// #ifndef H5 || APP-PLUS
 						that.downloadFilestoreImage();
 						that.downloadFilePromotionCode();
@@ -1931,7 +1913,7 @@
 		flex-wrap: nowrap;
 		width: 130rpx;
 	}
-	
+
 	.delete-line {
 		text-decoration: line-through;
 	}

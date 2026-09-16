@@ -32,6 +32,8 @@ class NotifyListener
     public function handle($event)
     {
         [$notify, $payType] = $event;
+        if ($payType !== 'weixin' || ($notify['attach'] ?? '') !== 'product') return false;
+
 
         if (isset($notify['out_bill_no']) && $notify['out_bill_no']) {
             return (new Hook(PayTransferNotifyServices::class, 'wechat'))->listen(

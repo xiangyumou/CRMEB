@@ -89,7 +89,7 @@ class ThemeServices extends BaseServices
             if (isset($item['user_data_update_time'])) $item['user_data_update_time'] = date('Y-m-d H:i', $item['user_data_update_time']);
             if (isset($item['theme_data_update_time'])) $item['theme_data_update_time'] = date('Y-m-d H:i', $item['theme_data_update_time']);
             if (isset($item['type'])) $item['type'] = $item['type'] == 0 ? '自建主题' : '广场主题';
-            if (isset($item['theme_data'])) $item['theme_data'] = json_decode($item['theme_data'], true) ?? [];
+            if (isset($item['theme_data'])) $item['theme_data'] = \app\services\CoreStore::cleanDiy(json_decode($item['theme_data'], true)) ?? [];
             $item['home_image'] = set_file_url($item['home_image']);
             $item['category_image'] = set_file_url($item['category_image']);
             $item['detail_image'] = set_file_url($item['detail_image']);
@@ -150,18 +150,18 @@ class ThemeServices extends BaseServices
         if (!$info) throw new AdminException('数据不存在');
         $info = $info->toArray();
         if ($type == 'home') {
-            return json_decode($info['home_data'], true) ?? [];
+            return \app\services\CoreStore::cleanDiy(json_decode($info['home_data'], true)) ?? [];
         } elseif ($type == 'category') {
             return ['status' => $info['category_data'] ?? 1];
         } elseif ($type == 'detail') {
-            return json_decode($info['detail_data'], true) ?? [];
+            return \app\services\CoreStore::cleanDiy(json_decode($info['detail_data'], true)) ?? [];
         } elseif ($type == 'user') {
-            return json_decode($info['user_data'], true) ?? [];
+            return \app\services\CoreStore::cleanDiy(json_decode($info['user_data'], true)) ?? [];
         } elseif ($type == 'theme') {
             if ($info['theme_data'] == '' || $info['theme_data'] == null || $info['theme_data'] == 'null') {
                 $info['theme_data'] = '{"theme_color":"#E93323","gradient_color":"#FF7931","sub_color":"#FE960F","light_color":"rgba(233, 51, 35, 0.1)"}';
             }
-            return json_decode($info['theme_data'], true) ?? [];
+            return \app\services\CoreStore::cleanDiy(json_decode($info['theme_data'], true)) ?? [];
         } elseif ($type == 'base') {
             return ['id' => $info['id'], 'type' => $info['type'], 'title' => $info['title'], 'info' => $info['info']];
         } else {
@@ -563,7 +563,7 @@ class ThemeServices extends BaseServices
                 'update_time' => date('Y-m-d H:i:s', $data['user_data_update_time']), // 用户中心数据更新时间
             ],
         ];
-        $theme['theme_data'] = json_decode($data['theme_data'], true); // 主题自身数据（JSON格式）
+        $theme['theme_data'] = \app\services\CoreStore::cleanDiy(json_decode($data['theme_data'], true)); // 主题自身数据（JSON格式）
 
         return $theme;
     }
@@ -842,7 +842,7 @@ class ThemeServices extends BaseServices
         $info['home_default_data'] = json_encode($homeData, JSON_UNESCAPED_UNICODE);
         $info['detail_default_data'] = json_encode($detailData, JSON_UNESCAPED_UNICODE);
         $info['user_default_data'] = json_encode($userData, JSON_UNESCAPED_UNICODE);
-        $info['theme_data'] = $info['theme_default_data'] = json_decode($info['theme_data'], true);
+        $info['theme_data'] = $info['theme_default_data'] = \app\services\CoreStore::cleanDiy(json_decode($info['theme_data'], true));
 
         // 4. 写入 config.json
         file_put_contents($dir . 'config.json', json_encode($info, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));

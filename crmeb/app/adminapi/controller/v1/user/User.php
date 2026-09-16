@@ -24,7 +24,7 @@ class User extends AuthController
      * @var UserServices
      */
     protected $services;
-    
+
     /**
      * user constructor.
      * @param App $app
@@ -478,8 +478,8 @@ class User extends AuthController
     public function getNewGift()
     {
         $data = [
-            'reward_money' => intval(sys_config('reward_money')),
-            'reward_integral' => intval(sys_config('reward_integral')),
+            'reward_money' => 0,
+            'reward_integral' => 0,
             'reward_coupon' => sys_config('reward_coupon') == '' ? [] : sys_config('reward_coupon')
         ];
         return app('json')->success($data);
@@ -494,6 +494,7 @@ class User extends AuthController
      */
     public function saveNewGift()
     {
+        \app\services\CoreStore::assertGift($this->request->post());
         $data = $this->request->postMore([
             ['reward_money', 0],
             ['reward_integral', 0],

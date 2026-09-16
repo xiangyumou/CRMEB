@@ -1,118 +1,17 @@
 <template>
-  <!-- 在线客服 -->
-  <view class="custmer" v-show="!isSortType">
-    <!-- #ifdef H5 || APP-PLUS -->
-    <view
-      class="customerService"
-      :class="positions ? '' : 'on'"
-      :style="'top:' + topConfig"
-      @touchmove.stop.prevent="setTouchMove"
-      @click="licks"
-    >
-      <view class="pictrue">
-        <image :src="logoConfig"></image>
-      </view>
-    </view>
-    <!-- #endif -->
-    <!-- #ifdef MP -->
-    <view
-      class="customerService"
-      :class="positions ? '' : 'on'"
-      :style="'top:' + topConfig"
-      @touchmove.stop.prevent="setTouchMove"
-      v-if="routineContact === 0"
-      @click="licks"
-    >
-      <view class="pictrue">
-        <image :src="logoConfig"></image>
-      </view>
-    </view>
-    <button
-      class="customerService-sty"
-      :class="positions ? '' : 'on'"
-      :style="'top:' + topConfig"
-      @touchmove.stop.prevent="setTouchMove"
-      open-type="contact"
-      v-if="routineContact === 1"
-    >
-      <image class="pictrue" :src="logoConfig"></image>
-    </button>
-    <!-- #endif -->
-  </view>
+  <view v-if="qrcode && !isSortType" class="core-customer" @click="preview"><image v-if="logo" :src="logo" mode="aspectFit" /><text v-else>客服</text></view>
 </template>
-
 <script>
-import { mapGetters } from "vuex";
-import { getCustomer } from "@/utils/index.js";
+import { getCustomerType } from '@/api/api.js';
 export default {
-  name: "customerService",
-  computed: mapGetters(["userInfo"]),
-  props: {
-    dataConfig: {
-      type: Object,
-      default: () => {},
-    },
-    isSortType: {
-      type: String | Number,
-      default: 0,
-    },
-  },
-  data() {
-    return {
-      routineContact: parseFloat(this.dataConfig.routine_contact_type),
-      logoConfig: this.dataConfig.logoConfig.url,
-      topConfig: this.dataConfig.marginConfig.val
-        ? this.dataConfig.marginConfig.val >= 80
-          ? 80 + "%"
-          : this.dataConfig.marginConfig.val + "%"
-        : "30%",
-      positions: this.dataConfig.locationConfig.tabVal,
-    };
-  },
-  created() {},
-  methods: {
-    licks() {
-      if (this.dataConfig.buttonConfig.tabVal) {
-        getCustomer(`/pages/extension/customer_list/chat`);
-      } else {
-        this.$util.JumpPath(this.dataConfig.logoConfig.link);
-      }
-    },
-    setTouchMove(e) {
-      var that = this;
-      if (e.touches[0].clientY < 545 && e.touches[0].clientY > 66) {
-        that.topConfig = e.touches[0].clientY + "px";
-      }
-    },
-  },
+  props: { dataConfig: { type: Object, default: () => ({}) }, isSortType: { type: [String, Number], default: 0 } },
+  data() { return { qrcode: '' }; },
+  computed: { logo() { return (this.dataConfig.logoConfig || {}).url || ''; } },
+  mounted() { getCustomerType().then(res => { this.qrcode = res.data.customer_qrcode || ''; }).catch(() => { this.qrcode = ''; }); },
+  methods: { preview() { if (this.qrcode) uni.previewImage({ urls: [this.qrcode], current: this.qrcode }); } }
 };
 </script>
-
-<style lang="scss">
-.custmer {
-  touch-action: none;
-}
-.customerService,
-.customerService-sty {
-  position: fixed;
-  right: 20rpx;
-  z-index: 40;
-  &.on {
-    left: 20rpx;
-  }
-  .pictrue {
-    width: 86rpx;
-    height: 86rpx;
-    border-radius: 50%;
-
-    image {
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-    }
-  }
-}
-.customerService-sty {
-  background-color: rgba(0, 0, 0, 0) !important;
-}
+<style scoped>
+.core-customer { position: fixed; right: 20rpx; bottom: 220rpx; z-index: 40; width: 88rpx; height: 88rpx; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 2rpx 12rpx #ddd; }
+.core-customer image { width: 88rpx; height: 88rpx; }
 </style>

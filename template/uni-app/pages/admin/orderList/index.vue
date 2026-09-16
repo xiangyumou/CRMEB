@@ -95,7 +95,7 @@
 							v-if="item._status == 2 && item.shipping_type == 1 && (item.pink_id == 0 || (item.pink_id > 0 && item.pinkStatus == 2))"
 							@click="goDelivery(item)">发送货
 						</view>
-						<navigator class="bnt primary" :url="'/pages/admin/logistics/index?orderId='+item.order_id" 
+						<navigator class="bnt primary" :url="'/pages/admin/logistics/index?orderId='+item.order_id"
 							v-if="item._status == 4 && item.delivery_type == 'express'">查看物流
 						</navigator>
 						<view class="bnt primary" v-if="item.shipping_type == 2 &&
@@ -170,7 +170,7 @@
 	import footerPage from '../components/footerPage/index.vue'
 	import countDown from '@/components/countDown/index.vue'
 	import emptyPage from '@/components/emptyPage.vue'
-	// #ifdef MP || APP-PLUS
+	// #ifdef MP
 	import NavBar from '@/components/NavBar.vue';
 	// #endif
 	import {
@@ -187,7 +187,7 @@
 			footerPage,
 			countDown,
 			emptyPage,
-			// #ifdef MP || APP-PLUS
+			// #ifdef MP
 			NavBar,
 			// #endif
 		},

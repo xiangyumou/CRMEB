@@ -24,7 +24,7 @@ export function silenceBindingSpread(app) {
     agent_id = Cache.get("agent_id");
   //#endif
 
-  //#ifdef MP || APP-PLUS
+  //#ifdef MP
   let puid = app.spid,
     code = app.code,
     agent_id = 0;
@@ -44,7 +44,7 @@ export function silenceBindingSpread(app) {
         //#ifdef H5
         Cache.clear("spread");
         //#endif
-        //#ifdef MP || APP-PLUS
+        //#ifdef MP
         app.spid = 0;
         app.code = 0;
         //#endif
@@ -57,49 +57,10 @@ export function isWeixin() {
   return navigator.userAgent.toLowerCase().indexOf("micromessenger") !== -1;
 }
 
-export function getCustomer(url) {
-  getCustomerType().then((res) => {
-    let type = res.data.customer_type;
-    if (type == "0") {
-      uni.navigateTo({
-        url: url || "/pages/extension/customer_list/chat",
-      });
-    } else if (type == "1") {
-      uni.makePhoneCall({
-        phoneNumber: res.data.customer_phone, //客服电话
-      });
-    } else {
-      // #ifdef APP-PLUS
-      plus.runtime.openURL(res.data.customer_url);
-      // #endif
-      // #ifdef H5 || MP
-      if (res.data.customer_url.indexOf("work.weixin.qq.com") > 0) {
-        // #ifdef H5
-        return (window.location.href = res.data.customer_url);
-        // #endif
-        // #ifdef MP
-        uni.openCustomerServiceChat({
-          extInfo: {
-            url: res.data.customer_url,
-          },
-          corpId: res.data.customer_corpId,
-          success(res) {},
-          fail(err) {
-            uni.showToast({
-              title: err.errMsg,
-              icon: "none",
-              duration: 2000,
-            });
-          },
-        });
-        // #endif
-      } else {
-        uni.navigateTo({
-          url: `/pages/annex/web_view/index?url=${res.data.customer_url}`,
-        });
-      }
-      // #endif
-    }
+export function getCustomer() {
+  return getCustomerType().then((res) => {
+    const url = res.data.customer_qrcode;
+    if (url) uni.previewImage({ urls: [url], current: url });
   });
 }
 

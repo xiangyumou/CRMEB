@@ -6,9 +6,6 @@
 			<view class="tip">请授权头像等信息，以便为您提供更好的服务</view>
 			<view class="bottom flex">
 				<view class="item" @click="close">随便逛逛</view>
-				<!-- #ifdef APP-PLUS -->
-				<button class="item grant" @click="setUserInfo">去授权</button>
-				<!-- #endif -->
 				<!-- #ifdef MP -->
 				<button class="item grant" type="primary" open-type="getPhoneNumber" lang="zh_CN" @getphonenumber="setUserInfo">去授权</button>
 				<!-- #endif -->

@@ -1,13 +1,4 @@
 <template>
-  <!-- #ifdef APP-PLUS -->
-  <view
-    class="animated dialog_nav"
-    :style="{ top: navH + 65 + 'rpx', marginTop: sysHeight }"
-    :class="[goodList ? 'dialogIndex' : '', currentPage ? '' : '']"
-    v-show="currentPage"
-  >
-    <!-- #endif -->
-    <!-- #ifndef APP-PLUS -->
     <view
       class="animated dialog_nav"
       :style="{ top: navH + 15 + 'rpx' }"
@@ -18,7 +9,6 @@
       ]"
       v-show="currentPage"
     >
-      <!-- #endif -->
       <view
         class="dialog_nav_item"
         :class="item.after"
@@ -146,7 +136,7 @@ export default {
     border-bottom: 30rpx solid #fff;
     position: absolute;
     top: -30rpx;
-    /* #ifdef APP-PLUS || H5 */
+    /* #ifdef H5 */
     right: 32rpx;
     /* #endif */
     /* #ifdef MP */
@@ -164,7 +154,7 @@ export default {
     border-bottom: 30rpx solid #fff;
     position: absolute;
     top: -20rpx;
-    /* #ifdef APP-PLUS || H5 */
+    /* #ifdef H5 */
     right: 32rpx;
     /* #endif */
     /* #ifdef MP */

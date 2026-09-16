@@ -11,8 +11,6 @@
 
 namespace app\listener\notice;
 
-use app\jobs\notice\PrintJob;
-use app\services\message\NoticeService;
 use app\services\message\notice\{
     EnterpriseWechatService,
     RoutineTemplateListService,

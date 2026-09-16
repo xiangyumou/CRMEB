@@ -116,12 +116,6 @@
 			}
 		},
 		methods: {
-			// #ifdef APP-PLUS
-			// 获取选择的地区
-			handleGetRegion(region) {
-				this.region = region
-			},
-			// #endif
 			// 获取地址数据
 			getCityList() {
 				let that = this;
@@ -202,12 +196,12 @@
 
 						break;
 				}
-				// #ifdef MP || APP-PLUS
+				// #ifdef MP
 				this.$set(this.multiArray, 0, multiArray[0]);
 				this.$set(this.multiArray, 1, multiArray[1]);
 				this.$set(this.multiArray, 2, multiArray[2]);
 				// #endif
-				// #ifdef H5 
+				// #ifdef H5
 				this.multiArray = multiArray;
 				// #endif
 
@@ -362,7 +356,7 @@
 			},
 			/**
 			 * 提交用户添加地址
-			 * 
+			 *
 			 */
 			formSubmit(e) {
 				let that = this,

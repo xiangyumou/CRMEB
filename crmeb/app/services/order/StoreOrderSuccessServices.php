@@ -46,7 +46,7 @@ class StoreOrderSuccessServices extends BaseServices
      * @throws \think\db\exception\ModelNotFoundException
      * @throws \think\exception\DbException
      */
-    public function zeroYuanPayment(array $orderInfo, int $uid, string $payType = PayServices::YUE_PAY)
+    public function zeroYuanPayment(array $orderInfo, int $uid, string $payType = PayServices::WEIXIN_PAY)
     {
         if ($orderInfo['paid']) {
             throw new ApiException('该订单已支付');

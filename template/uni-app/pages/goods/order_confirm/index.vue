@@ -507,9 +507,6 @@
 			// #ifdef MP
 			this.from = 'routine'
 			// #endif
-			// #ifdef APP-PLUS
-			this.from = 'app'
-			// #endif
 			if (!options.cartId && !options.order_id) return this.$util.Tips({
 				title: this.$t(`请选择要购买的商品`)
 			}, {
@@ -537,9 +534,7 @@
 				name += this.$t(`发票`);
 				this.invTitle = name;
 			}
-			// #ifndef APP-PLUS
 			this.textareaStatus = true;
-			// #endif
 			if (this.isLogin && this.toPay == false && (this.is_gift == 0 || this.is_gift == 1)) {
 				this.checkShipping();
 			}else if(this.is_gift && this.isLogin){
@@ -705,7 +700,7 @@
 			},
 			/**
 			 * 授权回调事件
-			 * 
+			 *
 			 */
 			onLoadFun: function() {
 				this.getaddressInfo();
@@ -808,7 +803,7 @@
 							this.getList()
 						})
 					} else {
-						// #endif	
+						// #endif
 						uni.getLocation({
 							type: 'wgs84',
 							success: (res) => {
@@ -819,7 +814,7 @@
 								this.getList()
 							}
 						})
-						// #ifdef H5	
+						// #ifdef H5
 					}
 					// #endif
 				};
@@ -849,7 +844,7 @@
 			},
 			/**
 			 * 处理点击优惠券后的事件
-			 * 
+			 *
 			 */
 			ChangCoupons: function(e) {
 				// this.usableCoupon = e
@@ -936,7 +931,7 @@
 			},
 			/**
 			 * 获取当前订单详细信息
-			 * 
+			 *
 			 */
 			getConfirm: function() {
 				let that = this;
@@ -1045,7 +1040,7 @@
 			},
 			/**
 			 * 获取当前金额可用优惠券
-			 * 
+			 *
 			 */
 			getCouponList: function() {
 				let shippingType = this.shippingType;
@@ -1118,9 +1113,9 @@
 						'&pinkId=' +
 						this.pinkId +
 						'&couponId=' +
-						this.couponId + 
+						this.couponId +
 						'&is_gift=' +
-						that.is_gift + 
+						that.is_gift +
 						'&order_id=' + that.orderId
 				} else {
 					let url = '/pages/users/user_address/index?cartId=' + this.cartId + '&pinkId=' + this
@@ -1263,9 +1258,6 @@
 						'/pages/goods/order_pay_status/index?' +
 						'&type=3' + '&totalPrice=' + this.totalPrice
 					// #endif
-					// #ifdef APP-PLUS
-					quitUrl: '/pages/goods/order_details/index?order_id=' + this.order_id
-					// #endif
 				};
 				if (that.is_gift) data.is_gift = that.is_gift
 				if (data.payType == 'yue' && parseFloat(that.userInfo.now_money) < parseFloat(that.totalPrice))
@@ -1359,7 +1351,7 @@
 						address: `${e.address}-${e.detailed_address}`,
 					}).then(res => {})
 				} else {
-					// #endif	
+					// #endif
 					uni.openLocation({
 						latitude: Number(e.latitude),
 						longitude: Number(e.longitude),
@@ -1369,7 +1361,7 @@
 							Number
 						}
 					});
-					// #ifdef H5	
+					// #ifdef H5
 				}
 				// #endif
 			},

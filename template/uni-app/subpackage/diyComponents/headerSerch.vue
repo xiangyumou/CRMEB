@@ -52,7 +52,7 @@
         </view>
       </view>
       <!-- #endif -->
-      <!-- #ifdef MP || APP-PLUS -->
+      <!-- #ifdef MP -->
       <view>
         <view class="mp-header" :class="special ? 'on' : ''">
           <view
@@ -295,7 +295,7 @@ export default {
     });
     uni.setStorageSync("hotList", that.hotWords);
     that.$store.commit("hotWords/setHotWord", that.hotWords);
-    // #ifdef MP || APP-PLUS
+    // #ifdef MP
     setTimeout(() => {
       // 获取小程序头部高度
       let info = uni.createSelectorQuery().in(this).select(".mp-header");
@@ -418,7 +418,7 @@ export default {
   }
 }
 
-/* #ifdef MP || APP-PLUS */
+/* #ifdef MP */
 .mp-header {
   z-index: 300;
   position: fixed;
@@ -433,9 +433,6 @@ export default {
   .serch-wrapper {
     height: 100%;
     /* #ifdef MP */
-    padding: 0 30rpx !important;
-    /* #endif */
-    /* #ifdef APP-PLUS */
     padding: 0 30rpx !important;
     /* #endif */
     .logo {
@@ -496,9 +493,6 @@ export default {
       &.on {
         /* #ifdef MP */
         width: 70%;
-        /* #endif */
-        /* #ifdef APP-PLUS */
-        width: 100%;
         /* #endif */
       }
 

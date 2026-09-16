@@ -161,20 +161,11 @@ Route::group('setting', function () {
         //设置客服广告
         Route::post('set_kf_adv', 'v1.setting.SystemGroupData/setKfAdv')->option(['real_name' => '设置客服广告']);
         //签到天数配置资源
-        Route::resource('sign_data', 'v1.setting.SystemGroupData')->except(['read'])->option([
-            'real_name' => [
-                'index' => '获取签到天数配置列表',
-                'create' => '获取签到天数配置表单',
-                'save' => '保存签到天数配置',
-                'edit' => '获取修改签到天数配置表单',
-                'update' => '修改签到天数配置',
-                'delete' => '删除签到天数配置'
-            ]
-        ]);
+
         //签到数据字段
-        Route::get('sign_data/header', 'v1.setting.SystemGroupData/header')->option(['real_name' => '签到数据头部']);
+
         //修改签到数据状态
-        Route::put('sign_data/set_status/:id/:status', 'v1.setting.SystemGroupData/set_status')->option(['real_name' => '修改签到数据状态']);
+
         //订单详情动态图配置资源
         Route::resource('order_data', 'v1.setting.SystemGroupData')->except(['read'])->option([
             'real_name' => [
@@ -221,20 +212,11 @@ Route::group('setting', function () {
         //分享海报数据状态
         Route::put('poster_data/set_status/:id/:status', 'v1.setting.SystemGroupData/set_status')->option(['real_name' => '分享海报数据状态']);
         //秒杀配置资源
-        Route::resource('seckill_data', 'v1.setting.SystemGroupData')->except(['read'])->option([
-            'real_name' => [
-                'index' => '获取分秒杀配置列表',
-                'create' => '获取秒杀配置表单',
-                'save' => '保存秒杀配置',
-                'edit' => '获取修改秒杀配置表单',
-                'update' => '修改秒杀配置',
-                'delete' => '删除秒杀配置'
-            ]
-        ]);
+
         //秒杀数据字段
-        Route::get('seckill_data/header', 'v1.setting.SystemGroupData/header')->option(['real_name' => '秒杀数据字段']);
+
         //秒杀数据状态
-        Route::put('seckill_data/set_status/:id/:status', 'v1.setting.SystemGroupData/set_status')->option(['real_name' => '秒杀数据状态']);
+
         //获取隐私协议
         Route::get('get_user_agreement', 'v1.setting.SystemGroupData/getUserAgreement')->option(['real_name' => '获取隐私协议']);
         //设置隐私协议

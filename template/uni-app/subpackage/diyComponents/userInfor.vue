@@ -4,11 +4,7 @@
       <view class="left acea-row row-middle">
         <view class="pictrue acea-row row-center-wrapper relative">
           <image :src="diyInfo.avatar" v-if="diyInfo.avatar && isLogin"></image>
-          <image
-            src="@/static/images/king.png"
-            class="king"
-            v-if="diyInfo.is_money_level"
-          ></image>
+       ge>
           <image
             v-if="!diyInfo.avatar && isLogin"
             :src="dataConfig.logoConfig.url || '@/static/images/f.png'"
@@ -22,32 +18,9 @@
           <view v-if="!isLogin" class="name">{{ $t(`请点击登录`) }}</view>
           <view v-else class="name acea-row row-middle">
             <view class="nameCon line1">{{ diyInfo.nickname }}</view>
-            <view
-              class="lable acea-row row-middle"
-              v-if="diyInfo.level > 0 && (diyInfo.vip_icon || diyInfo.vip_name)"
-              :style="[lableStyle]"
-            >
-              <img
-                class="icon"
-                v-if="diyInfo.vip_icon"
-                :src="diyInfo.vip_icon"
-                alt=""
-              />
-              {{ diyInfo.vip_name }}
-            </view>
+         ew>
           </view>
-          <view
-            class="acea-row row-middle"
-            v-if="isLogin && diyInfo.vip && diyInfo.level > 0"
-          >
-            <view class="progress" :style="[progressStyle]">
-              <view class="bg-reds" :style="[bgRedsStyle]"> </view>
-            </view>
-            <view class="percent"
-              >{{ diyInfo.exp ? diyInfo.exp.split(".")[0] : 0 }}
-              {{ diyInfo.next_exp ? `/ ${diyInfo.next_exp}` : "" }}</view
-            >
-          </view>
+       ew>
           <view
             class="phone acea-row row-middle"
             v-if="isLogin && diyInfo.level <= 0 && diyInfo.phone"
@@ -57,22 +30,8 @@
         </view>
         <view v-if="isLogin" class="right acea-row row-bottom">
           <template v-if="dataConfig.styleConfig.tabVal == 1">
-            <view
-              class="item"
-              v-if="checkType.indexOf(1) > -1"
-              @click.stop="handleMenu(1)"
-            >
-              <view class="num">{{ diyInfo.integral || 0 }}</view>
-              <view>{{ $t(`积分`) }}</view>
-            </view>
-            <view
-              class="item"
-              v-if="checkType.indexOf(2) > -1"
-              @click.stop="handleMenu(2)"
-            >
-              <view class="num">{{ diyInfo.now_money || 0 }}</view>
-              <view>{{ $t(`余额`) }}</view>
-            </view>
+         ew>
+         ew>
             <view
               class="item"
               v-if="checkType.indexOf(0) > -1"
@@ -104,22 +63,8 @@
         v-if="dataConfig.styleConfig.tabVal == 0 && isLogin"
         class="bottom acea-row row-middle"
       >
-        <view
-          v-if="checkType.indexOf(1) != -1"
-          class="item"
-          @click.stop="handleMenu(1)"
-        >
-          <view class="num">{{ diyInfo.integral || 0 }}</view>
-          <view>{{ $t(`积分`) }}</view>
-        </view>
-        <view
-          v-if="checkType.indexOf(2) != -1"
-          class="item"
-          @click.stop="handleMenu(2)"
-        >
-          <view class="num">{{ diyInfo.now_money || 0 }}</view>
-          <view>{{ $t(`余额`) }}</view>
-        </view>
+     ew>
+     ew>
         <view
           v-if="checkType.indexOf(0) != -1"
           class="item"

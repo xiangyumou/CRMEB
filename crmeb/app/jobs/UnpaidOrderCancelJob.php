@@ -12,7 +12,6 @@
 namespace app\jobs;
 
 
-use app\services\activity\seckill\StoreSeckillServices;
 use app\services\order\StoreOrderCartInfoServices;
 use app\services\order\StoreOrderRefundServices;
 use app\services\order\StoreOrderServices;

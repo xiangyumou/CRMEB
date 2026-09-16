@@ -15,9 +15,12 @@ Route::miss(function () {
         $appName = explode('/', $appRequest)[0] ?? '';
     }
 
+    if (in_array(strtolower($appName), ['api', 'adminapi', 'kefuapi', 'kefu'], true)) {
+        return \think\Response::create()->code(404);
+    }
+
     switch (strtolower($appName)) {
         case config('app.admin_prefix', 'admin'):
-        case 'kefu':
         case 'app':
             return view(app()->getRootPath() . 'public' . DS . config('app.admin_prefix', 'admin') . DS . 'index.html');
         case 'home':

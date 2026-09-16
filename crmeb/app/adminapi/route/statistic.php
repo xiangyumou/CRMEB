@@ -75,13 +75,13 @@ Route::group('statistic', function () {
     /** 余额统计 */
     Route::group(function () {
         //余额基础统计
-        Route::get('balance/get_basic', 'v1.statistic.BalanceStatistic/getBasic')->option(['real_name' => '余额基础统计']);
+
         //余额趋势
-        Route::get('balance/get_trend', 'v1.statistic.BalanceStatistic/getTrend')->option(['real_name' => '余额趋势']);
+
         //余额来源
-        Route::get('balance/get_channel', 'v1.statistic.BalanceStatistic/getChannel')->option(['real_name' => '余额来源']);
+
         //余额消耗
-        Route::get('balance/get_type', 'v1.statistic.BalanceStatistic/getType')->option(['real_name' => '余额消耗']);
+
     })->option(['parent' => 'statistic', 'cate_name' => '余额统计']);
 
 })->middleware([

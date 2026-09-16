@@ -131,7 +131,7 @@
 			}
 		},
 		created(options) {
-			// #ifdef H5 || APP-PLUS
+			// #ifdef H5
 			this.orderId = this.options.order_id;
 			this.totalPrice = this.options.totalPrice;
 			this.type = this.options.type;
@@ -177,7 +177,7 @@
 				});
 			},
 			/**
-			 * 
+			 *
 			 * 去订单详情页面
 			 */
 			goOrderDetails: function(e) {
@@ -369,7 +369,7 @@
 			width: 95%;
 			height: 95%;
 			// #endif
-			// #ifdef H5 || APP-PLUS
+			// #ifdef H5
 			width: 750rpx;
 			height: 750rpx;
 			// #endif

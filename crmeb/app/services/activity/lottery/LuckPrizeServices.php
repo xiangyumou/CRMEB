@@ -14,7 +14,6 @@ namespace app\services\activity\lottery;
 
 use app\services\BaseServices;
 use app\dao\activity\lottery\LuckPrizeDao;
-use app\services\activity\coupon\StoreCouponIssueServices;
 use crmeb\exceptions\AdminException;
 use crmeb\exceptions\ApiException;
 use crmeb\services\CacheService;

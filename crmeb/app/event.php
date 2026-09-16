@@ -15,7 +15,7 @@
  * @param mixed $args  参数
  * event($event,$args);
  * event('OrderCreateAfterListener',$order);
-*/ 
+*/
 
 return [
     'bind' => [],
@@ -38,7 +38,7 @@ return [
         'OrderRefundCreateAfterListener' => [\app\listener\order\OrderRefundCreateAfterListener::class], //售后单生成后置事件
         'OrderRefundCancelAfterListener' => [\app\listener\order\OrderRefundCancelAfterListener::class], //售后单取消后置事件
         'OutPushListener' => [\app\listener\out\OutPushListener::class], //对外推送事件
-        'UserLevelListener' => [\app\listener\user\UserLevelListener::class], //用户升级事件
+
         'UserVisitListener' => [\app\listener\user\UserVisitListener::class], //用户访问事件
         'NoticeListener' => [\app\listener\notice\NoticeListener::class], //通知->消息事件
         'CustomNoticeListener' => [\app\listener\notice\CustomNoticeListener::class], //通知->自定义消息发送事件

@@ -1,6 +1,6 @@
 <template>
   <view class="user-list">
-    <!-- #ifdef MP || APP-PLUS -->
+    <!-- #ifdef MP -->
     <view class="accountTitle">
       <view :style="{ height: getHeight.barTop + 'px' }"></view>
       <view

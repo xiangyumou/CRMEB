@@ -65,7 +65,7 @@
 				</div>
 			</div>
 		</div>
-		<!-- #ifdef H5 || APP-PLUS -->
+		<!-- #ifdef H5 -->
 		<uni-calendar
 			ref="calendar"
 			:date="info.date"
@@ -305,7 +305,7 @@ export default {
 			}
 		},
 		dateTitle: function () {
-			// #ifdef H5 || APP-PLUS
+			// #ifdef H5
 			this.$refs.calendar.open();
 			this.time = 'date';
 			// #endif

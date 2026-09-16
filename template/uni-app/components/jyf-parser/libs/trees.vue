@@ -2,7 +2,7 @@
 	<view class="interlayer">
 		<block v-for="(n, index) in nodes" v-bind:key="index">
 			<!--图片-->
-			<!--#ifdef MP-WEIXIN || MP-QQ || MP-ALIPAY || APP-PLUS-->
+			<!--#ifdef MP-WEIXIN || MP-QQ || MP-ALIPAY-->
 			<rich-text v-if="n.name=='img'" :id="n.attrs.id" class="_img" :style="''+handler.getStyle(n.attrs.style)" :nodes="handler.getNode(n,!lazyLoad||imgLoad)"
 			 :data-attrs="n.attrs" @tap="imgtap" @longpress="imglongtap" />
 			<!--#endif-->
@@ -11,7 +11,7 @@
 			 @tap="imgtap" @longpress="imglongtap" />
 			<!--#endif-->
 			<!--文本-->
-			<!--#ifdef MP-WEIXIN || MP-QQ || APP-PLUS-->
+			<!--#ifdef MP-WEIXIN || MP-QQ-->
 			<rich-text v-else-if="n.decode" class="_entity" :nodes="[n]"></rich-text>
 			<!--#endif-->
 			<text v-else-if="n.type=='text'" decode>{{n.text}}</text>
@@ -41,10 +41,6 @@
 			<!--#ifdef MP-BAIDU-->
 			<!--<ad v-else-if="n.name=='ad'" :class="n.attrs.class" :style="n.attrs.style" :appid="n.attrs.appid"
 			 :apid="n.attrs.apid" :type="n.attrs.type" data-from="ad" @error="error" />-->
-			<!--#endif-->
-			<!--#ifdef APP-PLUS-->
-			<!--<ad v-else-if="n.name=='ad'" :class="n.attrs.class" :style="n.attrs.style" :adpid="n.attrs.adpid"
-			 data-from="ad" @error="error" />-->
 			<!--#endif-->
 			<!--列表-->
 			<view v-else-if="n.name=='li'" :id="n.attrs.id" :class="n.attrs.class" :style="(n.attrs.style||'')+';display:flex'">
@@ -82,13 +78,8 @@
 					</view>
 				</view>
 			</view>
-			<!--#ifdef APP-PLUS-->
-			<iframe v-else-if="n.name=='iframe'" :style="n.attrs.style" :allowfullscreen="n.attrs.allowfullscreen" :frameborder="n.attrs.frameborder"
-			 :width="n.attrs.width" :height="n.attrs.height" :src="n.attrs.src" />
-			<embed v-else-if="n.name=='embed'" :style="n.attrs.style" :width="n.attrs.width" :height="n.attrs.height" :src="n.attrs.src" />
-			<!--#endif-->
 			<!--富文本-->
-			<!--#ifdef MP-WEIXIN || MP-QQ || MP-ALIPAY || APP-PLUS-->
+			<!--#ifdef MP-WEIXIN || MP-QQ || MP-ALIPAY-->
 			<rich-text v-else-if="handler.useRichText(n)" :id="n.attrs.id" :class="'_p __'+n.name" :nodes="[n]" />
 			<!--#endif-->
 			<!--#ifdef MP-BAIDU || MP-TOUTIAO-->
@@ -119,21 +110,16 @@
 		data() {
 			return {
 				controls: {},
-				// #ifdef MP-WEIXIN || MP-QQ || APP-PLUS
+				// #ifdef MP-WEIXIN || MP-QQ
 				imgLoad: false,
 				// #endif
-				// #ifndef APP-PLUS
 				loadVideo: true
-				// #endif
 			}
 		},
 		props: {
 			nodes: Array,
-			// #ifdef MP-WEIXIN || MP-QQ || H5 || APP-PLUS
+			// #ifdef MP-WEIXIN || MP-QQ || H5
 			lazyLoad: Boolean,
-			// #endif
-			// #ifdef APP-PLUS
-			loadVideo: Boolean
 			// #endif
 		},
 		mounted() {
@@ -147,7 +133,7 @@
 				this.top = this.top.$parent;
 			}
 		},
-		// #ifdef MP-WEIXIN || MP-QQ || APP-PLUS
+		// #ifdef MP-WEIXIN || MP-QQ
 		beforeDestroy() {
 			if (this.observer)
 				this.observer.disconnect();
@@ -212,10 +198,6 @@
 									id: attrs.href.substring(1)
 								})
 						} else if (attrs.href.indexOf('http') == 0 || attrs.href.indexOf('//') == 0) {
-							// #ifdef APP-PLUS
-							plus.runtime.openWeb(attrs.href);
-							// #endif
-							// #ifndef APP-PLUS
 							uni.setClipboardData({
 								data: attrs.href,
 								success: () =>
@@ -223,7 +205,6 @@
 										title: '链接已复制'
 									})
 							})
-							// #endif
 						} else
 							uni.navigateTo({
 								url: attrs.href

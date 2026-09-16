@@ -50,17 +50,11 @@ class OrderPayServices
      */
     public function getPayType(string $payType)
     {
-        //微信支付没有开启，通联支付开启，用户访问端在小程序或者公众号的时候，使用通联微信H5支付
-        if ($payType == PayServices::WEIXIN_PAY && !request()->isH5() && !request()->isApp()) {
-            $payType = sys_config('pay_weixin_open', 0);
+        \app\services\CoreStore::assertPayment($payType);
+        if (sys_config('pay_weixin_open', '') !== 'weixin') {
+            throw new \crmeb\exceptions\ApiException('微信支付未配置或未开启');
         }
-
-        //支付宝没有开启，通联支付开了，用户使用支付宝支付，并且在app端访问的时候，使用通联app支付宝支付
-        if ($payType == PayServices::ALIAPY_PAY && request()->isApp()) {
-            $payType = sys_config('ali_pay_status', 0);
-        }
-
-        return $payType;
+        return PayServices::WEIXIN_PAY;
     }
 
     /**
@@ -106,6 +100,7 @@ class OrderPayServices
      */
     public function beforePay(array $orderInfo, string $payType, array $options = [])
     {
+        \app\services\CoreStore::assertPayment($payType);
         $wechat = $payType == PayServices::WEIXIN_PAY;
 
         $payType = $this->getPayType($payType);

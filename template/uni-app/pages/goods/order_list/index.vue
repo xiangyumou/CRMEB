@@ -109,7 +109,7 @@
 						<view class="bnt cancelBnt" v-if="item._status._type == 4 && item.is_cancel == 0" @click="delOrder(item.order_id, index)">{{ $t(`删除订单`) }}</view>
 						<view class="bnt" :class="item._status._type == 0 && item.is_cancel == 0 ? 'cancelBnt' : 'bg-color'" @click="goOrderDetails(item.order_id)">{{ $t(`查看详情`) }}</view>
 						<view class="bnt bg-color" v-if="item._status._type == 0 && item.is_cancel == 0" @click="goPay(item.pay_price, item.order_id)">{{ $t(`立即付款`) }}</view>
-						
+
 						<!-- <view class="bnt bg-color" v-else-if="item._status._type == 3"
 							@click="goOrderDetails(item.order_id)">去评价</view> -->
 						<!-- <view class="bnt bg-color"
@@ -117,8 +117,8 @@
 							@click="goOrderDetails(item.order_id)">
 							再次购买
 						</view> -->
-						
-						
+
+
 					</view>
 				</view>
 			</view>
@@ -470,9 +470,6 @@ export default {
 .my-order .nav .item.on {
 	/* #ifdef H5 || MP */
 	font-weight: bold;
-	/* #endif */
-	/* #ifdef APP-PLUS */
-	color: #000;
 	/* #endif */
 	border-color: var(--view-theme);
 }

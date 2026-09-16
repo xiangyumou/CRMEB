@@ -231,12 +231,20 @@ class StoreCouponIssueServices extends BaseServices
     public function userFirstSubGiveCoupon(int $uid)
     {
         $giveCoupon = sys_config('reward_coupon', []);
-        if (count($giveCoupon)) {
-            $couponList = $this->dao->getGiveCoupon([['id', 'in', array_column($giveCoupon, 'id')]]);
+        if (!$giveCoupon) return false;
+        return \think\facade\Db::transaction(function () use ($uid, $giveCoupon) {
+            // A persistent row lock serializes registration retries across workers.
+            $user = \think\facade\Db::name('user')->where('uid', $uid)->lock(true)->find();
+            if (!$user) return false;
+            $ids = array_column($giveCoupon, 'id');
+            $issued = \think\facade\Db::name('store_coupon_issue_user')
+                ->where('uid', $uid)->whereIn('issue_coupon_id', $ids)->column('issue_coupon_id');
+            $ids = array_values(array_diff($ids, $issued));
+            if (!$ids) return true;
+            $couponList = $this->dao->getGiveCoupon([['id', 'in', $ids]]);
             $this->giveUserCoupon($uid, $couponList ?: []);
             return true;
-        }
-        return false;
+        });
     }
 
     /**

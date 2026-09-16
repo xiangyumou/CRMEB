@@ -13,7 +13,6 @@ namespace app\services\product\sku;
 
 
 use app\dao\product\sku\StoreProductAttrValueDao;
-use app\models\store\StoreProductAttrValue;
 use app\services\BaseServices;
 use crmeb\exceptions\AdminException;
 use app\services\product\product\StoreProductServices;

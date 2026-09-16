@@ -98,69 +98,44 @@ Route::group('app', function () {
     /** 客服相关 */
     Route::group(function () {
         //客服反馈接口
-        Route::resource('feedback', 'v1.kefu.StoreServiceFeedback')->only(['index', 'delete', 'update', 'edit'])->option([
-            'real_name' => [
-                'index' => '获取用户反馈列表',
-                'edit' => '获取修改用户反馈表单',
-                'update' => '修改用户反馈',
-                'delete' => '删除用户反馈'
-            ]
-        ]);
+
         //话术接口
-        Route::resource('wechat/speechcraft', 'v1.kefu.StoreServiceSpeechcraft')->except(['read'])->option([
-            'real_name' => [
-                'index' => '获取客服话术列表',
-                'create' => '获取客服话术表单',
-                'save' => '保存客服话术',
-                'edit' => '获取修改客服话术表单',
-                'update' => '修改客服话术',
-                'delete' => '删除客服话术'
-            ]
-        ]);
+
         //话术分类接口
-        Route::resource('wechat/speechcraftcate', 'v1.kefu.StoreServiceSpeechcraftCate')->except(['read'])->option([
-            'real_name' => [
-                'index' => '获取客服话术分类列表',
-                'create' => '获取客服话术分类表单',
-                'save' => '保存客服话术分类',
-                'edit' => '获取修改客服话术分类表单',
-                'update' => '修改客服话术分类',
-                'delete' => '删除客服话术分类'
-            ]
-        ]);
+
         //客服列表
-        Route::get('wechat/kefu', 'v1.kefu.StoreService/index')->option(['real_name' => '客服列表']);
+
         //客服登录
-        Route::get('wechat/kefu/login/:id', 'v1.kefu.StoreService/keufLogin')->option(['real_name' => '客服登录']);
+
         //新增客服选择用户列表
-        Route::get('wechat/kefu/create', 'v1.kefu.StoreService/create')->option(['real_name' => '新增客服选择用户列表']);
+
         //新增客服表单
-        Route::get('wechat/kefu/add', 'v1.kefu.StoreService/add')->option(['real_name' => '添加客服表单']);
+
         //保存新建的数据
-        Route::post('wechat/kefu', 'v1.kefu.StoreService/save')->option(['real_name' => '添加客服']);
+
         //编辑客服表单
-        Route::get('wechat/kefu/:id/edit', 'v1.kefu.StoreService/edit')->option(['real_name' => '修改客服表单']);
+
         //保存编辑的数据
-        Route::put('wechat/kefu/:id', 'v1.kefu.StoreService/update')->option(['real_name' => '修改客服']);
+
         //删除
-        Route::delete('wechat/kefu/:id', 'v1.kefu.StoreService/delete')->option(['real_name' => '删除客服']);
+
         //修改状态
-        Route::put('wechat/kefu/set_status/:id/:status', 'v1.kefu.StoreService/set_status')->option(['real_name' => '修改客服状态']);
+
         //聊天记录
-        Route::get('wechat/kefu/record/:id', 'v1.kefu.StoreService/chat_user')->option(['real_name' => '聊天记录']);
+
         //查看对话
-        Route::get('wechat/kefu/chat_list', 'v1.kefu.StoreService/chat_list')->option(['real_name' => '查看对话']);
+
 
         //客服自动回复列表
-        Route::get('kefu/auto_reply/list', 'v1.kefu.StoreServiceAutoReply/autoReplyList')->option(['real_name' => '客服自动回复列表']);
+
         //客服自动回复添加修改表单
-        Route::get('kefu/auto_reply/form/:id', 'v1.kefu.StoreServiceAutoReply/autoReplyForm')->option(['real_name' => '客服自动回复添加修改表单']);
+
         //客服自动回复添加修改保存
-        Route::post('kefu/auto_reply/save/:id', 'v1.kefu.StoreServiceAutoReply/autoReplySave')->option(['real_name' => '客服自动回复添加修改保存']);
+
         //客服自动回复修改状态
-        Route::put('kefu/auto_reply/status/:id/:status', 'v1.kefu.StoreServiceAutoReply/autoReplyStatus')->option(['real_name' => '客服自动回复修改状态']);
+
         //客服自动回复删除
-        Route::delete('kefu/auto_reply/del/:id', 'v1.kefu.StoreServiceAutoReply/autoReplyDel')->option(['real_name' => '客服自动回复删除']);
+
 
     })->option(['parent' => 'app', 'cate_name' => '客服相关']);
 

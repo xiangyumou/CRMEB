@@ -33,10 +33,6 @@ class PayController
     public function notify(string $type)
     {
         switch (urldecode($type)) {
-            case 'alipay':
-                /** @var Pay $pay */
-                $pay = app()->make(Pay::class, ['ali_pay']);
-                return $pay->handleNotify();
             case 'v3wechat':
                 return app()->make(Pay::class, ['v3_wechat_pay'])->handleNotify()->getContent();
             case 'routine':
@@ -51,11 +47,7 @@ class PayController
                 }
                 return $pay->handleNotify()->getContent();
             default:
-                if (strstr($type, 'allin') !== false) {
-                    /** @var Pay $pay */
-                    $pay = app()->make(Pay::class, ['allin_pay']);
-                    return $pay->handleNotify($type);
-                }
+                return \think\Response::create()->code(404);
         }
     }
 
@@ -73,31 +65,7 @@ class PayController
                 'value' => 'weixin',
                 'title' => '使用微信快捷支付',
                 'number' => null,
-                'payStatus' => !!sys_config('pay_weixin_open', 0),
-            ],
-            [
-                'icon' => 'icon-zhifubao',
-                'name' => '支付宝支付',
-                'value' => 'alipay',
-                'title' => '使用线上支付宝支付',
-                'number' => null,
-                'payStatus' => !!sys_config('ali_pay_status', 0),
-            ],
-            [
-                'icon' => 'icon-yuezhifu',
-                'name' => '余额支付',
-                'value' => 'yue',
-                'title' => '当前可用余额',
-                'number' => $request->user('now_money'),
-                'payStatus' => (int)sys_config('yue_pay_status', 0) === 1,
-            ],
-            [
-                'icon' => 'icon-yuezhifu1',
-                'name' => '线下支付',
-                'value' => 'offline',
-                'title' => '选择线下付款方式',
-                'number' => null,
-                'payStatus' => (int)sys_config('offline_pay_status', 0) === 1,
+                'payStatus' => sys_config('pay_weixin_open', '') === 'weixin',
             ],
             [
                 'icon' => 'icon-haoyoudaizhifu',

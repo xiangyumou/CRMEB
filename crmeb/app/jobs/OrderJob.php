@@ -16,15 +16,12 @@ use app\services\activity\combination\StoreCombinationServices;
 use app\services\activity\seckill\StoreSeckillServices;
 use app\services\activity\coupon\StoreCouponUserServices;
 use app\services\kefu\service\StoreServiceServices;
-use app\services\message\notice\SmsService;
-use app\services\order\OutStoreOrderServices;
 use app\services\order\StoreOrderCartInfoServices;
 use app\services\order\StoreOrderEconomizeServices;
 use app\services\order\StoreOrderServices;
 use app\services\product\product\StoreProductServices;
 use app\services\user\member\MemberCardServices;
 use app\services\user\UserLabelRelationServices;
-use app\services\user\UserLevelServices;
 use app\services\user\UserServices;
 use app\services\wechat\WechatUserServices;
 use crmeb\basic\BaseJobs;
@@ -91,14 +88,6 @@ class OrderJob extends BaseJobs
 //            }
 //        }
 
-        //检测会员等级
-        try {
-            /** @var UserLevelServices $levelServices */
-            $levelServices = app()->make(UserLevelServices::class);
-            $levelServices->detection((int)$order['uid']);
-        } catch (\Throwable $e) {
-            Log::error('会员等级升级失败,失败原因:' . $e->getMessage());
-        }
         //向后台发送新订单消息
         try {
             ChannelService::instance()->send('NEW_ORDER', ['order_id' => $order['order_id']]);

@@ -16,7 +16,6 @@ use app\dao\order\StoreOrderDao;
 use app\services\pay\PayServices;
 use app\services\product\product\StoreCategoryServices;
 use app\services\user\member\MemberCardServices;
-use app\services\user\UserBillServices;
 use app\services\user\UserServices;
 use crmeb\exceptions\ApiException;
 use app\services\user\UserAddressServices;
@@ -79,6 +78,7 @@ class StoreOrderComputedServices extends BaseServices
      */
     public function computedOrder(int $uid, array $userInfo = [], array $cartGroup, int $addressId, string $payType, bool $useIntegral = false, int $couponId = 0, bool $isCreate = false, int $shippingType = 1, int $is_gift = 0)
     {
+        \app\services\CoreStore::assertOrder($this->paramData + compact('payType', 'useIntegral', 'shippingType'));
         $offlinePayStatus = (int)sys_config('offline_pay_status') ?? (int)2;
         $systemPayType = PayServices::PAY_TYPE;
         if ($offlinePayStatus == 2) unset($systemPayType['offline']);
@@ -225,38 +225,8 @@ class StoreOrderComputedServices extends BaseServices
      */
     public function useIntegral(bool $useIntegral, $userInfo, string $payPrice, array $other)
     {
-        /** @var UserBillServices $userBillServices */
-        $userBillServices = app()->make(UserBillServices::class);
-        // 可用积分
-        $usable = bcsub((string)$userInfo['integral'], (string)$userBillServices->getBillSum(['uid' => $userInfo['uid'], 'is_frozen' => 1]), 0);
-
-        $SurplusIntegral = $usable;
-        if ($useIntegral && $userInfo['integral'] > 0 && $other['integralRatio'] > 0) {
-            //积分抵扣上限
-            $integralMaxNum = sys_config('integral_max_num', 200);
-            if ($integralMaxNum > 0 && $usable > $integralMaxNum) {
-                $integral = $integralMaxNum;
-            } else {
-                $integral = $usable;
-            }
-            $deductionPrice = (float)bcmul((string)$integral, (string)$other['integralRatio'], 2);
-            if ($deductionPrice < $payPrice) {
-                $payPrice = bcsub((string)$payPrice, (string)$deductionPrice, 2);
-                $usedIntegral = $integral;
-            } else {
-                $deductionPrice = $payPrice;
-                $usedIntegral = (int)ceil(bcdiv((string)$payPrice, (string)$other['integralRatio'], 2));
-                $payPrice = 0;
-            }
-            $deductionPrice = $deductionPrice > 0 ? $deductionPrice : 0;
-            $usedIntegral = $usedIntegral > 0 ? $usedIntegral : 0;
-            $SurplusIntegral = (int)bcsub((string)$usable, $usedIntegral, 0);
-        } else {
-            $deductionPrice = 0;
-            $usedIntegral = 0;
-        }
-        if ($payPrice <= 0) $payPrice = 0;
-        return [$payPrice, $deductionPrice, $usedIntegral, $SurplusIntegral];
+        if ($useIntegral) throw new ApiException('当前商城不支持该业务');
+        return [$payPrice, 0, 0, 0];
     }
 
     /**

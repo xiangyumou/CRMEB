@@ -22,7 +22,7 @@ export default {
     auth: ['admin-finance'],
   },
   redirect: {
-    name: `${pre}cashApply`,
+    name: `${pre}billingRecords`,
   },
   component: LayoutMain,
   children: [
@@ -44,15 +44,7 @@ export default {
       },
       component: () => import('@/pages/finance/capitalFlow/index'),
     },
-    {
-      path: 'user_extract/index',
-      name: `${pre}cashApply`,
-      meta: {
-        auth: ['finance-user_extract'],
-        title: '提现申请',
-      },
-      component: () => import('@/pages/finance/userExtract/index'),
-    },
+
     {
       path: 'user_recharge/index',
       name: `${pre}recharge`,
@@ -71,23 +63,7 @@ export default {
       },
       component: () => import('@/pages/finance/financialRecords/bill'),
     },
-    {
-      path: 'finance/commission',
-      name: `${pre}commissionRecord`,
-      meta: {
-        auth: ['finance-finance-commission'],
-        title: '佣金记录',
-      },
-      component: () => import('@/pages/finance/commission/index'),
-    },
-    {
-      path: 'balance/balance',
-      name: `${pre}balance`,
-      meta: {
-        auth: ['finance-user-balance'],
-        title: '余额记录',
-      },
-      component: () => import('@/pages/finance/balance/index'),
-    },
+
+
   ],
 };

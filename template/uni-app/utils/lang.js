@@ -5,7 +5,7 @@ import Cache from '@/utils/cache';
 Vue.use(VueI18n)
 
 let lang = '';
-// #ifdef MP || APP-PLUS
+// #ifdef MP
 lang = Cache.has('locale') ? Cache.get('locale') : 'zh-CN';
 // #endif
 // #ifdef H5

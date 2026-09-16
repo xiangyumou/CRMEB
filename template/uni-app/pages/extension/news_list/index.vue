@@ -251,7 +251,7 @@
 		border-radius: 6rpx;
 	}
 
-	// #ifdef APP-PLUS || H5
+	// #ifdef H5
 	.newsList ::v-deep uni-swiper .uni-swiper-dots-horizontal {
 		bottom: 20px;
 	}

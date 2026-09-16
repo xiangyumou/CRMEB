@@ -52,35 +52,10 @@
 			</view>
 			<view class="logon" @click="loginMobile" v-if="current !== 0">{{ $t(`登录`) }}</view>
 			<view class="logon" @click="submit" v-if="current === 0">{{ $t(`登录`) }}</view>
-			<!-- #ifndef APP-PLUS -->
 			<view class="tips">
 				<view v-if="current == 0" @click="current = 1">{{ $t(`快速登录`) }}</view>
 				<view v-if="current == 1" @click="current = 0">{{ $t(`账号登录`) }}</view>
 			</view>
-			<!-- #endif -->
-			<!-- #ifdef APP-PLUS -->
-			<view class="appLogin" v-if="!appLoginStatus && !appleLoginStatus">
-				<view class="hds">
-					<span class="line"></span>
-					<p>{{ $t(`其他方式登录`) }}</p>
-					<span class="line"></span>
-				</view>
-				<view class="btn-wrapper">
-					<view class="btn wx" @click="wxLogin">
-						<span class="iconfont icon-s-weixindenglu1"></span>
-					</view>
-					<view class="btn mima" v-if="current == 1" @click="current = 0">
-						<span class="iconfont icon-s-mimadenglu1"></span>
-					</view>
-					<view class="btn yanzheng" v-if="current == 0" @click="current = 1">
-						<span class="iconfont icon-s-yanzhengmadenglu1"></span>
-					</view>
-					<view class="apple-btn" @click="appleLogin" v-if="appleShow">
-						<view class="iconfont icon-s-pingguo"></view>
-					</view>
-				</view>
-			</view>
-			<!-- #endif -->
 			<view class="protocol">
 				<checkbox-group @change="ChangeIsDefault">
 					<checkbox :class="inAnimation ? 'trembling' : ''" @animationend="inAnimation = false" :checked="protocol ? true : false" />
@@ -108,9 +83,6 @@ import attrs, { required, alpha_num, chs_phone } from '@/utils/validate';
 import { getLogo } from '@/api/public';
 // import cookie from "@/utils/store/cookie";
 import { VUE_APP_API_URL } from '@/utils';
-// #ifdef APP-PLUS
-import { wechatAppAuth } from '@/api/api.js';
-// #endif
 const BACK_URL = 'login_back_url';
 import colors from '@/mixins/color.js';
 import Verify from '../components/verify/index.vue';

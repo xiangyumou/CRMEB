@@ -11,7 +11,6 @@
 namespace app\listener\order;
 
 use app\jobs\MiniOrderJob;
-use app\model\order\StoreOrder;
 use app\services\order\StoreOrderCartInfoServices;
 use app\services\order\StoreOrderServices;
 use app\services\wechat\WechatUserServices;

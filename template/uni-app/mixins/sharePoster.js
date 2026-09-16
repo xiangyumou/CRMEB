@@ -52,9 +52,6 @@ export const sharePoster = {
         this.followCode = "";
       }
       // #endif
-      // #ifdef APP-PLUS
-      this.PromotionCode = res;
-      // #endif
     },
     getImageBase64() {
       let that = this;
@@ -166,7 +163,7 @@ export const sharePoster = {
           });
         });
       // #endif
-      // #ifdef H5 || APP-PLUS
+      // #ifdef H5
       arr2 = [that.posterbackgd, that.storeImageBase64, that.PromotionCode];
       if (!that.storeImageBase64)
         return that.$util.Tips({
@@ -230,21 +227,6 @@ export const sharePoster = {
             title: err,
           });
         });
-      // #endif
-      // #ifdef APP-PLUS
-      uni.downloadFile({
-        url: that.setDomain(that.PromotionCode),
-        success: function (res) {
-          that.$set(that, "isDown", false);
-          if (typeof successFn == "function")
-            successFn && successFn(res.tempFilePath);
-          else that.$set(that, "PromotionCode", res.tempFilePath);
-        },
-        fail: function () {
-          that.$set(that, "isDown", false);
-          that.$set(that, "PromotionCode", "");
-        },
-      });
       // #endif
     },
   },

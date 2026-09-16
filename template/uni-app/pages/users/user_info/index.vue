@@ -75,26 +75,6 @@
 							{{$t(`点击更换手机号码`)}}<text class="iconfont icon-xiangyou"></text>
 						</navigator>
 					</view>
-					<!-- #ifdef APP-PLUS -->
-					<view class="item acea-row row-between-wrapper" v-if="userInfo.phone">
-						<view>{{$t(`密码`)}}</view>
-						<navigator url="/pages/users/user_pwd_edit/index" hover-class="none" class="input">
-							{{$t(`点击修改密码`)}}<text class="iconfont icon-xiangyou"></text>
-						</navigator>
-					</view>
-					<view class="item acea-row row-between-wrapper" @click="initData">
-						<view>{{$t(`缓存大小`)}}</view>
-						<view class="input">
-							{{fileSizeString}}<text class="iconfont icon-xiangyou"></text>
-						</view>
-					</view>
-					<view class="item acea-row row-between-wrapper" @click="updateApp">
-						<view>{{$t(`当前版本`)}}</view>
-						<view class="input">
-							{{version}}<text class="iconfont icon-xiangyou"></text>
-						</view>
-					</view>
-					<!-- #endif -->
 					<view class="item acea-row row-between-wrapper" v-if="array.length">
 						<view>{{$t(`语言切换`)}}</view>
 						<view class="uni-list-cell-db">
@@ -138,11 +118,8 @@
 				</view>
 
 				<button class='modifyBnt bg-color' formType="submit">{{$t(`保存修改`)}}</button>
-				<!-- #ifdef H5 || APP-PLUS || MP -->
+				<!-- #ifdef H5 || MP -->
 				<view class="logOut cartcolor acea-row row-center-wrapper" @click="outLogin">{{$t(`退出登录`)}}</view>
-				<!-- #endif -->
-				<!-- #ifdef APP-PLUS -->
-				<app-update ref="appUpdate" :force="true" :tabbar="false" :getVer='true' @isNew="isNew"></app-update>
 				<!-- #endif -->
 			</view>
 		</form>
@@ -183,9 +160,6 @@
 	import appUpdate from "@/components/update/app-update.vue";
 	export default {
 		components: {
-			// #ifdef APP-PLUS
-			appUpdate
-			// #endif
 			// #ifdef MP
 			authorize
 			// #endif
@@ -224,13 +198,6 @@
 			if (this.isLogin) {
 				this.getUserInfo();
 				this.getLangList()
-				// #ifdef APP-PLUS
-				this.formatSize()
-				// 获取版本号
-				plus.runtime.getProperty(plus.runtime.appid, (inf) => {
-					this.version = inf.version;
-				});
-				// #endif 
 			} else {
 				toLogin();
 			}
@@ -339,15 +306,15 @@
 					let files = plus.android.invoke(sdRoot, "listFiles");
 					let len = files.length;
 					for (let i = 0; i < len; i++) {
-						let filePath = '' + files[i]; // 没有找到合适的方法获取路径，这样写可以转成文件路径  
+						let filePath = '' + files[i]; // 没有找到合适的方法获取路径，这样写可以转成文件路径
 						plus.io.resolveLocalFileSystemURL(filePath, function(entry) {
 							if (entry.isDirectory) {
-								entry.removeRecursively(function(entry) { //递归删除其下的所有文件及子目录  
+								entry.removeRecursively(function(entry) { //递归删除其下的所有文件及子目录
 									uni.showToast({
 										title: that.$t(`缓存清理完成`),
 										duration: 2000
 									});
-									that.formatSize(); // 重新计算缓存  
+									that.formatSize(); // 重新计算缓存
 								}, function(e) {
 									console.log(e.message)
 								});
@@ -356,7 +323,7 @@
 							}
 						}, function(e) {});
 					}
-				} else { // ios暂时未找到清理缓存的方法，以下是官方提供的方法，但是无效，会报错  
+				} else { // ios暂时未找到清理缓存的方法，以下是官方提供的方法，但是无效，会报错
 					plus.cache.clear(function() {
 						uni.showToast({
 							title: that.$t(`缓存清理完成`),
@@ -419,7 +386,7 @@
 			},
 			/**
 			 * 退出登录
-			 * 
+			 *
 			 */
 			outLogin: function() {
 				let that = this;
@@ -468,7 +435,7 @@
 			},
 			/**
 			 * 上传文件
-			 * 
+			 *
 			 */
 			uploadpic: function() {
 				let that = this;

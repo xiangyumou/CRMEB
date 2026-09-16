@@ -98,22 +98,6 @@
 		methods: {
 			// 检查更新
 			update() {
-				// #ifdef APP-PLUS
-				// 获取手机系统信息
-				uni.getSystemInfo({
-					success: function(res) {
-						vm.platform = res.platform; //ios  or android
-						console.log("手机系统信息", vm.platform);
-					},
-				});
-
-				// 获取版本号
-				plus.runtime.getProperty(plus.runtime.appid, function(inf) {
-					vm.version = inf.version;
-				});
-				console.log("当前版本", vm.version);
-				this.getUpdateInfo(); //获取更新信息
-				// #endif
 			},
 
 			// 获取线上版本信息

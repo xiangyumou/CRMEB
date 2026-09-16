@@ -25,7 +25,7 @@ Route::group('pc', function () {
 
     //未授权接口
     Route::group(function () {
-        Route::get('get_pay_vip_code', 'pc.HomeController/getPayVipCode')->name('getPayVipCode')->option(['real_name' => '获取付费会员购买页面二维码']);//获取付费会员购买页面二维码
+//获取付费会员购买页面二维码
         Route::get('get_product_phone_buy', 'pc.HomeController/getProductPhoneBuy')->name('getProductPhoneBuy')->option(['real_name' => '手机购买跳转url配置']);//手机购买跳转url配置
         Route::get('get_banner', 'pc.HomeController/getBanner')->name('getBanner')->option(['real_name' => 'PC首页轮播图']);//PC首页轮播图
         Route::get('get_category_product', 'pc.HomeController/getCategoryProduct')->name('getCategoryProduct')->option(['real_name' => '首页分类尚品']);//首页分类尚品
@@ -48,7 +48,7 @@ Route::group('pc', function () {
     //会员授权接口
     Route::group(function () {
         Route::get('get_cart_list', 'pc.CartController/getCartList')->name('getCartList')->option(['real_name' => '购物车列表']);//购物车列表
-        Route::get('get_balance_record/:type', 'pc.UserController/getBalanceRecord')->name('getBalanceRecord')->option(['real_name' => '余额记录']);//余额记录
+//余额记录
         Route::get('get_order_list', 'pc.OrderController/getOrderList')->name('getOrderList')->option(['real_name' => '订单列表']);//订单列表
         Route::get('get_refund_order_list', 'pc.OrderController/getRefundOrderList')->name('getRefundOrderList')->option(['real_name' => '退款订单列表']);//退款订单列表
         Route::get('get_collect_list', 'pc.UserController/getCollectList')->name('getCollectList')->option(['real_name' => '收藏列表']);//收藏列表

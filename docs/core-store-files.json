@@ -1,0 +1,1402 @@
+[
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/controller/Common.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/UpgradeController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/agent/AgentManage.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/agent/Division.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/controller/v1/diy/PageLink.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/kefu/StoreServiceAutoReply.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/kefu/StoreServiceSpeechcraftCate.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/SignRewards.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/integral/StorePointRecord.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/controller/v1/order/DeliveryService.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/controller/v1/setting/SystemConfig.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/controller/v1/user/User.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/middleware/AdminEditorTokenMiddleware.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/agent.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/app.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/export.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/finance.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/live.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/marketing.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/merchant.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/order.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/route.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/setting.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/statistic.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/system.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/user.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v1/CrontabController.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v1/PayController.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v1/PublicController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/activity/StoreBargainController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/activity/StoreIntegralController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/activity/StoreSeckillController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/order/StoreIntegralOrderController.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v1/order/StoreOrderController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/user/SpreadApplyController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/user/UserBrokerageController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/user/UserExtractController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/user/UserLevelController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/user/UserRechargeController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/user/UserSignController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v2/activity/LuckLotteryController.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v2/wechat/AuthController.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v2/wechat/WechatController.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/route/pc.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/route/v1.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/route/v2.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/common.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/UserSpreadDao.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/event.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/jobs/OrderJob.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/jobs/RefundOrderJob.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/jobs/TaskJob.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/jobs/TemplateJob.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/jobs/UnpaidOrderCancelJob.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/jobs/UpgradeJob.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/kefuapi/controller/AuthController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/kefuapi/controller/Common.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/kefuapi/controller/Login.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/kefuapi/controller/Order.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/kefuapi/controller/Product.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/kefuapi/controller/Service.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/kefuapi/controller/User.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/kefuapi/route/route.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/listener/notice/NoticeListener.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/listener/order/OrderCreateAfterListener.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/listener/order/OrderPaySuccessListener.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/listener/order/OrderRefundCancelAfterListener.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/listener/order/OrderRefundCreateAfterListener.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/listener/order/OrderShippingListener.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/listener/pay/NotifyListener.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/listener/user/RegisterListener.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/user/UserSpread.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/activity/coupon/StoreCouponIssueServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/integral/StorePointRecordServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/activity/lottery/LuckPrizeServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/diy/DiyProServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/diy/DiyServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/diy/ThemeServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/kefu/service/StoreServiceSpeechcraftCateServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/message/notice/EnterpriseWechatService.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/message/notice/SmsService.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/order/StoreCartServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/order/StoreOrderComputedServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/order/StoreOrderCreateServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/order/StoreOrderDeliveryServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/order/StoreOrderServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/order/StoreOrderSuccessServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/order/StoreOrderTakeServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/pay/OrderPayServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/pay/PayServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/product/product/StoreProductServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/product/sku/StoreProductAttrValueServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/statistic/OrderStatisticServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/statistic/ProductStatisticServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/statistic/UserStatisticServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/system/UpgradeServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/system/crontab/CrontabRunServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/system/crontab/SystemCrontabServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/system/log/SystemFileServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/user/LoginServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/user/UserServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/UserSpreadServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/config/workerman.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/crmeb/command/Workerman.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/crmeb/services/workerman/chat/ChatHandle.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/crmeb/services/workerman/chat/ChatService.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/route/route.php"
+  },
+  {
+    "status": "M",
+    "path": "deploy/production/nginx.conf"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobileConfig/c_home_bargain.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobileConfig/c_home_seckill.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/components/mobileConfig/c_new_list.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobileConfig/c_paid_vip.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobileConfig/c_points_mall.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobileConfig/c_sign_in.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobileConfig/c_wechat_live.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobilePage/home_bargain.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/components/mobilePage/home_member.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobilePage/home_paid_vip.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobilePage/home_seckill.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/components/mobilePage/home_userInfor.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobilePage/points_mall.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobilePage/sign_in.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobilePage/wechat_live.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/main.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/agent/agentManage.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/agent/spread/apply.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/division/agent/agreement.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/division/agent/applyList.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/division/agent/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/division/agent/statistics.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/division/list/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/finance/balance/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/finance/commission/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/finance/userExtract/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/appChat/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/appChat/mobile/feedback.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/appChat/mobile/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/mobile/chat_list.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/mobile/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/mobile/orderList/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/mobile/user/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/pc/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/live/add_goods.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/live/anchor.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/live/creat_live.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/live/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/live/live_goods.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/lottery/config.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/lottery/create.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/lottery/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/lottery/lotteryList.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/lottery/recordingList.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/marketing/newuser/gift.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/point_record/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/point_statistic/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/recharge/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/sign/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/sign/rewards.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeBargain/bargainList.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeBargain/create.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeBargain/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeBargain/statistics.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeIntegral/create.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeIntegral/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeSeckill/create.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeSeckill/createMore.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeSeckill/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeSeckill/list.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeSeckill/statistics.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/userPoint/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/order/orderList/handle/orderSend.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/plugin/emoji-awesome/css/emojione.min.css"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/plugin/emoji-awesome/css/facebook.min.css"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/plugin/emoji-awesome/css/messenger.min.css"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/plugin/emoji-awesome/css/twitter.min.css"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/plugin/emoji-awesome/img/sheet_apple_64_indexed_256colors.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/plugin/emoji-awesome/img/sheet_emojione_64_indexed_128.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/plugin/emoji-awesome/img/sheet_facebook_64_indexed_128.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/plugin/emoji-awesome/img/sheet_google_64_indexed_128.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/plugin/emoji-awesome/img/sheet_messenger_64_indexed_128.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/plugin/emoji-awesome/img/sheet_twitter_64_indexed_128.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/router/modules/agent.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/router/modules/app.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/router/modules/division.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/router/modules/finance.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/router/modules/frameOut.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/router/modules/marketing.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/router/modules/setting.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/router/modules/system.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/router/modules/user.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/router/routers.js"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/App.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/api/store.js"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/api/user.js"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/components/Authorize.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/components/homeList/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/components/jyf-parser/jyf-parser.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/components/jyf-parser/libs/MpHtmlParser.js"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/components/jyf-parser/libs/config.js"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/components/jyf-parser/libs/trees.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/components/kefuIcon/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/components/payment/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/components/productConSwiper/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/components/uniNoticeBar/uni-notice-bar.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/components/update/app-update.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/config/app.js"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/libs/login.js"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/manifest.json"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/mixins/sharePoster.js"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages.json"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/activity/bargain/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/activity/goods_bargain/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/activity/goods_bargain_details/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/activity/goods_combination_details/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/activity/goods_combination_status/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/activity/goods_seckill/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/activity/goods_seckill_details/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/activity/poster-poster/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/activity/presell_details/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/admin/distribution/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/admin/distribution/orderDetail/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/admin/distribution/scanning/detail/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/admin/distribution/scanning/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/admin/goods/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/admin/orderDetail/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/admin/orderList/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/admin/order_cancellation/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/admin/refund_order_detail/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/admin/refund_order_list/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/admin/statistics/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/admin/user/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/admin/user/list.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/annex/components/verify/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/annex/components/verify/utils/ase.js"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/annex/components/verify/utils/crypto-js.js"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/annex/components/verify/utils/util.js"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/annex/components/verify/verify.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/annex/components/verify/verifyPoint/verifyPoint.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/annex/components/verify/verifySlider/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/annex/components/verify/verifySlider/verifySlider.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/annex/components/verify/verifySlider/verifySliderPc.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/annex/offline_pay/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/annex/offline_result/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/annex/settled/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/annex/special/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/annex/vip_active/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/annex/vip_clause/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/annex/vip_coupon/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/annex/vip_paid/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/columnGoods/live_list/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/extension/customer_list/chat.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/extension/news_details/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/extension/news_list/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/goods/cashier/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/goods/goods_comment_con/components/userAddress.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/goods/goods_comment_con/lottery_comment.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/goods/goods_details_store/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/goods/lottery/components/userAddress.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/goods/lottery/grids/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/goods/lottery/grids/record.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/goods/order_confirm/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/goods/order_details/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/goods/order_list/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/goods/order_pay_status/components/giftModal.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/goods/order_pay_status/components/userAddress.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/goods/order_pay_status/payLottery.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/goods_cate/goods_cate1.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/goods_details/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/index/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/order_addcart/order_addcart.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/points_mall/exchange_record.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/points_mall/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/points_mall/integral_goods_details.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/points_mall/integral_goods_list.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/points_mall/integral_order.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/points_mall/integral_order_details.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/points_mall/integral_order_status.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/points_mall/logistics_details.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/points_mall/user_address.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/user/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/alipay_invoke/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/commission_rank/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/users/login/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/users/payment_on_behalf/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/promoter-list/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/promoter-order/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/promoter_rank/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/staff_list/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/users/user_address/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/users/user_address_list/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_bill/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_cash/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_distribution_level/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/users/user_get_coupon/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/users/user_goods_collection/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/users/user_info/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_integral/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/users/user_invoice_list/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_money/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_payment/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_sgin/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_sgin_list/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_spread_code/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_spread_money/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_spread_money/receiving.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_spread_user/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_vip/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/users/user_vip_areer/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/subpackage/diyComponents/bargain.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/customerService.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/follow.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/goodList.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/headerSerch.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/subpackage/diyComponents/homePaidVip.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/homeUserInfor.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/subpackage/diyComponents/liveBroadcast.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/menus.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/newVip.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/pageDesign.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/subpackage/diyComponents/pointsMall.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/productBottom.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/productDesc.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/promotionList.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/richText.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/subpackage/diyComponents/seckill.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/subpackage/diyComponents/signIn.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/tabNav.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/subpackage/diyComponents/userInfor.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/utils/index.js"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/utils/lang.js"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/utils/request.js"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/utils/util.js"
+  },
+  {
+    "status": "M",
+    "path": "tests/regression/Cases/OrderPricingTest.php"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/app/services/CoreStore.php"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/upgrade/core-store/README.md"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/upgrade/core-store/migrate.php"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/upgrade/core-store/removed-pages.json"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-baseline.json"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-files.json"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-reduction.md"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-removed-pages.json"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-removed-routes.json"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-result.json"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-shared-retained.json"
+  },
+  {
+    "status": "A",
+    "path": "tests/regression/Cases/CoreStoreBoundaryTest.php"
+  },
+  {
+    "status": "A",
+    "path": "tests/regression/Cases/CoreStoreMigrationTest.php"
+  },
+  {
+    "status": "A",
+    "path": "tests/regression/Cases/NewUserCouponTest.php"
+  },
+  {
+    "status": "A",
+    "path": "tests/regression/Cases/RetainedActivityTest.php"
+  },
+  {
+    "status": "A",
+    "path": "tests/static/core-store-front.cjs"
+  }
+]

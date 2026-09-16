@@ -8,7 +8,6 @@
 // +----------------------------------------------------------------------
 // | Author: CRMEB Team <admin@crmeb.com>
 // +----------------------------------------------------------------------
-use app\api\middleware\BlockerMiddleware;
 use think\facade\Route;
 
 /**
@@ -37,6 +36,7 @@ Route::group('v2', function () {
         })->option(['mark' => 'wechat_auto', 'mark_name' => '微信授权']);
 
         Route::group(function () {
+
             Route::get('diy/get_store_status', 'v2.PublicController/getStoreStatus')->option(['real_name' => '获取门店自提开启状态']);
             Route::get('diy/color_change/:name', 'v2.PublicController/colorChange')->option(['real_name' => '一键换色']);
             Route::get('diy/get_diy/[:name]', 'v2.PublicController/getDiy')->option(['real_name' => '获取DIY数据']);
@@ -49,7 +49,7 @@ Route::group('v2', function () {
         Route::post('reset_cart', 'v2.store.StoreCartController/resetCart')->name('resetCart')->option(['real_name' => '清除购物车', 'mark' => 'cart', 'mark_name' => '购物车']);
         Route::get('new_coupon', 'v2.store.StoreCouponsController/getNewCoupon')->name('getNewCoupon')->option(['real_name' => '获取新人券', 'mark' => 'coupons', 'mark_name' => '优惠券']);//获取新人券
         Route::post('order/product_coupon/:orderId', 'v2.store.StoreCouponsController/getOrderProductCoupon')->option(['real_name' => '获取订单下管理的优惠券', 'mark' => 'coupons', 'mark_name' => '优惠券']);
-        Route::get('user/service/record', 'v2.user.StoreService/record')->name('userServiceRecord')->option(['real_name' => '客服聊天记录', 'parent' => 'user', 'cate_name' => '客服']);//客服聊天记录
+//客服聊天记录
         Route::get('cart_list', 'v2.store.StoreCartController/getCartList')->option(['real_name' => '获取购物车列表', 'mark' => 'cart', 'mark_name' => '购物车']);
         Route::get('get_attr/:id/:type', 'v2.store.StoreProductController/getProductAttr')->option(['real_name' => '获取商品规格', 'mark' => 'cart', 'mark_name' => '购物车']);
         Route::post('set_cart_num', 'v2.store.StoreCartController/setCartNum')->option(['real_name' => '获取购物车数量', 'mark' => 'cart', 'mark_name' => '购物车']);
@@ -81,18 +81,18 @@ Route::group('v2', function () {
         Route::get('user/clean_search', 'v2.user.UserSearchController/cleanUserSearch')->name('cleanUserSearch')->option(['real_name' => '清除搜索记录']);
 
         //抽奖活动详情
-        Route::get('lottery/info/:factor/[:lottery_id]', 'v2.activity.LuckLotteryController/lotteryInfo')->name('lotteryInfo')->option(['real_name' => '抽奖活动详情']);
+
         //参与抽奖
-        Route::post('lottery', 'v2.activity.LuckLotteryController/luckLottery')->name('luckLottery')->middleware(BlockerMiddleware::class)->option(['real_name' => '参与抽奖']);
+
         //领取奖品
-        Route::post('lottery/receive', 'v2.activity.LuckLotteryController/lotteryReceive')->name('lotteryReceive')->middleware(BlockerMiddleware::class)->option(['real_name' => '领取奖品']);
+
         //抽奖记录
-        Route::get('lottery/record', 'v2.activity.LuckLotteryController/lotteryRecord')->name('lotteryRecord')->option(['real_name' => '抽奖记录']);
+
 
         //获取分销等级列表
-        Route::get('agent/level_list', 'v2.agent.AgentLevel/levelList')->name('agentLevelList')->option(['real_name' => '获取分销等级列表']);
+
         //获取分销等级任务列表
-        Route::get('agent/level_task_list', 'v2.agent.AgentLevel/levelTaskList')->name('agentLevelTaskList')->option(['real_name' => '获取分销等级任务列表']);
+
 
     })->middleware(\app\api\middleware\AuthTokenMiddleware::class, true);
 
@@ -103,7 +103,7 @@ Route::group('v2', function () {
         Route::get('subscribe', 'v2.PublicController/subscribe')->name('WechatSubscribe')->option(['real_name' => '微信公众号用户是否关注']);// 微信公众号用户是否关注
         Route::get('index', 'v2.PublicController/index')->name('index')->option(['real_name' => '首页']);//首页
         Route::get('coupons', 'v2.store.StoreCouponsController/lst')->name('couponsList')->option(['real_name' => '可领取优惠券列表']); //可领取优惠券列表
-        Route::get('diy/sign', 'v2.PublicController/getDiySign')->name('getDiySign')->option(['real_name' => '获取Diy签到']);
+
     })->middleware(\app\api\middleware\AuthTokenMiddleware::class, false)
         ->option(['mark' => 'common', 'mark_name' => '公共接口']);
 

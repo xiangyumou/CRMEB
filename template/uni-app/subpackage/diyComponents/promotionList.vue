@@ -342,7 +342,6 @@ export default {
       immediate: true,
     },
     tempArr() {
-      // #ifndef APP-PLUS
       this.$nextTick(() => {
         if (this.productVideoStatus) {
           uni.getNetworkType({
@@ -363,15 +362,12 @@ export default {
           });
         }
       });
-      // #endif
     },
   },
   created() {
-    // #ifndef APP-PLUS
     this.$eventHub.$on("product_video_observe", () => {
       this.observeVideo();
     });
-    // #endif
     // this.getGroomList();
     let that = this;
     let type = that.goodType == 0 ? 3 : that.goodType;

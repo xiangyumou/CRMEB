@@ -62,7 +62,7 @@ class DiyProServices extends BaseServices
         $storeCategoryServices = app()->make(StoreCategoryServices::class);
 
 
-        $info['value'] = json_decode($info['value'], true);
+        $info['value'] = \app\services\CoreStore::cleanDiy(json_decode($info['value'], true));
         if ($info['value']) {
             foreach ($info['value'] as &$item) {
                 switch ($item['name']) {

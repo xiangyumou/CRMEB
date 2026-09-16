@@ -111,6 +111,9 @@ class PayServices
      */
     public function pay(string $payType, string $orderId, string $price, string $successAction, string $body, array $options = [])
     {
+        if (!in_array($payType, ['routine','weixinh5','weixin','pc','store'], true)) {
+            throw new ApiException('当前商城仅支持微信支付');
+        }
         try {
 
             //这些全都是微信支付

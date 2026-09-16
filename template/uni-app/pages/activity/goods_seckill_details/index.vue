@@ -2,7 +2,6 @@
   <view :style="colorStyle">
     <!-- 头部 -->
 
-    <!-- #ifndef APP-PLUS -->
     <view class="navbar" :style="{ height: navH + 'rpx', opacity: opacity }">
       <view class="navbarH" :style="'height:' + navH + 'rpx;'">
         <view class="navbarCon acea-row row-center-wrapper">
@@ -32,7 +31,6 @@
       <view class="iconfont icon-gengduo5" @click="moreNav"></view>
       <!-- #endif -->
     </view>
-    <!-- #endif -->
 
     <!-- #ifdef H5 -->
     <view
@@ -61,7 +59,7 @@
         @scroll="scroll"
       >
         <view id="past0">
-          <!-- #ifdef APP-PLUS || MP -->
+          <!-- #ifdef MP -->
           <view class="" :style="'width:100%;' + 'height:' + sysHeight"></view>
           <!-- #endif -->
           <productConSwiper
@@ -186,16 +184,11 @@
             <!-- <view class="" v-html="storeInfo.description">
 						</view> -->
 
-            <!-- #ifndef APP-PLUS -->
             <parser
               :html="storeInfo.description"
               ref="article"
               :tag-style="tagStyle"
             ></parser>
-            <!-- #endif -->
-            <!-- #ifdef APP-PLUS -->
-            <view class="description" v-html="storeInfo.description"></view>
-            <!-- #endif -->
           </view>
         </view>
         <view class="uni-p-b-98"></view>
@@ -353,16 +346,6 @@
         <view class="">{{ $t(`发送给朋友`) }}</view>
       </button>
       <!-- #endif -->
-      <!-- #ifdef APP-PLUS -->
-      <view class="item" @click="appShare('WXSceneSession')">
-        <view class="iconfont icon-weixin3"></view>
-        <view class="">{{ $t(`微信好友`) }}</view>
-      </view>
-      <view class="item" @click="appShare('WXSenceTimeline')">
-        <view class="iconfont icon-pengyouquan"></view>
-        <view class="">{{ $t(`微信朋友圈`) }}</view>
-      </view>
-      <!-- #endif -->
       <button class="item" hover-class="none" @tap="goPoster('seckill')">
         <view class="iconfont icon-haibao"></view>
         <view class="">{{ $t(`生成海报`) }}</view>
@@ -401,7 +384,7 @@
       ></image>
     </view>
     <swiperPrevie ref="cusSwiperImg" :list="storeInfo.images"></swiperPrevie>
-    <!-- #ifdef H5 || APP-PLUS -->
+    <!-- #ifdef H5 -->
     <zb-code
       ref="qrcode"
       :show="codeShow"
@@ -439,9 +422,6 @@ import countDown from "@/components/countDown";
 import { imageBase64 } from "@/api/public";
 import { toLogin } from "@/libs/login.js";
 import { getUserInfo } from "@/api/user.js";
-// #ifdef APP-PLUS
-import { TOKENNAME } from "@/config/app.js";
-// #endif
 import colors from "@/mixins/color.js";
 import menuIcon from "@/components/menuIcon.vue";
 import parser from "@/components/jyf-parser/jyf-parser";
@@ -584,9 +564,6 @@ export default {
     // #ifdef H5
     that.navH = 96;
     // #endif
-    // #ifdef APP-PLUS
-    that.navH = 30;
-    // #endif
     // #ifdef MP
     let menuButtonInfo = uni.getMenuButtonBoundingClientRect();
     this.meunHeight = menuButtonInfo.height;
@@ -640,37 +617,6 @@ export default {
       this.currentPage = !this.currentPage;
     },
     // app分享
-    // #ifdef APP-PLUS
-    appShare(scene) {
-      let that = this;
-      let routes = getCurrentPages(); // 获取当前打开过的页面路由数组
-      let curRoute = routes[routes.length - 1].$page.fullPath; // 获取当前页面路由，也就是最后一个打开的页面路由
-      uni.share({
-        provider: "weixin",
-        scene: scene,
-        type: 0,
-        href: `${HTTP_REQUEST_URL}${curRoute}`,
-        title: that.storeInfo.title,
-        summary: that.storeInfo.info,
-        imageUrl: that.storeInfo.small_image,
-        success: function (res) {
-          uni.showToast({
-            title: this.$t(`分享成功`),
-            icon: "success",
-          });
-          that.posters = false;
-        },
-        fail: function (err) {
-          uni.showToast({
-            title: this.$t(`分享失败`),
-            icon: "none",
-            duration: 2000,
-          });
-          that.posters = false;
-        },
-      });
-    },
-    // #endif
     /**
      * 购物车手动填写
      *
@@ -737,7 +683,7 @@ export default {
             navList.splice(1, 0, that.$t(`评价`));
           }
           that.$set(that, "navList", navList);
-          // #ifdef H5 || APP-PLUS
+          // #ifdef H5
           // this.PromotionCode = res.data.storeInfo.code_base
           that.storeImage = that.storeInfo.image;
           that.getImageBase64();
@@ -753,34 +699,9 @@ export default {
               "&time_id=" +
               that.time_id;
             // #endif
-            // #ifdef APP-PLUS
-            this.codeVal =
-              HTTP_REQUEST_URL +
-              "/pages/activity/goods_seckill_details/index?id=" +
-              that.id +
-              "&spid=" +
-              that.storeInfo.uid +
-              "&time_id=" +
-              that.time_id;
-            // #endif
           } else {
             that.$set(that, "PromotionCode", this.storeInfo.wechat_code);
           }
-          // #ifdef APP-PLUS
-          uni.downloadFile({
-            url: that.setDomain(res.data.storeInfo.wechat_code),
-            success: function (res) {
-              that.PromotionCode = res.tempFilePath;
-            },
-            fail: function () {
-              return that.$util.Tips({
-                title: that.$t(`二维码获取失败`),
-              });
-            },
-          });
-
-          that.downloadFilestoreImage();
-          // #endif
           // #ifdef H5
           that.setShare();
           // #endif
@@ -827,21 +748,6 @@ export default {
           that.$set(that, "isDown", false);
           that.$set(that, "PromotionCode", "");
         });
-      // #endif
-      // #ifdef APP-PLUS
-      uni.downloadFile({
-        url: that.setDomain(that.PromotionCode),
-        success: function (res) {
-          that.$set(that, "isDown", false);
-          if (typeof successFn == "function")
-            successFn && successFn(res.tempFilePath);
-          else that.$set(that, "PromotionCode", res.tempFilePath);
-        },
-        fail: function () {
-          that.$set(that, "isDown", false);
-          that.$set(that, "PromotionCode", "");
-        },
-      });
       // #endif
     },
     setShare() {
@@ -1278,26 +1184,6 @@ export default {
       });
     },
     // #endif
-    //#ifdef APP-PLUS
-    savePosterPath() {
-      let that = this;
-      uni.saveImageToPhotosAlbum({
-        filePath: that.posterImage,
-        success: function (res) {
-          that.posterImageClose();
-          that.$util.Tips({
-            title: that.$t(`保存成功`),
-            icon: "success",
-          });
-        },
-        fail: function (res) {
-          that.$util.Tips({
-            title: that.$t(`保存失败`),
-          });
-        },
-      });
-    },
-    // #endif
     setShareInfoStatus: function () {
       let data = this.storeInfo;
       let href = location.href;
@@ -1419,9 +1305,6 @@ export default {
   font-size: 30rpx;
   color: #050505;
   background-color: #fff;
-  /* #ifdef APP-PLUS */
-  width: 100%;
-  /* #endif */
 }
 
 .home {

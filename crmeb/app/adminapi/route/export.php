@@ -23,25 +23,25 @@ Route::group('export', function () {
     //商品列表
     Route::get('product_list', 'v1.export.ExportExcel/productList')->option(['real_name' => '商品列表导出']);
     //砍价列表
-    Route::get('bargain_list', 'v1.export.ExportExcel/bargainList')->option(['real_name' => '砍价商品列表导出']);
+
     //拼团列表
     Route::get('combination_list', 'v1.export.ExportExcel/combinationList')->option(['real_name' => '拼团商品列表导出']);
     //秒杀列表
-    Route::get('seckill_list', 'v1.export.ExportExcel/seckillList')->option(['real_name' => '秒杀商品列表导出']);
+
     //导出会员卡
     Route::get('member_card/:id', 'v1.export.ExportExcel/memberCardList')->option(['real_name' => '会员卡导出']);
     //分销用户推广列表
-    Route::get('userAgent', 'v1.export.ExportExcel/userAgent')->option(['real_name' => '分销员推广列表导出']);
+
     //用户资金监控
     Route::get('userFinance', 'v1.export.ExportExcel/userFinance')->option(['real_name' => '用户资金导出']);
     //用户佣金
-    Route::get('userCommission', 'v1.export.ExportExcel/userCommission')->option(['real_name' => '用户佣金导出']);
+
     //用户积分
-    Route::get('userPoint', 'v1.export.ExportExcel/userPoint')->option(['real_name' => '用户积分导出']);
+
     //用户充值
-    Route::get('userRecharge', 'v1.export.ExportExcel/userRecharge')->option(['real_name' => '用户充值导出']);
+
     //核销订单
-    Route::get('verify_order', 'v1.export.ExportExcel/verifyOrder')->option(['real_name' => '核销订单']);
+
 })->middleware([
     \app\http\middleware\AllowOriginMiddleware::class,
     \app\adminapi\middleware\AdminAuthTokenMiddleware::class,

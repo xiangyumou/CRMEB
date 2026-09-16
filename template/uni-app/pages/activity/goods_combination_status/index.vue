@@ -99,22 +99,10 @@
 				<view class="">{{$t(`发送给朋友`)}}</view>
 			</button>
 			<!-- #endif -->
-			<!-- #ifdef APP-PLUS -->
-			<view class="item" @click="appShare('WXSceneSession')">
-				<view class="iconfont icon-weixin3"></view>
-				<view class="">{{$t(`微信好友`)}}</view>
-			</view>
-			<view class="item" @click="appShare('WXSenceTimeline')">
-				<view class="iconfont icon-pengyouquan"></view>
-				<view class="">{{$t(`微信朋友圈`)}}</view>
-			</view>
-			<!-- #endif -->
-			<!-- #ifndef APP-PLUS -->
 			<button class="item" hover-class='none' @tap="goPoster">
 				<view class="iconfont icon-haibao"></view>
 				<view class="">{{$t(`生成海报`)}}</view>
 			</button>
-			<!-- #endif -->
 		</view>
 		<view class="mask" v-if="posters" @click="listenerActionClose"></view>
 		<!-- 发送给朋友图片 -->
@@ -152,11 +140,6 @@
 	// #endif
 	import home from '@/components/home';
 	const NAME = 'GroupRule';
-	// #ifdef APP-PLUS
-	import {
-		TOKENNAME
-	} from '@/config/app.js';
-	// #endif
 	const app = getApp();
 	import colors from '@/mixins/color.js';
 	import {
@@ -280,37 +263,6 @@
 		},
 		methods: {
 			// app分享
-			// #ifdef APP-PLUS
-			appShare(scene) {
-				let that = this
-				let routes = getCurrentPages(); // 获取当前打开过的页面路由数组
-				let curRoute = routes[routes.length - 1].$page.fullPath // 获取当前页面路由，也就是最后一个打开的页面路由
-				uni.share({
-					provider: "weixin",
-					scene: scene,
-					type: 0,
-					href: `${HTTP_REQUEST_URL}${curRoute}`,
-					title: that.$t(`您的好友`) + that.userInfo.nickname + that.$t(`邀请您参团`) + that.storeCombination
-						.title,
-					imageUrl: that.storeCombination.small_image,
-					success: function(res) {
-						uni.showToast({
-							title: that.$t(`分享成功`),
-							icon: 'success'
-						})
-						that.posters = false;
-					},
-					fail: function(err) {
-						uni.showToast({
-							title: that.$t(`分享失败`),
-							icon: 'none',
-							duration: 2000
-						})
-						that.posters = false;
-					}
-				});
-			},
-			// #endif
 			// 授权关闭
 			authColse: function(e) {
 				this.isShowAuth = e;

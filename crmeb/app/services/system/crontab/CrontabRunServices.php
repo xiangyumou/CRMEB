@@ -11,15 +11,11 @@
 namespace app\services\system\crontab;
 
 use app\services\activity\combination\StorePinkServices;
-use app\services\activity\live\LiveGoodsServices;
-use app\services\activity\live\LiveRoomServices;
-use app\services\agent\AgentManageServices;
 use app\services\order\StoreOrderInvoiceServices;
 use app\services\order\StoreOrderServices;
 use app\services\order\StoreOrderTakeServices;
 use app\services\product\product\StoreProductServices;
 use app\services\system\attachment\SystemAttachmentServices;
-use app\services\user\UserSignServices;
 use think\facade\Log;
 
 /**
@@ -37,15 +33,13 @@ class CrontabRunServices
     public $markList = [
         'orderCancel' => '未支付自动取消订单',
         'pinkExpiration' => '拼团到期订单处理',
-        'agentUnbind' => '到期自动解绑上级',
-        'liveProductStatus' => '自动更新直播商品状态',
-        'liveRoomStatus' => '自动更新直播间状态',
+
         'takeDelivery' => '订单自动收货',
         'advanceOff' => '预售商品到期自动下架',
         'productReplay' => '订单商品自动好评',
         'clearPoster' => '清除昨日海报',
         'autoInvoice' => '自动开具发票以及退款自动冲红',
-        'signRemind' => '未签到提醒',
+
         'customTimer' => '自定义定时任务',
     ];
 
@@ -114,15 +108,7 @@ class CrontabRunServices
      * @email 442384644@qq.com
      * @date 2023/03/01
      */
-    public function agentUnbind()
-    {
-        try {
-            app()->make(AgentManageServices::class)->removeSpread();
-            $this->crontabLog(' 执行自动解绑上级绑定');
-        } catch (\Throwable $e) {
-            $this->crontabLog('自动解除上级绑定失败,失败原因:' . $e->getMessage());
-        }
-    }
+
 
     /**
      * 更新直播商品状态
@@ -130,15 +116,7 @@ class CrontabRunServices
      * @email 442384644@qq.com
      * @date 2023/03/01
      */
-    public function liveProductStatus()
-    {
-        try {
-            app()->make(LiveGoodsServices::class)->syncGoodStatus();
-            $this->crontabLog(' 执行更新直播商品状态');
-        } catch (\Throwable $e) {
-            $this->crontabLog('更新直播商品状态失败,失败原因:' . $e->getMessage());
-        }
-    }
+
 
     /**
      * 更新直播间状态
@@ -146,15 +124,7 @@ class CrontabRunServices
      * @email 442384644@qq.com
      * @date 2023/03/01
      */
-    public function liveRoomStatus()
-    {
-        try {
-            app()->make(LiveRoomServices::class)->syncRoomStatus();
-            $this->crontabLog(' 执行更新直播间状态');
-        } catch (\Throwable $e) {
-            $this->crontabLog('更新直播间状态失败,失败原因:' . $e->getMessage());
-        }
-    }
+
 
     /**
      * 自动收货
@@ -244,15 +214,7 @@ class CrontabRunServices
      * @email 442384644@qq.com
      * @date 2023/9/30
      */
-    public function signRemind()
-    {
-        try {
-            app()->make(UserSignServices::class)->sendSignRemind();
-            $this->crontabLog(' 执行未签到提醒');
-        } catch (\Throwable $e) {
-            $this->crontabLog('未签到提醒失败,失败原因:' . $e->getMessage());
-        }
-    }
+
 
     /**
      * 自定义定时器

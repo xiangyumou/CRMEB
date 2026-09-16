@@ -1,13 +1,75 @@
 <template>
-  <common_wrapper :config="configObj">
-    <div
-      v-if="styleConfig"
-      class="userInfor acea-row row-between-wrapper"
-      :style="{
-        background: `linear-gradient(90deg,${bgColorLeft} 0%,${bgColorRight} 100%)`,
-        borderRadius: bgRadius,
-      }"
-    >
+<common_wrapper :config="configObj">
+  <div
+    v-if="styleConfig"
+    class="userInfor acea-row row-between-wrapper"
+    :style="{
+      background: `linear-gradient(90deg,${bgColorLeft} 0%,${bgColorRight} 100%)`,
+      borderRadius: bgRadius,
+    }"
+  >
+    <div class="left acea-row row-middle">
+      <div class="pictrue acea-row row-center-wrapper">
+        <img :src="logoConfig" v-if="logoConfig" />
+        <div class="empty-box" v-else>
+          <img src="../../assets/images/shan.png" />
+        </div>
+      </div>
+      <div class="text">
+        <div class="name acea-row row-middle">用户名称<img src="../../assets/images/vip-diy.png" /></div>
+        <div class="acea-row row-middle">
+          <div
+            class="progress"
+            :style="{
+              background: toneConfig ? progressBgColor : '#eee',
+            }"
+          >
+            <div
+              class="bgReds"
+              :style="{
+                background: toneConfig
+                  ? `linear-gradient(90deg,${progressLeft} 0%,${progressRight} 100%)`
+                  : themeColor,
+              }"
+            ></div>
+          </div>
+          <div class="percent">3000/1000000</div>
+        </div>
+        <!--<div class="phone"><span class="iconfont iconshouji"></span>13000000000</div>-->
+      </div>
+    </div>
+    <div class="right acea-row row-bottom">
+      <div class="item" v-if="checkType.slice(0, 3).indexOf(1) != -1">
+        <div class="num">20</div>
+        <div>积分</div>
+      </div>
+      <div class="item" v-if="checkType.slice(0, 3).indexOf(2) != -1">
+        <div class="num">200</div>
+        <div>余额</div>
+      </div>
+      <div class="item" v-if="checkType.slice(0, 3).indexOf(0) != -1">
+        <div class="num">2</div>
+        <div>优惠券</div>
+      </div>
+      <div class="item" v-if="checkType.slice(0, 3).indexOf(4) != -1">
+        <div class="num">80</div>
+        <div>收藏</div>
+      </div>
+      <div class="item" v-if="checkType.slice(0, 3).indexOf(5) != -1">
+        <div class="num">80</div>
+        <div>浏览</div>
+      </div>
+    </div>
+  </div>
+  <div
+    v-else
+    class="userInfor"
+    :style="{
+      background: `linear-gradient(90deg,${bgColorLeft} 0%,${bgColorRight} 100%)`,
+      borderRadius: bgRadius,
+    }"
+  >
+    <div class="acea-row row-between-wrapper">
       <div class="left acea-row row-middle">
         <div class="pictrue acea-row row-center-wrapper">
           <img :src="logoConfig" v-if="logoConfig" />
@@ -38,88 +100,22 @@
           <!--<div class="phone"><span class="iconfont iconshouji"></span>13000000000</div>-->
         </div>
       </div>
-      <div class="right acea-row row-bottom">
-        <div class="item" v-if="checkType.slice(0, 3).indexOf(1) != -1">
-          <div class="num">20</div>
-          <div>积分</div>
-        </div>
-        <div class="item" v-if="checkType.slice(0, 3).indexOf(2) != -1">
-          <div class="num">200</div>
-          <div>余额</div>
-        </div>
-        <div class="item" v-if="checkType.slice(0, 3).indexOf(0) != -1">
-          <div class="num">2</div>
-          <div>优惠券</div>
-        </div>
-        <div class="item" v-if="checkType.slice(0, 3).indexOf(4) != -1">
-          <div class="num">80</div>
-          <div>收藏</div>
-        </div>
-        <div class="item" v-if="checkType.slice(0, 3).indexOf(5) != -1">
-          <div class="num">80</div>
-          <div>浏览</div>
-        </div>
+    </div>
+    <div class="list acea-row row-around">
+     >
+     >
+      <div class="item" v-if="checkType.indexOf(0) != -1">
+        <div>优惠券<span class="num">2</span></div>
+      </div>
+      <div class="item" v-if="checkType.indexOf(4) != -1">
+        <div>收藏<span class="num">80</span></div>
+      </div>
+      <div class="item" v-if="checkType.indexOf(5) != -1">
+        <div>浏览<span class="num">80</span></div>
       </div>
     </div>
-    <div
-      v-else
-      class="userInfor"
-      :style="{
-        background: `linear-gradient(90deg,${bgColorLeft} 0%,${bgColorRight} 100%)`,
-        borderRadius: bgRadius,
-      }"
-    >
-      <div class="acea-row row-between-wrapper">
-        <div class="left acea-row row-middle">
-          <div class="pictrue acea-row row-center-wrapper">
-            <img :src="logoConfig" v-if="logoConfig" />
-            <div class="empty-box" v-else>
-              <img src="../../assets/images/shan.png" />
-            </div>
-          </div>
-          <div class="text">
-            <div class="name acea-row row-middle">用户名称<img src="../../assets/images/vip-diy.png" /></div>
-            <div class="acea-row row-middle">
-              <div
-                class="progress"
-                :style="{
-                  background: toneConfig ? progressBgColor : '#eee',
-                }"
-              >
-                <div
-                  class="bgReds"
-                  :style="{
-                    background: toneConfig
-                      ? `linear-gradient(90deg,${progressLeft} 0%,${progressRight} 100%)`
-                      : themeColor,
-                  }"
-                ></div>
-              </div>
-              <div class="percent">3000/1000000</div>
-            </div>
-            <!--<div class="phone"><span class="iconfont iconshouji"></span>13000000000</div>-->
-          </div>
-        </div>
-      </div>
-      <div class="list acea-row row-around">
-        <div class="item" v-if="checkType.indexOf(1) != -1">
-          <div>积分<span class="num">20000</span></div>
-        </div>
-        <div class="item" v-if="checkType.indexOf(2) != -1">
-          <div>余额<span class="num">200</span></div>
-        </div>
-        <div class="item" v-if="checkType.indexOf(0) != -1">
-          <div>优惠券<span class="num">2</span></div>
-        </div>
-        <div class="item" v-if="checkType.indexOf(4) != -1">
-          <div>收藏<span class="num">80</span></div>
-        </div>
-        <div class="item" v-if="checkType.indexOf(5) != -1">
-          <div>浏览<span class="num">80</span></div>
-        </div>
-      </div>
-    </div>
-  </common_wrapper>
+  </div>
+</common_wrapper>
 </template>
 
 <script>
@@ -264,14 +260,8 @@ export default {
           userType: 1,
           type: [1, 2],
           list: [
-            {
-              id: 1,
-              name: '积分',
-            },
-            {
-              id: 2,
-              name: '余额',
-            },
+
+
             {
               id: 4,
               name: '收藏',

@@ -80,6 +80,7 @@ class SystemCrontabServices extends BaseServices
      */
     public function saveTimer(array $data = [])
     {
+        if (!isset($this->getMarkList()[$data['mark']])) throw new AdminException('当前商城不支持该业务');
         if (!$data['id'] && $this->dao->getCount(['mark' => $data['mark'], 'is_del' => 0]) && $data['mark'] != 'customTimer') {
             throw new AdminException('该定时任务已存在，请勿重复添加');
         }
@@ -232,6 +233,7 @@ class SystemCrontabServices extends BaseServices
             if ($item['next_execution_time'] < $time) {
                 //转化小驼峰方法名
                 $functionName = Str::camel($item['mark']);
+                if (!isset($crontabRunServices->markList[$functionName])) continue;
                 //执行定时任务
                 if (strpos($functionName, 'customTimer') === 0) {
                     $crontabRunServices->customTimer(json_decode($item['customCode']));
@@ -272,6 +274,7 @@ class SystemCrontabServices extends BaseServices
             foreach ($list as &$item) {
                 // 获取函数名
                 $functionName = Str::camel($item['mark']);
+                if (!isset($crontabRunServices->markList[$functionName])) continue;
                 if ($functionName == 'customTimer') {
                     $functionName = 'customTimer_' . $item['id'];
                 }

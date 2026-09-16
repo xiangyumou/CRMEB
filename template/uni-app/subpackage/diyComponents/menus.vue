@@ -80,7 +80,7 @@
               <!-- #ifdef MP -->
               <button
                 class="list-item-content"
-                open-type="contact"
+                @click="getCustomer()"
                 v-if="item.routine_contact_type"
               >
                 <view class="list-img-box" v-if="navDisplayStyle !== 2">
@@ -198,7 +198,7 @@
                             'grid-item': menuStyleConfig === 1,
                           }"
                           :key="'btn_' + indexn"
-                          open-type="contact"
+                          @click="getCustomer()"
                           v-if="itemn.routine_contact_type"
                           :style="[gridItemContentStyle]"
                         >
@@ -304,7 +304,7 @@
                       'grid-item': menuStyleConfig === 1,
                     }"
                     :key="'btn_' + index"
-                    open-type="contact"
+                    @click="getCustomer()"
                     v-if="item.routine_contact_type"
                     :style="[gridItemContentStyle]"
                   >
@@ -605,6 +605,7 @@ export default {
     });
   },
   methods: {
+    getCustomer,
     getSwiperCount() {
       /* rowsNum 显示行数  0: 1行  1: 2行 2: 3行 3 4行 */
       /* number  单行显示  0: 3个  1: 4个 2: 5个 */

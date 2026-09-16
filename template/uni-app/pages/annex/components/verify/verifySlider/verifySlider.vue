@@ -45,7 +45,7 @@
 	 * */
 	import {
 		aesEncrypt
-	} from "./../utils/ase.js"
+	} from "@/pages/users/components/verify/utils/ase.js"
 	import {
 		getAjcaptcha,
 		ajcaptchaCheck

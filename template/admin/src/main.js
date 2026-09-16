@@ -67,7 +67,7 @@ import { authLapse } from '@/utils/authLapse';
 import './assets/fonts/font.css';
 import '@/theme/index.scss';
 import './assets/iconfontYI/iconfontYI.css';
-import './plugin/emoji-awesome/css/google.min.css';
+import './styles/emoji-awesome/css/google.min.css';
 import 'v-org-tree/dist/v-org-tree.css';
 import './styles/index.scss';
 import './styles/font/iconfont.js';

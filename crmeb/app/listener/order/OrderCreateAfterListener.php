@@ -12,8 +12,6 @@ namespace app\listener\order;
 
 
 use app\jobs\notice\PrintJob;
-use app\jobs\OrderCreateAfterJob;
-use app\jobs\OrderJob;
 use app\jobs\ProductLogJob;
 use app\jobs\UnpaidOrderCancelJob;
 use app\jobs\UnpaidOrderSend;

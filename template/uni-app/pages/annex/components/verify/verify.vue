@@ -74,8 +74,8 @@
  * @description 分发验证码使用
  * */
 import VerifySlide from './verifySlider/verifySlider';
-import verifySliderPc from './verifySlider/verifySliderPc';
-import VerifyPoint from './verifyPoint/verifyPoint';
+import verifySliderPc from '@/pages/users/components/verify/verifySlider/verifySliderPc.vue';
+import VerifyPoint from '@/pages/users/components/verify/verifyPoint/verifyPoint.vue';
 
 export default {
 	name: 'Vue2Verify',

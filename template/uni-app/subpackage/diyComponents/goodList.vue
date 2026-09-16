@@ -1206,11 +1206,9 @@ export default {
     },
   },
   created() {
-    // #ifndef APP-PLUS
     // this.$eventHub.$on('product_video_observe', () => {
     // 	this.observeVideo();
     // });
-    // #endif
   },
   mounted() {
     this.productslist();

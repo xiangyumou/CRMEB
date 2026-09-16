@@ -40,15 +40,15 @@ Route::group('user', function () {
         //执行赠送会员等级
         Route::put('save_give_level/:id', 'v1.user.User/save_give_level')->option(['real_name' => '执行赠送用户等级']);
         //赠送付费会员时长
-        Route::get('give_level_time/:id', 'v1.user.User/give_level_time')->option(['real_name' => '赠送付费会员时长']);
+
         //执行赠送付费会员时长
-        Route::put('save_give_level_time/:id', 'v1.user.User/save_give_level_time')->option(['real_name' => '执行赠送付费会员时长']);
+
         //清除会员等级
         Route::delete('del_level/:id', 'v1.user.User/del_level')->option(['real_name' => '清除用户等级']);
         //编辑其他
-        Route::get('edit_other/:id/:type', 'v1.user.User/edit_other')->option(['real_name' => '修改积分余额表单']);
+
         //编辑其他
-        Route::put('update_other/:id', 'v1.user.User/update_other')->option(['real_name' => '修改积分余额']);
+
         //修改用户状态
         Route::put('set_status/:status/:id', 'v1.user.User/set_status')->option(['real_name' => '修改用户状态']);
         //获取指定用户的信息
@@ -64,33 +64,33 @@ Route::group('user', function () {
     /** 用户等级 */
     Route::group(function () {
         //获取添加会员等级表单
-        Route::get('user_level/create', 'v1.user.UserLevel/create')->option(['real_name' => '添加用户等级表单']);
+
         //添加或修改会员等级
-        Route::post('user_level', 'v1.user.UserLevel/save')->option(['real_name' => '添加或修改用户等级']);
+
         //等级详情
-        Route::get('user_level/read/:id', 'v1.user.UserLevel/read')->option(['real_name' => '用户等级详情']);
+
         //获取系统设置的vip列表
-        Route::get('user_level/vip_list', 'v1.user.UserLevel/get_system_vip_list')->option(['real_name' => '获取系统设置的用户等级列表']);
+
         //删除会员等级
-        Route::put('user_level/delete/:id', 'v1.user.UserLevel/delete')->option(['real_name' => '删除用户等级']);
+
         //设置单个商品上架|下架
-        Route::put('user_level/set_show/:id/:is_show', 'v1.user.UserLevel/set_show')->option(['real_name' => '设置用户等级上下架']);
+
         //等级列表快速编辑
-        Route::put('user_level/set_value/:id', 'v1.user.UserLevel/set_value')->option(['real_name' => '用户等级列表快速编辑']);
+
         //等级任务列表
-        Route::get('user_level/task/:level_id', 'v1.user.UserLevel/get_task_list')->option(['real_name' => '用户等级任务列表']);
+
         //快速编辑等级任务
-        Route::put('user_level/set_task/:id', 'v1.user.UserLevel/set_task_value')->option(['real_name' => '快速编辑用户等级任务']);
+
         //设置等级任务显示|隐藏
-        Route::put('user_level/set_task_show/:id/:is_show', 'v1.user.UserLevel/set_task_show')->option(['real_name' => '设置用户等级任务显示|隐藏']);
+
         //设置是否务必达成
-        Route::put('user_level/set_task_must/:id/:is_must', 'v1.user.UserLevel/set_task_must')->option(['real_name' => '设置用户等级任务是否务必达成']);
+
         //添加等级任务表单
-        Route::get('user_level/create_task', 'v1.user.UserLevel/create_task')->option(['real_name' => '添加用户等级任务表单']);
+
         //保存或者修改任务
-        Route::post('user_level/save_task', 'v1.user.UserLevel/save_task')->option(['real_name' => '保存或修改用户等级任务']);
+
         //删除任务
-        Route::delete('user_level/delete_task/:id', 'v1.user.UserLevel/delete_task')->option(['real_name' => '删除用户等级任务']);
+
     })->option(['parent' => 'user', 'cate_name' => '用户等级']);
 
     /** 用户分组 */
@@ -140,35 +140,35 @@ Route::group('user', function () {
     /** 付费会员 */
     Route::group(function () {
         //会员卡批次列表资源
-        Route::get('member_batch/index', 'v1.user.member.MemberCardBatch/index')->option(['real_name' => '会员卡批次列表']);
+
         //添加会员卡批次
-        Route::post('member_batch/save/:id', 'v1.user.member.MemberCardBatch/save')->option(['real_name' => '添加会员卡批次']);
+
         //会员卡列表
-        Route::get('member_card/index/:card_batch_id', 'v1.user.member.MemberCard/index')->option(['real_name' => '会员卡列表']);
+
         //会员卡修改状态
-        Route::get('member_card/set_status', 'v1.user.member.MemberCard/set_status')->option(['real_name' => '会员卡修改状态']);
+
         //列表单字段修改操作
-        Route::get('member_batch/set_value/:id', 'v1.user.member.MemberCardBatch/set_value')->option(['real_name' => '会员卡批次快速修改']);
+
         //会员类型
-        Route::get('member/ship', 'v1.user.member.MemberCard/member_ship')->option(['real_name' => '会员类型列表']);
+
         //会员类型删除
-        Route::delete('member_ship/delete/:id', 'v1.user.member.MemberCard/delete')->option(['real_name' => '会员类型删除']);
+
         //会员类型修改状态
-        Route::get('member_ship/set_ship_status', 'v1.user.member.MemberCard/set_ship_status')->option(['real_name' => '会员类型修改状态']);
+
         //会员卡类型编辑
-        Route::post('member_ship/save/:id', 'v1.user.member.MemberCard/ship_save')->option(['real_name' => '会员卡类型编辑']);
+
         //兑换会员卡二维码
-        Route::get('member_scan', 'v1.user.member.MemberCardBatch/member_scan')->option(['real_name' => '兑换会员卡二维码']);
+
         //会员记录
-        Route::get('member/record', 'v1.user.member.MemberCard/member_record')->option(['real_name' => '会员记录']);
+
         //会员权益
-        Route::get('member/right', 'v1.user.member.MemberCard/member_right')->option(['real_name' => '会员权益列表']);
+
         //会员权益修改
-        Route::post('member_right/save/:id', 'v1.user.member.MemberCard/right_save')->option(['real_name' => '会员权益修改']);
+
         //会员协议
-        Route::post('member_agreement/save/:id', 'v1.user.member.MemberCardBatch/save_member_agreement')->option(['real_name' => '会员协议']);
+
         //获取会员协议
-        Route::get('member/agreement', 'v1.user.member.MemberCardBatch/getAgreement')->option(['real_name' => '获取会员协议']);
+
     })->option(['parent' => 'user', 'cate_name' => '付费会员']);
 
 

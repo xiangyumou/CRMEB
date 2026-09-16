@@ -11,8 +11,6 @@
 
 namespace app\services\message\notice;
 
-use app\jobs\notice\SmsJob;
-use app\jobs\TaskJob;
 use app\services\message\NoticeService;
 use app\services\kefu\service\StoreServiceServices;
 use app\services\message\SystemNotificationServices;

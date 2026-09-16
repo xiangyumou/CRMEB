@@ -12,7 +12,6 @@
 namespace app\adminapi\controller\v1\diy;
 
 use app\adminapi\controller\AuthController;
-use app\services\diy\DiyProServices;
 use app\services\diy\DiyServices;
 use app\services\diy\PageCategoryServices;
 use app\services\diy\PageLinkServices;

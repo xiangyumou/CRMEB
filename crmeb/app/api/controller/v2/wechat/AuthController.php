@@ -11,7 +11,6 @@
 
 namespace app\api\controller\v2\wechat;
 
-use app\Request;
 use app\services\wechat\RoutineServices;
 use crmeb\services\CacheService;
 

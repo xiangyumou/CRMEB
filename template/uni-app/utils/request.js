@@ -75,12 +75,7 @@ function baseRequest(url, method, data, {
 					mag: i18n.t(`请求失败`),
 					status: 1 //1没网
 				}
-				// #ifdef APP-PLUS
-				reject(data);
-				// #endif
-				// #ifndef APP-PLUS
 				reject(i18n.t(`请求失败`));
-				// #endif
 			}
 		})
 	});

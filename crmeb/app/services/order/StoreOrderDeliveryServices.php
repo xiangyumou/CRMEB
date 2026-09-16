@@ -52,6 +52,7 @@ class StoreOrderDeliveryServices extends BaseServices
      */
     public function delivery(int $id, array $data)
     {
+        if ((int)($data['type'] ?? 1) !== 1) throw new AdminException('当前商城不支持该业务');
         $orderInfo = $this->dao->get($id, ['*'], ['pink']);
         if (!$orderInfo) {
             throw new AdminException('订单未能查到,不能发货');
@@ -384,6 +385,7 @@ class StoreOrderDeliveryServices extends BaseServices
      */
     public function splitDelivery(int $id, array $data, $delivery_code = true)
     {
+        if ((int)($data['type'] ?? 1) !== 1) throw new AdminException('当前商城不支持该业务');
         $orderInfo = $this->dao->get($id, ['*'], ['pink']);
         if (!$orderInfo) {
             throw new AdminException('订单未能查到,不能发货');
@@ -446,6 +448,7 @@ class StoreOrderDeliveryServices extends BaseServices
      */
     public function doDelivery(int $id, $orderInfo, array $data)
     {
+        if ((int)($data['type'] ?? 1) !== 1) throw new AdminException('当前商城不支持该业务');
         $type = (int)$data['type'];
         unset($data['type']);
         //获取购物车内的商品标题

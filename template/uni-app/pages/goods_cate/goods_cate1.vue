@@ -14,9 +14,6 @@
 						v-for="(item,index) in productList" :key="index" @click='tap(index,"b"+index)'>
 						<text>{{$t(item.cate_name)}}</text>
 					</view>
-					<!-- #ifdef APP-PLUS -->
-					<view class="item" v-if="newData.status && newData.status.status"></view>
-					<!-- #endif -->
 				</scroll-view>
 			</view>
 
@@ -96,9 +93,6 @@
 				activeRouter: '',
 				pageHeight: '100%',
 				sysHeight: sysHeight,
-				// #ifdef APP-PLUS
-				pageHeight: app.globalData.windowHeight,
-				// #endif
 				lock: false
 			}
 		},
@@ -240,9 +234,6 @@
 		font-size: 30rpx;
 		color: #333;
 		background-color: #fff;
-		// #ifdef APP-PLUS
-		text-align: center;
-		// #endif
 		// #ifdef MP
 		text-align: left;
 		padding-left: 30rpx;

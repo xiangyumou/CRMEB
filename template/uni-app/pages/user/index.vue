@@ -1,7 +1,7 @@
 <template>
   <view class="new-users copy-data" :style="{ height: pageHeight }">
     <view class="top" :style="colorStyle">
-      <!-- #ifdef MP || APP-PLUS -->
+      <!-- #ifdef MP -->
       <view class="sys-head">
         <view class="sys-bar" :style="{ height: sysHeight }"></view>
         <!-- #ifdef MP -->
@@ -156,9 +156,6 @@ export default {
       pageHeight: "100%",
       routineContact: 0,
       // #endif
-      // #ifdef APP-PLUS
-      pageHeight: app.globalData.windowHeight,
-      // #endif
       // #ifdef H5
       isWeixin: Auth.isWeixin(),
       //#endif
@@ -208,7 +205,7 @@ export default {
     }
     // #endif
 
-    // #ifdef H5 || APP-PLUS
+    // #ifdef H5
     // if (that.isLogin == false) {
     // 	toLogin();
     // }
@@ -228,9 +225,6 @@ export default {
         })
         .catch((err) => {});
     }
-    // #endif
-    // #ifdef APP-PLUS
-    that.$set(that, "pageHeight", app.globalData.windowHeight);
     // #endif
 
     let routes = getCurrentPages(); // 获取当前打开过的页面路由数组
@@ -252,13 +246,6 @@ export default {
   },
   onShow: function () {
     let that = this;
-    // #ifdef APP-PLUS
-    uni.getSystemInfo({
-      success: function (res) {
-        that.pageHeight = res.windowHeight + "px";
-      },
-    });
-    // #endif
     if (that.isLogin) {
       this.getUserInfo();
       this.setVisit();
@@ -295,9 +282,6 @@ export default {
       uni.removeStorageSync("rulesStoreId");
     },
     bindHeighta(data) {
-      // #ifdef APP-PLUS
-      this.sortMpTop = data.top + data.height;
-      // #endif
     },
     changeSort(item, index) {
       if (this.curSort == index) return;

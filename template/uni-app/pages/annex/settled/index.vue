@@ -122,7 +122,7 @@
 									@click="code">
 									{{ text }}
 								</button>
-						
+
 							</view>
 						</view>
 						<view class="item">
@@ -191,7 +191,7 @@
 					{{$t(`返回首页`)}}
 				</view>
 		</view>
-		
+
 	</view>
 </template>
 <script>
@@ -310,15 +310,15 @@
 					}
 				})
 			} else {
-				// #ifdef H5 || APP-PLUS
+				// #ifdef H5
 				toLogin();
-				// #endif 
+				// #endif
 				// #ifdef MP
 				this.isAuto = true;
 				this.$set(this, 'isShowAuth', true)
 				// #endif
 			}
-		
+
 		},
 		onShow() {
 
@@ -335,7 +335,7 @@
 					this.isType = false;
 					this.showProtocol = true;
 				}
-				
+
 			},
 			code() {
 				let that = this
@@ -420,7 +420,7 @@
 				// list：图片 url 数组
 				if (list && list.length > 0) {
 					uni.previewImage({
-						current: list[idx], //  传 Number H5端出现不兼容 
+						current: list[idx], //  传 Number H5端出现不兼容
 						urls: list
 					});
 				}
@@ -447,7 +447,7 @@
 			},
 			/**
 			 * 上传文件
-			 * 
+			 *
 			 */
 			uploadpic: function() {
 				let that = this;
@@ -459,7 +459,7 @@
 			},
 			/**
 			 * 删除图片
-			 * 
+			 *
 			 */
 			DelPic: function(index) {
 				let that = this,
@@ -520,7 +520,7 @@
 						return this.$util.Tips({
 							title: err
 						});
-					}); 
+					});
 			},
 			formSpeadSubmit(){
 				if(!this.isAgree) return that.$util.Tips({

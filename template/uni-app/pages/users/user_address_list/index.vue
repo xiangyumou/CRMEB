@@ -41,10 +41,6 @@
 			</view>
 			<view style='height:120rpx;'></view>
 			<view class='footer acea-row row-between-wrapper'>
-				<!-- #ifdef APP-PLUS -->
-				<view class='addressBnt on' @click='addAddress'><text
-						class='iconfont icon-tianjiadizhi'></text>{{$t(`添加新地址`)}}</view>
-				<!-- #endif -->
 				<!-- #ifdef MP-->
 				<view class='addressBnt wxbnt' @click='addAddress'><text
 						class='iconfont icon-tianjiadizhi'></text>{{$t(`添加新地址`)}}</view>
@@ -161,7 +157,7 @@
 								addressP.province = res.provinceName;
 								addressP.city = res.cityName;
 								addressP.district = res.countyName;
-								
+
 								editAddress({
 									address: addressP,
 									is_default: 1,
@@ -250,7 +246,7 @@
 			},
 			/**
 			 * 获取地址列表
-			 * 
+			 *
 			 */
 			getAddressList: function(isPage) {
 				let that = this;

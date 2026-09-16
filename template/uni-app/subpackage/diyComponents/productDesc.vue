@@ -5,16 +5,11 @@
         $t(`产品介绍`)
       }}</view>
       <view class="conter">
-        <!-- #ifndef APP-PLUS -->
         <parser
           :html="productData.description"
           ref="article"
           :tag-style="tagStyle"
         ></parser>
-        <!-- #endif -->
-        <!-- #ifdef APP-PLUS -->
-        <view class="description" v-html="productData.description"></view>
-        <!-- #endif -->
       </view>
     </common-wrapper>
   </view>

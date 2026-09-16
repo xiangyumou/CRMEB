@@ -71,15 +71,7 @@ export default {
       },
       component: () => import('@/pages/setting/setSystem/index'),
     },
-    {
-      path: 'system_config_retail/:type?/:tab_id?',
-      name: `${pre}distributionSet`,
-      meta: {
-        ...meta,
-        title: '分销配置',
-      },
-      component: () => import('@/pages/setting/setSystem/index'),
-    },
+
     {
       path: 'membership_level/index',
       name: `${pre}membershipLevel`,
@@ -351,33 +343,9 @@ export default {
       },
       component: () => import('@/pages/setting/shippingTemplates/index'),
     },
-    {
-      path: 'merchant/system_store/list',
-      name: `${pre}store`,
-      meta: {
-        auth: ['setting-merchant-system-store'],
-        title: '提货点',
-      },
-      component: () => import('@/pages/setting/storeList/index'),
-    },
-    {
-      path: 'merchant/system_store_staff/index',
-      name: `${pre}staff`,
-      meta: {
-        auth: ['setting-merchant-system-store-staff'],
-        title: '核销员',
-      },
-      component: () => import('@/pages/setting/clerkList/index'),
-    },
-    {
-      path: 'merchant/system_verify_order/index',
-      name: `${pre}order`,
-      meta: {
-        auth: ['setting-merchant-system-verify-order'],
-        title: '核销订单',
-      },
-      component: () => import('@/pages/setting/verifyOrder/index'),
-    },
+
+
+
     {
       path: 'theme_style',
       name: `${pre}themeStyle`,
@@ -505,24 +473,8 @@ export default {
       },
       component: () => import('@/pages/system/group/list'),
     },
-    {
-      path: 'system_config_member_right/:type?/:tab_id?',
-      name: `${pre}right`,
-      meta: {
-        auth: ['setting-system-config-member-right'],
-        title: '会员权益',
-      },
-      component: () => import('@/pages/setting/setSystem/index'),
-    },
-    {
-      path: 'delivery_service/index',
-      name: `${pre}deliveryService`,
-      meta: {
-        auth: ['setting-delivery-service'],
-        title: '配送员列表',
-      },
-      component: () => import('@/pages/setting/deliveryService/index'),
-    },
+
+
     {
       path: 'pc_group_data',
       name: `${pre}systemPcGroupData`,
@@ -730,15 +682,7 @@ export default {
       },
       component: () => import('@/pages/setting/setSystem/index'),
     },
-    {
-      path: 'recharge_config/:type?/:tab_id?',
-      name: `${pre}recharge_config`,
-      meta: {
-        ...meta,
-        title: '充值配置',
-      },
-      component: () => import('@/pages/setting/setSystem/index'),
-    },
+
     {
       path: 'member_config/:type?/:tab_id?',
       name: `${pre}member_config`,
@@ -766,15 +710,7 @@ export default {
       },
       component: () => import('@/pages/setting/setSystem/index'),
     },
-    {
-      path: 'sign_config/:type?/:tab_id?',
-      name: `${pre}sign_config`,
-      meta: {
-        ...meta,
-        title: '签到配置',
-      },
-      component: () => import('@/pages/setting/setSystem/index'),
-    },
+
     {
       path: 'ticket',
       name: `${pre}document`,

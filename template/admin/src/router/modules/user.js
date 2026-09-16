@@ -77,16 +77,7 @@ export default {
       },
       component: () => import('@/pages/user/cancel/index'),
     },
-    {
-      path: 'recharge/:id',
-      name: `${pre}recharge`,
-      meta: {
-        auth: ['user-user-recharge'],
-        footer: true,
-        title: '充值配置',
-      },
-      component: () => import('@/pages/system/group/list'),
-    },
+
     {
       path: 'grade/type',
       name: `${pre}type`,
@@ -117,16 +108,7 @@ export default {
       },
       component: () => import('@/pages/user/grade/record/index'),
     },
-    {
-      path: 'grade/right',
-      name: `${pre}right`,
-      meta: {
-        auth: ['admin-user-grade-right'],
-        footer: true,
-        title: '会员权益',
-      },
-      component: () => import('@/pages/user/grade/right/index'),
-    },
+
     {
       path: 'grade/list/:id',
       name: `${pre}gradelist`,

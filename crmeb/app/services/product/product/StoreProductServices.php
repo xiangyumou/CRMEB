@@ -29,7 +29,6 @@ use app\services\product\sku\StoreProductAttrValueServices;
 use app\services\product\sku\StoreProductRuleServices;
 use app\services\product\sku\StoreProductVirtualServices;
 use app\services\shipping\ShippingTemplatesServices;
-use app\services\system\SystemUserLevelServices;
 use app\services\user\UserLabelServices;
 use app\services\user\member\MemberCardServices;
 use app\services\user\UserLevelServices;
@@ -1733,35 +1732,7 @@ class StoreProductServices extends BaseServices
      */
     public function setLevelPriceV2($price, int $uid, $userInfo, $vipStatus, $discount = 0, $vipPrice = 0.00, $is_vip = 0, $is_show = false)
     {
-        if ($uid) {
-            if (!$userInfo) {
-                /** @var UserServices $user */
-                $user = app()->make(UserServices::class);
-                $userInfo = $user->getUserInfo($uid);
-            }
-            if ($discount === 0) {
-                /** @var SystemUserLevelServices $systemLevel */
-                $systemLevel = app()->make(SystemUserLevelServices::class);
-                $discount = $systemLevel->value(['id' => $userInfo['level'], 'is_del' => 0, 'is_show' => 1], 'discount');
-            }
-        } else {
-            //没登录
-            $discount = 100;
-            $userInfo = [];
-        }
-        $discount = bcdiv((string)$discount, '100', 2);
-        if (!$vipStatus) $is_vip = 0;
-        //is_vip == 0表示会员价格不启用，展示为零
-        if ($is_vip == 0) $vipPrice = 0;
-
-        $noPayVipPrice = ($discount && sys_config('member_func_status')) ? bcmul((string)$discount, (string)$price, 2) : $price;
-        $vipPrice = ($vipPrice < $noPayVipPrice && $vipPrice > 0) ? $vipPrice : $noPayVipPrice;
-        //如果$isSingle==true 返回优惠后的总金额，否则返回优惠的金额
-        if ($vipStatus && $is_vip == 1 && (!$is_show || ($is_show && $userInfo && isset($userInfo['is_money_level']) && $userInfo['is_money_level'] > 0))) {
-            return [(float)$vipPrice, (float)bcsub((string)$price, (string)$vipPrice, 2)];
-        } else {
-            return [(float)$noPayVipPrice, (float)bcsub((string)$price, (string)$noPayVipPrice, 2)];
-        }
+        return [(float)$price, 0.0];
     }
 
     /**
@@ -1779,35 +1750,7 @@ class StoreProductServices extends BaseServices
      */
     public function setLevelPrice($price, int $uid, $userInfo, $vipStatus, $discount = 0, $vipPrice = 0.00, $is_vip = 0, $is_show = false)
     {
-        if (!(float)$price) return [0, 0, 'level'];
-        if (!$vipStatus) $is_vip = 0;
-        //已登录
-        if ($uid) {
-            if (!$userInfo) {
-                /** @var UserServices $user */
-                $user = app()->make(UserServices::class);
-                $userInfo = $user->getUserInfo($uid);
-            }
-            if ($discount === 0) {
-                $discount = 100;
-                if (sys_config('member_func_status', 1)) {
-                    /** @var SystemUserLevelServices $systemLevel */
-                    $systemLevel = app()->make(SystemUserLevelServices::class);
-                    $discount = $systemLevel->value(['id' => $userInfo['level'], 'is_del' => 0, 'is_show' => 1], 'discount') ?: 100;
-                }
-            }
-        } else {
-            //没登录
-            $discount = 100;
-        }
-        $discount = bcdiv((string)$discount, '100', 2);
-        //执行减去会员优惠金额
-        [$truePrice, $vip_truePrice, $type] = $this->isPayLevelPrice($uid, $userInfo, $vipStatus, $price, $discount, $vipPrice, $is_vip, $is_show);
-        //返回优惠后的总金额
-        $truePrice = $truePrice < 0.01 ? 0.01 : $truePrice;
-        //优惠的金额
-        $vip_truePrice = $vip_truePrice == $price ? bcsub((string)$vip_truePrice, '0.01', 2) : $vip_truePrice;
-        return [(float)$truePrice, (float)$vip_truePrice, $type];
+        return [(float)$price, 0.0, 'level'];
     }
 
 

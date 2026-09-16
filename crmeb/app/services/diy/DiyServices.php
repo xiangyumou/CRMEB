@@ -159,7 +159,7 @@ class DiyServices extends BaseServices
 
         if ($info) {
             if ($info['value']) {
-                $info['value'] = json_decode($info['value'], true);
+                $info['value'] = \app\services\CoreStore::cleanDiy(json_decode($info['value'], true));
                 if ($info['is_diy']) {
                     foreach ($info['value'] as &$item) {
                         if ($item['name'] == 'customerService') {

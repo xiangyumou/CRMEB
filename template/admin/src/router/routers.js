@@ -14,7 +14,6 @@ import order from './modules/order';
 import user from './modules/user';
 // import echarts from './modules/echarts'
 import setting from './modules/setting';
-import agent from './modules/agent';
 import finance from './modules/finance';
 import cms from './modules/cms';
 import marketing from './modules/marketing';
@@ -23,7 +22,6 @@ import system from './modules/system';
 import LayoutMain from '@/layout';
 import statistic from './modules/statistic';
 import frameOut from './modules/frameOut';
-import division from './modules/division';
 import settings from '@/setting';
 import crud from './modules/crud';
 
@@ -158,7 +156,7 @@ const frameIn = [
     component: () => import('@/components/uploadVideo/index'),
   },
   index,
-  agent,
+
   cms,
   product,
   marketing,
@@ -169,7 +167,7 @@ const frameIn = [
   system,
   app,
   statistic,
-  division,
+
   ...routers,
   crud,
 ];

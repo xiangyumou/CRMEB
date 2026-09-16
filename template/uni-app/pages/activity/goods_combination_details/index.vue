@@ -1,6 +1,5 @@
 <template>
   <view :style="colorStyle">
-    <!-- #ifndef APP-PLUS -->
     <view class="navbar" :style="{ height: navH + 'rpx', opacity: opacity }">
       <view class="navbarH" :style="'height:' + navH + 'rpx;'">
         <view class="navbarCon acea-row row-center-wrapper">
@@ -30,7 +29,6 @@
       <view class="iconfont icon-gengduo5" @click="moreNav"></view>
       <!-- #endif -->
     </view>
-    <!-- #endif -->
 
     <!-- #ifdef H5 -->
     <view
@@ -61,7 +59,7 @@
         @scroll="scroll"
       >
         <view id="past0">
-          <!-- #ifdef APP-PLUS || MP -->
+          <!-- #ifdef MP -->
           <view class="" :style="'width:100%;' + 'height:' + sysHeight"></view>
           <!-- #endif -->
           <productConSwiper
@@ -380,16 +378,6 @@
         <view class="">{{ $t(`发送给朋友`) }}</view>
       </button>
       <!-- #endif -->
-      <!-- #ifdef APP-PLUS -->
-      <view class="item" @click="appShare('WXSceneSession')">
-        <view class="iconfont icon-weixin3"></view>
-        <view class="">{{ $t(`微信好友`) }}</view>
-      </view>
-      <view class="item" @click="appShare('WXSenceTimeline')">
-        <view class="iconfont icon-pengyouquan"></view>
-        <view class="">{{ $t(`微信朋友圈`) }}</view>
-      </view>
-      <!-- #endif -->
       <button class="item" hover-class="none" @tap="goPoster('scombination')">
         <view class="iconfont icon-haibao"></view>
         <view class="">{{ $t(`生成海报`) }}</view>
@@ -448,7 +436,7 @@
       :ids="storeInfo.product_id"
       :routineContact="routineContact"
     ></kefuIcon>
-    <!-- #ifdef H5 || APP-PLUS -->
+    <!-- #ifdef H5 -->
     <zb-code
       ref="qrcode"
       :show="codeShow"
@@ -487,9 +475,6 @@ import countDown from "@/components/countDown/index.vue";
 import kefuIcon from "@/components/kefuIcon";
 import { getProductCode } from "@/api/store.js";
 import { getUserInfo } from "@/api/user.js";
-// #ifdef APP-PLUS
-import { TOKENNAME } from "@/config/app.js";
-// #endif
 import colors from "@/mixins/color.js";
 import parser from "@/components/jyf-parser/jyf-parser";
 import cusPreviewImg from "@/components/cusPreviewImg/index.vue";
@@ -627,9 +612,6 @@ export default {
     // #ifdef H5
     that.navH = 96;
     // #endif
-    // #ifdef APP-PLUS
-    that.navH = 30;
-    // #endif
     //设置商品列表高度
     uni.getSystemInfo({
       success: function (res) {
@@ -663,7 +645,7 @@ export default {
       if (this.isLogin) {
         this.combinationDetail();
       } else {
-        // #ifdef H5 || APP-PLUS
+        // #ifdef H5
         try {
           uni.setStorageSync("comGoodsId", options.id);
         } catch (e) {}
@@ -708,43 +690,9 @@ export default {
         this.followCode = "";
       }
       // #endif
-      // #ifdef APP-PLUS
-      this.PromotionCode = res;
-      // #endif
     },
 
     // app分享
-    // #ifdef APP-PLUS
-    appShare(scene) {
-      let that = this;
-      let routes = getCurrentPages(); // 获取当前打开过的页面路由数组
-      let curRoute = routes[routes.length - 1].$page.fullPath; // 获取当前页面路由，也就是最后一个打开的页面路由
-      uni.share({
-        provider: "weixin",
-        scene: scene,
-        type: 0,
-        href: `${HTTP_REQUEST_URL}${curRoute}`,
-        title: that.storeInfo.title,
-        summary: that.storeInfo.info,
-        imageUrl: that.storeInfo.small_image,
-        success: function (res) {
-          uni.showToast({
-            title: this.$t(`分享成功`),
-            icon: "success",
-          });
-          that.posters = false;
-        },
-        fail: function (err) {
-          uni.showToast({
-            title: this.$t(`分享失败`),
-            icon: "none",
-            duration: 2000,
-          });
-          that.posters = false;
-        },
-      });
-    },
-    // #endif
 
     showAll: function () {
       this.AllIndexDefault = this.AllIndex;
@@ -811,14 +759,6 @@ export default {
               "&spid=" +
               this.$store.state.app.uid;
             // #endif
-            // #ifdef APP-PLUS
-            this.codeVal =
-              HTTP_REQUEST_URL +
-              "/pages/activity/goods_combination_details/index?id=" +
-              this.id +
-              "&spid=" +
-              this.$store.state.app.uid;
-            // #endif
           } else {
             that.$set(that, "PromotionCode", this.storeInfo.wechat_code);
           }
@@ -837,10 +777,6 @@ export default {
           // #ifdef H5
           that.setShare();
           that.getImageBase64();
-          // #endif
-          // #ifdef APP-PLUS
-          that.downloadFilestoreImage();
-          // that.downloadFileAppCode();
           // #endif
           // #ifdef MP
           that.downloadFilestoreImage();
@@ -1350,26 +1286,6 @@ export default {
               },
             });
           }
-        },
-      });
-    },
-    // #endif
-    //#ifdef APP-PLUS
-    savePosterPath() {
-      let that = this;
-      uni.saveImageToPhotosAlbum({
-        filePath: that.posterImage,
-        success: function (res) {
-          that.posterImageClose();
-          that.$util.Tips({
-            title: this.$t(`保存成功`),
-            icon: "success",
-          });
-        },
-        fail: function (res) {
-          that.$util.Tips({
-            title: this.$t(`保存失败`),
-          });
         },
       });
     },

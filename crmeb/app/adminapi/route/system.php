@@ -90,61 +90,57 @@ Route::group('system', function () {
         //域名替换接口
         Route::post('replace_site_url', 'v1.system.SystemClearData/replaceSiteUrl')->option(['real_name' => '域名替换']);
         //获取APP版本列表
-        Route::get('version_list', 'v1.system.AppVersion/list')->option(['real_name' => '获取APP版本列表']);
         //添加版本信息
-        Route::get('version_crate/:id', 'v1.system.AppVersion/crate')->option(['real_name' => '添加版本']);
         //添加版本信息
-        Route::post('version_save', 'v1.system.AppVersion/save')->option(['real_name' => '保存版本']);
         //删除版本信息
-        Route::delete('version_del/:id', 'v1.system.AppVersion/del')->option(['real_name' => '删除版本']);
     })->option(['parent' => 'system', 'cate_name' => '数据清除']);
 
     /** 在线升级 */
     Route::group(function () {
         //升级状态
-        Route::get('upgrade_status', 'UpgradeController/upgradeStatus')->option(['real_name' => '升级状态']);
+
         //升级包列表
-        Route::get('upgrade/list', 'UpgradeController/upgradeList')->option(['real_name' => '升级包列表']);
+
         //可升级包列表
-        Route::get('upgradeable/list', 'UpgradeController/upgradeableList')->option(['real_name' => '可升级包列表']);
+
         //升级协议
-        Route::get('upgrade/agreement', 'UpgradeController/agreement')->option(['real_name' => '升级协议']);
+
         //升级记录
-        Route::get('upgrade_log/list', 'UpgradeController/upgradeLogList')->option(['real_name' => '升级记录']);
+
         //检测文件
-        Route::get('upgrade/check_file', 'UpgradeController/checkFile')->option(['real_name' => '检测文件']);
+
         //重新执行
-        Route::get('upgrade/reExecute', 'UpgradeController/reExecute')->option(['real_name' => '重新执行']);
+
         //升级包下载
-        Route::post('package_download/:package_key', 'UpgradeController/packageDownload')->option(['real_name' => '升级包下载']);
+
         //升级包下载进度
-        Route::get('upgrade_download/progress', 'UpgradeController/downloadProgress')->option(['real_name' => '升级包下载进度']);
+
         //升级进度
-        Route::get('upgrade_progress', 'UpgradeController/progress')->option(['real_name' => '升级进度']);
+
         //导出备份项目
-        Route::get('upgrade_export/:id/:type', 'UpgradeController/export')->option(['real_name' => '导出备份']);
+
 
         // 跨版本升级接口
         //获取跨版本升级概览
-        Route::get('cross_version/overview', 'UpgradeController/crossVersionOverview')->option(['real_name' => '跨版本升级概览']);
+
         //获取待升级版本列表
-        Route::get('cross_version/pending', 'UpgradeController/pendingVersions')->option(['real_name' => '待升级版本列表']);
+
         //获取待执行的升级SQL
-        Route::get('cross_version/pending_sql', 'UpgradeController/pendingUpgradeSql')->option(['real_name' => '待执行SQL列表']);
+
         //执行跨版本升级(单步)
-        Route::post('cross_version/execute', 'UpgradeController/executeCrossVersionUpgrade')->option(['real_name' => '执行跨版本升级']);
+
         //一键执行全部跨版本升级
-        Route::post('cross_version/execute_all', 'UpgradeController/executeAllCrossVersionUpgrade')->option(['real_name' => '一键升级']);
+
         //检查是否需要跨版本升级
-        Route::get('cross_version/check', 'UpgradeController/checkCrossVersionUpgrade')->option(['real_name' => '检查跨版本升级']);
+
         //获取备份状态
-        Route::get('cross_version/backup_status', 'UpgradeController/backupStatus')->option(['real_name' => '备份状态']);
+
         //获取升级进度
-        Route::get('cross_version/progress', 'UpgradeController/upgradeProgress')->option(['real_name' => '升级进度']);
+
         //获取可回退的版本列表
-        Route::get('rollback/versions', 'UpgradeController/rollbackVersions')->option(['real_name' => '可回退版本列表']);
+
         //执行版本回退
-        Route::post('rollback/execute', 'UpgradeController/executeRollback')->option(['real_name' => '执行版本回退']);
+
     })->option(['parent' => 'system', 'cate_name' => '在线升级']);
 
     /** 定时任务 */

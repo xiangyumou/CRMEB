@@ -248,12 +248,7 @@
 </template>
 
 <script>
-// #ifdef APP-PLUS
-let sysHeight = uni.getWindowInfo().statusBarHeight + "px";
-// #endif
-// #ifndef APP-PLUS
 let sysHeight = 0;
-// #endif
 import {
   getCartList,
   getCartCounts,

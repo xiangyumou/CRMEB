@@ -387,7 +387,7 @@
 		// #ifndef H5
 		bottom: 0rpx;
 		// #endif
-		// #ifdef MP || APP-PLUS
+		// #ifdef MP
 		bottom: 100rpx;
 		bottom: calc(100rpx + constant(safe-area-inset-bottom)); ///兼容 IOS<11.2/
 		bottom: calc(100rpx + env(safe-area-inset-bottom)); ///兼容 IOS>11.2/

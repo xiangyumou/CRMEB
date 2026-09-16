@@ -3,24 +3,6 @@
     <div class="article-manager">
       <el-card :bordered="false" shadow="never" class="ivu-mt fromBox">
         <el-form ref="formRef" :model="formData" label-width="100px">
-          <el-form-item label="赠送余额(元)：">
-            <el-input-number
-              class="form-width"
-              v-model="formData.reward_money"
-              placeholder="请输入赠送余额"
-              :min="0"
-            ></el-input-number>
-            <div class="tips-info">新用户奖励金额，必须大于等于0，0为不赠送</div>
-          </el-form-item>
-          <el-form-item label="赠送积分：">
-            <el-input-number
-              class="form-width"
-              v-model="formData.reward_integral"
-              placeholder="请输入赠送积分数量"
-              :min="0"
-            ></el-input-number>
-            <div class="tips-info">新用户奖励积分，必须大于等于0，0为不赠送</div>
-          </el-form-item>
           <el-form-item label="赠送优惠券：">
             <div v-if="formData.reward_coupon.length" class="mb10">
               <el-tag
@@ -54,8 +36,6 @@ export default {
     return {
       spinShow: false,
       formData: {
-        reward_money: 0,
-        reward_integral: 0,
         reward_coupon: [],
         updateIds: [],
       },
@@ -101,7 +81,7 @@ export default {
       getNewbie()
         .then((res) => {
           this.spinShow = false;
-          this.formData = res.data;
+          this.formData = { reward_coupon: res.data.reward_coupon || [] };
           this.updateIds = res.data.reward_coupon.map((item) => item.id);
         })
         .catch((err) => {

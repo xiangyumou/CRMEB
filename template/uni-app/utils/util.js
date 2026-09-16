@@ -12,9 +12,6 @@ import { TOKENNAME, HTTP_REQUEST_URL } from "../config/app.js";
 import store from "../store";
 import i18n from "./lang.js";
 import { pathToBase64 } from "@/plugin/image-tools/index.js";
-// #ifdef APP-PLUS
-import permision from "./permission.js";
-// #endif
 export default {
   /**
    * opt  object | string
@@ -936,12 +933,6 @@ export default {
   // 获取地理位置;
   $L: {
     async getLocation() {
-      // #ifdef APP-PLUS
-      let status = await this.checkPermission();
-      if (status !== 1) {
-        return;
-      }
-      // #endif
       // #ifdef MP-WEIXIN || MP-TOUTIAO || MP-QQ
       let status = await this.getSetting();
       if (status === 2) {

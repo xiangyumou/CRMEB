@@ -10,7 +10,6 @@
 // +----------------------------------------------------------------------
 
 // 应用公共文件
-use app\services\pay\PayServices;
 use crmeb\services\CacheService;
 use crmeb\services\HttpService;
 use Fastknife\Service\ClickWordCaptchaService;
@@ -129,6 +128,8 @@ if (!function_exists('sys_config')) {
      */
     function sys_config(string $name, $default = '')
     {
+        $retired = \app\services\CoreStore::DISABLED_CONFIG;
+        if (array_key_exists($name, $retired)) return $retired[$name];
         if (empty($name))
             return $default;
         $sysConfig = app('sysConfig')->get($name);
@@ -324,10 +325,10 @@ if (!function_exists('set_http_type')) {
         if (empty($url)) {
             return $url;
         }
-        
+
         // 检查是否是完整 URL
         $is_full_url = (strpos($url, '://') !== false);
-        
+
         if ($is_full_url) {
             // 处理完整 URL
             if ($type) {
@@ -338,7 +339,7 @@ if (!function_exists('set_http_type')) {
                 $url = preg_replace('/^http:/i', 'https:', $url);
             }
         }
-        
+
         return $url;
     }
 

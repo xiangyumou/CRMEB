@@ -10,7 +10,6 @@
 // +----------------------------------------------------------------------
 namespace app\listener\order;
 
-use app\jobs\RefundOrderJob;
 use crmeb\interfaces\ListenerInterface;
 
 /**

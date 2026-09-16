@@ -96,7 +96,6 @@
         <view class="">
           {{ site_config }}
         </view>
-        <!-- #ifndef APP-PLUS -->
         <view
           v-if="configData && configData.record_No"
           class="site-config"
@@ -111,7 +110,6 @@
           <image class="ban" src="/static/images/beian.png" alt="" srcset="" />
           {{ configData.network_security }}
         </view>
-        <!-- #endif -->
       </template>
     </PageDesign>
     <!-- #ifdef APP -->
@@ -210,7 +208,7 @@ export default {
       loaded: false,
       loading: false,
       domOffsetTop: 50,
-      // #ifdef APP-PLUS || MP
+      // #ifdef MP
       isFixed: true,
       // #endif
       // #ifdef H5
@@ -323,15 +321,6 @@ export default {
       });
     });
 
-    // #ifdef APP-PLUS
-    let onNetworkStatusChange = (res) => {
-      if (res.isConnected) {
-        this.diyData();
-        uni.offNetworkStatusChange(onNetworkStatusChange);
-      }
-    };
-    uni.onNetworkStatusChange(onNetworkStatusChange);
-    // #endif
   },
   onUnload() {
     // 清除监听
@@ -471,9 +460,6 @@ export default {
       // #endif
     },
     bindHeighta(data) {
-      // #ifdef APP-PLUS
-      this.sortMpTop = data.top + data.height;
-      // #endif
     },
     bindHeight(data) {
       uni.hideLoading();
@@ -734,19 +720,6 @@ export default {
           this.setDiyData(res.data);
         })
         .catch((error) => {
-          // #ifdef APP-PLUS
-          if (error.status) {
-            uni.hideLoading();
-            if (this.errorNetwork) {
-              uni.showToast({
-                title: "请开启网络连接",
-                icon: "none",
-                duration: 2000,
-              });
-            }
-            this.errorNetwork = true;
-          }
-          // #endif
         });
     },
     diyData() {

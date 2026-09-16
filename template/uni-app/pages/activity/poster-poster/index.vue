@@ -11,7 +11,7 @@
 				<canvas class="canvas" canvas-id="myCanvas" v-else></canvas>
 			</view>
 		</view>
-		<!-- #ifdef H5 || APP-PLUS -->
+		<!-- #ifdef H5 -->
 		<zb-code
 			ref="qrcodes"
 			:show="codeShow"
@@ -36,9 +36,6 @@
 import zbCode from '@/components/zb-code/zb-code.vue';
 import { getBargainPoster, getCombinationPoster, getBargainPosterData, getCombinationPosterData } from '@/api/activity.js';
 import { getUserInfo, imgToBase, routineCode } from '@/api/user.js';
-// #ifdef APP-PLUS
-import { TOKENNAME, HTTP_REQUEST_URL } from '@/config/app.js';
-// #endif
 import colors from '@/mixins/color.js';
 export default {
 	components: {
@@ -105,7 +102,7 @@ export default {
 			// #ifdef MP
 			this.from = 'routine';
 			// #endif
-			// #ifdef H5 || APP-PLUS
+			// #ifdef H5
 			this.from = 'wechat';
 			// #endif
 
@@ -142,7 +139,7 @@ export default {
 			// #ifdef MP
 			this.from = 'routine';
 			// #endif
-			// #ifdef H5 || APP-PLUS
+			// #ifdef H5
 			this.from = 'wechat';
 			// #endif
 
@@ -157,9 +154,6 @@ export default {
 			// #ifdef H5
 			this.val =
 				window.location.origin + '/pages/activity/goods_bargain_details/index?id=' + this.id + '&bargain=' + this.$store.state.app.uid + '&spread=' + this.$store.state.app.uid;
-			// #endif
-			// #ifdef APP-PLUS
-			this.val = HTTP_REQUEST_URL + '/pages/activity/goods_bargain_details/index?id=' + this.id + '&bargain=' + this.$store.state.app.uid + '&spread=' + this.$store.state.app.uid;
 			// #endif
 
 			this.$nextTick(() => {
@@ -187,14 +181,6 @@ export default {
 					window.location.origin + '/pages/activity/goods_bargain_details/index?id=' + this.id + '&bargain=' + this.$store.state.app.uid + '&spread=' + this.$store.state.app.uid;
 			} else if (this.type == 2) {
 				this.val = window.location.origin + '/pages/activity/goods_combination_status/index?id=' + this.id + '&spread=' + this.$store.state.app.uid;
-			}
-			// #endif
-			// #ifdef APP-PLUS
-			if (this.type == 1) {
-				this.val =
-					HTTP_REQUEST_URL + '/pages/activity/goods_bargain_details/index?id=' + this.id + '&bargain=' + this.$store.state.app.uid + '&spread=' + this.$store.state.app.uid;
-			} else if (this.type == 2) {
-				this.val = HTTP_REQUEST_URL + '/pages/activity/goods_combination_status/index?id=' + this.id + '&spread=' + this.$store.state.app.uid;
 			}
 			// #endif
 			setTimeout((e) => {}, 200);
@@ -255,7 +241,7 @@ export default {
 					});
 			}
 
-			// #ifdef H5 || APP-PLUS
+			// #ifdef H5
 			let imgData = await this.imgToBase(resData.image, resData.url);
 			arr = [this.posterBag, imgData.image, imgData.code || this.codeSrc];
 			// #endif
@@ -310,22 +296,6 @@ export default {
 		downloadImg() {},
 		savePosterPathMp(url) {
 			let that = this;
-			// #ifdef APP-PLUS
-			uni.saveImageToPhotosAlbum({
-				filePath: url,
-				success: function (res) {
-					that.$util.Tips({
-						title: that.$t(`保存成功`),
-						icon: 'success'
-					});
-				},
-				fail: function (res) {
-					that.$util.Tips({
-						title: that.$t(`保存失败`)
-					});
-				}
-			});
-			// #endif
 			// #ifdef MP
 			uni.getSetting({
 				success(res) {

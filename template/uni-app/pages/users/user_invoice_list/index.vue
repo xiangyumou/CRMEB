@@ -135,10 +135,6 @@ export default {
 				title: '复制中'
 			});
 			getInvoiceLink(id).then((res) => {
-				// #ifdef APP-PLUS
-				plus.runtime.openWeb(res.data.downloadBase64.pdfUrl);
-				// #endif
-				// #ifndef APP-PLUS
 				uni.setClipboardData({
 					data: res.data.downloadBase64.pdfUrl,
 					success: () =>
@@ -146,7 +142,6 @@ export default {
 							title: '链接已复制'
 						})
 				});
-				// #endif
 			});
 		},
 		getUserInfo() {

@@ -33,15 +33,11 @@
       <el-form-item label="选择类型：">
         <el-radio-group v-model="formItem.type" @input="changeRadio">
           <el-radio label="1" v-if="virtual_type !== 3">发货</el-radio>
-          <el-radio label="2" v-if="virtual_type !== 3">送货</el-radio>
-          <el-radio label="3">无需配送</el-radio>
         </el-radio-group>
       </el-form-item>
       <el-form-item v-if="formItem.type == 1" label="发货类型：">
         <el-radio-group v-model="formItem.express_record_type" @input="changeExpress">
           <el-radio label="1">录入单号</el-radio>
-          <el-radio label="2" v-show="export_open">电子面单打印</el-radio>
-          <el-radio label="3">商家寄件</el-radio>
         </el-radio-group>
       </el-form-item>
       <template v-if="['2', '3'].includes(formItem.express_record_type) && formItem.type == 1">

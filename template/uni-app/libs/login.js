@@ -13,7 +13,7 @@ import Cache from '../utils/cache';
 import {
 	Debounce
 } from '@/utils/validate.js'
-// #ifdef H5 || APP-PLUS
+// #ifdef H5
 import {
 	isWeixin
 } from "../utils";
@@ -32,12 +32,7 @@ import Routine from '@/libs/routine';
 function prePage() {
 	let pages = getCurrentPages();
 	let prePage = pages[pages.length - 1];
-	// #ifndef APP-PLUS
 	return prePage.route;
-	// #endif
-	// #ifdef APP-PLUS
-	return prePage.$page.fullPath;
-	// #endif
 
 }
 
@@ -95,11 +90,6 @@ function _toLogin(push, pathLogin) {
 	})
 	// #endif
 
-	// #ifdef APP-PLUS
-	uni.navigateTo({
-		url: '/pages/users/login/index'
-	})
-	// #endif
 
 }
 

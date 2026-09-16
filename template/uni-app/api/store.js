@@ -13,7 +13,7 @@ import request from "@/utils/request.js";
 /**
  * 获取产品详情
  * @param int id
- * 
+ *
  */
 export function getProductDetail(id) {
 	return request.get('product/detail/' + id, {}, {
@@ -25,7 +25,7 @@ export function getProductDetail(id) {
  * 产品分享二维码 推广员
  * @param int id
  */
-// #ifdef H5  || APP-PLUS
+// #ifdef H5
 export function getProductCode(id) {
 	return request.get('product/code/' + id, {}, {
 		noAuth: true
@@ -68,7 +68,7 @@ export function collectDel(id, category) {
 
 /**
  * 购车添加
- * 
+ *
  */
 export function postCartAdd(data) {
 	return request.post('cart/add', data);
@@ -76,7 +76,7 @@ export function postCartAdd(data) {
 
 /**
  * 获取分类列表
- * 
+ *
  */
 export function getCategoryList() {
 	return request.get('category', {}, {
@@ -98,7 +98,7 @@ export function getProductslist(data) {
 
 /**
  * 获取推荐产品
- * 
+ *
  */
 export function getProductHot(page, limit) {
 	return request.get("product/hot", {
@@ -110,9 +110,9 @@ export function getProductHot(page, limit) {
 }
 /**
  * 批量收藏
- * 
+ *
  * @param object id  产品编号 join(',') 切割成字符串
- * @param string category 
+ * @param string category
  */
 export function collectAll(id, category) {
 	return request.post('collect/all', {
@@ -123,8 +123,8 @@ export function collectAll(id, category) {
 
 /**
  * 首页产品的轮播图和产品信息
- * @param int type 
- * 
+ * @param int type
+ *
  */
 export function getGroomList(type, data) {
 	return request.get('groom/list/' + type, data, {
@@ -144,7 +144,7 @@ export function getCollectUserList(data) {
  * 获取产品评论
  * @param int id
  * @param object data
- * 
+ *
  */
 export function getReplyList(id, data) {
 	return request.get('reply/list/' + id, data, {noAuth: true})
@@ -160,7 +160,7 @@ export function getReplyConfig(id) {
 
 /**
  * 获取搜索关键字获取
- * 
+ *
  */
 export function getSearchKeyword() {
 	return request.get('search/keyword', {}, {
@@ -179,7 +179,7 @@ export function storeListApi(data) {
 /**
  * 套餐列表
  * @param int id
- * 
+ *
  */
 export function storeDiscountsList(id) {
 	return request.get('store_discounts/list/' + id, {}, {
@@ -189,14 +189,14 @@ export function storeDiscountsList(id) {
 
 /**
  * 购车添加、减少、修改
- * 
+ *
  */
 export function postCartNum(data) {
 	return request.post('v2/set_cart_num', data);
 }
 /**
  * 代理商申请
- * 
+ *
  */
 export function create(data) {
 	return request.post(`agent/apply/${data.id}`, data);
@@ -273,7 +273,7 @@ export function getVisitList(data) {
 }
 
 /**
- * 获取浏览记录列表-删除 
+ * 获取浏览记录列表-删除
  * @param object data
  */
 export function deleteVisitList(data) {
@@ -291,7 +291,7 @@ export function userSpreadInfo() {
 /**
  * 分销员申请
  * @param data
- * 
+ *
  */
 export function spreadCreateApi(id, data) {
 	return request.post(`user/spread/apply/${id}`, data);
@@ -299,7 +299,7 @@ export function spreadCreateApi(id, data) {
 
 /**
  * 到手价获取
- * 
+ *
  */
 export function realPrice(id, unique) {
 	return request.get(`product/real_price/${id}/${unique}`, {}, {

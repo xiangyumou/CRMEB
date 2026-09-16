@@ -1,62 +1,139 @@
 <template>
-  <view class="member-wrap">
-    <common-wrapper :config="configData">
-      <view class="member-card" :class="'style' + (styleConfig + 1)">
-        <template v-if="styleConfig == 0">
-          <view
-            class="card-header acea-row row-between-wrapper"
-            @click="goUserInfo"
-          >
-            <view class="user-info acea-row row-middle">
+<view class="member-wrap">
+  <common-wrapper :config="configData">
+    <view class="member-card" :class="'style' + (styleConfig + 1)">
+      <template v-if="styleConfig == 0">
+        <view
+          class="card-header acea-row row-between-wrapper"
+          @click="goUserInfo"
+        >
+          <view class="user-info acea-row row-middle">
+            <view class="avatar">
+              <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" />
+              <view class="empty-box" v-else>
+                <image src="/static/images/shan.png" mode="aspectFill" />
+              </view>
+            </view>
+            <view class="text">
+              <view class="name line1" :style="[nameTextStyle]">{{
+                userName
+              }}</view>
+              <view class="level line1" :style="[numTextStyle]">{{
+                userSubText
+              }}</view>
+            </view>
+          </view>
+          <view class="menu-entry" v-if="menuList.length">
+            <view
+              class="item"
+              v-for="(item, index) in menuList"
+              :key="index"
+              @click.stop="goLink(getInfo(item, 1))"
+            >
+              <template v-if="menuStyle == 0">
+                <image
+                  v-if="item.img"
+                  :src="item.img"
+                  mode="aspectFill"
+                  class="menu-img"
+                />
+              </template>
+              <template v-else>
+                <text
+                  v-if="item.icon"
+                  class="iconfont"
+                  :class="item.icon"
+                  :style="[menuIconStyle]"
+                ></text>
+              </template>
+            </view>
+          </view>
+        </view>
+      </template>
+
+      <template v-if="styleConfig == 1">
+        <view
+          class="card-header acea-row row-between-wrapper"
+          @click="goUserInfo"
+        >
+          <view class="user-info style-2 acea-row row-between-wrapper">
+            <view class="text">
+              <view class="name line1" :style="[nameTextStyle]">{{
+                userName
+              }}</view>
+              <view class="level line1" :style="[numTextStyle]">{{
+                userSubTextPlain
+              }}</view>
+            </view>
+            <view class="avatar">
+              <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" />
+              <view class="empty-box" v-else>
+                <image src="/static/images/shan.png" mode="aspectFill" />
+              </view>
+            </view>
+          </view>
+        </view>
+      </template>
+
+      <template v-if="styleConfig == 2">
+        <view
+          class="card-header acea-row row-center-wrapper"
+          @click="goUserInfo"
+        >
+          <view class="user-info style-3">
+            <view class="avatar">
+              <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" />
+              <view class="empty-box" v-else>
+                <image src="/static/images/shan.png" mode="aspectFill" />
+              </view>
+            </view>
+            <view class="text">
+              <view class="name line1" :style="[nameTextStyle]">{{
+                userName
+              }}</view>
+              <view class="level line1" :style="[numTextStyle]">{{
+                userSubText
+              }}</view>
+            </view>
+          </view>
+          <view class="menu-entry" v-if="menuList.length">
+            <view
+              class="item"
+              v-for="(item, index) in menuList"
+              :key="index"
+              @click.stop="goLink(getInfo(item, 1))"
+            >
+              <template v-if="menuStyle == 0">
+                <image
+                  v-if="item.img"
+                  :src="item.img"
+                  mode="aspectFill"
+                  class="menu-img"
+                />
+              </template>
+              <template v-else>
+                <text
+                  v-if="item.icon"
+                  class="iconfont"
+                  :class="item.icon"
+                  :style="[menuIconStyle]"
+                ></text>
+              </template>
+            </view>
+          </view>
+        </view>
+      </template>
+
+      <template v-if="styleConfig == 3">
+        <view class="style-4-container acea-row row-between-wrapper">
+          <view class="left-card" :style="[moduleCardStyle]">
+            <view class="user-info acea-row row-middle" @click="goUserInfo">
               <view class="avatar">
                 <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" />
                 <view class="empty-box" v-else>
                   <image src="/static/images/shan.png" mode="aspectFill" />
                 </view>
               </view>
-              <view class="text">
-                <view class="name line1" :style="[nameTextStyle]">{{
-                  userName
-                }}</view>
-                <view class="level line1" :style="[numTextStyle]">{{
-                  userSubText
-                }}</view>
-              </view>
-            </view>
-            <view class="menu-entry" v-if="menuList.length">
-              <view
-                class="item"
-                v-for="(item, index) in menuList"
-                :key="index"
-                @click.stop="goLink(getInfo(item, 1))"
-              >
-                <template v-if="menuStyle == 0">
-                  <image
-                    v-if="item.img"
-                    :src="item.img"
-                    mode="aspectFill"
-                    class="menu-img"
-                  />
-                </template>
-                <template v-else>
-                  <text
-                    v-if="item.icon"
-                    class="iconfont"
-                    :class="item.icon"
-                    :style="[menuIconStyle]"
-                  ></text>
-                </template>
-              </view>
-            </view>
-          </view>
-        </template>
-
-        <template v-if="styleConfig == 1">
-          <view
-            class="card-header acea-row row-between-wrapper"
-            @click="goUserInfo"
-          >
-            <view class="user-info style-2 acea-row row-between-wrapper">
               <view class="text">
                 <view class="name line1" :style="[nameTextStyle]">{{
                   userName
@@ -65,244 +142,9 @@
                   userSubTextPlain
                 }}</view>
               </view>
-              <view class="avatar">
-                <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" />
-                <view class="empty-box" v-else>
-                  <image src="/static/images/shan.png" mode="aspectFill" />
-                </view>
-              </view>
-            </view>
-          </view>
-        </template>
-
-        <template v-if="styleConfig == 2">
-          <view
-            class="card-header acea-row row-center-wrapper"
-            @click="goUserInfo"
-          >
-            <view class="user-info style-3">
-              <view class="avatar">
-                <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" />
-                <view class="empty-box" v-else>
-                  <image src="/static/images/shan.png" mode="aspectFill" />
-                </view>
-              </view>
-              <view class="text">
-                <view class="name line1" :style="[nameTextStyle]">{{
-                  userName
-                }}</view>
-                <view class="level line1" :style="[numTextStyle]">{{
-                  userSubText
-                }}</view>
-              </view>
-            </view>
-            <view class="menu-entry" v-if="menuList.length">
-              <view
-                class="item"
-                v-for="(item, index) in menuList"
-                :key="index"
-                @click.stop="goLink(getInfo(item, 1))"
-              >
-                <template v-if="menuStyle == 0">
-                  <image
-                    v-if="item.img"
-                    :src="item.img"
-                    mode="aspectFill"
-                    class="menu-img"
-                  />
-                </template>
-                <template v-else>
-                  <text
-                    v-if="item.icon"
-                    class="iconfont"
-                    :class="item.icon"
-                    :style="[menuIconStyle]"
-                  ></text>
-                </template>
-              </view>
-            </view>
-          </view>
-        </template>
-
-        <template v-if="styleConfig == 3">
-          <view class="style-4-container acea-row row-between-wrapper">
-            <view class="left-card" :style="[moduleCardStyle]">
-              <view class="user-info acea-row row-middle" @click="goUserInfo">
-                <view class="avatar">
-                  <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" />
-                  <view class="empty-box" v-else>
-                    <image src="/static/images/shan.png" mode="aspectFill" />
-                  </view>
-                </view>
-                <view class="text">
-                  <view class="name line1" :style="[nameTextStyle]">{{
-                    userName
-                  }}</view>
-                  <view class="level line1" :style="[numTextStyle]">{{
-                    userSubTextPlain
-                  }}</view>
-                </view>
-              </view>
-              <view
-                class="stats-row card-data acea-row row-around"
-                v-if="
-                  (assetMode == 0 && checkType.length) ||
-                  (assetMode == 1 && assetList.length)
-                "
-              >
-                <template v-if="assetMode == 0">
-                  <view
-                    class="item"
-                    v-for="(item, index) in dataList"
-                    :key="index"
-                    @click.stop="handleDataNavigation(item)"
-                    :class="{
-                      'style-vert': dataStyle == 0,
-                      'style-horiz': dataStyle == 1,
-                      'style-vert-2': dataStyle == 2,
-                    }"
-                  >
-                    <template v-if="dataStyle == 0">
-                      <view
-                        class="num line1"
-                        :style="{ color: dataNumColor }"
-                        >{{ item.val }}</view
-                      >
-                      <view
-                        class="label line1"
-                        :style="{ color: dataTitleColor }"
-                        >{{ item.name }}</view
-                      >
-                    </template>
-                    <template v-else>
-                      <view
-                        class="label line1"
-                        :style="{ color: dataTitleColor }"
-                        >{{ item.name }}</view
-                      >
-                      <view
-                        class="num line1"
-                        :style="{ color: dataNumColor }"
-                        >{{ item.val }}</view
-                      >
-                    </template>
-                  </view>
-                </template>
-                <template v-if="assetMode == 1">
-                  <view
-                    class="item"
-                    v-for="(item, index) in assetList"
-                    :key="index"
-                    @click.stop="goLink(getInfo(item, 1))"
-                  >
-                    <view class="icon-box">
-                      <image
-                        v-if="assetStyle == 0 && item.img"
-                        :src="item.img"
-                        mode="aspectFill"
-                        class="asset-img"
-                      />
-                      <text
-                        v-else-if="assetStyle == 1 && item.icon"
-                        class="iconfont"
-                        :class="item.icon"
-                        :style="[assetIconStyle]"
-                      ></text>
-                      <text
-                        v-else
-                        class="iconfont icon-tuiguang"
-                        :style="[assetIconStyle]"
-                      ></text>
-                    </view>
-                    <view
-                      class="label line1"
-                      :style="{ color: moduleTitleColor }"
-                      >{{ getInfo(item, 0) }}</view
-                    >
-                  </view>
-                </template>
-              </view>
             </view>
             <view
-              class="right-card"
-              :style="[moduleCardStyle]"
-              v-if="rightEntryList.length"
-              @click="goLink(getInfo(rightEntryList[0], 2))"
-            >
-              <view class="entry-content">
-                <view
-                  class="title line1"
-                  :style="{ color: moduleTitleColor }"
-                  >{{ getInfo(rightEntryList[0], 0) }}</view
-                >
-                <view class="subtitle line1">
-                  <text class="sub-text">{{
-                    getInfo(rightEntryList[0], 1)
-                  }}</text>
-                  <text class="iconfont icon-you2"></text>
-                </view>
-                <view class="img-box">
-                  <image
-                    v-if="rightEntryList[0].img"
-                    :src="rightEntryList[0].img"
-                    mode="aspectFill"
-                  />
-                </view>
-              </view>
-            </view>
-          </view>
-        </template>
-
-        <template v-if="styleConfig == 4">
-          <view class="style-5-container" :style="[cardStyle]">
-            <view
-              class="header acea-row row-between-wrapper"
-              @click="goUserInfo"
-            >
-              <view class="left">
-                <view class="avatar">
-                  <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" />
-                  <view class="empty-box" v-else>
-                    <image src="/static/images/shan.png" mode="aspectFill" />
-                  </view>
-                </view>
-                <view class="text">
-                  <view class="name line1" :style="[nameTextStyle]">{{
-                    userName
-                  }}</view>
-                  <view class="level line1" :style="[numTextStyle]">{{
-                    userSubTextPlain
-                  }}</view>
-                </view>
-              </view>
-              <view class="menu-entry" v-if="menuList.length">
-                <view
-                  class="item"
-                  v-for="(item, index) in menuList"
-                  :key="index"
-                  @click.stop="goLink(getInfo(item, 1))"
-                >
-                  <template v-if="menuStyle == 0">
-                    <image
-                      v-if="item.img"
-                      :src="item.img"
-                      mode="aspectFill"
-                      class="menu-img"
-                    />
-                  </template>
-                  <template v-else>
-                    <text
-                      v-if="item.icon"
-                      class="iconfont"
-                      :class="item.icon"
-                      :style="[menuIconStyle]"
-                    ></text>
-                  </template>
-                </view>
-              </view>
-            </view>
-            <view
-              class="card-data acea-row row-around"
+              class="stats-row card-data acea-row row-around"
               v-if="
                 (assetMode == 0 && checkType.length) ||
                 (assetMode == 1 && assetList.length)
@@ -321,9 +163,11 @@
                   }"
                 >
                   <template v-if="dataStyle == 0">
-                    <view class="num line1" :style="{ color: dataNumColor }">{{
-                      item.val
-                    }}</view>
+                    <view
+                      class="num line1"
+                      :style="{ color: dataNumColor }"
+                      >{{ item.val }}</view
+                    >
                     <view
                       class="label line1"
                       :style="{ color: dataTitleColor }"
@@ -336,15 +180,17 @@
                       :style="{ color: dataTitleColor }"
                       >{{ item.name }}</view
                     >
-                    <view class="num line1" :style="{ color: dataNumColor }">{{
-                      item.val
-                    }}</view>
+                    <view
+                      class="num line1"
+                      :style="{ color: dataNumColor }"
+                      >{{ item.val }}</view
+                    >
                   </template>
                 </view>
               </template>
-              <template v-else>
+              <template v-if="assetMode == 1">
                 <view
-                  class="item style-icon"
+                  class="item"
                   v-for="(item, index) in assetList"
                   :key="index"
                   @click.stop="goLink(getInfo(item, 1))"
@@ -354,33 +200,114 @@
                       v-if="assetStyle == 0 && item.img"
                       :src="item.img"
                       mode="aspectFill"
-                      class="img-icon"
+                      class="asset-img"
                     />
                     <text
                       v-else-if="assetStyle == 1 && item.icon"
                       class="iconfont"
                       :class="item.icon"
-                      :style="assetIconStyle"
+                      :style="[assetIconStyle]"
+                    ></text>
+                    <text
+                      v-else
+                      class="iconfont icon-tuiguang"
+                      :style="[assetIconStyle]"
                     ></text>
                   </view>
-                  <view class="label line1" :style="assetTextStyle">{{
-                    getInfo(item, 0)
-                  }}</view>
+                  <view
+                    class="label line1"
+                    :style="{ color: moduleTitleColor }"
+                    >{{ getInfo(item, 0) }}</view
+                  >
                 </view>
               </template>
             </view>
           </view>
-        </template>
+          <view
+            class="right-card"
+            :style="[moduleCardStyle]"
+            v-if="rightEntryList.length"
+            @click="goLink(getInfo(rightEntryList[0], 2))"
+          >
+            <view class="entry-content">
+              <view
+                class="title line1"
+                :style="{ color: moduleTitleColor }"
+                >{{ getInfo(rightEntryList[0], 0) }}</view
+              >
+              <view class="subtitle line1">
+                <text class="sub-text">{{
+                  getInfo(rightEntryList[0], 1)
+                }}</text>
+                <text class="iconfont icon-you2"></text>
+              </view>
+              <view class="img-box">
+                <image
+                  v-if="rightEntryList[0].img"
+                  :src="rightEntryList[0].img"
+                  mode="aspectFill"
+                />
+              </view>
+            </view>
+          </view>
+        </view>
+      </template>
 
-        <template
-          v-if="
-            ((assetMode == 0 && checkType.length) ||
-              (assetMode == 1 && assetList.length)) &&
-            styleConfig != 3 &&
-            styleConfig != 4
-          "
-        >
-          <view class="card-data acea-row row-around">
+      <template v-if="styleConfig == 4">
+        <view class="style-5-container" :style="[cardStyle]">
+          <view
+            class="header acea-row row-between-wrapper"
+            @click="goUserInfo"
+          >
+            <view class="left">
+              <view class="avatar">
+                <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" />
+                <view class="empty-box" v-else>
+                  <image src="/static/images/shan.png" mode="aspectFill" />
+                </view>
+              </view>
+              <view class="text">
+                <view class="name line1" :style="[nameTextStyle]">{{
+                  userName
+                }}</view>
+                <view class="level line1" :style="[numTextStyle]">{{
+                  userSubTextPlain
+                }}</view>
+              </view>
+            </view>
+            <view class="menu-entry" v-if="menuList.length">
+              <view
+                class="item"
+                v-for="(item, index) in menuList"
+                :key="index"
+                @click.stop="goLink(getInfo(item, 1))"
+              >
+                <template v-if="menuStyle == 0">
+                  <image
+                    v-if="item.img"
+                    :src="item.img"
+                    mode="aspectFill"
+                    class="menu-img"
+                  />
+                </template>
+                <template v-else>
+                  <text
+                    v-if="item.icon"
+                    class="iconfont"
+                    :class="item.icon"
+                    :style="[menuIconStyle]"
+                  ></text>
+                </template>
+              </view>
+            </view>
+          </view>
+          <view
+            class="card-data acea-row row-around"
+            v-if="
+              (assetMode == 0 && checkType.length) ||
+              (assetMode == 1 && assetList.length)
+            "
+          >
             <template v-if="assetMode == 0">
               <view
                 class="item"
@@ -442,137 +369,91 @@
               </view>
             </template>
           </view>
-        </template>
+        </view>
+      </template>
 
-        <template v-if="memberStyleConfig == 0 && memberList.length">
-          <view class="member-style-1" :style="[cardStyle, memberTopStyle]">
+      <template
+        v-if="
+          ((assetMode == 0 && checkType.length) ||
+            (assetMode == 1 && assetList.length)) &&
+          styleConfig != 3 &&
+          styleConfig != 4
+        "
+      >
+        <view class="card-data acea-row row-around">
+          <template v-if="assetMode == 0">
             <view
               class="item"
-              v-for="(item, index) in memberList"
+              v-for="(item, index) in dataList"
               :key="index"
-              @click="goLink(getInfo(item, 2))"
+              @click.stop="handleDataNavigation(item)"
+              :class="{
+                'style-vert': dataStyle == 0,
+                'style-horiz': dataStyle == 1,
+                'style-vert-2': dataStyle == 2,
+              }"
             >
-              <view class="text-box">
-                <view class="title line1">{{ getInfo(item, 0) }}</view>
-                <view class="subtitle line1"
-                  >{{ getInfo(item, 1) }}
-                  <text class="iconfont icon-you2"></text
-                ></view>
-              </view>
-              <view class="img-box">
-                <image v-if="item.img" :src="item.img" mode="aspectFill" />
-              </view>
-              <view class="line" v-if="index < memberList.length - 1"></view>
+              <template v-if="dataStyle == 0">
+                <view class="num line1" :style="{ color: dataNumColor }">{{
+                  item.val
+                }}</view>
+                <view
+                  class="label line1"
+                  :style="{ color: dataTitleColor }"
+                  >{{ item.name }}</view
+                >
+              </template>
+              <template v-else>
+                <view
+                  class="label line1"
+                  :style="{ color: dataTitleColor }"
+                  >{{ item.name }}</view
+                >
+                <view class="num line1" :style="{ color: dataNumColor }">{{
+                  item.val
+                }}</view>
+              </template>
             </view>
-          </view>
-        </template>
-
-        <template v-if="memberStyleConfig == 1">
-          <view
-            class="member-style-2"
-            :style="[cardStyle, memberTopStyle]"
-            @click="goLink(ms2ButtonLink)"
-          >
-            <view class="top-row">
-              <view class="left-info">
-                <view class="title-area">
-                  <image
-                    v-if="ms2TitleType == 1 && ms2TitleImage"
-                    :src="ms2TitleImage"
-                    mode="aspectFill"
-                    class="title-img"
-                  />
-                  <view
-                    v-else
-                    class="title-text line1"
-                    :style="{ color: ms2TitleColor }"
-                    >{{ ms2TitleText }}</view
-                  >
-                </view>
-                <view
-                  class="intro-text line1"
-                  :style="{ color: ms2IntroColor }"
-                  >{{ ms2IntroText }}</view
-                >
-              </view>
-              <view class="right-rights">
-                <view
-                  class="right-item"
-                  v-for="(item, index) in ms2RightsList"
-                  :key="index"
-                >
-                  <view class="icon-wrap">
-                    <image v-if="item.img" :src="item.img" mode="aspectFill" />
-                    <text
-                      v-else-if="item.icon"
-                      class="iconfont"
-                      :class="item.icon"
-                      :style="{ color: ms2RightsColor }"
-                    ></text>
-                  </view>
-                  <view class="text line1" :style="{ color: ms2RightsColor }">{{
-                    getInfo(item, 0)
-                  }}</view>
-                </view>
+          </template>
+          <template v-else>
+            <view
+              class="item style-icon"
+              v-for="(item, index) in assetList"
+              :key="index"
+              @click.stop="goLink(getInfo(item, 1))"
+            >
+              <view class="icon-box">
+                <image
+                  v-if="assetStyle == 0 && item.img"
+                  :src="item.img"
+                  mode="aspectFill"
+                  class="img-icon"
+                />
                 <text
-                  class="iconfont icon-you2"
-                  :style="{ color: ms2RightsColor }"
+                  v-else-if="assetStyle == 1 && item.icon"
+                  class="iconfont"
+                  :class="item.icon"
+                  :style="assetIconStyle"
                 ></text>
               </view>
-            </view>
-            <view class="divider"></view>
-            <view class="bottom-row">
-              <view class="explain-list">
-                <view class="icons" v-if="ms2ExplainIcons">
-                  <image :src="ms2ExplainIcons" mode="aspectFill" />
-                </view>
-                <view
-                  class="explain-text line1"
-                  :style="{ color: ms2ExplainColor }"
-                  >{{ ms2ExplainText }}</view
-                >
-              </view>
-              <view
-                class="action-btn line1"
-                :style="{ color: ms2ButtonColor, background: ms2ButtonBgColor }"
-                >{{ ms2ButtonText }}</view
-              >
-            </view>
-          </view>
-        </template>
-
-        <template v-if="memberStyleConfig == 2">
-          <view class="member-style-3" :style="[cardStyle, memberTopStyle]">
-            <view class="content-wrapper" :style="[ms3ContainerStyle]">
-              <view class="desc line1" :style="{ color: ms3TitleColor }">{{
-                ms3TitleText
+              <view class="label line1" :style="assetTextStyle">{{
+                getInfo(item, 0)
               }}</view>
-              <view
-                class="btn line1"
-                :style="{ color: ms3ButtonColor, borderColor: ms3ButtonColor }"
-                @click="goLink('/pages/annex/vip_paid/index')"
-                >{{ ms3ButtonText }}</view
-              >
             </view>
-          </view>
-        </template>
+          </template>
+        </view>
+      </template>
 
-        <template v-if="memberStyleConfig == 3">
-          <view class="member-style-4" :style="[cardStyle, memberTopStyle]">
-            <view class="left-box">
-              <view class="label">可提现(元)</view>
-              <view class="value">{{ withdrawAmount }}</view>
-            </view>
-            <view
-              class="right-box"
-              @click="goLink('/pages/users/user_cash/index')"
-              >立即提现</view
-            >
-          </view>
-        </template>
-      </view>
-    </common-wrapper>
-  </view>
+     >
+
+     >
+
+     >
+
+     >
+    </view>
+  </common-wrapper>
+</view>
 </template>
 
 <script>
@@ -1079,14 +960,14 @@ export default {
     },
     dataList() {
       let list = [
-        { id: 1, name: "余额", key: "money" },
+
         { id: 3, name: "优惠券", key: "coupon" },
-        { id: 2, name: "积分", key: "integral" },
+
         { id: 5, name: "收藏商品", key: "collection" },
         { id: 6, name: "浏览记录", key: "visit" },
-        { id: 8, name: "推广佣金", key: "brokerage" },
-        { id: 9, name: "推广人", key: "spreadCount" },
-        { id: 10, name: "推广订单", key: "spreadOrderCount" },
+
+
+
       ];
       return list
         .filter((item) => this.checkType.indexOf(item.id) != -1)

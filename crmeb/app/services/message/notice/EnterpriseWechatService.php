@@ -11,7 +11,6 @@
 
 namespace app\services\message\notice;
 
-use app\jobs\notice\EnterpriseWechatJob;
 use app\services\message\NoticeService;
 use crmeb\services\HttpService;
 use think\facade\Log;
