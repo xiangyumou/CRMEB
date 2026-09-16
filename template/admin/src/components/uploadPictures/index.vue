@@ -240,6 +240,7 @@ import {
 } from '@/api/uploadPictures';
 import Setting from '@/setting';
 import { getCookies } from '@/libs/util';
+import { showApiError } from '@/libs/request';
 import uploadImg from '@/components/uploadImg';
 import { VueTreeList, Tree, TreeNode } from 'vue-tree-list';
 export default {
@@ -552,7 +553,7 @@ export default {
           this.treeData = res.data.list;
         })
         .catch((res) => {
-          this.$message.error(res.msg);
+          showApiError(res, '附件分类加载失败，请稍后重试');
         });
     },
     loadData(item, callback) {
@@ -612,7 +613,7 @@ export default {
           });
         })
         .catch((res) => {
-          this.$message.error(res.msg);
+          showApiError(res, '附件列表加载失败，请稍后重试');
         });
     },
     showSelectData() {

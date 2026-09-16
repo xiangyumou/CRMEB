@@ -78,6 +78,11 @@
 - 长连接：`sudo -u www php think workerman start --d`
 - 定时任务：`php think timer start --d`
 
+### 6.3 后台前端改动必须重新构建
+- 后台 SPA 由 nginx 直接从 `crmeb/public/admin` 提供（`deploy/production/compose.yml` 以 `${CRMEB_PUBLIC_DIR}` 挂载），该目录是**提交进仓库的构建产物**，CI 和 Dockerfile 都不会构建它（`.dockerignore` 还排除了 `template/`）。
+- 因此**只改 `template/admin/src` 不会在线上生效**，必须执行：`cd template/admin && npm run build`（`vue.config.js` 的 `outputDir` 已指向 `../../crmeb/public/admin`），并把产物一起提交、随部署上线。
+- 涉及的改动包括接口错误提示、上传、`request.js` 等所有 `src` 下的代码。
+
 ## 7. 常用开发命令
 - 代码生成：`php think crmeb:build`
 - 数据库迁移：`php think migrate:run`

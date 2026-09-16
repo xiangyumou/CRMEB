@@ -37,6 +37,7 @@
 </template>
 <script>
 import { orderApi } from '@/api/index';
+import { showApiError } from '@/libs/request';
 import echartsFrom from '@/components/echarts/index';
 export default {
   components: { echartsFrom },
@@ -107,7 +108,7 @@ export default {
             ]);
         })
         .catch((res) => {
-          this.$message.error(res.msg);
+          showApiError(res, '订单统计加载失败，请稍后重试');
         });
     },
     // 时间改变
