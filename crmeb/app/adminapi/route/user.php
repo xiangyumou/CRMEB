@@ -30,14 +30,12 @@ Route::group('user', function () {
             ]
         ]);
         //添加用户保存
-        Route::post('user/save', 'v1.user.User/save_info')->option(['real_name' => '添加用户']);
         //同步微信用户
         Route::get('user/syncUsers', 'v1.user.User/syncWechatUsers')->option(['real_name' => '同步微信用户']);
         //用户信息
         Route::get('user/user_save_info/:uid', 'v1.user.User/userSaveInfo')->option(['real_name' => '添加编辑用户信息时候的信息']);
 
         //修改用户状态
-        Route::put('set_status/:status/:id', 'v1.user.User/set_status')->option(['real_name' => '修改用户状态']);
         //获取指定用户的信息
         Route::get('one_info/:id', 'v1.user.User/oneUserInfo')->option(['real_name' => '获取指定用户的信息']);
         //设置会员分组

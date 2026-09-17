@@ -19,7 +19,6 @@ Route::group('file', function () {
     //删除图片和数据记录
     Route::post('file/delete', 'v1.file.SystemAttachment/delete')->option(['real_name' => '删除图片']);
     //移动图片分来表单
-    Route::get('file/move', 'v1.file.SystemAttachment/move')->option(['real_name' => '移动图片分类表单']);
     //移动图片分类
     Route::put('file/do_move', 'v1.file.SystemAttachment/moveImageCate')->option(['real_name' => '移动图片分类']);
     //修改图片名称

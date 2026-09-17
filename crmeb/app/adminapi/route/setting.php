@@ -117,7 +117,6 @@ Route::group('setting', function () {
         //基本配置保存数据
         Route::post('config/save_basics', 'v1.setting.SystemConfig/save_basics')->option(['real_name' => '基本配置保存数据']);
         //基本配置上传文件
-        Route::post('config/upload', 'v1.setting.SystemConfig/file_upload')->option(['real_name' => '基本配置上传文件']);
         //获取单个配置值
         Route::get('config/get_system/:name', 'v1.setting.SystemConfig/get_system')->option(['real_name' => '基本配置编辑表单']);
         //获取某个分类下的所有配置信息

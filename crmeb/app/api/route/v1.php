@@ -49,8 +49,6 @@ Route::group(function () {
     Route::post('register/reset', 'v1.LoginController/reset')->name('registerReset')->option(['real_name' => '手机号修改密码']);
     // 绑定手机号(静默授权 还未有用户信息)
     Route::post('binding', 'v1.LoginController/binding_phone')->name('bindingPhone')->option(['real_name' => '绑定手机号']);
-    // 支付宝复制链接支付 弃用
-//    Route::get('ali_pay', 'v1.order.StoreOrderController/aliPay')->name('aliPay');
     //查询版权
     Route::get('copyright', 'v1.PublicController/copyright')->option(['real_name' => '申请版权'])->option(['real_name' => '查询版权']);
     //商城基础配置汇总接口
@@ -194,7 +192,6 @@ Route::group(function () {
     Route::group(function () {
         //优惠券类
         Route::post('coupon/receive', 'v1.store.StoreCouponsController/receive')->name('couponReceive')->option(['real_name' => '领取优惠券']); //领取优惠券
-        Route::post('coupon/receive/batch', 'v1.store.StoreCouponsController/receive_batch')->name('couponReceiveBatch')->option(['real_name' => '批量领取优惠券']); //批量领取优惠券
         Route::get('coupons/user/:types', 'v1.store.StoreCouponsController/user')->name('couponsUser')->option(['real_name' => '用户已领取优惠券']);//用户已领取优惠券
         Route::get('coupons/order/:price', 'v1.store.StoreCouponsController/order')->name('couponsOrder')->option(['real_name' => '优惠券 订单列表']);//优惠券 订单列表
     })->option(['mark' => 'coupons', 'mark_name' => '优惠券']);
@@ -220,7 +217,6 @@ Route::group(function () {
         Route::get('order/detail/:uni/[:cartId]', 'v1.order.StoreOrderController/detail')->name('orderDetail')->option(['real_name' => '订单详情']); //订单详情
         Route::get('order/refund_detail/:uni/[:cartId]', 'v1.order.StoreOrderController/refund_detail')->name('refundDetail')->option(['real_name' => '退款订单详情']); //退款订单详情
         Route::get('order/refund/reason', 'v1.order.StoreOrderController/refund_reason')->name('orderRefundReason')->middleware(BlockerMiddleware::class)->option(['real_name' => '订单退款理由']); //订单退款理由
-        Route::post('order/refund/verify', 'v1.order.StoreOrderController/refund_verify')->name('orderRefundVerify')->middleware(BlockerMiddleware::class)->option(['real_name' => '订单退款审核']); //订单退款审核
         Route::post('order/take', 'v1.order.StoreOrderController/take')->name('orderTake')->middleware(BlockerMiddleware::class)->option(['real_name' => '订单收货']); //订单收货
         Route::get('order/express/:uni/[:type]', 'v1.order.StoreOrderController/express')->name('orderExpress')->option(['real_name' => '订单查看物流']); //订单查看物流
         Route::post('order/del', 'v1.order.StoreOrderController/del')->name('orderDel')->option(['real_name' => '订单删除']); //订单删除
@@ -445,7 +441,6 @@ Route::group(function () {
     Route::group(function () {
         //微信
         Route::get('wechat/config', 'v1.wechat.WechatController/config')->name('wechatConfig')->option(['real_name' => '微信 sdk 配置']);//微信 sdk 配置
-        Route::get('wechat/auth', 'v1.wechat.WechatController/auth')->name('wechatAuth')->option(['real_name' => '微信授权']);//微信授权
 //微信APP授权
 
     })->option(['mark' => 'wechat', 'mark_name' => '微信']);

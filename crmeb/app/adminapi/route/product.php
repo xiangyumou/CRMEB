@@ -32,7 +32,6 @@ Route::group('product', function () {
         //商品分类修改状态
         Route::put('category/set_show/:id/:is_show', 'v1.product.StoreCategory/set_show')->option(['real_name' => '商品分类修改状态']);
         //商品分类快捷编辑
-        Route::put('category/set_category/:id', 'v1.product.StoreCategory/set_category')->option(['real_name' => '商品分类快捷编辑']);
     })->option(['parent' => 'product', 'cate_name' => '商品分类']);
 
     /** 商品 */
@@ -52,7 +51,6 @@ Route::group('product', function () {
         //修改商品状态
         Route::put('product/set_show/:id/:is_show', 'v1.product.StoreProduct/set_show')->option(['real_name' => '修改商品状态']);
         //商品快速编辑
-//        Route::put('product/set_product/:id', 'v1.product.StoreProduct/set_product')->option(['real_name' => '商品快速编辑']);
         //设置批量商品上架
         Route::put('product/product_show', 'v1.product.StoreProduct/product_show')->option(['real_name' => '设置批量商品上架']);
         //设置批量商品下架
@@ -121,7 +119,6 @@ Route::group('product', function () {
     /** 商品采集 */
     Route::group(function () {
         //获取商品数据
-        Route::post('crawl', 'v1.product.CopyTaobao/get_request_contents')->option(['real_name' => '获取采集商品数据']);
         //获取复制商品配置
         Route::get('copy_config', 'v1.product.CopyTaobao/getConfig')->option(['real_name' => '获取复制商品配置']);
         //复制其他平台商品
