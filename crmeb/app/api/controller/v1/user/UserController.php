@@ -69,15 +69,6 @@ class UserController
     }
 
     /**
-     * 获取活动状态
-     * @return mixed
-     */
-    public function activity()
-    {
-        return app('json')->success($this->services->activity());
-    }
-
-    /**
      * 用户修改信息
      * @param Request $request
      * @return mixed
@@ -96,23 +87,6 @@ class UserController
             return app('json')->success('设置成功');
         }
         return app('json')->fail('设置失败');
-    }
-
-    /**
-     * 推广人排行
-     * @param Request $request
-     * @return mixed
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function rank(Request $request)
-    {
-        $data = $request->getMore([
-            ['page', ''],
-            ['limit', ''],
-            ['type', '']
-        ]);
-        return app('json')->success($this->services->getRankList($data));
     }
 
     /**

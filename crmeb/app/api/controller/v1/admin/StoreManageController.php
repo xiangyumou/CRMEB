@@ -261,21 +261,6 @@ class StoreManageController
     }
 
     /**
-     * 用户等级
-     * @return \think\Response
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     * @author wuhaotian
-     * @email 442384644@qq.com
-     * @date 2025/11/17
-     */
-    public function userLevel()
-    {
-        return app('json')->success($this->services->userLevel());
-    }
-
-    /**
      * 用户标签
      * @param int $uid
      * @return \think\Response
@@ -289,6 +274,62 @@ class StoreManageController
     public function userLabel($uid = 0)
     {
         return app('json')->success($this->services->userLabel($uid));
+    }
+
+    /**
+     * 设置用户分组
+     * @param Request $request
+     * @return \think\Response
+     * @author wuhaotian
+     * @email 442384644@qq.com
+     * @date 2025/11/17
+     */
+    public function userSetGroup(Request $request)
+    {
+        [$uid, $group_id] = $request->postMore([
+            [['uid', 'd'], 0],
+            [['group_id', 'd'], 0],
+        ], true);
+        $this->services->userSetGroup((int)$uid, (int)$group_id);
+        return app('json')->success('修改成功');
+    }
+
+    /**
+     * 设置用户标签
+     * @param Request $request
+     * @return \think\Response
+     * @author wuhaotian
+     * @email 442384644@qq.com
+     * @date 2025/11/17
+     */
+    public function userSetLabel(Request $request)
+    {
+        [$uid, $label_id] = $request->postMore([
+            [['uid', 'd'], 0],
+            ['label_id', []],
+        ], true);
+        if (is_int($label_id)) $label_id = [$label_id];
+        $this->services->userSetLabel((int)$uid, (array)$label_id);
+        return app('json')->success('修改成功');
+    }
+
+    /**
+     * 赠送优惠券
+     * @param Request $request
+     * @return \think\Response
+     * @author wuhaotian
+     * @email 442384644@qq.com
+     * @date 2025/11/17
+     */
+    public function userSetCoupon(Request $request)
+    {
+        [$uid, $coupon_id] = $request->postMore([
+            ['uid', []],
+            [['coupon_id', 'd'], 0],
+        ], true);
+        if (!is_array($uid)) $uid = [$uid];
+        $this->services->userSetCoupon($uid, (int)$coupon_id);
+        return app('json')->success('赠送成功');
     }
 
     /**
@@ -308,35 +349,6 @@ class StoreManageController
             ['uid', 0],
         ]);
         return app('json')->success($this->services->userCoupon($where));
-    }
-
-    /**
-     * 修改用户信息
-     * @param Request $request
-     * @param $uid
-     * @return \think\Response
-     * @throws \think\Exception
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     * @author wuhaotian
-     * @email 442384644@qq.com
-     * @date 2025/11/17
-     */
-    public function userUpdate(Request $request, $uid)
-    {
-        $data = $request->postMore([
-            ['type', 0],
-            ['number', 0],
-            ['status', 0],
-            ['level', 0],
-            ['group_id', 0],
-            ['days', 0],
-            ['coupon_id', 0],
-            ['label_id', []],
-        ]);
-        $this->services->userUpdate($uid, $data);
-        return app('json')->success('修改成功');
     }
 
 }

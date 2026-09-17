@@ -107,8 +107,10 @@ Route::group(function () {
     Route::get('admin/manage/user/group', 'v1.admin.StoreManageController/userGroup');
 
     Route::get('admin/manage/user/label/[:uid]', 'v1.admin.StoreManageController/userLabel');
+    Route::post('admin/manage/user/set_group', 'v1.admin.StoreManageController/userSetGroup');
+    Route::post('admin/manage/user/set_label', 'v1.admin.StoreManageController/userSetLabel');
+    Route::post('admin/manage/user/set_coupon', 'v1.admin.StoreManageController/userSetCoupon');
     Route::get('admin/manage/user/coupon', 'v1.admin.StoreManageController/userCoupon');
-    Route::post('admin/manage/user/update/:uid', 'v1.admin.StoreManageController/userUpdate');
     Route::get('admin/manage/user/info/:uid', 'v1.admin.StoreManageController/userInfo');
 
 
@@ -135,8 +137,6 @@ Route::group(function () {
         Route::post('switch_h5', 'v1.LoginController/switch_h5')->name('switch_h5')->option(['real_name' => '切换账号']);// 切换账号
         //公共类
         Route::post('upload/image', 'v1.PublicController/upload_image')->name('uploadImage')->option(['real_name' => '图片上传']);//图片上传
-        // 用户微信转账详情接口
-        Route::get('transfer/info', 'v1.PublicController/getTransferInfo')->name('getTransferInfo')->option(['real_name' => '用户微信转账详情接口']);// 用户微信转账详情接口
 
     })->option(['mark' => 'common', 'mark_name' => '公共接口']);
 
@@ -176,7 +176,6 @@ Route::group(function () {
     })->option(['parent' => 'user', 'cate_name' => '用户收藏']);
 
     Route::group(function () {
-        Route::get('rank', 'v1.user.UserController/rank')->name('rank')->option(['real_name' => '公众号授权登录']);//推广人排行
         //用戶类 分享
         Route::post('user/share', 'v1.PublicController/user_share')->name('user_share')->option(['real_name' => '记录用户分享']);//记录用户分享
         Route::get('user/share/words', 'v1.PublicController/copy_share_words')->name('user_share_words')->option(['real_name' => '关键字分享']);//关键字分享
@@ -449,9 +448,6 @@ Route::group(function () {
 
         //活动-预售
         Route::get('advance/detail/:id', 'v1.activity.StoreAdvanceController/detail')->name('advanceDetail')->option(['real_name' => '预售商品详情']);//预售商品详情
-
-        //用户类
-        Route::get('user/activity', 'v1.user.UserController/activity')->name('userActivity')->option(['real_name' => '活动状态']);//活动状态
 
     })->option(['mark' => 'activity_nologin', 'mark_name' => '活动']);
 

@@ -78,18 +78,11 @@ Route::group(function () {
         })->option(['mark' => 'coupon', 'mark_name' => '优惠卷']);
 
         Route::group(function () {
-            //用户等级
-            Route::get('user_level/list', 'UserLevel/lst')->option(['real_name' => '用户等级列表']);
-
             //用户
             Route::get('user/list', 'User/lst')->option(['real_name' => '用户列表']);
             Route::get('user/info/:uid', 'User/info')->option(['real_name' => '用户详情']);
             Route::post('user', 'User/save')->option(['real_name' => '新增用户']);
             Route::put('user/:uid', 'User/update')->option(['real_name' => '修改用户']);
-            Route::put('user/give_balance/:uid', 'User/giveBalance')->option(['real_name' => '赠送余额']);
-            Route::put('user/give_point/:uid', 'User/givePoint')->option(['real_name' => '赠送积分']);
-            Route::put('user/change_balance/:uid', 'User/changeBalance')->option(['real_name' => '修改余额']);
-            Route::put('user/change_point/:uid', 'User/changePoint')->option(['real_name' => '修改积分']);
         })->option(['mark' => 'user', 'mark_name' => '用户']);
 
     })->middleware(AuthTokenMiddleware::class);

@@ -752,7 +752,7 @@ class Mcp extends AuthController
 
         $list = Db::name('user')
             ->where($where)
-            ->field('uid,nickname,avatar,phone,balance,integral,add_time')
+            ->field('uid,nickname,avatar,phone,add_time')
             ->order('uid desc')
             ->page($page, $limit)
             ->select()
@@ -783,9 +783,6 @@ class Mcp extends AuthController
             'nickname' => $info['nickname'] ?? '',
             'avatar' => $info['avatar'] ?? '',
             'phone' => $info['phone'] ?? '',
-            'now_money' => $info['now_money'] ?? 0,
-            'integral' => $info['integral'] ?? 0,
-            'level' => $info['level'] ?? 0,
             'add_time' => $info['add_time'] ?? 0,
             'last_time' => $info['last_time'] ?? 0,
         ];

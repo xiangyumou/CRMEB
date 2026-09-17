@@ -13,20 +13,15 @@ namespace app\services\admin;
 use app\services\activity\coupon\StoreCouponIssueServices;
 use app\services\activity\coupon\StoreCouponUserServices;
 use app\services\BaseServices;
-use app\services\order\StoreOrderCreateServices;
 use app\services\order\StoreOrderRefundServices;
 use app\services\order\StoreOrderServices;
 use app\services\product\product\StoreCategoryServices;
 use app\services\product\product\StoreProductLabelServices;
 use app\services\product\product\StoreProductServices;
 use app\services\product\sku\StoreProductAttrValueServices;
-use app\services\system\SystemUserLevelServices;
 use app\services\user\UserLabelRelationServices;
-use app\services\user\UserBillServices;
 use app\services\user\UserGroupServices;
 use app\services\user\UserLabelCateServices;
-use app\services\user\UserMoneyServices;
-use app\services\user\UserRechargeServices;
 use app\services\user\UserServices;
 use app\services\user\UserVisitServices;
 use crmeb\exceptions\ApiException;
@@ -418,22 +413,6 @@ class StoreManageServices extends BaseServices
     }
 
     /**
-     * 用户等级
-     * @return array
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     * @author wuhaotian
-     * @email 442384644@qq.com
-     * @date 2025/11/17
-     */
-    public function userLevel()
-    {
-        $systemUserLevelServices = app()->make(SystemUserLevelServices::class);
-        return $systemUserLevelServices->getLevelList([], 'id,name,icon,image');
-    }
-
-    /**
      * 用户标签
      * @param $uid
      * @return array
@@ -474,96 +453,64 @@ class StoreManageServices extends BaseServices
     }
 
     /**
-     * 用户数据修改
-     * @param $uid
-     * @param $data
+     * 设置用户分组
+     * @param int $uid
+     * @param int $groupId
      * @return bool
-     * @throws \think\Exception
      * @throws \think\db\exception\DataNotFoundException
      * @throws \think\db\exception\DbException
      * @throws \think\db\exception\ModelNotFoundException
-     * @author wuhaotian
-     * @email 442384644@qq.com
-     * @date 2025/11/17
      */
-    public function userUpdate($uid, $data)
+    public function userSetGroup(int $uid, int $groupId): bool
     {
-        $userServices = app()->make(UserServices::class);
-        $userInfo = $userServices->getUserInfo($uid);
-        switch ($data['type']) {
-            case 0: // 余额
-                /** @var UserMoneyServices $userMoneyServices */
-                $userMoneyServices = app()->make(UserMoneyServices::class);
-                if ($data['status'] == 1) { //增加
-                    $edit['now_money'] = bcadd($userInfo['now_money'], $data['number'], 2);
-                    $userMoneyServices->income('system_add', $uid, $data['number'], $edit['now_money'], 0, '移动端商家管理增加余额');
-                    //增加充值记录
-                    $recharge_data = [
-                        'order_id' => app()->make(StoreOrderCreateServices::class)->getNewOrderId('cz'),
-                        'uid' => $uid,
-                        'price' => $data['number'],
-                        'recharge_type' => 'system',
-                        'paid' => 1,
-                        'add_time' => time(),
-                        'give_price' => 0,
-                        'channel_type' => 'system',
-                        'pay_time' => time(),
-                    ];
-                    app()->make(UserRechargeServices::class)->save($recharge_data);
-                } else { //减少
-                    if ($userInfo['now_money'] > $data['number']) {
-                        $edit['now_money'] = bcsub($userInfo['now_money'], $data['number'], 2);
-                    } else {
-                        $edit['now_money'] = 0;
-                        $data['number'] = $userInfo['now_money'];
-                    }
-                    $userMoneyServices->income('system_sub', $uid, $data['number'], $edit['now_money'], 0, '移动端商家管理减少余额');
-                }
-                $userServices->update($uid, $edit);
-                break;
-            case 1: // 积分
-                /** @var UserBillServices $userBill */
-                $userBill = app()->make(UserBillServices::class);
-                $integral_data = ['link_id' => 0, 'number' => $data['number']];
-                if ($data['status'] == 1) { //增加
-                    $edit['integral'] = bcadd($userInfo['integral'], $data['number'], 2);
-                    $integral_data['balance'] = $edit['integral'];
-                    $integral_data['title'] = '系统增加积分';
-                    $integral_data['mark'] = '系统增加了' . floatval($data['number']) . '积分';
-                    $userBill->incomeIntegral($uid, 'system_add', $integral_data);
-                } else { //减少
-                    $edit['integral'] = bcsub($userInfo['integral'], $data['number'], 2);
-                    $integral_data['balance'] = $edit['integral'];
-                    $integral_data['title'] = '系统减少积分';
-                    $integral_data['mark'] = '系统扣除了' . floatval($data['number']) . '积分';
-                    $userBill->expendIntegral($uid, 'system_sub', $integral_data);
-                }
-                $userServices->update($uid, $edit);
-                break;
-            case 2: // 等级
-                $userServices->saveGiveLevel((int)$uid, (int)$data['level']);
-                break;
-            case 3: // 付费会员
-                $userServices->saveGiveLevelTime((int)$uid, (int)$data['days']);
-                break;
-            case 4: // 优惠券
-                /** @var StoreCouponIssueServices $issueService */
-                $issueService = app()->make(StoreCouponIssueServices::class);
-                $coupon = $issueService->get($data['coupon_id']);
-                if (!$coupon) {
-                    throw new ApiException('优惠券不存在');
-                } else {
-                    $coupon = $coupon->toArray();
-                }
-                $issueService->setCoupon($coupon, [$uid]);
-                break;
-            case 5: // 分组
-                $userServices->saveSetGroup([$uid], $data['group_id']);
-                break;
-            case 6: // 用户标签
-                $userServices->saveSetLabel([$uid], $data['label_id'], 0);
-                break;
+        if ($uid < 1) {
+            throw new ApiException('参数错误');
         }
+        app()->make(UserServices::class)->saveSetGroup([$uid], $groupId);
         return true;
     }
+
+    /**
+     * 设置用户标签
+     * @param int $uid
+     * @param array $labelIds
+     * @return bool
+     * @throws \think\db\exception\DataNotFoundException
+     * @throws \think\db\exception\DbException
+     * @throws \think\db\exception\ModelNotFoundException
+     */
+    public function userSetLabel(int $uid, array $labelIds): bool
+    {
+        if ($uid < 1) {
+            throw new ApiException('参数错误');
+        }
+        app()->make(UserServices::class)->saveSetLabel([$uid], $labelIds, 0);
+        return true;
+    }
+
+    /**
+     * 赠送优惠券
+     * @param array $uids
+     * @param int $couponId
+     * @return bool
+     * @throws \think\db\exception\DataNotFoundException
+     * @throws \think\db\exception\DbException
+     * @throws \think\db\exception\ModelNotFoundException
+     */
+    public function userSetCoupon(array $uids, int $couponId): bool
+    {
+        $uids = array_values(array_filter(array_map('intval', $uids)));
+        if (!$uids || $couponId < 1) {
+            throw new ApiException('参数错误');
+        }
+        /** @var StoreCouponIssueServices $issueService */
+        $issueService = app()->make(StoreCouponIssueServices::class);
+        $coupon = $issueService->get($couponId);
+        if (!$coupon) {
+            throw new ApiException('优惠券不存在');
+        }
+        $issueService->setCoupon($coupon->toArray(), $uids);
+        return true;
+    }
+
 }

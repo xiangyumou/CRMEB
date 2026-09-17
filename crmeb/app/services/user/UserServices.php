@@ -1663,31 +1663,6 @@ class UserServices extends BaseServices
     }
 
     /**
-     * 获取推广人排行
-     * @param $data 查询条件
-     * @return array
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\ModelNotFoundException
-     * @throws \think\exception\DbException
-     */
-    public function getRankList(array $data)
-    {
-        $startTime = strtotime('this week Monday');
-        $endTime = time();
-        switch ($data['type']) {
-            case 'week':
-                $startTime = strtotime('this week Monday');
-                break;
-            case 'month':
-                $startTime = strtotime('last month');
-                break;
-        }
-        [$page, $limit] = $this->getPageValue();
-        $field = 't0.uid,t0.spread_uid,count(t1.spread_uid) AS count,t0.add_time,t0.nickname,t0.avatar';
-        return $this->dao->getAgentRankList([$startTime, $endTime], $field, $page, $limit);
-    }
-
-    /**
      * 静默绑定推广人
      * @param int $uid
      * @param int $spreadUid
@@ -1804,24 +1779,6 @@ class UserServices extends BaseServices
         } else {
             throw new ApiException('设置失败');
         }
-    }
-
-    /**
-     * 获取活动状态
-     * @return mixed
-     */
-    public function activity()
-    {
-        /** @var StoreBargainServices $storeBragain */
-        $storeBragain = app()->make(StoreBargainServices::class);
-        /** @var StoreCombinationServices $storeCombinaion */
-        $storeCombinaion = app()->make(StoreCombinationServices::class);
-        /** @var StoreSeckillServices $storeSeckill */
-        $storeSeckill = app()->make(StoreSeckillServices::class);
-        $data['is_bargin'] = (bool)$storeBragain->validBargain();
-        $data['is_pink'] = (bool)$storeCombinaion->validCombination();
-        $data['is_seckill'] = (bool)$storeSeckill->getSeckillCount();
-        return $data;
     }
 
     /**

@@ -13,7 +13,6 @@ namespace app\api\controller\v1;
 
 use app\services\activity\combination\StorePinkServices;
 use app\services\activity\coupon\StoreCouponIssueServices;
-use app\services\activity\lottery\LuckLotteryRecordServices;
 use app\services\article\ArticleServices;
 use app\services\diy\DiyServices;
 use app\services\diy\ThemeServices;
@@ -41,7 +40,6 @@ use app\services\system\lang\LangTypeServices;
 use app\services\system\store\SystemStoreServices;
 use app\services\system\store\SystemStoreStaffServices;
 use app\services\user\UserBillServices;
-use app\services\user\UserExtractServices;
 use app\services\user\UserInvoiceServices;
 use app\services\user\UserServices;
 use app\services\wechat\RoutineSchemeServices;
@@ -152,59 +150,26 @@ class PublicController
         if ($request->hasMacro('user')) $userInfo = $request->user();
         if ($request->hasMacro('uid')) $uid = $request->uid();
 
-        //用户等级开关
-        $vipOpen = sys_config('member_func_status');
-        //分销功能开关
-        $brokerageFuncStatus = sys_config('brokerage_func_status');
-        //余额功能开关
-        $balanceFuncStatus = sys_config('balance_func_status');
-        //付费会员开关
-        $svipOpen = sys_config('member_card_status');
-        $userService = $userOrder = $userVerifyStatus = $deliveryUser = $invoiceStatus = $isUserPromoter = false;
+        $userOrder = $invoiceStatus = false;
         if ($uid && $userInfo) {
             /** @var StoreServiceServices $storeService */
             $storeService = app()->make(StoreServiceServices::class);
-            //是否客服
-            $userService = $storeService->checkoutIsService(['uid' => $uid, 'status' => 1]);
             //是否订单管理
             $userOrder = $storeService->checkoutIsService(['uid' => $uid, 'status' => 1, 'customer' => 1]);
-            //是否核销员
-            $userVerifyStatus = app()->make(SystemStoreStaffServices::class)->verifyStatus($uid);
-            //是否配送员
-            $deliveryUser = app()->make(DeliveryServiceServices::class)->checkoutIsService($uid);
             //发票功能开关
             $invoiceStatus = app()->make(UserInvoiceServices::class)->invoiceFuncStatus(false);
-            //是否分销员
-            $isUserPromoter = app()->make(UserServices::class)->checkUserPromoter($uid, $userInfo);
         }
         $auth = [];
-        $auth['/pages/users/user_vip/index'] = $vipOpen;
-        $auth['/pages/users/user_spread_user/index'] = $brokerageFuncStatus && $isUserPromoter;
-        $auth['/pages/annex/settled/index'] = $brokerageFuncStatus && sys_config('store_brokerage_statu') == 1 && !$isUserPromoter;
-        $auth['/pages/users/user_money/index'] = $balanceFuncStatus;
         $auth['/pages/admin/order/index'] = $auth['/pages/admin/manage/index'] = $userOrder;
-        $auth['/pages/admin/order_cancellation/index'] = $userVerifyStatus || $deliveryUser;
         $auth['/pages/users/user_invoice_list/index'] = $invoiceStatus;
-        $auth['/pages/annex/vip_paid/index'] = $svipOpen;
-        $auth['/kefu/mobile_list'] = $userService;
         foreach ($menusInfo as $key => &$value) {
             if (isset($value['is_show']) && $value['is_show'] == 0) {
                 unset($menusInfo[$key]);
                 continue;
             }
-            if ($value['url'] == '/pages/users/user_spread_user/index' && $auth['/pages/annex/settled/index']) {
-                $value['name'] = '分销申请';
-                $value['url'] = '/pages/annex/settled/index';
-            }
             if (isset($auth[$value['url']]) && !$auth[$value['url']]) {
                 unset($menusInfo[$key]);
                 continue;
-            }
-            if ($value['url'] == '/kefu/mobile_list') {
-                $value['url'] = sys_config('site_url') . $value['url'];
-                if ($request->isRoutine()) {
-                    $value['url'] = str_replace('http://', 'https://', $value['url']);
-                }
             }
         }
         /** @var SystemConfigServices $systemConfigServices */
@@ -792,46 +757,6 @@ class PublicController
         return app('json')->header(['X-Frame-Options' => 'payapp.weixin.qq.com'])->success($data);
     }
 
-    public function getTransferInfo(Request $request, $order_id, $type)
-    {
-        $extractServices = app()->make(UserExtractServices::class);
-        $lotteryRecordServices = app()->make(LuckLotteryRecordServices::class);
-        $uid = (int)$request->uid();
-        if ($type == 1) {
-            $info = $extractServices->getExtractByOrderId($uid, $order_id);
-            $info['true_extract_price'] = bcsub($info['extract_price'], $info['extract_fee'], 2);
-        } else {
-            $info = $lotteryRecordServices->getRecordByOrderId($uid, $order_id);
-            $info['true_extract_price'] = $info['num'];
-        }
-        if ($info['state'] == 'WAIT_USER_CONFIRM') {
-            $pay = new Pay('v3_wechat_pay');
-            $res = $pay->queryTransferBills($order_id);
-            if (isset($res['fail_reason']) && $res['fail_reason'] != '') {
-                if ($type == 1) {
-                    $extractServices->changeFail($info['id'], $info, '提现失败，原因：超时未领取');
-                    $extractServices->update($info['id'], ['state' => 'FAIL']);
-                } else {
-                    $lotteryRecordServices->update($info['id'], ['state' => 'FAIL']);
-                }
-                $info['state'] = 'FAIL';
-            }
-        }
-        switch ($info['channel_type']) {
-            case 'wechat':
-                $info['wechat_appid'] = sys_config('wechat_appid');
-                break;
-            case 'routine':
-                $info['wechat_appid'] = sys_config('routine_appid');
-                break;
-            case 'app':
-                $info['wechat_appid'] = sys_config('app_appid');
-                break;
-        }
-        $info['mchid'] = sys_config('pay_weixin_mchid');
-        return app('json')->success($info);
-    }
-
     /**
      * 获取主题信息
      * @param string $type 主题类型，当为'user'时会附加用户权限和订单统计信息
@@ -868,39 +793,23 @@ class PublicController
             if ($request->hasMacro('user')) $userInfo = $request->user();
 
             // 获取系统功能开关配置
-            //用户等级开关
-            $levelOpen = (bool)sys_config('member_func_status');
-            //分销功能开关
-            $brokerageOpen = (bool)sys_config('brokerage_func_status');
-            //余额功能开关
-            $balanceOpen = (bool)sys_config('balance_func_status');
-            //付费会员开关
-            $sVipOpen = (bool)sys_config('member_card_status');
             //发票功能
             $invoiceOpen = (bool)sys_config('invoice_func_status');
 
             // 初始化用户角色标识
-            $userIsService = $userIsOrder = $userIsVerify = $userIsDelivery = $userIsPromoter = false;
+            $userIsOrder = false;
 
             if ($uid && $userInfo) {
                 /** @var StoreServiceServices $storeService */
                 $storeService = app()->make(StoreServiceServices::class);
                 /** @var StoreOrderServices $orderServices */
                 $orderServices = app()->make(StoreOrderServices::class);
-                /** @var StoreOrderRefundServices $storeOrderRefundServices */
+                /** @var StoreOrderRefundServices $orderRefundServices */
                 $orderRefundServices = app()->make(StoreOrderRefundServices::class);
 
                 // 检查用户角色权限
-                //是否客服
-                $userIsService = (bool)$storeService->checkoutIsService(['uid' => $uid, 'status' => 1]);
                 //是否订单管理
                 $userIsOrder = (bool)$storeService->checkoutIsService(['uid' => $uid, 'status' => 1, 'customer' => 1]);
-                //是否核销员
-                $userIsVerify = (bool)app()->make(SystemStoreStaffServices::class)->verifyStatus($uid);
-                //是否配送员
-                $userIsDelivery = (bool)app()->make(DeliveryServiceServices::class)->checkoutIsService($uid);
-                //是否分销员
-                $userIsPromoter = (bool)app()->make(UserServices::class)->checkUserPromoter($uid, $userInfo);
 
                 // 统计各状态订单数量，用于菜单角标显示
                 $orderAuth = [];
@@ -916,15 +825,8 @@ class PublicController
 
             // 配置各页面的访问权限
             $auth = [];
-            $auth['/pages/users/user_vip/index'] = $levelOpen;
-            $auth['/pages/users/user_spread_user/index'] = $brokerageOpen && $userIsPromoter;
-            $auth['/pages/annex/settled/index'] = $brokerageOpen && sys_config('store_brokerage_statu') == 1 && !$userIsPromoter;
-            $auth['/pages/users/user_money/index'] = $balanceOpen;
             $auth['/pages/admin/order/index'] = $auth['/pages/admin/manage/index'] = $userIsOrder;
-            $auth['/pages/admin/order_cancellation/index'] = $userIsVerify || $userIsDelivery;
             $auth['/pages/users/user_invoice_list/index'] = $invoiceOpen;
-            $auth['/pages/annex/vip_paid/index'] = $sVipOpen;
-            $auth['/kefu/mobile_list'] = $userIsService;
 
             // 处理主题菜单配置
             if ($themeInfo) {
@@ -934,28 +836,6 @@ class PublicController
                             // 设置菜单显示权限和角标数量
                             $menuDataItem['show'] = ($auth[$menuDataItem['info'][1]['value']] ?? true) && $menuDataItem['show'];
                             $menuDataItem['num'] = $orderAuth[$menuDataItem['info'][1]['value']] ?? 0;
-
-                            // 处理客服链接，拼接完整URL
-                            if ($menuDataItem['info'][1]['value'] == '/kefu/mobile_list') {
-                                $menuDataItem['info'][1]['value'] = sys_config('site_url') . $menuDataItem['info'][1]['value'];
-                                // 小程序环境强制使用https
-                                if ($request->isRoutine()) {
-                                    $menuDataItem['info'][1]['value'] = str_replace('http://', 'https://', $menuDataItem['info'][1]['value']);
-                                }
-                            }
-
-                            // 处理客服聊天页面，添加联系方式类型配置
-                            if ($menuDataItem['info'][1]['value'] == '/pages/extension/customer_list/chat') {
-                                if ($request->isRoutine()) {
-                                    $menuDataItem['routine_contact_type'] = (int)sys_config('routine_contact_type', 0);
-                                }
-                            }
-
-                            if ($menuDataItem['info'][1]['value'] == '/pages/users/user_spread_user/index' && $brokerageOpen && sys_config('store_brokerage_statu') == 1 && !$userIsPromoter) {
-                                $menuDataItem['info'][0]['value'] = '分销申请';
-                                $menuDataItem['info'][1]['value'] = '/pages/annex/settled/index';
-                                $menuDataItem['show'] = true;
-                            }
                         }
                     }
                 }

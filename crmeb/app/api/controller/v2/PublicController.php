@@ -112,16 +112,6 @@ class PublicController
     }
 
     /**
-     * 获取提货点自提开启状态
-     * @return mixed
-     */
-    public function getStoreStatus()
-    {
-        $data['store_status'] = sys_config('store_self_mention', 0);
-        return app('json')->success($data);
-    }
-
-    /**
      * 获取颜色选择和分类模板选择
      * @param DiyServices $services
      * @param $name

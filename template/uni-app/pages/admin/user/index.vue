@@ -23,18 +23,6 @@
         <view class="text">
           <view class="name acea-row row-middle">
             <view class="nameCon line1">{{ infoData.nickname }}</view>
-            <view
-              class="svip acea-row row-center-wrapper"
-              v-if="infoData.isMember == 1"
-              >SVIP</view
-            >
-            <view
-              class="vip acea-row row-center-wrapper"
-              v-if="infoData.level_status == 1"
-            >
-              <text class="iconfont icon-huiyuandengji"></text>
-              V{{ infoData.level_grade }}
-            </view>
           </view>
           <view v-if="infoData.phone"
             >{{ infoData.phone }}（ID：{{ uid }}）</view
@@ -79,25 +67,6 @@
               <view v-if="groupArray.length">
                 <text class="not" v-if="groupIndex == -1">无</text>
                 <text v-else>{{ groupArray[groupIndex].group_name }}</text>
-              </view>
-              <text class="iconfont icon-ic_rightarrow"></text>
-            </view>
-          </picker>
-        </view>
-      </view>
-      <view class="item acea-row row-between-wrapper">
-        <view>等级</view>
-        <view>
-          <picker
-            @change="bindLevelChange"
-            :value="levelIndex"
-            :range="levelArray"
-            range-key="name"
-          >
-            <view class="acea-row row-middle">
-              <view v-if="levelArray.length">
-                <text class="not" v-if="levelIndex == -1">无</text>
-                <text v-else>{{ levelArray[levelIndex].name }}</text>
               </view>
               <text class="iconfont icon-ic_rightarrow"></text>
             </view>
@@ -158,22 +127,6 @@
     <view class="property">
       <view class="title">资产信息</view>
       <view class="info acea-row">
-        <view class="item" @click="balanceTap(1)">
-          <view>积分</view>
-          <view class="bottom acea-row row-between-wrapper">
-            <view class="num">{{ infoData.integral }}</view>
-            <view class="iconfont icon-ic_edit"></view>
-          </view>
-        </view>
-        <view class="item" @click="balanceTap(0)">
-          <view>余额</view>
-          <view class="bottom acea-row row-between-wrapper">
-            <view class="num">{{ infoData.now_money }}</view>
-            <view class="iconfont icon-ic_edit"></view>
-          </view>
-        </view>
-      </view>
-      <view class="info acea-row">
         <view class="item">
           <view class="acea-row row-between-wrapper">
             <view>优惠券</view>
@@ -187,16 +140,6 @@
             <view class="give" @click="couponTap">赠送</view>
           </view>
         </view>
-        <view class="item" @click="memberTap">
-          <view>会员</view>
-          <view class="bottom acea-row row-between-wrapper">
-            <view class="num" v-if="infoData.svip_over_day">{{
-              "剩余" + infoData.svip_over_day + "天"
-            }}</view>
-            <view class="num" v-else>已过期/暂未开通</view>
-            <view class="iconfont icon-ic_edit"></view>
-          </view>
-        </view>
       </view>
     </view>
     <edit-lable
@@ -204,21 +147,6 @@
       :visible="visibleLable"
       @closeDrawer="lableCloseDrawer"
     ></edit-lable>
-    <edit-balance
-      ref="balance"
-      :visible="visibleBalance"
-      :type="type"
-      :uid="parseInt(uid)"
-      @closeDrawer="balanceCloseDrawer"
-      @successChange="successChange"
-    ></edit-balance>
-    <member
-      ref="member"
-      :visible="visibleMember"
-      :userInfo="infoData"
-      @closeDrawer="memberCloseDrawer"
-      @successChange="successChange"
-    ></member>
     <coupon
       ref="coupon"
       :visible="visibleCoupon"
@@ -230,20 +158,15 @@
 
 <script>
 import editLable from "./components/userLable/index.vue";
-import editBalance from "./components/editBalance/index.vue";
-import member from "./components/member/index.vue";
 import coupon from "./components/coupon/index.vue";
 import {
   getUserInfo,
   getGroupList,
-  getLevelList,
-  postUserUpdateOther,
+  postUserSetGroup,
 } from "@/api/admin";
 export default {
   components: {
     editLable,
-    editBalance,
-    member,
     coupon,
   },
   data() {
@@ -252,13 +175,8 @@ export default {
       uid: 0,
       infoData: {},
       groupArray: [],
-      levelArray: [],
       groupIndex: -1,
-      levelIndex: -1,
       visibleLable: false,
-      visibleBalance: false,
-      type: 0,
-      visibleMember: false,
       visibleCoupon: false,
       isShow: false,
     };
@@ -285,24 +203,6 @@ export default {
         this.userInfo();
       }
     },
-    memberTap() {
-      this.visibleMember = true;
-    },
-    memberCloseDrawer() {
-      this.visibleMember = false;
-    },
-    balanceTap(type) {
-      this.type = type;
-      this.visibleBalance = true;
-    },
-    successChange() {
-      this.visibleBalance = false;
-      this.visibleMember = false;
-      this.userInfo();
-    },
-    balanceCloseDrawer() {
-      this.visibleBalance = false;
-    },
     lableCloseDrawer(e) {
       this.visibleLable = false;
       if (e) {
@@ -319,47 +219,11 @@ export default {
     },
     bindPickerChange(e) {
       this.groupIndex = e.detail.value;
-      this.userUpdate(5);
-    },
-    bindLevelChange(e) {
-      this.levelIndex = e.detail.value;
-      this.userUpdate(1);
-    },
-    userUpdate(num) {
-      let data = {};
-      if (num == 5) {
-        data = {
-          type: 5,
-          group_id: this.groupArray[this.groupIndex].id,
-        };
-      } else {
-        data = {
-          type: 2,
-          level: this.levelArray[this.levelIndex].id,
-        };
-      }
-      postUserUpdateOther(this.uid, data)
+      postUserSetGroup(this.uid, this.groupArray[this.groupIndex].id)
         .then((res) => {
           this.$util.Tips({
             title: res.msg,
           });
-        })
-        .catch((err) => {
-          this.$util.Tips({
-            title: err,
-          });
-        });
-    },
-    levelList() {
-      getLevelList()
-        .then((res) => {
-          let id = this.infoData.level;
-          res.data.list.forEach((item, index) => {
-            if (item.id == id) {
-              this.levelIndex = index;
-            }
-          });
-          this.levelArray = res.data.list;
         })
         .catch((err) => {
           this.$util.Tips({
@@ -393,7 +257,6 @@ export default {
           this.infoData = res.data;
           if (num) {
             this.groupList();
-            this.levelList();
           }
         })
         .catch((err) => {
@@ -470,30 +333,6 @@ export default {
             font-size: 32rpx;
             color: #fff;
             max-width: 300rpx;
-          }
-          .svip {
-            width: 56rpx;
-            height: 26rpx;
-            background: linear-gradient(270deg, #484643 0%, #1f1b17 100%);
-            border-radius: 14rpx;
-            font-size: 18rpx;
-            font-weight: 600;
-            color: #fddaa4;
-            margin-left: 12rpx;
-          }
-          .vip {
-            width: 68rpx;
-            height: 26rpx;
-            background: #fef0d9;
-            margin-left: 12rpx;
-            border-radius: 50rpx;
-            font-size: 18rpx;
-            font-weight: 500;
-            color: #dfa541;
-            .iconfont {
-              font-size: 20rpx;
-              margin-right: 4rpx;
-            }
           }
         }
       }

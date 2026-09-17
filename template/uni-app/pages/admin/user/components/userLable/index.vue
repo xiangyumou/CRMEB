@@ -42,7 +42,7 @@
 import emptyPage from '@/components/emptyPage.vue';
 import {
 	getUserLabel,
-	postUserUpdateOther
+	postUserSetLabel
 } from "@/api/admin";
 import { handleError } from "vue";
 export default {
@@ -76,10 +76,7 @@ export default {
 			this.dataLabel.forEach(item=>{
 				labelIds.push(item.id)
 			})
-			postUserUpdateOther(this.num?this.ids:this.goodsInfo.uid,{
-				type:6,
-				label_id:labelIds
-			}).then(res=>{
+			postUserSetLabel(this.num?this.ids:this.goodsInfo.uid, labelIds).then(res=>{
 				this.$util.Tips({
 					title: res.msg
 				});

@@ -49,4 +49,49 @@ final class CoreStoreBoundaryTest extends RegressionTestCase
         self::assertStringNotContainsString('<!DOCTYPE html>', (string)$body);
     }
     public function removedEndpoints(): array { return [['/api/seckill/index'],['/api/bargain/list'],['/api/store_integral/index'],['/api/recharge/index'],['/api/pay/notify/alipay'],['/adminapi/upgrade'],['/kefuapi/anything']]; }
+
+    /** @dataProvider retiredWriteEndpoints */
+    public function testRetiredWriteEndpointsAreNotHandled(string $path): void
+    {
+        $curl = curl_init(rtrim(getenv('REGRESSION_HTTP_BASE_URL'), '/') . $path);
+        curl_setopt_array($curl, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_CUSTOMREQUEST => 'POST']);
+        $body = curl_exec($curl); $status = curl_getinfo($curl, CURLINFO_HTTP_CODE); curl_close($curl);
+        self::assertSame(404, $status, (string)$body);
+        self::assertStringNotContainsString('<!DOCTYPE html>', (string)$body);
+    }
+
+    /** Mobile-admin balance/point/level writes and outright aliases must not resolve. */
+    public function retiredWriteEndpoints(): array
+    {
+        return [
+            ['/api/admin/manage/user/update/1'],
+            ['/api/outapi/user/give_balance/1'],
+            ['/api/outapi/user/give_point/1'],
+            ['/api/outapi/user/change_balance/1'],
+            ['/api/outapi/user/change_point/1'],
+        ];
+    }
+
+    /** @dataProvider retiredReadEndpoints */
+    public function testRetiredReadEndpointsReturnHttp404(string $path): void
+    {
+        $curl = curl_init(rtrim(getenv('REGRESSION_HTTP_BASE_URL'), '/') . $path);
+        curl_setopt_array($curl, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10]);
+        $body = curl_exec($curl); $status = curl_getinfo($curl, CURLINFO_HTTP_CODE); curl_close($curl);
+        self::assertSame(404, $status, (string)$body);
+        self::assertStringNotContainsString('<!DOCTYPE html>', (string)$body);
+    }
+
+    public function retiredReadEndpoints(): array
+    {
+        return [
+            ['/api/outapi/user_level/list'],
+            ['/api/rank'],
+            ['/api/user/activity'],
+            ['/api/transfer/info'],
+            ['/api/v2/diy/get_store_status'],
+            ['/adminapi/diy/get_store_status'],
+            ['/adminapi/export/member_card/1'],
+        ];
+    }
 }

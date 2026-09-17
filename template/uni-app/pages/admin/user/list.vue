@@ -78,28 +78,8 @@
             <view class="text">
               <view class="top acea-row row-middle">
                 <view class="name line1">{{ item.nickname }}</view>
-                <view
-                  class="svip acea-row row-center-wrapper"
-                  v-if="item.isMember == 1"
-                  >SVIP</view
-                >
-                <view
-                  class="vip acea-row row-center-wrapper"
-                  v-if="item.level_status == 1 && item.level_grade"
-                >
-                  <text class="iconfont icon-huiyuandengji"></text>
-                  V{{ item.level_grade }}
-                </view>
               </view>
               <view class="phone">{{ item.phone }}</view>
-              <view class="info acea-row row-middle">
-                <view
-                  >积分：<text>{{ item.integral }}</text></view
-                >
-                <view
-                  >余额：<text>{{ item.now_money }}</text></view
-                >
-              </view>
             </view>
             <view
               v-if="!administer"
@@ -164,18 +144,10 @@
           @tap="editInfo(index)"
         >
           <picker
-            @change="bindLevelChange"
-            :range="levelArray"
-            range-key="name"
-            v-if="index == 2"
-          >
-            <view class="uni-input">{{ item.name }}</view>
-          </picker>
-          <picker
-            v-else-if="index == 5"
             @change="userUpdateGroup"
             :range="groupArray"
             range-key="group_name"
+            v-if="index == 1"
           >
             <view class="uni-input">{{ item.name }}</view>
           </picker>
@@ -190,21 +162,6 @@
       :visible="visibleLable"
       @closeDrawer="lableCloseDrawer"
     ></edit-lable>
-    <edit-balance
-      ref="balance"
-      :visible="visibleBalance"
-      :type="type"
-      :uid="uid"
-      @closeDrawer="balanceCloseDrawer"
-      @successChange="successChange"
-    ></edit-balance>
-    <member
-      ref="member"
-      :visible="visibleMember"
-      :userInfo="userInfo"
-      @closeDrawer="memberCloseDrawer"
-      @successChange="successChange"
-    ></member>
     <coupon
       ref="coupon"
       :visible="visibleCoupon"
@@ -215,7 +172,6 @@
       ref="filter"
       :visible="visibleFilter"
       :groupArray="groupArray"
-      :levelArray="levelArray"
       @closeDrawer="filterCloseDrawer"
       @successChange="filterChange"
     ></user-filter>
@@ -227,21 +183,17 @@ import Loading from "@/components/Loading/index";
 import emptyPage from "@/components/emptyPage.vue";
 import footerPage from "../components/footerPage/index.vue";
 import editLable from "./components/userLable/index.vue";
-import editBalance from "./components/editBalance/index.vue";
-import member from "./components/member/index.vue";
 import coupon from "./components/coupon/index.vue";
 import userFilter from "./components/filter/index.vue";
 import {
   getUserList,
   getGroupList,
-  postUserUpdateOther,
-  getLevelList,
+  postUserSetGroup,
+  postUserSetLabel,
 } from "@/api/admin";
 export default {
   components: {
     editLable,
-    editBalance,
-    member,
     coupon,
     userFilter,
     footerPage,
@@ -252,18 +204,6 @@ export default {
     return {
       getHeight: this.$util.getWXStatusHeight(),
       editList: [
-        {
-          name: "修改余额",
-        },
-        {
-          name: "修改积分",
-        },
-        {
-          name: "修改等级",
-        },
-        {
-          name: "赠送会员",
-        },
         {
           name: "赠送优惠券",
         },
@@ -282,19 +222,14 @@ export default {
       limit: 20,
       page: 1,
       keyword: "", //搜索字段
-      visibleBalance: false,
-      type: 0,
-      visibleMember: false,
       visibleCoupon: false,
       uid: 0,
       groupArray: [],
       userInfo: {},
-      levelArray: [],
       visibleFilter: false,
       filterData: {
         labelIds: "",
         groupIds: 0,
-        levelIds: 0,
       },
     };
   },
@@ -318,8 +253,6 @@ export default {
     filterTap() {
       this.visibleFilter = true;
       this.$refs.filter.productLabel();
-      this.levelList();
-      // this.groupList();
     },
     sendCoupon() {
       if (!this.getIds().length) {
@@ -330,17 +263,6 @@ export default {
       }
       this.visibleCoupon = true;
       this.$refs.coupon.userCoupon(1, this.getIds());
-    },
-    levelList() {
-      getLevelList()
-        .then((res) => {
-          this.levelArray = res.data.list;
-        })
-        .catch((err) => {
-          this.$util.Tips({
-            title: err,
-          });
-        });
     },
     groupList() {
       getGroupList()
@@ -353,8 +275,8 @@ export default {
           });
         });
     },
-    userUpdate(data) {
-      postUserUpdateOther(this.uid, data)
+    userSetGroup(uid, groupId) {
+      postUserSetGroup(uid, groupId)
         .then((res) => {
           this.$util.Tips({
             title: res.msg,
@@ -367,18 +289,8 @@ export default {
         });
     },
     userUpdateGroup(e) {
-      this.userUpdate({
-        type: 5,
-        group_id: this.groupArray[e.detail.value].id,
-      });
       this.visible = false;
-      this.init();
-    },
-    bindLevelChange(e) {
-      this.userUpdate({
-        type: 2,
-        level: this.levelArray[e.detail.value].id,
-      });
+      this.userSetGroup(this.uid, this.groupArray[e.detail.value].id);
       this.init();
     },
     bindPickerChange(e) {
@@ -388,11 +300,7 @@ export default {
         });
         return;
       }
-      this.userUpdate({
-        type: 4,
-        uid: this.getIds(),
-        group_id: this.groupArray[e.detail.value].id,
-      });
+      this.userSetGroup(this.getIds(), this.groupArray[e.detail.value].id);
     },
     goDetails(item) {
       uni.navigateTo({
@@ -401,17 +309,6 @@ export default {
     },
     couponCloseDrawer() {
       this.visibleCoupon = false;
-    },
-    memberCloseDrawer() {
-      this.visibleMember = false;
-    },
-    balanceCloseDrawer() {
-      this.visibleBalance = false;
-    },
-    successChange() {
-      this.visibleMember = false;
-      this.visibleBalance = false;
-      this.init();
     },
     //批量编辑标签
     editLabels() {
@@ -457,7 +354,6 @@ export default {
         limit: that.limit,
         nickname: that.keyword,
         group_id: that.filterData.groupIds,
-        level: that.filterData.levelIds,
         label_id: that.filterData.labelIds,
       })
         .then((res) => {
@@ -480,24 +376,8 @@ export default {
         });
     },
     editInfo(index) {
-      this.type = index;
       switch (index) {
         case 0:
-          this.visible = false;
-          this.visibleBalance = true;
-          break;
-        case 1:
-          this.visible = false;
-          this.visibleBalance = true;
-          break;
-        case 2:
-          this.visible = false;
-          break;
-        case 3:
-          this.visible = false;
-          this.visibleMember = true;
-          break;
-        case 4:
           this.visible = false;
           this.visibleCoupon = true;
           break;
@@ -510,7 +390,6 @@ export default {
       this.visible = true;
       this.uid = item.uid;
       this.userInfo = item;
-      this.levelList();
       this.$refs.coupon.userCoupon(0);
     },
     closeDrawer() {
@@ -687,33 +566,6 @@ export default {
             color: #333333;
             font-family: PingFang SC, PingFang SC;
           }
-          .svip {
-            width: 56rpx;
-            height: 26rpx;
-            background: linear-gradient(270deg, #484643 0%, #1f1b17 100%);
-            border-radius: 100rpx;
-            font-size: 18rpx;
-            font-family: PingFang SC, PingFang SC;
-            font-weight: 600;
-            color: #fddaa4;
-            margin-left: 10rpx;
-          }
-          .vip {
-            width: 64rpx;
-            // height: 26rpx;
-            background: #fef0d9;
-            border: 1px solid #facc7d;
-            border-radius: 50rpx;
-            font-size: 18rpx;
-            font-family: PingFang SC, PingFang SC;
-            font-weight: 500;
-            color: #dfa541;
-            margin-left: 10rpx;
-            .iconfont {
-              font-size: 20rpx;
-              margin-right: 4rpx;
-            }
-          }
         }
         .phone {
           font-size: 24rpx;
@@ -721,16 +573,6 @@ export default {
           font-weight: 400;
           color: #999999;
           margin-top: 4rpx;
-        }
-        .info {
-          font-size: 24rpx;
-          font-weight: 400;
-          color: #999999;
-          margin-top: 4rpx;
-          text {
-            color: #333333;
-            margin-right: 28rpx;
-          }
         }
       }
       .bottom {

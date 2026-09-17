@@ -59,9 +59,6 @@ class User extends AuthController
             ['phone', 0],
             ['mark', ''],
             ['pwd', ''],
-            ['level', 0],
-            ['spread_open', 0],
-            ['is_promoter', 0],
             ['status', 1]
         ]);
         $uid = $this->services->saveUser(0, $data);
@@ -83,40 +80,11 @@ class User extends AuthController
             ['phone', 0],
             ['mark', ''],
             ['pwd', ''],
-            ['level', 0],
-            ['spread_open', 1],
-            ['is_promoter', 0],
             ['status', 1]
         ]);
         if (!$uid) return app('json')->fail('参数错误');
         $this->services->saveUser((int)$uid, $data);
         return app('json')->success('修改成功');
-    }
-
-    /**
-     * 赠送相关
-     * @param int $uid
-     * @return mixed
-     * @throws \think\Exception
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function give($uid)
-    {
-        $data = $this->request->postMore([
-            ['money_status', 0],
-            ['money', 0],
-            ['integration_status', 0],
-            ['integration', 0],
-            ['days', 0],
-            ['coupon', 0]
-        ]);
-        if (!$uid) return app('json')->fail('参数错误');
-        if (!$this->services->otherGive((int)$uid, $data)) {
-            return app('json')->fail('操作失败');
-        }
-        return app('json')->success('操作成功');
     }
 
     /**
@@ -132,93 +100,5 @@ class User extends AuthController
         if (!$uid) return app('json')->fail('参数错误');
         $data = $this->services->userInfo($uid);
         return app('json')->success(compact('data'));
-    }
-
-    /**
-     * 赠送余额
-     * @param int $uid
-     * @return mixed
-     * @throws \think\Exception
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function giveBalance($uid)
-    {
-        $data = $this->request->postMore([
-            ['money_status', 0],
-            ['money', 0],
-            ['integration_status', 0],
-            ['integration', 0],
-            ['days', 0],
-            ['coupon', 0]
-        ]);
-        if (!$uid) return app('json')->fail('参数错误');
-        if (!$this->services->otherGive((int)$uid, $data)) {
-            return app('json')->fail('操作失败');
-        }
-        return app('json')->success('操作成功');
-    }
-
-    /**
-     * 赠送积分
-     * @param int $uid
-     * @return mixed
-     * @throws \think\Exception
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function givePoint($uid)
-    {
-        $data = $this->request->postMore([
-            ['money_status', 0],
-            ['money', 0],
-            ['integration_status', 0],
-            ['integration', 0],
-            ['days', 0],
-            ['coupon', 0]
-        ]);
-        if (!$uid) return app('json')->fail('参数错误');
-        if (!$this->services->otherGive((int)$uid, $data)) {
-            return app('json')->fail('操作失败');
-        }
-        return app('json')->success('操作成功');
-    }
-
-    /**
-     * 修改余额
-     * @param $uid
-     * @return \think\Response
-     * @author wuhaotian
-     * @email 442384644@qq.com
-     * @date 2024/5/20
-     */
-    public function changeBalance($uid)
-    {
-        [$money] = $this->request->postMore([
-            ['money', 0],
-        ], true);
-        if (!$uid) return app('json')->fail('参数错误');
-        $this->services->changeUserData((int)$uid, $money, 'now_money');
-        return app('json')->success('修改成功');
-    }
-
-    /**
-     * 修改积分
-     * @param $uid
-     * @return \think\Response
-     * @author wuhaotian
-     * @email 442384644@qq.com
-     * @date 2024/5/20
-     */
-    public function changePoint($uid)
-    {
-        [$integral] = $this->request->postMore([
-            ['integral', 0],
-        ], true);
-        if (!$uid) return app('json')->fail('参数错误');
-        $this->services->changeUserData((int)$uid, $integral, 'integral');
-        return app('json')->success('修改成功');
     }
 }

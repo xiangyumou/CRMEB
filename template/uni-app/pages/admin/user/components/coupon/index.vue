@@ -42,7 +42,7 @@
 import emptyPage from '@/components/emptyPage.vue';
 import {
 	getUserCoupon,
-	postUserUpdateOther
+	postUserSetCoupon
 } from "@/api/admin";
 export default {
 	components: {
@@ -81,10 +81,7 @@ export default {
 	mounted: function() {},
 	methods:{
 		send(item){
-			postUserUpdateOther(this.num ? this.ids:this.uid,{
-				type:4,
-				coupon_id:item.id
-			}).then(res=>{
+			postUserSetCoupon(this.num ? this.ids : [this.uid], item.id).then(res=>{
 				this.$util.Tips({
 					title: res.msg
 				});

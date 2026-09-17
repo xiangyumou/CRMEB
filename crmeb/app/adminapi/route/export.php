@@ -29,7 +29,6 @@ Route::group('export', function () {
     //秒杀列表
 
     //导出会员卡
-    Route::get('member_card/:id', 'v1.export.ExportExcel/memberCardList')->option(['real_name' => '会员卡导出']);
     //分销用户推广列表
 
     //用户资金监控

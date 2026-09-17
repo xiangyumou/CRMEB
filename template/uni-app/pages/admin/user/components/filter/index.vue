@@ -26,14 +26,6 @@
 					</view>
 				</view>
 				<view class="item">
-					<view class="title">等级</view>
-					<view class="listn acea-row row-middle">
-						<view class="name acea-row row-center-wrapper" :class="{on:levelIds == item.id}" v-for="(item,levelIndex) in levelArray" :key="levelIndex" @click="selectLevel(item)">
-							<text class="line1">{{item.name}}</text>
-						</view>
-					</view>
-				</view>
-				<view class="item">
 					<view class="title">标签</view>
 					<view v-for="(item, index) in labelList" :key="index">
 						<view class="titlen" v-if="item.label && item.label.length">{{item.name}}</view>
@@ -68,10 +60,6 @@
 			    type: Array,
 			    default: [],
 			},
-			levelArray: {
-			    type: Array,
-			    default: [],
-			},
 		},
 		data: function() {
 			return {
@@ -80,8 +68,7 @@
 				// #endif
 				labelList:[],
 				labelIds:[],
-				groupIds:0,
-				levelIds:0
+				groupIds:0
 			}
 		},
 		mounted() {
@@ -90,21 +77,16 @@
 			reset(){
 				this.labelIds=[];
 				this.groupIds=0;
-				this.levelIds=0;
 			},
 			define(){
 				let data = {
 					labelIds: this.labelIds.join(','),
-					groupIds: this.groupIds,
-					levelIds: this.levelIds
+					groupIds: this.groupIds
 				};
 				this.$emit('successChange',data);
 			},
 			selectGroup(item){
 				this.groupIds = item.id;
-			},
-			selectLevel(item){
-				this.levelIds = item.id;
 			},
 			selectLabel(item){
 				if(this.labelIds.includes(item.id)){

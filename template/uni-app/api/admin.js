@@ -313,10 +313,24 @@ export function getUserList(data) {
 }
 
 /**
- * 平台-修改余额、积分
+ * 平台-设置用户分组
  */
-export function postUserUpdateOther(uid, data) {
-  return request.post(`admin/manage/user/update/${uid}`, data);
+export function postUserSetGroup(uid, groupId) {
+  return request.post(`admin/manage/user/set_group`, { uid, group_id: groupId });
+}
+
+/**
+ * 平台-设置用户标签
+ */
+export function postUserSetLabel(uid, labelId) {
+  return request.post(`admin/manage/user/set_label`, { uid, label_id: labelId });
+}
+
+/**
+ * 平台-赠送优惠券
+ */
+export function postUserSetCoupon(uid, couponId) {
+  return request.post(`admin/manage/user/set_coupon`, { uid, coupon_id: couponId });
 }
 
 /**
@@ -345,13 +359,6 @@ export function getUserCoupon(data) {
  */
 export function getUserLabel(uid) {
   return request.get(`admin/manage/user/label/${uid}`);
-}
-
-/**
- * 平台-等级列表
- */
-export function getLevelList() {
-  return request.get(`admin/manage/user/level`);
 }
 
 /**

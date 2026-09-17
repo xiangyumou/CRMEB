@@ -37,7 +37,6 @@ Route::group('v2', function () {
 
         Route::group(function () {
 
-            Route::get('diy/get_store_status', 'v2.PublicController/getStoreStatus')->option(['real_name' => '获取门店自提开启状态']);
             Route::get('diy/color_change/:name', 'v2.PublicController/colorChange')->option(['real_name' => '一键换色']);
             Route::get('diy/get_diy/[:name]', 'v2.PublicController/getDiy')->option(['real_name' => '获取DIY数据']);
             Route::get('diy/get_version/[:name]', 'v2.PublicController/getVersion')->option(['real_name' => '获取DIY版本号']);
