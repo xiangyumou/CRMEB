@@ -25,7 +25,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 cleanup
 set +e
-docker compose -f "$compose_file" up --build --pull never --abort-on-container-exit --exit-code-from regression regression
+docker compose -f "$compose_file" up --build --abort-on-container-exit --exit-code-from regression regression
 status=$?
 set -e
 
