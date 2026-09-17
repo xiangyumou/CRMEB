@@ -73,6 +73,41 @@ final class HistoricalOrderCompatTest extends RegressionTestCase
         self::assertNotEmpty($rows[0]['pink_name']);
     }
 
+    /**
+     * The admin order list eager-loads relations and rebuilds cart info. With an
+     * empty table it passes even when a relation or the cart payload is broken,
+     * so this runs against real rows.
+     */
+    public function testAdminOrderListLoadsHistoricalOrdersWithCartRows(): void
+    {
+        $fixtures = new FixtureFactory($this, $this->getName());
+        $user = $fixtures->createUser(['nickname' => '历史买家']);
+        $order = $fixtures->createOrder($user['uid'], [
+            'paid' => 1,
+            'pay_time' => time(),
+            'pay_type' => 'yue',
+            'status' => 3,
+            'refund_status' => 0,
+        ]);
+        $fixtures->createOrderCart($order['id'], $user['uid']);
+
+        $services = app()->make(StoreOrderServices::class);
+        $result = $services->getOrderList(['uid' => $user['uid'], 'is_del' => 0, 'is_system_del' => 0, 'pid' => 0], ['*'], [
+            'split' => function ($query) {
+                $query->field('id,pid');
+            }, 'pink', 'invoice',
+        ]);
+
+        $ids = array_column($result['data'], 'id');
+        self::assertContains($order['id'], $ids);
+        $row = $result['data'][array_search($order['id'], $ids, true)];
+        // The user relation must resolve; the admin list renders this nickname.
+        self::assertSame('历史买家', $row['nickname']);
+        self::assertSame('历史：余额支付', $row['pay_type_name']);
+        self::assertSame('已完成', $row['status_name']['status_name']);
+        self::assertNotEmpty($row['_info']);
+    }
+
     public function testHistoricalPayTypeLabelsAreStable(): void
     {
         self::assertSame('微信支付', CoreStore::historicalPayTypeLabel('weixin'));

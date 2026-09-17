@@ -38,8 +38,8 @@ final class StoreOrderPresentationServices
                     $cart['productInfo']['attrInfo'] = get_thumb_water($cart['productInfo']['attrInfo']);
                 }
                 $cart['productInfo'] = get_thumb_water($cart['productInfo']);
-                //一种商品买多件  计算总优惠
-                $cart['vip_sum_truePrice'] = bcmul($cart['vip_truePrice'], $cart['cart_num'] ? $cart['cart_num'] : 1, 2);
+                //一种商品买多件  计算总优惠（历史订单可能保留会员价优惠）
+                $cart['vip_sum_truePrice'] = bcmul($cart['vip_truePrice'] ?? 0, $cart['cart_num'] ? $cart['cart_num'] : 1, 2);
                 $cart['is_valid'] = 1;
                 array_push($info, $cart);
                 unset($cart);

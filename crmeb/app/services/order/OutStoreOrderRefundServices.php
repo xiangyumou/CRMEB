@@ -111,7 +111,7 @@ class OutStoreOrderRefundServices extends BaseServices
         $vipTruePrice = 0;
         foreach ($refund['cart_info'] ?? [] as $key => &$cart) {
             $cart['sum_true_price'] = sprintf("%.2f", $cart['sum_true_price'] ?? bcmul((string)$cart['truePrice'], (string)$cart['cart_num'], 2));
-            $cart['vip_sum_truePrice'] = bcmul($cart['vip_truePrice'], $cart['cart_num'] ?: 1, 2);
+            $cart['vip_sum_truePrice'] = bcmul($cart['vip_truePrice'] ?? 0, $cart['cart_num'] ?: 1, 2);
             $vipTruePrice = bcadd((string)$vipTruePrice, $cart['vip_sum_truePrice'], 2);
             $totalPrice = bcadd($totalPrice, $cart['sum_true_price'], 2);
         }

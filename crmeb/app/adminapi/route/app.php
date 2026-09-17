@@ -18,7 +18,9 @@ Route::group('app', function () {
     /** 公众号 */
     Route::group(function () {
         //菜单值
+        Route::get('wechat/menu', 'v1.application.wechat.menus/index')->option(['real_name' => '微信公众号菜单列表']);
         //保存菜单
+        Route::post('wechat/menu', 'v1.application.wechat.menus/save')->option(['real_name' => '保存微信公众号菜单']);
         //图文列表
         Route::get('wechat/news', 'v1.application.wechat.WechatNewsCategory/index')->option(['real_name' => '图文列表']);
         //详情

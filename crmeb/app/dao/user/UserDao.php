@@ -95,95 +95,6 @@ class UserDao extends BaseDao
     }
 
     /**
-     * 获取分销用户
-     * @param array $where
-     * @param string $field
-     * @param int $page
-     * @param int $limit
-     * @return array
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function getAgentUserList(array $where, string $field = '*', int $page, int $limit)
-    {
-        return $this->search($where)->field($field)->with([
-            'extract' => function ($query) {
-                $query->field('sum(extract_price) as extract_count_price,count(id) as extract_count_num,uid')->where('status', '1')->group('uid');
-            }, 'order' => function ($query) {
-                $query->field('sum(pay_price) as order_price,count(id) as order_count,uid')->where('paid', 1)->where('refund_status', 0)->whereIn('pid', [-1, 0])->group('uid');
-            }, 'bill' => function ($query) {
-                $query->field('sum(number) as brokerage_money,uid')->where('category', 'now_money')->where('type', 'brokerage')->where('status', 1)->where('pm', 1)->group('uid');
-            }, 'spreadCount' => function ($query) {
-                $query->field('count(*) as spread_count,spread_uid')->group('spread_uid');
-            }, 'spreadUser' => function ($query) {
-                $query->field('uid,phone,nickname');
-            }, 'agentLevel' => function ($query) {
-                $query->field('id,name');
-            }
-        ])->when($page && $limit, function ($query) use ($page, $limit) {
-            $query->page($page, $limit);
-        })->order('uid desc')->select()->toArray();
-    }
-
-    /**
-     * 获取推广人列表
-     * @param array $where
-     * @param string $field
-     * @param int $page
-     * @param int $limit
-     * @return array
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function getSairList(array $where, string $field = '*', int $page, int $limit)
-    {
-        return $this->search($where)->field($field)->with([
-            'order' => function ($query) {
-                $query->field('sum(pay_price) as order_price,count(id) as order_count,uid')->where('paid', 1)->where('pid', '<=', 0)->where('refund_status', 0)->group('uid');
-            }, 'spreadCount' => function ($query) {
-                $query->field('count(*) as spread_count,spread_uid')->group('spread_uid');
-            }, 'spreadUser' => function ($query) {
-                $query->field('uid,phone,nickname');
-            }
-        ])->page($page, $limit)->order('uid desc')->select()->toArray();
-    }
-
-    /**
-     * 获取推广人排行
-     * @param array $time
-     * @param string $field
-     * @param int $page
-     * @param int $limit
-     */
-    public function getAgentRankList(array $time, string $field = '*', int $page, int $limit)
-    {
-        return $this->getModel()->alias('t0')
-            ->field($field)
-            ->join('user t1', 't0.uid = t1.spread_uid', 'LEFT')
-            ->where('t1.spread_uid', '<>', 0)
-            ->order('count desc')
-            ->order('t0.uid desc')
-            ->where('t1.spread_time', 'BETWEEN', $time)
-            ->where('t0.is_del', 0)
-            ->page($page, $limit)
-            ->group('t0.uid')
-            ->select()->toArray();
-    }
-
-    /**
-     * 获取推广员ids
-     * @param array $where
-     * @return array
-     * @throws \ReflectionException
-     */
-    public function getAgentUserIds(array $where)
-    {
-        return $this->search($where)->column('uid');
-    }
-
-    /**
      * 某个条件 用户某个字段总和
      * @param array $where
      * @param string $filed
@@ -299,32 +210,5 @@ class UserDao extends BaseDao
     public function getUserInfoList(array $where, $field = "*"): array
     {
         return $this->search($where)->field($field)->select()->toArray();
-    }
-
-    /**
-     * 获取用户会员数量
-     * @param $where (time  type)
-     * @return int
-     */
-    public function getMemberCount($where, int $overdue_time = 0)
-    {
-        if (!$overdue_time) $overdue_time = time();
-        return $this->search($where)->where('is_ever_level', 1)->whereOr(function ($qeury) use ($overdue_time) {
-            $qeury->where('is_money_level', '>', 0)->where('overdue_time', '>', $overdue_time);
-        })->count();
-    }
-
-    /**
-     * 使用搜索器
-     * @param array $where
-     * @return \crmeb\basic\BaseModel
-     * @throws \ReflectionException
-     * @author wuhaotian
-     * @email 442384644@qq.com
-     * @date 2025/10/10
-     */
-    public function getSearch($where = [])
-    {
-        return $this->search($where);
     }
 }

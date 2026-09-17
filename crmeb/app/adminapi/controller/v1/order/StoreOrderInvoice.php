@@ -109,13 +109,9 @@ class StoreOrderInvoice extends AuthController
             return app('json')->fail('用户信息不存在');
         }
         $userInfo = $userInfo->hidden(['pwd', 'add_ip', 'last_ip', 'login_type']);
-        $userInfo['spread_name'] = '';
-        if ($userInfo['spread_uid'])
-            $userInfo['spread_name'] = $services->value(['uid' => $userInfo['spread_uid']], 'nickname');
         $orderInfo = $orderServices->tidyOrder($orderInfo->toArray(), true, true);
         //核算优惠金额
-        $vipTruePrice = array_column($orderInfo['cartInfo'], 'vip_sum_truePrice');
-        $vipTruePrice = array_sum($vipTruePrice);
+        $vipTruePrice = array_sum(array_column($orderInfo['cartInfo'], 'vip_sum_truePrice'));
         $orderInfo['vip_true_price'] = $vipTruePrice ?: 0;
 
         $orderInfo['add_time'] = $orderInfo['_add_time'] ?? '';

@@ -170,6 +170,12 @@ function pendingLiabilities(): array
             ->where('paid', 1)->whereIn('status', [0, 1, 4])->where('is_del', 0);
         $count = (int)$legacy->count();
         if ($count) $pending[] = "store_order: {$count} historical balance/offline order(s) still being fulfilled";
+        // Self-pickup write-off is retired with the store module, so a paid
+        // pickup order that was never collected can no longer be completed.
+        $pickup = Db::name('store_order')->where('shipping_type', 2)
+            ->where('paid', 1)->whereIn('status', [0, 1])->where('is_del', 0);
+        $count = (int)$pickup->count();
+        if ($count) $pending[] = "store_order: {$count} paid self-pickup order(s) awaiting write-off";
     }
     return $pending;
 }
@@ -178,7 +184,9 @@ function pendingLiabilities(): array
 function strandedBalances(): array
 {
     if (!tableExists('user')) return [];
-    $row = Db::name('user')->field([
+    // The query builder refuses a field-restricted find() without a where clause
+    // (think-orm BaseQuery::find), which would silently report zero balances.
+    $row = Db::name('user')->where('uid', '>', 0)->field([
         'COUNT(CASE WHEN now_money > 0 THEN 1 END) as money_users',
         'IFNULL(SUM(now_money), 0) as money_total',
         'COUNT(CASE WHEN integral > 0 THEN 1 END) as integral_users',
@@ -187,6 +195,18 @@ function strandedBalances(): array
         'IFNULL(SUM(brokerage_price), 0) as brokerage_total',
     ])->find();
     return $row ?: [];
+}
+
+/** The affected accounts, so the operator can compensate them one by one. */
+function strandedBalanceHolders(): array
+{
+    if (!tableExists('user')) return [];
+    return Db::name('user')->where('uid', '>', 0)
+        ->where(function ($query) {
+            $query->where('now_money', '>', 0)->whereOr('integral', '>', 0)->whereOr('brokerage_price', '>', 0);
+        })
+        ->field('uid,nickname,phone,now_money,integral,brokerage_price')
+        ->order('uid')->select()->toArray();
 }
 
 $mode = $argv[1] ?? 'plan';
@@ -484,10 +504,20 @@ try {
     if (array_sum(array_map('intval', $stranded)) > 0) {
         $fh = fopen($strandedCsv, 'w');
         chmod($strandedCsv, 0600);
+        fputcsv($fh, ['summary']);
         fputcsv($fh, ['metric', 'users', 'total']);
         fputcsv($fh, ['now_money', $stranded['money_users'], $stranded['money_total']]);
         fputcsv($fh, ['integral', $stranded['integral_users'], $stranded['integral_total']]);
         fputcsv($fh, ['brokerage_price', $stranded['brokerage_users'], $stranded['brokerage_total']]);
+        fputcsv($fh, []);
+        fputcsv($fh, ['affected accounts']);
+        fputcsv($fh, ['uid', 'nickname', 'phone', 'now_money', 'integral', 'brokerage_price']);
+        foreach (strandedBalanceHolders() as $holder) {
+            fputcsv($fh, [
+                $holder['uid'], $holder['nickname'], $holder['phone'],
+                $holder['now_money'], $holder['integral'], $holder['brokerage_price'],
+            ]);
+        }
         fclose($fh);
     }
     echo 'Applied: ' . count($changes) . ' row(s) removed, ' . count($renamed) . " table(s) renamed.\n";

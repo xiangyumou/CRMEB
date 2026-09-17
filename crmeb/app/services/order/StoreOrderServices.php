@@ -97,7 +97,9 @@ class StoreOrderServices extends BaseServices
             $vipTruePrice = 0;
             foreach ($item['_info'] as $items) {
                 $cart_num += $items['cart_info']['cart_num'];
-                $vipTruePrice = bcadd((string)$vipTruePrice, bcmul((string)$items['cart_info']['vip_truePrice'], (string)$items['cart_info']['cart_num'], 2), 2);
+                // Member pricing is retired, but orders placed before then keep
+                // their discount in cart_info; read it when it is there.
+                $vipTruePrice = bcadd((string)$vipTruePrice, bcmul((string)($items['cart_info']['vip_truePrice'] ?? 0), (string)$items['cart_info']['cart_num'], 2), 2);
             }
             $item['total_price'] = bcadd($item['total_price'], $vipTruePrice, 2);
             $item['is_all_refund'] = $refund_num == $cart_num;
@@ -1480,7 +1482,7 @@ class StoreOrderServices extends BaseServices
                 'num' => $item['cart_num'],
                 'sum_price' => bcmul((string)$item['sum_price'], (string)$item['cart_num'], 2)
             ];
-            $data['vip_price'] = bcadd((string)$data['vip_price'], $item['vip_sum_truePrice'], 2);
+            $data['vip_price'] = bcadd((string)$data['vip_price'], $item['vip_sum_truePrice'] ?? 0, 2);
         }
         return $data;
     }

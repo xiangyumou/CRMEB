@@ -97,6 +97,19 @@ class StoreOrder extends BaseModel
     }
 
     /**
+     * 一对一关联用户表
+     * @return \think\model\relation\HasOne
+     */
+    public function user()
+    {
+        return $this->hasOne(User::class, 'uid', 'uid')->field(['uid', 'nickname', 'phone', 'avatar'])->bind([
+            'nickname' => 'nickname',
+            'phone' => 'phone',
+            'avatar' => 'avatar',
+        ]);
+    }
+
+    /**
      * 一对一拼团获取状态
      * @return \think\model\relation\HasOne
      */

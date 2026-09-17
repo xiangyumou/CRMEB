@@ -100,6 +100,40 @@ final class FixtureFactory
         return array_merge($data, ['id' => $id]);
     }
 
+    /**
+     * Write the cart row an order needs to be listed and refunded. The embedded
+     * cart_info must carry the same id as the cart_id column, the way
+     * StoreOrderCartInfoServices::setCartInfo writes it.
+     */
+    public function createOrderCart(int $orderId, int $uid, array $overrides = []): array
+    {
+        $cartId = $overrides['cart_id'] ?? random_int(100000, 999999);
+        $cartInfo = array_merge([
+            'id' => $cartId,
+            'product_id' => 1,
+            'cart_num' => 1,
+            'productInfo' => ['id' => 1, 'store_name' => $this->unique('cart'), 'price' => '10.00', 'image' => ''],
+        ], $overrides['cart_info'] ?? []);
+        $data = array_merge([
+            'oid' => $orderId,
+            'uid' => $uid,
+            'cart_id' => $cartId,
+            'product_id' => 1,
+            'old_cart_id' => 0,
+            'cart_num' => 1,
+            'refund_num' => 0,
+            'surplus_num' => 1,
+            'split_status' => 0,
+            'unique' => md5($cartId . '_' . $orderId),
+            'cart_info' => json_encode($cartInfo),
+        ], array_diff_key($overrides, ['cart_info' => null]));
+        $id = (int)Db::name('store_order_cart_info')->insertGetId($data);
+        $this->test->registerCleanup(static function () use ($id): void {
+            Db::name('store_order_cart_info')->where('id', $id)->delete();
+        });
+        return array_merge($data, ['id' => $id]);
+    }
+
     public function createRefundOrder(int $uid, int $storeOrderId, array $overrides = []): array
     {
         $data = array_merge([

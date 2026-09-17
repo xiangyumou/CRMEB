@@ -88,7 +88,7 @@ class StoreOrder extends AuthController
         if ($where['status'] == 1) $where = $where + ['shipping_type' => 1];
         return app('json')->success($this->services->getOrderList($where, ['*'], ['split' => function ($query) {
             $query->field('id,pid');
-        }, 'pink', 'invoice', 'division']));
+        }, 'pink', 'invoice']));
     }
 
     /**
@@ -523,9 +523,10 @@ class StoreOrder extends AuthController
         //核算优惠金额
         $vipTruePrice = $levelPrice = $memberPrice = 0;
         foreach ($orderInfo['cartInfo'] as $cart) {
-            $vipTruePrice = bcadd((string)$vipTruePrice, (string)$cart['vip_sum_truePrice'], 2);
-            if ($cart['price_type'] == 'member') $memberPrice = bcadd((string)$memberPrice, (string)$cart['vip_sum_truePrice'], 2);
-            if ($cart['price_type'] == 'level') $levelPrice = bcadd((string)$levelPrice, (string)$cart['vip_sum_truePrice'], 2);
+            $memberDiscount = $cart['vip_sum_truePrice'] ?? 0;
+            $vipTruePrice = bcadd((string)$vipTruePrice, (string)$memberDiscount, 2);
+            if (($cart['price_type'] ?? '') == 'member') $memberPrice = bcadd((string)$memberPrice, (string)$memberDiscount, 2);
+            if (($cart['price_type'] ?? '') == 'level') $levelPrice = bcadd((string)$levelPrice, (string)$memberDiscount, 2);
         }
         $orderInfo['vip_true_price'] = $vipTruePrice;
         $orderInfo['levelPrice'] = $levelPrice;

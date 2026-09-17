@@ -894,8 +894,8 @@ class StoreOrderRefundServices extends BaseServices
             if (isset($cart['cart_info'])) $cart = $cart['cart_info'];
             if ($is_unit) {
                 if ($key == 'level' || $key == 'member') {
-                    if ($cart['price_type'] == $key) {
-                        $SumPrice = bcadd($SumPrice, bcmul($cart['cart_num'] ?? 1, $cart['vip_truePrice'], 2), 2);
+                    if (($cart['price_type'] ?? '') == $key) {
+                        $SumPrice = bcadd($SumPrice, bcmul($cart['cart_num'] ?? 1, $cart['vip_truePrice'] ?? 0, 2), 2);
                     }
                 } else {
                     $SumPrice = bcadd($SumPrice, bcmul($cart['cart_num'] ?? 1, $cart[$key] ?? 0, 2), 2);
@@ -985,12 +985,13 @@ class StoreOrderRefundServices extends BaseServices
     /**
      * Refunds only replay the original channel. Historical orders paid with
      * retired methods have no channel to replay, so refuse instead of guessing.
-     * @param array $order
+     * @param array|\think\Model $order
      * @return void
      */
-    protected function assertWechatRefundable(array $order): void
+    protected function assertWechatRefundable($order): void
     {
-        if (($order['pay_type'] ?? '') !== PayServices::WEIXIN_PAY) {
+        $payType = is_object($order) ? $order->getAttr('pay_type') : ($order['pay_type'] ?? '');
+        if ((string)$payType !== PayServices::WEIXIN_PAY) {
             throw new AdminException('该订单为历史支付方式，无法原路退款，请线下处理后标记已退款');
         }
     }
@@ -1024,7 +1025,7 @@ class StoreOrderRefundServices extends BaseServices
         $pay_postage = '0';
         foreach ($orderData['cartInfo'] ?? [] as $key => &$cart) {
             if (!isset($cart['sum_true_price'])) $cart['sum_true_price'] = bcmul((string)$cart['truePrice'], (string)$cart['cart_num'], 2);
-            $cart['vip_sum_truePrice'] = bcmul($cart['vip_truePrice'], $cart['cart_num'] ? $cart['cart_num'] : 1, 2);
+            $cart['vip_sum_truePrice'] = bcmul($cart['vip_truePrice'] ?? 0, $cart['cart_num'] ? $cart['cart_num'] : 1, 2);
             $vipTruePrice = bcadd((string)$vipTruePrice, (string)$cart['vip_sum_truePrice'], 2);
             if (isset($order['split']) && $order['split']) {
                 $orderData['cartInfo'][$key]['cart_num'] = $cart['surplus_num'];

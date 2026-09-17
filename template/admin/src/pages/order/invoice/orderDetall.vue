@@ -41,7 +41,6 @@
         </div>
         <div class="msg-item">
           <div class="item"><span>支付方式：</span>{{ orderDetail.orderInfo._status._payType }}</div>
-          <div class="item"><span>推广人：</span>{{ orderDetail.userInfo.spread_name }}</div>
         </div>
         <div class="msg-item">
           <div class="item"><span>商家备注：</span>{{ orderDetail.orderInfo.mark }}</div>

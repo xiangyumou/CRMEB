@@ -24,6 +24,16 @@ final class CoreStoreMigrationTest extends RegressionTestCase
         return [$status, implode("\n", $output)];
     }
 
+    /** Plan prints its JSON among advisory notes; take the object itself. */
+    private function parseReport(string $output): ?array
+    {
+        $start = strpos($output, '{');
+        $end = strrpos($output, '}');
+        if ($start === false || $end === false || $end < $start) return null;
+        $report = json_decode(substr($output, $start, $end - $start + 1), true);
+        return is_array($report) ? $report : null;
+    }
+
     /** Seed the data the migration is expected to remove: a retired table and settings. */
     private function seedRetiredData(): void
     {
@@ -60,7 +70,7 @@ final class CoreStoreMigrationTest extends RegressionTestCase
 
         [$status, $output] = $this->runScript('plan');
         self::assertSame(0, $status, $output);
-        $report = json_decode($output, true);
+        $report = $this->parseReport($output);
         self::assertIsArray($report, $output);
         self::assertSame(1, $report['retired_tables_present']);
         self::assertArrayHasKey('user_extract', $report['retired_tables']);
@@ -113,12 +123,76 @@ final class CoreStoreMigrationTest extends RegressionTestCase
         self::assertSame([], Db::query("SHOW TABLES LIKE 'eb_user_extract'"));
     }
 
+    /**
+     * Build a full order row from the live schema so the insert only has to
+     * supply the columns the case cares about. The suite's database carries no
+     * orders to copy from.
+     */
+    private function orderRow(array $overrides): array
+    {
+        $row = [];
+        foreach (Db::query('SHOW FULL COLUMNS FROM eb_store_order') as $column) {
+            $name = $column['Field'];
+            if ($column['Key'] === 'PRI') continue;
+            $type = strtolower($column['Type']);
+            $numeric = strpos($type, 'int') !== false || strpos($type, 'decimal') !== false
+                || strpos($type, 'float') !== false || strpos($type, 'double') !== false;
+            $row[$name] = $numeric ? 0 : '';
+            if ($column['Null'] === 'YES') $row[$name] = null;
+            if ($column['Default'] !== null) $row[$name] = $column['Default'];
+        }
+        return array_merge($row, $overrides);
+    }
+
+    public function testPlanReportsUnreachableBalances(): void
+    {
+        $this->seedRetiredData();
+        $uid = (int)Db::name('user')->order('uid')->value('uid');
+        $before = Db::name('user')->where('uid', $uid)->find();
+        $this->registerCleanup(function () use ($uid, $before) {
+            Db::name('user')->where('uid', $uid)->update([
+                'now_money' => $before['now_money'],
+                'integral' => $before['integral'],
+                'brokerage_price' => $before['brokerage_price'],
+            ]);
+        });
+        Db::name('user')->where('uid', $uid)->update(['now_money' => 42.5, 'integral' => 7, 'brokerage_price' => 3.25]);
+
+        [$status, $output] = $this->runScript('plan');
+        self::assertSame(0, $status, $output);
+        $report = $this->parseReport($output);
+        self::assertIsArray($report, $output);
+        // A field-restricted find() without a where clause returns empty in
+        // think-orm, which used to report zero balances for a funded database.
+        self::assertGreaterThanOrEqual(1, $report['unreachable_balances']['money_users']);
+        self::assertGreaterThanOrEqual(42.5, (float)$report['unreachable_balances']['money_total']);
+        self::assertGreaterThanOrEqual(7, (int)$report['unreachable_balances']['integral_total']);
+    }
+
+    public function testPaidSelfPickupOrderBlocksApply(): void
+    {
+        $this->seedRetiredData();
+        $uid = (int)Db::name('user')->order('uid')->value('uid');
+        $this->registerCleanup(function () use ($uid) {
+            Db::name('store_order')->where('uid', $uid)->where('unique', 'pickup-liability')->delete();
+        });
+        Db::name('store_order')->insert($this->orderRow([
+            'order_id' => 'SO-PICKUP-CASE', 'unique' => 'pickup-liability', 'uid' => $uid,
+            'shipping_type' => 2, 'paid' => 1, 'status' => 0, 'is_del' => 0, 'refund_status' => 0,
+            'store_id' => 1, 'verify_code' => '000111', 'add_time' => time(),
+        ]));
+
+        [$status, $output] = $this->runScript('plan');
+        self::assertSame(2, $status, $output);
+        self::assertStringContainsString('self-pickup', $output);
+    }
+
     public function testApplyRefusesWhileSettlementIsPending(): void
     {
         $this->seedRetiredData();
         Db::name('user_extract')->where('uid', 1)->update(['status' => 0]);
 
-        [$status, $output] = $this->runScript('plan 2>/dev/null');
+        [$status, $output] = $this->runScript('plan');
         self::assertSame(2, $status, $output);
         self::assertStringContainsString('withdrawal', $output);
 

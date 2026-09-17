@@ -251,7 +251,7 @@ class StoreOrderDao extends BaseDao
      */
     public function getOrderList(array $where, array $field, int $page = 0, int $limit = 0, array $with = [], $order = 'add_time DESC,id DESC')
     {
-        return $this->search($where)->field($field)->with(array_merge(['user', 'spread', 'refund'], $with))->when($page && $limit, function ($query) use ($page, $limit) {
+        return $this->search($where)->field($field)->with(array_merge(['user', 'refund'], $with))->when($page && $limit, function ($query) use ($page, $limit) {
             $query->page($page, $limit);
         })->order($order)->select()->toArray();
     }
@@ -859,7 +859,7 @@ class StoreOrderDao extends BaseDao
             ->when(is_array($where['refund_reason_time']), function ($query) use ($where) {
                 $query->whereBetween('refund_reason_time', [strtotime($where['refund_reason_time'][0]), strtotime($where['refund_reason_time'][1]) + 86400]);
             })
-            ->with(array_merge(['user', 'spread']));
+            ->with(['user']);
         $count = $model->count();
         $list = $model->when($page != 0 && $limit != 0, function ($query) use ($page, $limit) {
             $query->page($page, $limit);
