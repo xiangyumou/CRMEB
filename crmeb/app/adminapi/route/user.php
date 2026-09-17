@@ -38,6 +38,8 @@ Route::group('user', function () {
         //修改用户状态
         //获取指定用户的信息
         Route::get('one_info/:id', 'v1.user.User/oneUserInfo')->option(['real_name' => '获取指定用户的信息']);
+        //修改用户状态
+        Route::put('set_status/:status/:id', 'v1.user.User/set_status')->option(['real_name' => '修改用户状态']);
         //设置会员分组
         Route::post('set_group', 'v1.user.User/set_group')->option(['real_name' => '用户分组表单']);
         //执行设置会员分组

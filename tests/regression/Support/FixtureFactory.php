@@ -36,8 +36,8 @@ final class FixtureFactory
         ], $overrides);
         $id = (int)Db::name('user')->insertGetId($data);
         $this->test->registerCleanup(static function () use ($id): void {
+            // The ledger tables were dropped with the retired features; user_bill remains.
             Db::name('user_bill')->where('uid', $id)->delete();
-            Db::name('user_money')->where('uid', $id)->delete();
             Db::name('user')->where('uid', $id)->delete();
         });
         return array_merge($data, ['uid' => $id]);

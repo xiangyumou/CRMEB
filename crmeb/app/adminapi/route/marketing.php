@@ -42,6 +42,20 @@ Route::group('marketing', function () {
     })->option(['parent' => 'marketing', 'cate_name' => '优惠券']);
 
 
+    /** 预售活动 */
+    Route::group(function () {
+        //预售商品列表
+        Route::get('advance/index', 'v1.marketing.StoreAdvance/index')->option(['real_name' => '预售商品列表']);
+        //预售商品详情
+        Route::get('advance/info/:id', 'v1.marketing.StoreAdvance/info')->option(['real_name' => '预售商品详情']);
+        //保存新增或编辑预售
+        Route::post('advance/save/:id', 'v1.marketing.StoreAdvance/save')->option(['real_name' => '保存新增或编辑预售']);
+        //删除预售
+        Route::delete('advance/:id', 'v1.marketing.StoreAdvance/del')->option(['real_name' => '删除预售']);
+        //修改预售状态
+        Route::put('advance/set_status/:id/:status', 'v1.marketing.StoreAdvance/setStatus')->option(['real_name' => '修改预售状态']);
+    })->option(['parent' => 'marketing', 'cate_name' => '预售活动']);
+
     /** 拼团活动 */
     Route::group(function () {
         //拼团商品列表

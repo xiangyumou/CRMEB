@@ -1,71 +1,6 @@
---
--- 表的结构 `eb_agent_level`
---
-
-CREATE TABLE IF NOT EXISTS `eb_agent_level` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `name` varchar(50) NOT NULL DEFAULT '' COMMENT '等级名称',
-  `image` varchar(255) NOT NULL DEFAULT '' COMMENT '背景图',
-  `one_brokerage` smallint(5) NOT NULL DEFAULT '0' COMMENT '一级分拥上浮比例',
-  `one_brokerage_percent` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '一级分佣比例',
-  `two_brokerage` smallint(5) NOT NULL DEFAULT '0' COMMENT '二级分拥上浮比例',
-  `two_brokerage_percent` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '二级分佣比例',
-  `grade` smallint(5) NOT NULL DEFAULT '0' COMMENT '等级',
-  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '状态',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `task_total_num` int(11) NOT NULL DEFAULT '0' COMMENT '总任务数量',
-  `task_num` int(11) NOT NULL DEFAULT '0' COMMENT '完成任务数量',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COMMENT='分销员等级表';
-
---
--- 转存表中的数据 `eb_agent_level`
---
-
-INSERT INTO `eb_agent_level` (`id`, `name`, `image`, `one_brokerage`, `one_brokerage_percent`, `two_brokerage`, `two_brokerage_percent`, `grade`, `status`, `is_del`, `add_time`) VALUES
-(1, '一级分销', '/statics/system_images/spread_level_1.png', 1, '11.00', 1, '6.00', 1, 0, 0, 1630310923),
-(2, '二级分销', '/statics/system_images/spread_level_2.png', 2, '12.00', 1, '7.00', 2, 0, 0, 1630311000),
-(3, '三级分销', '/statics/system_images/spread_level_3.png', 3, '13.00', 1, '8.00', 3, 0, 0, 1630311024),
-(4, '四级分销', '/statics/system_images/spread_level_4.png', 4, '14.00', 1, '9.00', 4, 0, 0, 1630311052),
-(5, '五级分销', '/statics/system_images/spread_level_5.png', 5, '15.00', 1, '10.00', 5, 0, 0, 1630311069);
-
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_agent_level_task`
---
-
-CREATE TABLE IF NOT EXISTS `eb_agent_level_task` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `level_id` int(10) NOT NULL DEFAULT '0' COMMENT '分销等级id',
-  `name` varchar(50) NOT NULL DEFAULT '' COMMENT '任务名称',
-  `type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '任务类型',
-  `number` int(10) NOT NULL DEFAULT '0' COMMENT '任务限定数',
-  `desc` varchar(255) NOT NULL DEFAULT '' COMMENT '任务描述',
-  `is_must` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否必须达成0:其一1:所有',
-  `sort` smallint(5) NOT NULL DEFAULT '0' COMMENT '排序',
-  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '状态',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='分销员等级任务表';
-
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_agent_level_task_record`
---
-
-CREATE TABLE IF NOT EXISTS `eb_agent_level_task_record` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `uid` int(10) NOT NULL DEFAULT '0' COMMENT '用户uid',
-  `level_id` int(10) NOT NULL DEFAULT '0' COMMENT '等级id',
-  `task_id` int(10) NOT NULL DEFAULT '0' COMMENT '任务id',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '状态',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='分销员完成等级任务表记录表';
 
 -- --------------------------------------------------------
 
@@ -99,23 +34,6 @@ INSERT INTO `eb_agreement` (`id`, `type`, `title`, `content`, `sort`, `status`, 
 (7, 7, '关于我们', '<h1><b>关于我们</b><b></b></h1><h1><p>欢迎来到我们的商城平台！作为一个专注于提供优质商品和优质服务的在线购物平台，我们致力于为用户提供便捷、安全、愉悦的购物体验。<br/>我们的特点：<br/>1丰富的商品种类：我们汇集了来自全球各地的优质商品，涵盖服装、电子产品、家居用品、美妆护肤、食品饮料等多个品类，满足不同用户的各种需求。<br/>2优质的服务保障：我们以用户体验为核心，提供24小时在线客服支持，及时解决用户的问题和疑虑。我们还提供便捷的退换货政策和售后服务，保障用户的权益。<br/>3安全的交易环境：我们采用先进的加密技术和支付安全机制，保障用户的交易信息和资金安全。用户可以放心购物，享受安全的支付体验。<br/>4个性化的推荐服务：我们通过智能算法分析用户的购物偏好和行为，为用户提供个性化的商品推荐和优惠活动，帮助用户更轻松地发现心仪的商品。<br/>5快速的配送服务：我们与多家物流合作伙伴合作，实现快速、准时的配送服务。用户可以选择适合自己的配送方式，享受快捷的送货体验。<br/>我们的承诺：<br/>1诚信经营：我们秉承诚信为本的原则，保证所有商品信息的真实性和准确性，为用户提供诚信、透明的交易环境。<br/>2用户至上：用户的满意是我们最大的追求。我们将不断优化产品和服务，提升用户体验，为用户创造更多的价值和便利。<br/>3共同成长：我们愿与用户、合作伙伴共同成长，建立长期稳定的合作关系，实现互利共赢的目标。<br/>加入我们，尽享购物乐趣！<br/>无论您是时尚达人、科技爱好者，还是居家生活家，我们都能满足您的需求，为您提供全方位的购物体验。快来加入我们，尽享购物乐趣吧！</p></h1>', 0, 1, 1719627221),
 (8, 8, '分销说明', '<h1><b>分销说明</b><b></b></h1><h1><p>分销说明</p></h1>', 0, 1, 1719627221);
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_app_version`
---
-
-CREATE TABLE IF NOT EXISTS `eb_app_version` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `version` varchar(20) CHARACTER SET utf8mb4 NOT NULL DEFAULT '' COMMENT '版本号',
-  `platform` tinyint(1) NOT NULL DEFAULT '0' COMMENT '平台类型:1.安卓 2.IOS',
-  `info` text COMMENT '升级信息',
-  `url` varchar(1000) CHARACTER SET utf8mb4 NOT NULL DEFAULT '' COMMENT '下载链接',
-  `is_force` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否强制升级',
-  `is_new` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否最新',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='APP版本表';
 
 -- --------------------------------------------------------
 
@@ -272,42 +190,7 @@ INSERT INTO `eb_category` (`id`, `pid`, `owner_id`, `name`, `sort`, `type`, `oth
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_delivery_service`
---
-
-CREATE TABLE IF NOT EXISTS `eb_delivery_service` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'id',
-  `uid` int(11) NOT NULL DEFAULT '0' COMMENT '配送员uid',
-  `avatar` varchar(250) NOT NULL DEFAULT '' COMMENT '配送员头像',
-  `nickname` varchar(50) NOT NULL DEFAULT '' COMMENT '配送员名称',
-  `phone` varchar(20) NOT NULL DEFAULT '' COMMENT '手机号码',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '0隐藏1显示',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='配送员表' ROW_FORMAT=DYNAMIC;
-
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_division_agent_apply`
---
-
-CREATE TABLE IF NOT EXISTS `eb_division_agent_apply` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增id',
-  `uid` int(11) NOT NULL DEFAULT '0' COMMENT '用户uid',
-  `agent_name` varchar(255) NOT NULL DEFAULT '' COMMENT '代理商名称',
-  `name` varchar(255) NOT NULL DEFAULT '' COMMENT '用户名称',
-  `phone` varchar(32) NOT NULL DEFAULT '0' COMMENT '代理商电话',
-  `division_id` int(11) NOT NULL DEFAULT '0' COMMENT '事业部id',
-  `division_invite` int(11) NOT NULL DEFAULT '0' COMMENT '邀请码',
-  `images` varchar(2000) NOT NULL DEFAULT '' COMMENT '申请图片',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '申请时间',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '申请状态0申请，1同意，2拒绝',
-  `refusal_reason` varchar(1000) NOT NULL DEFAULT '' COMMENT '拒绝理由',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代理商申请表';
 
 -- --------------------------------------------------------
 
@@ -27157,327 +27040,25 @@ INSERT INTO `eb_lang_type` (`id`, `language_name`, `file_name`, `status`, `is_de
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_live_anchor`
---
-
-CREATE TABLE IF NOT EXISTS `eb_live_anchor` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `name` varchar(50) NOT NULL DEFAULT '' COMMENT '主播名称',
-  `cover_img` varchar(255) NOT NULL DEFAULT '' COMMENT '主播图像',
-  `wechat` varchar(50) NOT NULL DEFAULT '' COMMENT '主播微信号',
-  `phone` varchar(32) NOT NULL DEFAULT '' COMMENT '手机号',
-  `is_show` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否显示',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='直播主播表';
+-- --------------------------------------------------------
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_live_goods`
---
-
-CREATE TABLE IF NOT EXISTS `eb_live_goods` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `goods_id` int(10) NOT NULL DEFAULT '0' COMMENT '微信商品ID',
-  `audit_id` int(10) NOT NULL DEFAULT '0' COMMENT '审核ID',
-  `product_id` int(10) NOT NULL DEFAULT '0' COMMENT '商品id',
-  `name` varchar(30) NOT NULL DEFAULT '' COMMENT '商品名称',
-  `cover_img` varchar(255) NOT NULL DEFAULT '' COMMENT '商品图片链接',
-  `url` varchar(255) NOT NULL DEFAULT '' COMMENT '商品小程序链接',
-  `price_type` tinyint(1) NOT NULL DEFAULT '1' COMMENT '价格类型（1:一口价，此时读price字段; 2:价格区间，此时price字段为左边界，price2字段为右边界; 3:折扣价，此时price字段为原价，price2字段为现价；）',
-  `cost_price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '成本价',
-  `price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '一口价/最低价',
-  `price2` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '最高价',
-  `audit_status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '审核状态（0：未审核，1：审核中，2:审核通过，3审核失败）',
-  `third_part_tag` tinyint(1) NOT NULL DEFAULT '1' COMMENT '1、2：表示是为 API 添加商品，否则是直播控制台添加的商品',
-  `sort` smallint(5) NOT NULL DEFAULT '0' COMMENT '排序',
-  `is_show` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否显示',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='直播商品表';
+-- --------------------------------------------------------
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_live_room`
---
-
-CREATE TABLE IF NOT EXISTS `eb_live_room` (
-  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `room_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '直播间 id',
-  `name` varchar(32) NOT NULL DEFAULT '' COMMENT '直播间名字',
-  `cover_img` varchar(255) NOT NULL DEFAULT '' COMMENT '背景图',
-  `share_img` varchar(255) NOT NULL DEFAULT '' COMMENT '分享图',
-  `start_time` int(10) NOT NULL DEFAULT '0' COMMENT '直播计划开始时间',
-  `end_time` int(10) NOT NULL DEFAULT '0' COMMENT '直播计划结束时间',
-  `anchor_name` varchar(50) NOT NULL DEFAULT '' COMMENT '主播昵称',
-  `anchor_wechat` varchar(50) NOT NULL DEFAULT '' COMMENT '主播微信号',
-  `phone` varchar(32) NOT NULL DEFAULT '' COMMENT '主播手机号',
-  `type` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '直播间类型 【1: 推流，0：手机直播】',
-  `screen_type` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '横屏、竖屏 【1：横屏，0：竖屏】',
-  `close_like` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否关闭点赞',
-  `close_goods` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否关闭货架',
-  `close_comment` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否关闭评论',
-  `error_msg` varchar(255) NOT NULL DEFAULT '' COMMENT '未通过原因',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '审核状态0=未审核1=微信审核2=审核通过-1=审核未通过',
-  `live_status` smallint(5) UNSIGNED NOT NULL DEFAULT '102' COMMENT '直播状态101：直播中，102：未开始，103已结束，104禁播，105：暂停，106：异常，107：已过期',
-  `mark` varchar(512) NOT NULL DEFAULT '' COMMENT '备注',
-  `replay_status` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '回放状态',
-  `sort` smallint(5) NOT NULL DEFAULT '0' COMMENT '排序',
-  `is_show` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '是否显示',
-  `is_del` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否删除',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`,`phone`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='直播间表' ROW_FORMAT=DYNAMIC;
+-- --------------------------------------------------------
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_live_room_goods`
---
-
-CREATE TABLE IF NOT EXISTS `eb_live_room_goods` (
-  `live_room_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '直播间id',
-  `live_goods_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '商品id',
-  KEY `broadcast_room_id` (`live_room_id`,`live_goods_id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='直播间导入商品表' ROW_FORMAT=DYNAMIC;
+-- --------------------------------------------------------
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_luck_lottery`
---
-
-CREATE TABLE IF NOT EXISTS `eb_luck_lottery` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `type` tinyint(1) NOT NULL DEFAULT '1' COMMENT '抽奖类型1:九宫格2：大转盘3：九宫格升级版 4：幸运翻牌',
-  `name` varchar(255) NOT NULL DEFAULT '' COMMENT '抽奖活动名称',
-  `desc` varchar(255) NOT NULL DEFAULT '' COMMENT '活动描述',
-  `image` varchar(255) NOT NULL DEFAULT '' COMMENT '活动背景图',
-  `factor` tinyint(1) NOT NULL DEFAULT '1' COMMENT '抽奖消耗：1:积分2：余额3：下单支付成功4：关注5：订单评价',
-  `factor_num` smallint(5) NOT NULL DEFAULT '10' COMMENT '获取一次抽奖的条件数量',
-  `attends_user` tinyint(1) NOT NULL DEFAULT '1' COMMENT '参与用户1：所有2：部分',
-  `user_level` text COMMENT '参与用户等级',
-  `user_label` text COMMENT '参与用户标签',
-  `is_svip` tinyint(1) NOT NULL DEFAULT '1' COMMENT '参与用户是否付费会员',
-  `prize_num` smallint(5) NOT NULL DEFAULT '0' COMMENT '奖品数量',
-  `start_time` int(11) NOT NULL DEFAULT '0' COMMENT '开始时间',
-  `end_time` int(11) NOT NULL DEFAULT '0' COMMENT '结束时间',
-  `lottery_num_term` tinyint(1) NOT NULL DEFAULT '1' COMMENT '抽奖次数限制：1：每天2：每人',
-  `lottery_num` smallint(5) NOT NULL DEFAULT '1' COMMENT '抽奖次数',
-  `spread_num` smallint(5) NOT NULL DEFAULT '1' COMMENT '关注推广获取抽奖次数',
-  `is_all_record` tinyint(1) NOT NULL DEFAULT '1' COMMENT '中奖纪录展示',
-  `is_personal_record` tinyint(1) NOT NULL DEFAULT '1' COMMENT '个人中奖纪录展示',
-  `is_content` tinyint(1) NOT NULL DEFAULT '1' COMMENT '活动规格是否展示',
-  `content` longtext COMMENT '活动文案抽奖协议之类',
-  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '状态',
-  `is_use` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否使用',
-  `sort` smallint(5) NOT NULL DEFAULT '0' COMMENT '排序',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COMMENT='抽奖列表';
-
---
--- 转存表中的数据 `eb_luck_lottery`
---
-
-INSERT INTO `eb_luck_lottery` (`id`, `type`, `name`, `desc`, `image`, `factor`, `factor_num`, `attends_user`, `user_level`, `user_label`, `is_svip`, `prize_num`, `start_time`, `end_time`, `lottery_num_term`, `lottery_num`, `spread_num`, `is_all_record`, `is_personal_record`, `is_content`, `content`, `status`, `sort`, `is_del`, `add_time`) VALUES
-(1, 1, '幸运大转盘', '', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/3c49ade797d647b41412e06805a33fb6.jpeg', 1, 1, 1, '', '', -1, 0, 1675180800, 1706716800, 1, 1, 1, 1, 1, 1, '<p>活动规则</p>', 1, 0, 0, 1676427203),
-(2, 2, '幸运大转盘', '', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/3c49ade797d647b41412e06805a33fb6.jpeg', 1, 1, 1, '', '', -1, 0, 1675180800, 1706716800, 1, 1, 1, 1, 1, 1, '<p>活动规则</p>', 2, 0, 0, 1676427209);
-
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_luck_lottery_record`
---
-
-CREATE TABLE IF NOT EXISTS `eb_luck_lottery_record` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `wechat_order_id` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '订单id',
-  `uid` int(10) NOT NULL DEFAULT '0' COMMENT '用户uid',
-  `lottery_id` int(10) NOT NULL DEFAULT '0' COMMENT '活动id',
-  `prize_id` int(10) NOT NULL DEFAULT '0' COMMENT '奖品id',
-  `type` tinyint(1) NOT NULL DEFAULT '1' COMMENT '奖品类型1：未中奖2：积分3:余额4：红包5:优惠券6：站内商品7：等级经验8：用户等级 9：svip天数',
-  `num` DECIMAL(10,2) NOT NULL DEFAULT '0.00' COMMENT '积分、余额、svip天数、红包',
-  `is_receive` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否领取',
-  `receive_time` int(11) NOT NULL DEFAULT '0' COMMENT '领取时间',
-  `receive_info` text COMMENT '收获地址、备注等',
-  `is_deliver` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否发货',
-  `deliver_time` int(11) NOT NULL DEFAULT '0' COMMENT '发货处理时间',
-  `deliver_info` text COMMENT '发货单号、备注等',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `channel_type` VARCHAR(32) NOT NULL DEFAULT '' COMMENT '抽奖来源',
-  `out_bill_no` varchar(255) NOT NULL DEFAULT '' COMMENT '商户单号',
-  `transfer_bill_no` varchar(255) NOT NULL DEFAULT '' COMMENT '微信转账单号',
-  `state` varchar(32) NOT NULL DEFAULT '' COMMENT '单据状态',
-  `package_info` varchar(2000) NOT NULL DEFAULT '' COMMENT '跳转领取页面的package信息',
-  `fail_reason` varchar(255) NOT NULL DEFAULT '' COMMENT '失败原因',
-  PRIMARY KEY (`id`),
-  KEY `uid` (`uid`),
-  KEY `prize_id` (`prize_id`),
-  KEY `lottery_id` (`lottery_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='抽奖记录表';
-
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_luck_prize`
---
-
-CREATE TABLE IF NOT EXISTS `eb_luck_prize` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '奖品主键id',
-  `type` tinyint(1) NOT NULL DEFAULT '1' COMMENT '奖品类型1：未中奖2：积分3:余额4：红包5:优惠券6：站内商品7：等级经验8：用户等级 9：svip天数',
-  `lottery_id` int(10) NOT NULL DEFAULT '0' COMMENT '抽奖活动id',
-  `name` varchar(255) NOT NULL DEFAULT '' COMMENT '奖品名称',
-  `prompt` varchar(255) NOT NULL DEFAULT '' COMMENT '中奖提示语',
-  `image` varchar(255) NOT NULL DEFAULT '' COMMENT '奖品图片',
-  `chance` smallint(5) NOT NULL DEFAULT '10' COMMENT '中奖基数',
-  `percent` DECIMAL(10,2) NOT NULL DEFAULT '0.00' COMMENT '中奖概率',
-  `total` smallint(5) NOT NULL DEFAULT '1' COMMENT '奖品数量',
-  `coupon_id` int(10) NOT NULL DEFAULT '0' COMMENT '关联优惠券id',
-  `product_id` int(10) NOT NULL DEFAULT '0' COMMENT '关联商品id',
-  `unique` varchar(20) NOT NULL DEFAULT '' COMMENT '关联商品规格唯一值',
-  `num` DECIMAL(10,2) NOT NULL DEFAULT '0' COMMENT '积分 经验 会员天数',
-  `sort` smallint(5) NOT NULL DEFAULT '0' COMMENT '排序',
-  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '状态',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`),
-  KEY `lottery_id` (`lottery_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COMMENT='抽奖商品列表';
-
---
--- 转存表中的数据 `eb_luck_prize`
---
-
-INSERT INTO `eb_luck_prize` (`id`, `type`, `lottery_id`, `name`, `prompt`, `image`, `chance`, `total`, `coupon_id`, `product_id`, `unique`, `num`, `sort`, `status`, `is_del`, `add_time`) VALUES
-(1, 1, 1, '奖励一', '奖励一中奖啦', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/5ae4f6a3f8bf153beb849e02e14b5c40.png', 10, 10, 0, 0, '', 10, 1, 1, 0, 1676427203),
-(2, 1, 1, '奖励二', '奖励二中奖啦', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/a7cfed80049c0d051988da434d5553b6.jpg', 20, 10, 0, 0, '', 0, 2, 1, 0, 1676427203),
-(3, 1, 1, '奖励三', '奖励三', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/cf5414089d598d064b0a4d7154a4f491.png', 30, 30, 0, 0, '', 0, 3, 1, 0, 1676427203),
-(4, 1, 1, '奖励四', '奖励四', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/e1b434ef85145430b8bd1a93528c1e26.jpg', 40, 40, 0, 0, '', 0, 4, 1, 0, 1676427203),
-(5, 1, 1, '奖励五', '奖励五', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/5aea4687e62d39793ba63161eacf6661.jpg', 50, 50, 0, 0, '', 0, 5, 1, 0, 1676427203),
-(6, 1, 1, '奖励六', '奖励六', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/23fbc5512b9bc9f8b2cd22065dbe3a57.jpg', 60, 60, 0, 0, '', 0, 6, 1, 0, 1676427203),
-(7, 1, 1, '奖励七', '奖励七', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/895d5edf7eaf8d0f2c69fc34f30749e3.jpg', 70, 70, 0, 0, '', 0, 7, 1, 0, 1676427203),
-(8, 1, 1, '奖励八', '奖励八', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/080bad1fc75b2c68abf8f55eb6560608.jpg', 80, 80, 0, 0, '', 0, 8, 1, 0, 1676427203),
-(9, 1, 2, '奖励一', '奖励一中奖啦', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/5ae4f6a3f8bf153beb849e02e14b5c40.png', 10, 10, 0, 0, '', 10, 1, 1, 0, 1676427209),
-(10, 1, 2, '奖励二', '奖励二中奖啦', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/a7cfed80049c0d051988da434d5553b6.jpg', 20, 10, 0, 0, '', 0, 2, 1, 0, 1676427209),
-(11, 1, 2, '奖励三', '奖励三', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/cf5414089d598d064b0a4d7154a4f491.png', 30, 30, 0, 0, '', 0, 3, 1, 0, 1676427209),
-(12, 1, 2, '奖励四', '奖励四', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/e1b434ef85145430b8bd1a93528c1e26.jpg', 40, 40, 0, 0, '', 0, 4, 1, 0, 1676427209),
-(13, 1, 2, '奖励五', '奖励五', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/5aea4687e62d39793ba63161eacf6661.jpg', 50, 50, 0, 0, '', 0, 5, 1, 0, 1676427209),
-(14, 1, 2, '奖励六', '奖励六', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/23fbc5512b9bc9f8b2cd22065dbe3a57.jpg', 60, 60, 0, 0, '', 0, 6, 1, 0, 1676427209),
-(15, 1, 2, '奖励七', '奖励七', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/895d5edf7eaf8d0f2c69fc34f30749e3.jpg', 70, 70, 0, 0, '', 0, 7, 1, 0, 1676427209),
-(16, 1, 2, '奖励八', '奖励八', 'http://demo.crmeb.com/uploads/attach/2023/02/20230213/080bad1fc75b2c68abf8f55eb6560608.jpg', 80, 80, 0, 0, '', 0, 8, 1, 0, 1676427209);
-
--- --------------------------------------------------------
-
---
--- 表的结构 `eb_member_card`
---
-
-CREATE TABLE IF NOT EXISTS `eb_member_card` (
-  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `card_batch_id` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '卡批次id',
-  `card_number` varchar(20) CHARACTER SET utf8mb4 NOT NULL DEFAULT '' COMMENT '卡号',
-  `card_password` char(12) CHARACTER SET utf8mb4 NOT NULL DEFAULT '' COMMENT '密码',
-  `use_uid` int(11) NOT NULL DEFAULT '0' COMMENT '使用用户',
-  `use_time` int(10) NOT NULL DEFAULT '0' COMMENT '使用时间',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '卡状态：0：冻结；1：激活',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `update_time` int(10) NOT NULL DEFAULT '0' COMMENT '更新时间',
-  PRIMARY KEY (`id`,`card_batch_id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员卡表' ROW_FORMAT=DYNAMIC;
-
--- --------------------------------------------------------
-
---
--- 表的结构 `eb_member_card_batch`
---
-
-CREATE TABLE IF NOT EXISTS `eb_member_card_batch` (
-  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `title` varchar(100) NOT NULL DEFAULT '0' COMMENT '批次名称',
-  `total_num` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '生成卡数量',
-  `use_start_time` int(10) UNSIGNED NOT NULL DEFAULT '7' COMMENT '体验开始时间',
-  `use_end_time` int(10) NOT NULL DEFAULT '0' COMMENT '体验结束时间',
-  `use_day` int(10) NOT NULL DEFAULT '0' COMMENT '体验天数',
-  `use_num` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '使用',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否生效,控制此批次所有卡0：不生效；1：生效',
-  `sort` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '排序',
-  `qrcode` varchar(255) NOT NULL DEFAULT '' COMMENT '二维码图路径',
-  `remark` varchar(512) CHARACTER SET utf8mb4 NOT NULL DEFAULT '' COMMENT '备注',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `update_time` int(10) NOT NULL DEFAULT '0' COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员卡批次表' ROW_FORMAT=DYNAMIC;
-
--- --------------------------------------------------------
-
---
--- 表的结构 `eb_member_right`
---
-
-CREATE TABLE IF NOT EXISTS `eb_member_right` (
-  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `right_type` varchar(100) NOT NULL DEFAULT '' COMMENT '权益类别',
-  `title` varchar(200) NOT NULL DEFAULT '' COMMENT ' 权益名称',
-  `show_title` varchar(255) NOT NULL DEFAULT '' COMMENT '显示权益名称',
-  `image` varchar(200) CHARACTER SET utf8mb4 NOT NULL DEFAULT '' COMMENT '权益图标',
-  `explain` varchar(1024) CHARACTER SET utf8mb4 NOT NULL DEFAULT '' COMMENT '权益介绍',
-  `number` int(2) NOT NULL DEFAULT '1' COMMENT '规则数字',
-  `sort` int(10) NOT NULL DEFAULT '0' COMMENT '排序倒序',
-  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '0:禁用，1：启用',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`,`right_type`) USING BTREE,
-  KEY `type` (`right_type`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COMMENT='会员权益' ROW_FORMAT=DYNAMIC;
-
---
--- 转存表中的数据 `eb_member_right`
---
-
-INSERT INTO `eb_member_right` (`id`, `right_type`, `title`, `show_title`, `image`, `explain`, `number`, `sort`, `status`, `add_time`) VALUES
-(1, 'integral', '消费返利', '消费返利', '/statics/system_images/member_integral.png', '消费返多倍积分', 2, 0, 1, 0),
-(2, 'vip_price', '会员特价', '会员特价', '/statics/system_images/member_price.png', '商品享特价优惠', 1, 0, 1, 0),
-(3, 'express', '运费折扣', '运费折扣', '/statics/system_images/member_freight.png', '运费折扣优惠', 90, 0, 1, 0),
-(4, 'sign', '签到返利', '签到返利', '/statics/system_images/member_sign.png', '签到得多倍积分', 3, 0, 1, 0),
-(5, 'offline', '线下折扣', '线下折扣', '/statics/system_images/member_discount.png', '线下支付折扣', 1, 0, 1, 0),
-(6, 'coupon', '会员优惠券', '会员优惠券', '/statics/system_images/member_coupon.png', '领取会员券', 1, 0, 1, 0);
-
--- --------------------------------------------------------
-
---
--- 表的结构 `eb_member_ship`
---
-
-CREATE TABLE IF NOT EXISTS `eb_member_ship` (
-  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `type` varchar(20) NOT NULL DEFAULT 'month' COMMENT '会员类别month:月卡会员；quarter:季卡；year:年卡；ever:永久；free:免费',
-  `title` varchar(200) NOT NULL DEFAULT '' COMMENT '会员名称',
-  `vip_day` int(10) NOT NULL DEFAULT '0' COMMENT '会员时间(天)',
-  `price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '原价',
-  `pre_price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '优惠后价格',
-  `sort` int(10) NOT NULL DEFAULT '0' COMMENT '排序倒序',
-  `is_del` int(2) NOT NULL DEFAULT '0' COMMENT '删除',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `type` (`type`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COMMENT='会员类型' ROW_FORMAT=DYNAMIC;
-
---
--- 转存表中的数据 `eb_member_ship`
---
-
-INSERT INTO `eb_member_ship` (`id`, `type`, `title`, `vip_day`, `price`, `pre_price`, `sort`, `is_del`, `add_time`) VALUES
-(1, 'month', '月卡', 30, '30.00', '0.01', 9, 0, 1588129765),
-(2, 'quarter', '季卡', 90, '90.00', '80.00', 8, 0, 1588129794),
-(3, 'year', '年卡', 365, '365.00', '300.00', 6, 0, 1588129818),
-(4, 'ever', '永久', -1, '1000.00', '899.00', 1, 0, 1588129856),
-(5, 'free', '试用', 7, '100.00', '0.00', 11, 0, 1588130680);
 
 -- --------------------------------------------------------
 
@@ -27501,49 +27082,7 @@ CREATE TABLE IF NOT EXISTS `eb_message_system` (
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_other_order`
---
-
-CREATE TABLE IF NOT EXISTS `eb_other_order` (
-  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `uid` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户uid',
-  `type` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '区别 \r\n0：免费领取\r\n1：购买会员卡 \r\n2：卡密领取会员卡',
-  `order_id` varchar(32) CHARACTER SET utf8mb4 NOT NULL DEFAULT '' COMMENT '订单号',
-  `member_type` varchar(10) CHARACTER SET utf8mb4 NOT NULL DEFAULT '' COMMENT '会员类型 \r\n月卡：month\r\n季卡：quarter\r\n年卡：year\r\n永久：ever\r\n免费：free',
-  `code` varchar(20) NOT NULL DEFAULT '' COMMENT '卡号',
-  `pay_type` varchar(32) CHARACTER SET utf8mb4 NOT NULL DEFAULT '' COMMENT '支付方式',
-  `paid` tinyint(1) NOT NULL DEFAULT '0' COMMENT '支付状态 0:  未支付 1：已支付',
-  `pay_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '支付金额',
-  `member_price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '会员卡价格',
-  `pay_time` int(50) UNSIGNED NOT NULL DEFAULT '0' COMMENT '会员购买时间',
-  `trade_no` varchar(50) CHARACTER SET utf8mb4 NOT NULL DEFAULT '' COMMENT '支付宝支付,支付宝交易订单号',
-  `channel_type` varchar(10) NOT NULL DEFAULT '' COMMENT '支付渠道(微信公众号 h5 小程序)',
-  `is_free` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否免费',
-  `is_permanent` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否永久',
-  `overdue_time` bigint(20) UNSIGNED NOT NULL DEFAULT '0' COMMENT '会员过期时间',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '删除',
-  `vip_day` int(10) NOT NULL DEFAULT '0' COMMENT '会员有效天数',
-  `add_time` int(50) UNSIGNED NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `money` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '原价格',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员购买记录表' ROW_FORMAT=DYNAMIC;
-
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_other_order_status`
---
-
-CREATE TABLE IF NOT EXISTS `eb_other_order_status` (
-  `oid` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '订单id',
-  `change_type` varchar(32) NOT NULL DEFAULT '' COMMENT '操作类型',
-  `change_message` varchar(256) NOT NULL DEFAULT '' COMMENT '操作备注',
-  `shop_type` tinyint(1) NOT NULL DEFAULT '1' COMMENT '订单类型 1：会员卡',
-  `change_time` int(10) NOT NULL DEFAULT '0' COMMENT '订单修改时间',
-  KEY `oid` (`oid`) USING BTREE,
-  KEY `change_type` (`change_type`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单操作记录表' ROW_FORMAT=DYNAMIC;
 
 -- --------------------------------------------------------
 
@@ -27916,25 +27455,6 @@ CREATE TABLE IF NOT EXISTS `eb_sms_record` (
 -- 表的结构 `eb_store_advance`
 --
 
-CREATE TABLE IF NOT EXISTS `eb_store_activity` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT 'ID',
-  `type` tinyint(1) NOT NULL DEFAULT '1' COMMENT '1:秒杀',
-  `title` varchar(255) NOT NULL DEFAULT '' COMMENT '活动名称',
-  `start_day` int(10) NOT NULL DEFAULT '0' COMMENT '开始日期',
-  `end_day` int(10) NOT NULL DEFAULT '0' COMMENT '结束日期',
-  `time_ids` varchar(255) NOT NULL DEFAULT '' COMMENT '时间段ID多个',
-  `once_num` int(10) unsigned NOT NULL DEFAULT '0' COMMENT '活动期间每人每日购买数量，0不限制',
-  `num` int(10) unsigned NOT NULL DEFAULT '0' COMMENT '全部活动期间，用户购买总数限制，0不限制',
-  `is_commission` int(11) NOT NULL DEFAULT '0' COMMENT '是否参与分佣',
-  `status` tinyint(1) unsigned NOT NULL DEFAULT '0' COMMENT '是否显示',
-  `link_id` int(4) unsigned NOT NULL DEFAULT '0' COMMENT '关联ID',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `start_day` (`start_day`,`end_day`) USING BTREE,
-  KEY `type` (`type`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='活动表';
-
 -- --------------------------------------------------------
 
 --
@@ -27974,90 +27494,9 @@ CREATE TABLE IF NOT EXISTS `eb_store_advance` (
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_store_bargain`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_bargain` (
-  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '砍价商品ID',
-  `product_id` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '关联商品ID',
-  `title` varchar(255) NOT NULL DEFAULT '' COMMENT '砍价活动名称',
-  `image` varchar(150) NOT NULL DEFAULT '' COMMENT '砍价活动图片',
-  `unit_name` varchar(16) NOT NULL DEFAULT '' COMMENT '单位名称',
-  `stock` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '库存',
-  `sales` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '销量',
-  `images` varchar(2000) NOT NULL DEFAULT '' COMMENT '砍价商品轮播图',
-  `start_time` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '砍价开启时间',
-  `stop_time` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '砍价结束时间',
-  `store_name` varchar(255) NOT NULL DEFAULT '' COMMENT '砍价商品名称',
-  `price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '砍价金额',
-  `min_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '砍价商品最低价',
-  `num` int(11) UNSIGNED NOT NULL DEFAULT '1' COMMENT '可购买砍价商品数量',
-  `bargain_max_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '用户每次砍价的最大金额',
-  `bargain_min_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '用户每次砍价的最小金额',
-  `bargain_num` int(11) UNSIGNED NOT NULL DEFAULT '1' COMMENT '用户帮砍的次数',
-  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '砍价状态 0(到砍价时间不自动开启)  1(到砍价时间自动开启时间)',
-  `give_integral` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '反多少积分',
-  `info` varchar(255) NOT NULL DEFAULT '' COMMENT '砍价活动简介',
-  `cost` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '成本价',
-  `sort` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '排序',
-  `is_hot` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否推荐0不推荐1推荐',
-  `is_del` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否删除 0未删除 1删除',
-  `add_time` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `is_postage` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '是否包邮 0不包邮 1包邮',
-  `postage` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '邮费',
-  `rule` longtext COMMENT '砍价规则',
-  `look` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '砍价商品浏览量',
-  `share` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '砍价商品分享量',
-  `temp_id` int(11) NOT NULL DEFAULT '0' COMMENT '运费模板ID',
-  `weight` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '重量',
-  `volume` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '体积',
-  `quota` int(10) NOT NULL DEFAULT '0' COMMENT '限购总数',
-  `quota_show` int(10) NOT NULL DEFAULT '0' COMMENT '限量总数显示',
-  `people_num` int(11) NOT NULL DEFAULT '1' COMMENT '用户帮砍的次数',
-  `logistics` varchar(11) NOT NULL DEFAULT '1,2' COMMENT '物流方式',
-  `freight` tinyint(1) NOT NULL DEFAULT '2' COMMENT '运费设置',
-  `custom_form` varchar(2000) NOT NULL DEFAULT '' COMMENT '自定义表单',
-  `virtual_type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '商品类型',
-  `is_commission` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否返佣',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='砍价表';
-
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_store_bargain_user`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_bargain_user` (
-  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '用户参与砍价表ID',
-  `uid` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户ID',
-  `bargain_id` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '砍价商品id',
-  `bargain_price_min` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '砍价的最低价',
-  `bargain_price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '砍价金额',
-  `price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '砍掉的价格',
-  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '状态 1参与中 2 活动结束参与失败 3活动结束参与成功',
-  `add_time` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '参与时间',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否取消',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户参与砍价表';
-
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_store_bargain_user_help`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_bargain_user_help` (
-  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '砍价用户帮助表ID',
-  `uid` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '帮助的用户id',
-  `bargain_id` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '砍价商品ID',
-  `bargain_user_id` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户参与砍价表id',
-  `price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '帮助砍价多少金额',
-  `add_time` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否自己砍价',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='砍价用户帮助表';
 
 -- --------------------------------------------------------
 
@@ -28326,93 +27765,9 @@ CREATE TABLE IF NOT EXISTS `eb_store_coupon_user` (
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_store_integral`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_integral` (
-  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '积分商品ID',
-  `image` varchar(256) NOT NULL DEFAULT '' COMMENT '商品图片',
-  `product_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '商品id',
-  `images` varchar(2000) NOT NULL DEFAULT '' COMMENT '轮播图',
-  `title` varchar(255) NOT NULL DEFAULT '' COMMENT '活动标题',
-  `price` int(10) NOT NULL DEFAULT '0' COMMENT '兑换积分',
-  `sort` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '排序',
-  `sales` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '销量',
-  `unit_name` varchar(16) NOT NULL DEFAULT '' COMMENT '单位名',
-  `stock` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '库存',
-  `add_time` varchar(128) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `is_host` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '推荐',
-  `is_show` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '商品状态',
-  `is_del` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '删除',
-  `num` int(11) NOT NULL DEFAULT '0' COMMENT '最多积分几个',
-  `quota` int(10) NOT NULL DEFAULT '0' COMMENT '限购总数',
-  `once_num` int(11) NOT NULL DEFAULT '0' COMMENT '单次购买个数',
-  `quota_show` int(11) NOT NULL DEFAULT '0' COMMENT '限购显示',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COMMENT='积分商品表';
-
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_store_integral_order`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_integral_order` (
-  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '订单ID',
-  `order_id` varchar(32) NOT NULL DEFAULT '0' COMMENT '订单号',
-  `uid` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户id',
-  `real_name` varchar(32) NOT NULL DEFAULT '' COMMENT '用户姓名',
-  `user_phone` varchar(18) NOT NULL DEFAULT '' COMMENT '用户电话',
-  `user_address` varchar(100) NOT NULL DEFAULT '' COMMENT '详细地址',
-  `product_id` int(11) NOT NULL DEFAULT '0' COMMENT '商品id',
-  `image` varchar(256) NOT NULL DEFAULT '' COMMENT '商品图片',
-  `store_name` varchar(128) NOT NULL DEFAULT '' COMMENT '商品名称',
-  `suk` varchar(128) NOT NULL DEFAULT '' COMMENT '规格',
-  `total_num` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '订单商品总数',
-  `price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '单价',
-  `total_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '总积分',
-  `add_time` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '创建时间',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1：待发货；2：待收货；3：已完成；',
-  `delivery_name` varchar(64) NOT NULL DEFAULT '' COMMENT '快递名称/送货人姓名',
-  `delivery_code` varchar(50) NOT NULL DEFAULT '' COMMENT '快递公司编码',
-  `delivery_type` varchar(32) NOT NULL DEFAULT '' COMMENT '发货类型',
-  `delivery_id` varchar(64) NOT NULL DEFAULT '' COMMENT '快递单号/手机号',
-  `fictitious_content` varchar(500) NOT NULL DEFAULT '' COMMENT '虚拟发货内容',
-  `delivery_uid` int(11) NOT NULL DEFAULT '0' COMMENT '配送员id',
-  `mark` varchar(512) NOT NULL DEFAULT '' COMMENT '备注',
-  `is_del` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否删除',
-  `remark` varchar(512) NOT NULL DEFAULT '' COMMENT '管理员备注',
-  `mer_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '商户ID',
-  `is_mer_check` tinyint(3) UNSIGNED NOT NULL DEFAULT '0',
-  `is_remind` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '消息提醒',
-  `is_system_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '后台是否删除',
-  `channel_type` varchar(255) NOT NULL DEFAULT '' COMMENT '用户访问端标识',
-  `province` varchar(255) NOT NULL DEFAULT '' COMMENT '用户省份',
-  `express_dump` varchar(502) NOT NULL DEFAULT '' COMMENT '订单面单打印信息',
-  `verify_code` varchar(125) NOT NULL DEFAULT '' COMMENT '核销码',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `order_id_2` (`order_id`,`uid`) USING BTREE,
-  KEY `uid` (`uid`) USING BTREE,
-  KEY `add_time` (`add_time`) USING BTREE,
-  KEY `status` (`status`) USING BTREE,
-  KEY `is_del` (`is_del`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分订单表';
-
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_store_integral_order_status`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_integral_order_status` (
-  `oid` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '订单id',
-  `change_type` varchar(32) NOT NULL DEFAULT '' COMMENT '操作类型',
-  `change_message` varchar(256) NOT NULL DEFAULT '' COMMENT '操作备注',
-  `change_time` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '操作时间',
-  KEY `oid` (`oid`) USING BTREE,
-  KEY `change_type` (`change_type`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分订单操作记录表';
 
 -- --------------------------------------------------------
 
@@ -28548,30 +27903,6 @@ CREATE TABLE IF NOT EXISTS `eb_store_order_cart_info` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单购物详情表';
 
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_store_order_economize`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_order_economize` (
-  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '订单ID',
-  `order_id` varchar(32) NOT NULL DEFAULT '' COMMENT '订单号',
-  `uid` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户id',
-  `order_type` tinyint(1) UNSIGNED ZEROFILL NOT NULL DEFAULT '1' COMMENT '配送方式 1=商品订单 ，2=线下订单',
-  `pay_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '实际支付金额',
-  `postage_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '邮费优惠金额',
-  `member_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '会员优惠金额',
-  `offline_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '线下优惠金额',
-  `coupon_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '优惠券优惠金额',
-  `add_time` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '创建时间',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '状态',
-  PRIMARY KEY (`id`,`order_id`,`uid`) USING BTREE,
-  UNIQUE KEY `order_id_2` (`order_id`,`uid`) USING BTREE,
-  KEY `uid` (`uid`) USING BTREE,
-  KEY `add_time` (`add_time`) USING BTREE,
-  KEY `pay_price` (`pay_price`) USING BTREE,
-  KEY `status` (`status`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户资金节省表';
 
 -- --------------------------------------------------------
 
@@ -29269,192 +28600,17 @@ CREATE TABLE IF NOT EXISTS `eb_store_product_virtual` (
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_store_seckill`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_seckill` (
-  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '商品秒杀商品表id',
-  `activity_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '活动id',
-  `product_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '商品id',
-  `image` varchar(255) NOT NULL DEFAULT '' COMMENT '推荐图',
-  `images` varchar(2000) NOT NULL DEFAULT '' COMMENT '轮播图',
-  `title` varchar(255) NOT NULL DEFAULT '' COMMENT '活动标题',
-  `info` varchar(255) NOT NULL DEFAULT '' COMMENT '简介',
-  `price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '价格',
-  `cost` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '成本',
-  `ot_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '原价',
-  `give_integral` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '返多少积分',
-  `sort` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '排序',
-  `stock` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '库存',
-  `sales` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '销量',
-  `unit_name` varchar(16) NOT NULL DEFAULT '' COMMENT '单位名',
-  `postage` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '邮费',
-  `start_time` varchar(128) NOT NULL DEFAULT '' COMMENT '开始时间',
-  `stop_time` varchar(128) NOT NULL DEFAULT '' COMMENT '结束时间',
-  `add_time` varchar(128) NOT NULL DEFAULT '' COMMENT '添加时间',
-  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '商品状态',
-  `is_postage` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否包邮',
-  `is_hot` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '热门推荐',
-  `is_del` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '删除 0未删除1已删除',
-  `num` int(11) UNSIGNED NOT NULL DEFAULT '1' COMMENT '最多秒杀几个',
-  `is_show` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '显示',
-  `time_id` varchar(255) NOT NULL DEFAULT '' COMMENT '时间段ID',
-  `temp_id` int(11) NOT NULL DEFAULT '0' COMMENT '运费模板ID',
-  `weight` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '商品重量',
-  `volume` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '商品体积',
-  `quota` int(10) NOT NULL DEFAULT '0' COMMENT '限购总数',
-  `quota_show` int(10) NOT NULL DEFAULT '0' COMMENT '限购总数显示',
-  `once_num` int(11) NOT NULL DEFAULT '0' COMMENT '单次购买个数',
-  `logistics` varchar(10) NOT NULL DEFAULT '1,2' COMMENT '物流类型',
-  `freight` tinyint(1) NOT NULL DEFAULT '2' COMMENT '运费设置',
-  `custom_form` varchar(2000) NOT NULL DEFAULT '' COMMENT '自定义表单',
-  `virtual_type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '商品类型',
-  `is_commission` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否返佣',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `product_id` (`product_id`) USING BTREE,
-  KEY `start_time` (`start_time`,`stop_time`) USING BTREE,
-  KEY `is_del` (`is_del`) USING BTREE,
-  KEY `is_hot` (`is_hot`) USING BTREE,
-  KEY `is_show` (`status`) USING BTREE,
-  KEY `add_time` (`add_time`) USING BTREE,
-  KEY `sort` (`sort`) USING BTREE,
-  KEY `is_postage` (`is_postage`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品秒杀商品表';
+-- --------------------------------------------------------
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_store_seckill_time`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_seckill_time` (
-  `seckill_id` int(10) NOT NULL DEFAULT '0' COMMENT '秒杀活动ID',
-  `time_id` int(10) NOT NULL DEFAULT '0' COMMENT '秒杀时间段ID'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='秒杀时段表';
+-- --------------------------------------------------------
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_store_service`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_service` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '客服id',
-  `mer_id` int(11) NOT NULL DEFAULT '0' COMMENT '商户id',
-  `uid` int(11) NOT NULL DEFAULT '0' COMMENT '客服uid',
-  `online` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否在线',
-  `account` varchar(255) NOT NULL DEFAULT '' COMMENT '账号',
-  `password` varchar(255) NOT NULL DEFAULT '' COMMENT '密码',
-  `avatar` varchar(250) NOT NULL DEFAULT '' COMMENT '客服头像',
-  `nickname` varchar(50) NOT NULL DEFAULT '' COMMENT '代理名称',
-  `phone` varchar(20) NOT NULL DEFAULT '' COMMENT '客服电话',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '0隐藏1显示',
-  `notify` int(2) NOT NULL DEFAULT '0' COMMENT '订单通知1开启0关闭',
-  `customer` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否展示统计管理',
-  `uniqid` varchar(35) NOT NULL DEFAULT '',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COMMENT='客服表';
-
---
--- 转存表中的数据 `eb_store_service`
---
-
-INSERT INTO `eb_store_service` (`id`, `mer_id`, `uid`, `online`, `account`, `password`, `avatar`, `nickname`, `phone`, `add_time`, `status`, `notify`, `customer`, `uniqid`) VALUES
-(1, 0, 1, 0, '13000000000', '$2y$10$0sJdnsv5WgffssRfdBfir.JEiM5y5CG7Jo9S/VFADNnIWeR5h9uvi', '/statics/system_images/default_avatar.jpeg', 'CRMEB', '13000000000', 1642573891, 1, 1, 1, '');
-
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_store_service_feedback`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_service_feedback` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `uid` int(10) NOT NULL DEFAULT '0' COMMENT '用户UID',
-  `rela_name` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '' COMMENT '姓名',
-  `phone` varchar(30) COLLATE utf8_unicode_ci NOT NULL DEFAULT '' COMMENT '电话',
-  `content` varchar(500) COLLATE utf8_unicode_ci NOT NULL DEFAULT '' COMMENT '反馈内容',
-  `make` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '' COMMENT '备注',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '状态0=未查看，1=已查看',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`),
-  KEY `uid` (`uid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='反馈';
-
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_store_service_log`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_service_log` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '客服用户对话记录表ID',
-  `mer_id` int(11) NOT NULL DEFAULT '0' COMMENT '商户id',
-  `msn` text COMMENT '消息内容',
-  `uid` int(11) NOT NULL DEFAULT '1' COMMENT '发送人uid',
-  `to_uid` int(11) NOT NULL DEFAULT '1' COMMENT '接收人uid',
-  `is_tourist` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1=游客模式，0=非游客',
-  `time_node` tinyint(1) NOT NULL DEFAULT '0' COMMENT '时间节点',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '发送时间',
-  `type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否已读（0：否；1：是；）',
-  `remind` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否提醒过',
-  `msn_type` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '消息类型 1=文字 2=表情 3=图片 4=语音',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客服用户对话记录表';
-
--- --------------------------------------------------------
-
---
--- 表的结构 `eb_store_service_record`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_service_record` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `user_id` int(10) NOT NULL DEFAULT '0' COMMENT '发送人的uid',
-  `to_uid` int(10) NOT NULL DEFAULT '0' COMMENT '送达人的uid',
-  `nickname` varchar(50) COLLATE utf8_unicode_ci NOT NULL DEFAULT '' COMMENT '用户昵称',
-  `avatar` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '' COMMENT '用户头像',
-  `is_tourist` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否是游客',
-  `online` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否在线',
-  `type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0 = pc,1=微信，2=小程序，3=H5',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `update_time` int(10) NOT NULL DEFAULT '0' COMMENT '更新时间',
-  `mssage_num` int(10) NOT NULL DEFAULT '0' COMMENT '消息条数',
-  `message` text COLLATE utf8_unicode_ci COMMENT '内容',
-  `message_type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '消息类型',
-  PRIMARY KEY (`id`),
-  KEY `to_uid` (`to_uid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客服聊天用户记录表';
-
--- --------------------------------------------------------
-
---
--- 表的结构 `eb_store_service_speechcraft`
---
-
-CREATE TABLE IF NOT EXISTS `eb_store_service_speechcraft` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `kefu_id` int(10) NOT NULL DEFAULT '0' COMMENT '0为全局话术',
-  `cate_id` int(10) NOT NULL DEFAULT '0' COMMENT '0为不分类全局话术',
-  `title` varchar(100) COLLATE utf8_unicode_ci NOT NULL DEFAULT '' COMMENT '话术标题',
-  `message` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '' COMMENT '话术内容',
-  `sort` int(10) NOT NULL DEFAULT '0' COMMENT '排序',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`),
-  KEY `kefu_id` (`kefu_id`),
-  KEY `cate_id` (`cate_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COMMENT='客服话术';
-
---
--- 转存表中的数据 `eb_store_service_speechcraft`
---
-
-INSERT INTO `eb_store_service_speechcraft` (`id`, `kefu_id`, `cate_id`, `title`, `message`, `sort`, `add_time`) VALUES
-(1, 0, 0, '客户觉得贵，或者问能不能便宜', '我不能给你最低的价格，但我可以给你最高的品质和服务，我宁愿为价格解释一阵子，也不愿意为品质道歉一辈子', 0, 1664328094),
-(2, 0, 0, '提升价值的话', '外行人比的是价格，内行人比的是价值，一看你就是内行人', 0, 1664328158),
-(3, 0, 0, '让客户更加相信', '做有良心的产品，一直是我们的初衷，好服务加好产品，让客户满意是我们一直的追求。', 0, 1664328199);
 
 -- --------------------------------------------------------
 
@@ -33727,11 +32883,7 @@ INSERT INTO `eb_system_config` (`id`, `menu_name`, `type`, `input_type`, `config
 (28, 'pay_weixin_key', 'text', 'input', 4, '', 0, '', 100, 0, '\"\"', 'Key', '商户支付密钥Key。审核通过后，在微信发送的邮件中查看。', 0, 1, 0, 0, 0),
 (29, 'pay_weixin_open', 'radio', 'input', 109, '0=>关闭\nweixin=>微信\nallinpay=>通联', 1, '', 0, 0, '\"weixin\"', '微信支付', '请选择微信支付通道，关闭用户端不展示', 100, 1, 0, 0, 0),
 (32, 'store_free_postage', 'text', 'number', 114, '', 1, 'number:true,min:-1', 100, 0, '\"1000000\"', '满额包邮', '商城商品满多少金额即可包邮，此项优先于其他的运费设置', 100, 1, 0, 0, 0),
-(33, 'offline_postage', 'radio', 'input', 114, '1=>包邮\n0=>不包邮', 1, '', 0, 0, '0', '线下支付是否包邮', '用户选择线下支付时是否包邮', 97, 1, 0, 0, 0),
-(34, 'integral_ratio', 'text', 'input', 11, '', 0, 'number:true', 100, 0, '\"0.1\"', '积分抵用', '积分抵用比例(1积分抵多少金额)单位：元', 10, 1, 0, 0, 0),
-(44, 'store_user_min_recharge', 'text', 'number', 28, '', 1, 'required:true,number:true,min:0', 100, 0, '0.01', '最低充值金额', '用户单次最低充值金额', 3, 1, 0, 0, 0),
 (46, 'system_express_app_code', 'text', 'input', 92, '', 1, '', 0, 0, '\"\"', '快递查询密钥', '阿里云云市场快递查询接口密钥购买地址：https://market.aliyun.com/products/57126001/cmapi021863.html?spm=5176.2020520132.101.4.42a672183nvgfH#sku=yuncode1586300000', 0, 1, 0, 0, 0),
-(49, 'store_brokerage_ratio', 'text', 'input', 73, '', 0, 'required:true,min:0,max:100,number:true', 100, 0, '\"0\"', '一级返佣比例', '订单交易成功后给上级返佣的比例0 - 100,例:5 = 返订单商品金额的5%', 5, 1, 0, 0, 0),
 (53, 'user_extract_min_price', 'text', 'input', 74, '', 0, 'required:true,number:true,min:0', 100, 0, '\"1\"', '提现最低金额', '用户提现最低金额限制', 10, 1, 0, 0, 0),
 (59, 'routine_appId', 'text', 'input', 132, '', 0, '', 100, 0, '\"\"', 'appId', '小程序appID', 100, 1, 0, 0, 0),
 (60, 'routine_appsecret', 'text', 'input', 132, '', 0, '', 100, 0, '\"\"', 'AppSecret', '小程序AppSecret', 99, 1, 0, 0, 0),
@@ -33739,8 +32891,6 @@ INSERT INTO `eb_system_config` (`id`, `menu_name`, `type`, `input_type`, `config
 (74, 'routine_name', 'text', 'input', 132, '', 0, '', 100, 0, '\"\"', '小程序名称', '小程序名称', 98, 1, 0, 0, 0),
 (77, 'store_stock', 'text', 'number', 120, '', 1, '', 0, 0, '\"10\"', '警戒库存', '商品库存数量低于多少时，提示库存不足', 0, 1, 0, 0, 0),
 (85, 'stor_reason', 'textarea', 'input', 71, '', 1, '', 100, 8, '\"\\u6536\\u8d27\\u5730\\u5740\\u586b\\u9519\\u4e86\\n\\u4e0e\\u63cf\\u8ff0\\u4e0d\\u7b26\\n\\u4fe1\\u606f\\u586b\\u9519\\u4e86\\uff0c\\u91cd\\u65b0\\u62cd\\n\\u6536\\u5230\\u5546\\u54c1\\u635f\\u574f\\u4e86\\n\\u672a\\u6309\\u9884\\u5b9a\\u65f6\\u95f4\\u53d1\\u8d27\\n\\u5176\\u5b83\\u539f\\u56e0\"', '退货理由', '配置退货理由，一行一个理由', 0, 1, 0, 0, 0),
-(87, 'store_brokerage_two', 'text', 'input', 73, '', 0, 'required:true,min:0,max:100,number:true', 100, 0, '\"0\"', '二级返佣比例', '订单交易成功后给上级返佣的比例0 - 100,例:5 = 返订单商品金额的5%', 4, 1, 0, 0, 0),
-(88, 'store_brokerage_statu', 'radio', '', 72, '1=>指定分销\n2=>人人分销\n3=>满额分销', 0, '', 0, 0, '1', '分销模式', '人人分销”默认每个人都可以分销，“指定分销”仅可后台手动设置推广员，“满额分销”指用户购买商品满足消费金额后自动开启分销', 95, 1, 0, 0, 0),
 (99, 'user_extract_bank', 'textarea', '', 74, '', 0, '', 100, 5, '\"\\u4e2d\\u56fd\\u94f6\\u884c\"', '提现银行卡', '配置提现银行卡类型，每个银行换行', 9, 1, 0, 0, 0),
 (108, 'upload_type', 'radio', '', 31, '1=>本地存储\n2=>七牛云存储\n3=>阿里云OSS\n4=>腾讯COS', 1, '', 0, 0, '\"1\"', '上传类型', '文件储存配置，注意：一旦配置就不要轻易修改，会导致文件不能使用', 100, 1, 0, 0, 0),
 (110, 'accessKey', 'text', 'input', 32, '', 0, '', 100, 0, '\"\"', '阿里云云存储accessKey', 'accessKey', 0, 1, 0, 0, 0),
@@ -33754,10 +32904,7 @@ INSERT INTO `eb_system_config` (`id`, `menu_name`, `type`, `input_type`, `config
 (123, 'sms_account', 'text', 'input', 18, '', 1, '', 0, 0, '\"\"', 'AppId', '一号通账号内创建应用的AppId', 10, 1, 0, 0, 0),
 (137, 'sms_token', 'text', 'input', 18, '', 1, '', 0, 0, '\"\"', 'AppSecret', '一号通账号内创建应用的AppSecret', 9, 1, 0, 0, 0),
 (138, 'h5_avatar', 'upload', 'input', 105, '', 1, '', 0, 0, '\"\\/statics\\/system_images\\/default_avatar.jpeg\"', '用户默认头像', '用户默认头像，后台添加用户以及用户登录的默认头像显示，尺寸(80*80)', 100, 1, 0, 0, 0),
-(139, 'offline_pay_status', 'radio', 'input', 109, '1=>开启\n2=>关闭', 1, '', 0, 0, '\"2\"', '线下支付', '线下支付请选择开启或关闭', 89, 1, 0, 0, 0),
-(141, 'recharge_switch', 'radio', 'input', 28, '1=>开启\n0=>关闭', 1, '', 0, 0, '0', '小程序充值开关', '仅小程序端的充值开关，小程序提交审核前,需要关闭此功能', 4, 1, 0, 0, 0),
 (142, 'tengxun_map_key', 'text', 'input', 124, '', 1, '', 0, 0, '\"SMJBZ-WCHK4-ZPZUA-DSIXI-XDDVQ-XWFX7\"', '腾讯地图KEY', '腾讯地图KEY，申请地址：https://lbs.qq.com', 77, 1, 0, 0, 0),
-(143, 'store_self_mention', 'radio', 'input', 119, '1=>开启\n0=>关闭', 1, '', 0, 0, '\"0\"', '开启到店自提', '开启后下单页面支持到店自提，需要在设置->发货设置->提货点设置中添加提货点，关闭则隐藏此功能', 95, 1, 0, 0, 0),
 (145, 'pay_success_printing_switch', 'radio', 'input', 86, '1=>开启\n0=>关闭', 1, '', 0, 0, '0', '小票打印开关', '支付成功自动小票打印功能，需要购买易联云K4或者K6无线打印机，或者购买飞鹅云V58系列', 10, 1, 0, 0, 0),
 (146, 'develop_id', 'text', 'input', 87, '', 1, '', 0, 0, '\"\"', '开发者ID', '易联云申请应用后页面开发者信息中的用户ID', 0, 1, 0, 0, 0),
 (147, 'printing_api_key', 'text', 'input', 87, '', 1, '', 0, 0, '\"\"', '应用密钥', '易联云申请应用后页面开发者信息中的应用密钥', 0, 1, 0, 0, 0),
@@ -33770,36 +32917,21 @@ INSERT INTO `eb_system_config` (`id`, `menu_name`, `type`, `input_type`, `config
 (154, 'admin_pay_success_switch', 'radio', '', 20, '0=>关闭\n1=>开启', 0, '', 0, 0, '0', '用户支付成功管理员提醒开关', '用户支付成功管理员提醒开关', 0, 1, 0, 0, 0),
 (155, 'admin_refund_switch', 'radio', '', 20, '0=>关闭\n1=>开启', 0, '', 0, 0, '0', '用户退款管理员提醒开关', '用户退款管理员提醒开关', 0, 1, 0, 0, 0),
 (156, 'admin_confirm_take_over_switch', 'radio', '', 20, '0=>关闭\n1=>开启', 0, '', 0, 0, '0', '用户确认收货管理员短信提醒', '用户确认收货管理员短信提醒', 0, 1, 0, 0, 0),
-(158, 'recharge_attention', 'textarea', '', 28, '', 0, '', 100, 5, '\"\\u5145\\u503c\\u540e\\u5e10\\u6237\\u7684\\u91d1\\u989d\\u4e0d\\u80fd\\u63d0\\u73b0\\uff0c\\u53ef\\u7528\\u4e8e\\u5546\\u57ce\\u6d88\\u8d39\\u4f7f\\u7528\\n\\u4f63\\u91d1\\u5bfc\\u5165\\u8d26\\u6237\\u4e4b\\u540e\\u4e0d\\u80fd\\u518d\\u6b21\\u5bfc\\u51fa\\u3001\\u4e0d\\u53ef\\u63d0\\u73b0\\n\\u8d26\\u6237\\u5145\\u503c\\u51fa\\u73b0\\u95ee\\u9898\\u53ef\\u8054\\u7cfb\\u5546\\u57ce\\u5ba2\\u670d\\uff0c\\u4e5f\\u53ef\\u62e8\\u6253\\u5546\\u57ce\\u5ba2\\u670d\\u70ed\\u7ebf\\uff1a4008888888\\n\\n\\n\"', '充值注意事项', '充值注意事项', 0, 1, 0, 0, 0),
-(159, 'extract_time', 'text', 'input', 73, '', 0, '', 100, 0, '\"0\"', '冻结时间', '防止用户退款，佣金被提现了，所以需要设置佣金冻结时间(天)', 0, 1, 0, 0, 0),
-(160, 'store_brokerage_price', 'text', 'input', 72, '', 0, '', 100, 0, '\"100\"', '满额分销最低金额', '满额分销满足金额开通分销权限', 0, 1, 0, 0, 0),
 (162, 'price_revision_switch', 'radio', 'input', 20, '0=>关闭\n1=>开启', 0, '', 0, 0, '0', '改价短信提醒开关', '改价短信提醒开关', 0, 1, 0, 0, 0),
 (168, 'site_logo_square', 'upload', 'input', 122, '', 1, '', 0, 0, '\"\\/statics\\/system_images\\/admin_logo_small.png\"', '后台小LOGO', '后台菜单缩进小LOGO，尺寸180*180', 90, 1, 0, 0, 0),
-(170, 'yue_pay_status', 'radio', 'input', 109, '1=>开启\n2=>关闭', 1, '', 0, 0, '\"2\"', '余额支付', '余额支付请选择开启或关闭', 95, 1, 0, 0, 0),
 (171, 'login_logo', 'upload', 'input', 122, '', 1, '', 0, 0, '\"\\/statics\\/system_images\\/admin_login_logo.png\"', '后台登录页LOGO', '后台登录页LOGO，建议尺寸270x75', 93, 1, 0, 0, 0),
 (173, 'qiniu_accessKey', 'text', 'input', 80, '', 0, '', 100, 0, '\"\"', 'accessKey', '七牛云accessKey', 0, 1, 0, 0, 0),
 (174, 'qiniu_secretKey', 'text', 'input', 80, '', 0, '', 100, 0, '\"\"', 'secretKey', '七牛云secretKey', 0, 1, 0, 0, 0),
 (178, 'tengxun_accessKey', 'text', 'input', 82, '', 0, '', 100, 0, '\"\"', 'accessKey', '腾讯云accessKey', 0, 1, 0, 0, 0),
 (179, 'tengxun_secretKey', 'text', '', 82, '', 0, '', 100, 0, '\"\"', 'secretKey', '腾讯云secretKey', 0, 1, 0, 0, 0),
 (187, 'copy_product_apikey', 'text', 'input', 90, '', 1, '', 0, 0, '\"\"', '99Api apiKey', '注册99api采集接口在个人中心复制key', 0, 1, 0, 0, 0),
-(189, 'balance_func_status', 'radio', 'input', 28, '1=>开启\n0=>关闭\n', 1, '', 0, 0, '0', '余额功能启用', '商城余额功能启用或者关闭', 5, 1, 0, 0, 0),
-(190, 'brokerage_func_status', 'radio', '', 72, '1=>开启\n0=>关闭', 0, '', 0, 0, '0', '分销启用', '商城分销功能开启|关闭', 100, 1, 0, 0, 0),
-(191, 'order_give_integral', 'text', 'input', 11, '', 0, '', 100, 0, '\"1\"', '下单赠送积分', '下单支付金额按比例赠送积分（实际支付1元赠送多少积分）', 0, 1, 0, 0, 0),
-(193, 'member_func_status', 'radio', '', 45, '1=>开启\n0=>关闭', 0, '', 0, 0, '0', '用户等级启用', '商城用户等级功能开启|关闭', 0, 1, 0, 0, 0),
-(194, 'member_price_status', 'radio', 'input', 67, '1=>开启\n0=>关闭', 1, '', 0, 0, '\"1\"', '商品付费会员价', '商品付费会员价是否展示', 0, 1, 0, 0, 0),
 (195, 'store_user_mobile', 'radio', 'input', 105, '1=>强制\n0=>不强制', 1, '', 0, 0, '0', '强制手机号登录', '用户在授权之后强制绑定手机号，可以实现用户多端统一', 95, 1, 0, 0, 0),
-(196, 'order_give_exp', 'text', 'input', 45, '', 1, '', 0, 0, '\"0\"', '订单赠送经验', '下单赠送用户经验比例（实际支付1元赠送多少经验）', 0, 1, 0, 0, 0),
-(198, 'sign_give_exp', 'text', 'number', 126, '', 1, '', 0, 0, '0', '签到赠送经验', '签到赠送用户经验值', 0, 1, 0, 0, 0),
-(199, 'invite_user_exp', 'text', 'input', 45, '', 1, '', 0, 0, '\"0\"', '邀新赠送经验', '邀请一个新用户赠送用户经验值', 0, 1, 0, 0, 0),
-(200, 'brokerage_bindind', 'radio', '', 72, '1=>所有用户\n2=>新用户', 0, '', 0, 0, '2', '分销关系绑定', '所有用户”指所有没有上级推广人的用户点击或扫推广人码绑定分销关系，“新用户”指新注册的用户或首次进入系统的用户才会绑定推广关系', 98, 1, 0, 0, 0),
 (235, 'unpaid_order_switch', 'radio', '', 20, '1=>开启\n0=>关闭', 0, '', 0, 0, '0', '未支付短信提醒开关', '未支付短信提醒开关', 0, 1, 0, 0, 0),
 (236, 'verify_expire_time', 'text', 'input', 20, '', 0, '', 100, 0, '\"5\"', '验证码有效期', '短信验证码过期时间（分钟）', 0, 1, 0, 0, 0),
 (246, 'invoice_func_status', 'radio', '', 50, '1=>开启\n0=>关闭', 0, '', 0, 0, '0', '发票功能启用', '发票功能开启|关闭', 0, 1, 0, 0, 0),
 (247, 'special_invoice_status', 'radio', '', 50, '1=>开启\n0=>关闭', 0, '', 0, 0, '0', '专用发票启用', '专用发票功能开启|关闭', 0, 1, 0, 0, 0),
-(287, 'ali_pay_status', 'radio', 'input', 109, '0=>关闭\nalipay=>支付宝\nallinpay=>通联', 1, '', 0, 0, '\"alipay\"', '支付宝支付', '请选择支付宝通道，关闭用户端不显示', 98, 1, 0, 0, 0),
 (288, 'alipay_public_key', 'textarea', '', 63, '', 1, '', 100, 5, '\"\"', '支付宝公钥', '支付宝加签完成后生成的支付宝公钥', 0, 1, 1, 489, 0),
 (289, 'alipay_merchant_private_key', 'textarea', '', 63, '', 0, '', 100, 5, '\"\"', '支付应用私钥', '支付应用私钥', 85, 1, 0, 0, 0),
-(290, 'ali_pay_appid', 'text', 'input', 63, '', 0, '', 100, 0, '\"\"', '支付应用Appid', '支付应用Appid', 91, 1, 0, 0, 0),
 (291, 'logistics_type', 'radio', 'input', 91, '1=>一号通\n2=>阿里云物流查询', 1, '', 0, 0, '1', '接口选择', '建议使用一号通更方便不用配置密钥，阿里云云市场购买链接：https://market.aliyun.com/apimarket/detail/cmapi021863', 0, 1, 0, 0, 0),
 (292, 'system_product_copy_type', 'radio', 'input', 89, '1=>一号通\n2=>99Api', 1, '', 0, 0, '1', '接口选择', '采集商品接口选择，一号通快速注册开通使用不用配置apikey，或者去99api网址：https://www.99api.com/注册帐号，推荐一号通方便快捷', 999, 1, 0, 0, 0),
 (299, 'config_export_id', 'text', 'input', 94, '', 1, '', 0, 0, '\"\"', '快递公司', '快递公司', 0, 0, 0, 0, 0),
@@ -33809,24 +32941,16 @@ INSERT INTO `eb_system_config` (`id`, `menu_name`, `type`, `input_type`, `config
 (303, 'config_export_to_address', 'text', 'input', 94, '', 1, '', 0, 0, '\"\"', '发货人详细地址', '快递面单发货人详细地址', 0, 1, 0, 0, 0),
 (304, 'config_export_siid', 'text', 'input', 94, '', 1, '', 0, 0, '\"\"', '打印机编号', '请购买快递100二代云打印机(KX100L3)', 0, 1, 0, 0, 0),
 (305, 'service_feedback', 'textarea', 'input', 69, '', 1, '', 100, 7, '\"\\u5c0a\\u656c\\u7684\\u7528\\u6237\\uff0c\\u5ba2\\u670d\\u5f53\\u524d\\u4e0d\\u5728\\u7ebf\\uff0c\\u6709\\u95ee\\u9898\\u8bf7\\u7559\\u8a00\\uff0c\\u6211\\u4eec\\u4f1a\\u7b2c\\u4e00\\u65f6\\u95f4\\u8fdb\\u884c\\u5904\\u7406\\uff01\\uff01\\uff01\"', '客服反馈', '暂无客服在线是，联系客服跳转的客服反馈页面的显示文字', 0, 1, 0, 0, 0),
-(307, 'integral_max_num', 'text', 'input', 11, '', 0, '', 100, 0, '\"100\"', '积分抵扣上限', '单次下单积分使用上限,0不限制', 0, 1, 0, 0, 0),
-(310, 'member_card_status', 'radio', 'input', 67, '1=>开启\n0=>关闭', 1, '', 0, 0, '1', '开启付费会员', '付费会员开关', 0, 1, 0, 0, 0),
-(324, 'spread_banner', 'upload', '', 72, '', 2, '', 0, 0, '[\"\\/statics\\/system_images\\/spread_1.jpeg\",\"\\/statics\\/system_images\\/spread_2.jpeg\"]', '分销海报图', '个人中心分销海报图片，建议尺寸600x1000', 0, 1, 0, 0, 0),
 (325, 'config_export_open', 'radio', 'input', 93, '1=>开启\n0=>关闭', 1, '', 0, 0, '0', '开启电子面单', '电子面单是否开启，开启后请在物流公司列表配置<a href="/admin/setting/freight/express/index">月结账号</a>', 111, 1, 0, 0, 0),
 (326, 'wap_login_logo', 'upload', 'input', 122, '', 1, '', 0, 0, '\"\\/statics\\/system_images\\/login_logo.jpeg\"', '移动端登录LOGO', '移动端登录logo，建议尺寸86x86，建议png格式', 88, 1, 0, 0, 0),
 (327, 'pc_logo', 'upload', '', 75, '', 1, '', 0, 0, '\"\\/statics\\/system_images\\/pc_logo.png\"', 'PC端LOGO', 'PC端LOGO', 0, 0, 0, 0, 0),
 (328, 'record_No', 'text', 'input', 125, '', 1, '', 0, 0, '\"\"', '备案号', '网站的备案号，显示在H5和PC端底部', 70, 1, 0, 0, 0),
 (329, 'routine_contact_type', 'radio', 'input', 132, '0=>跟随系统\n1=>小程序客服', 1, '', 0, 0, '0', '客服类型', '跟随系统：跟随系统使用默认客服、电话或者跳转链接；小程序客服：需要在小程序后台配置客服用户；', 97, 1, 0, 0, 0),
 (330, 'station_open', 'radio', 'input', 1, '1=>开启\n0=>关闭', 1, '', 0, 0, '\"1\"', '站点开启', '站点开启|关闭（用于升级等临时关闭），关闭后前端会弹窗显示站点升级中，请稍后访问', 100, 1, 0, 0, 0),
-(331, 'uni_brokerage_price', 'text', 'input', 73, '', 0, '', 100, 0, '\"0\"', '推广佣金单价', '分销推广佣金单价（每推广一个用户）', 93, 1, 0, 0, 0),
-(332, 'day_brokerage_price_upper', 'text', 'input', 73, '', 0, '', 100, 0, '\"0\"', '每日推广佣金上限', '每日推广佣金上限（0:不发佣金-1:不限制；注最好是推广佣金单价的整数倍）', 92, 1, 0, 0, 0),
 (333, 'is_self_brokerage', 'radio', '', 73, '1=>开启\n0=>关闭', 0, '', 0, 0, '0', '自购返佣', '是否开启自购返佣（开启：分销员自己购买商品，享受一级返佣，上级享受二级返佣； 关闭：分销员自己购买商品没有返佣）', 99, 1, 0, 0, 0),
-(334, 'store_brokerage_binding_status', 'radio', '', 72, '1=>永久\n2=>有效期\n3=>临时', 0, '', 0, 0, '1', '绑定模式', '永久”一次绑定永久有效，“有效期”绑定后一段时间内有效，“临时” 临时有效', 91, 1, 0, 0, 0),
-(335, 'store_brokerage_binding_time', 'text', 'input', 72, '', 0, '', 100, 0, '\"1\"', '绑定有效期', '绑定有效期（绑定后N天内有效）', 90, 1, 0, 0, 0),
 (336, 'refund_name', 'text', 'input', 71, '', 1, '', 0, 0, '\"\"', '退货收货人姓名', '用户退货退款后台同意之后，显示在退货订单详情显示的接受退货的人员姓名', 90, 1, 0, 0, 0),
 (337, 'refund_phone', 'text', 'input', 71, '', 1, '', 0, 0, '\"\"', '退货收货人电话', '用户退货退款后台同意之后，显示在退货订单详情显示的接受退货的人员电话', 90, 1, 0, 0, 0),
 (338, 'refund_address', 'text', 'input', 71, '', 1, '', 0, 0, '\"\"', '退货收货人地址', '用户退货退款后台同意之后，显示在退货订单详情显示的接受退货的地址信息', 90, 1, 0, 0, 0),
-(339, 'brokerage_user_status', 'radio', '', 73, '1=>开启\n0=>关闭', 0, '', 100, 0, '0', '推广用户返佣', '分销推广用户获取佣金', 94, 1, 0, 0, 0),
 (340, 'wechat_open_app_id', 'text', 'input', 75, '', 1, '', 0, 0, '\"\"', 'AppID', '微信开放平台申请网页应用后给予的AppID', 0, 1, 0, 0, 0),
 (341, 'wechat_open_app_secret', 'text', 'input', 75, '', 1, '', 0, 0, '\"\"', 'AppSecret', '微信开放平台申请网页应用后给予的AppSecret', 0, 1, 0, 0, 0),
 (342, 'contact_number', 'text', 'input', 75, '', 1, '', 0, 0, '\"\"', '联系电话', 'PC底部显示的联系电话', 0, 1, 0, 0, 0),
@@ -33863,14 +32987,11 @@ INSERT INTO `eb_system_config` (`id`, `menu_name`, `type`, `input_type`, `config
 (377, 'watermark_y', 'text', 'input', 31, '', 0, '', 100, 0, '\"\"', '水印纵坐标偏移量（单位：px）', '水印纵坐标偏移量（单位：px）', 22, 1, 0, 0, 0),
 (379, 'ico_path', 'upload', 'input', 122, '', 3, '', 0, 0, '\"\"', '系统ICO图标', '程序ICO图标，更换后需要清除浏览器缓存', 85, 1, 0, 0, 0),
 (383, 'tengxun_appid', 'text', 'input', 82, '', 0, '', 0, 0, '\"\"', '腾讯云APPID', '腾讯云APPID', 0, 1, 0, 0, 0),
-(384, 'extract_type', 'checkbox', 'input', 74, '0=>银行卡\n1=>微信\n2=>支付宝\n3=>余额', 1, '', 0, 0, '[\"0\",\"1\",\"2\"]', '提现方式', '开启后用户才可以选择该提现方式', 8, 1, 0, 0, 0),
-(385, 'integral_frozen', 'text', 'input', 11, '', 1, '', 100, 0, '\"0\"', '积分冻结(天)', '积分冻结(天)，0为不冻结', 0, 1, 0, 0, 0),
 (386, 'print_type', 'radio', 'input', 86, '1=>易联云\n2=>飞鹅云', 1, '', 0, 0, '\"1\"', '平台选择', '打印平台选择', 0, 1, 0, 0, 0),
 (387, 'config_export_type', 'radio', 'input', 93, '1=>一号通', 1, '', 0, 0, '1', '电子面单类型', '电子面单类型', 0, 1, 0, 0, 0),
 (388, 'customer_corpId', 'text', 'input', 69, '', 1, '', 0, 0, '\"\"', '企业ID', '如果客服链接填写企业微信客服，小程序需要跳转企业微信客服的话需要配置此项，并且在小程序客服中绑定企业ID', 0, 1, 0, 0, 0),
 (389, 'create_wechat_user', 'radio', 'input', 130, '1=>开启\r\n0=>关闭', 1, '', 0, 0, '0', '关注是否生成用户', '用户关注公众号之后是否生成商城用户', 0, 1, 0, 0, 0),
 (390, 'friend_pay_status', 'radio', 'input', 109, '1=>开启\r\n0=>关闭', 1, '', 0, 0, '0', '好友代付', '好友代付开关，关闭后付款类型不显示好友代付', 0, 1, 0, 0, 0),
-(392, 'brokerage_level', 'radio', 'input', 72, '1=>一级分销\r\n2=>二级分销', 1, '', 0, 0, '2', '分销层级', '分销层级，一级是只返上级一层的佣金，二级是返上级和上上级的佣金', 98, 1, 0, 0, 0),
 (393, 'sms_type', 'radio', 'input', 97, '0=>一号通\r\n1=>阿里云\r\n2=>腾讯云', 1, '', 0, 0, '0', '短信类型', '短信类型，选择发送的短信类型', 0, 1, 0, 0, 0),
 (394, 'aliyun_AccessKeyId', 'text', 'input', 98, '', 1, '', 0, 0, '\"\"', 'AccessKeyId', '阿里云AccessKeyId', 100, 1, 0, 0, 0),
 (395, 'aliyun_AccessKeySecret', 'text', 'input', 98, '', 1, '', 0, 0, '\"\"', 'AccessKeySecret', '阿里云AccessKeySecret', 99, 1, 0, 0, 0),
@@ -33885,11 +33006,8 @@ INSERT INTO `eb_system_config` (`id`, `menu_name`, `type`, `input_type`, `config
 (410, 'pay_new_weixin_mchid', 'text', 'input', 4, '', 1, '', 0, 0, '\"\"', '小程序支付商户号', '小程序开通支付管理生成的商户号', 0, 1, 0, 0, 0),
 (411, 'system_comment_time', 'text', 'number', 117, '', 1, '', 0, 0, '\"0\"', '自动评价时间', '商城订单在收货之后，用户如果不主动评价订单商品，则在N天后自动评价，设置0为永远不自动评价', 0, 1, 0, 0, 0),
 (412, 'comment_content', 'text', 'input', 117, '', 1, '', 0, 0, '\"\\u6b64\\u7528\\u6237\\u672a\\u505a\\u8bc4\\u4ef7\"', '自动评价文字', '自动评价显示的评价文字', 0, 1, 0, 0, 0),
-(413, 'pay_wechat_type', 'radio', 'input', 4, '0=>v2 (支持企业付款到零钱)\n1=>v3 (支持商户转账到零钱)', 1, '', 0, 0, '0', '支付接口类型', '支付接口类型v2对应微信支付旧版v2支付。v3对应微信支付v3支付接口。支付证书可以通用一个。支付秘钥和v2旧版支付有区别', 10, 1, 0, 0, 0),
 (414, 'pay_weixin_serial_no', 'text', 'input', 4, '', 1, '', 100, 0, '\"\"', '证书序列号', '「商户API证书」的「证书序列号」，可以在证书管理里面查看', 0, 1, 0, 0, 0),
 (415, 'pay_weixin_key_v3', 'text', 'input', 4, '', 1, '', 100, 0, '\"\"', 'V3支付Key', 'V3支付秘钥', 0, 1, 0, 0, 0),
-(416, 'reward_money', 'text', 'number', 105, '', 1, '', 0, 0, '\"0\"', '赠送余额(元)', '新用户奖励金额，必须大于等于0，0为不赠送', 0, 0, 0, 0, 0),
-(417, 'reward_integral', 'text', 'number', 105, '', 1, '', 0, 0, '\"0\"', '赠送积分', '新用户奖励积分，必须大于等于0，0为不赠送', 0, 0, 0, 0, 0),
 (418, 'hs_accesskey', 'text', 'input', 106, '', 1, '', 0, 0, '\"\"', 'AccessKey', '机器翻译仅支持火山翻译，注册地址https://console.volcengine.com，在访问控制里面新建api密钥', 1, 1, 0, 0, 0),
 (419, 'hs_secretkey', 'text', 'input', 106, '', 1, '', 0, 0, '\"\"', 'SecretKey', '机器翻译仅支持火山翻译，注册地址https://console.volcengine.com，在访问控制里面新建api密钥', 0, 1, 0, 0, 0),
 (420, 'fey_user', 'text', 'input', 107, '', 1, '', 0, 0, '\"\"', '飞鹅云USER', '飞鹅云后台注册账号', 10, 1, 0, 0, 0),
@@ -33901,8 +33019,6 @@ INSERT INTO `eb_system_config` (`id`, `menu_name`, `type`, `input_type`, `config
 (428, 'queue_open', 'radio', 'input', 1, '1=>开启\n0=>关闭', 1, '', 0, 0, '0', '消息队列', '是否启用消息队列，启用后提升程序运行速度，启用前必须配置Redis缓存，文档地址：https://doc.crmeb.com/single/v52/8646', 73, 1, 0, 0, 0),
 (429, 'get_avatar', 'radio', 'input', 132, '1=>开启\n0=>关闭', 1, '', 0, 0, '\"1\"', '强制获取昵称头像', '是否在小程序用户授权之后，弹窗获取用户的昵称和头像', 89, 1, 0, 0, 0),
 (430, 'share_qrcode', 'radio', 'input', 130, '0=>商城\n1=>公众号', 1, '', 0, 0, '0', '公众号推广码类型', '公众号生成的推广码类型：商城：扫码直接进入商城，公众号：扫码进入公众号后推送商城的链接', 0, 1, 0, 0, 0),
-(431, 'member_brokerage', 'radio', 'input', 73, '1=>开启\n0=>关闭', 1, '', 0, 0, '\"0\"', '购买付费会员返佣', '购买付费会员是否按照设置的佣金比例进行返佣', 98, 1, 0, 0, 0),
-(432, 'user_brokerage_type', 'radio', 'input', 73, '0=>按照商品价格返佣\n1=>按照实际支付价格返佣', 1, '', 0, 0, '1', '返佣类型', '选择返佣类型，按照商品价格返佣（按照商品售价计算返佣金额）以及按照实际支付价格返佣（按照商品的实际支付价格计算返佣 ）', 97, 1, 0, 0, 0),
 (433, 'network_security', 'text', 'input', 125, '', 1, '', 0, 0, '\"\"', '网安备案', '公安部门登记的备案信息，显示在PC和H5底部', 8, 1, 0, 0, 0),
 (435, 'icp_url', 'text', 'input', 125, '', 1, '', 0, 0, '\"\"', 'ICP备案链接', 'H5和PC底部显示的ICP备案号点击跳转的链接', 9, 1, 0, 0, 0),
 (436, 'network_security_url', 'text', 'input', 125, '', 1, '', 0, 0, '\"\"', '网安备案链接', 'H5和PC底部显示的网安备案号点击跳转的链接', 7, 1, 0, 0, 0),
@@ -33915,12 +33031,6 @@ INSERT INTO `eb_system_config` (`id`, `menu_name`, `type`, `input_type`, `config
 (445, 'ty_accessKey', 'text', 'input', 112, '', 1, '', 100, 0, '\"\"', '天翼云accessKey', '天翼云accessKey', 0, 1, 0, 0, 0),
 (446, 'coupon_return_open', 'radio', 'input', 71, '1=>退还\n0=>不退还', 1, '', 0, 0, '\"0\"', '优惠券退还状态', '优惠券是否退回开关，商品成功退款后，退回/不退回使用的优惠券', 0, 1, 0, 0, 0),
 (447, 'jd_storageRegion', 'text', 'input', 110, '', 1, '', 100, 0, '\"\"', '京东云storageRegion', '京东云storageRegion', 0, 1, 0, 0, 0),
-(449, 'sign_status', 'radio', 'input', 126, '1=>开启\n0=>关闭', 1, '', 0, 0, '0', '签到开关', '签到开关，商城是否开启签到功能，关闭后隐藏签到入口', 100, 1, 0, 0, 0),
-(450, 'sign_mode', 'radio', 'input', 126, '-1=>无限制\n1=>周循环\n0=>月循环', 1, '', 0, 0, '\"-1\"', '签到模式', '无限制，累积和连续签到不会清零，周循环，每周一会清理累积和连续的记录为0，重新开启计算，月循环，每月一号会清理累积和连续的记录为0，重新开启计算', 95, 1, 0, 0, 0),
-(451, 'sign_remind', 'radio', 'input', 126, '1=>开启\n0=>关闭', 1, '', 0, 0, '0', '签到提醒', '是否开启签到提醒，提醒方式为短信以及站内信', 90, 1, 0, 0, 0),
-(452, 'sign_remind_time', 'text', 'time', 126, '', 1, '', 100, 0, '\"09:00:00\"', '提醒时间', '选择每日未签到提醒的通知时间', 0, 1, 0, 0, 0),
-(453, 'sign_remind_type', 'checkbox', 'input', 126, '1=>短信\n2=>站内信', 1, '', 0, 0, '[\"1\",\"2\"]', '提醒方式', '签到每日提醒的提醒方式，支持短信和站内信', 80, 1, 0, 0, 0),
-(454, 'sign_give_point', 'text', 'number', 126, '', 1, '', 0, 0, '0', '签到赠送积分', '签到赠送积分，每日签到赠送的积分值', 75, 1, 0, 0, 0),
 (455, 'mer_type', 'radio', 'input', 4, '0=>微信支付商户模式\n1=>微信支付服务商模式', 1, '', 0, 0, '0', '商户类型', '商户类型，目前支持普通微信商户模式和普通微信服务商模式；', 0, 1, 0, 0, 0),
 (456, 'pay_sub_merchant_id', 'text', 'input', 4, '', 1, '', 0, 0, '\"\"', '子商户商户号', '微信支付服务商子商户商户号', 0, 1, 0, 0, 0),
 (457, 'withdrawal_fee', 'text', 'number', 74, '', 1, '', 100, 0, '\"0\"', '提现手续费', '提现手续费百分比，范围0-100，0为无提现手续费，例：设置10，即收取10%手续费，提现100元，到账90元，10元手续费', 0, 1, 0, 0, 0),
@@ -33932,7 +33042,6 @@ INSERT INTO `eb_system_config` (`id`, `menu_name`, `type`, `input_type`, `config
 (464, 'routine_encodingaeskey', 'text', 'input', 133, '', 1, '', 0, 0, '\"\"', 'EncodingAESKey', '消息加密密钥由43位字符组成，字符范围为A-Z,a-z,0-9', 0, 1, 0, 0, 0),
 (465, 'model_checkbox', 'checkbox', 'input', 134, 'seckill=>秒杀\nbargain=>砍价\ncombination=>拼团', 1, '', 0, 0, '[\"seckill\",\"bargain\",\"combination\"]', '模块配置', '模块配置，选中展示对应的模块，取消选中则前后端不展示模块相关内容', 0, 1, 0, 0, 0),
 (466, 'sp_appid', 'text', 'input', 4, '', 1, '', 100, 0, '\"\"', '主商户APPID', '开启服务商支付，需要配置主商户申请的时候开通的公众号服务号的APPID', 0, 1, 0, 0, 0),
-(467, 'brokerage_window_switch', 'radio', 'input', 72, '1=>开启\n0=>关闭', 1, '', 0, 0, '1', '佣金悬浮窗开关', '佣金悬浮窗开关，关闭之后，商品详情不显示佣金悬浮窗', 0, 1, 0, 0, 0),
 (468, 'elec_invoice', 'radio', 'input', 18, '1=>开启\n0=>关闭', 1, '', 0, 0, '\"0\"', '电子发票状态', '是否开启电子发票', 0, 0, 0, 0, 0),
 (469, 'auto_invoice', 'radio', 'input', 18, '1=>开启\n0=>关闭', 1, '', 0, 0, '\"0\"', '是否自动开票', '是否开启自动开票功能', 0, 0, 0, 0, 0),
 (470, 'elec_invoice_cate', 'text', 'input', 18, '', 1, '', 100, 0, '\"0\"', '电子发票分类', '电子发票的商品分类', 0, 0, 0, 0, 0),
@@ -33944,8 +33053,6 @@ INSERT INTO `eb_system_config` (`id`, `menu_name`, `type`, `input_type`, `config
 (476, 'reward_coupon', 'text', 'input', 105, '', 1, '', 100, 0, '', '赠送优惠券', '赠送优惠券', 0, 0, 0, 0, 0),
 (477, 'param_filter_type', 'radio', 'input', 137, '0=>关闭\n1=>拦截\n2=>过滤', 1, '', 0, 0, '2', 'WAF类型', 'WAF类型：关闭（所有参数都能正常请求），拦截（匹配到WAF配置的参数阻断接口请求），过滤（匹配到WAF配置的参数过滤参数，正常请求接口）', 10, 1, 0, 0, 0),
 (478, 'product_type_config', 'checkbox', 'input', 136, '0=>普通商品\n1=>卡密/网盘\n2=>优惠券\n3=>虚拟商品', 1, '', 0, 0, '[\"0\",\"1\",\"2\",\"3\"]', '商品类型配置', '商品类型配置，可以配置添加商品时可选择的商品类型', 1, 1, 0, 0, 0),
-(479, 'weixin_extract_type', 'radio', 'input', 74, '0=>手动线下转账\n1=>自动转账到零钱', 1, '', 0, 0, '0', '微信提现', '微信提现方式：手动线下转账，自动转账到零钱(需开通商家转账到零钱)', 7, 1, 0, 0, 0),
-(480, 'alipay_extract_type', 'radio', 'input', 74, '0=>手动线下转账\n1=>自动转账到余额', 1, '', 0, 0, '0', '支付宝提现', '支付宝提现方式：手动线下转账，自动转账到余额(需开通支付宝转账)', 6, 1, 0, 0, 0),
 (481, 'v3_pay_public_key', 'text', 'input', 4, '', 1, '', 100, 0, '\"\"', 'v3支付公钥', 'v3支付公钥，新版本使用公钥请填写', 0, 1, 0, 0, 0),
 (482, 'v3_pay_public_pem', 'upload', 'input', 4, '', 3, '', 0, 0, '\"\"', 'v3支付公钥证书', 'v3支付公钥证书，使用新版本支付公钥上传此证书', 0, 1, 0, 0, 0),
 (483, 'v3_transfer_scene_id', 'text', 'input', '4', '', '1', '', '0', '0', '\"1000\"', '微信自动提现场景值', '微信自动提现场景值', 0, 1, 0, 0, 0),
@@ -33986,26 +33093,16 @@ INSERT INTO `eb_system_config_tab` (`id`, `pid`, `title`, `eng_title`, `status`,
 (2, 78, '公众号配置(H5)', 'wechat', 1, 0, 'ios-chatbubbles', 3, 0, 1006),
 (4, 23, '微信支付配置', 'pay', 1, 0, 'ios-chatbubbles', 3, 0, 1063),
 (7, 78, '小程序配置', 'routine', 1, 0, 'logo-android', 3, 0, 1007),
-(9, 0, '分销配置', 'fenxiao', 1, 0, 'md-contacts', 3, 0, 28),
-(11, 100, '用户积分配置', 'point', 0, 0, 'logo-euro', 3, 0, 3423),
 (18, 65, '一号通', 'system_sms', 1, 0, 'ios-chatboxes', 3, 99, 3418),
 (23, 65, '商城支付配置', 'pay_config', 1, 0, 'logo-usd', 3, 70, 1063),
-(28, 100, '用户充值配置', 'recharge_site', 0, 0, '', 3, 2, 3423),
 (31, 79, '基础配置', 'base_config', 0, 0, '', 0, 0, 1012),
 (41, 65, '采集商品配置', 'copy_product', 1, 0, '', 3, 0, 1058),
-(45, 100, '用户等级配置', 'store_member', 1, 0, '', 3, 3, 3423),
 (50, 113, '发票功能配置', 'store_invoice', 1, 0, '', 3, 0, 3424),
-(63, 23, '支付宝支付配置', 'ali_pay', 1, 0, '', 3, 0, 1063),
 (64, 65, '物流查询配置', 'logistics_select', 1, 0, '', 3, 0, 1059),
 (65, 0, '接口设置', 'system_serve', 1, 0, 'md-briefcase', 3, 0, 1056),
 (66, 65, '电子面单配置', 'electronic_sheet', 1, 0, '', 3, 0, 1060),
-(67, 100, '付费会员配置', 'member_card', 0, 0, '', 3, 2, 3423),
-(69, 0, '客服配置', 'kefu_config', 1, 0, '', 3, 0, 3421),
 (70, 129, '分享配置', 'share_index_config', 1, 0, '', 0, 0, 23),
 (71, 113, '售后退款配置', 'refund_config', 1, 0, '', 3, 0, 3424),
-(72, 9, '分销模式', 'brokerage_type', 1, 0, '', 3, 0, 28),
-(73, 9, '返佣设置', 'brokerage_set', 1, 0, '', 3, 0, 28),
-(74, 9, '提现设置', 'extract_set', 1, 0, '', 3, 0, 28),
 (75, 78, 'PC站点配置', 'system_pc', 1, 0, '', 3, 0, 1010),
 (77, 78, 'APP配置', 'app', 1, 0, '', 3, 0, 1011),
 (78, 0, '应用配置', 'sys_app', 1, 0, '', 3, 0, 135),
@@ -34039,13 +33136,11 @@ INSERT INTO `eb_system_config_tab` (`id`, `pid`, `title`, `eng_title`, `status`,
 (115, 113, '订单取消配置', 'order_cancel_config', 1, 0, '', 3, 0, 3424),
 (116, 113, '自动收货配置', 'auto_take_config', 1, 0, '', 3, 0, 3424),
 (117, 113, '自动评价配置', 'auto_reviews_config', 1, 0, '', 3, 0, 3424),
-(119, 113, '到店自提配置', 'self_mention_config', 1, 0, '', 3, 0, 3424),
 (120, 113, '警戒库存配置', 'store_stock_config', 1, 0, '', 3, 0, 3424),
 (122, 129, 'LOGO配置', 'site_logo_config', 1, 0, '', 0, 0, 23),
 (123, 129, '自定义JS', 'statistics_config', 1, 0, '', 0, 0, 23),
 (124, 129, '地图配置', 'map_config', 1, 0, '', 0, 0, 23),
 (125, 129, '备案配置', 'beian_config', 1, 0, '', 0, 0, 23),
-(126, 100, '用户签到配置', 'user_sign_config', 0, 0, '', 3, 0, 3423),
 (129, 0, '系统配置', 'system_config', 1, 0, '', 0, 0, 23),
 (130, 2, '公众号配置', 'wechat_config', 1, 0, '', 3, 0, 1006),
 (131, 2, '服务器域名配置', 'wechat_encoding', 1, 0, '', 3, 0, 1006),
@@ -47473,19 +46568,13 @@ CREATE TABLE IF NOT EXISTS `eb_system_group` (
 --
 
 INSERT INTO `eb_system_group` (`id`, `cate_id`, `name`, `info`, `config_name`, `fields`) VALUES
-(49, 0, '秒杀时间段', '秒杀时间段', 'routine_seckill_time', '[{\"name\":\"\\u5f00\\u542f\\u65f6\\u95f4(\\u6574\\u70b9)\",\"title\":\"time\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u6301\\u7eed\\u65f6\\u95f4(\\u6574\\u6570\\u5c0f\\u65f6)\",\"title\":\"continued\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u5e7b\\u706f\\u7247\",\"title\":\"slide\",\"type\":\"upload\",\"param\":\"1=>\\u56fe1\\n2=>\\u56fe2\\n3=>\\u56fe3\"}]'),
-(52, 1, '首页精品推荐图片', '首页精品推荐图片', 'routine_home_bast_banner', '[{\"name\":\"\\u56fe\\u7247\",\"title\":\"img\",\"type\":\"upload\",\"param\":\"\"},{\"name\":\"\\u63cf\\u8ff0\",\"title\":\"comment\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u8df3\\u8f6c\\u94fe\\u63a5\",\"title\":\"link\",\"type\":\"input\",\"param\":\"\"}]'),
 (53, 0, '订单详情状态图', '订单详情状态图', 'order_details_images', '[{\"name\":\"\\u8ba2\\u5355\\u72b6\\u6001\",\"title\":\"order_status\",\"type\":\"select\",\"param\":\"0=>\\u672a\\u652f\\u4ed8\\n1=>\\u5f85\\u53d1\\u8d27\\n2=>\\u5f85\\u6536\\u8d27\\n3=>\\u5f85\\u8bc4\\u4ef7\\n4=>\\u5df2\\u5b8c\\u6210\\n9=>\\u7ebf\\u4e0b\\u4ed8\\u6b3e\"},{\"name\":\"\\u56fe\\u6807\",\"title\":\"pic\",\"type\":\"upload\",\"param\":\"\"}]'),
 (54, 0, '个人中心菜单', '个人中心菜单', 'routine_my_menus', '[{\"name\":\"\\u83dc\\u5355\\u540d\",\"title\":\"name\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u56fe\\u6807(48*48)\",\"title\":\"pic\",\"type\":\"upload\",\"param\":\"\"},{\"name\":\"\\u8df3\\u8f6c\\u8def\\u5f84\",\"title\":\"url\",\"type\":\"select\",\"param\":\"\\/pages\\/users\\/user_address_list\\/index=>\\u5730\\u5740\\u7ba1\\u7406\\n\\/pages\\/users\\/user_vip\\/index=>\\u4f1a\\u5458\\u4e2d\\u5fc3\\n\\/pages\\/activity\\/bargain\\/index=>\\u780d\\u4ef7\\u8bb0\\u5f55\\n\\/pages\\/users\\/user_spread_user\\/index=>\\u63a8\\u5e7f\\u4e2d\\u5fc3\\n\\/pages\\/users\\/user_money\\/index=>\\u6211\\u7684\\u4f59\\u989d\\n\\/pages\\/users\\/user_goods_collection\\/index=>\\u6211\\u7684\\u6536\\u85cf\\n\\/pages\\/users\\/user_coupon\\/index=>\\u4f18\\u60e0\\u5238\\n\\/pages\\/admin\\/order\\/index=>\\u540e\\u53f0\\u8ba2\\u5355\\u7ba1\\u7406\\n\\/pages\\/extension\\/customer_list\\/chat=>\\u8054\\u7cfb\\u5ba2\\u670d\\n\\/pages\\/admin\\/order_cancellation\\/index=>\\u8ba2\\u5355\\u6838\\u9500\\n\\/pages\\/users\\/user_integral\\/index=>\\u79ef\\u5206\\u4e2d\\u5fc3\\n\\/pages\\/users\\/user_invoice_list\\/index=>\\u53d1\\u7968\\u7ba1\\u7406\\n\\/pages\\/annex\\/vip_paid\\/index=>\\u4ed8\\u8d39\\u4f1a\\u5458\\n\\/kefu\\/mobile_list=>\\u5ba2\\u670d\\u63a5\\u5f85\"},{\"name\":\"\\u662f\\u5426\\u663e\\u793a\",\"title\":\"is_show\",\"type\":\"radio\",\"param\":\"1=>\\u5f00\\u542f\\n0=>\\u5173\\u95ed\"}]'),
-(55, 0, '签到天数配置', '签到天数配置', 'sign_day_num', '[{\"name\":\"\\u7b2c\\u51e0\\u5929\",\"title\":\"day\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u83b7\\u53d6\\u79ef\\u5206\",\"title\":\"sign_num\",\"type\":\"input\",\"param\":\"\"}]'),
-(57, 1, '热门榜单推荐图片', '热门榜单推荐图片', 'routine_home_hot_banner', '[{\"name\":\"\\u56fe\\u7247(\\u5c3a\\u5bf8:750*280)\",\"title\":\"img\",\"type\":\"upload\",\"param\":\"\"},{\"name\":\"\\u63cf\\u8ff0\",\"title\":\"comment\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u94fe\\u63a5\",\"title\":\"link\",\"type\":\"input\",\"param\":\"\"}]'),
 (58, 1, '首发新品推荐图片', '首发新品推荐图片', 'routine_home_new_banner', '[{\"name\":\"\\u56fe\\u7247\",\"title\":\"img\",\"type\":\"upload\",\"param\":\"\"},{\"name\":\"\\u63cf\\u8ff0\",\"title\":\"comment\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u8df3\\u8f6c\\u94fe\\u63a5\",\"title\":\"link\",\"type\":\"input\",\"param\":\"\"}]'),
 (59, 1, '促销单品推荐图片', '促销单品推荐图片', 'routine_home_benefit_banner', '[{\"name\":\"\\u56fe\\u7247\",\"title\":\"img\",\"type\":\"upload\",\"param\":\"\"},{\"name\":\"\\u63cf\\u8ff0\",\"title\":\"comment\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u8df3\\u8f6c\\u94fe\\u63a5\",\"title\":\"link\",\"type\":\"input\",\"param\":\"\"}]'),
-(62, 0, '充值金额设置', '设置充值金额额度选择', 'user_recharge_quota', '[{\"name\":\"\\u552e\\u4ef7\",\"title\":\"price\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u8d60\\u9001\",\"title\":\"give_money\",\"type\":\"input\",\"param\":\"\"}]'),
 (65, 1, '后台登录页面幻灯片', '后台登录页面幻灯片', 'admin_login_slide', '[{\"name\":\"\\u5e7b\\u706f\\u7247\",\"title\":\"slide\",\"type\":\"upload\",\"param\":\"\"}]'),
 (66, 0, '前端页面链接', '前端页面链接', 'uni_app_link', '[{\"name\":\"\\u540d\\u79f0\",\"title\":\"name\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u5730\\u5740\",\"title\":\"link\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u53c2\\u6570\",\"title\":\"param\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u4e8b\\u4f8b\",\"title\":\"example\",\"type\":\"input\",\"param\":\"\"}]'),
 (67, 1, '拼团列表轮播图', '拼团列表轮播图', 'combination_banner', '[{\"name\":\"\\u56fe\\u7247\",\"title\":\"img\",\"type\":\"upload\",\"param\":\"\"},{\"name\":\"\\u63cf\\u8ff0\",\"title\":\"comment\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u8df3\\u8f6c\\u94fe\\u63a5\",\"title\":\"link\",\"type\":\"input\",\"param\":\"\"}]'),
-(68, 1, '积分商城轮播图', '积分商城轮播图', 'integral_shop_banner', '[{\"name\":\"\\u56fe\\u7247\",\"title\":\"img\",\"type\":\"upload\",\"param\":\"\"},{\"name\":\"\\u63cf\\u8ff0\",\"title\":\"comment\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u8df3\\u8f6c\\u94fe\\u63a5\",\"title\":\"link\",\"type\":\"input\",\"param\":\"\"}]'),
 (69, 0, 'PC端首页banner', 'PC端首页banner', 'pc_home_banner', '[{\"name\":\"\\u56fe\\u7247\\u6807\\u9898\",\"title\":\"title\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u56fe\\u7247\",\"title\":\"image\",\"type\":\"upload\",\"param\":\"\"},{\"name\":\"\\u8df3\\u8f6c\\u8def\\u5f84\",\"title\":\"url\",\"type\":\"input\",\"param\":\"\"}]'),
 (70, 0, '个人中心轮播图', '个人中心轮播图', 'routine_my_banner', '[{\"name\":\"\\u83dc\\u5355\\u540d\",\"title\":\"name\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u56fe\\u6807(48*48)\",\"title\":\"pic\",\"type\":\"upload\",\"param\":\"\"},{\"name\":\"\\u8df3\\u8f6c\\u8def\\u5f84\",\"title\":\"url\",\"type\":\"input\",\"param\":\"\"}]'),
 (71, 0, 'PC顶部菜单', 'PC顶部菜单', 'pc_home_menus', '[{\"name\":\"\\u83dc\\u5355\\u540d\\u79f0\",\"title\":\"title\",\"type\":\"input\",\"param\":\"\"},{\"name\":\"\\u8df3\\u8f6c\\u94fe\\u63a5\",\"title\":\"url\",\"type\":\"input\",\"param\":\"\"}]'),
@@ -48770,7 +47859,6 @@ INSERT INTO `eb_system_menus` (`id`, `pid`, `icon`, `menu_name`, `module`, `cont
 (7, 0, 's-home', '主页', 'admin', 'index', '', '', '', '[]', 127, 1, 1, 1, '/index', '', 1, 'home', 1, 'admin-home', 0, '主页'),
 (9, 0, 'user-solid', '用户', 'admin', 'user.user', '', '', '', '[]', 125, 1, 1, 1, '/user', '', 1, 'user', 1, 'admin-user', 0, '用户'),
 (10, 9, '', '用户管理', 'admin', 'user.user', 'index', '', '', '[]', 10, 1, 1, 1, '/user/list', '', 1, 'user', 0, 'admin-user-user-index', 0, '用户管理'),
-(11, 9, '', '用户等级', 'admin', 'user.user_level', 'index', '', '', '[]', 7, 1, 1, 1, '/user/level', '', 1, 'user', 0, 'user-user-level', 0, '用户等级'),
 (12, 0, 's-tools', '设置', 'admin', 'setting.system_config', 'index', '', '', '[]', 1, 1, 1, 1, '/setting', '', 1, 'setting', 1, 'admin-setting', 0, '设置'),
 (14, 12, '', '管理权限', 'admin', 'setting.system_admin', '', '', '', '[]', 0, 1, 1, 1, '/setting/auth/list', '', 1, 'setting', 0, 'setting-system-admin', 0, '管理权限'),
 (19, 14, '', '角色管理', 'admin', 'setting.system_role', 'index', '', '', '[]', 1, 1, 1, 1, '/setting/system_role/index', '', 1, 'setting', 0, 'setting-system-role', 0, '角色管理'),
@@ -48778,22 +47866,10 @@ INSERT INTO `eb_system_menus` (`id`, `pid`, `icon`, `menu_name`, `module`, `cont
 (21, 14, '', '权限设置', 'admin', 'setting.system_menus', 'index', '', '', '[]', 1, 1, 1, 1, '/setting/system_menus/index', '12/14', 1, 'setting', 1, 'setting-system-menus', 0, '菜单管理'),
 (23, 12, '', '系统设置', 'admin', 'setting.system_config', 'index', '', '', '[]', 10, 1, 1, 1, '/setting/system_config/2/129', '12', 1, 'setting', 1, 'setting-system-config', 0, '系统设置'),
 (25, 0, 'cpu', '维护', 'admin', 'system', '', '', '', '[]', 0, 1, 1, 1, '/system', '', 1, 'setting', 1, 'admin-system', 0, '维护'),
-(26, 0, 's-promotion', '分销', 'admin', 'agent', '', '', '', '[]', 104, 1, 1, 1, '/agent', '', 1, 'user', 1, 'admin-agent', 0, '分销'),
 (27, 0, 's-marketing', '营销', 'admin', 'marketing', '', '', '', '[]', 110, 1, 1, 1, '/marketing', '', 1, 'home', 1, 'admin-marketing', 0, '营销'),
-(28, 26, '', '分销设置', 'admin', 'setting.system_config', '', '', '', '[]', 1, 1, 1, 1, '/setting/system_config_retail/2/9', '', 1, 'setting', 0, 'setting-system-config', 0, '分销设置'),
-(29, 26, '', '分销员管理', 'admin', 'agent.agent_manage', 'index', '', '', '[]', 99, 1, 1, 1, '/agent/agent_manage/index', '', 1, 'user', 0, 'agent-agent-manage', 0, '分销员管理'),
 (30, 27, '', '优惠券', 'admin', 'marketing.store_coupon', '', '', '', '[]', 100, 1, 1, 1, '/marketing/store_coupon_issue/index', '27', 1, 'marketing', 1, 'marketing-store_coupon-index', 0, '优惠券'),
-(31, 27, '', '砍价管理', 'admin', 'marketing.store_bargain', '', '', '', '[]', 85, 1, 1, 1, '/marketing/store_bargain/index', '27', 1, 'marketing', 1, 'marketing-store_bargain-index', 0, '砍价管理'),
 (32, 27, '', '拼团管理', 'admin', 'marketing.store_combination', '', '', '', '[]', 80, 1, 1, 1, '/marketing/store_combination/index', '27', 1, 'marketing', 1, 'marketing-store_combination-index', 0, '拼团管理'),
-(33, 27, '', '秒杀管理', 'admin', 'marketing.store_seckill', '', '', '', '[]', 75, 1, 1, 1, '/marketing/store_seckill/list', '27', 1, 'marketing', 1, 'marketing-store_seckill-index', 0, '秒杀管理'),
-(34, 27, '', '积分管理', 'admin', 'marketing.user_point', '', '', '', '[]', 95, 1, 1, 1, '/marketing/point_statistic', '27', 1, 'marketing', 1, 'marketing-user_point-index', 0, '积分管理'),
 (35, 0, 's-finance', '财务', 'admin', 'finance', '', '', '', '[]', 90, 1, 1, 1, '/finance', '', 1, 'home', 1, 'admin-finance', 0, '财务'),
-(36, 35, '', '财务操作', 'admin', 'finance', '', '', '', '[]', 1, 1, 1, 1, '/finance/user_extract/index', '35', 1, 'finance', 1, 'finance-user_extract-index', 0, '财务操作'),
-(37, 35, '', '财务记录', 'admin', 'finance', '', '', '', '[]', 1, 1, 1, 1, '/finance/user_recharge/index', '35', 1, 'finance', 1, 'finance-user-recharge-index', 0, '财务记录'),
-(38, 35, '', '佣金记录', 'admin', 'finance', '', '', '', '[]', 1, 1, 1, 1, '/finance/finance/commission', '35', 1, 'finance', 1, 'finance-finance-index', 0, '佣金记录'),
-(39, 36, '', '提现申请', 'admin', 'finance.user_extract', '', '', '', '[]', 1, 1, 1, 1, '/finance/user_extract/index', '', 1, 'finance', 0, 'finance-user_extract', 0, '提现申请'),
-(40, 37, '', '充值记录', 'admin', 'finance.user_recharge', '', '', '', '[]', 1, 1, 1, 1, '/finance/user_recharge/index', '', 1, 'finance', 0, 'finance-user-recharge', 0, '充值记录'),
-(42, 38, '', '佣金记录', 'admin', 'finance.finance', '', '', '', '[]', 1, 1, 1, 1, '/finance/finance/commission', '', 1, 'finance', 0, 'finance-finance-commission', 0, '佣金记录'),
 (43, 0, 's-management', '内容', 'admin', 'cms', '', '', '', '[]', 85, 1, 1, 1, '/cms', '', 1, 'home', 1, 'admin-cms', 0, '内容'),
 (44, 43, '', '文章管理', 'admin', 'cms.article', 'index', '', '', '[]', 1, 1, 1, 1, '/cms/article/index', '', 1, 'cms', 0, 'cms-article-index', 0, '文章管理'),
 (45, 43, '', '文章分类', 'admin', 'cms.article_category', 'index', '', '', '[]', 1, 1, 1, 1, '/cms/article_category/index', '', 1, 'cms', 0, 'cms-article-category', 0, '文章分类'),
@@ -48806,12 +47882,8 @@ INSERT INTO `eb_system_menus` (`id`, `pid`, `icon`, `menu_name`, `module`, `cont
 (69, 135, '', '公众号', 'admin', 'wechat', '', '', '', '[]', 4, 1, 1, 1, '/app/wechat/setting/menus/index', '135', 1, 'app', 1, 'admin-wechat', 0, '公众号'),
 (71, 30, '', '优惠券列表', 'admin', 'marketing.store_coupon_issue', 'index', '', '', '[]', 0, 1, 1, 1, '/marketing/store_coupon_issue/index', '', 1, 'marketing', 0, 'marketing-store_coupon_issue', 0, '优惠券列表'),
 (72, 30, '', '用户领取记录', 'admin', 'marketing.store_coupon_user', 'index', '', '', '[]', 0, 1, 1, 1, '/marketing/store_coupon_user/index', '', 1, 'marketing', 0, 'marketing-store_coupon_user', 0, '用户领取记录'),
-(74, 31, '', '砍价商品', 'admin', 'marketing.store_bargain', 'index', '', '', '[]', 0, 1, 1, 1, '/marketing/store_bargain/index', '', 1, 'marketing', 0, 'marketing-store_bargain', 0, '砍价商品'),
 (75, 32, '', '拼团商品', 'admin', 'marketing.store_combination', 'index', '', '', '[]', 0, 1, 1, 1, '/marketing/store_combination/index', '', 1, 'marketing', 0, 'marketing-store_combination', 0, '拼团商品'),
 (76, 32, '', '拼团列表', 'admin', 'marketing.store_combination', 'combina_list', '', '', '[]', 0, 1, 1, 1, '/marketing/store_combination/combina_list', '', 1, 'marketing', 0, 'marketing-store_combination-combina_list', 0, '拼团列表'),
-(77, 33, '', '秒杀商品', 'admin', 'marketing.store_seckill', 'index', '', '', '[]', 0, 1, 1, 1, '/marketing/store_seckill/index', '', 1, 'marketing', 0, 'marketing-store_seckill', 0, '秒杀商品'),
-(78, 33, '', '秒杀配置', 'admin', 'marketing.store_seckill', 'index', '', '', '[]', 0, 1, 1, 1, '/marketing/store_seckill_data/index/49', '', 1, 'marketing', 0, 'marketing-store_seckill-data', 0, '秒杀配置'),
-(79, 34, '', '积分配置', 'admin', 'setting.system_config/index.html', 'index', '', '', '[]', 0, 1, 1, 1, '/marketing/integral/system_config/2/11', '27/34', 1, 'marketing', 1, 'marketing-integral-system_config', 0, '积分配置'),
 (92, 69, '', '微信菜单', 'admin', 'application.wechat_menus', 'index', '', '', '[]', 0, 1, 1, 1, '/app/wechat/setting/menus/index', '', 1, 'app', 0, 'application-wechat-menus', 0, '微信菜单'),
 (94, 3417, '', '一号通页面', 'admin', 'setting.sms_config', '', '', '', '[]', 8, 1, 1, 1, '/setting/sms/sms_config/index', '12/1056/3417', 1, 'setting', 1, 'setting-sms', 0, '一号通'),
 (99, 1, '', '商品规格', 'admin', 'store.store_product', 'index', '', '', '[]', 1, 1, 1, 1, '/product/product_attr', '', 1, 'product', 0, 'product-product-attr', 0, '商品规格'),
@@ -48824,54 +47896,24 @@ INSERT INTO `eb_system_menus` (`id`, `pid`, `icon`, `menu_name`, `module`, `cont
 (116, 114, '', '无效词回复', 'admin', 'wechat.reply', 'index', '', '', '[]', 0, 1, 1, 1, '/app/wechat/reply/index/default', '135/69/114', 1, 'app', 0, 'wechat-wechat-reply-default', 0, '无效词回复'),
 (128, 656, '', '数据配置', 'admin', 'setting.system_group_data', 'index', '', '', '[]', 2, 1, 1, 1, '/setting/system_visualization_data', '12/656', 1, 'system', 0, 'admin-setting-system_visualization_data', 0, '数据配置'),
 (135, 0, 'menu', '应用', 'admin', 'app', 'index', '', '', '[]', 70, 1, 1, 1, '/app', '', 1, 'app', 1, 'admin-app', 0, '应用'),
-(144, 303, '', '提货点设置', 'admin', 'merchant.system_store', 'index', '', '', '[]', 5, 1, 1, 1, '/setting/merchant/system_store/index', '', 1, '', 0, 'setting-system-config-merchant', 0, '提货点设置'),
 (145, 1073, '', '物流公司', 'admin', 'freight.express', 'index', '', '', '[]', 4, 1, 1, 1, '/setting/freight/express/index', '25/1073', 1, '', 0, 'setting-freight-express', 0, '物流公司'),
-(165, 0, 'message-solid', '客服', 'admin', 'setting.storeService', 'index', '', '', '[]', 104, 1, 1, 1, '/kefu', '', 1, '', 0, 'setting-store-service', 0, '客服'),
 (227, 9, '', '用户分组', 'admin', 'user.user_group', 'index', '', '', '[]', 9, 1, 1, 1, '/user/group', '', 1, 'user', 0, 'user-user-group', 0, '用户分组'),
-(229, 1073, '', '城市数据', 'admin', 'setting.system_city', '', '', '', '[]', 1, 1, 1, 1, '/setting/freight/city/list', '25/1073', 1, 'setting', 0, 'setting-system-city', 0, '城市数据'),
 (230, 303, '', '运费模板', 'admin', 'setting.shipping_templates', '', '', '', '[]', 0, 1, 1, 1, '/setting/freight/shipping_templates/list', '', 1, 'setting', 0, 'setting-shipping-templates', 0, '运费模板'),
-(300, 144, '', '提货点', 'admin', 'merchant.system_store', 'index', '', '', '[]', 0, 1, 1, 1, '/setting/merchant/system_store/list', '', 1, 'setting', 0, 'setting-merchant-system-store', 0, '提货点'),
-(301, 144, '', '核销员', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/merchant/system_store_staff/index', '', 1, 'setting', 0, 'setting-merchant-system-store-staff', 0, '核销员'),
-(302, 4, '', '核销记录', 'admin', '', 'index', '', '', '[]', 0, 1, 1, 1, '/setting/merchant/system_verify_order/index', '4', 1, 'setting', 1, 'setting-merchant-system-verify-order', 0, '核销订单'),
 (303, 12, '', '发货设置', 'admin', 'setting', 'index', '', '', '[]', 0, 1, 1, 1, '/setting/freight', '12', 1, '', 0, 'admin-setting-freight', 0, '发货设置'),
 (566, 656, '', '素材管理', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/system/file', '12/656', 1, '', 0, 'system-file', 0, '素材管理'),
 (589, 9, '', '用户标签', 'admin', 'user.user_label', 'index', '', '', '[]', 8, 1, 1, 1, '/user/label', '', 1, 'user', 0, 'user-user-label', 0, '用户标签'),
 (605, 25, '', '系统信息', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/system/maintain/auth', '', 1, '', 0, 'system-maintain-auth', 0, '系统信息'),
 (656, 0, 's-open', '装修', 'admin', '', '', '', '', '[]', 80, 1, 1, 1, '/setting/pages', '', 1, '', 0, 'admin-setting-pages', 0, '装修'),
 (657, 656, '', '首页装修', 'admin', '', '', '', '', '[]', 100, 0, 0, 1, '/setting/pages/devise/0', '12/656', 1, '', 0, 'admin-setting-pages-devise', 0, '页面设计'),
-(678, 165, '', '客服列表', 'admin', '', '', '', '', '[]', 10, 1, 1, 1, '/setting/store_service/index', '165', 1, '', 0, 'admin-setting-store_service-index', 0, '客服列表'),
-(679, 165, '', '客服话术', 'admin', '', '', '', '', '[]', 9, 1, 1, 1, '/setting/store_service/speechcraft', '165', 1, '', 0, 'admin-setting-store_service-speechcraft', 0, '客服话术'),
-(686, 27, '', '直播管理', 'admin', '', '', '', '', '[]', 65, 1, 1, 1, '/marketing/live/live_room', '27', 1, '', 0, 'admin-marketing-live', 0, '直播管理'),
-(687, 686, '', '直播间管理', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/live/live_room', '', 1, '', 0, 'admin-marketing-live-live_room', 0, '直播间管理'),
-(688, 686, '', '直播商品管理', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/live/live_goods', '', 1, '', 0, 'admin-marketing-live-live_goods', 0, '直播商品管理'),
-(689, 686, '', '主播管理', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/live/anchor', '', 1, '', 0, 'admin-marketing-live-anchor', 0, '主播管理'),
-(720, 303, '', '配送员管理', 'admin', '', '', '', '', '[]', 10, 1, 1, 1, '/setting/delivery_service/index', '', 1, '', 0, 'setting-delivery-service', 0, '配送员管理'),
-(731, 27, '', '付费会员', 'admin', '', '', '', '', '[]', 70, 1, 1, 1, '/user/grade/type', '27', 1, '', 0, 'user-user-grade', 0, '付费会员'),
-(738, 165, '', '用户留言', 'admin', '', '', '', '', '[]', 8, 1, 1, 1, '/setting/store_service/feedback', '165', 1, '', 0, 'admin-setting-store_service-feedback', 0, '用户留言'),
-(751, 731, '', '会员类型', 'admin', '', '', '', '', '[]', 5, 1, 1, 1, '/user/grade/type', '', 1, '', 0, 'admin-user-member-type', 0, '会员类型'),
-(755, 31, '', '砍价列表', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/store_bargain/bargain_list', '', 1, '', 0, 'marketing-store_bargain-bargain_list', 0, '砍价列表'),
-(760, 4, '', '收银订单', 'admin', '', '', '', '', '[]', 8, 1, 1, 1, '/order/offline', '4', 1, '', 0, 'admin-order-offline', 0, '收银订单'),
-(762, 731, '', '卡密会员', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/user/grade/card', '', 1, '', 0, 'admin-user-grade-card', 0, '卡密会员'),
-(763, 731, '', '会员记录', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/user/grade/record', '', 1, '', 0, 'admin-user-grade-record', 0, '会员记录'),
-(765, 731, '', '会员权益', 'admin', '', '', '', '', '[]', 4, 1, 1, 1, '/user/grade/right', '', 1, '', 0, 'admin-user-grade-right', 0, '会员权益'),
 (767, 36, '', '发票管理', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/order/invoice/list', '', 1, '', 0, 'admin-order-startOrderInvoice-index', 0, '发票管理'),
-(896, 26, '', '分销等级', 'admin', '', '', '', '', '[]', 95, 1, 1, 1, '/setting/membership_level/index', '26', 1, '', 0, 'admin-setting-membership_level-index', 0, '分销等级'),
 (897, 4, '', '售后订单', 'admin', '', '', '', '', '[]', 9, 1, 1, 1, '/order/refund', '4', 1, '', 0, 'admin-order-refund', 0, '售后订单'),
 (898, 12, '', '消息管理', 'admin', '', '', '', '', '[]', 9, 1, 1, 1, '/setting/notification/index', '12', 1, '', 0, 'setting-notification', 0, '消息管理'),
 (902, 656, '', '主题风格', 'admin', '', '', '', '', '[]', 2, 0, 0, 1, '/setting/theme_style', '12/656', 1, '', 0, 'admin-setting-theme_style', 0, '主题风格'),
 (903, 1008, '', 'PC端装修', 'admin', '', '', '', '', '[]', 2, 1, 1, 1, '/setting/pc_group_data', '12/656', 1, '', 0, 'setting-system-pc_data', 0, 'PC商城'),
-(905, 34, '', '积分商品', 'admin', '', '', '', '', '[]', 95, 1, 1, 1, '/marketing/store_integral/index', '27/34', 1, '', 0, 'marketing-store_integral', 0, '积分商品'),
-(909, 27, '', '抽奖管理', 'admin', '', '', '', '', '[]', 90, 1, 1, 1, '/marketing/lottery/list', '27', 1, '', 0, 'marketing-lottery-index', 0, '抽奖管理'),
-(912, 34, '', '积分订单', 'admin', '', '', '', '', '[]', 90, 1, 1, 1, '/marketing/store_integral/order_list', '27/34', 1, '', 0, 'marketing-store_integral-order', 0, '积分订单'),
 (993, 135, '', '小程序', 'admin', '', '', '', '', '[]', 3, 1, 1, 1, '/app/routine/download', '135', 1, '', 0, 'admin-routine', 0, '小程序'),
 (994, 993, '', '小程序下载', 'admin', '', '', '', '', '[]', 80, 1, 1, 1, '/app/routine/download', '135/993', 1, '', 0, 'routine-download', 0, '小程序下载'),
 (998, 37, '', '资金流水', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/finance/capital_flow/index', '35/37', 1, '', 0, 'finance-capital_flow-index', 0, '资金流水'),
 (999, 37, '', '账单记录', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/finance/billing_records/index', '35/37', 1, '', 0, 'finance-billing_records-index', 0, '账单记录'),
-(1001, 34, '', '积分记录', 'admin', '', '', '', '', '[]', 85, 1, 1, 1, '/marketing/point_record', '27/34', 1, '', 0, 'marketing-point_record-index', 0, '积分记录'),
-(1002, 34, '', '积分统计', 'admin', '', '', '', '', '[]', 100, 1, 1, 1, '/marketing/point_statistic', '27/34', 1, '', 0, 'marketing-point_statistic-index', 0, '积分统计'),
-(1003, 35, '', '余额记录', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/statistic/balance', '35', 1, '', 0, 'finance-balance-index', 0, '余额记录'),
-(1004, 1003, '', '余额记录', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/finance/balance/balance', '35/1003', 1, '', 0, 'finance-user-balance', 0, '余额记录'),
-(1005, 1003, '', '余额统计', 'admin', '', '', '', '', '[]', 100, 1, 1, 1, '/statistic/balance', '35/1003', 1, '', 0, 'admin-statistic', 0, '余额统计'),
 (1006, 69, '', '公众号配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/wechat_config/2/2', '135/69', 1, '', 0, 'setting-system-config', 0, '公众号配置'),
 (1007, 993, '', '小程序配置', 'admin', '', '', '', '', '[]', 100, 1, 1, 1, '/setting/routine_config/2/7', '135/993', 1, '', 0, 'setting-system-config', 0, '小程序配置'),
 (1008, 135, '', 'PC端', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/pc_group_data', '135', 1, '', 0, 'admin-pc', 0, 'PC端'),
@@ -48880,8 +47922,6 @@ INSERT INTO `eb_system_menus` (`id`, `pid`, `icon`, `menu_name`, `module`, `cont
 (1011, 1009, '', 'APP配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/app_config/2/77', '135/1009', 1, '', 0, 'setting-system-config', 0, 'APP配置'),
 (1012, 1056, '', '系统存储配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/storage', '12', 1, '', 0, 'setting-storage', 0, '系统存储配置'),
 (1023, 27, '', '渠道码', 'admin', '', '', '', '', '[]', 55, 1, 1, 1, '/marketing/channel_code/channelCodeIndex', '27', 1, '', 0, 'marketing-channel_code-index', 0, '渠道码'),
-(1053, 3420, '', '金额设置', 'admin', '', '', '', '', '[]', 60, 1, 1, 1, '/marketing/recharge', '27/3420', 1, '', 0, 'marketing-recharge-index', 0, '充值配置'),
-(1055, 1009, '', '版本管理', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/app/app/version', '135/1009', 1, '', 0, 'admin-app-version', 0, '版本管理'),
 (1056, 12, '', '接口配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/other_config', '12', 1, '', 0, 'setting-other', 0, '接口配置'),
 (1058, 1056, '', '商品采集配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/other_config/copy/2/41', '12/1056', 1, '', 0, 'setting-other-copy', 0, '商品采集配置'),
 (1059, 1056, '', '物流查询配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/other_config/logistics/2/64', '12/1056', 1, '', 0, 'setting-other-logistics', 0, '物流查询配置'),
@@ -48897,7 +47937,6 @@ INSERT INTO `eb_system_menus` (`id`, `pid`, `icon`, `menu_name`, `module`, `cont
 (1070, 1067, '', '地区列表', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/lang/country', '25/1067', 1, '', 0, 'admin-lang-country', 0, '地区列表'),
 (1071, 1695, '', '文件管理', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/system/maintain/system_file/opendir', '25/1695', 1, '', 0, 'system-maintain-system-file', 0, '文件管理'),
 (1073, 25, '', '数据维护', 'admin', '', '', '', '', '[]', 7, 1, 1, 1, 'system/database/index', '25', 1, '', 0, 'system-database-index', 0, '数据维护'),
-(1075, 731, '', '会员配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/member_config/2/67', '27/731', 1, '', 0, 'setting-member-config', 0, '会员配置'),
 (1076, 56, '', '定时任务', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/system/crontab', '25/56', 1, '', 0, 'system-crontab-index', 0, '定时任务'),
 (1078, 1695, '', '接口管理', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/system/backend_routing', '25/1695', 1, '', 0, 'system-config-backend-routing', 0, '接口管理'),
 (1101, 1695, '', '代码生成', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/system/code_generation_list', '25/1695', 1, '', 0, 'system-config-code-generation-list', 0, '代码生成'),
@@ -48907,11 +47946,6 @@ INSERT INTO `eb_system_menus` (`id`, `pid`, `icon`, `menu_name`, `module`, `cont
 (2452, 32, '', '拼团添加', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/store_combination/create', '27/32', 3, '', 0, 'marketing-store_combination-create', 0, '拼团添加'),
 (2453, 30, '', '添加优惠券', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/store_coupon_issue/create', '27/30', 3, '', 0, 'marketing-store_coupon_issue-create', 0, '添加优惠券'),
 (2454, 1, '', '商品添加', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/product/add_product', '1', 3, '', 0, 'admin-store-storeProuduct-index', 0, '商品添加'),
-(2455, 31, '', '砍价添加', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/store_bargain/create', '27/31', 3, '', 0, 'marketing-store_bargain-create', 0, '砍价添加'),
-(2456, 33, '', '秒杀添加', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/store_seckill/create', '27/33', 3, '', 0, 'marketing-store_seckill-create', 0, '秒杀添加'),
-(2457, 34, '', '积分商品添加', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/store_integral/create', '27/34', 3, '', 0, 'marketing-store_integral-create', 0, '积分商品添加'),
-(2458, 686, '', '直播间添加', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/live/add_live_room', '27/686', 3, '', 0, 'admin-marketing-live-add_live_room', 0, '直播间添加'),
-(2459, 686, '', '直播商品管理', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/live/add_live_goods', '27/686', 3, '', 0, 'admin-marketing-live-add_live_goods', 0, '直播商品管理'),
 (2460, 27, '', '渠道码添加', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/channel_code/create', '27', 3, '', 0, 'marketing-channel_code-create', 0, '渠道码添加'),
 (2461, 656, '', '装修页面', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/pages/diy', '656', 3, '', 0, 'admin-setting-pages-diy', 0, '装修页面'),
 (2462, 1695, '', '代码生成', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/system/code_generation', '25/1695', 3, '', 0, 'system-config-code-generation', 0, '代码生成'),
@@ -49815,15 +48849,9 @@ INSERT INTO `eb_system_menus` (`id`, `pid`, `icon`, `menu_name`, `module`, `cont
 (3417, 1056, '', '一号通', 'admin', '', '', '', '', '[]', 10, 1, 1, 1, '/yihaotong', '12/1056', 1, '', 0, 'setting-yihaotong', 0, ''),
 (3418, 3417, '', '一号通配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/yihaotong_config/3/18', '12/1056/3417', 1, '', 0, 'setting-yihaotong-config', 0, ''),
 (3419, 1067, '', '翻译配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/lang_config/3/106', '25/1067', 1, '', 0, 'setting-lang-config', 0, ''),
-(3420, 27, '', '用户充值', 'admin', '', '', '', '', '[]', 60, 1, 1, 1, '/marketing/recharge', '27', 1, '', 0, 'admin-marketing-recharge', 0, ''),
 (3421, 165, '', '客服配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/kefu_config/2/69', '165', 1, '', 0, 'setting-kefu-config', 0, ''),
-(3422, 3420, '', '充值配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/recharge_config/2/28', '27/3420', 1, '', 0, 'setting-recharge-config', 0, ''),
 (3423, 9, '', '用户配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/user_config/2/100', '9', 1, '', 0, '', 0, ''),
 (3424, 4, '', '订单配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/order_config/2/113', '4', 1, '', 0, '', 0, ''),
-(3425, 27, '', '每日签到', 'admin', '', '', '', '', '[]', 57, 1, 1, 1, '/setting/sign_config/2/126', '27', 1, '', 0, 'admin-marketing-sign', 0, ''),
-(3426, 3425, '', '签到配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/sign_config/2/126', '27/3425', 1, '', 0, '', 0, ''),
-(3427, 3425, '', '签到奖励', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/sign_rewards', '27/3425', 1, '', 0, '', 0, ''),
-(3429, 165, '', '自动回复', 'admin', '', '', '', '', '[]', 7, 1, 1, 1, '/setting/store_service/auto_reply', '165', 1, '', 0, '', 0, ''),
 (3430, 1695, '', '数据字典', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/system/code_data_dictionary', '25/1695', 1, '', 0, 'system-code-data_dictionary', 0, ''),
 (3431, 3430, '', '查看数据字典', '', '', '', 'system/crud/data_dictionary/<id>', 'GET', '[]', 1, 1, 1, 1, '', '', 2, '', 0, 'system-crud-data_dictionary', 0, ''),
 (3432, 3430, '', '删除数据字典', '', '', '', 'system/crud/data_dictionary/<id>', 'DELETE', '[]', 1, 1, 1, 1, '', '', 2, '', 0, 'system-crud-data_dictionary', 0, ''),
@@ -49837,70 +48865,31 @@ INSERT INTO `eb_system_menus` (`id`, `pid`, `icon`, `menu_name`, `module`, `cont
 (3440, 656, '', '商品分类', 'admin', '', '', '', '', '[]', 95, 0, 0, 1, '/setting/pages/cate_page/1', '656', 1, '', 0, '', 0, ''),
 (3441, 656, '', '个人中心', 'admin', '', '', '', '', '[]', 90, 0, 0, 1, '/setting/pages/user_page/2', '656', 1, '', 0, '', 0, ''),
 (3442, 993, '', '小程序链接', 'admin', '', '', '', '', '[]', 90, 1, 1, 1, '/app/routine/link', '135/993', 1, '', 0, '', 0, ''),
-(3443, 56, '', '模块配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/integral/system_config/2/134', '25/56', 1, '', 0, 'system-model-system_config', 0, ''),
 (3444, 3417, '', '电子发票', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/elec_invoice', '12/1056/3417', 1, '', 0, 'setting-elec-invoice', 0, ''),
 (3445, 56, '', '自定事件', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/system/event', '25/56', 1, '', 0, 'system-event-index', 0, ''),
 (3446, 27, '', '新人礼', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/newuser/gift', '27', 1, '', 0, 'admin-marketing-new-user-gift', 0, ''),
 (3447, 1, '', '商品配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/system_config/2/136', '1', 1, '', 0, 'admin-setting-system_config', 0, ''),
 (3448, 12, '', '小票配置', 'admin', '', '', '', '', '[]', 8, 1, 1, 1, '/setting/ticket', '12', 1, '', 0, 'admi-setting-ticket', 0, ''),
 (3449, 3448, '', '内容设置', 'admin', '', '', '', '', '[]', 0, 0, 0, 1, '/setting/ticket/content', '12/3448', 1, '', 0, 'admin-setting-ticket-content', 0, ''),
-(3450, 26, '', '分销员申请', 'admin', '', '', '', '', '[]', 97, 1, 1, 1, '/agent/spread/apply', '26', 1, '', 0, 'admin-agent-spread-apply', 0, ''),
-(3451, 909, '', '抽奖列表', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/lottery/list', '27/909', 1, '', 0, 'admin-marketing-lottery-list', 0, ''),
 (3452, 1, '', '商品参数', 'admin', '', '', '', '', '[]', 1, 1, 1, 1, '/product/param/list', '1', 1, '', 0, 'admin-product-param-list', 0, ''),
 (3453, 656, '', '链接管理', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/setting/pages/link', '656', 1, '', 0, 'admin-setting-pages-link', 0, ''),
 (3454, 1, '', '商品标签', 'admin', '', '', '', '', '[]', 1, 1, 1, 1, '/product/label/list', '1', 1, '', 0, 'admin-product-label-list', 0, ''),
 (3455, 1, '', '商品保障', 'admin', '', '', '', '', '[]', 1, 1, 1, 1, '/product/protection/list', '1', 1, '', 0, 'admin-product-protection-list', 0, ''),
-(3456, 33, '', '秒杀列表', 'admin', '', '', '', '', '[]', 1, 1, 1, 1, '/marketing/store_seckill/list', '27/33', 1, '', 0, 'marketing-store_seckill-list', 0, ''),
-(3457, 909, '', '抽奖配置', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/lottery/config', '27/909', 1, '', 0, 'admin-marketing-lottery-config', 0, ''),
 (3459, 656, '', '商城主题', 'admin', '', '', '', '', '[]', 25, 1, 1, 1, '/setting/mall_theme', '656', 1, '', 0, '', 0, ''),
 (3460, 656, '', '我的主题', 'admin', '', '', '', '', '[]', 20, 1, 1, 1, '/setting/my_theme', '656', 1, '', 0, '', 0, ''),
 (3461, 656, '', '编辑主题', 'admin', '', '', '', '', '[]', 0, 0, 0, 1, '/setting/edit_theme', '656', 3, '', 0, '', 0, ''),
 (3462, 993, '', '小程序上传', 'admin', '', '', '', '', '[]', 70, 1, 1, 1, '/app/routine/ci_upload', '135/993', 1, '', 0, '', 0, ''),
-(3464, 656, '', '专题页面', 'admin', '', '', '', '', '[]', 15, 1, 1, 1, '/setting/theme/micro_page', '656', 1, '', 0, '', 0, '');
+(3464, 656, '', '专题页面', 'admin', '', '', '', '', '[]', 15, 1, 1, 1, '/setting/theme/micro_page', '656', 1, '', 0, '', 0, ''),
+(3465, 27, '', '预售管理', 'admin', 'marketing.store_advance', '', '', '', '[]', 81, 1, 1, 1, '/marketing/store_advance/index', '27', 1, 'marketing', 1, 'marketing-store_advance-index', 0, '预售管理'),
+(3466, 3465, '', '预售商品', 'admin', 'marketing.store_advance', 'index', '', '', '[]', 0, 1, 1, 1, '/marketing/store_advance/index', '', 1, 'marketing', 0, 'marketing-store_advance', 0, '预售商品'),
+(3467, 3465, '', '添加预售', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/store_advance/create', '27/3465', 3, '', 0, 'marketing-store_advance-create', 0, '添加预售'),
+(3468, 3466, '', '添加预售商品', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/', '27/3465/3466', 3, '', 0, 'advance-add', 0, '添加预售商品'),
+(3469, 3466, '', '编辑预售', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/', '27/3465/3466', 3, '', 0, 'advance-edit', 0, '编辑预售'),
+(3470, 3466, '', '删除预售', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/', '27/3465/3466', 3, '', 0, 'advance-delete', 0, '删除预售');
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_system_notice`
---
-
-CREATE TABLE IF NOT EXISTS `eb_system_notice` (
-  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '通知模板id',
-  `title` varchar(64) NOT NULL DEFAULT '' COMMENT '通知标题',
-  `type` varchar(64) NOT NULL DEFAULT '' COMMENT '通知类型',
-  `icon` varchar(16) NOT NULL DEFAULT '' COMMENT '图标',
-  `url` varchar(64) NOT NULL DEFAULT '' COMMENT '链接',
-  `table_title` varchar(256) NOT NULL DEFAULT '' COMMENT '通知数据',
-  `template` varchar(64) NOT NULL DEFAULT '' COMMENT '通知模板',
-  `push_admin` varchar(128) NOT NULL DEFAULT '' COMMENT '通知管理员id',
-  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '状态',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `type` (`type`) USING BTREE,
-  KEY `status` (`status`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='通知模板表';
-
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_system_notice_admin`
---
-
-CREATE TABLE IF NOT EXISTS `eb_system_notice_admin` (
-  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '通知记录ID',
-  `notice_type` varchar(64) NOT NULL DEFAULT '' COMMENT '通知类型',
-  `admin_id` smallint(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT '通知的管理员',
-  `link_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '关联ID',
-  `table_data` text COMMENT '通知的数据',
-  `is_click` tinyint(3) UNSIGNED NOT NULL DEFAULT '0' COMMENT '点击次数',
-  `is_visit` tinyint(3) UNSIGNED NOT NULL DEFAULT '0' COMMENT '访问次数',
-  `visit_time` int(11) NOT NULL DEFAULT '0' COMMENT '访问时间',
-  `add_time` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '通知时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `admin_id` (`admin_id`,`notice_type`) USING BTREE,
-  KEY `add_time` (`add_time`) USING BTREE,
-  KEY `is_visit` (`is_visit`) USING BTREE,
-  KEY `is_click` (`is_click`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='通知记录表';
 
 -- --------------------------------------------------------
 
@@ -51421,19 +50410,6 @@ INSERT INTO `eb_system_route_cate` (`id`, `pid`, `app_name`, `name`, `mark`, `pa
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_system_sign_reward`
---
-
-CREATE TABLE IF NOT EXISTS `eb_system_sign_reward` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '编号',
-  `type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '类型，0连续签到奖励，1累计签到奖励',
-  `days` int(11) NOT NULL DEFAULT '0' COMMENT '天数',
-  `point` int(11) NOT NULL DEFAULT '0' COMMENT '赠送积分',
-  `exp` int(11) NOT NULL DEFAULT '0' COMMENT '赠送经验',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COMMENT='系统签到奖励表';
-
 -- --------------------------------------------------------
 
 --
@@ -51463,48 +50439,7 @@ CREATE TABLE IF NOT EXISTS `eb_system_storage` (
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_system_store`
---
-
-CREATE TABLE IF NOT EXISTS `eb_system_store` (
-  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `name` varchar(100) NOT NULL DEFAULT '' COMMENT '门店名称',
-  `introduction` varchar(1000) NOT NULL DEFAULT '' COMMENT '简介',
-  `phone` char(25) NOT NULL DEFAULT '' COMMENT '手机号码',
-  `address` varchar(255) NOT NULL DEFAULT '' COMMENT '省市区',
-  `detailed_address` varchar(255) NOT NULL DEFAULT '' COMMENT '详细地址',
-  `image` varchar(255) NOT NULL DEFAULT '' COMMENT '门店logo',
-  `oblong_image` varchar(255) NOT NULL DEFAULT '' COMMENT '门店推荐图',
-  `latitude` char(25) NOT NULL DEFAULT '' COMMENT '纬度',
-  `longitude` char(25) NOT NULL DEFAULT '' COMMENT '经度',
-  `valid_time` varchar(100) NOT NULL DEFAULT '' COMMENT '核销有效日期',
-  `day_time` varchar(100) NOT NULL DEFAULT '' COMMENT '每日营业开关时间',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `is_show` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否显示',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `phone` (`phone`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店自提';
-
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_system_store_staff`
---
-
-CREATE TABLE IF NOT EXISTS `eb_system_store_staff` (
-  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `uid` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '微信用户id',
-  `avatar` varchar(255) NOT NULL DEFAULT '' COMMENT '店员头像',
-  `store_id` int(11) NOT NULL DEFAULT '0' COMMENT '门店id',
-  `staff_name` varchar(64) NOT NULL DEFAULT '' COMMENT '店员名称',
-  `phone` char(15) NOT NULL DEFAULT '' COMMENT '手机号码',
-  `verify_status` tinyint(2) NOT NULL DEFAULT '0' COMMENT '核销开关',
-  `status` tinyint(2) NOT NULL DEFAULT '1' COMMENT '状态',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店店员表';
 
 -- --------------------------------------------------------
 
@@ -51542,52 +50477,12 @@ CREATE TABLE IF NOT EXISTS `eb_system_timer` (
 INSERT INTO `eb_system_timer` (`id`, `name`, `mark`, `content`, `type`, `week`, `day`, `hour`, `minute`, `second`, `last_execution_time`, `next_execution_time`, `add_time`, `is_del`, `is_open`) VALUES
 (1, '未支付自动取消订单', 'orderCancel', '每隔30秒执行自动取消到期未支付的订单', 1, 1, 1, 1, 30, 30, 0, 1670642407, 1670642377, 0, 1),
 (2, '拼团到期订单处理', 'pinkExpiration', '每隔1分钟拼团到期之后的操作', 2, 1, 1, 1, 1, 0, 0, 1670642487, 1670642427, 0, 1),
-(3, '到期自动解绑上级', 'agentUnbind', '每隔1分钟执行到期的绑定关系的解除', 2, 1, 1, 1, 1, 0, 0, 1670642534, 1670642474, 0, 1),
-(4, '自动更新直播商品状态', 'liveProductStatus', '每隔3分钟执行更新直播商品状态', 2, 1, 1, 1, 3, 0, 0, 1670642694, 1670642514, 0, 1),
-(5, '自动更新直播间状态', 'liveRoomStatus', '每隔3分钟执行更新直播间状态', 2, 1, 1, 1, 3, 0, 0, 1670642709, 1670642529, 0, 1),
 (6, '订单自动收货', 'takeDelivery', '每隔5分钟执行订单到期自动收货', 2, 1, 1, 1, 5, 0, 0, 1670642891, 1670642591, 0, 1),
 (7, '预售商品到期自动下架', 'advanceOff', '每隔5分钟执行预售商品到期下架', 2, 1, 1, 1, 5, 0, 0, 1670642913, 1670642613, 0, 1),
 (8, '订单商品自动好评', 'productReplay', '每隔5分钟执行订单到期商品好评', 2, 1, 1, 1, 5, 0, 0, 1670642933, 1670642633, 0, 1),
-(9, '清除昨日海报', 'clearPoster', '每天0时30分0秒执行一次清除昨日海报', 5, 1, 1, 0, 30, 0, 0, 1670862600, 1670815378, 0, 1),
-(10, '自动开具/冲红电子发票', 'autoInvoice', '每隔10分钟执行自动开具/冲红电子发票', 2, 1, 1, 1, 10, 0, 0, 0, 1715760152, 0, 1),
-(11, '未签到提醒', 'signRemind', '每隔10分钟执行未签到提醒', 2, 1, 1, 1, 10, 0, 0, 0, 1715760152, 0, 1);
+(10, '自动开具/冲红电子发票', 'autoInvoice', '每隔10分钟执行自动开具/冲红电子发票', 2, 1, 1, 1, 10, 0, 0, 0, 1715760152, 0, 1);
 
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_system_user_level`
---
-
-CREATE TABLE IF NOT EXISTS `eb_system_user_level` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `mer_id` int(11) NOT NULL DEFAULT '0' COMMENT '商户id',
-  `name` varchar(255) NOT NULL DEFAULT '' COMMENT '会员名称',
-  `money` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '购买金额',
-  `valid_date` int(11) NOT NULL DEFAULT '0' COMMENT '有效时间',
-  `is_forever` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否为永久会员',
-  `is_pay` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否购买,1=购买,0=不购买',
-  `is_show` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否显示 1=显示,0=隐藏',
-  `grade` int(11) NOT NULL DEFAULT '0' COMMENT '会员等级',
-  `discount` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '享受折扣',
-  `image` varchar(255) NOT NULL DEFAULT '' COMMENT '会员卡背景',
-  `icon` varchar(255) NOT NULL DEFAULT '' COMMENT '会员图标',
-  `explain` text COMMENT '说明',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除.1=删除,0=未删除',
-  `exp_num` int(10) NOT NULL DEFAULT '0' COMMENT '升级经验',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COMMENT='设置用户等级表';
-
---
--- 转存表中的数据 `eb_system_user_level`
---
-
-INSERT INTO `eb_system_user_level` (`id`, `mer_id`, `name`, `money`, `valid_date`, `is_forever`, `is_pay`, `is_show`, `grade`, `discount`, `image`, `icon`, `explain`, `add_time`, `is_del`, `exp_num`) VALUES
-(1, 0, 'V1', '0.00', 0, 1, 0, 1, 1, '99.00', '/statics/system_images/user_level_1_bgimg.jpeg', '/statics/system_images/user_level_1_icon.jpeg', 'V1', 1553824639, 0, 500),
-(2, 0, 'V2', '0.00', 0, 1, 0, 1, 2, '97.00', '/statics/system_images/user_level_2_bgimg.jpeg', '/statics/system_images/user_level_2_icon.jpeg', 'V2', 1553824742, 0, 1000),
-(3, 0, 'V3', '0.00', 0, 1, 0, 1, 3, '95.00', '/statics/system_images/user_level_3_bgimg.jpeg', '/statics/system_images/user_level_3_icon.jpeg', 'V3', 1553824797, 0, 3000),
-(4, 0, 'V4', '0.00', 0, 1, 0, 1, 4, '93.00', '/statics/system_images/user_level_4_bgimg.jpeg', '/statics/system_images/user_level_4_icon.jpeg', 'V4', 1553824837, 0, 8000),
-(5, 0, 'V5', '0.00', 0, 1, 0, 1, 5, '70.00', '/statics/system_images/user_level_5_bgimg.jpeg', '/statics/system_images/user_level_5_icon.jpeg', 'V5', 1553824871, 0, 15000);
 
 -- --------------------------------------------------------
 
@@ -51816,50 +50711,7 @@ CREATE TABLE IF NOT EXISTS `eb_user_bill` (
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_user_brokerage`
---
-
-CREATE TABLE IF NOT EXISTS `eb_user_brokerage` (
-  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '用户佣金id',
-  `uid` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户uid',
-  `link_id` varchar(32) NOT NULL DEFAULT '0' COMMENT '关联id',
-  `type` varchar(64) NOT NULL DEFAULT '' COMMENT '明细类型',
-  `title` varchar(64) NOT NULL DEFAULT '' COMMENT '账单标题',
-  `number` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '明细数字',
-  `balance` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '剩余',
-  `pm` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '0 = 支出 1 = 获得',
-  `mark` varchar(512) NOT NULL DEFAULT '' COMMENT '备注',
-  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '0 = 带确定 1 = 有效 -1 = 无效',
-  `take` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0 = 未收货 1 = 已收货',
-  `frozen_time` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '冻结到期时间',
-  `add_time` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `uid` (`uid`) USING BTREE,
-  KEY `status` (`status`) USING BTREE,
-  KEY `add_time` (`add_time`) USING BTREE,
-  KEY `pm` (`pm`) USING BTREE,
-  KEY `type` (`type`,`link_id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户分佣账单表';
-
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_user_brokerage_frozen`
---
-
-CREATE TABLE IF NOT EXISTS `eb_user_brokerage_frozen` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `uid` int(10) NOT NULL DEFAULT '0' COMMENT '用户uid',
-  `price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '金额',
-  `uill_id` int(10) NOT NULL DEFAULT '0' COMMENT '关联id',
-  `frozen_time` int(10) NOT NULL DEFAULT '0' COMMENT '冻结到期时间',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否有效',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `order_id` varchar(50) COLLATE utf8_unicode_ci NOT NULL DEFAULT '' COMMENT '订单id',
-  PRIMARY KEY (`id`),
-  KEY `uid` (`uid`,`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户佣金冻结记录表';
 
 -- --------------------------------------------------------
 
@@ -51881,91 +50733,9 @@ CREATE TABLE IF NOT EXISTS `eb_user_cancel` (
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_user_enter`
---
-
-CREATE TABLE IF NOT EXISTS `eb_user_enter` (
-  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '商户申请ID',
-  `uid` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户ID',
-  `province` varchar(32) NOT NULL DEFAULT '' COMMENT '商户所在省',
-  `city` varchar(32) NOT NULL DEFAULT '' COMMENT '商户所在市',
-  `district` varchar(32) NOT NULL DEFAULT '' COMMENT '商户所在区',
-  `address` varchar(256) NOT NULL DEFAULT '' COMMENT '商户详细地址',
-  `merchant_name` varchar(256) NOT NULL DEFAULT '' COMMENT '商户名称',
-  `link_user` varchar(32) NOT NULL DEFAULT '' COMMENT '关联用户',
-  `link_tel` varchar(16) NOT NULL DEFAULT '' COMMENT '商户电话',
-  `charter` varchar(512) NOT NULL DEFAULT '' COMMENT '商户证书',
-  `add_time` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `apply_time` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '审核时间',
-  `success_time` int(11) NOT NULL DEFAULT '0' COMMENT '通过时间',
-  `fail_message` varchar(256) NOT NULL DEFAULT '' COMMENT '未通过原因',
-  `fail_time` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '未通过时间',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '-1 审核未通过 0未审核 1审核通过',
-  `is_lock` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '0 = 开启 1= 关闭',
-  `is_del` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否删除',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uid` (`uid`) USING BTREE,
-  KEY `province` (`province`,`city`,`district`) USING BTREE,
-  KEY `is_lock` (`is_lock`) USING BTREE,
-  KEY `is_del` (`is_del`) USING BTREE,
-  KEY `status` (`status`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户申请表';
-
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_user_extract`
---
-
-CREATE TABLE IF NOT EXISTS `eb_user_extract` (
-  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `wechat_order_id` varchar(32) NOT NULL DEFAULT '' COMMENT '微信订单ID',
-  `uid` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户id',
-  `real_name` varchar(64) NOT NULL DEFAULT '' COMMENT '名称',
-  `user_name` varchar(64) NOT NULL DEFAULT '' COMMENT '用户姓名',
-  `extract_type` varchar(32) NOT NULL DEFAULT 'bank' COMMENT 'bank = 银行卡 alipay = 支付宝wx=微信',
-  `bank_code` varchar(32) NOT NULL DEFAULT '0' COMMENT '银行卡',
-  `bank_address` varchar(256) NOT NULL DEFAULT '' COMMENT '开户地址',
-  `alipay_code` varchar(64) NOT NULL DEFAULT '' COMMENT '支付宝账号',
-  `extract_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '提现金额',
-  `extract_fee` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '提现手续费',
-  `mark` varchar(512) NOT NULL DEFAULT '' COMMENT '备注',
-  `balance` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '提现前佣金',
-  `fail_msg` varchar(128) NOT NULL DEFAULT '' COMMENT '无效原因',
-  `fail_time` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '无效时间',
-  `add_time` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `status` tinyint(2) NOT NULL DEFAULT '0' COMMENT '-1 未通过 0 审核中 1 已提现',
-  `wechat` varchar(50) NOT NULL DEFAULT '' COMMENT '微信号',
-  `qrcode_url` varchar(255) NOT NULL DEFAULT '' COMMENT '二维码地址',
-  `channel_type` VARCHAR(32) NOT NULL DEFAULT '' COMMENT '提现来源',
-  `out_bill_no` varchar(255) NOT NULL DEFAULT '' COMMENT '商户单号',
-  `transfer_bill_no` varchar(255) NOT NULL DEFAULT '' COMMENT '微信转账单号',
-  `state` varchar(32) NOT NULL DEFAULT '' COMMENT '单据状态',
-  `package_info` varchar(2000) NOT NULL DEFAULT '' COMMENT '跳转领取页面的package信息',
-  `fail_reason` varchar(255) NOT NULL DEFAULT '' COMMENT '失败原因',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `extract_type` (`extract_type`) USING BTREE,
-  KEY `status` (`status`) USING BTREE,
-  KEY `add_time` (`add_time`) USING BTREE,
-  KEY `openid` (`uid`) USING BTREE,
-  KEY `fail_time` (`fail_time`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户提现表';
-
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_user_friends`
---
-
-CREATE TABLE IF NOT EXISTS `eb_user_friends` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `uid` int(10) NOT NULL DEFAULT '0' COMMENT '用户uid',
-  `friends_uid` int(10) NOT NULL DEFAULT '0' COMMENT '好友uid',
-  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`),
-  KEY `uid` (`uid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户好友关系';
 
 -- --------------------------------------------------------
 
@@ -52087,119 +50857,13 @@ INSERT INTO `eb_user_label_relation` (`uid`, `label_id`) VALUES
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_user_level`
---
-
-CREATE TABLE IF NOT EXISTS `eb_user_level` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `uid` int(11) NOT NULL DEFAULT '0' COMMENT '用户uid',
-  `level_id` int(11) NOT NULL DEFAULT '0' COMMENT '等级vip',
-  `grade` int(11) NOT NULL DEFAULT '0' COMMENT '会员等级',
-  `valid_time` int(11) NOT NULL DEFAULT '0' COMMENT '过期时间',
-  `is_forever` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否永久',
-  `mer_id` int(11) NOT NULL DEFAULT '0' COMMENT '商户id',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0:禁止,1:正常',
-  `mark` varchar(255) NOT NULL DEFAULT '' COMMENT '备注',
-  `remind` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否已通知',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除,0=未删除,1=删除',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  `discount` int(11) NOT NULL DEFAULT '0' COMMENT '享受折扣',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `id` (`id`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COMMENT='用户等级记录表';
-
---
--- 转存表中的数据 `eb_user_level`
---
-
-INSERT INTO `eb_user_level` (`id`, `uid`, `level_id`, `grade`, `valid_time`, `is_forever`, `mer_id`, `status`, `mark`, `remind`, `is_del`, `add_time`, `discount`) VALUES
-(1, 1, 3, 3, 0, 1, 0, 1, '尊敬的用户CRMEB在2022-01-19 14:31:07成为了V3', 0, 0, 1642573867, 95);
+-- --------------------------------------------------------
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_user_money`
---
-
-CREATE TABLE IF NOT EXISTS `eb_user_money` (
-  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '用户余额id',
-  `uid` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户uid',
-  `link_id` varchar(32) NOT NULL DEFAULT '0' COMMENT '关联id',
-  `type` varchar(64) NOT NULL DEFAULT '' COMMENT '明细类型',
-  `title` varchar(64) NOT NULL DEFAULT '' COMMENT '账单标题',
-  `number` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '明细数字',
-  `balance` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '剩余',
-  `pm` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '0 = 支出 1 = 获得',
-  `mark` varchar(512) NOT NULL DEFAULT '' COMMENT '备注',
-  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '0 = 带确定 1 = 有效 -1 = 无效',
-  `add_time` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `uid` (`uid`) USING BTREE,
-  KEY `status` (`status`) USING BTREE,
-  KEY `add_time` (`add_time`) USING BTREE,
-  KEY `pm` (`pm`) USING BTREE,
-  KEY `type` (`type`,`link_id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户余额账单表';
-
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_user_notice`
---
-
-CREATE TABLE IF NOT EXISTS `eb_user_notice` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `uid` text COMMENT '接收消息的用户id（类型：json数据）',
-  `type` tinyint(1) NOT NULL DEFAULT '1' COMMENT '消息通知类型（1：系统消息；2：用户通知）',
-  `user` varchar(20) NOT NULL DEFAULT '' COMMENT '发送人',
-  `title` varchar(20) NOT NULL DEFAULT '' COMMENT '通知消息的标题信息',
-  `content` varchar(500) NOT NULL DEFAULT '' COMMENT '通知消息的内容',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '通知消息发送的时间',
-  `is_send` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否发送（0：未发送；1：已发送）',
-  `send_time` int(11) NOT NULL DEFAULT '0' COMMENT '发送时间',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户通知表';
-
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_user_notice_see`
---
-
-CREATE TABLE IF NOT EXISTS `eb_user_notice_see` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `nid` int(11) NOT NULL DEFAULT '0' COMMENT '查看的通知id',
-  `uid` int(11) NOT NULL DEFAULT '0' COMMENT '查看通知的用户id',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '查看通知的时间',
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户通知发送记录表';
-
--- --------------------------------------------------------
-
---
--- 表的结构 `eb_user_recharge`
---
-
-CREATE TABLE IF NOT EXISTS `eb_user_recharge` (
-  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `uid` int(10) NOT NULL DEFAULT '0' COMMENT '充值用户UID',
-  `order_id` varchar(32) NOT NULL DEFAULT '' COMMENT '订单号',
-  `trade_no` varchar(100) NOT NULL DEFAULT '' COMMENT '微信订单号',
-  `price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '充值金额',
-  `give_price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '购买赠送金额',
-  `recharge_type` varchar(32) NOT NULL DEFAULT '' COMMENT '充值类型',
-  `paid` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否充值',
-  `pay_time` int(10) NOT NULL DEFAULT '0' COMMENT '充值支付时间',
-  `add_time` int(12) NOT NULL DEFAULT '0' COMMENT '充值时间',
-  `refund_price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '退款金额',
-  `channel_type` varchar(255) NOT NULL DEFAULT '' COMMENT '用户访问端标识',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `order_id` (`order_id`) USING BTREE,
-  KEY `uid` (`uid`) USING BTREE,
-  KEY `recharge_type` (`recharge_type`) USING BTREE,
-  KEY `paid` (`paid`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户充值表';
 
 -- --------------------------------------------------------
 
@@ -52221,36 +50885,7 @@ CREATE TABLE IF NOT EXISTS `eb_user_search` (
 
 -- --------------------------------------------------------
 
---
--- 表的结构 `eb_user_sign`
---
-
-CREATE TABLE IF NOT EXISTS `eb_user_sign` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `uid` int(11) NOT NULL DEFAULT '0' COMMENT '用户uid',
-  `title` varchar(255) NOT NULL DEFAULT '' COMMENT '签到说明',
-  `number` int(11) NOT NULL DEFAULT '0' COMMENT '获得积分',
-  `balance` int(11) NOT NULL DEFAULT '0' COMMENT '剩余积分',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '添加时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `uid` (`uid`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='签到记录表';
-
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_user_spread`
---
-
-CREATE TABLE IF NOT EXISTS `eb_user_spread` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-  `uid` int(10) NOT NULL DEFAULT '0' COMMENT '用户uid',
-  `spread_uid` int(10) NOT NULL DEFAULT '0' COMMENT '推广人uid',
-  `spread_time` int(10) NOT NULL DEFAULT '0' COMMENT '推广时间',
-  PRIMARY KEY (`id`),
-  KEY `uid` (`uid`) USING BTREE,
-  KEY `spread_uid` (`spread_uid`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户推广关系表';
 
 -- --------------------------------------------------------
 
@@ -52503,24 +51138,5 @@ CREATE TABLE IF NOT EXISTS `eb_system_ticket` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小票打印机列表';
 
 -- --------------------------------------------------------
-
---
--- 表的结构 `eb_spread_apply`
---
-
-CREATE TABLE IF NOT EXISTS `eb_spread_apply` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增id',
-  `uid` int(11) NOT NULL DEFAULT '0' COMMENT '用户uid',
-  `nickname` varchar(255) NOT NULL DEFAULT '' COMMENT '用户昵称',
-  `real_name` varchar(255) NOT NULL DEFAULT '' COMMENT '用户名称',
-  `phone` varchar(32) NOT NULL DEFAULT '0' COMMENT '用户电话',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '申请状态0申请，1同意，2拒绝',
-  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '申请时间',
-  `status_time` int(11) NOT NULL DEFAULT '0' COMMENT '审核时间',
-  `content` varchar(1000) NOT NULL DEFAULT '' COMMENT '自荐内容',
-  `refusal_reason` varchar(1000) NOT NULL DEFAULT '' COMMENT '拒绝理由',
-  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='分销员申请';
 
 -- --------------------------------------------------------

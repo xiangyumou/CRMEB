@@ -1,13 +1,36 @@
 # Core store data migration
 
-See `docs/core-store-reduction.md` at the repository root for the release and rollback procedure.
+Dropping the retired features from an existing database is a two-phase operation.
+See `docs/core-store-reduction.md` for the release and rollback procedure.
 
-Run from the `crmeb` root, first against a database copy, with PHP dependencies and the normal environment configuration available:
+Run from the `crmeb` root, first against a database copy, with PHP dependencies and
+the normal environment configuration available:
 
 ```sh
-php upgrade/core-store/migrate.php plan
-php upgrade/core-store/migrate.php apply /private/core-store-backup.json
-php upgrade/core-store/migrate.php rollback /private/core-store-backup.json
+php upgrade/core-store/drop-retired.php plan
+php upgrade/core-store/drop-retired.php apply /private/retired-backup.json
+php upgrade/core-store/drop-retired.php rollback /private/retired-backup.json
+php upgrade/core-store/drop-retired.php finalize
 ```
 
-Stop application writes and background workers while applying or rolling back. Transactional history or nonzero user balances/commission stop the migration. No product, SKU, category, attachment, uploaded file, table or column is removed. Keep the backup private and outside the web root. Existing backups are never overwritten. Rollback refuses to overwrite records edited after migration.
+- `plan` is read-only. It reports the retired tables and rows, the settlement still
+  owed (unpaid member/recharge orders, unshipped historical balance or offline
+  orders, unfinished points-mall orders, unaudited withdrawals) and the balances
+  that will become unreachable. It exits non-zero while anything is still owed.
+- `apply` refuses to run while settlement is pending, writes the backup, then
+  renames the retired tables to `eb_retired_*` and removes the retired settings,
+  config tabs, menus, timers and group data. Renaming is instant and reversible.
+- `rollback` restores the table names and the removed rows, refusing to overwrite
+  records that changed after the migration.
+- `finalize` drops the `eb_retired_*` tables. Run it only after the acceptance
+  window; after that, recovery needs a mysqldump restore.
+
+The backup and the exported balance list stay outside the web root with mode 0600.
+Existing backups are never overwritten. Product, SKU, category, attachment, order
+and user tables and their columns are not touched — historical order fields such as
+`pay_type`, `use_integral` and `spread_uid` keep their values and still render.
+
+Carry the notification roster across before renaming tables away: `apply` copies
+`eb_store_service` rows with `notify = 1` into the `order_notice_admin_uids`
+setting, so order alerts keep reaching an administrator and mobile order
+management keeps working.

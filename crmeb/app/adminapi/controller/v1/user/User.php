@@ -188,6 +188,24 @@ class User extends AuthController
     }
 
     /**
+     * 修改用户状态
+     * @param $status
+     * @param $id
+     * @return \think\Response
+     * @throws \think\db\exception\DataNotFoundException
+     * @throws \think\db\exception\DbException
+     * @throws \think\db\exception\ModelNotFoundException
+     */
+    public function set_status($status, $id)
+    {
+        if ($status === '' || !$id) return app('json')->fail('参数错误');
+        if (false === $this->services->update((int)$id, ['status' => (int)$status], 'uid')) {
+            return app('json')->fail('修改失败');
+        }
+        return app('json')->success((int)$status === 0 ? '禁用成功' : '启用成功');
+    }
+
+    /**
      * 设置会员分组
      * @return mixed
      */
