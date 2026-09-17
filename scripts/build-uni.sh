@@ -42,6 +42,10 @@ for target in h5 mp-weixin; do
     ./node_modules/.bin/vue-cli-service uni-build)
   built="$work/input/unpackage/dist/build/$target"
   test -s "$built/index.html" || [ "$target" = mp-weixin ] || { echo 'H5 index.html is missing' >&2; exit 1; }
+  if [ "$target" = h5 ]; then
+    index_css="$(grep -oE 'static/index\.[0-9a-f]{8}\.css' "$built/index.html" | head -n1 || true)"
+    [ -n "$index_css" ] && [ -s "$built/$index_css" ] || { echo 'H5 index.html must link the built static/index.<hash>.css' >&2; exit 1; }
+  fi
   test -s "$built/app.json" || [ "$target" = h5 ] || { echo 'Mini program app.json is missing' >&2; exit 1; }
   dest="$output/$target"
   if [ "$target" = mp-weixin ]; then dest="$output/mpWeixin"; fi
