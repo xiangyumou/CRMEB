@@ -1,2 +1,4 @@
+name: crmeb-production
+
 include:
   - ./deploy/production/compose.yml

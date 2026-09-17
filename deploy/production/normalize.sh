@@ -29,6 +29,9 @@ test ! -e "$root/.env" && test ! -L "$root/.env"
 test "$(df -Pk "$root" | awk 'NR==2 {print $4}')" -ge 5242880 || { echo 'At least 5 GB free space is required' >&2; exit 1; }
 docker image inspect "$old_image" >/dev/null
 docker compose --env-file "$settings" -f "$old_compose" config --quiet
+old_project="$(docker compose --env-file "$settings" -f "$old_compose" config --format json | jq -r .name)"
+new_project="$(docker compose --env-file "$settings" -f "$root/compose.yaml" config --format json | jq -r .name)"
+test "$old_project" = "$new_project" || { echo 'Compose project names differ; do not migrate automatically' >&2; exit 1; }
 old_database_services="$(docker compose --env-file "$settings" -f "$old_compose" config --format json | jq -cS '[.services.mysql,.services.redis]')"
 new_database_services="$(docker compose --env-file "$settings" -f "$root/compose.yaml" config --format json | jq -cS '[.services.mysql,.services.redis]')"
 test "$old_database_services" = "$new_database_services" || { echo 'Database service definitions differ; do not migrate automatically' >&2; exit 1; }
@@ -57,7 +60,7 @@ chmod 700 "$backup"
 bash "$root/docker/cache-assets.sh" "$old_public" "$root/data/assets-cache"
 
 database_dump="$root/data/backups/pre-normalize-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
-docker exec crmeb-mysql sh -ec 'MYSQL_PWD="$PASSWORD" mysqldump -h127.0.0.1 -u"$USERNAME" --single-transaction --routines --events --triggers --set-gtid-purged=OFF "$DATABASE"' | gzip > "$database_dump"
+docker exec crmeb-mysql sh -ec 'MYSQL_PWD="$PASSWORD" mysqldump --no-tablespaces -h127.0.0.1 -u"$USERNAME" --single-transaction --routines --events --triggers --set-gtid-purged=OFF "$DATABASE"' | gzip > "$database_dump"
 gzip -t "$database_dump"
 test "$(gzip -cd "$database_dump" | wc -c)" -gt 1024
 chmod 600 "$database_dump"
@@ -75,7 +78,7 @@ docker run -d --name "$restore_name" --network none \
   -e "MYSQL_ROOT_PASSWORD=$restore_password" -e MYSQL_DATABASE=restore_check \
   -v "$restore_volume:/var/lib/mysql" mysql:8.0.42 >/dev/null
 for attempt in $(seq 1 60); do
-  if docker exec -e "MYSQL_PWD=$restore_password" "$restore_name" mysqladmin -uroot ping --silent >/dev/null 2>&1; then break; fi
+  if docker exec -e "MYSQL_PWD=$restore_password" "$restore_name" mysql -uroot -N -e 'SELECT 1' >/dev/null 2>&1; then break; fi
   if [ "$attempt" -eq 60 ]; then echo 'Isolated MySQL restore did not start' >&2; exit 1; fi
   sleep 2
 done
