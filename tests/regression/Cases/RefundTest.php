@@ -20,7 +20,7 @@ final class RefundTest extends RegressionTestCase
     {
         $this->expectException(AdminException::class);
         $this->expectExceptionMessage('该订单为历史支付方式，无法原路退款，请线下处理后标记已退款');
-        $this->refundService()->assertWechatRefundable(['pay_type' => $payType]);
+        $this->refundService()->exposeGuard(['pay_type' => $payType]);
     }
 
     public function retiredPayTypes(): array
@@ -30,15 +30,18 @@ final class RefundTest extends RegressionTestCase
 
     public function testWechatOrdersPassTheRefundGuard(): void
     {
-        $this->refundService()->assertWechatRefundable(['pay_type' => 'weixin']);
+        $this->refundService()->exposeGuard(['pay_type' => 'weixin']);
         self::assertTrue(true);
     }
 
+    /** The guard is protected on purpose; a test double exposes it without widening production API. */
     private function refundService(): StoreOrderRefundServices
     {
-        return new StoreOrderRefundServices(
-            $this->createMock(StoreOrderRefundDao::class),
-            $this->createMock(StoreOrderServices::class)
-        );
+        return new class($this->createMock(StoreOrderRefundDao::class), $this->createMock(StoreOrderServices::class)) extends StoreOrderRefundServices {
+            public function exposeGuard(array $order): void
+            {
+                $this->assertWechatRefundable($order);
+            }
+        };
     }
 }

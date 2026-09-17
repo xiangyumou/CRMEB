@@ -7,6 +7,7 @@ use app\services\CoreStore;
 use app\services\order\StoreOrderServices;
 use Tests\Regression\Support\FixtureFactory;
 use Tests\Regression\Support\RegressionTestCase;
+use think\facade\Db;
 
 /**
  * Orders paid before the retired features were removed still exist in production.
@@ -26,12 +27,14 @@ final class HistoricalOrderCompatTest extends RegressionTestCase
         ], $overrides));
 
         $orders = app()->make(StoreOrderServices::class);
+        $row = Db::name('store_order')->where('id', $order['id'])->find();
+        $row['order_id_key'] = (int)$order['id'];
 
-        $detail = $orders->tidyOrder($order);
+        $detail = $orders->tidyOrder($row);
         self::assertSame($order['id'], $detail['id']);
         self::assertSame($expectedLabel, $detail['_status']['_payType']);
 
-        $list = $orders->tidyOrderList([$order]);
+        $list = $orders->tidyOrderList([$row]);
         self::assertSame($expectedLabel, $list[0]['pay_type_name']);
         self::assertArrayNotHasKey('offlinePayStatus', $detail);
         self::assertArrayNotHasKey('seckill_id', $detail);

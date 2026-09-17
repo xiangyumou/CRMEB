@@ -10,17 +10,19 @@ use crmeb\exceptions\ApiException;
 use Tests\Regression\Support\RegressionTestCase;
 final class OrderPricingTest extends RegressionTestCase
 {
-    public function testIntegralDeductionIsRejected(): void
+    /** Retired order parameters must be refused before any pricing work happens. */
+    public function testRetiredOrderParametersAreRejectedByComputedOrder(): void
     {
         $calculator = new StoreOrderComputedServices($this->createMock(StoreOrderDao::class));
         $this->expectException(ApiException::class);
         $this->expectExceptionMessage('当前商城不支持该业务');
-        $calculator->useIntegral(true, ['uid'=>1, 'integral'=>300], '10.00', ['integralRatio'=>'0.01']);
-    }
-    public function testOrdinaryPricingDoesNotReadOrConsumePoints(): void
-    {
-        $calculator = new StoreOrderComputedServices($this->createMock(StoreOrderDao::class));
-        self::assertSame(['10.00',0,0,0], $calculator->useIntegral(false, [], '10.00', []));
+        $calculator->setParamData(['useIntegral' => true])->computedOrder(
+            1,
+            ['uid' => 1, 'integral' => 300],
+            ['cartInfo' => [], 'priceGroup' => ['totalPrice' => '10.00', 'giftPrice' => 0], 'other' => []],
+            0,
+            'weixin'
+        );
     }
     public function testMissingCouponDoesNotChangePrice(): void
     {
@@ -34,7 +36,7 @@ final class OrderPricingTest extends RegressionTestCase
         self::assertSame('500.00', $service->growth(5, 0));
         self::assertEquals(-50, $service->growth(5, 10));
     }
-    public function testMultiItemCouponSplitReturnsCartRowsAndSpreadIds(): void
+    public function testMultiItemCouponSplitReturnsCartRows(): void
     {
         $coupon = $this->getMockBuilder(StoreCouponUserServices::class)
             ->disableOriginalConstructor()
@@ -59,24 +61,15 @@ final class OrderPricingTest extends RegressionTestCase
             []
         );
 
-        self::assertCount(2, $result, 'computeOrderProductTruePrice must return a [cartInfo, spreadIds] pair');
-        $cartInfo = $result[0];
-        self::assertCount(
-            2,
-            $cartInfo,
-            'the first element must be the list of cart rows; a single row means the brokerage step returned a bare cart instead of the [cartInfo, spreadIds] pair'
-        );
+        $cartInfo = $result;
+        self::assertCount(2, $cartInfo, 'computeOrderProductTruePrice returns the per-row cart list');
         self::assertSame([11, 22], array_column($cartInfo, 'id'));
-        self::assertSame([], $result[1], 'distribution is off, so no spread uids are returned');
 
         $couponSum = '0.00';
         foreach ($cartInfo as $cart) {
             self::assertArrayHasKey('coupon_price', $cart);
             self::assertArrayHasKey('sum_true_price', $cart);
             $couponSum = bcadd($couponSum, (string)$cart['coupon_price'], 2);
-            foreach (['one_brokerage', 'two_brokerage', 'staff_brokerage', 'agent_brokerage', 'division_brokerage'] as $field) {
-                self::assertSame('0.00', $cart[$field], $field . ' stays zero while distribution is off');
-            }
         }
         self::assertSame('7.00', $couponSum, 'the per-row coupon split adds up to the coupon amount');
         self::assertSame('17.20', $cartInfo[0]['sum_true_price']);

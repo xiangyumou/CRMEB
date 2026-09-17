@@ -40,7 +40,7 @@ final class QueueTest extends RegressionTestCase
         $refunds->expects(self::once())->method('transaction')->willReturnCallback(static function (callable $callback) {
             return $callback();
         });
-        $refunds->expects(self::once())->method('integralAndCouponBack')->with($order, 'cancel');
+        $refunds->expects(self::once())->method('couponBack')->with($order, 'cancel');
         $refunds->expects(self::once())->method('regressionStock')->with($order);
         $this->replace(StoreOrderServices::class, $orders);
         $this->replace(StoreOrderCartInfoServices::class, $cart);
@@ -57,7 +57,7 @@ final class QueueTest extends RegressionTestCase
         return [
             'paid' => [['paid' => 1]],
             'deleted' => [['is_del' => 1]],
-            'offline' => [['pay_type' => 'offline']],
+            'historical offline payment' => [['pay_type' => 'offline']],
             'already cancelled' => [['is_cancel' => 1]],
         ];
     }
@@ -76,7 +76,7 @@ final class QueueTest extends RegressionTestCase
     {
         return $this->getMockBuilder(StoreOrderRefundServices::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['transaction', 'integralAndCouponBack', 'regressionStock'])
+            ->onlyMethods(['transaction', 'couponBack', 'regressionStock'])
             ->getMock();
     }
 }

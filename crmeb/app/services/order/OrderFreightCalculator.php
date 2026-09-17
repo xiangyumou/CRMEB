@@ -193,9 +193,6 @@ final class OrderFreightCalculator
             $cartAlready = [];
             foreach ($cartInfo as &$item) {
                 if (isset($item['productInfo']['freight']) && in_array($item['productInfo']['freight'], [1, 2])) {
-                    if ($item['productInfo']['freight'] == 2) {
-                        $item['postage_price'] = sprintf("%.2f", bcmul($item['postage_price'], $discountRate, 6));
-                    }
                     continue;
                 }
                 $tempId = $item['productInfo']['temp_id'] ?? 0;
