@@ -414,7 +414,7 @@
 				success: function(res) {
 					that.height = res.windowHeight;
 					//res.windowHeight:获取整个窗口高度为px，*2为rpx；98为头部占据的高度；
-					// #ifndef APP-PLUS || H5 || MP-ALIPAY
+					// #ifdef MP-WEIXIN
 					that.navbarRight = res.windowWidth - uni.getMenuButtonBoundingClientRect().left;
 					// #endif
 				}
@@ -731,7 +731,7 @@
 						setTimeout(function() {
 							that.infoScroll();
 						}, 500);
-						// #ifndef H5 || APP-PLUS
+						// #ifdef MP-WEIXIN
 						that.downloadFilestoreImage();
 						that.downloadFilePromotionCode();
 						// #endif

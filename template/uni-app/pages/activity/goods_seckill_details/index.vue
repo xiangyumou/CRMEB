@@ -705,7 +705,7 @@ export default {
           // #ifdef H5
           that.setShare();
           // #endif
-          // #ifndef H5 || APP-PLUS
+          // #ifdef MP-WEIXIN
           that.downloadFilestoreImage();
           // that.downloadFilePromotionCode();
           // #endif

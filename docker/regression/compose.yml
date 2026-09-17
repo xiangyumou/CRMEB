@@ -10,6 +10,7 @@ services:
       - --default-authentication-plugin=mysql_native_password
       - --sql-mode=ONLY_FULL_GROUP_BY,NO_ENGINE_SUBSTITUTION
     volumes:
+      - ./mysql-client.cnf:/etc/mysql/conf.d/utf8-client.cnf:ro
       - ../../crmeb/public/install/crmeb.sql:/docker-entrypoint-initdb.d/001-crmeb.sql:ro
       - mysql-data:/var/lib/mysql
     healthcheck:
