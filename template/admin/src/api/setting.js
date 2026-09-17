@@ -816,7 +816,7 @@ export function scanUploadGet(scan_token) {
  */
 export function fileUpload(data) {
   return request({
-    url: `file/upload`,
+    url: `file/upload/1`,
     method: 'post',
     data,
   });

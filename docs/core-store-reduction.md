@@ -6,67 +6,62 @@
 
 退出砍价、秒杀、抽奖、直播、分销、积分签到、付费会员及等级权益、储值、非微信支付、门店自提核销、同城配送、自建聊天、原生 App 和上游覆盖升级。
 
-## 已实施
+退出业务已从后端、管理后台与数据库中删除，不再只是隐藏。历史订单字段保留原值并只读展示。
 
-- 删除退出业务的 API 路由、后台路由、用户页面、专属装修组件和无引用的控制器；拼团、预售、新人券不在删除集合中。
-- 公共下单/计价/购物车服务拒绝退出业务参数；非微信付款在订单修改之前拒绝。微信关闭或配置为旧通联渠道时明确失败，不再回退到其他渠道。
-- 删除收货发放积分、经验、分销佣金的实现；普通售价不再应用会员折扣。保留共享订单字段与合法零元订单流程。
-- 新人礼包配置拒绝非零余额/积分；注册只发券，通过用户行锁和已有领取记录防止重试重复发券。
-- 客服使用 `customer_qrcode`，公开客服配置不再返回电话。商品底部和悬浮客服在未配置二维码时隐藏。聊天 WebSocket 不再启动，`/msg` 返回 404；后台订单通知使用的 admin/channel 服务保留。
-- 原生 App 打包配置与本项目原生条件分支删除；第三方富文本组件中的平台兼容代码保留。
-- 合并六份完全相同的验证码实现、重复 emoji 资源；现有包依赖未进行激进删除，仍有共享/动态加载使用方。
-- 删除旧覆盖升级控制器、服务与任务。保留订单取消、拼团到期、预售下架、自动收货等定时能力，退出的任务不再被调度。
+## 后端
+
+- 删除退出业务的 service、dao、model、job、listener、控制器、路由文件与整个 `kefuapi` 应用，以及 alipay/allinpay/资金转账驱动和第三方直播聊天组件。
+- 订单主链路：支付成功、退款、购物车、运费、下单、订单读取、发货、收货、拆单都不再读写退出业务字段；退款只按原路微信支付处理。
+- 历史订单（`pay_type` 为 yue/offline/alipay/allinpay、`seckill_id`、`bargain_id`、`use_integral`、`spread_uid`、`shipping_type=2`）仍可列表、详情与导出，支付方式通过 `CoreStore::historicalPayTypeLabel()` 显示为「历史：…」；对这类订单发起原路退款会被明确拒绝，提示线下处理。
+- 新订单对退出字段写 0；`eb_user`、`eb_store_order` 上这些列保留原值且不再被读写。
+- 订单通知与移动端订单管理改为读取 `order_notice_admin_uids` 配置（用户 UID 列表），不再依赖已删除的客服表。
+- 删除隐藏层本身：`CoreStoreAdmin`、`CoreStore::DISABLED_CONFIG`、`sys_config()` 中的强制覆盖与 `config/core_store_removed_admin.json` 均已移除；`config/core_store_removed_pages.json` 仅用于清除装修里的失效链接。
+
+## 管理后台
+
+- 删除退出业务的页面、路由与 API 模块，以及对应的菜单过滤层；保留页面中的积分、会员价、佣金、核销、余额支付等分支一并清除。
+- 渠道码与客服选人改用现有用户列表接口。
+- 恢复管理端用户状态开关与预售后台（`marketing/advance` 路由组），预售 CRUD 可用。
+- 移除 `vue-pickers`、`quill`、`vue-ydui`、`emoji-awesome`、`better-scroll`、`countup`、`vue-puzzle-vcode`、`editor`、`oss`、`cropperjs`、`qs` 等无引用依赖。
 
 ## 迁移与数据保护
 
-脚本：`crmeb/upgrade/core-store/migrate.php`。只能从 CLI 运行，默认 `plan` 不写数据库。
-
-在维护窗口内停止业务写入、订单队列与定时任务，先复制数据库和上传文件。以下命令在 `crmeb` 根目录、具有现有环境配置与 vendor 的 PHP 7.4 环境运行：
+脚本：`crmeb/upgrade/core-store/drop-retired.php`。只能在 CLI 运行，`plan` 不写数据库；`apply`、`rollback` 需要位于 `public` 之外、权限 0600 的备份路径。
 
 ```sh
-php upgrade/core-store/migrate.php plan
-php upgrade/core-store/migrate.php apply /absolute/private/core-store-backup.json
-php upgrade/core-store/migrate.php rollback /absolute/private/core-store-backup.json
+php upgrade/core-store/drop-retired.php plan
+php upgrade/core-store/drop-retired.php apply /private/retired-backup.json
+php upgrade/core-store/drop-retired.php rollback /private/retired-backup.json
+php upgrade/core-store/drop-retired.php finalize
 ```
 
-- 存在订单、充值、提现、其他交易或非零余额/佣金时拒绝迁移；不能用清空数据绕过检查。
-- 备份必须位于 `public` 之外，权限 0600；先写备份，再在事务中修改配置、菜单、旧版 DIY、新版主题及旧导航分组。
-- 禁用退出业务配置；电话原值保留但配置入口隐藏，新增独立二维码上传配置。
-- 清理旧营销组件与失效导航，保留拼团、预售、`newVip` 新人组件和优惠券；更新受影响页面/主题版本。
-- 校验商品、规格、分类、描述、附件表的数量及内容哈希不变。脚本不改上传文件、不删表字段、不执行安装 SQL。
-- 重复 apply 无新增变化；rollback 检查当前记录仍匹配迁移结果，遇到之后的编辑会拒绝覆盖。
-- 回滚发布时须恢复配套旧代码/前端版本并重启队列和定时进程。只恢复数据库不会撤销精简版本的业务边界。
+- `plan` 只读，输出退出业务表与行数、未结清事项、将变为不可达的余额/积分/佣金，以及受保护表的行数与哈希。
+- **未结清负债会拒绝 apply**：未处理提现、未发货的历史余额/线下单、未完成的充值/付费会员订单、未完成的积分商城订单；先在业务侧处理完再执行。
+- 非零余额/积分/佣金不阻塞迁移，apply 会把清单导出为备份同目录的 CSV，供运营线下补偿；`eb_user` 上的这些列保留原值。
+- `apply` 先把退出业务表重命名为 `eb_retired_*`（瞬时、可回滚），再删除退出配置、配置 tab、菜单、定时任务与组合数据，并清理装修中的失效组件。
+- 通知名单转换：apply 会把 `eb_store_service` 中 `notify=1` 的记录写入 `order_notice_admin_uids`，避免上线后订单通知丢失。
+- `rollback` 恢复表名与被删除的行；若记录在迁移后被编辑则拒绝覆盖。`finalize` 在验收期后真正删除 `eb_retired_*`，此后只能依靠 mysqldump 恢复。
+- 校验商品、规格、分类、附件、订单、订单购物车与用户表的行数和内容哈希不变。脚本不改上传文件、不删共享表字段。
 
-已在仓库安装数据的隔离 MySQL 副本中验证预览、重复应用、数据保护和回滚；尚未取得实际线上数据库副本，未执行生产迁移。
+新装环境直接使用 `crmeb/public/install/crmeb.sql`：退出业务表、配置、菜单与定时任务种子已移除，并新增预售菜单与 `order_notice_admin_uids` 配置。
 
 ## 验证与发布边界
 
-自动验证命令：
-
 ```sh
-sh docker/run-regression.sh
-node tests/static/core-store-front.cjs
+sh scripts/check-maintenance.sh
 ```
 
-后台生产构建使用现有 Vue CLI，构建目录指向临时目录，不覆盖仓库已有发布文件：
+依次执行回归套件、PHP 7.4 语法检查、H5/小程序双端静态检查、管理后台接口正反向契约检查、退出业务残留守卫、发布清单校验与支付适配检查。回归覆盖下单/计价/库存/拼团/预售/优惠券/队列，以及历史订单兼容与迁移 plan→apply→重复 apply→rollback→finalize。
 
-```sh
-NODE_OPTIONS=--openssl-legacy-provider npm run build --prefix template/admin -- --dest /tmp/crmeb-core-admin-build
-```
+**发布前尚需验证：**HBuilderX 分别构建 H5/微信小程序并在真实客户端检查装修、下单和客服二维码；使用测试商户验证微信内/外 H5、小程序支付及原路退款；对拼团失败退款、预售完整履约执行端到端验收；用生产库脱敏副本执行一次 plan→apply，并在此前把提现、自提、历史余额单等负债处理干净。静态检查不等同于客户端构建或真机验收。
 
-新增测试覆盖退出接口 404、退出参数拒绝、积分不能抵扣、注册奖励不增加资金/积分、新人券重试、装修保留活动组件、迁移与回滚、预售到期下架、拼团成团状态。
+`crmeb/public/admin` 已用 Node 20.19.0 / npm 10.8.2 重建。生产配置挂载独立 public 目录，替换镜像不会自动更新这些文件。
 
-**发布前尚需验证：**HBuilderX 分别构建 H5/微信小程序并在真实客户端检查装修、下单和客服二维码；使用测试商户验证微信内/外 H5、小程序支付及原路退款；对拼团失败退款、预售完整履约执行端到端验收。静态双端语法检查不等同于客户端构建或真机验收。
+## 清单
 
-仓库内 `crmeb/public` 现有发布产物保持原样，不能直接把它们与新后端配对上线。发布时须构建并更新后台与 H5 文件、发布配套小程序版本；生产配置挂载独立 public 目录，替换镜像并不会自动更新这些文件。精简版本已提交并推送，尚未部署。
-
-## 清单与保守保留项
-
-- `core-store-baseline.json`：修改前提交及物理行数/文件体积口径；源码分类仍包含内嵌第三方代码，不能等同纯业务逻辑行数。
+- `core-store-baseline.json`：修改前提交及物理行数/文件体积口径。
 - `core-store-files.json`：实际修改、删除、新增文件清单。
-- `core-store-removed-routes.json`：主要退出路由清单，路径可能相对于所属路由组。
-- `core-store-removed-pages.json`：首批用户页面与后台路由目标清单；运行时清理清单位于 `crmeb/config/core_store_removed_pages.json`；完整文件变更以 files 清单为准。
-- `core-store-shared-retained.json`：仍有共享调用或回归测试引用的旧 PHP 类及引用证据。未用强行删除的方式破坏公共商品、订单、统计和退款流程。
+- `core-store-removed-routes.json`：主要退出路由清单。
+- `core-store-removed-pages.json`：用户页面与装修失效链接清单，运行时用于清理装修数据。
+- `core-store-shared-retained.json`：已清空；退出业务的共享类已全部删除。
 - `core-store-result.json`：最终同口径源码统计。
-
-未知动态引用、共享存储适配、既有数据库字段、第三方包、发布产物和上传素材保留；未将其计为业务删除成果。

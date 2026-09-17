@@ -11,18 +11,6 @@
 import request from '@/libs/request';
 
 /**
- * @description 小程序模板消息 -- 列表
- * @param {Object} param data {Object} 传值参数
- */
-export function routineListApi(data) {
-  return request({
-    url: 'app/routine',
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
  * @description  同步订阅消息
  */
 export function routineSyncTemplate() {
