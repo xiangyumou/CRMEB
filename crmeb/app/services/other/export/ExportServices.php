@@ -36,7 +36,7 @@ class ExportServices extends BaseServices
         /** @var UserServices $userServices */
         $userServices = app()->make(UserServices::class);
         $data = $userServices->index($where)['list'];
-        $header = ['用户ID', '昵称', '真实姓名', '性别', '电话', '用户等级', '用户分组', '用户标签', '用户类型', '用户余额', '最后登录时间', '注册时间', '是否注销'];
+        $header = ['用户ID', '昵称', '真实姓名', '性别', '电话', '用户分组', '用户标签', '用户类型', '最后登录时间', '注册时间', '是否注销'];
         $filename = '用户列表_' . date('YmdHis', time());
         $export = $fileKey = [];
         if (!empty($data)) {
@@ -48,11 +48,9 @@ class ExportServices extends BaseServices
                     'real_name' => $item['real_name'],
                     'sex' => $item['sex'],
                     'phone' => $item['phone'],
-                    'level' => $item['level'],
                     'group_id' => $item['group_id'],
                     'labels' => $item['labels'],
                     'user_type' => $item['user_type'],
-                    'now_money' => $item['now_money'],
                     'last_time' => date('Y-m-d H:i:s', $item['last_time']),
                     'add_time' => date('Y-m-d H:i:s', $item['add_time']),
                     'is_del' => $item['is_del'] ? '已注销' : '正常'
@@ -87,40 +85,16 @@ class ExportServices extends BaseServices
             $i = 0;
             foreach ($data as $item) {
                 if ($item['paid'] == 1) {
-                    switch ($item['pay_type']) {
-                        case 'weixin':
-                            $item['pay_type_name'] = '微信支付';
-                            break;
-                        case 'yue':
-                            $item['pay_type_name'] = '余额支付';
-                            break;
-                        case 'offline':
-                            $item['pay_type_name'] = '线下支付';
-                            break;
-                        default:
-                            $item['pay_type_name'] = '其他支付';
-                            break;
-                    }
+                    $item['pay_type_name'] = \app\services\CoreStore::historicalPayTypeLabel($item['pay_type']);
                 } else {
-                    switch ($item['pay_type']) {
-                        default:
-                            $item['pay_type_name'] = '未支付';
-                            break;
-                        case 'offline':
-                            $item['pay_type_name'] = '线下支付';
-                            break;
-                    }
+                    $item['pay_type_name'] = '未支付';
                 }
                 if ($item['paid'] == 0 && $item['status'] == 0) {
                     $item['status_name'] = '未支付';
                 } else if ($item['paid'] == 1 && $item['status'] == 0 && $item['shipping_type'] == 1 && $item['refund_status'] == 0) {
                     $item['status_name'] = '未发货';
-                } else if ($item['paid'] == 1 && $item['status'] == 0 && $item['shipping_type'] == 2 && $item['refund_status'] == 0) {
-                    $item['status_name'] = '未核销';
                 } else if ($item['paid'] == 1 && $item['status'] == 1 && $item['shipping_type'] == 1 && $item['refund_status'] == 0) {
                     $item['status_name'] = '待收货';
-                } else if ($item['paid'] == 1 && $item['status'] == 1 && $item['shipping_type'] == 2 && $item['refund_status'] == 0) {
-                    $item['status_name'] = '未核销';
                 } else if ($item['paid'] == 1 && $item['status'] == 2 && $item['refund_status'] == 0) {
                     $item['status_name'] = '待评价';
                 } else if ($item['paid'] == 1 && $item['status'] == 3 && $item['refund_status'] == 0) {
@@ -291,8 +265,7 @@ class ExportServices extends BaseServices
             '商品名称', '商品类型', '商品分类(一级)', '商品分类(二级)', '商品单位',
             '已售数量', '起购数量',
             '规格类型', '规格名称', '售价', '划线价', '成本价', '库存', '重量', '体积', '商品编码', '条形码',
-            '商品简介', '商品关键字', '商品口令',
-            '购买送积分'
+            '商品简介', '商品关键字', '商品口令'
         ];
         $filename = '商品导出_' . date('YmdHis', time());
         $virtualType = ['普通商品', '卡密/网盘', '优惠券', '虚拟商品'];
@@ -356,7 +329,6 @@ class ExportServices extends BaseServices
                         'store_info' => $productInfo['store_info'],
                         'keyword' => $productInfo['keyword'],
                         'command_word' => $productInfo['command_word'],
-                        'give_integral' => $productInfo['give_integral'],
                     ];
                     $export[] = $one_data;
                     if ($i == 0) {
@@ -364,46 +336,6 @@ class ExportServices extends BaseServices
                     }
                     $i++;
                 }
-            }
-        }
-        return compact('header', 'fileKey', 'export', 'filename');
-    }
-
-    /**
-     * 砍价商品导出
-     * @param $where
-     * @return array
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function exportBargainList($where)
-    {
-        $header = ['砍价名称', '起始价格', '最低价', '参与人数', '成功人数', '剩余库存', '活动状态', '活动时间', '添加时间'];
-        $filename = '砍价列表_' . date('YmdHis', time());
-        $export = $fileKey = [];
-        /** @var StoreBargainServices $bargainServices */
-        $bargainServices = app()->make(StoreBargainServices::class);
-        $data = $bargainServices->getStoreBargainList($where)['list'];
-        if (!empty($data)) {
-            $i = 0;
-            foreach ($data as $item) {
-                $one_data = [
-                    'title' => $item['title'],
-                    'price' => $item['price'],
-                    'min_price' => $item['min_price'],
-                    'count_people_all' => $item['count_people_all'],
-                    'count_people_success' => $item['count_people_success'],
-                    'quota' => $item['quota'],
-                    'start_name' => $item['start_name'],
-                    'activity_time' => $item['start_time'] . '至' . $item['stop_time'],
-                    'add_time' => $item['add_time']
-                ];
-                $export[] = $one_data;
-                if ($i == 0) {
-                    $fileKey = array_keys($one_data);
-                }
-                $i++;
             }
         }
         return compact('header', 'fileKey', 'export', 'filename');
@@ -436,87 +368,6 @@ class ExportServices extends BaseServices
                     'start_name' => $item['start_name'],
                     'activity_time' => $item['start_time'] . '至' . $item['stop_time'],
                     'add_time' => $item['add_time']
-                ];
-                $export[] = $one_data;
-                if ($i == 0) {
-                    $fileKey = array_keys($one_data);
-                }
-                $i++;
-            }
-        }
-        return compact('header', 'fileKey', 'export', 'filename');
-    }
-
-    /**
-     * 秒杀导出
-     * @param $where
-     * @return array
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function exportSeckillList($where)
-    {
-        $header = ['秒杀名称', '秒杀价', '原价', '剩余库存', '活动状态', '活动时间', '添加时间'];
-        $filename = '秒杀列表_' . date('YmdHis', time());
-        $export = $fileKey = [];
-        /** @var StoreSeckillServices $seckillServices */
-        $seckillServices = app()->make(StoreSeckillServices::class);
-        $data = $seckillServices->systemPage($where)['list'];
-        if (!empty($data)) {
-            $i = 0;
-            foreach ($data as $item) {
-                $one_data = [
-                    'title' => $item['title'],
-                    'price' => $item['price'],
-                    'ot_price' => $item['ot_price'],
-                    'quota' => $item['quota'],
-                    'start_name' => $item['start_name'],
-                    'activity_time' => $item['start_time'] . '至' . $item['stop_time'],
-                    'add_time' => $item['add_time']
-                ];
-                $export[] = $one_data;
-                if ($i == 0) {
-                    $fileKey = array_keys($one_data);
-                }
-                $i++;
-            }
-        }
-        return compact('header', 'fileKey', 'export', 'filename');
-    }
-
-    /**
-     * 会员卡导出
-     * @param $id
-     * @return array
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function exportMemberCard($id)
-    {
-        /** @var MemberCardServices $memberCardServices */
-        $memberCardServices = app()->make(MemberCardServices::class);
-        $data = $memberCardServices->getExportData(['batch_card_id' => $id]);
-        $header = ['会员卡号', '密码', '领取人', '领取人手机号', '领取时间', '是否使用'];
-        $filename = $data['title'] . '批次列表_' . date('YmdHis', time());
-        $export = $fileKey = [];
-        if (!empty($data['data'])) {
-            $userIds = array_column($data['data']->toArray(), 'use_uid');
-            /** @var  UserServices $userService */
-            $userService = app()->make(UserServices::class);
-            $userList = $userService->getColumn([['uid', 'in', $userIds]], 'nickname,phone,real_name', 'uid');
-
-
-            $i = 0;
-            foreach ($data['data'] as $item) {
-                $one_data = [
-                    'card_number' => $item['card_number'],
-                    'card_password' => $item['card_password'],
-                    'user_name' => $userList[$item['use_uid']]['real_name'] ?? $userList[$item['use_uid']]['nickname'] ?? '',
-                    'user_phone' => $userList[$item['use_uid']]['phone'] ?? "",
-                    'use_time' => $item['use_time'],
-                    'use_uid' => $item['use_uid'] ? '已领取' : '未领取'
                 ];
                 $export[] = $one_data;
                 if ($i == 0) {
@@ -592,207 +443,6 @@ class ExportServices extends BaseServices
     }
 
     /**
-     * 用户佣金导出
-     * @param $data 导出数据
-     */
-    public function userCommission($data = [])
-    {
-        $export = [];
-        if (!empty($data)) {
-            foreach ($data as &$value) {
-                $export[] = [
-                    $value['nickname'],
-                    $value['sum_number'],
-                    $value['now_money'],
-                    $value['brokerage_price'],
-                    $value['extract_price'],
-                ];
-            }
-        }
-        $header = ['昵称/姓名', '总佣金金额', '账户余额', '账户佣金', '提现到账佣金'];
-        $title = ['拥金记录', '拥金记录' . time(), ' 生成时间：' . date('Y-m-d H:i:s', time())];
-        $filename = '拥金记录_' . date('YmdHis', time());
-        $suffix = 'xlsx';
-        $is_save = true;
-        return $this->export($header, $title, $export, $filename, $suffix, $is_save);
-    }
-
-    /**
-     * 用户积分导出
-     * @param $data 导出数据
-     */
-    public function userPoint($data = [])
-    {
-        $export = [];
-        if (!empty($data)) {
-            foreach ($data as $key => $item) {
-                $export[] = [
-                    $item['id'],
-                    $item['title'],
-                    $item['balance'],
-                    $item['number'],
-                    $item['mark'],
-                    $item['nickname'],
-                    $item['add_time'],
-                ];
-            }
-        }
-        $header = ['编号', '标题', '变动前积分', '积分变动', '备注', '用户微信昵称', '添加时间'];
-        $title = ['积分日志', '积分日志' . time(), '生成时间：' . date('Y-m-d H:i:s', time())];
-        $filename = '积分日志_' . date('YmdHis', time());
-        $suffix = 'xlsx';
-        $is_save = true;
-        return $this->export($header, $title, $export, $filename, $suffix, $is_save);
-    }
-
-    /**
-     * 用户充值导出
-     * @param $data 导出数据
-     */
-    public function userRecharge($data = [])
-    {
-        $export = [];
-        if (!empty($data)) {
-            foreach ($data as $item) {
-                $item['_pay_time'] = $item['pay_time'] ? date('Y-m-d H:i:s', $item['pay_time']) : '暂无';
-                $item['_add_time'] = $item['add_time'] ? date('Y-m-d H:i:s', $item['add_time']) : '暂无';
-                $item['paid_type'] = $item['paid'] ? '已支付' : '未支付';
-
-                $export[] = [
-                    $item['nickname'],
-                    $item['order_id'],
-                    $item['price'],
-                    $item['paid_type'],
-                    $item['_recharge_type'],
-                    $item['_pay_time'],
-                    $item['paid'] == 1 && $item['refund_price'] == $item['price'] ? '已退款' : '未退款'
-                ];
-            }
-        }
-        $header = ['昵称/姓名', '订单号', '充值金额', '是否支付', '充值类型', '支付时间', '是否退款'];
-        $title = ['充值记录', '充值记录' . time(), ' 生成时间：' . date('Y-m-d H:i:s', time())];
-        $filename = '充值记录_' . date('YmdHis', time());
-        $suffix = 'xlsx';
-        $is_save = true;
-        return $this->export($header, $title, $export, $filename, $suffix, $is_save);
-    }
-
-    /**
-     * 用户推广导出
-     * @param $data 导出数据
-     */
-    public function userAgent($data = [])
-    {
-        $export = [];
-        if (!empty($data)) {
-            foreach ($data as $index => $item) {
-                $export[] = [
-                    $item['uid'],
-                    $item['nickname'],
-                    $item['phone'],
-                    $item['spread_count'],
-                    $item['spread_order']['order_count'],
-                    $item['spread_order']['order_price'],
-                    $item['brokerage_money'],
-                    $item['extract_count_price'],
-                    $item['extract_count_num'],
-                    $item['brokerage_price'],
-                    $item['spread_name'],
-                ];
-            }
-        }
-        $header = ['用户编号', '昵称', '电话号码', '推广用户数量', '推广订单数量', '推广订单金额', '佣金金额', '已提现金额', '提现次数', '未提现金额', '上级推广人'];
-        $title = ['推广用户', '推广用户导出' . time(), ' 生成时间：' . date('Y-m-d H:i:s', time())];
-        $filename = '推广用户_' . date('YmdHis', time());
-        $suffix = 'xlsx';
-        $is_save = true;
-        return $this->export($header, $title, $export, $filename, $suffix, $is_save);
-    }
-
-    /**
-     * 微信用户导出
-     * @param $data 导出数据
-     */
-    public function wechatUser($data = [])
-    {
-        $export = [];
-        if (!empty($data)) {
-            foreach ($data as $index => $item) {
-                $export[] = [
-                    $item['nickname'],
-                    $item['sex'],
-                    $item['country'] . $item['province'] . $item['city'],
-                    $item['subscribe'] == 1 ? '关注' : '未关注',
-                ];
-            }
-        }
-        $header = ['名称', '性别', '地区', '是否关注公众号'];
-        $title = ['微信用户导出', '微信用户导出' . time(), ' 生成时间：' . date('Y-m-d H:i:s', time())];
-        $filename = '微信用户导出_' . date('YmdHis', time());
-        $suffix = 'xlsx';
-        $is_save = true;
-        return $this->export($header, $title, $export, $filename, $suffix, $is_save);
-    }
-
-    /**
-     * 订单资金导出
-     * @param $data 导出数据
-     */
-    public function orderFinance($data = [])
-    {
-        $export = [];
-        if (!empty($data)) {
-            foreach ($data as $info) {
-                $time = $info['pay_time'];
-                $price = $info['total_price'] + $info['pay_postage'];
-                $zhichu = $info['coupon_price'] + $info['deduction_price'] + $info['cost'];
-                $profit = ($info['total_price'] + $info['pay_postage']) - ($info['coupon_price'] + $info['deduction_price'] + $info['cost']);
-                $deduction = $info['deduction_price'];//积分抵扣
-                $coupon = $info['coupon_price'];//优惠
-                $cost = $info['cost'];//成本
-                $export[] = [$time, $price, $zhichu, $cost, $coupon, $deduction, $profit];
-            }
-        }
-        $header = ['时间', '营业额(元)', '支出(元)', '成本', '优惠', '积分抵扣', '盈利(元)'];
-        $title = ['财务统计', '财务统计', date('Y-m-d H:i:s', time())];
-        $filename = '财务统计_' . date('YmdHis', time());
-        $suffix = 'xlsx';
-        $is_save = true;
-        return $this->export($header, $title, $export, $filename, $suffix, $is_save);
-    }
-
-    /**
-     * 商铺砍价活动导出
-     * @param $data 导出数据
-     */
-    public function storeBargain($data = [])
-    {
-        $export = [];
-        if (!empty($data)) {
-            foreach ($data as $index => $item) {
-                $export[] = [
-                    $item['title'],
-                    $item['info'],
-                    '￥' . $item['price'],
-                    $item['bargain_num'],
-                    $item['status'] ? '开启' : '关闭',
-                    empty($item['start_time']) ? '' : date('Y-m-d H:i:s', (int)$item['start_time']),
-                    empty($item['stop_time']) ? '' : date('Y-m-d H:i:s', (int)$item['stop_time']),
-                    $item['sales'],
-                    $item['quota'],
-                    empty($item['add_time']) ? '' : $item['add_time'],
-                ];
-            }
-        }
-        $header = ['砍价活动名称', '砍价活动简介', '砍价金额', '用户每次砍价的次数', '砍价状态', '砍价开启时间', '砍价结束时间', '销量', '限量', '添加时间'];
-        $title = ['砍价商品导出', '商品信息' . time(), ' 生成时间：' . date('Y-m-d H:i:s', time())];
-        $filename = '砍价商品导出_' . date('YmdHis', time());
-        $suffix = 'xlsx';
-        $is_save = true;
-        return $this->export($header, $title, $export, $filename, $suffix, $is_save);
-    }
-
-    /**
      * 商铺拼团导出
      * @param $data 导出数据
      */
@@ -819,125 +469,6 @@ class ExportServices extends BaseServices
         $header = ['编号', '拼团名称', '原价', '拼团价', '限量', '拼团人数', '参与人数', '成团数量', '销量', '商品状态', '结束时间'];
         $title = ['拼团商品导出', '商品信息' . time(), ' 生成时间：' . date('Y-m-d H:i:s', time())];
         $filename = '拼团商品导出_' . date('YmdHis', time());
-        $suffix = 'xlsx';
-        $is_save = true;
-        return $this->export($header, $title, $export, $filename, $suffix, $is_save);
-    }
-
-    /**
-     * 商铺秒杀活动导出
-     * @param $data 导出数据
-     */
-    public function storeSeckill($data = [])
-    {
-        $export = [];
-        if (!empty($data)) {
-            foreach ($data as $item) {
-                if ($item['status']) {
-                    if ($item['start_time'] > time())
-                        $item['start_name'] = '活动未开始';
-                    else if ($item['stop_time'] < time())
-                        $item['start_name'] = '活动已结束';
-                    else if ($item['stop_time'] > time() && $item['start_time'] < time())
-                        $item['start_name'] = '正在进行中';
-                } else {
-                    $item['start_name'] = '活动已结束';
-                }
-                $export[] = [
-                    $item['id'],
-                    $item['title'],
-                    $item['info'],
-                    $item['ot_price'],
-                    $item['price'],
-                    $item['quota'],
-                    $item['sales'],
-                    $item['start_name'],
-                    $item['stop_time'] ? date('Y-m-d H:i:s', $item['stop_time']) : '/',
-                    $item['status'] ? '开启' : '关闭',
-                ];
-            }
-        }
-        $header = ['编号', '活动标题', '活动简介', '原价', '秒杀价', '限量', '销量', '秒杀状态', '结束时间', '状态'];
-        $title = ['秒杀商品导出', ' ', ' 生成时间：' . date('Y-m-d H:i:s', time())];
-        $filename = '秒杀商品导出_' . date('YmdHis', time());
-        $suffix = 'xlsx';
-        $is_save = true;
-        return $this->export($header, $title, $export, $filename, $suffix, $is_save);
-    }
-
-    /**
-     * 商铺商品导出
-     * @param $data 导出数据
-     */
-    public function storeProduct($data = [])
-    {
-        $export = [];
-        if (!empty($data)) {
-            foreach ($data as $index => $item) {
-                $export[] = [
-                    $item['store_name'],
-                    $item['store_info'],
-                    $item['cate_name'],
-                    '￥' . $item['price'],
-                    $item['stock'],
-                    $item['sales'],
-                    $item['visitor'],
-                ];
-            }
-        }
-        $header = ['商品名称', '商品简介', '商品分类', '价格', '库存', '销量', '浏览量'];
-        $title = ['商品导出', '商品信息' . time(), ' 生成时间：' . date('Y-m-d H:i:s', time())];
-        $filename = '商品导出_' . date('YmdHis', time());
-        $suffix = 'xlsx';
-        $is_save = true;
-        return $this->export($header, $title, $export, $filename, $suffix, $is_save);
-    }
-
-
-    /**
-     * 商铺自提点导出
-     * @param $data 导出数据
-     */
-    public function storeMerchant($data = [])
-    {
-        $export = [];
-        if (!empty($data)) {
-            foreach ($data as $index => $item) {
-                $export[] = [
-                    $item['name'],
-                    $item['phone'],
-                    $item['address'] . '' . $item['detailed_address'],
-                    $item['day_time'],
-                    $item['is_show'] ? '开启' : '关闭'
-                ];
-            }
-        }
-        $header = ['提货点名称', '提货点', '地址', '营业时间', '状态'];
-        $title = ['提货点导出', '提货点信息' . time(), ' 生成时间：' . date('Y-m-d H:i:s', time())];
-        $filename = '提货点导出_' . date('YmdHis', time());
-        $suffix = 'xlsx';
-        $is_save = true;
-        return $this->export($header, $title, $export, $filename, $suffix, $is_save);
-    }
-
-    public function memberCard($data = [])
-    {
-        $export = [];
-        if (!empty($data)) {
-            foreach ($data['data'] as $index => $item) {
-                $export[] = [
-                    $item['card_number'],
-                    $item['card_password'],
-                    $item['user_name'],
-                    $item['user_phone'],
-                    $item['use_time'],
-                    $item['use_uid'] ? '已领取' : '未领取'
-                ];
-            }
-        }
-        $header = ['会员卡号', '密码', '领取人', '领取人手机号', '领取时间', '是否使用'];
-        $title = ['会员卡导出', '会员卡导出' . time(), ' 生成时间：' . date('Y-m-d H:i:s', time())];
-        $filename = $data['title'] ? ("卡密会员_" . trim(str_replace(["\r\n", "\r", "\\", "\n", "/", "<", ">", "=", " "], '', $data['title']))) : "";
         $suffix = 'xlsx';
         $is_save = true;
         return $this->export($header, $title, $export, $filename, $suffix, $is_save);
@@ -1020,41 +551,4 @@ class ExportServices extends BaseServices
         return $this->export($header, $title, $export, $filename, $suffix, $is_save);
     }
 
-    /**
-     * 核销记录导出
-     * @param array $data
-     * @return mixed|string[]
-     * @author wuhaotian
-     * @email 442384644@qq.com
-     * @date 2025/9/9
-     */
-    public function verifyOrder($data = [])
-    {
-        $export = [];
-        if (!empty($data)) {
-            foreach ($data as $item) {
-                $productName = '';
-                foreach ($item['_info'] as $productInfo) {
-                    $productName .= $productInfo['cart_info']['productInfo']['store_name'] . ' ';
-                }
-                $export[] = [
-                    $item['order_id'],
-                    $item['real_name'] . '/' . $item['uid'],
-                    $productName,
-                    $item['pay_price'],
-                    $item['clerk_name'],
-                    $item['store_name'],
-                    $item['pay_type_name'],
-                    $item['status_name']['status_name'],
-                    $item['add_time'],
-                ];
-            }
-        }
-        $header = ['订单号', '用户信息', '商品信息', '支付金额', '核销员', '核销门店', '支付状态', '订单状态', '下单时间'];
-        $title = ['核销记录导出', '核销记录导出' . time(), ' 生成时间：' . date('Y-m-d H:i:s', time())];
-        $filename = '核销记录_' . date('YmdHis', time());
-        $suffix = 'xlsx';
-        $is_save = true;
-        return $this->export($header, $title, $export, $filename, $suffix, $is_save);
-    }
 }

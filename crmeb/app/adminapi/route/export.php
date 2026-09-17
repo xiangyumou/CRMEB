@@ -32,7 +32,6 @@ Route::group('export', function () {
     //分销用户推广列表
 
     //用户资金监控
-    Route::get('userFinance', 'v1.export.ExportExcel/userFinance')->option(['real_name' => '用户资金导出']);
     //用户佣金
 
     //用户积分

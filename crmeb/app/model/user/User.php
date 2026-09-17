@@ -75,39 +75,12 @@ class User extends BaseModel
 //    }
 
     /**
-     * 链接会员登陆设置表
-     * @return \think\model\relation\HasOne
-     */
-    public function systemUserLevel()
-    {
-        return $this->hasOne(SystemUserLevel::class, 'id', 'level');
-    }
-
-    /**
      * 关联用户分组
      * @return \think\model\relation\HasOne
      */
     public function userGroup()
     {
         return $this->hasOne(UserGroup::class, 'id', 'group_id');
-    }
-
-    /**
-     * 关联自己
-     * @return \think\model\relation\HasOne
-     */
-    public function spreadUser()
-    {
-        return $this->hasOne(self::class, 'uid', 'spread_uid');
-    }
-
-    /**
-     * 关联自己
-     * @return \think\model\relation\HasOne
-     */
-    public function spreadCount()
-    {
-        return $this->hasMany(User::class, 'spread_uid', 'uid');
     }
 
     /**
@@ -138,39 +111,12 @@ class User extends BaseModel
     }
 
     /**
-     * 关联提现
-     * @return \think\model\relation\HasMany
-     */
-    public function extract()
-    {
-        return $this->hasMany(UserExtract::class, 'uid', 'uid');
-    }
-
-    /**
      * 关联订单
      * @return User|\think\model\relation\HasMany
      */
     public function order()
     {
         return $this->hasMany(StoreOrder::class, 'uid', 'uid');
-    }
-
-    /**
-     * 关联分销等级
-     * @return \think\model\relation\HasOne
-     */
-    public function agentLevel()
-    {
-        return $this->hasOne(AgentLevel::class, 'id', 'agent_level')->where('is_del', 0)->where('status', 1);
-    }
-
-    /**
-     * 关联佣金数据
-     * @return \think\model\relation\HasMany
-     */
-    public function bill()
-    {
-        return $this->hasMany(UserBill::class, 'uid', 'uid');
     }
 
     /**
@@ -247,16 +193,6 @@ class User extends BaseModel
     }
 
     /**
-     * 是否推广人搜索器
-     * @param Model $query
-     * @param $value
-     */
-    public function searchIsPromoterAttr($query, $value)
-    {
-        $query->where('is_promoter', $value);
-    }
-
-    /**
      * 状态搜索器
      * @param Model $query
      * @param $value
@@ -264,52 +200,6 @@ class User extends BaseModel
     public function searchStatusAttr($query, $value)
     {
         $query->where('status', $value);
-    }
-
-    /**
-     * 会员等级搜索器
-     * @param Model $query
-     * @param $value
-     */
-    public function searchLevelAttr($query, $value)
-    {
-        $query->where('level', $value);
-    }
-
-    /**
-     * 推广人uid搜索器
-     * @param Model $query
-     * @param $value
-     */
-    public function searchSpreadUidAttr($query, $value)
-    {
-        $query->where('spread_uid', $value);
-    }
-
-    /**
-     * 推广人uid不等于搜索器
-     * @param Model $query
-     * @param $value
-     */
-    public function searchNotSpreadUidAttr($query, $value)
-    {
-        $query->where('spread_uid', '<>', $value);
-    }
-
-    /**
-     * 推广人时间搜索器
-     * @param Model $query
-     * @param $value
-     */
-    public function searchSpreadTimeAttr($query, $value)
-    {
-        if ($value) {
-            if (is_array($value)) {
-                if (count($value) == 2) $query->where('spread_time', $value[0], $value[1]);
-            } else {
-                $query->where('spread_time', $value);
-            }
-        }
     }
 
     /**
@@ -333,16 +223,6 @@ class User extends BaseModel
     }
 
     /**
-     * 用户推广资格
-     * @param Model $query
-     * @param $value
-     */
-    public function searchSpreadOpenAttr($query, $value)
-    {
-        if ($value != '') $query->where('spread_open', $value);
-    }
-
-    /**
      * nickname搜索器
      * @param $query
      * @param $value
@@ -350,76 +230,6 @@ class User extends BaseModel
     public function searchNicknameAttr($query, $value)
     {
         $query->where('nickname', "like", "%" . $value . "%");
-    }
-
-    /**
-     * division_type搜索器
-     * @param $query
-     * @param $value
-     */
-    public function searchDivisionTypeAttr($query, $value)
-    {
-        if ($value !== '') $query->where('division_type', $value);
-    }
-
-    /**
-     * division_id搜索器
-     * @param $query
-     * @param $value
-     */
-    public function searchDivisionIdAttr($query, $value)
-    {
-        if ((int)$value !== 0) $query->where('division_id', $value);
-    }
-
-    /**
-     * agent_id搜索器
-     * @param $query
-     * @param $value
-     */
-    public function searchAgentIdAttr($query, $value)
-    {
-        if ($value !== '') $query->where('agent_id', $value);
-    }
-
-    /**
-     * staff_id搜索器
-     * @param $query
-     * @param $value
-     */
-    public function searchStaffIdAttr($query, $value)
-    {
-        if ($value !== '') $query->where('staff_id', $value);
-    }
-
-    /**
-     * is_division搜索器
-     * @param $query
-     * @param $value
-     */
-    public function searchIsDivisionAttr($query, $value)
-    {
-        if ($value !== '') $query->where('is_division', $value);
-    }
-
-    /**
-     * is_agent搜索器
-     * @param $query
-     * @param $value
-     */
-    public function searchIsAgentAttr($query, $value)
-    {
-        if ($value !== '') $query->where('is_agent', $value);
-    }
-
-    /**
-     * is_staff搜索器
-     * @param $query
-     * @param $value
-     */
-    public function searchIsStaffAttr($query, $value)
-    {
-        if ($value !== '') $query->where('is_staff', $value);
     }
 
     /**

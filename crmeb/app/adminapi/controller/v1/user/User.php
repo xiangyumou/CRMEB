@@ -49,7 +49,6 @@ class User extends AuthController
             ['nickname', ''],
             ['status', ''],
             ['pay_count', ''],
-            ['is_promoter', ''],
             ['order', ''],
             ['data', ''],
             ['user_type', ''],
@@ -59,19 +58,12 @@ class User extends AuthController
             ['user_time_type', ''],
             ['user_time', ''],
             ['sex', ''],
-            [['level', 0], 0],
             [['group_id', 'd'], 0],
             ['label_id', ''],
-            ['now_money', 'normal'],
             ['field_key', ''],
-            ['isMember', ''],
-            ['balance', []],
-            ['integral', []],
             ['before_pay_time', ''],
             ['pay_count_num', []],
             ['pay_count_money', []],
-            ['recharge_count', []],
-            ['agent_level', 0],
         ]);
         $where['label_id'] = toIntArray($where['label_id']);
         return app('json')->success($this->services->index($where));
@@ -118,11 +110,8 @@ class User extends AuthController
             ['mark', ''],
             ['pwd', ''],
             ['true_pwd', ''],
-            ['level', 0],
             ['group_id', 0],
             ['label_id', []],
-            ['spread_open', 1],
-            ['is_promoter', 0],
             ['status', 0]
         ]);
         if (!$data['real_name']) {
@@ -175,9 +164,6 @@ class User extends AuthController
             if ($label) {
                 $res = $this->services->saveSetLabel([$userInfo->uid], $label);
             }
-            if ($data['level']) {
-                $res = $this->services->saveGiveLevel((int)$userInfo->uid, (int)$data['level']);
-            }
             if (!$res) {
                 return app('json')->fail('保存失败');
             }
@@ -199,74 +185,6 @@ class User extends AuthController
             $id = (int)$id;
         }
         return app('json')->success($this->services->read($id));
-    }
-
-    /**
-     * 赠送会员等级表单
-     * @param $id
-     * @return mixed
-     */
-    public function give_level($id)
-    {
-        if (!$id) return app('json')->fail('参数错误');
-        return app('json')->success($this->services->giveLevel((int)$id));
-    }
-
-    /**
-     * 执行赠送会员等级
-     * @param $id
-     * @return mixed
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function save_give_level($id)
-    {
-        if (!$id) return app('json')->fail('参数错误');
-        list($level_id) = $this->request->postMore([
-            ['level_id', 0],
-        ], true);
-        return app('json')->success($this->services->saveGiveLevel((int)$id, (int)$level_id) ? '赠送成功' : '赠送失败');
-    }
-
-    /**
-     * 赠送付费会员时长表单
-     * @param $id
-     * @return mixed
-     * @throws \FormBuilder\Exception\FormBuilderException
-     */
-    public function give_level_time($id)
-    {
-        if (!$id) return app('json')->fail('参数错误');
-        return app('json')->success($this->services->giveLevelTime((int)$id));
-    }
-
-    /**
-     * 执行赠送付费会员时长
-     * @param $id
-     * @return mixed
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function save_give_level_time($id)
-    {
-        if (!$id) return app('json')->fail('参数错误');
-        list($days) = $this->request->postMore([
-            ['days', 0],
-        ], true);
-        return app('json')->success($this->services->saveGiveLevelTime((int)$id, (int)$days) ? '赠送成功' : '赠送失败');
-    }
-
-    /**
-     * 清除会员等级
-     * @param $id
-     * @return mixed
-     */
-    public function del_level($id)
-    {
-        if (!$id) return app('json')->fail('参数错误');
-        return app('json')->success($this->services->cleanUpLevel((int)$id) ? '清除成功' : '清除失败');
     }
 
     /**
@@ -353,24 +271,17 @@ class User extends AuthController
     {
         \app\services\CoreStore::assertAdminUser($this->request->post());
         $data = $this->request->postMore([
-            ['money_status', 0],
-            ['is_promoter', 0],
             ['real_name', ''],
             ['card_id', ''],
             ['birthday', ''],
             ['mark', ''],
-            ['money', 0],
-            ['integration_status', 0],
-            ['integration', 0],
             ['status', 0],
-            ['level', 0],
             ['phone', 0],
             ['addres', ''],
             ['label_id', []],
             ['group_id', 0],
             ['pwd', ''],
-            ['true_pwd'],
-            ['spread_open', 1]
+            ['true_pwd']
         ]);
         if (!$id) return app('json')->fail('参数错误');
         if (!$data['real_name']) {
@@ -403,15 +314,6 @@ class User extends AuthController
             unset($data['pwd']);
         }
         unset($data['true_pwd']);
-        $existing = $this->services->getUserInfo((int)$id);
-        if ($existing) {
-            $data['level'] = $existing['level'];
-            $data['is_promoter'] = $existing['is_promoter'];
-            $data['spread_open'] = $existing['spread_open'];
-        }
-        $data['adminId'] = $this->adminId;
-        $data['money'] = (string)$data['money'];
-        $data['integration'] = (string)$data['integration'];
         return app('json')->success($this->services->updateInfo($id, $data) ? '修改成功' : '修改失败');
     }
 
@@ -453,8 +355,6 @@ class User extends AuthController
     public function getNewGift()
     {
         $data = [
-            'reward_money' => 0,
-            'reward_integral' => 0,
             'reward_coupon' => sys_config('reward_coupon') == '' ? [] : sys_config('reward_coupon')
         ];
         return app('json')->success($data);
@@ -471,8 +371,6 @@ class User extends AuthController
     {
         \app\services\CoreStore::assertGift($this->request->post());
         $data = $this->request->postMore([
-            ['reward_money', 0],
-            ['reward_integral', 0],
             ['reward_coupon', '']
         ]);
         $configServices = app()->make(SystemConfigServices::class);

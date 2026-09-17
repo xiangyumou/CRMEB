@@ -99,37 +99,6 @@ class StoreOrder extends BaseModel
     }
 
     /**
-     * 一对一关联用户表
-     * @return \think\model\relation\HasOne
-     */
-    public function user()
-    {
-        return $this->hasOne(User::class, 'uid', 'uid')->field(['uid', 'nickname', 'phone', 'avatar', 'spread_uid'])->bind([
-            'nickname' => 'nickname',
-            'phone' => 'phone',
-            'avatar' => 'avatar',
-        ]);
-    }
-
-    public function division()
-    {
-        return $this->hasOne(User::class, 'uid', 'division_id')->field(['uid', 'nickname'])->bind([
-            'division_name' => 'nickname'
-        ]);
-    }
-
-    /**
-     * 一对一关联上级用户信息
-     * @return \think\model\relation\HasOne
-     */
-    public function spread()
-    {
-        return $this->hasOne(User::class, 'uid', 'spread_uid')->field(['uid', 'nickname'])->bind([
-            'spread_nickname' => 'nickname'
-        ]);
-    }
-
-    /**
      * 一对一拼团获取状态
      * @return \think\model\relation\HasOne
      */
@@ -137,41 +106,6 @@ class StoreOrder extends BaseModel
     {
         return $this->hasOne(StorePink::class, 'id', 'pink_id')->field(['id', 'order_id_key', 'status'])->bind([
             'pinkStatus' => 'status'
-        ]);
-    }
-
-    /**
-     * 门店一对一关联
-     * @return \think\model\relation\HasOne
-     */
-    public function store()
-    {
-        return $this->hasOne(SystemStore::class, 'id', 'store_id')->field(['id', 'name'])->bind([
-            'store_name' => 'name'
-        ]);
-    }
-
-    /**
-     * 订单关联店员
-     * @return \think\model\relation\HasOne
-     */
-    public function staff()
-    {
-        return $this->hasOne(SystemStoreStaff::class, 'uid', 'clerk_id')->field(['id', 'uid', 'store_id', 'staff_name'])->bind([
-            'staff_uid' => 'uid',
-            'staff_store_id' => 'store_id',
-            'clerk_name' => 'staff_name'
-        ]);
-    }
-
-    /**
-     * 店员关联用户
-     * @return \think\model\relation\HasOne
-     */
-    public function staffUser()
-    {
-        return $this->hasOne(User::class, 'uid', 'staff_uid')->field(['uid', 'nickname'])->bind([
-            'clerk_name' => 'nickname'
         ]);
     }
 
@@ -396,47 +330,6 @@ class StoreOrder extends BaseModel
     }
 
     /**
-     * 不是秒杀搜索器
-     * @param Model $query
-     * @param $value
-     */
-    public function searchSeckillIdGtAttr($query, $value)
-    {
-        $query->where('seckill_id', '>', $value);
-    }
-
-    /**
-     * 秒杀id商品搜索器
-     * @param Model $query
-     * @param $value
-     */
-    public function searchSeckillIdAttr($query, $value)
-    {
-        $query->where('seckill_id', $value);
-    }
-
-    /**
-     * 砍价商品id搜索器
-     * @param Model $query
-     * @param $value
-     */
-    public function searchBargainIdAttr($query, $value)
-    {
-        $query->where('bargain_id', $value);
-    }
-
-    /**
-     * 属于砍价搜索器
-     * @param Model $query
-     * @param $value
-     * @param $data
-     */
-    public function searchBargainIdGtAttr($query, $value)
-    {
-        $query->where('bargain_id', '>', $value);
-    }
-
-    /**
      * 核销码搜索器
      * @param Model $query
      * @param $value
@@ -499,53 +392,6 @@ class StoreOrder extends BaseModel
     }
 
     /**
-     * 退款id搜索器
-     * @param Model $query
-     * @param $value
-     */
-    public function searchRefundIdAttr($query, $value)
-    {
-        if ($value) {
-            $query->where('id', 'in', $value);
-        }
-    }
-
-    /**
-     * 上级｜上上级推广人
-     * @param $query
-     * @param $value
-     */
-    public function searchSpreadOrUidAttr($query, $value)
-    {
-        if ($value) $query->where('spread_uid|spread_two_uid', $value);
-    }
-
-    public function searchAllSpreadAttr($query, $value)
-    {
-        if ($value) $query->where('spread_uid|spread_two_uid|division_id|agent_id|staff_id', $value);
-    }
-
-    /**
-     * 上级推广人
-     * @param $query
-     * @param $value
-     */
-    public function searchSpreadUidAttr($query, $value)
-    {
-        if ($value) $query->where('spread_uid', $value);
-    }
-
-    /**
-     * 上上级推广人
-     * @param $query
-     * @param $value
-     */
-    public function searchSpreadTwoUidAttr($query, $value)
-    {
-        if ($value) $query->where('spread_two_uid', $value);
-    }
-
-    /**
      * 支付渠道
      * @param $query
      * @param $value
@@ -553,87 +399,6 @@ class StoreOrder extends BaseModel
     public function searchIsChannelAttr($query, $value)
     {
         if ($value !== '') $query->where('is_channel', $value);
-    }
-
-    /**
-     * 活动查询0普通，1秒杀，2砍价，3拼团，4预售
-     * @param $query
-     * @param $value
-     * @param $data
-     */
-    public function searchActivityTypeAttr($query, $value, $data)
-    {
-        if ($value !== '') {
-            switch ($value) {
-                case 0:
-                    $query->where('combination_id', 0)->where('seckill_id', 0)->where('bargain_id', 0)->where('advance_id', 0);
-                    break;
-                case 1:
-                    $query->where('seckill_id', '>', 0);
-                    break;
-                case 2:
-                    $query->where('bargain_id', '>', 0);
-                    break;
-                case 3:
-                    $query->where('combination_id', '>', 0);
-                    break;
-                case 4:
-                    $query->where('advance_id', '>', 0);
-                    break;
-                default:
-                    break;
-            }
-        }
-    }
-
-    /**
-     * 事业部推广订单
-     * @param $query
-     * @param $value
-     */
-    public function searchDivisionIdAttr($query, $value)
-    {
-        if ($value !== '') $query->where('division_id', $value);
-    }
-
-    /**
-     * 代理商推广订单
-     * @param $query
-     * @param $value
-     */
-    public function searchAgentIdAttr($query, $value)
-    {
-        if ($value !== '') $query->where('agent_id', $value);
-    }
-
-    /**
-     * 代理商推广订单
-     * @param $query
-     * @param $value
-     */
-    public function searchStaffIdAttr($query, $value)
-    {
-        if ($value !== '') $query->where('staff_id', $value);
-    }
-
-    /**
-     * @param $query
-     * @param $value
-     */
-    public function searchIdsAttr($query, $value)
-    {
-        if (is_string($value)) $value = explode(',', $value);
-        if (count($value)) $query->whereIn('id', $value);
-    }
-
-    public function searchDivisionBrokerageGreaterAttr($query, $value)
-    {
-        $query->where('division_brokerage', '>', $value);
-    }
-
-    public function searchAgentBrokerageGreaterAttr($query, $value)
-    {
-        $query->where('agent_brokerage', '>', $value);
     }
 
     public function searchVirtualTypeAttr($query, $value)

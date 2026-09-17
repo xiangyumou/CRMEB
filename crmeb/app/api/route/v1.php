@@ -356,21 +356,12 @@ Route::group(function () {
     })->option(['mark' => 'agent', 'mark_name' => '代理商']);
 
     Route::group(function () {
-        /** 佣金相关 */
-//推广数据 昨天的佣金 累计提现金额 当前佣金
-//佣金排行
         /** 用户注销 */
         Route::get('user_cancel', 'v1.user.UserController/SetUserCancel')->name('SetUserCancel')->option(['real_name' => '用户注销']);//用户注销
         /** 用户浏览记录 */
         Route::get('user/visit_list', 'v1.user.UserController/visitList')->name('visitList')->option(['real_name' => '商品浏览列表']);//商品浏览列表
         Route::delete('user/visit', 'v1.user.UserController/visitDelete')->name('visitDelete')->option(['real_name' => '商品浏览记录删除']);//商品浏览记录删除
     })->option(['mark' => 'user', 'mark_name' => '用户']);
-
-    Route::group(function () {
-        /** 分销员申请 */
-//申请信息
-//申请分销员
-    })->option(['mark' => 'spread', 'mark_name' => '分销员申请']);
 
 })->middleware(\app\http\middleware\AllowOriginMiddleware::class)->middleware(\app\api\middleware\StationOpenMiddleware::class)->middleware(\app\api\middleware\AuthTokenMiddleware::class, true);
 //未授权接口

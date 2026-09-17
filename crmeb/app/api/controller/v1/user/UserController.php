@@ -111,45 +111,6 @@ class UserController
     }
 
     /**
-     * 静默绑定推广人
-     * @param Request $request
-     * @return mixed
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function spread(Request $request)
-    {
-        [$spreadUid, $code, $agent_id] = $request->postMore([
-            ['puid', 0],
-            ['code', 0],
-            ['agent_id', 0]
-        ], true);
-        $uid = (int)$request->uid();
-        $res = $this->services->spread($uid, (int)$spreadUid, $code, $agent_id);
-        return app('json')->success($res);
-    }
-
-    /**
-     * 推荐用户
-     * @param Request $request
-     * @return mixed
-     */
-    public function spread_people(Request $request)
-    {
-        $spreadInfo = $request->postMore([
-            ['grade', 0],
-            ['keyword', ''],
-            ['sort', ''],
-        ]);
-        if (!in_array($spreadInfo['grade'], [0, 1])) {
-            return app('json')->fail('参数错误');
-        }
-        $uid = $request->uid();
-        return app('json')->success($this->services->getUserSpreadGrade($uid, $spreadInfo['grade'], $spreadInfo['sort'], $spreadInfo['keyword']));
-    }
-
-    /**
      * 是否关注
      * @param Request $request
      * @return mixed
