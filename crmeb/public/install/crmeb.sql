@@ -48880,10 +48880,10 @@ INSERT INTO `eb_system_menus` (`id`, `pid`, `icon`, `menu_name`, `module`, `cont
 (3461, 656, '', '编辑主题', 'admin', '', '', '', '', '[]', 0, 0, 0, 1, '/setting/edit_theme', '656', 3, '', 0, '', 0, ''),
 (3462, 993, '', '小程序上传', 'admin', '', '', '', '', '[]', 70, 1, 1, 1, '/app/routine/ci_upload', '135/993', 1, '', 0, '', 0, ''),
 (3464, 656, '', '专题页面', 'admin', '', '', '', '', '[]', 15, 1, 1, 1, '/setting/theme/micro_page', '656', 1, '', 0, '', 0, ''),
-(3465, 27, '', '预售管理', 'admin', 'marketing.store_advance', '', '', '', '[]', 81, 1, 1, 1, '/marketing/store_advance/index', '27', 1, 'marketing', 1, 'marketing-store_advance-index', 0, '预售管理'),
-(3466, 3465, '', '预售商品', 'admin', 'marketing.store_advance', 'index', '', '', '[]', 0, 1, 1, 1, '/marketing/store_advance/index', '', 1, 'marketing', 0, 'marketing-store_advance', 0, '预售商品'),
-(3467, 3465, '', '添加预售', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/store_advance/create', '27/3465', 3, '', 0, 'marketing-store_advance-create', 0, '添加预售'),
-(3468, 3466, '', '添加预售商品', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/', '27/3465/3466', 3, '', 0, 'advance-add', 0, '添加预售商品'),
+(3465, 27, '', '预售管理', 'admin', 'marketing.store_advance', '', '', '', '[]', 81, 1, 1, 1, '/marketing/presell/index', '27', 1, 'marketing', 1, 'marketing-presell', 0, '预售管理'),
+(3466, 3465, '', '预售商品', 'admin', 'marketing.store_advance', 'index', '', '', '[]', 0, 1, 1, 1, '/marketing/presell/index', '', 1, 'marketing', 0, 'marketing-presell', 0, '预售商品'),
+(3467, 3465, '', '添加预售', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/marketing/presell/create', '27/3465', 3, '', 0, 'marketing-presell-create', 0, '添加预售'),
+(3468, 3466, '', '预售列表', 'admin', 'marketing.store_advance', 'presellList', '', '', '[]', 0, 1, 1, 1, '/marketing/presell/presell_list', '', 1, 'marketing', 0, 'marketing-presell-presell_list', 0, '预售列表'),
 (3469, 3466, '', '编辑预售', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/', '27/3465/3466', 3, '', 0, 'advance-edit', 0, '编辑预售'),
 (3470, 3466, '', '删除预售', 'admin', '', '', '', '', '[]', 0, 1, 1, 1, '/', '27/3465/3466', 3, '', 0, 'advance-delete', 0, '删除预售');
 
