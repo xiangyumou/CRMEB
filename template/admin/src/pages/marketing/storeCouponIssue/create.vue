@@ -27,17 +27,7 @@
             :disabled="isEdit"
           ></el-input-number>
         </el-form-item>
-        <el-form-item label="用户类型：">
-          <el-radio-group v-model="formData.user_type" :disabled="isEdit" @input="changeUserType">
-            <el-radio :label="1">普通用户</el-radio>
-            <el-radio :label="2">付费会员用户</el-radio>
-          </el-radio-group>
-          <div class="tip">
-            普通用户：所有用户都能获取到的优惠券；<br />
-            付费会员用户：仅付费会员才能领取的优惠券；
-          </div>
-        </el-form-item>
-        <el-form-item label="发送方式：" v-show="formData.user_type == 1">
+        <el-form-item label="发送方式：">
           <el-radio-group v-model="formData.receive_type" :disabled="isEdit">
             <el-radio :label="1">用户领取</el-radio>
             <el-radio :label="3">系统赠送</el-radio>
@@ -234,7 +224,6 @@ export default {
         end_use_time: 0,
         start_time: 0,
         end_time: 0,
-        user_type: 1,
         receive_type: 1,
         is_permanent: 1,
         total_count: 1,
@@ -268,11 +257,6 @@ export default {
     }
   },
   methods: {
-    changeUserType() {
-      if (this.formData.user_type == 2) {
-        this.formData.receive_type = 1;
-      }
-    },
     // 品类
     getCategoryList() {
       cascaderListApi(1).then(async (res) => {
@@ -294,7 +278,6 @@ export default {
           }
           this.formData.coupon_time = data.coupon_time;
           this.formData.receive_type = data.receive_type;
-          this.formData.user_type = data.user_type;
           this.formData.is_permanent = data.is_permanent;
           this.formData.status = data.status;
           this.formData.product_id = data.product_id;

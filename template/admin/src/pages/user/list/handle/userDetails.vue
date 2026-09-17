@@ -134,7 +134,7 @@ export default {
           if (requestId !== this.headerRequestId) return;
           if (res.status === 200) {
             let data = res.data;
-            this.detailsData = (data.headerList || []).filter((item) => !['余额', '积分'].includes(item.title));
+            this.detailsData = data.headerList || [];
             this.psInfo = data.ps_info;
             // this.changeType('user');
             this.spinShow = false;

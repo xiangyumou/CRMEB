@@ -55,15 +55,6 @@ export default {
       component: () => import('@/pages/statistic/transaction/index'),
     },
     {
-      path: 'integral',
-      name: `${pre}integral`,
-      meta: {
-        // auth: ['setting-system-role'],
-        title: '积分统计',
-      },
-      component: () => import('@/pages/statistic/integral/index'),
-    },
-    {
       path: 'order',
       name: `${pre}order`,
       meta: {
@@ -71,15 +62,6 @@ export default {
         title: '订单统计',
       },
       component: () => import('@/pages/statistic/order/index'),
-    },
-    {
-      path: 'balance',
-      name: `${pre}balance`,
-      meta: {
-        // auth: ['setting-system-role'],
-        title: '余额统计',
-      },
-      component: () => import('@/pages/statistic/balance/index'),
     },
   ],
 };

@@ -14,8 +14,6 @@
           <div class="goods_info">
             <div class="number-wrapper">
               <div class="price"><span>¥</span>{{ goodsInfo.productInfo.price }}</div>
-              <div class="old-price">¥{{ goodsInfo.productInfo.vip_price }}</div>
-              <div><img src="../../../../assets/images/goods_vip.png" /></div>
             </div>
             <div class="name">{{ goodsInfo.productInfo.store_name }}</div>
             <div class="msg">

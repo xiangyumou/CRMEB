@@ -35,7 +35,6 @@ export function tableDelApi(data) {
     url: data.url,
     method: data.method,
     data: data.ids,
-    kefu: data.kefu || '',
   });
 }
 
@@ -56,5 +55,15 @@ export function getLogo() {
   return request({
     url: 'logo',
     method: 'GET',
+  });
+}
+
+/**
+ * 获取后台通知长连接地址
+ */
+export function getWorkermanUrl() {
+  return request({
+    url: `get_workerman_url`,
+    method: 'get',
   });
 }

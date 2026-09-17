@@ -18,8 +18,6 @@ import screenfull from 'screenfull';
 export default {
   namespaced: true,
   state: {
-    taskId: 0,
-    levelId: 0,
     categoryId: 0, // 文章分类id
   },
   mutations: {
@@ -28,20 +26,6 @@ export default {
      * @param {Object} state vuex state
      * @param {String} type 设备类型，可选值为 Mobile、Tablet、Desktop
      */
-
-    /**
-     * @description 会员任务id
-     */
-    getTaskId(state, taskId) {
-      state.taskId = taskId;
-    },
-
-    /**
-     * @description 会员等级id
-     */
-    getlevelId(state, levelId) {
-      state.levelId = levelId;
-    },
 
     /**
      * @description 文章分类id

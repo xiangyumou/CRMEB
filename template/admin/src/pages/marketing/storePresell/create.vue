@@ -442,14 +442,6 @@ export default {
             trigger: 'blur',
           },
         ],
-        give_integral: [
-          {
-            required: true,
-            type: 'number',
-            message: '请输入赠送积分',
-            trigger: 'blur',
-          },
-        ],
         effective_time: [
           {
             required: true,

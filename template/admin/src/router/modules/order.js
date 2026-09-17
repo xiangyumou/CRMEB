@@ -33,15 +33,6 @@ export default {
       component: () => import('@/pages/order/orderList/index'),
     },
     {
-      path: 'offline',
-      name: `${pre}offline`,
-      meta: {
-        auth: ['admin-order-offline'],
-        title: '收银订单',
-      },
-      component: () => import('@/pages/order/offline/index'),
-    },
-    {
       path: 'refund',
       name: `${pre}refund`,
       meta: {

@@ -75,17 +75,6 @@ export function importProductImport(data) {
 }
 
 /**
- * 砍价列表导出
- */
-export function exportBargainList(data) {
-  return request({
-    url: '/export/bargain_list',
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
  * 拼团列表导出
  */
 export function exportCombinationList(data) {
@@ -96,34 +85,3 @@ export function exportCombinationList(data) {
   });
 }
 
-/**
- * 秒杀列表导出
- */
-export function exportSeckillList(data) {
-  return request({
-    url: '/export/seckill_list',
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
- * 会员卡导出
- */
-export function exportmberCardList(id) {
-  return request({
-    url: `/export/member_card/${id}`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 核销订单导出；
- */
-export function exportverifyOrderApi(data) {
-  return request({
-    url: `export/verify_order`,
-    method: 'get',
-    params: data,
-  });
-}

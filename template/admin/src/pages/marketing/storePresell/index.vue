@@ -43,7 +43,7 @@
         <el-row class="mb20">
           <el-col v-bind="grid">
             <el-button
-              v-auth="['marketing-store_bargain-create']"
+              v-auth="['marketing-store_advance-create']"
               type="primary"
               icon="md-add"
               v-db-click
@@ -52,7 +52,7 @@
               >添加预售商品</el-button
             >
             <!-- <el-button
-              v-auth="['export-storeBargain']"
+              v-auth="['export-storeAdvance']"
               class="export"
               icon="ios-share-outline"
               v-db-click @click="exports"
@@ -151,7 +151,7 @@
 
 <script>
 import { mapState } from 'vuex';
-import { presellListApi, advanceSetStatusApi, stroeBargainApi } from '@/api/marketing';
+import { presellListApi, advanceSetStatusApi } from '@/api/marketing';
 import { formatDate } from '@/utils/validate';
 export default {
   name: 'storeBargain',
@@ -207,20 +207,6 @@ export default {
       this.$router.push({ path: this.$routeProStr + '/marketing/presell/create/0' });
     },
     // 导出
-    exports() {
-      let formValidate = this.tableFrom;
-      let data = {
-        status: formValidate.status,
-        store_name: formValidate.store_name,
-      };
-      stroeBargainApi(data)
-        .then((res) => {
-          location.href = res.data[0];
-        })
-        .catch((res) => {
-          this.$message.error(res.msg);
-        });
-    },
     // 编辑
     edit(row) {
       this.$router.push({

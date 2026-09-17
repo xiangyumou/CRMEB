@@ -5,7 +5,6 @@
       <el-form-item label="物流方式：" prop="logistics">
         <el-checkbox-group v-model="formValidate.logistics" @change="logisticsBtn">
           <el-checkbox label="1">快递</el-checkbox>
-          <el-checkbox label="2">到店</el-checkbox>
         </el-checkbox-group>
       </el-form-item>
     </el-col>

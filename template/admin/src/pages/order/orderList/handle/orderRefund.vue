@@ -111,9 +111,6 @@
 import {
   getExpressData,
   putDelivery,
-  splitDelivery,
-  orderExpressTemp,
-  orderSheetInfo,
   splitCartInfo,
   orderPrice,
   refundPrice,

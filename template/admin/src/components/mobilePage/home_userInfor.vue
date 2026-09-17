@@ -39,14 +39,6 @@
       </div>
     </div>
     <div class="right acea-row row-bottom">
-      <div class="item" v-if="checkType.slice(0, 3).indexOf(1) != -1">
-        <div class="num">20</div>
-        <div>积分</div>
-      </div>
-      <div class="item" v-if="checkType.slice(0, 3).indexOf(2) != -1">
-        <div class="num">200</div>
-        <div>余额</div>
-      </div>
       <div class="item" v-if="checkType.slice(0, 3).indexOf(0) != -1">
         <div class="num">2</div>
         <div>优惠券</div>

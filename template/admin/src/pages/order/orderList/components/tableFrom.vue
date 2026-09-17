@@ -14,8 +14,6 @@
             <el-option label="全部订单" value="" />
             <el-option label="普通订单" value="1" />
             <el-option v-permission="'combination'" label="拼团订单" value="2" />
-            <el-option v-permission="'seckill'" label="秒杀订单" value="3" />
-            <el-option v-permission="'bargain'" label="砍价订单" value="4" />
             <el-option label="预售订单" value="5" />
           </el-select>
         </el-form-item>
@@ -111,9 +109,7 @@ export default {
       payList: [
         { label: '全部', val: '' },
         { label: '微信支付', val: '1' },
-        { label: '支付宝支付', val: '4' },
-        { label: '余额支付', val: '2' },
-        { label: '线下支付', val: '3' },
+        { label: '历史支付方式', val: '2' },
       ],
       pickerOptions: timeOptions,
     };

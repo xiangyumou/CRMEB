@@ -276,42 +276,6 @@
               </el-col>
 
               <el-col :span="24">
-                <el-form-item label="团长返佣比例：" prop="head_commission">
-                  <div>
-                    <el-input-number
-                      :controls="false"
-                      :min="0"
-                      :max="100"
-                      placeholder="团长返佣比例"
-                      :precision="0"
-                      v-model="formValidate.head_commission"
-                      class="content_width input-number-unit-class"
-                      class-unit="%"
-                    />
-                    <div class="grey">
-                      拼团成功后，如果团长是分销员，则在订单确认收货时会给团长返一定的佣金，佣金比例是实际支付金额的0-100%
-                    </div>
-                  </div>
-                </el-form-item>
-              </el-col>
-              <el-col :span="24">
-                <el-form-item label="拼团是否参与分销：" props="is_commission" label-for="is_commission">
-                  <div>
-                    <el-switch
-                      class="defineSwitch"
-                      :active-value="1"
-                      :inactive-value="0"
-                      v-model="formValidate.is_commission"
-                      size="large"
-                      active-text="开启"
-                      inactive-text="关闭"
-                    >
-                    </el-switch>
-                    <div class="grey">拼团商品是否参与商城分销返佣</div>
-                  </div>
-                </el-form-item>
-              </el-col>
-              <el-col :span="24">
                 <el-form-item label="排序：">
                   <el-input-number
                     :controls="false"
@@ -547,7 +511,6 @@ export default {
         sales: 0,
         sort: 0,
         is_postage: 0,
-        is_commission: 0,
         is_host: 0,
         is_show: 0,
         section_time: [],
@@ -562,7 +525,6 @@ export default {
         items: [],
         virtual: 100,
         virtualPeople: 0,
-        head_commission: 0,
         logistics: ['1'], //选择物流方式
         freight: 2, //运费设置
         postage: 1, //设置运费金额
@@ -615,14 +577,6 @@ export default {
             required: true,
             type: 'number',
             message: '请输入库存',
-            trigger: 'blur',
-          },
-        ],
-        give_integral: [
-          {
-            required: true,
-            type: 'number',
-            message: '请输入赠送积分',
             trigger: 'blur',
           },
         ],
@@ -764,8 +718,7 @@ export default {
           sales: row.sales,
           sort: row.sort,
           is_postage: row.is_postage,
-          is_commission: 0,
-          is_host: row.is_hot,
+            is_host: row.is_hot,
           is_show: 0,
           section_time: [],
           description: '', // 不取商品中的
@@ -782,8 +735,7 @@ export default {
           postage: row.postage, //设置运费金额
           custom_form: row.custom_form, //自定义表单数据
           virtual_type: row.virtual_type, //虚拟商品类型
-          head_commission: 0,
-          description: row.description,
+            description: row.description,
         };
         this.productAttrs(row);
       }, 500);

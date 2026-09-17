@@ -12,18 +12,6 @@
                 :style="{ color: activityColor }"
               ></span
             ></span>
-            <span class="tag" :style="tagStyle"
-              ><span class="mb-iconfont icon-miaosha1"></span>限时秒杀<span
-                class="iconfont iconyou"
-                :style="{ color: activityColor }"
-              ></span
-            ></span>
-            <span class="tag" :style="tagStyle"
-              ><span class="mb-iconfont icon-ic_sale"></span>参与砍价<span
-                class="iconfont iconyou"
-                :style="{ color: activityColor }"
-              ></span
-            ></span>
           </div>
           <span class="iconfont iconyou" :style="{ color: contentColor }"></span>
         </div>

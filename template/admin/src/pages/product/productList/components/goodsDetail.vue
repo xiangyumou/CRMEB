@@ -14,12 +14,6 @@
           <div class="goods_info">
             <div class="number-wrapper">
               <div class="price"><span>¥</span>{{ goodsInfo.productInfo.price }}</div>
-              <div class="old-price" v-if="goodsInfo.productInfo.vip_price != '0.00'">
-                ¥{{ goodsInfo.productInfo.vip_price }}
-              </div>
-              <div v-if="goodsInfo.productInfo.vip_price != '0.00'">
-                <img src="../../../../assets/images/goods_vip.png" />
-              </div>
             </div>
             <div class="name">{{ goodsInfo.productInfo.store_name }}</div>
             <div class="msg">

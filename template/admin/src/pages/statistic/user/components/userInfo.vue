@@ -20,9 +20,6 @@
             <br />
             <div>成交用户数</div>
             <div>在选定条件下，下单并支付成功的用户</div>
-            <br />
-            <div>付费会员数</div>
-            <div>筛选时间截止时，具有商城付费会员身份的用户数</div>
           </div>
         </el-tooltip>
       </div>
@@ -142,12 +139,6 @@ export default {
               name: '成交用户数',
               icon: 'iconchengjiaoyonghushu',
               list: cardLists.payPeople,
-              colors: 'four',
-            },
-            {
-              name: '付费会员数',
-              icon: 'iconfufeihuiyuanshu',
-              list: cardLists.payUser,
               colors: 'four',
             },
           ];

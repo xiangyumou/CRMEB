@@ -108,15 +108,6 @@
             </el-form-item>
           </div>
           <div class="item lang">
-            <el-form-item label="分销禁用：">
-              <el-radio-group v-model="formItem.spread_open" class="form-sty">
-                <el-radio :label="0">是</el-radio>
-                <el-radio :label="1">否</el-radio>
-              </el-radio-group>
-              <div class="tip">禁用用户的分销资格后，在任何分销模式下该用户都无分销权限</div>
-            </el-form-item>
-          </div>
-          <div class="item lang">
             <el-form-item label="用户状态：">
               <el-radio-group v-model="formItem.status" class="form-sty">
                 <el-radio :label="1">开启</el-radio>
@@ -309,11 +300,8 @@ export default {
         mark: '',
         pwd: '',
         true_pwd: '',
-        level: '',
         group_id: '',
         label_id: [],
-        spread_open: 0,
-        is_promoter: 0,
         status: 1,
       };
     },

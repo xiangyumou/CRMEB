@@ -225,58 +225,6 @@ export function orderSheetInfo() {
 }
 
 /**
- * 所有配送员列表
- */
-export function deliveryList() {
-  return request({
-    url: '/order/delivery/index',
-    method: 'get',
-  });
-}
-
-/**
- * 订单时获取所有配送员列表
- */
-export function orderDeliveryList() {
-  return request({
-    url: '/order/delivery/list',
-    method: 'get',
-  });
-}
-
-/**
- * 列表修改账号状态
- * @param {*} data data
- */
-export function orderDeliveryStatus(data) {
-  return request({
-    url: `/order/delivery/set_status/${data.id}/${data.status}`,
-    method: 'get',
-  });
-}
-
-/**
- * 编辑配送员表单
- * @param {*} id id
- */
-export function orderDeliveryEdit(id) {
-  return request({
-    url: `/order/delivery/${id}/edit`,
-    method: 'get',
-  });
-}
-
-/**
- * 新增配送员表单
- */
-export function orderDeliveryAdd() {
-  return request({
-    url: '/order/delivery/add',
-    method: 'get',
-  });
-}
-
-/**
  * 电子面单模板
  * @param {com} data 快递公司编号
  */
@@ -324,29 +272,6 @@ export function splitDelivery(data) {
 }
 
 /**
- * @description 获取退积分表单
- * @param {Number} param id {Number} 订单id
- */
-export function refundIntegral(id) {
-  return request({
-    url: `/order/refund_integral/${id}`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 立即支付
- * @param {String} param path {String} 请求地址
- * @param {String} param method {String} 请求方式
- */
-export function payOffline(path, method) {
-  return request({
-    url: path,
-    method: method,
-  });
-}
-
-/**
  * @description 配送信息表单
  * @param {Number} param id {Number} 订单id
  */
@@ -369,79 +294,12 @@ export function getExpress(id) {
 }
 
 /**
- * @description  订单核销
- * @param {String} param data {String} 核销内容
- */
-export function putWrite(data) {
-  return request({
-    url: '/order/write',
-    method: 'post',
-    data: data,
-  });
-}
-
-/**
- * @description 订单管理 -- 导出
- */
-export function storeOrderApi(data) {
-  return request({
-    url: `export/storeOrder`,
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
- * @description 核销单个订单
- */
-export function writeUpdate(order_id) {
-  return request({
-    url: `order/write_update/${order_id}`,
-    method: 'put',
-  });
-}
-
-/**
- * 收银订单
- */
-export function orderScanList(data) {
-  return request({
-    url: 'order/scan_list',
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
- * 线下收款码
- */
-export function orderOfflineScan(id) {
-  return request({
-    url: 'order/offline_scan',
-    method: 'get',
-    params: id,
-  });
-}
-
-/**
  * @description 售后订单
  * @param {Object} param data {Object} 传值参数
  */
 export function orderRefundList(data) {
   return request({
     url: 'refund/list',
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
- * @description 批量发货记录
- * @param {Object} param data {Object} 传值参数
- */
-export function queueIndex(data) {
-  return request({
-    url: 'queue/index',
     method: 'get',
     params: data,
   });
@@ -456,61 +314,6 @@ export function handBatchDelivery(data) {
     url: 'order/hand/batch_delivery',
     method: 'get',
     params: data,
-  });
-}
-/**
- * @description 下载
- * @param {Object} param data {Object} 传值参数
- */
-export function batchOrderDelivery(id, type, catchType) {
-  return request({
-    url: `export/batchOrderDelivery/${id}/${type}/${catchType}`,
-    method: 'get',
-  });
-}
-/**
- * @description 积分商城订单 -- 导出
- */
-export function storeIntegralOrder(data) {
-  return request({
-    url: `export/storeIntegralOrder`,
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
- * @description 任务列表-查看
- * @param {Object} param data {Object} 传值参数
- */
-export function deliveryLog(id, type, data) {
-  return request({
-    url: `queue/delivery/log/${id}/${type}`,
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
- * @description 下载物流公司对照表
- * @param {Object} param data {Object} 传值参数
- */
-export function exportExpressList(id) {
-  return request({
-    url: 'export/expressList',
-    method: 'get',
-  });
-}
-
-/**
- * @description 批量发货-自动
- * @param {Object} param data {Object} 传值参数
- */
-export function otherBatchDelivery(data) {
-  return request({
-    url: 'order/other/batch_delivery',
-    method: 'post',
-    data,
   });
 }
 /**
@@ -535,38 +338,6 @@ export function shipmentCancelOrder(id, data) {
     data: data,
   });
 }
-/**
- * @description 重新执行
- * @param {Object} param data {Object} 传值参数
- */
-export function queueAgain(id, type) {
-  return request({
-    url: `queue/again/do_queue/${id}/${type}`,
-    method: 'get',
-  });
-}
-/**
- * @description 清除异常任务
- * @param {Object} param data {Object} 传值参数
- */
-export function queueDel(id, type) {
-  return request({
-    url: `queue/del/wrong_queue/${id}/${type}`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 停止任务
- * @param {Object} param data {Object} 传值参数
- */
-export function stopWrongQueue(id) {
-  return request({
-    url: `queue/stop/wrong_queue/${id}`,
-    method: 'get',
-  });
-}
-
 /**
  * @description 上架寄件快递列表
  * @param {Object} param data {Object} 传值参数

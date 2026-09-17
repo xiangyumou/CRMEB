@@ -62,15 +62,6 @@ export default {
       component: () => import('@/pages/marketing/storeCombination/statistics'),
     },
     {
-      path: 'store_coupon/index',
-      name: `${pre}storeCoupon`,
-      meta: {
-        auth: ['marketing-store_coupon'],
-        title: '优惠券模板',
-      },
-      component: () => import('@/pages/marketing/storeCoupon/index'),
-    },
-    {
       path: 'store_coupon_issue/index',
       name: `${pre}storeCouponIssue`,
       meta: {
@@ -114,20 +105,6 @@ export default {
 
 
     {
-      path: 'store_seckill_data/index/:id',
-      name: `${pre}storeSeckillData`,
-      meta: {
-        auth: ['marketing-store_seckill-data'],
-        title: '秒杀配置',
-      },
-      component: () => import('@/pages/system/group/list'),
-    },
-
-
-
-
-
-    {
       path: `model/system_config/:type?/:tab_id?`,
       name: `${pre}model`,
       meta: {
@@ -136,21 +113,6 @@ export default {
       },
       component: () => import('@/pages/setting/setSystem/index'),
     },
-
-
-    {
-      path: 'store_integral/order_list',
-      name: `${pre}storeIntegralOrder`,
-      meta: {
-        auth: ['marketing-store_integral-order'],
-        title: '兑换订单',
-      },
-      component: () => import('@/pages/marketing/storeIntegralOrder/index'),
-    },
-
-
-
-
 
 
     {

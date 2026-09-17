@@ -26,33 +26,18 @@
             </div>
             <div class="center acea-row row-around">
               <div class="item">
-                <div class="num">0.00</div>
-                <div class="font">我的余额</div>
-              </div>
-              <div class="item">
-                <div class="num">65749</div>
-                <div class="font">当前积分</div>
+                <div class="num">6</div>
+                <div class="font">收藏商品</div>
               </div>
               <div class="item">
                 <div class="num">25</div>
                 <div class="font">优惠券</div>
               </div>
+              <div class="item">
+                <div class="num">12</div>
+                <div class="font">浏览记录</div>
+              </div>
             </div>
-            <div class="bottom acea-row row-between-wrapper" v-if="userData.status == 1">
-              <div>会员到期 2022-12-31</div>
-              <div class="renew">立即续费<span class="iconfont iconjinru"></span></div>
-            </div>
-            <div class="bottomB acea-row row-between" v-if="userData.status == 3">
-              <div class="vip"><img src="../../../assets/images/member01.png" />开通会员VIP</div>
-              <div>会员可享多项权益<span class="iconfont iconjinru"></span></div>
-            </div>
-          </div>
-          <div class="member acea-row row-between-wrapper" v-if="userData.status == 2">
-            <div class="text">
-              <div class="title">会员可享多项权益</div>
-              <div>会员剩余360天</div>
-            </div>
-            <div class="bnt">立即续费</div>
           </div>
           <div
             class="orderCenter on dotted p-y-15"
@@ -510,64 +495,6 @@ export default {
     }
   }
 }
-.bottomB {
-  width: 337px;
-  height: 62px;
-  background: #343a48;
-  border-radius: 8px 8px 0px 0px;
-  padding: 11px 15px 0 15px;
-  margin: 10px auto 0 auto;
-  color: #bbbbbb;
-  font-size: 13px;
-  z-index: 0;
-  position: relative;
-  .iconfont {
-    font-size: 11px;
-  }
-  .vip {
-    font-size: 13px;
-    font-weight: bold;
-    color: #f8d5a8;
-
-    img {
-      width: 18px;
-      height: 18px;
-      display: inline-block;
-      vertical-align: middle;
-      margin-right: 9px;
-    }
-  }
-}
-.member {
-  background-image: url('../../../assets/images/user_vip.png');
-  background-repeat: no-repeat;
-  background-position-y: center;
-  background-size: 100%;
-  width: 334px;
-  height: 48px;
-  margin: -42px auto 0 auto;
-  position: relative;
-  z-index: 9;
-  margin-bottom: 13px;
-  padding: 0 20px 0 52px;
-  .text {
-    color: rgba(174, 90, 42, 0.8);
-    font-size: 12px;
-    .title {
-      font-size: 12px;
-    }
-  }
-  .bnt {
-    width: 70px;
-    height: 23px;
-    background-color: #fff;
-    border-radius: 14px;
-    color: #ae5a2a;
-    text-align: center;
-    line-height: 26px;
-    font-size: 12px;
-  }
-}
 .carousel {
   margin: 10px 18px 0 18px;
   .swiperimg {
@@ -711,25 +638,6 @@ export default {
               top: 50%;
               margin-top: -7px;
             }
-          }
-        }
-      }
-      .bottom {
-        background-image: url('../../../assets/images/member.png');
-        width: 355px;
-        height: 34px;
-        background-size: 100%;
-        background-repeat: no-repeat;
-        position: absolute;
-        bottom: -1px;
-        padding: 5px 20px 0 55px;
-        font-size: 13px;
-        color: #905100;
-        right: 8px;
-        .renew {
-          font-size: 12px;
-          .iconjinru {
-            font-size: 11px;
           }
         }
       }

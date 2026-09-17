@@ -21,7 +21,6 @@ import {
   localSave,
   localRead,
 } from '@/libs/util';
-import { isRemovedAdminPath } from '@/utils/coreStoreAdmin';
 // import { saveErrorLogger } from '@/api/data'
 import router from '@/router';
 // import routers from '@/router/routers'
@@ -71,7 +70,7 @@ export default {
       //   let homeTag = tagList.splice(homeTagIndex, 1)[0];
       //   tagList.unshift(homeTag);
       // }
-      state.tagNavList = tagList.filter((tag) => !isRemovedAdminPath(tag.path));
+      state.tagNavList = tagList;
       setTagNavListInLocalstorage([...state.tagNavList]);
     },
     closeTag(state, route) {

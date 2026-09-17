@@ -10,7 +10,6 @@
 
 import setting from '@/setting';
 let routePre = setting.routePre;
-const pre = 'kefu_';
 
 export default [
   // 登录
@@ -24,27 +23,12 @@ export default [
     component: () => import('@/pages/account/login'),
   },
 
-  // 客服
-
-
-
-
-
-
-
-
-
-
-
-
-
   {
     path: '/app/upload',
     name: `mobile_upload`,
     meta: {
       auth: true,
       title: '手机端扫码上传',
-      kefu: true,
     },
     component: () => import('@/pages/app/upload'),
   },

@@ -198,6 +198,7 @@ import {
   wechatQrcodeStatusApi,
   getUserList,
 } from '@/api/setting';
+import { userList } from '@/api/user';
 import { scrollTop } from '@/libs/util';
 
 export default {
@@ -438,7 +439,7 @@ export default {
     //
     getListService() {
       this.loading2 = true;
-      kefucreateApi(this.formValidate)
+      userList(this.formValidate)
         .then(async (res) => {
           let data = res.data;
           this.tableList2 = data.list;

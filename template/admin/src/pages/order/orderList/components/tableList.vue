@@ -10,7 +10,6 @@
         name="1"
         :label="orderChartType.un_send > 0 ? `待发货(${orderChartType.un_send})` : `待发货`"
       ></el-tab-pane>
-      <el-tab-pane name="5" label="待核销"></el-tab-pane>
       <el-tab-pane name="2" label="待收货"></el-tab-pane>
       <el-tab-pane name="3" label="待评价"></el-tab-pane>
       <el-tab-pane name="4" label="已完成"></el-tab-pane>
@@ -189,7 +188,6 @@
                   v-show="scope.row.paid == 1 && scope.row.refund_status == 0 && !scope.row.refund.length"
                   >立即退款</el-dropdown-item
                 >
-                <!--                            <el-dropdown-item command="6"  v-show='scope.row._status !==1 && (scope.row.use_integral > 0 && scope.row.use_integral >= scope.row.back_integral) '>退积分</el-dropdown-item>-->
                 <!--                            <el-dropdown-item command="7"  v-show='scope.row._status === 3'>不退款</el-dropdown-item>-->
                 <el-dropdown-item command="8" v-show="scope.row._status === 4">已收货</el-dropdown-item>
                 <el-dropdown-item command="9">删除订单</el-dropdown-item>
@@ -204,7 +202,7 @@
     <div class="acea-row row-right page">
       <pagination v-if="total" :total="total" :page.sync="page.page" :limit.sync="page.limit" @pagination="getList" />
     </div>
-    <!-- 编辑 退款 退积分 不退款-->
+    <!-- 编辑 退款 不退款-->
     <edit-from ref="edits" :FromData="FromData" @submitFail="submitFail"></edit-from>
     <!-- 详情 -->
     <details-from ref="details" :orderDatalist="orderDatalist" :orderId="orderId"></details-from>
@@ -349,8 +347,6 @@ export default {
         all: '0',
         general: '0',
         pink: '0',
-        seckill: '0',
-        bargain: '0',
         advance: '0',
       },
       addressData: {},

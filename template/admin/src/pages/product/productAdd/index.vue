@@ -99,27 +99,9 @@
           @addTemp="addTemp"
         ></logistics-setting>
 
-        <!-- 会员价/佣金 -->
-        <price-commission
-          v-show="headTab.length === 7 ? currentTab === '5' : currentTab === '4'"
-          :formValidate="formValidate"
-          :oneFormValidate="oneFormValidate"
-          :manyFormValidate="manyFormValidate"
-          :columnsInstall="columnsInstall"
-          :columnsInstal2="columnsInstal2"
-          :manyBrokerage.sync="manyBrokerage"
-          :manyBrokerageTwo.sync="manyBrokerageTwo"
-          :manyVipPrice.sync="manyVipPrice"
-          :manyVipDiscount.sync="manyVipDiscount"
-          @checkAllGroupChange="checkAllGroupChange"
-          @changeVipPrice="changeVipPrice"
-          @changeDiscount="changeDiscount"
-          @brokerageSetUp="brokerageSetUp"
-        ></price-commission>
-
         <!-- 营销设置-->
         <marketing-setting
-          v-show="headTab.length === 7 ? currentTab === '6' : currentTab === '5'"
+          v-show="headTab.length === 6 ? currentTab === '5' : currentTab === '4'"
           :formValidate="formValidate"
           :couponName="couponName"
           :dataLabel="dataLabel"
@@ -368,7 +350,6 @@ import BasicInfo from './components/BasicInfo.vue';
 import SpecStock from './components/SpecStock.vue';
 import ProductDetail from './components/ProductDetail.vue';
 import LogisticsSetting from './components/LogisticsSetting.vue';
-import PriceCommission from './components/PriceCommission.vue';
 import MarketingSetting from './components/MarketingSetting.vue';
 import OtherSetting from './components/OtherSetting.vue';
 import { formatRichText } from '@/utils/editorImg';
@@ -389,7 +370,6 @@ export default {
     SpecStock,
     ProductDetail,
     LogisticsSetting,
-    PriceCommission,
     MarketingSetting,
     OtherSetting,
   },
@@ -403,9 +383,8 @@ export default {
         { tit: '规格库存', name: '2' },
         { tit: '商品详情', name: '3' },
         { tit: '物流设置', name: '4' },
-        { tit: '会员价/佣金', name: '5' },
-        { tit: '营销设置', name: '6' },
-        { tit: '其他设置', name: '7' },
+        { tit: '营销设置', name: '5' },
+        { tit: '其他设置', name: '6' },
       ],
       virtual: [
         { tit: '普通商品', id: 0, tit2: '物流发货' },
@@ -495,8 +474,6 @@ export default {
         is_limit: false,
         limit_type: 0,
         limit_num: 0,
-        vip_product: false, //付费会员专属开关
-        vip_product_type: 0, // 0仅付费会员可见 1仅付费会员可购买
         custom_form: [], //自定义留言
         store_name: '',
         cate_id: [],
@@ -509,7 +486,6 @@ export default {
         slider_image: [],
         description: '',
         ficti: 0,
-        give_integral: 0,
         sort: 0,
         is_show: 1,
         is_gift: 0, // 开启送礼品
@@ -570,9 +546,6 @@ export default {
           bar_code_number: '',
           weight: 0,
           volume: 0,
-          brokerage: 0,
-          brokerage_two: 0,
-          vip_price: 0,
           virtual_list: [],
           coupon_id: 0,
         },
@@ -590,10 +563,6 @@ export default {
       picTit: '',
       tableIndex: 0,
       ruleValidate: RuleValidate,
-      manyBrokerage: undefined,
-      manyBrokerageTwo: undefined,
-      manyVipPrice: undefined,
-      manyVipDiscount: undefined,
       upload: {
         videoIng: false, // 是否显示进度条；
       },
@@ -603,40 +572,12 @@ export default {
       disk_info: '',
       videoLink: '',
       attrs: [],
-      activity: { 默认: 'red', 秒杀: 'blue', 砍价: 'green', 拼团: 'yellow' },
+      activity: { 默认: 'red', 拼团: 'yellow' },
       couponName: [],
       updateIds: [],
       updateName: [],
       couponIds: '',
       couponNames: [],
-      rakeBack: [
-        {
-          title: '一级返佣(元)',
-          slot: 'brokerage',
-          align: 'center',
-          width: 95,
-        },
-        {
-          title: '二级返佣(元)',
-          slot: 'brokerage_two',
-          align: 'center',
-          width: 95,
-        },
-      ],
-      member: [
-        {
-          title: '会员价',
-          slot: 'vip_price',
-          align: 'center',
-          width: 95,
-        },
-        {
-          title: '会员折扣',
-          slot: 'vip_proportion',
-          align: 'center',
-          width: 95,
-        },
-      ],
       columnsInstalM: [],
       moveIndex: '',
       addValue: '',
@@ -763,9 +704,6 @@ export default {
                   bar_code_number: '',
                   weight: 0,
                   volume: 0,
-                  brokerage: 0,
-                  brokerage_two: 0,
-                  vip_price: 0,
                   virtual_list: [],
                   coupon_id: 0,
                 },
@@ -869,17 +807,15 @@ export default {
         { tit: '规格库存', name: '2' },
         { tit: '商品详情', name: '3' },
         { tit: '物流设置', name: '4' },
-        { tit: '会员价/佣金', name: '5' },
-        { tit: '营销设置', name: '6' },
-        { tit: '其他设置', name: '7' },
+        { tit: '营销设置', name: '5' },
+        { tit: '其他设置', name: '6' },
       ];
       const virtualHeadTabs = [
         { tit: '基础信息', name: '1' },
         { tit: '规格库存', name: '2' },
         { tit: '商品详情', name: '3' },
-        { tit: '会员价/佣金', name: '4' },
-        { tit: '营销设置', name: '5' },
-        { tit: '其他设置', name: '6' },
+        { tit: '营销设置', name: '4' },
+        { tit: '其他设置', name: '5' },
       ];
 
       switch (index) {
@@ -1002,10 +938,6 @@ export default {
       this.formValidate.cate_id = cate_id;
       if (data.attr) {
         this.oneFormValidate = [data.attr];
-        this.oneFormValidate[0].vip_proportion = (
-          (this.oneFormValidate[0].vip_price / this.oneFormValidate[0].price) *
-          100
-        ).toFixed(2);
       }
       this.getproductLabelUseListApi();
 
@@ -1031,9 +963,6 @@ export default {
             bar_code_number: '',
             weight: 0,
             volume: 0,
-            brokerage: 0,
-            brokerage_two: 0,
-            vip_price: 0,
             virtual_list: [],
             coupon_id: 0,
           },
@@ -1068,28 +997,9 @@ export default {
     checkAllGroup(data) {
       let endLength = this.attrs.length + 3;
       if (this.formValidate.spec_type === 0) {
-        if (data.length === 2) {
-          this.columnsInstall = this.columns2.slice(0, endLength).concat(this.rakeBack).concat(this.member);
-        } else if (data.indexOf(0) > -1) {
-          this.columnsInstall = this.columns2.slice(0, endLength).concat(this.member);
-        } else if (data.indexOf(1) > -1) {
-          this.columnsInstall = this.columns2.slice(0, endLength).concat(this.rakeBack);
-        } else {
-          this.columnsInstall = this.columns2.slice(0, endLength);
-        }
+        this.columnsInstall = this.columns2.slice(0, endLength);
       } else {
-        if (data.length === 2) {
-          this.columnsInstal2 = this.columnsInstalM
-            .slice(0, endLength + 1)
-            .concat(this.rakeBack)
-            .concat(this.member);
-        } else if (data.indexOf(0) > -1) {
-          this.columnsInstal2 = this.columnsInstalM.slice(0, endLength).concat(this.member);
-        } else if (data.indexOf(1) > -1) {
-          this.columnsInstal2 = this.columnsInstalM.slice(0, endLength).concat(this.rakeBack);
-        } else {
-          this.columnsInstal2 = this.columnsInstalM.slice(0, endLength);
-        }
+        this.columnsInstal2 = this.columnsInstalM.slice(0, endLength);
       }
     },
     // 添加优惠券
@@ -1116,16 +1026,6 @@ export default {
         this.$refs.goodsCoupon.isTemplate = true;
         this.$refs.goodsCoupon.tableList(3);
       }
-    },
-    // 修改分佣比例
-    changeDiscount(index, type = 'manyFormValidate') {
-      // 根据分佣比例 vip_proportion 修改会员价 保留2位小数
-      this[type][index].vip_price = (this[type][index].price * (this[type][index].vip_proportion / 100)).toFixed(2);
-    },
-    // 修改会员价
-    changeVipPrice(index, type = 'manyFormValidate') {
-      // 根据会员价计算出分佣比例
-      this[type][index].vip_proportion = ((this[type][index].vip_price / this[type][index].price) * 100).toFixed(2);
     },
     // 添加优惠券
     addGoodsCoupon(index, name) {
@@ -1292,47 +1192,6 @@ export default {
     // 添加规则；
     addRule() {
       this.$refs.addattr.modal = true;
-    },
-    // 批量设置分佣；
-    brokerageSetUp() {
-      if (this.formValidate.is_sub.indexOf(1) > -1) {
-        if (this.manyBrokerage <= 0 || this.manyBrokerageTwo <= 0) {
-          return this.$message.error('请填写返佣金额后进行批量添加');
-        }
-      } else if (this.formValidate.is_sub.indexOf(0) > -1) {
-        if (this.manyVipPrice <= 0) {
-          return this.$message.error('请填写会员价后进行批量添加');
-        }
-      }
-      if (this.formValidate.is_sub.length === 2) {
-        if (this.manyBrokerage <= 0 || this.manyBrokerageTwo <= 0) {
-          return this.$message.error('请填写完金额后进行批量添加');
-        }
-        if (this.manyVipPrice > 0 && this.manyVipDiscount > 0) {
-          return this.$message.error('会员价和会员折扣只能二选一添加');
-        }
-      }
-      for (let val of this.manyFormValidate) {
-        this.manyBrokerage != undefined && this.$set(val, 'brokerage', this.manyBrokerage);
-        this.manyBrokerageTwo != undefined && this.$set(val, 'brokerage_two', this.manyBrokerageTwo);
-        if (this.manyVipPrice != undefined) {
-          this.$set(val, 'vip_price', this.manyVipPrice);
-          this.$set(val, 'vip_proportion', ((val.vip_price / val.price) * 100).toFixed(2));
-        } else {
-          this.$set(val, 'vip_proportion', this.manyVipDiscount);
-          this.$set(val, 'vip_price', (val.price * (this.manyVipDiscount / 100)).toFixed(2));
-        }
-      }
-    },
-    // 批量设置会员价
-    vipPriceSetUp() {
-      if (this.manyVipPrice <= 0) {
-        return this.$message.error('请填写会员价在进行批量添加');
-      } else {
-        for (let val of this.manyFormValidate) {
-          this.$set(val, 'vip_price', this.manyVipPrice);
-        }
-      }
     },
     // 新增卡密
     handleAdd() {
@@ -1731,10 +1590,6 @@ export default {
           unique: '',
           weight: '',
           volume: '',
-          brokerage: 0,
-          brokerage_two: 0,
-          vip_price: 0,
-          vip_proportion: 0,
         };
 
         // 设置虚拟类型相关属性
@@ -1772,10 +1627,6 @@ export default {
               volume: matchedItem.volume || 0,
               bar_code_number: matchedItem.bar_code_number || 0,
               is_virtual: matchedItem.is_virtual,
-              brokerage: matchedItem.brokerage,
-              brokerage_two: matchedItem.brokerage_two,
-              vip_price: matchedItem.vip_price,
-              vip_proportion: matchedItem.vip_proportion,
             });
 
             if (this.formValidate.virtual_type === 1) {
@@ -1963,26 +1814,6 @@ export default {
           for (let i = 0; i < item.length; i++) {
             if (item[i].stock > 1000000) {
               return this.$message.error('规格库存-库存超出系统范围(1000000)');
-            }
-          }
-          if (this.formValidate.is_sub[0] === 1) {
-            for (let i = 0; i < item.length; i++) {
-              if (item[i].brokerage === null || item[i].brokerage_two === null) {
-                return this.$message.error('营销设置- 一二级返佣不能为空');
-              }
-            }
-          } else {
-            for (let i = 0; i < item.length; i++) {
-              if (item[i].vip_price === null) {
-                return this.$message.error('营销设置-会员价不能为空');
-              }
-            }
-          }
-          if (this.formValidate.is_sub.length === 2) {
-            for (let i = 0; i < item.length; i++) {
-              if (item[i].brokerage === null || item[i].brokerage_two === null || item[i].vip_price === null) {
-                return this.$message.error('营销设置- 一二级返佣和会员价不能为空');
-              }
             }
           }
           if (this.formValidate.freight == 3 && !this.formValidate.temp_id) {

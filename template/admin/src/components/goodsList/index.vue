@@ -1,7 +1,7 @@
 <template>
   <div class="goodList">
     <el-form ref="formValidate" :model="formValidate" label-width="80px" label-position="right" inline class="tabform">
-      <el-form-item label="商品分类：" v-if="!liveStatus">
+      <el-form-item label="商品分类：">
         <el-cascader
           v-model="formValidate.cate_id"
           size="small"
@@ -63,7 +63,7 @@
           <span>{{ scope.row.store_name }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="商品分类" min-width="150" v-if="liveStatus">
+      <el-table-column label="商品分类" min-width="150">
         <template slot-scope="scope">
           <span>{{ scope.row.cate_name }}</span>
         </template>
@@ -85,7 +85,6 @@
 <script>
 import { mapState } from 'vuex';
 import { cascaderListApi, changeListApi } from '@/api/product';
-import { liveGoods } from '@/api/live';
 import { getProductList } from '@/api/diy';
 export default {
   name: 'index',
@@ -106,14 +105,6 @@ export default {
       type: Boolean,
       default: false,
     },
-    liveStatus: {
-      type: Boolean,
-      default: false,
-    },
-    isLive: {
-      type: Boolean,
-      default: false,
-    },
     isdiy: {
       type: Boolean,
       default: false,
@@ -122,12 +113,6 @@ export default {
       type: Array,
       default: () => {
         return [];
-      },
-    },
-    datas: {
-      type: Object,
-      default: function () {
-        return {};
       },
     },
   },
@@ -282,69 +267,67 @@ export default {
     // 列表
     getList() {
       this.loading = true;
-      if (!this.liveStatus) {
-        if (this.isLive) {
-          this.formValidate.is_live = 1;
-        }
-        changeListApi(this.formValidate)
-          .then(async (res) => {
-            let data = res.data;
-            this.tableList = data.list;
-            this.total = res.data.count;
-            this.loading = false;
-            this.$nextTick(() => {
-              if (this.selectIds.length) {
-                let arr = [];
-                this.selectIds.map((item) => {
-                  data.list.map((i) => {
-                    if (i.id == item) {
-                      this.$refs.table.toggleRowSelection(i, true);
-                      arr.push(i);
-                    }
-                  });
-                });
-                this.changeCheckbox(arr);
-              }
-            });
-          })
-          .catch((res) => {
-            this.loading = false;
-            this.$message.error(res.msg);
-          });
-      } else {
-        liveGoods({
-          is_show: '1',
-          status: '1',
-          live_id: this.datas.id,
-          kerword: this.formValidate.store_name,
-          page: this.formValidate.page,
-          limit: this.formValidate.limit,
-        })
-          .then(async (res) => {
-            let data = res.data;
-            data.list.forEach((el) => {
-              el.image = el.cover_img;
-            });
+      changeListApi(this.formValidate)
+        .then(async (res) => {
+          let data = res.data;
+          this.tableList = data.list;
+          this.total = res.data.count;
+          this.loading = false;
+          this.$nextTick(() => {
             if (this.selectIds.length) {
+              let arr = [];
               this.selectIds.map((item) => {
                 data.list.map((i) => {
                   if (i.id == item) {
-                    this.$refs.table.toggleRowSelection(i);
+                    this.$refs.table.toggleRowSelection(i, true);
+                    arr.push(i);
                   }
                 });
               });
+              this.changeCheckbox(arr);
             }
-            this.$nextTick((e) => {
-              this.tableList = data.list;
-              this.total = res.data.count;
-              this.loading = false;
-            });
-          })
-          .catch((res) => {
-            this.loading = false;
-            this.$message.error(res.msg);
           });
+        })
+        .catch((res) => {
+          this.loading = false;
+          this.$message.error(res.msg);
+        });
+    },
+    pageChange() {
+      if (this.diy) {
+        this.productList();
+      } else {
+        this.getList();
       }
+    },
+    // 列表
+    getList() {
+      this.loading = true;
+      changeListApi(this.formValidate)
+        .then(async (res) => {
+          let data = res.data;
+          this.tableList = data.list;
+          this.total = res.data.count;
+          this.loading = false;
+          this.$nextTick(() => {
+            if (this.selectIds.length) {
+              let arr = [];
+              this.selectIds.map((item) => {
+                data.list.map((i) => {
+                  if (i.id == item) {
+                    this.$refs.table.toggleRowSelection(i, true);
+                    arr.push(i);
+                  }
+                });
+              });
+              this.changeCheckbox(arr);
+            }
+          });
+        })
+        .catch((res) => {
+          this.loading = false;
+          this.$message.error(res.msg);
+        });
     },
     ok() {
       if (this.images.length > 0) {

@@ -73,15 +73,6 @@ export default {
     },
 
     {
-      path: 'membership_level/index',
-      name: `${pre}membershipLevel`,
-      meta: {
-        ...meta,
-        title: '分销等级',
-      },
-      component: () => import('@/pages/setting/membershipLevel/index'),
-    },
-    {
       path: 'system_config_message/:type?/:tab_id?',
       name: `${pre}message`,
       meta: {
@@ -178,15 +169,6 @@ export default {
       meta: {
         auth: ['setting-system-group_data-slide'],
         title: '首页幻灯片',
-      },
-      component: () => import('@/pages/system/group/list'),
-    },
-    {
-      path: 'system_group_data/sign/:id',
-      name: `${pre}groupDataSign`,
-      meta: {
-        auth: ['setting-system-group_data-sign'],
-        title: '签到天数配置',
       },
       component: () => import('@/pages/system/group/list'),
     },
@@ -299,15 +281,6 @@ export default {
       component: () => import('@/pages/system/group/list'),
     },
     {
-      path: 'merchant/system_store/index',
-      name: `${pre}systemStore`,
-      meta: {
-        auth: ['setting-system-config-merchant'],
-        title: '门店设置',
-      },
-      component: () => import('@/pages/setting/systemStore/index'),
-    },
-    {
       path: 'freight/express/index',
       name: `${pre}freight`,
       meta: {
@@ -315,24 +288,6 @@ export default {
         title: '物流公司',
       },
       component: () => import('@/pages/setting/freight/index'),
-    },
-    {
-      path: 'store_service/index',
-      name: `${pre}service`,
-      meta: {
-        auth: ['setting-store-service'],
-        title: '客服管理',
-      },
-      component: () => import('@/pages/setting/storeService/index'),
-    },
-    {
-      path: 'freight/city/list',
-      name: `${pre}dada`,
-      meta: {
-        auth: ['setting-system-city'],
-        title: '城市数据',
-      },
-      component: () => import('@/pages/setting/cityDada/index'),
     },
     {
       path: 'freight/shipping_templates/list',
@@ -436,33 +391,6 @@ export default {
         title: '页面链接',
       },
       component: () => import('@/pages/setting/devise/links'),
-    },
-    {
-      path: 'store_service/speechcraft',
-      name: `${pre}speechcraft`,
-      meta: {
-        auth: ['admin-setting-store_service-speechcraft'],
-        title: '客服话术',
-      },
-      component: () => import('@/pages/setting/storeService/speechcraft'),
-    },
-    {
-      path: 'store_service/feedback',
-      name: `${pre}feedback`,
-      meta: {
-        auth: ['admin-setting-store_service-feedback'],
-        title: '用户留言',
-      },
-      component: () => import('@/pages/setting/storeService/feedback'),
-    },
-    {
-      path: 'store_service/auto_reply',
-      name: `${pre}auto_reply`,
-      meta: {
-        auth: ['admin-setting-store_service-auto_reply'],
-        title: '自动回复',
-      },
-      component: () => import('@/pages/setting/storeService/autoReply'),
     },
     {
       path: 'system_group_data/pc/:id',
@@ -670,25 +598,6 @@ export default {
       meta: {
         ...meta,
         title: '翻译配置',
-      },
-      component: () => import('@/pages/setting/setSystem/index'),
-    },
-    {
-      path: 'kefu_config/:type?/:tab_id?',
-      name: `${pre}kefu_config`,
-      meta: {
-        ...meta,
-        title: '客服配置',
-      },
-      component: () => import('@/pages/setting/setSystem/index'),
-    },
-
-    {
-      path: 'member_config/:type?/:tab_id?',
-      name: `${pre}member_config`,
-      meta: {
-        ...meta,
-        title: '付费会员配置',
       },
       component: () => import('@/pages/setting/setSystem/index'),
     },

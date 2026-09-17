@@ -11,12 +11,7 @@ axios.defaults.withCredentials = true; // 携带cookie
 // 请求拦截器
 service.interceptors.request.use(
   (config) => {
-    if (config.kefu) {
-      let baseUrl = Setting.apiBaseURL.replace(/adminapi/, 'kefuapi');
-      config.baseURL = baseUrl;
-    } else {
-      config.baseURL = Setting.apiBaseURL;
-    }
+    config.baseURL = Setting.apiBaseURL;
     if (config.file) {
       config.headers['Content-Type'] = 'multipart/form-data';
     }
@@ -31,9 +26,8 @@ service.interceptors.request.use(
     }
 
     const token = getCookies('token');
-    const kefuToken = getCookies('kefu_token');
-    if (token || kefuToken) {
-      config.headers['Authori-zation'] = config.kefu ? 'Bearer ' + kefuToken : 'Bearer ' + token;
+    if (token) {
+      config.headers['Authori-zation'] = 'Bearer ' + token;
     }
     return config;
   },

@@ -486,26 +486,6 @@ export function groupAllApi() {
   });
 }
 /**
- * APP版本列表
- */
-export function versionList(params) {
-  return request({
-    url: `system/version_list`,
-    method: 'get',
-    params,
-  });
-}
-/**
- * APP版本列表
- */
-export function versionCrate(id) {
-  return request({
-    url: `system/version_crate/${id}`,
-    method: 'get',
-  });
-}
-
-/**
  * @description 数据配置保存
  */
 export function groupSaveApi(data) {
@@ -603,17 +583,6 @@ export function setAgreements(data, type) {
 }
 
 /**
- * @description 获取授权产品
- */
-export function crmebProduct(params) {
-  return request({
-    url: 'crmeb_product',
-    method: 'get',
-    params,
-  });
-}
-
-/**
  * @description 获取授权订单
  */
 export function getVersion() {
@@ -630,122 +599,6 @@ export function getCrmebCopyRight() {
   return request({
     url: `copyright`,
     method: 'get',
-  });
-}
-
-/**
- * @description 保存版权
- */
-export function saveCrmebCopyRight(data) {
-  return request({
-    url: `copyright`,
-    method: 'post',
-    data,
-  });
-}
-
-/**
- * @description 升级包 -- 列表
- * @param data
- */
-export function upgradeListApi(params) {
-  return request({
-    url: '/system/upgrade/list',
-    method: 'get',
-    params,
-  });
-}
-
-/**
- * @description 升级进度
- */
-export function upgradeProgressApi() {
-  return request({
-    url: `/system/upgrade_progress`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 升级协议
- */
-export function upgradeAgreementApi() {
-  return request({
-    url: `/system/upgrade/agreement`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 升级状态
- */
-export function upgradeStatusApi() {
-  return request({
-    url: `/system/upgrade_status`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 下载进度
- */
-export function downloadProgressApi(data) {
-  return request({
-    url: `/system/upgrade_download/progress`,
-    method: 'get',
-    params: data,
-  });
-}
-
-export function upgradeIgnoreFileApi() {
-  return request({
-    url: `/system/upgrade/ignore_file`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 升级包 -- 升级记录
- * @param data
- */
-export function upgradeLogListApi(params) {
-  return request({
-    url: '/system/upgrade_log/list',
-    method: 'get',
-    params,
-  });
-}
-
-/**
- * 导出备份文件
- */
-export function upgradeExportApi(id) {
-  return request({
-    url: `system/upgrade_export/${id}`,
-    method: 'get',
-    responseType: 'blob',
-  });
-}
-
-/**
- * @description 下载升级包
- */
-export function downloadApi(params) {
-  return request({
-    url: '/system/package_download/' + params,
-    method: 'POST',
-  });
-}
-
-/**
- * @description 升级包 -- 可升级列表
- * @param data
- */
-export function upgradeableListApi(params) {
-  return request({
-    url: '/system/upgradeable/list',
-    method: 'get',
-    params,
   });
 }
 
@@ -796,19 +649,6 @@ export function saveTimer(data) {
   });
 }
 
-/**
- * 更新定时任务
- * @param {*} id
- * @param {*} data
- * @returns
- */
-export function updateTimer(id, data) {
-  return request({
-    url: `system/crontab/update/${id}`,
-    method: 'post',
-    data,
-  });
-}
 /**
  * 更新备注
  * @param {*} data
@@ -914,105 +754,3 @@ export function copyrightList() {
 
 // ==================== 跨版本升级接口 ====================
 
-/**
- * 检查跨版本升级
- * @returns
- */
-export function checkCrossVersionUpgradeApi() {
-  return request({
-    url: 'system/cross_version/check',
-    method: 'get',
-  });
-}
-
-/**
- * 获取待执行的升级SQL列表
- * @returns
- */
-export function pendingSqlListApi() {
-  return request({
-    url: 'system/cross_version/pending_sql',
-    method: 'get',
-  });
-}
-
-/**
- * 执行跨版本升级(单步)
- * @param {Number} step 步骤索引
- * @returns
- */
-export function executeCrossVersionApi(step) {
-  return request({
-    url: 'system/cross_version/execute',
-    method: 'post',
-    data: { step },
-  });
-}
-
-/**
- * 一键执行全部跨版本升级
- * @returns
- */
-export function executeAllCrossVersionApi() {
-  return request({
-    url: 'system/cross_version/execute_all',
-    method: 'post',
-  });
-}
-
-/**
- * 获取跨版本升级进度
- * @returns
- */
-export function crossVersionUpgradeProgressApi() {
-  return request({
-    url: 'system/cross_version/progress',
-    method: 'get',
-  });
-}
-
-/**
- * 获取备份状态
- * @returns
- */
-export function backupStatusApi() {
-  return request({
-    url: 'system/cross_version/backup_status',
-    method: 'get',
-  });
-}
-
-/**
- * 获取可回退版本列表
- * @returns
- */
-export function rollbackVersionsApi() {
-  return request({
-    url: 'system/rollback/versions',
-    method: 'get',
-  });
-}
-/**
- * 重新执行升级
- * @returns
- */
-export function reExecuteUpgradeApi(data) {
-  return request({
-    url: 'system/upgrade/reExecute',
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
- * 执行版本回退
- * @param {Number} logId 升级日志ID
- * @returns
- */
-export function executeRollbackApi(logId) {
-  return request({
-    url: 'system/rollback/execute',
-    method: 'post',
-    data: { log_id: logId },
-  });
-}

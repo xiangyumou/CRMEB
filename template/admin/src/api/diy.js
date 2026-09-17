@@ -188,17 +188,6 @@ export function setStatus(id) {
 }
 
 /**
- * @description 使用diy模板(判断是否显示周边门店列表)
- * @param {Object} param data {Object} 传值参数
- */
-export function storeStatus() {
-  return request({
-    url: 'diy/get_store_status',
-    method: 'get',
-  });
-}
-
-/**
  * @description 添加模板
  * @param {Object} param data {Object} 传值参数
  */
@@ -303,26 +292,6 @@ export function pageLink(id) {
   });
 }
 
-/**
- * @description 页面链接-自定义链接提交；
- */
-export function saveLink(data, id) {
-  return request({
-    url: `diy/save_link/${id}`,
-    method: 'post',
-    data: data,
-  });
-}
-
-/**
- * @description diy页面-热搜词；
- */
-export function getWordsAll() {
-  return request({
-    url: `product/words/get_all`,
-    method: 'get',
-  });
-}
 /**
  * @description diy模板导出
  */

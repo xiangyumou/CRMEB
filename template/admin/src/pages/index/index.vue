@@ -6,7 +6,7 @@
     <!--头部-->
     <base-info ref="baseInfo" />
     <!--小方块-->
-    <grid-menu v-if="userInfo.level == 0" />
+    <grid-menu />
     <!--订单统计-->
     <visit-chart ref="visitChart" />
     <!--用户-->

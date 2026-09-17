@@ -324,12 +324,6 @@
                     ><a>查看评论</a></router-link
                   >
                 </el-dropdown-item>
-                <el-dropdown-item v-db-click @click.native="openModal(scope.row, 'vipPriceSet')"
-                  >会员价管理</el-dropdown-item
-                >
-                <el-dropdown-item v-db-click @click.native="openModal(scope.row, 'brokerageSet')"
-                  >佣金管理</el-dropdown-item
-                >
                 <el-dropdown-item
                   v-if="artFrom.type === '6'"
                   v-db-click
@@ -570,8 +564,6 @@
     >
       <goodsImport v-if="importShow" @close="importShow = false"></goodsImport>
     </el-dialog>
-    <brokerageSet ref="brokerageSet" :productId="productId"></brokerageSet>
-    <vipPriceSet ref="vipPriceSet" :productId="productId"></vipPriceSet>
     <!-- 商品标签 -->
     <el-dialog :visible.sync="storeLabelShow" title="选择商品标签" width="540">
       <storeLabelList
@@ -595,8 +587,6 @@ import couponList from '@/components/couponList';
 import { exportProductList, exportProductExport } from '@/api/export';
 import settings from '@/setting';
 import goodsImport from './components/goodsImport.vue';
-import brokerageSet from '../components/brokerageSet.vue';
-import vipPriceSet from '../components/vipPriceSet.vue';
 import {
   getGoodHeade,
   getGoods,
@@ -624,8 +614,6 @@ export default {
     userLabel,
     couponList,
     goodsImport,
-    brokerageSet,
-    vipPriceSet,
     storeLabelList,
     goodsLabel,
   },

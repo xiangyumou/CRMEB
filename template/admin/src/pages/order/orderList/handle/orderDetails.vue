@@ -108,49 +108,12 @@
                   <div class="value">{{ orderDatalist.orderInfo.coupon_price }}</div>
                 </li>
                 <li class="item">
-                  <div>积分抵扣：</div>
-                  <div class="value">{{ orderDatalist.orderInfo.deduction_price || '0.0' }}</div>
-                </li>
-                <li class="item">
                   <div>交付邮费：</div>
                   <div class="value">{{ orderDatalist.orderInfo.pay_postage }}</div>
                 </li>
                 <li class="item">
-                  <div>用户等级优惠：</div>
-                  <div class="value">{{ orderDatalist.orderInfo.levelPrice || '0.0' }}</div>
-                </li>
-                <li class="item">
-                  <div>付费会员优惠：</div>
-                  <div class="value">{{ orderDatalist.orderInfo.memberPrice || '0.0' }}</div>
-                </li>
-                <li class="item">
                   <div>实际支付：</div>
                   <div class="value">{{ orderDatalist.orderInfo.pay_price || '0.0' }}</div>
-                </li>
-              </ul>
-            </div>
-            <div class="section">
-              <div class="title">返佣信息(金额｜用户UID)</div>
-              <ul class="list">
-                <li class="item">
-                  <div>一级佣金：</div>
-                  <div class="value">{{ orderDatalist.orderInfo.one_brokerage }} | {{ orderDatalist.orderInfo.spread_uid }}</div>
-                </li>
-                <li class="item">
-                  <div>二级佣金：</div>
-                  <div class="value">{{ orderDatalist.orderInfo.two_brokerage }} | {{ orderDatalist.orderInfo.spread_two_uid }}</div>
-                </li>
-                <li class="item">
-                  <div>员工返佣：</div>
-                  <div class="value">{{ orderDatalist.orderInfo.staff_brokerage }} | {{ orderDatalist.orderInfo.staff_id }}</div>
-                </li>
-                <li class="item">
-                  <div>代理商佣金：</div>
-                  <div class="value">{{ orderDatalist.orderInfo.agent_brokerage }} | {{ orderDatalist.orderInfo.agent_id }}</div>
-                </li>
-                <li class="item">
-                  <div>事业部佣金：</div>
-                  <div class="value">{{ orderDatalist.orderInfo.division_brokerage }} | {{ orderDatalist.orderInfo.division_id }}</div>
                 </li>
               </ul>
             </div>
@@ -430,11 +393,13 @@ export default {
   },
   filters: {
     payType(val) {
+      // Retired payment methods only appear on historical orders.
       let obj = {
-        yue: '余额',
         weixin: '微信支付',
-        alipay: '支付宝支付',
-        offline: '线下支付',
+        yue: '历史：余额支付',
+        alipay: '历史：支付宝支付',
+        offline: '历史：线下支付',
+        allinpay: '历史：通联支付',
       };
       return obj[val] ?? '其它方式';
     },

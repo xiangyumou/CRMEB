@@ -101,7 +101,7 @@
   </div>
 </template>
 <script>
-import { mapState, mapMutations } from 'vuex';
+import { mapState } from 'vuex';
 import { userCancelList, userCancelSetMark } from '@/api/user';
 import editFrom from '@/components/from/from';
 import remark from '@/components/remark/index';
@@ -142,7 +142,6 @@ export default {
     },
   },
   methods: {
-    ...mapMutations('userLevel', ['getlevelId']),
     remark(row) {
       this.id = row.id;
       this.$refs.remark.formValidate.remark = row.remark;

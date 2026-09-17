@@ -24,10 +24,7 @@ import goodSelect from './module/goodSelect';
 import moren from './module/moren';
 import shopping from './module/shopping';
 import fresh from './module/fresh';
-import kefu from './module/kefu';
-import integralOrder from './module/integralOrder';
 import mobildConfig from './module/mobildConfig';
-import upgrade from './module/upgrade';
 import layout from './module/layout';
 import themeConfig from './module/themeConfig';
 import routesList from './module/routesList';
@@ -63,10 +60,7 @@ export default new Vuex.Store({
         userLevel: state.userLevel,
         order: state.order,
         media: state.media,
-        kefu: state.kefu,
-        integralOrder: state.integralOrder,
         mobildConfig: state.mobildConfig,
-        upgrade: state.upgrade,
         layout: state.layout,
         themeConfig: state.themeConfig,
         routesList: state.routesList,
@@ -88,10 +82,7 @@ export default new Vuex.Store({
     moren,
     shopping,
     fresh,
-    kefu,
     mobildConfig,
-    integralOrder,
-    upgrade,
     layout,
     themeConfig,
     routesList,

@@ -77,19 +77,13 @@ axios.defaults.withCredentials = true; // 携带cookie
 // 请求拦截器
 service.interceptors.request.use(
   (config) => {
-    if (config.kefu) {
-      let baseUrl = Setting.apiBaseURL.replace(/adminapi/, 'kefuapi');
-      config.baseURL = baseUrl;
-    } else {
-      config.baseURL = Setting.apiBaseURL;
-    }
+    config.baseURL = Setting.apiBaseURL;
     if (config.file) {
       config.headers['Content-Type'] = 'multipart/form-data';
     }
     const token = getCookies('token');
-    const kefuToken = getCookies('kefu_token');
-    if (token || kefuToken) {
-      config.headers['Authori-zation'] = config.kefu ? 'Bearer ' + kefuToken : 'Bearer ' + token;
+    if (token) {
+      config.headers['Authori-zation'] = 'Bearer ' + token;
     }
     return config;
   },
@@ -132,11 +126,10 @@ service.interceptors.response.use(
         router.replace({ name: 'login' }).catch(() => {});
         return Promise.reject({ msg: '未登录' });
       case 402:
-        removeCookies('kefuInfo');
-        removeCookies('kefu_token');
-        removeCookies('kefu_expires_time');
-        removeCookies('kefu_uuid');
-        router.replace({ path: '/kefu' }).catch(() => {});
+        removeCookies('token');
+        removeCookies('expires_time');
+        removeCookies('uuid');
+        router.replace({ name: 'login' }).catch(() => {});
         return Promise.reject({ msg: '未登录' });
       case 403:
         router.replace({ name: 'system_opendir_login' }).catch(() => {});

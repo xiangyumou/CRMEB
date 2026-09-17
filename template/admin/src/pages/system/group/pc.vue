@@ -24,7 +24,6 @@
             >
               首页轮播图
             </div>
-            <div class="left_cont" :class="pageId == 3 ? 'on' : ''" v-db-click @click="menu(3)">客服页面广告</div>
             <div class="left_cont" :class="pageId == 4 ? 'on' : ''" v-db-click @click="menu(4)">顶部菜单配置</div>
             <div class="left_cont" :class="pageId == 5 ? 'on' : ''" v-db-click @click="menu(5)">友情链接配置</div>
             <div class="left_cont" :class="pageId == 6 ? 'on' : ''" v-db-click @click="menu(6)">关于我们</div>
@@ -43,13 +42,6 @@
                   <img :src="item.image" />
                 </swiper-slide>
               </swiper>
-            </div>
-          </el-col>
-          <el-col v-if="pageId == 3" class="pciframe" :bordered="false" shadow="never">
-            <img src="../../../assets/images/kefu.png" class="pciframe-box" />
-            <div class="box3_sile">
-              <!-- {{formValidate}} -->
-              <div v-html="formValidate.content"></div>
             </div>
           </el-col>
           <el-col v-if="pageId == 'pc_home_banner'">
@@ -166,30 +158,6 @@
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </el-col>
-          <el-col v-if="pageId == 3" :xs="24" :sm="24" :md="12" :lg="14" style="margin-left: 40px">
-            <div class="table_box">
-              <el-row>
-                <el-col v-bind="grid">
-                  <div class="title">客服广告内容：</div>
-                </el-col>
-              </el-row>
-              <div>
-                <el-form
-                  class="form"
-                  ref="formValidate"
-                  :model="formValidate"
-                  :rules="ruleValidate"
-                  :label-width="0"
-                  :label-position="labelPosition"
-                  @submit.native.prevent
-                >
-                  <el-form-item label="" prop="content" style="margin: 0px">
-                    <WangEditor class="mt10" :content="content" @editorContent="getEditorContent"></WangEditor>
-                  </el-form-item>
-                </el-form>
               </div>
             </div>
           </el-col>
@@ -335,8 +303,6 @@ import {
   groupDataAddApi,
   pcLogoApi,
   pcLogoSave,
-  getKfAdv,
-  setKfAdv,
 } from '@/api/system';
 import { pcHomeMenusSave, pcHomeMenus } from '@/api/setting';
 import draggable from 'vuedraggable';
@@ -449,37 +415,6 @@ export default {
       this.tabList.list[this.activeIndexs].url = e;
       // item.url = e
     },
-    // 提交数据
-    onsubmit(name) {
-      this.$refs[name].validate((valid) => {
-        if (valid) {
-          setKfAdv(this.formValidate)
-            .then(async (res) => {
-              this.$message.success(res.msg);
-            })
-            .catch((res) => {
-              this.$message.error(res.msg);
-            });
-        } else {
-          return false;
-        }
-      });
-    },
-    //详情
-    getKfAdv() {
-      getKfAdv()
-        .then(async (res) => {
-          let data = res.data;
-          this.formValidate = {
-            content: data.content,
-          };
-          this.content = data.content;
-        })
-        .catch((res) => {
-          this.loading = false;
-          this.$message.error(res.msg);
-        });
-    },
     getAboutUs(id) {
       this.formValidate.content = '';
       getAgreements(id).then((res) => {
@@ -523,8 +458,6 @@ export default {
         pcLogoApi('pc_logo').then((res) => {
           this.pclogo = res.data.value;
         });
-      } else if (this.pageId == 3) {
-        this.getKfAdv();
       } else if (this.pageId == 4) {
         this.getMenuList();
       } else if (this.pageId == 5) {
@@ -625,8 +558,6 @@ export default {
           .catch((err) => {
             this.$message.error(err.msg);
           });
-      } else if (this.pageId == 3) {
-        this.onsubmit('formValidate');
       } else if (this.pageId == 4) {
         this.saveMenu('pc_home_menus');
       } else if (this.pageId == 5) {

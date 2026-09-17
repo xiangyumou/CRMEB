@@ -170,68 +170,6 @@ export function serveSign(data) {
 }
 
 /**
- * 客服登录
- */
-export function kefuLogin(id) {
-  return request({
-    url: `app/wechat/kefu/login/${id}`,
-    method: 'get',
-  });
-}
-
-/**
- * 客服话术列表
- */
-export function wechatSpeechcraft(data) {
-  return request({
-    url: `app/wechat/speechcraft`,
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
- * 客服话术编辑
- */
-export function speechcraftEdit(id) {
-  return request({
-    url: `app/wechat/speechcraft/${id}/edit`,
-    method: 'get',
-  });
-}
-
-/**
- * 客服话术添加
- */
-export function speechcraftCreate() {
-  return request({
-    url: `app/wechat/speechcraft/create`,
-    method: 'get',
-  });
-}
-
-/**
- * 客服反馈
- */
-export function kefuFeedBack(params) {
-  return request({
-    url: `app/feedback`,
-    method: 'get',
-    params,
-  });
-}
-
-/**
- * 客服反馈
- */
-export function kefuFeedBackEdit(id) {
-  return request({
-    url: `app/feedback/${id}/edit`,
-    method: 'get',
-  });
-}
-
-/**
  * @description 设置 短信 物流公司
  */
 export function exportAllApi() {
@@ -351,38 +289,6 @@ export function smsRecordApi(params) {
 }
 
 /**
- * @description 门店设置 详情
- */
-export function storeApi() {
-  return request({
-    url: 'merchant/store',
-    method: 'GET',
-  });
-}
-
-/**
- * @description 门店设置 获取地图key
- */
-export function keyApi() {
-  return request({
-    url: 'merchant/store/address',
-    method: 'GET',
-  });
-}
-
-/**
- * @description 门店设置 提交数据,
- * @param {Object} param data {Object} 传值参数
- */
-export function storeAddApi(data) {
-  return request({
-    url: `merchant/store/${data.id}`,
-    method: 'POST',
-    data,
-  });
-}
-
-/**
  * @description 设置 物流公司 列表
  * @param {Object} param data {Object} 传值参数
  */
@@ -437,15 +343,6 @@ export function freightSyncExpressApi() {
 }
 
 /**
- * @description 话术分类
- */
-export function speechcraftcate() {
-  return request({
-    url: `app/wechat/speechcraftcate`,
-    method: 'get',
-  });
-}
-/**
  * @description 渠道码分类
  */
 export function wechatQrcodeTree() {
@@ -456,30 +353,11 @@ export function wechatQrcodeTree() {
 }
 
 /**
- * @description 获取创建分类表单
- */
-export function speechcraftcateCreate() {
-  return request({
-    url: `app/wechat/speechcraftcate/create`,
-    method: 'get',
-  });
-}
-/**
  * @description 获取渠道码创建、编辑分类表单
  */
 export function wechatQrcodeCreate(id) {
   return request({
     url: `app/wechat_qrcode/cate/create/${id}`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 修改话术分类(获取表单)
- */
-export function speechcraftcateEdit(id) {
-  return request({
-    url: `app/wechat/speechcraftcate/${id}/edit`,
     method: 'get',
   });
 }
@@ -552,64 +430,6 @@ export function menusListApi() {
 }
 
 /**
- * @description 设置 客服管理 -- 列表
- * @param {Object} param params {Object} 传值参数
- */
-export function kefuListApi(params) {
-  return request({
-    url: `app/wechat/kefu`,
-    method: 'get',
-    params,
-  });
-}
-
-/**
- * @description 设置 客服管理 -- 选择用户
- *  @param {Object} param params {Object} 传值参数
- */
-export function kefucreateApi(params) {
-  return request({
-    url: `app/wechat/kefu/create`,
-    method: 'get',
-    params,
-  });
-}
-
-/**
- * @description 设置 客服管理 -- 添加客服
- *  @param {Object} param params {Object} 传值参数
- */
-export function kefuaddApi() {
-  return request({
-    url: `app/wechat/kefu/add`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 设置 客服管理 -- 添加客服保存
- *  @param {Object} param params {Object} 传值参数
- */
-export function kefuAddApi(data) {
-  return request({
-    url: `app/wechat/kefu`,
-    method: 'post',
-    data,
-  });
-}
-
-/**
- * @description 设置 客服管理 -- 修改状态
- *  @param {Object} param data {Object} 传值参数
- */
-export function kefusetStatusApi(data) {
-  return request({
-    url: `app/wechat/kefu/set_status/${data.id}/${data.status}`,
-    method: 'PUT',
-  });
-}
-
-/**
  * @description 设置 渠道码 -- 修改状态
  *  @param {Object} param data {Object} 传值参数
  */
@@ -650,42 +470,6 @@ export function wechatQrcodeSaveApi(id, data) {
     data,
   });
 }
-/**
- * @description 设置 客服管理 -- 编辑表单
- *  @param {Number} param id {Number} 客服id
- */
-export function kefuEditApi(id) {
-  return request({
-    url: `app/wechat/kefu/${id}/edit`,
-    method: 'GET',
-  });
-}
-
-/**
- * @description 设置 客服管理 -- 聊天记录列表
- *  @param {Number} param id {Number} 客服id
- *  @param {Object} param params {Object} 传参数
- */
-export function kefuRecordApi(params, id) {
-  return request({
-    url: `app/wechat/kefu/record/${id}`,
-    method: 'GET',
-    params,
-  });
-}
-
-/**
- * @description 设置 客服管理 -- 查看对话列表
- *  @param {Object} param params {Object} 传参数
- */
-export function kefuChatlistApi(params) {
-  return request({
-    url: `app/wechat/kefu/chat_list`,
-    method: 'GET',
-    params,
-  });
-}
-
 /**
  * @description 短信设置 -- 查看是否登录
  */
@@ -778,119 +562,6 @@ export function templatesSaveApi(id, data) {
 export function shipTemplatesApi(id) {
   return request({
     url: `setting/shipping_templates/${id}/edit`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 门店设置 -- 门店列表分类数量；
- */
-export function storeGetHeaderApi() {
-  return request({
-    url: `merchant/store/get_header`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 门店设置 -- 门店列表；
- */
-export function merchantStoreApi(data) {
-  return request({
-    url: `merchant/store`,
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
- * @description 门店设置 -- 门店设置；
- */
-export function storeSetShowApi(id, is_show) {
-  return request({
-    url: `merchant/store/set_show/${id}/${is_show}`,
-    method: 'put',
-  });
-}
-
-/**
- * @description 门店设置 -- 门店修改信息；
- */
-export function storeGetInfoApi(id) {
-  return request({
-    url: `merchant/store/get_info/${id}`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 门店设置 -- 店员列表；
- */
-export function storeStaffApi(data) {
-  return request({
-    url: `merchant/store_staff`,
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
- * @description 门店设置 -- 新增店员；
- */
-export function storeStaffCreateApi() {
-  return request({
-    url: `merchant/store_staff/create`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 门店设置 -- 新增店员；
- */
-export function storeStaffEditApi(id) {
-  return request({
-    url: `merchant/store_staff/${id}/edit`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 店员设置 -- 店员设置显示隐藏；
- */
-export function storeStaffSetShowApi(id, is_show) {
-  return request({
-    url: `merchant/store_staff/set_show/${id}/${is_show}`,
-    method: 'put',
-  });
-}
-
-/**
- * @description 订单设置 -- 核销订单列表；
- */
-export function verifyOrderApi(data) {
-  return request({
-    url: `merchant/verify_order`,
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
- * @description 订单设置 -- 核销订单头部；
- */
-export function verifySpreadInfoApi(uid) {
-  return request({
-    url: `merchant/verify/spread_info/${uid}`,
-    method: 'get',
-  });
-}
-
-/**
- * 获取店员搜索门店列表
- */
-export function merchantStoreListApi() {
-  return request({
-    url: `merchant/store_list`,
     method: 'get',
   });
 }

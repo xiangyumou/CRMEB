@@ -851,22 +851,6 @@ export default {
           list: [
             {
               img: '',
-              icon: 'icon-yue',
-              info: [
-                { title: '标题', value: '余额', tips: '选填，不超过4个字', max: 4 },
-                { title: '链接', value: '/pages/users/user_money/index', tips: '请输入链接', max: 100 },
-              ],
-            },
-            {
-              img: '',
-              icon: 'icon-jifen',
-              info: [
-                { title: '标题', value: '积分', tips: '选填，不超过4个字', max: 4 },
-                { title: '链接', value: '/pages/users/user_integral/index', tips: '请输入链接', max: 100 },
-              ],
-            },
-            {
-              img: '',
               icon: 'icon-youhuiquan',
               info: [
                 { title: '标题', value: '优惠券', tips: '选填，不超过4个字', max: 4 },
@@ -1098,7 +1082,7 @@ export default {
       if (!data.ms2TitleText) {
         this.$set(data, 'ms2TitleText', {
           title: '标题文字',
-          value: 'SVIP 会员',
+          value: '会员中心',
           max: 10,
         });
       }
@@ -1196,7 +1180,7 @@ export default {
       if (!data.ms2ButtonLink) {
         this.$set(data, 'ms2ButtonLink', {
           title: '按钮链接',
-          value: '/pages/users/user_vip/index',
+          value: '/pages/users/user_coupon/index',
           max: 100,
           type: 'link',
         });

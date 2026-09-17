@@ -2,19 +2,6 @@
   <!-- 营销设置 -->
   <el-row>
     <el-col :span="24">
-      <el-form-item label="购买送积分：" prop="give_integral">
-        <el-input-number
-          :controls="false"
-          v-model="formValidate.give_integral"
-          :min="0"
-          :max="9999999999"
-          placeholder="请输入积分"
-          class="input_width input-number-unit-class"
-          class-unit="积分"
-        />
-      </el-form-item>
-    </el-col>
-    <el-col :span="24">
       <el-form-item label="购买送优惠券：">
         <div v-if="couponName.length" class="mb10">
           <el-tag class="mr10" closable v-for="(item, index) in couponName" :key="index" @close="handleClose(item)">{{

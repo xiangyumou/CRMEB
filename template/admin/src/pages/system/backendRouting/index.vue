@@ -4,7 +4,6 @@
       <el-tabs v-model="apiType">
         <el-tab-pane label="管理端接口" name="adminapi"></el-tab-pane>
         <el-tab-pane label="用户端接口" name="api"></el-tab-pane>
-        <el-tab-pane label="客服端接口" name="kefuapi"></el-tab-pane>
         <el-tab-pane label="对外接口" name="outapi"></el-tab-pane>
       </el-tabs>
     </div>

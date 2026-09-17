@@ -10,11 +10,10 @@
 
 import { wss, getCookies, setCookies } from '@/libs/util';
 import Setting from '@/setting';
-import { getWorkermanUrl } from '@/api/kefu';
+import { getWorkermanUrl } from '@/api/common';
 import Vue from 'vue';
 const vm = new Vue();
 let wsAdminSocketUrl = getCookies('WS_ADMIN_URL') || '';
-let wsKefuSocketUrl = getCookies('WS_CHAT_URL') || '';
 
 class wsSocket {
   constructor(opt) {
@@ -37,13 +36,7 @@ class wsSocket {
   }
 
   init(key) {
-    let wsUrl = '';
-    if (key == 1) {
-      wsUrl = wsAdminSocketUrl;
-    }
-    if (key == 2) {
-      wsUrl = wsKefuSocketUrl;
-    }
+    let wsUrl = key == 1 ? wsAdminSocketUrl : '';
     if (wsUrl) {
       // 后端返回的可能是 ws:// 地址，HTTPS 页面上直接连接会被浏览器拦截，统一按页面协议转换
       this.ws = new WebSocket(wss(wsUrl));
@@ -97,9 +90,7 @@ class wsSocket {
 function createSocket(key) {
   getWorkermanUrl().then((res) => {
     wsAdminSocketUrl = res.data.admin;
-    wsKefuSocketUrl = res.data.chat;
     setCookies('WS_ADMIN_URL', res.data.admin);
-    setCookies('WS_CHAT_URL', res.data.chat);
   });
   return new Promise((resolve, reject) => {
     const ws = new wsSocket({
@@ -123,4 +114,3 @@ function createSocket(key) {
 }
 
 export const adminSocket = createSocket(1);
-export const Socket = createSocket(2);

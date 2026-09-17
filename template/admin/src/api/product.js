@@ -24,14 +24,6 @@ export function getGoodHeade(data) {
 /*
  * 获取商品表单头数量；
  * */
-export function getGoodsCategory(data) {
-  return request({
-    url: '/goods/goods_category',
-    method: 'get',
-    params: data,
-  });
-}
-
 /**
  * @description 商品管理-- 列表
  */
@@ -356,17 +348,6 @@ export function productGetTempKeysApi(data) {
 }
 
 /**
- * @description 商铺产品 -- 导出
- */
-export function storeProductApi(data) {
-  return request({
-    url: `export/storeProduct`,
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
  * @description 添加商品 -- 检测活动存在
  */
 export function checkActivityApi(id) {
@@ -434,16 +415,6 @@ export function batchSetting(data) {
 export function getProductTypeConfig() {
   return request({
     url: 'product/product_type_config',
-    method: 'get',
-  });
-}
-
-/**
- * @description 添加商品-- 商品标签
- */
-export function productStoreLabel() {
-  return request({
-    url: 'product/product_label',
     method: 'get',
   });
 }
@@ -595,18 +566,6 @@ export function productProtectionFormApi(id) {
 }
 
 /**
- * @description 商品保障服务
- * data 请求参数
- */
-export function productProtectionInfoApi(data) {
-  return request({
-    url: `product/protection/info`,
-    method: 'get',
-    params: data,
-  });
-}
-
-/**
  * @description 商品保障服务-- 修改状态
  * @param {Object} param params {Object} 传值参数
  */
@@ -614,27 +573,6 @@ export function protectionStatusApi(data) {
   return request({
     url: `product/protection/status/${data.id}/${data.status}`,
     method: 'PUT',
-  });
-}
-
-/**
- * @description 佣金列表
- */
-export function productBrokerage(id, type) {
-  return request({
-    url: `product/other_info/${id}/${type}`,
-    method: 'get',
-  });
-}
-
-/**
- * @description 佣金  提交
- */
-export function productBrokerageUpdate(id, type, data) {
-  return request({
-    url: `product/other_save/${id}/${type}`,
-    method: 'post',
-    data,
   });
 }
 

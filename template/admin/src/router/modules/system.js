@@ -196,15 +196,6 @@ export default {
     },
 
     {
-      path: 'crossVersionUpgrade/index',
-      name: `${pre}crossVersionUpgrade`,
-      meta: {
-        auth: ['system-crossVersionUpgrade-index'],
-        title: '跨版本升级',
-      },
-      component: () => import('@/pages/system/crossVersionUpgrade/index'),
-    },
-    {
       path: 'crontab',
       name: `${pre}crontab`,
       meta: {

@@ -12,7 +12,6 @@
  * 布局菜单配置
  * */
 import { menusApi } from '@/api/account';
-import { filterRemovedAdminMenus } from '@/utils/coreStoreAdmin';
 function getMenusName() {
   let storage = window.localStorage;
   let menuList;
@@ -24,7 +23,7 @@ function getMenusName() {
   if (typeof menuList !== 'object' || menuList === null) {
     menuList = [];
   }
-  return filterRemovedAdminMenus(menuList);
+  return menuList;
 }
 export default {
   namespaced: true,
@@ -37,7 +36,7 @@ export default {
   },
   mutations: {
     getmenusNav(state, menuList) {
-      state.menusName = filterRemovedAdminMenus(menuList);
+      state.menusName = menuList;
     },
     // getopenMenus (state, openList) {
     //   state.openMenus = openList

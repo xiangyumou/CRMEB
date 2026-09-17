@@ -60,16 +60,6 @@
         </router-link>
       </el-card>
     </el-col>
-    <el-col v-bind="grid" class="ivu-mb" v-auth="['agent-agent-manage']">
-      <el-card shadow="never">
-        <router-link :to="{ path: $routeProStr + '/agent/agent_manage/index' }">
-          <div class="icon">
-            <i class="iconfont iconfenxiaoguanli" style="color: #ff7d00"></i>
-          </div>
-          <p>分销管理</p>
-        </router-link>
-      </el-card>
-    </el-col>
     <el-col v-bind="grid" class="ivu-mb" v-auth="['marketing-store_coupon-index']">
       <el-card shadow="never">
         <router-link :to="{ path: $routeProStr + '/marketing/store_coupon_issue/index' }">

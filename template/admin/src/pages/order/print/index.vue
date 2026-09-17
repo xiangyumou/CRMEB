@@ -57,8 +57,6 @@
         <div class="acea-row row-middle">
           <div class="item"><span class="name">运费：</span>{{ orderData.pay_postage }}</div>
           <div class="item"><span class="name">优惠：</span>{{ orderData.coupon_price }}</div>
-          <div class="item"><span class="name">会员折扣：</span>{{ orderData.vip_price }}</div>
-          <div class="item"><span class="name">积分抵扣：</span>{{ orderData.deduction_price }}</div>
         </div>
         <div class="pricePay">实付金额：{{ orderData.pay_price }}</div>
       </div>

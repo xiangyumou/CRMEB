@@ -121,7 +121,6 @@
 <script>
 import { mapState } from 'vuex';
 import { cmsListApi, categoryListApi, relationApi } from '@/api/cms';
-import relationList from './relation';
 import { formatDate } from '@/utils/validate';
 import goodsList from '@/components/goodsList/index';
 export default {
@@ -156,7 +155,6 @@ export default {
     };
   },
   components: {
-    relationList,
     goodsList,
   },
   computed: {

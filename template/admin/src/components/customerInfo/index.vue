@@ -80,7 +80,7 @@
   </div>
 </template>
 <script>
-import { kefucreateApi } from '@/api/setting';
+import { userList } from '@/api/user';
 export default {
   name: 'index',
   data() {
@@ -129,10 +129,10 @@ export default {
       this.timeVal = [];
       this.getListService();
     },
-    // 客服列表
+    // 用户列表
     getListService() {
       this.loading2 = true;
-      kefucreateApi(this.formValidate)
+      userList(this.formValidate)
         .then(async (res) => {
           let data = res.data;
           this.tableList2 = data.list;

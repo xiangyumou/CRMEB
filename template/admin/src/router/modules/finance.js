@@ -45,25 +45,5 @@ export default {
       component: () => import('@/pages/finance/capitalFlow/index'),
     },
 
-    {
-      path: 'user_recharge/index',
-      name: `${pre}recharge`,
-      meta: {
-        auth: ['finance-user-recharge'],
-        title: '充值记录',
-      },
-      component: () => import('@/pages/finance/financialRecords/recharge'),
-    },
-    {
-      path: 'finance/bill',
-      name: `${pre}bill`,
-      meta: {
-        auth: ['finance-finance-bill'],
-        title: '资金记录',
-      },
-      component: () => import('@/pages/finance/financialRecords/bill'),
-    },
-
-
   ],
 };

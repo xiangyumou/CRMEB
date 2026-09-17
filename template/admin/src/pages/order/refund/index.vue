@@ -205,7 +205,7 @@
         />
       </div>
     </el-card>
-    <!-- 编辑 退款 退积分 不退款-->
+    <!-- 编辑 退款 不退款-->
     <edit-from ref="edits" :FromData="FromData" @submitFail="submitFail"></edit-from>
     <!-- 会员详情-->
     <user-details ref="userDetails"></user-details>

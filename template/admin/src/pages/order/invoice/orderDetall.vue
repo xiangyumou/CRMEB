@@ -26,7 +26,7 @@
           <div class="item"><span>商品总数：</span>{{ orderDetail.orderInfo.total_num }}</div>
           <div class="item">
             <span>商品总价：</span
-            >{{ parseFloat(orderDetail.orderInfo.total_price) + parseFloat(orderDetail.orderInfo.vip_true_price || 0) }}
+            >{{ orderDetail.orderInfo.total_price }}
           </div>
         </div>
         <div class="msg-item">
@@ -34,8 +34,6 @@
           <div class="item"><span>优惠券金额：</span>{{ orderDetail.orderInfo.coupon_price }}</div>
         </div>
         <div class="msg-item">
-          <div class="item"><span>会员商品优惠：</span>{{ orderDetail.orderInfo.vip_true_price || 0.0 }}</div>
-          <div class="item"><span>积分抵扣：</span>{{ orderDetail.orderInfo.deduction_price || 0.0 }}</div>
         </div>
         <div class="msg-item">
           <div class="item"><span>实际支付：</span>{{ orderDetail.orderInfo.pay_price }}</div>

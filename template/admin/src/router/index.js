@@ -91,9 +91,6 @@ export function editRouterFun(to, from) {
   if (
     [
       'product_productAdd',
-      'marketing_bargainCreate',
-      'marketing_storeSeckillCreate',
-      'marketing_storeIntegralCreate',
       'marketing_storeCouponCreate',
     ].includes(to.name)
   ) {
@@ -122,7 +119,7 @@ router.beforeEach(async (to, from, next) => {
   // PrevLoading.start();
   keepAliveSplice(to);
   editRouterFun(to, from);
-  if (to.fullPath.indexOf('kefu') != -1 || to.name == 'mobile_upload') {
+  if (to.name == 'mobile_upload') {
     return next();
   }
   // 判断是否需要登录才可以进入

@@ -225,51 +225,6 @@ export function getRecord(params) {
 }
 
 /**
- * @description 余额统计数量
- * @param {Object} param data {Object} 传值参数
- */
-export function getBalanceBasic(params) {
-  return request({
-    url: '/statistic/balance/get_basic',
-    method: 'get',
-    params,
-  });
-}
-
-/**
- * @description 余额统计折线图
- * @param {Object} param data {Object} 传值参数
- */
-export function getBalanceTrend(params) {
-  return request({
-    url: '/statistic/balance/get_trend',
-    method: 'get',
-    params,
-  });
-}
-/**
- * @description 余额来源分析
- * @param {Object} param data {Object} 传值参数
- */
-export function getBalanceChannel(params) {
-  return request({
-    url: '/statistic/balance/get_channel',
-    method: 'get',
-    params,
-  });
-}
-/**
- * @description 余额类型分析
- * @param {Object} param data {Object} 传值参数
- */
-export function getBalanceType(params) {
-  return request({
-    url: '/statistic/balance/get_type',
-    method: 'get',
-    params,
-  });
-}
-/**
  * @description 渠道码统计
  * @param {Object} param data {Object} 传值参数
  */
