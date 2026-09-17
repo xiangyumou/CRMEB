@@ -8,36 +8,19 @@
 // +----------------------------------------------------------------------
 // | Author: CRMEB Team <admin@crmeb.com>
 // +----------------------------------------------------------------------
+namespace app\dao\system\crontab;
 
-namespace crmeb\services\pay;
+use app\dao\BaseDao;
+use app\model\system\crontab\SystemCrontab;
 
-
-use crmeb\basic\BaseManager;
-use crmeb\services\pay\storage\V3WechatPay;
-use crmeb\services\pay\storage\WechatPay;
-use think\facade\Config;
-
-/**
- * 第三方支付
- * Class AllinPay
- * @package crmeb\services\pay
- * @mixin WechatPay
- */
-class Pay extends BaseManager
+class SystemCrontabDao extends BaseDao
 {
     /**
-     * 空间名
-     * @var string
+     * 设置模型
+     * @return string
      */
-    protected $namespace = '\\crmeb\\services\\pay\\storage\\';
-
-    /**
-     * 默认驱动
-     * @return mixed
-     */
-    protected function getDefaultDriver()
+    protected function setModel(): string
     {
-        return Config::get('pay.default', 'wechat_pay');
+        return SystemCrontab::class;
     }
-
 }

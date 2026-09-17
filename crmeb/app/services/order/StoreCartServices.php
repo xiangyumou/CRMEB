@@ -16,7 +16,6 @@ use app\services\activity\advance\StoreAdvanceServices;
 use app\services\BaseServices;
 use app\dao\order\StoreCartDao;
 use app\services\activity\coupon\StoreCouponIssueServices;
-use app\services\product\shipping\ShippingTemplatesServices;
 use app\services\shipping\ShippingTemplatesNoDeliveryServices;
 use app\services\user\UserServices;
 use app\jobs\ProductLogJob;

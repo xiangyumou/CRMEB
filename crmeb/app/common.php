@@ -71,16 +71,14 @@ if (!function_exists('fail')) {
 if (!function_exists('getWorkerManUrl')) {
 
     /**
-     * 获取客服数据
+     * 获取后台通知长连接地址（自建聊天已下线）
      * @return mixed
      */
     function getWorkerManUrl()
     {
         $ws = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') ? 'wss://' : 'ws://';
         $host = $_SERVER['HTTP_HOST'];
-        $data['admin'] = $ws . $host . '/notice';
-        $data['chat'] = $ws . $host . '/msg';
-        return $data;
+        return ['admin' => $ws . $host . '/notice'];
     }
 }
 if (!function_exists('object2array')) {

@@ -15,6 +15,7 @@ Route::miss(function () {
         $appName = explode('/', $appRequest)[0] ?? '';
     }
 
+    // Retired prefixes are answered with 404 instead of the app shell.
     if (in_array(strtolower($appName), ['api', 'adminapi', 'kefuapi', 'kefu'], true)) {
         return \think\Response::create()->code(404);
     }
