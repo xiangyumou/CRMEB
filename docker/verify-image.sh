@@ -3,15 +3,19 @@ set -eu
 
 image="${1:?usage: docker/verify-image.sh IMAGE}"
 container_id=""
+fixture_dir=""
 
 cleanup() {
     if [ -n "$container_id" ]; then
         docker rm -f "$container_id" >/dev/null 2>&1 || true
     fi
+    if [ -n "$fixture_dir" ]; then
+        rm -rf "$fixture_dir"
+    fi
 }
 trap cleanup EXIT INT TERM
 
-docker run --rm "$image" php -r '
+docker run --rm --entrypoint php "$image" -r '
 require "vendor/autoload.php";
 
 $requiredExtensions = ["bcmath", "curl", "gd", "intl", "mbstring", "mysqli", "pcntl", "pdo_mysql", "redis", "sockets", "zip"];
@@ -57,12 +61,19 @@ if [ -e .env ] || [ -e .constant ] || [ -e .git ]; then
     echo "Runtime image contains environment secrets or Git metadata" >&2
     exit 1
 fi
+test -s public/index.html && test -s public/admin/index.html && test -s public/index.php
+test -s public/install.lock && test ! -d public/install
+test -s /usr/local/share/crmeb/build.json
 find app config crmeb route -type f -name "*.php" -print0 \
     | xargs -0 -n1 php -l >/tmp/php-lint.log \
     || { cat /tmp/php-lint.log >&2; exit 1; }
 '
 
-container_id="$(docker run -d "$image")"
+fixture_dir="$(mktemp -d)"
+printf 'installed\n' > "$fixture_dir/.constant"
+container_id="$(docker run -d \
+    -v "$(pwd)/docker/regression/test.env:/var/www/crmeb/.env:ro" \
+    -v "$fixture_dir/.constant:/var/www/crmeb/.constant:ro" "$image")"
 sleep 10
 
 if [ "$(docker inspect -f '{{.State.Running}}' "$container_id")" != "true" ]; then

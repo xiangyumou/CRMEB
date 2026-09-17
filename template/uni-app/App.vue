@@ -15,7 +15,6 @@ import { getLangJson, getLangVersion } from "@/api/user.js";
 import { mapGetters } from "vuex";
 import colors from "@/mixins/color.js";
 import Cache from "@/utils/cache";
-import { debug } from "util";
 import { applyTheme } from "@/utils/theme.js";
 
 export default {

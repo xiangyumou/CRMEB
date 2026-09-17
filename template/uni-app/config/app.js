@@ -2,7 +2,7 @@ module.exports = {
 	// 小程序 / APP请求配置
 	// #ifdef MP
 	// 请求域名 格式： https://您的域名
-	HTTP_REQUEST_URL: `https://demo.crmeb.com`,
+	HTTP_REQUEST_URL: process.env.VUE_APP_CRMEB_API_ORIGIN,
 	// #endif
 
 	// H5请求配置

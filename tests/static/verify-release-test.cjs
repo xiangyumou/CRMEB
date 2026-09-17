@@ -47,6 +47,15 @@ try {
   manifest.mpWeixin.gitCommit = 'c'.repeat(40);
   assert.notStrictEqual(run().status, 0, 'mixed source commits must fail');
   manifest.mpWeixin.gitCommit = commit;
+  manifest.releaseVersion = `sha-${commit}`;
+  manifest.mpWeixin.publishable = false;
+  assert.strictEqual(run().status, 0, 'full SHA release with test mini program should pass');
+  manifest.releaseVersion = `sha-${'b'.repeat(40)}`;
+  assert.notStrictEqual(run().status, 0, 'mismatched release SHA must fail');
+  manifest.releaseVersion = `sha-${commit}`;
+  manifest.mpWeixin.publishable = 'false';
+  assert.notStrictEqual(run().status, 0, 'invalid publishable flag must fail');
+  manifest.mpWeixin.publishable = false;
   fs.unlinkSync(path.join(dir, 'admin.zip'));
   assert.notStrictEqual(run().status, 0, 'missing artifact must fail');
   console.log('Release manifest valid, mismatch, mixed commit, missing artifact: OK');

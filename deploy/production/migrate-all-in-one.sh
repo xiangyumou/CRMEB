@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+echo 'Retired: use deploy/production/normalize.sh for the one-time layout migration' >&2
+exit 1
 set -Eeuo pipefail
 
 image="${1:?usage: deploy/production/migrate-all-in-one.sh IMAGE [HOST]}"

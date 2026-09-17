@@ -11,6 +11,7 @@ services:
       - --sql-mode=ONLY_FULL_GROUP_BY,NO_ENGINE_SUBSTITUTION
     volumes:
       - ../../crmeb/public/install/crmeb.sql:/docker-entrypoint-initdb.d/001-crmeb.sql:ro
+      - mysql-data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-pregression", "--silent"]
       interval: 3s
@@ -19,6 +20,8 @@ services:
 
   redis:
     image: redis:5.0.14-bullseye
+    volumes:
+      - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
@@ -26,29 +29,35 @@ services:
       retries: 20
 
   php-fpm:
-    build:
-      context: ../..
-      target: runtime
+    image: ${CRMEB_TEST_IMAGE:?}
+    command: ["php"]
     environment:
       APP_DEBUG: "false"
     volumes:
       - ./test.env:/var/www/crmeb/.env:ro
-      - ./install.lock:/var/www/crmeb/public/install.lock:ro
+      - ./test.constant:/var/www/crmeb/.constant:ro
+      - uploads:/var/www/crmeb/public/uploads
+      - runtime:/var/www/crmeb/runtime
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      default:
+        aliases: [php, workerman]
 
   nginx:
-    image: nginx:1.26.3-alpine
+    image: ${CRMEB_TEST_IMAGE:?}
+    command: ["nginx"]
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ../../crmeb/public:/var/www/crmeb/public:ro
+      - ./test.env:/var/www/crmeb/.env:ro
+      - uploads:/var/www/crmeb/public/uploads:ro
+      - assets-cache:/var/cache/crmeb/assets
     depends_on:
       - php-fpm
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/api/version | grep -q '\"status\"'"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1/readyz | grep -q 'true'"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -77,3 +86,10 @@ services:
 networks:
   default:
     internal: true
+
+volumes:
+  mysql-data:
+  redis-data:
+  uploads:
+  runtime:
+  assets-cache:

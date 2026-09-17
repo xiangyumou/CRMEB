@@ -33,4 +33,5 @@ return [
     'taglib_end'    => '}',
     //模板文件路径
     'view_path'     => public_path(),
+    'cache_path'    => app()->getRuntimePath() . 'temp' . DIRECTORY_SEPARATOR . (getenv('CRMEB_REVISION') ?: 'default') . DIRECTORY_SEPARATOR,
 ];

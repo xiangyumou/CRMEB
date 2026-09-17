@@ -90,9 +90,16 @@ RUN mkdir -p runtime/cache runtime/log runtime/session runtime/temp public/uploa
     && php -r 'require "vendor/autoload.php"; if (!class_exists("Doctrine\\Common\\Cache\\FilesystemCache")) { fwrite(STDERR, "Doctrine FilesystemCache is unavailable\n"); exit(1); } $font = "vendor/fastknife/ajcaptcha/resources/fonts/WenQuanZhengHei.ttf"; if (!is_readable($font) || !is_array(imagettfbbox(12, 0, $font, "CRMEB"))) { fwrite(STDERR, "AJCaptcha font is unavailable\n"); exit(1); }' \
     && rm -rf packages
 
+FROM vendor AS vendor-runtime
+RUN rm -rf public
+
 FROM php-base AS runtime
 
+ARG TARGETARCH
+ARG VCS_REF=unknown
 ENV TZ=Asia/Shanghai
+ENV CRMEB_REVISION=${VCS_REF}
+LABEL org.opencontainers.image.revision=${VCS_REF}
 WORKDIR /var/www/crmeb
 
 RUN apt-get update \
@@ -103,15 +110,46 @@ RUN apt-get update \
         libjpeg62-turbo \
         libpng16-16 \
         libzip4 \
+        libpcre2-8-0 \
+        libssl1.1 \
+        curl \
     && rm -rf /var/lib/apt/lists/*
+
+RUN set -eu; \
+    case "$TARGETARCH" in \
+      amd64) digest=9dd6cc1705e9095f701814553c3e571f8632bd6f5d9efdd90502967680468c1a ;; \
+      arm64) digest=a1ac093a6291d005a5e2cede98c108646e95893398d5852f2a3548cdbda60fbf ;; \
+      *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://nginx.org/packages/mainline/debian/pool/nginx/n/nginx/nginx_1.27.5-1~bullseye_${TARGETARCH}.deb" -o /tmp/nginx.deb; \
+    echo "$digest  /tmp/nginx.deb" | sha256sum -c -; \
+    apt-get update; apt-get install -y --no-install-recommends /tmp/nginx.deb; \
+    rm -f /tmp/nginx.deb /etc/nginx/conf.d/default.conf; \
+    ln -sf /dev/stdout /var/log/nginx/access.log; \
+    ln -sf /dev/stderr /var/log/nginx/error.log; \
+    rm -rf /var/lib/apt/lists/*
 
 COPY --from=extensions /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
 COPY --from=extensions /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 COPY docker/php/conf.d/crmeb.ini /usr/local/etc/php/conf.d/zz-crmeb.ini
-COPY --from=vendor --chown=www-data:www-data /build/crmeb /var/www/crmeb
+COPY --from=vendor-runtime --chown=www-data:www-data /build/crmeb /var/www/crmeb
+COPY --chown=www-data:www-data .build/release/public/ /var/www/crmeb/public/
+COPY .build/release/build.json /usr/local/share/crmeb/build.json
+COPY deploy/production/nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker/entrypoint.sh /usr/local/bin/crmeb-entrypoint
+COPY docker/cache-assets.sh /usr/local/bin/crmeb-cache-assets
+COPY docker/ready.php /opt/crmeb/ready.php
 
-RUN chmod -R ug+rwX runtime public/uploads
+RUN mkdir -p public/uploads /var/cache/crmeb/assets \
+    && chmod -R ug+rwX runtime public/uploads \
+    && chmod +x /usr/local/bin/crmeb-entrypoint /usr/local/bin/crmeb-cache-assets \
+    && test -s public/admin/index.html \
+    && test -s public/index.html \
+    && test -s public/index.php \
+    && test -s public/install.lock \
+    && php -r '$m=json_decode(file_get_contents("/usr/local/share/crmeb/build.json"),true); if (($m["gitCommit"] ?? null) !== getenv("CRMEB_REVISION")) exit(1);'
 
-EXPOSE 9000
+EXPOSE 9000 80
 STOPSIGNAL SIGQUIT
-CMD ["php-fpm", "-F"]
+ENTRYPOINT ["/usr/local/bin/crmeb-entrypoint"]
+CMD ["php"]

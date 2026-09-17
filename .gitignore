@@ -25,6 +25,12 @@ crmeb/public/uploads/*
 /template/admin/node_modules/
 /template/uni-app/node_modules/
 /template/uni-app/unpackage/
+/.build/
+/deployment/
+/data/
+/.env
+/docker-compose.yml
+/nginx.conf
 /template/uni-app/.hbuilderx/
 /crmeb/.idea/
 

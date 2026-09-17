@@ -13,12 +13,17 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   IMAGE_NAME: ghcr.io/xiangyumou/crmeb
 
 jobs:
   validate:
     name: Validate ${{ matrix.platform }}
+    needs: frontend
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -40,6 +45,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-input
+          path: .build/release
+
       - name: Build test image
         uses: docker/build-push-action@v7
         with:
@@ -50,12 +60,20 @@ jobs:
           tags: crmeb-ci:${{ matrix.slug }}-${{ github.sha }}
           cache-from: type=gha,scope=validate-${{ matrix.slug }}
           cache-to: type=gha,mode=max,scope=validate-${{ matrix.slug }}
+          build-args: VCS_REF=${{ github.sha }}
 
       - name: Verify image
         run: sh docker/verify-image.sh crmeb-ci:${{ matrix.slug }}-${{ github.sha }}
 
-      - name: Verify HTTP stack
-        run: sh docker/verify-http-stack.sh crmeb-ci:${{ matrix.slug }}-${{ github.sha }}
+      - name: Save tested image
+        run: docker save crmeb-ci:${{ matrix.slug }}-${{ github.sha }} -o /tmp/crmeb-${{ matrix.slug }}.tar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tested-image-${{ matrix.slug }}
+          path: /tmp/crmeb-${{ matrix.slug }}.tar
+          retention-days: 1
+          compression-level: 0
 
       - name: Scan image
         if: matrix.platform == 'linux/amd64'
@@ -77,6 +95,7 @@ jobs:
 
   regression:
     name: Core transaction regression
+    needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -85,8 +104,15 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: tested-image-amd64
+          path: /tmp/tested-images
+      - name: Load validated image
+        run: docker load -i /tmp/tested-images/crmeb-amd64.tar
+
       - name: Run regression suite
-        run: sh docker/run-regression.sh
+        run: sh docker/run-regression.sh crmeb-ci:amd64-${{ github.sha }}
 
       - name: Upload regression report
         if: always()
@@ -97,6 +123,33 @@ jobs:
           path: tests/regression/artifacts/junit.xml
           if-no-files-found: error
           retention-days: 14
+
+  http_stack:
+    name: HTTP stack ${{ matrix.platform }}
+    needs: [validate, regression]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            slug: amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            slug: arm64
+            runner: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: tested-image-${{ matrix.slug }}
+          path: /tmp/tested-images
+      - name: Verify complete HTTP stack
+        run: |
+          docker load -i /tmp/tested-images/crmeb-${{ matrix.slug }}.tar
+          sh docker/verify-http-stack.sh crmeb-ci:${{ matrix.slug }}-${{ github.sha }}
 
   frontend:
     name: Frontend source and admin build
@@ -120,16 +173,35 @@ jobs:
         run: node tests/static/verify-release-test.cjs
       - name: Validate WeChat payment adapters
         run: node tests/static/wechat-payment-test.mjs
-      - name: Build admin outside public
-        run: NODE_OPTIONS=--openssl-legacy-provider npm run build --prefix template/admin -- --dest /tmp/crmeb-admin-ci
+      - name: Build complete release
+        run: bash scripts/build-release.sh
+      - name: Package deployment configuration
+        run: |
+          tar -czf .build/release/deployment-config.tar.gz \
+            compose.yaml deploy/production/compose.yml deploy/production/nginx.conf \
+            deploy/production/normalize.sh deploy/production/rollback.sh \
+            deploy/production/migrate-all-in-one.sh docker/cache-assets.sh
+      - name: Upload paired frontend and image inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-input
+          path: .build/release/
+          retention-days: 90
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        with:
+          name: mp-weixin-test-${{ github.sha }}
+          path: .build/release/mpWeixin/
+          retention-days: 90
 
   publish:
     name: Publish multi-architecture image
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs:
       - validate
       - regression
-      - frontend
+      - http_stack
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -137,19 +209,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
-      - name: Validate release tag
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
-        run: |
-          tag="${GITHUB_REF_NAME}"
-          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Release tag must match vX.Y.Z: $tag" >&2
-            exit 1
-          fi
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -161,31 +220,46 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate image metadata
-        id: meta
-        uses: docker/metadata-action@v6
+      - uses: actions/download-artifact@v4
         with:
-          images: ${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/master' }}
-            type=sha,format=short,prefix=sha-
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-
-      - name: Build and publish image
-        uses: docker/build-push-action@v7
+          pattern: tested-image-*
+          path: /tmp/tested-images
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
         with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: |
-            type=gha,scope=validate-amd64
-            type=gha,scope=validate-arm64
-            type=gha,scope=publish
-          cache-to: type=gha,mode=max,scope=publish
-          provenance: mode=max
-          sbom: true
+          name: release-input
+          path: .build/release
+      - name: Publish tested architecture images and digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tag in "sha-$GITHUB_SHA" "sha-$GITHUB_SHA-amd64" "sha-$GITHUB_SHA-arm64"; do
+            if docker manifest inspect "$IMAGE_NAME:$tag" >/dev/null 2>&1; then
+              echo "Immutable image tag already exists: $tag" >&2
+              exit 1
+            fi
+          done
+          for arch in amd64 arm64; do
+            docker load -i "/tmp/tested-images/crmeb-$arch.tar"
+            docker tag "crmeb-ci:$arch-$GITHUB_SHA" "$IMAGE_NAME:sha-$GITHUB_SHA-$arch"
+            docker push "$IMAGE_NAME:sha-$GITHUB_SHA-$arch"
+          done
+          docker buildx imagetools create -t "$IMAGE_NAME:sha-$GITHUB_SHA" \
+            "$IMAGE_NAME:sha-$GITHUB_SHA-amd64" "$IMAGE_NAME:sha-$GITHUB_SHA-arm64"
+          docker buildx imagetools inspect "$IMAGE_NAME:sha-$GITHUB_SHA" > /tmp/image-inspect.txt
+          digest="$(awk '/^Digest:/ {print $2; exit}' /tmp/image-inspect.txt)"
+          test -n "$digest"
+          node scripts/finalize-release.cjs "$IMAGE_NAME@$digest" ".build/release/release.json"
+          node scripts/verify-release.cjs ".build/release/release.json"
+      - name: Promote current master to edge
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(git ls-remote origin refs/heads/master | cut -f1)"
+          test "$head" = "$GITHUB_SHA" || { echo 'A newer master commit exists; edge unchanged'; exit 0; }
+          docker buildx imagetools create -t "$IMAGE_NAME:edge" "$IMAGE_NAME:sha-$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-record-${{ github.sha }}
+          path: .build/release/release.json
+          retention-days: 90

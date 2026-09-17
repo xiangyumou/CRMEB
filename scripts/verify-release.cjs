@@ -38,8 +38,9 @@ function digest(file) {
 
 function verify(filename) {
   const manifest = JSON.parse(fs.readFileSync(filename, 'utf8'));
-  if (!/^v\d+\.\d+\.\d+$/.test(manifest.releaseVersion)) throw Error('Invalid releaseVersion');
+  if (!/^(v\d+\.\d+\.\d+|sha-[a-f0-9]{40})$/.test(manifest.releaseVersion)) throw Error('Invalid releaseVersion');
   if (!/^[a-f0-9]{40}$/.test(manifest.gitCommit)) throw Error('Invalid gitCommit');
+  if (manifest.releaseVersion.startsWith('sha-') && manifest.releaseVersion.slice(4) !== manifest.gitCommit) throw Error('Release SHA mismatch');
   if (!/^sha256:[a-f0-9]{64}$/.test(manifest.backendImageDigest)) throw Error('Invalid backendImageDigest');
   for (const platform of ['admin', 'h5', 'mpWeixin']) {
     const value = manifest[platform];
@@ -48,6 +49,7 @@ function verify(filename) {
     const artifact = path.resolve(path.dirname(filename), value.artifactPath);
     if (digest(artifact) !== value.artifactSha256) throw Error(`${platform} artifactSha256 mismatch`);
   }
+  if (manifest.mpWeixin.publishable !== undefined && typeof manifest.mpWeixin.publishable !== 'boolean') throw Error('Invalid mpWeixin publishable');
   console.log(`Release ${manifest.releaseVersion} artifacts verified`);
 }
 

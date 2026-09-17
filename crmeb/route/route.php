@@ -28,23 +28,29 @@ Route::miss(function () {
             if (request()->isMobile()) {
                 return redirect(app()->route->buildUrl('/'));
             } else {
-                return view(app()->getRootPath() . 'public' . DS . 'home' . DS . 'index.html');
+                return view(app()->getRootPath() . 'public' . DS . 'home' . DS . 'index.html')
+                    ->header(['Cache-Control' => 'no-cache, must-revalidate']);
             }
         case 'pages':
-            return view(app()->getRootPath() . 'public' . DS . 'index.html');
+            return view(app()->getRootPath() . 'public' . DS . 'index.html')
+                ->header(['Cache-Control' => 'no-cache, must-revalidate']);
         default:
             if (!request()->isMobile()) {
                 if (is_dir(app()->getRootPath() . 'public' . DS . 'home') && !request()->get('mdType')) {
-                    return view(app()->getRootPath() . 'public' . DS . 'home' . DS . 'index.html');
+                    return view(app()->getRootPath() . 'public' . DS . 'home' . DS . 'index.html')
+                        ->header(['Cache-Control' => 'no-cache, must-revalidate']);
                 } else {
                     if (request()->get('type')) {
-                        return view(app()->getRootPath() . 'public' . DS . 'index.html');
+                        return view(app()->getRootPath() . 'public' . DS . 'index.html')
+                            ->header(['Cache-Control' => 'no-cache, must-revalidate']);
                     } else {
-                        return view(app()->getRootPath() . 'public' . DS . 'mobile.html', ['siteName' => sys_config('site_name'), 'siteUrl' => sys_config('site_url') . '/pages/index/index']);
+                        return view(app()->getRootPath() . 'public' . DS . 'mobile.html', ['siteName' => sys_config('site_name'), 'siteUrl' => sys_config('site_url') . '/pages/index/index'])
+                            ->header(['Cache-Control' => 'no-cache, must-revalidate']);
                     }
                 }
             } else {
-                return view(app()->getRootPath() . 'public' . DS . 'index.html');
+                return view(app()->getRootPath() . 'public' . DS . 'index.html')
+                    ->header(['Cache-Control' => 'no-cache, must-revalidate']);
             }
     }
 });

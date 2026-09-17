@@ -24,7 +24,7 @@ return [
             // 驱动方式
             'type'       => 'File',
             // 缓存保存目录
-            'path'       => app()->getRuntimePath() . 'cache' . DIRECTORY_SEPARATOR,
+            'path'       => app()->getRuntimePath() . 'cache' . DIRECTORY_SEPARATOR . (getenv('CRMEB_REVISION') ?: 'default') . DIRECTORY_SEPARATOR,
             // 缓存前缀
             'prefix'     => '',
             // 缓存有效期 0表示永久缓存

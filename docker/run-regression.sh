@@ -1,9 +1,13 @@
 #!/usr/bin/env sh
 set -eu
 
-root_dir="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+root_dir="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 test_dir="$root_dir/tests/regression"
 compose_file="$root_dir/docker/regression/compose.yml"
+CRMEB_TEST_REVISION="$(git -C "$root_dir" rev-parse HEAD)"
+export CRMEB_TEST_REVISION
+export CRMEB_TEST_IMAGE="${1:?usage: docker/run-regression.sh TESTED_IMAGE}"
+test "$(docker image inspect "$CRMEB_TEST_IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$CRMEB_TEST_REVISION"
 
 mkdir -p "$test_dir/artifacts"
 rm -f "$test_dir/artifacts/junit.xml"
@@ -21,7 +25,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 cleanup
 set +e
-docker compose -f "$compose_file" up --build --abort-on-container-exit --exit-code-from regression regression
+docker compose -f "$compose_file" up --build --pull never --abort-on-container-exit --exit-code-from regression regression
 status=$?
 set -e
 

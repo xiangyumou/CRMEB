@@ -26,6 +26,7 @@ Dockerfile.*
 # 3. IDE 和编辑器配置
 # ===========================================
 .idea/
+.zcode/
 .vscode/
 .vs/
 *.swp
@@ -41,6 +42,15 @@ Desktop.ini
 # ===========================================
 help/
 template/
+!.build/
+.build/*
+!.build/release/
+.build/release/*
+!.build/release/public/
+!.build/release/public/**
+!.build/release/build.json
+deployment/
+data/
 docs/
 doc/
 *.md
