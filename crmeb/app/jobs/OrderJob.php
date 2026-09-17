@@ -12,7 +12,6 @@
 namespace app\jobs;
 
 use app\services\activity\combination\StoreCombinationServices;
-use app\services\kefu\service\StoreServiceServices;
 use app\services\order\StoreOrderCartInfoServices;
 use app\services\order\StoreOrderServices;
 use app\services\product\product\StoreProductServices;
@@ -143,11 +142,9 @@ class OrderJob extends BaseJobs
      */
     public function sendOrderPaySuccessCustomerService($order, $type = 0)
     {
-        /** @var StoreServiceServices $services */
-        $services = app()->make(StoreServiceServices::class);
         /** @var WechatUserServices $wechatUserServices */
         $wechatUserServices = app()->make(WechatUserServices::class);
-        $serviceOrderNotice = $services->getStoreServiceOrderNotice();
+        $serviceOrderNotice = \app\services\CoreStore::orderNoticeRecipients();
         if (count($serviceOrderNotice)) {
             /** @var StoreProductServices $services */
             $services = app()->make(StoreProductServices::class);

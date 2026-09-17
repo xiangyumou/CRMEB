@@ -279,24 +279,6 @@ class SystemConfig extends AuthController
         if (isset($post['upload_type'])) {
             $this->services->checkThumbParam($post);
         }
-        if (isset($post['extract_type']) && !count($post['extract_type'])) {
-            return app('json')->fail('提现方式最少选一种');
-        }
-        if (isset($post['store_brokerage_binding_status'])) {
-            $this->services->checkBrokerageBinding($post);
-        }
-        if (isset($post['store_brokerage_ratio']) && isset($post['store_brokerage_two'])) {
-            $num = $post['store_brokerage_ratio'] + $post['store_brokerage_two'];
-            if ($num > 100) {
-                return app('json')->fail('一二级返佣比例不能大于100%');
-            }
-        }
-        if (isset($post['spread_banner'])) {
-            $num = count($post['spread_banner']);
-            if ($num > 5) {
-                return app('json')->fail('分销海报不能多于5张');
-            }
-        }
         if (isset($post['user_extract_min_price'])) {
             if (!preg_match('/[0-9]$/', $post['user_extract_min_price'])) {
                 return app('json')->fail('提现最低金额只能为数字');

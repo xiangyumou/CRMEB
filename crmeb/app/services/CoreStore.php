@@ -50,6 +50,58 @@ final class CoreStore
         return self::HISTORICAL_PAY_TYPES[$type] ?? '其他支付';
     }
 
+    /** Configuration key holding the uids allowed to receive and manage orders. */
+    public const ORDER_ADMIN_CONFIG = 'order_notice_admin_uids';
+
+    /**
+     * Uids that receive order notifications and may use mobile order management.
+     * Replaces the retired crmeb store_service roster.
+     * @return int[]
+     */
+    public static function orderAdminUids(): array
+    {
+        $raw = sys_config(self::ORDER_ADMIN_CONFIG, '');
+        $uids = is_array($raw) ? $raw : explode(',', (string)$raw);
+        $uids = array_filter(array_map('intval', $uids), static function (int $uid) {
+            return $uid > 0;
+        });
+        return array_values(array_unique($uids));
+    }
+
+    /**
+     * Order notification recipients, shaped like the retired service roster.
+     * @return array<int, array<string, mixed>>
+     */
+    public static function orderNoticeRecipients(): array
+    {
+        $uids = self::orderAdminUids();
+        if (!$uids) {
+            return [];
+        }
+        $users = \think\facade\Db::name('user')
+            ->whereIn('uid', $uids)
+            ->field('uid,nickname,phone')
+            ->select()
+            ->toArray();
+        $byUid = [];
+        foreach ($users as $user) {
+            $byUid[(int)$user['uid']] = $user;
+        }
+        $recipients = [];
+        foreach ($uids as $uid) {
+            if (!isset($byUid[$uid])) {
+                continue;
+            }
+            $recipients[] = [
+                'uid' => $uid,
+                'nickname' => $byUid[$uid]['nickname'],
+                'phone' => $byUid[$uid]['phone'],
+                'customer' => 1,
+            ];
+        }
+        return $recipients;
+    }
+
     public static function assertOrder(array $data): void
     {
         foreach (['seckill_id', 'seckillId', 'bargain_id', 'bargainId', 'useIntegral', 'use_integral', 'store_id', 'storeId'] as $key) {

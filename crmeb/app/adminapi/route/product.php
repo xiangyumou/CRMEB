@@ -98,9 +98,6 @@ Route::group('product', function () {
         //回收站商品彻底删除
         Route::delete('full_del/:id', 'v1.product.StoreProduct/fullDel')->option(['real_name' => '回收站商品彻底删除']);
 
-        Route::get('other_info/:id/:type', 'v1.product.StoreProduct/otherInfo')->option(['real_name' => '商品其他信息']);
-        Route::post('other_save/:id/:type', 'v1.product.StoreProduct/otherSave')->option(['real_name' => '修改商品其他信息']);
-
     })->option(['parent' => 'product', 'cate_name' => '商品']);
 
     /** 商品评论 */

@@ -37,7 +37,6 @@ class ProductServices extends BaseServices
 
         $where['is_show'] = 1;
         $where['is_del'] = 0;
-        $where['vip_user'] = $uid ? app()->make(UserServices::class)->value(['uid' => $uid], 'is_money_level') : 0;
         $data['count'] = $product->getCount($where);
         [$page, $limit] = $this->getPageValue();
         $list = $product->getSearchList($where + ['star' => 1], $page, $limit, ['id,store_name,cate_id,image,IFNULL(sales, 0) + IFNULL(ficti, 0) as sales,price,stock,activity,ot_price,spec_type,recommend_image,unit_name,presale']);

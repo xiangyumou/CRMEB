@@ -41,7 +41,6 @@ class NoticeListener implements ListenerInterface
      * @var string[]
      */
     protected $eventMethods = [
-        'bind_spread_uid' => 'handleBindSpreadUid',
         'order_pay_success' => 'handleOrderPaySuccess',
         'order_deliver_success' => 'handleOrderDeliverSuccess',
         'order_postage_success' => 'handleOrderPostageSuccess',
@@ -49,24 +48,15 @@ class NoticeListener implements ListenerInterface
         'price_revision' => 'handlePriceRevision',
         'order_refund' => 'handleOrderRefund',
         'send_order_refund_no_status' => 'handleSendOrderRefundNoStatus',
-        'recharge_success' => 'handleRechargeSuccess',
-        'recharge_order_refund_status' => 'handleRechargeOrderRefundStatus',
-        'integral_accout' => 'handleIntegralAccout',
-        'order_brokerage' => 'handleOrderBrokerage',
-        'bargain_success' => 'handleBargainSuccess',
         'can_pink_success' => 'handlePinkSuccess',
         'open_pink_success' => 'handlePinkSuccess',
         'order_user_groups_success' => 'handleGroupsSuccess',
         'send_order_pink_fial' => 'handlePinkFail',
         'send_order_pink_clone' => 'handlePinkFail',
-        'user_extract' => 'handleUserExtract',
-        'user_balance_change' => 'handleUserBalanceChange',
         'order_pay_false' => 'handleOrderPayFalse',
         'admin_pay_success_code' => 'handleAdminPaySuccessCode',
         'send_admin_confirm_take_over' => 'handleSendAdminConfirmTakeOver',
         'send_order_apply_refund' => 'handleSendOrderApplyRefund',
-        'kefu_send_extract_application' => 'handleKefuSendExtractApplication',
-        'sign_remind' => 'handleSignRemind',
         'revenue_received' => 'handleRevenueReceived',
         // add more event-method mappings here...
     ];
@@ -122,24 +112,6 @@ class NoticeListener implements ListenerInterface
             }
         } catch (\Throwable $e) {
         }
-    }
-
-    /**
-     * 推广新用户给上级发送消息
-     * @param $data
-     * @return bool
-     * @author: 吴汐
-     * @email: 442384644@qq.com
-     * @date: 2023/8/29
-     */
-    protected function handleBindSpreadUid($data)
-    {
-        if (isset($data['spreadUid']) && $data['spreadUid']) {
-            $name = $data['nickname'] ?? '';
-            //站内信
-            $this->getNoticeService('SysMsg')->sendMsg($data['spreadUid'], ['nickname' => $name]);
-        }
-        return true;
     }
 
     /**
@@ -330,111 +302,6 @@ class NoticeListener implements ListenerInterface
     }
 
     /**
-     * 充值成功给用户发消息
-     * @param $data
-     * @return bool
-     * @author: 吴汐
-     * @email: 442384644@qq.com
-     * @date: 2023/8/29
-     */
-    protected function handleRechargeSuccess($data)
-    {
-        $order = $data['order'];
-        $order['now_money'] = $data['now_money'];
-
-        //站内信
-        $this->getNoticeService('SysMsg')->sendMsg($order['uid'], ['order_id' => $order['order_id'], 'price' => $order['price'], 'now_money' => $order['now_money']]);
-        //模板消息公众号模版消息
-        $this->getNoticeService('Wechat')->sendRechargeSuccess($order['uid'], $order);
-        //模板消息小程序订阅消息
-        $this->getNoticeService('Routine')->sendRechargeSuccess($order['uid'], $order, $order['now_money']);
-        return true;
-    }
-
-    /**
-     * 充值退款给用户发消息
-     * @param $data
-     * @return bool
-     * @author: 吴汐
-     * @email: 442384644@qq.com
-     * @date: 2023/8/29
-     */
-    protected function handleRechargeOrderRefundStatus($data)
-    {
-        $datas = $data['data'];
-        $UserRecharge = $data['UserRecharge'];
-        $now_money = $data['now_money'];
-
-        //站内信
-        $this->getNoticeService('SysMsg')->sendMsg($UserRecharge['uid'], ['refund_price' => $datas['refund_price'], 'order_id' => $UserRecharge['order_id'], 'price' => $UserRecharge['price']]);
-        //模板消息公众号模版消息
-        $this->getNoticeService('Wechat')->sendOrderRefund($UserRecharge['uid'], ['refund_no' => $UserRecharge['order_id'], 'refund_price' => $UserRecharge['price']], '充值退款');
-        //模板消息小程序订阅消息
-        $this->getNoticeService('Routine')->sendRechargeSuccess($UserRecharge['uid'], $UserRecharge, $now_money);
-        return true;
-    }
-
-    /**
-     * 积分到账给用户发信息
-     * @param $data
-     * @return bool
-     * @author: 吴汐
-     * @email: 442384644@qq.com
-     * @date: 2023/8/29
-     */
-    protected function handleIntegralAccout($data)
-    {
-        $order = $data['order'];
-        //站内信
-        $this->getNoticeService('SysMsg')->sendMsg($order['uid'], ['order_id' => $order['order_id'], 'store_name' => $data['storeTitle'], 'pay_price' => $order['pay_price'], 'gain_integral' => $data['give_integral'], 'integral' => $data['integral']]);
-        //模板消息小程序订阅消息
-        $this->getNoticeService('Routine')->sendUserIntegral($order['uid'], $data['order'], $data['storeTitle'], $data['give_integral'], $data['integral']);
-        return true;
-    }
-
-    /**
-     * 佣金到账给用户发消息
-     * @param $data
-     * @return bool
-     * @author: 吴汐
-     * @email: 442384644@qq.com
-     * @date: 2023/8/29
-     */
-    protected function handleOrderBrokerage($data)
-    {
-        $brokeragePrice = $data['brokeragePrice'];
-        $goodsName = $data['goodsName'];
-        $goodsPrice = $data['goodsPrice'];
-        $spread_uid = $data['spread_uid'];
-
-        //站内信
-        $this->getNoticeService('SysMsg')->sendMsg($spread_uid, ['goods_name' => $goodsName, 'goods_price' => $goodsPrice, 'brokerage_price' => $brokeragePrice]);
-        return true;
-    }
-
-    /**
-     * 砍价成功给用户发消息
-     * @param $data
-     * @return bool
-     * @author: 吴汐
-     * @email: 442384644@qq.com
-     * @date: 2023/8/29
-     */
-    protected function handleBargainSuccess($data)
-    {
-        $uid = $data['uid'];
-        $bargainInfo = $data['bargainInfo'];
-        $bargainUserInfo = $data['bargainUserInfo'];
-        $bargainInfo['title'] = Str::substrUTf8($bargainInfo['title'], 20, 'UTF-8', '');
-
-        //站内信
-        $this->getNoticeService('SysMsg')->sendMsg($uid, ['title' => $bargainInfo['title'], 'min_price' => $bargainInfo['min_price']]);
-        //模板消息小程序订阅消息
-        $this->getNoticeService('Routine')->sendBargainSuccess($uid, $bargainInfo, $bargainUserInfo, $uid);
-        return true;
-    }
-
-    /**
      * 开团成功,参团成功给用户发消息
      * @param $data
      * @return bool
@@ -491,51 +358,6 @@ class NoticeListener implements ListenerInterface
 
         //站内信
         $this->getNoticeService('SysMsg')->sendMsg($uid, ['title' => $pink->title, 'count' => $pink->people]);
-        return true;
-    }
-
-    /**
-     * 提现成功给用户发消息
-     * @param $data
-     * @return bool
-     * @author: 吴汐
-     * @email: 442384644@qq.com
-     * @date: 2023/8/29
-     */
-    protected function handleUserExtract($data)
-    {
-        $extractNumber = $data['extractNumber'];
-        $nickname = $data['nickname'];
-        $uid = $data['uid'];
-
-        //站内信
-        $this->getNoticeService('SysMsg')->sendMsg($uid, ['extract_number' => $extractNumber, 'nickname' => $nickname, 'date' => date('Y-m-d H:i:s', time())]);
-        //模板消息公众号模版消息
-        $this->getNoticeService('Wechat')->sendUserExtract($uid, $extractNumber);
-        //模板消息小程序订阅消息
-        $this->getNoticeService('Routine')->sendExtractSuccess($uid, $extractNumber, $nickname);
-        return true;
-    }
-
-    /**
-     * 提现失败给用户发消息
-     * @param $data
-     * @return bool
-     * @author: 吴汐
-     * @email: 442384644@qq.com
-     * @date: 2023/8/29
-     */
-    protected function handleUserBalanceChange($data)
-    {
-        $extract_number = $data['extract_number'];
-        $message = $data['message'];
-        $uid = $data['uid'];
-        $nickname = $data['nickname'];
-
-        //站内信
-        $this->getNoticeService('SysMsg')->sendMsg($uid, ['extract_number' => $extract_number, 'nickname' => $nickname, 'date' => date('Y-m-d H:i:s', time()), 'message' => $message]);
-        //模板消息小程序订阅消息
-        $this->getNoticeService('Routine')->sendExtractFail($uid, $message, $extract_number, $nickname);
         return true;
     }
 
@@ -651,23 +473,6 @@ class NoticeListener implements ListenerInterface
         $this->getNoticeService('Wechat')->sendAdminOrder($order['refund_no'], $storeName, $title, $status, $link);
         //企业微信通知
         $this->getNoticeService('WeWork')->weComSend(['order_id' => $order['order_id']]);
-        return true;
-    }
-
-    /**
-     * 提现申请给客服发消息
-     * @param $data
-     * @return bool
-     * @author: 吴汐
-     * @email: 442384644@qq.com
-     * @date: 2023/8/29
-     */
-    protected function handleKefuSendExtractApplication($data)
-    {
-        //站内信
-        $this->getNoticeService('SysMsg')->kefuSystemSend($data);
-        //企业微信通知
-        $this->getNoticeService('WeWork')->weComSend($data);
         return true;
     }
 

@@ -14,7 +14,6 @@ namespace app\services\wechat;
 
 use app\services\BaseServices;
 use app\dao\wechat\WechatReplyDao;
-use app\services\kefu\KefuServices;
 use crmeb\exceptions\AdminException;
 use crmeb\services\app\WechatService;
 use crmeb\services\FormBuilder;
@@ -318,10 +317,8 @@ class WechatReplyServices extends BaseServices
     {
         $res = $this->dao->getKey($key);
         if (empty($res)) {
-            /** @var KefuServices $services */
-            $services = app()->make(KefuServices::class);
-            $services->replyTransferService($key, $openId);
-            return WechatService::transfer();
+            // Self-hosted chat was removed; unanswered keywords fall back to an empty text reply.
+            return WechatService::textMessage('');
         }
         return $this->replyDataByMessage($res->toArray());
     }

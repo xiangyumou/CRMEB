@@ -276,20 +276,11 @@ class WechatUserServices extends BaseServices
     public function wechatOauthAfter($data)
     {
         if (!$data) throw new ApiException('用户信息获取失败，请刷新页面重试');
+        // Retired distribution/agent slots stay in the tuple for caller compatibility and are ignored.
         [$openid, $wechatInfo, $spreadId, $agent_id, $login_type, $userType] = $data;
+        unset($spreadId, $agent_id);
         /** @var UserServices $userServices */
         $userServices = app()->make(UserServices::class);
-        $spreadInfo = $userServices->getUserInfo((int)$spreadId);
-        if (!$spreadInfo) {
-            $spreadId = 0;
-            $wechatInfo['staff_id'] = 0;
-            $wechatInfo['agent_id'] = 0;
-            $wechatInfo['division_id'] = 0;
-        } else {
-            $wechatInfo['staff_id'] = $spreadInfo['staff_id'];
-            $wechatInfo['agent_id'] = $spreadInfo['agent_id'];
-            $wechatInfo['division_id'] = $spreadInfo['division_id'];
-        }
         if (isset($wechatInfo['subscribe_scene'])) {
             unset($wechatInfo['subscribe_scene']);
         }
@@ -344,13 +335,7 @@ class WechatUserServices extends BaseServices
             }
             /** @var LoginServices $loginService */
             $loginService = app()->make(LoginServices::class);
-            $this->transaction(function () use ($loginService, $wechatInfo, $userInfo, $uid, $userType, $spreadId, $wechatUser, $agent_id) {
-                if ($agent_id) {
-                    $wechatInfo['code'] = $agent_id;
-                    $wechatInfo['is_staff'] = 1;
-                } else {
-                    $wechatInfo['code'] = $spreadId;
-                }
+            $this->transaction(function () use ($loginService, $wechatInfo, $userInfo, $uid, $userType, $wechatUser) {
                 $loginService->updateUserInfo($wechatInfo, $userInfo);
                 if ($wechatUser) {
                     if (!$this->dao->update($wechatUser['id'], $wechatInfo, 'id')) {
@@ -366,8 +351,8 @@ class WechatUserServices extends BaseServices
         } else {
             //user表没有用户,wechat_user表没有用户创建新用户
             //不存在则创建用户
-            $userInfo = $this->transaction(function () use ($userServices, $wechatInfo, $spreadId, $userType) {
-                $userInfo = $userServices->setUserInfo($wechatInfo, (int)$spreadId, $userType);
+            $userInfo = $this->transaction(function () use ($userServices, $wechatInfo, $userType) {
+                $userInfo = $userServices->setUserInfo($wechatInfo, $userType);
                 if (!$userInfo) {
                     throw new AuthException('新增用户失败');
                 }

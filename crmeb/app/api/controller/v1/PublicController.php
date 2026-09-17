@@ -16,7 +16,6 @@ use app\services\activity\coupon\StoreCouponIssueServices;
 use app\services\article\ArticleServices;
 use app\services\diy\DiyServices;
 use app\services\diy\ThemeServices;
-use app\services\kefu\service\StoreServiceServices;
 use app\services\message\MessageSystemServices;
 use app\services\order\DeliveryServiceServices;
 use app\services\order\StoreCartServices;
@@ -152,10 +151,8 @@ class PublicController
 
         $userOrder = $invoiceStatus = false;
         if ($uid && $userInfo) {
-            /** @var StoreServiceServices $storeService */
-            $storeService = app()->make(StoreServiceServices::class);
             //是否订单管理
-            $userOrder = $storeService->checkoutIsService(['uid' => $uid, 'status' => 1, 'customer' => 1]);
+            $userOrder = in_array((int)$uid, \app\services\CoreStore::orderAdminUids(), true);
             //发票功能开关
             $invoiceStatus = app()->make(UserInvoiceServices::class)->invoiceFuncStatus(false);
         }
@@ -800,8 +797,6 @@ class PublicController
             $userIsOrder = false;
 
             if ($uid && $userInfo) {
-                /** @var StoreServiceServices $storeService */
-                $storeService = app()->make(StoreServiceServices::class);
                 /** @var StoreOrderServices $orderServices */
                 $orderServices = app()->make(StoreOrderServices::class);
                 /** @var StoreOrderRefundServices $orderRefundServices */
@@ -809,7 +804,7 @@ class PublicController
 
                 // 检查用户角色权限
                 //是否订单管理
-                $userIsOrder = (bool)$storeService->checkoutIsService(['uid' => $uid, 'status' => 1, 'customer' => 1]);
+                $userIsOrder = in_array((int)$uid, \app\services\CoreStore::orderAdminUids(), true);
 
                 // 统计各状态订单数量，用于菜单角标显示
                 $orderAuth = [];

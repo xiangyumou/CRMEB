@@ -48,16 +48,14 @@ class LoginController
      */
     public function login(Request $request)
     {
-        [$account, $password, $spread, $agent_id] = $request->postMore([
-            'account', 'password', 'spread', ['agent_id', 0]
-        ], true);
+        [$account, $password] = $request->postMore(['account', 'password'], true);
         if (!$account || !$password) {
             return app('json')->fail('请输入账号和密码');
         }
         if (strlen(trim($password)) < 6 || strlen(trim($password)) > 32) {
             return app('json')->fail('账号密码必须是在6到32位之间');
         }
-        return app('json')->success('登录成功', $this->services->login($account, $password, $spread, $agent_id));
+        return app('json')->success('登录成功', $this->services->login($account, $password));
     }
 
     /**
@@ -209,7 +207,7 @@ class LoginController
      */
     public function register(Request $request)
     {
-        [$account, $captcha, $password, $spread] = $request->postMore([['account', ''], ['captcha', ''], ['password', ''], ['spread', 0]], true);
+        [$account, $captcha, $password] = $request->postMore([['account', ''], ['captcha', ''], ['password', '']], true);
         try {
             validate(RegisterValidates::class)->scene('register')->check(['account' => $account, 'captcha' => $captcha, 'password' => $password]);
         } catch (ValidateException $e) {
@@ -226,7 +224,7 @@ class LoginController
             return app('json')->fail('验证码错误');
         if (md5($password) == md5('123456')) return app('json')->fail('密码太过简单，请输入较为复杂的密码');
 
-        $registerStatus = $this->services->register($account, $password, $spread, 'h5');
+        $registerStatus = $this->services->register($account, $password, 'h5');
         if ($registerStatus) {
             return app('json')->success('注册成功');
         }
@@ -275,7 +273,7 @@ class LoginController
      */
     public function mobile(Request $request)
     {
-        [$phone, $captcha, $spread, $agent_id] = $request->postMore([['phone', ''], ['captcha', ''], ['spread', 0], ['agent_id', 0]], true);
+        [$phone, $captcha] = $request->postMore([['phone', ''], ['captcha', '']], true);
 
         //验证手机号
         try {
@@ -293,7 +291,7 @@ class LoginController
             return app('json')->fail('验证码错误');
         }
         $user_type = $request->getFromType() ? $request->getFromType() : 'h5';
-        $token = $this->services->mobile($phone, $spread, $user_type, $agent_id);
+        $token = $this->services->mobile($phone, $user_type);
         if ($token) {
             CacheService::delete('code_' . $phone);
             return app('json')->success('登录成功', $token);

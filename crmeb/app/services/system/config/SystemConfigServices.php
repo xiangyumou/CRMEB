@@ -1464,29 +1464,4 @@ WSS;
         }
         return true;
     }
-
-    /**
-     * 变更分销绑定关系模式
-     * @param array $post
-     * @return bool
-     */
-    public function checkBrokerageBinding(array $post)
-    {
-        try {
-            $config_data = $post['store_brokerage_binding_status'];
-            $config_one = $this->dao->getOne(['menu_name' => 'store_brokerage_binding_status']);
-            $config_old = json_decode($config_one['value'], true);
-            if ($config_old != 2 && $config_data == 2) {
-                //自动解绑上级绑定
-
-                /** @var AgentManageServices $agentManage */
-                $agentManage = app()->make(AgentManageServices::class);
-                $agentManage->resetSpreadTime();
-            }
-        } catch (\Throwable $e) {
-            Log::error('变更分销绑定模式重置绑定时间失败,失败原因:' . $e->getMessage());
-            return false;
-        }
-        return true;
-    }
 }

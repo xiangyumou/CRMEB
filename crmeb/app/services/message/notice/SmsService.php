@@ -12,7 +12,6 @@
 namespace app\services\message\notice;
 
 use app\services\message\NoticeService;
-use app\services\kefu\service\StoreServiceServices;
 use app\services\message\SystemNotificationServices;
 use app\services\serve\ServeServices;
 use crmeb\exceptions\ApiException;
@@ -94,9 +93,7 @@ class SmsService extends NoticeService
     public function sendAdminRefund($order)
     {
         if ($this->noticeInfo['is_sms'] == 1) {
-            /** @var StoreServiceServices $StoreServiceServices */
-            $StoreServiceServices = app()->make(StoreServiceServices::class);
-            $adminList = $StoreServiceServices->getStoreServiceOrderNotice();
+            $adminList = \app\services\CoreStore::orderNoticeRecipients();
 
             foreach ($adminList as $item) {
                 $data = ['order_id' => $order['order_id'], 'admin_name' => $item['nickname']];
@@ -116,9 +113,7 @@ class SmsService extends NoticeService
     public function sendAdminConfirmTakeOver($order)
     {
         if ($this->noticeInfo['is_sms'] == 1) {
-            /** @var StoreServiceServices $StoreServiceServices */
-            $StoreServiceServices = app()->make(StoreServiceServices::class);
-            $adminList = $StoreServiceServices->getStoreServiceOrderNotice();
+            $adminList = \app\services\CoreStore::orderNoticeRecipients();
             foreach ($adminList as $item) {
                 $data = ['order_id' => $order['order_id'], 'admin_name' => $item['nickname']];
                 $this->sendSms($item['phone'], $data);
@@ -137,9 +132,7 @@ class SmsService extends NoticeService
     public function sendAdminPaySuccess($order)
     {
         if ($this->noticeInfo['is_sms'] == 1) {
-            /** @var StoreServiceServices $StoreServiceServices */
-            $StoreServiceServices = app()->make(StoreServiceServices::class);
-            $adminList = $StoreServiceServices->getStoreServiceOrderNotice();
+            $adminList = \app\services\CoreStore::orderNoticeRecipients();
             foreach ($adminList as $item) {
                 $data = ['order_id' => $order['order_id'], 'admin_name' => $item['nickname']];
                 $this->sendSms($item['phone'], $data);

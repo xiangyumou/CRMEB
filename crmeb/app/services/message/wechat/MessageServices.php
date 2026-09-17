@@ -12,10 +12,8 @@
 namespace app\services\message\wechat;
 
 
-use app\services\activity\bargain\StoreBargainServices;
 use app\services\activity\combination\StoreCombinationServices;
 use app\services\activity\combination\StorePinkServices;
-use app\services\activity\seckill\StoreSeckillServices;
 use app\services\BaseServices;
 use app\services\other\QrcodeServices;
 use app\services\product\product\StoreProductServices;
@@ -59,70 +57,35 @@ class MessageServices extends BaseServices
             $qrcodeService->scanQrcode($message->Ticket, 'ticket');
             $thirdType = explode('-', $qrInfo['third_type']);
             $baseUrl = sys_config('site_url');
-            if (in_array(strtolower($thirdType[0]), ['spread', 'agent', 'wechatqrcode', 'product', 'combination', 'seckill', 'bargain', 'pink'])) {
+            if (in_array(strtolower($thirdType[0]), ['wechatqrcode', 'product', 'combination', 'pink'])) {
                 //扫码需要生成用户流程
-                $spreadUid = $qrInfo['third_id'];
-                $spreadInfo = $userService->get($spreadUid);
                 $is_new = $wechatUser->saveUser($message->FromUserName);
                 $uid = $wechatUser->getFieldValue($message->FromUserName, 'openid', 'uid', ['user_type', '<>', 'h5']);
                 $userInfo = $userService->get($uid);
                 try {
                     switch (strtolower($thirdType[0])) {
-                        case 'spread':
-                            if ($spreadUid == $uid) {
-                                $response = '自己不能推荐自己';
-                            } else if (!$userInfo) {
-                                $response = '用户不存在';
-                            } else if (!$spreadInfo) {
-                                $response = '上级用户不存在';
-                            } else if ($userInfo['spread_uid']) {
-                                $response = '已有推荐人!';
-                            } else if (!$loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new)) {
-                                $response = '绑定推荐人失败!';
-                            }
-                            $wechatNews['title'] = sys_config('site_name');
-                            $wechatNews['image'] = sys_config('wap_login_logo');
-                            $wechatNews['url'] = $baseUrl . '/pages/index/index';
-                            $loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new);
-                            $messages = WechatService::newsMessage($wechatNews);
-                            WechatService::staffService()->message($messages)->to($message->FromUserName)->send();
-                            break;
-                        case 'agent':
-                            if ($spreadUid == $uid) {
-                                $response = '自己不能推荐自己';
-                            } else if (!$userInfo) {
-                                $response = '用户不存在';
-                            } else if (!$spreadInfo) {
-                                $response = '上级用户不存在';
-                            } else if ($userInfo->is_division) {
-                                $response = '您是事业部,不能绑定成为别人的员工';
-                            } else if ($userInfo->is_agent) {
-                                $response = '您是代理商,不能绑定成为别人的员工';
-                            } else if ($loginService->updateUserInfo(['code' => $spreadUid, 'is_staff' => 1], $userInfo, $is_new)) {
-                                $response = '绑定店员成功!';
-                            }
-                            break;
                         case 'wechatqrcode':
                             /** @var WechatQrcodeServices $wechatQrcodeService */
                             $wechatQrcodeService = app()->make(WechatQrcodeServices::class);
                             //wechatqrcode类型的二维码数据中,third_id为渠道码的id
                             $qrcodeInfo = $wechatQrcodeService->qrcodeInfo($qrInfo['third_id']);
-                            $spreadUid = $qrcodeInfo['uid'];
-                            $spreadInfo = $userService->get($spreadUid);
+                            $ownerUid = $qrcodeInfo['uid'];
+                            $ownerInfo = $userService->get($ownerUid);
                             $is_new = $wechatUser->saveUser($message->FromUserName);
                             $uid = $wechatUser->getFieldValue($message->FromUserName, 'openid', 'uid', ['user_type', '<>', 'h5']);
                             $userInfo = $userService->get($uid);
                             if ($qrcodeInfo['status'] == 0 || $qrcodeInfo['is_del'] == 1 || ($qrcodeInfo['end_time'] < time() && $qrcodeInfo['end_time'] > 0)) {
                                 $response = '二维码已失效';
-                            } else if ($spreadUid == $uid) {
+                            } else if ($ownerUid == $uid) {
                                 $response = '自己不能推荐自己';
                             } else if (!$userInfo) {
                                 $response = '用户不存在';
-                            } else if (!$spreadInfo) {
+                            } else if (!$ownerInfo) {
                                 $response = '上级用户不存在';
-                            } else if ($loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new)) {
+                            } else {
+                                $loginService->updateUserInfo([], $userInfo, $is_new);
                                 //写入扫码记录,返回内容
-                                $response = $wechatQrcodeService->wechatQrcodeRecord($qrcodeInfo, $userInfo, $spreadInfo);
+                                $response = $wechatQrcodeService->wechatQrcodeRecord($qrcodeInfo, $userInfo, $ownerInfo);
                             }
                             break;
                         case 'product':
@@ -133,7 +96,7 @@ class MessageServices extends BaseServices
                             $wechatNews['image'] = $productInfo->image;
                             $wechatNews['description'] = $productInfo->store_info;
                             $wechatNews['url'] = $baseUrl . '/pages/goods_details/index?id=' . $thirdType[1];
-                            $loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new);
+                            $loginService->updateUserInfo([], $userInfo, $is_new);
                             $messages = WechatService::newsMessage($wechatNews);
                             WechatService::staffService()->message($messages)->to($message->FromUserName)->send();
                             break;
@@ -145,31 +108,7 @@ class MessageServices extends BaseServices
                             $wechatNews['image'] = $productInfo->image;
                             $wechatNews['description'] = $productInfo->info;
                             $wechatNews['url'] = $baseUrl . '/pages/activity/goods_combination_details/index?id=' . $thirdType[1];
-                            $loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new);
-                            $messages = WechatService::newsMessage($wechatNews);
-                            WechatService::staffService()->message($messages)->to($message->FromUserName)->send();
-                            break;
-                        case 'seckill':
-                            /** @var StoreSeckillServices $seckillService */
-                            $seckillService = app()->make(StoreSeckillServices::class);
-                            $productInfo = $seckillService->get($thirdType[1] ?? 0);
-                            $wechatNews['title'] = $productInfo->title;
-                            $wechatNews['image'] = $productInfo->image;
-                            $wechatNews['description'] = $productInfo->info;
-                            $wechatNews['url'] = $baseUrl . '/pages/activity/goods_seckill_details/index?id=' . $thirdType[1];
-                            $loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new);
-                            $messages = WechatService::newsMessage($wechatNews);
-                            WechatService::staffService()->message($messages)->to($message->FromUserName)->send();
-                            break;
-                        case 'bargain':
-                            /** @var StoreBargainServices $bargainService */
-                            $bargainService = app()->make(StoreBargainServices::class);
-                            $productInfo = $bargainService->get($thirdType[1] ?? 0);
-                            $wechatNews['title'] = $productInfo->title;
-                            $wechatNews['image'] = $productInfo->image;
-                            $wechatNews['description'] = $productInfo->info;
-                            $wechatNews['url'] = $baseUrl . '/pages/activity/goods_bargain_details/index?id=' . $thirdType[1] . '&bargain=' . $thirdType[2];
-                            $loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new);
+                            $loginService->updateUserInfo([], $userInfo, $is_new);
                             $messages = WechatService::newsMessage($wechatNews);
                             WechatService::staffService()->message($messages)->to($message->FromUserName)->send();
                             break;
@@ -184,7 +123,7 @@ class MessageServices extends BaseServices
                             $wechatNews['image'] = $productInfo->image;
                             $wechatNews['description'] = $productInfo->info;
                             $wechatNews['url'] = $baseUrl . '/pages/activity/goods_combination_status/index?id=' . $thirdType[1];
-                            $loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new);
+                            $loginService->updateUserInfo([], $userInfo, $is_new);
                             $messages = WechatService::newsMessage($wechatNews);
                             WechatService::staffService()->message($messages)->to($message->FromUserName)->send();
                             break;
@@ -192,8 +131,6 @@ class MessageServices extends BaseServices
                 } catch (\Throwable $e) {
                     $response = $e->getMessage();
                 }
-            } else {
-                //扫码不生成用户流程
             }
         }
         return $response;
@@ -239,70 +176,35 @@ class MessageServices extends BaseServices
             $qrcodeService->scanQrcode($message->Ticket, 'ticket');
             $thirdType = explode('-', $qrInfo['third_type']);
             $baseUrl = sys_config('site_url');
-            if (in_array(strtolower($thirdType[0]), ['spread', 'agent', 'wechatqrcode', 'product', 'combination', 'seckill', 'bargain', 'pink'])) {
+            if (in_array(strtolower($thirdType[0]), ['wechatqrcode', 'product', 'combination', 'pink'])) {
                 //扫码需要生成用户流程
-                $spreadUid = $qrInfo['third_id'];
-                $spreadInfo = $userService->get($spreadUid);
                 $is_new = $wechatUser->saveUser($message->FromUserName);
                 $uid = $wechatUser->getFieldValue($message->FromUserName, 'openid', 'uid', ['user_type', '<>', 'h5']);
                 $userInfo = $userService->get($uid);
                 try {
                     switch (strtolower($thirdType[0])) {
-                        case 'spread':
-                            if ($spreadUid == $uid) {
-                                $response = '自己不能推荐自己';
-                            } else if (!$userInfo) {
-                                $response = '用户不存在';
-                            } else if (!$spreadInfo) {
-                                $response = '上级用户不存在';
-                            } else if ($userInfo['spread_uid']) {
-                                $response = '已有推荐人!';
-                            } else if (!$loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new)) {
-                                $response = '绑定推荐人失败!';
-                            }
-                            $wechatNews['title'] = sys_config('site_name');
-                            $wechatNews['image'] = sys_config('wap_login_logo');
-                            $wechatNews['url'] = $baseUrl . '/pages/index/index';
-                            $loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new);
-                            $messages = WechatService::newsMessage($wechatNews);
-                            WechatService::staffService()->message($messages)->to($message->FromUserName)->send();
-                            break;
-                        case 'agent':
-                            if ($spreadUid == $uid) {
-                                $response = '自己不能推荐自己';
-                            } else if (!$userInfo) {
-                                $response = '用户不存在';
-                            } else if (!$spreadInfo) {
-                                $response = '上级用户不存在';
-                            } else if ($userInfo->is_division) {
-                                $response = '您是事业部,不能绑定成为别人的员工';
-                            } else if ($userInfo->is_agent) {
-                                $response = '您是代理商,不能绑定成为别人的员工';
-                            } else if ($loginService->updateUserInfo(['code' => $spreadUid, 'is_staff' => 1], $userInfo, $is_new)) {
-                                $response = '绑定店员成功!';
-                            }
-                            break;
                         case 'wechatqrcode':
                             /** @var WechatQrcodeServices $wechatQrcodeService */
                             $wechatQrcodeService = app()->make(WechatQrcodeServices::class);
                             //wechatqrcode类型的二维码数据中,third_id为渠道码的id
                             $qrcodeInfo = $wechatQrcodeService->qrcodeInfo($qrInfo['third_id']);
-                            $spreadUid = $qrcodeInfo['uid'];
-                            $spreadInfo = $userService->get($spreadUid);
+                            $ownerUid = $qrcodeInfo['uid'];
+                            $ownerInfo = $userService->get($ownerUid);
                             $is_new = $wechatUser->saveUser($message->FromUserName);
                             $uid = $wechatUser->getFieldValue($message->FromUserName, 'openid', 'uid', ['user_type', '<>', 'h5']);
                             $userInfo = $userService->get($uid);
                             if ($qrcodeInfo['status'] == 0 || $qrcodeInfo['is_del'] == 1 || ($qrcodeInfo['end_time'] < time() && $qrcodeInfo['end_time'] > 0)) {
                                 $response = '二维码已失效';
-                            } else if ($spreadUid == $uid) {
+                            } else if ($ownerUid == $uid) {
                                 $response = '自己不能推荐自己';
                             } else if (!$userInfo) {
                                 $response = '用户不存在';
-                            } else if (!$spreadInfo) {
+                            } else if (!$ownerInfo) {
                                 $response = '上级用户不存在';
-                            } else if ($loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new)) {
+                            } else {
+                                $loginService->updateUserInfo([], $userInfo, $is_new);
                                 //写入扫码记录,返回内容
-                                $response = $wechatQrcodeService->wechatQrcodeRecord($qrcodeInfo, $userInfo, $spreadInfo);
+                                $response = $wechatQrcodeService->wechatQrcodeRecord($qrcodeInfo, $userInfo, $ownerInfo);
                             }
                             break;
                         case 'product':
@@ -313,7 +215,7 @@ class MessageServices extends BaseServices
                             $wechatNews['image'] = $productInfo->image;
                             $wechatNews['description'] = $productInfo->store_info;
                             $wechatNews['url'] = $baseUrl . '/pages/goods_details/index?id=' . $thirdType[1];
-                            $loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new);
+                            $loginService->updateUserInfo([], $userInfo, $is_new);
                             $messages = WechatService::newsMessage($wechatNews);
                             WechatService::staffService()->message($messages)->to($message->FromUserName)->send();
                             break;
@@ -325,31 +227,7 @@ class MessageServices extends BaseServices
                             $wechatNews['image'] = $productInfo->image;
                             $wechatNews['description'] = $productInfo->info;
                             $wechatNews['url'] = $baseUrl . '/pages/activity/goods_combination_details/index?id=' . $thirdType[1];
-                            $loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new);
-                            $messages = WechatService::newsMessage($wechatNews);
-                            WechatService::staffService()->message($messages)->to($message->FromUserName)->send();
-                            break;
-                        case 'seckill':
-                            /** @var StoreSeckillServices $seckillService */
-                            $seckillService = app()->make(StoreSeckillServices::class);
-                            $productInfo = $seckillService->get($thirdType[1] ?? 0);
-                            $wechatNews['title'] = $productInfo->title;
-                            $wechatNews['image'] = $productInfo->image;
-                            $wechatNews['description'] = $productInfo->info;
-                            $wechatNews['url'] = $baseUrl . '/pages/activity/goods_seckill_details/index?id=' . $thirdType[1];
-                            $loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new);
-                            $messages = WechatService::newsMessage($wechatNews);
-                            WechatService::staffService()->message($messages)->to($message->FromUserName)->send();
-                            break;
-                        case 'bargain':
-                            /** @var StoreBargainServices $bargainService */
-                            $bargainService = app()->make(StoreBargainServices::class);
-                            $productInfo = $bargainService->get($thirdType[1] ?? 0);
-                            $wechatNews['title'] = $productInfo->title;
-                            $wechatNews['image'] = $productInfo->image;
-                            $wechatNews['description'] = $productInfo->info;
-                            $wechatNews['url'] = $baseUrl . '/pages/activity/goods_bargain_details/index?id=' . $thirdType[1] . '&bargain=' . $thirdType[2];
-                            $loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new);
+                            $loginService->updateUserInfo([], $userInfo, $is_new);
                             $messages = WechatService::newsMessage($wechatNews);
                             WechatService::staffService()->message($messages)->to($message->FromUserName)->send();
                             break;
@@ -364,7 +242,7 @@ class MessageServices extends BaseServices
                             $wechatNews['image'] = $productInfo->image;
                             $wechatNews['description'] = $productInfo->info;
                             $wechatNews['url'] = $baseUrl . '/pages/activity/goods_combination_status/index?id=' . $thirdType[1];
-                            $loginService->updateUserInfo(['code' => $spreadUid], $userInfo, $is_new);
+                            $loginService->updateUserInfo([], $userInfo, $is_new);
                             $messages = WechatService::newsMessage($wechatNews);
                             WechatService::staffService()->message($messages)->to($message->FromUserName)->send();
                             break;
@@ -372,23 +250,11 @@ class MessageServices extends BaseServices
                 } catch (\Throwable $e) {
                     $response = $e->getMessage();
                 }
-            } else {
-                //扫码不生成用户流程
             }
-        }
-
-        // 更新关注标识
-        if (!is_string($response)) {
-            $wechatUser->subscribe($message->FromUserName);
         }
         return $response;
     }
 
-    /**
-     * 位置 事件
-     * @param $message
-     * @return string
-     */
     public function wechatEventLocation($message)
     {
         //return 'location';

@@ -42,8 +42,6 @@ class UserStatisticServices extends BaseServices
         $user = app()->make(UserServices::class);
         /** @var StoreOrderServices $order */
         $order = app()->make(StoreOrderServices::class);
-        /** @var OtherOrderServices $otherOrder */
-        $otherOrder = app()->make(OtherOrderServices::class);
 
         $toEndTime = implode('-', [0, $time[1]]);
         $cumulativeUserWhere = ['time' => $toEndTime, 'user_type' => $where['channel_type']];
@@ -52,7 +50,6 @@ class UserStatisticServices extends BaseServices
         $now['browse'] = $userVisit->count($where);//访问量
         $now['newUser'] = $user->count($where + ['user_type' => $where['channel_type']]);//新增用户数
         $now['payPeople'] = $order->getDistinctCount($where + ['paid' => 1], 'uid');//成交用户数
-        $now['payUser'] = $otherOrder->getDistinctCount($where + ['member_type' => -1], 'uid');//激活付费会员数
         $now['cumulativeUser'] = $user->count($cumulativeUserWhere);//累计用户数
 
 
@@ -67,7 +64,6 @@ class UserStatisticServices extends BaseServices
         $last['browse'] = $userVisit->count($where);//访问量
         $last['newUser'] = $user->count($where + ['user_type' => $where['channel_type']]);//新增用户数
         $last['payPeople'] = $order->getDistinctCount($where + ['paid' => 1], 'uid');//成交用户数
-        $last['payUser'] = $otherOrder->getDistinctCount($where + ['member_type' => -1], 'uid');//激活付费会员数
         $cumulativeUserWhere['time'] = $toEndTime;
         $last['cumulativeUser'] = $user->count($cumulativeUserWhere);//累计用户数
 
@@ -123,15 +119,11 @@ class UserStatisticServices extends BaseServices
         $userVisit = app()->make(UserVisitServices::class);
         /** @var StoreOrderServices $order */
         $order = app()->make(StoreOrderServices::class);
-        /** @var OtherOrderServices $otherOrder */
-        $otherOrder = app()->make(OtherOrderServices::class);
 
-        $newPeople = $visitPeople = $paidPeople = $rechargePeople = $vipPeople = [];
+        $newPeople = $visitPeople = $paidPeople = [];
         $newPeople['name'] = '新增用户数';
         $visitPeople['name'] = '访客数';
         $paidPeople['name'] = '成交用户数';
-        $rechargePeople['name'] = '充值用户';
-        $vipPeople['name'] = '新增付费用户数';
         if ($num == 0) {
             $xAxis = ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23'];
             $timeType = '%H';
@@ -154,7 +146,6 @@ class UserStatisticServices extends BaseServices
         $newPeople = array_column($user->getTrendData($time, $channelType, $timeType), 'num', 'days');
         $paidPeople = array_column($order->getTrendData($time, $channelType, $timeType, 'count(distinct(uid))'), 'num', 'days');
         $visitNum = array_column($userVisit->getTrendData($time, $channelType, $timeType, 'count(id)'), 'num', 'days');
-        $vipPeople = array_column($otherOrder->getTrendData($time, $channelType, $timeType), 'num', 'days');
         if ($excel) {
             $data = [];
             $browsePeople = array_column($userVisit->getTrendData($time, $channelType, $timeType, 'count(id)'), 'num', 'days');
@@ -165,7 +156,6 @@ class UserStatisticServices extends BaseServices
                     'browse' => $browsePeople[$item] ?? 0,
                     'new' => $newPeople[$item] ?? 0,
                     'paid' => $paidPeople[$item] ?? 0,
-                    'vip' => $vipPeople[$item] ?? 0,
                 ];
             }
             /** @var ExportServices $exportService */
@@ -179,7 +169,6 @@ class UserStatisticServices extends BaseServices
                 $data['访客数'][] = isset($visitPeople[$item]) ? intval($visitPeople[$item]) : 0;
                 $data['浏览量'][] = isset($visitNum[$item]) ? intval($visitNum[$item]) : 0;
                 $data['成交用户数'][] = isset($paidPeople[$item]) ? intval($paidPeople[$item]) : 0;
-                $data['新增付费用户数'][] = isset($vipPeople[$item]) ? intval($vipPeople[$item]) : 0;
             }
             foreach ($data as $key => $item) {
                 $series[] = ['name' => $key, 'value' => $item];

@@ -1009,11 +1009,10 @@ class ExportServices extends BaseServices
                     $value['browse'],
                     $value['new'],
                     $value['paid'],
-                    $value['vip'],
                 ];
             }
         }
-        $header = ['日期/时间', '访客数', '浏览量', '新增用户数', '成交用户数', '付费会员数'];
+        $header = ['日期/时间', '访客数', '浏览量', '新增用户数', '成交用户数'];
         $title = ['用户统计', '用户统计' . time(), ' 生成时间：' . date('Y-m-d H:i:s', time())];
         $filename = '用户统计_' . date('YmdHis', time());
         $suffix = 'xlsx';

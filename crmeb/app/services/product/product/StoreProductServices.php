@@ -30,7 +30,6 @@ use app\services\product\sku\StoreProductRuleServices;
 use app\services\product\sku\StoreProductVirtualServices;
 use app\services\shipping\ShippingTemplatesServices;
 use app\services\user\UserLabelServices;
-use app\services\user\member\MemberCardServices;
 use app\services\user\UserSearchServices;
 use app\services\user\UserServices;
 use crmeb\exceptions\AdminException;
@@ -178,24 +177,10 @@ class StoreProductServices extends BaseServices
     public function getActivityExist($productIds)
     {
         if (!count($productIds)) return [];
-        $seckill = app()->make(StoreSeckillServices::class)->getProductExist($productIds);
-        $bargain = app()->make(StoreBargainServices::class)->getProductExist($productIds);
         $combination = app()->make(StoreCombinationServices::class)->getProductExist($productIds);
         $activityExist = [];
         foreach ($productIds as $productId) {
-            $activityExist[$productId]['seckill'] = false;
-            $activityExist[$productId]['bargain'] = false;
             $activityExist[$productId]['combination'] = false;
-            foreach ($seckill as $key1 => $item1) {
-                if ($productId == $key1) {
-                    $activityExist[$productId]['seckill'] = true;
-                }
-            }
-            foreach ($bargain as $key2 => $item2) {
-                if ($productId == $key2) {
-                    $activityExist[$productId]['bargain'] = true;
-                }
-            }
             foreach ($combination as $key3 => $item3) {
                 if ($productId == $key3) {
                     $activityExist[$productId]['combination'] = true;
@@ -285,7 +270,6 @@ class StoreProductServices extends BaseServices
         $couponIds = array_column($productInfo['coupons'], 'issue_coupon_id');
         $is_sub = $recommend = [];
         if ($productInfo['is_sub'] == 1) array_push($is_sub, 1);
-        if ($productInfo['is_vip'] == 1) array_push($is_sub, 0);
         if ($productInfo['is_hot'] == 1) array_push($recommend, 'is_hot');
         if ($productInfo['is_benefit'] == 1) array_push($recommend, 'is_benefit');
         if ($productInfo['is_new'] == 1) array_push($recommend, 'is_new');
@@ -319,7 +303,6 @@ class StoreProductServices extends BaseServices
         $productInfo['cate_id'] = explode(',', $productInfo['cate_id']);
         $label_id = explode(',', $productInfo['label_id']);
         $productInfo['label_id'] = $userLabelServices->getLabelList(['ids' => $label_id], ['id', 'label_name']);
-        $productInfo['give_integral'] = floatval($productInfo['give_integral']);
         $productInfo['presale_time'] = $productInfo['presale_start_time'] == 0 ? [] : [date('Y-m-d H:i:s', $productInfo['presale_start_time']), date('Y-m-d H:i:s', $productInfo['presale_end_time'])];
         $productInfo['description'] = $storeDescriptionServices->getDescription(['product_id' => $id, 'type' => 0]);
         $productInfo['custom_form'] = json_decode($productInfo['custom_form'], true);
@@ -351,8 +334,6 @@ class StoreProductServices extends BaseServices
                 'bar_code_number' => '',
                 'weight' => 0,
                 'volume' => 0,
-                'brokerage' => 0,
-                'brokerage_two' => 0,
             ];
             $skuList = $this->validateProductAttr($attr, $detail, $id, 0, 1, true);
             $storeProductAttrServices->saveProductAttr($skuList, $id, 0);
@@ -396,7 +377,7 @@ class StoreProductServices extends BaseServices
             }
             $productInfo['items'] = $result['attr'];
             $productInfo['attrs'] = $result['value'];
-            $productInfo['attr'] = ['pic' => '', 'vip_price' => 0, 'price' => 0, 'cost' => 0, 'ot_price' => 0, 'stock' => 0, 'bar_code' => '', 'bar_code_number' => '', 'weight' => 0, 'volume' => 0, 'brokerage' => 0, 'brokerage_two' => 0];
+            $productInfo['attr'] = ['pic' => '', 'price' => 0, 'cost' => 0, 'ot_price' => 0, 'stock' => 0, 'bar_code' => '', 'bar_code_number' => '', 'weight' => 0, 'volume' => 0];
         } else {
             /** @var StoreProductVirtualServices $virtualService */
             $virtualService = app()->make(StoreProductVirtualServices::class);
@@ -405,7 +386,6 @@ class StoreProductServices extends BaseServices
             $productInfo['attrs'] = [];
             $productInfo['attr'] = [
                 'pic' => $result['image'] ?? '',
-                'vip_price' => $result['vip_price'] ? floatval($result['vip_price']) : 0,
                 'price' => $result['price'] ? floatval($result['price']) : 0,
                 'cost' => $result['cost'] ? floatval($result['cost']) : 0,
                 'ot_price' => $result['ot_price'] ? floatval($result['ot_price']) : 0,
@@ -415,8 +395,6 @@ class StoreProductServices extends BaseServices
                 'virtual_list' => $virtualService->getArr($result['unique'], $id),
                 'weight' => $result['weight'] ? floatval($result['weight']) : 0,
                 'volume' => $result['volume'] ? floatval($result['volume']) : 0,
-                'brokerage' => $result['brokerage'] ? floatval($result['brokerage']) : 0,
-                'brokerage_two' => $result['brokerage_two'] ? floatval($result['brokerage_two']) : 0,
                 'coupon_id' => $result['coupon_id'],
                 'coupon_name' => $storeCouponIssueServices->value(['id' => $result['coupon_id']], 'title'),
                 'disk_info' => $result['disk_info'],
@@ -427,9 +405,7 @@ class StoreProductServices extends BaseServices
             $activity = explode(',', $productInfo['activity']);
             foreach ($activity as $k => $v) {
                 if ($v == 1) {
-                    $activity[$k] = '秒杀';
                 } elseif ($v == 2) {
-                    $activity[$k] = '砍价';
                 } elseif ($v == 3) {
                     $activity[$k] = '拼团';
                 } elseif ($v == 0) {
@@ -438,7 +414,7 @@ class StoreProductServices extends BaseServices
             }
             $productInfo['activity'] = $activity;
         } else {
-            $productInfo['activity'] = ['默认', '秒杀', '砍价', '拼团'];
+            $productInfo['activity'] = ['默认', '拼团'];
         }
         $data['productInfo'] = $productInfo;
         return $data;
@@ -483,7 +459,7 @@ class StoreProductServices extends BaseServices
 
             $types = 1;
             if ($id) {
-                $sukValue = $storeProductAttrValueServices->getColumn(['product_id' => $id, 'type' => 0, 'suk' => $suk], 'bar_code,bar_code_number,cost,price,ot_price,stock,image as pic,weight,volume,brokerage,brokerage_two,vip_price,is_virtual,coupon_id,unique,disk_info', 'suk');
+                $sukValue = $storeProductAttrValueServices->getColumn(['product_id' => $id, 'type' => 0, 'suk' => $suk], 'bar_code,bar_code_number,cost,price,ot_price,stock,image as pic,weight,volume,is_virtual,coupon_id,unique,disk_info', 'suk');
                 if (!$sukValue) {
                     if ($type == 0) $types = 0; //编辑商品时，将没有规格的数据不生成默认值
                     $sukValue[$suk]['pic'] = '';
@@ -502,8 +478,6 @@ class StoreProductServices extends BaseServices
                     }
                     $sukValue[$suk]['weight'] = 0;
                     $sukValue[$suk]['volume'] = 0;
-                    $sukValue[$suk]['brokerage'] = 0;
-                    $sukValue[$suk]['brokerage_two'] = 0;
                 }
             } else {
                 $sukValue[$suk]['pic'] = '';
@@ -522,8 +496,6 @@ class StoreProductServices extends BaseServices
                 }
                 $sukValue[$suk]['weight'] = 0;
                 $sukValue[$suk]['volume'] = 0;
-                $sukValue[$suk]['brokerage'] = 0;
-                $sukValue[$suk]['brokerage_two'] = 0;
             }
             if ($types) { //编辑商品时，将没有规格的数据不生成默认值
                 foreach ($head as $k => $title) {
@@ -540,7 +512,6 @@ class StoreProductServices extends BaseServices
                 $valueNew[$count]['price'] = $sukValue[$suk]['price'] ? floatval($sukValue[$suk]['price']) : 0;
                 $valueNew[$count]['cost'] = $sukValue[$suk]['cost'] ? floatval($sukValue[$suk]['cost']) : 0;
                 $valueNew[$count]['ot_price'] = isset($sukValue[$suk]['ot_price']) ? floatval($sukValue[$suk]['ot_price']) : 0;
-                $valueNew[$count]['vip_price'] = isset($sukValue[$suk]['vip_price']) ? floatval($sukValue[$suk]['vip_price']) : 0;
                 $valueNew[$count]['stock'] = $sukValue[$suk]['stock'] ? intval($sukValue[$suk]['stock']) : 0;
                 $valueNew[$count]['bar_code'] = $sukValue[$suk]['bar_code'] ?? '';
                 $valueNew[$count]['bar_code_number'] = $sukValue[$suk]['bar_code_number'] ?? '';
@@ -557,8 +528,6 @@ class StoreProductServices extends BaseServices
                 }
                 $valueNew[$count]['weight'] = floatval($sukValue[$suk]['weight']) ?? 0;
                 $valueNew[$count]['volume'] = floatval($sukValue[$suk]['volume']) ?? 0;
-                $valueNew[$count]['brokerage'] = floatval($sukValue[$suk]['brokerage']) ?? 0;
-                $valueNew[$count]['brokerage_two'] = floatval($sukValue[$suk]['brokerage_two']) ?? 0;
                 $count++;
             }
         }
@@ -611,10 +580,7 @@ class StoreProductServices extends BaseServices
         $description = $data['description'];
         $type = $data['type'];
         $data['recommend_list'] = count($data['recommend_list']) ? implode(',', array_column($data['recommend_list'], 'product_id')) : '';
-        $data['is_vip'] = in_array(0, $data['is_sub']) ? 1 : 0;
         $data['is_sub'] = in_array(1, $data['is_sub']) ? 1 : 0;
-        $data['vip_product'] = intval($data['vip_product']);
-        $data['vip_product_type'] = intval($data['vip_product_type'] ?? 0);
         $data['presale'] = intval($data['presale']);
         $data['presale_start_time'] = $data['presale'] ? strtotime($data['presale_time'][0]) : 0;
         $data['presale_end_time'] = $data['presale'] ? strtotime($data['presale_time'][1]) : 0;
@@ -643,10 +609,8 @@ class StoreProductServices extends BaseServices
         }
         foreach ($detail as &$item) {
             if ($data['is_sub'] == 0) {
-                $item['brokerage'] = 0;
-                $item['brokerage_two'] = 0;
             }
-            if (($item['brokerage'] + $item['brokerage_two']) > $item['price']) {
+            if (false) {
                 throw new AdminException('一二级返佣相加不能大于商品售价');
             }
             if (isset($item['detail'])) {
@@ -658,11 +622,7 @@ class StoreProductServices extends BaseServices
             }
         }
         foreach ($data['activity'] as $k => $v) {
-            if ($v == '秒杀') {
-                $data['activity'][$k] = 1;
-            } elseif ($v == '砍价') {
-                $data['activity'][$k] = 2;
-            } elseif ($v == '拼团') {
+            if ($v == '拼团') {
                 $data['activity'][$k] = 3;
             } else {
                 $data['activity'][$k] = 0;
@@ -762,7 +722,7 @@ class StoreProductServices extends BaseServices
                 }
                 $storeProductCateServices->change($id, $cateData);
                 $skuList = $this->validateProductAttr($attr, $detail, $id);
-                $attrRes = $storeProductAttrServices->saveProductAttr($skuList, $id, 0, $data['is_vip'], $data['virtual_type']);
+                $attrRes = $storeProductAttrServices->saveProductAttr($skuList, $id, 0, 0, $data['virtual_type']);
                 if (!empty($coupon_ids)) {
                     $storeProductCouponServices->setCoupon($id, $coupon_ids);
                 } else {
@@ -785,7 +745,7 @@ class StoreProductServices extends BaseServices
                 }
                 $storeProductCateServices->change($res->id, $cateData);
                 $skuList = $this->validateProductAttr($attr, $detail, $res->id, 0, 1, true);
-                $attrRes = $storeProductAttrServices->saveProductAttr($skuList, $res->id, 0, $data['is_vip'], $data['virtual_type']);
+                $attrRes = $storeProductAttrServices->saveProductAttr($skuList, $res->id, 0, 0, $data['virtual_type']);
                 if (!empty($coupon_ids)) $storeProductCouponServices->setCoupon($res->id, $coupon_ids);
                 if (!$attrRes) throw new AdminException('添加失败');
 
@@ -942,12 +902,9 @@ class StoreProductServices extends BaseServices
                 'bar_code_number' => $value['bar_code_number'] ?? '',
                 'weight' => $value['weight'] ?? 0,
                 'volume' => $value['volume'] ?? 0,
-                'brokerage' => $value['brokerage'] ?? 0,
-                'brokerage_two' => $value['brokerage_two'] ?? 0,
                 'type' => $type,
                 'quota' => $value['quota'] ?? 0,
                 'quota_show' => $value['quota'] ?? 0,
-                'vip_price' => $value['vip_price'] ?? 0,
                 'is_virtual' => $value['is_virtual'] ?? 0,
                 'coupon_id' => $value['coupon_id'] ?? 0,
                 'virtual_list' => $value['virtual_list'] ?? [],
@@ -1020,9 +977,7 @@ class StoreProductServices extends BaseServices
                 }
             });
             $item['cate_name'] = implode(',', array_column($cateName, 'cate_name'));
-            $item['give_integral'] = floatval($item['give_integral']);
             $item['price'] = floatval($item['price']);
-            $item['vip_price'] = floatval($item['vip_price']);
             $item['ot_price'] = floatval($item['ot_price']);
             $item['postage'] = floatval($item['postage']);
             $item['cost'] = floatval($item['cost']);
@@ -1125,19 +1080,13 @@ class StoreProductServices extends BaseServices
             $valueNew[$count]['unique'] = $sukValue[$suk]['unique'];
             $valueNew[$count]['weight'] = $sukValue[$suk]['weight'] ? floatval($sukValue[$suk]['weight']) : 0;
             $valueNew[$count]['volume'] = $sukValue[$suk]['volume'] ? floatval($sukValue[$suk]['volume']) : 0;
-            $valueNew[$count]['brokerage'] = $sukValue[$suk]['brokerage'] ? floatval($sukValue[$suk]['brokerage']) : 0;
-            $valueNew[$count]['brokerage_two'] = $sukValue[$suk]['brokerage_two'] ? floatval($sukValue[$suk]['brokerage_two']) : 0;
-            $valueNew[$count]['vip_price'] = $sukValue[$suk]['vip_price'] ? floatval($sukValue[$suk]['vip_price']) : 0;
             $count++;
         }
         $header[] = ['title' => '图片', 'slot' => 'pic', 'align' => 'center', 'minWidth' => 120];
         if ($type == 1) {
-            $header[] = ['title' => '秒杀价', 'slot' => 'price', 'align' => 'center', 'minWidth' => 80];
             $header[] = ['title' => '成本价', 'key' => 'cost', 'align' => 'center', 'minWidth' => 80];
             $header[] = ['title' => '日常售价', 'key' => 'r_price', 'align' => 'center', 'minWidth' => 80];
         } elseif ($type == 2) {
-            $header[] = ['title' => '砍价起始金额', 'slot' => 'price', 'align' => 'center', 'minWidth' => 80];
-            $header[] = ['title' => '砍价最低价', 'slot' => 'min_price', 'align' => 'center', 'minWidth' => 80];
             $header[] = ['title' => '成本价', 'key' => 'cost', 'align' => 'center', 'minWidth' => 80];
             $header[] = ['title' => '日常售价', 'key' => 'r_price', 'align' => 'center', 'minWidth' => 80];
         } elseif ($type == 3) {
@@ -1171,26 +1120,6 @@ class StoreProductServices extends BaseServices
     public function checkActivity($id = 0, $return = false)
     {
         if ($id) {
-            /** @var StoreSeckillServices $storeSeckillService */
-            $storeSeckillService = app()->make(StoreSeckillServices::class);
-            $res1 = $storeSeckillService->count(['product_id' => $id, 'is_del' => 0]);
-            if ($res1) {
-                if ($return) {
-                    return false;
-                } else {
-                    throw new AdminException('商品参与秒杀活动开启，无法进行此操作');
-                }
-            }
-            /** @var StoreBargainServices $storeBargainService */
-            $storeBargainService = app()->make(StoreBargainServices::class);
-            $res2 = $storeBargainService->count(['product_id' => $id, 'is_del' => 0]);
-            if ($res2) {
-                if ($return) {
-                    return false;
-                } else {
-                    throw new AdminException('商品参与砍价活动开启，无法进行此操作');
-                }
-            }
             /** @var StoreCombinationServices $storeCombinationService */
             $storeCombinationService = app()->make(StoreCombinationServices::class);
             $res3 = $storeCombinationService->count(['product_id' => $id, 'is_del' => 0]);
@@ -1234,11 +1163,7 @@ class StoreProductServices extends BaseServices
             app()->make(UserSearchServices::class)->saveUserSearch($uid, $where['store_name'], [$where['store_name']], []);
         }
         [$page, $limit] = $this->getPageValue();
-        $where['vip_user'] = $uid ? app()->make(UserServices::class)->value(['uid' => $uid], 'is_money_level') : 0;
-        $list = $this->dao->getSearchList($where, $page, $limit, ['id,store_name,cate_id,image,IFNULL(sales, 0) + IFNULL(ficti, 0) as sales,price,stock,activity,ot_price,spec_type,recommend_image,unit_name,is_vip,vip_price,is_virtual,presale,custom_form,virtual_type,min_qty,label_list']);
-        /** @var MemberCardServices $memberCardService */
-        $memberCardService = app()->make(MemberCardServices::class);
-        $vipStatus = $memberCardService->isOpenMemberCard('vip_price');
+        $list = $this->dao->getSearchList($where, $page, $limit, ['id,store_name,cate_id,image,IFNULL(sales, 0) + IFNULL(ficti, 0) as sales,price,stock,activity,ot_price,spec_type,recommend_image,unit_name,is_virtual,presale,custom_form,virtual_type,min_qty,label_list']);
 
         // 提取所有 label_list 并过滤空值
         $labelLists = array_map(function ($item) {
@@ -1261,9 +1186,6 @@ class StoreProductServices extends BaseServices
         $labelList = array_column($labelList, null, 'id');
 
         foreach ($list as &$item) {
-            if (!$this->vipIsOpen(!!$item['is_vip'], $vipStatus)) {
-                $item['vip_price'] = 0;
-            }
             $item['cart_button'] = $item['is_virtual'] || $item['virtual_type'] == 3 || $item['presale'] || json_decode($item['custom_form'], true) ? 0 : 1;
             if (count($item['star'])) {
                 $item['star'] = bcdiv((string)array_sum(array_column($item['star'], 'product_score')), (string)count($item['star']), 1);
@@ -1332,7 +1254,7 @@ class StoreProductServices extends BaseServices
      * @param array $productIds
      * @return array
      */
-    public function getActivityList(array $list, bool $status = true, $seckillIdsList = false, $pinkIdsList = false, $bargrainIdsList = false)
+    public function getActivityList(array $list, bool $status = true, $pinkIdsList = false)
     {
         if (!$list) return [];
         if ($status) {
@@ -1341,32 +1263,17 @@ class StoreProductServices extends BaseServices
             $productIds = [$list['id']];
             $list = [$list];
         }
-        if ($seckillIdsList === false) {
-            /** @var StoreSeckillServices $storeSeckillService */
-            $storeSeckillService = app()->make(StoreSeckillServices::class);
-            $seckillIdsList = $storeSeckillService->getSeckillIdsArray($productIds, ['id', 'time_id', 'product_id']);
-        }
         if ($pinkIdsList === false) {
             /** @var StoreCombinationServices $storeCombinationServices */
             $storeCombinationServices = app()->make(StoreCombinationServices::class);
             $pinkIdsList = $storeCombinationServices->getPinkIdsArray($productIds, ['id']);
-        }
-        if ($bargrainIdsList === false) {
-            /** @var StoreBargainServices $storeBargainServices */
-            $storeBargainServices = app()->make(StoreBargainServices::class);
-            $bargrainIdsList = $storeBargainServices->getBargainIdsArray($productIds, ['id']);
         }
 
         /** @var StoreCouponIssueServices $couponIssueServices */
         $couponIssueServices = app()->make(StoreCouponIssueServices::class);
 
         foreach ($list as &$item) {
-            $seckillId = array_filter($seckillIdsList, function ($val) use ($item) {
-                if ($val['product_id'] === $item['id']) {
-                    return $val;
-                }
-            });
-            $item['activity'] = $this->activity($item['activity'], $item['id'], $pinkIdsList[$item['id']] ?? 0, $seckillId, $bargrainIdsList[$item['id']] ?? 0, $status);
+            $item['activity'] = $this->activity($item['activity'], $item['id'], $pinkIdsList[$item['id']] ?? 0, $status);
             $item['checkCoupon'] = $couponIssueServices->checkProductCoupon($item['id']);
         }
         if ($status) {
@@ -1381,34 +1288,17 @@ class StoreProductServices extends BaseServices
      * @param string $activity
      * @param int $id
      * @param int $combinationId
-     * @param array $seckillId
-     * @param int $bargainId
      * @param bool $status
      * @return array
      */
-    public function activity(string $activity, int $id, int $combinationId, array $seckillId, int $bargainId, bool $status = true)
+    public function activity(string $activity, int $id, int $combinationId, bool $status = true)
     {
         if (!$activity) {
-            $activity = '0,1,2,3'; //如果老商品没有活动顺序，默认活动顺序，秒杀-砍价-拼团
+            $activity = '0,3'; //如果老商品没有活动顺序，默认活动顺序，拼团
         }
         $activity = explode(',', $activity);
         if ($activity[0] == 0 && $status) return [];
         $activityId = [];
-        $time_id = 0;
-        if ($seckillId) {
-            foreach ($seckillId as $v) {
-                $timeInfo = GroupDataService::getDataNumbers($v['time_id']);
-                foreach ($timeInfo as $time) {
-                    $value = json_decode($time['value'], true);
-                    if (date('H') >= $value['time']['value'] && date('H') < ($value['time']['value'] + $value['continued']['value'])) {
-                        $activityId[1] = $v['id'];
-                        $time_id = $time['id'];
-                        break;
-                    }
-                }
-            }
-        }
-        if ($bargainId) $activityId[2] = $bargainId;
         if ($combinationId) $activityId[3] = $combinationId;
         $data = [];
         foreach ($activity as $k => $v) {
@@ -1416,13 +1306,11 @@ class StoreProductServices extends BaseServices
                 if ($status) {
                     $data['type'] = $v;
                     $data['id'] = $activityId[$v];
-                    if ($v == 1) $data['time_id'] = $time_id;
                     break;
                 } else {
                     if ($v != 0) {
                         $arr['type'] = $v;
                         $arr['id'] = $activityId[$v];
-                        if ($v == 1) $arr['time_id'] = $time_id;
                         $data[] = $arr;
                     }
                 }
@@ -1447,7 +1335,7 @@ class StoreProductServices extends BaseServices
             $page = 1;
             $limit = $num;
         }
-        $list = $this->dao->getSearchList($where, $page, $limit, ['id,store_name,cate_id,image,IFNULL(sales, 0) + IFNULL(ficti, 0) as sales,price,stock,activity,unit_name,presale,is_vip,vip_price']);
+        $list = $this->dao->getSearchList($where, $page, $limit, ['id,store_name,cate_id,image,IFNULL(sales, 0) + IFNULL(ficti, 0) as sales,price,stock,activity,unit_name,presale']);
         $list = $this->getActivityList($list);
         return $list;
     }
@@ -1570,8 +1458,6 @@ class StoreProductServices extends BaseServices
                 'bar_code_number' => '',
                 'weight' => 0,
                 'volume' => 0,
-                'brokerage' => 0,
-                'brokerage_two' => 0,
             ];
             $skuList = $this->validateProductAttr($attr, $detail, $id, 0, 1, true);
             $storeProductAttrServices->saveProductAttr($skuList, $id, 0);
@@ -1594,30 +1480,8 @@ class StoreProductServices extends BaseServices
         $data['productValue'] = $productValue;
         $data['storeInfo'] = $storeInfo;
 
-        /** @var MemberCardServices $memberCardService */
-        $memberCardService = app()->make(MemberCardServices::class);
-        $data['svip_open'] = $vipStatus = $memberCardService->isOpenMemberCard('vip_price');
-        $data['svip_price_open'] = (int)sys_config('member_price_status');
-        $data['storeInfo']['svip_economize_price'] = bcsub((string)$data['storeInfo']['price'], (string)$data['storeInfo']['vip_price'], 2);
-        if (!$this->vipIsOpen(!!$storeInfo['is_vip'], $vipStatus)) {
-            $data['storeInfo']['vip_price'] = 0;
-        }
         $data['priceName'] = 0;
-        if ($uid && (int)sys_config('brokerage_window_switch', 1)) {
-            $user = $request->user();
-            if (!$user->is_promoter) {
-                /** @var StoreOrderServices $storeOrderService */
-                $storeOrderService = app()->make(StoreOrderServices::class);
-                $price = $storeOrderService->sum(['paid' => 1, 'refund_status' => 0, 'uid' => $uid], 'pay_price');
-                $status = is_brokerage_statu($price);
-                if ($status) {
-                    /** @var UserServices $userServices */
-                    $userServices = app()->make(UserServices::class);
-                    $userServices->update($uid, ['is_promoter' => 1]);
-                    $user->is_promoter = 1;
-                }
-            }
-            $data['priceName'] = $this->getPacketPrice($storeInfo, $attrValue, $uid);
+        if ($uid) {
             //用户访问事件
             event('UserVisitListener', [$uid, $id, 'product', $storeInfo['cate_id'], 'view']);
         }
@@ -1629,14 +1493,13 @@ class StoreProductServices extends BaseServices
         $data['replyChance'] = $replyChance;
         $data['replyCount'] = $replyCount;
         $data['mer_id'] = 0;
-        $vip_user = $uid ? app()->make(UserServices::class)->value(['uid' => $uid], 'is_money_level') : 0;
         if ($storeInfo['recommend_list'] != '') {
             $recommend_list = explode(',', $storeInfo['recommend_list']);
             $data['good_list'] = $this->getProducts(['ids' => $recommend_list, 'is_del' => 0, 'is_show' => 1], 12);
             $recommend_count = 12 - count($data['good_list']);
-            if ($recommend_count) $data['good_list'] = array_merge($data['good_list'], $this->getProducts(['is_good' => 1, 'is_del' => 0, 'is_show' => 1, 'vip_user' => $vip_user, 'not_ids' => $recommend_list], $recommend_count));
+            if ($recommend_count) $data['good_list'] = array_merge($data['good_list'], $this->getProducts(['is_good' => 1, 'is_del' => 0, 'is_show' => 1, 'not_ids' => $recommend_list], $recommend_count));
         } else {
-            $data['good_list'] = $this->getProducts(['is_good' => 1, 'is_del' => 0, 'is_show' => 1, 'vip_user' => $vip_user], 12);
+            $data['good_list'] = $this->getProducts(['is_good' => 1, 'is_del' => 0, 'is_show' => 1], 12);
         }
         $data['mapKey'] = sys_config('tengxun_map_key');
         $data['store_self_mention'] = (int)sys_config('store_self_mention') ?? 0; //门店自提是否开启
@@ -1656,65 +1519,6 @@ class StoreProductServices extends BaseServices
         ]]);
 
         return $data;
-    }
-
-    /**
-     * 是否开启vip
-     * @param bool $vip
-     * @return bool
-     */
-    public function vipIsOpen(bool $vip = false, $vipStatus = -1)
-    {
-        if ($vipStatus == -1) {
-            /** @var MemberCardServices $memberCardService */
-            $memberCardService = app()->make(MemberCardServices::class);
-            $vipStatus = $memberCardService->isOpenMemberCard('vip_price');
-        }
-        return $vipStatus && sys_config('member_card_status') && $vip && sys_config('member_price_status', 1);
-    }
-
-    /**
-     * 获取商品分销佣金最低和最高
-     * @param $storeInfo
-     * @param $productValue
-     * @param int $uid
-     * @return int|string
-     */
-    public function getPacketPrice($storeInfo, $productValue, int $uid)
-    {
-        /** @var UserServices $userServices */
-        $userServices = app()->make(UserServices::class);
-        if (!$userServices->checkUserPromoter($uid)) {
-            return 0;
-        }
-        if (!count($productValue)) {
-            return 0;
-        }
-        if (!sys_config('brokerage_func_status')) {
-            return 0;
-        }
-        $store_brokerage_ratio = sys_config('store_brokerage_ratio');
-        $store_brokerage_ratio = bcdiv((string)$store_brokerage_ratio, '100', 2);
-        if (isset($storeInfo['is_sub']) && $storeInfo['is_sub'] == 1) {
-            $maxPrice = (int)max(array_column($productValue, 'brokerage'));
-            $minPrice = (int)min(array_column($productValue, 'brokerage'));
-        } else {
-            $maxPrice = max(array_column($productValue, 'price'));
-            $minPrice = min(array_column($productValue, 'price'));
-            $maxPrice = bcmul((string)$store_brokerage_ratio, (string)$maxPrice, 0);
-            $minPrice = bcmul((string)$store_brokerage_ratio, (string)$minPrice, 0);
-        }
-        if ($minPrice == 0 && $maxPrice == 0) {
-            $priceName = 0;
-        } else if ($minPrice == 0 && $maxPrice)
-            $priceName = $maxPrice;
-        else if ($maxPrice == 0 && $minPrice)
-            $priceName = $minPrice;
-        else if ($maxPrice == $minPrice && $minPrice)
-            $priceName = $maxPrice;
-        else
-            $priceName = $minPrice . '~' . $maxPrice;
-        return strlen(trim($priceName)) ? $priceName : 0;
     }
 
     /**商品列表
@@ -1756,7 +1560,7 @@ class StoreProductServices extends BaseServices
     public function getProductColumn(array $ids, string $field = '')
     {
         $productData = [];
-        $productInfoField = 'id,image,price,ot_price,vip_price,postage,give_integral,sales,stock,store_name,unit_name,is_show,is_del,is_postage,cost,is_sub,temp_id';
+        $productInfoField = 'id,image,price,ot_price,postage,sales,stock,store_name,unit_name,is_show,is_del,is_postage,cost,temp_id';
         if (!empty($ids)) {
             $productAll = $this->dao->idByProductList($ids, $field ?: $productInfoField);
             if (!empty($productAll))
@@ -1860,26 +1664,16 @@ class StoreProductServices extends BaseServices
      */
     public function getRecommendProductArr(int $uid, array $fields, bool $is_num = true, string $type = 'mid')
     {
-        $baseList = $firstList = $benefitList = $hotList = $vipList = [];
-        $data = [$baseList, $firstList, $benefitList, $hotList, $vipList];
+        $baseList = $firstList = $benefitList = $hotList = [];
+        $data = [$baseList, $firstList, $benefitList, $hotList];
         if ($fields) {
-            /** @var MemberCardServices $memberCardService */
-            $memberCardService = app()->make(MemberCardServices::class);
-            $vipStatus = $memberCardService->isOpenMemberCard('vip_price');
-            $seckillIdsList = $pinkIdsList = $bargrainIdsList = false;
+            $pinkIdsList = false;
             if (count($fields) > 1) {
-                /** @var StoreSeckillServices $storeSeckillService */
-                $storeSeckillService = app()->make(StoreSeckillServices::class);
-                $seckillIdsList = $storeSeckillService->getSeckillIdsArray([], ['id', 'time_id', 'product_id']);
                 /** @var StoreCombinationServices $storeCombinationServices */
                 $storeCombinationServices = app()->make(StoreCombinationServices::class);
                 $pinkIdsList = $storeCombinationServices->getPinkIdsArray([], ['id']);
-                /** @var StoreBargainServices $storeBargainServices */
-                $storeBargainServices = app()->make(StoreBargainServices::class);
-                $bargrainIdsList = $storeBargainServices->getBargainIdsArray([], ['id']);
             }
             [$page, $limit] = $this->getPageValue();
-            $where['vip_user'] = $uid ? app()->make(UserServices::class)->value(['uid' => $uid], 'is_money_level') : 0;
             foreach ($fields as $field) {
                 $list = [];
                 switch ($field) {
@@ -1915,19 +1709,10 @@ class StoreProductServices extends BaseServices
                         $hotNumber = $is_num ? 3 : 0;
                         $list = $this->dao->getRecommendProduct($where, $field, $hotNumber, $page, $limit);
                         break;
-                    case 'is_vip': //会员
-                        $k = 4;
-                        $list = $this->dao->getRecommendProduct($where, $field, 0, $page, $limit);
-                        break;
                 }
                 if ($list) {
                     $list = get_thumb_water($list, $type);
-                    $list = $this->getActivityList($list, true, $seckillIdsList, $pinkIdsList, $bargrainIdsList);
-                    foreach ($list as &$item) {
-                        if (!($vipStatus && $item['is_vip'])) {
-                            $item['vip_price'] = 0;
-                        }
-                    }
+                    $list = $this->getActivityList($list, true, $pinkIdsList);
                 }
                 if (isset($k)) $data[$k] = $list;
             }
@@ -1949,19 +1734,10 @@ class StoreProductServices extends BaseServices
     public function getRecommendProduct(int $uid, $field, int $num = 0, string $type = 'mid')
     {
         [$page, $limit] = $this->getPageValue();
-        $where['vip_user'] = $uid ? app()->make(UserServices::class)->value(['uid' => $uid], 'is_money_level') : 0;
         $list = $this->dao->getRecommendProduct($where, $field, $num, $page, $limit);
         if ($list) {
             $list = get_thumb_water($list, $type);
             $list = $this->getActivityList($list);
-            /** @var MemberCardServices $memberCardService */
-            $memberCardService = app()->make(MemberCardServices::class);
-            $vipStatus = $memberCardService->isOpenMemberCard('vip_price');
-            foreach ($list as &$item) {
-                if (!$this->vipIsOpen(!!$item['is_vip'], $vipStatus)) {
-                    $item['vip_price'] = 0;
-                }
-            }
         }
         return $list;
     }
@@ -2010,55 +1786,6 @@ class StoreProductServices extends BaseServices
             $keyWords = $oneKey . $mainKey . $twoKey . $threeKey;
         }
         return $keyWords;
-    }
-
-    /**
-     * 获取会员价格（付费会员价格和购买商品会员价格）
-     * @param int $uid
-     * @param $userInfo
-     * @param $vipStatus
-     * @param $goodsList
-     * @param string $discount
-     * @param bool $isSingle
-     * @param float $payVipPrice
-     * @param int $is_vip
-     * @param bool $is_show
-     * @return float|int|mixed|string
-     */
-    public function isPayLevelPrice(int $uid, $userInfo, $vipStatus, $price, string $discount, $payVipPrice = 0.00, $is_vip = 0, $is_show = false)
-    {
-        //is_vip == 0表示会员价格不启用，展示为零
-        if ($is_vip == 0) $payVipPrice = 0;
-        if (!$userInfo && $uid) {
-            //检测用户是否是付费会员
-            /** @var  UserServices $userService */
-            $userService = app()->make(UserServices::class);
-            $userInfo = $userService->getUserInfo($uid);
-        }
-        $noPayVipPrice = ($discount && $discount != 0.00) ? bcmul((string)$discount, (string)$price, 2) : $price;
-        if ($payVipPrice < $noPayVipPrice && $payVipPrice > 0) {
-            $vipPrice = $payVipPrice;
-            $type = 'member';
-        } else {
-            $vipPrice = $noPayVipPrice;
-            $type = 'level';
-        }
-
-        //如果$isSingle==true 返回优惠后的总金额，否则返回优惠的金额
-        if ($vipStatus && $is_vip == 1) {
-            //$is_show == false 是计算支付价格，true是展示
-            if (!$is_show) {
-                return [$vipPrice, bcsub((string)$price, (string)$vipPrice, 2), $type];
-            } else {
-                if ($userInfo && isset($userInfo['is_money_level']) && $userInfo['is_money_level'] > 0) {
-                    return [$vipPrice, bcsub((string)$price, (string)$vipPrice, 2), $type];
-                } else {
-                    return [$noPayVipPrice, bcsub((string)$price, (string)$noPayVipPrice, 2), $type];
-                }
-            }
-        } else {
-            return [$noPayVipPrice, bcsub((string)$price, (string)$noPayVipPrice, 2), $type];
-        }
     }
 
     /**
@@ -2167,15 +1894,6 @@ class StoreProductServices extends BaseServices
                             'temp_id' => $data['freight'] == 3 ? $data['temp_id'] : 0
                         ];
                     }
-                }
-                if (count($batchData)) $this->dao->saveAll($batchData);
-                break;
-            case 3:
-                foreach ($ids as $product_id) {
-                    $batchData[] = [
-                        'id' => $product_id,
-                        'give_integral' => $data['give_integral']
-                    ];
                 }
                 if (count($batchData)) $this->dao->saveAll($batchData);
                 break;
@@ -2293,8 +2011,7 @@ class StoreProductServices extends BaseServices
             '条形码',
             '商品简介',
             '商品关键字',
-            '商品口令',
-            '购买送积分'
+            '商品口令'
         ];
         $filename = '商品迁移数据_' . date('YmdHis', time());
         $virtualType = ['普通商品', '卡密/网盘', '优惠券', '虚拟商品'];
@@ -2359,7 +2076,6 @@ class StoreProductServices extends BaseServices
                         'store_info' => $productInfo['store_info'],
                         'keyword' => $productInfo['keyword'],
                         'command_word' => $productInfo['command_word'],
-                        'give_integral' => $productInfo['give_integral'],
                     ];
                     $export[] = $one_data;
                     if ($i == 0) {
@@ -2404,7 +2120,6 @@ class StoreProductServices extends BaseServices
                 $productData[$sku['id']]['limit_type'] = 0;
                 $productData[$sku['id']]['limit_num'] = 0;
                 $productData[$sku['id']]['video_open'] = $sku['video_link'] != '' ? 1 : 0;
-                $productData[$sku['id']]['vip_product'] = 0;
                 $productData[$sku['id']]['custom_form'] = [];
                 $productData[$sku['id']]['store_name'] = $sku['store_name'];
                 $productData[$sku['id']]['cate_id'] = $productCateServices->getCateId($sku['cate_name_one'] ?? '', $sku['cate_name_two'] ?? '');
@@ -2416,7 +2131,6 @@ class StoreProductServices extends BaseServices
                 $productData[$sku['id']]['slider_image'] = explode(';', $sku['slider_image']);
                 $productData[$sku['id']]['description'] = $sku['description'] ?? '';
                 $productData[$sku['id']]['ficti'] = $sku['ficti'] ?? 0;
-                $productData[$sku['id']]['give_integral'] = $sku['give_integral'] ?? 0;
                 $productData[$sku['id']]['sort'] = 0;
                 $productData[$sku['id']]['is_show'] = 0;
                 $productData[$sku['id']]['is_hot'] = 0;
@@ -2432,7 +2146,7 @@ class StoreProductServices extends BaseServices
                 $productData[$sku['id']]['is_virtual'] = 0;
                 $productData[$sku['id']]['video_link'] = is_null($sku['video_link']) ? '' : $sku['video_link'];
                 $productData[$sku['id']]['temp_id'] = '';
-                $productData[$sku['id']]['activity'] = ['默认', '秒杀', '砍价', '拼团'];
+                $productData[$sku['id']]['activity'] = ['默认', '拼团'];
                 $productData[$sku['id']]['couponName'] = [];
                 $productData[$sku['id']]['coupon_ids'] = [];
                 $productData[$sku['id']]['command_word'] = $sku['command_word'] ?? '';
@@ -2513,70 +2227,6 @@ class StoreProductServices extends BaseServices
         return compact('all', 'success', 'jump', 'fail');
     }
 
-    public function otherInfo($id, $type)
-    {
-        $storeInfo = $this->dao->get($id, ['id', 'is_sub', 'is_vip', 'vip_product', 'vip_product_type']);
-        if (!$storeInfo) throw new AdminException('商品不存在');
-        $storeInfo = $storeInfo->toArray();
-        $storeInfo['store_brokerage_ratio'] = sys_config('store_brokerage_ratio');
-        $storeInfo['store_brokerage_two'] = sys_config('store_brokerage_two');
-        /** @var StoreProductAttrValueServices $storeProductAttrValueServices */
-        $storeProductAttrValueServices = app()->make(StoreProductAttrValueServices::class);
-        $attrValue = $storeProductAttrValueServices->getSkuArray(['product_id' => $id, 'type' => 0]);
-        return compact('storeInfo', 'attrValue');
-    }
-
-    public function otherSave($id, $type, $data)
-    {
-        $upProductData = [];
-        if ($type == 1) {
-            $upProductData = [
-                'is_sub' => $data['is_sub'],
-            ];
-        } elseif ($type == 2) {
-            $upProductData = [
-                'is_vip' => $data['is_vip'],
-                'vip_product' => $data['vip_product'],
-                'vip_product_type' => $data['vip_product_type'],
-            ];
-        }
-        if ($upProductData) $this->dao->update($id, $upProductData);
-        /** @var StoreProductAttrValueServices $storeProductAttrValueServices */
-        $storeProductAttrValueServices = app()->make(StoreProductAttrValueServices::class);
-        /** @var StoreProductAttrResultServices $storeProductAttrValueServices */
-        $storeProductAttrResultServices = app()->make(StoreProductAttrResultServices::class);
-        $attrResult = json_decode($storeProductAttrResultServices->get(['product_id' => $id, 'type' => 0])->toArray()['result'], true);
-        foreach ($data['attr_value'] as $item) {
-            $upAttrData = [];
-            if ($type == 1) {
-                $upAttrData = [
-                    'brokerage' => $data['is_sub'] ? $item['brokerage'] : 0,
-                    'brokerage_two' => $data['is_sub'] ? $item['brokerage_two'] : 0
-                ];
-            } elseif ($type == 2) {
-                $upAttrData = [
-                    'vip_price' => $data['is_vip'] ? $item['vip_price'] : 0
-                ];
-            }
-            if ($upAttrData) $storeProductAttrValueServices->update($item['id'], $upAttrData);
-            foreach ($attrResult['value'] as $key => $result) {
-                if (isset($result['unique'])) {
-                    if ($result['unique'] == $item['unique']) {
-                        if ($type == 1) {
-                            $attrResult['value'][$key]['brokerage'] = $data['is_sub'] ? $item['brokerage'] : 0;
-                            $attrResult['value'][$key]['brokerage_two'] = $data['is_sub'] ? $item['brokerage_two'] : 0;
-                        } elseif ($type == 2) {
-                            $attrResult['value'][$key]['vip_price'] = $data['is_vip'] ? $item['vip_price'] : 0;
-                            $attrResult['value'][$key]['vip_proportion'] = $data['is_vip'] ? bcmul(bcdiv($item['vip_price'], $item['price'], 4), 100, 2) : 0;
-                        }
-                    }
-                }
-            }
-            $storeProductAttrResultServices->update(['product_id' => $id, 'type' => 0], ['result' => json_encode($attrResult)]);
-        }
-        return true;
-    }
-
     /**
      * 真实价格
      * @param $uid
@@ -2589,9 +2239,8 @@ class StoreProductServices extends BaseServices
      */
     public function realPrice($uid, $id, $unique)
     {
-        $isMember = $isVip = $levelPrice = $memberPrice = $realPrice = $price = 0;
-        $productIsVip = $this->dao->value(['id' => $id], 'is_vip');
-        $attrInfo = app()->make(StoreProductAttrValueServices::class)->get(['unique' => $unique, 'product_id' => $id, 'type' => 0], ['price', 'vip_price', 'ot_price']);
+        $realPrice = $price = 0;
+        $attrInfo = app()->make(StoreProductAttrValueServices::class)->get(['unique' => $unique, 'product_id' => $id, 'type' => 0], ['price', 'ot_price']);
         $attrInfo = $attrInfo->toArray();
         $realPrice = $price = $attrInfo['price'];
         $otPrice = $attrInfo['ot_price'];
@@ -2613,8 +2262,8 @@ class StoreProductServices extends BaseServices
             if ($item['start_use_time'] != 0 && ($item['start_use_time'] > $time || $item['end_use_time'] < $time)) {
                 continue;
             }
-            // 用户未登录或者不是付费会员跳过付费会员券
-            if ($item['receive_type'] == 4 && !$isMember) {
+            // 会员券随付费会员一并下架
+            if ($item['receive_type'] == 4) {
                 continue;
             }
             // 判断用户是否还能领取或者已经领取未使用
@@ -2631,7 +2280,7 @@ class StoreProductServices extends BaseServices
                 break;
             }
         }
-        return ['real_price' => $realPrice, 'price' => $price, 'is_vip' => $isVip, 'product_is_vip' => $productIsVip, 'member_price' => $memberPrice, 'level_price' => $levelPrice, 'user_is_member' => $isMember, 'ot_price' => $otPrice];
+        return ['real_price' => $realPrice, 'price' => $price, 'is_vip' => 0, 'product_is_vip' => 0, 'member_price' => 0, 'level_price' => 0, 'user_is_member' => 0, 'ot_price' => $otPrice];
     }
 
     /**

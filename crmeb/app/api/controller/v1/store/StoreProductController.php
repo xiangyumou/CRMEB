@@ -145,8 +145,7 @@ class StoreProductController
      */
     public function product_hot(Request $request)
     {
-        $vip_user = $request->uid() ? app()->make(UserServices::class)->value(['uid' => $request->uid()], 'is_money_level') : 0;
-        $list = $this->services->getProducts(['is_hot' => 1, 'is_show' => 1, 'is_del' => 0, 'vip_user' => $vip_user]);
+        $list = $this->services->getProducts(['is_hot' => 1, 'is_show' => 1, 'is_del' => 0]);
         return app('json')->success(get_thumb_water($list, 'mid'));
     }
 

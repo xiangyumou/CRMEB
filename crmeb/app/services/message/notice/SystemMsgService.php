@@ -12,7 +12,6 @@
 namespace app\services\message\notice;
 
 use app\services\message\NoticeService;
-use app\services\kefu\service\StoreServiceServices;
 use app\services\message\MessageSystemServices;
 use think\facade\Log;
 
@@ -67,9 +66,7 @@ class SystemMsgService extends NoticeService
     {
         /** @var MessageSystemServices $MessageSystemServices */
         $MessageSystemServices = app()->make(MessageSystemServices::class);
-        /** @var StoreServiceServices $StoreServiceServices */
-        $StoreServiceServices = app()->make(StoreServiceServices::class);
-        $adminList = $StoreServiceServices->getStoreServiceOrderNotice();
+        $adminList = \app\services\CoreStore::orderNoticeRecipients();
         try {
             if ($this->noticeInfo['is_system'] == 1) {
                 $save = [];

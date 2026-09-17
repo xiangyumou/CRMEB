@@ -136,9 +136,6 @@ class StoreProductAttrServices extends BaseServices
         $storeProductService = app()->make(StoreProductServices::class);
         $_values = $storeProductAttrValueService->getProductAttrValue(['product_id' => $id, 'type' => $typeId]);
         if ($productId == 0) $productId = $id;
-        $is_vip = $storeProductService->get($productId, ['is_vip']);
-        $vip_price = true;
-        if (!$storeProductService->vipIsOpen(!!$is_vip['is_vip'])) $vip_price = false;
         $stock = $storeProductAttrValueService->getColumn(['product_id' => $productId, 'type' => 0], 'stock', 'suk');
         $values = [];
         $cartNumList = [];
@@ -156,7 +153,7 @@ class StoreProductAttrServices extends BaseServices
                     $value['cart_num'] = 0;
                 if (is_null($value['cart_num'])) $value['cart_num'] = 0;
             }
-            if (!$vip_price) $value['vip_price'] = 0;
+            $value['vip_price'] = 0;
             $value['product_stock'] = $stock[$value['suk']] ?? 0;
             $values[$value['suk']] = $value;
             if ($typeId) {

@@ -117,12 +117,11 @@ class UserServices extends BaseServices
     /**
      * 保存用户信息
      * @param $user
-     * @param int $spreadUid
      * @param string $userType
      * @return User|\think\Model
      * @throws Exception
      */
-    public function setUserInfo($user, int $spreadUid = 0, string $userType = 'wechat')
+    public function setUserInfo($user, string $userType = 'wechat')
     {
         $data = [
             'account' => $user['account'] ?? 'wx' . rand(1, 9999) . time(),
@@ -135,14 +134,7 @@ class UserServices extends BaseServices
             'last_time' => time(),
             'last_ip' => app()->request->ip(),
             'user_type' => $userType,
-            'staff_id' => $user['staff_id'] ?? 0,
-            'agent_id' => $user['agent_id'] ?? 0,
-            'division_id' => $user['division_id'] ?? 0,
         ];
-        if ($spreadUid) {
-            $data['spread_uid'] = $spreadUid;
-            $data['spread_time'] = time();
-        }
         $res = $this->dao->save($data);
         if (!$res)
             throw new AdminException('保存用户信息失败');
@@ -151,7 +143,7 @@ class UserServices extends BaseServices
         $this->rewardNewUser((int)$res->uid);
 
         //用户生成后置事件
-        event('UserRegisterListener', [$spreadUid, $userType, $user['nickname'], $res->uid, 1]);
+        event('UserRegisterListener', [$userType, $user['nickname'], $res->uid, 1]);
 
         //自定义事件-用户注册
         event('CustomEventListener', ['user_register', [
@@ -162,19 +154,6 @@ class UserServices extends BaseServices
             'user_type' => $userType,
         ]]);
 
-        if ($spreadUid) {
-            //推送消息
-            event('NoticeListener', [['spreadUid' => $spreadUid, 'user_type' => $userType, 'nickname' => $user['nickname']], 'bind_spread_uid']);
-
-            //自定义事件-绑定关系
-            event('CustomEventListener', ['user_spread', [
-                'uid' => $res->uid,
-                'nickname' => $user['nickname'],
-                'spread_uid' => $spreadUid,
-                'spread_time' => date('Y-m-d H:i:s'),
-                'user_type' => $userType,
-            ]]);
-        }
         return $res;
     }
 

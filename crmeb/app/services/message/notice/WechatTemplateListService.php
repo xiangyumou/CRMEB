@@ -13,7 +13,6 @@ namespace app\services\message\notice;
 
 use app\jobs\TemplateJob;
 use app\services\message\NoticeService;
-use app\services\kefu\service\StoreServiceServices;
 use app\services\user\UserServices;
 use app\services\wechat\WechatUserServices;
 use think\facade\Log;
@@ -230,9 +229,7 @@ class WechatTemplateListService extends NoticeService
      */
     public function sendAdminOrder($orderId, $storeName, $title, $status, $link)
     {
-        /** @var StoreServiceServices $StoreServiceServices */
-        $StoreServiceServices = app()->make(StoreServiceServices::class);
-        $adminList = $StoreServiceServices->getStoreServiceOrderNotice();
+        $adminList = \app\services\CoreStore::orderNoticeRecipients();
         foreach ($adminList as $item) {
             $this->sendTemplate((int)$item['uid'], [
                 'short_thing6' => $status,

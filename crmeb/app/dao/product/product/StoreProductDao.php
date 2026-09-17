@@ -63,10 +63,6 @@ class StoreProductDao extends BaseDao
             } else {
                 $query->whereIn('id', $where['ids'])->orderField('id', $where['ids'], 'asc');
             }
-        })->when(isset($where['is_live']) && $where['is_live'] == 1, function ($query) use ($where) {
-            $query->whereNotIn('id', function ($query) {
-                $query->name('live_goods')->where('is_del', 0)->where('audit_status', '<>', 3)->field('product_id')->select();
-            });
         })->count();
     }
 
@@ -151,10 +147,6 @@ class StoreProductDao extends BaseDao
             } else {
                 $query->whereIn('id', $where['ids'])->orderField('id', $where['ids'], 'asc');
             }
-        })->when(isset($where['is_live']) && $where['is_live'] == 1, function ($query) use ($where) {
-            $query->whereNotIn('id', function ($query) {
-                $query->name('live_goods')->where('is_del', 0)->where('audit_status', '<>', 3)->field('product_id')->select();
-            });
         })->when(isset($where['priceOrder']) && $where['priceOrder'] != '', function ($query) use ($where) {
             if ($where['priceOrder'] === 'desc') {
                 $query->order("price desc");
@@ -235,13 +227,9 @@ class StoreProductDao extends BaseDao
         $where['is_show'] = 1;
         $where['is_del'] = 0;
         return $this->search($where)->with(['couponId', 'star'])
-            ->field(['id', 'image', 'store_name', 'store_info', 'cate_id', 'price', 'ot_price', 'IFNULL(sales,0) + IFNULL(ficti,0) as sales', 'unit_name', 'sort', 'activity', 'stock', 'vip_price', 'is_vip'])
-            ->when(in_array($field, ['is_best', 'is_new', 'is_benefit', 'is_hot', 'is_vip']), function ($query) use ($field) {
-                if ($field != 'is_vip') {
-                    $query->where($field, 1);
-                } else {
-                    $query->where('is_vip', 1)->where('vip_price', '>', 0);
-                }
+            ->field(['id', 'image', 'store_name', 'store_info', 'cate_id', 'price', 'ot_price', 'IFNULL(sales,0) + IFNULL(ficti,0) as sales', 'unit_name', 'sort', 'activity', 'stock'])
+            ->when(in_array($field, ['is_best', 'is_new', 'is_benefit', 'is_hot']), function ($query) use ($field) {
+                $query->where($field, 1);
             })
             ->when($num, function ($query) use ($num) {
                 $query->limit($num);

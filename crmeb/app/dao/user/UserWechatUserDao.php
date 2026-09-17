@@ -235,66 +235,7 @@ class UserWechatUserDao extends BaseDao
             }
         }
 
-        // --- 充值次数筛选 (区间) ---
-        // recharge_count: [min, max] 统计 user_recharge 表中的记录数
-        if (isset($where['recharge_count']) && count($where['recharge_count']) == 2) {
-            $min = $where['recharge_count'][0];
-            $max = $where['recharge_count'][1];
-            
-            if ($min !== '' || $max !== '') {
-                $model = $model->where(function ($query) use ($userAlias, $min, $max) {
-                    // 子查询：通过分组统计充值记录数
-                    $query->whereExists(function ($q) use ($userAlias, $min, $max) {
-                        $q->name('user_recharge')
-                            ->whereColumn('uid', $userAlias . 'uid')
-                            ->field('uid')
-                            ->group('uid')
-                            ->having('COUNT(*) BETWEEN ' . (int)$min . ' AND ' . (int)$max);
-                    });
-                    
-                    // 特殊处理：包含无充值记录的用户
-                    if ($min === '' || $min == 0) {
-                        $query->whereOr(function ($q) use ($userAlias) {
-                            $q->whereNotExists(function ($sub) use ($userAlias) {
-                                $sub->name('user_recharge')
-                                    ->whereColumn('uid', $userAlias . 'uid');
-                            });
-                        });
-                    }
-                });
-            }
-        }
 
-        // --- 余额筛选 (区间) ---
-        // balance: [min, max]
-        if (isset($where['balance']) && count($where['balance']) == 2) {
-            if ($where['balance'][0] != '' && $where['balance'][1] != '') {
-                $model = $model->whereBetween($userAlias . 'now_money', $where['balance']);
-            } elseif ($where['balance'][0] != '' && $where['balance'][1] == '') {
-                $model = $model->where($userAlias . 'now_money', '>', $where['balance'][0]);
-            } elseif ($where['balance'][0] == '' && $where['balance'][1] != '') {
-                $model = $model->where($userAlias . 'now_money', '<', $where['balance'][1]);
-            }
-        }
-
-        // --- 积分筛选 (区间) ---
-        // integral: [min, max]
-        if (isset($where['integral']) && count($where['integral']) == 2) {
-            if ($where['integral'][0] != '' && $where['integral'][1] != '') {
-                $model = $model->whereBetween($userAlias . 'integral', $where['integral']);
-            } elseif ($where['integral'][0] != '' && $where['integral'][1] == '') {
-                $model = $model->where($userAlias . 'integral', '>', $where['integral'][0]);
-            } elseif ($where['integral'][0] == '' && $where['integral'][1] != '') {
-                $model = $model->where($userAlias . 'integral', '<', $where['integral'][1]);
-            }
-        }
-
-        // --- 基础属性筛选 ---
-        // 用户等级
-        if (isset($where['level']) && $where['level']) {
-            $model = $model->where($userAlias . 'level', $where['level']);
-        }
-        // 用户分组
         if (isset($where['group_id']) && $where['group_id']) {
             $model = $model->where($userAlias . 'group_id', $where['group_id']);
         }
@@ -325,16 +266,6 @@ class UserWechatUserDao extends BaseDao
             });
         }
         
-        // --- 会员状态筛选 ---
-        // isMember: 0(非会员), 1(会员)
-        if (isset($where['isMember']) && $where['isMember'] != '') {
-            if ($where['isMember'] == 0) {
-                $model = $model->where($userAlias . 'is_money_level', 0);
-            } else {
-                $model = $model->where($userAlias . 'is_money_level', '>', 0);
-            }
-        }
-
         // --- 关键字搜索 ---
         // field_key: 指定搜索字段 (nickname, phone, uid)
         // nickname: 搜索关键词
@@ -368,11 +299,7 @@ class UserWechatUserDao extends BaseDao
         // --- 客户端类型筛选 ---
         // user_type: app, wechat, routine 等
         if (isset($where['user_type']) && $where['user_type']) {
-            if ($where['user_type'] == 'app') {
-                $model = $model->whereIn($userAlias . 'user_type', ['app', 'apple']);
-            } else {
-                $model = $model->where($userAlias . 'user_type', $where['user_type']);
-            }
+            $model = $model->where($userAlias . 'user_type', $where['user_type']);
         }
 
         // --- 性别筛选 ---
@@ -405,11 +332,6 @@ class UserWechatUserDao extends BaseDao
         // --- 指定ID筛选 ---
         if (isset($where['ids']) && count($where['ids'])) {
             $model->whereIn($userAlias . 'uid', $where['ids']);
-        }
-
-        // --- 代理等级筛选 ---
-        if (isset($where['agent_level']) && $where['agent_level'] != '') {
-            $model->where($userAlias . 'agent_level', $where['agent_level']);
         }
 
         return $field ? $model->field($field) : $model;

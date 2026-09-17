@@ -31,11 +31,10 @@ class HomeServices extends BaseServices
         $category = app()->make(StoreCategoryServices::class);
         /** @var StoreProductServices $product */
         $product = app()->make(StoreProductServices::class);
-        $vip_user = $uid ? app()->make(UserServices::class)->value(['uid' => $uid], 'is_money_level') : 0;
         [$page, $limit] = $this->getPageValue();
         $list = $category->getCid($page, $limit);
         foreach ($list as $key => &$info) {
-            $productList = $product->getSearchList(['cid' => $info['id'], 'star' => 1, 'is_show' => 1, 'is_del' => 0, 'vip_user' => $vip_user], 1, 8, ['id,store_name,image,IFNULL(sales, 0) + IFNULL(ficti, 0) as sales,price,ot_price,presale']);
+            $productList = $product->getSearchList(['cid' => $info['id'], 'star' => 1, 'is_show' => 1, 'is_del' => 0, ], 1, 8, ['id,store_name,image,IFNULL(sales, 0) + IFNULL(ficti, 0) as sales,price,ot_price,presale']);
             if (!count($productList)) unset($list[$key]);
             foreach ($productList as &$item) {
                 if (count($item['star'])) {

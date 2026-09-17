@@ -14,11 +14,7 @@ namespace app\services\statistic;
 use app\services\BaseServices;
 use app\services\order\StoreOrderRefundServices;
 use app\services\other\export\ExportServices;
-use app\services\order\OtherOrderServices;
 use app\services\order\StoreOrderServices;
-use app\services\user\UserExtractServices;
-use app\services\user\UserMoneyServices;
-use app\services\user\UserRechargeServices;
 
 /**
  * Class TradeStatisticServices
@@ -194,18 +190,7 @@ class TradeStatisticServices extends BaseServices
     {
         /** 收入营业额 */
         //商品订单收入
-        $inOrderMoney = $this->getOrderTotalMoney($where, $selectType, "", $isNum);
-        //用户充值收入
-        $inRechargeMoneyHome = $this->getRechargeTotalMoney($where, $selectType, "", $isNum);
-        $inrechgeMoneyAdmin = $this->getBillYeTotalMoney($where, $selectType, '', $isNum);
-        $inRechargeMoney = bcadd($inRechargeMoneyHome, $inrechgeMoneyAdmin, 2);
-        //购买会员收入
-        $inMemberMoney = $this->getMemberTotalMoney($where, $selectType, "", $isNum);
-        //线下收款收入
-        $inOfflineMoney = $this->getOfflineTotalMoney($where, $selectType, "", $isNum);
-        //总交易额
-        $inTotalMoney = bcadd(bcadd($inOrderMoney, $inRechargeMoney, 2), bcadd($inMemberMoney, $inOfflineMoney, 2), 2);/* - $outExtractUserMoney*/
-        return $inTotalMoney;
+        return $this->getOrderTotalMoney($where, $selectType, "", $isNum);
     }
 
     /**
@@ -219,19 +204,7 @@ class TradeStatisticServices extends BaseServices
 
         //商品订单收入
         $orderGroup = "add_time";
-        $OrderMoney = $this->getOrderTotalMoney($where, $selectType, $orderGroup);
-        //用户充值收入
-        $rechargeGroup = "add_time";
-        $RechargeMoneyHome = $this->getRechargeTotalMoney($where, $selectType, $rechargeGroup);
-        $RechargeMoneyAdmin = $this->getBillYeTotalMoney($where, $selectType, $rechargeGroup);
-        $RechargeMoney = $this->totalArrData([$RechargeMoneyHome, $RechargeMoneyAdmin]);
-        //购买会员收入
-        $memberGroup = "add_time";
-        $MemberMoney = $this->getMemberTotalMoney($where, $selectType, $memberGroup);
-        //线下收款收入
-        $offlineGroup = "add_time";
-        $OfflineMoney = $this->getOfflineTotalMoney($where, $selectType, $offlineGroup);
-        return $this->totalArrData([$OrderMoney, $RechargeMoney, $MemberMoney, $OfflineMoney]);
+        return $this->getOrderTotalMoney($where, $selectType, $orderGroup);
     }
 
     /**
@@ -266,7 +239,7 @@ class TradeStatisticServices extends BaseServices
         $OrderChain = $this->countRate($OrderMoney, $lastOrderMoney);
         $topData[1] = [
             'title' => '商品支付金额',
-            'desc' => '选定条件下，用户购买商品的实际支付金额，包括微信支付、余额支付、支付宝支付、线下支付金额（拼团商品在成团之后计入，线下支付订单在后台确认支付后计入）',
+            'desc' => '选定条件下，用户购买商品的实际支付金额（拼团商品在成团之后计入）',
             'total_money' => $OrderMoney,
             'rate' => $OrderChain,
             'value' => $OrderCurve['y'],
@@ -276,110 +249,12 @@ class TradeStatisticServices extends BaseServices
 
         $Chain['goods'] = $OrderCurve;
 
-        /** 购买会员金额 */
-        $memberMoney = $this->getMemberTotalMoney($where, 'sum');
-        $lastMemberMoney = $this->getMemberTotalMoney($dateWhere, 'sum', "", $isNum);
-        $memberCurve = $this->getMemberTotalMoney($where, 'group', "pay_time");
-        $MemberChain = $this->countRate($memberMoney, $lastMemberMoney);
-        $topData[2] = [
-            'title' => '购买会员金额',
-            'desc' => '选定条件下，用户成功购买付费会员的金额',
-            'total_money' => $memberMoney,
-            'rate' => $MemberChain,
-            'value' => $memberCurve['y'],
-            'type' => 1,
-            'sign' => 'member',
-        ];
-        $Chain['member'] = $memberCurve;
-
-        /** 充值金额 */
-        $rechgeMoneyHome = $this->getRechargeTotalMoney($where, 'sum');
-        $rechgeMoneyAdmin = $this->getBillYeTotalMoney($where, 'sum');
-        $rechgeMoneyTotal = bcadd($rechgeMoneyHome, $rechgeMoneyAdmin, 2);
-        $lastRechgeMoneyHome = $this->getRechargeTotalMoney($dateWhere, 'sum', "", $isNum);
-        $lastRechgeMoneyAdmin = $this->getBillYeTotalMoney($dateWhere, 'sum', "", $isNum);
-        $lastRechgeMoneyTotal = bcadd($lastRechgeMoneyHome, $lastRechgeMoneyAdmin, 2);
-        $RechgeHomeCurve = $this->getRechargeTotalMoney($where, 'group', "pay_time");
-        $RechgeAdminCurve = $this->getBillYeTotalMoney($where, 'group', "add_time");
-        $RechgeTotalCurve = $this->totalArrData([$RechgeHomeCurve, $RechgeAdminCurve]);
-        $RechgeChain = $this->countRate($rechgeMoneyTotal, $lastRechgeMoneyTotal);
-        $topData[3] = [
-            'title' => '充值金额',
-            'desc' => '选定条件下，用户成功充值的金额',
-            'total_money' => $rechgeMoneyTotal,
-            'rate' => $RechgeChain,
-            'value' => $RechgeTotalCurve['y'],
-            'type' => 1,
-            'sign' => 'rechge',
-        ];
-        $Chain['rechage'] = $RechgeTotalCurve;
-
-        /** 线下收银 */
-        $offlineMoney = $this->getOfflineTotalMoney($where, 'sum');
-        $lastOfflineMoney = $this->getOfflineTotalMoney($dateWhere, 'sum', "", $isNum);
-        $offlineCurve = $this->getOfflineTotalMoney($where, 'group', "pay_time");
-        $offlineChain = $this->countRate($offlineMoney, $lastOfflineMoney);
-        $topData[4] = [
-            'title' => '线下收银金额',
-            'desc' => '选定条件下，用户在线下扫码支付的金额',
-            'total_money' => $offlineMoney,
-            'rate' => $offlineChain,
-            'value' => $offlineCurve['y'],
-            'type' => 0,
-            'sign' => 'offline',
-        ];
-        $Chain['offline'] = $offlineCurve;
-
-        /**  支出*/
-        //余额支付商品
-        $outYeOrderMoney = $this->getOrderTotalMoney(['pay_type' => "yue", 'time' => $where['time']], 'sum');
-        $lastOutYeOrderMoney = $this->getOrderTotalMoney(['pay_type' => "yue", 'time' => $dateWhere['time']], 'sum', "", $isNum);
-        $outYeOrderCurve = $this->getOrderTotalMoney(['pay_type' => "yue", 'time' => $where['time']], 'group', 'pay_time');
-        $outYeOrderChain = $this->countRate($outYeOrderMoney, $lastOutYeOrderMoney);
-        //余额购买会员
-        $outYeMemberMoney = $this->getMemberTotalMoney(['pay_type' => "yue", 'time' => $where['time']], 'sum');
-        $lastOutYeMemberMoney = $this->getMemberTotalMoney(['pay_type' => "yue", 'time' => $dateWhere['time']], 'sum', "", $isNum);
-        $outYeMemberCurve = $this->getMemberTotalMoney(['pay_type' => "yue", 'time' => $where['time']], 'group', "pay_time");
-        $outYeMemberChain = $this->countRate($outYeMemberMoney, $lastOutYeMemberMoney);
-        //余额支付
-        $outYeMoney = bcadd($outYeOrderMoney, $outYeMemberMoney, 2);
-        $lastOutYeMoney = bcadd($lastOutYeOrderMoney, $lastOutYeMemberMoney, 2);
-        $outYeCurve = $this->totalArrData([$outYeOrderCurve, $outYeMemberCurve]);
-        $outYeChain = $this->countRate($outYeOrderChain, $outYeMemberChain);
-        $topData[6] = [
-            'title' => '余额支付金额',
-            'desc' => '用户下单时使用余额实际支付的金额',
-            'total_money' => $outYeMoney,
-            'rate' => $outYeChain,
-            'value' => $outYeCurve['y'],
-            'type' => 0,
-            'sign' => 'yue',
-        ];
-        $Chain['out_ye'] = $outYeCurve;
-
-
-        //支付佣金金额
-        $outExtractMoney = $this->getExtractTotalMoney($where, 'sum');
-        $lastOutExtractMoney = $this->getExtractTotalMoney($dateWhere, 'sum', "", $isNum);
-        $OutExtractCurve = $this->getExtractTotalMoney($where, 'group', "add_time");
-        $OutExtractChain = $this->countRate($outExtractMoney, $lastOutExtractMoney);
-        $topData[7] = [
-            'title' => '支付佣金金额',
-            'desc' => '后台给推广员支付的推广佣金，以实际支付为准',
-            'total_money' => $outExtractMoney,
-            'rate' => $OutExtractChain,
-            'value' => $OutExtractCurve['y'],
-            'type' => 0,
-            'sign' => 'yong',
-        ];
-        $Chain['extract'] = $OutExtractCurve;
-
         //商品退款金额
         $outOrderRefund = $this->getOrderRefundTotalMoney(['refund_type' => 6, 'time' => $where['time']], 'sum');
         $lastOutOrderRefund = $this->getOrderRefundTotalMoney(['refund_type' => 6, 'time' => $dateWhere['time']], 'sum', "", $isNum);
         $outOrderRefundCurve = $this->getOrderRefundTotalMoney(['refund_type' => 6, 'time' => $where['time']], 'group', 'add_time');
         $orderRefundChain = $this->countRate($outOrderRefund, $lastOutOrderRefund);
-        $topData[8] = [
+        $topData[2] = [
             'title' => '商品退款金额',
             'desc' => '用户成功退款的商品金额',
             'total_money' => $outOrderRefund,
@@ -391,13 +266,13 @@ class TradeStatisticServices extends BaseServices
         $Chain['refund'] = $outOrderRefundCurve;
 
         //支出金额
-        $outTotalMoney = bcadd(bcadd($outYeMoney, $outExtractMoney, 2), $outOrderRefund, 2);
-        $lastOutTotalMoney = bcadd(bcadd($lastOutYeMoney, $lastOutExtractMoney, 2), $lastOutOrderRefund, 2);
-        $outTotalCurve = $this->totalArrData([$outYeCurve, $OutExtractCurve, $outOrderRefundCurve]);
-        $outTotalChain = $this->countRate($outTotalMoney, $lastOutTotalMoney);
-        $topData[5] = [
+        $outTotalMoney = $outOrderRefund;
+        $lastOutTotalMoney = $lastOutOrderRefund;
+        $outTotalCurve = $outOrderRefundCurve;
+        $outTotalChain = $orderRefundChain;
+        $topData[3] = [
             'title' => '支出金额',
-            'desc' => '余额支付金额、支付佣金金额、商品退款金额',
+            'desc' => '商品退款金额',
             'total_money' => $outTotalMoney,
             'rate' => $outTotalChain,
             'value' => $outTotalCurve['y'],
@@ -433,7 +308,7 @@ class TradeStatisticServices extends BaseServices
         $inTotalChain = $this->countRate($inTotalMoney, $lastInTotalMoney);
         $topData[0] = [
             'title' => '营业额',
-            'desc' => '商品支付金额、充值金额、购买付费会员金额、线下收银金额',
+            'desc' => '选定条件下，用户购买商品的实际支付金额',
             'total_money' => $inTotalMoney,
             'rate' => $inTotalChain,
             'value' => $inTotalCurve['y'],
@@ -622,144 +497,6 @@ class TradeStatisticServices extends BaseServices
 
         if ($group) {
             $totalMoney = $this->trendYdata($totalMoney, $whereOrderMoner['timeKey']);
-        }
-        return $totalMoney;
-    }
-
-    /**
-     * 支付佣金
-     * @param $where
-     * @param string $selectType
-     * @param string $group
-     * @param bool $isNum
-     * @return array|float|mixed
-     * @throws \Exception
-     */
-    public function getExtractTotalMoney($where, string $selectType, string $group = "", bool $isNum = false)
-    {
-        /** 普通商品订单支付金额 */
-        /** @var UserExtractServices $extractService */
-        $extractService = app()->make(UserExtractServices::class);
-        $orderSumField = "extract_price";
-        $whereData['status'] = 1;
-        $whereData['timeKey'] = $this->TimeConvert($where['time'], $isNum);
-        $totalMoney = $extractService->getOutMoneyByWhere($whereData, $orderSumField, $selectType, $group);
-        if ($group) {
-
-            $totalMoney = $this->trendYdata($totalMoney, $whereData['timeKey']);
-
-        }
-        return $totalMoney;
-    }
-
-    /**
-     * 获取用户充值营收
-     * @param array $where
-     * @param string $selectType
-     * @param string $group
-     * @param bool $isNum
-     * @return array|float|int
-     * @throws \Exception
-     */
-    public function getRechargeTotalMoney(array $where, string $selectType, string $group = "", bool $isNum = false)
-    {
-        /** @var UserRechargeServices $userRechageService */
-        $userRechageService = app()->make(UserRechargeServices::class);
-        $rechargeSumField = "price";
-        $whereInRecharge['paid'] = 1;
-        $whereInRecharge['refund_price'] = '0.00';
-        $whereInRecharge['no_recharge_type'] = 'system';
-        $whereInRecharge['timeKey'] = $this->TimeConvert($where['time'], $isNum);
-        $whereInRecharge['store_id'] = 0;
-        $totalMoney = $userRechageService->getRechargeMoneyByWhere($whereInRecharge, $rechargeSumField, $selectType, $group);
-        if ($group) {
-            $totalMoney = $this->trendYdata($totalMoney, $whereInRecharge['timeKey']);
-        }
-        return $totalMoney;
-    }
-
-    /**
-     * 后台手动充值
-     * @param array $where
-     * @param string $selectType
-     * @param string $group
-     * @param bool $isNum
-     * @return array|float|int
-     * @throws \Exception
-     */
-    public function getBillYeTotalMoney(array $where, string $selectType, string $group = "", bool $isNum = false)
-    {
-        /** 后台用户充值金额 */
-        $rechargeSumField = "number";
-        $whereInRecharge['pm'] = 1;
-        $whereInRecharge['type'] = 'system_add';
-        $whereInRecharge['timeKey'] = $this->TimeConvert($where['time'], $isNum);
-        $whereInRecharge['store_id'] = 0;
-        /** @var UserMoneyServices $userMoneyServices */
-        $userMoneyServices = app()->make(UserMoneyServices::class);
-        $totalMoney = $userMoneyServices->getRechargeMoneyByWhere($whereInRecharge, $rechargeSumField, $selectType, $group);
-        if ($group) {
-            $totalMoney = $this->trendYdata($totalMoney, $whereInRecharge['timeKey']);
-        }
-        return $totalMoney;
-    }
-
-    /**
-     * 购买会员总额
-     * @param array $where
-     * @param string $selectType
-     * @param string $group
-     * @param bool $isNum
-     * @return array|mixed
-     * @throws \Exception
-     */
-    public function getMemberTotalMoney(array $where, string $selectType, string $group = "", bool $isNum = false)
-    {
-
-        /** 购买会员 */
-        /** @var OtherOrderServices $otherOrderService */
-        $otherOrderService = app()->make(OtherOrderServices::class);
-        $memberSumField = "pay_price";
-        $whereInMember['type'] = 1;
-        $whereInMember['paid'] = 1;
-        $whereInMember['store_id'] = 0;
-        if (isset($where['pay_type'])) {
-            $whereInMember['pay_type'] = $where['pay_type'];
-        } else {
-            //$whereInMember['pay_type_no'] = 'yue';
-        }
-        $whereInMember['timeKey'] = $this->TimeConvert($where['time'], $isNum);
-        $totalMoney = $otherOrderService->getMemberMoneyByWhere($whereInMember, $memberSumField, $selectType, $group);
-        if ($group) {
-            $totalMoney = $this->trendYdata($totalMoney, $whereInMember['timeKey']);
-        }
-        return $totalMoney;
-
-    }
-
-    /**
-     * 线下付款总额
-     * @param array $where
-     * @param string $selectType
-     * @param string $group
-     * @param bool $isNum
-     * @return array|mixed
-     * @throws \Exception
-     */
-    public function getOfflineTotalMoney(array $where, string $selectType, string $group = "", bool $isNum = false)
-    {
-        /** 线下付款总额 */
-        /** @var OtherOrderServices $otherOrderService */
-        $otherOrderService = app()->make(OtherOrderServices::class);
-        $offlineSumField = "pay_price";
-        $whereOffline['type'] = 3;
-        $whereOffline['paid'] = 1;
-        $whereOffline['store_id'] = 0;
-        // $whereOffline['pay_type_no'] = 'yue';
-        $whereOffline['timeKey'] = $this->TimeConvert($where['time'], $isNum);
-        $totalMoney = $otherOrderService->getMemberMoneyByWhere($whereOffline, $offlineSumField, $selectType, $group);
-        if ($group) {
-            $totalMoney = $this->trendYdata($totalMoney, $whereOffline['timeKey']);
         }
         return $totalMoney;
     }

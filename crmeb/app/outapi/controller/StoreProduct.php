@@ -39,7 +39,6 @@ class StoreProduct extends AuthController
             ['cate_id', ''],
             ['store_name', ''],
             ['type', 1],
-            ['is_live', 0],
             ['is_new', ''],
             ['is_virtual', -1],
             ['is_presale', -1]

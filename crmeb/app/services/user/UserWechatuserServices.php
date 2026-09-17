@@ -52,10 +52,6 @@ class UserWechatuserServices extends BaseServices
     {
         [$page, $limit] = $this->getPageValue();
         $order_string = '';
-        $order_arr = ['ascending', 'descending'];
-        if (isset($where['now_money']) && in_array($where['now_money'], $order_arr)) {
-            $order_string = $where['now_money'] == 'ascending' ? 'now_money asc' : 'now_money desc';
-        }
         $list = $this->dao->getListByModel($where, $field, $order_string, $page, $limit);
         $count = $this->dao->getCountByWhere($where);
         return [$list, $count];

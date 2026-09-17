@@ -137,39 +137,19 @@ class StoreOrderDao extends BaseDao
         })->when(isset($where['type']), function ($query) use ($where) {
             switch ($where['type']) {
                 case 1:
-                    $query->where('combination_id', 0)->where('seckill_id', 0)->where('bargain_id', 0)->where('advance_id', 0);
+                    $query->where('combination_id', 0)->where('advance_id', 0);
                     break;
                 case 2:
                     $query->where('pink_id|combination_id', ">", 0);
                     break;
-                case 3:
-                    $query->where('seckill_id', ">", 0);
-                    break;
-                case 4:
-                    $query->where('bargain_id', ">", 0);
-                    break;
                 case 5:
                     $query->where('advance_id', ">", 0);
-                    break;
-                case 6:
-                    $query->where(function ($query) {
-                        $query->where('one_brokerage', '>', 0)->whereOr('two_brokerage', '>', 0);
-                    });
                     break;
             }
         })->when(isset($where['pay_type']), function ($query) use ($where) {
             switch ($where['pay_type']) {
                 case 1:
                     $query->where('pay_type', 'weixin');
-                    break;
-                case 2:
-                    $query->where('pay_type', 'yue');
-                    break;
-                case 3:
-                    $query->where('pay_type', 'offline');
-                    break;
-                case 4:
-                    $query->where('pay_type', 'alipay');
                     break;
             }
         })->when($realName && $fieldKey && in_array($fieldKey, $this->withField), function ($query) use ($where, $realName, $fieldKey) {
@@ -180,11 +160,7 @@ class StoreOrderDao extends BaseDao
                     $que->name('store_order_cart_info')->whereOr('product_id', 'in', function ($q) use ($where) {
                         $q->name('store_product')->whereLike('store_name|keyword', '%' . $where['real_name'] . '%')->field(['id'])->select();
                     })->whereOr('product_id', 'in', function ($q) use ($where) {
-                        $q->name('store_bargain')->whereLike('title|info', '%' . $where['real_name'] . '%')->field(['id'])->select();
-                    })->whereOr('product_id', 'in', function ($q) use ($where) {
                         $q->name('store_combination')->whereLike('title|info', '%' . $where['real_name'] . '%')->field(['id'])->select();
-                    })->whereOr('product_id', 'in', function ($q) use ($where) {
-                        $q->name('store_seckill')->whereLike('title|info', '%' . $where['real_name'] . '%')->field(['id'])->select();
                     })->field(['oid'])->select();
                 });
             }
@@ -196,11 +172,7 @@ class StoreOrderDao extends BaseDao
                     $que->name('store_order_cart_info')->whereOr('product_id', 'in', function ($q) use ($where) {
                         $q->name('store_product')->whereLike('store_name|keyword', '%' . $where['real_name'] . '%')->field(['id'])->select();
                     })->whereOr('product_id', 'in', function ($q) use ($where) {
-                        $q->name('store_bargain')->whereLike('title|info', '%' . $where['real_name'] . '%')->field(['id'])->select();
-                    })->whereOr('product_id', 'in', function ($q) use ($where) {
                         $q->name('store_combination')->whereLike('title|info', '%' . $where['real_name'] . '%')->field(['id'])->select();
-                    })->whereOr('product_id', 'in', function ($q) use ($where) {
-                        $q->name('store_seckill')->whereLike('title|info', '%' . $where['real_name'] . '%')->field(['id'])->select();
                     })->field(['oid'])->select();
                 });
             });

@@ -345,7 +345,6 @@ class StoreProduct extends AuthController
             ['cate_id', ''],
             ['store_name', ''],
             ['type', 1],
-            ['is_live', 0],
             ['is_new', ''],
             ['is_virtual', -1],
             ['is_presale', -1],
@@ -540,24 +539,5 @@ class StoreProduct extends AuthController
     {
         app()->make(SystemClearData::class)->recycleProduct($id);
         return app('json')->success('删除成功');
-    }
-
-    public function otherInfo($id, $type)
-    {
-        if (!$id) return app('json')->fail('参数错误');
-        return app('json')->success($this->service->otherInfo($id, $type));
-    }
-
-    public function otherSave($id, $type)
-    {
-        $data = $this->request->postMore([
-            ['is_sub', 0],
-            ['is_vip', 0],
-            ['vip_product', 0],
-            ['vip_product_type', 0],
-            ['attr_value', []],
-        ]);
-        $this->service->otherSave($id, $type, $data);
-        return app('json')->success('保存成功');
     }
 }
