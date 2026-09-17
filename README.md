@@ -126,6 +126,8 @@ docker run -d --name crmeb-php -p 9000:9000 ghcr.io/xiangyumou/crmeb:latest
 
 This image provides PHP-FPM only; it does not bundle Nginx, MySQL, or Redis. Point an external Nginx FastCGI upstream at port `9000` and configure the database and Redis separately. For a source checkout, run `composer install` in the `crmeb` directory before starting the application.
 
+For the existing `x-zoo.vip` production stack, follow the [production runbook](deploy/production/README.md) instead of the standalone `docker run` example above.
+
 > Click here for detailed information [Help Documentation](/help/docker/docker.md)。
 ---
 

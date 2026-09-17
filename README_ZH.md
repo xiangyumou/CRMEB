@@ -129,6 +129,8 @@ docker run -d --name crmeb-php -p 9000:9000 ghcr.io/xiangyumou/crmeb:latest
 
 该镜像提供 PHP-FPM 服务，不包含 Nginx、MySQL 或 Redis。生产环境需要将 Nginx FastCGI 指向容器的 `9000` 端口，并单独配置数据库与 Redis。源码安装依赖请在 `crmeb` 目录执行 `composer install`。
 
+`x-zoo.vip` 现有生产环境的更新、验证及人工回滚操作见 [生产部署手册](deploy/production/README.md)。上述 `docker run` 示例不是该环境的更新命令。
+
 > 详细说明点击查看 [帮助文档](/help/docker/docker.md)。
 ---
 
