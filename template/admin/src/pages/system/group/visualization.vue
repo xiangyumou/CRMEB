@@ -935,7 +935,7 @@ export default {
     },
     getListHeader() {
       this.loading = true;
-      groupDataHeaderApi({ config_name: this.name }, 'setting/sign_data/header')
+      groupDataHeaderApi({ config_name: this.name }, 'setting/group_data/header')
         .then((res) => {
           let data = res.data;
           let header = data.header;

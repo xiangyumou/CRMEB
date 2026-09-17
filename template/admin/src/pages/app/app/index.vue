@@ -59,7 +59,6 @@ import Setting from '@/setting';
 import { getColorChange } from '@/api/diy';
 import { mapState } from 'vuex';
 import {
-  groupDataHeaderApi,
   getAgreement,
   setAgreement,
 } from '@/api/system';
@@ -181,21 +180,6 @@ export default {
     link(index) {
       this.activeIndexs = index;
       this.$refs.linkaddres.modals = true;
-    },
-    getListHeader() {
-      this.loading = true;
-      groupDataHeaderApi({ config_name: this.name }, 'setting/sign_data/header')
-        .then((res) => {
-          let data = res.data;
-          let header = data.header;
-          let index = [];
-          this.columns1 = header;
-          this.loading = false;
-        })
-        .catch((res) => {
-          this.loading = false;
-          this.$message.error(res.msg);
-        });
     },
     getContent(val) {
       this.formValidate.content = val;

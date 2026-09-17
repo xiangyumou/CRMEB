@@ -45,7 +45,8 @@ class wsSocket {
       wsUrl = wsKefuSocketUrl;
     }
     if (wsUrl) {
-      this.ws = new WebSocket(wsUrl);
+      // 后端返回的可能是 ws:// 地址，HTTPS 页面上直接连接会被浏览器拦截，统一按页面协议转换
+      this.ws = new WebSocket(wss(wsUrl));
       this.ws.onopen = this.onOpen.bind(this);
       this.ws.onerror = this.onError.bind(this);
       this.ws.onmessage = this.onMessage.bind(this);

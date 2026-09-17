@@ -161,21 +161,17 @@ export default {
         let data = {
           tab_id: Number(ids),
         };
+        // 物流配置和短信开关各自有独立接口，其余配置页（系统设置、公众号/小程序/APP
+        // 配置、优惠券配置、模块配置等）都由 setting/config 提供表单。
         let logistics = 'freight/config/edit_basics',
-          agent = 'agent/config/edit_basics',
-          integral = 'marketing/integral_config/edit_basics',
           sms = 'serve/sms_config/edit_basics',
           config = 'setting/config/edit_basics';
         let url =
           this.$route.name === 'setting_logistics'
             ? logistics
-            : this.$route.name === 'setting_distributionSet'
-            ? agent
             : this.$route.name === 'setting_message'
             ? sms
-            : this.$route.name === 'setting_setSystem'
-            ? config
-            : integral;
+            : config;
         dataFromApi(data, url)
           .then(async (res) => {
             this.spinShow = false;

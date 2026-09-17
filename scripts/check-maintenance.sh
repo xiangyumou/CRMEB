@@ -4,10 +4,13 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 
+# The tested image is built from the current revision:
+#   docker build --build-arg VCS_REF="$(git rev-parse HEAD)" -t crmeb-test .
 # Use the PHP 7.4 image built by the regression runner, so host PHP is optional.
-sh docker/run-regression.sh
-docker run --rm -v "$root/crmeb:/lint:ro" crmeb-regression-regression \
-    sh -c 'find /lint/app /lint/crmeb /lint/route /lint/upgrade/core-store -type f -name "*.php" -exec sh -c '\''for file do php -l "$file" >/dev/null || exit 1; done'\'' sh {} +'
+image=${1:-crmeb-test}
+sh docker/run-regression.sh "$image"
+docker run --rm --entrypoint sh -v "$root/crmeb:/lint:ro" crmeb-regression-regression \
+    -c 'find /lint/app /lint/crmeb /lint/route /lint/upgrade/core-store -type f -name "*.php" -exec sh -c '\''for file do php -l "$file" >/dev/null || exit 1; done'\'' sh {} +'
 node tests/static/core-store-front.cjs
 node tests/static/admin-api-contract.cjs
 node tests/static/verify-release-test.cjs

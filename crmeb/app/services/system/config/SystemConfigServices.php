@@ -62,14 +62,6 @@ class SystemConfigServices extends BaseServices
         'freight' => [
             'url' => '/freight/config/save_basics',
             'auth' => ['express'],
-        ],
-        'agent' => [
-            'url' => '/agent/config/save_basics',
-            'auth' => ['fenxiao'],
-        ],
-        'marketing' => [
-            'url' => '/marketing/integral_config/save_basics',
-            'auth' => ['point'],
         ]
     ];
 

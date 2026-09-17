@@ -67,7 +67,6 @@
 
 <script>
 import { mapState, mapMutations } from 'vuex';
-import { putWrite } from '@/api/order';
 import { exportOrderList } from '@/api/export';
 import timeOptions from '@/libs/timeOptions';
 export default {
@@ -108,7 +107,6 @@ export default {
       statusType: '',
       time: '',
       value2: [],
-      modals2: false,
       timeVal: [],
       payList: [
         { label: '全部', val: '' },

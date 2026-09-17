@@ -165,12 +165,6 @@
             <el-dropdown size="small" @command="changeMenu(scope.row, $event)">
               <span class="el-dropdown-link">更多<i class="el-icon-arrow-down el-icon--right"></i> </span>
               <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item
-                  command="1"
-                  ref="ones"
-                  v-show="scope.row._status === 1 && scope.row.paid === 0 && scope.row.pay_type === 'offline'"
-                  >立即支付</el-dropdown-item
-                >
                 <el-dropdown-item command="2">订单详情</el-dropdown-item>
                 <el-dropdown-item
                   command="4"
@@ -230,7 +224,6 @@ import {
   getDataInfoNew,
   getNewRefundFrom,
   getNewnoRefundFrom,
-  refundIntegral,
   getDistribution,
 } from '@/api/order';
 import userDetails from '@/pages/user/list/handle/userDetails';
@@ -306,23 +299,6 @@ export default {
     changeMenu(row, name) {
       this.orderId = row.id;
       switch (name) {
-        case '1':
-          this.delfromData = {
-            title: '修改立即支付',
-            url: `/order/pay_offline/${row.id}`,
-            method: 'post',
-            ids: '',
-          };
-          this.$modalSure(this.delfromData)
-            .then((res) => {
-              this.$message.success(res.msg);
-              this.getOrderList();
-            })
-            .catch((res) => {
-              this.$message.error(res.msg);
-            });
-          // this.modalTitleSs = '修改立即支付';
-          break;
         case '2':
           this.getData(row.order_id, 2);
           break;
@@ -335,9 +311,6 @@ export default {
           break;
         case '5':
           this.getRefundData(row.id, row.refund_type);
-          break;
-        case '6':
-          this.getRefundIntegral(row.id);
           break;
         case '7':
           this.getNoRefundData(row.id);
@@ -419,17 +392,6 @@ export default {
           this.$emit('changeGetTabs');
         });
       }
-    },
-    // 获取退积分表单数据
-    getRefundIntegral(id) {
-      refundIntegral(id)
-        .then(async (res) => {
-          this.FromData = res.data;
-          this.$refs.edits.modals = true;
-        })
-        .catch((res) => {
-          this.$message.error(res.msg);
-        });
     },
     // 获取详情表单数据
     getData(id, type) {

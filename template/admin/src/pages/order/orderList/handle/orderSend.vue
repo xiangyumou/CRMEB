@@ -136,23 +136,6 @@
           </el-form-item>
         </template>
       </div>
-      <div v-if="formItem.type === '2'">
-        <el-form-item label="送货人：" :prop="formItem.type == '2' ? 'sh_delivery' : ''">
-          <el-select
-            v-model="formItem.sh_delivery"
-            placeholder="请选择送货人"
-            style="width: 60%"
-            @change="shDeliveryChange"
-          >
-            <el-option
-              v-for="(item, i) in deliveryList"
-              :value="item.id"
-              :key="i"
-              :label="`${item.wx_name}（${item.phone}）`"
-            ></el-option>
-          </el-select>
-        </el-form-item>
-      </div>
       <div v-show="formItem.type === '3'">
         <el-form-item label="备注：">
           <el-input
@@ -252,7 +235,6 @@ import {
   putDelivery,
   splitDelivery,
   orderExpressTemp,
-  orderDeliveryList,
   orderSheetInfo,
   splitCartInfo,
   kuaidiComsList,
@@ -285,7 +267,6 @@ export default {
         to_name: '',
         to_tel: '',
         to_addr: '',
-        sh_delivery: '',
         fictitious_content: '',
         service_type: '',
         day_type: 0,
@@ -295,14 +276,13 @@ export default {
       express: [],
       kuaidiExpress: [],
       expressTemp: [],
-      deliveryList: [],
       temp: {},
       export_open: false,
       manyFormValidate: [],
       selectData: [],
       serviceTypeList: [],
       sendPrice: 0,
-      ruleValidate: { sh_delivery: [{ required: true, message: '请输入送货人', trigger: 'change' }] },
+      ruleValidate: {},
       deliveryErrorMsg: '',
       isLoading: true,
       userSendmsg: {},
@@ -392,24 +372,10 @@ export default {
           this.expressTemp = [];
           this.getList(1);
           break;
-        case '2':
-          this.formItem.sh_delivery = '';
-          break;
         case '3':
           this.formItem.fictitious_content = '';
           break;
         default:
-          // this.formItem = {
-          //     type: '3',
-          //     express_record_type: '1',
-          //     delivery_name: '',
-          //     delivery_id: '',
-          //     express_temp_id: '',
-          //     to_name: '',
-          //     to_tel: '',
-          //     to_addr: '',
-          //     sh_delivery: ''
-          // };
           break;
       }
     },
@@ -452,7 +418,6 @@ export default {
         to_name: '',
         to_tel: '',
         to_addr: '',
-        sh_delivery: '',
         fictitious_content: '',
         service_type: '',
       };
@@ -509,11 +474,6 @@ export default {
           return this.$message.error('快递公司不能为空');
         } else if (this.formItem.delivery_id === '') {
           return this.$message.error('快递单号不能为空');
-        }
-      }
-      if (this.formItem.type === '2') {
-        if (this.formItem.sh_delivery === '') {
-          return this.$message.error('送货人不能为空');
         }
       }
       if (this.splitSwitch) {
@@ -615,15 +575,6 @@ export default {
         });
       });
     },
-    getDeliveryList() {
-      orderDeliveryList()
-        .then((res) => {
-          this.deliveryList = res.data.list;
-        })
-        .catch((err) => {
-          this.$message.error(err.msg);
-        });
-    },
     getSheetInfo() {
       orderSheetInfo()
         .then((res) => {
@@ -643,15 +594,6 @@ export default {
         .catch((err) => {
           this.$message.error(err.msg);
         });
-    },
-    shDeliveryChange(value) {
-      if (!value) return;
-      let deliveryItem = this.deliveryList.find((item) => {
-        return item.id === value;
-      });
-      this.formItem.sh_delivery_name = deliveryItem.wx_name;
-      this.formItem.sh_delivery_id = deliveryItem.phone;
-      this.formItem.sh_delivery_uid = deliveryItem.uid;
     },
     expressTempChange(tempId) {
       this.temp = this.expressTemp.find((item) => {

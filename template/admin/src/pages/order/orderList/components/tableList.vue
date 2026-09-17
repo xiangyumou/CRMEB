@@ -18,7 +18,6 @@
       <el-tab-pane name="-4" label="已删除"></el-tab-pane>
     </el-tabs>
     <div class="acea-row">
-      <el-button v-auth="['order-write']" type="primary" v-db-click @click="writeOff">订单核销</el-button>
       <el-button v-db-click @click="batchShipmentModal = true">批量发货</el-button>
       <!-- <el-upload class="mr14" :action="expressUrl" :headers="header" :on-success="upExpress">
         <el-button class="export" type="primary">批量发货</el-button>
@@ -165,41 +164,10 @@
             >配送信息</a
           >
           <el-divider direction="vertical" v-if="scope.row._status === 4 && !scope.row.split.length" />
-          <a
-            v-db-click
-            @click="bindWrite(scope.row)"
-            v-if="
-              scope.row.shipping_type == 2 &&
-              scope.row.status == 0 &&
-              scope.row.paid == 1 &&
-              scope.row.refund_status === 0
-            "
-            >立即核销</a
-          >
-          <el-divider
-            direction="vertical"
-            v-if="
-              scope.row.shipping_type == 2 &&
-              scope.row.status == 0 &&
-              scope.row.paid == 1 &&
-              scope.row.refund_status === 0
-            "
-          />
           <template>
             <el-dropdown size="small" @command="changeMenu(scope.row, $event)" :transfer="true">
               <span class="el-dropdown-link"> 更多<i class="el-icon-arrow-down el-icon--right"></i> </span>
               <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item
-                  command="1"
-                  v-show="
-                    scope.row._status === 1 &&
-                    scope.row.paid === 0 &&
-                    scope.row.pay_type === 'offline' &&
-                    scope.row.is_del !== 1 &&
-                    scope.row.is_cancel !== 1
-                  "
-                  >确认付款</el-dropdown-item
-                >
                 <el-dropdown-item v-show="scope.row._status === 1 && scope.row.is_del !== 1 && scope.row.is_cancel !== 1" command="15">订单编辑</el-dropdown-item>
                 <el-dropdown-item command="11" v-show="scope.row._status >= 3 && scope.row.express_dump"
                   >电子面单打印</el-dropdown-item
@@ -275,43 +243,11 @@
     ></order-refund>
     <!--    -->
     <el-dialog
-      :visible.sync="modals2"
-      title="订单核销"
-      class="paymentFooter"
-      :show-close="true"
-      width="540px"
-      @closed="changeModal"
-    >
-      <el-form
-        ref="writeOffFrom"
-        :model="writeOffFrom"
-        :rules="writeOffRules"
-        label-width="80px"
-        label-position="right"
-        class="tabform"
-        @submit.native.prevent
-      >
-        <el-form-item prop="code" label="核销码：">
-          <el-input
-            style="width: 414px"
-            type="text"
-            placeholder="请输入12位核销码"
-            v-model.number="writeOffFrom.code"
-          />
-        </el-form-item>
-      </el-form>
-      <div slot="footer">
-        <el-button type="primary" v-db-click @click="ok('writeOffFrom')">立即核销</el-button>
-        <el-button v-db-click @click="del('writeOffFrom')">取消</el-button>
-      </div>
-    </el-dialog>
-    <el-dialog
       :visible.sync="batchShipmentModal"
       title="批量发货"
       class="paymentFooter"
       :show-close="true"
       width="540px"
-      @closed="changeModal"
     >
       <!-- <el-upload :action="expressUrl" :headers="header" :on-success="upExpress">
         <el-button class="export" type="primary">批量发货</el-button>
@@ -351,11 +287,8 @@ import {
   getDataInfo,
   getRefundFrom,
   getnoRefund,
-  refundIntegral,
   getDistribution,
-  writeUpdate,
   shipmentCancelOrder,
-  putWrite,
   importExpress,
   editAddress,
 } from '@/api/order';
@@ -385,22 +318,6 @@ export default {
     orderAddress,
   },
   data() {
-    const codeNum = (rule, value, callback) => {
-      if (!value) {
-        return callback(new Error('请填写核销码'));
-      }
-      // 模拟异步验证效果
-      if (!Number.isInteger(value)) {
-        callback(new Error('请填写12位数字'));
-      } else {
-        const reg = /\b\d{12}\b/;
-        if (!reg.test(value)) {
-          callback(new Error('请填写12位数字'));
-        } else {
-          callback();
-        }
-      }
-    };
     return {
       batchShipmentModal: false,
       expressUrl: Setting.apiBaseURL + '/file/upload/1',
@@ -436,14 +353,6 @@ export default {
         bargain: '0',
         advance: '0',
       },
-      writeOffRules: {
-        code: [{ validator: codeNum, trigger: 'blur', required: true }],
-      },
-      writeOffFrom: {
-        code: '',
-        confirm: 0,
-      },
-      modals2: false,
       addressData: {},
     };
   },
@@ -483,24 +392,6 @@ export default {
     changeMenu(row, name) {
       this.orderId = row.id;
       switch (name) {
-        case '1':
-          this.delfromData = {
-            title: '修改订单为已支付',
-            url: `/order/pay_offline/${row.id}`,
-            method: 'post',
-            ids: '',
-          };
-          this.$modalSure(this.delfromData)
-            .then((res) => {
-              this.$message.success(res.msg);
-              this.$emit('changeGetTabs');
-              this.getList();
-            })
-            .catch((res) => {
-              this.$message.error(res.msg);
-            });
-          // this.modalTitleSs = '修改立即支付';
-          break;
         case '2':
           this.getData(row.id);
           break;
@@ -760,17 +651,6 @@ export default {
         this.$emit('changeGetTabs');
       });
     },
-    // 获取退积分表单数据
-    getRefundIntegral(id) {
-      refundIntegral(id)
-        .then(async (res) => {
-          this.FromData = res.data;
-          this.$refs.edits.modals = true;
-        })
-        .catch((res) => {
-          this.$message.error(res.msg);
-        });
-    },
     // 不退款表单数据
     getNoRefundData(id) {
       this.$modalForm(getnoRefund(id)).then(() => {
@@ -794,7 +674,6 @@ export default {
       this.status = row._status;
       this.pay_type = row.pay_type;
       this.$refs.send.getList();
-      this.$refs.send.getDeliveryList();
       this.$nextTick((e) => {
         this.$refs.send.getCartInfo(row._status, row.id);
       });
@@ -809,30 +688,6 @@ export default {
         .catch((res) => {
           this.$message.error(res.msg);
         });
-    },
-    // 核销订单
-    bindWrite(row) {
-      let self = this;
-      this.$msgbox({
-        title: '提示',
-        message: '确定要核销该订单吗？',
-        showCancelButton: true,
-        cancelButtonText: '取消',
-        confirmButtonText: '确定',
-        iconClass: 'el-icon-warning',
-        confirmButtonClass: 'btn-custom-cancel',
-      })
-        .then(() => {
-          writeUpdate(row.order_id)
-            .then((res) => {
-              self.$message.success(res.msg);
-              self.getList();
-            })
-            .catch((res) => {
-              self.$message.error(res.msg);
-            });
-        })
-        .catch(() => {});
     },
     // 订单类型  @on-changeTabs="getChangeTabs"
     getTabs() {
@@ -954,40 +809,6 @@ export default {
           resolve(res.data);
         });
       });
-    },
-    // 订单核销
-    writeOff() {
-      this.modals2 = true;
-    },
-    // 订单核销
-    ok(name) {
-      if (!this.writeOffFrom.code) {
-        this.$message.warning('请先验证订单！');
-      } else {
-        this.writeOffFrom.confirm = 1;
-        putWrite(this.writeOffFrom)
-          .then(async (res) => {
-            if (res.status === 200) {
-              this.$message.success(res.msg);
-              this.modals2 = false;
-              this.$refs[name].resetFields();
-              this.getList();
-            } else {
-              this.$message.error(res.msg);
-            }
-          })
-          .catch((res) => {
-            this.$message.error(res.msg);
-          });
-      }
-    },
-    del(name) {
-      this.modals2 = false;
-      this.writeOffFrom.code = '';
-      this.$refs[name].resetFields();
-    },
-    changeModal() {
-      this.writeOffFrom.code = '';
     },
   },
 };

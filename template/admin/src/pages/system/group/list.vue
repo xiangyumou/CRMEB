@@ -188,11 +188,9 @@ export default {
       let url = 'setting/group_data' + type;
       if (this.$route.params.id) {
         let arr = {
-          setting_groupDataSign: 'setting/sign_data' + type,
           setting_groupDataOrder: 'setting/order_data' + type,
           setting_groupDataUser: 'setting/usermenu_data' + type,
           setting_groupDataPoster: 'setting/poster_data' + type,
-          marketing_storeSeckillData: 'setting/seckill_data' + type,
         };
         if (arr[this.$route.name] === undefined) return url;
         return arr[this.$route.name];

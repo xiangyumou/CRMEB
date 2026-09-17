@@ -103,7 +103,6 @@
 <script>
 import { mapState, mapMutations } from 'vuex';
 import { userCancelList, userCancelSetMark } from '@/api/user';
-import taskList from './handle/task';
 import editFrom from '@/components/from/from';
 import remark from '@/components/remark/index';
 export default {

@@ -671,7 +671,7 @@ export function invoiceCategory(name) {
  */
 export function saveBasics(data) {
   return request({
-    url: `/marketing/integral_config/save_basics`,
+    url: `/setting/config/save_basics`,
     method: 'post',
     data,
   });

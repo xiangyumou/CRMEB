@@ -11,7 +11,14 @@
     "/finance/balance", "/statistic/balance",
     "/kefu",
     "/setting/store_service", "/setting/freight/city",
-    "/setting/merchant/system_store"
+    "/setting/merchant/system_store",
+    "/setting/merchant/system_store_staff", "/setting/merchant/system_verify_order",
+    "/setting/delivery_service",
+    "/setting/sign_config", "/setting/system_group_data/sign", "/setting/recharge_config",
+    "/marketing/sign_rewards",
+    "/order/offline",
+    "/app/app/version",
+    "/system/crossVersionUpgrade"
   ],
   "api": [
     { "method": "GET", "path": "user/user_level/vip_list" },

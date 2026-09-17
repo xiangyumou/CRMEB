@@ -44,7 +44,15 @@ const bodySnippet = (data, limit = 500) => {
   return text.length > limit ? `${text.slice(0, limit)}…` : text;
 };
 
-const requestUrl = (config) => (config ? `${config.baseURL || ''}${config.url || ''}` : '');
+const isAbsoluteUrl = (url) => /^[a-z][a-z\d+\-.]*:\/\//i.test(url);
+
+// axios 0.18 在 dispatchRequest 里会把 baseURL 合并进 config.url，日志里不能再拼一次
+const requestUrl = (config) => {
+  if (!config) return '';
+  const url = config.url || '';
+  if (!url) return config.baseURL || '';
+  return isAbsoluteUrl(url) ? url : `${config.baseURL || ''}${url}`;
+};
 
 // 服务端返回的不是接口约定的 JSON（PHP 报错输出、网关或代理页面、被截断的响应等）时统一走这里
 const unexpectedBody = (response) => {
