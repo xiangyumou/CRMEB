@@ -19,7 +19,6 @@ use app\services\order\{StoreCartServices,
     StoreOrderCartInfoServices,
     StoreOrderComputedServices,
     StoreOrderCreateServices,
-    StoreOrderEconomizeServices,
     StoreOrderInvoiceServices,
     StoreOrderRefundServices,
     StoreOrderServices,
@@ -313,17 +312,16 @@ class StoreOrderController
     /**
      * 订单详情
      * @param Request $request
-     * @param StoreOrderEconomizeServices $services
      * @param $uni
      * @return mixed
      * @throws DataNotFoundException
      * @throws DbException
      * @throws ModelNotFoundException
      */
-    public function detail(Request $request, StoreOrderEconomizeServices $services, $uni)
+    public function detail(Request $request, $uni)
     {
         if (!strlen(trim($uni))) return app('json')->fail('参数错误');
-        $orderData = $this->services->getUserOrderByKey($services, $uni, (int)$request->uid());
+        $orderData = $this->services->getUserOrderByKey($uni, (int)$request->uid());
         return app('json')->success($orderData);
     }
 

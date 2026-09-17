@@ -4,51 +4,14 @@ declare(strict_types=1);
 namespace Tests\Regression\Cases;
 
 use app\dao\system\statistics\CapitalFlowDao;
-use app\dao\user\UserUserBrokerageDao;
 use app\dao\wechat\WechatReplyKeyDao;
 use app\services\wechat\WechatReplyServices;
 use Tests\Regression\Support\RegressionTestCase;
 use think\facade\Db;
 
-final class CommissionReplyCapitalFlowSqlModeTest extends RegressionTestCase
+final class ReplyCapitalFlowSqlModeTest extends RegressionTestCase
 {
     private const STRICT_MODE = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION';
-
-    public function testCommissionListAggregatesDeterministically(): void
-    {
-        $originalMode = $this->enableStrictMode();
-        Db::startTrans();
-
-        try {
-            $uid = (int) Db::name('user')->insertGetId([
-                'account' => 'regression-commission',
-                'pwd' => '',
-                'nickname' => 'Regression Commission',
-                'phone' => '',
-                'add_time' => 1700000000,
-            ]);
-            $firstId = (int) Db::name('user_brokerage')->insertGetId($this->brokerageRow($uid, 'brokerage', 1, '12.00', 1700000100));
-            Db::name('user_brokerage')->insert($this->brokerageRow($uid, 'extract_fail', 1, '3.00', 1700000200));
-            $lastId = (int) Db::name('user_brokerage')->insertGetId($this->brokerageRow($uid, 'extract', 0, '4.00', 1700000300));
-
-            $where = ['time' => '', ['u.uid', '=', $uid]];
-            $field = "sum(IF(b.pm = 1 AND b.type <> 'extract_fail', b.number, 0)) as income,sum(IF(b.pm = 0, b.number, 0)) as pay,u.nickname,u.phone,u.uid,u.now_money,u.brokerage_price,MAX(b.add_time) as time,MAX(b.id) as last_brokerage_id";
-            $dao = new UserUserBrokerageDao();
-            $list = $dao->getList($where, $field, '', 1, 20);
-
-            self::assertCount(1, $list);
-            self::assertSame($uid, (int) $list[0]['uid']);
-            self::assertSame('12.00', $list[0]['income']);
-            self::assertSame('4.00', $list[0]['pay']);
-            self::assertSame(1700000300, (int) $list[0]['time']);
-            self::assertSame($lastId, (int) $list[0]['last_brokerage_id']);
-            self::assertGreaterThan($firstId, $lastId);
-            self::assertSame(1, $dao->getCount($where));
-        } finally {
-            Db::rollback();
-            $this->restoreSqlMode($originalMode);
-        }
-    }
 
     public function testKeywordReplyWithMultipleKeysReturnsOneReply(): void
     {
@@ -127,23 +90,6 @@ final class CommissionReplyCapitalFlowSqlModeTest extends RegressionTestCase
         Db::execute('SET SESSION sql_mode = ?', [$mode]);
     }
 
-    private function brokerageRow(int $uid, string $type, int $pm, string $number, int $addTime): array
-    {
-        return [
-            'uid' => $uid,
-            'link_id' => 'regression',
-            'type' => $type,
-            'title' => 'Regression',
-            'number' => $number,
-            'balance' => '0.00',
-            'pm' => $pm,
-            'mark' => '',
-            'status' => 1,
-            'take' => 0,
-            'frozen_time' => 0,
-            'add_time' => $addTime,
-        ];
-    }
 
     private function capitalFlowRow(string $token, string $price, int $addTime): array
     {

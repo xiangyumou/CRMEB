@@ -12,8 +12,6 @@
 namespace app\model\order;
 
 use app\model\activity\combination\StorePink;
-use app\model\system\store\SystemStore;
-use app\model\system\store\SystemStoreStaff;
 use app\model\user\User;
 use crmeb\basic\BaseModel;
 use crmeb\traits\ModelTrait;

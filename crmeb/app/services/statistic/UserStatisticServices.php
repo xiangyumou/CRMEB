@@ -13,7 +13,6 @@ namespace app\services\statistic;
 
 use app\services\BaseServices;
 use app\services\other\export\ExportServices;
-use app\services\order\OtherOrderServices;
 use app\services\order\StoreOrderServices;
 use app\services\user\UserServices;
 use app\services\user\UserVisitServices;

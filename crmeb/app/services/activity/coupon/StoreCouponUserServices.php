@@ -361,34 +361,6 @@ class StoreCouponUserServices extends BaseServices
         return $couponList;
     }
 
-    /** 获取会员优惠券列表
-     * @param array $where
-     * @return array
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function getMemberCoupon($uid)
-    {
-        if (!$uid) return [];
-        /** @var StoreCouponIssueServices $couponIssueService */
-        $couponIssueService = app()->make(StoreCouponIssueServices::class);
-        $couponWhere['receive_type'] = 4;
-        $couponInfo = $couponIssueService->getMemberCouponIssueList($couponWhere);
-        $couponList = [];
-        if ($couponInfo) {
-            $couponIds = array_column($couponInfo, 'id');
-            $couponType = array_column($couponInfo, 'type', 'id');
-            $couponList = $this->dao->getCouponListByOrder(['uid' => $uid, 'coupon_ids' => $couponIds], 'add_time desc');
-            if ($couponList) {
-                foreach ($couponList as $k => $v) {
-                    $couponList[$k]['coupon_type'] = $couponIssueService->_couponType[$couponType[$v['cid']]];
-                }
-            }
-        }
-        return $couponList ? $this->tidyCouponList($couponList) : [];
-    }
-
     /**根据月分组看会员发放优惠券情况
      * @param array $where
      * @return array
@@ -465,8 +437,7 @@ class StoreCouponUserServices extends BaseServices
 
     public function autoReceiveCoupon($uid, $cartGroup)
     {
-        $isMember = boolval(app()->make(UserServices::class)->value(['uid' => $uid], 'is_money_level'));
-        $canReceiveCoupons = app()->make(StoreCouponIssueServices::class)->canReceiveCoupons($uid, $isMember);
+        $canReceiveCoupons = app()->make(StoreCouponIssueServices::class)->canReceiveCoupons($uid, false);
         $cartInfo = $cartGroup['valid'];
         $canReceiveCoupon = [];
         if ($canReceiveCoupons) {

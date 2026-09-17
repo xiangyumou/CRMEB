@@ -3,7 +3,6 @@ declare(strict_types=1);
 namespace Tests\Regression\Cases;
 
 use app\services\CoreStore;
-use app\services\CoreStoreAdmin;
 use crmeb\exceptions\ApiException;
 use Tests\Regression\Support\RegressionTestCase;
 
@@ -26,22 +25,6 @@ final class CoreStoreAdminBoundaryTest extends RegressionTestCase
     {
         CoreStore::assertAdminUser(['group_id' => 4, 'label_id' => '2,3', 'level' => 0, 'balance' => ['', '']]);
         self::assertTrue(true);
-    }
-
-    public function testMenuFilterKeepsRetainedChildrenAndAdminPrivileges(): void
-    {
-        $rows = [
-            ['id' => 1, 'pid' => 0, 'menu_path' => '/user/level'],
-            ['id' => 2, 'pid' => 1, 'menu_path' => '/user/level/task'],
-            ['id' => 3, 'pid' => 0, 'menu_path' => '/setting/member_config/2/67'],
-            ['id' => 4, 'pid' => 0, 'menu_path' => '/system/role/index'],
-            ['id' => 5, 'pid' => 0, 'menu_path' => '/marketing/store_combination/index'],
-            ['id' => 6, 'pid' => 0, 'menu_path' => '/user/grade'],
-            ['id' => 7, 'pid' => 6, 'menu_path' => '/user/group'],
-            ['id' => 8, 'pid' => 1, 'menu_path' => '/'],
-        ];
-        self::assertSame([1, 2, 3, 8], CoreStoreAdmin::removedMenuIds($rows));
-        self::assertSame([4, 5, 6, 7], array_column(CoreStoreAdmin::filterMenus($rows), 'id'));
     }
 
     /** @dataProvider retiredHttpRoutes */

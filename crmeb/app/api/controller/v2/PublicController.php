@@ -17,7 +17,6 @@ use app\services\diy\DiyServices;
 use app\services\product\product\StoreCategoryServices;
 use app\services\product\product\StoreProductServices;
 use app\services\user\UserServices;
-use app\services\user\UserSignServices;
 use app\services\wechat\WechatUserServices;
 
 class PublicController
@@ -109,27 +108,5 @@ class PublicController
     public function subscribe(Request $request, WechatUserServices $services)
     {
         return app('json')->success(['subscribe' => (bool)$services->value(['uid' => $request->uid(), 'user_type' => 'wechat'], 'subscribe')]);
-    }
-
-    /**
-     * 获取颜色选择和分类模板选择
-     * @param DiyServices $services
-     * @param $name
-     * @return mixed
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function colorChange(DiyServices $services, $name)
-    {
-        $status = (int)$services->getColorChange((string)$name);
-        $is_diy = $services->value(['status' => 1, 'is_del' => 0], 'is_diy');
-        return app('json')->success(compact('status', 'is_diy'));
-    }
-
-    public function getDiySign(Request $request)
-    {
-        $uid = (int)$request->uid();
-        return app('json')->success(app()->make(UserSignServices::class)->signConfig($uid, 1));
     }
 }

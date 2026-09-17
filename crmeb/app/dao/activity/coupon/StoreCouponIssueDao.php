@@ -368,18 +368,12 @@ class StoreCouponIssueDao extends BaseDao
         return (bool)$this->getModel()->whereFindInSet('product_id', $product_id)->count();
     }
 
-    public function canReceiveCoupons($uid, $isMember)
+    public function canReceiveCoupons($uid, $isMember = false)
     {
         return $this->getModel()->where('status', 1)
             ->where('is_del', 0)
             ->where('remain_count > 0 OR is_permanent = 1')
-            ->where(function ($query) use ($isMember) {
-                if ($isMember) {
-                    $query->where('receive_type', 1)->whereOr('receive_type', 4);
-                } else {
-                    $query->where('receive_type', 1);
-                }
-            })->where(function ($query) {
+            ->where('receive_type', 1)->where(function ($query) {
                 $query->where(function ($query) {
                     $query->where('start_time', '<', time())->where('end_time', '>', time());
                 })->whereOr(function ($query) {

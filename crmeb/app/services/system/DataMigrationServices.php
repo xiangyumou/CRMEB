@@ -15,9 +15,6 @@ use think\facade\Log;
 use think\facade\Cache;
 use app\services\BaseServices;
 use app\services\user\UserBillServices;
-use app\services\user\UserMoneyServices;
-use app\services\user\UserBrokerageServices;
-use app\services\user\UserBrokerageFrozenServices;
 use app\services\order\StoreOrderServices;
 use app\services\order\StoreOrderRefundServices;
 use app\services\order\StoreOrderCreateServices;
@@ -193,103 +190,6 @@ class DataMigrationServices extends BaseServices
     }
 
     // ==================== 数据迁移方法 ====================
-
-    /**
-     * 处理历史余额数据
-     * @param int $page
-     * @param int $limit
-     * @return array
-     */
-    public function handleMoney(int $page = 1, int $limit = 100): array
-    {
-        /** @var UserBillServices $userBillServices */
-        $userBillServices = app()->make(UserBillServices::class);
-        $where = ['category' => 'now_money', 'type' => ['pay_product', 'pay_product_refund', 'system_add', 'system_sub', 'recharge', 'lottery_use', 'lottery_add']];
-        $list = $userBillServices->getList($where, '*', $page, $limit, [], 'id asc');
-        
-        if (empty($list)) {
-            return ['completed' => true, 'processed' => 0];
-        }
-        
-        $allData = [];
-        foreach ($list as $item) {
-            $allData[] = [
-                'uid' => $item['uid'],
-                'link_id' => $item['link_id'],
-                'pm' => $item['pm'],
-                'title' => $item['title'],
-                'type' => $item['type'],
-                'number' => $item['number'],
-                'balance' => $item['balance'],
-                'mark' => $item['mark'],
-                'add_time' => strtotime($item['add_time']),
-            ];
-        }
-        
-        if ($allData) {
-            /** @var UserMoneyServices $userMoneyServices */
-            $userMoneyServices = app()->make(UserMoneyServices::class);
-            $userMoneyServices->saveAll($allData);
-        }
-        
-        Log::notice(['type' => 'data_migration', 'handler' => 'handleMoney', 'page' => $page, 'count' => count($list)]);
-        
-        return ['completed' => false, 'count' => count($list)];
-    }
-
-    /**
-     * 处理历史佣金数据
-     * @param int $page
-     * @param int $limit
-     * @return array
-     */
-    public function handleBrokerage(int $page = 1, int $limit = 100): array
-    {
-        /** @var UserBillServices $userBillServices */
-        $userBillServices = app()->make(UserBillServices::class);
-        $where = ['category' => ['', 'now_money'], 'type' => ['brokerage', 'brokerage_user', 'extract', 'refund', 'extract_fail']];
-        $list = $userBillServices->getList($where, '*', $page, $limit, [], 'id asc');
-        
-        if (empty($list)) {
-            return ['completed' => true, 'processed' => 0];
-        }
-        
-        $allData = [];
-        /** @var UserBrokerageFrozenServices $brokerageFrozenServices */
-        $brokerageFrozenServices = app()->make(UserBrokerageFrozenServices::class);
-        $frozenList = $brokerageFrozenServices->getColumn([['uill_id', 'in', array_column($list, 'id')], ['frozen_time', '>', time()]], 'uill_id,frozen_time', 'uill_id');
-        
-        foreach ($list as $item) {
-            if (in_array($item['type'], ['brokerage_user', 'extract', 'refund', 'extract_fail'])) {
-                $type = $item['type'];
-            } else {
-                $type = strpos($item['mark'], '二级') !== false ? 'two_brokerage' : 'one_brokerage';
-            }
-            
-            $allData[] = [
-                'uid' => $item['uid'],
-                'link_id' => $item['link_id'],
-                'pm' => $item['pm'],
-                'title' => $item['title'],
-                'type' => $type,
-                'number' => $item['number'],
-                'balance' => $item['balance'],
-                'mark' => $item['mark'],
-                'frozen_time' => $frozenList[$item['id']]['frozen_time'] ?? 0,
-                'add_time' => strtotime($item['add_time']),
-            ];
-        }
-        
-        if ($allData) {
-            /** @var UserBrokerageServices $userBrokerageServices */
-            $userBrokerageServices = app()->make(UserBrokerageServices::class);
-            $userBrokerageServices->saveAll($allData);
-        }
-        
-        Log::notice(['type' => 'data_migration', 'handler' => 'handleBrokerage', 'page' => $page, 'count' => count($list)]);
-        
-        return ['completed' => false, 'count' => count($list)];
-    }
 
     /**
      * 处理历史退款数据

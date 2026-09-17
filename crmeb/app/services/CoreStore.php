@@ -6,18 +6,6 @@ use crmeb\exceptions\ApiException;
 /** Fixed product boundary, independent of stale settings and client versions. */
 final class CoreStore
 {
-    public const DISABLED_CONFIG = [
-            'reward_money' => 0, 'reward_integral' => 0,
-            'brokerage_func_status' => 0, 'store_brokerage_statu' => 0,
-            'member_card_status' => 0, 'member_func_status' => 0,
-            'level_status' => 0, 'store_integral_ratio' => 0,
-            'member_price_status' => 0, 'brokerage_window_switch' => 0,
-            'order_give_integral' => 0, 'order_give_exp' => 0,
-            'integral_ratio' => 0, 'integral_max_num' => 0,
-            'store_self_mention' => 0, 'offline_pay_status' => 2,
-            'ali_pay_status' => 0, 'yue_pay_status' => 0,
-            'recharge_switch' => 0, 'routine_contact_type' => 0,
-        ];
 
     public const REMOVED_COMPONENTS = ['bargain', 'seckill', 'pointsMall', 'signIn', 'liveBroadcast', 'homePaidVip', 'home_bargain', 'home_seckill', 'home_paid_vip', 'points_mall', 'sign_in', 'wechat_live'];
 

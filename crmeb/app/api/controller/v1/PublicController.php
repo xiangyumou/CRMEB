@@ -17,7 +17,6 @@ use app\services\article\ArticleServices;
 use app\services\diy\DiyServices;
 use app\services\diy\ThemeServices;
 use app\services\message\MessageSystemServices;
-use app\services\order\DeliveryServiceServices;
 use app\services\order\StoreCartServices;
 use app\services\order\StoreOrderCartInfoServices;
 use app\services\order\StoreOrderRefundServices;
@@ -29,15 +28,12 @@ use app\services\product\product\StoreProductRelationServices;
 use app\services\product\product\StoreProductServices;
 use app\services\shipping\ExpressServices;
 use app\services\shipping\SystemCityServices;
-use app\services\system\AppVersionServices;
 use app\services\system\attachment\SystemAttachmentServices;
 use app\services\system\config\SystemConfigServices;
 use app\services\system\config\SystemStorageServices;
 use app\services\system\lang\LangCodeServices;
 use app\services\system\lang\LangCountryServices;
 use app\services\system\lang\LangTypeServices;
-use app\services\system\store\SystemStoreServices;
-use app\services\system\store\SystemStoreStaffServices;
 use app\services\user\UserBillServices;
 use app\services\user\UserInvoiceServices;
 use app\services\user\UserServices;
@@ -346,21 +342,6 @@ class PublicController
     }
 
     /**
-     * 门店列表
-     * @return mixed
-     */
-    public function store_list(Request $request, SystemStoreServices $services)
-    {
-        list($latitude, $longitude) = $request->getMore([
-            ['latitude', ''],
-            ['longitude', ''],
-        ], true);
-        $data['list'] = $services->getStoreList(['type' => 0], ['id', 'name', 'phone', 'address', 'detailed_address', 'image', 'latitude', 'longitude'], $latitude, $longitude);
-        $data['tengxun_map_key'] = sys_config('tengxun_map_key');
-        return app('json')->success($data);
-    }
-
-    /**
      * 查找城市数据
      * @param Request $request
      * @return mixed
@@ -489,13 +470,6 @@ class PublicController
             }
         }
         return app('json')->success($services->homeProductList($where, $request->uid()));
-    }
-
-    public function getNewAppVersion($platform)
-    {
-        /** @var AppVersionServices $appService */
-        $appService = app()->make(AppVersionServices::class);
-        return app('json')->success($appService->getNewInfo($platform));
     }
 
     public function getCustomerType()

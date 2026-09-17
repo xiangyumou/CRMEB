@@ -30,7 +30,6 @@ use think\facade\Log;
 class StoreOrderInvoiceServices extends BaseServices
 {
     /**
-     * LiveAnchorServices constructor.
      * @param StoreOrderInvoiceDao $dao
      */
     public function __construct(StoreOrderInvoiceDao $dao)

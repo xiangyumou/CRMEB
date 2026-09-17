@@ -1107,7 +1107,6 @@ class StoreOrderServices extends BaseServices
 
     /**
      * 用户订单信息
-     * @param StoreOrderEconomizeServices $services
      * @param string $uni
      * @param int $uid
      * @return void
@@ -1115,7 +1114,7 @@ class StoreOrderServices extends BaseServices
      * @throws \think\db\exception\DbException
      * @throws \think\db\exception\ModelNotFoundException
      */
-    public function getUserOrderByKey(StoreOrderEconomizeServices $services, string $uni, int $uid): array
+    public function getUserOrderByKey(string $uni, int $uid): array
     {
         $order = $this->getUserOrderDetail($uni, $uid, ['split', 'invoice', 'user']);
         if (!$order) throw new ApiException('订单不存在');

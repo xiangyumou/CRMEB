@@ -41,29 +41,6 @@ Route::group('marketing', function () {
         Route::post('coupon/user/grant', 'v1.marketing.StoreCouponUser/grant')->option(['real_name' => '发送优惠券']);
     })->option(['parent' => 'marketing', 'cate_name' => '优惠券']);
 
-    /** 砍价活动 */
-    Route::group(function () {
-        //砍价商品列表
-
-        //砍价详情
-
-        //保存新增或编辑砍价
-
-        //删除砍价
-
-        //修改砍价状态
-
-        //砍价列表
-
-        //砍价人列表
-
-        //砍价统计
-
-        //砍价列表
-
-        //砍价订单
-
-    })->option(['parent' => 'marketing', 'cate_name' => '砍价活动']);
 
     /** 拼团活动 */
     Route::group(function () {
@@ -94,138 +71,9 @@ Route::group('marketing', function () {
 
     })->option(['parent' => 'marketing', 'cate_name' => '拼团活动']);
 
-    /** 秒杀活动 */
-    Route::group(function () {
-        //秒杀列表
 
-        //秒杀时间段列表
 
-        //秒杀详情
 
-        //秒杀保存新增或编辑
-
-        //秒杀删除
-
-        //修改秒杀状态
-
-        //秒杀统计
-
-        //参与活动人员
-
-        //秒杀订单
-
-
-
-
-
-
-
-
-
-
-    })->option(['parent' => 'marketing', 'cate_name' => '秒杀活动']);
-
-    /** 积分活动 */
-    Route::group(function () {
-        //积分日志列表
-
-        //积分日志头部数据
-
-        //积分配置编辑表单
-
-        //积分配置保存数据
-
-        //积分商品列表
-
-        //积分商品新增或编辑
-
-        //积分商品详情
-
-        //积分商品删除
-
-        //修改积分商品状态
-
-        //积分商城订单列表
-
-        //积分商城订单数据
-
-        //积分商城订单详情数据
-
-        //修改积分商品订单备注信息
-
-        //获取积分订单状态
-
-        //删除积分订单
-
-        //积分订单发送货
-
-        //获取积分订单配送信息表单
-
-        //修改积分订单配送信息
-
-        //积分订单确认收货
-
-        //积分订单获取物流公司
-
-        //积分订单快递公司电子面单模版
-
-        //积分订单获取物流信息
-
-        //打印积分订单
-
-        //积分订单列表获取配送员
-
-        //积分订单获取面单默认配置信息
-
-        //积分记录
-
-
-
-
-        //积分来源统计
-
-        //积分消耗统计
-
-    })->option(['parent' => 'marketing', 'cate_name' => '积分活动']);
-
-    /** 抽奖活动 */
-    Route::group(function () {
-        //抽奖活动列表
-
-        //抽奖活动详情
-
-        //添加抽奖活动
-
-        //修改抽奖活动数据
-
-        //删除抽奖活动
-
-        //设置抽奖活动是否显示
-
-        //抽奖记录列表
-
-        //抽奖中奖发货、备注处理
-
-        //分类抽奖列表
-
-        //保存抽奖配置
-
-
-    })->option(['parent' => 'marketing', 'cate_name' => '抽奖活动']);
-
-    /** 每日签到 */
-    Route::group(function () {
-        //签到奖励列表
-
-        //添加签到奖励
-
-        //编辑签到奖励
-
-        //保存签到奖励
-
-        //删除签到奖励
-
-    })->option(['parent' => 'marketing', 'cate_name' => '每日签到']);
 
 })->middleware([
     \app\http\middleware\AllowOriginMiddleware::class,

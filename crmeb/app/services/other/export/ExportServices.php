@@ -11,16 +11,13 @@
 
 namespace app\services\other\export;
 
-use app\services\activity\bargain\StoreBargainServices;
 use app\services\activity\combination\StoreCombinationServices;
-use app\services\activity\seckill\StoreSeckillServices;
 use app\services\BaseServices;
 use app\services\order\StoreOrderServices;
 use app\services\product\product\StoreCategoryServices;
 use app\services\product\product\StoreDescriptionServices;
 use app\services\product\product\StoreProductServices;
 use app\services\product\sku\StoreProductAttrResultServices;
-use app\services\user\member\MemberCardServices;
 use app\services\user\UserServices;
 use crmeb\services\SpreadsheetExcelService;
 

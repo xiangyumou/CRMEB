@@ -128,8 +128,6 @@ if (!function_exists('sys_config')) {
      */
     function sys_config(string $name, $default = '')
     {
-        $retired = \app\services\CoreStore::DISABLED_CONFIG;
-        if (array_key_exists($name, $retired)) return $retired[$name];
         if (empty($name))
             return $default;
         $sysConfig = app('sysConfig')->get($name);

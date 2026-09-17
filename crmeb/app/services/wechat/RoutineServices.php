@@ -313,24 +313,6 @@ class RoutineServices extends BaseServices
     }
 
     /**
-     * 获取小程序直播列表
-     * @param $page
-     * @param $limit
-     * @return array|bool|mixed
-     */
-    public function live($page, $limit)
-    {
-        $list = CacheService::remember('WECHAT_LIVE_LIST_' . $page . '_' . $limit, function () use ($page, $limit) {
-            $list = MiniProgramService::getLiveInfo((int)$page, (int)$limit);
-            foreach ($list as &$item) {
-                $item['_start_time'] = date('m-d H:i', $item['start_time']);
-            }
-            return $list;
-        }, 600) ?: [];
-        return $list;
-    }
-
-    /**
      * 更新用户信息
      * @param $uid
      * @param array $data

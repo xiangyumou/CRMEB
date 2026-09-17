@@ -12,9 +12,7 @@
 namespace app\services\user;
 
 use app\jobs\UserJob;
-use app\services\activity\bargain\StoreBargainServices;
 use app\services\activity\combination\StoreCombinationServices;
-use app\services\activity\seckill\StoreSeckillServices;
 use app\services\BaseServices;
 use app\dao\user\UserDao;
 use app\services\activity\coupon\StoreCouponUserServices;

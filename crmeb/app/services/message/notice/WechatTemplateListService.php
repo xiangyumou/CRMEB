@@ -171,36 +171,6 @@ class WechatTemplateListService extends NoticeService
     }
 
     /**
-     * 充值成功
-     * @param $uid
-     * @param $order
-     * @return bool|void
-     */
-    public function sendRechargeSuccess($uid, $order)
-    {
-        return $this->sendTemplate((int)$uid, [
-            'time1' => date('Y-m-d H:i:s', $order['add_time']),
-            'amount3' => $order['price'],
-            'amount4' => $order['give_price'],
-            'amount5' => $order['now_money'],
-        ]);
-    }
-
-    /**
-     * 提现成功
-     * @param $uid
-     * @param $extractNumber
-     * @return bool|void
-     */
-    public function sendUserExtract($uid, $extractNumber)
-    {
-        return $this->sendTemplate((int)$uid, [
-            'time3' => date('Y-m-d H:i:s', time()),
-            'amount2' => $extractNumber,
-        ]);
-    }
-
-    /**
      * 提现成功
      * @param $uid
      * @param $extractNumber

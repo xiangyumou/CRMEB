@@ -15,6 +15,56 @@ if (!in_array($mode, ['plan', 'apply', 'rollback'], true) || ($mode !== 'plan' &
 if ($backup && ($backup[0] !== '/' || strpos(realpath(dirname($backup)) . '/', realpath(public_path()) . '/') === 0)) {
     fwrite(STDERR, "Backup must be an absolute path outside public/.\n"); exit(1);
 }
+$removedMenuPaths = [
+    "/user/level",
+    "/user/grade",
+    "/agent",
+    "/setting/system_config_retail",
+    "/setting/membership_level",
+    "/setting/member_config",
+    "/marketing/store_seckill",
+    "/marketing/store_seckill_data",
+    "/marketing/store_bargain",
+    "/marketing/store_integral",
+    "/marketing/lottery",
+    "/marketing/live",
+    "/marketing/point_record",
+    "/marketing/point_statistic",
+    "/marketing/integral",
+    "/marketing/recharge",
+    "/finance/user_recharge",
+    "/finance/user_extract",
+    "/finance/finance/commission",
+    "/finance/balance",
+    "/statistic/balance",
+    "/kefu",
+    "/setting/store_service",
+    "/setting/freight/city",
+    "/setting/merchant/system_store",
+    "/setting/merchant/system_store_staff",
+    "/setting/merchant/system_verify_order",
+    "/setting/delivery_service",
+    "/setting/sign_config",
+    "/setting/system_group_data/sign",
+    "/setting/recharge_config",
+    "/marketing/sign_rewards",
+    "/order/offline",
+    "/app/app/version",
+    "/system/crossVersionUpgrade",
+];
+$disabledConfig = [
+    'reward_money' => 0, 'reward_integral' => 0,
+    'brokerage_func_status' => 0, 'store_brokerage_statu' => 0,
+    'member_card_status' => 0, 'member_func_status' => 0,
+    'level_status' => 0, 'store_integral_ratio' => 0,
+    'member_price_status' => 0, 'brokerage_window_switch' => 0,
+    'order_give_integral' => 0, 'order_give_exp' => 0,
+    'integral_ratio' => 0, 'integral_max_num' => 0,
+    'store_self_mention' => 0, 'offline_pay_status' => 2,
+    'ali_pay_status' => 0, 'yue_pay_status' => 0,
+    'recharge_switch' => 0, 'routine_contact_type' => 0,
+];
+
 $removedPages = json_decode(file_get_contents(dirname(__DIR__, 2) . '/config/core_store_removed_pages.json'), true);
 function protectedFingerprint() {
     $out = [];
@@ -51,7 +101,7 @@ try {
     }
     $fingerprint = protectedFingerprint();
     $changes = [];
-    $disabled = CoreStore::DISABLED_CONFIG;
+    $disabled = $disabledConfig;
     foreach (Db::name('system_config')->lock(true)->select()->toArray() as $row) {
         $next = $row; $name = $row['menu_name'];
         if (array_key_exists($name, $disabled)) { $next['value'] = json_encode($disabled[$name]); $next['status'] = 0; }
@@ -66,7 +116,30 @@ try {
         $changes[] = ['table'=>'system_config','id'=>$sample['id'],'before'=>null,'after'=>$sample];
     }
     $menus = Db::name('system_menus')->lock(true)->select()->toArray();
-    $ids = array_fill_keys(\app\services\CoreStoreAdmin::removedMenuIds($menus), true);
+    $removedIds = [];
+    foreach ($menus as $m) {
+        $path = '/' . ltrim((string)$m['menu_path'], '/');
+        foreach ($removedMenuPaths as $prefix) {
+            if ($path === $prefix || strpos($path, $prefix . '/') === 0) { $removedIds[(int)$m['id']] = true; break; }
+        }
+    }
+    // Keep a parent navigable while it still has a retained child.
+    $children = []; $byId = [];
+    foreach ($menus as $m) { $children[(int)$m['pid']][] = (int)$m['id']; $byId[(int)$m['id']] = $m; }
+    do {
+        $changed = false;
+        foreach ($menus as $m) {
+            $id = (int)$m['id'];
+            if (!isset($removedIds[$id])) continue;
+            foreach ($children[$id] ?? [] as $child) {
+                $childMenu = $byId[$child] ?? null;
+                if ($childMenu && !isset($removedIds[$child]) && !in_array($childMenu['menu_path'], ['', '/'], true)) {
+                    unset($removedIds[$id]); $changed = true; break;
+                }
+            }
+        }
+    } while ($changed);
+    $ids = $removedIds;
     foreach ($menus as $row) {
         if (isset($ids[$row['id']])) {
             $next = array_merge($row, ['is_show'=>0,'is_show_path'=>0,'access'=>0,'is_del'=>1]);

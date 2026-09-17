@@ -11,7 +11,6 @@
 
 namespace app\model\product\sku;
 
-use app\model\activity\integral\StoreIntegral;
 use crmeb\basic\BaseModel;
 use crmeb\traits\ModelTrait;
 use think\Model;
@@ -123,14 +122,6 @@ class StoreProductAttrValue extends BaseModel
     }
 
     /**
-     * 关联积分商城表
-     * @return \think\model\relation\HasOne
-     */
-    public function storeIntegral()
-    {
-        return $this->hasOne(StoreIntegral::class, 'id', 'product_id')->field('title store_name,id')->where('is_show', 1)->where('is_del', 0)->bind(['store_name']);
-    }
-
     /**
      * 编号搜索器
      * @param Model $query

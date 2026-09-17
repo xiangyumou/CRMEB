@@ -13,7 +13,6 @@ namespace app\api\controller\v1\wechat;
 
 
 use app\Request;
-use app\services\activity\live\LiveRoomServices;
 use app\services\wechat\RoutineServices;
 
 /**
@@ -96,25 +95,4 @@ class AuthController
         return app('json')->success($this->services->tempIds());
     }
 
-    /**
-     * 获取小程序直播列表
-     * @param Request $request
-     * @param LiveRoomServices $liveRoom
-     * @return mixed
-     */
-    public function live(Request $request, LiveRoomServices $liveRoom)
-    {
-        return app('json')->success($liveRoom->userList([]));
-    }
-
-    /**
-     * 获取直播回放
-     * @param $id
-     * @param LiveRoomServices $lvieRoom
-     * @return mixed
-     */
-    public function livePlaybacks($id, LiveRoomServices $lvieRoom)
-    {
-        return app('json')->success($lvieRoom->getPlaybacks((int)$id));
-    }
 }

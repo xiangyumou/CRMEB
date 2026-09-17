@@ -14,10 +14,8 @@ namespace app\services\product\product;
 
 use app\dao\product\product\StoreProductDao;
 use app\Request;
-use app\services\activity\bargain\StoreBargainServices;
 use app\services\activity\combination\StoreCombinationServices;
 use app\services\activity\coupon\StoreCouponUserServices;
-use app\services\activity\seckill\StoreSeckillServices;
 use app\services\BaseServices;
 use app\services\activity\coupon\StoreCouponIssueServices;
 use app\services\order\StoreCartServices;

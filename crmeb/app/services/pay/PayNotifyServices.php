@@ -11,9 +11,7 @@
 
 namespace app\services\pay;
 
-use app\services\order\OtherOrderServices;
 use app\services\order\StoreOrderSuccessServices;
-use app\services\user\UserRechargeServices;
 
 /**
  * 支付成功回调 所有的异步通知回调都会走下面的三个方法,不在取分微信/支付宝支付回调
@@ -47,51 +45,6 @@ class PayNotifyServices
                 return $orderInfo && $orderInfo->paid;
             }
             return true;
-        } catch (\Exception $e) {
-            return false;
-        }
-    }
-
-    /**
-     * 充值成功后
-     * @param string|null $order_id 订单id
-     * @return bool
-     */
-    public function wechatUserRecharge(string $order_id = null, string $trade_no = null, string $payType = PayServices::WEIXIN_PAY, array $payment = [])
-    {
-        try {
-            /** @var UserRechargeServices $userRecharge */
-            $userRecharge = app()->make(UserRechargeServices::class);
-            if (array_key_exists('paid_amount', $payment)) {
-                $recharge = $userRecharge->getOne(['order_id' => $order_id]);
-                if (!$recharge) return true;
-                if (!$this->paymentMatches((string)$recharge->price, $payment)) return false;
-                if ($recharge->paid) return true;
-            } elseif ($userRecharge->be(['order_id' => $order_id, 'paid' => 1])) {
-                return true;
-            }
-            return $userRecharge->rechargeSuccess($order_id, ['trade_no' => $trade_no, 'pay_type' => $payType]);
-        } catch (\Exception $e) {
-            return false;
-        }
-    }
-
-    /**
-     * 购买会员
-     * @param string|null $order_id
-     * @return bool
-     */
-    public function wechatMember(string $order_id = null, string $trade_no = null, string $payType = PayServices::WEIXIN_PAY, array $payment = [])
-    {
-        try {
-            /** @var OtherOrderServices $services */
-            $services = app()->make(OtherOrderServices::class);
-            $orderInfo = $services->getOne(['order_id' => $order_id]);
-            if (!$orderInfo) return true;
-            if (array_key_exists('paid_amount', $payment)
-                && !$this->paymentMatches((string)$orderInfo->pay_price, $payment)) return false;
-            if ($orderInfo->paid) return true;
-            return $services->paySuccess($orderInfo->toArray(), $payType, ['trade_no' => $trade_no]);
         } catch (\Exception $e) {
             return false;
         }

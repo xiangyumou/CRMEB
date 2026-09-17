@@ -25,7 +25,6 @@ use crmeb\exceptions\ApiException;
 class UserInvoiceServices extends BaseServices
 {
     /**
-     * LiveAnchorServices constructor.
      * @param UserInvoiceDao $dao
      */
     public function __construct(UserInvoiceDao $dao)

@@ -78,7 +78,7 @@ class SystemMenusServices extends BaseServices
         $rulesStr = Arr::unique($rules);
         $menusList = $this->dao->getMenusRoule(['route' => $level ? $rulesStr : '', 'is_show_path' => 1]);
         $unique = $this->dao->getMenusUnique(['unique' => $level ? $rulesStr : '']);
-        return [Arr::getMenuIviewList(\app\services\CoreStoreAdmin::filterMenus($this->getMenusData($menusList))), $unique];
+        return [Arr::getMenuIviewList($this->getMenusData($menusList)), $unique];
     }
 
     /**

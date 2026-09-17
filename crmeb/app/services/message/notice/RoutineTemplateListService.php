@@ -107,23 +107,6 @@ class RoutineTemplateListService extends NoticeService
     }
 
     /**
-     * 充值金额退款
-     * @param $uid
-     * @param $UserRecharge
-     * @param $now_money
-     * @return bool|void
-     */
-    public function sendRechargeSuccess($uid, $UserRecharge, $now_money)
-    {
-        return $this->sendTemplate((int)$uid, [
-            'character_string1' => $UserRecharge['order_id'],
-            'amount3' => $UserRecharge['price'],
-            'amount4' => $now_money,
-            'date5' => date('Y-m-d H:i:s', time()),
-        ], '/pages/users/user_bill/index?type=2');
-    }
-
-    /**
      * 订单退款成功发送消息
      * @param $uid
      * @param $order
@@ -175,22 +158,6 @@ class RoutineTemplateListService extends NoticeService
     }
 
     /**
-     * 砍价成功通知
-     * @param $uid
-     * @param array $bargain
-     * @param array $bargainUser
-     * @param int $bargainUserId
-     * @return bool|void
-     */
-    public function sendBargainSuccess($uid, $bargain = [], $bargainUser = [], $bargainUserId = 0)
-    {
-        $data['thing1'] = $bargain['title'];
-        $data['amount2'] = $bargain['min_price'];
-        $data['thing3'] = '恭喜您，已经砍到最低价了';
-        return $this->sendTemplate((int)$uid, $data, '/pages/activity/goods_bargain_details/index?id=' . $bargain['id'] . '&bargain=' . $bargainUserId);
-    }
-
-    /**
      * 订单支付成功发送模板消息
      * @param $uid
      * @param $pay_price
@@ -204,57 +171,6 @@ class RoutineTemplateListService extends NoticeService
         $data['amount2'] = $pay_price . '元';
         $data['date3'] = date('Y-m-d H:i:s', time());
         return $this->sendTemplate((int)$uid, $data, '/pages/goods/order_details/index?order_id=' . $orderId);
-    }
-
-    /**
-     * 会员订单支付成功发送消息
-     * @param $uid
-     * @param $pay_price
-     * @param $orderId
-     * @return bool|void
-     */
-    public function sendMemberOrderSuccess($uid, $pay_price, $orderId)
-    {
-        if ($orderId == '') return true;
-        $data['character_string1'] = $orderId;
-        $data['amount2'] = $pay_price . '元';
-        $data['date3'] = date('Y-m-d H:i:s', time());
-        return $this->sendTemplate((int)$uid, $data, '/pages/annex/vip_paid/index');
-    }
-
-    /**
-     * 提现失败
-     * @param $uid
-     * @param $msg
-     * @param $extract_number
-     * @param $nickname
-     * @return bool|void
-     */
-    public function sendExtractFail($uid, $msg, $extract_number, $nickname)
-    {
-        return $this->sendTemplate((int)$uid, [
-            'thing1' => '提现失败：' . $msg,
-            'amount2' => $extract_number . '元',
-            'thing3' => $nickname,
-            'date4' => date('Y-m-d H:i:s', time())
-        ], '/pages/users/user_spread_money/index?type=1');
-    }
-
-    /**
-     * 提现成功
-     * @param $uid
-     * @param $extract_number
-     * @param $nickname
-     * @return bool|void
-     */
-    public function sendExtractSuccess($uid, $extract_number, $nickname)
-    {
-        return $this->sendTemplate((int)$uid, [
-            'thing1' => '提现成功',
-            'amount2' => $extract_number,
-            'thing3' => $nickname,
-            'date4' => date('Y-m-d H:i:s', time())
-        ], '/pages/users/user_spread_money/index?type=1');
     }
 
     /**
@@ -313,56 +229,4 @@ class RoutineTemplateListService extends NoticeService
         ], $link);
     }
 
-    /**
-     * 赠送积分消息提醒
-     * @param $uid
-     * @param $order
-     * @param $storeTitle
-     * @param $gainIntegral
-     * @param $integral
-     * @return bool|void
-     */
-    public function sendUserIntegral($uid, $order, $storeTitle, $gainIntegral, $integral)
-    {
-        if (!$order || !$uid) return true;
-        if (is_string($order['cart_id']))
-            $order['cart_id'] = json_decode($order['cart_id'], true);
-        return $this->sendTemplate((int)$uid, [
-            'character_string2' => $order['order_id'],
-            'thing3' => $storeTitle,
-            'amount4' => $order['pay_price'],
-            'number5' => $gainIntegral,
-            'number6' => $integral
-        ], '/pages/users/user_integral/index');
-    }
-
-    /**
-     * 获得推广佣金发送提醒
-     * @param $uid
-     * @param string $brokeragePrice
-     * @param string $goods_name
-     * @return bool|void
-     */
-    public function sendOrderBrokerageSuccess($uid, string $brokeragePrice, string $goods_name)
-    {
-        return $this->sendTemplate((int)$uid, [
-            'thing2' => $goods_name,
-            'amount4' => $brokeragePrice . '元',
-            'time1' => date('Y-m-d H:i:s', time())
-        ], '/pages/users/user_spread_user/index');
-    }
-
-    /**
-     * 绑定推广关系发送消息提醒
-     * @param $uid
-     * @param string $userName
-     * @return bool|void
-     */
-    public function sendBindSpreadUidSuccess($uid, string $userName)
-    {
-        return $this->sendTemplate((int)$uid, [
-            'name3' => $userName . "加入您的团队",
-            'date4' => date('Y-m-d H:i:s', time())
-        ], '/pages/users/user_spread_user/index');
-    }
 }

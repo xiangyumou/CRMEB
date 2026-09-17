@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace Tests\Regression\Cases;
 
-use app\dao\order\OtherOrderDao;
 use app\dao\order\StoreCartDao;
 use app\dao\order\StoreOrderDao;
 use app\dao\order\StoreOrderRefundDao;
@@ -13,12 +12,7 @@ use app\dao\shipping\ShippingTemplatesFreeCityDao;
 use app\dao\shipping\ShippingTemplatesNoDeliveryCityDao;
 use app\dao\shipping\ShippingTemplatesRegionCityDao;
 use app\dao\user\UserBillDao;
-use app\dao\user\UserExtractDao;
-use app\dao\user\UserMoneyDao;
-use app\dao\user\UserRechargeDao;
-use app\dao\user\UserSignDao;
 use app\dao\user\UserStoreOrderDao;
-use app\dao\user\UserUserBillDao;
 use Tests\Regression\Support\RegressionTestCase;
 use think\facade\Db;
 
@@ -71,13 +65,6 @@ final class GroupedDaoSqlModeTest extends RegressionTestCase
                 20
             ));
             self::assertIsArray($billDao->getGroupField($timeKey, 'number', 'add_time'));
-            self::assertIsArray((new UserMoneyDao())->getGroupField($timeKey, 'number', 'add_time'));
-            self::assertIsArray((new UserExtractDao())->getGroupField($timeKey, 'extract_price', 'add_time'));
-            self::assertIsArray((new UserRechargeDao())->getGroupField($timeKey, 'price', 'pay_time'));
-
-            $otherOrderDao = new OtherOrderDao();
-            self::assertIsArray($otherOrderDao->getPayUserCount(time(), 'regression-none'));
-            self::assertIsArray($otherOrderDao->getGroupField($timeKey, 'pay_price', 'pay_time'));
             self::assertIsArray((new StoreOrderRefundDao())->getDayGroupMoney($timeKey, 'refund_price', 'add_time'));
 
             $orderDao = new StoreOrderDao();
@@ -92,16 +79,8 @@ final class GroupedDaoSqlModeTest extends RegressionTestCase
             self::assertIsArray($orderDao->getDayGroupMoney($timeKey, 'pay_price', 'pay_time'));
             self::assertIsArray($orderDao->getOrderGroupCount($timeKey));
             self::assertIsArray($orderDao->getPayOrderGroupPeople($timeKey));
-            self::assertIsArray($orderDao->seckillPeople(-1, 'regression-none', 1, 20));
 
             self::assertIsArray((new StoreCartDao())->productIdByCartNum([-1], -1));
-            self::assertIsArray((new UserSignDao())->getListGroup(
-                ['uid' => -1],
-                'FROM_UNIXTIME(add_time,"%Y-%m") as time,GROUP_CONCAT(id SEPARATOR ",") ids',
-                1,
-                20,
-                'time'
-            ));
             self::assertIsArray((new UserStoreOrderDao())->getUserSpreadCountList(
                 [['u.uid', '=', -1]],
                 'u.uid,u.nickname,p.orderCount,p.numberCount',
@@ -109,7 +88,6 @@ final class GroupedDaoSqlModeTest extends RegressionTestCase
                 1,
                 20
             ));
-            self::assertIsArray((new UserUserBillDao())->getList([['u.uid', '=', -1]], '', '', 1, 20));
 
             $replyWhere = [
                 'data' => '',

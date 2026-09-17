@@ -11,16 +11,11 @@
 namespace app\api\controller\v1\admin;
 
 use app\Request;
-use app\services\order\DeliveryServiceServices;
 use app\services\order\StoreOrderCartInfoServices;
 use app\services\order\StoreOrderCreateServices;
 use app\services\order\StoreOrderDeliveryServices;
-use app\services\order\StoreOrderEconomizeServices;
 use app\services\order\StoreOrderRefundServices;
 use app\services\order\StoreOrderServices;
-use app\services\order\StoreOrderWapServices;
-use app\services\order\StoreOrderWriteOffServices;
-use app\services\pay\OrderOfflineServices;
 use app\services\serve\ServeServices;
 use app\services\user\UserServices;
 use app\services\shipping\ExpressServices;
@@ -191,8 +186,7 @@ class StoreOrderController
      */
     public function detail(Request $request, StoreOrderServices $services, UserServices $userServices, $orderId)
     {
-        $economizeServices = app()->make(StoreOrderEconomizeServices::class);
-        $orderData = $services->getUserOrderByKey($economizeServices, $orderId, 0);
+        $orderData = $services->getUserOrderByKey($orderId, 0);
         $orderData['nickname'] = $userServices->value(['uid' => $orderData['uid']], 'nickname');
         return app('json')->success($orderData);
     }
@@ -360,23 +354,6 @@ class StoreOrderController
     }
 
     /**
-     * 订单支付
-     * @param Request $request
-     * @param OrderOfflineServices $services
-     * @return mixed
-     */
-    public function offline(Request $request, OrderOfflineServices $services)
-    {
-        [$orderId] = $request->postMore([['order_id', '']], true);
-        $orderInfo = $this->service->getOne(['order_id' => $orderId], 'id');
-        if (!$orderInfo) return app('json')->fail('参数错误');
-        $id = $orderInfo->id;
-        $services->orderOffline((int)$id);
-        return app('json')->success('操作成功');
-
-    }
-
-    /**
      * 订单退款
      * @param Request $request
      * @param StoreOrderRefundServices $services
@@ -530,42 +507,6 @@ class StoreOrderController
             }
         }
 
-    }
-
-    /**
-     * 门店核销
-     * @param Request $request
-     * @param StoreOrderWriteOffServices $services
-     * @return mixed
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function order_verific(Request $request, StoreOrderWriteOffServices $services)
-    {
-        list($verifyCode, $isConfirm, $auth) = $request->postMore([
-            ['verify_code', ''],
-            ['is_confirm', 0],
-            ['auth', 0],
-        ], true);
-        if (!$verifyCode) return app('json')->fail('请输入核销码或者扫描核销二维码');
-        $uid = $request->uid();
-        $orderInfo = $services->writeOffOrder($verifyCode, (int)$isConfirm, $uid, $auth);
-        if ($isConfirm == 0) {
-            return app('json')->success($orderInfo);
-        }
-        return app('json')->success('核销成功');
-    }
-
-    /**
-     * 获取所有配送员列表
-     * @param DeliveryServiceServices $services
-     * @return mixed
-     */
-    public function getDeliveryAll(DeliveryServiceServices $services)
-    {
-        $list = $services->getDeliveryList();
-        return app('json')->success($list['list']);
     }
 
     /**

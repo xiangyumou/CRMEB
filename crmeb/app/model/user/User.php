@@ -11,9 +11,7 @@
 
 namespace app\model\user;
 
-use app\model\agent\AgentLevel;
 use app\model\order\StoreOrder;
-use app\model\system\SystemUserLevel;
 use crmeb\basic\BaseModel;
 use crmeb\traits\ModelTrait;
 use think\Model;

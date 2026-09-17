@@ -11,9 +11,7 @@
 namespace app\adminapi\controller\v1\diy;
 
 use app\adminapi\controller\AuthController;
-use app\services\activity\bargain\StoreBargainServices;
 use app\services\activity\combination\StoreCombinationServices;
-use app\services\activity\seckill\StoreSeckillServices;
 use app\services\article\ArticleServices;
 use app\services\diy\DiyServices;
 use app\services\other\CacheServices;
@@ -69,7 +67,7 @@ class Diy extends AuthController
         $data = $this->request->postMore([
             ['value', ''],
         ]);
-        $value_config = ['seckill', 'bargain', 'combination', 'goodList'];
+        $value_config = ['combination', 'goodList'];
         $value = is_string($data['value']) ? json_decode($data['value'], true) : $data['value'];
         foreach ($value as $key => &$val) {
             if (in_array($key, $value_config) && is_array($val)) {
@@ -200,15 +198,13 @@ class Diy extends AuthController
      * 获取一条数据
      * @param int $id
      * @param StoreProductServices $services
-     * @param StoreSeckillServices $seckillServices
      * @param StoreCombinationServices $combinationServices
-     * @param StoreBargainServices $bargainServices
      * @return mixed
      * @throws \think\db\exception\DataNotFoundException
      * @throws \think\db\exception\DbException
      * @throws \think\db\exception\ModelNotFoundException
      */
-    public function getInfo(int $id, StoreProductServices $services, StoreSeckillServices $seckillServices, StoreCombinationServices $combinationServices, StoreBargainServices $bargainServices)
+    public function getInfo(int $id, StoreProductServices $services, StoreCombinationServices $combinationServices)
     {
         if (!$id) throw new AdminException('参数错误');
         $info = $this->services->get($id);
@@ -219,27 +215,13 @@ class Diy extends AuthController
         }
         if (!$info['value']) return app('json')->success(compact('info'));
         $info['value'] = json_decode($info['value'], true);
-        $value_config = ['seckill', 'bargain', 'combination', 'goodList'];
+        $value_config = ['combination', 'goodList'];
         foreach ($info['value'] as $key => &$val) {
             if (in_array($key, $value_config) && is_array($val)) {
                 if ($key == 'goodList') {
                     foreach ($val as $k => &$v) {
                         if (isset($v['ids']) && $v['ids'] && $v['tabConfig']['tabVal'] == 1) {
                             $v['goodsList']['list'] = $services->getSearchList(['ids' => $v['ids']]);
-                        }
-                    }
-                }
-                if ($key == "seckill") {
-                    foreach ($val as $k => &$v) {
-                        if (isset($v['ids']) && $v['ids'] && $v['tabConfig']['tabVal'] == 1) {
-                            $v['goodsList']['list'] = $seckillServices->getDiySeckillList(['ids' => $v['ids']])['list'];
-                        }
-                    }
-                }
-                if ($key == "bargain") {
-                    foreach ($val as $k => &$v) {
-                        if (isset($v['ids']) && $v['ids'] && $v['tabConfig']['tabVal'] == 1) {
-                            $v['goodsList']['list'] = $bargainServices->getHomeList(['ids' => $v['ids']])['list'];
                         }
                     }
                 }
@@ -337,12 +319,6 @@ class Diy extends AuthController
             $info = $services->getRecommendProduct(0, 'is_new', $num);// 首发新品
         } else if ($type == 4) {// 促销单品
             $info = $services->getRecommendProduct(0, 'is_benefit', $num);// 促销单品
-        } else if ($type == 5) {// 会员商品
-            $whereVip = [
-                ['vip_price', '>', 0],
-                ['is_vip', '=', 1],
-            ];
-            $info = $services->getRecommendProduct(0, $whereVip, $num);// 会员商品
         }
         return $info;
     }
@@ -376,12 +352,10 @@ class Diy extends AuthController
     {
         $url = sys_data('uni_app_link');
         if ($url) {
-            $model_checkbox = sys_config('model_checkbox', ['seckill', 'bargain', 'combination']);
+            $model_checkbox = sys_config('model_checkbox', ['combination']);
             foreach ($url as $key => &$link) {
                 $link['url'] = $link['link'];
                 $link['parameter'] = trim($link['param']);
-                if (!in_array('seckill', $model_checkbox) && strpos($link['name'], '秒杀') !== false) unset($url[$key]);
-                if (!in_array('bargain', $model_checkbox) && strpos($link['name'], '砍价') !== false) unset($url[$key]);
                 if (!in_array('combination', $model_checkbox) && strpos($link['name'], '拼团') !== false) unset($url[$key]);
             }
         } else {

@@ -25,7 +25,6 @@ use app\services\order\{StoreOrderCartInfoServices,
     StoreOrderServices
 };
 use app\services\shipping\ExpressServices;
-use app\services\system\store\SystemStoreServices;
 use app\services\user\UserServices;
 use think\facade\App;
 
@@ -532,13 +531,7 @@ class StoreOrder extends AuthController
         $orderInfo['levelPrice'] = $levelPrice;
         $orderInfo['memberPrice'] = $memberPrice;
         $orderInfo['total_price'] = bcadd($orderInfo['total_price'], $orderInfo['vip_true_price'], 2);
-        if ($orderInfo['store_id'] && $orderInfo['shipping_type'] == 2) {
-            /** @var  $storeServices */
-            $storeServices = app()->make(SystemStoreServices::class);
-            $orderInfo['_store_name'] = $storeServices->value(['id' => $orderInfo['store_id']], 'name');
-        } else
-            $orderInfo['_store_name'] = '';
-        $orderInfo['spread_name'] = $services->value(['uid' => $orderInfo['spread_uid']], 'nickname') ?? '无';
+        $orderInfo['_store_name'] = '';
         $orderInfo['_info'] = app()->make(StoreOrderCartInfoServices::class)->getOrderCartInfo((int)$orderInfo['id']);
         $cart_num = 0;
         $refund_num = array_sum(array_column($orderInfo['refund'], 'refund_num'));

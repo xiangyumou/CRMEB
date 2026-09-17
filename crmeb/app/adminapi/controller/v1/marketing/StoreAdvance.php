@@ -13,9 +13,7 @@ namespace app\adminapi\controller\v1\marketing;
 
 use app\adminapi\controller\AuthController;
 use app\services\activity\advance\StoreAdvanceServices;
-use app\services\activity\bargain\StoreBargainServices;
 use app\services\activity\combination\StoreCombinationServices;
-use app\services\activity\seckill\StoreSeckillServices;
 use crmeb\exceptions\AdminException;
 use think\facade\App;
 
@@ -82,18 +80,6 @@ class StoreAdvance extends AuthController
             ['copy', 0]
         ]);
         if (!$id) {
-            /** @var StoreSeckillServices $storeSeckillService */
-            $storeSeckillService = app()->make(StoreSeckillServices::class);
-            $res1 = $storeSeckillService->count(['product_id' => $data['product_id'], 'is_del' => 0, 'status' => 1, 'seckill_time' => 1]);
-            if ($res1) {
-                throw new AdminException('商品参与其他活动开启，无法开启预售');
-            }
-            /** @var StoreBargainServices $storeBargainService */
-            $storeBargainService = app()->make(StoreBargainServices::class);
-            $res2 = $storeBargainService->count(['product_id' => $data['product_id'], 'is_del' => 0, 'status' => 1, 'bargain_time' => 1]);
-            if ($res2) {
-                throw new AdminException('商品参与其他活动开启，无法开启预售');
-            }
             /** @var StoreCombinationServices $storeCombinationService */
             $storeCombinationService = app()->make(StoreCombinationServices::class);
             $res3 = $storeCombinationService->count(['product_id' => $data['product_id'], 'is_del' => 0, 'is_show' => 1, 'pinkIngTime' => 1]);

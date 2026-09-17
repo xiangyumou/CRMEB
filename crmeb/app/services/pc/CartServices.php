@@ -16,7 +16,6 @@ namespace app\services\pc;
 use app\services\BaseServices;
 use app\services\order\StoreCartServices;
 use app\services\product\product\StoreProductServices;
-use app\services\user\member\MemberCardServices;
 use app\services\user\UserServices;
 
 class CartServices extends BaseServices

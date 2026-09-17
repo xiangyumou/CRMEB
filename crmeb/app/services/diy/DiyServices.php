@@ -12,9 +12,7 @@ declare (strict_types=1);
 
 namespace app\services\diy;
 
-use app\services\activity\bargain\StoreBargainServices;
 use app\services\activity\combination\StoreCombinationServices;
-use app\services\activity\seckill\StoreSeckillServices;
 use app\services\BaseServices;
 use app\dao\diy\DiyDao;
 use app\services\other\QrcodeServices;
@@ -207,22 +205,14 @@ class DiyServices extends BaseServices
     {
         /** @var StoreProductServices $StoreProductServices */
         $StoreProductServices = app()->make(StoreProductServices::class);
-        /** @var StoreBargainServices $StoreBargainServices */
-        $StoreBargainServices = app()->make(StoreBargainServices::class);
         /** @var  $StoreCombinationServices StoreCombinationServices */
         $StoreCombinationServices = app()->make(StoreCombinationServices::class);
-        /** @var  $StoreSeckillServices  StoreSeckillServices */
-        $StoreSeckillServices = app()->make(StoreSeckillServices::class);
         $type = $where['type'];
         unset($where['type']);
         $data = [];
         switch ($type) {
             case 0:
                 $data = $StoreProductServices->searchList($where);
-                break;
-            //秒杀
-            case 2:
-                $data = $StoreSeckillServices->getDiySeckillList($where);
                 break;
             //拼团
             case 3:
@@ -244,10 +234,6 @@ class DiyServices extends BaseServices
                 $where['is_best'] = 1;
                 $data = $StoreProductServices->searchList($where);
                 break;
-            //砍价
-            case 8:
-                $data = $StoreBargainServices->getDiyBargainList($where);
-                break;
         }
         return $data;
     }
@@ -260,22 +246,14 @@ class DiyServices extends BaseServices
     {
         /** @var StoreProductServices $StoreProductServices */
         $StoreProductServices = app()->make(StoreProductServices::class);
-        /** @var StoreBargainServices $StoreBargainServices */
-        $StoreBargainServices = app()->make(StoreBargainServices::class);
         /** @var  $StoreCombinationServices StoreCombinationServices */
         $StoreCombinationServices = app()->make(StoreCombinationServices::class);
-        /** @var  $StoreSeckillServices  StoreSeckillServices */
-        $StoreSeckillServices = app()->make(StoreSeckillServices::class);
         $type = $where['type'];
         $data = [];
         switch ($type) {
             case 0:
                 $where['type'] = $where['isType'] ?? 0;
                 $data['list'] = $StoreProductServices->getGoodsList($where, $uid);
-                break;
-            //秒杀
-            case 2:
-                $data = $StoreSeckillServices->getHomeSeckillList($where);
                 break;
             //拼团
             case 3:
@@ -300,10 +278,6 @@ class DiyServices extends BaseServices
                 $where['is_best'] = 1;
                 $where['type'] = $where['isType'] ?? 0;
                 $data['list'] = $StoreProductServices->getGoodsList($where, $uid);
-                break;
-            //砍价
-            case 8:
-                $data = $StoreBargainServices->getHomeList($where);
                 break;
         }
         foreach ($data['list'] as &$item) {

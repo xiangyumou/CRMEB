@@ -17,8 +17,6 @@ use app\dao\activity\coupon\StoreCouponIssueDao;
 use app\services\order\StoreCartServices;
 use app\services\product\product\StoreCategoryServices;
 use app\services\product\product\StoreProductServices;
-use app\services\user\member\MemberCardServices;
-use app\services\user\member\MemberRightServices;
 use app\services\user\UserServices;
 use crmeb\exceptions\AdminException;
 use crmeb\exceptions\ApiException;
@@ -70,19 +68,6 @@ class StoreCouponIssueServices extends BaseServices
     }
 
     /**
-     * 获取会员优惠券列表
-     * @param array $where
-     * @return array
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function getMemberCouponIssueList(array $where)
-    {
-        return $this->dao->getApiIssueList($where);
-    }
-
-    /**
      * 新增优惠券
      * @param $data
      * @return bool
@@ -106,12 +91,8 @@ class StoreCouponIssueServices extends BaseServices
             throw new AdminException('请输入优惠券名称');
         }
 
-        if (!in_array((int)$data['receive_type'], [1, 2, 3, 4])) {
+        if (!in_array((int)$data['receive_type'], [1, 2, 3])) {
             throw new AdminException('请核对领取方式');
-        }
-
-        if ($data['user_type'] == 2) {
-            $data['receive_type'] = 4;
         }
 
         if ($data['receive_type'] == 3) {
@@ -208,15 +189,9 @@ class StoreCouponIssueServices extends BaseServices
         if (!$coupon) {
             throw new AdminException('优惠券不存在');
         }
-        if ($coupon['receive_type'] != 4) {
-            /** @var StoreCouponIssueUserServices $storeCouponIssueUserService */
-            $storeCouponIssueUserService = app()->make(StoreCouponIssueUserServices::class);
-            return $storeCouponIssueUserService->issueLog(['issue_coupon_id' => $id]);
-        } else {//会员券
-            /** @var StoreCouponUserServices $storeCouponUserService */
-            $storeCouponUserService = app()->make(StoreCouponUserServices::class);
-            return $storeCouponUserService->issueLog(['cid' => $id]);
-        }
+        /** @var StoreCouponIssueUserServices $storeCouponIssueUserService */
+        $storeCouponIssueUserService = app()->make(StoreCouponIssueUserServices::class);
+        return $storeCouponIssueUserService->issueLog(['issue_coupon_id' => $id]);
 
     }
 
@@ -407,9 +382,6 @@ class StoreCouponIssueServices extends BaseServices
     {
         $issueCouponInfo = $this->dao->getInfo((int)$id);
         if (!$issueCouponInfo) throw new ApiException('领取的优惠劵已领完或已过期');
-        if ($user->is_money_level <= 0 && $issueCouponInfo['receive_type'] == 4) {
-            throw new ApiException('请先开通付费会员才能领取会员券');
-        }
         $uid = $user->uid;
         /** @var StoreCouponIssueUserServices $issueUserService */
         $issueUserService = app()->make(StoreCouponIssueUserServices::class);
@@ -428,38 +400,6 @@ class StoreCouponIssueServices extends BaseServices
                 $issueCouponInfo->save();
             }
         });
-    }
-
-    /**
-     * 会员发放优惠期券
-     * @param $id
-     * @param $uid
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function memberIssueUserCoupon($id, $uid)
-    {
-        $issueCouponInfo = $this->dao->getInfo((int)$id);
-        if ($issueCouponInfo) {
-            /** @var StoreCouponIssueUserServices $issueUserService */
-            $issueUserService = app()->make(StoreCouponIssueUserServices::class);
-            /** @var StoreCouponUserServices $couponUserService */
-            $couponUserService = app()->make(StoreCouponUserServices::class);
-            if ($issueCouponInfo->remain_count >= 0 || $issueCouponInfo->is_permanent) {
-                $this->transaction(function () use ($issueUserService, $uid, $id, $couponUserService, $issueCouponInfo) {
-                    //$issueUserService->save(['uid' => $uid, 'issue_coupon_id' => $id, 'add_time' => time()]);
-                    $couponUserService->addMemberUserCoupon($uid, $issueCouponInfo, "send");
-                    // 如果会员劵需要限制数量时打开
-                    if ($issueCouponInfo['total_count'] > 0) {
-                        $issueCouponInfo['remain_count'] -= 1;
-                        $issueCouponInfo->save();
-                    }
-                });
-            }
-
-        }
-
     }
 
     /**
@@ -578,73 +518,6 @@ class StoreCouponIssueServices extends BaseServices
         list($date_1['y'], $date_1['m']) = explode("-", date('Y-m', $date1_stamp));
         list($date_2['y'], $date_2['m']) = explode("-", date('Y-m', $date2_stamp));
         return abs($date_1['y'] - $date_2['y']) * 12 + $date_2['m'] - $date_1['m'];
-    }
-
-    /**
-     * 给会员发放优惠券
-     * @param $uid
-     * @param int $couponId
-     * @return bool
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function sendMemberCoupon($uid, $couponId = 0)
-    {
-        if (!$uid) return false;
-        /** @var MemberCardServices $memberCardService */
-        $memberCardService = app()->make(MemberCardServices::class);
-        //看付费会员是否开启
-        $isOpenMember = $memberCardService->isOpenMemberCard();
-        if (!$isOpenMember) return false;
-        /** @var UserServices $userService */
-        $userService = app()->make(UserServices::class);
-        $userInfo = $userService->getUserInfo((int)$uid);
-        //看是否会员过期
-        $checkMember = $userService->offMemberLevel($uid, $userInfo);
-        if (!$checkMember) return false;
-        /** @var MemberRightServices $memberRightService */
-        $memberRightService = app()->make(MemberRightServices::class);
-        //看是否开启会员送券
-        $isSendCoupon = $memberRightService->getMemberRightStatus("coupon");
-        if (!$isSendCoupon) return false;
-        if ($userInfo && (($userInfo['is_money_level'] > 0) || $userInfo['is_ever_level'] == 1)) {
-            if ($couponId) {//手动点击领取
-                $couponWhere['id'] = $couponId;
-            } else {//主动批量发放
-                $couponWhere['status'] = 1;
-                $couponWhere['receive_type'] = 4;
-                $couponWhere['is_del'] = 0;
-            }
-            $couponInfo = $this->getMemberCouponIssueList($couponWhere);
-            if ($couponInfo) {
-                /** @var StoreCouponUserServices $couponUserService */
-                $couponUserService = app()->make(StoreCouponUserServices::class);
-                $couponIds = array_column($couponInfo, 'id');
-                $couponUserMonth = $couponUserService->memberCouponUserGroupBymonth(['uid' => $uid, 'couponIds' => $couponIds]);
-                $getTime = array();
-                if ($couponUserMonth) {
-                    $getTime = array_column($couponUserMonth, 'num', 'time');
-                }
-                // 判断这个月是否领取过,而且领全了
-                //if (in_array(date('Y-m', time()), $getTime)) return false;
-                $timeKey = date('Y-m', time());
-                if (array_key_exists($timeKey, $getTime) && $getTime[$timeKey] == count($couponIds)) return false;
-                $monthNum = $this->getMonthNum(date('Y-m-d H:i:s', time()), date('Y-m-d H:i:s', $userInfo['overdue_time']));
-                //判断是否领完所有月份
-                if (count($getTime) >= $monthNum && (array_key_exists($timeKey, $getTime) && $getTime[$timeKey] == count($couponIds)) && $userInfo['is_ever_level'] != 1 && $monthNum > 0) return false;
-                //看之前是否手动领取过某一张，领取过就不再领取。
-                $couponUser = $couponUserService->getUserCounponByMonth(['uid' => $uid, 'cid' => $couponIds], 'id,cid');
-                if ($couponUser) $couponUser = array_combine(array_column($couponUser, 'cid'), $couponUser);
-                foreach ($couponInfo as $cv) {
-                    if (!isset($couponUser[$cv['id']])) {
-                        $this->memberIssueUserCoupon($cv['id'], $uid);
-                    }
-                }
-
-            }
-        }
-        return true;
     }
 
     /**

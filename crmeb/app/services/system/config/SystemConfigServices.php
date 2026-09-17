@@ -13,7 +13,6 @@ namespace app\services\system\config;
 
 
 use app\dao\system\config\SystemConfigDao;
-use app\services\agent\AgentManageServices;
 use app\services\BaseServices;
 use crmeb\exceptions\AdminException;
 use crmeb\services\CacheService;
@@ -70,65 +69,9 @@ class SystemConfigServices extends BaseServices
      * @var array[]
      */
     protected $relatedRule = [
-        'sign_status' => [
-            'son_type' => [
-                'sign_mode' => '',
-                'sign_remind' => [
-                    'son_type' => [
-                        'sign_remind_time' => '',
-                        'sign_remind_type' => '',
-                    ],
-                    'show_value' => 1
-                ],
-                'sign_give_point' => '',
-                'sign_give_exp' => '',
-            ],
-            'show_value' => 1
-        ],
-        'brokerage_func_status' => [
-            'son_type' => [
-                'store_brokerage_statu' => [
-                    'son_type' => ['store_brokerage_price' => ''],
-                    'show_value' => 3
-                ],
-                'brokerage_bindind' => '',
-                'store_brokerage_binding_status' => [
-                    'son_type' => ['store_brokerage_binding_time' => ''],
-                    'show_value' => 2
-                ],
-                'spread_banner' => '',
-                'brokerage_level' => '',
-                'division_status' => '',
-                'agent_apply_open' => '',
-                'brokerage_window_switch' => '',
-            ],
-            'show_value' => 1
-        ],
-        'brokerage_user_status' => [
-            'son_type' => [
-                'uni_brokerage_price' => '',
-                'day_brokerage_price_upper' => '',
-            ],
-            'show_value' => 1
-        ],
         'invoice_func_status' => [
             'son_type' => [
                 'special_invoice_status' => '',
-            ],
-            'show_value' => 1
-        ],
-        'member_func_status' => [
-            'son_type' => [
-                'order_give_exp' => '',
-                'invite_user_exp' => ''
-            ],
-            'show_value' => 1
-        ],
-        'balance_func_status' => [
-            'son_type' => [
-                'recharge_attention' => '',
-                'recharge_switch' => '',
-                'store_user_min_recharge' => '',
             ],
             'show_value' => 1
         ],
@@ -202,12 +145,6 @@ class SystemConfigServices extends BaseServices
             'son_type' => [
                 'pay_sub_merchant_id' => '',
                 'sp_appid' => ''
-            ],
-            'show_value' => 1
-        ],
-        'member_card_status' => [
-            'son_type' => [
-                'member_price_status' => '',
             ],
             'show_value' => 1
         ],

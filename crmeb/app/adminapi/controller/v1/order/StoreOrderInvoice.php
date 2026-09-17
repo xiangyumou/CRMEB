@@ -16,7 +16,6 @@ use app\services\order\StoreOrderInvoiceServices;
 use app\services\order\StoreOrderServices;
 use app\services\product\product\StoreProductServices;
 use app\services\serve\ServeServices;
-use app\services\system\store\SystemStoreServices;
 use app\services\user\UserServices;
 use think\facade\App;
 
@@ -125,13 +124,7 @@ class StoreOrderInvoice extends AuthController
         foreach ($orderInfo['cartInfo'] as &$item) {
             $item['class_name'] = $cateData[$item['product_id']] ?? '';
         }
-        if ($orderInfo['store_id'] && $orderInfo['shipping_type'] == 2) {
-            /** @var  $storeServices */
-            $storeServices = app()->make(SystemStoreServices::class);
-            $orderInfo['_store_name'] = $storeServices->value(['id' => $orderInfo['store_id']], 'name');
-        } else {
-            $orderInfo['_store_name'] = '';
-        }
+        $orderInfo['_store_name'] = '';
         $userInfo = $userInfo->toArray();
         $invoice = $this->services->getOne(['order_id' => $id]);
         return app('json')->success(compact('orderInfo', 'userInfo', 'invoice'));
