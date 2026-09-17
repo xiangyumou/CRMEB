@@ -5,7 +5,6 @@ namespace Tests\Regression\Cases;
 
 use app\services\order\StoreOrderSuccessServices;
 use app\services\pay\PayNotifyServices;
-use app\services\user\UserRechargeServices;
 use Tests\Regression\Support\RegressionTestCase;
 
 final class PaymentNotifyTest extends RegressionTestCase
@@ -78,29 +77,6 @@ final class PaymentNotifyTest extends RegressionTestCase
         self::assertTrue((new PayNotifyServices())->wechatProduct('order-7', 'trade-7'));
     }
 
-    public function testRepeatedRechargeNotificationDoesNotCreditBalanceAgain(): void
-    {
-        $recharges = $this->rechargeServiceMock();
-        $recharges->expects(self::once())->method('be')->with(['order_id' => 'recharge-1', 'paid' => 1])->willReturn(true);
-        $recharges->expects(self::never())->method('rechargeSuccess');
-        $this->replace(UserRechargeServices::class, $recharges);
-
-        self::assertTrue((new PayNotifyServices())->wechatUserRecharge('recharge-1', 'trade-1'));
-    }
-
-    public function testFirstRechargeNotificationCreditsThroughBusinessService(): void
-    {
-        $recharges = $this->rechargeServiceMock();
-        $recharges->method('be')->willReturn(false);
-        $recharges->expects(self::once())
-            ->method('rechargeSuccess')
-            ->with('recharge-2', ['trade_no' => 'trade-2', 'pay_type' => 'weixin'])
-            ->willReturn(true);
-        $this->replace(UserRechargeServices::class, $recharges);
-
-        self::assertTrue((new PayNotifyServices())->wechatUserRecharge('recharge-2', 'trade-2'));
-    }
-
     private function orderServiceMock(): StoreOrderSuccessServices
     {
         return $this->getMockBuilder(StoreOrderSuccessServices::class)
@@ -110,12 +86,4 @@ final class PaymentNotifyTest extends RegressionTestCase
             ->getMock();
     }
 
-    private function rechargeServiceMock(): UserRechargeServices
-    {
-        return $this->getMockBuilder(UserRechargeServices::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['rechargeSuccess'])
-            ->addMethods(['be'])
-            ->getMock();
-    }
 }

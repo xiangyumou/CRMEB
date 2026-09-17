@@ -20,7 +20,7 @@ final class OrderLifecycleTest extends RegressionTestCase
 
         self::assertTrue($orders->cancelOrder($order['order_id'], $user['uid']));
         self::assertSame(1, (int)Db::name('store_order')->where('id', $order['id'])->value('is_cancel'));
-        self::assertSame(1, (int)Db::name('store_order_status')->where([
+        self::assertSame(0, (int)Db::name('store_order_status')->where([
             'oid' => $order['id'],
             'change_type' => 'integral_back',
         ])->count());

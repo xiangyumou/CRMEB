@@ -13,7 +13,6 @@ namespace app\services\order;
 
 use app\services\BaseServices;
 use app\dao\order\StoreOrderDao;
-use app\services\pay\PayServices;
 use app\services\user\UserServices;
 use crmeb\exceptions\ApiException;
 use app\services\user\UserAddressServices;
@@ -25,12 +24,6 @@ use app\services\user\UserAddressServices;
  */
 class StoreOrderComputedServices extends BaseServices
 {
-    /**
-     * 支付类型
-     * @var string[]
-     */
-    public $payType = ['weixin' => '微信支付', 'yue' => '余额支付', 'offline' => '线下支付', 'pc' => 'pc'];
-
     /**
      * 额外参数
      * @var array
@@ -63,7 +56,6 @@ class StoreOrderComputedServices extends BaseServices
      * @param string $key
      * @param array $cartGroup
      * @param int $addressId
-     * @param string $payType
      * @param bool $useIntegral
      * @param int $couponId
      * @param bool $is_create
@@ -73,9 +65,6 @@ class StoreOrderComputedServices extends BaseServices
     public function computedOrder(int $uid, array $userInfo = [], array $cartGroup, int $addressId, string $payType, bool $useIntegral = false, int $couponId = 0, bool $isCreate = false, int $shippingType = 1, int $is_gift = 0)
     {
         \app\services\CoreStore::assertOrder($this->paramData + compact('payType', 'useIntegral', 'shippingType'));
-        $offlinePayStatus = (int)sys_config('offline_pay_status') ?? (int)2;
-        $systemPayType = PayServices::PAY_TYPE;
-        if ($offlinePayStatus == 2) unset($systemPayType['offline']);
         if (!$userInfo) {
             /** @var UserServices $userServices */
             $userServices = app()->make(UserServices::class);
@@ -101,18 +90,13 @@ class StoreOrderComputedServices extends BaseServices
             $postage = [];
         }
         $combinationId = $this->paramData['combinationId'] ?? 0;
-        $seckillId = $this->paramData['seckill_id'] ?? 0;
-        $bargainId = $this->paramData['bargainId'] ?? 0;
-        $isActivity = $combinationId || $seckillId || $bargainId;
-        if (!$isActivity) {
+        if (!$combinationId) {
             //使用优惠劵
             [$payPrice, $couponPrice] = $this->useCouponId($couponId, $uid, $cartInfo, $payPrice, $isCreate);
-            //使用积分
-            [$payPrice, $deductionPrice, $usedIntegral, $SurplusIntegral] = $this->useIntegral($useIntegral, $userInfo, $payPrice, $other);
         }
 
         //计算邮费
-        [$payPrice, $payPostage, $storePostageDiscount, $storeFreePostage, $isStoreFreePostage] = $this->computedPayPostage($shippingType, $payType, $cartInfo, $addr, $payPrice, $postage, $other, $userInfo, $is_gift);
+        [$payPrice, $payPostage, $storePostageDiscount, $storeFreePostage, $isStoreFreePostage] = $this->computedPayPostage($shippingType, $cartInfo, $addr, $payPrice, $postage, $other, $userInfo, $is_gift);
 
         //赠送商品计算
         $payPrice = bcadd($payPrice, $priceGroup['giftPrice'], 2);
@@ -123,9 +107,9 @@ class StoreOrderComputedServices extends BaseServices
             'pay_price' => $payPrice > 0 ? $payPrice : 0,
             'pay_postage' => $payPostage,
             'coupon_price' => $couponPrice ?? 0,
-            'deduction_price' => $deductionPrice ?? 0,
-            'usedIntegral' => $usedIntegral ?? 0,
-            'SurplusIntegral' => $SurplusIntegral ?? 0,
+            'deduction_price' => 0,
+            'usedIntegral' => 0,
+            'SurplusIntegral' => 0,
             'storePostageDiscount' => $storePostageDiscount ?? 0,
             'isStoreFreePostage' => $isStoreFreePostage ?? false,
             'storeFreePostage' => $storeFreePostage ?? 0
@@ -148,30 +132,15 @@ class StoreOrderComputedServices extends BaseServices
     }
 
     /**
-     * 使用积分
-     * @param $useIntegral
-     * @param $userInfo
-     * @param $payPrice
-     * @param $other
-     * @return array
-     */
-    public function useIntegral(bool $useIntegral, $userInfo, string $payPrice, array $other)
-    {
-        if ($useIntegral) throw new ApiException('当前商城不支持该业务');
-        return [$payPrice, 0, 0, 0];
-    }
-
-    /**
      * 计算邮费
      * @param int $shipping_type
-     * @param string $payType
      * @param array $cartInfo
      * @param array $addr
      * @param string $payPrice
      * @param array $other
      * @return array
      */
-    public function computedPayPostage(int $shipping_type, string $payType, array $cartInfo, array $addr, string $payPrice, array $postage = [], array $other, $userInfo = [], $is_gift = 0)
+    public function computedPayPostage(int $shipping_type, array $cartInfo, array $addr, string $payPrice, array $postage = [], array $other, $userInfo = [], $is_gift = 0)
     {
         return (new OrderFreightCalculator())->computedPayPostage($shipping_type, $payType, $cartInfo, $addr, $payPrice, $postage, $other, $userInfo, $is_gift);
     }

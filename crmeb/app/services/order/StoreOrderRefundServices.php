@@ -13,10 +13,8 @@ namespace app\services\order;
 use app\dao\order\StoreOrderRefundDao;
 use app\jobs\ProductLogJob;
 use app\services\activity\advance\StoreAdvanceServices;
-use app\services\activity\bargain\StoreBargainServices;
 use app\services\activity\combination\StoreCombinationServices;
 use app\services\activity\combination\StorePinkServices;
-use app\services\activity\seckill\StoreSeckillServices;
 use app\services\BaseServices;
 use app\services\activity\coupon\StoreCouponIssueUserServices;
 use app\services\activity\coupon\StoreCouponUserServices;
@@ -24,13 +22,9 @@ use app\services\pay\PayServices;
 use app\services\product\product\StoreProductServices;
 use app\services\shipping\ExpressServices;
 use app\services\statistic\CapitalFlowServices;
-use app\services\user\UserBillServices;
-use app\services\user\UserBrokerageServices;
-use app\services\user\UserMoneyServices;
 use app\services\user\UserServices;
 use crmeb\exceptions\AdminException;
 use crmeb\exceptions\ApiException;
-use crmeb\services\AliPayService;
 use crmeb\services\CacheService;
 use crmeb\services\FormBuilder as Form;
 use crmeb\services\pay\Pay;
@@ -141,9 +135,9 @@ class StoreOrderRefundServices extends BaseServices
             [$splitOrderInfo, $otherOrder] = $storeOrderSplitServices->equalSplit($orderRefundInfo['store_order_id'], $cart_ids, $orderInfo);
 
 
-            //回退积分和优惠卷
-            if (!$this->integralAndCouponBack($splitOrderInfo)) {
-                throw new AdminException('回退积分和优惠券失败');
+            //回退优惠卷
+            if (!$this->couponBack($splitOrderInfo)) {
+                throw new AdminException('回退优惠券失败');
             }
             //退拼团
             if ($splitOrderInfo['pid'] == 0 && $splitOrderInfo['pink_id'] > 0) {
@@ -152,13 +146,6 @@ class StoreOrderRefundServices extends BaseServices
                 if (!$pinkServices->setRefundPink($splitOrderInfo)) {
                     throw new AdminException('拼团修改失败');
                 }
-            }
-
-            //退佣金
-            /** @var UserBrokerageServices $userBrokerageServices */
-            $userBrokerageServices = app()->make(UserBrokerageServices::class);
-            if (!$userBrokerageServices->orderRefundBrokerageBack($splitOrderInfo)) {
-                throw new AdminException('回退佣金失败');
             }
 
             //回退库存
@@ -184,54 +171,28 @@ class StoreOrderRefundServices extends BaseServices
                 } else {
                     $refundOrder = $splitOrderInfo;
                 }
-                switch ($refundOrder['pay_type']) {
-                    case PayServices::WEIXIN_PAY:
-                        $no = $refundOrder['order_id'];
-                        if ($refundOrder['trade_no']) {
-                            $no = $refundOrder['trade_no'];
-                            $refundData['type'] = 'trade_no';
-                        }
-                        if (sys_config('pay_wechat_type')) {
-                            $drivers = 'v3_wechat_pay';
-                        } else {
-                            $drivers = 'wechat_pay';
-                        }
-                        /** @var Pay $pay */
-                        $pay = app()->make(Pay::class, [$drivers]);
-                        if ($refundOrder['is_channel'] == 1) {
-                            $refundData['trade_no'] = $refundOrder['trade_no'];
-                            $refundData['pay_new_weixin_open'] = sys_config('pay_new_weixin_open');
-                            //小程序退款
-                            $pay->refund($no, $refundData);//小程序
-                        } else {
-                            //微信公众号退款
-                            $refundData['wechat'] = true;
-                            $pay->refund($no, $refundData);//公众号
-                        }
-                        break;
-                    case PayServices::YUE_PAY:
-                        //余额退款
-                        if (!$this->yueRefund($refundOrder, $refundData)) {
-                            throw new AdminException('余额退款失败');
-                        }
-                        break;
-                    case PayServices::ALIAPY_PAY:
-                        mt_srand();
-                        $refund_id = $refundData['refund_id'] ?? $refundOrder['order_id'] . rand(100, 999);
-                        //支付宝退款
-                        AliPayService::instance()->refund(strpos($refundOrder['trade_no'], '_') !== false ? $refundOrder['trade_no'] : $refundOrder['order_id'], floatval($refundData['refund_price']), $refund_id);
-                        break;
-                    case PayServices::ALLIN_PAY:
-                        /** @var Pay $pay */
-                        $pay = app()->make(Pay::class, ['allin_pay']);
-                        /** @var StoreOrderServices $orderServices */
-                        $orderServices = app()->make(StoreOrderServices::class);
-                        $trade_no = $orderServices->value(['id' => $orderRefundInfo['store_order_id']], 'trade_no');
-                        $pay->refund($trade_no, [
-                            'order_id' => $refundOrder['order_id'],
-                            'refund_price' => $refundData['refund_price']
-                        ]);
-                        break;
+                $this->assertWechatRefundable($refundOrder);
+                $no = $refundOrder['order_id'];
+                if ($refundOrder['trade_no']) {
+                    $no = $refundOrder['trade_no'];
+                    $refundData['type'] = 'trade_no';
+                }
+                if (sys_config('pay_wechat_type')) {
+                    $drivers = 'v3_wechat_pay';
+                } else {
+                    $drivers = 'wechat_pay';
+                }
+                /** @var Pay $pay */
+                $pay = app()->make(Pay::class, [$drivers]);
+                if ($refundOrder['is_channel'] == 1) {
+                    $refundData['trade_no'] = $refundOrder['trade_no'];
+                    $refundData['pay_new_weixin_open'] = sys_config('pay_new_weixin_open');
+                    //小程序退款
+                    $pay->refund($no, $refundData);//小程序
+                } else {
+                    //微信公众号退款
+                    $refundData['wechat'] = true;
+                    $pay->refund($no, $refundData);//公众号
                 }
             }
             //订单记录
@@ -269,7 +230,7 @@ class StoreOrderRefundServices extends BaseServices
             $userInfo = $userServices->get($splitOrderInfo['uid']);
             $splitOrderInfo['nickname'] = $userInfo['nickname'];
             $splitOrderInfo['phone'] = $userInfo['phone'];
-            if (in_array($orderInfo['pay_type'], ['weixin', 'alipay', 'allinpay', 'offline'])) {
+            if ($orderInfo['pay_type'] === PayServices::WEIXIN_PAY) {
                 $capitalFlowServices->setFlow($splitOrderInfo, 'refund');
             }
 
@@ -336,9 +297,9 @@ class StoreOrderRefundServices extends BaseServices
     {
         return $this->transaction(function () use ($type, $order, $refundData) {
 
-            //回退积分和优惠卷
-            if (!$this->integralAndCouponBack($order)) {
-                throw new AdminException('回退积分和优惠券失败');
+            //回退优惠卷
+            if (!$this->couponBack($order)) {
+                throw new AdminException('回退优惠券失败');
             }
             //虚拟商品优惠券退款处理
             if ($order['virtual_type'] == 2) {
@@ -359,14 +320,6 @@ class StoreOrderRefundServices extends BaseServices
                     throw new AdminException('拼团修改失败');
                 }
             }
-
-            //退佣金
-            /** @var UserBrokerageServices $userBrokerageServices */
-            $userBrokerageServices = app()->make(UserBrokerageServices::class);
-            if (!$userBrokerageServices->orderRefundBrokerageBack($order)) {
-                throw new AdminException('回退佣金失败');
-            }
-
 
             //回退库存
             if ($order['status'] == 0) {
@@ -389,169 +342,27 @@ class StoreOrderRefundServices extends BaseServices
                 } else {
                     $refundOrder = $order;
                 }
-                switch ($refundOrder['pay_type']) {
-                    case PayServices::WEIXIN_PAY:
-                        $no = $refundOrder['order_id'];
-                        if ($refundOrder['trade_no']) {
-                            $no = $refundOrder['trade_no'];
-                            $refundData['type'] = 'trade_no';
-                        }
-                        /** @var Pay $pay */
-                        $pay = app()->make(Pay::class);
-                        if ($refundOrder['is_channel'] == 1) {
-                            //小程序退款
-                            $pay->refund($no, $refundData);//小程序
-                        } else {
-                            //微信公众号退款
-                            $refundData['wechat'] = true;
-                            $pay->refund($no, $refundData);//公众号
-                        }
-                        break;
-                    case PayServices::YUE_PAY:
-                        //余额退款
-                        if (!$this->yueRefund($refundOrder, $refundData)) {
-                            throw new AdminException('余额退款失败');
-                        }
-                        break;
-                    case PayServices::ALIAPY_PAY:
-                        mt_srand();
-                        $refund_id = $refundData['refund_id'] ?? $refundOrder['order_id'] . rand(100, 999);
-                        //支付宝退款
-                        AliPayService::instance()->refund(strpos($refundOrder['trade_no'], '_') !== false ? $refundOrder['trade_no'] : $refundOrder['order_id'], floatval($refundData['refund_price']), $refund_id);
-                        break;
+                $this->assertWechatRefundable($refundOrder);
+                $no = $refundOrder['order_id'];
+                if ($refundOrder['trade_no']) {
+                    $no = $refundOrder['trade_no'];
+                    $refundData['type'] = 'trade_no';
+                }
+                /** @var Pay $pay */
+                $pay = app()->make(Pay::class);
+                if ($refundOrder['is_channel'] == 1) {
+                    //小程序退款
+                    $pay->refund($no, $refundData);//小程序
+                } else {
+                    //微信公众号退款
+                    $refundData['wechat'] = true;
+                    $pay->refund($no, $refundData);//公众号
                 }
             }
             //修改开票数据退款状态
             $orderInvoiceServices = app()->make(StoreOrderInvoiceServices::class);
             $orderInvoiceServices->update(['order_id' => $order['id']], ['is_refund' => 1]);
         });
-    }
-
-    /**
-     * 余额退款
-     * @param $order
-     * @param array $refundData
-     * @return bool
-     */
-    public function yueRefund($order, array $refundData)
-    {
-        /** @var UserServices $userServices */
-        $userServices = app()->make(UserServices::class);
-        $userMoney = $userServices->value(['uid' => $order['uid']], 'now_money');
-        $res = $userServices->bcInc($order['uid'], 'now_money', $refundData['refund_price'], 'uid');
-        /** @var UserMoneyServices $userMoneyServices */
-        $userMoneyServices = app()->make(UserMoneyServices::class);
-        return $res && $userMoneyServices->income('pay_product_refund', $order['uid'], $refundData['refund_price'], bcadd((string)$userMoney, (string)$refundData['refund_price'], 2), $order['id']);
-    }
-
-    /**
-     * 回退积分和优惠卷
-     * @param $order
-     * @param string $type
-     * @return bool
-     */
-    public function integralAndCouponBack($order, $type = 'refund')
-    {
-        /** @var StoreOrderStatusServices $statusService */
-        $statusService = app()->make(StoreOrderStatusServices::class);
-        $res = true;
-        //取消或者退款的订单退回优惠券
-        if ($order['coupon_id'] && $order['coupon_price']) {
-            /** @var StoreCouponUserServices $couponUserServices */
-            $couponUserServices = app()->make(StoreCouponUserServices::class);
-            //未支付取消订单，或者退优惠券开关打开之后的主订单以及最后一个子订单退还优惠券
-            if ($type == 'cancel' || (sys_config('coupon_return_open', 1) && ($order['pid'] == 0 || $this->storeOrderServices->count(['pid' => $order['pid'], 'refund_status' => 0]) == 1))) {
-                $res = $couponUserServices->recoverCoupon((int)$order['coupon_id']);
-                $statusService->save([
-                    'oid' => $order['id'],
-                    'change_type' => 'coupon_back',
-                    'change_message' => '商品退优惠券',
-                    'change_time' => time()
-                ]);
-            }
-        }
-
-        //回退积分
-        $order = $this->regressionIntegral($order);
-        $statusService->save([
-            'oid' => $order['id'],
-            'change_type' => 'integral_back',
-            'change_message' => '商品退积分',
-            'change_time' => time()
-        ]);
-        return $res && $order->save();
-    }
-
-    /**
-     * 回退使用积分和赠送积分
-     * @param $order
-     * @return bool
-     */
-    public function regressionIntegral($order)
-    {
-        /** @var UserServices $userServices */
-        $userServices = app()->make(UserServices::class);
-        $userInfo = $userServices->get($order['uid'], ['integral']);
-        if (!$userInfo) {
-            $order->back_integral = $order->use_integral;
-            return $order;
-        }
-        $integral = $userInfo['integral'];
-        if ($order['status'] == -2 || $order['is_del']) {
-            return $order;
-        }
-
-        $res1 = $res2 = $res3 = $res4 = true;
-        //订单赠送积分
-        /** @var UserBillServices $userBillServices */
-        $userBillServices = app()->make(UserBillServices::class);
-        $order_gain = $userBillServices->sum([
-            'category' => 'integral',
-            'type' => 'gain',
-            'link_id' => $order['id'],
-            'uid' => $order['uid']
-        ], 'number');
-        //商品赠送
-        $product_gain = $userBillServices->sum([
-            'category' => 'integral',
-            'type' => 'product_gain',
-            'link_id' => $order['id'],
-            'uid' => $order['uid']
-        ], 'number');
-
-        $give_integral = $order_gain + $product_gain;
-        if ($give_integral) {
-            //判断订单是否已经回退积分
-            $count = $userBillServices->count(['category' => 'integral', 'type' => 'integral_refund', 'link_id' => $order['id']]);
-            if (!$count) {
-                if ($integral > $give_integral) {
-                    $res1 = $userServices->bcDec($order['uid'], 'integral', $give_integral);
-                    //记录赠送积分收回
-                    $integral = $integral - $give_integral;
-                } else {
-                    $res1 = $userServices->update($order['uid'], ['integral' => 0]);
-                    //记录赠送积分收回
-                    $integral = 0;
-                }
-                $res2 = $userBillServices->income('integral_refund', $order['uid'], $give_integral, $integral, $order['id']);
-                //清除积分冻结
-                $userBillServices->update(['link_id' => $order['id']], ['frozen_time' => 0]);
-            }
-        }
-        //返还下单使用积分
-        $use_integral = $order['use_integral'];
-        if ($use_integral > 0) {
-            $res3 = $userServices->bcInc($order['uid'], 'integral', $use_integral);
-            //记录下单使用积分还回
-            $res4 = $userBillServices->income('pay_product_integral_back', $order['uid'], (int)$use_integral, $integral + $use_integral, $order['id']);
-        }
-        if (!($res1 && $res2 && $res3 && $res4)) {
-            throw new ApiException('回退积分增加失败');
-        }
-        if ($use_integral > $give_integral) {
-            $order->back_integral = bcsub($use_integral, $give_integral, 2);
-        }
-        return $order;
     }
 
     /**
@@ -567,19 +378,13 @@ class StoreOrderRefundServices extends BaseServices
     {
         if ($order['status'] == -2 || $order['is_del']) return true;
         $combination_id = $order['combination_id'];
-        $seckill_id = $order['seckill_id'];
-        $bargain_id = $order['bargain_id'];
         $res5 = true;
         /** @var StoreOrderCartInfoServices $cartServices */
         $cartServices = app()->make(StoreOrderCartInfoServices::class);
         /** @var StoreProductServices $services */
         $services = app()->make(StoreProductServices::class);
-        /** @var StoreSeckillServices $seckillServices */
-        $seckillServices = app()->make(StoreSeckillServices::class);
         /** @var StoreCombinationServices $pinkServices */
         $pinkServices = app()->make(StoreCombinationServices::class);
-        /** @var StoreBargainServices $bargainServices */
-        $bargainServices = app()->make(StoreBargainServices::class);
         /** @var StoreAdvanceServices $advanceServices */
         $advanceServices = app()->make(StoreAdvanceServices::class);
         $cartInfo = $cartServices->getCartInfoList(['cart_id' => $order['cart_id']], ['cart_info']);
@@ -590,10 +395,6 @@ class StoreOrderRefundServices extends BaseServices
             $cart_num = (int)$cart['cart_info']['cart_num'];
             if ($combination_id) {
                 $res5 = $res5 && $pinkServices->incCombinationStock($cart_num, (int)$combination_id, $unique);
-            } else if ($seckill_id) {
-                $res5 = $res5 && $seckillServices->incSeckillStock($cart_num, (int)$seckill_id, $unique);
-            } else if ($bargain_id) {
-                $res5 = $res5 && $bargainServices->incBargainStock($cart_num, (int)$bargain_id, $unique);
             } else {
                 $res5 = $res5 && $services->incProductStock($cart_num, (int)$cart['cart_info']['productInfo']['id'], $unique);
             }
@@ -627,7 +428,7 @@ class StoreOrderRefundServices extends BaseServices
         $userInfo = $userServices->get($order['uid']);
         $order['nickname'] = $userInfo['nickname'];
         $order['phone'] = $userInfo['phone'];
-        if (in_array($order['pay_type'], ['weixin', 'alipay', 'allinpay', 'offline'])) {
+        if ($order['pay_type'] === PayServices::WEIXIN_PAY) {
             $order['refund_price'] = $refund_price;
             $capitalFlowServices->setFlow($order, 'refund');
         }
@@ -747,59 +548,6 @@ class StoreOrderRefundServices extends BaseServices
         return true;
     }
 
-
-    /**
-     * 退积分表单创建
-     * @param int $id
-     * @return array
-     * @throws \FormBuilder\Exception\FormBuilderException
-     */
-    public function refundIntegralForm(int $id)
-    {
-        if (!$orderInfo = $this->dao->get($id))
-            throw new AdminException('订单不存在');
-        if ($orderInfo->use_integral < 0 || $orderInfo->use_integral == $orderInfo->back_integral)
-            throw new AdminException('积分已退或者积分为零无法再退');
-        if (!$orderInfo->paid)
-            throw new AdminException('未支付无法退积分');
-        $f[] = Form::input('order_id', '退款单号', $orderInfo->getData('order_id'))->disabled(1);
-        $f[] = Form::number('use_integral', '使用的积分', (float)$orderInfo->getData('use_integral'))->min(0)->disabled(1);
-        $f[] = Form::number('use_integrals', '已退积分', (float)$orderInfo->getData('back_integral'))->min(0)->disabled(1);
-        $f[] = Form::number('back_integral', '可退积分', (float)bcsub($orderInfo->getData('use_integral'), $orderInfo->getData('back_integral')))->min(0)->precision(0)->required('请输入可退积分');
-        return create_form('退积分', $f, $this->url('/order/refund_integral/' . $id), 'PUT');
-    }
-
-    /**
-     * 单独退积分处理
-     * @param $orderInfo
-     * @param $back_integral
-     */
-    public function refundIntegral($orderInfo, $back_integral)
-    {
-        /** @var UserServices $userServices */
-        $userServices = app()->make(UserServices::class);
-        $integral = $userServices->value(['uid' => $orderInfo['uid']], 'integral');
-        return $this->transaction(function () use ($userServices, $orderInfo, $back_integral, $integral) {
-            $res1 = $userServices->bcInc($orderInfo['uid'], 'integral', $back_integral, 'uid');
-            /** @var UserBillServices $userBillServices */
-            $userBillServices = app()->make(UserBillServices::class);
-            $res2 = $userBillServices->income('pay_product_integral_back', $orderInfo['uid'], (int)$back_integral, $integral + $back_integral, $orderInfo['id']);
-            /** @var StoreOrderStatusServices $statusService */
-            $statusService = app()->make(StoreOrderStatusServices::class);
-            $res3 = $statusService->save([
-                'oid' => $orderInfo['id'],
-                'change_type' => 'integral_back',
-                'change_message' => '商品退积分:' . $back_integral,
-                'change_time' => time()
-            ]);
-            $res4 = $orderInfo->save();
-            $res = $res1 && $res2 && $res3 && $res4;
-            if (!$res) {
-                throw new AdminException('订单退积分失败');
-            }
-            return true;
-        });
-    }
 
     /**
      * 订单申请退款
@@ -1205,6 +953,19 @@ class StoreOrderRefundServices extends BaseServices
      * @email 442384644@qq.com
      * @date 2023/02/17
      */
+    /**
+     * Refunds only replay the original channel. Historical orders paid with
+     * retired methods have no channel to replay, so refuse instead of guessing.
+     * @param array $order
+     * @return void
+     */
+    protected function assertWechatRefundable(array $order): void
+    {
+        if (($order['pay_type'] ?? '') !== PayServices::WEIXIN_PAY) {
+            throw new AdminException('该订单为历史支付方式，无法原路退款，请线下处理后标记已退款');
+        }
+    }
+
     public function refundDetail($uni)
     {
         if (!strlen(trim($uni))) throw new ApiException('参数错误');
@@ -1221,19 +982,13 @@ class StoreOrderRefundServices extends BaseServices
         $userInfo = $userServices->get($order['uid']);
 
         $order['mapKey'] = sys_config('tengxun_map_key');
-        $order['yue_pay_status'] = (int)sys_config('balance_func_status') && (int)sys_config('yue_pay_status') == 1 ? (int)1 : (int)2;//余额支付 1 开启 2 关闭
         $order['pay_weixin_open'] = (int)sys_config('pay_weixin_open') ?? 0;//微信支付 1 开启 0 关闭
-        $order['ali_pay_status'] = sys_config('ali_pay_status') ? true : false;//支付包支付 1 开启 0 关闭
         $orderData = $order;
         $orderData['store_order_sn'] = $orderInfo['order_id'];
         $orderData['cartInfo'] = $orderData['cart_info'];
         $orderData['_pay_time'] = date('Y-m-d H:i:s', $orderInfo['pay_time']);
         $orderData['type'] = 0;
-        if ($orderInfo['seckill_id'] || $orderInfo['bargain_id'] || $orderInfo['combination_id']) {
-            if ($orderInfo['seckill_id']) $orderData['type'] = 1;
-            if ($orderInfo['bargain_id']) $orderData['type'] = 2;
-            if ($orderInfo['combination_id']) $orderData['type'] = 3;
-        }
+        if ($orderInfo['combination_id']) $orderData['type'] = 3;
         //核算优惠金额
         $vipTruePrice = 0;
         $total_price = 0;
@@ -1264,26 +1019,7 @@ class StoreOrderRefundServices extends BaseServices
         $orderData['memberPrice'] = $this->getOrderSumPrice($orderData['cart_info'], 'member');//获取付费会员优惠
         $orderData['pay_type'] = $orderInfo['pay_type'];
 
-        switch ($orderInfo['pay_type']) {
-            case PayServices::WEIXIN_PAY:
-                $pay_type_name = '微信支付';
-                break;
-            case PayServices::YUE_PAY:
-                $pay_type_name = '余额支付';
-                break;
-            case PayServices::OFFLINE_PAY:
-                $pay_type_name = '线下支付';
-                break;
-            case PayServices::ALIAPY_PAY:
-                $pay_type_name = '支付宝支付';
-                break;
-            case PayServices::ALLIN_PAY:
-                $pay_type_name = '通联支付';
-                break;
-            default:
-                $pay_type_name = '其他支付';
-                break;
-        }
+        $pay_type_name = \app\services\CoreStore::historicalPayTypeLabel($orderInfo['pay_type']);
         $orderData['_add_time'] = date('Y-m-d H:i:s', $orderData['add_time']);
         $orderData['add_time_y'] = date('Y-m-d', $orderData['add_time']);
         $orderData['add_time_h'] = date('H:i:s', $orderData['add_time']);

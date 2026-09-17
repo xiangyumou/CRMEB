@@ -31,7 +31,6 @@ use app\services\product\sku\StoreProductVirtualServices;
 use app\services\shipping\ShippingTemplatesServices;
 use app\services\user\UserLabelServices;
 use app\services\user\member\MemberCardServices;
-use app\services\user\UserLevelServices;
 use app\services\user\UserSearchServices;
 use app\services\user\UserServices;
 use crmeb\exceptions\AdminException;
@@ -1718,42 +1717,6 @@ class StoreProductServices extends BaseServices
         return strlen(trim($priceName)) ? $priceName : 0;
     }
 
-    /**
-     * 设置会员价格
-     * @param $list
-     * @param int $uid
-     * @param $userInfo
-     * @param $vipStatus
-     * @param int $discount
-     * @param float $vipPrice
-     * @param int $is_vip
-     * @param bool $is_show
-     * @return array|float|int|mixed|string
-     */
-    public function setLevelPriceV2($price, int $uid, $userInfo, $vipStatus, $discount = 0, $vipPrice = 0.00, $is_vip = 0, $is_show = false)
-    {
-        return [(float)$price, 0.0];
-    }
-
-    /**
-     * 设置会员价格
-     * @param $list
-     * @param int $uid
-     * @param $userInfo
-     * @param $vipStatus
-     * @param bool $isSingle
-     * @param int $discount
-     * @param float $vipPrice
-     * @param int $is_vip
-     * @param bool $is_show
-     * @return array|float|int|mixed|string
-     */
-    public function setLevelPrice($price, int $uid, $userInfo, $vipStatus, $discount = 0, $vipPrice = 0.00, $is_vip = 0, $is_show = false)
-    {
-        return [(float)$price, 0.0, 'level'];
-    }
-
-
     /**商品列表
      * @param array $where
      * @param $limit
@@ -2627,32 +2590,11 @@ class StoreProductServices extends BaseServices
     public function realPrice($uid, $id, $unique)
     {
         $isMember = $isVip = $levelPrice = $memberPrice = $realPrice = $price = 0;
-        $levelDiscount = 100;
-        if ($uid) {
-            $isMember = app()->make(UserServices::class)->value(['uid' => $uid], 'is_money_level');
-            if (sys_config('member_func_status', 0)) {
-                $levelDiscount = app()->make(UserLevelServices::class)->getUerLevelInfoByUid($uid, 'discount');
-            }
-        }
         $productIsVip = $this->dao->value(['id' => $id], 'is_vip');
         $attrInfo = app()->make(StoreProductAttrValueServices::class)->get(['unique' => $unique, 'product_id' => $id, 'type' => 0], ['price', 'vip_price', 'ot_price']);
         $attrInfo = $attrInfo->toArray();
         $realPrice = $price = $attrInfo['price'];
-        $levelPrice = bcmul($attrInfo['price'], bcdiv($levelDiscount, 100, 2), 2);
-        $memberPrice = $attrInfo['vip_price'];
         $otPrice = $attrInfo['ot_price'];
-        if ($levelDiscount && $isMember && $productIsVip) {
-            $realPrice = min($levelPrice, $memberPrice);
-            $isVip = $memberPrice < $levelPrice ? 1 : 0;
-        }
-        if ($levelDiscount && (!$isMember || !$productIsVip)) {
-            $realPrice = $levelPrice;
-            $isVip = 0;
-        }
-        if (!$levelDiscount && $isMember && $productIsVip) {
-            $realPrice = $memberPrice;
-            $isVip = 1;
-        }
         /** @var StoreProductServices $storeProductService */
         $storeProductService = app()->make(StoreProductServices::class);
         /** @var StoreCategoryServices $storeCategoryService */

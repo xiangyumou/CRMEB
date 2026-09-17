@@ -13,9 +13,7 @@ namespace app\api\controller\v1\order;
 use app\Request;
 use app\services\shipping\ExpressServices;
 use app\services\system\admin\SystemAdminServices;
-use app\services\activity\{lottery\LuckLotteryServices,
-    combination\StorePinkServices
-};
+use app\services\activity\combination\StorePinkServices;
 use app\services\activity\coupon\StoreCouponIssueServices;
 use app\services\order\{StoreCartServices,
     StoreOrderCartInfoServices,
@@ -129,7 +127,7 @@ class StoreOrderController
         $uid = $request->uid();
         if ($this->services->be(['order_id|unique' => $key, 'uid' => $uid, 'is_del' => 0]))
             return app('json')->status('extend_order', '订单不存在', ['orderId' => $key, 'key' => $key]);
-        list($addressId, $couponId, $payType, $useIntegral, $mark, $combinationId, $pinkId, $seckill_id, $bargainId, $shipping_type, $is_gift) = $request->postMore([
+        list($addressId, $couponId, $payType, $useIntegral, $mark, $combinationId, $pinkId, $shipping_type, $is_gift) = $request->postMore([
             'addressId',
             'couponId',
             ['payType', ''],
@@ -137,8 +135,6 @@ class StoreOrderController
             'mark',
             ['combinationId', 0],
             ['pinkId', 0],
-            ['seckill_id', 0],
-            ['bargainId', 0],
             ['shipping_type', 1],
             ['is_gift', 0],
         ], true);
@@ -148,8 +144,6 @@ class StoreOrderController
         $priceGroup = $computedServices->setParamData([
             'combinationId' => $combinationId,
             'pinkId' => $pinkId,
-            'seckill_id' => $seckill_id,
-            'bargainId' => $bargainId,
         ])->computedOrder($request->uid(), $request->user()->toArray(), $cartGroup, $addressId, $payType, !!$useIntegral, (int)$couponId, false, (int)$shipping_type, $is_gift);
         if ($priceGroup)
             return app('json')->status('NONE', '操作成功', $priceGroup);
@@ -174,7 +168,7 @@ class StoreOrderController
         $userInfo = $request->user()->toArray();
         if ($checkOrder = $this->services->getOne(['order_id|unique' => $key, 'uid' => $userInfo['uid'], 'is_del' => 0]))
             return app('json')->status('extend_order', '订单已创建，请点击查看完成支付', ['orderId' => $checkOrder['order_id'], 'key' => $key]);
-        [$addressId, $couponId, $payType, $useIntegral, $mark, $combinationId, $pinkId, $seckillId, $bargainId, $shipping_type, $real_name, $phone, $storeId, $news, $invoice_id, $advanceId, $customForm, $is_gift, $gift_mark] = $request->postMore([
+        [$addressId, $couponId, $payType, $useIntegral, $mark, $combinationId, $pinkId, $shipping_type, $real_name, $phone, $news, $invoice_id, $advanceId, $customForm, $is_gift, $gift_mark] = $request->postMore([
             [['addressId', 'd'], 0],
             [['couponId', 'd'], 0],
             ['payType', ''],
@@ -182,12 +176,9 @@ class StoreOrderController
             ['mark', ''],
             [['combinationId', 'd'], 0],
             [['pinkId', 'd'], 0],
-            [['seckill_id', 'd'], 0],
-            [['bargainId', 'd'], ''],
             [['shipping_type', 'd'], 1],
             ['real_name', ''],
             ['phone', ''],
-            [['store_id', 'd'], 0],
             ['new', 0],
             [['invoice_id', 'd'], 0],
             [['advanceId', 'd'], 0],
@@ -196,8 +187,8 @@ class StoreOrderController
             ['gift_mark', ''],
         ], true);
         $payType = strtolower($payType);
-        $order = CacheService::lock('orderCreate' . $key, function () use ($createServices, $userInfo, $key, $addressId, $payType, $useIntegral, $couponId, $mark, $combinationId, $pinkId, $seckillId, $bargainId, $shipping_type, $real_name, $phone, $storeId, $news, $advanceId, $customForm, $invoice_id, $is_gift, $gift_mark) {
-            return $createServices->createOrder($userInfo['uid'], $key, $userInfo, $addressId, $payType, !!$useIntegral, $couponId, $mark, $combinationId, $pinkId, $seckillId, $bargainId, $shipping_type, $real_name, $phone, $storeId, !!$news, $advanceId, $customForm, $invoice_id, $is_gift, $gift_mark);
+        $order = CacheService::lock('orderCreate' . $key, function () use ($createServices, $userInfo, $key, $addressId, $payType, $useIntegral, $couponId, $mark, $combinationId, $pinkId, $shipping_type, $real_name, $phone, $news, $advanceId, $customForm, $invoice_id, $is_gift, $gift_mark) {
+            return $createServices->createOrder($userInfo['uid'], $key, $userInfo, $addressId, $payType, !!$useIntegral, $couponId, $mark, $combinationId, $pinkId, $shipping_type, $real_name, $phone, !!$news, $advanceId, $customForm, $invoice_id, $is_gift, $gift_mark);
         });
         $orderId = $order['order_id'];
         return app('json')->status('success', '订单创建成功', compact('orderId', 'key'));
@@ -566,8 +557,6 @@ class StoreOrderController
         if ($group['product_score'] < 1) return app('json')->fail('请为商品评分');
         else if ($group['service_score'] < 1) return app('json')->fail('请为商家服务评分');
         if ($cartInfo['cart_info']['combination_id']) $productId = $cartInfo['cart_info']['product_id'];
-        else if ($cartInfo['cart_info']['seckill_id']) $productId = $cartInfo['cart_info']['product_id'];
-        else if ($cartInfo['cart_info']['bargain_id']) $productId = $cartInfo['cart_info']['product_id'];
         else $productId = $cartInfo['product_id'];
         if ($group['pics']) $group['pics'] = json_encode(is_array($group['pics']) ? $group['pics'] : explode(',', $group['pics']));
         $group = array_merge($group, [
@@ -602,27 +591,11 @@ class StoreOrderController
         } catch (\Exception $e) {
             return app('json')->fail('评价失败');
         }
-        //缓存抽奖次数
-        /** @var LuckLotteryServices $luckLotteryServices */
-        $luckLotteryServices = app()->make(LuckLotteryServices::class);
-        $luckLotteryServices->setCacheLotteryNum((int)$uid == $orderInfo['uid'] ? $orderInfo['uid'] : $orderInfo['gift_uid'], 'comment');
-
         /** @var SystemAdminServices $systemAdmin */
         $systemAdmin = app()->make(SystemAdminServices::class);
         $systemAdmin->adminNewPush();
 
-        $lottery = $luckLotteryServices->getFactorLottery(4);
-        if (!$lottery) {
-            return app('json')->success(['to_lottery' => false]);
-        }
-        $lottery = $lottery->toArray();
-        try {
-            $luckLotteryServices->checkoutUserAuth($uid, (int)$lottery['id'], [], $lottery);
-            $lottery_num = $luckLotteryServices->getLotteryNum($uid, (int)$lottery['id'], [], $lottery);
-            if ($lottery_num > 0) return app('json')->success(['to_lottery' => true]);
-        } catch (\Exception $e) {
-            return app('json')->success(['to_lottery' => false]);
-        }
+        return app('json')->success(['to_lottery' => false]);
     }
 
     /**
@@ -811,8 +784,6 @@ class StoreOrderController
         }
         $cartProduct['product_id'] = $cartInfo['cart_info']['product_id'] ?? 0;
         $cartProduct['combination_id'] = $cartInfo['cart_info']['combination_id'] ?? 0;
-        $cartProduct['seckill_id'] = $cartInfo['cart_info']['seckill_id'] ?? 0;
-        $cartProduct['bargain_id'] = $cartInfo['cart_info']['bargain_id'] ?? 0;
         $cartProduct['order_id'] = $this->services->value(['id' => $cartInfo['oid']], 'order_id');
         return app('json')->success($cartProduct);
     }

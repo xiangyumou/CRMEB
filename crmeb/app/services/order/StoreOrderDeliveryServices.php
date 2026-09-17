@@ -13,7 +13,6 @@ namespace app\services\order;
 
 use app\jobs\MiniOrderJob;
 use app\services\activity\coupon\StoreCouponIssueServices;
-use app\services\activity\integral\StoreIntegralOrderServices;
 use app\services\BaseServices;
 use app\dao\order\StoreOrderDao;
 use app\services\message\MessageSystemServices;
@@ -184,10 +183,6 @@ class StoreOrderDeliveryServices extends BaseServices
         $data['delivery_id'] = $data['sh_delivery_id'];
         $data['delivery_uid'] = $data['sh_delivery_uid'];
         $data['shipping_type'] = 1;
-        //获取核销码
-        /** @var StoreOrderCreateServices $storeOrderCreateService */
-        $storeOrderCreateService = app()->make(StoreOrderCreateServices::class);
-        $data['verify_code'] = $storeOrderCreateService->getStoreCode();
         unset($data['sh_delivery_name'], $data['sh_delivery_id'], $data['sh_delivery_uid']);
         if (!$data['delivery_name']) {
             throw new AdminException('请输入送货人姓名');
@@ -337,17 +332,10 @@ class StoreOrderDeliveryServices extends BaseServices
 //        /** @var StoreOrderServices $orderService */
 //        $orderService = app()->make(StoreOrderServices::class);
 //        $orderInfo = $orderService->getOne(['id' => $orderId]);
-        if ($type == 'order') {
-            /** @var StoreOrderServices $orderService */
-            $orderService = app()->make(StoreOrderServices::class);
-            $orderInfo = $orderService->getOne(['id' => $orderId]);
-        } else {
-            /** @var StoreIntegralOrderServices $integralOrderService */
-            $integralOrderService = app()->make(StoreIntegralOrderServices::class);
-            $orderInfo = $integralOrderService->getOne(['id' => $orderId]);
-        }
+        /** @var StoreOrderServices $orderService */
+        $orderService = app()->make(StoreOrderServices::class);
+        $orderInfo = $orderService->getOne(['id' => $orderId]);
         if (!$orderInfo) throw new AdminException('订单不存在');
-        if ($orderInfo->shipping_type != 1) throw new AdminException('自提订单无法打印');
         if (!$orderInfo->express_dump) throw new AdminException('请先发货');
         if (!sys_config('config_export_open', 0)) {
             throw new AdminException('请先在系统设置中打开单子面单打印开关');
@@ -724,7 +712,7 @@ class StoreOrderDeliveryServices extends BaseServices
         /** @var StoreOrderCartInfoServices $services */
         $services = app()->make(StoreOrderCartInfoServices::class);
         $orderInfo['cart_info'] = $services->getOrderCartInfo((int)$orderInfo['id']);
-        $activityStatus = $orderInfo['combination_id'] || $orderInfo['seckill_id'] || $orderInfo['bargain_id'];
+        $activityStatus = (bool)$orderInfo['combination_id'];
         if ($orderInfo['virtual_type'] == 1) {
             /** @var StoreOrderServices $orderService */
             $orderService = app()->make(StoreOrderServices::class);

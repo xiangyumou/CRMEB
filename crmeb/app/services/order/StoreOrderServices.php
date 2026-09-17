@@ -16,34 +16,24 @@ use app\jobs\AutoCommentJob;
 use app\services\activity\combination\StorePinkServices;
 use app\services\activity\coupon\StoreCouponUserServices;
 use app\services\BaseServices;
-use app\services\other\PosterServices;
 use app\services\other\QrcodeServices;
-use app\services\other\UploadService;
-use app\services\pay\OrderPayServices;
 use app\services\pay\PayServices;
 use app\services\serve\ServeServices;
-use app\services\system\attachment\SystemAttachmentServices;
-use app\services\system\store\SystemStoreServices;
 use app\services\system\SystemTicketServices;
 use app\services\user\UserInvoiceServices;
-use app\services\user\UserRechargeServices;
 use app\services\user\UserServices;
 use app\services\product\product\StoreProductReplyServices;
 use app\services\user\UserAddressServices;
-use app\services\user\UserBillServices;
-use app\services\user\UserLevelServices;
 use app\services\wechat\WechatUserServices;
 use crmeb\exceptions\AdminException;
 use crmeb\exceptions\ApiException;
 use crmeb\exceptions\PayException;
-use crmeb\services\app\MiniProgramService;
 use crmeb\services\CacheService;
 use crmeb\services\easywechat\orderShipping\MiniOrderService;
 use crmeb\services\FormBuilder as Form;
 use crmeb\services\printer\Printer;
 use crmeb\services\SystemConfigService;
 use crmeb\utils\Arr;
-use Guzzle\Http\EntityBody;
 use think\facade\Log;
 
 /**
@@ -182,10 +172,8 @@ class StoreOrderServices extends BaseServices
         $data['no_refund_count'] = (string)$storeOrderRefundServices->count($refund_where + ['refund_type' => 3]);
         $data['refunded_count'] = (string)$storeOrderRefundServices->count($refund_where + ['refund_type' => 6]);
         $data['refund_count'] = bcadd(bcadd($data['refunding_count'], $data['refunded_count'], 0), $data['no_refund_count'], 0);
-        $data['yue_pay_status'] = (int)sys_config('balance_func_status') && (int)sys_config('yue_pay_status') == 1 ? (int)1 : (int)2;//余额支付 1 开启 2 关闭
         $data['pc_order_count'] = $data['order_count'] + $data['refunding_count'] + $data['refunded_count'];
         $data['pay_weixin_open'] = sys_config('pay_weixin_open', '0') != '0';//微信支付 1 开启 0 关闭
-        $data['ali_pay_status'] = sys_config('ali_pay_status', '0') != '0';//支付包支付 1 开启 0 关闭
         $data['friend_pay_status'] = (int)sys_config('friend_pay_status') ?? 0;//好友代付 1 开启 0 关闭
         return $data;
     }
@@ -223,26 +211,15 @@ class StoreOrderServices extends BaseServices
         $price['pay_price'] = 0;//支付金额
         $price['refund_price'] = 0;//退款金额
         $price['pay_price_wx'] = 0;//微信支付金额
-        $price['pay_price_yue'] = 0;//余额支付金额
-        $price['pay_price_offline'] = 0;//线下支付金额
         $price['pay_price_other'] = 0;//其他支付金额
-        $price['use_integral'] = 0;//用户使用积分
-        $price['back_integral'] = 0;//退积分总数
         $price['deduction_price'] = 0;//抵扣金额
         $price['total_num'] = 0; //商品总数
         $price['today_count_sum'] = 0; //今日订单总数
         $price['count_sum'] = 0; //订单总数
-        $price['brokerage'] = 0;
         $price['pay_postage'] = 0;
         $whereData = ['is_del' => 0];
-        if ($where['status'] == '' && $where['pay_type'] != 3) {
+        if ($where['status'] == '') {
             $whereData['paid'] = 1;
-        }
-        $ids = $this->dao->column($where + $whereData, 'id');
-        if (count($ids)) {
-            /** @var UserBillServices $services */
-            $services = app()->make(UserBillServices::class);
-            $price['brokerage'] = $services->getBrokerageNumSum($ids);
         }
         $price['refund_price'] = $this->dao->together($where + ['is_del' => 0, 'paid' => 1, 'refund_status' => 2], 'refund_price');
         $sumNumber = $this->dao->search($where + $whereData)->field([
@@ -250,8 +227,6 @@ class StoreOrderServices extends BaseServices
             'count(id) as count_sum',
             'sum(pay_price) as sum_pay_price',
             'sum(pay_postage) as sum_pay_postage',
-            'sum(use_integral) as sum_use_integral',
-            'sum(back_integral) as sum_back_integral',
             'sum(deduction_price) as sum_deduction_price'
         ])->find();
         if ($sumNumber) {
@@ -259,18 +234,12 @@ class StoreOrderServices extends BaseServices
             $price['total_num'] = $sumNumber['sum_total_num'];
             $price['pay_price'] = $sumNumber['sum_pay_price'];
             $price['pay_postage'] = $sumNumber['sum_pay_postage'];
-            $price['use_integral'] = $sumNumber['sum_use_integral'];
-            $price['back_integral'] = $sumNumber['sum_back_integral'];
             $price['deduction_price'] = $sumNumber['sum_deduction_price'];
         }
         $list = $this->dao->column($where + $whereData, 'sum(pay_price) as sum_pay_price,pay_type', 'id', 'pay_type');
         foreach ($list as $v) {
             if ($v['pay_type'] == 'weixin') {
                 $price['pay_price_wx'] = $v['sum_pay_price'];
-            } elseif ($v['pay_type'] == 'yue') {
-                $price['pay_price_yue'] = $v['sum_pay_price'];
-            } elseif ($v['pay_type'] == 'offline') {
-                $price['pay_price_offline'] = $v['sum_pay_price'];
             } else {
                 $price['pay_price_other'] = $v['sum_pay_price'];
             }
@@ -366,7 +335,6 @@ class StoreOrderServices extends BaseServices
         $f[] = Form::hidden('total_price', (float)$product->getData('total_price'));
         $f[] = Form::hidden('pay_postage', (float)$product->getData('pay_postage') ?: 0);
         $f[] = Form::number('pay_price', '实际支付金额', (float)$product->getData('pay_price'))->min(0);
-        $f[] = Form::number('gain_integral', '赠送积分', (float)$product->getData('gain_integral') ?: 0)->min(0);
         return create_form('修改订单', $f, $this->url('/order/update/' . $id), 'PUT');
     }
 
@@ -386,24 +354,6 @@ class StoreOrderServices extends BaseServices
         /** @var StoreOrderCreateServices $createServices */
         $createServices = app()->make(StoreOrderCreateServices::class);
         $data['order_id'] = $createServices->getNewOrderId('cp');
-        if (sys_config('user_brokerage_type') == 1) {
-            $percent = $order['pay_price'] != 0 ? bcdiv((string)$data['pay_price'], (string)$order['pay_price'], 6) : $order['pay_price'];
-            if ($order['one_brokerage'] > 0) {
-                $data['one_brokerage'] = bcmul((string)$order['one_brokerage'], $percent, 2);
-            }
-            if ($order['two_brokerage'] > 0) {
-                $data['two_brokerage'] = bcmul((string)$order['two_brokerage'], $percent, 2);
-            }
-            if ($order['staff_brokerage'] > 0) {
-                $data['staff_brokerage'] = bcmul((string)$order['staff_brokerage'], $percent, 2);
-            }
-            if ($order['agent_brokerage'] > 0) {
-                $data['agent_brokerage'] = bcmul((string)$order['agent_brokerage'], $percent, 2);
-            }
-            if ($order['division_brokerage'] > 0) {
-                $data['division_brokerage'] = bcmul((string)$order['division_brokerage'], $percent, 2);
-            }
-        }
         /** @var StoreOrderStatusServices $services */
         $services = app()->make(StoreOrderStatusServices::class);
         return $this->transaction(function () use ($id, $data, $services) {
@@ -414,14 +364,6 @@ class StoreOrderServices extends BaseServices
                     'change_time' => time(),
                     'change_message' => '修改商品总价为：' . $data['total_price'] . ' 实际支付金额' . $data['pay_price']
                 ]);
-            if (isset($data['gain_integral'])) {
-                $res = $res && $services->save([
-                        'oid' => $id,
-                        'change_type' => 'order_edit',
-                        'change_time' => time(),
-                        'change_message' => '修改订单赠送积分为：' . $data['gain_integral']
-                    ]);
-            }
             if ($res) {
                 $order = $this->dao->getOne(['id' => $id, 'is_del' => 0]);
                 //改价短信提醒
@@ -435,7 +377,6 @@ class StoreOrderServices extends BaseServices
                     'uid' => $order['uid'],
                     'order_id' => $data['order_id'],
                     'pay_price' => $data['pay_price'],
-                    'gain_integral' => $data['gain_integral'] ?? $order['gain_integral'],
                     'change_time' => date('Y-m-d H:i:s'),
                 ]]);
 
@@ -620,68 +561,34 @@ class StoreOrderServices extends BaseServices
         $computedServices = app()->make(StoreOrderComputedServices::class);
         $priceGroup = $computedServices->getOrderPriceGroup($storeFreePostage, $validCartInfo, $addr, $user, $shipping_type, $is_gift);
         $validCartInfo = $priceGroup['cartInfo'] ?? $validCartInfo;
-        $other = [
-            'offlinePostage' => sys_config('offline_postage'),
-            'integralRatio' => sys_config('integral_ratio')
-        ];
+        $other = [];
         $cartIdA = explode(',', $cartId);
-        $seckill_id = 0;
         $combination_id = 0;
-        $bargain_id = 0;
         $advance_id = 0;
         if (count($cartIdA) == 1) {
-            $seckill_id = $cartGroup['deduction']['seckill_id'] ?? 0;
             $combination_id = $cartGroup['deduction']['combination_id'] ?? 0;
-            $bargain_id = $cartGroup['deduction']['bargain_id'] ?? 0;
             $advance_id = $cartGroup['deduction']['advance_id'] ?? 0;
         }
         $data['valid_count'] = count($validCartInfo);
         $data['virtual_type'] = $data['valid_count'] ? (int)$validCartInfo[0]['productInfo']['virtual_type'] > 0 : 0;
-        $data['deduction'] = $seckill_id || $combination_id || $bargain_id || $advance_id;
+        $data['deduction'] = $combination_id || $advance_id;
         $data['addressInfo'] = $addr;
-        $data['seckill_id'] = $seckill_id;
         $data['combination_id'] = $combination_id;
-        $data['bargain_id'] = $bargain_id;
         $data['advance_id'] = $advance_id;
         $data['cartInfo'] = $cartGroup['cartInfo'];
         $data['custom_form'] = json_decode($cartGroup['cartInfo'][0]['productInfo']['custom_form'], true) ?? [];
         if (!is_array($data['custom_form'])) $data['custom_form'] = [];
         $data['priceGroup'] = $priceGroup;
         $data['orderKey'] = $this->cacheOrderInfo($user['uid'], $validCartInfo, $priceGroup, $other);
-        $data['offlinePostage'] = $other['offlinePostage'];
-        /** @var UserLevelServices $levelServices */
-        $levelServices = app()->make(UserLevelServices::class);
-        $userLevel = $levelServices->getUerLevelInfoByUid($user['uid']);
         if (isset($user['pwd'])) unset($user['pwd']);
-        $user['vip'] = $userLevel !== false;
-        if ($user['vip']) {
-            $user['vip_id'] = $userLevel['id'] ?? 0;
-            $user['discount'] = $userLevel['discount'] ?? 0;
-        }
         $data['userInfo'] = $user;
-        $data['integralRatio'] = $other['integralRatio'];
-        $data['offline_pay_status'] = (int)sys_config('offline_pay_status') ?? (int)2;
-        $data['yue_pay_status'] = (int)sys_config('balance_func_status') && (int)sys_config('yue_pay_status') == 1 ? (int)1 : (int)2;//余额支付 1 开启 2 关闭
         $data['pay_weixin_open'] = sys_config('pay_weixin_open', '0') != '0';//微信支付 1 开启 0 关闭
         $data['friend_pay_status'] = (int)sys_config('friend_pay_status') ?? 0;//好友代付 1 开启 0 关闭
-        $data['store_self_mention'] = (int)sys_config('store_self_mention') ?? 0;//门店自提是否开启
-        /** @var SystemStoreServices $systemStoreServices */
-        $systemStoreServices = app()->make(SystemStoreServices::class);
-        $store_count = $systemStoreServices->count(['type' => 0]);
-        $data['store_self_mention'] = $data['store_self_mention'] && $store_count;
-
-        $data['ali_pay_status'] = sys_config('ali_pay_status', '0') != '0';//支付包支付 1 开启 0 关闭
-        $data['system_store'] = [];//门店信息
         /** @var UserInvoiceServices $userInvoice */
         $userInvoice = app()->make(UserInvoiceServices::class);
         $invoice_func = $userInvoice->invoiceFuncStatus();
         $data['invoice_func'] = $invoice_func['invoice_func'];
         $data['special_invoice'] = $invoice_func['special_invoice'];
-
-        /** @var UserBillServices $userBillServices */
-        $userBillServices = app()->make(UserBillServices::class);
-        $data['usable_integral'] = bcsub((string)$user['integral'], (string)$userBillServices->getBillSum(['uid' => $user['uid'], 'is_frozen' => 1]), 0);
-        $data['integral_open'] = sys_config('integral_ratio', 0) > 0;
 
         //自动领取优惠券
         app()->make(StoreCouponUserServices::class)->autoReceiveCoupon($user['uid'], $cartGroup);
@@ -722,16 +629,6 @@ class StoreOrderServices extends BaseServices
         return $prefix . $id;
     }
 
-    /**获取用户购买活动产品的次数
-     * @param $uid
-     * @param $seckill_id
-     * @return int
-     */
-    public function activityProductCount(array $where)
-    {
-        return $this->dao->count($where);
-    }
-
     /**
      * 获取订单缓存信息
      * @param int $uid
@@ -768,97 +665,6 @@ class StoreOrderServices extends BaseServices
     }
 
     /**
-     * 判断支付方式是否开启
-     * @param $payType
-     * @return bool
-     */
-    public function checkPaytype(string $payType)
-    {
-        $res = false;
-        switch ($payType) {
-            case PayServices::WEIXIN_PAY:
-                $res = sys_config('pay_weixin_open', '0') != '0';
-                break;
-            case PayServices::YUE_PAY:
-                $res = sys_config('balance_func_status') && sys_config('yue_pay_status') == 1;
-                break;
-            case 'offline':
-                $res = sys_config('offline_pay_status') == 1;
-                break;
-            case PayServices::ALIAPY_PAY:
-                $res = sys_config('ali_pay_status', '0') != '0';
-                break;
-            case PayServices::FRIEND:
-                $res = sys_config('friend_pay_status', 1) == 1;
-                break;
-            case PayServices::ALLIN_PAY:
-                $res = sys_config('allin_pay_status') == 1;
-        }
-        return $res;
-    }
-
-
-    /**
-     * 修改支付方式为线下支付
-     * @param string $orderId
-     * @return bool|\crmeb\basic\BaseModel
-     */
-    public function setOrderTypePayOffline(string $orderId)
-    {
-        if (($count = strpos($orderId, '_')) !== false) {
-            $orderId = substr($orderId, $count + 1);
-        }
-        if (sys_config('offline_postage', 0) == 1) {
-            $orderInfo = $this->dao->get(['order_id' => $orderId]);
-            $cartInfoService = app()->make(StoreOrderCartInfoServices::class);
-            $cartInfo = $cartInfoService->getColumn(['oid' => $orderInfo['id']], 'cart_info', 'id');
-            foreach ($cartInfo as $key => &$item) {
-                $item_arr = json_decode($item, true);
-                $item_arr['postage_price'] = $item_arr['origin_postage_price'] = 0;
-                $cartInfoService->update(['id' => $key], ['cart_info' => json_encode($item_arr)]);
-            }
-            return $this->dao->update($orderId, [
-                'pay_type' => 'offline',
-                'pay_price' => bcsub((string)$orderInfo['pay_price'], (string)$orderInfo['pay_postage'], 2),
-                'pay_postage' => 0
-            ], 'order_id');
-        }
-        return $this->dao->update($orderId, ['pay_type' => 'offline'], 'order_id');
-    }
-
-    /**
-     * 删除订单
-     * @param string $uni
-     * @param int $uid
-     * @return bool
-     * @throws \Psr\SimpleCache\InvalidArgumentException
-     */
-    public function removeOrder(string $uni, int $uid)
-    {
-        $order = $this->getUserOrderDetail($uni, $uid);
-        if (!$order) {
-            throw new ApiException('订单不存在');
-        }
-        $order = $this->tidyOrder($order);
-        if ($order['_status']['_type'] != 0 && $order['_status']['_type'] != -2 && $order['_status']['_type'] != 4)
-            throw new ApiException('该订单无法删除');
-
-        $order->is_del = 1;
-        /** @var StoreOrderStatusServices $statusService */
-        $statusService = app()->make(StoreOrderStatusServices::class);
-        $res = $statusService->save([
-            'oid' => $order['id'],
-            'change_type' => 'remove_order',
-            'change_message' => '删除订单',
-            'change_time' => time()
-        ]);
-        if ($order->save() && $res) {
-            return true;
-        } else
-            throw new ApiException('取消失败');
-    }
-
-    /**
      * 取消订单
      * @param $order_id
      * @param $uid
@@ -883,7 +689,7 @@ class StoreOrderServices extends BaseServices
         $refundServices = app()->make(StoreOrderRefundServices::class);
 
         $this->transaction(function () use ($refundServices, $order) {
-            $res = $refundServices->integralAndCouponBack($order, 'cancel') && $refundServices->regressionStock($order);
+            $res = $refundServices->couponBack($order, 'cancel') && $refundServices->regressionStock($order);
             $order->is_cancel = 1;
             if (!($res && $order->save())) {
                 throw new ApiException('取消失败');
@@ -966,58 +772,11 @@ class StoreOrderServices extends BaseServices
         }
         [$page, $limit] = $this->getPageValue();
         $where = ['uid' => $uid, 'paid' => 1, 'refund_status' => 0, 'pid' => 0];
-        $list = $this->dao->getStairOrderList($where, 'order_id,real_name,total_num,total_price,pay_price,FROM_UNIXTIME(pay_time,"%Y-%m-%d") as pay_time,paid,pay_type,pink_id,seckill_id,bargain_id', $page, $limit);
+        $list = $this->dao->getStairOrderList($where, 'order_id,real_name,total_num,total_price,pay_price,FROM_UNIXTIME(pay_time,"%Y-%m-%d") as pay_time,paid,pay_type,pink_id', $page, $limit);
         $count = $this->dao->count($where);
         return compact('list', 'count');
     }
 
-
-    /**
-     * 获取推广订单列表
-     * @param int $uid
-     * @param $where
-     * @return array
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function getUserStairOrderList(int $uid, $where)
-    {
-        $where_data = [];
-        if (isset($where['type'])) {
-            switch ((int)$where['type']) {
-                case 1:
-                    $where_data['spread_uid'] = $uid;
-                    break;
-                case 2:
-                    $where_data['spread_two_uid'] = $uid;
-                    break;
-                case 3:
-                    $where_data['division_id'] = $uid;
-                    break;
-                case 4:
-                    $where_data['agent_id'] = $uid;
-                    break;
-                default:
-                    $where_data['all_spread'] = $uid;
-                    break;
-            }
-        }
-        if (isset($where['data']) && $where['data']) {
-            $where_data['time'] = $where['data'];
-        }
-        if (isset($where['order_id']) && $where['order_id']) {
-            $where_data['order_id'] = $where['order_id'];
-        }
-        //推广订单只显示支付过并且未退款的订单
-        $where_data['paid'] = 1;
-        $where_data['refund_status'] = 0;
-        $where_data['pid'] = 0;
-        [$page, $limit] = $this->getPageValue();
-        $list = $this->dao->getStairOrderList($where_data, '*', $page, $limit);
-        $count = $this->dao->count($where_data);
-        return compact('list', 'count');
-    }
 
     /**
      * 订单导出
@@ -1066,20 +825,9 @@ class StoreOrderServices extends BaseServices
                         $item['color'] = '#457856';
                         break;
                 }
-            } elseif ($item['seckill_id']) {
-                $item['pink_name'] = '[秒杀订单]';
-                $item['color'] = '#32c5e9';
-            } elseif ($item['bargain_id']) {
-                $item['pink_name'] = '[砍价订单]';
-                $item['color'] = '#12c5e9';
             } else {
-                if ($item['shipping_type'] == 1) {
-                    $item['pink_name'] = '[普通订单]';
-                    $item['color'] = '#895612';
-                } else if ($item['shipping_type'] == 2) {
-                    $item['pink_name'] = '[核销订单]';
-                    $item['color'] = '#8956E8';
-                }
+                $item['pink_name'] = '[普通订单]';
+                $item['color'] = '#895612';
             }
         }
         return $list;
@@ -1095,7 +843,7 @@ class StoreOrderServices extends BaseServices
     public function orderUnpaidCancel()
     {
         //系统预设取消订单时间段
-        $keyValue = ['order_cancel_time', 'order_activity_time', 'order_bargain_time', 'order_seckill_time', 'order_pink_time'];
+        $keyValue = ['order_cancel_time', 'order_activity_time', 'order_pink_time'];
         //获取配置
         $systemValue = SystemConfigService::more($keyValue);
         //格式化数据
@@ -1106,10 +854,6 @@ class StoreOrderServices extends BaseServices
         foreach ($list as $order) {
             if ($order['pink_id'] || $order['combination_id']) {
                 $secs = $systemValue['order_pink_time'] ?: $systemValue['order_activity_time'];
-            } elseif ($order['seckill_id']) {
-                $secs = $systemValue['order_seckill_time'] ?: $systemValue['order_activity_time'];
-            } elseif ($order['bargain_id']) {
-                $secs = $systemValue['order_bargain_time'] ?: $systemValue['order_activity_time'];
             } else {
                 $secs = $systemValue['order_cancel_time'];
             }
@@ -1118,7 +862,7 @@ class StoreOrderServices extends BaseServices
                 try {
                     $this->transaction(function () use ($order, $refundServices) {
                         //回退积分和优惠卷
-                        $res = $refundServices->integralAndCouponBack($order, 'cancel');
+                        $res = $refundServices->couponBack($order, 'cancel');
                         //回退库存和销量
                         $res = $res && $refundServices->regressionStock($order);
                         //修改订单状态
@@ -1354,51 +1098,11 @@ class StoreOrderServices extends BaseServices
 
         foreach ($order['cartInfo'] as $v) {
             if ($v['combination_id']) throw new ApiException('拼团商品不能再来一单，请在拼团商品内自行下单');
-            elseif ($v['bargain_id']) throw new ApiException('砍价商品不能再来一单，请在砍价商品内自行下单');
-            elseif ($v['seckill_id']) throw new ApiException('秒杀商品不能再来一单，请在秒杀商品内自行下单');
             elseif ($v['advance_id']) throw new ApiException('预售商品不能再来一单，请在预售商品内自行下单');
             else $cateId[] = $services->setCart($uid, (int)$v['product_id'], (int)$v['cart_num'], $v['productInfo']['attrInfo']['unique'] ?? '', '0', true);
         }
         if (!$cateId) throw new ApiException('再来一单失败，请重新下单');
         return $cateId;
-    }
-
-    /**
-     * 支付宝单独支付
-     * @param OrderPayServices $payServices
-     * @param OtherOrderServices $services
-     * @param string $key
-     * @param string $quitUrl
-     * @return array|string
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function aliPayOrder(OrderPayServices $payServices, OtherOrderServices $services, string $key, string $quitUrl)
-    {
-        if (!$key) {
-            throw new ApiException('参数错误');
-        }
-        if (!$quitUrl) {
-            throw new ApiException('参数错误');
-        }
-
-        $orderCache = CacheService::get($key);
-        if (!$orderCache || !isset($orderCache['order_id'])) {
-            throw new ApiException('该订单无法支付');
-        }
-
-        $payType = isset($orderCache['other_pay_type']) && $orderCache['other_pay_type'] == true;
-        if ($payType) {
-            $orderInfo = $services->getOne(['order_id' => $orderCache['order_id'], 'is_del' => 0, 'paid' => 0]);
-        } else {
-            $orderInfo = $this->get(['order_id' => $orderCache['order_id'], 'paid' => 0, 'is_del' => 0]);
-        }
-
-        if (!$orderInfo) {
-            throw new ApiException('订单支付状态有误，无法进行支付');
-        }
-        return $payServices->beforePay($orderInfo->toArray(), PayServices::ALIAPY_PAY, ['quitUrl' => $quitUrl]);
     }
 
     /**
@@ -1417,109 +1121,22 @@ class StoreOrderServices extends BaseServices
         if (!$order) throw new ApiException('订单不存在');
         $order = $order->toArray();
         $splitNum = [];
-        //是否开启门店自提
-        $store_self_mention = sys_config('store_self_mention');
-        //关闭门店自提后 订单隐藏门店信息
-        if ($store_self_mention == 0) $order['shipping_type'] = 1;
-        if ($order['verify_code']) {
-            $verify_code = $order['verify_code'];
-            $verify[] = substr($verify_code, 0, 4);
-            $verify[] = substr($verify_code, 4, 4);
-            $verify[] = substr($verify_code, 8);
-            $order['_verify_code'] = implode(' ', $verify);
-        }
-        $order['add_time_y'] = date('Y-m-d', $order['add_time']);
-        $order['add_time_h'] = date('H:i:s', $order['add_time']);
-        $order['system_store'] = false;
-        if ($order['store_id']) {
-            /** @var SystemStoreServices $storeServices */
-            $storeServices = app()->make(SystemStoreServices::class);
-            $order['system_store'] = $storeServices->getStoreDispose($order['store_id']);
-        }
-        $order['code'] = '';
-        if (($order['shipping_type'] === 2 || $order['delivery_uid'] != 0) && $order['verify_code']) {
-//            $name = $order['verify_code'] . '.jpg';
-//            /** @var SystemAttachmentServices $attachmentServices */
-//            $attachmentServices = app()->make(SystemAttachmentServices::class);
-//            $imageInfo = $attachmentServices->getInfo(['name' => $name]);
-//            $siteUrl = sys_config('site_url');
-//            if (!$imageInfo) {
-//                $imageInfo = PosterServices::getQRCodePath($order['verify_code'], $name);
-//                if (is_array($imageInfo)) {
-//                    $attachmentServices->attachmentAdd($imageInfo['name'], $imageInfo['size'], $imageInfo['type'], $imageInfo['dir'], $imageInfo['thumb_path'], 1, $imageInfo['image_type'], $imageInfo['time'], 2);
-//                    $url = $imageInfo['dir'];
-//                } else
-//                    $url = '';
-//            } else $url = $imageInfo['att_dir'];
-//            if (isset($imageInfo['image_type']) && $imageInfo['image_type'] == 1) $url = $siteUrl . $url;
-//            $order['code'] = $url;
-            try {
-                $verifyName = 'verify_code_' . $order['verify_code'] . '.jpg';
-                $data = 'verify_code=' . $order['verify_code'];
-                /** @var SystemAttachmentServices $systemAttachmentService */
-                $systemAttachmentService = app()->make(SystemAttachmentServices::class);
-                $imageInfo = $systemAttachmentService->getOne(['name' => $verifyName]);
-                $siteUrl = sys_config('site_url');
-                if (!$imageInfo) {
-                    $res = MiniProgramService::appCodeUnlimitService($data, 'pages/admin/order_cancellation/index', 280);
-                    if (!$res) throw new ApiException('小程序核销码生成失败');
-                    $uploadType = (int)sys_config('upload_type', 1);
-                    $upload = UploadService::init();
-                    $res = (string)EntityBody::factory($res);
-                    $res = $upload->to('routine/product')->validate()->setAuthThumb(false)->stream($res, $verifyName);
-                    if ($res === false) throw new ApiException('小程序核销码生成失败');
-                    $imageInfo = $upload->getUploadInfo();
-                    $imageInfo['image_type'] = $uploadType;
-                    if ($imageInfo['image_type'] == 1) $remoteImage = PosterServices::remoteImage($siteUrl . $imageInfo['dir']);
-                    else $remoteImage = PosterServices::remoteImage($imageInfo['dir']);
-                    if (!$remoteImage['status']) throw new ApiException('小程序核销码生成失败');
-                    $systemAttachmentService->save([
-                        'name' => $imageInfo['name'],
-                        'att_dir' => $imageInfo['dir'],
-                        'satt_dir' => $imageInfo['thumb_path'],
-                        'att_size' => $imageInfo['size'],
-                        'att_type' => $imageInfo['type'],
-                        'image_type' => $imageInfo['image_type'],
-                        'module_type' => 2,
-                        'time' => time(),
-                        'pid' => 1,
-                        'type' => 2
-                    ]);
-                    $url = $imageInfo['dir'];
-                } else $url = $imageInfo['att_dir'];
-                if ($imageInfo['image_type'] == 1) $url = $siteUrl . $url;
-                $order['code'] = $url;
-            } catch (\Exception $e) {
-            }
-        }
         $order['mapKey'] = sys_config('tengxun_map_key');
-        $order['yue_pay_status'] = (int)sys_config('balance_func_status') && (int)sys_config('yue_pay_status') == 1 ? (int)1 : (int)2;//余额支付 1 开启 2 关闭
         $order['pay_weixin_open'] = sys_config('pay_weixin_open') != '0';//微信支付 1 开启 0 关闭
-        $order['ali_pay_status'] = sys_config('ali_pay_status', '0') != '0';//支付包支付 1 开启 0 关闭
         $order['friend_pay_status'] = (int)sys_config('friend_pay_status') ?? 0;//好友代付 1 开启 0 关闭
         $orderData = $this->tidyOrder($order, true, true);
-        $vipTruePrice = $memberPrice = $levelPrice = 0;
         foreach ($orderData['cartInfo'] ?? [] as $key => $cart) {
-            $vipTruePrice = bcadd((string)$vipTruePrice, (string)$cart['vip_sum_truePrice'], 2);
-            if ($cart['price_type'] == 'member') $memberPrice = bcadd((string)$memberPrice, (string)$cart['vip_sum_truePrice'], 2);
-            if ($cart['price_type'] == 'level') $levelPrice = bcadd((string)$levelPrice, (string)$cart['vip_sum_truePrice'], 2);
             if (isset($splitNum[$cart['id']])) {
                 $orderData['cartInfo'][$key]['cart_num'] = $cart['cart_num'] - $splitNum[$cart['id']];
                 if ($orderData['cartInfo'][$key]['cart_num'] == 0) unset($orderData['cartInfo'][$key]);
             }
         }
         $orderData['cartInfo'] = array_merge($orderData['cartInfo']);
-        $orderData['vip_true_price'] = $vipTruePrice;
-        $orderData['levelPrice'] = $levelPrice;
-        $orderData['memberPrice'] = $memberPrice;
-        $economize = $services->get(['order_id' => $order['order_id']], ['postage_price', 'member_price']);
-        if ($economize) {
-            $orderData['postage_price'] = $economize['postage_price'];
-            $orderData['member_price'] = $economize['member_price'];
-        } else {
-            $orderData['postage_price'] = 0;
-            $orderData['member_price'] = 0;
-        }
+        $orderData['vip_true_price'] = 0;
+        $orderData['levelPrice'] = 0;
+        $orderData['memberPrice'] = 0;
+        $orderData['postage_price'] = 0;
+        $orderData['member_price'] = 0;
         $orderData['routine_contact_type'] = sys_config('routine_contact_type', 0);
         /** @var UserInvoiceServices $userInvoice */
         $userInvoice = app()->make(UserInvoiceServices::class);
@@ -1643,12 +1260,8 @@ class StoreOrderServices extends BaseServices
         $res = array_unique(explode(',', implode(',', $arr)));
         if (count($res) == 2) {
             return ['type' => 0];
-        } else {
-            if ($res[0] == 2 && sys_config('store_self_mention') == 0) {
-                return ['type' => 1];
-            }
-            return ['type' => (int)$res[0]];
         }
+        return ['type' => 1];
     }
 
     /**
@@ -1695,20 +1308,16 @@ class StoreOrderServices extends BaseServices
     {
         //支付类型开关
         $data = [
-            'ali_pay_status' => sys_config('ali_pay_status', '0') != '0',
             'wechat_pay_status' => sys_config('pay_weixin_open', '0') != '0',
-            'offline_pay_status' => (int)sys_config('offline_pay_status') == 1,
             'friend_pay_status' => (int)sys_config('friend_pay_status') == 1,
-            'yue_pay_status' => (int)sys_config('balance_func_status') && (int)sys_config('yue_pay_status') == 1,
         ];
 
         $data['order_id'] = $orderId;
         $data['pay_price'] = '0';
-        $data['now_money'] = app()->make(UserServices::class)->value(['uid' => $uid], 'now_money');
 
         switch ($type) {
             case 'order':
-                $info = $this->dao->get(['order_id' => $orderId], ['id', 'pay_price', 'add_time', 'combination_id', 'seckill_id', 'bargain_id', 'pay_postage', 'is_gift']);
+                $info = $this->dao->get(['order_id' => $orderId], ['id', 'pay_price', 'add_time', 'combination_id', 'pay_postage', 'is_gift']);
                 if (!$info) {
                     throw new PayException('您支付的订单不存在');
                 }
@@ -1716,10 +1325,6 @@ class StoreOrderServices extends BaseServices
                 $orderActivityTime = sys_config('order_activity_time', 0);
                 if ($info->combination_id) {
                     $time = (sys_config('order_pink_time', 0) ?: $orderActivityTime) * 60 * 60 + ((int)$info->add_time);
-                } else if ($info->seckill_id) {
-                    $time = (sys_config('order_seckill_time', 0) ?: $orderActivityTime) * 60 * 60 + ((int)$info->add_time);
-                } else if ($info->bargain_id) {
-                    $time = (sys_config('order_bargain_time', 0) ?: $orderActivityTime) * 60 * 60 + ((int)$info->add_time);
                 } else {
                     $time = $orderCancelTime * 60 * 60 + ((int)$info->add_time);
                 }
@@ -1730,27 +1335,10 @@ class StoreOrderServices extends BaseServices
 
                 $data['pay_price'] = $info['pay_price'];
                 $data['pay_postage'] = $info['pay_postage'];
-                $data['offline_postage'] = (int)sys_config('offline_postage', 0);
                 $data['invalid_time'] = $time;
                 $data['oid'] = $info['id'];
                 $data['is_gift'] = $info['is_gift'];
 
-                break;
-            case 'svip':
-                $info = app()->make(OtherOrderServices::class)->get(['order_id' => $orderId], ['id', 'pay_price', 'add_time']);
-                if (!$info) {
-                    throw new PayException('您支付的订单不存在');
-                }
-                $data['pay_price'] = $info['pay_price'];
-                $data['invalid_time'] = $info->add_time + 86400;
-                break;
-            case 'recharge':
-                $info = app()->make(UserRechargeServices::class)->get(['order_id' => $orderId], ['id', 'price', 'add_time']);
-                if (!$info) {
-                    throw new PayException('您支付的订单不存在');
-                }
-                $data['pay_price'] = $info['price'];
-                $data['invalid_time'] = $info->add_time + 86400;
                 break;
             default:
                 throw new PayException('暂不支持其他类型订单支付');
@@ -1915,15 +1503,7 @@ class StoreOrderServices extends BaseServices
             $arr[] = $cartInfo['productInfo']['logistics'];
         }
         $res = array_unique(explode(',', implode(',', $arr)));
-        if (count($res) == 2) {
-            $type = 0;
-        } else {
-            if ($res[0] == 2 && sys_config('store_self_mention') == 0) {
-                $type = 1;
-            } else {
-                $type = (int)$res[0];
-            }
-        }
+        $type = count($res) == 2 ? 0 : 1;
         return [
             'id' => $orderInfo['id'],
             'order_id' => $orderInfo['order_id'],
@@ -1939,7 +1519,6 @@ class StoreOrderServices extends BaseServices
             'gift_uid' => $orderInfo['gift_uid'],
             'refund_status' => $orderInfo['refund_status'],
             'type' => $type,
-            'store_self_mention' => (int)sys_config('store_self_mention') ?? 0,//门店自提是否开启
         ];
     }
 
@@ -1968,20 +1547,12 @@ class StoreOrderServices extends BaseServices
             $phone = $addressInfo['phone'];
             $address = $addressInfo['province'] . ' ' . $addressInfo['city'] . ' ' . $addressInfo['district'] . ' ' . $addressInfo['detail'];
         }
-        $verify_code = '';
-        if ($shipping_type == 2 && $store_id) {
-            $store_id = app()->make(SystemStoreServices::class)->getStoreDispose($store_id, 'id');
-            if (!$store_id) throw new ApiException('门店选择错误');
-            $verify_code = app()->make(StoreOrderCreateServices::class)->getStoreCode();
-        }
         $orderData = [
             'gift_uid' => $uid,
             'real_name' => $name,
             'user_phone' => $phone,
             'user_address' => $address,
             'shipping_type' => $shipping_type,
-            'store_id' => $store_id,
-            'verify_code' => $verify_code,
         ];
         $this->dao->update($oid, $orderData);
         return true;

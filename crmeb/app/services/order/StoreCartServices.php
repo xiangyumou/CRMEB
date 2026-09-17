@@ -18,14 +18,10 @@ use app\dao\order\StoreCartDao;
 use app\services\activity\coupon\StoreCouponIssueServices;
 use app\services\product\shipping\ShippingTemplatesServices;
 use app\services\shipping\ShippingTemplatesNoDeliveryServices;
-use app\services\system\SystemUserLevelServices;
-use app\services\user\member\MemberCardServices;
 use app\services\user\UserServices;
 use app\jobs\ProductLogJob;
 use crmeb\exceptions\ApiException;
 use crmeb\services\CacheService;
-use app\services\activity\seckill\StoreSeckillServices;
-use app\services\activity\bargain\StoreBargainServices;
 use app\services\activity\combination\StoreCombinationServices;
 use app\services\product\product\StoreProductServices;
 use app\services\product\sku\StoreProductAttrValueServices;
@@ -105,11 +101,9 @@ class StoreCartServices extends BaseServices
             $shipping_type = 0;
         }
         [$cartInfo, $valid, $invalid] = $this->handleCartList($uid, $cartInfo, $addr, $shipping_type);
-        $seckillIds = array_unique(array_column($cartInfo, 'seckill_id'));
-        $bargainIds = array_unique(array_column($cartInfo, 'bargain_id'));
         $combinationId = array_unique(array_column($cartInfo, 'combination_id'));
         $advanceId = array_unique(array_column($cartInfo, 'advance_id'));
-        $deduction = ['seckill_id' => $seckillIds[0] ?? 0, 'bargain_id' => $bargainIds[0] ?? 0, 'combination_id' => $combinationId[0] ?? 0, 'advance_id' => $advanceId[0] ?? 0];
+        $deduction = ['combination_id' => $combinationId[0] ?? 0, 'advance_id' => $advanceId[0] ?? 0];
         return ['cartInfo' => $cartInfo, 'valid' => $valid, 'invalid' => $invalid, 'deduction' => $deduction];
     }
 
@@ -137,8 +131,6 @@ class StoreCartServices extends BaseServices
      * @param string $unique
      * @param int $type
      * @param $productId
-     * @param int $seckillId
-     * @param int $bargainId
      * @param int $combinationId
      * @return array
      * @throws \Psr\SimpleCache\InvalidArgumentException
@@ -146,7 +138,7 @@ class StoreCartServices extends BaseServices
      * @throws \think\db\exception\DbException
      * @throws \think\db\exception\ModelNotFoundException
      */
-    public function checkProductStock(int $uid, int $cartNum, string $unique, int $type = 0, $productId, int $seckillId, int $bargainId, int $combinationId, int $advanceId)
+    public function checkProductStock(int $uid, int $cartNum, string $unique, int $type = 0, $productId, int $combinationId, int $advanceId)
     {
         /** @var StoreProductAttrValueServices $attrValueServices */
         $attrValueServices = app()->make(StoreProductAttrValueServices::class);
@@ -184,16 +176,6 @@ class StoreCartServices extends BaseServices
                     }
                 }
                 break;
-            case 1://秒杀
-                /** @var StoreSeckillServices $seckillService */
-                $seckillService = app()->make(StoreSeckillServices::class);
-                [$attrInfo, $unique, $productInfo] = $seckillService->checkSeckillStock($uid, $seckillId, $cartNum, $unique);
-                break;
-            case 2://砍价
-                /** @var StoreBargainServices $bargainService */
-                $bargainService = app()->make(StoreBargainServices::class);
-                [$attrInfo, $unique, $productInfo, $bargainUserInfo] = $bargainService->checkBargainStock($uid, $bargainId, $cartNum, $unique);
-                break;
             case 3://拼团
                 /** @var StoreCombinationServices $combinationService */
                 $combinationService = app()->make(StoreCombinationServices::class);
@@ -214,7 +196,7 @@ class StoreCartServices extends BaseServices
                 throw new ApiException('该商品库存不足{:num}', ['num' => $cartNum]);
             }
         }
-        return [$attrInfo, $unique, $bargainUserInfo['bargain_price_min'] ?? 0, $cartNum, $productInfo];
+        return [$attrInfo, $unique, $cartNum, $productInfo];
     }
 
     /**
@@ -226,32 +208,30 @@ class StoreCartServices extends BaseServices
      * @param string $type 添加购物车类型
      * @param bool $new true = 立即购买，false = 加入购物车
      * @param int $combination_id 拼团商品ID
-     * @param int $seckill_id 秒杀商品ID
-     * @param int $bargain_id 砍价商品ID
      * @return mixed|string
      * @throws \Psr\SimpleCache\InvalidArgumentException
      * @throws \think\db\exception\DataNotFoundException
      * @throws \think\db\exception\DbException
      * @throws \think\db\exception\ModelNotFoundException
      */
-    public function setCart(int $uid, int $product_id, int $cart_num = 1, string $product_attr_unique = '', int $type = 0, bool $new = true, int $combination_id = 0, int $seckill_id = 0, int $bargain_id = 0, int $advance_id = 0)
+    public function setCart(int $uid, int $product_id, int $cart_num = 1, string $product_attr_unique = '', int $type = 0, bool $new = true, int $combination_id = 0, int $advance_id = 0)
     {
-        \app\services\CoreStore::assertOrder(compact('seckill_id', 'bargain_id'));
+        if ($type == 1 || $type == 2) {
+            throw new ApiException('当前商城不支持该业务');
+        }
         if ($cart_num < 1) $cart_num = 1;
         if ($type == 0) {
             //检查限购
             $this->checkLimit($uid, $product_id, $cart_num, $new);
         }
         //检测库存限量
-        [$attrInfo, $product_attr_unique, $bargainPriceMin, $cart_num, $productInfo] = $this->checkProductStock($uid, $cart_num, $product_attr_unique, $type, $product_id, $seckill_id, $bargain_id, $combination_id, $advance_id);
+        [$attrInfo, $product_attr_unique, $cart_num, $productInfo] = $this->checkProductStock($uid, $cart_num, $product_attr_unique, $type, $product_id, $combination_id, $advance_id);
         if ($new) {
             /** @var StoreOrderCreateServices $storeOrderCreateService */
             $storeOrderCreateService = app()->make(StoreOrderCreateServices::class);
             $key = $storeOrderCreateService->getNewOrderId((string)$uid);
             $info['id'] = $key;
             $info['type'] = $type;
-            $info['seckill_id'] = $seckill_id;
-            $info['bargain_id'] = $bargain_id;
             $info['combination_id'] = $combination_id;
             $info['advance_id'] = $advance_id;
             $info['product_id'] = $product_id;
@@ -261,15 +241,9 @@ class StoreCartServices extends BaseServices
             $info['productInfo']['attrInfo'] = $attrInfo->toArray();
             $info['attrInfo'] = $attrInfo->toArray();
             $info['sum_price'] = $info['productInfo']['attrInfo']['price'];
-            //砍价
-            if ($bargain_id) {
-                $info['truePrice'] = $bargainPriceMin;
-                $info['productInfo']['attrInfo']['price'] = $bargainPriceMin;
-            } else {
-                $info['truePrice'] = $info['productInfo']['attrInfo']['price'] ?? $info['productInfo']['price'] ?? 0;
-            }
-            //拼团砍价秒杀不参与会员价
-            if ($bargain_id || $combination_id || $seckill_id || $advance_id) {
+            $info['truePrice'] = $info['productInfo']['attrInfo']['price'] ?? $info['productInfo']['price'] ?? 0;
+            //拼团、预售不参与会员价
+            if ($combination_id || $advance_id) {
                 $info['truePrice'] = $info['productInfo']['attrInfo']['price'] ?? 0;
                 $info['vip_truePrice'] = 0;
             }
@@ -329,7 +303,7 @@ class StoreCartServices extends BaseServices
     {
         if (!$id || !$number || !$uid) return false;
         $where = ['uid' => $uid, 'id' => $id];
-        $carInfo = $this->dao->getOne($where, 'product_id,combination_id,seckill_id,bargain_id,product_attr_unique,cart_num');
+        $carInfo = $this->dao->getOne($where, 'product_id,combination_id,product_attr_unique,cart_num');
 
         //购物车修改数量检查限购
         /** @var StoreProductServices $productServices */
@@ -387,11 +361,9 @@ class StoreCartServices extends BaseServices
             $query->where('type', 0);
         }]);
         [$list, $valid, $invalid] = $this->handleCartList($uid, $list);
-        $seckillIds = array_unique(array_column($list, 'seckill_id'));
-        $bargainIds = array_unique(array_column($list, 'bargain_id'));
         $combinationId = array_unique(array_column($list, 'combination_id'));
         $discountId = array_unique(array_column($list, 'discount_id'));
-        $deduction = ['seckill_id' => $seckillIds[0] ?? 0, 'bargain_id' => $bargainIds[0] ?? 0, 'combination_id' => $combinationId[0] ?? 0, 'discount_id' => $discountId[0] ?? 0];
+        $deduction = ['combination_id' => $combinationId[0] ?? 0, 'discount_id' => $discountId[0] ?? 0];
         if ($status == 1) {
             return ['valid' => $list, 'invalid' => [], 'deduction' => $deduction];
         } else {
@@ -527,30 +499,12 @@ class StoreCartServices extends BaseServices
         $sum_price = 0;
         $cartList = $this->dao->getUserCartList($uid, '*', ['productInfo', 'attrInfo']);
         if ($cartList) {
-            /** @var StoreProductServices $productServices */
-            $productServices = app()->make(StoreProductServices::class);
-            /** @var MemberCardServices $memberCardService */
-            $memberCardService = app()->make(MemberCardServices::class);
-            $vipStatus = $memberCardService->isOpenMemberCard('vip_price', false);
-            /** @var UserServices $user */
-            $user = app()->make(UserServices::class);
-            $userInfo = $user->getUserInfo($uid);
-            $discount = 100;
-            if (sys_config('member_func_status', 1)) {
-                /** @var SystemUserLevelServices $systemLevel */
-                $systemLevel = app()->make(SystemUserLevelServices::class);
-                $discount = $systemLevel->value(['id' => $userInfo['level'], 'is_del' => 0, 'is_show' => 1], 'discount') ?: 100;
-            }
             foreach ($cartList as &$item) {
                 $productInfo = $item['productInfo'];
                 if (isset($productInfo['attrInfo']['product_id']) && $item['product_attr_unique']) {
-                    [$truePrice, $vip_truePrice, $type] = $productServices->setLevelPrice($productInfo['attrInfo']['price'] ?? 0, $uid, $userInfo, $vipStatus, $discount, $productInfo['attrInfo']['vip_price'] ?? 0, $productInfo['is_vip'] ?? 0, true);
-                    $item['truePrice'] = $truePrice;
-                    $item['price_type'] = $type;
+                    $item['truePrice'] = $productInfo['attrInfo']['price'] ?? 0;
                 } else {
-                    [$truePrice, $vip_truePrice, $type] = $productServices->setLevelPrice($item['productInfo']['price'] ?? 0, $uid, $userInfo, $vipStatus, $discount, $item['productInfo']['vip_price'] ?? 0, $item['productInfo']['is_vip'] ?? 0, true);
-                    $item['truePrice'] = $truePrice;
-                    $item['price_type'] = $type;
+                    $item['truePrice'] = $item['productInfo']['price'] ?? 0;
                 }
                 $sum_price = bcadd((string)$sum_price, (string)bcmul((string)$item['cart_num'], (string)$item['truePrice'], 4), 2);
             }
@@ -583,23 +537,6 @@ class StoreCartServices extends BaseServices
         if (!$cartList) return [$cartList, [], []];
         $tempIds = [];
         $userInfo = [];
-        $discount = 100;
-        if ($uid) {
-            /** @var UserServices $user */
-            $user = app()->make(UserServices::class);
-            $userInfo = $user->getUserInfo($uid);
-            //用户等级是否开启
-            if (sys_config('member_func_status', 1)) {
-                /** @var SystemUserLevelServices $systemLevel */
-                $systemLevel = app()->make(SystemUserLevelServices::class);
-                $discount = $systemLevel->value(['id' => $userInfo['level'], 'is_del' => 0, 'is_show' => 1], 'discount') ?: 100;
-            }
-        }
-
-        //付费会员是否开启，用户是否是付费会员，两个都满足，订单计算金额才会按照付费会员计算。
-        /** @var MemberCardServices $memberCardService */
-        $memberCardService = app()->make(MemberCardServices::class);
-        $vipStatus = $memberCardService->isOpenMemberCard('vip_price', false) && $userInfo['is_money_level'] > 0;
 
         //不送达运费模板
         if ($shipping_type == 1 && $addr) {
@@ -625,13 +562,9 @@ class StoreCartServices extends BaseServices
         foreach ($cartList as &$item) {
             if ($item['type'] == 0) $item['min_qty'] = $item['productInfo']['min_qty'];
             $item['productInfo']['express_delivery'] = false;
-            $item['productInfo']['store_mention'] = false;
             if (isset($item['productInfo']['logistics'])) {
                 if (in_array(1, explode(',', $item['productInfo']['logistics']))) {
                     $item['productInfo']['express_delivery'] = true;
-                }
-                if (in_array(2, explode(',', $item['productInfo']['logistics']))) {
-                    $item['productInfo']['store_mention'] = true;
                 }
             }
             if (isset($item['attrInfo']) && $item['attrInfo'] && (!isset($item['productInfo']['attrInfo']) || !$item['productInfo']['attrInfo'])) {
@@ -646,33 +579,18 @@ class StoreCartServices extends BaseServices
             $item['productInfo'] = get_thumb_water($item['productInfo']);
             $productInfo = $item['productInfo'];
             $item['vip_truePrice'] = 0;
-            $is_activity = $item['seckill_id'] || $item['bargain_id'] || $item['combination_id'] || $item['advance_id'];
+            $is_activity = $item['combination_id'] || $item['advance_id'];
+            $item['price_type'] = $is_activity ? 'activity' : 'normal';
             if (isset($productInfo['attrInfo']['product_id']) && $item['product_attr_unique']) {
                 $item['costPrice'] = $productInfo['attrInfo']['cost'] ?? 0;
                 $item['trueStock'] = $productInfo['attrInfo']['stock'] ?? 0;
                 $item['truePrice'] = $productInfo['attrInfo']['price'] ?? 0;
                 $item['sum_price'] = $productInfo['attrInfo']['price'] ?? 0;
-                if (!$is_activity) {
-                    [$truePrice, $vip_truePrice, $type] = $productServices->setLevelPrice($productInfo['attrInfo']['price'] ?? 0, $uid, $userInfo, $vipStatus, $discount, $productInfo['attrInfo']['vip_price'] ?? 0, $productInfo['is_vip'] ?? 0, true);
-                    $item['truePrice'] = $truePrice;
-                    $item['vip_truePrice'] = $vip_truePrice;
-                    $item['price_type'] = $type;
-                } else {
-                    $item['price_type'] = 'activity';
-                }
             } else {
                 $item['costPrice'] = $item['productInfo']['cost'] ?? 0;
                 $item['trueStock'] = $item['productInfo']['stock'] ?? 0;
                 $item['truePrice'] = $item['productInfo']['price'] ?? 0;
                 $item['sum_price'] = $item['productInfo']['price'] ?? 0;
-                if (!$is_activity) {
-                    [$truePrice, $vip_truePrice, $type] = $productServices->setLevelPrice($item['productInfo']['price'] ?? 0, $uid, $userInfo, $vipStatus, $discount, $item['productInfo']['vip_price'] ?? 0, $item['productInfo']['is_vip'] ?? 0, true);
-                    $item['truePrice'] = $truePrice;
-                    $item['vip_truePrice'] = $vip_truePrice;
-                    $item['price_type'] = $type;
-                } else {
-                    $item['price_type'] = 'activity';
-                }
             }
             if (isset($item['status']) && $item['status'] == 0) {
                 $item['is_valid'] = 0;
@@ -682,16 +600,6 @@ class StoreCartServices extends BaseServices
                     case 1:
                         //不送达
                         if (in_array($item['productInfo']['temp_id'], $tempIds) || (isset($item['productInfo']['logistics']) && !in_array(1, explode(',', $item['productInfo']['logistics'])) && $item['productInfo']['logistics'] != 0)) {
-                            $item['is_valid'] = 0;
-                            $invalid[] = $item;
-                        } else {
-                            $item['is_valid'] = 1;
-                            $valid[] = $item;
-                        }
-                        break;
-                    case 2:
-                        //不支持到店自提
-                        if (isset($item['productInfo']['logistics']) && $item['productInfo']['logistics'] && !in_array(2, explode(',', $item['productInfo']['logistics'])) && $item['productInfo']['logistics'] != 0) {
                             $item['is_valid'] = 0;
                             $invalid[] = $item;
                         } else {
@@ -747,20 +655,6 @@ class StoreCartServices extends BaseServices
                 throw new ApiException('该商品限购 {:limit} 件，您已经购买 {:pay_num} 件', ['limit' => $limitInfo['limit_num'], 'pay_num' => $orderNum]);
             }
         }
-        return true;
-    }
-
-    /**
-     * 判断是否非付费会员购买会员专属商品
-     * @param $user
-     * @param $pid
-     * @return bool
-     * @author: 吴汐
-     * @email: 442384644@qq.com
-     * @date: 2023/10/30
-     */
-    public function checkVipGoodsBuy($user, $pid)
-    {
         return true;
     }
 }

@@ -4,12 +4,10 @@ namespace app\services\order;
 use app\services\shipping\ShippingTemplatesFreeServices;
 use app\services\shipping\ShippingTemplatesRegionServices;
 use app\services\shipping\ShippingTemplatesServices;
-use app\services\user\member\MemberCardServices;
-use app\services\user\UserServices;
 
 final class OrderFreightCalculator
 {
-    public function computedPayPostage(int $shipping_type, string $payType, array $cartInfo, array $addr, string $payPrice, array $postage = [], array $other, $userInfo = [], $is_gift = 0)
+    public function computedPayPostage(int $shipping_type, array $cartInfo, array $addr, string $payPrice, array $postage = [], array $other, $userInfo = [], $is_gift = 0)
     {
         $storePostageDiscount = 0;
         $storeFreePostage = $postage['storeFreePostage'] ?? 0;
@@ -24,24 +22,14 @@ final class OrderFreightCalculator
         if (!$addr && !isset($addr['id']) || !$cartInfo) {
             $payPostage = 0;
         } else {
-            //$shipping_type = 1 快递发货 $shipping_type = 2 门店自提
-            if ($shipping_type == 2) {
-                $store_self_mention = sys_config('store_self_mention') ?? 0;
-                if (!$store_self_mention) $shipping_type = 1;
+            if (!$postage || !isset($postage['storePostage']) || !isset($postage['storePostageDiscount'])) {
+                $postage = $this->getOrderPriceGroup($storeFreePostage, $cartInfo, $addr, $userInfo);
             }
-            //门店自提 || （线下支付 && 线下支付包邮） 没有邮费支付
-            if ($shipping_type === 2 || ($payType == 'offline' && ((isset($other['offlinePostage']) && $other['offlinePostage']) || sys_config('offline_postage')) == 1)) {
-                $payPostage = 0;
-            } else {
-                if (!$postage || !isset($postage['storePostage']) || !isset($postage['storePostageDiscount'])) {
-                    $postage = $this->getOrderPriceGroup($storeFreePostage, $cartInfo, $addr, $userInfo);
-                }
-                $payPostage = $postage['storePostage'];
-                $storePostageDiscount = $postage['storePostageDiscount'];
-                $isStoreFreePostage = $postage['isStoreFreePostage'] ?? false;
+            $payPostage = $postage['storePostage'];
+            $storePostageDiscount = $postage['storePostageDiscount'];
+            $isStoreFreePostage = $postage['isStoreFreePostage'] ?? false;
 
-                $payPrice = (float)bcadd((string)$payPrice, (string)$payPostage, 2);
-            }
+            $payPrice = (float)bcadd((string)$payPrice, (string)$payPostage, 2);
         }
         return [$payPrice, $payPostage, $storePostageDiscount, $storeFreePostage, $isStoreFreePostage];
     }
@@ -55,9 +43,6 @@ final class OrderFreightCalculator
         $sumPrice = $this->getOrderSumPrice($cartInfo, 'sum_price');//获取订单原总金额
         $totalPrice = $this->getOrderSumPrice($cartInfo, 'truePrice');//获取订单svip、用户等级优惠之后总金额
         $costPrice = $this->getOrderSumPrice($cartInfo, 'costPrice');//获取订单成本价
-        $vipPrice = $this->getOrderSumPrice($cartInfo, 'vip_truePrice');//获取订单等级和付费会员总优惠金额
-        $levelPrice = $this->getOrderSumPrice($cartInfo, 'level');//获取会员等级优惠
-        $memberPrice = $this->getOrderSumPrice($cartInfo, 'member');//获取付费会员优惠
 
         // 判断商品包邮和固定运费
         foreach ($cartInfo as $key => &$item) {
@@ -197,22 +182,7 @@ final class OrderFreightCalculator
                 }
             }
         }
-        //会员邮费享受折扣
         if ($storePostage) {
-            $express_rule_number = 100;
-            if (!$userInfo) {
-                /** @var UserServices $userService */
-                $userService = app()->make(UserServices::class);
-                $userInfo = $userService->getUserInfo($addr['uid']);
-            }
-            if ($userInfo && isset($userInfo['is_money_level']) && $userInfo['is_money_level'] > 0) {
-                //看是否开启会员折扣奖励
-                /** @var MemberCardServices $memberCardService */
-                $memberCardService = app()->make(MemberCardServices::class);
-                $express_rule_number = $memberCardService->isOpenMemberCard('express');
-                $express_rule_number = $express_rule_number <= 0 ? 0 : $express_rule_number;
-            }
-            $discountRate = bcdiv($express_rule_number, 100, 4);
             $truePostageArr = [];
             foreach ($postageArr as $postitem) {
                 if ($postitem['sum'] == ($maxStorePostage ?? 0)) {
@@ -250,21 +220,11 @@ final class OrderFreightCalculator
                 $cartAlready[$tempId]['number'] = bcadd((string)($cartAlready[$tempId]['number'] ?? 0), (string)$num, 4);
                 $cartAlready[$tempId]['price'] = bcadd((string)($cartAlready[$tempId]['price'] ?? 0.00), (string)$price, 4);
 
-                if ($express_rule_number && $express_rule_number < 100) {
-                    $price = bcmul($price, $discountRate, 4);
-                }
                 $item['postage_price'] = sprintf("%.2f", $price);
             }
-            if ($express_rule_number && $express_rule_number < 100) {
-                $storePostageDiscount = $storePostage;
-                $storePostage = bcmul($storePostage, bcdiv($express_rule_number, 100, 4), 2);
-                $storePostageDiscount = bcsub($storePostageDiscount, $storePostage, 2);
-            } else {
-                $storePostageDiscount = 0;
-                $storePostage = $storePostage;
-            }
+            $storePostageDiscount = 0;
         }
-        return compact('storePostage', 'storeFreePostage', 'isStoreFreePostage', 'sumPrice', 'totalPrice', 'costPrice', 'vipPrice', 'storePostageDiscount', 'cartInfo', 'levelPrice', 'memberPrice', 'giftPrice');
+        return compact('storePostage', 'storeFreePostage', 'isStoreFreePostage', 'sumPrice', 'totalPrice', 'costPrice', 'storePostageDiscount', 'cartInfo', 'giftPrice');
     }
 
     public function getOrderSumPrice($cartInfo, $key = 'truePrice', $is_unit = true)
@@ -278,13 +238,7 @@ final class OrderFreightCalculator
         foreach ($cartInfo as $cart) {
             if (isset($cart['cart_info'])) $cart = $cart['cart_info'];
             if ($is_unit) {
-                if ($key == 'level' || $key == 'member') {
-                    if ($cart['price_type'] == $key) {
-                        $SumPrice = bcadd($SumPrice, bcmul($cart['cart_num'], $cart['vip_truePrice'], 2), 2);
-                    }
-                } else {
-                    $SumPrice = bcadd($SumPrice, bcmul($cart['cart_num'], $cart[$key], 2), 2);
-                }
+                $SumPrice = bcadd($SumPrice, bcmul($cart['cart_num'], $cart[$key], 2), 2);
             } else {
                 $SumPrice = bcadd($SumPrice, $cart[$key], 2);
             }

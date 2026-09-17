@@ -22,10 +22,8 @@ use app\services\order\{StoreOrderCartInfoServices,
     StoreOrderRefundServices,
     StoreOrderStatusServices,
     StoreOrderTakeServices,
-    StoreOrderWriteOffServices,
     StoreOrderServices
 };
-use app\services\pay\OrderOfflineServices;
 use app\services\shipping\ExpressServices;
 use app\services\system\store\SystemStoreServices;
 use app\services\user\UserServices;
@@ -92,55 +90,6 @@ class StoreOrder extends AuthController
         return app('json')->success($this->services->getOrderList($where, ['*'], ['split' => function ($query) {
             $query->field('id,pid');
         }, 'pink', 'invoice', 'division']));
-    }
-
-    /**
-     * 核销码核销
-     * @param StoreOrderWriteOffServices $services
-     * @return mixed
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function write_order(StoreOrderWriteOffServices $services)
-    {
-        [$code, $confirm] = $this->request->getMore([
-            ['code', ''],
-            ['confirm', 0]
-        ], true);
-        if (!$code) return app('json')->fail('参数错误');
-        $orderInfo = $services->writeOffOrder($code, (int)$confirm);
-        if ($confirm == 0) {
-            return app('json')->success('验证成功', $orderInfo);
-        }
-        return app('json')->success('核销成功');
-    }
-
-    /**
-     * 订单号核销
-     * @param StoreOrderWriteOffServices $services
-     * @param $order_id
-     * @return mixed
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function write_update(StoreOrderWriteOffServices $services, $order_id)
-    {
-        $orderInfo = $this->services->getOne(['order_id' => $order_id, 'is_del' => 0]);
-        if ($orderInfo->shipping_type != 2 && $orderInfo->delivery_type != 'send') {
-            return app('json')->fail('核销订单未查到');
-        } else {
-            if (!$orderInfo->verify_code) {
-                return app('json')->fail('参数错误');
-            }
-            $orderInfo = $services->writeOffOrder($orderInfo->verify_code, 1);
-            if ($orderInfo) {
-                return app('json')->success('验证成功');
-            } else {
-                return app('json')->fail('核销失败');
-            }
-        }
     }
 
     /**
@@ -700,70 +649,6 @@ class StoreOrder extends AuthController
         event('CustomNoticeListener', [$orderInfo['uid'], $orderInfo, 'order_refund_fail']);
 
         return app('json')->success('操作成功');
-    }
-
-    /**
-     * 线下支付
-     * @param $id 订单id
-     * @return mixed
-     */
-    public function pay_offline(OrderOfflineServices $services, $id)
-    {
-        if (!$id) return app('json')->fail('参数错误');
-        $res = $services->orderOffline((int)$id);
-        if ($res) {
-            return app('json')->success('操作成功');
-        } else {
-            return app('json')->fail('操作失败');
-        }
-    }
-
-    /**
-     * 退积分表单获取
-     * @param $id
-     * @return mixed
-     * @throws \FormBuilder\Exception\FormBuilderException
-     */
-    public function refund_integral(StoreOrderRefundServices $services, $id)
-    {
-        if (!$id)
-            return app('json')->fail('参数错误');
-        return app('json')->success($services->refundIntegralForm((int)$id));
-    }
-
-    /**
-     * 退积分保存
-     * @param $id
-     * @return mixed
-     */
-    public function update_refund_integral(StoreOrderRefundServices $services, $id)
-    {
-        [$back_integral] = $this->request->postMore([['back_integral', 0]], true);
-        if (!$id || !($orderInfo = $this->services->get($id))) {
-            return app('json')->fail('订单不存在');
-        }
-        if ($orderInfo->is_del) {
-            return app('json')->fail('订单已删除无法退积分');
-        }
-        if ($back_integral <= 0) {
-            return app('json')->fail('请输入积分');
-        }
-        if ($orderInfo['use_integral'] == $orderInfo['back_integral']) {
-            return app('json')->fail('已退完积分');
-        }
-
-        $data['back_integral'] = bcadd((string)$back_integral, (string)$orderInfo['back_integral'], 2);
-        $bj = bccomp((string)$orderInfo['use_integral'], (string)$data['back_integral'], 2);
-        if ($bj < 0) {
-            return app('json')->fail('退积分大于支付积分，请修改退积分');
-        }
-        //积分退款处理
-        $orderInfo->back_integral = $data['back_integral'];
-        if ($services->refundIntegral($orderInfo, $back_integral)) {
-            return app('json')->success('退积分成功');
-        } else {
-            return app('json')->fail('退积分失败');
-        }
     }
 
     /**

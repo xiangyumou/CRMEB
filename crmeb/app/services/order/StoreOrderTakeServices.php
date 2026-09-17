@@ -119,18 +119,7 @@ class StoreOrderTakeServices extends BaseServices
         $storeName = $orderInfoServices->getCarIdByProductTitle((int)$order['id']);
         $storeTitle = Str::substrUTf8($storeName, 20, 'UTF-8', '');
 
-        $res = $this->transaction(function () use ($order, $userInfo, $storeTitle) {
-            //赠送积分
-            $res1 = $this->gainUserIntegral($order, $userInfo, $storeTitle);
-            //返佣
-            $res2 = $this->backOrderBrokerage($order, $userInfo);
-            //经验
-            $res3 = $this->gainUserExp($order, $userInfo);
-            //事业部
-            $res4 = $this->divisionBrokerage($order, $userInfo);
-            if (!($res1 && $res2 && $res3 && $res4)) {
-                throw new ApiException('收货失败');
-            }
+        $res = $this->transaction(function () {
             return true;
         }, $isTran);
 
@@ -176,80 +165,6 @@ class StoreOrderTakeServices extends BaseServices
     }
 
     /**
-     * 赠送积分
-     * @param $order
-     * @param $userInfo
-     * @param $storeTitle
-     * @return bool
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function gainUserIntegral($order, $userInfo, $storeTitle)
-    {
-        return true;
-    }
-
-    /**
-     * 事业部返佣
-     * @param $orderInfo
-     * @param $userInfo
-     * @return bool
-     */
-    public function divisionBrokerage($orderInfo, $userInfo)
-    {
-        return true;
-    }
-
-    /**
-     * 一级返佣
-     * @param $orderInfo
-     * @param $userInfo
-     * @return bool
-     */
-    public function backOrderBrokerage($orderInfo, $userInfo)
-    {
-        return true;
-    }
-
-
-    /**
-     * 二级推广返佣
-     * @param $orderInfo
-     * @param $userInfo
-     * @param $isSelfbrokerage
-     * @param $frozenTime
-     * @return bool
-     */
-    public function backOrderBrokerageTwo($orderInfo, $userInfo, $isSelfbrokerage = 0, $frozenTime = 0)
-    {
-        return true;
-    }
-
-    /**
-     * 佣金到账发送模板消息
-     * @param $orderInfo
-     * @param $spread_uid
-     * @param $brokeragePrice
-     */
-    public function sendBackOrderBrokerage($orderInfo, $spread_uid, $brokeragePrice, string $type = 'order')
-    {
-        return;
-    }
-
-
-    /**
-     * 赠送经验
-     * @param $order
-     * @param $userInfo
-     * @return bool
-     */
-    public function gainUserExp($order, $userInfo)
-    {
-        return true;
-    }
-
-    /**
      * 自动收货
      * @return bool
      */
@@ -276,8 +191,6 @@ class StoreOrderTakeServices extends BaseServices
                 continue;
             }
             if ($order['paid'] == 1 && $order['status'] == 1) {
-                $data['status'] = 2;
-            } else if ($order['pay_type'] == 'offline') {
                 $data['status'] = 2;
             } else {
                 continue;

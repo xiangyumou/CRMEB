@@ -31,22 +31,7 @@ class CartServices extends BaseServices
     {
         /** @var StoreCartServices $storeCartServices */
         $storeCartServices = app()->make(StoreCartServices::class);
-        /** @var StoreProductServices $productServices */
-        $productServices = app()->make(StoreProductServices::class);
         $list = $storeCartServices->getCartList(['uid' => $uid], 0, 0, ['productInfo', 'attrInfo']);
-        /** @var MemberCardServices $memberCardService */
-        $memberCardService = app()->make(MemberCardServices::class);
-        $vipStatus = $memberCardService->isOpenMemberCard('vip_price', false);
-        /** @var UserServices $user */
-        $user = app()->make(UserServices::class);
-        $userInfo = $user->getUserInfo($uid);
-        //用户等级是否开启
-        $discount = 100;
-        if (sys_config('member_func_status', 1)) {
-            /** @var SystemUserLevelServices $systemLevel */
-            $systemLevel = app()->make(SystemUserLevelServices::class);
-            $discount = $systemLevel->value(['id' => $userInfo['level'], 'is_del' => 0, 'is_show' => 1], 'discount') ?: 100;
-        }
         $valid = $invalid = [];
         foreach ($list as &$item) {
             $is_valid = $item['attrInfo']['suk'] ?? 0;
@@ -60,17 +45,15 @@ class CartServices extends BaseServices
             if (isset($productInfo['attrInfo']['product_id']) && $item['product_attr_unique']) {
                 $item['costPrice'] = $productInfo['attrInfo']['cost'] ?? 0;
                 $item['trueStock'] = $productInfo['attrInfo']['stock'] ?? 0;
-                [$truePrice, $vip_truePrice, $type] = $productServices->setLevelPrice($productInfo['attrInfo']['price'] ?? 0, $uid, $userInfo, $vipStatus, $discount, $productInfo['attrInfo']['vip_price'] ?? 0, $productInfo['is_vip'] ?? 0, true);
-                $item['truePrice'] = $truePrice;
-                $item['vip_truePrice'] = $vip_truePrice;
-                $item['price_type'] = $type;
+                $item['truePrice'] = $productInfo['attrInfo']['price'] ?? 0;
+                $item['vip_truePrice'] = 0;
+                $item['price_type'] = 'normal';
             } else {
                 $item['costPrice'] = $item['productInfo']['cost'] ?? 0;
                 $item['trueStock'] = $item['productInfo']['stock'] ?? 0;
-                [$truePrice, $vip_truePrice, $type] = $productServices->setLevelPrice($item['productInfo']['price'] ?? 0, $uid, $userInfo, $vipStatus, $discount, $item['productInfo']['vip_price'] ?? 0, $item['productInfo']['is_vip'] ?? 0);
-                $item['truePrice'] = $truePrice;
-                $item['vip_truePrice'] = $vip_truePrice;
-                $item['price_type'] = $type;
+                $item['truePrice'] = $item['productInfo']['price'] ?? 0;
+                $item['vip_truePrice'] = 0;
+                $item['price_type'] = 'normal';
             }
             unset($item['attrInfo']);
             if ($item['status'] == 1 && $is_valid && $item['trueStock'] > 0) {

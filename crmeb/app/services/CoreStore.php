@@ -33,6 +33,23 @@ final class CoreStore
         }
     }
 
+    /**
+     * Read-only labels for orders paid before the retired features were removed.
+     * Retired pay types are never written or settled again; they only render.
+     */
+    public const HISTORICAL_PAY_TYPES = [
+        'weixin' => '微信支付',
+        'yue' => '历史：余额支付',
+        'offline' => '历史：线下支付',
+        'alipay' => '历史：支付宝支付',
+        'allinpay' => '历史：通联支付',
+    ];
+
+    public static function historicalPayTypeLabel($type): string
+    {
+        return self::HISTORICAL_PAY_TYPES[$type] ?? '其他支付';
+    }
+
     public static function assertOrder(array $data): void
     {
         foreach (['seckill_id', 'seckillId', 'bargain_id', 'bargainId', 'useIntegral', 'use_integral', 'store_id', 'storeId'] as $key) {

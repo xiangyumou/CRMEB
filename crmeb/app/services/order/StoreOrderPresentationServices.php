@@ -2,8 +2,6 @@
 namespace app\services\order;
 
 use app\services\activity\combination\StorePinkServices;
-use app\services\pay\PayServices;
-use app\services\system\store\SystemStoreServices;
 use app\services\user\UserServices;
 use app\services\product\product\StoreProductReplyServices;
 use crmeb\services\SystemConfigService;
@@ -57,16 +55,11 @@ final class StoreOrderPresentationServices
             $status['_msg'] = '您已取消订单,感谢您的使用';
             $status['_class'] = 'nobuy';
         } else {
-            if (!$order['paid'] && $order['pay_type'] == 'offline' && !$order['status'] >= 2) {
-                $status['_type'] = 9;
-                $status['_title'] = '线下付款,未支付';
-                $status['_msg'] = '等待商家处理,请耐心等待';
-                $status['_class'] = 'nobuy';
-            } else if (!$order['paid']) {
+            if (!$order['paid']) {
                 $status['_type'] = 0;
                 $status['_title'] = '未支付';
                 //系统预设取消订单时间段
-                $keyValue = ['order_cancel_time', 'order_activity_time', 'order_bargain_time', 'order_seckill_time', 'order_pink_time'];
+                $keyValue = ['order_cancel_time', 'order_activity_time', 'order_pink_time'];
                 //获取配置
                 $systemValue = SystemConfigService::more($keyValue);
                 //格式化数据
@@ -74,14 +67,6 @@ final class StoreOrderPresentationServices
                 if ($order['pink_id'] || $order['combination_id']) {
                     $order_pink_time = $systemValue['order_pink_time'] ?: $systemValue['order_activity_time'];
                     $time = $order['add_time'] + $order_pink_time * 3600;
-                    $status['_msg'] = '请在' . date('m-d H:i:s', $time) . '前完成支付!';
-                } else if ($order['seckill_id']) {
-                    $order_seckill_time = $systemValue['order_seckill_time'] ?: $systemValue['order_activity_time'];
-                    $time = $order['add_time'] + $order_seckill_time * 3600;
-                    $status['_msg'] = '请在' . date('m-d H:i:s', $time) . '前完成支付!';
-                } else if ($order['bargain_id']) {
-                    $order_bargain_time = $systemValue['order_bargain_time'] ?: $systemValue['order_activity_time'];
-                    $time = $order['add_time'] + $order_bargain_time * 3600;
                     $status['_msg'] = '请在' . date('m-d H:i:s', $time) . '前完成支付!';
                 } else {
                     $time = $order['add_time'] + $systemValue['order_cancel_time'] * 3600;
@@ -173,11 +158,6 @@ final class StoreOrderPresentationServices
                             $status['_msg'] = '商家未发货,请耐心等待';
                         }
                         $status['_class'] = 'state-nfh';
-                    } elseif ($order['shipping_type'] === 2) {
-                        $status['_type'] = 1;
-                        $status['_title'] = '待核销';
-                        $status['_msg'] = '待核销,请到核销点进行核销';
-                        $status['_class'] = 'state-nfh';
                     } else {
                         $status['_type'] = 1;
                         $status['_title'] = '待领取';
@@ -220,7 +200,7 @@ final class StoreOrderPresentationServices
             }
         }
         if (isset($order['pay_type']))
-            $status['_payType'] = $status['_type'] == 0 ? '' : PayServices::PAY_TYPE[$order['pay_type']] ?? '其他方式';
+            $status['_payType'] = $status['_type'] == 0 ? '' : \app\services\CoreStore::historicalPayTypeLabel($order['pay_type']);
         if (isset($order['delivery_type']))
             $status['_deliveryType'] = $this->deliveryType[$order['delivery_type']] ?? '其他方式';
         $order['_status'] = $status;
@@ -228,16 +208,12 @@ final class StoreOrderPresentationServices
         $order['_add_time'] = isset($order['add_time']) ? (strstr((string)$order['add_time'], '-') === false ? date('Y-m-d H:i:s', $order['add_time']) : $order['add_time']) : '';
 
         //系统预设取消订单时间段
-        $keyValue = ['order_cancel_time', 'order_activity_time', 'order_bargain_time', 'order_seckill_time', 'order_pink_time'];
+        $keyValue = ['order_cancel_time', 'order_activity_time', 'order_pink_time'];
         //获取配置
         $systemValue = SystemConfigService::more($keyValue);
         //格式化数据
         $systemValue = Arr::setValeTime($keyValue, is_array($systemValue) ? $systemValue : []);
-        if ($order['seckill_id']) {
-            $secs = $systemValue['order_seckill_time'] ? $systemValue['order_seckill_time'] : $systemValue['order_activity_time'];
-        } elseif ($order['bargain_id']) {
-            $secs = $systemValue['order_bargain_time'] ? $systemValue['order_bargain_time'] : $systemValue['order_activity_time'];
-        } elseif ($order['combination_id']) {
+        if ($order['combination_id']) {
             $secs = $systemValue['order_pink_time'] ? $systemValue['order_pink_time'] : $systemValue['order_activity_time'];
         } else {
             $secs = $systemValue['order_cancel_time'];
@@ -254,13 +230,10 @@ final class StoreOrderPresentationServices
                 }
             }
         }
-        if ($order['seckill_id'] || $order['bargain_id'] || $order['combination_id'] || $order['advance_id']) {
-            if ($order['seckill_id']) $order['type'] = 1;
-            if ($order['bargain_id']) $order['type'] = 2;
+        if ($order['combination_id'] || $order['advance_id']) {
             if ($order['combination_id']) $order['type'] = 3;
             if ($order['advance_id']) $order['type'] = 4;
         }
-        $order['offlinePayStatus'] = (int)sys_config('offline_pay_status') ?? (int)2;
         $log = $statusServices->getColumn(['oid' => $order['id']], 'change_time', 'change_type');
         if (isset($log['delivery'])) {
             $delivery = date('Y-m-d', $log['delivery']);
@@ -328,55 +301,17 @@ final class StoreOrderPresentationServices
             } elseif ($item['combination_id']) {
                 $item['pink_name'] = '[拼团订单]';
                 $item['color'] = '#FF7D00';
-            } elseif ($item['seckill_id']) {
-                $item['pink_name'] = '[秒杀订单]';
-                $item['color'] = '#3491FA';
-            } elseif ($item['bargain_id']) {
-                $item['pink_name'] = '[砍价订单]';
-                $item['color'] = '#F7BA1E';
             } elseif ($item['advance_id']) {
                 $item['pink_name'] = '[预售订单]';
                 $item['color'] = '#B27FEB';
             } else {
-                if ($item['shipping_type'] == 1) {
-                    $item['pink_name'] = '[普通订单]';
-                    $item['color'] = '#333';
-                } else if ($item['shipping_type'] == 2) {
-                    $item['pink_name'] = '[核销订单]';
-                    $item['color'] = '#8956E8';
-                }
+                $item['pink_name'] = '[普通订单]';
+                $item['color'] = '#333';
             }
             if ($item['paid'] == 1) {
-                switch ($item['pay_type']) {
-                    case PayServices::WEIXIN_PAY:
-                        $item['pay_type_name'] = '微信支付';
-                        break;
-                    case PayServices::YUE_PAY:
-                        $item['pay_type_name'] = '余额支付';
-                        break;
-                    case PayServices::OFFLINE_PAY:
-                        $item['pay_type_name'] = '线下支付';
-                        break;
-                    case PayServices::ALIAPY_PAY:
-                        $item['pay_type_name'] = '支付宝支付';
-                        break;
-                    case PayServices::ALLIN_PAY:
-                        $item['pay_type_name'] = '通联支付';
-                        break;
-                    default:
-                        $item['pay_type_name'] = '其他支付';
-                        break;
-                }
+                $item['pay_type_name'] = \app\services\CoreStore::historicalPayTypeLabel($item['pay_type']);
             } else {
-                switch ($item['pay_type']) {
-                    case 'offline':
-                        $item['pay_type_name'] = '线下支付';
-                        $item['pay_type_info'] = 1;
-                        break;
-                    default:
-                        $item['pay_type_name'] = '';
-                        break;
-                }
+                $item['pay_type_name'] = '';
             }
             $status_name = ['status_name' => '', 'pics' => []];
             if ($item['paid'] == 0 && $item['status'] == 0) {
@@ -385,12 +320,8 @@ final class StoreOrderPresentationServices
                 $status_name['status_name'] = $item['combination_id'] && isset($item['pinkStatus']) && $item['pinkStatus'] == 1 ? '未发货(拼团中)' : '未发货';
             } else if ($item['paid'] == 1 && $item['status'] == 4 && $item['shipping_type'] == 1 && $item['refund_status'] == 0) {
                 $status_name['status_name'] = '部分发货';
-            } else if ($item['paid'] == 1 && $item['status'] == 0 && $item['shipping_type'] == 2 && $item['refund_status'] == 0) {
-                $status_name['status_name'] = '未核销';
             } else if ($item['paid'] == 1 && $item['status'] == 1 && $item['shipping_type'] == 1 && $item['refund_status'] == 0) {
                 $status_name['status_name'] = '待收货';
-            } else if ($item['paid'] == 1 && $item['status'] == 1 && $item['shipping_type'] == 2 && $item['refund_status'] == 0) {
-                $status_name['status_name'] = '未核销';
             } else if ($item['paid'] == 1 && $item['status'] == 2 && $item['refund_status'] == 0) {
                 $status_name['status_name'] = '待评价';
             } else if ($item['paid'] == 1 && $item['status'] == 3 && $item['refund_status'] == 0) {
@@ -442,23 +373,6 @@ HTML;
                 $item['_status'] = 10;//拆单发货 已全部申请退款
             } else if ($item['paid'] == 1 && $item['refund_status'] == 3 && $item['status'] == 0) {
                 $item['_status'] = 11;//拆单退款 未发货
-            }
-            if ($item['clerk_id'] == 0 && !isset($item['clerk_name'])) {
-                $item['clerk_name'] = '总平台';
-            }
-
-            if ($item['store_id']) {
-                $store = app()->make(SystemStoreServices::class);
-                $storeOne = $store->value(['id' => $item['store_id']], 'name');
-                if ($storeOne) $item['store_name'] = $storeOne;
-            }
-
-            //根据核销员更改store_name
-            if ($item['clerk_id'] && isset($item['staff_store_id']) && $item['staff_store_id']) {
-                /** @var SystemStoreServices $store */
-                $store = app()->make(SystemStoreServices::class);
-                $storeOne = $store->value(['id' => $item['staff_store_id']], 'name');
-                if ($storeOne) $item['store_name'] = $storeOne;
             }
         }
         return $data;

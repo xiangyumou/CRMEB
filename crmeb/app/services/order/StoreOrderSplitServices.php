@@ -285,21 +285,13 @@ class StoreOrderSplitServices extends BaseServices
     {
         $order_update['cart_id'] = array_column($cart_info_data, 'cart_id');
         $order_update['total_num'] = array_sum(array_column($cart_info_data, 'cart_num'));
-        $total_price = $coupon_price = $deduction_price = $use_integral = $pay_postage = $gainIntegral = $one_brokerage = $two_brokerage = $staffBrokerage = $agentBrokerage = $divisionBrokerage = 0;
+        $total_price = $coupon_price = $deduction_price = $pay_postage = 0;
         foreach ($cart_info_data as $cart) {
             $_info = json_decode($cart['cart_info'], true);
             $total_price = bcadd((string)$total_price, (string)$_info['sum_true_price'], 2);
             $deduction_price = bcadd((string)$deduction_price, (string)$_info['integral_price'], 2);
             $coupon_price = bcadd((string)$coupon_price, (string)$_info['coupon_price'], 2);
-            $use_integral = bcadd((string)$use_integral, (string)$_info['use_integral'], 0);
             $pay_postage = isset($_info['postage_price']) ? bcadd((string)$pay_postage, (string)$_info['postage_price'], 2) : 0;
-            $cartInfoGainIntegral = bcmul((string)$cart['cart_num'], (string)($_info['productInfo']['give_integral'] ?? '0'), 0);
-            $gainIntegral = bcadd((string)$gainIntegral, (string)$cartInfoGainIntegral, 0);
-            $one_brokerage = bcadd((string)$one_brokerage, (string)$_info['one_brokerage'], 2);
-            $two_brokerage = bcadd((string)$two_brokerage, (string)$_info['two_brokerage'], 2);
-            $staffBrokerage = bcadd((string)$staffBrokerage, (string)$_info['staff_brokerage'], 2);
-            $agentBrokerage = bcadd((string)$agentBrokerage, (string)$_info['agent_brokerage'], 2);
-            $divisionBrokerage = bcadd((string)$divisionBrokerage, (string)$_info['division_brokerage'], 2);
         }
 
         $order_update['coupon_id'] = array_unique(array_column($cart_info_data, 'coupon_id'));
@@ -316,14 +308,14 @@ class StoreOrderSplitServices extends BaseServices
         $order_update['total_price'] = bcadd((string)$total_price, (string)bcadd((string)$deduction_price, (string)$coupon_price, 2), 2);
         $order_update['deduction_price'] = $deduction_price;
         $order_update['coupon_price'] = $coupon_price;
-        $order_update['use_integral'] = $use_integral;
-        $order_update['gain_integral'] = $gainIntegral;
+        $order_update['use_integral'] = 0;
+        $order_update['gain_integral'] = 0;
         $order_update['pay_postage'] = $pay_postage;
-        $order_update['one_brokerage'] = $one_brokerage;
-        $order_update['two_brokerage'] = $two_brokerage;
-        $order_update['staff_brokerage'] = $staffBrokerage;
-        $order_update['agent_brokerage'] = $agentBrokerage;
-        $order_update['division_brokerage'] = $divisionBrokerage;
+        $order_update['one_brokerage'] = 0;
+        $order_update['two_brokerage'] = 0;
+        $order_update['staff_brokerage'] = 0;
+        $order_update['agent_brokerage'] = 0;
+        $order_update['division_brokerage'] = 0;
         if (false === $this->dao->update($id, $order_update, 'id')) {
             throw new AdminException('保存新订单商品信息失败');
         }
@@ -331,7 +323,7 @@ class StoreOrderSplitServices extends BaseServices
     }
 
     /**
-     * 部分发货重新计算订单商品：实际金额、优惠、积分等金额
+     * 部分发货重新计算订单商品：实际金额、优惠等金额
      * @param int $cart_num
      * @param array $cart_info
      * @param string $orderType
@@ -343,14 +335,13 @@ class StoreOrderSplitServices extends BaseServices
         if ($cart_num >= $cart_info['cart_num']) return $cart_info;
         $new_cart_info = $cart_info;
         $new_cart_info['cart_num'] = $cart_num;
-        $compute_arr = ['coupon_price', 'integral_price', 'postage_price', 'use_integral', 'one_brokerage', 'two_brokerage', 'staff_brokerage', 'agent_brokerage', 'division_brokerage', 'sum_true_price'];
+        $compute_arr = ['coupon_price', 'integral_price', 'postage_price', 'sum_true_price'];
         foreach ($compute_arr as $field) {
             if (!isset($cart_info[$field]) || !$cart_info[$field]) {
                 $new_cart_info[$field] = 0;
                 continue;
             }
             $scale = 2;
-            if ($field == 'use_integral') $scale = 0;
             $new_cart_info[$field] = bcmul((string)$cart_num, bcdiv((string)$cart_info[$field], (string)$cart_info['cart_num'], 4), $scale);
             if ($orderType == 'new') {//拆出
                 if ($field == 'sum_true_price') {

@@ -11,16 +11,11 @@
 
 namespace app\jobs;
 
-use app\services\activity\bargain\StoreBargainServices;
 use app\services\activity\combination\StoreCombinationServices;
-use app\services\activity\seckill\StoreSeckillServices;
-use app\services\activity\coupon\StoreCouponUserServices;
 use app\services\kefu\service\StoreServiceServices;
 use app\services\order\StoreOrderCartInfoServices;
-use app\services\order\StoreOrderEconomizeServices;
 use app\services\order\StoreOrderServices;
 use app\services\product\product\StoreProductServices;
-use app\services\user\member\MemberCardServices;
 use app\services\user\UserLabelRelationServices;
 use app\services\user\UserServices;
 use app\services\wechat\WechatUserServices;
@@ -47,15 +42,9 @@ class OrderJob extends BaseJobs
      */
     public function doJob($order)
     {
-        //计算商品节省金额
-        try {
-            $this->setEconomizeMoney($order);
-        } catch (\Throwable $e) {
-            Log::error('计算节省金额,失败原因:' . $e->getMessage());
-        }
         //更新用户支付订单数量
         try {
-            $this->setUserPayCountAndPromoter($order);
+            $this->setUserPayCount($order);
         } catch (\Throwable $e) {
             Log::error('更新用户订单数失败,失败原因:' . $e->getMessage());
         }
@@ -98,25 +87,16 @@ class OrderJob extends BaseJobs
     }
 
     /**
-     * 设置用户购买次数和检测时候成为推广人
+     * 设置用户购买次数
      * @param $order
      */
-    public function setUserPayCountAndPromoter($order)
+    public function setUserPayCount($order)
     {
         /** @var UserServices $userServices */
         $userServices = app()->make(UserServices::class);
         $userInfo = $userServices->get($order['uid']);
         if ($userInfo) {
             $userInfo->pay_count = $userInfo->pay_count + 1;
-            if (!$userInfo->is_promoter) {
-                /** @var StoreOrderServices $orderServices */
-                $orderServices = app()->make(StoreOrderServices::class);
-                $price = $orderServices->sum(['paid' => 1, 'refund_status' => 0, 'uid' => $userInfo['uid']], 'pay_price');
-                $status = is_brokerage_statu($price);
-                if ($status) {
-                    $userInfo->is_promoter = 1;
-                }
-            }
             $userInfo->save();
         }
     }
@@ -171,12 +151,8 @@ class OrderJob extends BaseJobs
         if (count($serviceOrderNotice)) {
             /** @var StoreProductServices $services */
             $services = app()->make(StoreProductServices::class);
-            /** @var StoreSeckillServices $seckillServices */
-            $seckillServices = app()->make(StoreSeckillServices::class);
             /** @var StoreCombinationServices $pinkServices */
             $pinkServices = app()->make(StoreCombinationServices::class);
-            /** @var StoreBargainServices $bargainServices */
-            $bargainServices = app()->make(StoreBargainServices::class);
             /** @var StoreOrderCartInfoServices $cartInfoServices */
             $cartInfoServices = app()->make(StoreOrderCartInfoServices::class);
             foreach ($serviceOrderNotice as $item) {
@@ -190,16 +166,9 @@ class OrderJob extends BaseJobs
                             $url = sys_config('site_url') . '/pages/admin/orderDetail/index?id=' . $order['order_id'];
                             $description = '';
                             $image = sys_config('site_logo');
-                            if (isset($order['seckill_id']) && $order['seckill_id'] > 0) {
-                                $description .= '秒杀商品：' . $seckillServices->value(['id' => $order['seckill_id']], 'title');
-                                $image = $seckillServices->value(['id' => $order['seckill_id']], 'image');
-                            } else if (isset($order['combination_id']) && $order['combination_id'] > 0) {
+                            if (isset($order['combination_id']) && $order['combination_id'] > 0) {
                                 $description .= '拼团商品：' . $pinkServices->value(['id' => $order['combination_id']], 'title');
                                 $image = $pinkServices->value(['id' => $order['combination_id']], 'image');
-                            } else if (isset($order['bargain_id']) && $order['bargain_id'] > 0) {
-                                $title = $bargainServices->value(['id' => $order['bargain_id']], 'title');
-                                $description .= '砍价商品：' . $title;
-                                $image = $bargainServices->value(['id' => $order['bargain_id']], 'image');
                             } else {
                                 $productIds = $cartInfoServices->getCartIdsProduct($order['id']);
                                 $storeProduct = $services->getProductArray([['id', 'in', $productIds]], 'image,store_name', 'id');
@@ -233,68 +202,4 @@ class OrderJob extends BaseJobs
         }
     }
 
-    /**
-     * 计算节约金额
-     * @param $order
-     * @return false|mixed
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function setEconomizeMoney($order)
-    {
-        /** @var UserServices $userService */
-        $userService = app()->make(UserServices::class);
-        /** @var StoreOrderCartInfoServices $cartInfoService */
-        $cartInfoService = app()->make(StoreOrderCartInfoServices::class);
-        /** @var StoreCouponUserServices $couponService */
-        $couponService = app()->make(StoreCouponUserServices::class);
-        /** @var StoreOrderEconomizeServices $economizeService */
-        $economizeService = app()->make(StoreOrderEconomizeServices::class);
-        /** @var MemberCardServices $memberCardService */
-        $memberCardService = app()->make(MemberCardServices::class);
-        $getOne = $economizeService->getOne(['order_id' => $order['order_id']]);
-        if ($getOne) return false;
-        //看是否是会员
-        $userInfo = $userService->getUserInfo($order['uid']);
-        if ($userInfo && $userInfo['is_money_level'] > 0) {
-            $save = [];
-            $save['order_type'] = 1;
-            $save['add_time'] = time();
-            $save['pay_price'] = $order['pay_price'];
-            $save['order_id'] = $order['order_id'];
-            $save['uid'] = $order['uid'];
-            //计算商品节约金额
-            $isOpenVipPrice = $memberCardService->isOpenMemberCard('vip_price');
-            if ($isOpenVipPrice) {
-                $cartInfo = $cartInfoService->getOrderCartInfo($order['id']);
-                $memberPrice = 0.00;
-                if ($cartInfo) {
-                    foreach ($cartInfo as $k => $item) {
-                        foreach ($item as $value) {
-                            if (isset($value['price_type']) && $value['price_type'] == 'member') $memberPrice += bcmul($value['vip_truePrice'], $value['cart_num'] ?: 1, 2);
-                        }
-                    }
-                }
-                $save['member_price'] = $memberPrice;
-            }
-            //计算邮费节约金额
-            $isOpenExpress = $memberCardService->isOpenMemberCard('express');
-            if ($isOpenExpress) {
-                $expressTotalMoney = bcdiv($order['total_postage'], bcdiv($isOpenExpress, 100, 2), 2);
-                $save['postage_price'] = bcsub($expressTotalMoney, $order['total_postage'], 2);
-            }
-
-            //计算会员券节省金额
-            if ($order['coupon_id']) {
-                $couponMoney = $couponService->get($order['coupon_id'], ['*'], ['issue']);
-                if ($couponMoney && $couponMoney['receive_type']) {
-                    $save['coupon_price'] = $couponMoney['coupon_price'];
-                }
-            }
-            return $economizeService->addEconomize($save);
-        }
-        return false;
-
-    }
 }
