@@ -1,11 +1,51 @@
 [
   {
     "status": "M",
+    "path": ".dockerignore"
+  },
+  {
+    "status": "A",
+    "path": ".env.example"
+  },
+  {
+    "status": "M",
+    "path": ".github/workflows/container.yml"
+  },
+  {
+    "status": "M",
+    "path": ".gitignore"
+  },
+  {
+    "status": "M",
+    "path": "Dockerfile"
+  },
+  {
+    "status": "M",
+    "path": "README.md"
+  },
+  {
+    "status": "M",
+    "path": "README_ZH.md"
+  },
+  {
+    "status": "A",
+    "path": "compose.yaml"
+  },
+  {
+    "status": "M",
     "path": "crmeb/app/adminapi/controller/Common.php"
   },
   {
     "status": "D",
     "path": "crmeb/app/adminapi/controller/UpgradeController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/agent/AgentLevel.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/agent/AgentLevelTask.php"
   },
   {
     "status": "D",
@@ -16,12 +56,52 @@
     "path": "crmeb/app/adminapi/controller/v1/agent/Division.php"
   },
   {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/agent/SpreadApply.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/controller/v1/diy/Diy.php"
+  },
+  {
     "status": "M",
     "path": "crmeb/app/adminapi/controller/v1/diy/PageLink.php"
   },
   {
+    "status": "M",
+    "path": "crmeb/app/adminapi/controller/v1/export/ExportExcel.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/finance/Finance.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/finance/UserBalance.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/finance/UserExtract.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/finance/UserRecharge.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/kefu/StoreService.php"
+  },
+  {
     "status": "D",
     "path": "crmeb/app/adminapi/controller/v1/kefu/StoreServiceAutoReply.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/kefu/StoreServiceFeedback.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/kefu/StoreServiceSpeechcraft.php"
   },
   {
     "status": "D",
@@ -32,27 +112,127 @@
     "path": "crmeb/app/adminapi/controller/v1/marketing/SignRewards.php"
   },
   {
+    "status": "M",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/StoreAdvance.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/StoreBargain.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/StoreCouponIssue.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/StoreSeckill.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/UserPoint.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/integral/StoreIntegral.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/integral/StoreIntegralOrder.php"
+  },
+  {
     "status": "D",
     "path": "crmeb/app/adminapi/controller/v1/marketing/integral/StorePointRecord.php"
   },
   {
-    "status": "M",
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/live/LiveAnchor.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/live/LiveGoods.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/live/LiveRoom.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/lottery/LuckLottery.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/marketing/lottery/LuckLotteryRecord.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/merchant/SystemStore.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/merchant/SystemStoreStaff.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/merchant/SystemVerifyOrder.php"
+  },
+  {
+    "status": "D",
     "path": "crmeb/app/adminapi/controller/v1/order/DeliveryService.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/order/OtherOrder.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/controller/v1/order/StoreOrder.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/controller/v1/order/StoreOrderInvoice.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/controller/v1/product/StoreProduct.php"
   },
   {
     "status": "M",
     "path": "crmeb/app/adminapi/controller/v1/setting/SystemConfig.php"
   },
   {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/statistic/BalanceStatistic.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/system/AppVersion.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/system/SystemUpgradeClient.php"
+  },
+  {
     "status": "M",
     "path": "crmeb/app/adminapi/controller/v1/user/User.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/user/UserLevel.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/user/member/MemberCard.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/adminapi/controller/v1/user/member/MemberCardBatch.php"
   },
   {
     "status": "M",
     "path": "crmeb/app/adminapi/middleware/AdminEditorTokenMiddleware.php"
   },
   {
-    "status": "M",
+    "status": "D",
     "path": "crmeb/app/adminapi/route/agent.php"
   },
   {
@@ -61,14 +241,22 @@
   },
   {
     "status": "M",
+    "path": "crmeb/app/adminapi/route/diy.php"
+  },
+  {
+    "status": "M",
     "path": "crmeb/app/adminapi/route/export.php"
   },
   {
     "status": "M",
+    "path": "crmeb/app/adminapi/route/file.php"
+  },
+  {
+    "status": "D",
     "path": "crmeb/app/adminapi/route/finance.php"
   },
   {
-    "status": "M",
+    "status": "D",
     "path": "crmeb/app/adminapi/route/live.php"
   },
   {
@@ -76,12 +264,16 @@
     "path": "crmeb/app/adminapi/route/marketing.php"
   },
   {
-    "status": "M",
+    "status": "D",
     "path": "crmeb/app/adminapi/route/merchant.php"
   },
   {
     "status": "M",
     "path": "crmeb/app/adminapi/route/order.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/adminapi/route/product.php"
   },
   {
     "status": "M",
@@ -105,7 +297,15 @@
   },
   {
     "status": "M",
+    "path": "crmeb/app/api/controller/pc/UserController.php"
+  },
+  {
+    "status": "M",
     "path": "crmeb/app/api/controller/v1/CrontabController.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v1/LoginController.php"
   },
   {
     "status": "M",
@@ -128,6 +328,18 @@
     "path": "crmeb/app/api/controller/v1/activity/StoreSeckillController.php"
   },
   {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v1/admin/StoreManageController.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v1/admin/StoreOrderController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/order/OtherOrderController.php"
+  },
+  {
     "status": "D",
     "path": "crmeb/app/api/controller/v1/order/StoreIntegralOrderController.php"
   },
@@ -136,12 +348,40 @@
     "path": "crmeb/app/api/controller/v1/order/StoreOrderController.php"
   },
   {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v1/store/StoreCartController.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v1/store/StoreProductController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/user/DivisionController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/user/MemberCardController.php"
+  },
+  {
     "status": "D",
     "path": "crmeb/app/api/controller/v1/user/SpreadApplyController.php"
   },
   {
     "status": "D",
+    "path": "crmeb/app/api/controller/v1/user/StoreService.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v1/user/UserBillController.php"
+  },
+  {
+    "status": "D",
     "path": "crmeb/app/api/controller/v1/user/UserBrokerageController.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v1/user/UserController.php"
   },
   {
     "status": "D",
@@ -160,8 +400,28 @@
     "path": "crmeb/app/api/controller/v1/user/UserSignController.php"
   },
   {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v1/wechat/AuthController.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v2/PublicController.php"
+  },
+  {
     "status": "D",
     "path": "crmeb/app/api/controller/v2/activity/LuckLotteryController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v2/agent/AgentLevel.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/controller/v2/order/StoreOrderInvoiceController.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/api/controller/v2/user/StoreService.php"
   },
   {
     "status": "M",
@@ -170,6 +430,10 @@
   {
     "status": "M",
     "path": "crmeb/app/api/controller/v2/wechat/WechatController.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/api/middleware/CustomerMiddleware.php"
   },
   {
     "status": "M",
@@ -189,15 +453,251 @@
   },
   {
     "status": "D",
+    "path": "crmeb/app/dao/activity/StoreActivityDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/bargain/StoreBargainDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/bargain/StoreBargainUserDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/bargain/StoreBargainUserHelpDao.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/dao/activity/coupon/StoreCouponIssueDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/integral/StoreIntegralDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/integral/StoreIntegralOrderDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/integral/StoreIntegralOrderStatusDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/live/LiveAnchorDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/live/LiveGoodsDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/live/LiveRoomDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/live/LiveRoomGoodsDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/lottery/LuckLotteryDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/lottery/LuckLotteryRecordDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/lottery/LuckPrizeDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/activity/seckill/StoreSeckillDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/agent/AgentLevelDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/agent/AgentLevelTaskDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/agent/AgentLevelTaskRecordDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/agent/DivisionAgentApplyDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/agent/SpreadApplyDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/order/DeliveryServiceDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/order/OtherOrderDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/order/OtherOrderStatusDao.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/dao/order/StoreOrderDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/order/StoreOrderEconomizeDao.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/dao/product/product/StoreProductDao.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/dao/product/sku/StoreProductAttrValueDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/service/StoreServiceAuxiliaryDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/service/StoreServiceDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/service/StoreServiceFeedbackDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/service/StoreServiceLogDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/service/StoreServiceRecordDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/service/StoreServiceSpeechcraftDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/system/AppVersionDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/system/SystemSignRewardDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/system/SystemUserLevelDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/system/store/SystemStoreDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/system/store/SystemStoreStaffDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/MemberCardBatchDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/MemberCardDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/MemberRightDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/MemberShipDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/UserBrokerageDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/UserBrokerageFrozenDao.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/dao/user/UserDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/UserExtractDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/UserFriendsDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/UserLevelDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/UserMoneyDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/UserRechargeDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/UserSignDao.php"
+  },
+  {
+    "status": "D",
     "path": "crmeb/app/dao/user/UserSpreadDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/UserUserBillDao.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/dao/user/UserUserBrokerageDao.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/dao/user/UserWechatUserDao.php"
   },
   {
     "status": "M",
     "path": "crmeb/app/event.php"
   },
   {
+    "status": "D",
+    "path": "crmeb/app/jobs/AgentJob.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/jobs/LiveJob.php"
+  },
+  {
     "status": "M",
     "path": "crmeb/app/jobs/OrderJob.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/jobs/OtherOrderJob.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/jobs/PosterJob.php"
   },
   {
     "status": "M",
@@ -218,6 +718,18 @@
   {
     "status": "D",
     "path": "crmeb/app/jobs/UpgradeJob.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/kefuapi/KefuApiExceptionHandle.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/kefuapi/README.md"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/kefuapi/config/route.php"
   },
   {
     "status": "D",
@@ -248,8 +760,24 @@
     "path": "crmeb/app/kefuapi/controller/User.php"
   },
   {
-    "status": "M",
+    "status": "D",
+    "path": "crmeb/app/kefuapi/middleware/KefuAuthTokenMiddleware.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/kefuapi/provider.php"
+  },
+  {
+    "status": "D",
     "path": "crmeb/app/kefuapi/route/route.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/kefuapi/validate/LoginValidate.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/kefuapi/validate/SpeechcraftValidate.php"
   },
   {
     "status": "M",
@@ -285,19 +813,343 @@
   },
   {
     "status": "D",
+    "path": "crmeb/app/listener/user/UserLevelListener.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/StoreActivity.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/bargain/StoreBargain.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/bargain/StoreBargainUser.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/bargain/StoreBargainUserHelp.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/integral/StoreIntegral.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/integral/StoreIntegralOrder.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/integral/StoreIntegralOrderStatus.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/live/LiveAnchor.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/live/LiveGoods.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/live/LiveRoom.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/live/LiveRoomGoods.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/lottery/LuckLottery.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/lottery/LuckLotteryRecord.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/lottery/LuckPrize.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/activity/seckill/StoreSeckill.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/agent/AgentLevel.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/agent/AgentLevelTask.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/agent/AgentLevelTaskRecord.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/agent/DivisionAgentApply.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/agent/SpreadApply.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/order/DeliveryService.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/order/OtherOrder.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/order/OtherOrderStatus.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/model/order/StoreOrder.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/order/StoreOrderEconomize.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/model/product/sku/StoreProductAttrValue.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/service/StoreService.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/service/StoreServiceFeedback.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/service/StoreServiceLog.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/service/StoreServiceRecord.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/service/StoreServiceSpeechcraft.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/system/AppVersion.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/system/SystemSignReward.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/system/SystemUserLevel.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/system/SystemUserTask.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/system/store/SystemStore.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/system/store/SystemStoreStaff.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/user/MemberCard.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/user/MemberCardBatch.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/user/MemberRight.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/user/MemberShip.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/model/user/User.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/user/UserBrokerage.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/user/UserBrokerageFrozen.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/user/UserExtract.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/user/UserFriends.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/user/UserLevel.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/user/UserMoney.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/user/UserRecharge.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/model/user/UserSign.php"
+  },
+  {
+    "status": "D",
     "path": "crmeb/app/model/user/UserSpread.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/outapi/controller/Mcp.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/outapi/controller/StoreProduct.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/outapi/controller/User.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/outapi/controller/UserLevel.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/outapi/route/route.php"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/app/services/CoreStore.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/StoreActivityServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/bargain/StoreBargainServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/bargain/StoreBargainUserHelpServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/bargain/StoreBargainUserServices.php"
   },
   {
     "status": "M",
     "path": "crmeb/app/services/activity/coupon/StoreCouponIssueServices.php"
   },
   {
+    "status": "M",
+    "path": "crmeb/app/services/activity/coupon/StoreCouponUserServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/integral/StoreIntegralOrderServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/integral/StoreIntegralOrderStatusServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/integral/StoreIntegralServices.php"
+  },
+  {
     "status": "D",
     "path": "crmeb/app/services/activity/integral/StorePointRecordServices.php"
   },
   {
-    "status": "M",
+    "status": "D",
+    "path": "crmeb/app/services/activity/live/LiveAnchorServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/live/LiveGoodsServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/live/LiveRoomGoodsServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/live/LiveRoomServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/lottery/LuckLotteryRecordServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/lottery/LuckLotteryServices.php"
+  },
+  {
+    "status": "D",
     "path": "crmeb/app/services/activity/lottery/LuckPrizeServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/activity/seckill/StoreSeckillServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/admin/StoreManageServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/agent/AgentLevelServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/agent/AgentLevelTaskRecordServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/agent/AgentLevelTaskServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/agent/AgentManageServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/agent/DivisionAgentApplyServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/agent/DivisionServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/agent/SpreadApplyServices.php"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/app/services/diy/DiyCompatibilityServices.php"
   },
   {
     "status": "M",
@@ -312,8 +1164,48 @@
     "path": "crmeb/app/services/diy/ThemeServices.php"
   },
   {
-    "status": "M",
+    "status": "D",
+    "path": "crmeb/app/services/kefu/KefuServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/kefu/LoginServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/kefu/ProductServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/kefu/UserServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/kefu/service/StoreServiceAuxiliaryServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/kefu/service/StoreServiceFeedbackServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/kefu/service/StoreServiceLogServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/kefu/service/StoreServiceRecordServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/kefu/service/StoreServiceServices.php"
+  },
+  {
+    "status": "D",
     "path": "crmeb/app/services/kefu/service/StoreServiceSpeechcraftCateServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/kefu/service/StoreServiceSpeechcraftServices.php"
   },
   {
     "status": "M",
@@ -321,7 +1213,47 @@
   },
   {
     "status": "M",
+    "path": "crmeb/app/services/message/notice/RoutineTemplateListService.php"
+  },
+  {
+    "status": "M",
     "path": "crmeb/app/services/message/notice/SmsService.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/message/notice/SystemMsgService.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/message/notice/WechatTemplateListService.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/message/wechat/MessageServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/order/DeliveryServiceServices.php"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/app/services/order/OrderCouponCalculator.php"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/app/services/order/OrderFreightCalculator.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/order/OtherOrderServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/order/OtherOrderStatusServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/order/OutStoreOrderRefundServices.php"
   },
   {
     "status": "M",
@@ -340,8 +1272,32 @@
     "path": "crmeb/app/services/order/StoreOrderDeliveryServices.php"
   },
   {
+    "status": "D",
+    "path": "crmeb/app/services/order/StoreOrderEconomizeServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/order/StoreOrderInvoiceServices.php"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/app/services/order/StoreOrderPresentationServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/order/StoreOrderRefundServices.php"
+  },
+  {
     "status": "M",
     "path": "crmeb/app/services/order/StoreOrderServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/order/StoreOrderSplitServices.php"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/app/services/order/StoreOrderStatisticsServices.php"
   },
   {
     "status": "M",
@@ -352,16 +1308,60 @@
     "path": "crmeb/app/services/order/StoreOrderTakeServices.php"
   },
   {
+    "status": "D",
+    "path": "crmeb/app/services/order/StoreOrderWriteOffServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/other/export/ExportServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/pay/OrderOfflineServices.php"
+  },
+  {
     "status": "M",
     "path": "crmeb/app/services/pay/OrderPayServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/pay/PayNotifyServices.php"
   },
   {
     "status": "M",
     "path": "crmeb/app/services/pay/PayServices.php"
   },
   {
+    "status": "D",
+    "path": "crmeb/app/services/pay/PayTransferNotifyServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/pay/RechargeServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/pay/YuePayServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/pc/CartServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/pc/HomeServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/pc/ProductServices.php"
+  },
+  {
     "status": "M",
     "path": "crmeb/app/services/product/product/StoreProductServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/product/sku/StoreProductAttrServices.php"
   },
   {
     "status": "M",
@@ -377,11 +1377,39 @@
   },
   {
     "status": "M",
+    "path": "crmeb/app/services/statistic/TradeStatisticServices.php"
+  },
+  {
+    "status": "M",
     "path": "crmeb/app/services/statistic/UserStatisticServices.php"
   },
   {
     "status": "D",
+    "path": "crmeb/app/services/system/AppVersionServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/system/DataMigrationServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/system/SystemSignRewardServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/system/SystemUserLevelServices.php"
+  },
+  {
+    "status": "D",
     "path": "crmeb/app/services/system/UpgradeServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/system/admin/SystemAdminServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/system/config/SystemConfigServices.php"
   },
   {
     "status": "M",
@@ -396,8 +1424,64 @@
     "path": "crmeb/app/services/system/log/SystemFileServices.php"
   },
   {
+    "status": "D",
+    "path": "crmeb/app/services/system/store/SystemStoreServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/system/store/SystemStoreStaffServices.php"
+  },
+  {
     "status": "M",
     "path": "crmeb/app/services/user/LoginServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/OutUserLevelServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/user/OutUserServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/user/UserBillServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/UserBrokerageFrozenServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/UserBrokerageServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/user/UserCancelServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/UserExtractServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/UserFriendsServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/user/UserInvoiceServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/UserLevelServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/UserMoneyServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/UserRechargeServices.php"
   },
   {
     "status": "M",
@@ -405,7 +1489,71 @@
   },
   {
     "status": "D",
+    "path": "crmeb/app/services/user/UserSignServices.php"
+  },
+  {
+    "status": "D",
     "path": "crmeb/app/services/user/UserSpreadServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/UserUserBillServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/UserUserBrokerageServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/user/UserWechatuserServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/member/MemberCardBatchServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/member/MemberCardServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/member/MemberRightServices.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/app/services/user/member/MemberShipServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/wechat/RoutineServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/wechat/WechatReplyServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/app/services/wechat/WechatUserServices.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/config/cache.php"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/config/core_store_removed_pages.json"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/config/pay.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/config/upgrade.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/config/view.php"
   },
   {
     "status": "M",
@@ -417,6 +1565,46 @@
   },
   {
     "status": "D",
+    "path": "crmeb/crmeb/services/AliPayService.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/crmeb/services/UpgradeOpenApiService.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/crmeb/services/UpgradeService.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/crmeb/services/app/MiniProgramService.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/crmeb/services/easywechat/Application.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/crmeb/services/easywechat/wechatlive/ProgramProvider.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/crmeb/services/easywechat/wechatlive/ProgramWechatLive.php"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/crmeb/services/pay/Pay.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/crmeb/services/pay/storage/AliPay.php"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/crmeb/services/pay/storage/AllinPay.php"
+  },
+  {
+    "status": "D",
     "path": "crmeb/crmeb/services/workerman/chat/ChatHandle.php"
   },
   {
@@ -425,11 +1613,2155 @@
   },
   {
     "status": "M",
+    "path": "crmeb/public/admin/index.html"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/app.01a47a3d.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/app.0281f07e.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-028b4b2c.89ce03ea.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-0333f81c.058d8fb8.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-03de104d.0da27dd5.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-0553e0d0.e578b0e6.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-07bd1a6d.8376e466.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-08c29d8f.5cd78c7a.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-09308138.712926a5.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-0cf2103c.3b282c0b.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-0de657ad.0d4bf0b2.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-0df9a19d.9535d490.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-0e1e2ddf.2fa3e520.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-0e4ba14e.b7cedfb9.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-0ea27dd3.b3743fe7.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-110b600d.579c3d52.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-15881117.02c85ccd.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-15ad8a16.1f6ebadf.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-1835ef2f.933065b7.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-1978ae79.27fc301a.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-1a357582.c8a7f39c.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-1ca20f86.2da0c9e3.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-5935c9b4.bd881dbf.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-200b0045.a8b0b525.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-203749f0.0a5244b9.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-21499eac.638969ed.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-21ff7bed.83c0d64d.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-229f1bb3.07ffe4ef.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-2323bac2.848fd8ab.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-236963f0.27bb0a5c.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-27e552c0.501d13b2.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-28987d5a.8098219f.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-28a2522b.314a7b42.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-2982d216.0e64c89b.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-518bc085.239fd983.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-2ad1da51.87d2dc7e.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-685f38c4.70f553ba.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-2b1e3abd.a6fae69f.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-2c032dc6.d7905c62.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-2e6af1b8.2a6c9d33.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-2f0e8035.2ff0f70d.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-2f50113c.a9a90fb0.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-305a9162.bfa38507.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-32906402.db28760f.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-34720fc9.573a961c.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-35dde0c4.a004a430.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-38f11f9e.e9cf385c.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-ebf8ee4a.551aaf9e.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-39290f9e.551aaf9e.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-39e9c2c5.24c2f227.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-3a23578a.848619a3.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-3e7b0c90.3e1000a3.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-3f042e9c.a9ba2ae4.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-411d1500.407b816d.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-42586c26.f600d762.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-42926c40.59c69f35.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-461920ef.fad6cbb4.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-4624317b.3bc827dc.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-47e9925d.cfda26d8.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-4832a97b.2246ebf5.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-49ef3d24.631c639d.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-4a392eb4.e302bcd7.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-61bdee03.eee677ab.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-4ac94756.eee677ab.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-4c872661.ade25099.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-4e76bac0.69c9add3.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-4ebcecd8.295061fd.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-4efe87d9.9b4476bb.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-5ba9780d.27b2e184.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-4fb495f5.27d8313b.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-50c88a48.44f3ebf6.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-510dcfca.24941b45.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-51781cf6.1620e254.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-52101e3f.0fdc9f9e.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-53af4ed8.4478e130.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-57ae5730.f71d9530.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-5bf4eae8.a5fd1b1e.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-5e8b0e2c.f25bd58f.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-5f0bbf6c.ac21b6e2.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-5f0e1460.e08f0c5e.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-5fc1fc43.8487e74e.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-6105c1a1.b357639b.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-624935ee.70bbf5e2.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-625a0916.d2b35420.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-5b2cb482.b2c160e0.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-629ae58c.0d37eb52.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-63d13fcc.1ede9393.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-63d5c550.d260ab7e.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-1be369b6.1fed2160.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-693a7c8c.ccd00734.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-69ae4943.18c3463a.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-6c577356.5b040ef4.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-6db89f9c.b1d26b09.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-6e9219bc.4ee40667.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-6fbc9cbc.4d7bb00d.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-7224f61f.f9d596bc.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-7447a014.ff56f0fb.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-74a0d8e8.614d30fc.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-017f7eea.98b74f0b.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-74a3dc7e.98b74f0b.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-74cac8f9.5ad543ee.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-75eb0ae8.763fe3d1.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-778d58da.aa313961.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-7879a10e.58085071.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-78aacae6.4c3bb0a4.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-7a7af76c.37d8ac72.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-7be2d49a.361911d4.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-7c8e8302.cffdbeeb.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-7dc500f2.642d7f86.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-7f0b7777.1fb39fc1.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-7fc65c40.d1f9565a.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-691f3f56.a9d53dbc.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-7ff5f4ee.ee7357a6.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-817230c2.741456b7.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-9a643230.8372c981.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-823cb4d8.1450fd22.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-87b84518.5ec2aaac.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-892da1c0.ee03b67c.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-8ef1f4ee.4c1f52b7.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-95f5141a.d15002c6.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-9eee8310.b83b3af3.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-9f54d040.7bda4bed.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-a0765e7e.24f7608c.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-752bbbcb.8c2aef82.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-a0ba7194.eb92d3bd.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-a398020e.7c8dbac4.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-ad168248.12940760.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-ae431d92.03183198.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-bc4986ce.bc57d671.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-bdc7e6c8.2708d59d.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-c0d6a60e.5117b167.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-c1b415d0.58d2a925.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-4b9a8554.0ce16dd8.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-c39c1468.0ce16dd8.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-20004f16.be608306.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-cd8f8b7c.be608306.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-d5256d5e.5240d79f.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-d5c3023e.8e79f0ef.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-15b0ba3c.a1488b4b.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-d5ca0fc2.7e1c31e1.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-d7091734.f40b4159.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-d7e22b4e.d4c53b54.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-de638b88.0eb691e4.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-de6be648.52f0ef59.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-df06347e.6e2cfeac.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-e0fc4244.8d1a1c9f.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-e317e47c.2fd266e3.css"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/css/chunk-24396f14.24c9b63b.css",
+    "path": "crmeb/public/admin/system_static/css/chunk-e642cd4c.694db097.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-ea228ade.3ad3228b.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-ecdb5702.7eb15664.css"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/css/chunk-f86f0152.58236d71.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-f89b6710.26c0d127.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-f9ca619a.09568d84.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/css/chunk-fc01ca50.f886e744.css"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/bg.ee41a758.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/bg2.c636f6a6.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/feed-icon.99e39a74.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/kefu.6c63578f.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/kfbg_2.c2db7dc6.jpg"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/line.05bf1c84.jpg"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/logo-dark.b9962944.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/m_bg.fc451180.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/member.b885cf62.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/no_all.174e30c0.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/no_chat.b9c3e583.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/no_fh.977a0fb8.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/no_tk.401d40f4.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/no_user.a09b282b.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/no_zf.e61fe9b5.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/pricetitle.d0496d6f.jpg"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/sheet_apple_64_indexed_256colors.f99f1af2.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/sheet_emojione_64_indexed_128.5953c7ea.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/sheet_facebook_64_indexed_128.f1911246.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/sheet_google_64_indexed_128.04280c7a.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/sheet_messenger_64_indexed_128.68a885d7.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/sheet_twitter_64_indexed_128.0ebbf2e8.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/signInGift.e0d13400.png"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/sw.3ef10e8b.jpg"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/img/user_vip.7fa6644b.png"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/app.2d2022f7.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/app.d52be417.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-00542f4f.1429a5e7.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-00542f4f.1a7a28c9.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-0195425a.0164cfc2.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-0195425a.9578719f.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-028b4b2c.ab377159.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-0333f81c.c6fee219.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-03de104d.68f2b52b.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-0553e0d0.c2362ab8.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-07713c30.1dd10b4f.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-07713c30.267d7066.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-07bd1a6d.ee98da47.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-08c29d8f.c374fbf6.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-09308138.f6c41f11.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-0b4b6516.df4a7cba.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-0b4b6516.6a888b8a.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-0cc2dae9.caaa9af9.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-0cc2dae9.02bc7091.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-0cf2103c.f9f75759.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-0d01acc8.f4d2c8e7.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-0d01acc8.e34df06f.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-0de657ad.cd6ed2ef.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-0df9a19d.7e7ea57c.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-0e1e2ddf.c885431b.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-0e4ba14e.88fec3fe.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-0ea27dd3.6fbdae2e.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-0f5d378e.8abfd4c7.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-0f5d378e.e1e6caac.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-110b600d.08aea341.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-121f1779.ae7f6df4.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-121f1779.7a8090c1.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-142b9562.02805006.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-142b9562.31f37ce4.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-143da3aa.35cba1cf.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-143da3aa.3bc320a6.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-1493f05c.b21efcf8.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-1493f05c.85574058.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-15881117.40197f4e.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-15ad8a16.15136e89.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-15b0ba3c.d1b12c89.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-181f18a8.c5b80420.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-181f18a8.e7c68dad.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-1835ef2f.2dfd8723.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-191b7e90.2c0ec822.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-191b7e90.6b3746d4.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-1978ae79.f7376bce.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-1a357582.313877a5.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-1be369b6.cf787b32.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-1ca20f86.363a359f.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-1e68bb52.c1d4d506.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-1e68bb52.fd17c254.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-20004f16.cae32880.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-200b0045.63a810b8.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-203749f0.d2d73c05.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-20d83652.6b26f6d1.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-20d83652.e8684198.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-21499eac.57fa6726.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-219ab9ee.2abc8ae1.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-219ab9ee.4fb06e3a.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-21ff7bed.bf5be5db.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-229f1bb3.bfbc3bdb.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-2323bac2.e883a714.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-23374e14.27526461.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-23374e14.aa4a2eab.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-236963f0.eb9ad8ec.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-24396f14.de9f0959.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-25af6642.57877258.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-25af6642.6a66cefb.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-279725c3.973582ee.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-279725c3.87d5f075.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-27e552c0.f4603c8a.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-280614e9.37deb9be.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-280614e9.ee026c53.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-28987d5a.07c153f7.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-28a2522b.7706df4f.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-28d55445.5f56ad62.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-28d55445.d4651332.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-2982d216.6585ff37.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-29df8074.d917cb0c.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-29df8074.0f20d356.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-518bc085.23c6e7d0.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-2ad1da51.34125fe7.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-2b1e3abd.ff8abd08.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-2c032dc6.0197412a.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-2d0ab8b4.a13a2367.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-2d0ab8b4.7fb0b905.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-2d0c4a7f.c3050ed8.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-2d0c4a7f.64965133.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-2d0c8a73.5f2d4edf.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-2d0c8a73.c9dfe4c9.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-2d0e488e.32b5637e.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-2d0e5357.b7e236af.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-2d207af7.bbde4518.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-2d207f67.a4cfd1b1.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-2d21afa5.3959f2d4.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-2d21afa5.209e3f3e.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-2d229c13.b4fd82c0.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-2d229c13.c4b42fa6.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-2d22c8ff.e25d5c92.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-2d230494.dcf5b4ed.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-2d237c92.06725538.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-2d237c92.e0bae638.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-2e6af1b8.4cc568f8.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-2ef8f87b.ae82e7a7.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-2ef8f87b.95157a6e.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-2f0e8035.005e5eae.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-2f50113c.a833c934.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-305a9162.9936497d.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-32906402.0a3febc6.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-33a0fffa.63d9826e.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-33a0fffa.fa804a1c.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-34720fc9.21f01045.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-35dde0c4.506c1dab.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-37f847a4.56054b50.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-37f847a4.36664b24.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-3899d053.8f8b32e3.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-3899d053.c60658ab.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-38f11f9e.81d33624.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-39290f9e.8e93d8cd.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-39e9c2c5.a7693de6.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-3a23578a.e07be8d0.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-3c32d0db.602a4037.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-3c32d0db.5c2d8dd3.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-3e51b856.526fb1f9.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-3e51b856.aac28889.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-3e7b0c90.83ba9334.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-3f042e9c.682e5088.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-411d1500.c884d9ec.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-42586c26.3dace7e4.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-42926c40.f38b734b.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-42f96402.6a699e71.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-42f96402.a146c589.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-4492fabf.5d01bad6.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-4492fabf.68e35049.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-45f4109e.32d0873f.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-45f4109e.08acafff.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-461920ef.553340a2.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-4624317b.e73af8da.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-46a69e16.4ebf684b.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-46a69e16.a22ff000.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-47e9925d.29495bf7.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-4832a97b.3c27baec.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-49378f5a.4a7ffc64.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-49378f5a.fbc9880d.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-49ef3d24.39df6885.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-4a392eb4.62a60b77.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-4ac94756.9fb6d0c8.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-4b46909a.f3b2068b.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-4b46909a.072a049b.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-4b9a8554.5ab528ea.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-4c872661.967b34b5.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-4e45f7d8.03dc53f0.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-4e45f7d8.607d1bfa.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-4e76bac0.74755f20.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-4ebcecd8.d0f9a433.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-4efe87d9.182036c7.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-4fb495f5.59f029d1.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-5003d37a.2b9573b2.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-5003d37a.b804a491.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-50c88a48.afdaf6e1.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-510dcfca.add07936.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-51781cf6.3813447c.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-51e38925.69675543.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-51e38925.78be7ff4.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-52101e3f.540cf310.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-53af4ed8.6164b1c8.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-54c41076.84ae2c3c.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-54c41076.ecc92ab0.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-568f33be.2c4d8de0.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-568f33be.ca22a882.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-57ae5730.4c4a2f8c.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-58c32c79.28ef0bcf.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-58c32c79.9b7f3ddb.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-5935c9b4.84ca333e.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-59dfd6af.0dd39d91.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-59dfd6af.dd5150cf.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-5b0c00b0.e79996fe.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-5b0c00b0.6cf7e589.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-5b2cb482.63234661.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-5ba9780d.9b26ef6a.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-5baca8e0.4fbd7119.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-5baca8e0.d8822e63.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-5bf4eae8.a19a8177.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-5c0622ac.0f7eafc2.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-5d7429bb.f402f187.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-5d7429bb.eb710578.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-5e8b0e2c.b0a47d07.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-5f0bbf6c.1a7d4dcc.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-5f0e1460.630e4aa7.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-5fc1fc43.e3a03367.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-5fda057a.e74986f5.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-5fda057a.fee8c13e.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-5ff856ce.a2c54c9a.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-5ff856ce.f5f61ab8.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-608fe066.7be80c35.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-608fe066.984caf71.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-6105c1a1.4b6a84ab.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-61bdee03.4a9c0675.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-624935ee.f28ab9fd.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-625a0916.bd39f243.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-629ae58c.e646a765.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-633ab804.d9037ced.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-633ab804.9fd78b23.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-63d13fcc.2c261d67.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-63d5c550.786d5c72.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-655f8b43.97d15d60.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-655f8b43.a0aef792.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-6586d4a8.1f492d83.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-6586d4a8.af0e6f3a.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-67c9ad31.95d0654b.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-67c9ad31.d6f31165.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-67f97ff8.05ade843.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-67f97ff8.44722041.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-685f38c4.d0e776d9.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-691f3f56.8a78b93d.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-693a7c8c.ad73aeeb.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-69ae4943.7775d7f8.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-69c05e50.6654a271.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-69c05e50.75d072f7.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-6bd36fb9.e191340b.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-6bd36fb9.5c75a7bd.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-6c577356.b44bf5a7.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-6d02b352.0be93bc3.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-6db89f9c.723c442f.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-6dd25960.4cab0b0b.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-6dd25960.fb479d61.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-6e01cc10.34612521.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-6e01cc10.c3478535.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-6e2c2167.69ba8a96.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-6e2c2167.70569e8f.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-6e9219bc.8802aaca.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-6edd489a.09093957.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-6edd489a.4ff0e442.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-6f3421f8.0a02d2a6.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-6f3421f8.bb78e77e.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-6f60f314.cfa60f76.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-6f60f314.dd5b7acc.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-6f738938.133464b5.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-6f738938.9d9bb9c4.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-6fbc9cbc.e4bfa187.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-70c44ef4.2185fcc2.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-70c44ef4.a6cdaa09.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-71e3b3c3.da1149f2.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-71e3b3c3.9c00f97c.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-72222d2b.de502ab7.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-72222d2b.11deeca2.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-7224f61f.90501f5d.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-7447a014.0a535bb6.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-74a0d8e8.997a5025.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-017f7eea.6c4ac653.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-74a3dc7e.023bada0.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-74cac8f9.67f54f30.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-752bbbcb.29a0d6b8.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-75eb0ae8.0aa5ac20.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-778d58da.b8119347.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-7879a10e.37b848a2.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-78aacae6.36968b86.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-78f20d48.1f0e9fda.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-78f20d48.45e06b28.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-7a7af76c.321191a0.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-7ac4096e.7f2f91a5.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-7ac4096e.bbb17779.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-7af6120b.0c0d7039.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-7af6120b.2e42a84b.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-7be2d49a.6d310da1.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-7c8e8302.e5c1e3ed.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-7cb36b7b.413f9787.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-7cb36b7b.c260a480.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-7dc500f2.01acc016.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-7f0b7777.0c9d8d4d.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-7fc65c40.2a68d04c.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-7fd3c2e5.768cd7a2.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-7fd3c2e5.b126b15a.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-7ff5f4ee.c5e79d05.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-817230c2.4924236d.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-823cb4d8.db1d0a94.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-87b84518.4bf5b46e.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-892da1c0.43c252ca.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-8af7aa2e.96dbe41e.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-8e59b1b2.d18c5a37.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-8e59b1b2.d28bdc92.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-8ef1f4ee.8df8b317.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-936cf2b8.35647a8e.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-936cf2b8.a6210c15.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-94db83d2.69f32b00.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-94db83d2.6c931fd4.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-95f5141a.8ca4f60e.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-9a643230.d671e086.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-9eee8310.5b8c5d2b.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-9f54d040.736c1b5a.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-a0765e7e.218f8263.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-a0ba7194.dbd70fda.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-a398020e.e1c814c3.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-ad168248.48072eb6.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-ae431d92.6a040970.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-aede492a.07014d5b.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-aede492a.e74dbbc1.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-bc4986ce.82beb3d8.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-bdc7e6c8.015b9a18.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-bf085602.d3614fa0.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-bf085602.bf9731ef.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-c0d6a60e.4ffe2f88.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-c1b415d0.a7a1cf28.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-c393d16a.2f4f5515.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-c393d16a.9ad3dcf7.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-c39c1468.1b8f6079.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-c3d42964.35bf9f00.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-c3d42964.4ca36a38.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-234cff3c.83199dea.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-c87337fa.28919a37.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-cd5e0b88.b7a1ea40.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-cd5e0b88.b8f82bc1.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-cd8f8b7c.40f2eede.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-d05ce344.efc015ff.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-d05ce344.f38d8d93.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-d5256d5e.64472272.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-d5c3023e.c8c84773.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-d5ca0fc2.c03ec52f.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-d7091734.c23dc4f0.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-d7e22b4e.a87a90a3.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-da6292f8.c2ac32eb.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-da6292f8.73475616.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-de638b88.7e7f9685.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-de6be648.1d6382c0.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-df06347e.b1cebb6f.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-e058b1fe.ece58f17.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-e0fc4244.ebb20978.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-e317e47c.d05dd3ab.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-e642cd4c.de3ae90f.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-ea228ade.ee89670b.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-ebf8ee4a.5ab8a4f8.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-ec3869c0.6a7271f4.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-ecdb5702.f64143a7.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-ef95ebee.cd1be64a.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-ef95ebee.d30e9a80.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-f3e60934.764e9276.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-f3e60934.46e80c0a.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-f4a4b6ea.cf1230a8.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-f4a4b6ea.985412f7.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-f86f0152.ca157fa4.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-f89b6710.67cfc262.js"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/public/admin/system_static/js/chunk-f945a06a.4310df25.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-f945a06a.f059f60a.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-f9ca619a.0735e9b5.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/js/chunk-fc01ca50.2e6ae530.js"
+  },
+  {
+    "status": "R",
+    "from": "crmeb/public/admin/system_static/js/chunk-vendors.3683c14e.js",
+    "path": "crmeb/public/admin/system_static/js/chunk-vendors.66401c7d.js"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/media/notice.367f95a9.mp3"
+  },
+  {
+    "status": "D",
+    "path": "crmeb/public/admin/system_static/media/notice.51a07ae7.wav"
+  },
+  {
+    "status": "M",
+    "path": "crmeb/public/install/crmeb.sql"
+  },
+  {
+    "status": "M",
     "path": "crmeb/route/route.php"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/upgrade/core-store/README.md"
+  },
+  {
+    "status": "A",
+    "path": "crmeb/upgrade/core-store/drop-retired.php"
+  },
+  {
+    "status": "A",
+    "path": "deploy/production/README.md"
+  },
+  {
+    "status": "M",
+    "path": "deploy/production/compose.yml"
+  },
+  {
+    "status": "M",
+    "path": "deploy/production/migrate-all-in-one.sh"
   },
   {
     "status": "M",
     "path": "deploy/production/nginx.conf"
+  },
+  {
+    "status": "A",
+    "path": "deploy/production/normalize.sh"
+  },
+  {
+    "status": "A",
+    "path": "deploy/production/rollback.sh"
+  },
+  {
+    "status": "A",
+    "path": "docker/cache-assets.sh"
+  },
+  {
+    "status": "A",
+    "path": "docker/entrypoint.sh"
+  },
+  {
+    "status": "A",
+    "path": "docker/ready.php"
+  },
+  {
+    "status": "M",
+    "path": "docker/regression/compose.yml"
+  },
+  {
+    "status": "A",
+    "path": "docker/regression/mysql-client.cnf"
+  },
+  {
+    "status": "A",
+    "path": "docker/regression/test.constant"
+  },
+  {
+    "status": "A",
+    "path": "docker/release.Dockerfile"
+  },
+  {
+    "status": "M",
+    "path": "docker/run-regression.sh"
+  },
+  {
+    "status": "A",
+    "path": "docker/upgrade-drill.sh"
+  },
+  {
+    "status": "M",
+    "path": "docker/verify-http-stack.sh"
+  },
+  {
+    "status": "M",
+    "path": "docker/verify-image.sh"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-baseline.json"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-files.json"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-reduction.md"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-removed-pages.json"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-removed-routes.json"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-result.json"
+  },
+  {
+    "status": "A",
+    "path": "docs/core-store-shared-retained.json"
+  },
+  {
+    "status": "A",
+    "path": "docs/maintenance/architecture.md"
+  },
+  {
+    "status": "A",
+    "path": "docs/maintenance/build-release.md"
+  },
+  {
+    "status": "A",
+    "path": "docs/maintenance/inventory.json"
+  },
+  {
+    "status": "A",
+    "path": "docs/maintenance/progress.md"
+  },
+  {
+    "status": "A",
+    "path": "docs/maintenance/request-audit.json"
+  },
+  {
+    "status": "A",
+    "path": "scripts/assemble-release.cjs"
+  },
+  {
+    "status": "A",
+    "path": "scripts/build-admin.sh"
+  },
+  {
+    "status": "A",
+    "path": "scripts/build-release.sh"
+  },
+  {
+    "status": "A",
+    "path": "scripts/build-uni.sh"
+  },
+  {
+    "status": "A",
+    "path": "scripts/check-maintenance.sh"
+  },
+  {
+    "status": "A",
+    "path": "scripts/finalize-release.cjs"
+  },
+  {
+    "status": "A",
+    "path": "scripts/verify-release.cjs"
+  },
+  {
+    "status": "A",
+    "path": "template/admin/.nvmrc"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/package.json"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/api/agent.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/api/app.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/api/common.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/api/diy.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/api/export.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/api/finance.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/api/kefu.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/api/kefu_mobile.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/api/live.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/api/lottery.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/api/marketing.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/api/membershipLevel.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/api/order.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/api/product.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/api/setting.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/api/statistic.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/api/system.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/api/user.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/components/customerInfo/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/dateRadio/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/components/goodsList/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/components/linkaddress/index.vue"
   },
   {
     "status": "D",
@@ -438,6 +3770,14 @@
   {
     "status": "D",
     "path": "template/admin/src/components/mobileConfig/c_home_seckill.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobileConfig/c_home_store_list.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/components/mobileConfig/c_member.vue"
   },
   {
     "status": "M",
@@ -450,6 +3790,14 @@
   {
     "status": "D",
     "path": "template/admin/src/components/mobileConfig/c_points_mall.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobileConfig/c_ranking.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/mobileConfig/c_short_video.vue"
   },
   {
     "status": "D",
@@ -472,6 +3820,10 @@
     "path": "template/admin/src/components/mobilePage/home_paid_vip.vue"
   },
   {
+    "status": "M",
+    "path": "template/admin/src/components/mobilePage/home_product_service.vue"
+  },
+  {
     "status": "D",
     "path": "template/admin/src/components/mobilePage/home_seckill.vue"
   },
@@ -492,8 +3844,56 @@
     "path": "template/admin/src/components/mobilePage/wechat_live.vue"
   },
   {
+    "status": "D",
+    "path": "template/admin/src/components/quill/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/referrerInfo/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/searchFrom/referrerInfo/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/searchFrom/searchFrom.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/systemStore/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/components/ueditorFrom/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/layout/navBars/breadcrumb/userNews.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/libs/api.request.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/libs/dialog.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/libs/request.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/libs/socket.js"
+  },
+  {
     "status": "M",
     "path": "template/admin/src/main.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/account/login/index.vue"
   },
   {
     "status": "D",
@@ -501,7 +3901,31 @@
   },
   {
     "status": "D",
+    "path": "template/admin/src/pages/agent/handle/promotersList.vue"
+  },
+  {
+    "status": "D",
     "path": "template/admin/src/pages/agent/spread/apply.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/app/app/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/app/version/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/app/wechat/user/handle/sendOut.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/cms/article/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/cms/article/relation.vue"
   },
   {
     "status": "D",
@@ -529,11 +3953,39 @@
   },
   {
     "status": "D",
+    "path": "template/admin/src/pages/finance/billingRecords/orderDetall.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/finance/commission/handle/commissionDetails.vue"
+  },
+  {
+    "status": "D",
     "path": "template/admin/src/pages/finance/commission/index.vue"
   },
   {
     "status": "D",
+    "path": "template/admin/src/pages/finance/financialRecords/bill/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/finance/financialRecords/recharge/index.vue"
+  },
+  {
+    "status": "D",
     "path": "template/admin/src/pages/finance/userExtract/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/index/components/gridMenu.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/index/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/appChat/feedback.vue"
   },
   {
     "status": "D",
@@ -549,11 +4001,39 @@
   },
   {
     "status": "D",
+    "path": "template/admin/src/pages/kefu/components/Loading.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/components/PriceChange.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/components/empty.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/components/words.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/components/writeOff.vue"
+  },
+  {
+    "status": "D",
     "path": "template/admin/src/pages/kefu/index.vue"
   },
   {
     "status": "D",
     "path": "template/admin/src/pages/kefu/mobile/chat_list.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/mobile/goods/detail.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/mobile/goods/list.vue"
   },
   {
     "status": "D",
@@ -565,11 +4045,107 @@
   },
   {
     "status": "D",
+    "path": "template/admin/src/pages/kefu/mobile/orderList/orderDelivery.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/mobile/orderList/orderDetail.vue"
+  },
+  {
+    "status": "D",
     "path": "template/admin/src/pages/kefu/mobile/user/index.vue"
   },
   {
     "status": "D",
+    "path": "template/admin/src/pages/kefu/mobile/user/userLabel.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/pc/components/baseHeader.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/pc/components/chatList.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/pc/components/delivery.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/pc/components/emoji.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/pc/components/goods_detail.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/pc/components/msgWindow.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/pc/components/order_detail.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/pc/components/remarks.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/pc/components/rightMenu.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/pc/components/transfer.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/pc/components/userGroup.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/pc/components/userLabel.vue"
+  },
+  {
+    "status": "D",
     "path": "template/admin/src/pages/kefu/pc/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/static/bg.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/static/feedback.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/static/msg.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/static/search.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/static/tool-01.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/static/tool-02.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/static/tool-03.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/kefu/static/tool-04.png"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/marketing/channelCode/channelCodeIndex.vue"
   },
   {
     "status": "D",
@@ -578,6 +4154,18 @@
   {
     "status": "D",
     "path": "template/admin/src/pages/marketing/live/anchor.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/live/components/add_goods.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/live/components/goods_detail.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/live/components/live_detail.vue"
   },
   {
     "status": "D",
@@ -593,11 +4181,23 @@
   },
   {
     "status": "D",
+    "path": "template/admin/src/pages/marketing/lottery/addGoods.vue"
+  },
+  {
+    "status": "D",
     "path": "template/admin/src/pages/marketing/lottery/config.vue"
   },
   {
     "status": "D",
     "path": "template/admin/src/pages/marketing/lottery/create.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/lottery/formRule/lotteryFrom.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/lottery/formRule/ruleShip.js"
   },
   {
     "status": "D",
@@ -652,12 +4252,80 @@
     "path": "template/admin/src/pages/marketing/storeBargain/statistics.vue"
   },
   {
+    "status": "M",
+    "path": "template/admin/src/pages/marketing/storeCombination/create.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeCoupon/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/marketing/storeCouponIssue/create.vue"
+  },
+  {
     "status": "D",
     "path": "template/admin/src/pages/marketing/storeIntegral/create.vue"
   },
   {
     "status": "D",
     "path": "template/admin/src/pages/marketing/storeIntegral/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeIntegralOrder/components/tableExpand.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeIntegralOrder/components/tableFrom.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeIntegralOrder/components/tableList.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeIntegralOrder/handle/autoSend.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeIntegralOrder/handle/orderDetails.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeIntegralOrder/handle/orderRecord.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeIntegralOrder/handle/orderRemark.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeIntegralOrder/handle/orderSend.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeIntegralOrder/handle/queueList.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeIntegralOrder/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/marketing/storeIntegralOrder/orderlistDetails.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/marketing/storePresell/create.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/marketing/storePresell/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/marketing/storePresell/presellList.vue"
   },
   {
     "status": "D",
@@ -681,11 +4349,263 @@
   },
   {
     "status": "D",
+    "path": "template/admin/src/pages/marketing/systemConfig/index.vue"
+  },
+  {
+    "status": "D",
     "path": "template/admin/src/pages/marketing/userPoint/index.vue"
   },
   {
     "status": "M",
+    "path": "template/admin/src/pages/order/invoice/orderDetall.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/order/offline/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/order/orderList/components/tableExpand.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/order/orderList/components/tableFrom.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/order/orderList/components/tableList.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/order/orderList/handle/orderDetails.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/order/orderList/handle/orderRefund.vue"
+  },
+  {
+    "status": "M",
     "path": "template/admin/src/pages/order/orderList/handle/orderSend.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/order/orderList/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/order/print/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/order/refund/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/product/components/brokerageSet.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/product/components/vipPriceSet.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/product/productAdd/components/LogisticsSetting.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/product/productAdd/components/MarketingSetting.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/product/productAdd/components/PriceCommission.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/product/productAdd/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/product/productList/components/goodsDetail.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/product/productList/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/setting/cityDada/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/setting/clerkList/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/setting/deliveryService/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/setting/devise/diyIndex.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/setting/devise/users.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/setting/membershipLevel/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/setting/setApp/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/setting/setSystem/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/setting/storeList/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/setting/storeService/autoReply.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/setting/storeService/feedback.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/setting/storeService/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/setting/storeService/speechcraft.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/setting/systemOutInterface/request.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/setting/systemStore/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/setting/verifyOrder/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/statistic/balance/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/statistic/integral/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/statistic/product/components/goodsDetail.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/statistic/transaction/components/transaction.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/statistic/user/components/userInfo.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/system/backendRouting/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/system/backendRouting/request.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/system/crossVersionUpgrade/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/system/group/list.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/system/group/pc.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/system/group/visualization.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/system/onlineUpgrade/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/user/cancel/handle/task.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/user/cancel/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/user/grade/agreement/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/user/grade/card/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/user/grade/card/list.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/user/grade/record/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/user/grade/right/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/user/grade/type/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/user/level/handle/task.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/pages/user/level/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/user/list/handle/userDetails.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/user/list/handle/userEdit.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/user/list/handle/userEditForm.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/user/list/handle/userInfo.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/user/list/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/pages/user/list/tableExpand.vue"
   },
   {
     "status": "D",
@@ -728,6 +4648,10 @@
     "path": "template/admin/src/plugin/emoji-awesome/img/sheet_twitter_64_indexed_128.png"
   },
   {
+    "status": "M",
+    "path": "template/admin/src/router/index.js"
+  },
+  {
     "status": "D",
     "path": "template/admin/src/router/modules/agent.js"
   },
@@ -753,7 +4677,15 @@
   },
   {
     "status": "M",
+    "path": "template/admin/src/router/modules/order.js"
+  },
+  {
+    "status": "M",
     "path": "template/admin/src/router/modules/setting.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/router/modules/statistic.js"
   },
   {
     "status": "M",
@@ -769,7 +4701,103 @@
   },
   {
     "status": "M",
+    "path": "template/admin/src/store/index.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/store/module/app.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/store/module/integralOrder.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/store/module/kefu.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/store/module/menus.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/store/module/upgrade.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/src/store/module/userLevel.js"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/styles/emoji-awesome/css/apple.min.css"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/styles/emoji-awesome/css/emojione.min.css"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/styles/emoji-awesome/css/facebook.min.css"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/styles/emoji-awesome/css/google.min.css"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/styles/emoji-awesome/css/messenger.min.css"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/styles/emoji-awesome/css/twitter.min.css"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/styles/emoji-awesome/img/sheet_apple_64_indexed_256colors.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/styles/emoji-awesome/img/sheet_emojione_64_indexed_128.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/styles/emoji-awesome/img/sheet_facebook_64_indexed_128.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/styles/emoji-awesome/img/sheet_google_64_indexed_128.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/styles/emoji-awesome/img/sheet_messenger_64_indexed_128.png"
+  },
+  {
+    "status": "D",
+    "path": "template/admin/src/styles/emoji-awesome/img/sheet_twitter_64_indexed_128.png"
+  },
+  {
+    "status": "A",
+    "path": "template/admin/src/utils/coreStoreAdmin.js"
+  },
+  {
+    "status": "A",
+    "path": "template/admin/src/utils/diyRegistry.js"
+  },
+  {
+    "status": "M",
+    "path": "template/admin/vue.config.js"
+  },
+  {
+    "status": "M",
     "path": "template/uni-app/App.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/api/admin.js"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/api/points_mall.js"
   },
   {
     "status": "M",
@@ -778,6 +4806,10 @@
   {
     "status": "M",
     "path": "template/uni-app/api/user.js"
+  },
+  {
+    "status": "A",
+    "path": "template/uni-app/babel.config.js"
   },
   {
     "status": "M",
@@ -841,6 +4873,14 @@
   },
   {
     "status": "M",
+    "path": "template/uni-app/package-lock.json"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/package.json"
+  },
+  {
+    "status": "M",
     "path": "template/uni-app/pages.json"
   },
   {
@@ -878,6 +4918,10 @@
   {
     "status": "M",
     "path": "template/uni-app/pages/activity/presell_details/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/admin/components/ucharts/component.vue"
   },
   {
     "status": "D",
@@ -922,6 +4966,26 @@
   {
     "status": "M",
     "path": "template/uni-app/pages/admin/statistics/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/admin/user/components/coupon/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/admin/user/components/editBalance/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/admin/user/components/filter/index.vue"
+  },
+  {
+    "status": "D",
+    "path": "template/uni-app/pages/admin/user/components/member/index.vue"
+  },
+  {
+    "status": "M",
+    "path": "template/uni-app/pages/admin/user/components/userLable/index.vue"
   },
   {
     "status": "M",
@@ -1236,6 +5300,14 @@
     "path": "template/uni-app/pages/users/user_vip_areer/index.vue"
   },
   {
+    "status": "A",
+    "path": "template/uni-app/postcss.config.js"
+  },
+  {
+    "status": "A",
+    "path": "template/uni-app/public/index.html"
+  },
+  {
     "status": "D",
     "path": "template/uni-app/subpackage/diyComponents/bargain.vue"
   },
@@ -1316,6 +5388,10 @@
     "path": "template/uni-app/subpackage/diyComponents/userInfor.vue"
   },
   {
+    "status": "A",
+    "path": "template/uni-app/utils/diyRegistry.js"
+  },
+  {
     "status": "M",
     "path": "template/uni-app/utils/index.js"
   },
@@ -1332,52 +5408,28 @@
     "path": "template/uni-app/utils/util.js"
   },
   {
+    "status": "A",
+    "path": "template/uni-app/utils/wechatPayment.js"
+  },
+  {
     "status": "M",
-    "path": "tests/regression/Cases/OrderPricingTest.php"
+    "path": "template/uni-app/vue.config.js"
+  },
+  {
+    "status": "D",
+    "path": "tests/regression/Cases/BalanceConcurrencyTest.php"
+  },
+  {
+    "status": "D",
+    "path": "tests/regression/Cases/BalanceOrderConcurrencyTest.php"
+  },
+  {
+    "status": "D",
+    "path": "tests/regression/Cases/BalancePaymentTest.php"
   },
   {
     "status": "A",
-    "path": "crmeb/app/services/CoreStore.php"
-  },
-  {
-    "status": "A",
-    "path": "crmeb/upgrade/core-store/README.md"
-  },
-  {
-    "status": "A",
-    "path": "crmeb/upgrade/core-store/migrate.php"
-  },
-  {
-    "status": "A",
-    "path": "crmeb/upgrade/core-store/removed-pages.json"
-  },
-  {
-    "status": "A",
-    "path": "docs/core-store-baseline.json"
-  },
-  {
-    "status": "A",
-    "path": "docs/core-store-files.json"
-  },
-  {
-    "status": "A",
-    "path": "docs/core-store-reduction.md"
-  },
-  {
-    "status": "A",
-    "path": "docs/core-store-removed-pages.json"
-  },
-  {
-    "status": "A",
-    "path": "docs/core-store-removed-routes.json"
-  },
-  {
-    "status": "A",
-    "path": "docs/core-store-result.json"
-  },
-  {
-    "status": "A",
-    "path": "docs/core-store-shared-retained.json"
+    "path": "tests/regression/Cases/CoreStoreAdminBoundaryTest.php"
   },
   {
     "status": "A",
@@ -1388,8 +5440,45 @@
     "path": "tests/regression/Cases/CoreStoreMigrationTest.php"
   },
   {
+    "status": "M",
+    "path": "tests/regression/Cases/GatewayNotifyContractTest.php"
+  },
+  {
+    "status": "M",
+    "path": "tests/regression/Cases/GroupedDaoSqlModeTest.php"
+  },
+  {
+    "status": "A",
+    "path": "tests/regression/Cases/HistoricalOrderCompatTest.php"
+  },
+  {
     "status": "A",
     "path": "tests/regression/Cases/NewUserCouponTest.php"
+  },
+  {
+    "status": "M",
+    "path": "tests/regression/Cases/OrderLifecycleTest.php"
+  },
+  {
+    "status": "M",
+    "path": "tests/regression/Cases/OrderPricingTest.php"
+  },
+  {
+    "status": "M",
+    "path": "tests/regression/Cases/PaymentNotifyTest.php"
+  },
+  {
+    "status": "M",
+    "path": "tests/regression/Cases/QueueTest.php"
+  },
+  {
+    "status": "M",
+    "path": "tests/regression/Cases/RefundTest.php"
+  },
+  {
+    "status": "R",
+    "from": "tests/regression/Cases/CommissionReplyCapitalFlowSqlModeTest.php",
+    "path": "tests/regression/Cases/ReplyCapitalFlowSqlModeTest.php"
   },
   {
     "status": "A",
@@ -1397,6 +5486,54 @@
   },
   {
     "status": "A",
+    "path": "tests/regression/Cases/RouteIntegrityTest.php"
+  },
+  {
+    "status": "M",
+    "path": "tests/regression/README.md"
+  },
+  {
+    "status": "M",
+    "path": "tests/regression/Support/FixtureFactory.php"
+  },
+  {
+    "status": "D",
+    "path": "tests/regression/Support/balance-worker.php"
+  },
+  {
+    "status": "D",
+    "path": "tests/regression/Support/payment-worker.php"
+  },
+  {
+    "status": "M",
+    "path": "tests/regression/cases.md"
+  },
+  {
+    "status": "M",
+    "path": "tests/regression/defects.md"
+  },
+  {
+    "status": "A",
+    "path": "tests/static/admin-api-contract.cjs"
+  },
+  {
+    "status": "A",
     "path": "tests/static/core-store-front.cjs"
+  },
+  {
+    "status": "A",
+    "path": "tests/static/model-relation-guard.cjs"
+  },
+  {
+    "status": "A",
+    "path": "tests/static/retired-code-guard.cjs"
+  },
+  {
+    "status": "A",
+    "path": "tests/static/verify-release-test.cjs"
+  },
+  {
+    "status": "A",
+    "path": "tests/static/wechat-payment-test.mjs"
   }
 ]

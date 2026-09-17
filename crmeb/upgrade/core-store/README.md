@@ -15,8 +15,9 @@ php upgrade/core-store/drop-retired.php finalize
 
 - `plan` is read-only. It reports the retired tables and rows, the settlement still
   owed (unpaid member/recharge orders, unshipped historical balance or offline
-  orders, unfinished points-mall orders, unaudited withdrawals) and the balances
-  that will become unreachable. It exits non-zero while anything is still owed.
+  orders, unfinished points-mall orders, unaudited withdrawals, paid self-pickup
+  orders that can no longer be written off once the store module is gone) and the
+  balances that will become unreachable. It exits non-zero while anything is owed.
 - `apply` refuses to run while settlement is pending, writes the backup, then
   renames the retired tables to `eb_retired_*` and removes the retired settings,
   config tabs, menus, timers and group data. Renaming is instant and reversible.
@@ -26,7 +27,9 @@ php upgrade/core-store/drop-retired.php finalize
   window; after that, recovery needs a mysqldump restore.
 
 The backup and the exported balance list stay outside the web root with mode 0600.
-Existing backups are never overwritten. Product, SKU, category, attachment, order
+Existing backups are never overwritten. The balance CSV lists every affected account
+(uid, nickname, phone, balance, points, commission) next to the totals, so the
+operator can compensate them one by one. Product, SKU, category, attachment, order
 and user tables and their columns are not touched — historical order fields such as
 `pay_type`, `use_integral` and `spread_uid` keep their values and still render.
 

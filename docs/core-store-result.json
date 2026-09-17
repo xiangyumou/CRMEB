@@ -1,41 +1,48 @@
 {
   "baseline_commit": "66681c07d76ce79c6794721563029f8ea4af023b",
+  "head_commit": "678ab708da92bc2e5bfd45d8456a472f6d237995",
   "categories": {
-    "source-including-vendored": {
-      "files": 2563,
-      "bytes": 38536244,
-      "lines": 552584
+    "source": {
+      "files": 2324,
+      "bytes": 29722934,
+      "lines": 491627
     },
     "published-and-assets": {
-      "files": 2541,
-      "bytes": 112456995,
-      "lines": 22438
+      "files": 2359,
+      "bytes": 102359525,
+      "lines": 76126
     },
     "vendored": {
-      "files": 100,
-      "bytes": 14665301,
-      "lines": 5486
+      "files": 0,
+      "bytes": 0,
+      "lines": 0
     },
     "other": {
-      "files": 236,
-      "bytes": 16327125,
-      "lines": 4168
+      "files": 277,
+      "bytes": 30895516,
+      "lines": 81990
     }
   },
   "source_reduction": {
-    "files": 163,
-    "bytes": 11498654,
-    "lines": 94444
+    "files": 471,
+    "bytes": 20536934,
+    "lines": 176105
   },
-  "source_physical_line_reduction_percent": 14.6,
+  "source_physical_line_reduction_percent": 26.4,
   "validation": {
-    "regression_tests": 86,
-    "regression_assertions": 552,
-    "admin_build": "passed with warnings",
+    "regression_tests": 128,
+    "regression_assertions": 526,
+    "admin_build": "passed",
     "php_lint": "passed",
-    "uni_app_static_files_per_target": 275,
-    "uni_app_actual_build": "not run; HBuilderX required",
-    "production_migration": "not run"
+    "static_guards": [
+      "core-store-front",
+      "admin-api-contract",
+      "retired-code-guard",
+      "model-relation-guard",
+      "verify-release-test",
+      "wechat-payment-test"
+    ],
+    "production_migration": "plan/apply/rollback/finalize rehearsed on a copy of the pre-cleanup schema seeded with historical orders"
   },
   "unchanged_public": true
 }

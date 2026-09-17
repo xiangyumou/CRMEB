@@ -51,9 +51,15 @@ php upgrade/core-store/drop-retired.php finalize
 sh scripts/check-maintenance.sh
 ```
 
-依次执行回归套件、PHP 7.4 语法检查、H5/小程序双端静态检查、管理后台接口正反向契约检查、退出业务残留守卫、发布清单校验与支付适配检查。回归覆盖下单/计价/库存/拼团/预售/优惠券/队列，以及历史订单兼容与迁移 plan→apply→重复 apply→rollback→finalize。
+依次执行回归套件、PHP 7.4 语法检查、H5/小程序双端静态检查、管理后台接口正反向契约检查、退出业务残留守卫、模型关联守卫、发布清单校验与支付适配检查。回归覆盖下单/计价/库存/拼团/预售/优惠券/队列，以及历史订单兼容与迁移 plan→apply→重复 apply→rollback→finalize。
 
-**发布前尚需验证：**HBuilderX 分别构建 H5/微信小程序并在真实客户端检查装修、下单和客服二维码；使用测试商户验证微信内/外 H5、小程序支付及原路退款；对拼团失败退款、预售完整履约执行端到端验收；用生产库脱敏副本执行一次 plan→apply，并在此前把提现、自提、历史余额单等负债处理干净。静态检查不等同于客户端构建或真机验收。
+`tests/static/model-relation-guard.cjs` 校验每个 DAO 预加载的关联都仍在对应模型上有定义。删除退出业务的模型关联时，`with()` 调用会一起留下——空订单表不会报错，直到迁移在真实数据上运行，后台订单列表才整体不可用。
+
+`node scripts/source-metrics.cjs --write` 用同一口径重新计算 `core-store-baseline.json` 与 `core-store-result.json`。
+
+**已验证：** 用改造前的建表 SQL 加历史订单/用户/退出业务数据构建脱敏副本，跑通 plan（拒绝未结清提现、积分商城单、未核销自提单）→ apply（154 行删除、48 张表改名、余额清单导出、通知名单继承）→ rollback（表名与行恢复）→ 再次 apply；后台登录、订单/售后/用户/商品/预售接口均正常；历史余额与支付宝订单可列表、可导出、退款被明确拒绝，微信订单可进入原路退款；`assertWechatRefundable` 曾因类型声明拒绝所有退款，已修复并加回归。
+
+**发布前尚需验证：**HBuilderX 分别构建 H5/微信小程序并在真实客户端检查装修、下单和客服二维码；使用测试商户验证微信内/外 H5、小程序支付及原路退款；对拼团失败退款、预售完整履约执行端到端验收。静态检查与本地演练不等同于客户端构建、真机验收或真实商户支付。`/notice` WebSocket 需 workerman 容器，快递公司列表需 CRMeb 云 token，文件管理器需其独立登录——这三项在本地演练栈中不可用，属环境限制。
 
 `crmeb/public/admin` 已用 Node 20.19.0 / npm 10.8.2 重建。生产配置挂载独立 public 目录，替换镜像不会自动更新这些文件。
 
@@ -61,7 +67,7 @@ sh scripts/check-maintenance.sh
 
 - `core-store-baseline.json`：修改前提交及物理行数/文件体积口径。
 - `core-store-files.json`：实际修改、删除、新增文件清单。
-- `core-store-removed-routes.json`：主要退出路由清单。
+- `core-store-removed-routes.json`：全部退出路由清单（后台 282、前台 115、outapi 5，共 402 条，由基线提交与当前提交的路由表做差集得出）。
 - `core-store-removed-pages.json`：用户页面与装修失效链接清单，运行时用于清理装修数据。
 - `core-store-shared-retained.json`：已清空；退出业务的共享类已全部删除。
 - `core-store-result.json`：最终同口径源码统计。

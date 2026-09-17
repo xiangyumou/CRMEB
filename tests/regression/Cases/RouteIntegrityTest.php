@@ -52,6 +52,17 @@ final class RouteIntegrityTest extends RegressionTestCase
                 return true;
             }
         }
+        // The dispatcher applies StudlyCase to the controller segment, so a
+        // route may name `wechat.menus` while the file on disk is `Menus.php`.
+        $parts = explode('.', $controller);
+        $parts[count($parts) - 1] = str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', (string)end($parts))));
+        foreach (['adminapi', 'api', 'outapi'] as $layer) {
+            $file = CRMEB_TEST_ROOT . '/app/' . $layer . '/controller/' . implode('/', $parts) . '.php';
+            if (!is_file($file)) continue;
+            if (preg_match('/\bfunction\s+' . preg_quote($method, '/') . '\s*\(/', (string)file_get_contents($file))) {
+                return true;
+            }
+        }
         return false;
     }
 }

@@ -1,25 +1,25 @@
 {
   "commit": "66681c07d76ce79c6794721563029f8ea4af023b",
   "categories": {
-    "other": {
-      "files": 228,
-      "bytes": 16306338,
-      "lines": 3915
-    },
-    "source-including-vendored": {
-      "files": 2726,
-      "bytes": 50034898,
-      "lines": 647028
-    },
-    "vendored": {
-      "files": 100,
-      "bytes": 14665301,
-      "lines": 5486
+    "source": {
+      "files": 2795,
+      "bytes": 50259868,
+      "lines": 667732
     },
     "published-and-assets": {
       "files": 2541,
       "bytes": 112456995,
-      "lines": 22438
+      "lines": 78408
+    },
+    "vendored": {
+      "files": 0,
+      "bytes": 0,
+      "lines": 0
+    },
+    "other": {
+      "files": 259,
+      "bytes": 30746669,
+      "lines": 77679
     }
   }
 }

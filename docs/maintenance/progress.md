@@ -54,3 +54,40 @@ The maintenance check passes (125 tests, 511 assertions, plus the static gates) 
 H5/MP-WEIXIN builds, on-device flows, production gateway payment/refund, and a
 plan/apply rehearsal on a production database copy — the operator must settle
 withdrawals, self-pickup and historical balance orders before applying.
+
+## Production-copy rehearsal (2026-09-17)
+
+The migration was rehearsed against a copy of the pre-cleanup schema (157 tables)
+seeded with users holding balances, historical `yue`/`offline`/`alipay`/seckill/
+bargain/pickup orders, open withdrawals, an unfinished points-mall order and a
+pending recharge. The rehearsal surfaced four defects that an empty test database
+could not, all now fixed and covered by regression:
+
+- **Order relations.** Removing the retired feature deleted model relations that
+  the order DAOs still eager-loaded, so the admin order list, refund list and
+  invoice pages answered `method not exist` as soon as the table held rows.
+  `StoreOrder::user()` is restored, `spread`/`division` are dropped from the
+  queries, and `tests/static/model-relation-guard.cjs` fails on the next stale
+  `with()`. `HistoricalOrderCompatTest` now drives the DAO list with real rows.
+- **Refund channel check.** `assertWechatRefundable(array $order)` received a
+  model from the refund dispatcher and aborted every refund, not only historical
+  ones. It now accepts either. Verified live: historical orders are refused with
+  the offline-handling message, a WeChat order reaches the payment driver.
+- **Unreachable balances.** The plan's balance query used a field-restricted
+  `find()` with no `where`, which think-orm answers with an empty result, so a
+  funded database reported zero. The plan now reports real totals and the CSV
+  lists every affected account for offline compensation.
+- **Pickup liability.** Paid self-pickup orders awaiting write-off became
+  unfulfillable once the store module was dropped; they now block `apply`
+  alongside withdrawals and unfinished historic orders.
+
+Driving the admin UI over 113 menu pages against the migrated database found one
+further regression: the WeChat public-account menu routes had been dropped with
+the retired ones although the controller, service and DAO were retained. Restored.
+
+Rollback restores table names and rows exactly; the second `apply` reported
+`Already migrated`. Remaining out-of-scope items in the local stack: the `/notice`
+WebSocket needs the workerman container, the courier list needs a CRMeb cloud
+token, and the file manager needs its own login.
+
+The maintenance check passes (128 tests, 526 assertions, plus the static gates).
