@@ -233,7 +233,6 @@ class StoreOrderController
      * @param Request $request
      * @param StorePinkServices $services
      * @param OrderPayServices $payServices
-     * @param YuePayServices $yuePayServices
      * @return mixed
      */
     public function pay(Request $request, StorePinkServices $services, OrderPayServices $payServices)
