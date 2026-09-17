@@ -104,13 +104,22 @@ console.log(JSON.stringify({ baseline: before, head: after, reduction, percent }
 
 if (process.argv.includes('--write')) {
   const docs = path.join(root, 'docs');
+  const resultFile = path.join(docs, 'core-store-result.json');
+  // Hand-written keys such as the validation record are not recomputed here,
+  // so carry them over instead of dropping them on every refresh.
+  let carried = {};
+  if (fs.existsSync(resultFile)) {
+    try {
+      const previous = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
+      for (const [key, value] of Object.entries(previous)) {
+        if (!(key in result)) carried[key] = value;
+      }
+    } catch { /* first write */ }
+  }
   fs.writeFileSync(
     path.join(docs, 'core-store-baseline.json'),
     JSON.stringify({ commit: result.baseline_commit, categories: before }, null, 2) + '\n'
   );
-  fs.writeFileSync(
-    path.join(docs, 'core-store-result.json'),
-    JSON.stringify(result, null, 2) + '\n'
-  );
+  fs.writeFileSync(resultFile, JSON.stringify({ ...result, ...carried }, null, 2) + '\n');
   console.log('\nwrote docs/core-store-baseline.json and docs/core-store-result.json');
 }

@@ -1,11 +1,11 @@
 {
   "baseline_commit": "66681c07d76ce79c6794721563029f8ea4af023b",
-  "head_commit": "678ab708da92bc2e5bfd45d8456a472f6d237995",
+  "head_commit": "e1938493acb3e56dc597f31389aecafbc3d232e9",
   "categories": {
     "source": {
-      "files": 2324,
-      "bytes": 29722934,
-      "lines": 491627
+      "files": 2326,
+      "bytes": 29732540,
+      "lines": 491856
     },
     "published-and-assets": {
       "files": 2359,
@@ -19,19 +19,19 @@
     },
     "other": {
       "files": 277,
-      "bytes": 30895516,
-      "lines": 81990
+      "bytes": 31019101,
+      "lines": 86799
     }
   },
   "source_reduction": {
-    "files": 471,
-    "bytes": 20536934,
-    "lines": 176105
+    "files": 469,
+    "bytes": 20527328,
+    "lines": 175876
   },
-  "source_physical_line_reduction_percent": 26.4,
+  "source_physical_line_reduction_percent": 26.3,
   "validation": {
-    "regression_tests": 128,
-    "regression_assertions": 526,
+    "regression_tests": 132,
+    "regression_assertions": 545,
     "admin_build": "passed",
     "php_lint": "passed",
     "static_guards": [

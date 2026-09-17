@@ -90,4 +90,4 @@ Rollback restores table names and rows exactly; the second `apply` reported
 WebSocket needs the workerman container, the courier list needs a CRMeb cloud
 token, and the file manager needs its own login.
 
-The maintenance check passes (128 tests, 526 assertions, plus the static gates).
+The maintenance check passes (132 tests, 545 assertions, plus the static gates).
