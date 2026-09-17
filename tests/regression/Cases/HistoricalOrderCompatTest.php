@@ -16,7 +16,7 @@ use think\facade\Db;
 final class HistoricalOrderCompatTest extends RegressionTestCase
 {
     /** @dataProvider historicalOrders */
-    public function testHistoricalOrdersStayReadable(array $overrides, string $expectedLabel): void
+    public function testHistoricalOrdersStayReadable(array $overrides, string $expectedLabel, int $expectedType = 0): void
     {
         $fixtures = new FixtureFactory($this, $this->getName());
         $user = $fixtures->createUser(['now_money' => '120.00', 'integral' => 500]);
@@ -36,9 +36,9 @@ final class HistoricalOrderCompatTest extends RegressionTestCase
 
         $list = $orders->tidyOrderList([$row]);
         self::assertSame($expectedLabel, $list[0]['pay_type_name']);
+        // The retired columns stay on historical rows but never map to a live activity type.
         self::assertArrayNotHasKey('offlinePayStatus', $detail);
-        self::assertArrayNotHasKey('seckill_id', $detail);
-        self::assertArrayNotHasKey('bargain_id', $detail);
+        self::assertSame($expectedType, (int)($detail['type'] ?? 0));
     }
 
     public function historicalOrders(): array
@@ -49,6 +49,7 @@ final class HistoricalOrderCompatTest extends RegressionTestCase
             'legacy alipay order' => [['pay_type' => 'alipay'], '历史：支付宝支付'],
             'legacy seckill order' => [['pay_type' => 'weixin', 'seckill_id' => 9], '微信支付'],
             'legacy bargain order' => [['pay_type' => 'weixin', 'bargain_id' => 9], '微信支付'],
+            'legacy combination order' => [['pay_type' => 'weixin', 'combination_id' => 3], '微信支付', 3],
             'legacy self pickup order' => [['pay_type' => 'weixin', 'shipping_type' => 2, 'verify_code' => '123456789012'], '微信支付'],
             'legacy spread order' => [['pay_type' => 'weixin', 'spread_uid' => 5, 'one_brokerage' => '2.00'], '微信支付'],
         ];
