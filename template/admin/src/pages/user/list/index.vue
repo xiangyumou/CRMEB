@@ -22,17 +22,6 @@
                   </el-select>
                 </el-input>
               </el-form-item>
-              <el-form-item label="用户等级：" label-for="level">
-                <el-select v-model="level" placeholder="请选择用户等级" clearable class="form_content_width">
-                  <el-option value="all" label="全部">全部</el-option>
-                  <el-option
-                    :value="item.id"
-                    v-for="(item, index) in levelList"
-                    :key="index"
-                    :label="item.name"
-                  ></el-option>
-                </el-select>
-              </el-form-item>
               <el-form-item label="用户分组：">
                 <el-select v-model="group_id" placeholder="请选择用户分组" clearable class="form_content_width">
                   <el-option value="all" label="全部"></el-option>
@@ -66,17 +55,6 @@
                   </el-select>
                 </el-input>
               </el-form-item>
-              <el-form-item label="用户等级：" label-for="level">
-                <el-select v-model="level" placeholder="请选择用户等级" clearable class="form_content_width">
-                  <el-option value="all" label="全部">全部</el-option>
-                  <el-option
-                    :value="item.id"
-                    v-for="(item, index) in levelList"
-                    :key="index"
-                    :label="item.name"
-                  ></el-option>
-                </el-select>
-              </el-form-item>
               <el-form-item label="用户分组：">
                 <el-select v-model="group_id" placeholder="请选择用户分组" clearable class="form_content_width">
                   <el-option value="all" label="全部"></el-option>
@@ -85,17 +63,6 @@
                     v-for="(item, index) in groupList"
                     :key="index"
                     :label="item.group_name"
-                  ></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="分销等级：">
-                <el-select v-model="agent_level" placeholder="请选择分销等级" clearable class="form_content_width">
-                  <el-option value="all" label="全部"></el-option>
-                  <el-option
-                    :value="item.grade"
-                    v-for="(item, index) in membershipList"
-                    :key="index"
-                    :label="item.name"
                   ></el-option>
                 </el-select>
               </el-form-item>
@@ -111,50 +78,6 @@
                   </div>
                   <div class="ivu-icon ivu-icon-ios-arrow-down"></div>
                 </div>
-              </el-form-item>
-              <el-form-item label="用户身份：">
-                <el-select v-model="userFrom.is_promoter" placeholder="请选择" clearable class="form_content_width">
-                  <el-option value="" label="全部"></el-option>
-                  <el-option value="1" label="推广员"></el-option>
-                  <el-option value="0" label="普通用户"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="付费会员：" label-for="isMember">
-                <el-select v-model="userFrom.isMember" placeholder="请选择" clearable class="form_content_width">
-                  <el-option value="" label="全部"></el-option>
-                  <el-option value="1" label="是"></el-option>
-                  <el-option value="0" label="否"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="储值余额：" label-for="balance">
-                <el-input
-                  clearable
-                  placeholder="最小值"
-                  v-model="userFrom.balance[0]"
-                  class="form_range_content_width"
-                />
-                ~
-                <el-input
-                  clearable
-                  placeholder="最大值"
-                  v-model="userFrom.balance[1]"
-                  class="form_range_content_width"
-                />
-              </el-form-item>
-              <el-form-item label="积分剩余：" label-for="integral">
-                <el-input
-                  clearable
-                  placeholder="最小值"
-                  v-model="userFrom.integral[0]"
-                  class="form_range_content_width"
-                />
-                ~
-                <el-input
-                  clearable
-                  placeholder="最大值"
-                  v-model="userFrom.integral[1]"
-                  class="form_range_content_width"
-                />
               </el-form-item>
               <el-form-item label="上次消费：" label-for="before_pay_time">
                 <el-date-picker
@@ -198,21 +121,6 @@
                   clearable
                   placeholder="最大值"
                   v-model="userFrom.pay_count_money[1]"
-                  class="form_range_content_width"
-                />
-              </el-form-item>
-              <el-form-item label="充值次数：" label-for="store_name">
-                <el-input
-                  clearable
-                  placeholder="最小值"
-                  v-model="userFrom.recharge_count[0]"
-                  class="form_range_content_width"
-                />
-                ~
-                <el-input
-                  clearable
-                  placeholder="最大值"
-                  v-model="userFrom.recharge_count[1]"
                   class="form_range_content_width"
                 />
               </el-form-item>
@@ -348,24 +256,9 @@
             <div v-if="scope.row.is_del == 1" style="color: red">用户已注销</div>
           </template>
         </el-table-column>
-        <el-table-column label="付费会员" min-width="90">
-          <template slot-scope="scope">
-            <div>{{ scope.row.isMember ? '是' : '否' }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column label="用户等级" min-width="90">
-          <template slot-scope="scope">
-            <div>{{ scope.row.level }}</div>
-          </template>
-        </el-table-column>
         <el-table-column label="分组" min-width="100">
           <template slot-scope="scope">
             <div>{{ scope.row.group_id }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column label="分销等级" min-width="100">
-          <template slot-scope="scope">
-            <div>{{ scope.row.agent_level_name }}</div>
           </template>
         </el-table-column>
         <el-table-column label="手机号" min-width="100">
@@ -378,16 +271,6 @@
             <div>{{ scope.row.user_type }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="上级用户" min-width="100">
-          <template slot-scope="scope">
-            <div>{{ scope.row.spread_uid_nickname }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column label="余额" prop="now_money" min-width="100" :sortable="true">
-          <template slot-scope="scope">
-            <div>{{ scope.row.now_money }}</div>
-          </template>
-        </el-table-column>
         <el-table-column label="操作" fixed="right" width="120">
           <template slot-scope="scope">
             <template v-if="scope.row.is_del != 1">
@@ -398,14 +281,8 @@
                 <span class="el-dropdown-link">更多<i class="el-icon-arrow-down el-icon--right"></i> </span>
                 <el-dropdown-menu slot="dropdown">
                   <!-- <el-dropdown-item command="1">编辑</el-dropdown-item> -->
-                  <el-dropdown-item command="2">修改余额</el-dropdown-item>
-                  <el-dropdown-item command="8">修改积分</el-dropdown-item>
-                  <el-dropdown-item command="3">赠送会员</el-dropdown-item>
-                  <!--                                <el-dropdown-item command="4" v-if="row.vip_name">清除等级</el-dropdown-item>-->
                   <el-dropdown-item command="5">设置分组</el-dropdown-item>
                   <el-dropdown-item command="6">设置标签</el-dropdown-item>
-                  <el-dropdown-item command="7">修改上级推广人</el-dropdown-item>
-                  <el-dropdown-item command="99" v-if="scope.row.spread_uid">清除上级推广人</el-dropdown-item>
                 </el-dropdown-menu>
               </el-dropdown>
             </template>
@@ -426,8 +303,6 @@
         />
       </div>
     </el-card>
-    <!-- 编辑表单 积分余额-->
-    <edit-from ref="edits" :FromData="FromData" @submitFail="submitFail"></edit-from>
     <!-- 发送优惠券-->
     <send-from ref="sends" :userIds="ids.toString()"></send-from>
     <!-- 会员详情-->
@@ -443,28 +318,6 @@
         :contentWidth="contentWidth"
         :maxCols="maxCols"
       ></news-category>
-    </el-dialog>
-    <!--修改推广人-->
-    <el-dialog :visible.sync="promoterShow" title="修改推广人" width="540px" :show-close="true">
-      <el-form ref="formInline" :model="formInline" label-width="100px" @submit.native.prevent>
-        <el-form-item v-if="formInline" label="选择推广人：" prop="image">
-          <div class="picBox" v-db-click @click="customer">
-            <div class="pictrue" v-if="formInline.image">
-              <img v-lazy="formInline.image" />
-            </div>
-            <div class="upLoad acea-row row-center-wrapper" v-else>
-              <i class="el-icon-user"></i>
-            </div>
-          </div>
-        </el-form-item>
-      </el-form>
-      <div class="acea-row row-right mt20">
-        <el-button v-db-click @click="cancel('formInline')">取消</el-button>
-        <el-button type="primary" v-db-click @click="putSend('formInline')">提交</el-button>
-      </div>
-    </el-dialog>
-    <el-dialog :visible.sync="customerShow" title="请选择商城用户" :show-close="true" width="1000px">
-      <customerInfo v-if="customerShow" @imageObject="imageObject"></customerInfo>
     </el-dialog>
     <el-dialog :visible.sync="labelShow" append-to-body title="请选择用户标签" width="540px" :show-close="true">
       <userLabel
@@ -521,42 +374,26 @@ import expandRow from './tableExpand.vue';
 import userEdit from './handle/userEdit.vue';
 import {
   userList,
-  getUserData,
   isShowApi,
-  editOtherApi,
-  giveLevelApi,
   userSetGroup,
   userGroupApi,
-  levelListApi,
-  userSetLabelApi,
-  userLabelApi,
-  userSynchro,
-  getUserSaveForm,
-  giveLevelTimeApi,
   getUserInfo,
   setUser,
   editUser,
   saveSetLabel,
 } from '@/api/user';
-import { agentSpreadApi } from '@/api/agent';
 import { exportUserList } from '@/api/export';
-import editFrom from '../../../components/from/from';
 import sendFrom from '@/components/sendCoupons/index';
 import userDetails from './handle/userDetails';
 import newsCategory from '@/components/newsCategory/index';
-import customerInfo from '@/components/customerInfo';
-import { cityList } from '@/api/app';
-import { membershipDataListApi } from '@/api/membershipLevel';
 
 export default {
   name: 'user_list',
   components: {
     expandRow,
-    editFrom,
     sendFrom,
     userDetails,
     newsCategory,
-    customerInfo,
     userLabel,
     userEdit,
   },
@@ -568,16 +405,9 @@ export default {
       modals: false,
       selectLabelShow: false,
       labelShow: false,
-      customerShow: false,
-      promoterShow: false,
       is_batch: false,
       labelActive: {
         uid: 0,
-      },
-      formInline: {
-        uid: 0,
-        spread_uid: 0,
-        image: '',
       },
       pickerOptions: this.$timeOptions,
       collapse: false,
@@ -587,10 +417,8 @@ export default {
         { type: 'routine', name: '微信小程序' },
         { type: 'h5', name: 'H5' },
         { type: 'pc', name: 'PC' },
-        { type: 'app', name: 'APP' },
       ],
       address: [],
-      addresData: [],
       isShowSend: true,
       modal13: false,
       maxCols: 4,
@@ -612,20 +440,16 @@ export default {
         xs: 24,
       },
       loading: false,
+      listRequestId: 0,
       total: 0,
       userFrom: {
         label_id: '',
         user_type: '',
         status: '',
         sex: '',
-        is_promoter: '',
         country: '',
-        isMember: '',
         pay_count_num: ['', ''],
-        balance: ['', ''],
-        integral: ['', ''],
         pay_count_money: ['', ''],
-        recharge_count: ['', ''],
         user_time_type: '',
         user_time: '',
         before_pay_time: '',
@@ -634,33 +458,21 @@ export default {
         city: '',
         page: 1,
         limit: 15,
-        level: '',
         group_id: '',
-        agent_level: '',
         field_key: '',
       },
       before_pay_time: '',
       field_key: '',
-      level: '',
       group_id: '',
-      agent_level: '',
       label_id: '',
       user_time_type: '',
       pay_count: '',
       userLists: [],
-      FromData: null,
       selectionList: [],
       user_ids: '',
       selectedData: [],
       timeVal: [],
       groupList: [],
-      levelList: [],
-      membershipList: [],
-      labelFrom: {
-        page: 1,
-        limit: '',
-      },
-      labelLists: [],
       selectedIds: [], //选中合并项的id
       ids: [],
     };
@@ -670,19 +482,13 @@ export default {
   },
   created() {
     this.getList();
-    this.getCityList();
   },
   mounted() {
     this.userGroup();
-    this.levelLists();
-    this.membershipDataList();
-    // this.groupLists();
   },
   methods: {
-    getCityList() {
-      cityList().then((res) => {
-        this.addresData = res.data;
-      });
+    showUserError(error, fallback = '请求失败，请稍后重试') {
+      if (!error || !error._messageShown) this.$message.error((error && error.msg) || fallback);
     },
     setUser() {
       let data = this.$refs.userEdit.formItem;
@@ -703,7 +509,7 @@ export default {
             this.getList();
           })
           .catch((err) => {
-            this.$message.error(err);
+            this.showUserError(err);
           });
       } else {
         setUser(data)
@@ -713,7 +519,7 @@ export default {
             this.getList();
           })
           .catch((err) => {
-            this.$message.error(err.msg);
+            this.showUserError(err);
           });
       }
     },
@@ -728,62 +534,9 @@ export default {
       this.selectLabelShow = false;
     },
     // 提交
-    putSend(name) {
-      this.$refs[name].validate((valid) => {
-        if (valid) {
-          if (!this.formInline.spread_uid) {
-            return this.$message.error('请上传用户');
-          }
-          agentSpreadApi(this.formInline)
-            .then((res) => {
-              this.promoterShow = false;
-              this.$message.success(res.msg);
-              this.getList();
-              this.$refs[name].resetFields();
-            })
-            .catch((res) => {
-              this.$message.error(res.msg);
-            });
-        }
-      });
-    },
 
-    save() {
-      this.modals = true;
-
-      // this.$modalForm(getUserSaveForm())
-      //   .then(() => {
-      //     this.userFrom.page = 1;
-      //     this.getList();
-      //   })
-      //   .catch((res) => {
-      //     this.$message.error(res.msg);
-      //   });
-    },
-    synchro() {
-      userSynchro()
-        .then((res) => {
-          this.$message.success(res.msg);
-        })
-        .catch((res) => {
-          this.$message.error(res.msg);
-        });
-    },
     isSel(row) {
       return !!!row.is_del;
-    },
-    // 分组列表
-    groupLists() {
-      this.loading = true;
-      userLabelApi(this.labelFrom)
-        .then(async (res) => {
-          let data = res.data;
-          this.labelLists = data.list;
-        })
-        .catch((res) => {
-          this.loading = false;
-          this.$message.error(res.msg);
-        });
     },
     onClickTab() {
       this.userFrom.page = 1;
@@ -796,27 +549,6 @@ export default {
       };
       userGroupApi(data).then((res) => {
         this.groupList = res.data.list;
-      });
-    },
-    levelLists() {
-      let data = {
-        page: 1,
-        limit: '',
-        title: '',
-        is_show: 1,
-      };
-      levelListApi(data).then((res) => {
-        this.levelList = res.data.list;
-      });
-    },
-    membershipDataList() {
-      let data = {
-        page: 1,
-        limit: 0,
-        staus: 1,
-      };
-      membershipDataListApi(data).then((res) => {
-        this.membershipList = res.data.list;
       });
     },
     // 批量设置分组；
@@ -838,12 +570,8 @@ export default {
         this.$message.warning('请选择要设置标签的用户');
       } else {
         this.is_batch = true;
-        let uids = { uids: this.ids };
         this.labelActive.uid = 0;
         this.labelShow = true;
-        // this.$modalForm(userSetLabelApi(uids)).then(() =>
-        //   this.$refs.sends.getList()
-        // );
       }
     },
     activeSelectData(data) {
@@ -896,11 +624,6 @@ export default {
         this.$message.success(res.msg);
       });
     },
-    //是否为付费会员；
-    changeMember() {
-      this.userFrom.page = 1;
-      this.getList();
-    },
     // 选择国家
     changeCountry() {
       if (this.userFrom.country === 'abroad' || !this.userFrom.country) {
@@ -925,45 +648,18 @@ export default {
       this.$refs.userDetails.getDetails(row.uid);
     },
     // 操作
-    changeMenu(row, name, index) {
+    changeMenu(row, name) {
       let uid = [];
       uid.push(row.uid);
       let uids = { uids: uid };
       switch (name) {
-        case '1':
-          this.edit(row);
-          break;
-        case '2':
-          this.getOtherFrom(row.uid, 'money');
-          break;
-        case '3':
-          this.giveLevelTime(row.uid);
-          break;
-        case '4':
-          this.del(row, '清除 【 ' + this.tenText(row.nickname) + ' 】的会员等级', index, 'user');
-          break;
         case '5':
           this.$modalForm(userSetGroup(uids)).then(() => this.getList());
           break;
         case '6':
           this.openLabel(row);
           break;
-        case '7':
-          this.editS(row);
-          break;
-        case '8':
-          this.getOtherFrom(row.uid, 'point');
-          break;
-        default:
-          this.del(row, '解除【 ' + this.tenText(row.nickname) + ' 】的上级推广人', index, 'tuiguang');
       }
-    },
-    tenText(str) {
-      if (str.length > 10) {
-        //如果字符长度超过10，后面的字符就变成...可自行调整长度和代替字符
-        str = str.substr(0, 10) + '...'; //截取从第一个字符开始，往后取10个字符，剩余的用...代替
-      }
-      return str;
     },
     openLabel(row) {
       this.is_batch = false;
@@ -972,83 +668,6 @@ export default {
     },
     openSelectLabel() {
       this.selectLabelShow = true;
-    },
-    editS(row) {
-      this.promoterShow = true;
-      this.formInline.uid = row.uid;
-    },
-    customer() {
-      this.customerShow = true;
-    },
-    imageObject(e) {
-      this.customerShow = false;
-      this.formInline.spread_uid = e.uid;
-      this.formInline.image = e.image;
-    },
-    cancel(name) {
-      this.promoterShow = false;
-      this.$refs[name].resetFields();
-      this.formInline = {
-        uid: 0,
-        spread_uid: 0,
-        image: '',
-      };
-    },
-    // 赠送会员等级
-    giveLevel(id) {
-      this.$modalForm(giveLevelApi(id)).then(() => this.getList(1));
-
-      // giveLevelApi(id)
-      //   .then(async (res) => {
-      //     if (res.data.status === false) {
-      //       return this.$authLapse(res.data);
-      //     }
-
-      //     this.FromData = res.data;
-      //     this.$refs.edits.modals = true;
-      //   })
-      //   .catch((res) => {
-      //     this.$message.error(res.msg);
-      //   });
-    },
-    // 赠送会员等级
-    giveLevelTime(id) {
-      this.$modalForm(giveLevelTimeApi(id)).then(() => this.getList(1));
-
-      // giveLevelTimeApi(id)
-      //   .then(async (res) => {
-      //     if (res.data.status === false) {
-      //       return this.$authLapse(res.data);
-      //     }
-      //     this.FromData = res.data;
-      //     this.$refs.edits.modals = true;
-      //   })
-      //   .catch((res) => {
-      //     this.$message.error(res.msg);
-      //   });
-    },
-    // 删除
-    del(row, tit, num, name) {
-      let delfromData = {
-        title: tit,
-        num: num,
-        url: name === 'user' ? `user/del_level/${row.uid}` : `agent/stair/delete_spread/${row.uid}`,
-        method: name === 'user' ? 'DELETE' : 'PUT',
-        ids: '',
-        width: 600,
-      };
-      this.$modalSure(delfromData)
-        .then((res) => {
-          this.$message.success(res.msg);
-          this.getList();
-        })
-        .catch((res) => {
-          this.$message.error(res.msg);
-        });
-    },
-    // 清除会员删除成功
-    submitModel() {
-      this.getList();
     },
     // 会员列表
     getList() {
@@ -1062,17 +681,16 @@ export default {
       this.userFrom.user_type = this.userFrom.user_type || '';
       this.userFrom.status = this.userFrom.status || '';
       this.userFrom.sex = this.userFrom.sex || '';
-      this.userFrom.is_promoter = this.userFrom.is_promoter || '';
       this.userFrom.country = this.userFrom.country || '';
       this.userFrom.pay_count = this.pay_count === 'all' ? '' : this.pay_count;
       this.userFrom.user_time_type = this.user_time_type === 'all' ? '' : this.user_time_type;
       this.userFrom.field_key = this.field_key === 'all' ? '' : this.field_key;
-      this.userFrom.level = this.level === 'all' ? '' : this.level;
       this.userFrom.group_id = this.group_id === 'all' ? '' : this.group_id;
-      this.userFrom.agent_level = this.agent_level === 'all' ? '' : this.agent_level;
+      const requestId = ++this.listRequestId;
       this.loading = true;
       userList(this.userFrom)
         .then(async (res) => {
+          if (requestId !== this.listRequestId) return;
           let data = res.data;
           this.userLists = data.list;
 
@@ -1083,8 +701,11 @@ export default {
           });
         })
         .catch((res) => {
+          if (requestId !== this.listRequestId) return;
           this.loading = false;
-          this.$message.error(res.msg);
+          this.userLists = [];
+          this.total = 0;
+          this.showUserError(res, '获取用户列表失败');
         });
     },
     // 用户导出
@@ -1095,14 +716,11 @@ export default {
       this.userFrom.user_type = this.userFrom.user_type || '';
       this.userFrom.status = this.userFrom.status || '';
       this.userFrom.sex = this.userFrom.sex || '';
-      this.userFrom.is_promoter = this.userFrom.is_promoter || '';
       this.userFrom.country = this.userFrom.country || '';
       this.userFrom.pay_count = this.pay_count === 'all' ? '' : this.pay_count;
       this.userFrom.user_time_type = this.user_time_type === 'all' ? '' : this.user_time_type;
       this.userFrom.field_key = this.field_key === 'all' ? '' : this.field_key;
-      this.userFrom.level = this.level === 'all' ? '' : this.level;
       this.userFrom.group_id = this.group_id === 'all' ? '' : this.group_id;
-      this.userFrom.agent_level = this.agent_level === 'all' ? '' : this.agent_level;
       let [th, filekey, data, fileName] = [[], [], [], ''];
       //   let fileName = "";
       let excelData = JSON.parse(JSON.stringify(this.userFrom));
@@ -1150,14 +768,9 @@ export default {
         label_id: '',
         status: '',
         sex: '',
-        is_promoter: '',
         country: '',
-        isMember: '',
         pay_count_num: ['', ''],
-        balance: ['', ''],
-        integral: ['', ''],
         pay_count_money: ['', ''],
-        recharge_count: ['', ''],
         user_time_type: '',
         user_time: '',
         before_pay_time: '',
@@ -1166,17 +779,13 @@ export default {
         city: '',
         page: 1,
         limit: 15,
-        level: '',
         group_id: '',
-        agent_level: '',
         field_key: '',
         page: 1, // 当前页
         limit: 20, // 每页显示条数
       };
       this.field_key = '';
-      this.level = '';
       this.group_id = '';
-      this.agent_level = '';
       this.dataLabel = [];
       this.selectDataLabel = [];
       this.user_time_type = '';
@@ -1193,12 +802,8 @@ export default {
           this.userData = res.data;
         })
         .catch((res) => {
-          this.$message.error(res.msg);
+          this.showUserError(res);
         });
-    },
-    // 获取积分余额表单
-    getOtherFrom(id, type) {
-      this.$modalForm(editOtherApi(id, type)).then(() => this.getList(1));
     },
     // 修改状态
     onchangeIsShow(row) {
@@ -1211,7 +816,7 @@ export default {
           this.$message.success(res.msg);
         })
         .catch((res) => {
-          this.$message.error(res.msg);
+          this.showUserError(res);
         });
     },
     // 点击发送优惠券

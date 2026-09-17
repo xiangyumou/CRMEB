@@ -86,11 +86,7 @@ export default {
       theme2: 'light',
       list: [
         { val: 'order', label: '消费记录' },
-        { val: 'integral', label: '积分明细' },
-        { val: 'sign', label: '签到记录' },
         { val: 'coupon', label: '持有优惠券' },
-        { val: 'balance_change', label: '余额变动' },
-        { val: 'spread', label: '好友关系' },
       ],
       modals: false,
       spinShow: false,
@@ -107,6 +103,8 @@ export default {
       userLists: [],
       psInfo: {},
       activeName: 'user',
+      detailRequestId: 0,
+      headerRequestId: 0,
     };
   },
   created() {},
@@ -123,15 +121,20 @@ export default {
     },
     // 会员详情
     getDetails(id) {
+      this.detailRequestId++;
+      const requestId = ++this.headerRequestId;
       this.activeName = 'user';
+      this.userLists = [];
+      this.total = 0;
       this.userId = id;
       this.spinShow = true;
       this.isEdit = false;
       detailsApi(id)
         .then(async (res) => {
+          if (requestId !== this.headerRequestId) return;
           if (res.status === 200) {
             let data = res.data;
-            this.detailsData = data.headerList;
+            this.detailsData = (data.headerList || []).filter((item) => !['余额', '积分'].includes(item.title));
             this.psInfo = data.ps_info;
             // this.changeType('user');
             this.spinShow = false;
@@ -141,17 +144,22 @@ export default {
           }
         })
         .catch((res) => {
+          if (requestId !== this.headerRequestId) return;
           this.spinShow = false;
-          this.$message.error(res.msg);
+          if (!res._messageShown) this.$message.error(res.msg || '获取用户详情失败');
         });
     },
     changeTab(tab) {
+      this.detailRequestId++;
       this.activeName = tab.name;
+      this.userFrom.page = 1;
+      this.userLists = [];
+      this.total = 0;
       this.changeType();
     },
     // tab选项
     changeType() {
-      this.loading = true;
+      this.loading = this.activeName !== 'user';
       this.userFrom.type = this.activeName;
       this.isEdit = false;
       if (this.activeName == 'user') return;
@@ -162,10 +170,13 @@ export default {
         id: this.userId,
         datas: this.userFrom,
       };
+      const requestId = ++this.detailRequestId;
+      const type = this.userFrom.type;
       infoApi(data)
         .then(async (res) => {
+          if (requestId !== this.detailRequestId) return;
           if (res.status === 200) {
-            switch (this.userFrom.type) {
+            switch (type) {
               case 'order':
                 this.columns = [
                   {
@@ -195,59 +206,6 @@ export default {
                   },
                 ];
                 break;
-              case 'integral':
-                this.columns = [
-                  {
-                    title: '来源/用途',
-                    key: 'title',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '积分变化',
-                    slot: 'number',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '变化后积分',
-                    key: 'balance',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '日期',
-                    key: 'add_time',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '备注',
-                    key: 'mark',
-                    minWidth: 120,
-                  },
-                ];
-                break;
-              case 'sign':
-                this.columns = [
-                  {
-                    title: '动作',
-                    key: 'title',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '获得积分',
-                    key: 'number',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '签到时间',
-                    key: 'add_time',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '备注',
-                    key: 'mark',
-                    minWidth: 120,
-                  },
-                ];
-                break;
               case 'coupon':
                 this.columns = [
                   {
@@ -272,58 +230,9 @@ export default {
                   },
                 ];
                 break;
-              case 'balance_change':
-                this.columns = [
-                  {
-                    title: '动作',
-                    key: 'title',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '余额变动',
-                    slot: 'number',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '当前余额',
-                    key: 'balance',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '创建时间',
-                    key: 'add_time',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '备注',
-                    key: 'mark',
-                    minWidth: 120,
-                  },
-                ];
-                break;
               default:
-                this.columns = [
-                  {
-                    title: 'ID',
-                    key: 'uid',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '昵称',
-                    key: 'nickname',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '等级',
-                    key: 'type',
-                    minWidth: 120,
-                  },
-                  {
-                    title: '加入时间',
-                    key: 'add_time',
-                    minWidth: 120,
-                  },
-                ];
+                this.columns = [];
+                break;
             }
             this.$nextTick((e) => {
               let data = res.data;
@@ -337,8 +246,9 @@ export default {
           }
         })
         .catch((res) => {
+          if (requestId !== this.detailRequestId) return;
           this.loading = false;
-          this.$message.error(res.msg);
+          if (!res._messageShown) this.$message.error(res.msg || '获取用户记录失败');
         });
     },
   },

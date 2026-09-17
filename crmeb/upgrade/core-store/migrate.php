@@ -66,10 +66,7 @@ try {
         $changes[] = ['table'=>'system_config','id'=>$sample['id'],'before'=>null,'after'=>$sample];
     }
     $menus = Db::name('system_menus')->lock(true)->select()->toArray();
-    $ids = [];
-    $retired = '~(?:bargain|seckill|lottery|integral|point_record|point_statistic|user_point|recharge|user_extract|brokerage|commission|user_balance|/balance/|/agent(?:/|$)|/division(?:/|$)|/kefu(?:/|$)|/live(?:/|$)|/sign(?:/|$)|sign_rewards|user_level|member_card|member_batch|member_ship|member_config|/upgrade(?:/|$))~i';
-    foreach ($menus as $row) if (preg_match($retired, implode(' ', [$row['menu_path'],$row['api_url'],$row['unique_auth']]))) $ids[$row['id']] = true;
-    do { $count = count($ids); foreach ($menus as $row) if (isset($ids[$row['pid']])) $ids[$row['id']] = true; } while ($count !== count($ids));
+    $ids = array_fill_keys(\app\services\CoreStoreAdmin::removedMenuIds($menus), true);
     foreach ($menus as $row) {
         if (isset($ids[$row['id']])) {
             $next = array_merge($row, ['is_show'=>0,'is_show_path'=>0,'access'=>0,'is_del'=>1]);

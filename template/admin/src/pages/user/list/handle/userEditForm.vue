@@ -73,18 +73,6 @@
         <div class="section-hd">用户概况</div>
         <div class="section-bd">
           <div class="item">
-            <el-form-item label="用户等级：">
-              <el-select v-model="formItem.level" class="form-sty" clearable>
-                <el-option
-                  v-for="(item, index) in infoData.levelInfo"
-                  :key="index"
-                  :value="item.id"
-                  :label="item.name"
-                ></el-option>
-              </el-select>
-            </el-form-item>
-          </div>
-          <div class="item">
             <el-form-item label="用户分组：">
               <el-select v-model="formItem.group_id" class="form-sty" clearable>
                 <el-option
@@ -126,15 +114,6 @@
                 <el-radio :label="1">否</el-radio>
               </el-radio-group>
               <div class="tip">禁用用户的分销资格后，在任何分销模式下该用户都无分销权限</div>
-            </el-form-item>
-          </div>
-          <div class="item lang" v-if="formItem.spread_open == 1">
-            <el-form-item label="分销权限：">
-              <el-radio-group v-model="formItem.is_promoter" class="form-sty">
-                <el-radio :label="1">开启</el-radio>
-                <el-radio :label="0">关闭</el-radio>
-              </el-radio-group>
-              <div class="tip">手动开启或关闭用户的分销权限</div>
             </el-form-item>
           </div>
           <div class="item lang">
@@ -216,20 +195,15 @@ export default {
         mark: '',
         pwd: '',
         true_pwd: '',
-        level: '',
         group_id: '',
         label_id: [],
-        spread_open: 0,
-        is_promoter: 0,
         status: 1,
       },
       groupInfo: [],
       labelInfo: [],
-      levelInfo: [],
       infoData: {
         groupInfo: [],
         labelInfo: [],
-        levelInfo: [],
       },
       ruleValidate: {
         real_name: [{ required: true, message: ' ', trigger: 'blur' }],
@@ -269,7 +243,7 @@ export default {
             this.$emit('success');
           })
           .catch((err) => {
-            this.$message.error(err.msg);
+            if (!err._messageShown) this.$message.error(err.msg || '保存失败');
           });
       } else {
         setUser(data)
@@ -278,7 +252,7 @@ export default {
             this.$message.success(res.msg);
           })
           .catch((err) => {
-            this.$message.error('err.msg');
+            if (!err._messageShown) this.$message.error(err.msg || '保存失败');
           });
       }
     },
@@ -298,7 +272,6 @@ export default {
         .then(async (res) => {
           this.userData = res.data;
           this.$set(this.infoData, 'groupInfo', this.userData.groupInfo);
-          this.$set(this.infoData, 'levelInfo', this.userData.levelInfo);
           this.$set(this.infoData, 'labelInfo', this.userData.labelInfo);
           let arr = Object.keys(this.formItem);
           if (this.userData.userInfo) {
@@ -314,7 +287,7 @@ export default {
           }
         })
         .catch((res) => {
-          this.$message.error('res.msg');
+          if (!res._messageShown) this.$message.error(res.msg || '加载用户资料失败');
         });
     },
     // 标签弹窗关闭

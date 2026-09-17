@@ -58,4 +58,15 @@ final class CoreStore
             }
         }
     }
+
+    public static function assertAdminUser(array $data): void
+    {
+        foreach (['level', 'agent_level', 'isMember', 'is_promoter', 'money', 'money_status', 'integration', 'integration_status', 'balance', 'integral', 'recharge_count'] as $key) {
+            if (!isset($data[$key])) continue;
+            $value = $data[$key];
+            if (is_array($value) ? count(array_filter($value, static function ($item) { return $item !== '' && $item !== null && $item !== 0 && $item !== '0'; })) > 0 : $value !== '' && $value !== null && $value !== 0 && $value !== '0') {
+                throw new ApiException('当前商城不支持该业务');
+            }
+        }
+    }
 }

@@ -35,19 +35,6 @@ Route::group('user', function () {
         Route::get('user/syncUsers', 'v1.user.User/syncWechatUsers')->option(['real_name' => '同步微信用户']);
         //用户信息
         Route::get('user/user_save_info/:uid', 'v1.user.User/userSaveInfo')->option(['real_name' => '添加编辑用户信息时候的信息']);
-        //赠送会员等级
-        Route::get('give_level/:id', 'v1.user.User/give_level')->option(['real_name' => '赠送用户等级']);
-        //执行赠送会员等级
-        Route::put('save_give_level/:id', 'v1.user.User/save_give_level')->option(['real_name' => '执行赠送用户等级']);
-        //赠送付费会员时长
-
-        //执行赠送付费会员时长
-
-        //清除会员等级
-        Route::delete('del_level/:id', 'v1.user.User/del_level')->option(['real_name' => '清除用户等级']);
-        //编辑其他
-
-        //编辑其他
 
         //修改用户状态
         Route::put('set_status/:status/:id', 'v1.user.User/set_status')->option(['real_name' => '修改用户状态']);
@@ -60,38 +47,6 @@ Route::group('user', function () {
         //设置会员标签
         Route::post('set_label', 'v1.user.User/set_label')->option(['real_name' => '设置用户标签']);
     })->option(['parent' => 'user', 'cate_name' => '用户']);
-
-    /** 用户等级 */
-    Route::group(function () {
-        //获取添加会员等级表单
-
-        //添加或修改会员等级
-
-        //等级详情
-
-        //获取系统设置的vip列表
-
-        //删除会员等级
-
-        //设置单个商品上架|下架
-
-        //等级列表快速编辑
-
-        //等级任务列表
-
-        //快速编辑等级任务
-
-        //设置等级任务显示|隐藏
-
-        //设置是否务必达成
-
-        //添加等级任务表单
-
-        //保存或者修改任务
-
-        //删除任务
-
-    })->option(['parent' => 'user', 'cate_name' => '用户等级']);
 
     /** 用户分组 */
     Route::group(function () {

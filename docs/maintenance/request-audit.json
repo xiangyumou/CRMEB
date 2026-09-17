@@ -1,0 +1,28 @@
+{
+  "scope": "Source audit of admin registered pages, shared layout, popups, DIY links and retained client entrypoints. Runtime network results must be recorded separately.",
+  "inventory": { "adminRouterModulesWithPageImports": 14, "pageImportDeclarationsBeforeRuntimeFiltering": 176, "apiExportsInAdminSource": 826, "coverage": "Source-wide route/API inventory and targeted reachability review of confirmed conflicts, shared layout, user forms and DIY links. Entries below do not prove that every dynamic API export is reachable. Remaining dynamic forms, H5 and MP-WEIXIN traffic require staging traces." },
+  "verificationStatus": {
+    "maintenanceCheck": "passed: 108 regression tests, 595 assertions, PHP lint, frontend static checks and admin contract",
+    "adminBuild": "passed: isolated production build in /tmp/crmeb-admin-404-final; existing CSS order warnings",
+    "diffCheck": "passed",
+    "browserAndNetwork": "not verified: no staging site or browser request trace",
+    "h5AndMpWeixinBuilds": "not verified: HBuilderX unavailable",
+    "databaseCopyMigration": "not verified: no test database copy supplied",
+    "paymentAndDevice": "not verified: no real WeChat gateway or device test"
+  },
+  "requests": [
+    { "page": "admin/user/list", "trigger": "mounted", "method": "GET", "path": "user/user_level/vip_list", "backend": "adminapi/route/user.php (removed)", "status": "confirmed-conflict", "fix": "template/admin/src/pages/user/list/index.vue", "verification": "admin-api-contract.cjs; browser pending" },
+    { "page": "admin/user/list", "trigger": "mounted", "method": "GET", "path": "agent/level", "backend": "adminapi/route/agent.php (removed)", "status": "confirmed-conflict", "fix": "template/admin/src/pages/user/list/index.vue", "verification": "admin-api-contract.cjs; browser pending" },
+    { "page": "admin/user/list", "trigger": "created, filter, export", "method": "GET", "path": "user/user", "backend": "adminapi/route/user.php resource index", "status": "retained", "verification": "regression; browser pending" },
+    { "page": "admin/user/list", "trigger": "group picker", "method": "GET", "path": "user/user_group/list", "backend": "adminapi/route/user.php", "status": "retained", "verification": "regression; browser pending" },
+    { "page": "admin/user/list", "trigger": "more actions", "method": "GET", "path": "user/give_level_time/:id", "backend": "adminapi/route/user.php (removed)", "status": "retired-entry", "fix": "template/admin/src/pages/user/list/index.vue", "verification": "admin-api-contract.cjs" },
+    { "page": "admin/user/list/detail", "trigger": "detail tabs", "method": "GET", "path": "user/one_info/:id?type=integral|sign|spread|balance_change", "backend": "adminapi/controller/v1/user/User.php", "status": "retired-entry", "fix": "template/admin/src/pages/user/list/handle/userDetails.vue", "verification": "admin-api-contract.cjs; regression" },
+    { "page": "admin/user/list/detail", "trigger": "detail tabs", "method": "GET", "path": "user/one_info/:id?type=order|coupon", "backend": "adminapi/controller/v1/user/User.php", "status": "retained", "verification": "regression; browser pending" },
+    { "page": "admin/user/list/edit", "trigger": "save", "method": "PUT", "path": "user/user/:uid", "backend": "adminapi/controller/v1/user/User.php", "status": "retained", "verification": "regression; browser pending" },
+    { "page": "admin/setting/pages", "trigger": "link category", "method": "GET", "path": "diy/get_page_category", "backend": "adminapi/route/diy.php (dynamic category data)", "status": "dynamic-unverified", "fix": "template/admin/src/components/linkaddress/index.vue; template/admin/src/utils/coreStoreAdmin.js", "verification": "seeded retired link categories filtered by name in contract; test environment link picker pending" },
+    { "page": "admin/layout/notice", "trigger": "notifications", "method": "GET", "path": "notice (WebSocket)", "backend": "deploy/production/nginx.conf -> workerman:40001", "status": "retained", "verification": "live websocket pending" },
+    { "page": "admin/layout/notice", "trigger": "open notification menu", "method": "GET", "path": "jnotice", "backend": "adminapi/controller/Common.php; adminapi/route/common.php", "status": "retained", "fix": "crmeb/app/adminapi/controller/Common.php", "verification": "regression; browser pending" },
+    { "page": "admin/public", "trigger": "navigation", "method": "GET", "path": "admin/system_static/js/:hash.js", "backend": "deploy/production/nginx.conf public mount", "status": "dynamic-unverified", "verification": "paired staging artifacts pending" },
+    { "page": "uni-app/H5 and MP-WEIXIN", "trigger": "retained pages and saved DIY links", "method": "GET", "path": "api/:dynamic-route", "backend": "app/api/route/ (runtime platform routes)", "status": "dynamic-unverified", "verification": "HBuilderX platform build and on-device trace pending" }
+  ]
+}

@@ -84,24 +84,6 @@ export default {
           read: 0,
         });
       });
-      ws.$on('WITHDRAW', function (data) {
-        // that.$Notice.warning({
-        //   title: '提现提醒',
-        //   duration: 8,
-        //   desc: '有用户申请提现,编号为(' + data.id + '),请注意查看',
-        // });
-        that.$notify.info({
-          title: '提现提醒',
-          message: '有用户申请提现,编号为(' + data.id + '),请注意查看',
-        });
-        that.messageList.push({
-          title: '退款订单提醒',
-          icon: 'md-people',
-          iconColor: '#f06292',
-          time: 0,
-          read: 0,
-        });
-      });
       ws.$on('STORE_STOCK', function (data) {
         that.$notify.info({
           title: '库存预警',
@@ -131,7 +113,7 @@ export default {
     });
   },
   filters: {
-    // 1 待发货 2 库存报警  3评论回复  4提现申请
+    // 1 待发货 2 库存报警  3评论回复
     msgType(type) {
       let typeName;
       switch (type) {
@@ -143,9 +125,6 @@ export default {
           break;
         case 3:
           typeName = '评论回复';
-          break;
-        case 4:
-          typeName = '提现申请';
           break;
         default:
           typeName = '其它';

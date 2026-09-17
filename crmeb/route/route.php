@@ -22,7 +22,8 @@ Route::miss(function () {
     switch (strtolower($appName)) {
         case config('app.admin_prefix', 'admin'):
         case 'app':
-            return view(app()->getRootPath() . 'public' . DS . config('app.admin_prefix', 'admin') . DS . 'index.html');
+            return view(app()->getRootPath() . 'public' . DS . config('app.admin_prefix', 'admin') . DS . 'index.html')
+                ->header(['Cache-Control' => 'no-cache, must-revalidate']);
         case 'home':
             if (request()->isMobile()) {
                 return redirect(app()->route->buildUrl('/'));

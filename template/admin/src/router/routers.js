@@ -24,6 +24,7 @@ import statistic from './modules/statistic';
 import frameOut from './modules/frameOut';
 import settings from '@/setting';
 import crud from './modules/crud';
+import { filterRemovedAdminRoutes } from '@/utils/coreStoreAdmin';
 
 const modulesFiles = require.context('./modules/crud', true, /\.js$/);
 
@@ -213,4 +214,4 @@ const errorPage = [
 export const frameInRoutes = frameIn;
 
 // 重新组织后导出
-export default [...frameIn, ...frameOuts, ...errorPage];
+export default [...filterRemovedAdminRoutes(frameIn), ...frameOuts, ...errorPage];

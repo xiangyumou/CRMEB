@@ -47,16 +47,8 @@
       <div class="section-hd">用户概况</div>
       <div class="section-bd">
         <div class="item">
-          <div>推广资格：</div>
-          <div class="value">{{ psInfo.spread_open ? '开启' : '关闭' }}</div>
-        </div>
-        <div class="item">
           <div>用户状态：</div>
           <div class="value">{{ psInfo.status ? '开启' : '锁定' }}</div>
-        </div>
-        <div class="item">
-          <div>用户等级：</div>
-          <div class="value">{{ psInfo.vip_name || '-' }}</div>
         </div>
         <div class="item">
           <div>用户标签：</div>
@@ -67,24 +59,12 @@
           <div class="value">{{ psInfo.group_name || '-' }}</div>
         </div>
         <div class="item">
-          <div>推广人：</div>
-          <div class="value">{{ psInfo.spread_uid_nickname || '-' }}</div>
-        </div>
-        <div class="item">
           <div>注册时间：</div>
           <div class="value">{{ psInfo.add_time | timeFormat }}</div>
         </div>
         <div class="item">
           <div>登录时间：</div>
           <div class="value">{{ psInfo.last_time | timeFormat }}</div>
-        </div>
-        <div v-if="psInfo.is_money_level" class="item">
-          <div>付费会员：</div>
-          <div class="value">
-            {{
-              psInfo.is_ever_level == 1 ? '永久会员' : psInfo.overdue_time ? `${psInfo.overdue_time} 到期` : '已过期'
-            }}
-          </div>
         </div>
       </div>
     </div>

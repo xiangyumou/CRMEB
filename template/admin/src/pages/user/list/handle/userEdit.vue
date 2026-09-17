@@ -66,16 +66,6 @@
         ></el-input>
       </el-form-item>
 
-      <el-form-item label="用户等级：">
-        <el-select v-model="formItem.level" class="form-sty" clearable>
-          <el-option
-            v-for="(item, index) in infoData.levelInfo"
-            :key="index"
-            :value="item.id"
-            :label="item.name"
-          ></el-option>
-        </el-select>
-      </el-form-item>
       <el-form-item label="用户分组：">
         <el-select v-model="formItem.group_id" class="form-sty" clearable>
           <el-option
@@ -114,20 +104,6 @@
           </div>
           <span class="addfont" v-db-click @click="addLabel">新增标签</span>
         </div>
-      </el-form-item>
-      <el-form-item label="分销禁用：">
-        <el-radio-group v-model="formItem.spread_open" class="form-sty">
-          <el-radio :label="0">是</el-radio>
-          <el-radio :label="1">否</el-radio>
-        </el-radio-group>
-        <div class="tip">禁用用户的分销资格后，在任何分销模式下该用户都无分销权限</div>
-      </el-form-item>
-      <el-form-item label="分销权限：" v-if="formItem.spread_open == 1">
-        <el-radio-group v-model="formItem.is_promoter" class="form-sty">
-          <el-radio :label="1">开启</el-radio>
-          <el-radio :label="0">关闭</el-radio>
-        </el-radio-group>
-        <div class="tip">手动开启或关闭用户的分销权限</div>
       </el-form-item>
       <el-form-item label="用户状态：">
         <el-radio-group v-model="formItem.status" class="form-sty">
@@ -188,20 +164,15 @@ export default {
         mark: '',
         pwd: '',
         true_pwd: '',
-        level: '',
         group_id: '',
         label_id: [],
-        spread_open: 1,
-        is_promoter: 0,
         status: 1,
       },
       groupInfo: [],
       labelInfo: [],
-      levelInfo: [],
       infoData: {
         groupInfo: [],
         labelInfo: [],
-        levelInfo: [],
       },
       ruleValidate: {
         real_name: [{ required: true, message: ' ', trigger: 'blur' }],
@@ -214,7 +185,6 @@ export default {
   },
   mounted() {
     this.$set(this.infoData, 'groupInfo', this.userData.groupInfo);
-    this.$set(this.infoData, 'levelInfo', this.userData.levelInfo);
     this.$set(this.infoData, 'labelInfo', this.userData.labelInfo);
     let arr = Object.keys(this.formItem);
     if (this.userData.userInfo) {
@@ -269,11 +239,8 @@ export default {
         mark: '',
         pwd: '',
         true_pwd: '',
-        level: '',
         group_id: '',
         label_id: [],
-        spread_open: 1,
-        is_promoter: 0,
         status: 1,
       };
     },

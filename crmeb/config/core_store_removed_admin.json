@@ -1,0 +1,34 @@
+{
+  "menuPaths": [
+    "/user/level", "/user/grade",
+    "/agent", "/setting/system_config_retail",
+    "/setting/membership_level", "/setting/member_config",
+    "/marketing/store_seckill", "/marketing/store_seckill_data",
+    "/marketing/store_bargain", "/marketing/store_integral", "/marketing/lottery",
+    "/marketing/live", "/marketing/point_record", "/marketing/point_statistic",
+    "/marketing/integral", "/marketing/recharge",
+    "/finance/user_recharge", "/finance/user_extract", "/finance/finance/commission",
+    "/finance/balance", "/statistic/balance",
+    "/kefu",
+    "/setting/store_service", "/setting/freight/city",
+    "/setting/merchant/system_store"
+  ],
+  "api": [
+    { "method": "GET", "path": "user/user_level/vip_list" },
+    { "method": "GET", "path": "agent/level" },
+    { "method": "GET", "path": "user/give_level/:id" },
+    { "method": "PUT", "path": "user/save_give_level/:id" },
+    { "method": "DELETE", "path": "user/del_level/:id" },
+    { "method": "GET", "path": "user/give_level_time/:id" },
+    { "method": "PUT", "path": "agent/stair/delete_spread/:id" },
+    { "method": "PUT", "path": "user/update_other/:id" },
+    { "method": "GET", "path": "user/one_info/:id?type=integral|sign|spread|balance_change" }
+  ],
+  "removedLinkTypes": ["seckill", "bargain", "integral", "lottery_list"],
+  "removedLinkCategoryNames": ["秒杀链接", "砍价链接", "积分链接", "抽奖链接"],
+  "removedLinkPaths": [
+    "/kefu",
+    "/pages/activity/goods_seckill_details", "/pages/activity/goods_bargain_details",
+    "/pages/points_mall", "/pages/goods/lottery"
+  ]
+}

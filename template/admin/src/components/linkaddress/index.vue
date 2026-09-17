@@ -17,35 +17,13 @@
             </div>
           </div>
         </div>
-        <div class="right_box" v-if="currenType == 'marketing_link' && coupon.length">
-          <div>
+        <div class="right_box" v-if="currenType == 'marketing_link' && (coupon.length || userList.length || advanceList.length)">
+          <div v-if="coupon.length">
             <div class="cont">优惠券</div>
             <div class="Box">
               <div class="cont_box" :class="currenId == item.id ? 'on' : ''" v-for="(item, index) in coupon"
                 :key="index" v-db-click @click="getUrl(item)">
                 {{ item.name }}
-              </div>
-            </div>
-          </div>
-          <div>
-            <div v-permission="'seckill'" v-if="basicsList.length">
-              <div class="cont">秒杀</div>
-              <div class="Box">
-                <div class="cont_box" :class="currenId == item.id ? 'on' : ''" v-for="(item, index) in basicsList"
-                  :key="index" v-db-click @click="getUrl(item)">
-                  {{ item.name }}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div>
-            <div v-permission="'bargain'" v-if="distributionList.length">
-              <div class="cont">砍价</div>
-              <div class="Box">
-                <div class="cont_box" :class="currenId == item.id ? 'on' : ''" v-for="(item, index) in distributionList"
-                  :key="index" v-db-click @click="getUrl(item)">
-                  {{ item.name }}
-                </div>
               </div>
             </div>
           </div>
@@ -60,20 +38,11 @@
               </div>
             </div>
           </div>
-          <div v-if="integral.length">
-            <div class="cont">积分</div>
+          <div v-if="advanceList.length">
+            <div class="cont">预售</div>
             <div class="Box">
-              <div class="cont_box" :class="currenId == item.id ? 'on' : ''" v-for="(item, index) in integral"
-                :key="index" v-db-click @click="getUrl(item)">
-                {{ item.name }}
-              </div>
-            </div>
-          </div>
-          <div v-if="luckDraw.length">
-            <div class="cont">抽奖</div>
-            <div class="Box">
-              <div class="cont_box" :class="currenId == item.id ? 'on' : ''" v-for="(item, index) in luckDraw"
-                :key="index" v-db-click @click="getUrl(item)">
+              <div class="cont_box" :class="currenId == item.id ? 'on' : ''" v-for="item in advanceList"
+                :key="item.id" v-db-click @click="getUrl(item)">
                 {{ item.name }}
               </div>
             </div>
@@ -83,13 +52,9 @@
           currenType == 'special' ||
           currenType == 'product_category' ||
           currenType == 'product' ||
-          currenType == 'seckill' ||
-          currenType == 'bargain' ||
           currenType == 'combination' ||
           currenType == 'news' ||
-          currenType == 'advance' ||
-          currenType == 'integral' ||
-          currenType == 'lottery_list'
+          currenType == 'advance'
         ">
           <el-form ref="formValidate" :model="formValidate" class="tabform" v-if="currenType == 'product'">
             <el-row :gutter="24">
@@ -120,12 +85,9 @@
           <el-table row-key="id" ref="table" empty-text="暂无数据" :data="tableList" v-loading="loading" :max-height="currenType == 'product_category'
               ? '460'
               : currenType == 'product' ||
-                currenType == 'seckill' ||
-                currenType == 'bargain' ||
                 currenType == 'advance' ||
                 currenType == 'combination' ||
-                currenType == 'news' ||
-                currenType == 'integral'
+                currenType == 'news'
                 ? '428'
                 : ''
             ">
@@ -133,14 +95,10 @@
               [
                 'special',
                 'product',
-                'seckill',
                 'product_category',
-                'bargain',
                 'combination',
                 'advance',
-                'integral',
                 'news',
-                'lottery_list',
                 'link',
               ].includes(currenType)
             ">
@@ -153,16 +111,12 @@
               ? columns
               : currenType == 'product_category'
                 ? columns7
-                : currenType == 'bargain' ||
-                  currenType == 'combination' ||
-                  currenType == 'advance' ||
-                  currenType == 'integral'
+                : currenType == 'combination' ||
+                  currenType == 'advance'
                   ? bargain
                   : currenType == 'news'
                     ? news
-                    : currenType == 'lottery_list'
-                      ? lottery
-                      : currenType == 'link'
+                    : currenType == 'link'
                         ? diyLink
                         : columns8" :key="index">
               <template slot-scope="scope">
@@ -198,13 +152,9 @@
           <div class="acea-row row-right page" v-if="
             currenType == 'product' ||
             currenType == 'special' ||
-            currenType == 'seckill' ||
-            currenType == 'bargain' ||
             currenType == 'advance' ||
             currenType == 'combination' ||
-            currenType == 'news' ||
-            currenType == 'integral' ||
-            currenType == 'lottery_list'
+            currenType == 'news'
           ">
             <pagination v-if="total" :total="total" :page.sync="formValidate.page" :limit.sync="formValidate.limit"
               @pagination="getList" />
@@ -261,14 +211,8 @@
 <script>
 import { pageCategory, pageLink, saveLink } from '@/api/diy';
 import { cascaderListApi, changeListApi } from '@/api/product';
-import {
-  seckillListApi,
-  combinationListApi,
-  bargainListApi,
-  integralProductListApi,
-  presellListApi,
-} from '@/api/marketing';
-import { lotteryList } from '@/api/lottery';
+import { combinationListApi, presellListApi } from '@/api/marketing';
+import { filterStoreLinkCategories, isRemovedStoreLink } from '@/utils/coreStoreAdmin';
 import { cmsListApi } from '@/api/cms';
 import { linkListApi } from '@/api/setting';
 export default {
@@ -369,17 +313,6 @@ export default {
           key: 'title',
         },
       ],
-      lottery: [
-        {
-          title: 'ID',
-          key: 'id',
-          width: 60,
-        },
-        {
-          title: '名称',
-          key: 'name',
-        },
-      ],
       formValidate: {
         page: 1,
         limit: 15,
@@ -387,12 +320,9 @@ export default {
         store_name: '',
       },
       total: 0,
-      basicsList: [],
       userList: [],
-      distributionList: [],
+      advanceList: [],
       coupon: [],
-      luckDraw: [],
-      integral: [],
       currenId: '',
       currenUrl: '',
       loading: false,
@@ -421,6 +351,9 @@ export default {
     this.goodsCategory();
   },
   methods: {
+    showLinkError(error, fallback) {
+      if (!error || !error._messageShown) this.$message.error((error && error.msg) || fallback);
+    },
     getTemplateRow(row) {
       this.presentId = row.id;
       this.currenUrl = row.url;
@@ -443,7 +376,7 @@ export default {
           }
         })
         .catch((res) => {
-          this.$message.error(res.msg || '删除失败');
+          this.showLinkError(res, '删除失败');
         });
     },
     customLink() {
@@ -458,10 +391,10 @@ export default {
           if (!res.data.list.length) {
             this.customNum = 2;
           }
-          this.tableList = res.data.list;
+          this.tableList = res.data.list.filter((item) => !isRemovedStoreLink(item.type, item.url));
         })
         .catch((err) => {
-          this.$message.error(err.msg || '获取自定义列表失败');
+          this.showLinkError(err, '获取自定义列表失败');
         });
     },
     getLotteryList() { },
@@ -474,6 +407,7 @@ export default {
           } else {
             url = this.customdate.mpUrl + '@APPID=' + this.customdate.appid;
           }
+          if (isRemovedStoreLink(null, url)) return this.$message.error('当前商城不支持该业务');
           this.$emit('linkUrl', url);
           this.modals = false;
           this.reset();
@@ -501,7 +435,7 @@ export default {
           this.treeSelect = res.data;
         })
         .catch((res) => {
-          this.$message.error(res.msg || '获取商品分类失败');
+          this.showLinkError(res, '获取商品分类失败');
         });
     },
     // 表格搜索
@@ -517,34 +451,33 @@ export default {
       this.customdate.url = '';
     },
     getUrl(item) {
+      if (isRemovedStoreLink(item.type, item.url)) return;
       this.currenId = item.id;
       this.currenUrl = item.url;
     },
     getSort() {
       pageCategory()
         .then((res) => {
-          if (res.data.length) {
-            res.data[0].children[0].selected = true;
-          }
-          this.categoryData = res.data;
-          if (
-            this.fromType === 'diyPage' &&
-            res.data.length &&
-            res.data[0].children.length &&
-            res.data[0].children[2]
-          ) {
-            this.handleCheckChange(res.data[0].children[2]);
-          } else if (res.data.length && res.data[0].children.length && res.data[0].children[0].children.length) {
-            this.handleCheckChange(res.data[0].children[0].children[0]);
+          this.categoryData = filterStoreLinkCategories(res.data || []);
+          const firstGroup = this.categoryData[0] && this.categoryData[0].children;
+          const firstCategory = firstGroup && (this.fromType === 'diyPage' ? firstGroup.find((item) => item.type === 'product') : firstGroup[0]);
+          if (firstCategory) {
+            firstCategory.selected = true;
+            const leaf = firstCategory.children && firstCategory.children.length ? firstCategory.children[0] : firstCategory;
+            this.handleCheckChange(leaf);
           }
         })
         .catch((err) => {
-          this.$message.error(err.msg || '获取链接分类失败');
+          this.showLinkError(err, '获取链接分类失败');
         });
     },
     getList() {
       this.loading = true;
       this.formValidate.limit = 15;
+      if (isRemovedStoreLink(this.currenType)) {
+        this.loading = false;
+        return;
+      }
       if (this.currenType == 'product') {
         changeListApi(this.formValidate)
           .then(async (res) => {
@@ -558,22 +491,7 @@ export default {
           })
           .catch((res) => {
             this.loading = false;
-            this.$message.error(res.msg || '获取列表失败');
-          });
-      } else if (this.currenType == 'seckill') {
-        seckillListApi(this.formValidate)
-          .then(async (res) => {
-            let data = res.data;
-            data.list.forEach((e) => {
-              e.url = `/pages/activity/goods_seckill_details/index?id=${e.id}&status=1`;
-            });
-            this.tableList = data.list;
-            this.total = res.data.count;
-            this.loading = false;
-          })
-          .catch((res) => {
-            this.loading = false;
-            this.$message.error(res.msg || '获取秒杀列表失败');
+            this.showLinkError(res, '获取列表失败');
           });
       } else if (this.currenType == 'advance') {
         presellListApi(this.formValidate)
@@ -588,23 +506,7 @@ export default {
           })
           .catch((res) => {
             this.loading = false;
-            this.$message.error(res.msg || '获取预售列表失败');
-            advance;
-          });
-      } else if (this.currenType == 'bargain') {
-        bargainListApi(this.formValidate)
-          .then(async (res) => {
-            let data = res.data;
-            data.list.forEach((e) => {
-              e.url = `/pages/activity/goods_bargain_details/index?id=${e.id}`;
-            });
-            this.tableList = data.list;
-            this.total = res.data.count;
-            this.loading = false;
-          })
-          .catch((res) => {
-            this.loading = false;
-            this.$message.error(res.msg || '获取砍价列表失败');
+            this.showLinkError(res, '获取预售列表失败');
           });
       } else if (this.currenType == 'combination') {
         combinationListApi(this.formValidate)
@@ -619,7 +521,7 @@ export default {
           })
           .catch((res) => {
             this.loading = false;
-            this.$message.error(res.msg || '获取拼团列表失败');
+            this.showLinkError(res, '获取拼团列表失败');
           });
       } else if (this.currenType == 'news') {
         cmsListApi(this.formValidate)
@@ -634,46 +536,12 @@ export default {
           })
           .catch((res) => {
             this.loading = false;
-            this.$message.error(res.msg || '获取新闻列表失败');
-          });
-      } else if (this.currenType == 'lottery_list') {
-        this.formValidate = {
-          page: 1,
-          limit: 15,
-          factor: 1,
-        };
-        lotteryList(this.formValidate)
-          .then(async (res) => {
-            let data = res.data;
-            data.list.forEach((e) => {
-              e.url = `/pages/goods/lottery/grids/index?type=1&lottery_id=${e.id}`;
-            });
-            this.tableList = data.list;
-            this.total = data.count;
-            this.loading = false;
-          })
-          .catch((res) => {
-            this.loading = false;
-            this.$message.error(res.msg || '获取抽奖列表失败');
-          });
-      } else if (this.currenType == 'integral') {
-        integralProductListApi(this.formValidate)
-          .then(async (res) => {
-            let data = res.data;
-            data.list.forEach((e) => {
-              e.url = `/pages/points_mall/integral_goods_details?id=${e.id}`;
-            });
-            this.tableList = data.list;
-            this.total = res.data.count;
-            this.loading = false;
-          })
-          .catch((res) => {
-            this.loading = false;
-            this.$message.error(res.msg || '获取积分商品列表失败');
+            this.showLinkError(res, '获取新闻列表失败');
           });
       }
     },
     handleCheckChange(data) {
+      if (isRemovedStoreLink(data.type, data.url)) return;
       this.reset();
       let id = '';
       this.treeId = data.id;
@@ -687,13 +555,9 @@ export default {
       this.currenType = data.type;
       if (
         this.currenType == 'product' ||
-        this.currenType == 'seckill' ||
-        this.currenType == 'bargain' ||
         this.currenType == 'combination' ||
         this.currenType == 'news' ||
-        this.currenType == 'advance' ||
-        this.currenType == 'integral' ||
-        this.currenType == 'lottery_list'
+        this.currenType == 'advance'
       ) {
         this.getList();
       } else if (this.currenType == 'custom') {
@@ -706,7 +570,7 @@ export default {
         linkListApi(this.formValidate)
           .then((res) => {
             this.loading = false;
-            let data = res.data.list;
+            let data = res.data.list.filter((item) => !isRemovedStoreLink(item.type, item.url));
             this.total = res.data.count;
             if (this.currenType == 'special') {
               let list = [];
@@ -717,6 +581,11 @@ export default {
               this.tableList = list;
             } else {
               this.tableList = data;
+            }
+            if (this.currenType == 'marketing_link') {
+              this.userList = data.filter((item) => item.type == 3 || /goods_combination/.test(item.url || ''));
+              this.advanceList = data.filter((item) => /presell|advance/.test(item.url || ''));
+              this.coupon = data.filter((item) => !this.userList.includes(item) && !this.advanceList.includes(item));
             }
             // if (this.currenType == 'marketing_link' || this.currenType == 'link') {
             //   let basicsList = [];
@@ -769,11 +638,12 @@ export default {
           })
           .catch((err) => {
             this.loading = false;
-            this.$message.error(err.msg || '获取链接列表失败');
+            this.showLinkError(err, '获取链接列表失败');
           });
       }
     },
     ok() {
+      if (isRemovedStoreLink(null, this.currenUrl)) return this.$message.warning('当前商城不支持该业务');
       if (this.currenUrl == '') {
         return this.$message.warning('请选择链接');
       } else {

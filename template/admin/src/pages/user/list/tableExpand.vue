@@ -28,10 +28,6 @@
         <span class="expand-value">{{ row.birthday }}</span>
       </el-col>
       <el-col :span="6">
-        <span class="expand-key">推荐人：</span>
-        <span class="expand-value">{{ row.spread_uid_nickname }}</span>
-      </el-col>
-      <el-col :span="6">
         <span class="expand-key">地址：</span>
         <span class="expand-value">{{ row.addres }}</span>
       </el-col>

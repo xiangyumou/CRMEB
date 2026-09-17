@@ -42,6 +42,7 @@ class User extends AuthController
      */
     public function index()
     {
+        \app\services\CoreStore::assertAdminUser($this->request->get());
         $where = $this->request->getMore([
             ['page', 1],
             ['limit', 20],
@@ -107,6 +108,7 @@ class User extends AuthController
      */
     public function save()
     {
+        \app\services\CoreStore::assertAdminUser($this->request->post());
         $data = $this->request->postMore([
             ['real_name', ''],
             ['phone', 0],
@@ -328,43 +330,6 @@ class User extends AuthController
     }
 
     /**
-     * 编辑其他
-     * @param $id
-     * @return mixed
-     * @throws \FormBuilder\Exception\FormBuilderException
-     */
-    public function edit_other($id, $type)
-    {
-        if (!$id) return app('json')->fail('数据不存在');
-        return app('json')->success($this->services->editOther((int)$id, $type));
-    }
-
-    /**
-     * 执行编辑其他
-     * @param $id
-     * @return mixed
-     * @throws \think\Exception
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function update_other($id)
-    {
-        $data = $this->request->postMore([
-            ['money_status', 0],
-            ['money', 0],
-            ['integration_status', 0],
-            ['integration', 0],
-            ['mark', ''],
-        ]);
-        if (!$id) return app('json')->fail('参数错误');
-        $data['adminId'] = $this->adminId;
-        $data['money'] = (string)$data['money'];
-        $data['integration'] = (string)$data['integration'];
-        $data['is_other'] = true;
-        return app('json')->success($this->services->updateInfo($id, $data) ? '修改成功' : '修改失败');
-    }
-
-    /**
      * 编辑会员信息
      * @param $id
      * @return mixed
@@ -386,6 +351,7 @@ class User extends AuthController
      */
     public function update($id)
     {
+        \app\services\CoreStore::assertAdminUser($this->request->post());
         $data = $this->request->postMore([
             ['money_status', 0],
             ['is_promoter', 0],
@@ -437,6 +403,12 @@ class User extends AuthController
             unset($data['pwd']);
         }
         unset($data['true_pwd']);
+        $existing = $this->services->getUserInfo((int)$id);
+        if ($existing) {
+            $data['level'] = $existing['level'];
+            $data['is_promoter'] = $existing['is_promoter'];
+            $data['spread_open'] = $existing['spread_open'];
+        }
         $data['adminId'] = $this->adminId;
         $data['money'] = (string)$data['money'];
         $data['integration'] = (string)$data['integration'];
@@ -455,6 +427,9 @@ class User extends AuthController
         ]);
         $id = (int)$id;
         if ($data['type'] == '') return app('json')->fail('参数错误');
+        if (!in_array($data['type'], ['order', 'coupon'], true)) {
+            throw new \crmeb\exceptions\ApiException('当前商城不支持该业务');
+        }
         return app('json')->success($this->services->oneUserInfo($id, $data['type']));
     }
 
