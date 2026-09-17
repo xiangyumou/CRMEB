@@ -783,17 +783,14 @@ class StoreOrderCreateServices extends BaseServices
      * 计算实际佣金
      * @param int $uid
      * @param array $cartInfo
-     * @return array
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
+     * @return array 返回 [每个商品的购物车数据, [一级返佣uid, 二级返佣uid]]
      */
     public function computeOrderProductBrokerage(int $uid, array $cartInfo)
     {
         foreach ($cartInfo as &$cart) {
             foreach (['one_brokerage','two_brokerage','staff_brokerage','agent_brokerage','division_brokerage'] as $field) $cart[$field] = '0.00';
         }
-        return $cartInfo;
+        return [$cartInfo, []];
     }
 
 

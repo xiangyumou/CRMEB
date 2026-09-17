@@ -27,6 +27,7 @@
 ## Required follow-up coverage
 
 - [x] PRICE-003 Ordinary item pricing, coupon thresholds and freight boundaries.
+- [x] PRICE-004 Multi-item order pricing returns the cart list with its spread ids and splits the coupon across every row.
 - [ ] ORDER-001 Cart, confirmation, creation, payment, delivery and receipt lifecycle.
 - [x] BALANCE-005 Competing full order payments with persisted ledger and order assertions.
 - [ ] GATEWAY-001 Offline WeChat V2/V3 and Alipay signature, tampering and amount checks.
