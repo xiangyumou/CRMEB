@@ -4,8 +4,8 @@ This runbook is for the existing `x-zoo.vip` server. Its repository remote point
 
 ## First migration
 
-1. Build and validate the complete release in CI. Check the `release-record-<SHA>` artifact and verify the published `edge` image contains the same full revision. Ensure there is a current MySQL backup and at least 5 GB free space.
-2. Transfer the matching `deployment-config.tar.gz` artifact to `/home/ubuntu/apps/CRMEB` and extract it there. It contains `compose.yaml`, `deploy/production/compose.yml`, `deploy/production/nginx.conf`, `normalize.sh`, `rollback.sh`, and `docker/cache-assets.sh`. The existing `docker-compose.yml` remains available until the migration succeeds.
+1. Build and validate the complete release in CI. Pull `ghcr.io/xiangyumou/crmeb-release:sha-<full commit>` on an authenticated workstation, inspect `/release/release.json`, and verify the published `edge` image contains the same full revision. Ensure there is a current MySQL backup and at least 5 GB free space.
+2. Extract `/release/deployment-config.tar.gz` from that release package and transfer it to `/home/ubuntu/apps/CRMEB`. For example, run `docker create ghcr.io/xiangyumou/crmeb-release:sha-<full commit> /`, then `docker cp <container-id>:/release/deployment-config.tar.gz .`, `docker rm <container-id>`, and `scp deployment-config.tar.gz ubuntu@43.142.105.205:/home/ubuntu/apps/CRMEB/`. Extract the archive on the server. It contains `compose.yaml`, `deploy/production/compose.yml`, `deploy/production/nginx.conf`, `normalize.sh`, `rollback.sh`, and `docker/cache-assets.sh`. The existing `docker-compose.yml` remains available until the migration succeeds.
 3. On the server run `bash deploy/production/normalize.sh --check`, then during a maintenance window run `bash deploy/production/normalize.sh --apply`. The script verifies a new database backup by restoring it to a disposable isolated MySQL container before stopping application services. It does not modify or restart the production database data directory.
 4. Verify `docker compose ps`, `https://x-zoo.vip/readyz`, `/admin/`, `/pages/index/index`, `/api/version`, and `/notice`. Check logs for queue, timer and workerman. Keep the old image and all directories in `deployment/normalize-backups/` and `deployment/releases/`.
 
@@ -27,7 +27,7 @@ The admin and H5 files come from the same image as the backend. Old content-hash
 
 ## Rollback
 
-Record the previous immutable `sha-<40-character commit>` tag or the `backendImageDigest` in the `release-record-<SHA>` artifact before an update. To pin a known-good image:
+Record the previous immutable `sha-<40-character commit>` tag or the `backendImageDigest` in the matching `crmeb-release:sha-<full commit>` package before an update. To pin a known-good image:
 
 ```sh
 bash deploy/production/rollback.sh ghcr.io/xiangyumou/crmeb@sha256:<64-hex-digit-digest>

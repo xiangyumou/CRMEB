@@ -7,8 +7,6 @@ on:
   push:
     branches:
       - master
-    tags:
-      - "v*.*.*"
 
 permissions:
   contents: read
@@ -19,10 +17,12 @@ concurrency:
 
 env:
   IMAGE_NAME: ghcr.io/xiangyumou/crmeb
+  RELEASE_NAME: ghcr.io/xiangyumou/crmeb-release
 
 jobs:
   validate:
     name: Validate ${{ matrix.platform }}
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: frontend
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -37,6 +37,7 @@ jobs:
             runner: ubuntu-24.04-arm
     permissions:
       contents: read
+      packages: write
       security-events: write
     steps:
       - name: Check out repository
@@ -45,10 +46,22 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - uses: actions/download-artifact@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
         with:
-          name: release-input
-          path: .build/release
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retrieve release inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "$RELEASE_NAME:input-$GITHUB_SHA"
+          container="$(docker create "$RELEASE_NAME:input-$GITHUB_SHA" /)"
+          mkdir -p .build/release
+          docker cp "$container:/release/." .build/release
+          docker rm "$container"
 
       - name: Build test image
         uses: docker/build-push-action@v7
@@ -58,22 +71,15 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: false
           tags: crmeb-ci:${{ matrix.slug }}-${{ github.sha }}
-          cache-from: type=gha,scope=validate-${{ matrix.slug }}
-          cache-to: type=gha,mode=max,scope=validate-${{ matrix.slug }}
           build-args: VCS_REF=${{ github.sha }}
 
       - name: Verify image
         run: sh docker/verify-image.sh crmeb-ci:${{ matrix.slug }}-${{ github.sha }}
 
-      - name: Save tested image
-        run: docker save crmeb-ci:${{ matrix.slug }}-${{ github.sha }} -o /tmp/crmeb-${{ matrix.slug }}.tar
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: tested-image-${{ matrix.slug }}
-          path: /tmp/crmeb-${{ matrix.slug }}.tar
-          retention-days: 1
-          compression-level: 0
+      - name: Stage verified architecture image
+        run: |
+          docker tag crmeb-ci:${{ matrix.slug }}-${{ github.sha }} "$IMAGE_NAME:ci-${{ github.sha }}-${{ matrix.slug }}"
+          docker push "$IMAGE_NAME:ci-${{ github.sha }}-${{ matrix.slug }}"
 
       - name: Scan image
         if: matrix.platform == 'linux/amd64'
@@ -95,37 +101,32 @@ jobs:
 
   regression:
     name: Core transaction regression
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
+      packages: read
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
         with:
-          name: tested-image-amd64
-          path: /tmp/tested-images
-      - name: Load validated image
-        run: docker load -i /tmp/tested-images/crmeb-amd64.tar
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Retrieve verified image
+        run: docker pull "$IMAGE_NAME:ci-${{ github.sha }}-amd64"
 
       - name: Run regression suite
-        run: sh docker/run-regression.sh crmeb-ci:amd64-${{ github.sha }}
-
-      - name: Upload regression report
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: core-regression-report
-          path: tests/regression/artifacts/junit.xml
-          if-no-files-found: error
-          retention-days: 14
+        run: sh docker/run-regression.sh "$IMAGE_NAME:ci-${{ github.sha }}-amd64"
 
   http_stack:
     name: HTTP stack ${{ matrix.platform }}
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: [validate, regression]
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -140,22 +141,27 @@ jobs:
             runner: ubuntu-24.04-arm
     permissions:
       contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
         with:
-          name: tested-image-${{ matrix.slug }}
-          path: /tmp/tested-images
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Verify complete HTTP stack
         run: |
-          docker load -i /tmp/tested-images/crmeb-${{ matrix.slug }}.tar
-          sh docker/verify-http-stack.sh crmeb-ci:${{ matrix.slug }}-${{ github.sha }}
+          docker pull "$IMAGE_NAME:ci-${{ github.sha }}-${{ matrix.slug }}"
+          sh docker/verify-http-stack.sh "$IMAGE_NAME:ci-${{ github.sha }}-${{ matrix.slug }}"
 
   frontend:
     name: Frontend source and admin build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
@@ -181,19 +187,55 @@ jobs:
             compose.yaml deploy/production/compose.yml deploy/production/nginx.conf \
             deploy/production/normalize.sh deploy/production/rollback.sh \
             deploy/production/migrate-all-in-one.sh docker/cache-assets.sh
-      - name: Upload paired frontend and image inputs
-        uses: actions/upload-artifact@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
         with:
-          name: release-input
-          path: .build/release/
-          retention-days: 90
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Stage all frontend inputs
+        run: |
+          docker build -f docker/release.Dockerfile -t "$RELEASE_NAME:input-$GITHUB_SHA" .build/release
+          docker push "$RELEASE_NAME:input-$GITHUB_SHA"
+
+  pr_check:
+    name: Pull request ${{ matrix.platform }}
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            slug: amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            slug: arm64
+            runner: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
         with:
-          name: mp-weixin-test-${{ github.sha }}
-          path: .build/release/mpWeixin/
-          retention-days: 90
+          node-version: '20.19.0'
+      - name: Check source and build all frontends
+        run: |
+          npm ci --prefix template/admin --no-audit --no-fund
+          npm run lint:check --prefix template/admin -- src/utils/diyRegistry.js src/pages/setting/devise/diyIndex.vue
+          node tests/static/core-store-front.cjs
+          node tests/static/verify-release-test.cjs
+          node tests/static/wechat-payment-test.mjs
+          bash scripts/build-release.sh
+      - name: Build and validate image
+        run: |
+          docker build --build-arg VCS_REF="$GITHUB_SHA" -t crmeb-pr:${{ matrix.slug }} .
+          sh docker/verify-image.sh crmeb-pr:${{ matrix.slug }}
+      - name: Test transaction regression
+        if: matrix.slug == 'amd64'
+        run: sh docker/run-regression.sh crmeb-pr:${{ matrix.slug }}
+      - name: Verify HTTP stack
+        run: sh docker/verify-http-stack.sh crmeb-pr:${{ matrix.slug }}
 
   publish:
     name: Publish multi-architecture image
@@ -220,15 +262,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: tested-image-*
-          path: /tmp/tested-images
-          merge-multiple: true
-      - uses: actions/download-artifact@v4
-        with:
-          name: release-input
-          path: .build/release
+      - name: Retrieve release inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "$RELEASE_NAME:input-$GITHUB_SHA"
+          container="$(docker create "$RELEASE_NAME:input-$GITHUB_SHA" /)"
+          mkdir -p .build/release
+          docker cp "$container:/release/." .build/release
+          docker rm "$container"
       - name: Publish tested architecture images and digest
         shell: bash
         run: |
@@ -240,9 +282,8 @@ jobs:
             fi
           done
           for arch in amd64 arm64; do
-            docker load -i "/tmp/tested-images/crmeb-$arch.tar"
-            docker tag "crmeb-ci:$arch-$GITHUB_SHA" "$IMAGE_NAME:sha-$GITHUB_SHA-$arch"
-            docker push "$IMAGE_NAME:sha-$GITHUB_SHA-$arch"
+            docker buildx imagetools create -t "$IMAGE_NAME:sha-$GITHUB_SHA-$arch" \
+              "$IMAGE_NAME:ci-$GITHUB_SHA-$arch"
           done
           docker buildx imagetools create -t "$IMAGE_NAME:sha-$GITHUB_SHA" \
             "$IMAGE_NAME:sha-$GITHUB_SHA-amd64" "$IMAGE_NAME:sha-$GITHUB_SHA-arm64"
@@ -251,6 +292,8 @@ jobs:
           test -n "$digest"
           node scripts/finalize-release.cjs "$IMAGE_NAME@$digest" ".build/release/release.json"
           node scripts/verify-release.cjs ".build/release/release.json"
+          docker build -f docker/release.Dockerfile -t "$RELEASE_NAME:sha-$GITHUB_SHA" .build/release
+          docker push "$RELEASE_NAME:sha-$GITHUB_SHA"
       - name: Promote current master to edge
         shell: bash
         run: |
@@ -258,8 +301,3 @@ jobs:
           head="$(git ls-remote origin refs/heads/master | cut -f1)"
           test "$head" = "$GITHUB_SHA" || { echo 'A newer master commit exists; edge unchanged'; exit 0; }
           docker buildx imagetools create -t "$IMAGE_NAME:edge" "$IMAGE_NAME:sha-$GITHUB_SHA"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-record-${{ github.sha }}
-          path: .build/release/release.json
-          retention-days: 90

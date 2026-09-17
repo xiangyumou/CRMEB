@@ -70,6 +70,15 @@ find app config crmeb route -type f -name "*.php" -print0 \
 '
 
 fixture_dir="$(mktemp -d)"
+test -s .build/release/build.json && test -d .build/release/public
+mkdir -p "$fixture_dir/public"
+container_id="$(docker create --entrypoint sh "$image" -c true)"
+docker cp "$container_id:/var/www/crmeb/public/." "$fixture_dir/public"
+docker cp "$container_id:/usr/local/share/crmeb/build.json" "$fixture_dir/build.json"
+docker rm "$container_id" >/dev/null
+container_id=""
+cmp .build/release/build.json "$fixture_dir/build.json"
+diff -qr --exclude=uploads .build/release/public "$fixture_dir/public"
 printf 'installed\n' > "$fixture_dir/.constant"
 container_id="$(docker run -d \
     -v "$(pwd)/docker/regression/test.env:/var/www/crmeb/.env:ro" \
