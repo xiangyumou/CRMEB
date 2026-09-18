@@ -227,4 +227,59 @@ final class RetainedPathSmokeTest extends RegressionTestCase
         self::assertNotSame(200, $response['body']['status'], json_encode($response['body'], JSON_UNESCAPED_UNICODE));
         self::assertSame(0, (int)Db::name('store_order')->where('id', $order['id'])->value('is_del'));
     }
+
+    /**
+     * The storefront read `sys_config('ali_pay_status') != '0'`, which is *true*
+     * when the row is missing. Once the migration deleted the retired payment
+     * rows, every client showed Alipay (and the balance and offline options) as
+     * available. The endpoint must report them off instead of reading a row the
+     * removed feature used to own.
+     */
+    public function testRetiredPaymentFlagsReportOffWithoutTheirConfigRows(): void
+    {
+        self::assertSame(0, (int)Db::name('system_config')->where('menu_name', 'ali_pay_status')->count(),
+            'the retired config rows should not be present in a migrated or fresh install');
+
+        $response = (new HttpTestClient())->request('GET', '/api/basic_config', null);
+        self::assertSame(200, $response['http_status']);
+        $data = $response['body']['data'] ?? [];
+        self::assertFalse((bool)($data['ali_pay_status'] ?? true), 'Alipay must not be advertised');
+        self::assertFalse((bool)($data['yue_pay_status'] ?? true), 'balance payment must not be advertised');
+        self::assertFalse((bool)($data['offline_pay_status'] ?? true), 'offline payment must not be advertised');
+        self::assertSame(0, (int)($data['store_self_mention'] ?? 1), 'self-pickup must not be advertised');
+    }
+
+    /**
+     * `StoreOrder::searchActivityTypeAttr()` was deleted with the retired
+     * activities while the 订单类型 statistic kept passing `activity_type` to the
+     * DAO. The DAO drops unknown search keys, so every bucket of the chart asked
+     * for its own name and received the whole-table total.
+     */
+    public function testOrderTypeStatisticSeparatesRetainedOrdersFromHistoricalOnes(): void
+    {
+        $fixtures = new FixtureFactory($this, $this->getName());
+        $user = $fixtures->createUser();
+        // Each bucket sums `pay_price`, so the two orders get distinct amounts:
+        // a bucket that ignores the filter reports the 13.00 total instead.
+        $fixtures->createOrder($user['uid'], [
+            'paid' => 1, 'pay_time' => time(), 'status' => 3, 'pay_price' => '10.00',
+        ]);
+        $fixtures->createOrder($user['uid'], [
+            'paid' => 1, 'pay_time' => time(), 'status' => 3, 'pay_price' => '3.00', 'advance_id' => 4242,
+        ]);
+
+        // The admin date picker joins two `yyyy/MM/dd` values with a dash, which is
+        // the only shape the time searcher splits into a range.
+        $start = date('Y/m/d', time() - 86400 * 30);
+        $end = date('Y/m/d', time() + 86400);
+
+        $buckets = app()->make(\app\services\statistic\OrderStatisticServices::class)
+            ->getType(['time' => $start . '-' . $end]);
+        $byName = [];
+        foreach ($buckets['list'] as $row) {
+            $byName[$row['name']] = (float)$row['value'];
+        }
+        self::assertSame(10.0, $byName['普通订单'] ?? null, 'only the plain order belongs in its bucket: ' . json_encode($byName));
+        self::assertSame(3.0, $byName['预售订单'] ?? null, 'only the presale order belongs in its bucket: ' . json_encode($byName));
+    }
 }

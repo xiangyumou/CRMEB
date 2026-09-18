@@ -145,3 +145,54 @@ re-verified.
   (151 tests, 613 assertions, plus the static gates), and the guards were
   confirmed to fail when a retired table name or a rollback-clobbering edit is
   reintroduced.
+
+## Mobile app and residual flags (2026-09-18)
+
+The last planned round covers the mobile (uni-app) surface and the backend flags
+the earlier rounds left reading removed settings.
+
+- **Write-off.** Self-pickup was already retired, but the mobile admin still
+  shipped "订单核销" buttons on the order list and both detail pages, all posting
+  to the deleted `order/order_verific` route, and the user-facing order detail
+  still rendered a QR code pointing at the deleted `order_cancellation` page.
+  Those, the two orphaned write-off components, and the API helpers behind them
+  are gone. Historical self-pickup orders no longer render a blank status: the
+  storefront list, the admin list and the CSV export all label them
+  "历史自提订单".
+- **Authorization.** `CustomerMiddleware` compared the request rule against a
+  whitelist whose entries (`order_verific`, `admin/order/detail/<orderId>`)
+  could never match the unprefixed rule, so removing it removes an
+  authorization hole rather than a guard: the whitelist is deleted and the
+  middleware checks the order-admin uid list alone.
+- **Flags that inverted when their rows were deleted.** `ali_pay_status`
+  returned `'' != '0'` — true — after its config row was removed, and the
+  storefront turned that into "Alipay is available". The same held for the
+  balance, offline-payment, self-pickup, level and member-card flags. They now
+  answer "off" explicitly instead of reading a missing row.
+- **`model_checkbox`.** The menu, DIY page-link and page-category DAOs, the
+  storefront permission helper and the order-type statistic still defaulted to
+  seckill/bargain/combination; only group-buying is retained, so the fallback is
+  `['combination']`. The order-type statistic's `activity_type` searcher is
+  restored — without it every bucket of the 订单类型 chart returned the same
+  whole-table total.
+- **Dead branches.** `NotifyListener`'s `attach === 'wechat'` message path, the
+  mini-program handler's `hy`/`cz` attach prefixes and the payment components'
+  all-in-one and Alipay branches have no producer since the transfer, recharge
+  and Alipay drivers were deleted; the empty transaction around take-delivery
+  and two unused parameters went with them. `crmeb/upgrade/VersionManager.php`
+  was dead since `config/upgrade.php` was removed, and the maintenance lint now
+  covers all of `crmeb/upgrade` rather than only `core-store`.
+- **Pre-existing breakage fixed in passing.** The mobile admin's "agree refund"
+  handlers imported `orderRefundAgree`, which no API module has ever exported,
+  and posted nothing; they now use the same helper as the neighbouring
+  branches. The build's remaining missing-export warnings were checked against
+  `master` and are unchanged by this work.
+
+**Verification.** The maintenance check passes (153 tests, 621 assertions, plus
+the static gates). Both H5 and MP-WEIXIN build from source with Node 20.19.0 /
+npm 10.8.2, and the build's missing-export warnings were diffed against a clean
+`master` build: this work adds none. The two new regression cases were confirmed
+to fail with the defect reintroduced (the flag test against a rebuilt image, the
+statistic test against the working tree) and to pass once fixed. Not verified
+here: on-device flows and a production gateway payment, which the release
+checklist already lists as operator steps.
