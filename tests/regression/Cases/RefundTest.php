@@ -28,17 +28,34 @@ final class RefundTest extends RegressionTestCase
         return [['yue'], ['offline'], ['alipay'], ['allinpay'], ['']];
     }
 
+    /**
+     * The complement of the refusal above: a WeChat order passes the guard, so
+     * the rejection can never be a blanket "refunds are disabled". The guard is
+     * fed a model the way the dispatch code does, which is what a type change
+     * here silently breaks.
+     */
     public function testWechatOrdersPassTheRefundGuard(): void
     {
-        $this->refundService()->exposeGuard(['pay_type' => 'weixin']);
-        self::assertTrue(true);
+        $order = new class {
+            public $pay_type = 'weixin';
+            public function getAttr(string $name): string
+            {
+                return $name === 'pay_type' ? $this->pay_type : '';
+            }
+        };
+        $this->refundService()->exposeGuard($order);
+        self::assertTrue(true, 'the guard returns instead of raising');
     }
 
-    /** The guard is protected on purpose; a test double exposes it without widening production API. */
+    /**
+     * The guard is protected on purpose; a test double exposes it without
+     * widening production API. It accepts an array or a model, because the
+     * refund dispatch hands it a model while other callers pass a row.
+     */
     private function refundService(): StoreOrderRefundServices
     {
         return new class($this->createMock(StoreOrderRefundDao::class), $this->createMock(StoreOrderServices::class)) extends StoreOrderRefundServices {
-            public function exposeGuard(array $order): void
+            public function exposeGuard($order): void
             {
                 $this->assertWechatRefundable($order);
             }
