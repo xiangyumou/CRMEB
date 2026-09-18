@@ -5,10 +5,44 @@ namespace Tests\Regression\Cases;
 
 use app\services\order\StoreOrderSuccessServices;
 use app\services\pay\PayNotifyServices;
+use Tests\Regression\Support\FixtureFactory;
 use Tests\Regression\Support\RegressionTestCase;
+use think\facade\Db;
 
 final class PaymentNotifyTest extends RegressionTestCase
 {
+    /**
+     * Two callbacks for the same order, with the real services and a real row:
+     * the first pays it, the second is acknowledged because the atomic
+     * `paid = 0` transition loses the race. The payment effects (order status,
+     * capital flow) must run once, not once per callback.
+     */
+    public function testTwoWechatCallbacksForTheSameOrderPayItExactlyOnce(): void
+    {
+        $fixtures = new FixtureFactory($this, $this->getName());
+        $user = $fixtures->createUser();
+        $order = $fixtures->createOrder($user['uid'], ['paid' => 0, 'status' => 0]);
+        $this->registerCleanup(function () use ($order, $user) {
+            Db::name('store_order_status')->where('oid', $order['id'])->delete();
+            Db::name('capital_flow')->where('order_id', $order['order_id'])->delete();
+            Db::name('store_product_log')->where('uid', $user['uid'])->where('type', 'pay')->delete();
+            Db::name('message_system')->where('uid', $user['uid'])->delete();
+        });
+
+        $notify = new PayNotifyServices();
+        self::assertTrue($notify->wechatProduct($order['order_id'], 'trade-once-1'));
+        self::assertTrue($notify->wechatProduct($order['order_id'], 'trade-once-2'), 'the losing callback is still acknowledged');
+
+        $row = Db::name('store_order')->where('id', $order['id'])->field('paid,trade_no,pay_type')->find();
+        self::assertSame(1, (int)$row['paid']);
+        self::assertSame('trade-once-1', $row['trade_no'], 'the losing callback must not overwrite the trade number');
+        self::assertSame('weixin', (string)$row['pay_type']);
+        self::assertSame(1, (int)Db::name('store_order_status')
+            ->where('oid', $order['id'])->where('change_type', 'pay_success')->count(), 'one payment status row');
+        self::assertSame(1, (int)Db::name('capital_flow')
+            ->where('order_id', $order['order_id'])->count(), 'one capital-flow row');
+    }
+
     public function testUnknownOrderIsAcknowledgedWithoutPaymentSideEffects(): void
     {
         $orders = $this->orderServiceMock();

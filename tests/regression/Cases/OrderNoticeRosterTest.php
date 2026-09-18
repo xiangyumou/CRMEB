@@ -61,11 +61,35 @@ final class OrderNoticeRosterTest extends RegressionTestCase
         $uids = array_column($recipients, 'uid');
         self::assertContains($listed['uid'], $uids);
         self::assertNotContains($other['uid'], $uids);
-        // Shape retained from the roster the notification code used to read.
         $entry = $recipients[array_search($listed['uid'], $uids, true)];
         self::assertSame('订单通知管理员', $entry['nickname']);
         self::assertSame('13700000001', $entry['phone']);
-        self::assertSame(1, (int)$entry['customer']);
+    }
+
+    /**
+     * The roster is what decides who is told about a new order: driving the real
+     * notification listener writes an in-site message for every listed
+     * administrator and nobody else. (The SMS and WeChat legs of the same
+     * listener fail offline and are swallowed by their senders.)
+     */
+    public function testNewOrderNoticeReachesExactlyTheRoster(): void
+    {
+        $fixtures = new FixtureFactory($this, $this->getName());
+        $listed = $fixtures->createUser(['nickname' => '订单通知管理员', 'phone' => '13700000001']);
+        $stranger = $fixtures->createUser(['nickname' => '普通用户']);
+        $this->setRoster([$listed['uid']]);
+        $this->registerCleanup(function () use ($fixtures) {
+            Db::name('message_system')->where('type', 2)->delete();
+        });
+
+        $order = $fixtures->createOrder($listed['uid'], ['paid' => 1, 'pay_time' => time()]);
+        (new \app\listener\notice\NoticeListener())->handle([
+            $order, 'admin_pay_success_code',
+        ]);
+
+        $notices = Db::name('message_system')->where('title', '您有新的订单待处理')->column('uid');
+        self::assertContains((int)$listed['uid'], $notices, 'the listed administrator is notified');
+        self::assertNotContains((int)$stranger['uid'], $notices, 'nobody outside the roster is notified');
     }
 
     public function testMobileOrderManagementFollowsTheRoster(): void
