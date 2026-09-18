@@ -298,29 +298,10 @@ const PRE_EXISTING = [
  * a green, working check; the next commit removes the calls and must delete the
  * entries (the resolved check below enforces that).
  */
-const PENDING_FIX = [
-  'crmeb/app/adminapi/controller/v1/diy/DiyPro.php:101 app\\services\\diy\\DiyProServices::delInfo()',
-  'crmeb/app/adminapi/controller/v1/diy/DiyPro.php:107 app\\services\\diy\\DiyProServices::setInfoStatus()',
-  'crmeb/app/adminapi/controller/v1/export/ExportExcel.php:190 app\\services\\other\\export\\ExportServices::storeProduct()',
-  'crmeb/app/adminapi/controller/v1/export/ExportExcel.php:217 app\\services\\other\\export\\ExportServices::storeOrder()',
-  'crmeb/app/api/controller/v1/PublicController.php:413 app\\services\\diy\\DiyServices::getDiyInfo()',
-  'crmeb/app/api/controller/v1/user/UserController.php:46 app\\services\\user\\UserServices::userInfo()',
-  'crmeb/app/api/controller/v1/user/UserController.php:57 app\\services\\user\\UserServices::balance()',
-  'crmeb/app/api/controller/v2/PublicController.php:45 app\\services\\user\\UserServices::offMemberLevel()',
-  'crmeb/app/jobs/OrderCreateAfterJob.php:63 app\\services\\user\\UserServices::getSpreadUid()',
-  'crmeb/app/jobs/OrderCreateAfterJob.php:69 app\\services\\user\\UserServices::getSpreadUid()',
-  'crmeb/app/jobs/OrderCreateAfterJob.php:85 app\\services\\user\\UserServices::checkUserPromoter()',
-  'crmeb/app/jobs/OrderCreateAfterJob.php:86 app\\services\\user\\UserServices::checkUserPromoter()',
-  'crmeb/app/services/activity/combination/StorePinkServices.php:624 app\\services\\user\\UserServices::checkUserPromoter()',
-  'crmeb/app/services/activity/combination/StorePinkServices.php:888 app\\services\\user\\UserServices::checkUserPromoter()',
-  'crmeb/app/services/user/UserStoreOrderServices.php:51 app\\services\\user\\UserServices::getUserSpredadUids()',
-  'crmeb/app/services/wechat/WechatReplyServices.php:67 app\\dao\\wechat\\WechatReplyDao::getListByModel()',
-  'crmeb/app/services/wechat/WechatReplyServices.php:68 app\\dao\\wechat\\WechatReplyDao::getCountByWhere()',
-];
 
-const known = [...PRE_EXISTING, ...PENDING_FIX];
+const known = PRE_EXISTING;
 const regressions = failures.filter((entry) => !known.includes(entry));
 const resolved = known.filter((entry) => !failures.includes(entry));
-assert.deepStrictEqual(resolved, [], 'These baselined calls now resolve — delete them from PRE_EXISTING/PENDING_FIX:\n' + resolved.join('\n'));
+assert.deepStrictEqual(resolved, [], 'These baselined calls now resolve — delete them from PRE_EXISTING:\n' + resolved.join('\n'));
 assert.deepStrictEqual(regressions, [], 'Calls to methods that no longer exist:\n' + regressions.join('\n'));
 console.log(`PHP symbols checked: ${resolvedCalls} resolvable calls, ${known.length} baselined (pre-existing upstream).`);

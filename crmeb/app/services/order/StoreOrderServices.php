@@ -667,6 +667,47 @@ class StoreOrderServices extends BaseServices
     }
 
     /**
+     * 删除订单
+     *
+     * Only an order the user can no longer act on may be hidden: unpaid ones can
+     * still be cancelled, in-flight ones still received, and refunding ones still
+     * resolved. The status codes come from the presentation layer (`_type`).
+     *
+     * @param string $uni
+     * @param int $uid
+     * @return bool
+     * @throws \think\db\exception\DataNotFoundException
+     * @throws \think\db\exception\DbException
+     * @throws \think\db\exception\ModelNotFoundException
+     */
+    public function removeOrder(string $uni, int $uid)
+    {
+        $order = $this->dao->getUserOrderDetail($uni, $uid);
+        if (!$order) {
+            throw new ApiException('订单不存在');
+        }
+        $order = $this->tidyOrder($order);
+        $type = $order['_status']['_type'] ?? null;
+        if (!in_array($type, [0, -2, 4], true)) {
+            throw new ApiException('该订单无法删除');
+        }
+
+        $order->is_del = 1;
+        /** @var StoreOrderStatusServices $statusService */
+        $statusService = app()->make(StoreOrderStatusServices::class);
+        $res = $statusService->save([
+            'oid' => $order['id'],
+            'change_type' => 'remove_order',
+            'change_message' => '删除订单',
+            'change_time' => time()
+        ]);
+        if ($order->save() && $res) {
+            return true;
+        }
+        throw new ApiException('取消失败');
+    }
+
+    /**
      * 取消订单
      * @param $order_id
      * @param $uid

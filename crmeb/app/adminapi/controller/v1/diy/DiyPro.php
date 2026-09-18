@@ -96,17 +96,6 @@ class DiyPro extends AuthController
         return app('json')->success($id ? '修改成功' : '保存成功', ['id' => $this->services->saveInfo($id, $data)]);
     }
 
-    public function delInfo($id)
-    {
-        $this->services->delInfo($id);
-        return app('json')->success('删除成功');
-    }
-
-    public function setInfoStatus($id)
-    {
-        return app('json')->success($this->services->setInfoStatus($id));
-    }
-
     public function getProduct()
     {
         $where = $this->request->getMore([

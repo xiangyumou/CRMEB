@@ -11,13 +11,7 @@
 namespace app\adminapi\controller\v1\export;
 
 use app\adminapi\controller\AuthController;
-use app\services\activity\combination\StoreCombinationServices;
-use app\services\activity\combination\StorePinkServices;
 use app\services\other\export\ExportServices;
-use app\services\order\StoreOrderServices;
-use app\services\product\product\StoreProductServices;
-use app\services\user\UserBillServices;
-use app\services\wechat\WechatUserServices;
 use think\facade\App;
 
 /**
@@ -137,84 +131,4 @@ class ExportExcel extends AuthController
         $where['is_del'] = 0;
         return app('json')->success($this->service->exportCombinationList($where));
     }
-
-    /**
-     * 拼团导出
-     * @param StoreCombinationServices $services
-     * @return mixed
-     */
-    public function storeCombination(StoreCombinationServices $services)
-    {
-        $where = $this->request->getMore([
-            ['start_status', ''],
-            ['is_show', ''],
-            ['store_name', ''],
-        ]);
-        $data = $services->getList($where);
-        /** @var StorePinkServices $storePinkServices */
-        $storePinkServices = app()->make(StorePinkServices::class);
-        $countAll = $storePinkServices->getPinkCount([]);
-        $countTeam = $storePinkServices->getPinkCount(['k_id' => 0, 'status' => 2]);
-        $countPeople = $storePinkServices->getPinkCount(['k_id' => 0]);
-        foreach ($data as &$item) {
-            $item['count_people'] = $countPeople[$item['id']] ?? 0;//拼团数量
-            $item['count_people_all'] = $countAll[$item['id']] ?? 0;//参与人数
-            $item['count_people_pink'] = $countTeam[$item['id']] ?? 0;//成团数量
-            $item['stop_status'] = $item['stop_time'] < time() ? 1 : 0;
-            if ($item['is_show']) {
-                if ($item['start_time'] > time())
-                    $item['start_name'] = '未开始';
-                else if ($item['stop_time'] < time())
-                    $item['start_name'] = '已结束';
-                else if ($item['stop_time'] > time() && $item['start_time'] < time()) {
-                    $item['start_name'] = '进行中';
-                }
-            } else $item['start_name'] = '已结束';
-        }
-        return app('json')->success($this->service->storeCombination($data));
-    }
-
-    /**
-     * 商品导出
-     * @param StoreProductServices $services
-     * @return mixed
-     */
-    public function storeProduct(StoreProductServices $services)
-    {
-        $where = $this->request->getMore([
-            ['store_name', ''],
-            ['cate_id', ''],
-            ['type', 1]
-        ]);
-        $data = $services->searchList($where, true, false);
-        return app('json')->success($this->service->storeProduct($data['list'] ?? []));
-    }
-
-    /**
-     * 订单列表导出
-     * @param StoreOrderServices $services
-     * @return mixed
-     * @throws \think\db\exception\DataNotFoundException
-     * @throws \think\db\exception\DbException
-     * @throws \think\db\exception\ModelNotFoundException
-     */
-    public function storeOrder(StoreOrderServices $services)
-    {
-        $where = $this->request->getMore([
-            ['status', ''],
-            ['real_name', ''],
-            ['data', '', '', 'time']
-        ]);
-        $where['pid'] = 0;
-        $ids = $this->request->get('ids');
-        if ($ids) {
-            $idsArr = array_filter(explode(',', $ids));
-            if ($idsArr) {
-                $where['id'] = $idsArr;
-            }
-        }
-        $data = $services->getExportList($where);
-        return app('json')->success($this->service->storeOrder($data));
-    }
-
 }

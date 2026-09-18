@@ -155,15 +155,8 @@ for (const file of files) {
  * resolves. Keeping them listed lets the guard land green; the resolved check
  * below refuses to let an entry outlive the defect it describes.
  */
-const PENDING_FIX = [
-  "crmeb/app/services/order/StoreOrderCreateServices.php:290 event('OrderCreateAfterListener') passes 5 value(s), OrderCreateAfterListener reads 7",
-  "crmeb/app/services/user/LoginServices.php:154 event('UserRegisterListener') passes 4 value(s), RegisterListener reads 5",
-  "crmeb/app/services/user/UserServices.php:137 event('UserRegisterListener') passes 4 value(s), RegisterListener reads 5",
-];
 
-const regressions = failures.filter((entry) => !PENDING_FIX.includes(entry));
-const resolved = PENDING_FIX.filter((entry) => !failures.includes(entry));
-assert.deepStrictEqual(resolved, [], 'These baselined payloads now match — delete them from PENDING_FIX:\n' + resolved.join('\n'));
+const regressions = failures;
 assert(checked >= 15, `only ${checked} dispatch/listener pairs were compared`);
 assert.deepStrictEqual(regressions, [], 'Event payloads shorter than their listeners:\n' + regressions.join('\n'));
-console.log(`Event payloads checked: ${checked} dispatch/listener pairs across ${unpackCounts.size} listeners (${PENDING_FIX.length} baselined).`);
+console.log(`Event payloads checked: ${checked} dispatch/listener pairs across ${unpackCounts.size} listeners.`);

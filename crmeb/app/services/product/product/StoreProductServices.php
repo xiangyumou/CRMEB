@@ -1671,6 +1671,7 @@ class StoreProductServices extends BaseServices
                 $storeCombinationServices = app()->make(StoreCombinationServices::class);
                 $pinkIdsList = $storeCombinationServices->getPinkIdsArray([], ['id']);
             }
+            $where = [];
             [$page, $limit] = $this->getPageValue();
             foreach ($fields as $field) {
                 $list = [];
@@ -1731,6 +1732,7 @@ class StoreProductServices extends BaseServices
      */
     public function getRecommendProduct(int $uid, $field, int $num = 0, string $type = 'mid')
     {
+        $where = [];
         [$page, $limit] = $this->getPageValue();
         $list = $this->dao->getRecommendProduct($where, $field, $num, $page, $limit);
         if ($list) {

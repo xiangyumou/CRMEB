@@ -37,24 +37,17 @@ class UserController
 
     /**
      * 获取用户信息
+     *
+     * The brokerage summary this used to add (`broken_commission`,
+     * `commissionCount`) went away with the distribution feature; the endpoint
+     * still returns the user row so existing clients keep working.
+     *
      * @param Request $request
      * @return mixed
      */
     public function userInfo(Request $request)
     {
-        $info = $request->user()->toArray();
-        return app('json')->success($this->services->userInfo($info));
-    }
-
-    /**
-     * 用户资金统计
-     * @param Request $request
-     * @return mixed
-     */
-    public function balance(Request $request)
-    {
-        $uid = (int)$request->uid();
-        return app('json')->success($this->services->balance($uid));
+        return app('json')->success($request->user()->toArray());
     }
 
     /**

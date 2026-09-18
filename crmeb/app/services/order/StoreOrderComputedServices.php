@@ -140,9 +140,9 @@ class StoreOrderComputedServices extends BaseServices
      * @param array $other
      * @return array
      */
-    public function computedPayPostage(int $shipping_type, array $cartInfo, array $addr, string $payPrice, array $postage = [], array $other, $userInfo = [], $is_gift = 0)
+    public function computedPayPostage(int $shipping_type, array $cartInfo, array $addr, string $payPrice, array $postage = [], array $other = [], $userInfo = [], $is_gift = 0)
     {
-        return (new OrderFreightCalculator())->computedPayPostage($shipping_type, $payType, $cartInfo, $addr, $payPrice, $postage, $other, $userInfo, $is_gift);
+        return (new OrderFreightCalculator())->computedPayPostage($shipping_type, $cartInfo, $addr, $payPrice, $postage, $other, $userInfo, $is_gift);
     }
     /**
      * 运费计算,总金额计算

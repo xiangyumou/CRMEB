@@ -35,14 +35,10 @@ class PublicController
         /** @var StoreProductServices $storeProductServices */
         $storeProductServices = app()->make(StoreProductServices::class);
         //获取推荐商品
-        [$baseList, $firstList, $benefit, $likeInfo, $vipList] = $storeProductServices->getRecommendProductArr((int)$request->uid(), ['is_best', 'is_new', 'is_benefit', 'is_hot']);
+        [$baseList, $firstList, $benefit, $likeInfo] = $storeProductServices->getRecommendProductArr((int)$request->uid(), ['is_best', 'is_new', 'is_benefit', 'is_hot']);
         $info['bastList'] = $baseList;//TODO 精品推荐个数
         $info['firstList'] = $firstList;//TODO 首发新品个数
         if ($request->uid()) {
-            /** @var UserServices $userService */
-            $userService = app()->make(UserServices::class);
-            //看是否会员过期
-            $userService->offMemberLevel($request->uid());
             /** @var WechatUserServices $wechatUserService */
             $wechatUserService = app()->make(WechatUserServices::class);
             $subscribe = (bool)$wechatUserService->value(['uid' => $request->uid(), 'user_type' => 'wechat'], 'subscribe');

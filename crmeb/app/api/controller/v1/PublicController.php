@@ -83,7 +83,7 @@ class PublicController
         /** @var StoreProductServices $storeProductServices */
         $storeProductServices = app()->make(StoreProductServices::class);
         //获取推荐商品
-        [$baseList, $firstList, $benefit, $likeInfo, $vipList] = $storeProductServices->getRecommendProductArr((int)$request->uid(), ['is_best', 'is_new', 'is_benefit', 'is_hot']);
+        [$baseList, $firstList, $benefit, $likeInfo] = $storeProductServices->getRecommendProductArr((int)$request->uid(), ['is_best', 'is_new', 'is_benefit', 'is_hot']);
         $info['bastList'] = $baseList; //TODO 精品推荐个数
         $info['firstList'] = $firstList; //TODO 首发新品个数
         $info['bastBanner'] = sys_data('routine_home_bast_banner') ?? []; //TODO 首页精品推荐图片
@@ -410,7 +410,7 @@ class PublicController
      */
     public function getDiy(DiyServices $services, $id = 0)
     {
-        return app('json')->success($services->getDiyInfo((int)$id));
+        return app('json')->success($services->getDiy((int)$id));
     }
 
     /**

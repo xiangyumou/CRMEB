@@ -619,11 +619,6 @@ class StorePinkServices extends BaseServices
                 $imageInfo = $systemAttachmentServices->getInfo(['name' => $name]);
                 if (!$imageInfo) {
                     $valueData = 'id=' . $pinkId;
-                    /** @var UserServices $userServices */
-                    $userServices = app()->make(UserServices::class);
-                    if ($userServices->checkUserPromoter((int)$user['uid'], $user)) {
-                        $valueData .= '&pid=' . $user['uid'];
-                    }
                     $res = MiniProgramService::appCodeUnlimitService($valueData, 'pages/activity/goods_combination_status/index', 280);
                     if (!$res) throw new ApiException('二维码生成失败');
                     $uploadType = (int)sys_config('upload_type', 1);
@@ -717,7 +712,8 @@ class StorePinkServices extends BaseServices
                 return $wapPosterImage;
             }
             throw new ApiException('参数错误');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            // \Error (TypeError and friends) must not escape as a bare 500 here.
             throw new ApiException($e->getMessage());
         }
     }
@@ -883,11 +879,6 @@ class StorePinkServices extends BaseServices
                 $imageInfo = $systemAttachmentServices->getInfo(['name' => $name]);
                 if (!$imageInfo) {
                     $valueData = 'id=' . $id;
-                    /** @var UserServices $userServices */
-                    $userServices = app()->make(UserServices::class);
-                    if ($userServices->checkUserPromoter((int)$user['uid'], $user)) {
-                        $valueData .= '&pid=' . $user['uid'];
-                    }
                     $res = MiniProgramService::appCodeUnlimitService($valueData, 'pages/activity/goods_combination_status/index', 280);
                     if (!$res) throw new ApiException('二维码生成失败');
                     $uploadType = (int)sys_config('upload_type', 1);

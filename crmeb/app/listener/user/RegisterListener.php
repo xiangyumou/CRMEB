@@ -23,6 +23,11 @@ class RegisterListener implements ListenerInterface
 {
     /**
      * 注册完成后置事件
+     *
+     * The payload is `[userType, nickname, uid, isNew]`; both dispatchers
+     * (`LoginServices::register` and `UserServices::setUserInfo`) send it in that
+     * shape, and `$isNew` is what gates the new-user coupon.
+     *
      * @param $event
      * @throws \think\db\exception\DataNotFoundException
      * @throws \think\db\exception\DbException
@@ -30,7 +35,7 @@ class RegisterListener implements ListenerInterface
      */
     public function handle($event): void
     {
-        [$spreadUid, $userType, $name, $uid, $isNew] = $event;
+        [$userType, $name, $uid, $isNew] = $event;
         if ($isNew) {
             app()->make(StoreCouponIssueServices::class)->userFirstSubGiveCoupon((int)$uid);
         }

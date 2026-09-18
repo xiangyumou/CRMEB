@@ -56,20 +56,6 @@ class WechatReplyServices extends BaseServices
     }
 
     /**
-     * 复杂条件搜索列表
-     * @param array $where
-     * @param string $field
-     * @return array
-     */
-    public function getWhereUserList(array $where, string $field): array
-    {
-        [$page, $limit] = $this->getPageValue();
-        $list = $this->dao->getListByModel($where, $field, $page, $limit);
-        $count = $this->dao->getCountByWhere($where);
-        return [$list, $count];
-    }
-
-    /**
      * 关注回复
      * @param string $key
      * @return array|\think\Model|null
