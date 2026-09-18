@@ -11,6 +11,8 @@ This runbook is for the existing `x-zoo.vip` server. Its repository remote point
 
 The first migration links root `.env` to `deployment/deployment.env`, switches `CRMEB_IMAGE` to `edge`, and removes `CRMEB_PUBLIC_DIR`. `deployment/config/.env`, `.constant`, `data/mysql`, `data/redis`, `data/uploads`, and `data/runtime` remain on the host. Never commit or print their secret values.
 
+PHP-FPM runs as uid 33 (`www-data`), and the image is built with `public/uploads` and `runtime` owned by that user. A host bind mount replaces that ownership, so `chown -R 33:33 data/uploads data/runtime` once on the server: a root-owned `data/uploads` makes every product-image upload, the customer QR code upload and the group-buy poster fail with `mkdir(): Permission denied`.
+
 ## Routine update
 
 Run in `/home/ubuntu/apps/CRMEB`:

@@ -141,6 +141,7 @@ COPY docker/cache-assets.sh /usr/local/bin/crmeb-cache-assets
 COPY docker/ready.php /opt/crmeb/ready.php
 
 RUN mkdir -p public/uploads /var/cache/crmeb/assets \
+    && chown -R www-data:www-data runtime public/uploads \
     && chmod -R ug+rwX runtime public/uploads \
     && chmod +x /usr/local/bin/crmeb-entrypoint /usr/local/bin/crmeb-cache-assets \
     && test -s public/admin/index.html \
