@@ -23,9 +23,10 @@ php upgrade/core-store/drop-retired.php finalize --dump=/private/full-dump.sql
   removed, the balances that will become unreachable, and the menus that will be
   removed or re-homed. It exits non-zero while anything is owed.
 - `apply` refuses to run while settlement is pending. It writes the backup first,
-  then in one transaction removes the retired settings, config tabs, menus, timers
-  and group data, carries the notification roster across and creates the retained
-  settings and presale menus a fresh install ships. Only then does it rename the
+  then in one transaction creates the retained settings and presale menus an old
+  database never had and carries the notification roster across, and only then
+  removes the retired settings, config tabs, menus, timers, notification
+  templates, custom events and group data. After the commit it renames the
   retired tables to `eb_retired_*`, one at a time, recording each name in the
   backup before the rename; a run killed halfway is fully recoverable. Existing
   backups are never overwritten.
@@ -59,5 +60,11 @@ their values and still render.
 - The retained menus that used to hang under a retired parent (invoice, capital
   flow, billing records, customer service) are re-homed under their retained
   parent, and the orphan permission rows of the removed menus go with them.
+  Retired permission buttons that hang under a retained parent (member gifting,
+  spread editing) are removed by their exact `unique_auth`.
+- Notification templates and custom-event definitions whose only sender was a
+  retired feature are removed, so the retained message-management pages list no
+  templates for features that no longer exist. The AllInPay settings tab and its
+  keys go with the deleted driver.
 - The presale menus and the `order_notice_admin_uids` setting are created when an
   older database never had them, so a migrated shop matches a fresh install.

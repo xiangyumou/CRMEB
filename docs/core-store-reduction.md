@@ -16,7 +16,7 @@
 - 新订单对退出字段写 0；`eb_user`、`eb_store_order` 上这些列保留原值且不再被读写。
 - 订单通知与移动端订单管理改为读取 `order_notice_admin_uids` 配置（用户 UID 列表），不再依赖已删除的客服表。
 - 客服只保留二维码：`customer_qrcode` 是唯一入口（公开接口只返回它），聊天类型/电话/链接/企业 ID/离线反馈文案等配置随聊天一起删除，H5 与小程序的客服悬浮按钮在未配置二维码时隐藏。
-- 删除隐藏层本身：`CoreStoreAdmin`、`CoreStore::DISABLED_CONFIG`、`sys_config()` 中的强制覆盖与 `config/core_store_removed_admin.json` 均已移除；`config/core_store_removed_pages.json` 仅用于清除装修里的失效链接。
+- 删除隐藏层本身：`CoreStoreAdmin`、`CoreStore::DISABLED_CONFIG`、`sys_config()` 中的强制覆盖与 `config/core_store_removed_admin.json` 均已移除；`config/core_store_removed_pages.json` 由装修清理与迁移共用，用于剔除装修里和已保存的个人中心菜单里指向已删页面的链接。
 
 ## 管理后台
 
@@ -39,7 +39,7 @@ php upgrade/core-store/drop-retired.php finalize --dump=/private/full-dump.sql [
 - `plan` 只读，输出退出业务表与行数、未结清事项、将变为不可达的余额/积分/佣金，以及受保护表的行数与哈希；受保护表用服务端聚合计数与校验和比对，真实订单量下不会把整表读进内存。
 - **未结清负债会拒绝 apply**：审核中的提现（`status=0`，已提现的 `status=1` 不会阻塞）、未发货的历史余额/线下单、未完成的积分商城订单、无法再核销的已付自提单；未完成的充值/付费会员订单同样计入。先在业务侧处理完再执行。
 - 非零余额/积分/佣金不阻塞迁移，apply 会把清单导出为备份同目录的 CSV，供运营线下补偿；`eb_user` 上的这些列保留原值。
-- `apply` 先在**一个事务内**删除退出配置、配置 tab、菜单、定时任务与组合数据，补齐新装才有的保留设置、客服 tab 与预售菜单，迁移订单通知名单，并校验受保护表未变；提交后**再逐表重命名**为 `eb_retired_*`。每张表的改名都先写入备份再执行，中途中断可完整恢复，失败时打印已改名的清单。
+- `apply` 先写备份，再在**一个事务内**补齐新装才有的保留设置、客服 tab 与预售菜单、迁移订单通知名单，然后删除退出配置、配置 tab、菜单、定时任务、通知模板与组合数据，并校验受保护表未变；提交后**再逐表重命名**为 `eb_retired_*`。每张表的改名都先写入备份再执行，中途中断可完整恢复，失败时打印已改名的清单。
 - 通知名单转换：apply 把 `eb_store_service` 中 `status=1` 且 `notify=1` **或** `customer=1` 的记录并入 `order_notice_admin_uids`（与既有值合并去重），避免上线后订单通知或移动端订单管理丢失。
 - 保留菜单不再变孤儿：发票管理、资金流水、账单记录、客服配置改挂到保留的父菜单，被删菜单遗留的权限行一并删除。
 - `rollback` 恢复表名与被删除的行；受保护表在迁移后发生变化时拒绝执行（`--force` 可强制），记录被编辑则拒绝覆盖。`finalize` 之后 `eb_retired_*` 已不存在，rollback 直接**非 0 退出**并提示需要 mysqldump 恢复，不再假成功。
@@ -48,7 +48,7 @@ php upgrade/core-store/drop-retired.php finalize --dump=/private/full-dump.sql [
 
 维护窗口：apply 的重命名阶段按表执行且不可回滚，请安排停机窗口；期间不要同时跑定时任务或后台操作。
 
-新装环境直接使用 `crmeb/public/install/crmeb.sql`：退出业务表、配置、菜单与定时任务种子已移除；保留的发票/资金流水/账单记录菜单挂回保留父级，客服配置 tab 承载 `customer_qrcode`，首页精品/热门 banner 组合数据保留，个人中心菜单选项只留下仍然存在的页面。`replace_site_url` 与「清除数据」按保留表重写：缺失的表跳过并记日志，单表失败汇总报告，不再因为退出业务的表已删除而整体失败。
+新装环境直接使用 `crmeb/public/install/crmeb.sql`：退出业务表、配置、配置 tab、菜单、定时任务、通知模板与自定义事件种子已移除（AllInPay 网关的设置 tab 与密钥随驱动一并删除）；保留的发票/资金流水/账单记录菜单挂回保留父级，客服配置 tab 承载 `customer_qrcode`，首页精品/热门 banner 组合数据保留，个人中心菜单选项只留下仍然存在的页面。`eb_system_route` 接口文档登记表仍保留少量指向已删控制器的行：它们是惰性文档，代码不读取，后台"同步路由"会在运行中的店铺上自行清理。`tests/static/install-sql-guard.cjs` 以迁移脚本中的退出清单为准，防止安装 SQL 再次播种这些行。`replace_site_url` 与「清除数据」按保留表重写：缺失的表跳过并记日志，单表失败汇总报告，不再因为退出业务的表已删除而整体失败。
 
 ## 验证与发布边界
 
@@ -56,7 +56,7 @@ php upgrade/core-store/drop-retired.php finalize --dump=/private/full-dump.sql [
 sh scripts/check-maintenance.sh
 ```
 
-依次执行回归套件、PHP 7.4 语法检查、H5/小程序双端静态检查、管理后台接口正反向契约检查、退出业务残留守卫、模型关联守卫、发布清单校验与支付适配检查。回归覆盖下单/计价/库存/拼团/预售/优惠券/队列，以及历史订单兼容与迁移 plan→apply→重复 apply→rollback→finalize。
+依次执行回归套件、PHP 7.4 语法检查（含 `crmeb/upgrade` 全目录）、H5/小程序双端静态检查、管理后台接口正反向契约检查、退出业务残留守卫、安装 SQL 种子守卫、模型关联守卫、发布清单校验与支付适配检查。回归覆盖下单/计价/库存/拼团/预售/优惠券/队列，购物车到下单的真实 HTTP 链路与下单后自动取消入队、真实注册发新人券、拼团海报离线生成、历史订单兼容、双支付回调只入账一次，以及迁移 plan→apply→rollback→finalize 全周期。
 
 `tests/static/model-relation-guard.cjs` 校验每个 DAO 预加载的关联都仍在对应模型上有定义。删除退出业务的模型关联时，`with()` 调用会一起留下——空订单表不会报错，直到迁移在真实数据上运行，后台订单列表才整体不可用。
 

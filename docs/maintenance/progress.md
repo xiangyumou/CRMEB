@@ -10,7 +10,7 @@ This record distinguishes changes in this working tree from the broader maintena
 | P3 | Partial | DIY registry contract and stale-component skip, cashier WeChat-only selection, three WeChat payment adapters and one corrected import. Order pages and admin product/editor pages still need deeper component extraction and on-device verification. Admin does not currently offer authoring components for `newVip` or `presale`; only persisted client components and links are retained. |
 | P4 | Partial | Admin `dist/` output, Node 20.19.0/npm 10.8.2 clean build, release manifest validation and written rollout steps. HBuilderX version, actual H5/MP-WEIXIN builds, saved mini-program review package, real gateway refund/payment and production-db-copy migration rehearsal are not verified. |
 
-Do not infer that a passing static check certifies a real uni-app build or that the checked-in `public` output is ready to deploy. The old activity pages remain in `pages.json` until their callers, deep links and archived-order behavior are resolved. `docs/maintenance/inventory.json` records the current first confirmed deletion, while `docs/core-store-shared-retained.json` remains the reference set for the wider audit.
+Do not infer that a passing static check certifies a real uni-app build or that the checked-in `public` output is ready to deploy. The old activity pages remain in `pages.json` until their callers, deep links and archived-order behavior are resolved. `docs/maintenance/inventory.json` records the current first confirmed deletion; the shared-class audit is finished and `docs/core-store-shared-retained.json` is emptied accordingly.
 
 The two paragraphs below describe the earlier hiding-based passes and are kept as
 history: the hiding mechanism they name (`core_store_removed_admin.json`) was
@@ -104,8 +104,11 @@ Driving the admin UI over 113 menu pages against the migrated database found one
 further regression: the WeChat public-account menu routes had been dropped with
 the retired ones although the controller, service and DAO were retained. Restored.
 
-Rollback restores table names and rows exactly; the second `apply` reported
-`Already migrated`. Remaining out-of-scope items in the local stack: the `/notice`
+Rollback restored table names and rows exactly in the no-drift rehearsal; the
+second `apply` reported `Already migrated`. (Rollback is only exact while the
+protected tables have not drifted and nothing was dropped: with drift it refuses
+without `--force`, and after `finalize` it fails loudly instead of restoring.)
+Remaining out-of-scope items in the local stack: the `/notice`
 WebSocket needs the workerman container, the courier list needs a CRMeb cloud
 token, and the file manager needs its own login.
 
@@ -196,3 +199,61 @@ to fail with the defect reintroduced (the flag test against a rebuilt image, the
 statistic test against the working tree) and to pass once fixed. Not verified
 here: on-device flows and a production gateway payment, which the release
 checklist already lists as operator steps.
+
+## Review fixes and coverage round (2026-09-19)
+
+Phase five of the repair plan: executable coverage for the fixes the earlier
+rounds landed, the documentation corrected against the code, and the last
+retired remnants removed.
+
+- **Storefront purchase coverage.** A new HTTP test walks cart → confirm →
+  computed → create against production routes and asserts the order lands with
+  stock decremented, `order/computed` returns the confirmation's price, order
+  creation queues `UnpaidOrderCancelJob` (with the queue flag flipped on for the
+  duration), the group-buy poster composes offline, and `/api/register` issues
+  the newcomer coupon to the new uid only.
+- **Double payment callback.** A real-row case pays one order through two
+  notifications: the second is acknowledged, keeps the first trade number, and
+  duplicates neither the pay-success status row nor the capital-flow row.
+- **Roster by effect.** The order-notice roster test now drives the real
+  notification listener and asserts the new-order in-site message reaches every
+  listed administrator and nobody else, instead of restating the recipient
+  array's shape.
+- **Migration coverage.** The migration test seeds eight retired tables plus a
+  timer, menu, permission row, dead personal-centre link, senderless
+  notification template and custom event; asserts plan is read-only and
+  reports them, apply removes exactly them while the retained timers and menus
+  survive, rollback restores every shared table row-for-row, and the finalize
+  dump list is derived from the fixtures. The plan report also gained the
+  notification and event counters.
+- **AllInPay remnants.** An install-SQL audit against the migration's retired
+  lists found the AllInPay driver still on disk behind an unreachable branch,
+  its settings tab and keys still seeded, six dead permission buttons under the
+  retained user menu, ten notification templates with no sender left, and seven
+  custom-event definitions of exited features. The driver, the branch and all
+  of those seed rows are gone, the migration removes the same rows on existing
+  shops, and the new `tests/static/install-sql-guard.cjs` (confirmed to fail on
+  a reintroduced seed) keeps the install SQL and the migration lists in
+  agreement. The stale route-registry rows are left deliberately: they are inert
+  documentation pruned by the retained route sync.
+- **Released image uploads.** The final image stage owned `public/uploads` by
+  root while php-fpm runs as `www-data`, so every upload — including the
+  regression poster case — failed with `mkdir(): Permission denied`. The image
+  now chowns the directory and the deploy runbook documents the `chown` a host
+  bind-mount needs.
+- **Records corrected.** The apply order in `docs/core-store-reduction.md` and
+  `crmeb/upgrade/core-store/README.md` now matches the code (create retained
+  rows first, then remove, then rename); the install-SQL claims name exactly
+  what is removed and the route-registry exception; `progress.md` no longer
+  presents the emptied shared-class reference set as active or rollback as
+  unconditionally exact; `tests/regression/cases.md` was rewritten against the
+  current suite; and `docs/core-store-result.json` was regenerated with
+  `node scripts/source-metrics.cjs --write`.
+
+**Verification.** The maintenance check passes (159 tests, 720 assertions,
+plus the static gates including the new install-SQL guard). The guards were
+negative-tested: a reintroduced retired seed row fails the install-SQL guard
+until reverted, and the new migration assertions fail against the pre-fix
+script (they were observed failing before the image was rebuilt at the fixed
+revision). Not verified here: on-device flows and a production gateway
+payment, which the release checklist lists as operator steps.
