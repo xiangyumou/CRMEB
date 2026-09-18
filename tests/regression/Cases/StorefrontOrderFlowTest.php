@@ -293,18 +293,18 @@ final class StorefrontOrderFlowTest extends RegressionTestCase
             'name' => $attachmentName,
             'att_dir' => 'statics/poster/poster.jpg',
             'satt_dir' => 'statics/poster/poster.jpg',
-            'att_size' => 0,
+            'att_size' => '0',
             'att_type' => 'image/jpeg',
             'image_type' => 1,
             'module_type' => 2,
             'time' => time(),
-            'pid' => 1,
-            'type' => 1,
+            'pid' => 2,
+            'type' => 0,
         ]);
         $this->registerCleanup(function () use ($combinationId, $pinkId, $attachmentId) {
             Db::name('store_pink')->where('id', $pinkId)->delete();
             Db::name('store_combination')->where('id', $combinationId)->delete();
-            Db::name('system_attachment')->where('id', $attachmentId)->delete();
+            Db::name('system_attachment')->where('att_id', $attachmentId)->delete();
         });
 
         $response = $this->http->request('POST', '/api/combination/poster', $token, [
