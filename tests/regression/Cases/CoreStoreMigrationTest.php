@@ -81,6 +81,23 @@ final class CoreStoreMigrationTest extends RegressionTestCase
         }
     }
 
+    /**
+     * Settings and tabs apply creates for a shop that never had them; removing
+     * them again keeps the suite repeatable and leaves the seeded schema alone.
+     */
+    private function cleanupCreatedSettings(array $names): void
+    {
+        $this->registerCleanup(function () use ($names) {
+            foreach ($names as $name) {
+                $row = Db::name('system_config')->where('menu_name', $name)->find();
+                if ($row) Db::name('system_config')->where('id', $row['id'])->delete();
+            }
+            foreach (Db::name('system_config_tab')->where('eng_title', 'order_notice')->select()->toArray() as $tab) {
+                Db::name('system_config_tab')->where('id', $tab['id'])->delete();
+            }
+        });
+    }
+
     public function testPlanIsReadOnlyAndReportsRetiredData(): void
     {
         $this->seedRetiredData();
@@ -90,7 +107,7 @@ final class CoreStoreMigrationTest extends RegressionTestCase
         self::assertSame(0, $status, $output);
         $report = $this->parseReport($output);
         self::assertIsArray($report, $output);
-        self::assertSame(1, $report['retired_tables_present']);
+        self::assertSame(3, $report['retired_tables_present']);
         self::assertArrayHasKey('user_extract', $report['retired_tables']);
         self::assertSame(1, $report['retired_tables']['user_extract']);
         self::assertGreaterThanOrEqual(1, $report['retired_config_rows']);

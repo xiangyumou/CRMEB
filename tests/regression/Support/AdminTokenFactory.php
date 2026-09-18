@@ -3,13 +3,13 @@ declare(strict_types=1);
 
 namespace Tests\Regression\Support;
 
+use app\services\system\admin\SystemAdminServices;
 use crmeb\services\CacheService;
-use crmeb\utils\JwtAuth;
 
 /**
- * Mint an admin token the same way the login endpoint does: the JWT carries the
- * hashed password, and the token is registered in the admin-tagged cache that
- * AdminAuthTokenMiddleware checks.
+ * Mint an admin token the way the login endpoint does: the token carries
+ * `md5(<stored password hash>)` and is registered in the admin-tagged cache
+ * that AdminAuthTokenMiddleware checks, so the HTTP layer accepts it.
  */
 final class AdminTokenFactory
 {
@@ -21,9 +21,10 @@ final class AdminTokenFactory
         $this->test = $test;
     }
 
-    public function create(int $adminId, string $password): string
+    /** @param string $passwordHash the `pwd` column of `eb_system_admin` */
+    public function create(int $adminId, string $passwordHash): string
     {
-        $token = app()->make(JwtAuth::class)->createToken($adminId, 'admin', ['pwd' => md5($password)])['token'];
+        $token = app()->make(SystemAdminServices::class)->createToken($adminId, 'admin', $passwordHash)['token'];
         $this->test->registerCleanup(static function () use ($token): void {
             CacheService::delete(md5($token));
         });

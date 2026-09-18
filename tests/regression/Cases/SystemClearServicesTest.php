@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Tests\Regression\Cases;
 
 use app\services\system\SystemClearServices;
+use crmeb\exceptions\AdminException;
 use Tests\Regression\Support\AdminTokenFactory;
 use Tests\Regression\Support\FixtureFactory;
 use Tests\Regression\Support\HttpTestClient;
@@ -23,7 +24,7 @@ final class SystemClearServicesTest extends RegressionTestCase
     /** @var HttpTestClient */
     private $http;
 
-    /** @var array{id: int, account: string, pwd: string} */
+    /** @var array{id: int, account: string, pwd: string} pwd is the stored hash */
     private $admin;
 
     protected function setUp(): void
@@ -32,7 +33,7 @@ final class SystemClearServicesTest extends RegressionTestCase
         $this->http = new HttpTestClient();
         $row = Db::name('system_admin')->order('id')->find();
         self::assertNotEmpty($row, 'the install SQL must seed an administrator');
-        $this->admin = ['id' => (int)$row['id'], 'account' => (string)$row['account'], 'pwd' => 'crmeb.com'];
+        $this->admin = ['id' => (int)$row['id'], 'account' => (string)$row['account'], 'pwd' => (string)$row['pwd']];
     }
 
     private function adminToken(): string
@@ -118,8 +119,8 @@ final class SystemClearServicesTest extends RegressionTestCase
     public function testClearDataRejectsAnUnsafeTableName(): void
     {
         $services = app()->make(SystemClearServices::class);
-        $report = $services->clearData(['user`; DROP TABLE eb_user; --'], true);
-        self::assertArrayHasKey('user`; DROP TABLE eb_user; --', $report['failed']);
+        $this->expectException(AdminException::class);
+        $services->clearData(['user`; DROP TABLE eb_user; --'], true);
     }
 
     /** Clearing the order data must actually empty the retained order tables. */
