@@ -92,7 +92,7 @@
 
         <!-- 物流设置-->
         <logistics-setting
-          v-show="headTab.length === 7 ? currentTab === '4' : false"
+          v-show="currentTab === tabPaneName('logistics')"
           :formValidate="formValidate"
           :templateList="templateList"
           @logisticsBtn="logisticsBtn"
@@ -101,7 +101,7 @@
 
         <!-- 营销设置-->
         <marketing-setting
-          v-show="headTab.length === 6 ? currentTab === '5' : currentTab === '4'"
+          v-show="currentTab === tabPaneName('marketing')"
           :formValidate="formValidate"
           :couponName="couponName"
           :dataLabel="dataLabel"
@@ -118,7 +118,7 @@
 
         <!-- 其他设置-->
         <other-setting
-          v-show="headTab.length === 7 ? currentTab === '7' : currentTab === '6'"
+          v-show="currentTab === tabPaneName('other')"
           :formValidate="formValidate"
           :customBtn.sync="customBtn"
           :paramsType="paramsType"
@@ -137,18 +137,7 @@
 
         <el-form-item>
           <el-button v-if="currentTab !== '1'" v-db-click @click="upTab">上一步</el-button>
-          <el-button
-            class="submission"
-            v-if="currentTab !== '7' && formValidate.virtual_type == 0"
-            v-db-click
-            @click="downTab"
-            >下一步</el-button
-          >
-          <el-button
-            class="submission"
-            v-if="currentTab !== '6' && formValidate.virtual_type != 0"
-            v-db-click
-            @click="downTab"
+          <el-button class="submission" v-if="currentTab !== tabPaneName('other')" v-db-click @click="downTab"
             >下一步</el-button
           >
           <el-button
@@ -379,12 +368,12 @@ export default {
       tagShow: false,
       dataLabel: [],
       headTab: [
-        { tit: '基础信息', name: '1' },
-        { tit: '规格库存', name: '2' },
-        { tit: '商品详情', name: '3' },
-        { tit: '物流设置', name: '4' },
-        { tit: '营销设置', name: '5' },
-        { tit: '其他设置', name: '6' },
+        { tit: '基础信息', name: '1', key: 'basic' },
+        { tit: '规格库存', name: '2', key: 'spec' },
+        { tit: '商品详情', name: '3', key: 'detail' },
+        { tit: '物流设置', name: '4', key: 'logistics' },
+        { tit: '营销设置', name: '5', key: 'marketing' },
+        { tit: '其他设置', name: '6', key: 'other' },
       ],
       virtual: [
         { tit: '普通商品', id: 0, tit2: '物流发货' },
@@ -519,7 +508,7 @@ export default {
             bar_code_number: '',
           },
         ],
-        activity: ['默认', '秒杀', '砍价', '拼团'],
+        activity: ['默认', '拼团'],
         couponName: [],
         header: [],
         selectRule: '',
@@ -604,6 +593,13 @@ export default {
     },
     labelBottom() {
       return this.isMobile ? undefined : '15px';
+    },
+    // 按标签页 key 取当前名称，避免依赖标签数量与硬编码序号
+    tabPaneName() {
+      return (key) => {
+        let tab = this.headTab.filter((item) => item.key === key)[0];
+        return tab ? tab.name : '';
+      };
     },
   },
   watch: {
@@ -803,19 +799,19 @@ export default {
       }
       // 定义基础商品和虚拟商品的标签页配置
       const baseHeadTabs = [
-        { tit: '基础信息', name: '1' },
-        { tit: '规格库存', name: '2' },
-        { tit: '商品详情', name: '3' },
-        { tit: '物流设置', name: '4' },
-        { tit: '营销设置', name: '5' },
-        { tit: '其他设置', name: '6' },
+        { tit: '基础信息', name: '1', key: 'basic' },
+        { tit: '规格库存', name: '2', key: 'spec' },
+        { tit: '商品详情', name: '3', key: 'detail' },
+        { tit: '物流设置', name: '4', key: 'logistics' },
+        { tit: '营销设置', name: '5', key: 'marketing' },
+        { tit: '其他设置', name: '6', key: 'other' },
       ];
       const virtualHeadTabs = [
-        { tit: '基础信息', name: '1' },
-        { tit: '规格库存', name: '2' },
-        { tit: '商品详情', name: '3' },
-        { tit: '营销设置', name: '4' },
-        { tit: '其他设置', name: '5' },
+        { tit: '基础信息', name: '1', key: 'basic' },
+        { tit: '规格库存', name: '2', key: 'spec' },
+        { tit: '商品详情', name: '3', key: 'detail' },
+        { tit: '营销设置', name: '4', key: 'marketing' },
+        { tit: '其他设置', name: '5', key: 'other' },
       ];
 
       switch (index) {
@@ -1953,8 +1949,6 @@ export default {
       // 使用对象映射优化权限判断逻辑
       const permissionMap = {
         默认: true,
-        秒杀: 'seckill',
-        砍价: 'bargain',
         拼团: 'combination',
       };
       this.formValidate.activity.forEach((el) => {

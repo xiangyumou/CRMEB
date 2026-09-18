@@ -47,15 +47,11 @@ export default {
   data() {
     return {
       loadingExist: false,
-      currentTab: '1',
+      currentTab: '3',
       headerList: [
-        { label: '付费会员协议', value: '1' },
-        { label: '代理商协议', value: '2' },
         { label: '隐私协议', value: '3' },
         { label: '用户协议', value: '4' },
         { label: '注销协议', value: '5' },
-        { label: '积分协议', value: '6' },
-        { label: '分销协议', value: '8' },
       ],
       ueConfig: {
         autoHeightEnabled: false,

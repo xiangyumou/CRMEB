@@ -6,8 +6,8 @@ import { Local } from '@/utils/storage.js';
  * @returns {boolean} - 返回布尔值，表示是否有权限
  */
 function checkArray(key) {
-  // seckill 秒杀 bargain 砍价 combination 拼团
-  let arr = Local.get('PERMISSIONS') || ['seckill', 'bargain', 'combination']; // 定义一个数组，包含三种类型
+  // 只有拼团是本商城保留的活动模块
+  let arr = Local.get('PERMISSIONS') || ['combination'];
   let index = arr.indexOf(key); // 获取 key 在数组中的索引
   if (index > -1) {
     // 如果索引大于 -1，说明 key 存在于数组中

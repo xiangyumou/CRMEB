@@ -176,7 +176,6 @@
           <el-dropdown-menu slot="dropdown">
             <el-dropdown-item :command="1">商品分类</el-dropdown-item>
             <el-dropdown-item :command="2">物流设置</el-dropdown-item>
-            <el-dropdown-item :command="3">购买送积分</el-dropdown-item>
             <el-dropdown-item :command="4">购买送优惠券</el-dropdown-item>
             <el-dropdown-item :command="5">关联用户标签</el-dropdown-item>
             <el-dropdown-item :command="6">活动推荐</el-dropdown-item>
@@ -241,30 +240,12 @@
           <template slot-scope="scope">
             <el-tag
               class="mb5 cup"
-              v-if="scope.row.activityExist.bargain"
-              type=""
-              @click="activityDetail(scope.row, 0)"
-              effect="dark"
-            >
-              砍价
-            </el-tag>
-            <el-tag
-              class="mb5 cup"
               v-if="scope.row.activityExist.combination"
               type="success"
               @click="activityDetail(scope.row, 1)"
               effect="dark"
             >
               拼团
-            </el-tag>
-            <el-tag
-              class="mb5 cup"
-              v-if="scope.row.activityExist.seckill"
-              type="warning"
-              @click="activityDetail(scope.row, 2)"
-              effect="dark"
-            >
-              秒杀
             </el-tag>
           </template>
         </el-table-column>
@@ -439,18 +420,8 @@
               </div>
             </el-form-item>
           </el-col>
-          <el-col :span="24" v-if="[3, 4, 5, 6].includes(batchType)">
-            <!--            <el-divider content-position="left" v-if="[3, 4, 5, 6].includes(batchType)">营销设置</el-divider>-->
-            <el-form-item label="赠送积分：" prop="give_integral" v-if="batchType == 3">
-              <el-input-number
-                :controls="false"
-                v-model="batchFormData.give_integral"
-                :min="0"
-                :max="9999999999"
-                placeholder="请输入积分"
-                style="width: 100%"
-              />
-            </el-form-item>
+          <el-col :span="24" v-if="[4, 5, 6].includes(batchType)">
+            <!--            <el-divider content-position="left" v-if="[4, 5, 6].includes(batchType)">营销设置</el-divider>-->
             <el-form-item label="赠送优惠券：" v-if="batchType == 4">
               <div v-if="couponName.length" class="mb20">
                 <el-tag closable v-for="(item, index) in couponName" :key="index" @close="handleClose(item)">{{
@@ -594,11 +565,9 @@ import {
   cascaderListApi, // 分类列表
   productShowApi,
   productUnshowApi,
-  storeProductApi,
   batchSetting,
   productGetTemplateApi,
   productLabelUseListApi,
-  productBatchDelete,
 } from '@/api/product';
 import userLabel from '@/components/labelList';
 import storeLabelList from '@/components/storeLabelList';
@@ -636,7 +605,6 @@ export default {
         freight: 2,
         postage: 0,
         temp_id: null,
-        give_integral: 0,
         label_id: [],
         coupon_ids: [],
         recommend: [],
@@ -763,17 +731,9 @@ export default {
       this.artFrom.page = 1;
       this.getDataList();
     },
-    activityDetail(row, type) {
-      let name = '';
-      if (type === 0) {
-        name = 'marketing_storeBargain';
-      } else if (type === 1) {
-        name = 'marketing_combinalist';
-      } else if (type === 2) {
-        name = 'marketing_storeSeckill';
-      }
+    activityDetail(row) {
       this.$router.push({
-        name,
+        name: 'marketing_combinalist',
         params: {
           product_id: row.id,
         },
@@ -814,7 +774,6 @@ export default {
           freight: 0,
           postage: null,
           temp_id: null,
-          give_integral: null,
           label_id: [],
           coupon_ids: [],
           recommend: [],

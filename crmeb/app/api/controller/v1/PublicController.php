@@ -686,7 +686,7 @@ class PublicController
         $data['wechat_auth_switch'] = (int)in_array(1, sys_config('routine_auth_type')); //微信登录开关
         $data['phone_auth_switch'] = (int)in_array(2, sys_config('routine_auth_type')); //手机号登录开关
         $data['wechat_status'] = sys_config('wechat_appid') != '' && sys_config('wechat_appsecret') != ''; //公众号是否配置
-        $data['site_func'] = sys_config('model_checkbox', ['seckill', 'bargain', 'combination']);
+        $data['site_func'] = sys_config('model_checkbox', ['combination']);
         return app('json')->success($data);
     }
 

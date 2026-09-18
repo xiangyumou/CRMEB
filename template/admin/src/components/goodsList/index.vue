@@ -293,42 +293,6 @@ export default {
           this.$message.error(res.msg);
         });
     },
-    pageChange() {
-      if (this.diy) {
-        this.productList();
-      } else {
-        this.getList();
-      }
-    },
-    // 列表
-    getList() {
-      this.loading = true;
-      changeListApi(this.formValidate)
-        .then(async (res) => {
-          let data = res.data;
-          this.tableList = data.list;
-          this.total = res.data.count;
-          this.loading = false;
-          this.$nextTick(() => {
-            if (this.selectIds.length) {
-              let arr = [];
-              this.selectIds.map((item) => {
-                data.list.map((i) => {
-                  if (i.id == item) {
-                    this.$refs.table.toggleRowSelection(i, true);
-                    arr.push(i);
-                  }
-                });
-              });
-              this.changeCheckbox(arr);
-            }
-          });
-        })
-        .catch((res) => {
-          this.loading = false;
-          this.$message.error(res.msg);
-        });
-    },
     ok() {
       if (this.images.length > 0) {
         if (this.$route.query.fodder === 'image') {

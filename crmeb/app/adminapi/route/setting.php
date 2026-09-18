@@ -155,10 +155,6 @@ Route::group('setting', function () {
         Route::put('group_data/set_status/:id/:status', 'v1.setting.SystemGroupData/set_status')->option(['real_name' => '修改组合数据状态']);
         //数据配置保存
         Route::post('group_data/save_all', 'v1.setting.SystemGroupData/saveAll')->option(['real_name' => '提交数据配置']);
-        //获取客服广告
-        Route::get('get_kf_adv', 'v1.setting.SystemGroupData/getKfAdv')->option(['real_name' => '获取客服广告']);
-        //设置客服广告
-        Route::post('set_kf_adv', 'v1.setting.SystemGroupData/setKfAdv')->option(['real_name' => '设置客服广告']);
         //签到天数配置资源
 
         //签到数据字段

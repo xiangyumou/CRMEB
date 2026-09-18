@@ -159,7 +159,7 @@
 </template>
 
 <script>
-import { combinationListApi, combinationSetStatusApi, storeCombinationApi } from '@/api/marketing';
+import { combinationListApi, combinationSetStatusApi } from '@/api/marketing';
 import { mapState } from 'vuex';
 import { formatDate } from '@/utils/validate';
 import { exportCombinationList } from '@/api/export.js';

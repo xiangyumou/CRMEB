@@ -179,30 +179,13 @@ export default {
               info: [
                 {
                   title: '标题',
-                  value: '秒杀活动',
+                  value: '预售活动',
                   maxlength: 5,
                   tips: '请填写标题',
                 },
                 {
                   title: '链接',
-                  value: '/pages/activity/goods_seckill/index',
-                  maxlength: 999,
-                  tips: '请填写链接',
-                },
-              ],
-            },
-            {
-              img: 'http://admin.crmeb.net/uploads/attach/2020/05/20200515/5cbdc6eda8c4a2c92c88abffee50d1ff.png',
-              info: [
-                {
-                  title: '标题',
-                  value: '砍价活动',
-                  maxlength: 5,
-                  tips: '请填写标题',
-                },
-                {
-                  title: '链接',
-                  value: '/pages/activity/goods_bargain/index',
+                  value: '/pages/activity/presell/index',
                   maxlength: 999,
                   tips: '请填写链接',
                 },
@@ -219,7 +202,7 @@ export default {
                 },
                 {
                   title: '链接',
-                  value: '/pages/activity/goods_bargain/index',
+                  value: '/pages/users/user_address_list/index',
                   maxlength: 999,
                   tips: '请填写链接',
                 },

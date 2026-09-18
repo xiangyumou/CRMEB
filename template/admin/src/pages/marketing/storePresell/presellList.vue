@@ -55,10 +55,10 @@
         </el-table-column>
         <el-table-column label="实际支付" min-width="110">
           <template slot-scope="scope">
-            <span>{{ scope.row.pay_price }}</span>
+            <span>{{ scope.row.paid ? scope.row.pay_price : '未支付' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="定金" min-width="110">
+        <el-table-column label="商品总价" min-width="110">
           <template slot-scope="scope">
             <span>{{ scope.row.total_price }}</span>
           </template>
@@ -70,7 +70,7 @@
         </el-table-column>
         <el-table-column label="状态" min-width="120">
           <template slot-scope="scope">
-            <span>{{ scope.row.status_name }}</span>
+            <div v-html="scope.row.status_name.status_name"></div>
           </template>
         </el-table-column>
       </el-table>

@@ -115,7 +115,7 @@
 <script>
 import searchFrom from '@/components/publicSearchFrom';
 import { mapState } from 'vuex';
-import { getFlowList, cashEditApi, setMarks } from '@/api/finance';
+import { getFlowList, setMarks } from '@/api/finance';
 import { formatDate } from '@/utils/validate';
 export default {
   name: 'cashApply',

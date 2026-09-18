@@ -767,7 +767,7 @@ export default {
     groupAdd() {
       this.$modalForm(groupDataAddApi({ gid: this.pageId, config_name: this.name }, 'setting/group_data/create')).then(
         () => {
-          this.url = this.BaseURL + 'pages/users/user_sgin/index';
+          this.url = this.BaseURL + 'pages/index/index';
           this.info();
         },
       );
@@ -954,7 +954,7 @@ export default {
         groupDataEditApi({ gid: this.pageId, config_name: this.name }, 'setting/group_data/' + row.id + '/edit'),
       ).then(() => {
         this.info();
-        this.url = this.BaseURL + 'pages/users/user_sgin/index';
+        this.url = this.BaseURL + 'pages/index/index';
       });
     },
     // 删除
@@ -979,12 +979,12 @@ export default {
     onchangeIsShow(row) {
       groupDataSetApi('setting/group_data/set_status/' + row.id + '/' + row.status)
         .then(async (res) => {
-          this.url = this.BaseURL + '/pages/users/user_sgin/index';
+          this.url = this.BaseURL + '/pages/index/index';
           this.$message.success(res.msg);
           this.info();
         })
         .catch((res) => {
-          this.url = this.BaseURL + '/pages/users/user_sgin/index';
+          this.url = this.BaseURL + '/pages/index/index';
           this.$message.error(res.msg);
         });
     },

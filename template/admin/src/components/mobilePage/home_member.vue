@@ -594,16 +594,11 @@ export default {
           title: '数据内容',
           name: 'checkboxInfo',
           maxList: 5,
-          type: [1, 2, 3],
+          type: [3, 5, 6],
           list: [
-
             { id: 3, name: '优惠券' },
-
             { id: 5, name: '收藏商品' },
             { id: 6, name: '浏览记录' },
-
-
-
           ],
         },
         logoConfig: {

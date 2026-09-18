@@ -220,7 +220,6 @@ import {
   productLabelListApi,
   productLabelInfoApi,
   productLabelSaveApi,
-  userLabelEdit,
   productLabelCateFormApi,
   labelStatusApi,
   labelIsShowApi,

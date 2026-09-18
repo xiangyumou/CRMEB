@@ -22,7 +22,6 @@
   </div>
 </template>
 <script>
-import { getWordsAll } from '@/api/diy';
 import vuedraggable from 'vuedraggable';
 export default {
   name: 'c_hot_word',
@@ -43,13 +42,11 @@ export default {
       hotIndex: 1,
       defaults: {},
       configData: {},
-      wordList: [],
     };
   },
   created() {
     this.defaults = this.configObj;
     this.configData = this.configObj[this.configNme];
-    // this.wordsAll();
   },
   watch: {
     configObj: {
@@ -62,15 +59,6 @@ export default {
     },
   },
   methods: {
-    wordsAll() {
-      getWordsAll()
-        .then((res) => {
-          this.wordList = res.data;
-        })
-        .catch((err) => {
-          this.$message.error(err.msg);
-        });
-    },
     addHotTxt() {
       // let obj = {}
       // if(this.configData.list.length){

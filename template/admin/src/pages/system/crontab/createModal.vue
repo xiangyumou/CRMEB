@@ -138,7 +138,7 @@
 <script>
 import * as monaco from 'monaco-editor';
 import { mapMutations } from 'vuex';
-import { timerTask, timerInfo, saveTimer, updateTimer } from '@/api/system';
+import { timerTask, timerInfo, saveTimer } from '@/api/system';
 export default {
   props: {
     currentTab: {

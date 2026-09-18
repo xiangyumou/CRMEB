@@ -21,7 +21,7 @@
 </template>
 
 <script>
-import { getCategory, getByCategory, diySave, storeStatus } from '@/api/diy';
+import { getCategory, getByCategory, diySave } from '@/api/diy';
 import toolCom from '@/components/diyComponents/index.js';
 import { mapMutations } from 'vuex';
 import { mapState } from 'vuex';
@@ -92,18 +92,9 @@ export default {
       configData: {},
       isShow: true,
       categoryList: [],
-      status: 0,
     };
   },
-  mounted() {
-    this.storeStatus();
-  },
   methods: {
-    storeStatus() {
-      storeStatus().then((res) => {
-        this.status = parseInt(res.data.store_status);
-      });
-    },
     getCategory() {
       getCategory().then((res) => {
         let data = [];
@@ -137,14 +128,6 @@ export default {
     saveConfig() {
       let data = this.$store.state.moren.defaultConfig;
       if (this.name.name == 'tabBar') {
-        if (!this.status) {
-          let list = data.tabBar.default.tabBarList.list;
-          for (let i = 0; i < list.length; i++) {
-            if (list[i].link == '/pages/storeList/index' || list[i].link == 'pages/storeList/index') {
-              return this.$message.error('请先开启您的周边功能(/pages/storeList/index)');
-            }
-          }
-        }
         if (data.tabBar.default.tabBarList.list.length < 2) {
           return this.$message.error('您最少应添加2个导航');
         }

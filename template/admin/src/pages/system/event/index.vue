@@ -50,9 +50,7 @@
           <template slot-scope="scope">
             <a v-db-click @click="edit(scope.row.id)">编辑</a>
             <el-divider direction="vertical"></el-divider>
-            <a v-permission="'seckill'" v-db-click @click="handleDelete(scope.row, '删除自定事件', scope.$index)"
-              >删除</a
-            >
+            <a v-db-click @click="handleDelete(scope.row, '删除自定事件', scope.$index)">删除</a>
           </template>
         </el-table-column>
       </el-table>

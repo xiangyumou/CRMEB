@@ -96,16 +96,6 @@
               </el-form-item>
             </el-col>
             <el-col v-bind="grid">
-              <el-form-item label="积分：" label-for="give_integral">
-                <el-input-number
-                  :controls="false"
-                  class="perW100"
-                  v-model="formValidate.give_integral"
-                  placeholder="请输入积分"
-                />
-              </el-form-item>
-            </el-col>
-            <el-col v-bind="grid">
               <el-form-item label="运费模板：" prop="temp_id">
                 <el-select v-model="formValidate.temp_id" clearable>
                   <el-option
@@ -524,7 +514,6 @@ export default {
         slider_image: [],
         description: '',
         ficti: 0,
-        give_integral: 0,
         is_show: 0,
         price: 0,
         cost: 0,

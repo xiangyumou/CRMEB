@@ -159,7 +159,7 @@ class SystemAdminServices extends BaseServices
             'queue' => $queue ?? true,
             'timer' => $timer ?? true,
             'site_name' => sys_config('site_name'),
-            'site_func' => sys_config('model_checkbox', ['seckill', 'bargain', 'combination']),
+            'site_func' => sys_config('model_checkbox', ['combination']),
         ];
     }
 

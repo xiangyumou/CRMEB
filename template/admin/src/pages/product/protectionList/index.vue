@@ -97,12 +97,7 @@
 </template>
 <script>
 import { mapState, mapMutations } from 'vuex';
-import {
-  productProtectionFormApi,
-  productProtectionInfoApi,
-  productProtectionListApi,
-  protectionStatusApi,
-} from '@/api/product';
+import { productProtectionFormApi, productProtectionListApi, protectionStatusApi } from '@/api/product';
 export default {
   name: 'articleCategory',
   data() {

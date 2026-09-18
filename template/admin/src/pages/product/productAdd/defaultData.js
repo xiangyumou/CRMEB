@@ -388,5 +388,4 @@ export const RuleValidate = {
       trigger: 'change',
     },
   ],
-  give_integral: [{ type: 'integer', message: '请输入整数' }],
 };

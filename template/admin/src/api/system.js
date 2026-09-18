@@ -453,29 +453,6 @@ export function authApply(data) {
 }
 
 /**
- * @description 获取客服页面广告
- * @param data
- */
-export function getKfAdv() {
-  return request({
-    url: 'setting/get_kf_adv',
-    method: 'get',
-  });
-}
-
-/**
- * @description 设置客服页面广告
- * @param data
- */
-export function setKfAdv(data) {
-  return request({
-    url: 'setting/set_kf_adv',
-    method: 'post',
-    data,
-  });
-}
-
-/**
  * @description 数据配置
  * @param data
  */
@@ -599,6 +576,17 @@ export function getCrmebCopyRight() {
   return request({
     url: `copyright`,
     method: 'get',
+  });
+}
+
+/**
+ * @description 保存版权
+ */
+export function saveCrmebCopyRight(data) {
+  return request({
+    url: `copyright`,
+    method: 'post',
+    data,
   });
 }
 

@@ -59,11 +59,7 @@
           <template slot-scope="scope">
             <a v-db-click @click="edit(scope.row.id)">编辑</a>
             <el-divider direction="vertical" v-if="currentTab === '1'"></el-divider>
-            <a
-              v-if="currentTab === '1'"
-              v-permission="'seckill'"
-              v-db-click
-              @click="handleDelete(scope.row, '删除定时任务', scope.$index)"
+            <a v-if="currentTab === '1'" v-db-click @click="handleDelete(scope.row, '删除定时任务', scope.$index)"
               >删除</a
             >
           </template>

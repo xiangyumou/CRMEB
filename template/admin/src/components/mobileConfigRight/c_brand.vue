@@ -64,15 +64,6 @@ export default {
     sliderChange() {
       this.$emit('getConfig', { name: 'brands' });
     },
-    getBrandList() {
-      brandList()
-        .then((res) => {
-          this.brandData = res.data;
-        })
-        .catch((err) => {
-          this.$message.error(err.msg);
-        });
-    },
   },
 };
 </script>

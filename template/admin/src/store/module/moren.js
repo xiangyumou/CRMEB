@@ -667,30 +667,13 @@ export default {
                 info: [
                   {
                     title: '标题',
-                    value: '秒杀活动',
+                    value: '预售活动',
                     maxlength: 5,
                     tips: '请填写标题',
                   },
                   {
                     title: '链接',
-                    value: '/pages/activity/goods_seckill/index',
-                    maxlength: 999,
-                    tips: '请填写链接',
-                  },
-                ],
-              },
-              {
-                img: '',
-                info: [
-                  {
-                    title: '标题',
-                    value: '砍价活动',
-                    maxlength: 5,
-                    tips: '请填写标题',
-                  },
-                  {
-                    title: '链接',
-                    value: '/pages/activity/goods_bargain/index',
+                    value: '/pages/activity/presell/index',
                     maxlength: 999,
                     tips: '请填写链接',
                   },
@@ -707,7 +690,7 @@ export default {
                   },
                   {
                     title: '链接',
-                    value: '/pages/activity/goods_bargain/index',
+                    value: '/pages/users/user_address_list/index',
                     maxlength: 999,
                     tips: '请填写链接',
                   },
@@ -814,30 +797,13 @@ export default {
                 info: [
                   {
                     title: '标题',
-                    value: '秒杀活动',
+                    value: '预售活动',
                     maxlength: 5,
                     tips: '请填写标题',
                   },
                   {
                     title: '链接',
-                    value: '/pages/activity/goods_seckill/index',
-                    maxlength: 999,
-                    tips: '请填写链接',
-                  },
-                ],
-              },
-              {
-                img: '',
-                info: [
-                  {
-                    title: '标题',
-                    value: '砍价活动',
-                    maxlength: 5,
-                    tips: '请填写标题',
-                  },
-                  {
-                    title: '链接',
-                    value: '/pages/activity/goods_bargain/index',
+                    value: '/pages/activity/presell/index',
                     maxlength: 999,
                     tips: '请填写链接',
                   },
@@ -854,7 +820,7 @@ export default {
                   },
                   {
                     title: '链接',
-                    value: '/pages/activity/goods_bargain/index',
+                    value: '/pages/users/user_address_list/index',
                     maxlength: 999,
                     tips: '请填写链接',
                   },
@@ -977,19 +943,19 @@ export default {
                 info: [
                   {
                     title: '标题',
-                    value: '秒杀专区',
+                    value: '预售专区',
                     maxlength: 20,
                     tips: '标题',
                   },
                   {
                     title: '描述',
-                    value: '新能源汽车优惠多多',
+                    value: '先定后付，好货不错过',
                     maxlength: 20,
                     tips: '描述',
                   },
                   {
                     title: '链接',
-                    value: '/pages/activity/goods_seckill/index',
+                    value: '/pages/activity/presell/index',
                     maxlength: 999,
                     tips: '链接',
                   },
@@ -1000,19 +966,19 @@ export default {
                 info: [
                   {
                     title: '标题',
-                    value: '砍价活动',
+                    value: '优惠券领取',
                     maxlength: 20,
                     tips: '标题',
                   },
                   {
                     title: '描述',
-                    value: '呼朋唤友来砍价~~',
+                    value: '领券下单更优惠',
                     maxlength: 20,
                     tips: '描述',
                   },
                   {
                     title: '链接',
-                    value: '/pages/activity/goods_bargain/index',
+                    value: '/pages/users/user_get_coupon/index',
                     maxlength: 999,
                     tips: '链接',
                   },
@@ -1059,19 +1025,19 @@ export default {
                 info: [
                   {
                     title: '标题',
-                    value: '秒杀专区',
+                    value: '预售专区',
                     maxlength: 20,
                     tips: '标题',
                   },
                   {
                     title: '描述',
-                    value: '新能源汽车优惠多多',
+                    value: '先定后付，好货不错过',
                     maxlength: 20,
                     tips: '描述',
                   },
                   {
                     title: '链接',
-                    value: '/pages/activity/goods_seckill/index',
+                    value: '/pages/activity/presell/index',
                     maxlength: 999,
                     tips: '链接',
                   },
@@ -1082,19 +1048,19 @@ export default {
                 info: [
                   {
                     title: '标题',
-                    value: '砍价活动',
+                    value: '优惠券领取',
                     maxlength: 20,
                     tips: '标题',
                   },
                   {
                     title: '描述',
-                    value: '呼朋唤友来砍价~~',
+                    value: '领券下单更优惠',
                     maxlength: 20,
                     tips: '描述',
                   },
                   {
                     title: '链接',
-                    value: '/pages/activity/goods_bargain/index',
+                    value: '/pages/users/user_get_coupon/index',
                     maxlength: 999,
                     tips: '链接',
                   },
@@ -1103,72 +1069,6 @@ export default {
             ],
           },
           max: 3,
-        },
-      },
-      alive: {
-        defaultVal: {
-          isShow: {
-            val: true,
-          },
-          titleInfo: {
-            title: '',
-            list: [
-              {
-                title: '标题',
-                val: '直播间',
-                max: 20,
-                pla: '选填，不超过六个字',
-              },
-              {
-                title: '介绍',
-                val: '精彩直播',
-                max: 8,
-                pla: '选填，不超过8个字',
-              },
-              {
-                title: '链接',
-                val: '/pages/columnGoods/live_list/index',
-                max: 999,
-                pla: '选填',
-              },
-            ],
-          },
-          numConfig: {
-            title: '显示数量',
-            val: 3,
-          },
-        },
-        default: {
-          isShow: {
-            val: true,
-          },
-          titleInfo: {
-            title: '',
-            list: [
-              {
-                title: '标题',
-                val: '直播间',
-                max: 20,
-                pla: '选填，不超过六个字',
-              },
-              {
-                title: '介绍',
-                val: '精彩直播',
-                max: 8,
-                pla: '选填，不超过8个字',
-              },
-              {
-                title: '链接',
-                val: '/pages/columnGoods/live_list/index',
-                max: 999,
-                pla: '选填',
-              },
-            ],
-          },
-          numConfig: {
-            title: '显示数量',
-            val: 3,
-          },
         },
       },
       scrollBox: {
@@ -2297,22 +2197,6 @@ export default {
           {
             components: toolCom.c_upload_list,
             configNme: 'imgList',
-          },
-        ],
-      },
-      alive: {
-        list: [
-          {
-            components: toolCom.c_is_show,
-            configNme: 'isShow',
-          },
-          {
-            components: toolCom.c_input_list,
-            configNme: 'titleInfo',
-          },
-          {
-            components: toolCom.c_input_number,
-            configNme: 'numConfig',
           },
         ],
       },

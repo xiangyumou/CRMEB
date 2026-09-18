@@ -19,7 +19,6 @@
 import toolCom from '@/components/mobileConfigRight/index.js';
 import rightBtn from '@/components/rightBtn/index.vue';
 import { mapState, mapMutations, mapActions } from 'vuex';
-import { newcomerList } from '@/api/diy';
 export default {
   name: 'c_new_vip',
   componentsName: 'home_new_vip',

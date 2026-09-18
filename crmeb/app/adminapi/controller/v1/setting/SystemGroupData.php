@@ -261,31 +261,6 @@ class SystemGroupData extends AuthController
         }
     }
 
-    /**
-     * 获取客服页面广告内容
-     * @return mixed
-     */
-    public function getKfAdv()
-    {
-        /** @var CacheServices $cache */
-        $cache = app()->make(CacheServices::class);
-        $content = $cache->getDbCache('kf_adv', '');
-        return app('json')->success(compact('content'));
-    }
-
-    /**
-     * 设置客服页面广告内容
-     * @return mixed
-     */
-    public function setKfAdv()
-    {
-        $content = $this->request->post('content');
-        /** @var CacheServices $cache */
-        $cache = app()->make(CacheServices::class);
-        $cache->setDbCache('kf_adv', $content);
-        return app('json')->success('设置成功');
-    }
-
     public function saveAll()
     {
         $params = request()->post();

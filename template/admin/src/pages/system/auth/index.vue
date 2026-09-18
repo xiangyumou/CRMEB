@@ -61,7 +61,7 @@
 </template>
 <script>
 import uploadPictures from '@/components/uploadPictures';
-import { auth, getVersion, crmebProduct, saveCrmebCopyRight, getCrmebCopyRight, copyrightList } from '@/api/system';
+import { auth, getVersion, saveCrmebCopyRight, getCrmebCopyRight, copyrightList } from '@/api/system';
 import { mapState } from 'vuex';
 import { formatDate } from '@/utils/validate';
 import QRCode from 'qrcodejs2';
@@ -263,23 +263,6 @@ export default {
     },
     toCrmeb() {
       window.open('http://www.crmeb.com');
-    },
-    getProduct() {
-      crmebProduct({ type: 'copyright' })
-        .then((res) => {
-          this.price = res.data.attr.price;
-          this.productStatus = true;
-        })
-        .catch((err) => {
-          this.$message.error(err.msg);
-        });
-      crmebProduct({ type: 'pro' })
-        .then((res) => {
-          this.proPrice = res.data.attr.price;
-        })
-        .catch((err) => {
-          this.$message.error(err.msg);
-        });
     },
     payment(product) {
       this.productType = product;

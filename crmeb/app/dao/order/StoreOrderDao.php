@@ -151,6 +151,10 @@ class StoreOrderDao extends BaseDao
                 case 1:
                     $query->where('pay_type', 'weixin');
                     break;
+                case 2:
+                    // 历史支付方式：迁移前用过的支付渠道，仅用于筛选历史订单
+                    $query->whereIn('pay_type', ['yue', 'offline', 'alipay', 'allinpay']);
+                    break;
             }
         })->when($realName && $fieldKey && in_array($fieldKey, $this->withField), function ($query) use ($where, $realName, $fieldKey) {
             if ($fieldKey !== 'title') {
