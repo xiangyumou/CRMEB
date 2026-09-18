@@ -15,5 +15,7 @@ node tests/static/core-store-front.cjs
 node tests/static/admin-api-contract.cjs
 node tests/static/retired-code-guard.cjs
 node tests/static/model-relation-guard.cjs
+node tests/static/php-symbol-guard.cjs
+node tests/static/event-payload-guard.cjs
 node tests/static/verify-release-test.cjs
 node tests/static/wechat-payment-test.mjs

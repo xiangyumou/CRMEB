@@ -75,6 +75,7 @@ Route::group('user', function () {
         //设置和取消用户标签
         Route::post('label/:uid', 'v1.user.UserLabel/setUserLabel')->option(['real_name' => '设置和取消用户标签']);
         //设置会员分组
+        Route::put('save_set_label', 'v1.user.user/save_set_label')->option(['real_name' => '保存用户标签']);
         //标签分类
         Route::resource('user_label_cate', 'v1.user.UserLabelCate')->except(['read'])->option([
             'real_name' => [

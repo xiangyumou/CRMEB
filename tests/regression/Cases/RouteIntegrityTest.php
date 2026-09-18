@@ -9,32 +9,63 @@ use Tests\Regression\Support\RegressionTestCase;
  * Every route target must resolve to a controller method that exists. Deleting
  * whole controllers for the retired features makes stale routes the most likely
  * way to break an unrelated endpoint, so the check is static and exhaustive.
+ *
+ * Resolution is scoped to the layer that owns the route file: a route declared in
+ * `app/adminapi/route` is served by the adminapi application, so an `api` class
+ * with the same name must not satisfy it. Matching across layers used to hide
+ * exactly the stale routes a controller deletion leaves behind.
+ *
+ * `Route::resource()` is skipped here: it names a controller rather than a
+ * method. The admin-api contract check in `tests/static` covers the generated
+ * resource paths the frontend calls.
  */
 final class RouteIntegrityTest extends RegressionTestCase
 {
+    /** Route directory => application layer that serves that directory. */
+    private const LAYERS = [
+        'app/adminapi/route' => 'adminapi',
+        'app/api/route' => 'api',
+        'app/outapi/route' => 'outapi',
+    ];
+
     public function testEveryRouteTargetResolvesToAnExistingControllerMethod(): void
     {
-        $files = array_merge(
-            glob(CRMEB_TEST_ROOT . '/app/adminapi/route/*.php') ?: [],
-            glob(CRMEB_TEST_ROOT . '/app/api/route/*.php') ?: [],
-            glob(CRMEB_TEST_ROOT . '/app/outapi/route/*.php') ?: [],
-            glob(CRMEB_TEST_ROOT . '/route/*.php') ?: []
-        );
-        self::assertNotEmpty($files, 'No route files found');
-
         $missing = [];
         $checked = 0;
-        foreach ($files as $file) {
-            $source = (string)file_get_contents($file);
-            preg_match_all('/Route::\w+\(\s*\'[^\']*\'\s*,\s*\'([^\']+)\'/', $source, $matches);
-            foreach ($matches[1] as $target) {
+        $files = [];
+        foreach (array_keys(self::LAYERS) as $directory) {
+            foreach (glob(CRMEB_TEST_ROOT . '/' . $directory . '/*.php') ?: [] as $file) {
+                $files[] = [$file, self::LAYERS[$directory]];
+            }
+        }
+        foreach (glob(CRMEB_TEST_ROOT . '/route/*.php') ?: [] as $file) {
+            $files[] = [$file, 'api'];
+        }
+        self::assertNotEmpty($files, 'No route files found');
+
+        foreach ($files as [$file, $layer]) {
+            $source = $this->stripComments((string)file_get_contents($file));
+            // Both quoting styles appear in these files.
+            preg_match_all(
+                '/Route::(\w+)\(\s*[\'"]([^\'"]*)[\'"]\s*,\s*[\'"]([^\'"]+)[\'"]/',
+                $source,
+                $matches,
+                PREG_SET_ORDER
+            );
+            foreach ($matches as $match) {
+                if (strtolower($match[1]) === 'resource') {
+                    continue;
+                }
+                $target = $match[3];
+                // A target without a slash is a controller closure or a single
+                // class name, never a `Controller/method` pair.
                 if (strpos($target, '/') === false) {
                     continue;
                 }
                 $checked++;
                 [$controller, $method] = explode('/', $target, 2);
-                if (!$this->targetExists($controller, $method)) {
-                    $missing[] = basename($file) . ': ' . $target;
+                if (!$this->targetExists($layer, $controller, $method)) {
+                    $missing[] = basename($file) . ': ' . $layer . '/' . $target;
                 }
             }
         }
@@ -43,26 +74,27 @@ final class RouteIntegrityTest extends RegressionTestCase
         self::assertSame([], array_values(array_unique($missing)), "Unresolvable route targets:\n" . implode("\n", $missing));
     }
 
-    /** The same controller name can exist in several layers, so match on the method. */
-    private function targetExists(string $controller, string $method): bool
+    /** Remove comments so commented-out routes are not treated as live ones. */
+    private function stripComments(string $source): string
     {
-        foreach (['adminapi', 'api', 'outapi'] as $layer) {
-            $class = 'app\\' . $layer . '\\controller\\' . str_replace('.', '\\', $controller);
-            if (class_exists($class) && method_exists($class, $method)) {
-                return true;
-            }
+        return (string)preg_replace(['/\/\*[\s\S]*?\*\//', '/(^|[^:])\/\/[^\n]*/'], ['', '$1'], $source);
+    }
+
+    /** A target must resolve inside the layer that registered the route. */
+    private function targetExists(string $layer, string $controller, string $method): bool
+    {
+        $class = 'app\\' . $layer . '\\controller\\' . str_replace('.', '\\', $controller);
+        if (class_exists($class) && method_exists($class, $method)) {
+            return true;
         }
-        // The dispatcher applies StudlyCase to the controller segment, so a
-        // route may name `wechat.menus` while the file on disk is `Menus.php`.
+        // The dispatcher applies StudlyCase to the controller segment, so a route
+        // may name `wechat.menus` while the file on disk is `Menus.php`.
         $parts = explode('.', $controller);
         $parts[count($parts) - 1] = str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', (string)end($parts))));
-        foreach (['adminapi', 'api', 'outapi'] as $layer) {
-            $file = CRMEB_TEST_ROOT . '/app/' . $layer . '/controller/' . implode('/', $parts) . '.php';
-            if (!is_file($file)) continue;
-            if (preg_match('/\bfunction\s+' . preg_quote($method, '/') . '\s*\(/', (string)file_get_contents($file))) {
-                return true;
-            }
+        $file = CRMEB_TEST_ROOT . '/app/' . $layer . '/controller/' . implode('/', $parts) . '.php';
+        if (!is_file($file)) {
+            return false;
         }
-        return false;
+        return (bool)preg_match('/\bfunction\s+' . preg_quote($method, '/') . '\s*\(/i', (string)file_get_contents($file));
     }
 }
