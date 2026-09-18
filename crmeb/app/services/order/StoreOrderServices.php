@@ -1564,7 +1564,7 @@ class StoreOrderServices extends BaseServices
         ];
     }
 
-    public function receiveGift($uid, $oid, $gift_key, $shipping_type, $name, $phone, $address_id = 0, $store_id = 0)
+    public function receiveGift($uid, $oid, $gift_key, $shipping_type, $name, $phone, $address_id = 0)
     {
         $orderInfo = $this->dao->get($oid);
         if (!$orderInfo) {

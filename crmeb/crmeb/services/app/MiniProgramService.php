@@ -664,19 +664,8 @@ class MiniProgramService
                             } else {
                                 $trade_no = $message['order_info']['trade_no'];
                             }
-                            $prefix = substr($trade_no, 0, 2);
-                            //处理一下参数
-                            switch ($prefix) {
-                                case 'cp':
-                                    $data['attach'] = 'Product';
-                                    break;
-                                case 'hy':
-                                    $data['attach'] = 'Member';
-                                    break;
-                                case 'cz':
-                                    $data['attach'] = 'UserRecharge';
-                                    break;
-                            }
+                            // 会员卡与充值已退出，只剩商城订单（`cp` 前缀）会产生回调。
+                            $data['attach'] = 'Product';
                             $data['out_trade_no'] = $message['order_info']['trade_no'];
                             $data['transaction_id'] = $message['order_info']['transaction_id'];
                             $data['opneid'] = $message['FromUserName'];

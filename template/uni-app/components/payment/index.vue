@@ -24,7 +24,6 @@
 			</view>
 		</view>
 		<view class="mask" @click='close' v-if="pay_close"></view>
-		<view v-show="false" v-html="formContent"></view>
 	</view>
 </template>
 
@@ -65,7 +64,6 @@
 		mixins: [colors],
 		data() {
 			return {
-				formContent: '',
 				active: 0,
 				paytype: '',
 				number: 0
@@ -96,23 +94,6 @@
 				this.paytype = paytype;
 				this.number = number;
 				this.$emit('changePayType', paytype)
-			},
-			formpost(url, postData) {
-				let tempform = document.createElement("form");
-				tempform.action = url;
-				tempform.method = "post";
-				tempform.target = "_self";
-				tempform.style.display = "none";
-				for (let x in postData) {
-					let opt = document.createElement("input");
-					opt.name = x;
-					opt.value = postData[x];
-					tempform.appendChild(opt);
-				}
-				document.body.appendChild(tempform);
-				this.$nextTick(e => {
-					tempform.submit();
-				})
 			},
 			close: function() {
 				this.$emit('onChangeFun', {
@@ -155,37 +136,7 @@
 					// #endif
 				}).then(res => {
 					let jsConfig = res.data.result.jsConfig;
-					if (res.data.status == 'ALLINPAY_PAY') {
-						uni.hideLoading();
-						// #ifdef MP
-						wx.openEmbeddedMiniProgram({
-							appId: 'wxef277996acc166c3',
-							extraData: {
-								cusid: jsConfig.cusid,
-								appid: jsConfig.appid,
-								version: jsConfig.version,
-								trxamt: jsConfig.trxamt,
-								reqsn: jsConfig.reqsn,
-								notify_url: jsConfig.notify_url,
-								body: jsConfig.body,
-								remark: jsConfig.remark,
-								validtime: jsConfig.validtime,
-								randomstr: jsConfig.randomstr,
-								paytype: jsConfig.paytype,
-								sign: jsConfig.sign,
-								signtype: jsConfig.signtype
-							}
-						})
-						this.jumpData = {
-							orderId: res.data.result.orderId,
-							msg: res.msg,
-						}
-						// #endif
-						// #ifdef H5
-						this.formpost(res.data.result.pay_url, jsConfig)
-						// #endif
-					} else {
-						switch (paytype) {
+					switch (paytype) {
 							case 'weixin':
 								if (res.data.result === undefined) return that.$util.Tips({
 									title: that.$t(`缺少支付参数`)
@@ -276,62 +227,6 @@
 								}
 								// #endif
 								break;
-							case 'yue':
-								uni.hideLoading();
-								return that.$util.Tips({
-									title: res.msg,
-									icon: 'success'
-								}, () => {
-									that.$emit('onChangeFun', {
-										action: 'pay_complete'
-									});
-								});
-								break;
-							case 'offline':
-								uni.hideLoading();
-								return that.$util.Tips({
-									title: res.msg,
-									icon: 'success'
-								}, () => {
-									that.$emit('onChangeFun', {
-										action: 'pay_complete'
-									});
-								});
-								break;
-							case 'friend':
-								uni.hideLoading();
-								return that.$util.Tips({
-									title: res.msg,
-									icon: 'success'
-								}, () => {
-									that.$emit('onChangeFun', {
-										action: 'pay_complete'
-									});
-								});
-								break;
-
-							case 'alipay':
-								uni.hideLoading();
-								//#ifdef H5
-								if (this.$wechat.isWeixin()) {
-									uni.redirectTo({
-										url: `/pages/users/alipay_invoke/index?id=${res.data.result.order_id}&pay_key=${res.data.result.pay_key}`
-									});
-								} else {
-									uni.hideLoading();
-									that.formContent = res.data.result.jsConfig;
-									that.$nextTick(() => {
-										document.getElementById('alipaysubmit').submit();
-									});
-								}
-								//#endif
-								// #ifdef MP
-								uni.navigateTo({
-									url: `/pages/users/alipay_invoke/index?id=${res.data.result.order_id}&link=${res.data.result.jsConfig.qrCode}`
-								});
-								// #endif
-								break;
-						}
 					}
 
 				}).catch(err => {

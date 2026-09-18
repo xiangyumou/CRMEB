@@ -21,7 +21,7 @@
 					<image src="../static/adorn.png" v-if="state == 0"></image>
 				</view>
 				<view class="item" :class="state == 1 ? 'on' : ''" @click="changeStatus(1)">
-					待发货/核销
+					待发货
 					<image src="../static/adorn.png" v-if="state == 1"></image>
 				</view>
 				<view class="item" :class="state == 2 ? 'on' : ''" @click="changeStatus(2)">
@@ -98,10 +98,6 @@
 						<navigator class="bnt primary" :url="'/pages/admin/logistics/index?orderId='+item.order_id"
 							v-if="item._status == 4 && item.delivery_type == 'express'">查看物流
 						</navigator>
-						<view class="bnt primary" v-if="item.shipping_type == 2 &&
-                (item.status == 0 || item.status == 5) &&
-                item.paid == 1 &&
-                item.refund_status === 0" @click="verify(item)">订单核销</view>
 					</view>
 				</view>
 				</view>
@@ -158,9 +154,7 @@
 		setAdminRefundRemark,
 		setOfflinePay,
 		setOrderRefund,
-		orderRefundAgree,
-		adminRefundList,
-		orderVerific
+		adminRefundList
 	} from "@/api/admin";
 	// import {
 	// 	erpConfig
@@ -299,29 +293,6 @@
 			}).exec();
 		},
 		methods: {
-			verify(item) {
-				uni.showModal({
-					title: '操作提示',
-					content: '是否确认核销该订单？',
-					success: (res) => {
-						if (res.confirm) {
-							orderVerific(item.verify_code, 1, 1)
-								.then((res) => {
-									item.status = 2;
-									this.$util.Tips({
-										title: res.msg
-									});
-								})
-								.catch((res) => {
-									// this.verify_code = '';
-									return this.$util.Tips({
-										title: res
-									});
-								});
-						}
-					}
-				});
-			},
 			searchSubmit() {
 
 			},
@@ -475,24 +446,10 @@
 						// );
 					} else {
 						if (opt.type == 1) {
-							orderRefundAgree(this.orderInfo.id).then(res => {
-								that.change = false;
-								that.$util.Tips({
-									title: res.msg
-								});
-								that.init();
-							}).catch(err => {
-								that.change = false;
-								that.$util.Tips({
-									title: err
-								});
-							})
+							data.price = refund_price;
+							data.type = opt.type;
+							this.objOrderRefund(data);
 						}
-						// else{
-						// 	data.type = opt.type;
-						// 	data.refuse_reason = opt.refuse_reason;
-						// 	this.objOrderRefund(data);
-						// }
 					}
 				} else if (that.status == 8) {
 					data.type = opt.type;

@@ -137,18 +137,6 @@ export function getLogistics(data) {
 }
 
 /**
- * 订单核销
- * @returns {*}
- */
-export function orderVerific(verify_code, is_confirm, auth = 0) {
-  return request.post("order/order_verific", {
-    verify_code,
-    is_confirm,
-    auth,
-  });
-}
-
-/**
  * 获取物流公司模板
  * @returns {*}
  */
@@ -394,18 +382,4 @@ export function getTemplateOption() {
 
 export function productCreate(data) {
   return request.post(`admin/manage/product/create`, data);
-}
-
-/**
- * 配送员-核销订单获取商品信息
- */
-export function orderCartInfo(data) {
-  return request.post("store/order/cart_info", data);
-}
-
-/**
- * 配送员-订单核销
- */
-export function orderWriteoff(data) {
-  return request.post("store/order/writeoff", data);
 }

@@ -158,6 +158,12 @@ final class StoreOrderPresentationServices
                             $status['_msg'] = '商家未发货,请耐心等待';
                         }
                         $status['_class'] = 'state-nfh';
+                    } elseif ($order['shipping_type'] === 2) {
+                        // 自提核销已下线，历史自提单只能由商家线下处理。
+                        $status['_type'] = 1;
+                        $status['_title'] = '历史自提订单';
+                        $status['_msg'] = '门店自提已下线，请联系商家线下处理';
+                        $status['_class'] = 'state-nfh';
                     } else {
                         $status['_type'] = 1;
                         $status['_title'] = '待领取';
@@ -349,6 +355,11 @@ HTML;
                 $status_name['status_name'] = <<<HTML
 <b style="color:#f124c7">退款中</b><br/>
 HTML;
+            }
+            // 门店自提已下线，历史自提单不再匹配任何分支；留空会让列表出现
+            // 一行没有状态的订单，这里补上历史兜底文案。
+            if ($item['paid'] == 1 && $status_name['status_name'] === '') {
+                $status_name['status_name'] = $item['shipping_type'] == 2 ? '历史自提订单' : '未知状态';
             }
             $item['status_name'] = $status_name;
             if ($item['paid'] == 0 && $item['status'] == 0 && $item['refund_status'] == 0) {

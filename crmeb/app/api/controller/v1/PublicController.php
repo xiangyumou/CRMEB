@@ -670,18 +670,22 @@ class PublicController
         $data['icp_url'] = sys_config('icp_url'); //备案号链接
         $data['network_security'] = sys_config('network_security'); //网安备案
         $data['network_security_url'] = sys_config('network_security_url'); //网安备案链接
-        $data['store_self_mention'] = sys_config('store_self_mention'); //是否开启到店自提
+        // 门店自提、用户等级、余额、充值、付费会员与会员价都随业务退出：它们的
+        // 配置行已删除，固定返回关闭，避免客户端拿缺失配置当真值。
+        $data['store_self_mention'] = 0; //是否开启到店自提
         $data['invoice_func_status'] = sys_config('invoice_func_status'); //发票功能启用
         $data['special_invoice_status'] = sys_config('special_invoice_status'); //专用发票启用
-        $data['member_func_status'] = sys_config('member_func_status'); //用户等级启用
-        $data['balance_func_status'] = sys_config('balance_func_status'); //余额功能启用
-        $data['recharge_switch'] = sys_config('recharge_switch'); //小程序充值开关
-        $data['member_card_status'] = sys_config('member_card_status'); //是否开启付费会员
-        $data['member_price_status'] = sys_config('member_price_status'); //商品会员折扣价展示启用
-        $data['ali_pay_status'] = sys_config('ali_pay_status') != '0'; //支付宝是否启用
+        $data['member_func_status'] = 0; //用户等级启用
+        $data['balance_func_status'] = 0; //余额功能启用
+        $data['recharge_switch'] = 0; //小程序充值开关
+        $data['member_card_status'] = 0; //是否开启付费会员
+        $data['member_price_status'] = 0; //商品会员折扣价展示启用
+        // 支付宝、余额与线下支付的配置行已随业务退出被删除。再读它们会得到相反的
+        // 默认值（缺失时 `'' != '0'` 为 true，客户端会显示支付宝可用），因此固定关闭。
+        $data['ali_pay_status'] = false; //支付宝是否启用
         $data['pay_weixin_open'] = sys_config('pay_weixin_open') != '0'; //微信是否启用
-        $data['yue_pay_status'] = sys_config('yue_pay_status') == 1 && sys_config('balance_func_status') != 0; //余额是否启用
-        $data['offline_pay_status'] = sys_config('offline_pay_status') == 1; //线下是否启用
+        $data['yue_pay_status'] = false; //余额是否启用
+        $data['offline_pay_status'] = false; //线下是否启用
         $data['friend_pay_status'] = sys_config('friend_pay_status') == 1; //好友是否启用
         $data['wechat_auth_switch'] = (int)in_array(1, sys_config('routine_auth_type')); //微信登录开关
         $data['phone_auth_switch'] = (int)in_array(2, sys_config('routine_auth_type')); //手机号登录开关

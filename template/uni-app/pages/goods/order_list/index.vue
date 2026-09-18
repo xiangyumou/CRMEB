@@ -59,7 +59,7 @@
 								<text v-if="item.refund.length">，{{ item.is_all_refund ? $t(`退款中`) : $t(`部分退款中`) }}</text>
 							</view>
 							<view v-else-if="item._status._type == 1 && item.shipping_type == 2" class="font-color">
-								{{ $t(`待核销`) }}
+								{{ $t(`历史自提`) }}
 								<text v-if="item.refund.length">，{{ item.is_all_refund ? $t(`退款中`) : $t(`部分退款中`) }}</text>
 							</view>
 							<view v-else-if="item._status._type == 2" class="font-color">
@@ -72,10 +72,6 @@
 							</view>
 							<view v-else-if="item._status._type == 4" class="font-color">
 								{{ $t(`已完成`) }}
-								<text v-if="item.refund.length">，{{ item.is_all_refund ? $t(`退款中`) : $t(`部分退款中`) }}</text>
-							</view>
-							<view v-else-if="item._status._type == 5 && item.status == 0" class="font-color">
-								{{ $t(`未核销`) }}
 								<text v-if="item.refund.length">，{{ item.is_all_refund ? $t(`退款中`) : $t(`部分退款中`) }}</text>
 							</view>
 							<view v-else-if="item._status._type == -2" class="font-color">{{ $t(`已退款`) }}</view>
@@ -172,7 +168,6 @@ export default {
 			pay_close: false,
 			pay_order_id: '',
 			totalPrice: '0',
-			initIn: false,
 			isAuto: false, //没有授权的不会自动授权
 			isShowAuth: false, //是否隐藏授权
 			uid: 0
@@ -184,23 +179,6 @@ export default {
 	 */
 	onLoad: function (options) {
 		if (options.status) this.orderStatus = options.status;
-		let EnOptions = wx.getEnterOptionsSync();
-		if (EnOptions.scene == '1038' && EnOptions.referrerInfo.appId == 'wxef277996acc166c3' && this.initIn) {
-			// 代表从收银台小程序返回
-			let extraData = EnOptions.referrerInfo.extraData;
-			this.initIn = false;
-			if (!extraData) {
-				this.getOrderList();
-				// "当前通过物理按键返回，未接收到返参，建议自行查询交易结果";
-			} else {
-				if (extraData.code == 'success') {
-					this.getOrderList();
-				} else if (extraData.code == 'cancel') {
-				} else {
-					// "支付失败：" + extraData.errmsg;
-				}
-			}
-		}
 	},
 	onShow() {
 		if (this.isLogin) {

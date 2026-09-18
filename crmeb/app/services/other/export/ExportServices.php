@@ -101,6 +101,10 @@ class ExportServices extends BaseServices
                 } else if ($item['paid'] == 1 && $item['refund_status'] == 2) {
                     $item['status_name'] = '已退款';
                 }
+                // 门店自提已下线，历史自提单不会命中上面的分支。
+                if ($item['paid'] == 1 && empty($item['status_name'])) {
+                    $item['status_name'] = $item['shipping_type'] == 2 ? '历史自提订单' : '未知状态';
+                }
                 $custom_form = '';
                 foreach ($item['custom_form'] as $custom_form_value) {
                     if (is_string($custom_form_value['value'])) {

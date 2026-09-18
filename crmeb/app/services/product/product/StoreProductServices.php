@@ -1500,7 +1500,7 @@ class StoreProductServices extends BaseServices
             $data['good_list'] = $this->getProducts(['is_good' => 1, 'is_del' => 0, 'is_show' => 1], 12);
         }
         $data['mapKey'] = sys_config('tengxun_map_key');
-        $data['store_self_mention'] = (int)sys_config('store_self_mention') ?? 0; //门店自提是否开启
+        $data['store_self_mention'] = 0; //门店自提已随门店模块下线
         $data['activity'] = $this->getActivityList($data['storeInfo'], false);
         /** @var StoreCouponIssueServices $couponService */
         $couponService = app()->make(StoreCouponIssueServices::class);

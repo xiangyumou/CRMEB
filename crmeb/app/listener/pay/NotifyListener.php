@@ -13,7 +13,6 @@ namespace app\listener\pay;
 
 
 use app\services\pay\PayNotifyServices;
-use app\services\wechat\WechatMessageServices;
 use crmeb\utils\Hook;
 
 /**
@@ -31,37 +30,28 @@ class NotifyListener
     public function handle($event)
     {
         [$notify, $payType] = $event;
+        // Only the retained shop order can produce a notification: member cards,
+        // recharges and their `wechat` message type are gone.
         if ($payType !== 'weixin' || ($notify['attach'] ?? '') !== 'product') return false;
 
-
-        if (isset($notify['attach']) && $notify['attach']) {
-            if (($count = strpos($notify['out_trade_no'], '_')) !== false) {
-                $notify['out_trade_no'] = substr($notify['out_trade_no'], $count + 1);
-            }
-            $payment = [
-                'paid_amount' => $notify['paid_amount'] ?? null,
-                'currency' => $notify['currency'] ?? null,
-                'merchant_id' => $notify['merchant_id'] ?? null,
-            ];
-            if (!$this->merchantMatches($payment['merchant_id'], $payType)) {
-                return false;
-            }
-            return (new Hook(PayNotifyServices::class, 'wechat'))->listen(
-                $notify['attach'],
-                $notify['out_trade_no'],
-                $notify['transaction_id'],
-                $payType,
-                $payment
-            );
+        if (($count = strpos($notify['out_trade_no'], '_')) !== false) {
+            $notify['out_trade_no'] = substr($notify['out_trade_no'], $count + 1);
         }
-
-        if ($notify['attach'] === 'wechat' && isset($notify['out_trade_no'])) {
-            /** @var WechatMessageServices $wechatMessageService */
-            $wechatMessageService = app()->make(WechatMessageServices::class);
-            $wechatMessageService->setOnceMessage($notify, $notify['openid'], 'payment_success', $notify['out_trade_no']);
+        $payment = [
+            'paid_amount' => $notify['paid_amount'] ?? null,
+            'currency' => $notify['currency'] ?? null,
+            'merchant_id' => $notify['merchant_id'] ?? null,
+        ];
+        if (!$this->merchantMatches($payment['merchant_id'], $payType)) {
+            return false;
         }
-
-        return false;
+        return (new Hook(PayNotifyServices::class, 'wechat'))->listen(
+            $notify['attach'],
+            $notify['out_trade_no'],
+            $notify['transaction_id'],
+            $payType,
+            $payment
+        );
     }
 
     private function merchantMatches($merchantId, string $payType): bool

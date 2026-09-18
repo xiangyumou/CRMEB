@@ -135,14 +135,6 @@ export function getSignMonthList(data) {
 	return request.get('sign/month', data)
 }
 
-/**
- * 活动状态
- *
- */
-export function userActivity() {
-	return request.get('user/activity');
-}
-
 /*
  * 资金明细（types|0=全部,1=消费,2=充值,3=返佣,4=提现）
  * */
@@ -217,13 +209,6 @@ export function spreadOrder(data) {
  */
 export function divisionOrder(data) {
 	return request.post('division/order', data);
-}
-
-/*
- * 获取推广人排行
- * */
-export function getRankList(q) {
-	return request.get("rank", q);
 }
 
 /*
@@ -728,9 +713,4 @@ export function changeRemindStatus(status) {
  */
 export function spreadAgent(data) {
 	return request.post(`agent/spread`, data);
-}
-
-// 用户确认商家转账
-export function transferInfoApi(data) {
-	return request.get(`transfer/info`, data);
 }

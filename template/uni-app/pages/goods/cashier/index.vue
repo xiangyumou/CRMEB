@@ -31,7 +31,6 @@
 			<view class="button acea-row row-center-wrapper" @click='goPay(number, paytype)'>{{$t(`确认支付`)}}</view>
 			<view class="wait-pay" @click="waitPay">{{$t(`暂不支付`)}}</view>
 		</view>
-		<view v-show="false" v-html="formContent"></view>
 	</view>
 	</view>
 </template>
@@ -73,12 +72,6 @@
 				payPostage: 0,
 				offlinePostage: false,
 				invalidTime: 0,
-				initIn: false,
-				jumpData: {
-					orderId: '',
-					msg: ''
-				},
-				formContent: '',
 				oid: 0,
 				is_gift: 0
 			}
@@ -107,50 +100,6 @@
 			if (options.order_id) this.orderId = options.order_id
 			if (options.from_type) this.fromType = options.from_type
 			this.getBasicConfig()
-		},
-		onShow() {
-			// #ifdef MP-WEIXIN
-			let options = wx.getEnterOptionsSync();
-			if (options.scene == '1038' && options.referrerInfo.appId == 'wxef277996acc166c3' && this.initIn) {
-				// 代表从收银台小程序返回
-				let extraData = options.referrerInfo.extraData;
-				this.initIn = false
-				if (!extraData) {
-					// "当前通过物理按键返回，未接收到返参，建议自行查询交易结果";
-					this.$util.Tips({
-						title: this.$t(`取消支付`)
-					}, {
-						tab: 5,
-						url: `/pages/goods/order_pay_status/index?order_id=${this.orderId}&msg=${this.$t(`取消支付`)}&type=3&totalPrice=${this.payPriceShow}&status=2`
-					});
-				} else {
-					if (extraData.code == 'success') {
-						let url = `/pages/goods/order_pay_status/index?order_id=${this.orderId}&msg=${this.jumpData.msg}&type=3&totalPrice=${this.payPriceShow}`
-						if(this.is_gift) url += '&is_gift=1'
-						this.$util.Tips({
-							title: this.$t(`支付成功`),
-							icon: 'success'
-						}, {
-							tab: 5,
-							url
-						});
-					} else if (extraData.code == 'cancel') {
-						// "支付已取消";
-						this.$util.Tips({
-							title: this.$t(`取消支付`)
-						}, {
-							tab: 5,
-							url: `/pages/goods/order_pay_status/index?order_id=${this.orderId}&msg=${this.$t(`取消支付`)}&type=3&totalPrice=${this.payPriceShow}&status=2`
-						});
-					} else {
-						// "支付失败：" + extraData.errmsg;
-						uni.reLaunch({
-							url: `/pages/goods/order_pay_status/index?order_id=${this.orderId}&msg=${this.$t(`支付失败`)}&totalPrice=${this.payPriceShow}`
-						})
-					}
-				}
-			}
-			// #endif
 		},
 		methods: {
 			getBasicConfig() {
@@ -197,23 +146,6 @@
 
 				}
 			},
-			formpost(url, postData) {
-				let tempform = document.createElement("form");
-				tempform.action = url;
-				tempform.method = "post";
-				tempform.target = "_self";
-				tempform.style.display = "none";
-				for (let x in postData) {
-					let opt = document.createElement("input");
-					opt.name = x;
-					opt.value = postData[x];
-					tempform.appendChild(opt);
-				}
-				document.body.appendChild(tempform);
-				this.$nextTick(e => {
-					tempform.submit();
-				})
-			},
 			waitPay() {
 				uni.reLaunch({
 					url: '/pages/goods/order_pay_status/index?order_id=' + this.orderId + '&msg=取消支付&type=3' +
@@ -257,7 +189,6 @@
 					let goPage = '/pages/goods/order_pay_status/index?order_id=' + this.orderId + '&msg=' + res.msg + '&type=3' + '&totalPrice=' + this.payPriceShow
 					if(this.is_gift) goPage += '&is_gift=1'
 					let status = res.data.status,
-						orderId = res.data.result.order_id,
 						jsConfig = res.data.result.jsConfig,
 						goPages = goPage,
 						friendPay = '/pages/users/payment_on_behalf/index?order_id=' + this.orderId +
@@ -274,37 +205,6 @@
 								tab: 5,
 								url: goPages
 							});
-						case 'ALLINPAY_PAY':
-							uni.hideLoading();
-							// #ifdef MP
-							this.initIn = true
-							wx.openEmbeddedMiniProgram({
-								appId: 'wxef277996acc166c3',
-								extraData: {
-									cusid: jsConfig.cusid,
-									appid: jsConfig.appid,
-									version: jsConfig.version,
-									trxamt: jsConfig.trxamt,
-									reqsn: jsConfig.reqsn,
-									notify_url: jsConfig.notify_url,
-									body: jsConfig.body,
-									remark: jsConfig.remark,
-									validtime: jsConfig.validtime,
-									randomstr: jsConfig.randomstr,
-									paytype: jsConfig.paytype,
-									sign: jsConfig.sign,
-									signtype: jsConfig.signtype
-								}
-							})
-							this.jumpData = {
-								orderId: res.data.result.order_id,
-								msg: res.msg,
-							}
-							// #endif
-							// #ifdef H5
-							this.formpost(res.data.result.pay_url, jsConfig)
-							// #endif
-							break;
 						case 'PAY_ERROR':
 							uni.hideLoading();
 							return that.$util.Tips({
@@ -432,26 +332,6 @@
 							redirectExternalBrowserPayment(res.data.result.jsConfig.h5_url);
 							break;
 
-						case 'ALIPAY_PAY':
-							//#ifdef H5
-							uni.hideLoading();
-							that.$util.Tips({
-								title: that.$t(`等待支付中`)
-							}, {
-								tab: 4,
-								url: goPages + '&status=0'
-							});
-							that.formContent = res.data.result.jsConfig;
-							setTimeout(() => {
-								document.getElementById('alipaysubmit').submit();
-							}, 1500);
-							//#endif
-							// #ifdef MP
-							uni.navigateTo({
-								url: `/pages/users/alipay_invoke/index?id=${orderId}&link=${jsConfig.qrCode}`
-							});
-							// #endif
-							break;
 					}
 
 				}).catch(err => {

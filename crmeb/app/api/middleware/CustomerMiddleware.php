@@ -20,9 +20,7 @@ class CustomerMiddleware implements MiddlewareInterface
     public function handle(Request $request, \Closure $next)
     {
         $uid = (int)$request->uid();
-        $rule = trim(strtolower($request->rule()->getRule()));
-        $withRule = ['/api/order/order_verific', "/api/admin/order/detail/<orderId>"];
-        if (!in_array($uid, CoreStore::orderAdminUids(), true) && !(in_array($rule, $withRule)))
+        if (!in_array($uid, CoreStore::orderAdminUids(), true))
             return app('json')->fail('权限不足');
         return $next($request);
     }

@@ -45,7 +45,7 @@ class PageLinkDao extends BaseDao
      */
     public function getList(array $where, string $field = '*', int $page = 0, int $limit = 0)
     {
-        $where['no_model'] = sys_config('model_checkbox', ['seckill', 'bargain', 'combination']);
+        $where['no_model'] = sys_config('model_checkbox', ['combination']);
         return $this->search($where)->field($field)
             ->when(isset($where['cate_ids']), function ($query) use ($where) {
 

@@ -155,7 +155,9 @@ class OrderStatisticServices extends BaseServices
         $orderService = app()->make(StoreOrderServices::class);
 
         $bing_xdata = ['普通订单', '秒杀订单', '砍价订单', '拼团订单', '预售订单'];
-        $model_checkbox = sys_config('model_checkbox', ['seckill', 'bargain', 'combination']);
+        // Only 拼团 is still configurable; the retired modules can only appear
+        // through a value carried over from before the removal.
+        $model_checkbox = sys_config('model_checkbox', ['combination']);
         $color = ['#64a1f4', '#3edeb5', '#70869f', '#ffc653', '#fc7d6a'];
         $bing_data = [];
         foreach ($bing_xdata as $key => $item) {

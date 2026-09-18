@@ -119,49 +119,41 @@ class StoreOrderTakeServices extends BaseServices
         $storeName = $orderInfoServices->getCarIdByProductTitle((int)$order['id']);
         $storeTitle = Str::substrUTf8($storeName, 20, 'UTF-8', '');
 
-        $res = $this->transaction(function () {
-            return true;
-        }, $isTran);
+        // Taking delivery only notifies and queues follow-up work now: the points,
+        // commission and experience rewards left no database work behind.
+        try {
+            // 收货成功后置队列
+            event('OrderTakeListener', [$order, $userInfo, $storeTitle]);
+            //收货给用户发送消息
+            event('NoticeListener', [['order' => $order, 'storeTitle' => $storeTitle], 'order_take']);
+            //收货给客服发送消息
+            event('NoticeListener', [['order' => $order, 'storeTitle' => $storeTitle], 'send_admin_confirm_take_over']);
+            //自定义消息-订单收货
+            $order['storeTitle'] = $storeTitle;
+            $order['time'] = date('Y-m-d H:i:s');
+            $order['phone'] = $order['user_phone'];
+            event('CustomNoticeListener', [$order['uid'], $order, 'order_take']);
 
-        if ($res) {
-            try {
-                // 收货成功后置队列
-                event('OrderTakeListener', [$order, $userInfo, $storeTitle]);
-                //收货给用户发送消息
-                event('NoticeListener', [['order' => $order, 'storeTitle' => $storeTitle], 'order_take']);
-                //收货给客服发送消息
-                event('NoticeListener', [['order' => $order, 'storeTitle' => $storeTitle], 'send_admin_confirm_take_over']);
-                //自定义消息-订单收货
-                $order['storeTitle'] = $storeTitle;
-                $order['time'] = date('Y-m-d H:i:s');
-                $order['phone'] = $order['user_phone'];
-                event('CustomNoticeListener', [$order['uid'], $order, 'order_take']);
+            //自定义事件-订单收货/核销
+            event('CustomEventListener', ['order_take', [
+                'uid' => $order['uid'],
+                'id' => (int)$order['id'],
+                'order_id' => $order['order_id'],
+                'real_name' => $order['real_name'],
+                'user_phone' => $order['user_phone'],
+                'user_address' => $order['user_address'],
+                'total_num' => $order['total_num'],
+                'pay_price' => $order['pay_price'],
+                'pay_postage' => $order['pay_postage'],
+                'deduction_price' => $order['deduction_price'],
+                'coupon_price' => $order['coupon_price'],
+                'store_name' => $storeTitle,
+                'add_time' => date('Y-m-d H:i:s', $order['add_time']),
+            ]]);
+        } catch (\Throwable $exception) {
 
-                //自定义事件-订单收货/核销
-                event('CustomEventListener', ['order_take', [
-                    'uid' => $order['uid'],
-                    'id' => (int)$order['id'],
-                    'order_id' => $order['order_id'],
-                    'real_name' => $order['real_name'],
-                    'user_phone' => $order['user_phone'],
-                    'user_address' => $order['user_address'],
-                    'total_num' => $order['total_num'],
-                    'pay_price' => $order['pay_price'],
-                    'pay_postage' => $order['pay_postage'],
-                    'deduction_price' => $order['deduction_price'],
-                    'coupon_price' => $order['coupon_price'],
-                    'store_name' => $storeTitle,
-                    'add_time' => date('Y-m-d H:i:s', $order['add_time']),
-                ]]);
-
-
-            } catch (\Throwable $exception) {
-
-            }
-            return true;
-        } else {
-            return false;
         }
+        return true;
     }
 
     /**

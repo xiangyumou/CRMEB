@@ -51,7 +51,7 @@
 					<view class="navCon acea-row row-between-wrapper" v-if="!is_gift">
 						<view :class="status.type == 0 || status.type == -9 ? 'on' : ''">{{ $t(`待付款`) }}</view>
 						<view :class="status.type == 1 || status.type == 5 ? 'on' : ''">
-							{{ orderInfo.shipping_type == 1 ? $t(`待发货`) : $t(`待核销`) }}
+							{{ $t(`待发货`) }}
 						</view>
 						<view :class="status.type == 2 ? 'on' : ''" v-if="orderInfo.shipping_type == 1">{{ $t(`待收货`) }}</view>
 						<view :class="status.type == 3 ? 'on' : ''">{{ $t(`待评价`) }}</view>
@@ -115,66 +115,6 @@
 						{{ giftData.gift_mark }}
 					</view>
 				</view>
-				<!-- <view class="writeOff" v-if="orderInfo.shipping_type == 2 && orderInfo.paid"> -->
-				<view class="writeOff" v-if="orderInfo.verify_code && orderInfo.paid == 1">
-					<view class="title">{{ $t(`核销信息`) }}</view>
-					<view class="grayBg">
-						<view class="written" v-if="orderInfo.status == 2">
-							<image src="../static/written.png"></image>
-						</view>
-						<view class="pictrue">
-							<image :src="codeSrc" mode=""></image>
-							<zb-code
-								ref="qrcode"
-								:show="codeShow"
-								:cid="cid"
-								:val="val"
-								:size="size"
-								:unit="unit"
-								:background="background"
-								:foreground="foreground"
-								:pdground="pdground"
-								:icon="icon"
-								:iconSize="iconsize"
-								:onval="onval"
-								:loadMake="loadMake"
-								@result="qrR"
-							/>
-						</view>
-					</view>
-					<view class="gear">
-						<image src="../static/writeOff.jpg"></image>
-					</view>
-					<view class="num">{{ orderInfo._verify_code }}</view>
-					<view class="rules">
-						<view class="item" v-if="orderInfo.shipping_type == 2">
-							<view class="rulesTitle acea-row row-middle">
-								<text class="iconfont icon-shijian"></text>
-								{{ $t(`营业时间`) }}
-							</view>
-							<view class="info">
-								{{ $t(`每日`) }}：
-								<text class="time">{{ orderInfo.system_store.day_time }}</text>
-							</view>
-						</view>
-						<view class="item">
-							<view class="rulesTitle acea-row row-middle">
-								<text class="iconfont icon-shuoming1"></text>
-								{{ $t(`使用说明`) }}
-							</view>
-							<view class="info">
-								{{ orderInfo.shipping_type == 2 ? $t(`可将二维码出示给店员扫描或提供数字核销码`) : $t(`可将二维码出示给配送员进行核销`) }}
-							</view>
-						</view>
-					</view>
-				</view>
-				<view class="map acea-row row-between-wrapper" v-if="orderInfo.shipping_type == 2">
-					<view>{{ $t(`地址信息`) }}</view>
-					<view class="place cart-color acea-row row-center-wrapper" @tap="showMaoLocation">
-						<text class="iconfont icon-weizhi"></text>
-						{{ $t(`查看位置`) }}
-					</view>
-				</view>
 				<view class="mt-12" v-if="orderInfo.virtual_type == 0 && (is_gift == 0 || is_gift == 2)">
 					<view class="address" v-if="orderInfo.shipping_type === 1">
 						<view class="name">
@@ -182,19 +122,6 @@
 							<text class="phone">{{ orderInfo.user_phone }}</text>
 						</view>
 						<view>{{ orderInfo.user_address }}</view>
-					</view>
-					<view v-else class="address acea-row row-between-wrapper">
-						<view class="address-box">
-							<view class="name" @tap="makePhone">
-								{{ orderInfo.system_store.name }}
-								<text class="phone">{{ orderInfo.system_store.phone }}</text>
-							</view>
-							<view>{{ orderInfo.system_store.detailed_address }}</view>
-						</view>
-						<view class="icon acea-row row-middle">
-							<view class="iconfont icon-dianhua" @click.stop="makePhone"></view>
-							<view class="iconfont icon-dingwei2" @click.stop="showMaoLocation(system_store)"></view>
-						</view>
 					</view>
 					<view class="line" v-if="orderInfo.shipping_type === 1 && !is_gift">
 						<image src="@/static/images/line.jpg"></image>
@@ -577,7 +504,6 @@ import colors from '@/mixins/color';
 import invoicePicker from '../components/invoicePicker/index.vue';
 import invoiceModal from '../components/invoiceModal/index.vue';
 import giftModal from '../order_pay_status/components/giftModal.vue';
-import zbCode from '@/components/zb-code/zb-code.vue';
 import { HTTP_REQUEST_URL } from '@/config/app.js';
 import { userShare } from '@/api/user.js';
 export default {
@@ -587,7 +513,6 @@ export default {
 		invoiceModal,
 		orderGoods,
 		giftModal,
-		zbCode,
 		// #ifdef MP
 		authorize
 		// #endif
@@ -597,26 +522,7 @@ export default {
 		return {
 			imgHost: HTTP_REQUEST_URL,
 			customForm: '', //自定义留言
-			//二维码参数
-			codeShow: false,
-			cid: '1',
 			ifShow: true,
-			val: '', // 要生成的二维码值
-			size: 200, // 二维码大小
-			unit: 'upx', // 单位
-			background: '#FFF', // 背景色
-			foreground: '#000', // 前景色
-			pdground: '#000', // 角标色
-			icon: '', // 二维码图标
-			iconsize: 40, // 二维码图标大小
-			lv: 3, // 二维码容错级别 ， 一般不用设置，默认就行
-			onval: true, // val值变化时自动重新生成二维码
-			loadMake: true, // 组件加载完成后自动生成二维码
-			src: '', // 二维码生成后的图片地址或base64
-			codeSrc: '',
-			wd: 0,
-			hg: 0,
-			mpUrl: '',
 
 			order_id: '',
 			evaluate: 0,
@@ -625,10 +531,8 @@ export default {
 			split: [], //分单商品
 			orderInfo: {
 				help_info: {},
-				system_store: {},
 				_status: {}
 			}, //订单详情
-			system_store: {},
 			isGoodsReturn: false, //是否为退款订单
 			status: {}, //订单底部按钮状态
 			refund_close: false,
@@ -717,30 +621,6 @@ export default {
 			this.getOrderInfo();
 			this.getUserInfo();
 			this.getCustomerType();
-			let opt = wx.getEnterOptionsSync();
-			if (opt.scene == '1038' && opt.referrerInfo.appId == 'wxef277996acc166c3') {
-				// 代表从收银台小程序返回
-				let extraData = opt.referrerInfo.extraData;
-				if (!extraData) {
-					// "当前通过物理按键返回，未接收到返参，建议自行查询交易结果";
-					this.getOrderInfo();
-				} else {
-					if (extraData.code == 'success') {
-						// "支付成功";
-						this.getOrderInfo();
-					} else if (extraData.code == 'cancel') {
-						// "支付已取消";
-						this.$util.Tips({
-							title: this.$t(`支付已取消`)
-						});
-					} else {
-						// "支付失败：" + extraData.errmsg;
-						this.$util.Tips({
-							title: this.$t(`支付失败：${extraData.errmsg}`)
-						});
-					}
-				}
-			}
 		} else {
 			toLogin();
 		}
@@ -810,9 +690,6 @@ export default {
 			}
 		},
 		// #endif
-		qrR(res) {
-			this.codeSrc = res;
-		},
 		shareH5() {
 			this.H5ShareBox = true;
 		},
@@ -888,32 +765,6 @@ export default {
 			// #endif
 		},
 		goReturnGoods() {},
-		/**
-		 * 拨打电话
-		 */
-		makePhone: function () {
-			uni.makePhoneCall({
-				phoneNumber: this.system_store.phone
-			});
-		},
-		/**
-		 * 打开地图
-		 *
-		 */
-		showMaoLocation: function () {
-			if (!this.system_store.latitude || !this.system_store.longitude)
-				return this.$util.Tips({
-					title: this.$t(`缺少经纬度信息无法查看地图`)
-				});
-			uni.openLocation({
-				latitude: parseFloat(this.system_store.latitude),
-				longitude: parseFloat(this.system_store.longitude),
-				scale: 8,
-				name: this.system_store.name,
-				address: this.system_store.address + this.system_store.detailed_address,
-				success: function () {}
-			});
-		},
 		/**
 		 * 打开支付组件
 		 *
@@ -999,7 +850,6 @@ export default {
 					that.$set(that, 'pid', res.data.pid);
 					that.$set(that, 'split', res.data.split);
 					that.$set(that, 'evaluate', _type == 3 ? 3 : 0);
-					that.$set(that, 'system_store', res.data.system_store);
 					that.$set(that, 'invoiceData', res.data.invoice);
 					if (res.data.is_gift) {
 						let giftStatus = res.data.gift_uid === this.$store.state.app.uid;
@@ -1035,20 +885,6 @@ export default {
 					that.$set(that, 'invoice_func', res.data.invoice_func);
 					that.$set(that, 'special_invoice', res.data.special_invoice);
 					that.$set(that, 'routineContact', Number(res.data.routine_contact_type));
-					// #ifdef H5
-					this.$nextTick(() => {
-						that.val = HTTP_REQUEST_URL + '/pages/admin/order_cancellation/index?verify_code=' + that.orderInfo.verify_code;
-					});
-					// #endif
-					// #ifdef MP
-					if (!that.orderInfo.code) {
-						this.$nextTick(() => {
-							that.val = HTTP_REQUEST_URL + '/pages/admin/order_cancellation/index?verify_code=' + that.orderInfo.verify_code;
-						});
-					} else {
-						this.codeSrc = that.orderInfo.code || '';
-					}
-					// #endif
 					if (this.orderInfo.refund_status != 0) {
 						this.isGoodsReturn = true;
 					} else {
@@ -1850,140 +1686,6 @@ export default {
 	margin-left: 18rpx;
 }
 
-.order-details .writeOff {
-	background-color: #fff;
-	margin-top: 13rpx;
-	padding-bottom: 30rpx;
-}
-
-.order-details .writeOff .title {
-	font-size: 30rpx;
-	color: #282828;
-	height: 87rpx;
-	border-bottom: 1px solid #f0f0f0;
-	padding: 0 30rpx;
-	line-height: 87rpx;
-}
-
-.order-details .writeOff .grayBg {
-	background-color: #f2f5f7;
-	width: 590rpx;
-	height: 384rpx;
-	border-radius: 20rpx 20rpx 0 0;
-	margin: 50rpx auto 0 auto;
-	padding-top: 55rpx;
-	position: relative;
-}
-
-.order-details .writeOff .grayBg .written {
-	position: absolute;
-	top: 0;
-	right: 0;
-	width: 60rpx;
-	height: 60rpx;
-}
-
-.order-details .writeOff .grayBg .written image {
-	width: 100%;
-	height: 100%;
-}
-
-.order-details .writeOff .grayBg .pictrue {
-	width: 290rpx;
-	height: 290rpx;
-	margin: 0 auto;
-}
-
-.order-details .writeOff .grayBg .pictrue image {
-	width: 100%;
-	height: 100%;
-	display: block;
-}
-
-.order-details .writeOff .gear {
-	width: 590rpx;
-	height: 30rpx;
-	margin: 0 auto;
-}
-
-.order-details .writeOff .gear image {
-	width: 100%;
-	height: 100%;
-	display: block;
-}
-
-.order-details .writeOff .num {
-	background-color: #f0c34c;
-	width: 590rpx;
-	height: 84rpx;
-	color: #282828;
-	font-size: 48rpx;
-	margin: 0 auto;
-	border-radius: 0 0 20rpx 20rpx;
-	text-align: center;
-	padding-top: 4rpx;
-}
-
-.order-details .writeOff .rules {
-	margin: 46rpx 30rpx 0 30rpx;
-	border-top: 1px solid #f0f0f0;
-	padding-top: 10rpx;
-}
-
-.order-details .writeOff .rules .item {
-	margin-top: 20rpx;
-}
-
-.order-details .writeOff .rules .item .rulesTitle {
-	font-size: 28rpx;
-	color: #282828;
-}
-
-.order-details .writeOff .rules .item .rulesTitle .iconfont {
-	font-size: 30rpx;
-	color: #333;
-	margin-right: 8rpx;
-	margin-top: 5rpx;
-}
-
-.order-details .writeOff .rules .item .info {
-	font-size: 28rpx;
-	color: #999;
-	margin-top: 7rpx;
-}
-
-.order-details .writeOff .rules .item .info .time {
-	margin-left: 20rpx;
-}
-
-.order-details .map {
-	height: 86rpx;
-	font-size: 30rpx;
-	color: #282828;
-	line-height: 86rpx;
-	border-bottom: 1px solid #f0f0f0;
-	margin-top: 13rpx;
-	background-color: #fff;
-	padding: 0 30rpx;
-}
-
-.order-details .map .place {
-	font-size: 26rpx;
-	// width: 176rpx;
-	height: 50rpx;
-	border-radius: 25rpx;
-	line-height: 50rpx;
-	text-align: center;
-	padding: 0 10rpx;
-}
-
-.order-details .map .place .iconfont {
-	font-size: 27rpx;
-	height: 27rpx;
-	line-height: 27rpx;
-	margin: 2rpx 3rpx 0 0;
-}
-
 .order-details .address .name .iconfont {
 	font-size: 34rpx;
 	margin-left: 10rpx;
@@ -2232,139 +1934,6 @@ export default {
 
 .order-details .footer .bnt ~ .bnt {
 	margin-left: 18rpx;
-}
-
-.order-details .writeOff {
-	background-color: #fff;
-	margin-top: 13rpx;
-	padding-bottom: 30rpx;
-}
-
-.order-details .writeOff .title {
-	font-size: 30rpx;
-	color: #282828;
-	height: 87rpx;
-	border-bottom: 1px solid #f0f0f0;
-	padding: 0 30rpx;
-	line-height: 87rpx;
-}
-
-.order-details .writeOff .grayBg {
-	background-color: #f2f5f7;
-	width: 590rpx;
-	height: 384rpx;
-	border-radius: 20rpx 20rpx 0 0;
-	margin: 50rpx auto 0 auto;
-	padding-top: 55rpx;
-	position: relative;
-}
-
-.order-details .writeOff .grayBg .written {
-	position: absolute;
-	top: 0;
-	right: 0;
-	width: 60rpx;
-	height: 60rpx;
-}
-
-.order-details .writeOff .grayBg .written image {
-	width: 100%;
-	height: 100%;
-}
-
-.order-details .writeOff .grayBg .pictrue {
-	width: 290rpx;
-	height: 290rpx;
-	margin: 0 auto;
-}
-
-.order-details .writeOff .grayBg .pictrue image {
-	width: 100%;
-	height: 100%;
-	display: block;
-}
-
-.order-details .writeOff .gear {
-	width: 590rpx;
-	height: 30rpx;
-	margin: 0 auto;
-}
-
-.order-details .writeOff .gear image {
-	width: 100%;
-	height: 100%;
-	display: block;
-}
-
-.order-details .writeOff .num {
-	background-color: #f0c34c;
-	width: 590rpx;
-	height: 84rpx;
-	color: #282828;
-	font-size: 48rpx;
-	margin: 0 auto;
-	border-radius: 0 0 20rpx 20rpx;
-	text-align: center;
-	padding-top: 4rpx;
-}
-
-.order-details .writeOff .rules {
-	margin: 46rpx 30rpx 0 30rpx;
-	border-top: 1px solid #f0f0f0;
-	padding-top: 10rpx;
-}
-
-.order-details .writeOff .rules .item {
-	margin-top: 20rpx;
-}
-
-.order-details .writeOff .rules .item .rulesTitle {
-	font-size: 28rpx;
-	color: #282828;
-}
-
-.order-details .writeOff .rules .item .rulesTitle .iconfont {
-	font-size: 30rpx;
-	color: #333;
-	margin-right: 8rpx;
-	margin-top: 5rpx;
-}
-
-.order-details .writeOff .rules .item .info {
-	font-size: 28rpx;
-	color: #999;
-	margin-top: 7rpx;
-}
-
-.order-details .writeOff .rules .item .info .time {
-	margin-left: 20rpx;
-}
-
-.order-details .map {
-	height: 86rpx;
-	font-size: 30rpx;
-	color: #282828;
-	line-height: 86rpx;
-	border-bottom: 1px solid #f0f0f0;
-	margin-top: 13rpx;
-	background-color: #fff;
-	padding: 0 30rpx;
-}
-
-.order-details .map .place {
-	font-size: 26rpx;
-	// width: 176rpx;
-	height: 50rpx;
-	border-radius: 25rpx;
-	line-height: 50rpx;
-	text-align: center;
-}
-
-.order-details .map .place .iconfont {
-	font-size: 27rpx;
-	height: 27rpx;
-	line-height: 27rpx;
-	margin: 2rpx 3rpx 0 0;
 }
 
 .order-details .address .name .iconfont {

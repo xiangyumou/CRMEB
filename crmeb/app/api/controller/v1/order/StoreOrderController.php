@@ -922,13 +922,12 @@ class StoreOrderController
     public function receiveGift(Request $request, $oid)
     {
         \app\services\CoreStore::assertOrder($request->post());
-        [$gift_key, $shipping_type, $name, $phone, $address_id, $store_id] = $request->postMore([
+        [$gift_key, $shipping_type, $name, $phone, $address_id] = $request->postMore([
             ['gift_key', ''],
             ['shipping_type', 1],
             ['name', ''],
             ['phone', ''],
             ['address_id', 0],
-            ['store_id', 0],
         ], true);
         if (!$oid) {
             return app('json')->fail('缺少参数');
@@ -937,7 +936,7 @@ class StoreOrderController
             return app('json')->fail('请选择收货地址');
         }
         $uid = $request->uid();
-        $res = $this->services->receiveGift($uid, $oid, $gift_key, $shipping_type, $name, $phone, $address_id, $store_id);
+        $res = $this->services->receiveGift($uid, $oid, $gift_key, $shipping_type, $name, $phone, $address_id);
         if ($res) {
             return app('json')->success('领取成功', ['status' => 1]);
         } else {

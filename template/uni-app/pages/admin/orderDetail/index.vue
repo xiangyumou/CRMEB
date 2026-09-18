@@ -46,9 +46,6 @@
         <view v-if="orderInfo._status._type == 2" class="data"
           >商家已发货，等待用户收货</view
         >
-        <view v-if="orderInfo._status._type == 5" class="data"
-          >需用户出示二维码或数字即可核销</view
-        >
       </view>
       <view
         class="remarks acea-row row-middle"
@@ -92,12 +89,6 @@
         <view class="text">
           <view class="acea-row row-middle name">
             {{ userInfo.nickname }}
-            <view v-if="userInfo.isMember" class="svip">SVIP</view>
-            <view v-if="userInfo.level_grade" class="grade acea-row row-middle"
-              ><text class="iconfont icon-huiyuandengji"></text>V{{
-                userInfo.level_grade
-              }}</view
-            >
           </view>
           <view v-if="userInfo.phone" class=""
             >{{ userInfo.phone }}（ID:{{ userInfo.uid }}）</view
@@ -219,26 +210,6 @@
                 v-if="item.refund_num && orderInfo.refund_type != 6"
                 >{{ item.refund_num }}件退款中</view
               >
-              <view
-                class="writeOff"
-                v-if="
-                  orderInfo._status._type == 2 &&
-                  orderInfo.delivery_type == 'send'
-                "
-              >
-                <text v-if="item.refund_num">，</text>
-                <text class="on" v-if="item.is_writeoff">已核销</text>
-                <text
-                  v-if="!item.is_writeoff && item.surplus_num < item.cart_num"
-                  >已核销{{
-                    parseInt(item.cart_num) - parseInt(item.surplus_num)
-                  }}件</text
-                >
-                <text
-                  v-if="!item.is_writeoff && item.surplus_num == item.cart_num"
-                  >未核销</text
-                >
-              </view>
             </view>
           </view>
         </navigator>
@@ -577,17 +548,6 @@
           @click="goLogistics(orderInfo)"
           >查看物流
         </view>
-        <view
-          v-if="
-            orderInfo.shipping_type == 2 &&
-            (orderInfo.status == 0 || orderInfo.status == 5) &&
-            orderInfo.paid == 1 &&
-            orderInfo.refund_status === 0
-          "
-          class="bnt delivery"
-          @click="verify"
-          >立即核销</view
-        >
       </view>
       <PriceChange
         :change="change"
@@ -626,9 +586,7 @@ import {
   setAdminOrderRemark,
   setOfflinePay,
   setOrderRefund,
-  orderRefundAgree,
   getUserInfo,
-  orderVerific,
 } from "@/api/admin";
 // import {
 // 	erpConfig
@@ -711,28 +669,6 @@ export default {
     // #endif
   },
   methods: {
-    verify() {
-      uni.showModal({
-        title: '操作提示',
-        content: '是否确认核销该订单？',
-        success: (res) => {
-          if (res.confirm) {
-            orderVerific(this.orderInfo.verify_code, 1, 1)
-              .then((res) => {
-                this.$util.Tips({
-                  title: res.msg
-                });
-                this.getIndex();
-              })
-              .catch((res) => {
-                return this.$util.Tips({
-                  title: res
-                });
-              });
-          }
-        }
-      });
-    },
     statusChange(e) {
       this.status = e;
     },
@@ -877,20 +813,9 @@ export default {
           this.objOrderRefund(data);
         } else {
           if (opt.type == 1) {
-            orderRefundAgree(this.orderInfo.id)
-              .then((res) => {
-                that.change = false;
-                that.$util.Tips({
-                  title: res.msg,
-                });
-                that.getIndex();
-              })
-              .catch((err) => {
-                that.change = false;
-                that.$util.Tips({
-                  title: err,
-                });
-              });
+            data.price = refund_price;
+            data.type = opt.type;
+            this.objOrderRefund(data);
           }
         }
       } else if (that.status == 8) {
@@ -1563,36 +1488,5 @@ export default {
     color: #333333;
   }
 
-  .svip {
-    width: 56rpx;
-    height: 26rpx;
-    border-radius: 14rpx;
-    margin-left: 12rpx;
-    background: linear-gradient(90deg, #484643 0%, #1f1b17 100%);
-    text-align: center;
-    font-weight: 600;
-    font-size: 18rpx;
-    line-height: 26rpx;
-    color: #fddaa4;
-  }
-
-  .grade {
-    height: 26rpx;
-    padding: 0 10rpx;
-    border: 1rpx solid #facc7d;
-    border-radius: 14rpx;
-    margin-left: 10rpx;
-    background: #fef0d9;
-    font-weight: 500;
-    font-size: 18rpx;
-    line-height: 24rpx;
-    color: #dfa541;
-    transform: rotateZ(360deg);
-
-    .iconfont {
-      margin-right: 6rpx;
-      font-size: 18rpx;
-    }
-  }
 }
 </style>

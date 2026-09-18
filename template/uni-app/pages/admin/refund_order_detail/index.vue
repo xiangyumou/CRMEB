@@ -27,8 +27,6 @@
 				<view class="text">
 					<view class="acea-row row-middle name">
 						{{userInfo.nickname}}
-						<view v-if="userInfo.isMember" class="svip">SVIP</view>
-						<view v-if="userInfo.level_grade" class="grade acea-row row-middle"><text class="iconfont icon-huiyuandengji"></text>V{{userInfo.level_grade}}</view>
 					</view>
 					<view v-if="userInfo.phone" class="">{{userInfo.phone}}（ID:{{userInfo.uid}}）</view>
 					<view v-else class="">ID:{{userInfo.uid}}</view>
@@ -79,12 +77,6 @@
 						<view class="num">共{{ item.cart_num }}件</view>
 						<view class="acea-row row-right">
 							<view class="writeOff" v-if="item.refund_num  && orderInfo.refund_type != 6">{{item.refund_num}}件退款中</view>
-							<view class="writeOff" v-if="orderInfo._status._type==2 && orderInfo.delivery_type == 'send'">
-								<text v-if="item.refund_num">，</text>
-								<text class="on" v-if="item.is_writeoff">已核销</text>
-								<text v-if="!item.is_writeoff && item.surplus_num<item.cart_num">已核销{{parseInt(item.cart_num)-parseInt(item.surplus_num)}}件</text>
-								<text v-if="!item.is_writeoff && item.surplus_num==item.cart_num">未核销</text>
-							</view>
 						</view>
 					</view>
 				</navigator>
@@ -1185,36 +1177,5 @@
 			color: #333333;
 		}
 
-		.svip {
-			width: 56rpx;
-			height: 26rpx;
-			border-radius: 14rpx;
-			margin-left: 12rpx;
-			background: linear-gradient(90deg, #484643 0%, #1F1B17 100%);
-			text-align: center;
-			font-weight: 600;
-			font-size: 18rpx;
-			line-height: 26rpx;
-			color: #FDDAA4;
-		}
-
-		.grade {
-			height: 26rpx;
-			padding: 0 10rpx;
-			border: 1rpx solid #FACC7D;
-			border-radius: 14rpx;
-			margin-left: 10rpx;
-			background: #FEF0D9;
-			font-weight: 500;
-			font-size: 18rpx;
-			line-height: 24rpx;
-			color: #DFA541;
-			transform: rotateZ(360deg);
-
-			.iconfont {
-				margin-right: 6rpx;
-				font-size: 18rpx;
-			}
-		}
 	}
 </style>

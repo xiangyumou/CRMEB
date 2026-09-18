@@ -341,6 +341,42 @@ class StoreOrder extends BaseModel
     }
 
     /**
+     * 订单类型搜索器
+     *
+     * The retired activities no longer create orders, but their historical rows
+     * still carry the id columns: without this searcher every bucket of the
+     * order-type statistic returned the same whole-table total.
+     *
+     * @param Model $query
+     * @param $value
+     */
+    public function searchActivityTypeAttr($query, $value)
+    {
+        if ($value === '') {
+            return;
+        }
+        switch ((int)$value) {
+            case 0:
+                $query->where('combination_id', 0)->where('seckill_id', 0)->where('bargain_id', 0)->where('advance_id', 0);
+                break;
+            case 1:
+                $query->where('seckill_id', '>', 0);
+                break;
+            case 2:
+                $query->where('bargain_id', '>', 0);
+                break;
+            case 3:
+                $query->where('combination_id', '>', 0);
+                break;
+            case 4:
+                $query->where('advance_id', '>', 0);
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
      * 核销码搜索器
      * @param Model $query
      * @param $value
