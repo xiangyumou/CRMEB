@@ -250,7 +250,7 @@ retired remnants removed.
   current suite; and `docs/core-store-result.json` was regenerated with
   `node scripts/source-metrics.cjs --write`.
 
-**Verification.** The maintenance check passes (159 tests, 720 assertions,
+**Verification.** The maintenance check passes (160 tests, 715 assertions,
 plus the static gates including the new install-SQL guard). The guards were
 negative-tested: a reintroduced retired seed row fails the install-SQL guard
 until reverted, and the new migration assertions fail against the pre-fix

@@ -1,16 +1,16 @@
 {
   "baseline_commit": "66681c07d76ce79c6794721563029f8ea4af023b",
-  "head_commit": "e1938493acb3e56dc597f31389aecafbc3d232e9",
+  "head_commit": "3158d266940f9ab578626e231189c12cd14cfdd8",
   "categories": {
     "source": {
       "files": 2326,
-      "bytes": 29732540,
-      "lines": 491856
+      "bytes": 29748476,
+      "lines": 490759
     },
     "published-and-assets": {
       "files": 2359,
-      "bytes": 102359525,
-      "lines": 76126
+      "bytes": 102290669,
+      "lines": 75796
     },
     "vendored": {
       "files": 0,
@@ -19,25 +19,26 @@
     },
     "other": {
       "files": 277,
-      "bytes": 31019101,
-      "lines": 86799
+      "bytes": 31032940,
+      "lines": 86973
     }
   },
   "source_reduction": {
     "files": 469,
-    "bytes": 20527328,
-    "lines": 175876
+    "bytes": 20511392,
+    "lines": 176973
   },
-  "source_physical_line_reduction_percent": 26.3,
+  "source_physical_line_reduction_percent": 26.5,
   "validation": {
-    "regression_tests": 132,
-    "regression_assertions": 545,
+    "regression_tests": 160,
+    "regression_assertions": 715,
     "admin_build": "passed",
     "php_lint": "passed",
     "static_guards": [
       "core-store-front",
       "admin-api-contract",
       "retired-code-guard",
+      "install-sql-guard",
       "model-relation-guard",
       "verify-release-test",
       "wechat-payment-test"
