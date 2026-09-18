@@ -488,7 +488,6 @@ export default {
         res.data.routine_my_menus.forEach((el, index, arr) => {
           if (
             el.url == "/pages/admin/order/index" ||
-            el.url == "/pages/admin/order_cancellation/index" ||
             el.url == "/pages/admin/manage/index" ||
             el.name == "客服接待"
           ) {
