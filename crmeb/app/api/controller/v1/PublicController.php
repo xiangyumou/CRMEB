@@ -14,6 +14,7 @@ namespace app\api\controller\v1;
 use app\services\activity\combination\StorePinkServices;
 use app\services\activity\coupon\StoreCouponIssueServices;
 use app\services\article\ArticleServices;
+use app\services\diy\DiyCompatibilityServices;
 use app\services\diy\DiyServices;
 use app\services\diy\ThemeServices;
 use app\services\message\MessageSystemServices;
@@ -157,6 +158,12 @@ class PublicController
         $auth['/pages/users/user_invoice_list/index'] = $invoiceStatus;
         foreach ($menusInfo as $key => &$value) {
             if (isset($value['is_show']) && $value['is_show'] == 0) {
+                unset($menusInfo[$key]);
+                continue;
+            }
+            // The saved menus may predate the migration; never hand the client a
+            // link to a page the storefront no longer ships.
+            if (DiyCompatibilityServices::isRemovedPage($value['url'] ?? null)) {
                 unset($menusInfo[$key]);
                 continue;
             }

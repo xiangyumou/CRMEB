@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Tests\Regression\Cases;
 
+use app\services\diy\DiyCompatibilityServices;
 use app\services\system\SystemClearServices;
 use crmeb\exceptions\AdminException;
 use Tests\Regression\Support\AdminTokenFactory;
@@ -58,6 +59,37 @@ final class SystemClearServicesTest extends RegressionTestCase
         $replaced = $this->http->request('POST', '/adminapi/system/replace_site_url', $token, ['url' => $siteUrl], $this->adminHeaders($token));
         self::assertSame(200, $replaced['http_status']);
         self::assertSame(200, $replaced['body']['status'], json_encode($replaced['body'], JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * The personal-centre menu list is served to the client as navigation. A
+     * saved row pointing at a page the storefront no longer ships would open a
+     * blank screen, so it is filtered out on the way out.
+     */
+    public function testPersonalMenuSkipsPagesThatNoLongerExist(): void
+    {
+        $groupId = (int)Db::name('system_group')->where('config_name', 'routine_my_menus')->value('id');
+        self::assertGreaterThan(0, $groupId, 'the install SQL must seed the personal menu group');
+        $row = Db::name('system_group_data')->where('gid', $groupId)->order('id')->find();
+        self::assertNotEmpty($row);
+
+        $removed = 'pages/users/user_money/index';
+        self::assertContains($removed, DiyCompatibilityServices::removedPages());
+        $value = json_decode((string)$row['value'], true);
+        $value['url']['value'] = '/' . $removed;
+        $cacheKey = 'data_routine_my_menus';
+        \crmeb\services\CacheService::delete($cacheKey);
+        Db::name('system_group_data')->where('id', $row['id'])->update(['value' => json_encode($value)]);
+        $this->registerCleanup(function () use ($row, $cacheKey) {
+            \crmeb\services\CacheService::delete($cacheKey);
+            Db::name('system_group_data')->where('id', $row['id'])->update(['value' => $row['value']]);
+        });
+
+        $token = $this->adminToken();
+        $response = $this->http->request('GET', '/api/menu/user', $token, [], $this->adminHeaders($token));
+        self::assertSame(200, $response['http_status']);
+        $urls = array_column($response['body']['data']['routine_my_menus'] ?? [], 'url');
+        self::assertNotContains('/' . $removed, $urls, 'a removed page must not be handed to the client');
     }
 
     /** adminapi reads `Authori-zation` (cookie.token_name), not `Authorization`. */
