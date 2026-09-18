@@ -142,16 +142,24 @@ final class CoreStoreMigrationTest extends RegressionTestCase
         // The settings the retained code reads exist after the upgrade.
         self::assertSame(1, (int)Db::name('system_config')->where('menu_name', 'customer_qrcode')->count());
 
+        // Nothing left to do: the run is a no-op and the backup stays untouched.
         [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
-        self::assertSame(1, $status, $output);
-        self::assertStringContainsString('already exists', $output, 'a second apply must not overwrite the backup');
-
-        [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup . '.2'));
         self::assertSame(0, $status, $output);
         self::assertStringContainsString('Already migrated', $output);
-        $this->registerCleanup(function () use ($backup) {
-            if (is_file($backup . '.2')) unlink($backup . '.2');
+
+        // With work to do, the existing backup must not be overwritten: the
+        // rollback point for the applied run would be lost.
+        $sample = Db::name('system_config')->order('id')->find();
+        unset($sample['id']);
+        $sample['menu_name'] = 'brokerage_func_status';
+        $lateId = (int)Db::name('system_config')->insertGetId($sample);
+        $this->registerCleanup(function () use ($lateId) {
+            Db::name('system_config')->where('id', $lateId)->delete();
         });
+        [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
+        self::assertSame(1, $status, $output);
+        self::assertStringContainsString('already exists', $output);
+        Db::name('system_config')->where('id', $lateId)->delete();
 
         [$status, $output] = $this->runScript('rollback ' . escapeshellarg($backup));
         self::assertSame(0, $status, $output);

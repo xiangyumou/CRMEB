@@ -18,7 +18,12 @@ final class HttpTestClient
         }
     }
 
-    public function request(string $method, string $path, ?string $token, array $body = []): array
+    /**
+     * @param array<string, string> $extraHeaders endpoints that read a named
+     *        header instead of `Authorization`; adminapi expects `Authori-zation`
+     *        (cookie.token_name)
+     */
+    public function request(string $method, string $path, ?string $token, array $body = [], array $extraHeaders = []): array
     {
         $url = parse_url($this->baseUrl . '/' . ltrim($path, '/'));
         if (!is_array($url) || empty($url['host'])) {
@@ -40,6 +45,9 @@ final class HttpTestClient
         ];
         if ($token !== null) {
             $headers[] = 'Authorization: Bearer ' . $token;
+        }
+        foreach ($extraHeaders as $name => $value) {
+            $headers[] = $name . ': ' . $value;
         }
         if ($payload !== '') {
             $headers[] = 'Content-Type: application/json';

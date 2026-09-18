@@ -48,16 +48,22 @@ final class SystemClearServicesTest extends RegressionTestCase
 
         // `system` used to clear `system_notice_admin`, a table the migration
         // renames away: the statement failed and the endpoint returned an error.
-        $cleared = $this->http->request('GET', '/adminapi/system/clear/system', $token);
+        $cleared = $this->http->request('GET', '/adminapi/system/clear/system', $token, [], $this->adminHeaders($token));
         self::assertSame(200, $cleared['http_status']);
         self::assertSame(200, $cleared['body']['status'], json_encode($cleared['body'], JSON_UNESCAPED_UNICODE));
 
         // Replacing the site url with itself rewrites the retained media columns
         // to the same values: the path runs end to end without touching data.
         $siteUrl = $this->useTestSiteUrl();
-        $replaced = $this->http->request('POST', '/adminapi/system/replace_site_url', $token, ['url' => $siteUrl]);
+        $replaced = $this->http->request('POST', '/adminapi/system/replace_site_url', $token, ['url' => $siteUrl], $this->adminHeaders($token));
         self::assertSame(200, $replaced['http_status']);
         self::assertSame(200, $replaced['body']['status'], json_encode($replaced['body'], JSON_UNESCAPED_UNICODE));
+    }
+
+    /** adminapi reads `Authori-zation` (cookie.token_name), not `Authorization`. */
+    private function adminHeaders(string $token): array
+    {
+        return ['Authori-zation' => 'Bearer ' . $token];
     }
 
     /** A syntactically valid site url for the domain-replacement endpoints. */
