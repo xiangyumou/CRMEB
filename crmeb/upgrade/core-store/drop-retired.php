@@ -69,6 +69,7 @@ const RETIRED_CONFIG = [
     'sign_status', 'sign_mode', 'sign_remind', 'sign_give_point', 'sign_give_exp',
     'store_integral_ratio', 'store_self_mention', 'offline_pay_status', 'offline_postage',
     'ali_pay_status', 'ali_pay_appid', 'yue_pay_status', 'allin_pay_status',
+    'allin_private_key', 'allin_cusid', 'allin_appid',
     'pay_wechat_type', 'wechat_extract_type', 'weixin_extract_switch',
     'user_sign_num', 'sign_day_num', 'app_version_*',
     // The customer-service chat is gone; contact is a QR code now.
@@ -78,8 +79,9 @@ const RETIRED_CONFIG = [
 /**
  * Config tabs that only held retired settings; their remaining rows go too.
  * The customer-service tab stays: the retained QR setting lives in it.
+ * 108 held the AllInPay gateway, whose driver is deleted.
  */
-const RETIRED_CONFIG_TABS = [9, 11, 28, 45, 63, 67, 72, 73, 74, 119, 126];
+const RETIRED_CONFIG_TABS = [9, 11, 28, 45, 63, 67, 72, 73, 74, 108, 119, 126];
 
 /**
  * Timer rows belonging to retired features. Matched on the exact mark: the
@@ -87,6 +89,36 @@ const RETIRED_CONFIG_TABS = [9, 11, 28, 45, 63, 67, 72, 73, 74, 119, 126];
  * and the rest still run and must survive.
  */
 const RETIRED_TIMER_MARKS = ['agentUnbind', 'liveProductStatus', 'liveRoomStatus', 'signRemind'];
+
+/**
+ * Admin permission rows of retired features that hang under a retained parent
+ * (the user menu). Matched on the exact unique_auth, so no substring can hit a
+ * retained sibling.
+ */
+const RETIRED_MENU_UNIQUE_AUTH = [
+    'user-set-level-time', 'user-give_level_time', 'user-save_give_level_time',
+    'user-set-spread', 'app-wechat-kefu-create', 'agent-spread',
+];
+
+/**
+ * Notification templates whose only sender was a retired feature. No code path
+ * dispatches these marks any more; the rows would otherwise sit in the retained
+ * 消息管理 page as editable templates for features that no longer exist.
+ */
+const RETIRED_NOTIFICATION_MARKS = [
+    'bind_spread_uid', 'recharge_success', 'recharge_order_refund_status', 'user_extract',
+    'user_balance_change', 'order_brokerage', 'integral_accout', 'bargain_success',
+    'sign_remind', 'kefu_send_extract_application',
+];
+
+/**
+ * Custom-event definitions of retired features shown by the retained custom-event
+ * admin page; no code fires these event names any more.
+ */
+const RETIRED_EVENT_VALUES = [
+    'user_spread', 'user_sign', 'user_recharge', 'user_extract',
+    'user_lottery', 'order_brokerage', 'order_point',
+];
 
 /** Retired admin menu paths; a parent with a retained child stays navigable. */
 const RETIRED_MENU_PATHS = [
@@ -348,6 +380,7 @@ function menuRemovalPlan(array $menus): array
     $remove = [];
     foreach ($menus as $menu) {
         if (isRetiredMenuPath((string)$menu['menu_path'])) $remove[(int)$menu['id']] = true;
+        if (in_array((string)$menu['unique_auth'], RETIRED_MENU_UNIQUE_AUTH, true)) $remove[(int)$menu['id']] = true;
     }
 
     // Menus that must survive take the place of the retired ancestor.
@@ -731,6 +764,12 @@ try {
             $report['retired_group_data_rows'] += (int)Db::name('system_group')->whereIn('config_name', RETIRED_GROUP_DATA)->count();
         }
     }
+    if (tableExists('system_notification')) {
+        $report['retired_notification_rows'] = (int)Db::name('system_notification')->whereIn('mark', RETIRED_NOTIFICATION_MARKS)->count();
+    }
+    if (tableExists('system_event_data')) {
+        $report['retired_event_rows'] = (int)Db::name('system_event_data')->whereIn('value', RETIRED_EVENT_VALUES)->count();
+    }
 
     if ($mode === 'plan') {
         echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n";
@@ -856,6 +895,16 @@ try {
         foreach (Db::name('system_timer')->lock(true)->select()->toArray() as $row) {
             if (!in_array((string)$row['mark'], RETIRED_TIMER_MARKS, true)) continue;
             recordChange($changes, 'system_timer', (int)$row['id'], $row, null);
+        }
+    }
+    if (tableExists('system_notification')) {
+        foreach (Db::name('system_notification')->whereIn('mark', RETIRED_NOTIFICATION_MARKS)->lock(true)->select()->toArray() as $row) {
+            recordChange($changes, 'system_notification', (int)$row['id'], $row, null);
+        }
+    }
+    if (tableExists('system_event_data')) {
+        foreach (Db::name('system_event_data')->whereIn('value', RETIRED_EVENT_VALUES)->lock(true)->select()->toArray() as $row) {
+            recordChange($changes, 'system_event_data', (int)$row['id'], $row, null);
         }
     }
     if (tableExists('system_group_data') && tableExists('system_group')) {

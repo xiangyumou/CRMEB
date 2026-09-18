@@ -25,33 +25,15 @@ class PayServices
     //微信支付类型
     const WEIXIN_PAY = 'weixin';
 
-    //余额支付
-    const YUE_PAY = 'yue';
-
-    //线下支付
-    const OFFLINE_PAY = 'offline';
-
-    //支付宝
-    const ALIAPY_PAY = 'alipay';
-
-    //通联支付
-    const ALLIN_PAY = 'allinpay';
-
-    //好友代付
-    const FRIEND = 'friend';
-
-    //银行转账
-    const BANK = 'bank';
-
-    //支付方式
+    //支付方式：现役订单只有微信；其余键只用于渲染历史流水/订单，不再受理
     const PAY_TYPE = [
         PayServices::WEIXIN_PAY => '微信支付',
-        PayServices::YUE_PAY => '余额支付',
-        PayServices::OFFLINE_PAY => '线下支付',
-        PayServices::ALIAPY_PAY => '支付宝',
-        PayServices::FRIEND => '好友代付',
-        PayServices::ALLIN_PAY => '通联支付',
-        PayServices::BANK => '银行转账',
+        'yue' => '余额支付',
+        'offline' => '线下支付',
+        'alipay' => '支付宝',
+        'friend' => '好友代付',
+        'allinpay' => '通联支付',
+        'bank' => '银行转账',
     ];
 
     /**
@@ -115,20 +97,11 @@ class PayServices
             throw new ApiException('当前商城仅支持微信支付');
         }
         try {
-
             //这些全都是微信支付
-            if (in_array($payType, ['routine', 'weixinh5', 'weixin', 'pc', 'store'])) {
-                $payType = 'wechat_pay';
-                //判断是否使用v3
-                if (sys_config('pay_wechat_type') == 1) {
-                    $payType = 'v3_wechat_pay';
-                }
+            if (sys_config('pay_wechat_type') == 1) {
+                $payType = 'v3_wechat_pay';
             } else {
-                if ($payType == 'alipay') {
-                    $payType = 'ali_pay';
-                } elseif ($payType == 'allinpay') {
-                    $payType = 'allin_pay';
-                }
+                $payType = 'wechat_pay';
             }
 
             /** @var Pay $pay */
@@ -144,57 +117,4 @@ class PayServices
             throw new ApiException($e->getMessage());
         }
     }
-
-    /**
-     * TODO 发起支付 弃用
-     * @param string $payType
-     * @param string $openid
-     * @param string $orderId
-     * @param string $price
-     * @param string $successAction
-     * @param string $body
-     * @return array|string
-     */
-//    public function pay(string $payType, string $openid, string $orderId, string $price, string $successAction, string $body, bool $isCode = false)
-//    {
-//        try {
-//
-//            //这些全都是微信支付
-//            if (in_array($payType, ['routine', 'weixinh5', 'weixin', 'pc', 'store'])) {
-//                $payType = 'wechat_pay';
-//                //判断是否使用v3
-//                if (sys_config('pay_wechat_type') == 1) {
-//                    $payType = 'v3_wechat_pay';
-//                }
-//            }
-//
-//            if ($payType == 'alipay') {
-//                $payType = 'ali_pay';
-//            }
-//
-//
-//            $options = [];
-//            if (self::ALLIN_PAY === $payType) {
-//                $options['returl'] = $this->getOption('returl');
-//                if ($options['returl']) {
-//                    $options['returl'] = str_replace('http://', 'https://', $options['returl']);
-//                }
-//                $options['is_wechat'] = $this->getOption('is_wechat', false);
-//                $options['appid'] = sys_config('routine_appId');
-//                $payType = 'allin_pay';
-//            }
-//
-//            /** @var Pay $pay */
-//            $pay = app()->make(Pay::class, [$payType]);
-//
-//
-//            return $pay->create($orderId, $price, $successAction, $body, '', ['openid' => $openid, 'isCode' => $isCode, 'pay_new_weixin_open' => (bool)sys_config('pay_new_weixin_open')] + $options);
-//
-//        } catch (\Exception $e) {
-//            if (strpos($e->getMessage(), 'api unauthorized rid') !== false) {
-//                throw new ApiException('请在微信支付配置中将小程序商户号选择改为商户号绑定');
-//            }
-//            throw new ApiException($e->getMessage());
-//        }
-//    }
 }
