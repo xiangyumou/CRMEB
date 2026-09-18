@@ -15,6 +15,7 @@
 - 历史订单（`pay_type` 为 yue/offline/alipay/allinpay、`seckill_id`、`bargain_id`、`use_integral`、`spread_uid`、`shipping_type=2`）仍可列表、详情与导出，支付方式通过 `CoreStore::historicalPayTypeLabel()` 显示为「历史：…」；对这类订单发起原路退款会被明确拒绝，提示线下处理。
 - 新订单对退出字段写 0；`eb_user`、`eb_store_order` 上这些列保留原值且不再被读写。
 - 订单通知与移动端订单管理改为读取 `order_notice_admin_uids` 配置（用户 UID 列表），不再依赖已删除的客服表。
+- 客服只保留二维码：`customer_qrcode` 是唯一入口（公开接口只返回它），聊天类型/电话/链接/企业 ID/离线反馈文案等配置随聊天一起删除，H5 与小程序的客服悬浮按钮在未配置二维码时隐藏。
 - 删除隐藏层本身：`CoreStoreAdmin`、`CoreStore::DISABLED_CONFIG`、`sys_config()` 中的强制覆盖与 `config/core_store_removed_admin.json` 均已移除；`config/core_store_removed_pages.json` 仅用于清除装修里的失效链接。
 
 ## 管理后台
@@ -31,19 +32,23 @@
 ```sh
 php upgrade/core-store/drop-retired.php plan
 php upgrade/core-store/drop-retired.php apply /private/retired-backup.json
-php upgrade/core-store/drop-retired.php rollback /private/retired-backup.json
-php upgrade/core-store/drop-retired.php finalize
+php upgrade/core-store/drop-retired.php rollback /private/retired-backup.json [--force]
+php upgrade/core-store/drop-retired.php finalize --dump=/private/full-dump.sql [--yes]
 ```
 
-- `plan` 只读，输出退出业务表与行数、未结清事项、将变为不可达的余额/积分/佣金，以及受保护表的行数与哈希。
-- **未结清负债会拒绝 apply**：未处理提现、未发货的历史余额/线下单、未完成的充值/付费会员订单、未完成的积分商城订单；先在业务侧处理完再执行。
+- `plan` 只读，输出退出业务表与行数、未结清事项、将变为不可达的余额/积分/佣金，以及受保护表的行数与哈希；受保护表用服务端聚合计数与校验和比对，真实订单量下不会把整表读进内存。
+- **未结清负债会拒绝 apply**：审核中的提现（`status=0`，已提现的 `status=1` 不会阻塞）、未发货的历史余额/线下单、未完成的积分商城订单、无法再核销的已付自提单；未完成的充值/付费会员订单同样计入。先在业务侧处理完再执行。
 - 非零余额/积分/佣金不阻塞迁移，apply 会把清单导出为备份同目录的 CSV，供运营线下补偿；`eb_user` 上的这些列保留原值。
-- `apply` 先把退出业务表重命名为 `eb_retired_*`（瞬时、可回滚），再删除退出配置、配置 tab、菜单、定时任务与组合数据，并清理装修中的失效组件。
-- 通知名单转换：apply 会把 `eb_store_service` 中 `notify=1` 的记录写入 `order_notice_admin_uids`，避免上线后订单通知丢失。
-- `rollback` 恢复表名与被删除的行；若记录在迁移后被编辑则拒绝覆盖。`finalize` 在验收期后真正删除 `eb_retired_*`，此后只能依靠 mysqldump 恢复。
+- `apply` 先在**一个事务内**删除退出配置、配置 tab、菜单、定时任务与组合数据，补齐新装才有的保留设置、客服 tab 与预售菜单，迁移订单通知名单，并校验受保护表未变；提交后**再逐表重命名**为 `eb_retired_*`。每张表的改名都先写入备份再执行，中途中断可完整恢复，失败时打印已改名的清单。
+- 通知名单转换：apply 把 `eb_store_service` 中 `status=1` 且 `notify=1` **或** `customer=1` 的记录并入 `order_notice_admin_uids`（与既有值合并去重），避免上线后订单通知或移动端订单管理丢失。
+- 保留菜单不再变孤儿：发票管理、资金流水、账单记录、客服配置改挂到保留的父菜单，被删菜单遗留的权限行一并删除。
+- `rollback` 恢复表名与被删除的行；受保护表在迁移后发生变化时拒绝执行（`--force` 可强制），记录被编辑则拒绝覆盖。`finalize` 之后 `eb_retired_*` 已不存在，rollback 直接**非 0 退出**并提示需要 mysqldump 恢复，不再假成功。
+- `finalize` 真正删除 `eb_retired_*`：必须提供命名了全部待删表的 `--dump`，未加 `--yes` 时要求交互确认。
 - 校验商品、规格、分类、附件、订单、订单购物车与用户表的行数和内容哈希不变。脚本不改上传文件、不删共享表字段。
 
-新装环境直接使用 `crmeb/public/install/crmeb.sql`：退出业务表、配置、菜单与定时任务种子已移除，并新增预售菜单与 `order_notice_admin_uids` 配置。
+维护窗口：apply 的重命名阶段按表执行且不可回滚，请安排停机窗口；期间不要同时跑定时任务或后台操作。
+
+新装环境直接使用 `crmeb/public/install/crmeb.sql`：退出业务表、配置、菜单与定时任务种子已移除；保留的发票/资金流水/账单记录菜单挂回保留父级，客服配置 tab 承载 `customer_qrcode`，首页精品/热门 banner 组合数据保留，个人中心菜单选项只留下仍然存在的页面。`replace_site_url` 与「清除数据」按保留表重写：缺失的表跳过并记日志，单表失败汇总报告，不再因为退出业务的表已删除而整体失败。
 
 ## 验证与发布边界
 

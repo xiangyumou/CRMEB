@@ -602,6 +602,15 @@ export default {
       component: () => import('@/pages/setting/setSystem/index'),
     },
     {
+      path: 'kefu_config/:type?/:tab_id?',
+      name: `${pre}kefu_config`,
+      meta: {
+        ...meta,
+        title: '客服配置',
+      },
+      component: () => import('@/pages/setting/setSystem/index'),
+    },
+    {
       path: 'user_config/:type?/:tab_id?',
       name: `${pre}user_config`,
       meta: {

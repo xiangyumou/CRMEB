@@ -62,8 +62,6 @@ class SystemClearData extends AuthController
                 return $this->categoryData();
             case 'order':
                 return $this->orderData();
-            case 'kefu':
-                return $this->kefuData();
             case 'wechat':
                 return $this->wechatData();
             case 'article':
@@ -165,60 +163,30 @@ class SystemClearData extends AuthController
     public function userRelevantData()
     {
         $this->services->clearData([
-            'agent_level_task_record',
-            'member_card',
-            'member_card_batch',
             'capital_flow',
-            'delivery_service',
-            'division_agent_apply',
-            'luck_lottery_record',
-            'other_order',
-            'other_order_status',
             'qrcode',
             'sms_record',
-            'store_bargain_user',
-            'store_bargain_user_help',
             'store_cart',
             'store_coupon_issue_user',
             'store_coupon_user',
-            'store_integral_order',
-            'store_integral_order_status',
             'store_order',
             'store_order_cart_info',
-            'store_order_economize',
             'store_order_invoice',
             'store_order_refund',
             'store_order_status',
             'store_pink',
             'store_product_relation',
             'store_product_reply',
-            'store_service',
-            'store_service_feedback',
-            'store_service_log',
-            'store_service_record',
             'store_visit',
-            'system_store_staff',
             'user',
             'user_address',
             'user_bill',
-            'user_brokerage',
-            'user_brokerage_frozen',
             'user_cancel',
-            'user_enter',
-            'user_extract',
-            'user_friends',
             'user_group',
             'user_invoice',
             'user_label',
             'user_label_relation',
-            'user_level',
-            'user_money',
-            'user_notice',
-            'user_notice_see',
-            'user_recharge',
             'user_search',
-            'user_sign',
-            'user_spread',
             'user_visit',
             'wechat_user',
         ], true);
@@ -233,8 +201,6 @@ class SystemClearData extends AuthController
     public function storeData()
     {
         $this->services->clearData([
-            'agent_level_task',
-            'agent_level_task_record',
             'article',
             'article_category',
             'article_content',
@@ -242,26 +208,10 @@ class SystemClearData extends AuthController
             'cache',
             'capital_flow',
             'category',
-            'delivery_service',
-            'division_agent_apply',
-            'live_anchor',
-            'live_goods',
-            'live_room',
-            'live_room_goods',
-            'luck_lottery',
-            'luck_lottery_record',
-            'luck_prize',
-            'member_card',
-            'member_card_batch',
             'message_system',
-            'other_order',
-            'other_order_status',
             'qrcode',
             'sms_record',
             'store_advance',
-            'store_bargain',
-            'store_bargain_user',
-            'store_bargain_user_help',
             'store_cart',
             'store_category',
             'store_combination',
@@ -269,12 +219,8 @@ class SystemClearData extends AuthController
             'store_coupon_issue_user',
             'store_coupon_product',
             'store_coupon_user',
-            'store_integral',
-            'store_integral_order',
-            'store_integral_order_status',
             'store_order',
             'store_order_cart_info',
-            'store_order_economize',
             'store_order_invoice',
             'store_order_refund',
             'store_order_status',
@@ -291,39 +237,18 @@ class SystemClearData extends AuthController
             'store_product_reply',
             'store_product_rule',
             'store_product_virtual',
-            'store_seckill',
-            'store_service',
-            'store_service_feedback',
-            'store_service_log',
-            'store_service_record',
             'store_visit',
             'system_file',
             'system_log',
-            'system_notice',
-            'system_notice_admin',
-            'system_store',
-            'system_store_staff',
             'user',
             'user_address',
             'user_bill',
-            'user_brokerage',
-            'user_brokerage_frozen',
             'user_cancel',
-            'user_enter',
-            'user_extract',
-            'user_friends',
             'user_group',
             'user_invoice',
             'user_label',
             'user_label_relation',
-            'user_level',
-            'user_money',
-            'user_notice',
-            'user_notice_see',
-            'user_recharge',
             'user_search',
-            'user_sign',
-            'user_spread',
             'user_visit',
             'wechat_key',
             'wechat_media',
@@ -355,36 +280,14 @@ class SystemClearData extends AuthController
     public function orderData()
     {
         $this->services->clearData([
-            'other_order',
-            'other_order_status',
             'store_cart',
-            'store_integral_order',
-            'store_integral_order_status',
             'store_order',
             'store_order_cart_info',
-            'store_order_economize',
             'store_order_invoice',
             'store_order_refund',
             'store_order_status',
             'store_pink',
         ], true);
-        return app('json')->success('清除数据成功');
-    }
-
-    /**
-     * 清除客服数据
-     * @return mixed
-     */
-    public function kefuData()
-    {
-        $this->services->clearData([
-            'store_service',
-            'store_service_log',
-            'store_service_record',
-            'store_service_feedback',
-            'store_service_speechcraft'
-        ], true);
-        $this->services->delDirAndFile('./public/uploads/store/service');
         return app('json')->success('清除数据成功');
     }
 
@@ -403,7 +306,7 @@ class SystemClearData extends AuthController
             'wechat_qrcode',
             'wechat_qrcode_cate',
             'wechat_qrcode_record',
-            'wechat_reply'
+            'wechat_reply',
         ], true);
         $this->services->delDirAndFile('./public/uploads/wechat');
         return app('json')->success('清除数据成功');
@@ -417,7 +320,7 @@ class SystemClearData extends AuthController
     {
         $this->services->clearData([
             'system_attachment',
-            'system_attachment_category'
+            'system_attachment_category',
         ], true);
         $this->services->delDirAndFile('./public/uploads/');
         return app('json')->success('清除数据成功');
@@ -429,7 +332,7 @@ class SystemClearData extends AuthController
         $this->services->clearData([
             'article_category',
             'article',
-            'article_content'
+            'article_content',
         ], true);
         return app('json')->success('清除数据成功');
     }
@@ -438,8 +341,7 @@ class SystemClearData extends AuthController
     public function systemData()
     {
         $this->services->clearData([
-            'system_notice_admin',
-            'system_log'
+            'system_log',
         ], true);
         return app('json')->success('清除数据成功');
     }

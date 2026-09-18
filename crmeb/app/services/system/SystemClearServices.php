@@ -16,6 +16,7 @@ use app\services\BaseServices;
 use crmeb\exceptions\AdminException;
 use think\facade\Config;
 use think\facade\Db;
+use think\facade\Log;
 
 /**
  * 清除数据
@@ -25,25 +26,112 @@ use think\facade\Db;
 class SystemClearServices extends BaseServices
 {
     /**
-     * 清除表数据
+     * Retained tables that store media URLs, with the columns to rewrite.
+     * Retired-feature tables are gone from the database, so listing them here
+     * would abort the whole replacement on the first missing table.
+     * Each entry is [column, escapes slashes] — the second form matches the
+     * `\/` escaping the JSON columns use.
+     * @var array<string, array<int, array{0: string, 1: bool}>>
+     */
+    protected $siteUrlColumns = [
+        'agreement' => [['content', false]],
+        'article' => [['image_input', false]],
+        'article_category' => [['image', false]],
+        'article_content' => [['content', false]],
+        'cache' => [['result', true]],
+        'diy' => [['value', true], ['default_value', true]],
+        'out_interface' => [['return_params', false], ['request_example', false], ['return_example', false]],
+        'qrcode' => [['url', false], ['qrcode_url', false]],
+        'store_category' => [['pic', false], ['big_pic', false]],
+        'store_combination' => [['image', false], ['images', true]],
+        'store_order_cart_info' => [['cart_info', true]],
+        'store_order_refund' => [['refund_img', false], ['cart_info', true]],
+        'store_pink' => [['avatar', false]],
+        'store_product' => [['image', false], ['slider_image', true], ['recommend_image', false]],
+        'store_product_attr_result' => [['result', true]],
+        'store_product_attr_value' => [['image', false]],
+        'store_product_description' => [['description', false]],
+        'store_product_reply' => [['avatar', false], ['pics', true]],
+        'system_admin' => [['head_pic', false]],
+        'system_attachment' => [['att_dir', false], ['satt_dir', false]],
+        'system_config' => [['value', false], ['value', true]],
+        'system_group_data' => [['value', true]],
+        'theme' => [
+            ['home_data', true], ['detail_data', true], ['user_data', true],
+            ['home_default_data', true], ['detail_default_data', true], ['user_default_data', true],
+            ['home_data', false], ['detail_data', false], ['user_data', false],
+            ['home_default_data', false], ['detail_default_data', false], ['user_default_data', false],
+            ['home_image', false], ['category_image', false], ['detail_image', false], ['user_image', false],
+            ['home_default_image', false], ['category_default_image', false], ['detail_default_image', false],
+            ['user_default_image', false],
+        ],
+        'user' => [['avatar', false]],
+        'wechat_qrcode' => [['image', false]],
+        'wechat_user' => [['headimgurl', false]],
+    ];
+
+    /**
+     * 表名前缀
+     * @return string
+     */
+    protected function prefix(): string
+    {
+        return (string)Config::get('database.connections.' . Config::get('database.default') . '.prefix');
+    }
+
+    /**
+     * 数据表是否存在
+     * @param string $table
+     * @return bool
+     */
+    protected function tableExists(string $table): bool
+    {
+        if (!preg_match('/^[a-z0-9_]+$/', $table)) return false;
+        return (bool)Db::query("SHOW TABLES LIKE '" . $this->prefix() . $table . "'");
+    }
+
+    /**
+     * 清除表数据。退出业务的表在迁移后已不存在，缺失的表跳过并在报告里列出，
+     * 单个表失败不阻断其余表，最后统一报告结果。
      * @param string|array $table_name
-     * @param $status
+     * @param bool $status true 使用 TRUNCATE，false 使用 DELETE
+     * @return array{cleared: string[], missing: string[], failed: array<string, string>}
      */
     public function clearData($table_name, bool $status)
     {
-        $prefix = config('database.connections.' . config('database.default'))['prefix'];
-        if (is_string($table_name)) {
-            $clearData = [$table_name];
-        } else {
-            $clearData = $table_name;
-        }
+        $prefix = $this->prefix();
+        $clearData = is_string($table_name) ? [$table_name] : $table_name;
+        $cleared = [];
+        $missing = [];
+        $failed = [];
         foreach ($clearData as $name) {
-            if ($status) {
-                Db::execute('TRUNCATE TABLE ' . $prefix . $name);
-            } else {
-                Db::execute('DELETE FROM' . $prefix . $name);
+            if (!is_string($name) || !preg_match('/^[a-z0-9_]+$/', $name)) {
+                $failed[(string)$name] = '表名不合法';
+                continue;
+            }
+            if (!$this->tableExists($name)) {
+                $missing[] = $name;
+                continue;
+            }
+            try {
+                if ($status) {
+                    Db::execute('TRUNCATE TABLE `' . $prefix . $name . '`');
+                } else {
+                    Db::execute('DELETE FROM `' . $prefix . $name . '`');
+                }
+                $cleared[] = $name;
+            } catch (\Throwable $e) {
+                $failed[$name] = $e->getMessage();
             }
         }
+        if ($failed) {
+            $detail = [];
+            foreach ($failed as $name => $message) {
+                $detail[] = $name . '(' . $message . ')';
+            }
+            throw new AdminException('清除失败：{:msg}', ['msg' => implode('、', $detail)]);
+        }
+        return compact('cleared', 'missing', 'failed');
     }
 
     /**
@@ -72,13 +160,14 @@ class SystemClearServices extends BaseServices
 
     /**
      * 替换域名
-     * @param string $url
+     * @param string $url 替换后的域名
+     * @param string|null $from 替换前的域名，默认取站点配置
      * @return mixed
      */
-    public function replaceSiteUrl(string $url)
+    public function replaceSiteUrl(string $url, ?string $from = null)
     {
         // 获取站点 URL
-        $siteUrl = sys_config('site_url');
+        $siteUrl = $from !== null && $from !== '' ? $from : (string)sys_config('site_url');
         // 解析站点 URL 的协议
         $siteUrlScheme = parse_url($siteUrl)['scheme'];
         // 将站点 URL 中的协议替换为 JSON 格式
@@ -89,64 +178,25 @@ class SystemClearServices extends BaseServices
         // 将当前 URL 中的协议替换为 JSON 格式
         $urlJson = str_replace($urlScheme . '://', $urlScheme . ':\\\/\\\/', $url);
         // 获取数据库表前缀
-        $prefix = Config::get('database.connections.' . Config::get('database.default') . '.prefix');
+        $prefix = $this->prefix();
 
-        // 构建 SQL 语句数组
-        $sql = [
-            "UPDATE `{$prefix}agent_level` SET `image` = replace(`image` ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}agreement` SET `content` = replace(content ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}article` SET `image_input` = replace(`image_input` ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}article_category` SET `image` = replace(`image` ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}article_content` SET `content` = replace(`content` ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}cache` SET `result` = replace(result ,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}delivery_service` SET `avatar` = replace(`avatar` ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}division_agent_apply` SET `images` = replace(images ,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}diy` SET `value` = replace(value ,'{$siteUrlJson}','{$urlJson}'),`default_value` = replace(default_value ,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}diy` SET `value` = replace(value ,'{$siteUrl}','{$url}'),`default_value` = replace(default_value ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}live_anchor` SET `cover_img` = replace(`cover_img` ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}live_goods` SET `cover_img` = replace(`cover_img` ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}live_room` SET `cover_img` = replace(`cover_img` ,'{$siteUrl}','{$url}'),`share_img` = replace(`share_img` ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}luck_lottery` SET `image` = replace(image ,'{$siteUrl}','{$url}'),`content` = replace(content ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}luck_prize` SET `image` = replace(image ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}member_card_batch` SET `qrcode` = replace(qrcode ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}member_right` SET `image` = replace(image ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}out_interface` SET `return_params` = replace(return_params ,'{$siteUrl}','{$url}'),`request_example` = replace(request_example ,'{$siteUrl}','{$url}'),`return_example` = replace(return_example ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}qrcode` SET `url` = replace(url ,'{$siteUrl}','{$url}'),`qrcode_url` = replace(qrcode_url ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}store_bargain` SET `image` = replace(image ,'{$siteUrl}','{$url}'),`images` = replace(images,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}store_category` SET `pic` = replace(`pic` ,'{$siteUrl}','{$url}'),`big_pic` = replace(`big_pic` ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}store_combination` SET `image` = replace(image ,'{$siteUrl}','{$url}'),`images` = replace(images,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}store_integral` SET `image` = replace(image ,'{$siteUrl}','{$url}'),`images` = replace(images,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}store_integral_order` SET `image` = replace(`image` ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}store_order_cart_info` SET `cart_info` = replace(cart_info ,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}store_order_refund` SET `refund_img` = replace(refund_img ,'{$siteUrl}','{$url}'),`cart_info` = replace(cart_info,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}store_pink` SET `avatar` = replace(`avatar` ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}store_product` SET `image` = replace(image ,'{$siteUrl}','{$url}'),`slider_image` = replace(slider_image ,'{$siteUrlJson}','{$urlJson}'),`recommend_image` = replace(recommend_image ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}store_product_attr_result` SET `result` = replace(result ,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}store_product_attr_value` SET `image` = replace(image ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}store_product_description` SET `description`= replace(description,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}store_product_reply` SET `avatar` = replace(avatar ,'{$siteUrl}','{$url}'),`pics` = replace(pics,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}store_seckill` SET `image` = replace(image ,'{$siteUrl}','{$url}'),`images` = replace(images,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}store_service` SET `avatar` = replace(avatar ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}store_service_log` SET `msn` = replace(msn ,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}store_service_record` SET `avatar` = replace(avatar ,'{$siteUrl}','{$url}'),`message` = replace(message,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}system_admin` SET `head_pic` = replace(head_pic ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}system_attachment` SET `att_dir` = replace(att_dir ,'{$siteUrl}','{$url}'),`satt_dir` = replace(satt_dir ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}system_config` SET `value` = replace(value ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}system_config` SET `value` = replace(value ,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}system_group_data` SET `value` = replace(value ,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}system_store` SET `image` = replace(image ,'{$siteUrl}','{$url}'),`oblong_image` = replace(oblong_image ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}system_store_staff` SET `avatar` = replace(avatar ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}system_user_level` SET `image` = replace(image ,'{$siteUrl}','{$url}'),`icon` = replace(icon ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}user` SET `avatar` = replace(avatar ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}user_extract` SET `qrcode_url` = replace(qrcode_url ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}wechat_qrcode` SET `image` = replace(image ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}wechat_user` SET `headimgurl` = replace(headimgurl ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}theme` SET `home_data` = replace(home_data ,'{$siteUrlJson}','{$urlJson}'),`detail_data` = replace(detail_data ,'{$siteUrlJson}','{$urlJson}'),`user_data` = replace(user_data ,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}theme` SET `home_default_data` = replace(home_default_data ,'{$siteUrlJson}','{$urlJson}'),`detail_default_data` = replace(detail_default_data ,'{$siteUrlJson}','{$urlJson}'),`user_default_data` = replace(user_default_data ,'{$siteUrlJson}','{$urlJson}')",
-            "UPDATE `{$prefix}theme` SET `home_data` = replace(home_data ,'{$siteUrl}','{$url}'),`detail_data` = replace(detail_data ,'{$siteUrl}','{$url}'),`user_data` = replace(user_data ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}theme` SET `home_default_data` = replace(home_default_data ,'{$siteUrl}','{$url}'),`detail_default_data` = replace(detail_default_data ,'{$siteUrl}','{$url}'),`user_default_data` = replace(user_default_data ,'{$siteUrl}','{$url}')",
-            "UPDATE `{$prefix}theme` SET `home_image` = replace(home_image ,'{$siteUrl}','{$url}'),`category_image` = replace(category_image ,'{$siteUrl}','{$url}'),`detail_image` = replace(detail_image ,'{$siteUrl}','{$url}'),`user_image` = replace(user_image ,'{$siteUrl}','{$url}'),`home_default_image` = replace(home_default_image ,'{$siteUrl}','{$url}'),`category_default_image` = replace(category_default_image ,'{$siteUrl}','{$url}'),`detail_default_image` = replace(detail_default_image ,'{$siteUrl}','{$url}'),`user_default_image` = replace(user_default_image ,'{$siteUrl}','{$url}')",
-        ];
+        // 构建 SQL 语句数组；退出业务的表已从数据库中删除，只保留仍在用的表
+        $sql = [];
+        $missing = [];
+        foreach ($this->siteUrlColumns as $table => $columns) {
+            if (!$this->tableExists($table)) {
+                $missing[] = $table;
+                continue;
+            }
+            foreach ($columns as [$column, $escaped]) {
+                $search = $escaped ? $siteUrlJson : $siteUrl;
+                $replace = $escaped ? $urlJson : $url;
+                $sql[] = "UPDATE `{$prefix}{$table}` SET `{$column}` = replace(`{$column}`,'{$search}','{$replace}')";
+            }
+        }
+        if ($missing) {
+            Log::info('替换域名跳过的表：' . implode('、', $missing));
+        }
 
         // 执行 SQL 语句
         return $this->transaction(function () use ($sql) {

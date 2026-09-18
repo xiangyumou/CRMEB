@@ -98,12 +98,6 @@ export default {
           type: 'order',
         },
         {
-          title: '清除客服数据',
-          tlt: '清除添加的客服数据，谨慎操作',
-          typeName: 'error',
-          type: 'kefu',
-        },
-        {
           title: '清除微信数据',
           tlt: '清除微信菜单保存数据，微信关键字无效回复',
           typeName: 'error',

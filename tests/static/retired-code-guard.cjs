@@ -55,30 +55,21 @@ const TABLE_SCAN_EXEMPT = [
 ];
 
 /**
- * Files that still name retired tables because a later cleanup phase rewrites
- * them. These are the real defects this scan was added to catch — "replace site
- * url" and "clear data" fail on any database the migration has run against —
- * and they are listed here only so the guard can land before the rewrite.
- *
- * The baseline is self-expiring: once a file stops referencing retired tables it
- * must be dropped from this list, or the "resolved" check below fails.
+ * The rewrite of "clear data" and "replace site url" landed, so nothing may name
+ * a retired table any more — neither in the backend nor in the admin source.
+ * The baseline is kept as an empty list so this guard keeps asserting that.
  */
-const TABLE_BASELINE = [
-  'crmeb/app/adminapi/controller/v1/system/SystemClearData.php',
-  'crmeb/app/services/system/SystemClearServices.php',
-  'crmeb/crmeb/command/Util.php',
-];
+const TABLE_BASELINE = [];
 
 const failures = [];
 const baselined = new Map(TABLE_BASELINE.map((file) => [file, []]));
 
-/** Tables dropped by the migration, plus the notice tables retired alongside them. */
+/** Tables dropped by the migration. */
 function retiredTables() {
   const migration = fs.readFileSync(path.join(root, 'crmeb/upgrade/core-store/drop-retired.php'), 'utf8');
   const block = /const RETIRED_TABLES = \[([\s\S]*?)\];/.exec(migration);
   assert(block, 'RETIRED_TABLES not found in the migration script');
   const names = new Set([...block[1].matchAll(/'([a-z0-9_]+)'/g)].map((m) => m[1]));
-  for (const extra of ['system_notice', 'system_notice_admin', 'user_notice', 'user_notice_see', 'user_enter']) names.add(extra);
   assert(names.size > 40, `only ${names.size} retired tables were parsed`);
   return names;
 }

@@ -45,11 +45,29 @@ final class CoreStoreMigrationTest extends RegressionTestCase
             `status` tinyint NOT NULL DEFAULT 0,
             `add_time` int NOT NULL DEFAULT 0,
             PRIMARY KEY (`id`))');
+        Db::execute('CREATE TABLE IF NOT EXISTS `eb_store_service` (
+            `id` int NOT NULL AUTO_INCREMENT,
+            `uid` int NOT NULL DEFAULT 0,
+            `status` tinyint NOT NULL DEFAULT 0,
+            `notify` tinyint NOT NULL DEFAULT 0,
+            `customer` tinyint NOT NULL DEFAULT 0,
+            PRIMARY KEY (`id`))');
+        Db::execute('CREATE TABLE IF NOT EXISTS `eb_store_seckill` (
+            `id` int NOT NULL AUTO_INCREMENT,
+            PRIMARY KEY (`id`))');
         $this->registerCleanup(function () {
-            Db::execute('DROP TABLE IF EXISTS `eb_user_extract`');
-            Db::execute('DROP TABLE IF EXISTS `eb_retired_user_extract`');
+            foreach (['user_extract', 'store_service', 'store_seckill'] as $table) {
+                Db::execute('DROP TABLE IF EXISTS `eb_' . $table . '`');
+                Db::execute('DROP TABLE IF EXISTS `eb_retired_' . $table . '`');
+            }
         });
-        Db::name('user_extract')->insert(['uid' => 1, 'extract_price' => '10.00', 'status' => 2, 'add_time' => time()]);
+        // 1 is "already paid out" in the enum, not "pending": a shop with history
+        // must not be blocked by withdrawals that finished long ago.
+        Db::name('user_extract')->insert(['uid' => 1, 'extract_price' => '10.00', 'status' => 1, 'add_time' => time()]);
+        // One grantee of each kind: only `notify` rows used to be carried over.
+        Db::name('store_service')->insert(['uid' => 1, 'status' => 1, 'notify' => 1, 'customer' => 0]);
+        Db::name('store_service')->insert(['uid' => 100, 'status' => 1, 'notify' => 0, 'customer' => 1]);
+        Db::name('store_service')->insert(['uid' => 101, 'status' => 0, 'notify' => 1, 'customer' => 1]);
 
         if (!Db::name('system_config')->where('menu_name', 'brokerage_func_status')->count()) {
             $sample = Db::name('system_config')->order('id')->find();
@@ -82,6 +100,7 @@ final class CoreStoreMigrationTest extends RegressionTestCase
     public function testApplyRenamesTablesRemovesSeedsAndRollbackRestoresThem(): void
     {
         $this->seedRetiredData();
+        $this->cleanupCreatedSettings(['order_notice_admin_uids', 'customer_qrcode']);
         $beforeConfig = Db::name('system_config')->order('id')->select()->toArray();
         $backup = tempnam(sys_get_temp_dir(), 'retired-'); unlink($backup);
         $this->registerCleanup(function () use ($backup) {
@@ -95,15 +114,89 @@ final class CoreStoreMigrationTest extends RegressionTestCase
         self::assertNotSame($beforeConfig, Db::name('system_config')->order('id')->select()->toArray());
         self::assertNotEmpty(Db::query("SHOW TABLES LIKE 'eb_retired_user_extract'"), 'tables are renamed, not dropped');
 
+        // The roster keeps everyone who could receive or manage orders, not just
+        // the notify flag, and merges with what the setting already held.
+        $roster = json_decode((string)Db::name('system_config')->where('menu_name', 'order_notice_admin_uids')->value('value'), true);
+        $uids = array_map('intval', explode(',', (string)$roster));
+        self::assertContains(1, $uids, 'notify=1 rows are carried over');
+        self::assertContains(100, $uids, 'customer=1 rows are carried over');
+        self::assertNotContains(101, $uids, 'inactive rows are not');
+
+        // The settings the retained code reads exist after the upgrade.
+        self::assertSame(1, (int)Db::name('system_config')->where('menu_name', 'customer_qrcode')->count());
+
         [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
+        self::assertSame(1, $status, $output);
+        self::assertStringContainsString('already exists', $output, 'a second apply must not overwrite the backup');
+
+        [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup . '.2'));
         self::assertSame(0, $status, $output);
         self::assertStringContainsString('Already migrated', $output);
+        $this->registerCleanup(function () use ($backup) {
+            if (is_file($backup . '.2')) unlink($backup . '.2');
+        });
 
         [$status, $output] = $this->runScript('rollback ' . escapeshellarg($backup));
         self::assertSame(0, $status, $output);
         self::assertSame($beforeConfig, Db::name('system_config')->order('id')->select()->toArray());
         self::assertSame(1, (int)Db::name('user_extract')->count(), 'the retired table comes back with its rows');
         self::assertSame([], Db::query("SHOW TABLES LIKE 'eb_retired_%'"));
+    }
+
+    /**
+     * `status` in `eb_user_extract` is -1 refused, 0 waiting, 1 paid out. Reading
+     * 1 as pending blocked apply on every shop that ever paid a withdrawal.
+     */
+    public function testCompletedWithdrawalsDoNotBlockApply(): void
+    {
+        $this->seedRetiredData();
+        [$status, $output] = $this->runScript('plan');
+        self::assertSame(0, $status, $output);
+
+        Db::name('user_extract')->where('uid', 1)->update(['status' => 0]);
+        [$status, $output] = $this->runScript('plan');
+        self::assertSame(2, $status, $output);
+        self::assertStringContainsString('withdrawal', $output);
+    }
+
+    public function testFinalizeRefusesWithoutADump(): void
+    {
+        $this->seedRetiredData();
+        $backup = tempnam(sys_get_temp_dir(), 'retired-'); unlink($backup);
+        [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+        $this->registerCleanup(function () use ($backup) {
+            if (is_file($backup)) unlink($backup);
+            Db::execute('DROP TABLE IF EXISTS `eb_retired_user_extract`');
+        });
+
+        [$status, $output] = $this->runScript('finalize');
+        self::assertSame(1, $status, $output);
+        self::assertStringContainsString('--dump', $output);
+        self::assertNotEmpty(Db::query("SHOW TABLES LIKE 'eb_retired_user_extract'"), 'nothing is dropped without a dump');
+    }
+
+    /** After finalize the data is gone, so rollback must fail loudly, not report success. */
+    public function testRollbackAfterFinalizeFails(): void
+    {
+        $this->seedRetiredData();
+        $backup = tempnam(sys_get_temp_dir(), 'retired-'); unlink($backup);
+        [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+        $this->registerCleanup(function () use ($backup) {
+            if (is_file($backup)) unlink($backup);
+        });
+
+        $dump = $backup . '.sql';
+        file_put_contents($dump, '-- ' . implode("\n-- ", array_map(static function ($table) {
+            return 'eb_retired_' . $table;
+        }, ['user_extract', 'store_service', 'store_seckill'])));
+        [$status, $output] = $this->runScript('finalize --dump=' . escapeshellarg($dump) . ' --yes');
+        self::assertSame(0, $status, $output);
+
+        [$status, $output] = $this->runScript('rollback ' . escapeshellarg($backup));
+        self::assertSame(1, $status, $output);
+        self::assertStringContainsString('mysqldump', $output);
     }
 
     public function testFinalizeDropsTheRenamedTables(): void
@@ -117,7 +210,11 @@ final class CoreStoreMigrationTest extends RegressionTestCase
             if (is_file($backup)) unlink($backup);
         });
 
-        [$status, $output] = $this->runScript('finalize');
+        $dump = $backup . '.sql';
+        file_put_contents($dump, '-- ' . implode("\n-- ", array_map(static function ($table) {
+            return 'eb_retired_' . $table;
+        }, ['user_extract', 'store_service', 'store_seckill'])));
+        [$status, $output] = $this->runScript('finalize --dump=' . escapeshellarg($dump) . ' --yes');
         self::assertSame(0, $status, $output);
         self::assertSame([], Db::query("SHOW TABLES LIKE 'eb_retired_%'"));
         self::assertSame([], Db::query("SHOW TABLES LIKE 'eb_user_extract'"));
