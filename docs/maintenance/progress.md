@@ -110,3 +110,38 @@ WebSocket needs the workerman container, the courier list needs a CRMeb cloud
 token, and the file manager needs its own login.
 
 The maintenance check passes (132 tests, 545 assertions, plus the static gates).
+
+## Retired-feature round two (2026-09-18)
+
+A review of the deletion round found eleven defects that the green gates could
+not see, because the guards matched by prefix and the regression suite had no
+seeded data. The backend, migration and maintenance fixes are on this branch;
+this section records what the database and tooling work changed and what was
+re-verified.
+
+- **Migration.** `apply` now removes rows and verifies inside one transaction and
+  renames tables outside it, recording each name in the backup before the rename,
+  so an interrupted run is recoverable and a failure prints the already-renamed
+  list. Settlement checks were corrected against the real enums (a completed
+  withdrawal no longer blocks apply, the points-mall status list matches the
+  shipped one), timers are matched by exact mark rather than substring (so
+  `takeDelivery` and `clearPoster` survive), the roster takes the union of
+  `notify` and `customer` grantees and merges with the configured list, and
+  `finalize` requires a dump naming every table it drops.
+- **Install SQL.** The retained invoice, capital-flow and billing menus are
+  re-homed under their retained parents instead of being left behind a removed
+  one; the customer-service tab that holds `customer_qrcode` is restored; the
+  home-page banner groups and the `clearPoster` timer are back; the dead
+  personal-centre menu seeds are gone; retired settings and orphan rows are
+  removed.
+- **Maintenance tools.** "Clear data" and "replace site url" share one retained
+  table map, skip tables that no longer exist, and report per-table instead of
+  aborting midway. The mobile order-management middleware whitelist is deleted.
+- **Verification.** A migrated shop now matches a fresh install on menus,
+  configs, tabs, groups, group data and timers (byte-compared, names included).
+  The full cycle was re-run on the seeded production copy: plan → apply →
+  rollback restores the exact prior state, and finalize refuses without a dump
+  and makes a later rollback fail loudly. The maintenance check passes
+  (151 tests, 613 assertions, plus the static gates), and the guards were
+  confirmed to fail when a retired table name or a rollback-clobbering edit is
+  reintroduced.
