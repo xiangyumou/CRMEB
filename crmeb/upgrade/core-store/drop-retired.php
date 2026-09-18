@@ -131,16 +131,17 @@ const RETAINED_MENU_GROUP = 'routine_my_menus';
 /**
  * Admin menus a fresh install ships that an older database never had. Without
  * them the retained feature is reachable by URL but invisible in the sidebar.
- * Each entry is keyed by `unique_auth`; the second element names the parent.
+ * Each entry is keyed by the menu name + path a database would already hold;
+ * `parent` names another entry here, or a menu path (leading `/`).
  */
 const REQUIRED_MENUS = [
-    // unique_auth => [menu_path, parent unique_auth ('' = root/parent menu), name, controller, action,
-    //                 sort, auth_type, header, is_header, mark]
-    'marketing-presell' => ['/marketing/presell/index', '/marketing', '预售管理', 'marketing.store_advance', '', 81, 1, 'marketing', 1, '预售管理'],
-    'marketing-presell-presell_list' => ['/marketing/presell/presell_list', 'marketing-presell', '预售列表', 'marketing.store_advance', 'presellList', 0, 1, 'marketing', 0, '预售列表'],
-    'marketing-presell-create' => ['/marketing/presell/create', 'marketing-presell', '添加预售', '', '', 0, 3, '', 0, '添加预售'],
-    'advance-edit' => ['/', 'marketing-presell-presell_list', '编辑预售', '', '', 0, 3, '', 0, '编辑预售'],
-    'advance-delete' => ['/', 'marketing-presell-presell_list', '删除预售', '', '', 0, 3, '', 0, '删除预售'],
+    // key => [menu_path, parent, name, controller, action, sort, auth_type, header, is_header, unique_auth, mark]
+    '预售管理' => ['/marketing/presell/index', '/marketing', 'marketing.store_advance', '', 81, 1, 'marketing', 1, 'marketing-presell', '预售管理'],
+    '预售商品' => ['/marketing/presell/index', '预售管理', 'marketing.store_advance', 'index', 0, 1, 'marketing', 0, 'marketing-presell', '预售商品'],
+    '添加预售' => ['/marketing/presell/create', '预售管理', '', '', 0, 3, '', 0, 'marketing-presell-create', '添加预售'],
+    '预售列表' => ['/marketing/presell/presell_list', '预售商品', 'marketing.store_advance', 'presellList', 0, 1, 'marketing', 0, 'marketing-presell-presell_list', '预售列表'],
+    '编辑预售' => ['/', '预售商品', '', '', 0, 3, '', 0, 'advance-edit', '编辑预售'],
+    '删除预售' => ['/', '预售商品', '', '', 0, 3, '', 0, 'advance-delete', '删除预售'],
 ];
 
 /**
@@ -789,7 +790,20 @@ try {
                     || !Db::name('system_config_tab')->where('id', $currentTab)->count();
                 if (!$tabIsRetired) continue;
                 $next = $existing;
-                $next['config_tab_id'] = $requiredTabIds[$definition['tab']];
+                // The row describes a control the form builder renders: take the
+                // shipped shape so an upgraded shop matches a fresh install. The
+                // value, status and sort belong to the operator and are preserved.
+                foreach ([
+                    'type' => $definition['type'], 'input_type' => $definition['input_type'],
+                    'upload_type' => $definition['upload_type'], 'required' => '',
+                    'width' => ($name === 'customer_qrcode' ? 0 : 100), 'high' => 0,
+                    'info' => $definition['info'], 'desc' => $definition['desc'],
+                    'config_tab_id' => $requiredTabIds[$definition['tab']],
+                ] as $field => $value) {
+                    $next[$field] = $value;
+                }
+                $next['link_id'] = 0;
+                $next['link_value'] = 0;
                 recordChange($changes, 'system_config', (int)$existing['id'], $existing, $next);
                 continue;
             }
@@ -875,21 +889,22 @@ try {
         }
         // Menus a fresh install ships that this database never had; the sidebar
         // would otherwise hide features that are present and working.
-        $byAuth = [];
+        $byName = [];
         $byPath = [];
         foreach ($menus as $menu) {
-            $byAuth[(string)$menu['unique_auth']] = $menu;
-            $byPath['/' . ltrim((string)$menu['menu_path'], '/')] = $menu;
+            $byName[(string)$menu['menu_name']] = $menu;
+            if ((string)$menu['menu_path'] !== '') {
+                $byPath['/' . ltrim((string)$menu['menu_path'], '/')] = $menu;
+            }
         }
         $nextId = (int)Db::name('system_menus')->lock(true)->max('id') + 1;
-        $addedMenus = [];
-        foreach (REQUIRED_MENUS as $uniqueAuth => $definition) {
-            if (isset($byAuth[$uniqueAuth])) continue;
-            [$menuPath, $parentKey, $name, $controller, $action, $sort, $authType, $header, $isHeader, $mark] = $definition;
+        foreach (REQUIRED_MENUS as $name => $definition) {
+            if (isset($byName[$name])) continue;
+            [$menuPath, $parentKey, $controller, $action, $sort, $authType, $header, $isHeader, $uniqueAuth, $mark] = $definition;
             if (strpos($parentKey, '/') === 0) {
                 $parent = $byPath[$parentKey] ?? null;
             } else {
-                $parent = $byAuth[$parentKey] ?? ($addedMenus[$parentKey] ?? null);
+                $parent = $byName[$parentKey] ?? null;
             }
             $pid = $parent ? (int)$parent['id'] : 0;
             $template = $parent ?: Db::name('system_menus')->order('id')->find();
@@ -899,13 +914,12 @@ try {
                 'controller' => $controller, 'action' => $action, 'api_url' => '', 'methods' => '',
                 'params' => '[]', 'sort' => $sort, 'is_show' => 1, 'is_show_path' => 1, 'access' => 1,
                 'menu_path' => $menuPath,
-                'path' => $parent ? (string)$parent['path'] . ($parent['path'] !== '' ? '/' : '') . $parent['id'] : '',
+                'path' => $parent ? ((string)$parent['path'] === '' ? (string)$parent['id'] : $parent['path'] . '/' . $parent['id']) : '',
                 'auth_type' => $authType, 'header' => $header, 'is_header' => $isHeader,
                 'unique_auth' => $uniqueAuth, 'is_del' => 0, 'mark' => $mark,
             ]);
             recordChange($changes, 'system_menus', (int)$row['id'], null, $row);
-            $byAuth[$uniqueAuth] = $row;
-            $addedMenus[$uniqueAuth] = $row;
+            $byName[$name] = $row;
             if ($menuPath !== '' && $menuPath !== '/') $byPath[$menuPath] = $row;
         }
     }

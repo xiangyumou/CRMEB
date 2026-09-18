@@ -12,6 +12,11 @@ This record distinguishes changes in this working tree from the broader maintena
 
 Do not infer that a passing static check certifies a real uni-app build or that the checked-in `public` output is ready to deploy. The old activity pages remain in `pages.json` until their callers, deep links and archived-order behavior are resolved. `docs/maintenance/inventory.json` records the current first confirmed deletion, while `docs/core-store-shared-retained.json` remains the reference set for the wider audit.
 
+The two paragraphs below describe the earlier hiding-based passes and are kept as
+history: the hiding mechanism they name (`core_store_removed_admin.json`) was
+removed by the retired-feature deletion recorded further down, which is the
+current state.
+
 The admin 404 repair is recorded in `docs/maintenance/request-audit.json`. It removes the user list's two retired mount-time requests, user-facing exited filters and actions, and old DIY link requests; keeps historical response fields. Seeded link categories for removed activities are filtered by exact name while group-buying and coupon links remain visible. `core_store_removed_admin.json` drives admin page/menu cleanup and reversible migration. The maintenance check passed (108 tests, 595 assertions), and the admin built in an isolated directory with existing CSS order warnings. Browser network traces, a staging proxy/cache drill, a database-copy migration rehearsal and real H5/MP-WEIXIN builds have not been completed; do not treat this repair as release sign-off.
 
 A second admin pass fixes the blank configuration pages left by that removal. Every page reusing `pages/setting/setSystem/index.vue` now falls back to `setting/config/edit_basics` instead of the deleted `marketing/integral_config` alias, `SystemConfigServices::$postUrl` no longer offers the deleted `agent`/`marketing` save targets, and the electronic-invoice form saves through `setting/config/save_basics`. The 数据配置 page's sign/recharge table header uses the retained `setting/group_data/header`. Retired entries and requests were removed from the retained order list, refund list and send/refund dialogs (offline payment, write-off, integral refund, courier list), and the courier, write-off, sign, recharge, cashier, app-version and upgrade menus are hidden through `core_store_removed_admin.json`. `libs/socket.js` upgrades `ws://` URLs with the existing `wss()` helper, and `libs/request.js` no longer prints the base URL twice. `tests/static/admin-api-contract.cjs` now fails when a retired endpoint reappears in a reachable page. The maintenance check passed again (108 tests, 595 assertions) and the admin was rebuilt with Node 20.19.0; `crmeb/public/admin` and `.build/release/admin` were replaced with that build. The reused configuration pages were driven page-by-page against a local Compose stack through the admin API (18 pages, correct form action, retired endpoints answering HTTP 404), and the `ws://`-to-`wss://` upgrade was confirmed against a TLS front-end. No browser backend was available for console and network traces, and no H5/MP-WEIXIN build, staging drill or database-copy rehearsal was performed in this pass.
@@ -35,13 +40,27 @@ and the database.
   pay-type options. Channel-code and customer pickers use the retained user list.
   The presale admin gained the `marketing/advance` route group its pages call.
 - **Database:** `upgrade/core-store/drop-retired.php` replaces the hiding migration.
-  `plan` is read-only and refuses apply while withdrawals, unshipped historical
-  balance/offline orders, unfinished member/recharge or points-mall orders exist.
-  `apply` renames retired tables to `eb_retired_*`, deletes retired settings, tabs,
-  menus, timers and group data, carries the notification roster over and exports
-  unreachable balances to CSV. `rollback` restores; `finalize` drops after the
-  acceptance window. The install SQL carries none of the retired tables or seeds and
-  now ships the presale menus and the notification setting.
+  `plan` is read-only, hashes the protected tables server-side (a shop with real
+  orders does not need the tables in memory) and refuses apply while withdrawals
+  still under review, unshipped historical balance/offline orders, unfinished
+  member/recharge or points-mall orders exist. `apply` removes the retired settings,
+  tabs, menus, timers and group data inside one transaction, creates the retained
+  settings, config tab and presale menus an old database never had, merges the
+  notification roster (`notify` or `customer` grantees, union with the configured
+  list) and exports unreachable balances to CSV — then renames the retired tables
+  outside the transaction, recording each name in the backup before it runs, so an
+  interrupted run is recoverable. `rollback` restores names and rows, requires
+  `--force` when the protected tables drifted, and fails after `finalize` instead of
+  reporting success. `finalize` needs a `--dump` naming every table it drops.
+  Timers are matched by exact mark, so `takeDelivery` and `clearPoster` survive.
+  The install SQL carries none of the retired tables or seeds, re-homes the retained
+  invoice/capital-flow/billing menus under their retained parents, keeps the
+  customer-service tab that holds `customer_qrcode`, and restores the home-page
+  banner groups the storefront reads.
+- **Maintenance tools:** `SystemClearServices` holds the retained table map used by
+  both "clear data" and "replace site url"; missing tables are skipped with a log
+  line, a failing table is reported without aborting the rest, and the console
+  `util replace` delegates to the same list.
 - **Guards:** `tests/static/retired-code-guard.cjs` fails on any retired identifier
   in the backend or admin source; `tests/static/admin-api-contract.cjs` is now a
   forward check that every admin call path resolves to a registered route;
