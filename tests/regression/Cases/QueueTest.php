@@ -7,6 +7,8 @@ use app\jobs\UnpaidOrderCancelJob;
 use app\model\order\StoreOrderPaymentAttempt;
 use app\services\order\StoreOrderPaymentAttemptServices;
 use app\services\order\StoreOrderRefundServices;
+use app\services\order\StoreOrderSuccessServices;
+use app\services\pay\PayServices;
 use app\services\pay\PayTradeServices;
 use Tests\Regression\Support\FixtureFactory;
 use Tests\Regression\Support\RegressionTestCase;
@@ -103,10 +105,11 @@ final class QueueTest extends RegressionTestCase
         $orderId = (int)$order['id'];
         $events = [];
 
-        $trade = $this->getMockBuilder(PayTradeServices::class)->onlyMethods(['settleAttempt'])->getMock();
-        $trade->expects(self::once())->method('settleAttempt')->willReturnCallback(static function () use (&$events): string {
+        $trade = $this->getMockBuilder(PayTradeServices::class)->onlyMethods(['settleResult'])->getMock();
+        $trade->expects(self::once())->method('settleResult')->willReturnCallback(static function () use (&$events): array {
             $events[] = 'gateway';
-            return PayTradeServices::STATE_CLOSED;
+
+            return ['state' => PayTradeServices::STATE_CLOSED, 'trade_no' => '', 'out_trade_no' => 'T-11', 'identity_mismatch' => false, 'not_exist' => false];
         });
         $this->replace(PayTradeServices::class, $trade);
 
@@ -140,7 +143,6 @@ final class QueueTest extends RegressionTestCase
         $order = $this->createOrder();
         $orderId = (int)$order['id'];
         $this->replaceSettledGateway(['id' => 12, 'out_trade_no' => 'T-12', 'driver' => 'v3_wechat_pay'], PayTradeServices::STATE_UNKNOWN);
-
         $attempts = $this->attemptDouble([['id' => 12, 'out_trade_no' => 'T-12', 'driver' => 'v3_wechat_pay']]);
         $attempts->expects(self::never())->method('mark');
         $attempts->expects(self::never())->method('closeRemaining');
@@ -157,7 +159,8 @@ final class QueueTest extends RegressionTestCase
 
     /**
      * A late callback that says the order was paid after all must keep it alive:
-     * the cancellation stops and records what the gateway reported.
+     * the cancellation stops, the unified confirmation runs with the fresh trade
+     * number, and the operator gets "订单已支付，无法取消".
      */
     public function testAGatewayPaymentFoundDuringCancellationKeepsTheOrderAlive(): void
     {
@@ -173,8 +176,7 @@ final class QueueTest extends RegressionTestCase
         $attempts = $this->attemptDouble([
             ['id' => 13, 'out_trade_no' => 'T-13', 'driver' => 'v3_wechat_pay', 'trade_no' => 'trade-13'],
         ]);
-        $attempts->expects(self::once())->method('mark')
-            ->with(13, StoreOrderPaymentAttempt::STATUS_PAID, 'cancel:paid', 'trade-13');
+        $attempts->expects(self::never())->method('mark');
         $attempts->expects(self::never())->method('closeRemaining');
         $this->replace(StoreOrderPaymentAttemptServices::class, $attempts);
 
@@ -183,8 +185,22 @@ final class QueueTest extends RegressionTestCase
         $refunds->expects(self::never())->method('regressionStock');
         $this->replace(StoreOrderRefundServices::class, $refunds);
 
-        self::assertFalse((new UnpaidOrderCancelJob())->doJob($orderId));
-        self::assertSame(0, $this->isCancelled($orderId));
+        //取消流程发现已收款后调用统一确认流程，并携带查询返回的交易号
+        $success = $this->getMockBuilder(StoreOrderSuccessServices::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['paySuccess'])
+            ->getMock();
+        $success->expects(self::once())->method('paySuccess')->with(
+            self::callback(static function (array $orderInfo) use ($orderId): bool {
+                return (int)$orderInfo['id'] === $orderId;
+            }),
+            PayServices::WEIXIN_PAY,
+            ['trade_no' => 'trade-13', 'out_trade_no' => 'T-13']
+        )->willReturn(true);
+        $this->replace(StoreOrderSuccessServices::class, $success);
+
+        self::assertFalse((new UnpaidOrderCancelJob())->doJob($orderId), 'the cancel stops and reports failure');
+        self::assertSame(0, $this->isCancelled($orderId), 'a paid order stays alive');
     }
 
     /**
@@ -400,8 +416,14 @@ final class QueueTest extends RegressionTestCase
 
     private function replaceSettledGateway(array $attempt, string $state): void
     {
-        $trade = $this->getMockBuilder(PayTradeServices::class)->onlyMethods(['settleAttempt'])->getMock();
-        $trade->expects(self::once())->method('settleAttempt')->with($attempt)->willReturn($state);
+        $trade = $this->getMockBuilder(PayTradeServices::class)->onlyMethods(['settleResult'])->getMock();
+        $trade->expects(self::once())->method('settleResult')->with($attempt)->willReturn([
+            'state' => $state,
+            'trade_no' => (string)($attempt['trade_no'] ?? ''),
+            'out_trade_no' => (string)($attempt['out_trade_no'] ?? ''),
+            'identity_mismatch' => false,
+            'not_exist' => false,
+        ]);
         $this->replace(PayTradeServices::class, $trade);
     }
 

@@ -114,7 +114,11 @@ class PayServices
             if (strpos($e->getMessage(), 'api unauthorized rid') !== false) {
                 throw new ApiException('请在微信支付配置中将小程序商户号选择改为商户号绑定');
             }
-            throw new ApiException($e->getMessage());
+            //网关边界错误单独标记：调用方据此保留支付尝试并标记结果未知
+            if ($e instanceof \crmeb\exceptions\PayGatewayException) {
+                throw $e;
+            }
+            throw new \crmeb\exceptions\PayGatewayException($e->getMessage(), [], 0, $e);
         }
     }
 }

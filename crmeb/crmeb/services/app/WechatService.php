@@ -76,7 +76,9 @@ class WechatService
             'secret' => $appsecret,
             'token' => isset($wechat['wechat_token']) ? trim($wechat['wechat_token']) : '',
             'guzzle' => [
-                'timeout' => 10.0, // 超时时间（秒）
+                //支付网关调用的超时上限：连接 3 秒，单次总超时 15 秒
+                'connect_timeout' => 3.0,
+                'timeout' => 15.0,
                 'verify' => false
             ],
         ];

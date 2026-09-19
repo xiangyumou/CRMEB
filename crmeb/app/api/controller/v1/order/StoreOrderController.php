@@ -246,60 +246,27 @@ class StoreOrderController
             ['type', 0]
         ], true);
         //这个缓存锁只用来挡住同一用户的重复点击，不作为并发正确性保障：
-        //真正的串行化由订单行状态和支付尝试记录负责
+        //支付创建与取消的互斥由订单行锁和支付尝试记录保证
         $payLock = CacheService::get('PAY_LOCK_' . $uni);
         if ($payLock) return app('json')->fail('订单支付中，请勿重复支付');
         CacheService::set('PAY_LOCK_' . $uni, 'PAY_LOCK', 2);
         if (!$uni) return app('json')->fail('参数错误');
-        $orderInfo = $this->services->get(['order_id' => $uni]);
-        if ($orderInfo->is_cancel == 1 || $orderInfo->is_del == 1 || $orderInfo->is_system_del == 1) return app('json')->fail('订单已经超过系统支付时间，无法支付，请重新下单');
-        $uid = $type == 1 ? (int)$request->uid() : $orderInfo->uid;
-        $orderInfo->is_channel = $this->getChennel[$request->getFromType()] ?? ($request->isApp() ? 0 : 1);
-        $orderInfo->order_id = $uid != $orderInfo->pay_uid ? app()->make(StoreOrderCreateServices::class)->getNewOrderId('cp') : $uni;
-        $orderInfo->pay_uid = $uid;
-        $orderInfo->save();
-        $orderInfo = $orderInfo->toArray();
-        $order = $this->services->get(['order_id' => $orderInfo['order_id']]);
-        if (!$order)
-            return app('json')->fail('订单不存在');
-        if ($order['paid'])
-            return app('json')->fail('订单已支付');
-        if ($order['pink_id'] && $services->isPinkStatus($order['pink_id'])) {
-            return app('json')->fail('该订单已失效');
-        }
-
-        //0元支付
-        if (bcsub((string)$orderInfo['pay_price'], '0', 2) <= 0) {
-            //创建订单jspay支付
-            /** @var StoreOrderSuccessServices $success */
-            $success = app()->make(StoreOrderSuccessServices::class);
-            $payPriceStatus = $success->zeroYuanPayment($orderInfo, $uid);
-            if ($payPriceStatus)//0元支付成功
-                return app('json')->status('success', '支付成功', ['order_id' => $orderInfo['order_id'], 'key' => $orderInfo['unique']]);
-            else
-                return app('json')->status('pay_error', '支付失败');
-        }
+        $channel = $this->getChennel[$request->getFromType()] ?? ($request->isApp() ? 0 : 1);
 
         /**
-         * 调用网关之前先落库这一次支付尝试。网关侧的商户订单号就是下面的
-         * order_id，而订单表的 order_id 会随付款人改写，回调只能靠这条记录
-         * 才能准确归属，取消流程也要靠它才能确认网关侧没有可收款的单子。
+         * 支付创建的完整编排：事务一在订单锁内校验并落库支付尝试，事务二
+         * 重新锁单重读后再调用网关。0元支付、换付款人与尝试记录都在服务内
+         * 处理，控制器不再自行改写订单。
          */
-        /** @var StoreOrderPaymentAttemptServices $attemptServices */
-        $attemptServices = app()->make(StoreOrderPaymentAttemptServices::class);
-        $attemptServices->record((int)$order['id'], (string)$order['order_id'], sys_config('pay_wechat_type') == 1 ? 'v3_wechat_pay' : 'wechat_pay', [
-            'channel' => (int)$orderInfo['is_channel'],
-            'pay_type' => $paytype,
-            'total_fee' => (string)$orderInfo['pay_price'],
-            'pay_uid' => $uid,
-        ]);
-        //落库之后重新读取订单，确认它在这段时间里没有被支付或取消
-        if (!$this->services->getForUpdate((int)$order['id']) instanceof \think\Model) {
-            return app('json')->fail('订单已经超过系统支付时间，无法支付，请重新下单');
+        $result = $this->services->createPayment((string)$uni, (int)$request->uid(), (int)$type, (string)$paytype, $channel, ['quitUrl' => $quitUrl]);
+        if ($result['zero']) {
+            return app('json')->status($result['pay']['status'], $result['pay']['payInfo'], [
+                'order_id' => $result['order']['order_id'],
+                'key' => $result['order']['unique'],
+            ]);
         }
 
-        $payInfo = $payServices->beforePay($order->toArray(), $paytype, ['quitUrl' => $quitUrl]);
-        return app('json')->status($payInfo['status'], $payInfo['payInfo']);
+        return app('json')->status($result['pay']['status'], $result['pay']['payInfo']);
     }
 
     /**

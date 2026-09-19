@@ -141,7 +141,9 @@ class BaseClient extends AbstractAPI
         }
         curl_setopt($curl, CURLOPT_URL, $location);
         curl_setopt($curl, CURLOPT_HEADER, true);
-        curl_setopt($curl, CURLOPT_TIMEOUT, 60);
+        //支付网关调用的超时上限：连接 3 秒，单次总超时 15 秒，避免网关异常时长时间占用订单锁
+        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 3);
+        curl_setopt($curl, CURLOPT_TIMEOUT, 15);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);

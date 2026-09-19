@@ -18,6 +18,7 @@ use app\services\activity\combination\StorePinkServices;
 use app\services\activity\coupon\StoreCouponUserServices;
 use app\services\BaseServices;
 use app\services\other\QrcodeServices;
+use app\services\pay\OrderPayServices;
 use app\services\pay\PayServices;
 use app\services\pay\PayTradeServices;
 use app\services\serve\ServeServices;
@@ -36,6 +37,7 @@ use crmeb\services\FormBuilder as Form;
 use crmeb\services\printer\Printer;
 use crmeb\services\SystemConfigService;
 use crmeb\utils\Arr;
+use think\facade\Db;
 use think\facade\Log;
 
 /**
@@ -758,6 +760,121 @@ class StoreOrderServices extends BaseServices
     }
 
     /**
+     * 支付创建的完整入口（控制器支付按钮调用的唯一编排点）
+     *
+     * 关键约束（本轮 ORDER/PAY-007 修复）：
+     * 1. 事务一在原订单行锁内检查支付、取消、删除与拼团状态，改写付款人并
+     *    分配商户订单号，随后在同一把锁内提交支付尝试记录；之后即使进程退出，
+     *    尝试记录也已经落库，不会被当作"从未发生"。
+     * 2. 事务二再次锁定原订单并重新读取，禁止用旧订单对象发起支付；网关的
+     *    创建调用在订单锁内完成，与取消互斥。数据库锁等待 5 秒。
+     * 3. 拒绝路径（已支付/已取消/已删除）把尝试关闭，不产生新的可付款订单；
+     *    网关边界错误（超时、断连等结果未知）把尝试标记为未知并原样抛出，
+     *    保留尝试，绝不视为未发生。
+     *
+     * @param string $uni 商户订单号
+     * @param int $requestUid 当前登录用户
+     * @param int $type 1=以当前登录人付款（收银台代付），0=以订单归属人付款
+     * @param string $paytype 支付方式
+     * @param int $channel 访问端渠道
+     * @param array $options 透传给支付网关的选项
+     * @return array{zero:bool,pay?:array{status:string,payInfo:mixed},order?:array}
+     * @throws \think\db\exception\DataNotFoundException
+     * @throws \think\db\exception\DbException
+     * @throws \think\db\exception\ModelNotFoundException
+     */
+    public function createPayment(string $uni, int $requestUid, int $type, string $paytype, int $channel, array $options = []): array
+    {
+        if ($uni === '') {
+            throw new ApiException('参数错误');
+        }
+        /** @var StoreOrderPaymentAttemptServices $attemptServices */
+        $attemptServices = app()->make(StoreOrderPaymentAttemptServices::class);
+        /** @var StorePinkServices $pinkServices */
+        $pinkServices = app()->make(StorePinkServices::class);
+        /** @var StoreOrderCreateServices $createServices */
+        $createServices = app()->make(StoreOrderCreateServices::class);
+
+        //事务一：原订单锁内校验 + 分配商户订单号 + 提交支付尝试
+        [$order, $attempt] = $this->transaction(function () use ($uni, $requestUid, $type, $paytype, $channel, $attemptServices, $pinkServices, $createServices) {
+            $order = $this->dao->getByOrderIdForUpdate($uni);
+            if (!$order || $order['is_cancel'] || $order['is_del'] || $order['is_system_del']) {
+                throw new ApiException('订单已经超过系统支付时间，无法支付，请重新下单');
+            }
+            if ($order['paid']) {
+                throw new ApiException('订单已支付');
+            }
+            if ($order['pink_id'] && $pinkServices->isPinkStatus((int)$order['pink_id'])) {
+                throw new ApiException('该订单已失效');
+            }
+            $uid = $type == 1 ? $requestUid : (int)$order['uid'];
+            $update = ['is_channel' => $channel, 'pay_uid' => $uid];
+            if ($uid != $order['pay_uid']) {
+                //换付款人：商户订单号随之改写，网关侧以新号发起
+                $update['order_id'] = $createServices->getNewOrderId('cp');
+            }
+            $this->dao->update((int)$order['id'], $update);
+            $fresh = $this->dao->get((int)$order['id']);
+            $fresh = $fresh ? $fresh->toArray() : [];
+            if (bccomp((string)$fresh['pay_price'], '0', 2) <= 0) {
+                //0元支付不走网关，也不落支付尝试
+                return [$fresh, null];
+            }
+            $driver = sys_config('pay_wechat_type') == 1 ? 'v3_wechat_pay' : 'wechat_pay';
+            $identity = $attemptServices->configIdentity($channel);
+            $attempt = $attemptServices->record((int)$fresh['id'], (string)$fresh['order_id'], $driver, [
+                'channel' => (string)$channel,
+                'pay_type' => $paytype,
+                'total_fee' => (string)$fresh['pay_price'],
+                'pay_uid' => $uid,
+                'mch_id' => $identity['mch_id'],
+                'app_id' => $identity['app_id'],
+            ]);
+
+            return [$fresh, $attempt];
+        });
+
+        if (bccomp((string)$order['pay_price'], '0', 2) <= 0) {
+            //0元支付：直接走支付成功流程
+            /** @var StoreOrderSuccessServices $success */
+            $success = app()->make(StoreOrderSuccessServices::class);
+            $paid = $success->zeroYuanPayment($order, (int)$order['pay_uid']);
+            if ($paid) {
+                return ['zero' => true, 'pay' => ['status' => 'success', 'payInfo' => '支付成功'], 'order' => $order];
+            }
+
+            return ['zero' => true, 'pay' => ['status' => 'pay_error', 'payInfo' => '支付失败'], 'order' => $order];
+        }
+
+        //事务二：再次锁单重读，网关创建在订单锁内完成（与取消互斥）
+        $refused = false;
+        try {
+            $payInfo = $this->transaction(function () use ($order, $paytype, $options, $attemptServices, &$refused) {
+                Db::execute('SET SESSION innodb_lock_wait_timeout = 5');
+                $fresh = $this->dao->getForUpdate((int)$order['id']);
+                if (!$fresh || $fresh['paid'] || $fresh['is_cancel'] || $fresh['is_del']) {
+                    $refused = true;
+                    throw new ApiException('订单已经超过系统支付时间，无法支付，请重新下单');
+                }
+                /** @var OrderPayServices $payServices */
+                $payServices = app()->make(OrderPayServices::class);
+
+                return $payServices->beforePay($fresh->toArray(), $paytype, $options);
+            });
+
+            return ['zero' => false, 'pay' => $payInfo, 'order' => $order];
+        } catch (\Throwable $e) {
+            //尝试已落库：拒绝路径关闭它，结果未知路径标记未知，都不视为未发生
+            $attemptServices->mark(
+                (int)$attempt['id'],
+                $refused ? StoreOrderPaymentAttempt::STATUS_CLOSED : StoreOrderPaymentAttempt::STATUS_UNKNOWN,
+                ($refused ? 'create:refused:' : 'create:unknown:') . mb_substr($e->getMessage(), 0, 60)
+            );
+            throw $e;
+        }
+    }
+
+    /**
      * 取消未支付订单（手动取消、队列取消、定时取消共用的唯一入口）
      *
      * 关键约束：
@@ -774,17 +891,59 @@ class StoreOrderServices extends BaseServices
     {
         /** @var StoreOrderPaymentAttemptServices $attemptServices */
         $attemptServices = app()->make(StoreOrderPaymentAttemptServices::class);
-        //关单必须在事务之外完成：网关调用不能持有数据库锁
-        $this->settlePaymentAttempts($orderId, $attemptServices);
-
         /** @var StoreOrderRefundServices $refundServices */
         $refundServices = app()->make(StoreOrderRefundServices::class);
-        $cancelled = $this->transaction(function () use ($orderId, $mark, $refundServices, $attemptServices) {
+        /** @var PayTradeServices $payTrade */
+        $payTrade = app()->make(PayTradeServices::class);
+
+        //关单必须在事务之外完成：网关调用不能持有数据库锁。
+        //逐条核验全部未决尝试；查到已收款即停止（支付金额与商户身份以本次查询为准）。
+        $paidResult = null;
+        foreach ($attemptServices->openAttempts($orderId) as $attempt) {
+            $result = $payTrade->settleResult($attempt);
+            if (!empty($result['identity_mismatch'])) {
+                //当前配置与记录身份不匹配：停止操作，提示人工处理
+                throw new ApiException('支付配置与记录身份不匹配，请人工核对后处理');
+            }
+            if ($result['state'] === PayTradeServices::STATE_PAID) {
+                $paidResult = $result;
+                break;
+            }
+            if ($result['state'] === PayTradeServices::STATE_CLOSED) {
+                $attemptServices->mark((int)$attempt['id'], StoreOrderPaymentAttempt::STATUS_CLOSED, 'cancel:closed');
+                continue;
+            }
+            //未知、无法识别、超时，以及"查无此单"的尝试：不能据此释放资源
+            throw new ApiException('支付状态确认失败，请稍后重试');
+        }
+
+        $confirmedPaid = false;
+        $cancelled = $this->transaction(function () use ($orderId, $mark, $refundServices, $attemptServices, $paidResult, &$confirmedPaid) {
             $order = $this->dao->getForUpdate($orderId);
             if (!$order) {
                 return false;
             }
             if ($order['paid'] || $order['is_cancel'] || $order['is_del']) {
+                return false;
+            }
+            if ($paidResult !== null) {
+                //查到已付款：在原订单锁内调用统一支付确认流程，本地确认与取消
+                //互斥提交；确认完成后才对外返回"无法取消"
+                /** @var StoreOrderSuccessServices $success */
+                $success = app()->make(StoreOrderSuccessServices::class);
+                $paid = $success->paySuccess($order->toArray(), PayServices::WEIXIN_PAY, [
+                    'trade_no' => (string)$paidResult['trade_no'],
+                    'out_trade_no' => (string)$paidResult['out_trade_no'],
+                ]);
+                if (!$paid) {
+                    //并发下别处已完成支付：重新读取确认，否则本次取消放弃
+                    $fresh = $this->dao->get($orderId);
+                    if ($fresh && $fresh['paid']) {
+                        $confirmedPaid = true;
+                    }
+                } else {
+                    $confirmedPaid = true;
+                }
                 return false;
             }
             if (!$refundServices->couponBack($order, 'cancel')) {
@@ -804,45 +963,12 @@ class StoreOrderServices extends BaseServices
             return true;
         });
 
-        return (bool)$cancelled;
-    }
+        if ($confirmedPaid) {
+            //本地确认提交完成之后，取消才以"已支付"终止
+            throw new ApiException('订单已支付，无法取消');
+        }
 
-    /**
-     * 确认订单名下所有未决支付尝试都已经不可能再收款
-     *
-     * 查到已收款直接中断取消；无法确认则抛错，由调用方稍后重试，绝不在状态
-     * 不明的情况下释放库存。
-     *
-     * @param int $orderId
-     * @param StoreOrderPaymentAttemptServices $attemptServices
-     * @return void
-     * @throws ApiException
-     */
-    private function settlePaymentAttempts(int $orderId, StoreOrderPaymentAttemptServices $attemptServices): void
-    {
-        $attempts = $attemptServices->openAttempts($orderId);
-        if (!$attempts) {
-            return;
-        }
-        /** @var PayTradeServices $tradeServices */
-        $tradeServices = app()->make(PayTradeServices::class);
-        foreach ($attempts as $attempt) {
-            $state = $tradeServices->settleAttempt($attempt);
-            if ($state === PayTradeServices::STATE_CLOSED) {
-                $attemptServices->mark((int)$attempt['id'], StoreOrderPaymentAttempt::STATUS_CLOSED, 'cancel:closed');
-                continue;
-            }
-            if ($state === PayTradeServices::STATE_PAID) {
-                $attemptServices->mark(
-                    (int)$attempt['id'],
-                    StoreOrderPaymentAttempt::STATUS_PAID,
-                    'cancel:paid',
-                    (string)($attempt['trade_no'] ?? '')
-                );
-                throw new ApiException('订单已支付，无法取消');
-            }
-            throw new ApiException('支付状态确认失败，请稍后重试');
-        }
+        return (bool)$cancelled;
     }
 
     /**

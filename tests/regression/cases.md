@@ -5,6 +5,14 @@ the response or return value, the persisted effects, and a no-side-effect
 failure or repeat path. HTTP cases use production routing, middleware and JWT
 against the seeded install SQL; payment transports stay offline.
 
+## Payment concurrency and creation (offline gateway)
+
+- [x] PAYC-001 A payment create held at the gateway boundary while a cancellation commits can never leave a collectible gateway payment on a cancelled order: either the cancel settles the attempt first, or the create is refused under the order lock and the attempt is closed.
+- [x] PAYC-002 A create the gateway accepted but whose response was lost keeps the attempt as unknown (not submitted, not closed), the order unpaid and uncancelled, and a later cancellation closes the gateway order before releasing anything.
+- [x] PAYC-003 Repeated pay taps by the same payer keep one attempt row for one merchant order number; no tap completes or cancels the order on its own.
+- [x] PAYC-004 The attempt's driver, merchant, app, channel, amount and payer are immutable: an identical replay is idempotent, any change is refused for manual handling and the stored row is untouched.
+- [x] PAYC-005 A recorded merchant identity that no longer matches the configuration stops cancellation with 请人工核对后处理 and releases no stock, coupon or cancel flag.
+
 ## Payment and gateway
 
 - [x] PAY-001 Unknown product order notification is acknowledged without side effects.
@@ -37,7 +45,7 @@ against the seeded install SQL; payment transports stay offline.
 - [x] QUEUE-002 An eligible unpaid order restores resources and persists cancellation state once.
 - [x] QUEUE-003 A cancellation settles the payment gateway before it releases anything: settlement runs first, the attempt is marked closed, and only then are the coupon and the stock restored.
 - [x] QUEUE-004 An unconfirmed gateway state (unknown or timeout) releases nothing: the attempt is neither closed nor marked, the coupon and the stock stay with the order and the job reports failure.
-- [x] QUEUE-005 A gateway payment discovered during cancellation keeps the order alive and records the reported trade number without releasing any resource.
+- [x] QUEUE-005 A gateway payment discovered during cancellation keeps the order alive, runs the unified local confirmation with the query's fresh trade number inside the original order lock, and releases no resource.
 - [x] QUEUE-006 When the stock restore fails the coupon return, the stock restore and the cancel flag roll back together and no coupon_back status row survives.
 - [x] QUEUE-007 When the coupon cannot be returned the stock restore never runs and no stock layer is touched.
 - [x] QUEUE-008 Cancelling a presale order restores all four ledgers (the presale activity row, its type-6 SKU, the product row and its type-0 SKU) with deliberately different presale and product ids, so a restore through the ordinary layer cannot pass on matching totals.

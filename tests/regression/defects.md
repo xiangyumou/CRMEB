@@ -1,5 +1,75 @@
 # Regression defects
 
+## Launch blockers: payment, refund and fulfillment consistency (2026-09-19, this round)
+
+Found by the independent review behind `risk-matrix.md`. Every entry below
+lists the baseline commit, the failing assertion observed before the fix (the
+command is always `sh docker/run-regression.sh crmeb-test`), the fix commit and
+the passing result. Failures are business assertions — no missing class, no
+environment failure.
+
+### PAY-007 (P1, plan 3.1): payment creation and cancellation did not share the order lock
+
+`StoreOrderController::pay()` read the order, rewrote the payer and recorded
+the payment attempt with no transaction around any of it, and its
+`FOR UPDATE` re-read ran outside a transaction (a no-op) with the result
+discarded. A cancellation that completed while a payment request was in flight
+therefore left a collectible gateway payment standing on a cancelled order:
+baseline commit 1559a52a, case
+`PaymentConcurrencyTest::testNoCollectibleGatewayPaymentSurvivesACancelledOrder`
+failed with *"a cancelled order ended up with a collectible gateway payment
+(open)"* — the create landed on the gateway only after the cancel had released
+the stock and the coupon. The creation path also treated a lost response as
+"never happened": case `testACreateResponseTimeoutKeepsTheAttemptAsUnknown`
+failed with *"Failed asserting that 0 is identical to 3"* — the attempt stayed
+`STATUS_SUBMITTED` after the gateway accepted the create and the response was
+lost.
+
+Fix (one commit with PAY-008/PAY-009): `StoreOrderServices::createPayment()` —
+transaction one locks the original order row, checks paid/cancel/deleted/pink
+state, renumbers for a payer swap and records the attempt inside the lock;
+transaction two re-locks, re-reads and only then calls the gateway, with the
+5 s `innodb_lock_wait_timeout` set for the section and the gateway create
+covered by the order lock. Refusals close the attempt (`create:refused`);
+gateway-boundary errors (`PayGatewayException`, wrapped in `PayServices::pay`)
+mark it `STATUS_UNKNOWN` and keep it. The controller now delegates to this one
+entry. WeChat v2/v3 transports get connect-timeout 3 s and total timeout 15 s.
+
+### PAY-008 (P1, plan 3.1): the attempt context was mutable and unverified
+
+`StoreOrderPaymentAttemptServices::record()` overwrote driver, merchant, app,
+channel, amount and payer on every re-record, and nothing compared the
+recorded merchant identity with the current configuration.
+`PaymentConcurrencyTest::testPaymentAttemptContextIsImmutable` fails on the
+baseline code with *"a changed amount must not overwrite the recorded
+attempt"* (the row was silently rewritten to 12.00), and
+`testConfigIdentityMismatchStopsCancellationForManualHandling` fails with *"a
+config identity mismatch must stop the cancellation"*.
+
+Fix: `record()` is now write-once — an identical replay is idempotent, any
+context change (including the driver after a `pay_wechat_type` switch) is
+refused with 请人工核对后处理, a `STATUS_UNKNOWN` or paid attempt refuses
+re-recording, and a refused-create attempt reopens in place. The attempt now
+also stores the configured merchant/app identity (`mch_id`, `app_id`, keys
+only, no secrets), and `PayTradeServices::identityMatches()` refuses to settle
+a mismatched attempt: cancellation stops with 支付配置与记录身份不匹配，请人工
+核对后处理 and releases nothing.
+
+### PAY-009 (P1, plan 3.2): a discovered payment was not confirmed locally
+
+When cancellation's settlement found a paid attempt, the old code marked the
+attempt paid and threw 订单已支付 — the order itself stayed unpaid, its
+fulfillment waiting for a callback that might never come, and the fresh trade
+number from the query was discarded (`settleAttempt` returned a bare string).
+The paid case now runs the unified confirmation inside the original order
+lock: `QueueTest::testAGatewayPaymentFoundDuringCancellationKeepsTheOrderAlive`
+(fixed expectation) proves `paySuccess()` receives the query's trade number,
+the cancel then reports failure and the order stays alive; the confirmation
+commits before 订单已支付，无法取消 is returned. `PayTradeServices::settleResult()`
+returns the standard result (state, fresh trade number, amount, driver,
+merchant identity, `not_exist`), and a "查无此单" answer for an attempt that
+was created keeps 待核对 state instead of being read as "safe to release".
+
 ## Retained-path audit (2026-09-19)
 
 The entries below were found by reviewing the deletion batch against the paths it
