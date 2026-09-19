@@ -55,7 +55,7 @@ class StoreCouponIssueDao extends BaseDao
         })->when(isset($where['receive_types']) && $where['receive_types'], function ($query) use ($where) {
             $query->where(function ($query) use ($where) {
                 if ($where['receive_types'] == 1) {
-                    $query->where('receive_type', 1)->whereOr('receive_type', 4);
+                    $query->where('receive_type', 1);
                 } else {
                     $query->where('receive_type', 2)->whereOr('receive_type', 3);
                 }
@@ -109,7 +109,7 @@ class StoreCouponIssueDao extends BaseDao
             ->where('is_del', 0)
             ->where('remain_count > 0 OR is_permanent = 1')
             ->where(function ($query) {
-                $query->where('receive_type', 1)->whereOr('receive_type', 4);
+                $query->where('receive_type', 1);
             })->where(function ($query) {
                 $query->where(function ($query) {
                     $query->where('start_time', '<', time())->where('end_time', '>', time());
@@ -154,7 +154,7 @@ class StoreCouponIssueDao extends BaseDao
             ->where('is_del', 0)
             ->where('remain_count > 0 OR is_permanent = 1')
             ->where(function ($query) {
-                $query->where('receive_type', 1)->whereOr('receive_type', 4);
+                $query->where('receive_type', 1);
             })->where(function ($query) {
                 $query->where(function ($query) {
                     $query->where('start_time', '<', time())->where('end_time', '>', time());
@@ -187,7 +187,7 @@ class StoreCouponIssueDao extends BaseDao
                 ->where('is_del', 0)
                 ->where('remain_count > 0 OR is_permanent = 1')
                 ->where(function ($query) {
-                    $query->where('receive_type', 4)->whereOr('receive_type', 1);
+                    $query->where('receive_type', 1);
                 })->where(function ($query) {
                     $query->where(function ($query) {
                         $query->where('start_time', '<', time())->where('end_time', '>', time());
@@ -331,7 +331,7 @@ class StoreCouponIssueDao extends BaseDao
             ->where('is_del', 0)
             ->where('remain_count > 0 OR is_permanent = 1')
             ->where(function ($query) {
-                $query->where('receive_type', 1)->whereOr('receive_type', 4);
+                $query->where('receive_type', 1);
             })->where(function ($query) {
                 $query->where(function ($query) {
                     $query->where('start_time', '<', time())->where('end_time', '>', time());
@@ -406,7 +406,10 @@ class StoreCouponIssueDao extends BaseDao
      */
     public function getThemeCoupon($where, $order, $limit)
     {
-        $model = $this->getModel()->where('status', 1)->where('is_del', 0)->where('remain_count > 0 OR is_permanent = 1');
+        // 会员专享券（receive_type = 4）随会员业务退出，装修组件也不再返回。
+        $model = $this->getModel()->where('status', 1)->where('is_del', 0)
+            ->where('remain_count > 0 OR is_permanent = 1')
+            ->where('receive_type', '<>', 4);
 
         if ($where['ids'] != '') {
             $ids = explode(',', $where['ids']);
@@ -414,12 +417,6 @@ class StoreCouponIssueDao extends BaseDao
         } else {
             $list = $model->when($where['type'] !== '', function ($query) use ($where) {
                 $query->where('type', $where['type']);
-            })->when($where['user_type'] !== '', function ($query) use ($where) {
-                if ($where['user_type'] == 1) {
-                    $query->where('receive_type', '<>', 4);
-                } else {
-                    $query->where('receive_type', 4);
-                }
             })->when($where['receive_type'] !== '', function ($query) use ($where) {
                 $query->where('receive_type', $where['receive_type']);
             })->when(isset($where['min_price']), function ($query) use ($where) {

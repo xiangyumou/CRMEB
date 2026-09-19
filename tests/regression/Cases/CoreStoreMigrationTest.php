@@ -243,6 +243,269 @@ final class CoreStoreMigrationTest extends RegressionTestCase
         }
     }
 
+    /** Remove a shipped setting for one test and put it back at teardown. */
+    private function removeShippedSetting(string $name): array
+    {
+        $row = Db::name('system_config')->where('menu_name', $name)->find();
+        if (!$row) return [];
+        Db::name('system_config')->where('id', $row['id'])->delete();
+        $this->registerCleanup(function () use ($row) {
+            if (!Db::name('system_config')->where('id', $row['id'])->count()) {
+                Db::name('system_config')->insert($row);
+            }
+        });
+        return $row;
+    }
+
+    /** Remove a shipped config tab for one test and put it back at teardown. */
+    private function removeShippedTab(string $engTitle): array
+    {
+        $row = Db::name('system_config_tab')->where('eng_title', $engTitle)->find();
+        if (!$row) return [];
+        Db::name('system_config_tab')->where('id', $row['id'])->delete();
+        $this->registerCleanup(function () use ($row) {
+            if (!Db::name('system_config_tab')->where('id', $row['id'])->count()) {
+                Db::name('system_config_tab')->insert($row);
+            }
+        });
+        return $row;
+    }
+
+    /**
+     * A shop that never had the customer-service or order-notice tab must get
+     * both, and two settings added in one run must not share an id. Reading
+     * MAX(id)+1 once per row handed every new row the same key, and a same-key
+     * change is merged, so the second setting vanished without an error.
+     */
+    public function testApplyCreatesEveryMissingTabAndSettingWithUniqueIds(): void
+    {
+        $this->seedRetiredData();
+        $this->removeShippedTab('kefu_config');
+        $this->removeShippedTab('order_notice');
+        $this->removeShippedSetting('customer_qrcode');
+        $this->removeShippedSetting('order_notice_admin_uids');
+
+        $backup = tempnam(sys_get_temp_dir(), 'retired-'); unlink($backup);
+        $this->registerCleanup(function () use ($backup) {
+            if (is_file($backup)) unlink($backup);
+        });
+        [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+
+        $tabs = Db::name('system_config_tab')->whereIn('eng_title', ['kefu_config', 'order_notice'])
+            ->order('id')->select()->toArray();
+        self::assertCount(2, $tabs, 'both missing tabs are recreated');
+        self::assertNotSame((int)$tabs[0]['id'], (int)$tabs[1]['id'], 'each new tab gets its own id');
+        $tabIds = [];
+        foreach ($tabs as $tab) $tabIds[(string)$tab['eng_title']] = (int)$tab['id'];
+
+        $settings = Db::name('system_config')->whereIn('menu_name', ['customer_qrcode', 'order_notice_admin_uids'])
+            ->order('id')->select()->toArray();
+        self::assertCount(2, $settings, 'both missing settings are created');
+        self::assertNotSame((int)$settings[0]['id'], (int)$settings[1]['id'], 'each new setting gets its own id');
+        foreach ($settings as $row) {
+            if ((string)$row['menu_name'] === 'customer_qrcode') {
+                self::assertSame($tabIds['kefu_config'], (int)$row['config_tab_id'], 'the QR setting points at the recreated tab');
+            } else {
+                self::assertSame($tabIds['order_notice'], (int)$row['config_tab_id'], 'the roster setting points at the recreated tab');
+            }
+        }
+
+        // Both added rows are in the backup, so one rollback takes them all away.
+        [$status, $output] = $this->runScript('rollback ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+        self::assertSame(0, (int)Db::name('system_config')
+            ->whereIn('menu_name', ['customer_qrcode', 'order_notice_admin_uids'])->count());
+        self::assertSame(0, (int)Db::name('system_config_tab')
+            ->whereIn('eng_title', ['kefu_config', 'order_notice'])->count());
+    }
+
+    /**
+     * Creating the roster setting must carry the retired chat's members over:
+     * they and the mobile order-management permission otherwise disappear.
+     */
+    public function testRosterIsInheritedWhenTheSettingIsCreated(): void
+    {
+        $this->seedRetiredData();
+        $this->removeShippedSetting('order_notice_admin_uids');
+
+        $backup = tempnam(sys_get_temp_dir(), 'retired-'); unlink($backup);
+        $this->registerCleanup(function () use ($backup) {
+            if (is_file($backup)) unlink($backup);
+        });
+        [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+
+        $value = (string)Db::name('system_config')->where('menu_name', 'order_notice_admin_uids')->value('value');
+        $uids = array_map('intval', array_filter(explode(',', trim($value, '"'))));
+        self::assertContains(1, $uids, 'a notify=1 row is carried into the created setting');
+        self::assertContains(100, $uids, 'a customer=1 row is carried too');
+        self::assertNotContains(101, $uids, 'an inactive row is not');
+
+        [$status, $output] = $this->runScript('rollback ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+        self::assertSame(0, (int)Db::name('system_config')->where('menu_name', 'order_notice_admin_uids')->count());
+    }
+
+    /**
+     * A retained setting parked on a retired tab must be moved onto a live one,
+     * not deleted with the tab it happened to sit on.
+     */
+    public function testRetainedSettingOnARetiredTabIsMovedAndKept(): void
+    {
+        $this->seedRetiredData();
+        $original = Db::name('system_config')->where('menu_name', 'customer_qrcode')->find();
+        self::assertNotEmpty($original, 'the install SQL ships the QR setting');
+        $kept = '"https://example.test/customer.png"';
+        Db::name('system_config')->where('id', $original['id'])->update(['config_tab_id' => 119, 'value' => $kept]);
+        $this->registerCleanup(function () use ($original) {
+            Db::name('system_config')->where('id', $original['id'])->update([
+                'config_tab_id' => $original['config_tab_id'], 'value' => $original['value'],
+            ]);
+        });
+
+        $backup = tempnam(sys_get_temp_dir(), 'retired-'); unlink($backup);
+        $this->registerCleanup(function () use ($backup) {
+            if (is_file($backup)) unlink($backup);
+        });
+        [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+
+        $row = Db::name('system_config')->where('id', $original['id'])->find();
+        self::assertNotEmpty($row, 'the setting survives the retired tab it sat on');
+        self::assertNotContains((int)$row['config_tab_id'], [9, 11, 28, 45, 63, 67, 72, 73, 74, 108, 119, 126], 'it is moved off the retired tab');
+        self::assertSame(1, (int)Db::name('system_config_tab')->where('id', (int)$row['config_tab_id'])->count(), 'onto a tab that still exists');
+        self::assertSame($kept, (string)$row['value'], 'the operator value is kept');
+
+        [$status, $output] = $this->runScript('rollback ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+        self::assertSame(119, (int)Db::name('system_config')->where('id', $original['id'])->value('config_tab_id'), 'rollback puts it back where it was');
+    }
+
+    /** A row edited after apply stops the rollback before either the names or the rows move. */
+    public function testRollbackRefusesWhenARowChangedAndLeavesEverythingAsIs(): void
+    {
+        $this->seedRetiredData();
+        $backup = tempnam(sys_get_temp_dir(), 'retired-'); unlink($backup);
+        $this->registerCleanup(function () use ($backup) {
+            if (is_file($backup)) unlink($backup);
+        });
+        [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+
+        $rosterId = (int)Db::name('system_config')->where('menu_name', 'order_notice_admin_uids')->value('id');
+        $afterApply = (string)Db::name('system_config')->where('id', $rosterId)->value('value');
+        Db::name('system_config')->where('id', $rosterId)->update(['value' => '"4242"']);
+
+        [$status, $output] = $this->runScript('rollback ' . escapeshellarg($backup));
+        self::assertSame(1, $status, $output);
+        self::assertStringContainsString('Concurrent changes', $output);
+        self::assertNotEmpty(Db::query("SHOW TABLES LIKE 'eb_retired_user_extract'"), 'the tables are left renamed');
+        self::assertSame([], Db::query("SHOW TABLES LIKE 'eb_user_extract'"));
+        self::assertSame('"4242"', (string)Db::name('system_config')->where('id', $rosterId)->value('value'), 'the edit is untouched');
+        self::assertSame(0, (int)Db::name('system_config')->where('menu_name', 'brokerage_func_status')->count(), 'nothing was restored');
+
+        // Undo the edit and the same backup rolls back cleanly.
+        Db::name('system_config')->where('id', $rosterId)->update(['value' => $afterApply]);
+        [$status, $output] = $this->runScript('rollback ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+        self::assertSame([], Db::query("SHOW TABLES LIKE 'eb_retired_%'"));
+        self::assertSame(1, (int)Db::name('user_extract')->count());
+    }
+
+    /**
+     * A failed data restore keeps the names restored and the same backup usable:
+     * RENAME commits implicitly, so the row work runs in its own transaction.
+     */
+    public function testRollbackCanBeRetriedAfterTheDataRestoreFails(): void
+    {
+        $this->seedRetiredData();
+        $backup = tempnam(sys_get_temp_dir(), 'retired-'); unlink($backup);
+        $this->registerCleanup(function () use ($backup) {
+            if (is_file($backup)) unlink($backup);
+            Db::execute('DROP TRIGGER IF EXISTS regression_block_restore');
+        });
+        [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+
+        // A trigger stands in for any write failure inside the restore: the
+        // pre-check still classifies the row, the insert does not go through.
+        Db::execute('CREATE TRIGGER regression_block_restore BEFORE INSERT ON `eb_system_config` FOR EACH ROW'
+            . " SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'regression: block insert'");
+
+        [$status, $output] = $this->runScript('rollback ' . escapeshellarg($backup));
+        self::assertSame(1, $status, $output);
+        self::assertStringContainsString('data restore failed and can be retried', $output);
+        self::assertStringContainsString('Re-run the rollback', $output);
+        self::assertSame([], Db::query("SHOW TABLES LIKE 'eb_retired_%'"), 'the names came back even though the rows did not');
+        self::assertSame(1, (int)Db::name('user_extract')->count(), 'a renamed table is back with its rows');
+        self::assertSame(0, (int)Db::name('system_config')->where('menu_name', 'brokerage_func_status')->count(), 'the row restore is still pending');
+
+        Db::execute('DROP TRIGGER `regression_block_restore`');
+        [$status, $output] = $this->runScript('rollback ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+        self::assertSame(1, (int)Db::name('system_config')->where('menu_name', 'brokerage_func_status')->count(), 'the retry finishes the restore');
+    }
+
+    /** The WeChat payment version selector chooses a retained gateway and must survive. */
+    public function testWechatPaymentVersionSettingSurvivesApply(): void
+    {
+        $this->seedRetiredData();
+        $row = Db::name('system_config')->where('menu_name', 'pay_wechat_type')->find();
+        self::assertNotEmpty($row, 'the install SQL ships the version selector');
+        self::assertSame('0', (string)$row['value']);
+        Db::name('system_config')->where('id', $row['id'])->update(['value' => '1']);
+        $this->registerCleanup(function () use ($row) {
+            Db::name('system_config')->where('id', $row['id'])->update(['value' => $row['value']]);
+        });
+
+        $backup = tempnam(sys_get_temp_dir(), 'retired-'); unlink($backup);
+        $this->registerCleanup(function () use ($backup) {
+            if (is_file($backup)) unlink($backup);
+        });
+        [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+
+        $after = Db::name('system_config')->where('menu_name', 'pay_wechat_type')->find();
+        self::assertNotEmpty($after, 'the version selector is not dropped with the retired settings');
+        self::assertSame('1', (string)$after['value'], 'an operator who chose v3 keeps v3');
+        self::assertSame('pay', (string)Db::name('system_config_tab')->where('id', (int)$after['config_tab_id'])->value('eng_title'), 'it stays on the live payment tab');
+
+        [$status, $output] = $this->runScript('rollback ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+    }
+
+    /** A refusal while planning must leave the database exactly as it was. */
+    public function testPlanRefusalLeavesTheDatabaseUnmodified(): void
+    {
+        $this->seedRetiredData();
+        $setting = Db::name('system_config')->where('menu_name', 'pay_wechat_type')->find();
+        $payTab = Db::name('system_config_tab')->where('eng_title', 'pay')->find();
+        // The selector sits on a retired tab and the tab it belongs on is gone:
+        // no live tab can hold it, so the run must refuse before writing.
+        Db::name('system_config')->where('id', $setting['id'])->update(['config_tab_id' => 119]);
+        Db::name('system_config_tab')->where('id', $payTab['id'])->delete();
+        $this->registerCleanup(function () use ($setting, $payTab) {
+            Db::name('system_config')->where('id', $setting['id'])->update(['config_tab_id' => $setting['config_tab_id']]);
+            if (!Db::name('system_config_tab')->where('id', $payTab['id'])->count()) {
+                Db::name('system_config_tab')->insert($payTab);
+            }
+        });
+
+        $beforeConfig = Db::name('system_config')->order('id')->select()->toArray();
+        $beforeTabs = Db::name('system_config_tab')->order('id')->select()->toArray();
+        $backup = tempnam(sys_get_temp_dir(), 'retired-'); unlink($backup);
+
+        [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
+        self::assertSame(1, $status, $output);
+        self::assertStringContainsString('pay_wechat_type', $output);
+        self::assertFileDoesNotExist($backup, 'the refusal happens before the backup is written');
+        self::assertSame($beforeConfig, Db::name('system_config')->order('id')->select()->toArray());
+        self::assertSame($beforeTabs, Db::name('system_config_tab')->order('id')->select()->toArray());
+        self::assertNotEmpty(Db::query("SHOW TABLES LIKE 'eb_user_extract'"), 'the retired tables are not renamed');
+        self::assertSame([], Db::query("SHOW TABLES LIKE 'eb_retired_%'"));
+    }
+
     public function testApplyRenamesTablesRemovesSeedsAndRollbackRestoresThem(): void
     {
         $this->seedRetiredData();
@@ -337,7 +600,35 @@ final class CoreStoreMigrationTest extends RegressionTestCase
         self::assertStringContainsString('withdrawal', $output);
     }
 
-    public function testFinalizeRefusesWithoutADump(): void
+    /** Rows left in the renamed tables are real data; a dump file that merely names them proves nothing. */
+    public function testFinalizeRefusesTablesThatStillHoldRows(): void
+    {
+        $this->seedRetiredData();
+        $backup = tempnam(sys_get_temp_dir(), 'retired-'); unlink($backup);
+        [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
+        self::assertSame(0, $status, $output);
+        $dump = $backup . '.sql';
+        file_put_contents($dump, '-- ' . implode("\n-- ", array_map(static function ($table) {
+            return 'eb_retired_' . $table;
+        }, array_keys(self::RETIRED_FIXTURES))));
+        $this->registerCleanup(function () use ($backup, $dump) {
+            if (is_file($backup)) unlink($backup);
+            if (is_file($dump)) unlink($dump);
+            Db::execute('DROP TABLE IF EXISTS `eb_retired_user_extract`');
+        });
+
+        // A dump that only mentions the table names, plus --yes, must not be
+        // allowed to take the rows with it.
+        [$status, $output] = $this->runScript('finalize --dump=' . escapeshellarg($dump) . ' --yes');
+        self::assertSame(2, $status, $output);
+        self::assertStringContainsString('still hold rows', $output);
+        self::assertStringContainsString('eb_retired_user_extract', $output);
+        self::assertNotEmpty(Db::query("SHOW TABLES LIKE 'eb_retired_user_extract'"), 'the non-empty table survives');
+        self::assertSame(1, $this->renamedRowCount('user_extract'), 'its rows survive too');
+    }
+
+    /** An empty table still needs a dump recorded: the drop cannot be undone. */
+    public function testFinalizeNeedsADumpForEmptyTables(): void
     {
         $this->seedRetiredData();
         $backup = tempnam(sys_get_temp_dir(), 'retired-'); unlink($backup);
@@ -347,6 +638,7 @@ final class CoreStoreMigrationTest extends RegressionTestCase
             if (is_file($backup)) unlink($backup);
             Db::execute('DROP TABLE IF EXISTS `eb_retired_user_extract`');
         });
+        $this->emptyRenamedTables();
 
         [$status, $output] = $this->runScript('finalize');
         self::assertSame(1, $status, $output);
@@ -364,6 +656,7 @@ final class CoreStoreMigrationTest extends RegressionTestCase
         $this->registerCleanup(function () use ($backup) {
             if (is_file($backup)) unlink($backup);
         });
+        $this->emptyRenamedTables();
 
         $dump = $backup . '.sql';
         file_put_contents($dump, '-- ' . implode("\n-- ", array_map(static function ($table) {
@@ -387,6 +680,7 @@ final class CoreStoreMigrationTest extends RegressionTestCase
         $this->registerCleanup(function () use ($backup) {
             if (is_file($backup)) unlink($backup);
         });
+        $this->emptyRenamedTables();
 
         $dump = $backup . '.sql';
         file_put_contents($dump, '-- ' . implode("\n-- ", array_map(static function ($table) {
@@ -396,6 +690,27 @@ final class CoreStoreMigrationTest extends RegressionTestCase
         self::assertSame(0, $status, $output);
         self::assertSame([], Db::query("SHOW TABLES LIKE 'eb_retired_%'"));
         self::assertSame([], Db::query("SHOW TABLES LIKE 'eb_user_extract'"));
+    }
+
+    /** Rows held by a renamed table, read through its retired name. */
+    private function renamedRowCount(string $table): int
+    {
+        $rows = Db::query('SELECT COUNT(*) AS `rows` FROM `eb_retired_' . $table . '`');
+        return (int)$rows[0]['rows'];
+    }
+
+    /**
+     * Empty every renamed table of the fixture list. finalize only removes
+     * empty tables, so a test that wants the drop to go through has to clear
+     * the seeded rows first.
+     */
+    private function emptyRenamedTables(): void
+    {
+        foreach (array_keys(self::RETIRED_FIXTURES) as $table) {
+            if (Db::query("SHOW TABLES LIKE 'eb_retired_" . $table . "'")) {
+                Db::execute('TRUNCATE TABLE `eb_retired_' . $table . '`');
+            }
+        }
     }
 
     /**

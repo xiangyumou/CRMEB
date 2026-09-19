@@ -155,7 +155,9 @@ class StoreOrderRefundServices extends BaseServices
                 if (!$services->count(['oid' => $splitOrderInfo['id'], 'change_type' => 'refund_price'])) {
                     /** @var StoreOrderServices $orderServices */
                     $orderServices = app()->make(StoreOrderServices::class);
-                    $this->regressionStock($orderServices->get($splitOrderInfo['id']));
+                    if (!$this->regressionStock($orderServices->get($splitOrderInfo['id']))) {
+                        throw new AdminException('库存回退失败');
+                    }
                 }
             }
 
@@ -326,7 +328,9 @@ class StoreOrderRefundServices extends BaseServices
                 /** @var StoreOrderStatusServices $services */
                 $services = app()->make(StoreOrderStatusServices::class);
                 if (!$services->count(['oid' => $order['id'], 'change_type' => 'refund_price'])) {
-                    $this->regressionStock($order);
+                    if (!$this->regressionStock($order)) {
+                        throw new AdminException('库存回退失败');
+                    }
                 }
             }
 
@@ -407,6 +411,7 @@ class StoreOrderRefundServices extends BaseServices
     {
         if ($order['status'] == -2 || $order['is_del']) return true;
         $combination_id = $order['combination_id'];
+        $advance_id = $order['advance_id'] ?? 0;
         $res5 = true;
         /** @var StoreOrderCartInfoServices $cartServices */
         $cartServices = app()->make(StoreOrderCartInfoServices::class);
@@ -424,6 +429,8 @@ class StoreOrderRefundServices extends BaseServices
             $cart_num = (int)$cart['cart_info']['cart_num'];
             if ($combination_id) {
                 $res5 = $res5 && $pinkServices->incCombinationStock($cart_num, (int)$combination_id, $unique);
+            } elseif ($advance_id) {
+                $res5 = $res5 && $advanceServices->incAdvanceStock($cart_num, (int)$advance_id, $unique);
             } else {
                 $res5 = $res5 && $services->incProductStock($cart_num, (int)$cart['cart_info']['productInfo']['id'], $unique);
             }

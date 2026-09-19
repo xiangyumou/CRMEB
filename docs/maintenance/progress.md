@@ -5,12 +5,12 @@ This record distinguishes changes in this working tree from the broader maintena
 | Batch | State | Evidence / remaining work |
 | --- | --- | --- |
 | P0 | Implemented | Architecture and tracked baseline inventory, PHP 7.4 syntax gate, regression, H5/MP-WEIXIN static checks, CI admin build and no-fix lint command. New checks run through `sh scripts/check-maintenance.sh`. |
-| P1 | Partial | Shared DIY removed-page data moved under `crmeb/config`, cleanup delegated; unused points API deleted. Bargain, seckill, lottery, distribution and 118 shared legacy references need reachability auditing, historical-data checks and separate cleanup. No dependencies removed without evidence. |
-| P2 | Partial | Order presentation, dashboard statistics, coupon and freight-template calculation extracted with public delegating methods. Legacy branches in create/product/user services remain; group and presale end-to-end coverage remains incomplete. |
-| P3 | Partial | DIY registry contract and stale-component skip, cashier WeChat-only selection, three WeChat payment adapters and one corrected import. Order pages and admin product/editor pages still need deeper component extraction and on-device verification. Admin does not currently offer authoring components for `newVip` or `presale`; only persisted client components and links are retained. |
-| P4 | Partial | Admin `dist/` output, Node 20.19.0/npm 10.8.2 clean build, release manifest validation and written rollout steps. HBuilderX version, actual H5/MP-WEIXIN builds, saved mini-program review package, real gateway refund/payment and production-db-copy migration rehearsal are not verified. |
+| P1 | Implemented | The audit this row asked for is done and the shared legacy classes are gone: bargain, seckill, lottery, distribution, points, balance, commission and member surfaces were deleted from the backend, the admin and the install SQL rather than hidden. `tests/static/retired-code-guard.cjs` keeps their identifiers from coming back. |
+| P2 | Implemented | Order presentation, dashboard statistics, coupon and freight-template calculation are extracted with public delegating methods; the legacy branches they carried went with the features. The group and presale paths now have executable coverage (`cases.md` SMOKE-010…012, REFUND-002…004, CORE-001). |
+| P3 | Implemented | DIY registry contract and stale-component skip, cashier WeChat-only selection, three WeChat payment adapters. The v2/v3 selector the removal dropped by mistake is back (`pay_wechat_type`, GATEWAY-002). The admin still offers no authoring components for `newVip` or `presale`; persisted client components and links are retained, and on-device verification is still open. |
+| P4 | Partially verified | Admin `dist/` output, the Node 20.19.0/npm 10.8.2 clean build, release manifest validation and the written rollout steps are done. The HBuilderX version, actual H5/MP-WEIXIN builds, a saved mini-program review package, real gateway payment/refund and a production-database migration rehearsal are still operator steps. |
 
-Do not infer that a passing static check certifies a real uni-app build or that the checked-in `public` output is ready to deploy. The old activity pages remain in `pages.json` until their callers, deep links and archived-order behavior are resolved. `docs/maintenance/inventory.json` records the current first confirmed deletion; the shared-class audit is finished and `docs/core-store-shared-retained.json` is emptied accordingly.
+Row state describes the current tree, not the state when each batch was proposed. Do not infer that a passing static check certifies a real uni-app build or that the checked-in `public` output is ready to deploy. The old activity pages remain in `pages.json` until their callers, deep links and archived-order behavior are resolved. `docs/maintenance/inventory.json` records the first confirmed deletion; the shared-class audit is finished and `docs/core-store-shared-retained.json` is emptied accordingly. The dated sections below are kept as history, including the rounds a later one corrected; the last section describes the current state.
 
 The two paragraphs below describe the earlier hiding-based passes and are kept as
 history: the hiding mechanism they name (`core_store_removed_admin.json`) was
@@ -257,3 +257,74 @@ until reverted, and the new migration assertions fail against the pre-fix
 script (they were observed failing before the image was rebuilt at the fixed
 revision). Not verified here: on-device flows and a production gateway
 payment, which the release checklist lists as operator steps.
+
+## Retained-path audit (2026-09-19)
+
+A review of the unpushed deletion batch against the paths it kept — the payment
+selector, presale stock, the migration plan and the coupon entry points — found
+eight defects the green gate could not see, because the guards match identifiers
+and the suite had no fixture that used those paths. Only the settings defect came
+in with the deletion; the presale and historical-order faults predate it. All
+A ninth site surfaced while the coupon fix was being written: the DIY
+`theme/coupon` component still listed the retired member rows. All of them are
+fixed on this branch and each fix has a case in `tests/regression/cases.md`.
+
+- **WeChat version selector.** `pay_wechat_type` sat in the migration's retired
+  setting list and was gone from the install SQL, although `PayServices::pay()`,
+  `StoreOrderRefundServices::agreeRefund()` and the notification handler read it
+  to pick the v2 or v3 driver. A v3 shop fell back to v2 after the migration and a
+  fresh install had no way to select v3. The setting is out of the retired list,
+  back in the install SQL with the row the pre-cleanup schema shipped, and created
+  with default `0` on a database that never had it (`GATEWAY-002`).
+- **Presale stock.** `regressionStock()` branched on `combination_id` and
+  otherwise restored ordinary product stock, so a presale order's presale row,
+  presale SKU and product row were credited through the wrong service; it now
+  dispatches on the layer the order sold from. Both refund paths also ignored the
+  return value and could report success with the stock still deducted, and now
+  throw `库存回退失败` before the payment gateway is reached (`REFUND-002`…`REFUND-004`).
+- **Apply plan.** Three defects that lost settings without an error shared one
+  cause: rules read the database as it was before the run instead of the state the
+  run was about to produce. Added rows took `MAX(id) + 1` once per turn and handed
+  the same id to two of them, which `recordChange()` merges; the roster merge read
+  only the stored setting, so the one this run created kept an empty value and
+  dropped the chat members it should have inherited; and the retired-setting
+  cleanup judged the stored tab, so a retained setting the same run had just moved
+  off a dead tab was deleted afterwards. Ids are now claimed once per row, every
+  later rule reads the planned state, and a check before the backup is written
+  refuses a duplicate id, a duplicate name or a retained setting left on a tab
+  that will not exist (`MIG-008`…`MIG-010`).
+- **Rollback and finalize.** `rollback` ran `RENAME TABLE` inside the transaction
+  that restored the rows; the rename commits implicitly, so a conflict found
+  afterwards left the names and part of the rows restored while the command
+  reported a refusal, and the retry could fail again on the rows it had already
+  fixed. Every row image is now classified before the first rename, the renames
+  run outside any transaction, the rows go into a fresh one afterwards, and a DML
+  failure says the names are back and the same backup can be re-run. `finalize`
+  accepted a dump file that merely *named* every table — the old test asserted
+  exactly that — so a file that could restore nothing authorised dropping tables
+  that still held rows. It now counts every pending table's rows first and refuses
+  the whole batch with exit code 2 when any is non-empty; `--yes` and `--dump`
+  cannot bypass the check (`MIG-011`…`MIG-013`).
+- **Member coupons.** The storefront queries still admitted `receive_type = 4` and
+  `issueUserCoupon()` had lost its membership check, so any user could claim a
+  member-exclusive coupon by id and consume its `remain_count`. The list, PC list,
+  popup list, quantity counts and search now admit `receive_type = 1` only. A
+  later pass over the same path found the DIY `theme/coupon` component was still
+  offering the retired rows as well; it now excludes `receive_type = 4` for every
+  audience and returns an empty list for a block saved as 会员用户. Claiming by id
+  refuses the row with `该优惠券所属业务已下线` before any write; records already
+  issued are left untouched (`COUPON-001`…`COUPON-003`).
+- **Recorded, not fixed.** Seckill and bargain orders would still be restored
+  through the ordinary product-stock path, and splitting a historical order still
+  zeroes some integral and commission fields. Both need data these shops do not
+  have, so this round leaves them alone rather than growing a compatibility layer
+  for history that does not exist.
+
+**Verification.** `sh scripts/check-maintenance.sh crmeb-test` passes on an image
+built with `VCS_REF=$(git rev-parse HEAD)`: 179 tests, 837 assertions, the PHP 7.4
+lint over `crmeb/{app,crmeb,route,upgrade}` and all nine static guards. The new
+cases were red first: with the production fixes stashed, the four affected test
+classes reported 39 tests, 166 assertions, 1 error and 15 failures. This is source
+and behaviour verification only. No admin, H5 or mini-program bundle was rebuilt in
+this round, and no real-device or live-merchant payment/refund acceptance was run;
+those remain release steps.

@@ -30,9 +30,8 @@
   },
   "source_physical_line_reduction_percent": 26.5,
   "validation": {
-    "regression_tests": 160,
-    "regression_assertions": 715,
-    "admin_build": "passed",
+    "regression_tests": 179,
+    "regression_assertions": 837,
     "php_lint": "passed",
     "static_guards": [
       "core-store-front",
@@ -40,10 +39,15 @@
       "retired-code-guard",
       "install-sql-guard",
       "model-relation-guard",
+      "php-symbol-guard",
+      "event-payload-guard",
       "verify-release-test",
       "wechat-payment-test"
     ],
-    "production_migration": "plan/apply/rollback/finalize rehearsed on a copy of the pre-cleanup schema seeded with historical orders"
-  },
-  "unchanged_public": true
+    "source_checks": "sh scripts/check-maintenance.sh crmeb-test, on an image built with VCS_REF=$(git rev-parse HEAD): the regression suite, the PHP 7.4 lint and the nine static guards above",
+    "admin_build": "not re-run in this round; no admin source changed. Rebuild crmeb/public/admin and .build/release/admin with scripts/build-admin.sh before release",
+    "h5_and_miniprogram_builds": "not re-run in this round; real H5 and MP-WEIXIN builds remain operator steps",
+    "merchant_payment_acceptance": "not run; needs live WeChat merchant credentials and a device (purchase, group buy, presale, refund)",
+    "production_migration": "the 2026-09-17 rehearsal used a copy of the pre-cleanup schema seeded with historical orders and predates this round's plan changes; the current script is covered by CoreStoreMigrationTest (18 cases) on a disposable schema, and no shop with historical business data has been migrated"
+  }
 }

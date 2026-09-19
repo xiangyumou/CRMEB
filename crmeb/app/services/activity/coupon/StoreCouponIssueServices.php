@@ -382,6 +382,12 @@ class StoreCouponIssueServices extends BaseServices
     {
         $issueCouponInfo = $this->dao->getInfo((int)$id);
         if (!$issueCouponInfo) throw new ApiException('领取的优惠劵已领完或已过期');
+        // Member-exclusive coupons belonged to a retired feature. A database
+        // imported from an old shop can still hold the rows, so refuse before
+        // any write: a coupon nobody can use must not be handed out.
+        if ((int)($issueCouponInfo['receive_type'] ?? 0) === 4) {
+            throw new ApiException('该优惠券所属业务已下线');
+        }
         $uid = $user->uid;
         /** @var StoreCouponIssueUserServices $issueUserService */
         $issueUserService = app()->make(StoreCouponIssueUserServices::class);
@@ -591,6 +597,9 @@ class StoreCouponIssueServices extends BaseServices
      */
     public function getThemeCoupon($where)
     {
+        // 会员专享券随会员业务退出：旧的装修组件若仍配置为“会员用户”，返回空列表，
+        // 而不是把无法领取的券展示出去（普通用户与全部则按下面的查询排除）。
+        if ((string)($where['user_type'] ?? '') === '2') return [];
         $sort = $where['sort'] ? 'desc' : 'asc';
         $order = 'id desc';
         switch ($where['order']) {

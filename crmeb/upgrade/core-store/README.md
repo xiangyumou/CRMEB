@@ -30,15 +30,28 @@ php upgrade/core-store/drop-retired.php finalize --dump=/private/full-dump.sql
   retired tables to `eb_retired_*`, one at a time, recording each name in the
   backup before the rename; a run killed halfway is fully recoverable. Existing
   backups are never overwritten.
-- `rollback` restores the table names and the removed rows. It refuses to
-  overwrite records that changed after the migration, and requires `--force` when
-  the protected tables drifted (rows written after apply are not part of the
-  backup). Once `finalize` has dropped a renamed table, rollback fails with a
-  non-zero exit rather than reporting success.
-- `finalize` drops the `eb_retired_*` tables. It refuses to run without a
-  `--dump=<mysqldump.sql>` that names every table it is about to drop, and it asks
-  for confirmation unless `--yes` is given. After that, recovery needs a full
-  mysqldump restore.
+- `rollback` restores the table names and the removed rows. It checks every
+  recorded row against the backup *before* the first rename: a row still in its
+  post-apply image is restored, a row already in its pre-apply image counts as
+  restored, and any other value aborts the command with
+  `Concurrent changes: rollback refused` while the database is still untouched.
+  `--force` only excuses drift in the protected tables (rows written after apply
+  are not in the backup); it never excuses an edited record. Renaming happens
+  outside any transaction, because `RENAME TABLE` commits implicitly. If the row
+  restore then fails, the table names stay restored, the failure message says so,
+  and the same backup can be used to finish the job — the second run restores the
+  rows that are still missing and changes nothing else. Once `finalize` has
+  dropped a renamed table, rollback fails with a non-zero exit rather than
+  reporting success.
+- `finalize` drops the renamed tables that are **empty**. It counts every pending
+  `eb_retired_*` table first and refuses the whole batch with exit code 2 — naming
+  the tables and their row counts — when any of them still holds rows; `--yes` and
+  `--dump` cannot override that. For empty tables it still requires
+  `--dump=<mysqldump.sql>`, which is recorded as the recoverable point, and asks
+  for confirmation unless `--yes` is given. The dump is not verified as a backup:
+  a file that merely names the tables proves nothing. Permanent deletion of a
+  non-empty retired table, and restoring one, are not supported here — stop and
+  plan that operation separately.
 
 The backup and the exported balance list stay outside the web root with mode 0600,
 created under `umask(0077)` so they are never briefly readable. The balance CSV

@@ -154,6 +154,80 @@ final class FixtureFactory
         return array_merge($data, ['id' => $id]);
     }
 
+    /**
+     * Seed a presale activity the way the admin form writes one: the activity row
+     * plus its own SKU layer (type 6). The presale SKU keeps the ordinary product
+     * SKU's `suk`, which is how the stock restore finds the product SKU again.
+     * A presale order therefore moves stock in the activity row, the type-6 SKU,
+     * the product row and the type-0 SKU.
+     */
+    public function createAdvance(int $productId, array $overrides = [], array $skuOverrides = []): array
+    {
+        $data = array_merge([
+            'product_id' => $productId,
+            'title' => $this->unique('advance'),
+            'price' => '10.00',
+            'stock' => 5,
+            'sales' => 3,
+            'quota' => 5,
+            'quota_show' => 5,
+            'type' => 0,
+            'num' => 5,
+            'start_time' => (string)(time() - 60),
+            'stop_time' => (string)(time() + 3600),
+            'status' => 1,
+            'is_del' => 0,
+        ], $overrides);
+        $id = (int)Db::name('store_advance')->insertGetId($data);
+        $sku = array_merge([
+            'product_id' => $id,
+            // `unique` is char(8); the factory's readable names do not fit it.
+            'unique' => bin2hex(random_bytes(4)),
+            'suk' => 'default',
+            'type' => 6,
+            'stock' => $data['stock'],
+            'sales' => $data['sales'],
+            'quota' => $data['quota'],
+            'quota_show' => $data['quota_show'],
+            'price' => $data['price'],
+        ], $skuOverrides);
+        $skuId = (int)Db::name('store_product_attr_value')->insertGetId($sku);
+        $this->test->registerCleanup(static function () use ($id, $skuId): void {
+            Db::name('store_product_attr_value')->where('id', $skuId)->delete();
+            Db::name('store_advance')->where('id', $id)->delete();
+        });
+        return ['id' => $id, 'sku_id' => $skuId, 'advance' => $data, 'sku' => $sku];
+    }
+
+    /**
+     * Read back the stock ledgers a presale order moves, keyed so a failure names
+     * the layer that was not restored instead of only reporting a mismatched count.
+     *
+     * @return array<string, array<string, int>>
+     */
+    public function stockLayers(array $product, ?array $advance = null): array
+    {
+        $layers = [
+            'product' => $this->stockRow('store_product', ['id' => $product['id']]),
+            'product_sku' => $this->stockRow('store_product_attr_value', ['id' => $product['sku_id']]),
+        ];
+        if ($advance !== null) {
+            $layers['advance'] = $this->stockRow('store_advance', ['id' => $advance['id']]);
+            $layers['advance_sku'] = $this->stockRow('store_product_attr_value', ['id' => $advance['sku_id']]);
+        }
+        return $layers;
+    }
+
+    /** @return array<string, int> */
+    private function stockRow(string $table, array $where): array
+    {
+        $row = Db::name($table)->where($where)->field('stock,sales')->find();
+        if (!$row) {
+            throw new \RuntimeException('missing ' . $table . ' row: ' . json_encode($where));
+        }
+        return array_map('intval', $row);
+    }
+
     private function unique(string $type): string
     {
         return $this->prefix . '_' . $type . '_' . (++$this->sequence);

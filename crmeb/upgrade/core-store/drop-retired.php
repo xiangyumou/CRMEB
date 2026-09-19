@@ -18,12 +18,15 @@
  *      killed halfway leaves an exact record of what to restore; a failure stops
  *      the run and prints the list.
  *
- * `rollback` restores the names and the removed rows, refusing to overwrite
- * records that changed after the migration. It fails hard when a renamed table
- * cannot be restored (usually because `finalize` already dropped it).
+ * `rollback` restores the names and the removed rows. It checks every table and
+ * every planned row change first, so a row that changed after the migration
+ * stops the run before the database is touched. The renames then run outside a
+ * transaction (DDL commits implicitly) and only the rows go inside one, so a
+ * failure there leaves the names restored and the backup reusable.
  *
- * `finalize` drops the renamed tables for good, and only with a mysqldump that
- * names every one of them plus an explicit confirmation.
+ * `finalize` drops the renamed tables for good, and only while they are empty:
+ * a table that still holds rows stops the whole batch with exit code 2. The
+ * dump is a record of what was taken, not a proof of recoverability.
  */
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 umask(0077);
@@ -70,7 +73,7 @@ const RETIRED_CONFIG = [
     'store_integral_ratio', 'store_self_mention', 'offline_pay_status', 'offline_postage',
     'ali_pay_status', 'ali_pay_appid', 'yue_pay_status', 'allin_pay_status',
     'allin_private_key', 'allin_cusid', 'allin_appid',
-    'pay_wechat_type', 'wechat_extract_type', 'weixin_extract_switch',
+    'wechat_extract_type', 'weixin_extract_switch',
     'user_sign_num', 'sign_day_num', 'app_version_*',
     // The customer-service chat is gone; contact is a QR code now.
     'customer_type', 'customer_url', 'customer_phone', 'customer_corpId', 'service_feedback',
@@ -186,18 +189,32 @@ const REQUIRED_CONFIG_TABS = [
 ];
 
 /**
- * Settings the retained code reads. Rows are inserted when missing; the values
- * here are the same defaults the install SQL ships.
+ * Settings the retained code reads. A missing row is created with the shipped
+ * shape; a row an older shop parked on a tab that is going away is moved onto a
+ * live tab instead of being dropped with it. The operator's value, status and
+ * sort are always preserved.
  */
 const REQUIRED_CONFIG = [
     'customer_qrcode' => [
         'tab' => 'kefu_config', 'type' => 'upload', 'input_type' => 'input', 'upload_type' => 1,
+        'parameter' => '', 'width' => 0, 'high' => 0, 'required' => '',
         'value' => '""', 'info' => '客服二维码', 'desc' => '未配置时隐藏客服入口', 'sort' => 0,
     ],
     'order_notice_admin_uids' => [
         'tab' => 'order_notice', 'type' => 'text', 'input_type' => 'input', 'upload_type' => 1,
+        'parameter' => '', 'width' => 100, 'high' => 0, 'required' => '',
         'value' => '""', 'info' => '订单通知管理员',
         'desc' => '填写用户UID，多个用英文逗号分隔；这些用户会收到订单通知并可使用移动端订单管理', 'sort' => 0,
+    ],
+    // Both WeChat gateways are retained code, and this row is what chooses
+    // between them: v2 when it is 0, v3 when it is 1.
+    'pay_wechat_type' => [
+        'tab' => 'pay', 'tab_id' => 4, 'type' => 'radio', 'input_type' => 'input', 'upload_type' => 1,
+        'parameter' => "0=>v2 (支持企业付款到零钱)\n1=>v3 (支持商户转账到零钱)",
+        'width' => 0, 'high' => 0, 'required' => '',
+        'value' => '0', 'info' => '支付接口类型',
+        'desc' => '支付接口类型v2对应微信支付旧版v2支付。v3对应微信支付v3支付接口。支付证书可以通用一个。支付秘钥和v2旧版支付有区别',
+        'sort' => 10,
     ],
 ];
 
@@ -538,6 +555,117 @@ function requiredConfigTabIds(array $changes): array
     return $tabs;
 }
 
+/**
+ * The tab a retained setting belongs on, or null when no live tab can hold it.
+ * The eng_title of the running shop wins; the shipped id is only a fallback for
+ * a database that lost the tab row entirely.
+ */
+function requiredConfigTabId(array $definition, array $tabIds): ?int
+{
+    $engTitle = (string)($definition['tab'] ?? '');
+    if ($engTitle !== '' && isset($tabIds[$engTitle])) return (int)$tabIds[$engTitle];
+    $shippedId = (int)($definition['tab_id'] ?? 0);
+    if ($shippedId && tableExists('system_config_tab')
+        && Db::name('system_config_tab')->where('id', $shippedId)->count()) {
+        return $shippedId;
+    }
+    return null;
+}
+
+/**
+ * The rows of one table as they will look once this run's planned changes are
+ * applied, keyed by a business column. A row this run adds is planned in memory
+ * only, so any rule that runs after it must read this instead of the database.
+ */
+function effectiveRows(array $changes, string $table, array $rows, string $keyField): array
+{
+    $effective = [];
+    foreach ($rows as $row) $effective[(string)$row[$keyField]] = $row;
+    foreach ($changes as $change) {
+        if ($change['table'] !== $table) continue;
+        $row = $change['after'] ?? $change['before'];
+        if (!is_array($row) || !isset($row[$keyField])) continue;
+        $key = (string)$row[$keyField];
+        if ($change['after'] === null) { unset($effective[$key]); continue; }
+        $effective[$key] = $change['after'];
+    }
+    return $effective;
+}
+
+/**
+ * One primary key may be claimed only once across a run. Handing the same id to
+ * two planned rows makes recordChange() merge them, which reads as one row and
+ * loses the other without an error; this turns that into a refusal.
+ */
+function claimPlannedId(array &$claimed, string $table, int $id): void
+{
+    $key = $table . '#' . $id;
+    if (isset($claimed[$key])) {
+        throw new RuntimeException("The plan reuses primary key {$key} for two new rows.");
+    }
+    $claimed[$key] = true;
+}
+
+/**
+ * Fail before the backup is written when the planned settings would be broken:
+ * the same name written twice, or a setting kept on a tab that will not exist.
+ * Nothing is written before this point, so a failure here leaves the shop as it
+ * was.
+ */
+function assertPlanKeepsSettingsUsable(array $changes): void
+{
+    $liveTabIds = [];
+    if (tableExists('system_config_tab')) {
+        foreach (Db::name('system_config_tab')->column('id') as $id) $liveTabIds[(int)$id] = true;
+    }
+    foreach ($changes as $change) {
+        if ($change['table'] !== 'system_config_tab') continue;
+        $row = $change['after'] ?? $change['before'];
+        $id = (int)$row['id'];
+        if ($change['after'] === null) { unset($liveTabIds[$id]); continue; }
+        $liveTabIds[$id] = true;
+    }
+    foreach (RETIRED_CONFIG_TABS as $id) unset($liveTabIds[$id]);
+
+    $names = [];
+    foreach ($changes as $change) {
+        if ($change['table'] !== 'system_config' || $change['after'] === null) continue;
+        $name = (string)$change['after']['menu_name'];
+        if (isset($names[$name])) {
+            throw new RuntimeException("The plan writes the setting {$name} more than once.");
+        }
+        $names[$name] = true;
+        $tab = (int)$change['after']['config_tab_id'];
+        if (!isset($liveTabIds[$tab])) {
+            throw new RuntimeException("The plan keeps the setting {$name} on tab {$tab}, which will not exist.");
+        }
+    }
+}
+
+/**
+ * Compare a stored row with an image from the backup. MySQL hands numbers back
+ * as strings, and the backup is JSON, so a strict comparison would report a
+ * conflict for a row nobody touched.
+ */
+function rowsMatch($left, $right): bool
+{
+    if (!is_array($left) || !is_array($right)) return false;
+    foreach (array_unique(array_merge(array_keys($left), array_keys($right))) as $field) {
+        $a = $left[$field] ?? null;
+        $b = $right[$field] ?? null;
+        if ($a === null || $b === null) {
+            if ($a !== $b) return false;
+            continue;
+        }
+        if (is_array($a) || is_array($b)) {
+            if (json_encode($a) !== json_encode($b)) return false;
+            continue;
+        }
+        if ((string)$a !== (string)$b) return false;
+    }
+    return true;
+}
+
 /** Write the backup atomically, with the mode umask(0077) already gives us. */
 function writeBackup(string $path, array $payload): void
 {
@@ -596,25 +724,38 @@ try {
             echo "Nothing to finalize.\n";
             exit;
         }
+        // Dropping is only supported while the renamed tables are empty: a row
+        // left in them is real data, nothing here can bring it back, and a file
+        // that happens to mention the table name proves nothing about it.
+        $counts = [];
+        $ready = [];
+        foreach ($pending as $table) {
+            // Report the name the operator has to look at: the retired table on
+            // disk, not the name it will get back.
+            $renamed = retiredTableName($table);
+            $ready[] = $renamed;
+            $rows = Db::query('SELECT COUNT(*) AS `rows` FROM `' . $renamed . '`');
+            if ((int)$rows[0]['rows'] > 0) $counts[$renamed] = (int)$rows[0]['rows'];
+        }
+        if ($counts) {
+            fwrite(STDERR, 'Refusing to drop ' . count($counts) . " renamed table(s) that still hold rows:\n");
+            foreach ($counts as $table => $rows) fwrite(STDERR, "- {$table}: {$rows}\n");
+            fwrite(STDERR, "Nothing was dropped. Move that data out first; this step only removes empty tables.\n");
+            exit(2);
+        }
         if (!$dump) {
             throw new RuntimeException(
-                "finalize drops data for good; pass --dump=<mysqldump.sql> with a fresh dump naming these "
-                . count($pending) . " table(s):\n- " . implode("\n- ", $pending)
+                "finalize drops tables for good; pass --dump=<mysqldump.sql> for the dump taken before apply. "
+                . count($pending) . " empty table(s) are ready:\n- " . implode("\n- ", $ready)
             );
         }
+        // Only that the file exists is checked: what makes this safe is that
+        // every table is empty, not that a file names them.
         if (!is_file($dump) || filesize($dump) === 0) {
             throw new RuntimeException("The dump {$dump} is missing or empty; nothing was dropped.");
         }
-        $contents = (string)file_get_contents($dump);
-        $missing = [];
-        foreach ($pending as $table) {
-            if (strpos($contents, retiredTableName($table)) === false) $missing[] = $table;
-        }
-        if ($missing) {
-            throw new RuntimeException("The dump {$dump} does not contain:\n- " . implode("\n- ", $missing));
-        }
         if (empty($flags['yes'])) {
-            fwrite(STDOUT, 'Type "yes" to drop ' . count($pending) . " renamed table(s):\n");
+            fwrite(STDOUT, 'Type "yes" to drop ' . count($pending) . " empty renamed table(s):\n");
             $answer = trim((string)fgets(STDIN));
             if (strtolower($answer) !== 'yes') {
                 fwrite(STDERR, "Not confirmed; nothing was dropped.\n");
@@ -627,7 +768,7 @@ try {
             $dropped++;
         }
         \crmeb\services\CacheService::clear();
-        echo "Finalized: dropped {$dropped} renamed table(s).\n";
+        echo "Finalized: dropped {$dropped} empty renamed table(s).\n";
         exit;
     }
 
@@ -684,29 +825,64 @@ try {
                 . implode("\n- ", $drifted) . "\n");
         }
 
-        Db::startTrans();
+        // Classify every planned row change against the current data before
+        // touching anything, so a refusal cannot leave the shop half restored.
+        // The migration's image means the row still needs work; the pre-apply
+        // image means an earlier run already put it back.
+        $pendingRows = [];
+        foreach (array_reverse($saved['changes']) as $change) {
+            $label = $change['table'] . ' #' . $change['id'];
+            $currentRow = Db::name($change['table'])->where('id', $change['id'])->find();
+            if ($change['after'] === null) {
+                // apply removed the row; rollback puts the original back
+                if (!$currentRow) { $pendingRows[] = $change; continue; }
+                if (rowsMatch($currentRow, $change['before'])) continue;
+                throw new RuntimeException(
+                    "Concurrent changes: rollback refused at {$label}; the row is not the one the migration removed."
+                );
+            }
+            if ($change['before'] === null) {
+                // apply added the row; rollback takes it away again
+                if (!$currentRow) continue;
+                if (rowsMatch($currentRow, $change['after'])) { $pendingRows[] = $change; continue; }
+                throw new RuntimeException(
+                    "Concurrent changes: rollback refused at {$label}; the row is not the one the migration added."
+                );
+            }
+            if (rowsMatch($currentRow, $change['after'])) { $pendingRows[] = $change; continue; }
+            if (rowsMatch($currentRow, $change['before'])) continue;
+            throw new RuntimeException(
+                "Concurrent changes: rollback refused at {$label}; it changed after the migration."
+            );
+        }
+
+        // RENAME commits implicitly, so it stays outside any DML transaction and
+        // only touches the tables that still carry their retired name.
         foreach ($restorable as $table) {
             Db::execute('RENAME TABLE `' . retiredTableName($table) . '` TO `' . tableName($table) . '`');
         }
-        foreach (array_reverse($saved['changes']) as $change) {
-            $table = Db::name($change['table']);
-            $currentRow = $table->where('id', $change['id'])->find();
-            if ($change['after'] === null) {
-                // the row was deleted by apply; put the original back
-                if ($currentRow) throw new RuntimeException('Concurrent changes: rollback refused.');
-                $table->insert($change['before']);
-                continue;
+
+        try {
+            Db::startTrans();
+            foreach ($pendingRows as $change) {
+                $table = Db::name($change['table']);
+                if ($change['after'] === null) {
+                    $table->insert($change['before']);
+                } elseif ($change['before'] === null) {
+                    $table->where('id', $change['id'])->delete();
+                } else {
+                    $table->where('id', $change['id'])->update($change['before']);
+                }
             }
-            if ($change['before'] === null) {
-                // the row was inserted by apply; take it away again
-                if ($currentRow != $change['after']) throw new RuntimeException('Concurrent changes: rollback refused.');
-                $table->where('id', $change['id'])->delete();
-                continue;
-            }
-            if ($currentRow != $change['after']) throw new RuntimeException('Concurrent changes: rollback refused.');
-            $table->where('id', $change['id'])->update($change['before']);
+            Db::commit();
+        } catch (Throwable $rowError) {
+            Db::rollback();
+            \crmeb\services\CacheService::clear();
+            fwrite(STDERR, $rowError->getMessage() . "\n");
+            fwrite(STDERR, "Table names are restored; the data restore failed and can be retried.\n");
+            fwrite(STDERR, "Re-run the rollback with {$backup}.\n");
+            exit(1);
         }
-        Db::commit();
         \crmeb\services\CacheService::clear();
         echo "Rollback complete.\n";
         exit;
@@ -803,24 +979,38 @@ try {
     }
 
     // Settings the retained code reads are created before anything is dropped, so
-    // an upgrade reaches the same schema a fresh install ships.
+    // an upgrade reaches the same schema a fresh install ships. Every rule here
+    // only plans rows in memory: the database still knows nothing about a row
+    // this run adds, so the later rules have to read the planned state instead.
+    $configRows = tableExists('system_config') ? Db::name('system_config')->lock(true)->select()->toArray() : [];
+    $dbConfigByName = [];
+    foreach ($configRows as $row) $dbConfigByName[(string)$row['menu_name']] = $row;
+    $plannedIds = [];
     $requiredTabIds = requiredConfigTabIds([]);
-    foreach (REQUIRED_CONFIG_TABS as $engTitle => [$pid, $title, $type, $sort, $menusId]) {
-        if (isset($requiredTabIds[$engTitle]) || !tableExists('system_config_tab')) continue;
-        $template = Db::name('system_config_tab')->order('id')->find();
-        if (!$template) throw new RuntimeException('system_config_tab is empty; cannot add the retained tabs.');
-        $row = array_merge($template, [
-            'id' => (int)Db::name('system_config_tab')->lock(true)->max('id') + 1,
-            'pid' => $pid, 'title' => $title, 'eng_title' => $engTitle, 'status' => 1,
-            'icon' => '', 'type' => $type, 'sort' => $sort, 'menus_id' => $menusId,
-        ]);
-        recordChange($changes, 'system_config_tab', (int)$row['id'], null, $row);
-        $requiredTabIds[$engTitle] = (int)$row['id'];
+    if (tableExists('system_config_tab')) {
+        // One id per added row, handed out in order. Reading MAX(id) again inside
+        // the loop would give every row of a single run the same key, and
+        // recordChange() merges same-key rows, so the extra ones would vanish.
+        $nextTabId = (int)Db::name('system_config_tab')->lock(true)->max('id') + 1;
+        foreach (REQUIRED_CONFIG_TABS as $engTitle => [$pid, $title, $type, $sort, $menusId]) {
+            if (isset($requiredTabIds[$engTitle])) continue;
+            $template = Db::name('system_config_tab')->order('id')->find();
+            if (!$template) throw new RuntimeException('system_config_tab is empty; cannot add the retained tabs.');
+            claimPlannedId($plannedIds, 'system_config_tab', $nextTabId);
+            $row = array_merge($template, [
+                'id' => $nextTabId++,
+                'pid' => $pid, 'title' => $title, 'eng_title' => $engTitle, 'status' => 1,
+                'icon' => '', 'type' => $type, 'sort' => $sort, 'menus_id' => $menusId,
+            ]);
+            recordChange($changes, 'system_config_tab', (int)$row['id'], null, $row);
+        }
     }
+    // The tabs planned above count as existing for every rule below.
+    $requiredTabIds = requiredConfigTabIds($changes);
     if (tableExists('system_config')) {
+        $nextConfigId = (int)Db::name('system_config')->lock(true)->max('id') + 1;
         foreach (REQUIRED_CONFIG as $name => $definition) {
-            if (!isset($requiredTabIds[$definition['tab']])) continue;
-            $existing = Db::name('system_config')->where('menu_name', $name)->lock(true)->find();
+            $existing = $dbConfigByName[$name] ?? null;
             if ($existing) {
                 // An older shop may hold the row on a tab that is going away (or
                 // on none at all); the form only renders it from a live tab.
@@ -828,16 +1018,25 @@ try {
                 $tabIsRetired = in_array($currentTab, RETIRED_CONFIG_TABS, true)
                     || !Db::name('system_config_tab')->where('id', $currentTab)->count();
                 if (!$tabIsRetired) continue;
+            }
+            $tabId = requiredConfigTabId($definition, $requiredTabIds);
+            if ($tabId === null) {
+                throw new RuntimeException(
+                    "No live tab is available for the retained setting {$name}; nothing was changed."
+                );
+            }
+            if ($existing) {
                 $next = $existing;
                 // The row describes a control the form builder renders: take the
                 // shipped shape so an upgraded shop matches a fresh install. The
                 // value, status and sort belong to the operator and are preserved.
                 foreach ([
                     'type' => $definition['type'], 'input_type' => $definition['input_type'],
-                    'upload_type' => $definition['upload_type'], 'required' => '',
-                    'width' => ($name === 'customer_qrcode' ? 0 : 100), 'high' => 0,
+                    'upload_type' => $definition['upload_type'], 'required' => $definition['required'],
+                    'parameter' => $definition['parameter'],
+                    'width' => $definition['width'], 'high' => $definition['high'],
                     'info' => $definition['info'], 'desc' => $definition['desc'],
-                    'config_tab_id' => $requiredTabIds[$definition['tab']],
+                    'config_tab_id' => $tabId,
                 ] as $field => $value) {
                     $next[$field] = $value;
                 }
@@ -848,12 +1047,14 @@ try {
             }
             $template = Db::name('system_config')->order('id')->find();
             if (!$template) throw new RuntimeException('system_config is empty; cannot add the retained settings.');
+            claimPlannedId($plannedIds, 'system_config', $nextConfigId);
             $row = array_merge($template, [
-                'id' => (int)Db::name('system_config')->lock(true)->max('id') + 1,
+                'id' => $nextConfigId++,
                 'menu_name' => $name, 'type' => $definition['type'], 'input_type' => $definition['input_type'],
-                'config_tab_id' => $requiredTabIds[$definition['tab']], 'parameter' => '',
-                'upload_type' => $definition['upload_type'], 'required' => '', 'width' => ($name === 'customer_qrcode' ? 0 : 100),
-                'high' => 0, 'value' => $definition['value'], 'info' => $definition['info'],
+                'config_tab_id' => $tabId, 'parameter' => $definition['parameter'],
+                'upload_type' => $definition['upload_type'], 'required' => $definition['required'],
+                'width' => $definition['width'], 'high' => $definition['high'],
+                'value' => $definition['value'], 'info' => $definition['info'],
                 'desc' => $definition['desc'], 'sort' => $definition['sort'], 'status' => 1,
                 'level' => 0, 'link_id' => 0, 'link_value' => 0,
             ]);
@@ -862,27 +1063,42 @@ try {
     }
 
     // The retired chat held the order roster: carry its members over to the
-    // retained setting, merging with whatever is configured there already.
+    // retained setting, merging with whatever is configured there already. Read
+    // the planned state: on a shop that never had the setting it is a row this
+    // run just added, and the database still knows nothing about it.
     $rosterUids = inheritedRosterUids();
     if ($rosterUids && tableExists('system_config')) {
-        $existing = Db::name('system_config')->where('menu_name', 'order_notice_admin_uids')->lock(true)->find();
+        $existing = effectiveRows($changes, 'system_config', $configRows, 'menu_name')['order_notice_admin_uids'] ?? null;
         if ($existing) {
             $raw = trim((string)$existing['value'], '"');
-            $configured = array_filter(array_map('intval', $raw === '' ? [] : explode(',', $raw)));
+            $configured = array_values(array_filter(array_map('intval', $raw === '' ? [] : explode(',', $raw))));
             $merged = array_values(array_unique(array_merge($configured, $rosterUids)));
             if ($merged !== $configured) {
                 $next = $existing;
                 $next['value'] = json_encode(implode(',', $merged));
-                recordChange($changes, 'system_config', (int)$existing['id'], $existing, $next);
+                // The row may be one this run added: it then has no database
+                // image to keep, and null says exactly that.
+                recordChange(
+                    $changes,
+                    'system_config',
+                    (int)$existing['id'],
+                    $dbConfigByName['order_notice_admin_uids'] ?? null,
+                    $next
+                );
             }
         }
     }
 
     if (tableExists('system_config')) {
-        foreach (Db::name('system_config')->lock(true)->select()->toArray() as $row) {
-            $retired = configNameMatches((string)$row['menu_name'])
-                || in_array((int)$row['config_tab_id'], RETIRED_CONFIG_TABS, true);
-            if (!$retired) continue;
+        $plannedConfigs = effectiveRows($changes, 'system_config', $configRows, 'menu_name');
+        foreach ($configRows as $row) {
+            $name = (string)$row['menu_name'];
+            // Decide from the planned state: a retained setting the rules above
+            // already moved onto a live tab is not retired, whatever tab it came
+            // from, and deleting it here would undo that move.
+            $planned = $plannedConfigs[$name] ?? null;
+            $tabId = (int)($planned['config_tab_id'] ?? $row['config_tab_id']);
+            if (!configNameMatches($name) && !in_array($tabId, RETIRED_CONFIG_TABS, true)) continue;
             recordChange($changes, 'system_config', (int)$row['id'], $row, null);
         }
     }
@@ -1037,6 +1253,10 @@ try {
         echo "Already migrated.\n";
         exit;
     }
+
+    // Everything so far is only planned, so a refusal here still leaves the
+    // shop exactly as it was.
+    assertPlanKeepsSettingsUsable($changes);
 
     if (is_file($backup)) {
         throw new RuntimeException(

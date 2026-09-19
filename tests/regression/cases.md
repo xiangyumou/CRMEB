@@ -15,6 +15,7 @@ against the seeded install SQL; payment transports stay offline.
 - [x] PAY-006 Only the first atomic payment transition updates an order or records its trade number.
 - [x] PAY-007 Two callbacks for the same real order pay it exactly once: the losing callback keeps the first trade number and no status or capital-flow row is duplicated.
 - [x] GATEWAY-001 Signed WeChat V2/V3 callbacks reject a paid amount that is short, over, or malformed before any payment effect.
+- [x] GATEWAY-002 The retained `pay_wechat_type` setting selects the matching WeChat driver — `0` builds the v2 channel, `1` the v3 channel — and the setting ships with the install SQL.
 
 ## Pricing
 
@@ -22,14 +23,6 @@ against the seeded install SQL; payment transports stay offline.
 - [x] PRICE-002 Disabled integral deduction leaves price and available points unchanged.
 - [x] PRICE-003 Ordinary item pricing, coupon thresholds and freight boundaries.
 - [x] PRICE-004 Multi-item order pricing returns the cart list with its spread ids and splits the coupon across every row.
-
-## Balance and ledger
-
-- [x] BALANCE-001 A paid recharge is not credited again; a first notification reaches the recharge-success service once. (Recharge is retired; the historical-ledger behaviour stays covered.)
-- [x] BALANCE-002 Insufficient order balance writes nothing; an exact balance writes one ledger entry and pays the order.
-- [x] BALANCE-003 Two orders cannot spend the same balance, and concurrent refund credits are not lost.
-- [x] BALANCE-004 Negative balance changes are rejected without writing.
-- [x] BALANCE-005 Competing full order payments with persisted ledger and order assertions.
 
 ## Stock
 
@@ -55,14 +48,22 @@ against the seeded install SQL; payment transports stay offline.
 
 ## Refunds
 
-- [x] REFUND-001 Balance refunds credit the user and record the resulting two-decimal balance; failed credits write no ledger.
-- [x] REFUND-002 Historical pay types (`yue`, `offline`, `alipay`, `allinpay`, empty) are refused for original-channel refunds with the offline-handling message, while WeChat orders pass the guard when handed a model the way the dispatcher does.
+- [x] REFUND-001 Historical pay types (`yue`, `offline`, `alipay`, `allinpay`, empty) are refused for original-channel refunds with the offline-handling message, while WeChat orders pass the guard when handed a model the way the dispatcher does.
+- [x] REFUND-002 A presale order restore moves the presale activity row, the presale SKU, the product row and the product SKU back to their exact prior stock and sales; the fixture uses deliberately different ids and SKUs for the presale and the product layers so a restore through the wrong layer cannot pass on matching totals.
+- [x] REFUND-003 An order sold from a group buy, a presale or ordinary stock restores through that layer only: the matching service is called once with the id and SKU the order carried, and the other two are never called.
+- [x] REFUND-004 When the stock restore returns false the refund stops with `库存回退失败` before the payment gateway is resolved, and no `refund_price` status row is written.
 
 ## Registration and notifications
 
 - [x] USER-001 Self registration through the real `/api/register` route issues the configured newcomer coupon to the new uid only.
 - [x] USER-002 A registration retry issues the coupon once and never credits money or points.
 - [x] USER-003 The order-notice roster drives who receives the new-order in-site message, and nobody outside it.
+
+## Coupons
+
+- [x] COUPON-001 A retired member coupon (`receive_type = 4`, including the row the install SQL still ships) is absent from the storefront list, the PC list, the popup list, the quantity counts, the `receive_types = 1` search and the DIY `theme/coupon` component (both the every-user and the pinned-id form, while a component saved for the retired member audience returns an empty list), while an ordinary coupon stays listed.
+- [x] COUPON-002 Claiming a retired member coupon by id fails with `该优惠券所属业务已下线` before any write: no claim record, no user coupon and an unchanged `remain_count`.
+- [x] COUPON-003 An ordinary coupon can still be claimed and still consumes one from `remain_count`.
 
 ## Storefront paths broken by the removal
 
@@ -94,9 +95,16 @@ against the seeded install SQL; payment transports stay offline.
 - [x] MIG-002 `plan` leaves the shipped retained timers (`takeDelivery`, `clearPoster`, …) off the removal list and the retained menus parented under live parents.
 - [x] MIG-003 `apply` renames every seeded retired table, removes exactly the retired seeds, keeps the retained timers and menus, carries the notify-or-customer roster union across, creates the retained settings, and is a no-op afterwards without overwriting the backup.
 - [x] MIG-004 Completed withdrawals (`status=1`) do not block apply; pending ones (`status=0`) do, and the refusal happens before any backup is written.
-- [x] MIG-005 `finalize` refuses without a dump naming every renamed table, drops them with one, and a later `rollback` then fails non-zero instead of reporting success.
+- [x] MIG-005 `finalize` drops only empty renamed tables: a table that still holds rows refuses the whole batch with exit code 2 and the table names and row counts, and neither `--yes` nor `--dump` can bypass it. Empty tables are dropped when a dump is given, and a later `rollback` then fails non-zero instead of reporting success.
 - [x] MIG-006 `plan` reports unreachable balances from a funded database (a field-restricted `find()` used to report zero) and blocks apply on paid self-pickup orders that could never be written off.
 - [x] MIG-007 `rollback` restores every shared table row-for-row after apply.
+- [x] MIG-008 `apply` creates every missing config tab and setting when several are missing at once, each with its own id and a correct `config_tab_id` reference.
+- [x] MIG-009 A setting that is both created by this apply and holds a notification roster inherits the merged uid list, so order alerts and mobile order management survive its first creation.
+- [x] MIG-010 A retained setting that lives on a retired tab is moved to the retained tab with its value intact instead of being deleted with the tab.
+- [x] MIG-011 The WeChat payment version setting survives apply with its configured value, and a fresh install ships it too.
+- [x] MIG-012 `rollback` refuses, without touching a single table name or row, when any recorded row was edited after apply; the refusal happens before the first rename.
+- [x] MIG-013 `rollback` can be retried: after a rename completed but the data restore failed, a second run restores the remaining rows and repeating it again changes nothing.
+- [x] MIG-014 A refused `plan` leaves the database unmodified.
 
 ## Maintenance tools
 
@@ -113,3 +121,12 @@ Payment transports are offline by design: real WeChat sandbox payment, refund
 and gateway-side retry are operator verification steps. The double-callback
 case (PAY-007) drives the same notification path the gateway would, with the
 transport stripped.
+
+Permanent deletion of a retired table that still holds rows is not supported:
+`finalize` refuses it (exit code 2) instead of restoring or exporting the data.
+There is no backup-restore tooling for that case — a shop that finds non-empty
+retired tables must be handled by a separately planned operation.
+
+The storefront and admin builds, H5/mini-program builds, on-device flows and a
+real merchant WeChat payment and refund are release steps, not covered by this
+suite.

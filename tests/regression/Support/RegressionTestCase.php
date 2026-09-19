@@ -25,6 +25,30 @@ abstract class RegressionTestCase extends TestCase
         $this->replacements[$abstract] = $replacement;
     }
 
+    /**
+     * Bind an abstract to a factory for one test, the way `app()->make($abstract, $args)`
+     * resolves one on demand. `replace()` cannot cover this: it hands back a fixed
+     * object and never sees the requested constructor arguments.
+     *
+     * `Container::bind()` has no unbind, an already resolved instance wins over the
+     * closure, and `delete()` only drops the instance. Cleanup therefore removes both,
+     * or the fake would leak into every later test in the same process.
+     */
+    protected function bindClass(string $abstract, callable $factory): void
+    {
+        $container = Container::getInstance();
+        $container->delete($abstract);
+        $container->bind($abstract, \Closure::fromCallable($factory));
+        $this->registerCleanup(static function () use ($container, $abstract): void {
+            $container->delete($abstract);
+            $property = new \ReflectionProperty(Container::class, 'bind');
+            $property->setAccessible(true);
+            $bound = $property->getValue($container);
+            unset($bound[$abstract]);
+            $property->setValue($container, $bound);
+        });
+    }
+
     protected function tearDown(): void
     {
         $container = Container::getInstance();
