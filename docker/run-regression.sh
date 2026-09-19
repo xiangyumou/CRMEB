@@ -24,6 +24,21 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 cleanup
+
+# Docker copies the image content into an empty named volume while the container
+# starts. php-fpm and workerman both mount the runtime and uploads volumes and
+# Compose starts them in parallel, so the two copies race inside one volume and
+# the stack dies with "failed to mkdir .../temp: file exists". Populate the
+# shared volumes once, serially, before any container that mounts them starts.
+project="$(awk '/^name:/{print $2; exit}' "$compose_file")"
+for volume in runtime uploads; do
+    docker volume create "${project}_${volume}" >/dev/null
+done
+docker run --rm --entrypoint sh \
+    -v "${project}_runtime:/var/www/crmeb/runtime" \
+    -v "${project}_uploads:/var/www/crmeb/public/uploads" \
+    "$CRMEB_TEST_IMAGE" -c 'test -d /var/www/crmeb/runtime/temp'
+
 set +e
 docker compose -f "$compose_file" up --build --abort-on-container-exit --exit-code-from regression regression
 status=$?

@@ -155,6 +155,34 @@ final class FixtureFactory
     }
 
     /**
+     * A coupon the user already holds. Cancelling or refunding an order returns it,
+     * so the record has to exist for real: a missing row would let a broken restore
+     * pass while the coupon silently stays consumed.
+     */
+    public function createUserCoupon(int $uid, array $overrides = []): array
+    {
+        $data = array_merge([
+            'cid' => 0,
+            'uid' => $uid,
+            'coupon_title' => substr($this->unique('coupon'), 0, 32),
+            'coupon_price' => '5.00',
+            'use_min_price' => '0.00',
+            'add_time' => time(),
+            'start_time' => time() - 60,
+            'end_time' => time() + 3600,
+            'use_time' => 0,
+            'type' => 'send',
+            'status' => 0,
+            'is_fail' => 0,
+        ], $overrides);
+        $id = (int)Db::name('store_coupon_user')->insertGetId($data);
+        $this->test->registerCleanup(static function () use ($id): void {
+            Db::name('store_coupon_user')->where('id', $id)->delete();
+        });
+        return array_merge($data, ['id' => $id]);
+    }
+
+    /**
      * Seed a presale activity the way the admin form writes one: the activity row
      * plus its own SKU layer (type 6). The presale SKU keeps the ordinary product
      * SKU's `suk`, which is how the stock restore finds the product SKU again.

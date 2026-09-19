@@ -60,6 +60,35 @@ class BaseClient extends AbstractAPI
      */
     public function request(string $endpoint, string $method = 'POST', array $options = [], $serial = true)
     {
+        return $this->send($endpoint, $method, $options, $serial)['body'];
+    }
+
+    /**
+     * 发起请求并保留 HTTP 状态码
+     *
+     * 微信 v3 的关单接口成功时返回 204 且没有响应体，只靠响应体无法区分"关单
+     * 成功"和"请求根本没发出去"。需要在响应体之外拿到状态码的调用方使用本方法。
+     *
+     * @param string $endpoint
+     * @param string $method
+     * @param array $options
+     * @param bool $serial
+     * @return array{status:int,body:mixed}
+     */
+    public function requestWithStatus(string $endpoint, string $method = 'POST', array $options = [], $serial = true): array
+    {
+        return $this->send($endpoint, $method, $options, $serial);
+    }
+
+    /**
+     * @param string $endpoint
+     * @param string $method
+     * @param array $options
+     * @param bool $serial
+     * @return array{status:int,body:mixed}
+     */
+    protected function send(string $endpoint, string $method = 'POST', array $options = [], $serial = true): array
+    {
         $body = $options['body'] ?? '';
 
         if (isset($options['json'])) {
@@ -92,7 +121,7 @@ class BaseClient extends AbstractAPI
      * @param $method
      * @param $location
      * @param array $options
-     * @return mixed
+     * @return array{status:int,body:mixed}
      */
     private function _doRequestCurl($method, $location, $options = [])
     {
@@ -118,8 +147,13 @@ class BaseClient extends AbstractAPI
         curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
         $content = curl_exec($curl);
         $headerSize = curl_getinfo($curl, CURLINFO_HEADER_SIZE);
+        $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
-        return json_decode(substr($content, $headerSize), true);
+        if ($content === false) {
+            return ['status' => 0, 'body' => null];
+        }
+        $raw = substr($content, $headerSize);
+        return ['status' => $status, 'body' => $raw === '' ? null : json_decode($raw, true)];
     }
 
     /**
@@ -283,4 +317,3 @@ class BaseClient extends AbstractAPI
         throw new InvalidArgumentException('AEAD_AES_256_GCM 需要 PHP 7.1 以上或者安装 libsodium-php');
     }
 }
-

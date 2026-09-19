@@ -40,11 +40,34 @@ class StoreOrderDao extends BaseDao
     /**
      * Atomically transition an unpaid order to paid.
      *
+     * The cancel path releases stock and coupons, so a cancelled order must never
+     * be flipped to paid by a late callback: the update also requires is_cancel = 0.
+     *
      * @return int Number of updated rows
      */
     public function markPaid(int $id, array $data): int
     {
-        return $this->getModel()->where(['id' => $id, 'paid' => 0])->update($data);
+        return $this->getModel()->where(['id' => $id, 'paid' => 0, 'is_cancel' => 0])->update($data);
+    }
+
+    /**
+     * 锁定一条订单，供取消、退款等需要串行化的流程使用
+     * @param int $id
+     * @return \crmeb\basic\BaseModel|mixed|\think\Model|null
+     */
+    public function getForUpdate(int $id)
+    {
+        return $this->getModel()->where('id', $id)->lock(true)->find();
+    }
+
+    /**
+     * 按商户订单号锁定一条订单
+     * @param string $orderId
+     * @return \crmeb\basic\BaseModel|mixed|\think\Model|null
+     */
+    public function getByOrderIdForUpdate(string $orderId)
+    {
+        return $this->getModel()->where('order_id', $orderId)->lock(true)->find();
     }
 
     /**

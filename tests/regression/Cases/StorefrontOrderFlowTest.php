@@ -154,6 +154,65 @@ final class StorefrontOrderFlowTest extends RegressionTestCase
     }
 
     /**
+     * The coupon is spent by a conditional update inside the order transaction, and
+     * the order is refused unless exactly one row changed. A coupon that is not the
+     * caller's to spend has to fail before anything is written: no order row, no
+     * stock movement, and the coupon keeps the state it already had.
+     */
+    public function testASpentCouponIsRefusedBeforeAnyOrderIsWritten(): void
+    {
+        $fixtures = new FixtureFactory($this, $this->getName());
+        $user = $fixtures->createUser();
+        $product = $this->sellableProduct($fixtures);
+        $addressId = $this->shippingAddress($fixtures, $user['uid']);
+        $token = (new TestTokenFactory($this))->create($user['uid']);
+        $spent = $fixtures->createUserCoupon($user['uid'], ['status' => 1, 'use_time' => time()]);
+
+        $cart = $this->addToCart($token, $product['id'], $product['sku']['unique']);
+        $confirm = $this->http->request('POST', '/api/order/confirm', $token, [
+            'cartId' => (string)$cart['cartId'], 'new' => 0, 'addressId' => $addressId, 'shipping_type' => 1,
+        ]);
+        $orderKey = $confirm['body']['data']['orderKey'] ?? '';
+        self::assertNotSame('', $orderKey, 'confirmation returns an order key');
+        $ordersBefore = (int)Db::name('store_order')->where('uid', $user['uid'])->count();
+
+        $create = $this->http->request('POST', '/api/order/create/' . $orderKey, $token, [
+            'addressId' => $addressId,
+            'couponId' => (int)$spent['id'],
+            'payType' => '',
+            'useIntegral' => 0,
+            'mark' => '',
+            'combinationId' => 0,
+            'pinkId' => 0,
+            'shipping_type' => 1,
+            'real_name' => '',
+            'phone' => '',
+            'new' => 0,
+            'invoice_id' => 0,
+            'advanceId' => 0,
+            'custom_form' => [],
+            'is_gift' => 0,
+            'gift_mark' => '',
+        ]);
+        self::assertNotSame(200, (int)($create['body']['status'] ?? 200), 'a spent coupon is refused: ' . json_encode($create['body'], JSON_UNESCAPED_UNICODE));
+        self::assertSame(
+            $ordersBefore,
+            (int)Db::name('store_order')->where('uid', $user['uid'])->count(),
+            'no order is written for the refused coupon'
+        );
+        self::assertSame(
+            10,
+            (int)Db::name('store_product')->where('id', $product['id'])->value('stock'),
+            'the stock is untouched by the refused order'
+        );
+        self::assertSame(
+            1,
+            (int)Db::name('store_coupon_user')->where('id', $spent['id'])->value('status'),
+            'the coupon stays spent, not returned'
+        );
+    }
+
+    /**
      * The listener used to destructure seven values from a five-value payload,
      * so it aborted with a TypeError *after* the order row was written and the
      * unpaid-order jobs were never queued. The delay is what later cancels an

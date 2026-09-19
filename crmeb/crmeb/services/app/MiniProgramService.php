@@ -579,6 +579,26 @@ class MiniProgramService
     }
 
     /**
+     * 查询支付单（小程序支付）
+     * @param string $orderNo
+     * @return mixed
+     */
+    public static function orderQuery($orderNo)
+    {
+        return self::paymentService()->query($orderNo);
+    }
+
+    /**
+     * 关闭支付单（小程序支付）
+     * @param string $orderNo
+     * @return mixed
+     */
+    public static function closeOrder($orderNo)
+    {
+        return self::paymentService()->close($orderNo);
+    }
+
+    /**
      * 微信支付成功回调接口
      * @return \Symfony\Component\HttpFoundation\Response
      * @throws \EasyWeChat\Core\Exceptions\FaultException

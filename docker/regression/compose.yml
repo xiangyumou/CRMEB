@@ -46,7 +46,31 @@ services:
         condition: service_healthy
     networks:
       default:
-        aliases: [php, workerman]
+        aliases: [php]
+
+  # 真实的长连接容器：Channel 服务监听在这里，php、nginx 通过服务名连它。
+  # php-fpm 不再冒充 workerman，拓扑与生产 compose 保持一致。
+  workerman:
+    image: ${CRMEB_TEST_IMAGE:?}
+    command: ["workerman"]
+    environment:
+      APP_DEBUG: "false"
+    volumes:
+      - ./test.env:/var/www/crmeb/.env:ro
+      - ./test.constant:/var/www/crmeb/.constant:ro
+      - uploads:/var/www/crmeb/public/uploads
+      - runtime:/var/www/crmeb/runtime
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "php", "/opt/crmeb/healthcheck.php", "workerman"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
 
   nginx:
     image: ${CRMEB_TEST_IMAGE:?}
@@ -56,7 +80,13 @@ services:
       - uploads:/var/www/crmeb/public/uploads:ro
       - assets-cache:/var/cache/crmeb/assets
     depends_on:
-      - php-fpm
+      php-fpm:
+        condition: service_started
+      # nginx.conf proxies /notice to http://workerman:40001 and resolves that
+      # name while loading its configuration; without this dependency the
+      # container exits on startup with "host not found in upstream".
+      workerman:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1/readyz | grep -q 'true'"]
       interval: 2s

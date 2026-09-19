@@ -75,6 +75,92 @@ member audience returns an empty list — and `issueUserCoupon()` refuses `4` wi
 `该优惠券所属业务已下线` before any write. Records already issued are left
 untouched.
 
+## Order, payment and refund consistency (2026-09-19)
+
+These entries were found by reviewing the newly split containers and the order
+money paths after the previous round, with fault injection and separate-process
+races on a real MySQL. Each one has a case in `cases.md`, and every new case was
+observed failing on the pre-fix code first.
+
+### ORDER-004 / COUPON-004 / COUPON-005 / COUPON-006 (P1): a coupon could pay for two orders
+
+`OrderCouponCalculator::useCouponId()` spent the coupon with
+`StoreCouponUserServices::useCoupon()` while it was still computing the price, and
+the create transaction only covered the order and stock writes. A confirmation
+that later failed on stock, on a price check or on the cart update left the coupon
+consumed with no order written. The same call updated by id alone, so two
+concurrent orders could both spend one coupon — and a spent, failed, expired or
+foreign coupon was accepted as long as the id matched. The calculator now only
+computes, and `StoreOrderCreateServices` redeems the coupon inside the order
+transaction through `StoreCouponUserDao::redeemCoupon()`: a single conditional
+update keyed on the holder, the unused state and the validity window, whose
+affected-row count is the success signal, so the order is refused unless exactly
+one row changed and the coupon, the stock and the order either all commit or all
+roll back. The HTTP case submits an order with an already spent coupon and asserts
+a non-200 result, no order row, unchanged stock and the coupon still spent; the
+unit cases cover the single-use boundary, the unusable coupons and a
+two-process race.
+
+### QUEUE-003 … QUEUE-009 (P1): cancellation released stock before it knew the payment state
+
+Three entry points restore an abandoned order — the manual cancel API,
+`UnpaidOrderCancelJob` and the timer loop — and they behaved differently. The job
+ignored a `false` from the stock or coupon restore, reported success and persisted
+the cancel state, so a failure lost the stock for good. The queue path ran the
+release and the cancel flag in different places, so a partial failure could
+restore stock while leaving the order open. None of them asked the gateway whether
+the order had actually been paid, so a cancellation could free the stock and the
+coupon of an order whose payment landed a moment later. Cancellation now goes
+through one service entry point: inside the transaction it locks and re-reads the
+order, settles every recorded payment attempt with the gateway first, and only
+when every attempt is closed or provably absent does it return the coupon, restore
+the layer the order sold from (`incCombinationStock`, `incAdvanceStock`,
+`incProductStock`) and persist the cancel state in the same commit. An
+unconfirmed gateway answer, a coupon that cannot be returned or a stock restore
+that returns `false` aborts the whole cancellation and leaves the order open for a
+retry; a payment discovered during settlement marks the attempt paid with its
+trade number and keeps the order alive. Cases QUEUE-003 … QUEUE-009 prove the
+ordering, the unknown-answer path, the late payment, both rollback directions, the
+four presale ledgers and the two-process race.
+
+### REFUND-005 / REFUND-006 (P1): a refund retry could ask the gateway for a different amount
+
+`agreeRefund()` checked eligibility, asked the gateway and marked the after-sale
+row complete in separate steps, and the standard v2/v3 drivers generated a random
+`out_refund_no` per call. A retry after "the gateway accepted it but the local
+transaction rolled back", or a concurrent second operator, therefore sent a
+second differently numbered refund request, and nothing tied the requested amount
+to the first attempt — a retry could even ask for more money. `freezeRefundRequest()`
+now runs first in its own transaction: it locks the after-sale row, refuses one
+that is already complete or in an unsupported state, derives the gateway number
+from the persisted unique after-sale number and stores the frozen amount and
+payment context in `refund_request`. Every retry replays that row, so the gateway
+number and the amount stay identical across failures and across processes, and the
+completion update moved out of the controller into the service transaction.
+
+### PAY-006 / QUEUE-010 / QUEUE-011 (P1): the post-payment effects had no second delivery
+
+The payment transaction was made to register "notification, push, printing and
+invoice still have to happen" as a row, so no external call could leave the
+process before the order was committed. The repair side of that contract was
+never wired: nothing ever called the effect job or swept the pending rows, so a
+payment whose process died between the commit and the notice — or whose notice
+threw — left the order permanently silent with nobody to notice, while the table
+slowly filled with pending rows. The registration also passed the recorded id to
+`OrderEffectJob::dispatch()` as a bare value, and that signature reads a non-array
+argument as a *method name*: the call became `$job->4242()` and threw inside the
+wrapper that swallows it, so even the immediate attempt did nothing. The id is now
+passed as the argument list, and the delivery has three parts: the queue job runs
+the recorded row right after the commit, the timer re-delivers pending rows every
+30 seconds (bounded per cycle), and a claim update (`pending → running`) decides
+which delivery may call the gateway-facing side, so two deliveries that arrive at
+once cannot both run the external call. A record left in `running` by a killed
+worker becomes claimable again after `STALE_SECONDS`, a failed effect keeps its
+unknown outcome and error text for an operator, and a record that used up
+`MAX_ATTEMPTS` stops being re-delivered instead of retrying forever.
+`OrderEffectTest` fails on the old code — the recorded row was never handed to
+`runById` — and covers the claim, the redelivery filters and the attempt counter.
+
 ## STOCK-003: inventory deduction was not atomic
 
 `BaseDao::decStockIncSales()` read the row and then issued an unconditional decrement. A competing order could pass the read before another request consumed the remaining stock. The update now includes `stock >= requested` and, for quota-backed products, `quota >= requested` in the same SQL statement. Non-positive deductions are rejected. The affected-row count is the success signal.

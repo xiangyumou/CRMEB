@@ -161,6 +161,72 @@ final class RefundTest extends RegressionTestCase
     }
 
     /**
+     * The refund gateway call cannot be rolled back with the transaction that raised
+     * it, so a retry — the same admin after a local failure, or a concurrent one —
+     * has to replay the same gateway number and the same amount. A second attempt
+     * that asked for more money would be a second refund request, not a retry.
+     */
+    public function testRefundNumberAndAmountStayFrozenAcrossRetries(): void
+    {
+        $fixtures = new FixtureFactory($this, $this->getName());
+        $user = $fixtures->createUser();
+        $order = $fixtures->createOrder($user['uid']);
+        $refund = $fixtures->createRefundOrder($user['uid'], $order['id'], [
+            'refund_type' => 1, 'refund_price' => '10.00', 'out_refund_no' => '', 'refund_request' => '',
+        ]);
+        $service = $this->freezingRefundService();
+
+        $first = $service->exposeFreeze((int)$refund['id'], ['refund_price' => '10.00', 'pay_price' => '10.00']);
+        self::assertSame((string)$refund['order_id'], $first['out_refund_no'], 'the persisted after-sale number is the gateway number');
+        self::assertSame(10.0, $first['refund_price']);
+
+        $second = $service->exposeFreeze((int)$refund['id'], ['refund_price' => '99.00', 'pay_price' => '99.00']);
+        self::assertSame($first['out_refund_no'], $second['out_refund_no'], 'the retry reuses the same gateway number');
+        self::assertSame(10.0, $second['refund_price'], 'the retry cannot raise the frozen amount');
+
+        $stored = Db::name('store_order_refund')->where('id', $refund['id'])->find();
+        self::assertSame($first['out_refund_no'], (string)$stored['out_refund_no']);
+        $frozen = json_decode((string)$stored['refund_request'], true);
+        self::assertIsArray($frozen, 'the frozen request is persisted');
+        self::assertSame(10.0, (float)$frozen['refund_price']);
+    }
+
+    /**
+     * The freeze step is the only thing serializing two refund attempts for one
+     * after-sale row. Two processes released together must still agree on one
+     * number and one amount, otherwise a double submit refunds twice.
+     */
+    public function testConcurrentRefundsFreezeOneNumberAndAmount(): void
+    {
+        $fixtures = new FixtureFactory($this, $this->getName());
+        $user = $fixtures->createUser();
+        $order = $fixtures->createOrder($user['uid']);
+        $refund = $fixtures->createRefundOrder($user['uid'], $order['id'], [
+            'refund_type' => 1, 'refund_price' => '10.00', 'out_refund_no' => '', 'refund_request' => '',
+        ]);
+
+        $results = $this->race('refund-freeze', (int)$refund['id'], ['10.00', '99.00']);
+
+        self::assertSame(
+            $results[0]['out_refund_no'],
+            $results[1]['out_refund_no'],
+            'both attempts freeze the same gateway number'
+        );
+        self::assertSame(
+            $results[0]['refund_price'],
+            $results[1]['refund_price'],
+            'both attempts freeze the same amount'
+        );
+
+        $stored = Db::name('store_order_refund')->where('id', $refund['id'])->find();
+        self::assertSame($results[0]['out_refund_no'], (string)$stored['out_refund_no']);
+        self::assertSame(
+            (float)$results[0]['refund_price'],
+            (float)json_decode((string)$stored['refund_request'], true)['refund_price']
+        );
+    }
+
+    /**
      * One presale order in the database: cart info carries the presale SKU while the
      * order carries the presale activity id, exactly as the checkout writes them.
      */
@@ -213,5 +279,64 @@ final class RefundTest extends RegressionTestCase
                 $this->assertWechatRefundable($order);
             }
         };
+    }
+
+    /**
+     * The freeze step is protected so a test can drive it; passing the real DAO and
+     * the real database is the point, since the stability comes from the row lock.
+     */
+    private function freezingRefundService(): StoreOrderRefundServices
+    {
+        return new class(app()->make(StoreOrderRefundDao::class), app()->make(StoreOrderServices::class)) extends StoreOrderRefundServices {
+            public function exposeFreeze(int $id, array $refundData): array
+            {
+                return $this->freezeRefundRequest($id, $refundData);
+            }
+        };
+    }
+
+    /**
+     * Run the same write in two processes released together, the way a double
+     * submit or a retry after a local rollback arrives in production.
+     *
+     * @param array<int, string> $values
+     * @return array<int, mixed>
+     */
+    private function race(string $action, int $id, array $values): array
+    {
+        $start = tempnam(sys_get_temp_dir(), 'crmeb-race-start-');
+        unlink($start);
+        $processes = [];
+        $outputs = [];
+        foreach ($values as $index => $value) {
+            $output = tempnam(sys_get_temp_dir(), 'crmeb-race-');
+            $outputs[$index] = $output;
+            $command = sprintf(
+                'php %s %s %d %s %s %s',
+                escapeshellarg(dirname(__DIR__) . '/Support/race-worker.php'),
+                escapeshellarg($action),
+                $id,
+                escapeshellarg((string)$value),
+                escapeshellarg($start),
+                escapeshellarg($output)
+            );
+            $processes[$index] = proc_open($command, [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);
+        }
+
+        touch($start);
+        $results = [];
+        foreach ($processes as $index => $process) {
+            self::assertSame(0, proc_close($process), 'the ' . $action . ' worker exits cleanly');
+            $raw = (string)file_get_contents($outputs[$index]);
+            unlink($outputs[$index]);
+            $decoded = json_decode($raw, true);
+            self::assertIsArray($decoded, 'the ' . $action . ' worker reported a result: ' . $raw);
+            self::assertSame('', (string)$decoded['error'], 'the ' . $action . ' worker must not fail');
+            self::assertTrue($decoded['ok']);
+            $results[] = $decoded['value'];
+        }
+        unlink($start);
+
+        return $results;
     }
 }

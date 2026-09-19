@@ -58,6 +58,26 @@ class StoreCouponUserDao extends BaseDao
     }
 
     /**
+     * 核销优惠券：只有仍然属于该用户、未使用且在有效期内的券才会被改成已使用。
+     * 条件更新保证并发下同一张券最多只能成功核销一次，返回值是受影响行数。
+     *
+     * @param int $id
+     * @param int $uid
+     * @return int
+     */
+    public function redeemCoupon(int $id, int $uid): int
+    {
+        return $this->getModel()
+            ->where('id', $id)
+            ->where('uid', $uid)
+            ->where('status', 0)
+            ->where('is_fail', 0)
+            ->where('start_time', '<', time())
+            ->where('end_time', '>', time())
+            ->update(['status' => 1, 'use_time' => time()]);
+    }
+
+    /**
      * 获取指定商品id下的优惠卷
      * @param array $productIds
      * @param int $uid

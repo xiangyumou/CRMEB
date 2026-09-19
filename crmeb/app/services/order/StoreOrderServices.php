@@ -13,11 +13,13 @@ namespace app\services\order;
 
 use app\dao\order\StoreOrderDao;
 use app\jobs\AutoCommentJob;
+use app\model\order\StoreOrderPaymentAttempt;
 use app\services\activity\combination\StorePinkServices;
 use app\services\activity\coupon\StoreCouponUserServices;
 use app\services\BaseServices;
 use app\services\other\QrcodeServices;
 use app\services\pay\PayServices;
+use app\services\pay\PayTradeServices;
 use app\services\serve\ServeServices;
 use app\services\system\SystemTicketServices;
 use app\services\user\UserInvoiceServices;
@@ -728,33 +730,119 @@ class StoreOrderServices extends BaseServices
         if ($order->paid) {
             throw new ApiException('订单已经支付无法取消');
         }
-        /** @var StoreOrderRefundServices $refundServices */
-        $refundServices = app()->make(StoreOrderRefundServices::class);
-
-        $this->transaction(function () use ($refundServices, $order) {
-            $res = $refundServices->couponBack($order, 'cancel') && $refundServices->regressionStock($order);
-            $order->is_cancel = 1;
-            if (!($res && $order->save())) {
-                throw new ApiException('取消失败');
-            }
-        });
+        $orderInfo = $order->toArray();
+        if (!$this->cancelUnpaidOrder((int)$orderInfo['id'])) {
+            // 并发下订单可能已经被别的入口处理掉了，重新读取后给出准确原因
+            $fresh = $this->dao->get((int)$orderInfo['id']);
+            if ($fresh && $fresh['is_cancel']) throw new ApiException('订单已取消，请勿重复操作！');
+            if ($fresh && $fresh['paid']) throw new ApiException('订单已经支付无法取消');
+            throw new ApiException('取消失败');
+        }
 
         //自定义事件-订单取消
         event('CustomEventListener', ['order_cancel', [
             'uid' => $uid,
-            'id' => $order['id'],
+            'id' => $orderInfo['id'],
             'order_id' => $order_id,
-            'real_name' => $order['id'],
-            'user_phone' => $order['id'],
-            'user_address' => $order['id'],
-            'total_num' => $order['id'],
-            'pay_price' => $order['id'],
-            'deduction_price' => $order['id'],
-            'coupon_price' => $order['id'],
+            'real_name' => $orderInfo['real_name'],
+            'user_phone' => $orderInfo['user_phone'],
+            'user_address' => $orderInfo['user_address'],
+            'total_num' => $orderInfo['total_num'],
+            'pay_price' => $orderInfo['pay_price'],
+            'deduction_price' => $orderInfo['deduction_price'],
+            'coupon_price' => $orderInfo['coupon_price'],
             'cancel_time' => date('Y-m-d H:i:s'),
         ]]);
 
         return true;
+    }
+
+    /**
+     * 取消未支付订单（手动取消、队列取消、定时取消共用的唯一入口）
+     *
+     * 关键约束：
+     * 1. 释放库存和优惠券之前，先确认网关侧没有仍然可以收款的支付单；
+     * 2. 事务内重新加锁读订单，已支付或已取消直接放弃，不重复退券、回库；
+     * 3. 退券、各层库存恢复、取消状态必须同时提交，任一失败整体回滚。
+     *
+     * @param int $orderId 订单表主键
+     * @param string|null $mark 取消原因；传 null 表示不覆盖订单原有备注（手动取消沿用原行为）
+     * @return bool 是否真的执行了取消
+     * @throws \think\db\exception\DbException
+     */
+    public function cancelUnpaidOrder(int $orderId, ?string $mark = null): bool
+    {
+        /** @var StoreOrderPaymentAttemptServices $attemptServices */
+        $attemptServices = app()->make(StoreOrderPaymentAttemptServices::class);
+        //关单必须在事务之外完成：网关调用不能持有数据库锁
+        $this->settlePaymentAttempts($orderId, $attemptServices);
+
+        /** @var StoreOrderRefundServices $refundServices */
+        $refundServices = app()->make(StoreOrderRefundServices::class);
+        $cancelled = $this->transaction(function () use ($orderId, $mark, $refundServices, $attemptServices) {
+            $order = $this->dao->getForUpdate($orderId);
+            if (!$order) {
+                return false;
+            }
+            if ($order['paid'] || $order['is_cancel'] || $order['is_del']) {
+                return false;
+            }
+            if (!$refundServices->couponBack($order, 'cancel')) {
+                throw new ApiException('回退优惠券失败');
+            }
+            if (!$refundServices->regressionStock($order)) {
+                throw new ApiException('库存回退失败');
+            }
+            $cancelData = ['is_cancel' => 1];
+            if ($mark !== null && $mark !== '') {
+                $cancelData['mark'] = $mark;
+            }
+            if (!$this->dao->update($orderId, $cancelData)) {
+                throw new ApiException('取消失败');
+            }
+            $attemptServices->closeRemaining($orderId);
+            return true;
+        });
+
+        return (bool)$cancelled;
+    }
+
+    /**
+     * 确认订单名下所有未决支付尝试都已经不可能再收款
+     *
+     * 查到已收款直接中断取消；无法确认则抛错，由调用方稍后重试，绝不在状态
+     * 不明的情况下释放库存。
+     *
+     * @param int $orderId
+     * @param StoreOrderPaymentAttemptServices $attemptServices
+     * @return void
+     * @throws ApiException
+     */
+    private function settlePaymentAttempts(int $orderId, StoreOrderPaymentAttemptServices $attemptServices): void
+    {
+        $attempts = $attemptServices->openAttempts($orderId);
+        if (!$attempts) {
+            return;
+        }
+        /** @var PayTradeServices $tradeServices */
+        $tradeServices = app()->make(PayTradeServices::class);
+        foreach ($attempts as $attempt) {
+            $state = $tradeServices->settleAttempt($attempt);
+            if ($state === PayTradeServices::STATE_CLOSED) {
+                $attemptServices->mark((int)$attempt['id'], StoreOrderPaymentAttempt::STATUS_CLOSED, 'cancel:closed');
+                continue;
+            }
+            if ($state === PayTradeServices::STATE_PAID) {
+                $attemptServices->mark(
+                    (int)$attempt['id'],
+                    StoreOrderPaymentAttempt::STATUS_PAID,
+                    'cancel:paid',
+                    (string)($attempt['trade_no'] ?? '')
+                );
+                throw new ApiException('订单已支付，无法取消');
+            }
+            throw new ApiException('支付状态确认失败，请稍后重试');
+        }
     }
 
     /**
@@ -892,39 +980,26 @@ class StoreOrderServices extends BaseServices
         //格式化数据
         $systemValue = Arr::setValeTime($keyValue, is_array($systemValue) ? $systemValue : []);
         $list = $this->dao->getOrderUnPaidList();
-        /** @var StoreOrderRefundServices $refundServices */
-        $refundServices = app()->make(StoreOrderRefundServices::class);
         foreach ($list as $order) {
             if ($order['pink_id'] || $order['combination_id']) {
                 $secs = $systemValue['order_pink_time'] ?: $systemValue['order_activity_time'];
             } else {
                 $secs = $systemValue['order_cancel_time'];
             }
-            if ($secs == 0) return true;
+            //时间为 0 表示该类订单不自动取消，跳过这一条而不是中断整个列表
+            if ($secs == 0) {
+                continue;
+            }
             if (($order['add_time'] + bcmul($secs, '3600', 0)) < time()) {
                 try {
-                    $this->transaction(function () use ($order, $refundServices) {
-                        //回退积分和优惠卷
-                        $res = $refundServices->couponBack($order, 'cancel');
-                        //回退库存和销量
-                        $res = $res && $refundServices->regressionStock($order);
-                        //修改订单状态
-                        $res = $res && $this->dao->update($order['id'], ['is_cancel' => 1, 'mark' => '订单未支付已超过系统预设时间']);
-                        if (!$res) {
-                            Log::error('订单号' . $order['order_id'] . '自动取消订单失败');
-                        }
-                        return true;
-                    });
-
-                    /** @var StoreOrderCartInfoServices $cartServices */
-                    $cartServices = app()->make(StoreOrderCartInfoServices::class);
-                    $cartInfo = $cartServices->getOrderCartInfo((int)$order['id']);
-
+                    //与手动、队列取消共用同一个入口，失败时抛出并保留订单原状
+                    $this->cancelUnpaidOrder((int)$order['id'], '订单未支付已超过系统预设时间');
                 } catch (\Throwable $e) {
-                    Log::error('自动取消订单失败,失败原因:' . $e->getMessage(), $e->getTrace());
+                    Log::error('订单号' . $order['order_id'] . '自动取消订单失败,失败原因:' . $e->getMessage());
                 }
             }
         }
+        return true;
     }
 
     /**根据时间获取当天或昨天订单营业额

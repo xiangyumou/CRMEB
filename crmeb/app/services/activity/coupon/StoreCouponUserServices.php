@@ -24,6 +24,7 @@ use crmeb\utils\Arr;
  * Class StoreCouponUserServices
  * @package app\services\coupon
  * @method useCoupon(int $id) 使用优惠券修改优惠券状态
+ * @method redeemCoupon(int $id, int $uid) 条件核销优惠券，返回受影响行数
  * @method delUserCoupon(array $where)
  */
 class StoreCouponUserServices extends BaseServices

@@ -217,9 +217,8 @@ class OutStoreOrderRefundServices extends BaseServices
             $refundData['refund_id'] = $order['order_id'] . rand(100, 999);
         }
         $refundData['order_id'] = $orderId;
-        //修改订单退款状态
-        if ($refundServices->agreeRefund((int)$orderRefund['id'], $refundData)) {
-            $refundServices->update((int)$orderRefund['id'], $data);
+        //收尾状态由服务在同一个事务里提交
+        if ($refundServices->agreeRefund((int)$orderRefund['id'], $refundData, $data)) {
             return true;
         } else {
             $refundServices->storeProductOrderRefundYFasle((int)$orderRefund['id'], $refundPrice);

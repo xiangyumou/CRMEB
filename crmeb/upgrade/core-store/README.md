@@ -61,6 +61,26 @@ category, attachment, order and user tables and their columns are not touched â€
 historical order fields such as `pay_type`, `use_integral` and `spread_uid` keep
 their values and still render.
 
+## Order reliability schema
+
+The order, payment and refund work added `store_order_payment_attempt`,
+`store_order_effect` and the `out_refund_no` / `refund_request` columns on
+`store_order_refund`. A database that predates them needs a second, additive
+migration, and the application refuses to report ready without it:
+
+```sh
+php upgrade/core-store/order-reliability.php plan
+php upgrade/core-store/order-reliability.php apply
+```
+
+`plan` is read-only and reports what is missing; `apply` creates and adds only,
+takes no backup path, and is safe to re-run, so a release interrupted halfway is
+finished by running it again. It is separate from `drop-retired.php` in both
+directions: it never touches the retired-feature settings, and `drop-retired.php`
+does not add these objects. Run it during the same maintenance window, with the
+writers stopped, before the new image starts â€” `/readyz` fails on a database that
+has not run it. See `deploy/production/README.md` for the production sequence.
+
 ## What the run leaves behind
 
 - The order-notice roster: `apply` copies the `eb_store_service` rows that were

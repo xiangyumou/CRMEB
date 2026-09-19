@@ -23,9 +23,100 @@ docker compose up -d --wait --wait-timeout 180
 docker compose ps
 ```
 
-Plain `docker compose up -d` also works but returns before all health checks pass. Changes to the deployment topology or database schema are separate maintenance operations; `pull/up` alone cannot update a Compose file or migrate a database. If only an application image changes, MySQL and Redis must remain running and must not be force-recreated.
+Plain `docker compose up -d` also works but returns before all health checks pass. Changes to the deployment topology or database schema are separate maintenance operations; `pull/up` alone cannot update a Compose file or migrate a database, so a schema-changing release follows the next section instead. If only an application image changes, MySQL and Redis must remain running and must not be force-recreated.
 
-The admin and H5 files come from the same image as the backend. Old content-hashed browser assets are retained under `data/assets-cache`; do not clear that directory during a release. `/healthz` is the Nginx liveness probe, while `/readyz` also checks PHP, MySQL and Redis. A successful `/healthz` alone does not mean the site is ready.
+The admin and H5 files come from the same image as the backend. Old content-hashed browser assets are retained under `data/assets-cache`; do not clear that directory during a release. `/healthz` is the Nginx liveness probe; `/readyz` proves the application is installed, the retained business tables and the order-reliability columns exist and the settings table is populated, on top of MySQL and Redis. A successful `/healthz` alone does not mean the site is ready, and `/readyz` is what fails on a database that has not run the migration.
+
+`up -d --wait` now waits on a healthcheck for every application role, not just PHP and Nginx: PHP issues a real FastCGI request through the pool, the queue and timer roles publish a heartbeat from the loop that does the work, and Workerman has to answer an application-level round trip on the Channel server. A stack that prints `running` because a process merely started is no longer possible; a role whose worker died turns unhealthy.
+
+## Schema migration release
+
+A release that changes the database schema cannot use the routine update. The
+order-reliability release adds `store_order_payment_attempt`, `store_order_effect`
+and the two `store_order_refund` refund columns, and the new stack refuses to come up
+without them: the PHP healthcheck issues a real `/readyz` request through the pool,
+and `/readyz` answers 503 while those objects are missing. So `up -d --wait` fails on
+a database that has not been migrated, which is the intended signal and not a reason
+to relax the check. Migrate with the writers stopped, then start the same image.
+
+Both scripts ship inside the image at `/var/www/crmeb/upgrade/core-store/`. They are
+CLI-only and read the database settings from `deployment/config/.env`, which the `php`
+service already mounts. Start them with `--entrypoint php` so the container runs the
+script instead of the application role it starts by default. Never migrate with the
+moving `edge` tag: pin `CRMEB_IMAGE` in `deployment/deployment.env` to the tested
+`sha-<commit>` digest first, so the one-off container and the restarted stack are the
+same build. Record what is running before you replace it:
+
+```sh
+cd /home/ubuntu/apps/CRMEB
+docker image inspect "$(docker inspect crmeb-php --format '{{.Image}}')" \
+  --format '{{range .RepoDigests}}{{println .}}{{end}}'
+```
+
+During a maintenance window:
+
+```sh
+cd /home/ubuntu/apps/CRMEB
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+compose() { docker compose --env-file deployment/deployment.env "$@"; }
+migrate() { compose run --rm --no-deps --entrypoint php "$@"; }
+mkdir -p deployment/retired-backups
+
+# 1. stop the writers; keep MySQL and Redis running
+compose stop nginx php queue timer workerman
+
+# 2. back up the database and the deployment settings before anything changes
+docker exec crmeb-mysql sh -ec 'MYSQL_PWD="$PASSWORD" mysqldump --no-tablespaces -h127.0.0.1 -u"$USERNAME" --single-transaction --routines --events --triggers --set-gtid-purged=OFF "$DATABASE"' | gzip > "data/backups/pre-migration-$stamp.sql.gz"
+gzip -t "data/backups/pre-migration-$stamp.sql.gz"
+cp -p deployment/deployment.env "deployment/deployment.env.$stamp"
+
+# 3. plan is read-only; it exits non-zero while settlement or a liability is pending
+migrate -v "$PWD/deployment/retired-backups:/backups" php /var/www/crmeb/upgrade/core-store/drop-retired.php plan
+
+# 4. remove the retired settings and rename the retired tables
+migrate -v "$PWD/deployment/retired-backups:/backups" php /var/www/crmeb/upgrade/core-store/drop-retired.php apply "/backups/retired-$stamp.json"
+
+# 5. add the order-reliability tables and refund columns; safe to re-run
+migrate php /var/www/crmeb/upgrade/core-store/order-reliability.php apply
+
+# 6. start the pinned image and wait for every role
+compose up -d --wait --wait-timeout 180
+compose ps
+curl -fsS https://x-zoo.vip/readyz
+```
+
+`drop-retired.php apply` writes its backup before it changes anything and never
+overwrites one, so each attempt needs a new path. `order-reliability.php apply` only
+adds objects and is idempotent, so re-running it finishes a release that stopped
+halfway. If the retired-feature step has to be undone, run `drop-retired.php rollback
+/backups/retired-$stamp.json` with the same `/backups` mount and the same file:
+it restores the settings rows and the table names. It does not undo the additive
+step, which is safe to leave in place.
+
+Accept the release with real purchases before restoring traffic: check `compose ps`,
+`https://x-zoo.vip/readyz`, `/admin/`, the storefront, and the queue, timer and
+workerman logs, then run the client and merchant acceptance in a staging copy or
+behind the maintenance window. Promote the same digest to `edge` only after that
+passes. The renamed `eb_retired_*` tables stay as they are: `finalize` is a separate
+operation and is not part of this release.
+
+The `## First migration` section above is the one-time deployment-directory
+normalization. On a host that has already run it, `normalize.sh` prints `Already
+migrated; no services changed` and the schema steps above are what a schema-changing
+release needs.
+
+## Channel settings after the container split
+
+`crmeb/config/workerman.php` now reads its listen address, dial address and port from the settings file, so the PHP, queue, timer and workerman containers have to agree on them. Set them in `deployment/config/.env`:
+
+```ini
+[CHANNEL]
+LISTEN_IP = 0.0.0.0
+CLIENT_IP = workerman
+PORT = 40003
+```
+
+`LISTEN_IP` is the interface the Workerman container binds; `CLIENT_IP` is the address the other roles dial. After the containers are split, leaving `CLIENT_IP` at its `127.0.0.1` default makes each role connect to itself: the site responds normally while new-order popups and customer-service messages never arrive. The port is deliberately not published to the host, so only services on `server-internal-net` can reach it. If the workerman healthcheck starts failing after a topology change, check this value first.
 
 ## Rollback
 
@@ -35,6 +126,8 @@ Record the previous immutable `sha-<40-character commit>` tag or the `backendIma
 bash deploy/production/rollback.sh ghcr.io/xiangyumou/crmeb@sha256:<64-hex-digit-digest>
 ```
 
-After fixing the issue, resume tracking the tested master release with `bash deploy/production/rollback.sh --edge`. The script checks the new containers and restores the previous image setting if their health check fails. Database changes are never rolled back by replacing containers; restore data only using a separately verified database recovery procedure.
+Before it pulls anything, the script inspects the application containers and reads the `ghcr.io/xiangyumou/crmeb@sha256:` digest of the image they are actually running. That digest — not the `edge` tag string — is the recovery target, because `edge` moves and restoring the string would start whatever `edge` points to at that moment. It refuses to continue when a role has no recorded digest or when the roles disagree, and it will not change the deployment for a recovery target that is not available locally. Keep the previous image on the host until acceptance is finished.
+
+After fixing the issue, resume tracking the tested master release with `bash deploy/production/rollback.sh --edge`. The script checks the new containers and restores the captured digest if their health check fails. Database changes are never rolled back by replacing containers; restore data only using a separately verified database recovery procedure. Image rollback and database recovery are separate operations and the script reports them separately.
 
 The retired `migrate-all-in-one.sh` intentionally exits without changing services. Do not repeat a migration or run `docker compose down -v` in production.

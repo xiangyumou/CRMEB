@@ -154,7 +154,11 @@ const RETAINED_MENU_REPARENT = [
 const PROTECTED_TABLES = [
     'store_product', 'store_product_attr', 'store_product_attr_value',
     'store_product_attr_result', 'store_product_description', 'store_category',
-    'system_attachment', 'store_order', 'store_order_cart_info', 'user',
+    // The rows the shop keeps selling with: orders and their items, the coupons
+    // customers hold, and the accounts that own them (whose money columns live
+    // in the user row). All of them are only hashed here, never rewritten.
+    'system_attachment', 'store_order', 'store_order_cart_info', 'store_order_status',
+    'store_coupon_user', 'store_coupon_issue_user', 'user',
 ];
 
 /** Rows living inside shared tables that belong to retired features. */
@@ -245,6 +249,33 @@ function tableExistsRaw(string $full): bool
 function tableExists(string $table): bool
 {
     return tableExistsRaw(tableName($table));
+}
+
+/**
+ * The retired tables this run would rename, in the order apply would walk them.
+ * A source table is only a candidate while the original name still exists.
+ */
+function plannedRenames(): array
+{
+    $renamed = [];
+    foreach (RETIRED_TABLES as $table) {
+        if (tableExists($table)) $renamed[] = $table;
+    }
+    return $renamed;
+}
+
+/**
+ * Tables where both names exist. A RENAME would fail there, and it would fail
+ * after the settings were already committed unless this is asked first. The
+ * database is left exactly as it was either way.
+ */
+function renameConflicts(): array
+{
+    $conflicts = [];
+    foreach (RETIRED_TABLES as $table) {
+        if (tableExists($table) && tableExistsRaw(retiredTableName($table))) $conflicts[] = $table;
+    }
+    return $conflicts;
 }
 
 function configNameMatches(string $name): bool
@@ -686,6 +717,289 @@ function writeBackup(string $path, array $payload): void
     if (!rename($temp, $path)) throw new RuntimeException('Backup rename failed.');
 }
 
+/**
+ * Every row this migration plans to change, built from the database as it
+ * is right now. plan and apply both call this, so the plan a run reports is
+ * the plan apply will attempt: the same added ids, the same tabs, the same
+ * roaming of retained settings off a retired tab and the same renames. It
+ * only reads and only stages rows in memory, so calling it costs nothing
+ * and a refusal it raises leaves the database untouched.
+ */
+function planRowChanges(array &$changes, array &$renamed): void
+{
+if (tableExists('system_menus')) {
+    $menus = Db::name('system_menus')->lock(true)->select()->toArray();
+    $menuPlan = menuRemovalPlan($menus);
+}
+
+// Settings the retained code reads are created before anything is dropped, so
+// an upgrade reaches the same schema a fresh install ships. Every rule here
+// only plans rows in memory: the database still knows nothing about a row
+// this run adds, so the later rules have to read the planned state instead.
+$configRows = tableExists('system_config') ? Db::name('system_config')->lock(true)->select()->toArray() : [];
+$dbConfigByName = [];
+foreach ($configRows as $row) $dbConfigByName[(string)$row['menu_name']] = $row;
+$plannedIds = [];
+$requiredTabIds = requiredConfigTabIds([]);
+if (tableExists('system_config_tab')) {
+    // One id per added row, handed out in order. Reading MAX(id) again inside
+    // the loop would give every row of a single run the same key, and
+    // recordChange() merges same-key rows, so the extra ones would vanish.
+    $nextTabId = (int)Db::name('system_config_tab')->lock(true)->max('id') + 1;
+    foreach (REQUIRED_CONFIG_TABS as $engTitle => [$pid, $title, $type, $sort, $menusId]) {
+        if (isset($requiredTabIds[$engTitle])) continue;
+        $template = Db::name('system_config_tab')->order('id')->find();
+        if (!$template) throw new RuntimeException('system_config_tab is empty; cannot add the retained tabs.');
+        claimPlannedId($plannedIds, 'system_config_tab', $nextTabId);
+        $row = array_merge($template, [
+            'id' => $nextTabId++,
+            'pid' => $pid, 'title' => $title, 'eng_title' => $engTitle, 'status' => 1,
+            'icon' => '', 'type' => $type, 'sort' => $sort, 'menus_id' => $menusId,
+        ]);
+        recordChange($changes, 'system_config_tab', (int)$row['id'], null, $row);
+    }
+}
+// The tabs planned above count as existing for every rule below.
+$requiredTabIds = requiredConfigTabIds($changes);
+if (tableExists('system_config')) {
+    $nextConfigId = (int)Db::name('system_config')->lock(true)->max('id') + 1;
+    foreach (REQUIRED_CONFIG as $name => $definition) {
+        $existing = $dbConfigByName[$name] ?? null;
+        if ($existing) {
+            // An older shop may hold the row on a tab that is going away (or
+            // on none at all); the form only renders it from a live tab.
+            $currentTab = (int)$existing['config_tab_id'];
+            $tabIsRetired = in_array($currentTab, RETIRED_CONFIG_TABS, true)
+                || !Db::name('system_config_tab')->where('id', $currentTab)->count();
+            if (!$tabIsRetired) continue;
+        }
+        $tabId = requiredConfigTabId($definition, $requiredTabIds);
+        if ($tabId === null) {
+            throw new RuntimeException(
+                "No live tab is available for the retained setting {$name}; nothing was changed."
+            );
+        }
+        if ($existing) {
+            $next = $existing;
+            // The row describes a control the form builder renders: take the
+            // shipped shape so an upgraded shop matches a fresh install. The
+            // value, status and sort belong to the operator and are preserved.
+            foreach ([
+                'type' => $definition['type'], 'input_type' => $definition['input_type'],
+                'upload_type' => $definition['upload_type'], 'required' => $definition['required'],
+                'parameter' => $definition['parameter'],
+                'width' => $definition['width'], 'high' => $definition['high'],
+                'info' => $definition['info'], 'desc' => $definition['desc'],
+                'config_tab_id' => $tabId,
+            ] as $field => $value) {
+                $next[$field] = $value;
+            }
+            $next['link_id'] = 0;
+            $next['link_value'] = 0;
+            recordChange($changes, 'system_config', (int)$existing['id'], $existing, $next);
+            continue;
+        }
+        $template = Db::name('system_config')->order('id')->find();
+        if (!$template) throw new RuntimeException('system_config is empty; cannot add the retained settings.');
+        claimPlannedId($plannedIds, 'system_config', $nextConfigId);
+        $row = array_merge($template, [
+            'id' => $nextConfigId++,
+            'menu_name' => $name, 'type' => $definition['type'], 'input_type' => $definition['input_type'],
+            'config_tab_id' => $tabId, 'parameter' => $definition['parameter'],
+            'upload_type' => $definition['upload_type'], 'required' => $definition['required'],
+            'width' => $definition['width'], 'high' => $definition['high'],
+            'value' => $definition['value'], 'info' => $definition['info'],
+            'desc' => $definition['desc'], 'sort' => $definition['sort'], 'status' => 1,
+            'level' => 0, 'link_id' => 0, 'link_value' => 0,
+        ]);
+        recordChange($changes, 'system_config', (int)$row['id'], null, $row);
+    }
+}
+
+// The retired chat held the order roster: carry its members over to the
+// retained setting, merging with whatever is configured there already. Read
+// the planned state: on a shop that never had the setting it is a row this
+// run just added, and the database still knows nothing about it.
+$rosterUids = inheritedRosterUids();
+if ($rosterUids && tableExists('system_config')) {
+    $existing = effectiveRows($changes, 'system_config', $configRows, 'menu_name')['order_notice_admin_uids'] ?? null;
+    if ($existing) {
+        $raw = trim((string)$existing['value'], '"');
+        $configured = array_values(array_filter(array_map('intval', $raw === '' ? [] : explode(',', $raw))));
+        $merged = array_values(array_unique(array_merge($configured, $rosterUids)));
+        if ($merged !== $configured) {
+            $next = $existing;
+            $next['value'] = json_encode(implode(',', $merged));
+            // The row may be one this run added: it then has no database
+            // image to keep, and null says exactly that.
+            recordChange(
+                $changes,
+                'system_config',
+                (int)$existing['id'],
+                $dbConfigByName['order_notice_admin_uids'] ?? null,
+                $next
+            );
+        }
+    }
+}
+
+if (tableExists('system_config')) {
+    $plannedConfigs = effectiveRows($changes, 'system_config', $configRows, 'menu_name');
+    foreach ($configRows as $row) {
+        $name = (string)$row['menu_name'];
+        // Decide from the planned state: a retained setting the rules above
+        // already moved onto a live tab is not retired, whatever tab it came
+        // from, and deleting it here would undo that move.
+        $planned = $plannedConfigs[$name] ?? null;
+        $tabId = (int)($planned['config_tab_id'] ?? $row['config_tab_id']);
+        if (!configNameMatches($name) && !in_array($tabId, RETIRED_CONFIG_TABS, true)) continue;
+        recordChange($changes, 'system_config', (int)$row['id'], $row, null);
+    }
+}
+if (tableExists('system_config_tab')) {
+    foreach (Db::name('system_config_tab')->whereIn('id', RETIRED_CONFIG_TABS)->lock(true)->select()->toArray() as $row) {
+        recordChange($changes, 'system_config_tab', (int)$row['id'], $row, null);
+    }
+}
+if (tableExists('system_timer')) {
+    foreach (Db::name('system_timer')->lock(true)->select()->toArray() as $row) {
+        if (!in_array((string)$row['mark'], RETIRED_TIMER_MARKS, true)) continue;
+        recordChange($changes, 'system_timer', (int)$row['id'], $row, null);
+    }
+}
+if (tableExists('system_notification')) {
+    foreach (Db::name('system_notification')->whereIn('mark', RETIRED_NOTIFICATION_MARKS)->lock(true)->select()->toArray() as $row) {
+        recordChange($changes, 'system_notification', (int)$row['id'], $row, null);
+    }
+}
+if (tableExists('system_event_data')) {
+    foreach (Db::name('system_event_data')->whereIn('value', RETIRED_EVENT_VALUES)->lock(true)->select()->toArray() as $row) {
+        recordChange($changes, 'system_event_data', (int)$row['id'], $row, null);
+    }
+}
+if (tableExists('system_group_data') && tableExists('system_group')) {
+    $gids = Db::name('system_group')->whereIn('config_name', RETIRED_GROUP_DATA)->column('id');
+    if ($gids) {
+        foreach (Db::name('system_group_data')->whereIn('gid', $gids)->lock(true)->select()->toArray() as $row) {
+            recordChange($changes, 'system_group_data', (int)$row['id'], $row, null);
+        }
+    }
+    // Saved personal-center menus keep entries whose page no longer exists.
+    $removedPages = json_decode((string)@file_get_contents(dirname(__DIR__, 2) . '/config/core_store_removed_pages.json'), true) ?: [];
+    $menuGroupId = (int)Db::name('system_group')->where('config_name', RETAINED_MENU_GROUP)->value('id');
+    if ($menuGroupId && $removedPages) {
+        foreach (Db::name('system_group_data')->where('gid', $menuGroupId)->lock(true)->select()->toArray() as $row) {
+            $value = json_decode((string)$row['value'], true);
+            $url = ltrim((string)($value['url']['value'] ?? ''), '/');
+            if ($url === '' || !in_array($url, $removedPages, true)) continue;
+            recordChange($changes, 'system_group_data', (int)$row['id'], $row, null);
+        }
+    }
+}
+if (tableExists('system_group')) {
+    foreach (Db::name('system_group')->whereIn('config_name', RETIRED_GROUP_DATA)->lock(true)->select()->toArray() as $row) {
+        recordChange($changes, 'system_group', (int)$row['id'], $row, null);
+    }
+}
+if (tableExists('system_menus')) {
+    $menusById = [];
+    foreach ($menus as $menu) {
+        $menusById[(int)$menu['id']] = $menu;
+    }
+    // Menus a fresh install ships that this database never had; the sidebar
+    // would otherwise hide features that are present and working.
+    $byName = [];
+    $byPath = [];
+    foreach ($menus as $menu) {
+        $byName[(string)$menu['menu_name']] = $menu;
+        if ((string)$menu['menu_path'] !== '') {
+            $byPath['/' . ltrim((string)$menu['menu_path'], '/')] = $menu;
+        }
+    }
+    $nextId = (int)Db::name('system_menus')->lock(true)->max('id') + 1;
+    foreach (REQUIRED_MENUS as $name => $definition) {
+        if (isset($byName[$name])) continue;
+        [$menuPath, $parentKey, $controller, $action, $sort, $authType, $header, $isHeader, $uniqueAuth, $mark] = $definition;
+        if (strpos($parentKey, '/') === 0) {
+            $parent = $byPath[$parentKey] ?? null;
+        } else {
+            $parent = $byName[$parentKey] ?? null;
+        }
+        $pid = $parent ? (int)$parent['id'] : 0;
+        $template = $parent ?: Db::name('system_menus')->order('id')->find();
+        if (!$template) throw new RuntimeException('system_menus is empty; cannot add the retained menus.');
+        $row = array_merge($template, [
+            'id' => $nextId++, 'pid' => $pid, 'icon' => '', 'menu_name' => $name, 'module' => 'admin',
+            'controller' => $controller, 'action' => $action, 'api_url' => '', 'methods' => '',
+            'params' => '[]', 'sort' => $sort, 'is_show' => 1, 'is_show_path' => 1, 'access' => 1,
+            'menu_path' => $menuPath,
+            'path' => $parent ? ((string)$parent['path'] === '' ? (string)$parent['id'] : $parent['path'] . '/' . $parent['id']) : '',
+            'auth_type' => $authType, 'header' => $header, 'is_header' => $isHeader,
+            'unique_auth' => $uniqueAuth, 'is_del' => 0, 'mark' => $mark,
+        ]);
+        recordChange($changes, 'system_menus', (int)$row['id'], null, $row);
+        $byName[$name] = $row;
+        if ($menuPath !== '' && $menuPath !== '/') $byPath[$menuPath] = $row;
+    }
+}
+if ($menusById) {
+    foreach ($menuPlan['remove'] as $id) {
+        if (!isset($menusById[$id])) continue;
+        $row = $menusById[$id];
+        recordChange($changes, 'system_menus', (int)$row['id'], $row, null);
+    }
+    // The customer-service page keeps its menu, but the tab it opened was
+    // recreated under a new id, so the embedded path has to follow.
+    $kefuTabId = $requiredTabIds['kefu_config'] ?? null;
+    foreach ($menusById as $id => $row) {
+        if (isset($menuPlan['remove'][$id]) || !$kefuTabId) continue;
+        if (strpos('/' . ltrim((string)$row['menu_path'], '/'), '/setting/kefu_config') !== 0) continue;
+        $next = $row;
+        $next['menu_path'] = '/setting/kefu_config/2/' . $kefuTabId;
+        recordChange($changes, 'system_menus', (int)$row['id'], $row, $next);
+    }
+    foreach ($menuPlan['reparent'] as $id => $pid) {
+        if (!isset($menusById[$id])) continue;
+        $row = $menusById[$id];
+        if ((int)$row['pid'] === (int)$pid) continue;
+        $next = $row;
+        $next['pid'] = $pid;
+        recordChange($changes, 'system_menus', (int)$row['id'], $row, $next);
+    }
+}
+
+// Retired components may still be embedded in saved layouts; clean them in place.
+if (tableExists('diy')) {
+    foreach (Db::name('diy')->lock(true)->select()->toArray() as $row) {
+        $next = $row;
+        foreach (['value', 'default_value'] as $field) {
+            $value = json_decode($row[$field] ?? '', true);
+            if (!is_array($value)) continue;
+            $cleaned = \app\services\CoreStore::cleanDiy($value);
+            if ($cleaned !== $value) $next[$field] = json_encode($cleaned, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+        if ($next != $row) recordChange($changes, 'diy', (int)$row['id'], $row, $next);
+    }
+}
+if (tableExists('theme')) {
+    foreach (Db::name('theme')->lock(true)->select()->toArray() as $row) {
+        $next = $row;
+        foreach ($row as $field => $encoded) {
+            if (substr($field, -5) !== '_data') continue;
+            $value = json_decode($encoded ?? '', true);
+            if (!is_array($value)) continue;
+            $cleaned = \app\services\CoreStore::cleanDiy($value);
+            if ($cleaned !== $value) $next[$field] = json_encode($cleaned, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+        if ($next != $row) recordChange($changes, 'theme', (int)$row['id'], $row, $next);
+    }
+}
+
+foreach (plannedRenames() as $table) {
+    $renamed[] = $table;
+}
+}
+
 $mode = $argv[1] ?? 'plan';
 $options = array_slice($argv, 2);
 $flags = [];
@@ -948,6 +1262,35 @@ try {
     }
 
     if ($mode === 'plan') {
+        // Build the plan apply would build, through the same builder and the
+        // same refusals, so a plan that prints is a plan apply can carry out.
+        // Nothing here writes: a refusal costs the shop nothing.
+        $planned = [];
+        $plannedRenames = [];
+        $planError = '';
+        try {
+            planRowChanges($planned, $plannedRenames);
+            $planned = array_values(array_filter($planned, function ($change) {
+                return $change['before'] != $change['after'];
+            }));
+            assertPlanKeepsSettingsUsable($planned);
+            $conflicts = renameConflicts();
+            if ($conflicts) {
+                $planError = 'both the original table and its retired name exist for: ' . implode(', ', $conflicts);
+            }
+        } catch (Throwable $planFailure) {
+            $planError = $planFailure->getMessage();
+        }
+        $byTable = [];
+        foreach ($planned as $change) {
+            $byTable[$change['table']] = ($byTable[$change['table']] ?? 0) + 1;
+        }
+        ksort($byTable);
+        $report['planned_rows'] = count($planned);
+        $report['planned_rows_by_table'] = $byTable;
+        $report['planned_renames'] = $plannedRenames;
+        $report['apply_ready'] = $planError === '' && !$pending;
+        if ($planError !== '') $report['apply_blocked_by'] = $planError;
         echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n";
         if ($retiredTimers) {
             fwrite(STDERR, "Timers removed by apply: " . implode(', ', array_unique(array_values($retiredTimers))) . "\n");
@@ -962,6 +1305,10 @@ try {
         if (array_sum(array_map('intval', $stranded)) > 0) {
             fwrite(STDERR, "Note: unreachable balances exist; export them before apply for offline compensation.\n");
         }
+        if ($planError !== '') {
+            fwrite(STDERR, "apply would be refused: {$planError}\n");
+            exit(2);
+        }
         exit;
     }
 
@@ -969,280 +1316,30 @@ try {
         throw new RuntimeException("Pending settlement blocks apply:\n- " . implode("\n- ", $pending));
     }
 
+    // Both names in one database means the renames cannot all run. Asked here,
+    // before the transaction, so the refusal leaves the settings as they were
+    // instead of committing them and failing on the first RENAME.
+    $conflicts = renameConflicts();
+    if ($conflicts) {
+        throw new RuntimeException(
+            "Both the original table and its retired name exist for: " . implode(', ', $conflicts)
+            . ". Nothing was changed; drop or rename the unexpected table first."
+        );
+    }
+
     Db::startTrans();
     $fingerprint = protectedFingerprint();
     $changes = [];
     $renamed = [];
-    if (tableExists('system_menus')) {
-        $menus = Db::name('system_menus')->lock(true)->select()->toArray();
-        $menuPlan = menuRemovalPlan($menus);
-    }
-
-    // Settings the retained code reads are created before anything is dropped, so
-    // an upgrade reaches the same schema a fresh install ships. Every rule here
-    // only plans rows in memory: the database still knows nothing about a row
-    // this run adds, so the later rules have to read the planned state instead.
-    $configRows = tableExists('system_config') ? Db::name('system_config')->lock(true)->select()->toArray() : [];
-    $dbConfigByName = [];
-    foreach ($configRows as $row) $dbConfigByName[(string)$row['menu_name']] = $row;
-    $plannedIds = [];
-    $requiredTabIds = requiredConfigTabIds([]);
-    if (tableExists('system_config_tab')) {
-        // One id per added row, handed out in order. Reading MAX(id) again inside
-        // the loop would give every row of a single run the same key, and
-        // recordChange() merges same-key rows, so the extra ones would vanish.
-        $nextTabId = (int)Db::name('system_config_tab')->lock(true)->max('id') + 1;
-        foreach (REQUIRED_CONFIG_TABS as $engTitle => [$pid, $title, $type, $sort, $menusId]) {
-            if (isset($requiredTabIds[$engTitle])) continue;
-            $template = Db::name('system_config_tab')->order('id')->find();
-            if (!$template) throw new RuntimeException('system_config_tab is empty; cannot add the retained tabs.');
-            claimPlannedId($plannedIds, 'system_config_tab', $nextTabId);
-            $row = array_merge($template, [
-                'id' => $nextTabId++,
-                'pid' => $pid, 'title' => $title, 'eng_title' => $engTitle, 'status' => 1,
-                'icon' => '', 'type' => $type, 'sort' => $sort, 'menus_id' => $menusId,
-            ]);
-            recordChange($changes, 'system_config_tab', (int)$row['id'], null, $row);
-        }
-    }
-    // The tabs planned above count as existing for every rule below.
-    $requiredTabIds = requiredConfigTabIds($changes);
-    if (tableExists('system_config')) {
-        $nextConfigId = (int)Db::name('system_config')->lock(true)->max('id') + 1;
-        foreach (REQUIRED_CONFIG as $name => $definition) {
-            $existing = $dbConfigByName[$name] ?? null;
-            if ($existing) {
-                // An older shop may hold the row on a tab that is going away (or
-                // on none at all); the form only renders it from a live tab.
-                $currentTab = (int)$existing['config_tab_id'];
-                $tabIsRetired = in_array($currentTab, RETIRED_CONFIG_TABS, true)
-                    || !Db::name('system_config_tab')->where('id', $currentTab)->count();
-                if (!$tabIsRetired) continue;
-            }
-            $tabId = requiredConfigTabId($definition, $requiredTabIds);
-            if ($tabId === null) {
-                throw new RuntimeException(
-                    "No live tab is available for the retained setting {$name}; nothing was changed."
-                );
-            }
-            if ($existing) {
-                $next = $existing;
-                // The row describes a control the form builder renders: take the
-                // shipped shape so an upgraded shop matches a fresh install. The
-                // value, status and sort belong to the operator and are preserved.
-                foreach ([
-                    'type' => $definition['type'], 'input_type' => $definition['input_type'],
-                    'upload_type' => $definition['upload_type'], 'required' => $definition['required'],
-                    'parameter' => $definition['parameter'],
-                    'width' => $definition['width'], 'high' => $definition['high'],
-                    'info' => $definition['info'], 'desc' => $definition['desc'],
-                    'config_tab_id' => $tabId,
-                ] as $field => $value) {
-                    $next[$field] = $value;
-                }
-                $next['link_id'] = 0;
-                $next['link_value'] = 0;
-                recordChange($changes, 'system_config', (int)$existing['id'], $existing, $next);
-                continue;
-            }
-            $template = Db::name('system_config')->order('id')->find();
-            if (!$template) throw new RuntimeException('system_config is empty; cannot add the retained settings.');
-            claimPlannedId($plannedIds, 'system_config', $nextConfigId);
-            $row = array_merge($template, [
-                'id' => $nextConfigId++,
-                'menu_name' => $name, 'type' => $definition['type'], 'input_type' => $definition['input_type'],
-                'config_tab_id' => $tabId, 'parameter' => $definition['parameter'],
-                'upload_type' => $definition['upload_type'], 'required' => $definition['required'],
-                'width' => $definition['width'], 'high' => $definition['high'],
-                'value' => $definition['value'], 'info' => $definition['info'],
-                'desc' => $definition['desc'], 'sort' => $definition['sort'], 'status' => 1,
-                'level' => 0, 'link_id' => 0, 'link_value' => 0,
-            ]);
-            recordChange($changes, 'system_config', (int)$row['id'], null, $row);
-        }
-    }
-
-    // The retired chat held the order roster: carry its members over to the
-    // retained setting, merging with whatever is configured there already. Read
-    // the planned state: on a shop that never had the setting it is a row this
-    // run just added, and the database still knows nothing about it.
-    $rosterUids = inheritedRosterUids();
-    if ($rosterUids && tableExists('system_config')) {
-        $existing = effectiveRows($changes, 'system_config', $configRows, 'menu_name')['order_notice_admin_uids'] ?? null;
-        if ($existing) {
-            $raw = trim((string)$existing['value'], '"');
-            $configured = array_values(array_filter(array_map('intval', $raw === '' ? [] : explode(',', $raw))));
-            $merged = array_values(array_unique(array_merge($configured, $rosterUids)));
-            if ($merged !== $configured) {
-                $next = $existing;
-                $next['value'] = json_encode(implode(',', $merged));
-                // The row may be one this run added: it then has no database
-                // image to keep, and null says exactly that.
-                recordChange(
-                    $changes,
-                    'system_config',
-                    (int)$existing['id'],
-                    $dbConfigByName['order_notice_admin_uids'] ?? null,
-                    $next
-                );
-            }
-        }
-    }
-
-    if (tableExists('system_config')) {
-        $plannedConfigs = effectiveRows($changes, 'system_config', $configRows, 'menu_name');
-        foreach ($configRows as $row) {
-            $name = (string)$row['menu_name'];
-            // Decide from the planned state: a retained setting the rules above
-            // already moved onto a live tab is not retired, whatever tab it came
-            // from, and deleting it here would undo that move.
-            $planned = $plannedConfigs[$name] ?? null;
-            $tabId = (int)($planned['config_tab_id'] ?? $row['config_tab_id']);
-            if (!configNameMatches($name) && !in_array($tabId, RETIRED_CONFIG_TABS, true)) continue;
-            recordChange($changes, 'system_config', (int)$row['id'], $row, null);
-        }
-    }
-    if (tableExists('system_config_tab')) {
-        foreach (Db::name('system_config_tab')->whereIn('id', RETIRED_CONFIG_TABS)->lock(true)->select()->toArray() as $row) {
-            recordChange($changes, 'system_config_tab', (int)$row['id'], $row, null);
-        }
-    }
-    if (tableExists('system_timer')) {
-        foreach (Db::name('system_timer')->lock(true)->select()->toArray() as $row) {
-            if (!in_array((string)$row['mark'], RETIRED_TIMER_MARKS, true)) continue;
-            recordChange($changes, 'system_timer', (int)$row['id'], $row, null);
-        }
-    }
-    if (tableExists('system_notification')) {
-        foreach (Db::name('system_notification')->whereIn('mark', RETIRED_NOTIFICATION_MARKS)->lock(true)->select()->toArray() as $row) {
-            recordChange($changes, 'system_notification', (int)$row['id'], $row, null);
-        }
-    }
-    if (tableExists('system_event_data')) {
-        foreach (Db::name('system_event_data')->whereIn('value', RETIRED_EVENT_VALUES)->lock(true)->select()->toArray() as $row) {
-            recordChange($changes, 'system_event_data', (int)$row['id'], $row, null);
-        }
-    }
-    if (tableExists('system_group_data') && tableExists('system_group')) {
-        $gids = Db::name('system_group')->whereIn('config_name', RETIRED_GROUP_DATA)->column('id');
-        if ($gids) {
-            foreach (Db::name('system_group_data')->whereIn('gid', $gids)->lock(true)->select()->toArray() as $row) {
-                recordChange($changes, 'system_group_data', (int)$row['id'], $row, null);
-            }
-        }
-        // Saved personal-center menus keep entries whose page no longer exists.
-        $removedPages = json_decode((string)@file_get_contents(dirname(__DIR__, 2) . '/config/core_store_removed_pages.json'), true) ?: [];
-        $menuGroupId = (int)Db::name('system_group')->where('config_name', RETAINED_MENU_GROUP)->value('id');
-        if ($menuGroupId && $removedPages) {
-            foreach (Db::name('system_group_data')->where('gid', $menuGroupId)->lock(true)->select()->toArray() as $row) {
-                $value = json_decode((string)$row['value'], true);
-                $url = ltrim((string)($value['url']['value'] ?? ''), '/');
-                if ($url === '' || !in_array($url, $removedPages, true)) continue;
-                recordChange($changes, 'system_group_data', (int)$row['id'], $row, null);
-            }
-        }
-    }
-    if (tableExists('system_group')) {
-        foreach (Db::name('system_group')->whereIn('config_name', RETIRED_GROUP_DATA)->lock(true)->select()->toArray() as $row) {
-            recordChange($changes, 'system_group', (int)$row['id'], $row, null);
-        }
-    }
-    if (tableExists('system_menus')) {
-        $menusById = [];
-        foreach ($menus as $menu) {
-            $menusById[(int)$menu['id']] = $menu;
-        }
-        // Menus a fresh install ships that this database never had; the sidebar
-        // would otherwise hide features that are present and working.
-        $byName = [];
-        $byPath = [];
-        foreach ($menus as $menu) {
-            $byName[(string)$menu['menu_name']] = $menu;
-            if ((string)$menu['menu_path'] !== '') {
-                $byPath['/' . ltrim((string)$menu['menu_path'], '/')] = $menu;
-            }
-        }
-        $nextId = (int)Db::name('system_menus')->lock(true)->max('id') + 1;
-        foreach (REQUIRED_MENUS as $name => $definition) {
-            if (isset($byName[$name])) continue;
-            [$menuPath, $parentKey, $controller, $action, $sort, $authType, $header, $isHeader, $uniqueAuth, $mark] = $definition;
-            if (strpos($parentKey, '/') === 0) {
-                $parent = $byPath[$parentKey] ?? null;
-            } else {
-                $parent = $byName[$parentKey] ?? null;
-            }
-            $pid = $parent ? (int)$parent['id'] : 0;
-            $template = $parent ?: Db::name('system_menus')->order('id')->find();
-            if (!$template) throw new RuntimeException('system_menus is empty; cannot add the retained menus.');
-            $row = array_merge($template, [
-                'id' => $nextId++, 'pid' => $pid, 'icon' => '', 'menu_name' => $name, 'module' => 'admin',
-                'controller' => $controller, 'action' => $action, 'api_url' => '', 'methods' => '',
-                'params' => '[]', 'sort' => $sort, 'is_show' => 1, 'is_show_path' => 1, 'access' => 1,
-                'menu_path' => $menuPath,
-                'path' => $parent ? ((string)$parent['path'] === '' ? (string)$parent['id'] : $parent['path'] . '/' . $parent['id']) : '',
-                'auth_type' => $authType, 'header' => $header, 'is_header' => $isHeader,
-                'unique_auth' => $uniqueAuth, 'is_del' => 0, 'mark' => $mark,
-            ]);
-            recordChange($changes, 'system_menus', (int)$row['id'], null, $row);
-            $byName[$name] = $row;
-            if ($menuPath !== '' && $menuPath !== '/') $byPath[$menuPath] = $row;
-        }
-    }
-    if ($menusById) {
-        foreach ($menuPlan['remove'] as $id) {
-            if (!isset($menusById[$id])) continue;
-            $row = $menusById[$id];
-            recordChange($changes, 'system_menus', (int)$row['id'], $row, null);
-        }
-        // The customer-service page keeps its menu, but the tab it opened was
-        // recreated under a new id, so the embedded path has to follow.
-        $kefuTabId = $requiredTabIds['kefu_config'] ?? null;
-        foreach ($menusById as $id => $row) {
-            if (isset($menuPlan['remove'][$id]) || !$kefuTabId) continue;
-            if (strpos('/' . ltrim((string)$row['menu_path'], '/'), '/setting/kefu_config') !== 0) continue;
-            $next = $row;
-            $next['menu_path'] = '/setting/kefu_config/2/' . $kefuTabId;
-            recordChange($changes, 'system_menus', (int)$row['id'], $row, $next);
-        }
-        foreach ($menuPlan['reparent'] as $id => $pid) {
-            if (!isset($menusById[$id])) continue;
-            $row = $menusById[$id];
-            if ((int)$row['pid'] === (int)$pid) continue;
-            $next = $row;
-            $next['pid'] = $pid;
-            recordChange($changes, 'system_menus', (int)$row['id'], $row, $next);
-        }
-    }
-
-    // Retired components may still be embedded in saved layouts; clean them in place.
-    if (tableExists('diy')) {
-        foreach (Db::name('diy')->lock(true)->select()->toArray() as $row) {
-            $next = $row;
-            foreach (['value', 'default_value'] as $field) {
-                $value = json_decode($row[$field] ?? '', true);
-                if (!is_array($value)) continue;
-                $cleaned = \app\services\CoreStore::cleanDiy($value);
-                if ($cleaned !== $value) $next[$field] = json_encode($cleaned, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            }
-            if ($next != $row) recordChange($changes, 'diy', (int)$row['id'], $row, $next);
-        }
-    }
-    if (tableExists('theme')) {
-        foreach (Db::name('theme')->lock(true)->select()->toArray() as $row) {
-            $next = $row;
-            foreach ($row as $field => $encoded) {
-                if (substr($field, -5) !== '_data') continue;
-                $value = json_decode($encoded ?? '', true);
-                if (!is_array($value)) continue;
-                $cleaned = \app\services\CoreStore::cleanDiy($value);
-                if ($cleaned !== $value) $next[$field] = json_encode($cleaned, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            }
-            if ($next != $row) recordChange($changes, 'theme', (int)$row['id'], $row, $next);
-        }
-    }
-
-    foreach (RETIRED_TABLES as $table) {
-        if (tableExists($table)) $renamed[] = $table;
+    planRowChanges($changes, $renamed);
+    // Another session may have created a retired name while this run planned.
+    // Asked again inside the transaction, so the refusal rolls back cleanly.
+    $conflicts = renameConflicts();
+    if ($conflicts) {
+        throw new RuntimeException(
+            "Both the original table and its retired name exist for: " . implode(', ', $conflicts)
+            . ". Nothing was changed."
+        );
     }
     $changes = array_values(array_filter($changes, function ($change) {
         return $change['before'] != $change['after'];

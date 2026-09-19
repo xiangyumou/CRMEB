@@ -193,8 +193,8 @@ class RefundOrder extends AuthController
             //修改订单退款状态
 //            $data['refund_price'] = $data['refunded_price'];
             unset($data['refund_price']);
-            if ($this->services->agreeRefund($id, $refund_data)) {
-                $this->services->update($id, $data);
+            //收尾状态由服务在同一个事务里提交，控制器不再单独更新
+            if ($this->services->agreeRefund($id, $refund_data, $data)) {
                 return app('json')->success('退款成功');
             } else {
                 $this->services->storeProductOrderRefundYFasle((int)$id, $refund_price);

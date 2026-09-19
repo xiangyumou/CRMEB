@@ -13,6 +13,7 @@ namespace crmeb\services\workerman;
 
 
 use Channel\Client;
+use crmeb\utils\HealthHeartbeat;
 use Workerman\Connection\TcpConnection;
 use Workerman\Lib\Timer;
 use Workerman\Worker;
@@ -88,6 +89,9 @@ class WorkermanService
 
         ChannelService::connet();
 
+        // 容器健康心跳：证明长连接进程的事件循环仍在运行
+        HealthHeartbeat::write('workerman');
+
         Client::on('crmeb', function ($eventData) use ($worker) {
             if (!isset($eventData['type']) || !$eventData['type']) return;
             $ids = isset($eventData['ids']) && count($eventData['ids']) ? $eventData['ids'] : array_keys($this->user);
@@ -104,6 +108,10 @@ class WorkermanService
                     $this->response->connection($connection)->close('timeout');
                 }
             }
+        });
+
+        Timer::add(30, function () {
+            HealthHeartbeat::write('workerman');
         });
     }
 

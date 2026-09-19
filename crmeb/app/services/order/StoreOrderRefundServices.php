@@ -106,18 +106,32 @@ class StoreOrderRefundServices extends BaseServices
 
     /**
      * 同意退款：拆分退款单、退积分、佣金等
+     *
+     * 退款网关调用不能随数据库事务回滚，所以稳定退款单号和请求金额必须在调用前
+     * 单独落库：第一次尝试冻结 out_refund_no 与金额，之后无论本地事务是否回滚、
+     * 是否并发，重试都复用同一编号与同一金额。网关侧按 out_refund_no 幂等，
+     * 不会重复退款。
+     *
      * @param int $id
      * @param array $refundData
+     * @param array $completion 退款成功后要写入售后单的收尾字段（由服务统一提交）
      * @return bool
      * @throws \think\db\exception\DataNotFoundException
      * @throws \think\db\exception\DbException
      * @throws \think\db\exception\ModelNotFoundException
      */
-    public function agreeRefund(int $id, array $refundData)
+    public function agreeRefund(int $id, array $refundData, array $completion = [])
     {
-        $order = $this->transaction(function () use ($id, $refundData) {
+        //先把稳定退款单号和请求上下文冻结到售后单上（独立提交，不受后面回滚影响）
+        $freeze = $this->freezeRefundRequest($id, $refundData);
+        $refundData['refund_id'] = $freeze['out_refund_no'];
+        if ($freeze['refund_price'] !== null) {
+            $refundData['refund_price'] = $freeze['refund_price'];
+        }
+
+        $order = $this->transaction(function () use ($id, $refundData, $completion) {
             //退款拆分
-            $orderRefundInfo = $this->dao->get($id);
+            $orderRefundInfo = $this->dao->getForUpdate($id);
             if (!$orderRefundInfo) throw new AdminException('数据不存在');
             $cart_ids = [];
             if ($orderRefundInfo['cart_info']) {
@@ -163,10 +177,6 @@ class StoreOrderRefundServices extends BaseServices
 
             //退金额
             if ($refundData['refund_price'] > 0) {
-                if (!isset($refundData['refund_id']) || !$refundData['refund_id']) {
-                    mt_srand();
-                    $refundData['refund_id'] = $splitOrderInfo['order_id'] . rand(100, 999);
-                }
                 if ($splitOrderInfo['pid'] > 0) {//子订单
                     $refundOrder = $this->storeOrderServices->get((int)$splitOrderInfo['pid']);
                     $refundData['pay_price'] = $refundOrder['pay_price'];
@@ -236,6 +246,11 @@ class StoreOrderRefundServices extends BaseServices
                 $capitalFlowServices->setFlow($splitOrderInfo, 'refund');
             }
 
+            //退款收尾字段与本地变更一起提交，控制器不再单独更新状态
+            if ($completion) {
+                $this->dao->update($id, $completion);
+            }
+
             return $splitOrderInfo;
         });
         //处理开票
@@ -264,6 +279,71 @@ class StoreOrderRefundServices extends BaseServices
         ]]);
 
         return true;
+    }
+
+    /**
+     * 冻结一次退款的稳定单号与请求金额
+     *
+     * 退款单号取自售后单自身的售后单号（持久化且唯一），因此无论重试多少次
+     * 都是同一个值，微信侧按 out_refund_no 幂等，不会重复退款。金额只在首次
+     * 记录，之后重试一律沿用，避免网关受理后金额被改大。
+     *
+     * 这一步独立提交，不受 agreeRefund 主事务回滚影响；"网关已受理但本地回滚"
+     * 的重试因此能够复用同一编号与金额。
+     *
+     * @param int $id 售后单ID
+     * @param array $refundData
+     * @return array{out_refund_no:string,refund_price:float}
+     * @throws \think\db\exception\DbException
+     * @throws \think\db\exception\DataNotFoundException
+     * @throws \think\db\exception\ModelNotFoundException
+     */
+    protected function freezeRefundRequest(int $id, array $refundData): array
+    {
+        return $this->transaction(function () use ($id, $refundData) {
+            $orderRefundInfo = $this->dao->getForUpdate($id);
+            if (!$orderRefundInfo) throw new AdminException('数据不存在');
+            //已完成或状态不允许的售后单在锁内直接拒绝，避免并发与重试重复发起
+            if ((int)$orderRefundInfo['refund_type'] === 6) {
+                throw new AdminException('该售后单已完成退款，请勿重复操作');
+            }
+            if (!in_array((int)$orderRefundInfo['refund_type'], [1, 5], true)) {
+                throw new AdminException('售后订单状态不支持该操作');
+            }
+
+            $storedRequest = [];
+            if (!empty($orderRefundInfo['refund_request'])) {
+                $decoded = json_decode((string)$orderRefundInfo['refund_request'], true);
+                if (is_array($decoded)) $storedRequest = $decoded;
+            }
+
+            $outRefundNo = trim((string)$orderRefundInfo['out_refund_no']);
+            if ($outRefundNo === '') {
+                //售后单号持久化且唯一，用它做退款单号天然可重放
+                $outRefundNo = (string)$orderRefundInfo['order_id'];
+            }
+
+            //金额一旦冻结就不再接受新值，保证"网关受理后本地回滚"重试时金额不变
+            $refundPrice = array_key_exists('refund_price', $storedRequest)
+                ? (float)$storedRequest['refund_price']
+                : (float)($refundData['refund_price'] ?? 0);
+
+            if (empty($storedRequest)) {
+                $this->dao->update($id, [
+                    'out_refund_no' => $outRefundNo,
+                    'refund_request' => json_encode([
+                        'refund_price' => $refundPrice,
+                        'pay_price' => (string)($refundData['pay_price'] ?? ''),
+                        'order_id' => (string)($refundData['order_id'] ?? ''),
+                        'frozen_time' => time(),
+                    ], JSON_UNESCAPED_UNICODE),
+                ]);
+            } elseif (trim((string)$orderRefundInfo['out_refund_no']) === '') {
+                $this->dao->update($id, ['out_refund_no' => $outRefundNo]);
+            }
+
+            return ['out_refund_no' => $outRefundNo, 'refund_price' => $refundPrice];
+        });
     }
 
     /**
@@ -336,9 +416,10 @@ class StoreOrderRefundServices extends BaseServices
 
             //退金额
             if ($refundData['refund_price'] > 0) {
+                //退款单号必须跨重试稳定：优先用调用方给出的持久化单号，
+                //没有再退回该订单已落库的商户订单号，不再使用随机数。
                 if (!isset($refundData['refund_id']) || !$refundData['refund_id']) {
-                    mt_srand();
-                    $refundData['refund_id'] = $order['order_id'] . rand(100, 999);
+                    $refundData['refund_id'] = (string)$order['order_id'];
                 }
                 if ($order['pid'] > 0) {//子订单
                     $refundOrder = $this->storeOrderServices->get((int)$order['pid']);
@@ -352,10 +433,14 @@ class StoreOrderRefundServices extends BaseServices
                     $no = $refundOrder['trade_no'];
                     $refundData['type'] = 'trade_no';
                 }
+                //必须跟随系统选择的微信支付版本，不能落到默认驱动
+                $drivers = sys_config('pay_wechat_type') ? 'v3_wechat_pay' : 'wechat_pay';
                 /** @var Pay $pay */
-                $pay = app()->make(Pay::class);
+                $pay = app()->make(Pay::class, [$drivers]);
                 if ($refundOrder['is_channel'] == 1) {
                     //小程序退款
+                    $refundData['trade_no'] = $refundOrder['trade_no'];
+                    $refundData['pay_new_weixin_open'] = sys_config('pay_new_weixin_open');
                     $pay->refund($no, $refundData);//小程序
                 } else {
                     //微信公众号退款

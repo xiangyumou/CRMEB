@@ -264,10 +264,10 @@ A review of the unpushed deletion batch against the paths it kept — the paymen
 selector, presale stock, the migration plan and the coupon entry points — found
 eight defects the green gate could not see, because the guards match identifiers
 and the suite had no fixture that used those paths. Only the settings defect came
-in with the deletion; the presale and historical-order faults predate it. All
-A ninth site surfaced while the coupon fix was being written: the DIY
-`theme/coupon` component still listed the retired member rows. All of them are
-fixed on this branch and each fix has a case in `tests/regression/cases.md`.
+in with the deletion; the presale and historical-order faults predate it. A ninth
+site surfaced while the coupon fix was being written: the DIY `theme/coupon`
+component still listed the retired member rows. All of them are fixed on this
+branch and each fix has a case in `tests/regression/cases.md`.
 
 - **WeChat version selector.** `pay_wechat_type` sat in the migration's retired
   setting list and was gone from the install SQL, although `PayServices::pay()`,
@@ -331,3 +331,99 @@ those remain release steps. The image carries the front-end artifacts built for
 `81ab0b1b` — the fix commit changes no front-end source, their recorded
 `artifactSha256` values still match the files on disk, and the release manifest was
 re-assembled for this revision so the image could be built from it at all.
+## Order, payment and release readiness (2026-09-19)
+
+A second review of the unpushed branch, this time over the split containers and the
+money paths, found a further set of defects that a green static gate cannot see.
+The fixes are in this working tree; every one has a case in `cases.md` and was
+observed failing on the pre-fix code first.
+
+- **One cancellation entry.** The manual cancel API, `UnpaidOrderCancelJob` and the
+  timer loop each restored an abandoned order differently, and the job ignored a
+  `false` from the stock or coupon restore and persisted the cancel flag anyway. All
+  three now call `StoreOrderServices::cancelUnpaidOrder()`, which settles the gateway
+  first (outside the transaction, so no lock is held across the network), then locks
+  and re-reads the order, returns the coupon, restores the layer the order sold from
+  and writes the cancel flag in one commit. A failed coupon return, a failed stock
+  restore or an unconfirmed gateway answer aborts the whole cancellation and leaves
+  the order open for a retry. The manual path's cancel event now carries the order's
+  own fields instead of repeating its id, and a zero `order_cancel_time` skips that
+  product class instead of ending the whole sweep (`QUEUE-003`...`QUEUE-009`).
+- **Payment attempts.** `store_order_payment_attempt` is written before the gateway
+  is called, so a callback still finds the order after the payer rewrote `order_id`;
+  the callback resolves the order through the attempt instead of guessing.
+  Cancellation asks the gateway about every open attempt through `PayTradeServices`:
+  paid keeps the order alive and records the trade number, closed releases the
+  resources, and anything unconfirmed releases nothing and can be retried.
+  `StoreOrderDao::markPaid()` now also requires `is_cancel = 0`, so a callback that
+  arrives after a cancellation cannot revive a released order.
+- **One commit for the payment core.** `StoreOrderSuccessServices::paySuccess()`
+  writes the paid flag, creates the group buy (a `false` now throws instead of being
+  reported as success), closes the remaining attempts and registers the follow-up
+  work as a row in `store_order_effect` — all in one transaction. Notifications,
+  push, printing and invoicing moved behind the commit, so they can no longer be sent
+  for an order whose transaction rolled back.
+- **Delivering that follow-up work.** The registration was wired to nothing at
+  first, and the id was passed to `OrderEffectJob::dispatch()` as a bare value, which
+  that signature reads as a *method name*: the immediate attempt became
+  `$job->4242()` and threw inside its own error wrapper, so even it did nothing. The
+  id is now passed as the argument list, and delivery has three parts: the queue job
+  runs the recorded row right after the commit, the timer re-delivers pending rows
+  every 30 seconds (bounded per cycle), and a claim update (`pending -> running`)
+  decides which delivery may make the external call. A row left `running` by a killed
+  worker is claimable again after `STALE_SECONDS`; a failed one keeps its unknown
+  outcome and error text; one that used up `MAX_ATTEMPTS` stops being re-delivered
+  (`PAY-006`, `QUEUE-010`, `QUEUE-011`).
+- **Coupons.** Price calculation no longer spends the coupon:
+  `OrderCouponCalculator` only computes, and `StoreOrderCreateServices` redeems it
+  inside the order transaction with one conditional update keyed on the holder, the
+  unused state and the validity window. The affected-row count is the success signal,
+  so a spent, failed, expired or foreign coupon cannot pay for an order and two
+  concurrent orders cannot both spend one coupon (`ORDER-004`,
+  `COUPON-004`...`COUPON-006`).
+- **Refunds.** `freezeRefundRequest()` locks the after-sale row first, derives the
+  gateway number from the persisted unique after-sale number and stores the frozen
+  amount and payment context in `refund_request`, so a retry after "the gateway
+  accepted it but the local transaction rolled back" replays the same number and the
+  same amount instead of asking for a different sum. The completion write moved out
+  of the two admin controllers into the service transaction, and the stock restore
+  still runs before the gateway (`REFUND-005`, `REFUND-006`).
+- **Health and release.** After the container split each role had its own idea of
+  whether it was up. PHP now issues a real FastCGI request for `/readyz` through the
+  pool, the queue and timer roles publish a heartbeat from the loop that does the
+  work, and Workerman has to answer an application-level round trip through the
+  Channel server. `/readyz` itself proves the application is installed, the retained
+  tables and the reliability columns exist and the settings table is populated, so a
+  database that never ran the migration fails instead of reporting ready; `up -d
+  --wait` therefore waits on every application role. The Channel listen and dial
+  addresses are now separate settings (bind `0.0.0.0`, dial `workerman:40003`, never
+  published to the host), `rollback.sh` captures the digest the containers are
+  actually running instead of the moving `edge` string, and the image publish step
+  compares an existing tag's digest before it overwrites anything.
+- **Incremental migration.** `crmeb/upgrade/core-store/order-reliability.php` adds
+  the payment-attempt and effect tables and the two refund columns to a database that
+  predates them, is safe to re-run and finishes an interrupted release; the install
+  SQL ships the same objects. DDL stays out of the business DML transaction
+  (`MIG-015`...`MIG-017`).
+
+**Recorded, not fixed.** The payment attempt and the cancellation are ordered by the
+attempt row, but the gateway call itself cannot sit inside the order lock, so a
+payment that starts in the milliseconds between the cancel flow's gateway
+confirmation and its commit can still be collected: `markPaid()` then refuses to
+revive the order and the money has to be refunded by hand. Closing that window needs
+either an out-of-band reconciliation job or a gateway-side close atomic with the
+lock; neither is in this round. The new mini-program payment channel stays disabled
+(`pay_new_weixin_open = 0`) because its query/close contract was not verified, and a
+channel without it must not take part in the automatic release. The frozen-number
+guarantee covers `agreeRefund()`, which is the only refund entry the storefront, the
+admin panel and the mobile admin API call; the legacy `payOrderRefund()` still falls
+back to the order's merchant number and is reached by tests only, so it is left alone
+rather than extended.
+
+**Verification.** `sh scripts/check-maintenance.sh crmeb-test` passes on an image
+built with `VCS_REF=$(git rev-parse HEAD)`: 203 tests, 990 assertions, the PHP 7.4
+lint over `crmeb/{app,crmeb,route,upgrade}` and the nine static guards. The effect
+case was red first — on the pre-fix code `runById` was called zero times. Source,
+behaviour and container-topology verification only: no admin, H5 or mini-program
+bundle was rebuilt in this round, and no real-device or live-merchant
+payment/refund acceptance was run; those remain release steps.

@@ -27973,6 +27973,8 @@ CREATE TABLE IF NOT EXISTS `eb_store_order_refund` (
   `is_del` tinyint(1) DEFAULT '0' COMMENT '取消申请',
   `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '申请退款时间',
   `is_system_del` tinyint(1) DEFAULT '0' COMMENT '系统删除',
+  `out_refund_no` varchar(64) NOT NULL DEFAULT '' COMMENT '提交给支付网关的退款单号，重试时必须复用',
+  `refund_request` text COMMENT '首次发起退款时冻结的请求上下文（金额、渠道、驱动）',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='退款订单表';
 
@@ -50809,5 +50811,52 @@ CREATE TABLE IF NOT EXISTS `eb_system_ticket` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小票打印机列表';
 
 -- --------------------------------------------------------
+
+--
+-- 表的结构 `eb_store_order_payment_attempt`
+--
+
+CREATE TABLE IF NOT EXISTS `eb_store_order_payment_attempt` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `store_order_id` int(11) NOT NULL DEFAULT '0' COMMENT '订单表ID',
+  `out_trade_no` varchar(64) NOT NULL DEFAULT '' COMMENT '提交给支付网关的商户订单号',
+  `driver` varchar(32) NOT NULL DEFAULT '' COMMENT '支付驱动 wechat_pay或v3_wechat_pay',
+  `mch_id` varchar(64) NOT NULL DEFAULT '' COMMENT '商户号',
+  `app_id` varchar(64) NOT NULL DEFAULT '' COMMENT '应用标识',
+  `channel` varchar(16) NOT NULL DEFAULT '' COMMENT '支付渠道 routine/weixin/weixin_h5/pc',
+  `pay_type` varchar(32) NOT NULL DEFAULT '' COMMENT '支付方式',
+  `total_fee` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '订单应付金额',
+  `pay_uid` int(11) NOT NULL DEFAULT '0' COMMENT '支付用户uid',
+  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0已提交 1已支付 2已关闭 3结果未知',
+  `trade_no` varchar(100) NOT NULL DEFAULT '' COMMENT '网关支付单号',
+  `last_result` varchar(255) NOT NULL DEFAULT '' COMMENT '最近一次查单或关单结论',
+  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '创建时间',
+  `update_time` int(11) NOT NULL DEFAULT '0' COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `out_trade_no` (`out_trade_no`) USING BTREE,
+  KEY `store_order_id` (`store_order_id`) USING BTREE,
+  KEY `status` (`status`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单支付尝试记录';
+
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `eb_store_order_effect`
+--
+
+CREATE TABLE IF NOT EXISTS `eb_store_order_effect` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `store_order_id` int(11) NOT NULL DEFAULT '0' COMMENT '订单表ID',
+  `event_type` varchar(64) NOT NULL DEFAULT '' COMMENT '副作用类型',
+  `payload` text COMMENT '处理该副作用所需的数据',
+  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0待处理 1已完成 2结果未知 3执行中',
+  `attempts` int(11) NOT NULL DEFAULT '0' COMMENT '已处理次数',
+  `last_error` varchar(255) NOT NULL DEFAULT '' COMMENT '最近一次错误',
+  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '创建时间',
+  `update_time` int(11) NOT NULL DEFAULT '0' COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `order_event` (`store_order_id`,`event_type`) USING BTREE,
+  KEY `status` (`status`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单支付后置副作用';
 
 -- --------------------------------------------------------

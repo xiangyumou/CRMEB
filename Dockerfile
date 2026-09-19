@@ -139,11 +139,14 @@ COPY deploy/production/nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker/entrypoint.sh /usr/local/bin/crmeb-entrypoint
 COPY docker/cache-assets.sh /usr/local/bin/crmeb-cache-assets
 COPY docker/ready.php /opt/crmeb/ready.php
+COPY docker/healthcheck.php /opt/crmeb/healthcheck.php
 
 RUN mkdir -p public/uploads /var/cache/crmeb/assets \
     && chown -R www-data:www-data runtime public/uploads \
     && chmod -R ug+rwX runtime public/uploads \
     && chmod +x /usr/local/bin/crmeb-entrypoint /usr/local/bin/crmeb-cache-assets \
+    && php -l /opt/crmeb/ready.php >/dev/null \
+    && php -l /opt/crmeb/healthcheck.php >/dev/null \
     && test -s public/admin/index.html \
     && test -s public/index.html \
     && test -s public/index.php \

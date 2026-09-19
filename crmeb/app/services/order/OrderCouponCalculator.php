@@ -9,7 +9,6 @@ final class OrderCouponCalculator
 {
     public function useCouponId(int $couponId, int $uid, $cartInfo, $payPrice, bool $isCreate)
     {
-        $used = true;
         if (!$couponId) return [$payPrice, 0];
 
         $couponServices = app()->make(StoreCouponUserServices::class);
@@ -50,10 +49,11 @@ final class OrderCouponCalculator
                 break;
         }
         if (!$count || $couponInfo['use_min_price'] > $price) throw new ApiException('不满足优惠劵的使用条件');
-        if ($isCreate) $used = $couponServices->useCoupon($couponId);
         $couponPrice = $couponInfo['coupon_price'] > $price ? $price : $couponInfo['coupon_price'];
         $payPrice = (float)bcsub((string)$payPrice, (string)$couponPrice, 2);
-        if (!$used) throw new ApiException('使用优惠劵失败');
+        // 这里只做试算，绝不写库：核销必须发生在创建订单的同一事务里
+        // （见 StoreOrderCreateServices::createOrder），否则下单失败会留下已核销的券。
+        // $isCreate 保留在签名里，供调用方表达"这是一次真实下单"的意图。
         return [$payPrice, $couponPrice];
     }
 }

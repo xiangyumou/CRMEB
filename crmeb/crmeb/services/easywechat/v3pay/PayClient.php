@@ -45,6 +45,14 @@ class PayClient extends BaseClient
     const API_REFUND_URL = 'v3/refund/domestic/refunds';
     //退款查询接口
     const API_REFUND_QUERY_URL = 'v3/refund/domestic/refunds/{out_refund_no}';
+    //查询支付单
+    const API_ORDER_QUERY_URL = 'v3/pay/transactions/out-trade-no/{out_trade_no}';
+    //查询支付单-服务商模式
+    const API_ORDER_QUERY_PARTNER_URL = 'v3/pay/partner/transactions/out-trade-no/{out_trade_no}';
+    //关闭支付单
+    const API_ORDER_CLOSE_URL = 'v3/pay/transactions/out-trade-no/{out_trade_no}/close';
+    //关闭支付单-服务商模式
+    const API_ORDER_CLOSE_PARTNER_URL = 'v3/pay/partner/transactions/out-trade-no/{out_trade_no}/close';
     //发起转账
     const API_TRANSFER_BILLS_URL = 'v3/fund-app/mch-transfer/transfer-bills';
     //查询转账
@@ -437,6 +445,50 @@ class PayClient extends BaseClient
         }
 
         return $res;
+    }
+
+    /**
+     * 查询支付单
+     *
+     * 返回值可能是 null（网络异常、响应无法解析），调用方必须用 null 判断为
+     * "结果未知"，不能当成"未支付"。
+     *
+     * @param string $outTradeNo
+     * @return array{status:int,body:mixed}
+     */
+    public function queryOrder(string $outTradeNo)
+    {
+        $merType = $this->app['config']['v3_payment']['mer_type'];
+        if ($merType) {
+            $url = $this->getApiUrl(self::API_ORDER_QUERY_PARTNER_URL, ['out_trade_no'], [$outTradeNo]);
+            $url .= '?sp_mchid=' . urlencode((string)$this->app['config']['v3_payment']['mchid'])
+                . '&sub_mchid=' . urlencode((string)$this->app['config']['v3_payment']['sub_mch_id']);
+        } else {
+            $url = $this->getApiUrl(self::API_ORDER_QUERY_URL, ['out_trade_no'], [$outTradeNo]);
+            $url .= '?mchid=' . urlencode((string)$this->app['config']['v3_payment']['mchid']);
+        }
+        return $this->requestWithStatus($url, 'GET');
+    }
+
+    /**
+     * 关闭支付单
+     * @param string $outTradeNo
+     * @return array{status:int,body:mixed}
+     */
+    public function closeOrder(string $outTradeNo)
+    {
+        $merType = $this->app['config']['v3_payment']['mer_type'];
+        if ($merType) {
+            $url = $this->getApiUrl(self::API_ORDER_CLOSE_PARTNER_URL, ['out_trade_no'], [$outTradeNo]);
+            $data = [
+                'sp_mchid' => (string)$this->app['config']['v3_payment']['mchid'],
+                'sub_mchid' => (string)$this->app['config']['v3_payment']['sub_mch_id'],
+            ];
+        } else {
+            $url = $this->getApiUrl(self::API_ORDER_CLOSE_URL, ['out_trade_no'], [$outTradeNo]);
+            $data = ['mchid' => (string)$this->app['config']['v3_payment']['mchid']];
+        }
+        return $this->requestWithStatus($url, 'POST', ['json' => $data]);
     }
 
     /**

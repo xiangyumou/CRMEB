@@ -61,10 +61,13 @@ services:
     networks:
       - server-internal-net
     healthcheck:
-      test: ["CMD", "php", "-r", "$$s=fsockopen('127.0.0.1',9000); exit($$s ? 0 : 1);"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+      # A real FastCGI request for /readyz through the pool, not just a bound
+      # port: it fails while the schema is missing or php-fpm cannot execute PHP.
+      test: ["CMD", "php", "/opt/crmeb/healthcheck.php", "php"]
+      interval: 15s
+      timeout: 10s
+      retries: 6
+      start_period: 90s
     logging:
       options: {max-size: "10m", max-file: "3"}
 
@@ -87,6 +90,13 @@ services:
         condition: service_healthy
     networks:
       - server-internal-net
+    healthcheck:
+      # The queue only writes this heartbeat while it is really consuming jobs.
+      test: ["CMD", "php", "/opt/crmeb/healthcheck.php", "queue"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
     logging:
       options: {max-size: "10m", max-file: "3"}
 
@@ -109,6 +119,13 @@ services:
         condition: service_healthy
     networks:
       - server-internal-net
+    healthcheck:
+      # Written by the same second-granularity loop that runs the scheduled work.
+      test: ["CMD", "php", "/opt/crmeb/healthcheck.php", "timer"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
     logging:
       options: {max-size: "10m", max-file: "3"}
 
@@ -131,6 +148,13 @@ services:
         condition: service_healthy
     networks:
       - server-internal-net
+    healthcheck:
+      # Application level round trip through the Channel server.
+      test: ["CMD", "php", "/opt/crmeb/healthcheck.php", "workerman"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     logging:
       options: {max-size: "10m", max-file: "3"}
 
@@ -146,14 +170,15 @@ services:
       php:
         condition: service_healthy
       workerman:
-        condition: service_started
+        condition: service_healthy
     networks:
       - server-internal-net
     healthcheck:
       test: ["CMD", "curl", "-fsS", "--max-time", "5", "http://127.0.0.1/readyz"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+      interval: 15s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
     logging:
       options: {max-size: "10m", max-file: "3"}
     labels:

@@ -69,6 +69,35 @@ interface PayInterface
     public function queryRefund(string $outTradeNo, string $outRequestNo, array $other = []);
 
     /**
+     * 查询支付单在网关侧的真实状态
+     *
+     * 取消订单前必须确认网关侧没有仍然可支付的单子，否则会出现"库存已释放、
+     * 用户却还能付款"。返回结构固定为：
+     * - state: paid | closed | not_exist | unknown
+     * - trade_no: 网关流水号，取不到时为空字符串
+     * - raw: 网关原始返回，仅用于排查
+     *
+     * 任何无法识别的结果都必须返回 unknown，调用方据此保留库存和优惠券。
+     *
+     * @param string $outTradeNo 商户订单号
+     * @param array $options 支付上下文（付款通道、是否新小程序支付等）
+     * @return array{state:string,trade_no:string,raw:mixed}
+     */
+    public function queryOrder(string $outTradeNo, array $options = []);
+
+    /**
+     * 关闭支付单
+     *
+     * 只有确认已关闭或者确定不存在才能返回 true；网络异常、响应无法识别一律
+     * 返回 false，让调用方保留资源并稍后重试。
+     *
+     * @param string $outTradeNo 商户订单号
+     * @param array $options 支付上下文（付款通道、是否新小程序支付等）
+     * @return bool
+     */
+    public function closeOrder(string $outTradeNo, array $options = []): bool;
+
+    /**
      * 支付回调
      * @return mixed
      */

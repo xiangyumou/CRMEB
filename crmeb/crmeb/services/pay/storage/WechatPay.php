@@ -140,6 +140,87 @@ class WechatPay extends BasePay implements PayInterface
     }
 
     /**
+     * 查询支付单状态（微信支付v2）
+     * @param string $outTradeNo
+     * @param array $options
+     * @return array{state:string,trade_no:string,raw:mixed}
+     */
+    public function queryOrder(string $outTradeNo, array $options = [])
+    {
+        try {
+            if (!empty($options['pay_new_weixin_open'])) {
+                // 新小程序支付通道只有下单和退款，没有查单能力，不得据此释放资源
+                return ['state' => 'unknown', 'trade_no' => '', 'raw' => 'pay_new_weixin_open:no-query-api'];
+            }
+            $result = !empty($options['is_channel'])
+                ? MiniProgramService::orderQuery($outTradeNo)
+                : WechatService::orderQuery($outTradeNo);
+            return $this->normalizeV2Query($result);
+        } catch (\Throwable $e) {
+            return ['state' => 'unknown', 'trade_no' => '', 'raw' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * 关闭支付单（微信支付v2）
+     * @param string $outTradeNo
+     * @param array $options
+     * @return bool
+     */
+    public function closeOrder(string $outTradeNo, array $options = []): bool
+    {
+        try {
+            if (!empty($options['pay_new_weixin_open'])) {
+                return false;
+            }
+            $result = !empty($options['is_channel'])
+                ? MiniProgramService::closeOrder($outTradeNo)
+                : WechatService::closeOrder($outTradeNo);
+            $data = json_decode(json_encode($result), true) ?: [];
+            if (($data['return_code'] ?? '') !== 'SUCCESS') return false;
+            if (($data['result_code'] ?? '') === 'SUCCESS') return true;
+            // 已经关闭或者单子不存在，对"释放库存"来说都算安全
+            return in_array((string)($data['err_code'] ?? ''), ['ORDERCLOSED', 'ORDERNOTEXIST'], true);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * 归一化 v2 查单结果
+     * @param mixed $result
+     * @return array{state:string,trade_no:string,raw:mixed}
+     */
+    private function normalizeV2Query($result): array
+    {
+        $data = json_decode(json_encode($result), true) ?: [];
+        $tradeNo = (string)($data['transaction_id'] ?? '');
+        if (($data['return_code'] ?? '') !== 'SUCCESS') {
+            return ['state' => 'unknown', 'trade_no' => $tradeNo, 'raw' => $data];
+        }
+        if (($data['result_code'] ?? '') !== 'SUCCESS') {
+            $errCode = (string)($data['err_code'] ?? '');
+            if ($errCode === 'ORDERNOTEXIST') {
+                return ['state' => 'not_exist', 'trade_no' => $tradeNo, 'raw' => $data];
+            }
+            return ['state' => 'unknown', 'trade_no' => $tradeNo, 'raw' => $data];
+        }
+        switch (strtoupper((string)($data['trade_state'] ?? ''))) {
+            case 'SUCCESS':
+                return ['state' => 'paid', 'trade_no' => $tradeNo, 'raw' => $data];
+            case 'NOTPAY':
+            case 'USERPAYING':
+                return ['state' => 'open', 'trade_no' => $tradeNo, 'raw' => $data];
+            case 'CLOSED':
+            case 'REVOKED':
+            case 'PAYERROR':
+                return ['state' => 'closed', 'trade_no' => $tradeNo, 'raw' => $data];
+            default:
+                return ['state' => 'unknown', 'trade_no' => $tradeNo, 'raw' => $data];
+        }
+    }
+
+    /**
      * 异步回调
      * @return mixed|\Symfony\Component\HttpFoundation\Response
      * @throws \EasyWeChat\Core\Exceptions\FaultException

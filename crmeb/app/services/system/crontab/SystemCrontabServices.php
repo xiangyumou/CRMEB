@@ -10,9 +10,14 @@
 // +----------------------------------------------------------------------
 namespace app\services\system\crontab;
 
+use app\jobs\HealthProbeJob;
+use app\jobs\OrderEffectJob;
 use app\dao\system\crontab\SystemCrontabDao;
+use app\services\order\StoreOrderEffectServices;
 use app\services\BaseServices;
 use crmeb\exceptions\AdminException;
+use crmeb\utils\HealthHeartbeat;
+use crmeb\utils\Queue;
 use think\facade\Cache;
 use think\helper\Str;
 use Workerman\Crontab\Crontab;
@@ -257,12 +262,40 @@ class SystemCrontabServices extends BaseServices
         file_put_contents(root_path() . 'runtime/.timer', time());
         // 获取 CrontabRunServices 实例
         $crontabRunServices = app()->make(CrontabRunServices::class);
+        // 上一次投递健康探针的秒级时间戳，避免同一秒内重复投递
+        $probeMark = '';
         // 创建一个每秒钟执行一次的定时任务
-        new Crontab('*/1 * * * * *', function () use ($task, $crontabRunServices) {
+        new Crontab('*/1 * * * * *', function () use ($task, $crontabRunServices, &$probeMark) {
             // 写入时间戳，用于检测定时任务是否正常执行
             $timerTime = file_get_contents(root_path() . 'runtime/.timer');
             if ($timerTime < (time() - 60)) {
                 file_put_contents(root_path() . 'runtime/.timer', time());
+            }
+            // 容器健康探针：每 30 秒写一次定时器心跳，并向队列投递一次探针任务。
+            // 队列只有真的在消费任务时才会写自己的心跳，两个角色因此都可被验证。
+            // 探针失败只影响健康检查结果，不打断业务定时任务。
+            $mark = (string)time();
+            if ((int)date('s') % 30 === 0 && $probeMark !== $mark) {
+                $probeMark = $mark;
+                HealthHeartbeat::write('timer');
+                try {
+                    Queue::instance()->job(HealthProbeJob::class)->push();
+                } catch (\Throwable $e) {
+                    // 忽略：队列不可用时健康检查会如实报告
+                }
+                // 订单后置副作用补投：支付事务只登记"还需要做什么"，提交后由队列立即执行。
+                // 执行失败或进程中断留下的待处理记录在这里重新投递，处理器按
+                // (订单ID, 事件类型) 命中同一条记录，重复投递不会重复完成业务。
+                // 单轮限量，避免异常堆积拖住秒级定时循环。
+                try {
+                    /** @var StoreOrderEffectServices $effectServices */
+                    $effectServices = app()->make(StoreOrderEffectServices::class);
+                    foreach ($effectServices->pendingIds(20) as $effectId) {
+                        OrderEffectJob::dispatch([$effectId]);
+                    }
+                } catch (\Throwable $e) {
+                    // 忽略：补投失败下一轮重试，不影响业务定时任务
+                }
             }
             // 从缓存中获取定时任务列表
             $list = Cache::get('crontabCache');

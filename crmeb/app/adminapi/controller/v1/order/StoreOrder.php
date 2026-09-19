@@ -482,8 +482,8 @@ class StoreOrder extends AuthController
         $refund_data['order_id'] = $orderRefund['order_id'];
         //修改订单退款状态
         unset($data['refund_price']);
-        if ($services->agreeRefund($orderRefund['id'], $refund_data)) {
-            $services->update($orderRefund['id'], $data);
+        //收尾状态由服务在同一个事务里提交，控制器不再单独更新
+        if ($services->agreeRefund($orderRefund['id'], $refund_data, $data)) {
             return app('json')->success('退款成功');
         } else {
             $services->storeProductOrderRefundYFasle((int)$orderRefund['id'], $refund_price);

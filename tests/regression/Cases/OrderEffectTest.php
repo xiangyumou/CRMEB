@@ -1,0 +1,184 @@
+<?php
+declare(strict_types=1);
+
+namespace Tests\Regression\Cases;
+
+use app\dao\order\StoreOrderEffectDao;
+use app\jobs\OrderEffectJob;
+use app\model\order\StoreOrderEffect;
+use app\services\order\StoreOrderEffectServices;
+use app\services\order\StoreOrderSuccessServices;
+use app\services\pay\PayServices;
+use Tests\Regression\Support\FixtureFactory;
+use Tests\Regression\Support\RegressionTestCase;
+use think\facade\Db;
+
+/**
+ * Post-payment effects.
+ *
+ * The payment transaction may only record "this still has to happen" — the notice,
+ * the push, the print and the invoice must not leave the process before the order is
+ * committed. Those effects therefore live in their own table, are handed to a queue
+ * job right after the commit, and are re-delivered by the timer when the first
+ * attempt or the process dies. Two delivery paths reaching one record must not run
+ * the external call twice, and a record nobody picked up must not be forgotten.
+ *
+ * The effect handler is replaced here because the external calls themselves belong
+ * to the notice and printing stack, not to the delivery contract this class asserts.
+ */
+final class OrderEffectTest extends RegressionTestCase
+{
+    private function effectServices(): StoreOrderEffectServices
+    {
+        return app()->make(StoreOrderEffectServices::class);
+    }
+
+    private function effectDao(): StoreOrderEffectDao
+    {
+        return app()->make(StoreOrderEffectDao::class);
+    }
+
+    /** @return int[] rows left behind by one test */
+    private function seedEffects(int $orderId, array $rows): array
+    {
+        $ids = [];
+        foreach ($rows as $row) {
+            $ids[] = (int)Db::name('store_order_effect')->insertGetId(array_merge([
+                'store_order_id' => $orderId,
+                'event_type' => 'regression_' . bin2hex(random_bytes(3)),
+                'payload' => '{}',
+                'status' => StoreOrderEffect::STATUS_PENDING,
+                'attempts' => 0,
+                'last_error' => '',
+                'add_time' => time(),
+                'update_time' => time(),
+            ], $row));
+        }
+        $this->registerCleanup(function () use ($orderId): void {
+            Db::name('store_order_effect')->where('store_order_id', $orderId)->delete();
+        });
+        return $ids;
+    }
+
+    /**
+     * The payment path registers one effect per order and event and hands it to the
+     * repair job. Leaving the registration out is what let a paid order reach the
+     * storefront with no notice and no printed receipt, and only one entry may be
+     * written no matter how often the gateway repeats its callback.
+     */
+    public function testPaymentSuccessRegistersOneEffectAndHandsItToTheRepairJob(): void
+    {
+        $fixtures = new FixtureFactory($this, $this->getName());
+        $user = $fixtures->createUser();
+        $order = $fixtures->createOrder((int)$user['uid']);
+        $orderId = (int)$order['id'];
+
+        $effects = $this->createMock(StoreOrderEffectServices::class);
+        $effects->expects(self::once())
+            ->method('record')
+            ->with($orderId, StoreOrderEffectServices::EVENT_PAY_SUCCESS, self::isType('array'))
+            ->willReturn(4242);
+        // The recorded row is what the queue job carries; the job has to end up
+        // running exactly that row.
+        $effects->expects(self::once())
+            ->method('runById')
+            ->with(4242)
+            ->willReturn(true);
+        $this->replace(StoreOrderEffectServices::class, $effects);
+
+        $orderInfo = array_merge($order, ['combination_id' => 0, 'refund_status' => 0]);
+        self::assertTrue(
+            app()->make(StoreOrderSuccessServices::class)->paySuccess($orderInfo, PayServices::WEIXIN_PAY),
+            'the payment must be recorded'
+        );
+        self::assertSame(1, (int)Db::name('store_order')->where('id', $orderId)->value('paid'));
+        self::assertSame(
+            0,
+            (int)Db::name('store_order_effect')->where('store_order_id', $orderId)->count(),
+            'the effect is registered through the service only, never by a second write path'
+        );
+    }
+
+    /**
+     * Registration is keyed by order and event type, so a repeated callback cannot
+     * add a second entry, and the entry is claimable through exactly one delivery.
+     */
+    public function testOneEffectPerOrderAndEventAndOneClaimPerDelivery(): void
+    {
+        $fixtures = new FixtureFactory($this, $this->getName());
+        $user = $fixtures->createUser();
+        $order = $fixtures->createOrder((int)$user['uid']);
+        $orderId = (int)$order['id'];
+        $this->registerCleanup(function () use ($orderId): void {
+            Db::name('store_order_effect')->where('store_order_id', $orderId)->delete();
+        });
+
+        $first = $this->effectServices()->record($orderId, StoreOrderEffectServices::EVENT_PAY_SUCCESS, ['trade_no' => 't1']);
+        $second = $this->effectServices()->record($orderId, StoreOrderEffectServices::EVENT_PAY_SUCCESS, ['trade_no' => 't2']);
+        self::assertSame($first, $second, 'a repeated callback reuses the entry it already wrote');
+        self::assertSame(1, (int)Db::name('store_order_effect')->where('store_order_id', $orderId)->count());
+
+        self::assertSame(
+            StoreOrderEffect::STATUS_PENDING,
+            (int)Db::name('store_order_effect')->where('id', $first)->value('status')
+        );
+        self::assertContains($first, $this->effectServices()->pendingIds(50), 'the queue and the timer can see it');
+
+        // Two deliveries released together: only the one that claims the row may
+        // run the external call.
+        self::assertTrue($this->effectDao()->claim($first, 1), 'the first delivery claims the row');
+        self::assertFalse($this->effectDao()->claim($first, 2), 'a second delivery must not run the same effect');
+        self::assertSame(StoreOrderEffect::STATUS_RUNNING, (int)Db::name('store_order_effect')->where('id', $first)->value('status'));
+    }
+
+    /**
+     * A failed or interrupted delivery has to stay visible to the next cycle, while a
+     * finished one, a fresh claim and a record that used up its attempts must not be
+     * handed out again.
+     */
+    public function testRedeliverySkipsFinishedFreshAndExhaustedRecords(): void
+    {
+        $orderId = random_int(900000000, 999999999);
+        [$pending, $unknown, $done, $runningFresh, $runningStale, $exhausted] = $this->seedEffects($orderId, [
+            ['status' => StoreOrderEffect::STATUS_PENDING],
+            ['status' => StoreOrderEffect::STATUS_UNKNOWN],
+            ['status' => StoreOrderEffect::STATUS_DONE],
+            ['status' => StoreOrderEffect::STATUS_RUNNING, 'update_time' => time()],
+            ['status' => StoreOrderEffect::STATUS_RUNNING, 'update_time' => time() - StoreOrderEffect::STALE_SECONDS - 1],
+            ['status' => StoreOrderEffect::STATUS_PENDING, 'attempts' => StoreOrderEffect::MAX_ATTEMPTS],
+        ]);
+
+        $pendingIds = $this->effectServices()->pendingIds(500);
+        self::assertContains($pending, $pendingIds);
+        self::assertContains($unknown, $pendingIds, 'an unknown outcome is retried');
+        self::assertContains($runningStale, $pendingIds, 'a delivery interrupted mid-run is picked up again');
+        self::assertNotContains($done, $pendingIds, 'a finished effect is never re-delivered');
+        self::assertNotContains($runningFresh, $pendingIds, 'a delivery that is still running is not stolen');
+        self::assertNotContains($exhausted, $pendingIds, 'an exhausted record waits for an operator');
+    }
+
+    /**
+     * Running an effect that throws records the unknown outcome and counts the
+     * attempt instead of reporting success.
+     */
+    public function testAFailedEffectIsRecordedAsUnknownWithItsAttemptCounted(): void
+    {
+        $orderId = random_int(900000000, 999999999);
+        [$id] = $this->seedEffects($orderId, [['event_type' => 'regression_unknown_event']]);
+
+        self::assertFalse((new OrderEffectJob())->doJob($id), 'an effect that cannot be executed is not reported as done');
+        $row = Db::name('store_order_effect')->where('id', $id)->find();
+        self::assertSame(StoreOrderEffect::STATUS_UNKNOWN, (int)$row['status']);
+        self::assertSame(1, (int)$row['attempts']);
+        self::assertNotSame('', (string)$row['last_error'], 'the failure is kept for the operator');
+
+        // The next cycle may try again, and counts the second attempt.
+        self::assertFalse((new OrderEffectJob())->doJob($id));
+        self::assertSame(2, (int)Db::name('store_order_effect')->where('id', $id)->value('attempts'));
+
+        // A finished record is not executed a second time.
+        Db::name('store_order_effect')->where('id', $id)->update(['status' => StoreOrderEffect::STATUS_DONE]);
+        self::assertTrue((new OrderEffectJob())->doJob($id));
+        self::assertSame(2, (int)Db::name('store_order_effect')->where('id', $id)->value('attempts'), 'a finished effect is left alone');
+    }
+}

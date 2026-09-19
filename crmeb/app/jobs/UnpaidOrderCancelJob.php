@@ -12,8 +12,6 @@
 namespace app\jobs;
 
 
-use app\services\order\StoreOrderCartInfoServices;
-use app\services\order\StoreOrderRefundServices;
 use app\services\order\StoreOrderServices;
 use crmeb\basic\BaseJobs;
 use crmeb\traits\QueueTrait;
@@ -49,26 +47,10 @@ class UnpaidOrderCancelJob extends BaseJobs
         if ($orderInfo->is_cancel == 1) {
             return true;
         }
-        /** @var StoreOrderCartInfoServices $cartServices */
-        $cartServices = app()->make(StoreOrderCartInfoServices::class);
-        $cartInfo = $cartServices->getOrderCartInfo($orderId);
-        /** @var StoreOrderRefundServices $refundServices */
-        $refundServices = app()->make(StoreOrderRefundServices::class);
-
         try {
-            $res = $refundServices->transaction(function () use ($orderInfo, $refundServices) {
-                //回退积分和优惠卷
-                $refundServices->couponBack($orderInfo, 'cancel');
-                //回退库存和销量
-                $refundServices->regressionStock($orderInfo);
-                return true;
-            });
-            if ($res) {
-                $orderInfo->is_cancel = 1;
-                $orderInfo->mark = '订单未支付已超过系统预设时间';
-                $orderInfo->save();
-            }
-            return $res;
+            //手动、队列、定时取消共用同一个入口：先确认网关侧已无可支付的单子，
+            //再在同一个事务里退券、各层回库并写入取消状态，任一失败整体回滚。
+            return $services->cancelUnpaidOrder((int)$orderInfo['id'], '订单未支付已超过系统预设时间');
         } catch (\Throwable $e) {
             Log::error('自动取消订单失败,失败原因:' . $e->getMessage());
             return false;

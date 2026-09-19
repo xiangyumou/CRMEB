@@ -1,6 +1,6 @@
 {
   "baseline_commit": "66681c07d76ce79c6794721563029f8ea4af023b",
-  "head_commit": "79f47cec019f47ba4ce3152e20fd253dad9ef014",
+  "head_commit": "432d405db4b65cc27c81700de0fe0cd525900578",
   "categories": {
     "source": {
       "files": 2327,
@@ -19,8 +19,8 @@
     },
     "other": {
       "files": 277,
-      "bytes": 31040894,
-      "lines": 87051
+      "bytes": 31041344,
+      "lines": 87054
     }
   },
   "source_reduction": {
@@ -30,8 +30,8 @@
   },
   "source_physical_line_reduction_percent": 26.3,
   "validation": {
-    "regression_tests": 179,
-    "regression_assertions": 837,
+    "regression_tests": 203,
+    "regression_assertions": 990,
     "php_lint": "passed",
     "static_guards": [
       "core-store-front",
@@ -44,10 +44,11 @@
       "verify-release-test",
       "wechat-payment-test"
     ],
-    "source_checks": "sh scripts/check-maintenance.sh crmeb-test, on an image built with VCS_REF=$(git rev-parse HEAD): the regression suite, the PHP 7.4 lint and the nine static guards above",
-    "admin_build": "not re-run in this round; no admin source changed. The manifest baked into the image was re-assembled at this revision and reuses the artifacts built for 81ab0b1b with their recorded artifactSha256 values unchanged. Rebuild crmeb/public/admin and .build/release/admin with scripts/build-admin.sh before release",
+    "source_checks": "sh scripts/check-maintenance.sh crmeb-test, on an image built with VCS_REF=$(git rev-parse HEAD): 203 tests and 990 assertions, the PHP 7.4 lint and the nine static guards above. sh docker/verify-http-stack.sh brings up the real multi-container topology (own MySQL, Redis, PHP, queue, timer, workerman and nginx) and checks the health probes fail when a role is broken.",
+    "admin_build": "not re-run in this round; no admin source changed. The front-end artifacts baked into the image were built for 81ab0b1b, their recorded artifactSha256 values still match the files on disk, and the release manifest was re-assembled for this revision so the image could be built from it at all. Rebuild crmeb/public/admin and .build/release/admin with scripts/build-admin.sh before release",
     "h5_and_miniprogram_builds": "not re-run in this round; real H5 and MP-WEIXIN builds remain operator steps",
-    "merchant_payment_acceptance": "not run; needs live WeChat merchant credentials and a device (purchase, group buy, presale, refund)",
-    "production_migration": "the 2026-09-17 rehearsal used a copy of the pre-cleanup schema seeded with historical orders and predates this round's plan changes; the current script is covered by CoreStoreMigrationTest (18 cases) on a disposable schema, and no shop with historical business data has been migrated"
-  }
+    "merchant_payment_acceptance": "not run; needs live WeChat merchant credentials and a device (purchase, group buy, presale, cancellation, refund). The standard v3 channel is the release-critical path; the new mini-program channel stays disabled because its query/close contract is unverified",
+    "production_migration": "not run against production. The 2026-09-17 rehearsal predates the current plans; the control-plane script is covered by CoreStoreMigrationTest and the order-reliability script by OrderReliabilityMigrationTest, both on disposable schemas. The first production release still needs a write-stopped maintenance window (README, deploy/production)"
+  },
+  "head_note": "The size figures describe the committed revision above. The order/payment/release round of 2026-09-19 is in the working tree on top of it and is not counted here; re-run node scripts/source-metrics.cjs --write after committing that round."
 }

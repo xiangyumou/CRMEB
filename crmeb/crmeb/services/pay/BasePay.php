@@ -58,5 +58,31 @@ abstract class BasePay extends BaseStorage
         }
     }
 
+    /**
+     * 默认不支持查询支付单状态
+     *
+     * 没有实现查单能力的驱动必须返回 unknown，取消订单时保留库存和优惠券，
+     * 不允许把"查不到"当成"已关单"。
+     *
+     * @param string $outTradeNo
+     * @param array $options
+     * @return array{state:string,trade_no:string,raw:mixed}
+     */
+    public function queryOrder(string $outTradeNo, array $options = [])
+    {
+        return ['state' => 'unknown', 'trade_no' => '', 'raw' => null];
+    }
+
+    /**
+     * 默认不支持关闭支付单
+     * @param string $outTradeNo
+     * @param array $options
+     * @return bool
+     */
+    public function closeOrder(string $outTradeNo, array $options = []): bool
+    {
+        return false;
+    }
+
 
 }

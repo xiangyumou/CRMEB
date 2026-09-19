@@ -426,9 +426,8 @@ class StoreOrderController
                 $refundData['order_id'] = $orderId;
 
 
-                //修改订单退款状态
-                if ($services->agreeRefund((int)$orderRefund['id'], $refundData)) {
-                    $services->update((int)$orderRefund['id'], $data);
+                //收尾状态由服务在同一个事务里提交，控制器不再单独更新
+                if ($services->agreeRefund((int)$orderRefund['id'], $refundData, $data)) {
                     return app('json')->success('退款成功');
                 } else {
                     $services->storeProductOrderRefundYFasle((int)$orderInfo['id'], $price);
@@ -496,9 +495,8 @@ class StoreOrderController
                 $res = $services->save($refundOrderData);
                 $refund_data['order_id'] = $refundOrderData['order_id'];
 
-                //修改订单退款状态
-                if ($services->agreeRefund((int)$res->id, $refund_data)) {
-                    $this->service->update($id, $data);
+                //收尾状态由服务在同一个事务里提交，控制器不再单独更新
+                if ($services->agreeRefund((int)$res->id, $refund_data, $data)) {
                     return app('json')->success('退款成功');
                 } else {
                     $services->storeProductOrderRefundYFasle((int)$id, $refund_price);

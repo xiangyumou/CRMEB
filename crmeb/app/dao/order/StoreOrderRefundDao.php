@@ -25,6 +25,35 @@ class StoreOrderRefundDao extends BaseDao
     }
 
     /**
+     * 锁定一条退款单
+     *
+     * 退款资格检查、累计退款金额与完成状态必须在同一把锁内完成，否则并发的
+     * 两次同意退款会各自读到"还没退过"，向网关重复发起。
+     *
+     * @param int $id
+     * @return \crmeb\basic\BaseModel|mixed|\think\Model|null
+     */
+    public function getForUpdate(int $id)
+    {
+        return $this->getModel()->where('id', $id)->lock(true)->find();
+    }
+
+    /**
+     * 锁定订单下未完成的退款单
+     * @param int $storeOrderId
+     * @return array
+     */
+    public function getOpenListForUpdate(int $storeOrderId): array
+    {
+        return $this->getModel()
+            ->where('store_order_id', $storeOrderId)
+            ->whereIn('refund_type', [1, 2, 4, 5])
+            ->order('id asc')
+            ->lock(true)
+            ->select()->toArray();
+    }
+
+    /**
      * 搜索器
      * @param array $where
      * @param bool $search

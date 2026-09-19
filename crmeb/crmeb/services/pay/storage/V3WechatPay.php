@@ -220,6 +220,80 @@ class V3WechatPay extends BasePay implements PayInterface
     }
 
     /**
+     * 查询支付单状态（微信支付v3）
+     *
+     * 微信 v3 的响应体在异常路径上可能是 null，只要拿不到可识别的 trade_state
+     * 就返回 unknown，让调用方保留库存和优惠券。
+     *
+     * @param string $outTradeNo
+     * @param array $options
+     * @return array{state:string,trade_no:string,raw:mixed}
+     */
+    public function queryOrder(string $outTradeNo, array $options = [])
+    {
+        try {
+            $res = $this->instance->v3pay->queryOrder($outTradeNo);
+            $status = (int)($res['status'] ?? 0);
+            $body = $res['body'] ?? null;
+            if (!is_array($body)) {
+                return ['state' => 'unknown', 'trade_no' => '', 'raw' => $body];
+            }
+            $code = (string)($body['code'] ?? '');
+            if (in_array($code, ['ORDER_NOT_EXIST', 'ORDERNOTEXIST', 'RESOURCE_NOT_EXISTS'], true)) {
+                return ['state' => 'not_exist', 'trade_no' => '', 'raw' => $body];
+            }
+            if ($code !== '') {
+                return ['state' => 'unknown', 'trade_no' => '', 'raw' => $body];
+            }
+            $tradeNo = (string)($body['transaction_id'] ?? '');
+            switch (strtoupper((string)($body['trade_state'] ?? ''))) {
+                case 'SUCCESS':
+                case 'REFUND':
+                    return ['state' => 'paid', 'trade_no' => $tradeNo, 'raw' => $body];
+                case 'NOTPAY':
+                case 'USERPAYING':
+                    return ['state' => 'open', 'trade_no' => $tradeNo, 'raw' => $body];
+                case 'CLOSED':
+                case 'REVOKED':
+                case 'PAYERROR':
+                    return ['state' => 'closed', 'trade_no' => $tradeNo, 'raw' => $body];
+                default:
+                    return ['state' => 'unknown', 'trade_no' => $tradeNo, 'raw' => $body];
+            }
+        } catch (\Throwable $e) {
+            return ['state' => 'unknown', 'trade_no' => '', 'raw' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * 关闭支付单（微信支付v3）
+     *
+     * 关单成功返回 204 且没有响应体；已经关闭或从未存在同样视为安全。
+     * 其余情况一律返回 false。
+     *
+     * @param string $outTradeNo
+     * @param array $options
+     * @return bool
+     */
+    public function closeOrder(string $outTradeNo, array $options = []): bool
+    {
+        try {
+            $res = $this->instance->v3pay->closeOrder($outTradeNo);
+            $status = (int)($res['status'] ?? 0);
+            $body = $res['body'] ?? null;
+            if ($status === 204) return true;
+            if (is_array($body)) {
+                $code = (string)($body['code'] ?? '');
+                if ($code === '') return $status === 200;
+                return in_array($code, ['ORDER_CLOSED', 'ORDERCLOSED', 'ORDER_NOT_EXIST', 'ORDERNOTEXIST', 'RESOURCE_NOT_EXISTS'], true);
+            }
+            return $status === 200 && $body === null;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * @return mixed|\think\Response
      * @author 等风来
      * @email 136327134@qq.com

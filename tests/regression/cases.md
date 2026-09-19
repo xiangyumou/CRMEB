@@ -35,9 +35,19 @@ against the seeded install SQL; payment transports stay offline.
 
 - [x] QUEUE-001 Paid, deleted, offline and already cancelled orders are not restored by the unpaid-cancel job.
 - [x] QUEUE-002 An eligible unpaid order restores resources and persists cancellation state once.
+- [x] QUEUE-003 A cancellation settles the payment gateway before it releases anything: settlement runs first, the attempt is marked closed, and only then are the coupon and the stock restored.
+- [x] QUEUE-004 An unconfirmed gateway state (unknown or timeout) releases nothing: the attempt is neither closed nor marked, the coupon and the stock stay with the order and the job reports failure.
+- [x] QUEUE-005 A gateway payment discovered during cancellation keeps the order alive and records the reported trade number without releasing any resource.
+- [x] QUEUE-006 When the stock restore fails the coupon return, the stock restore and the cancel flag roll back together and no coupon_back status row survives.
+- [x] QUEUE-007 When the coupon cannot be returned the stock restore never runs and no stock layer is touched.
+- [x] QUEUE-008 Cancelling a presale order restores all four ledgers (the presale activity row, its type-6 SKU, the product row and its type-0 SKU) with deliberately different presale and product ids, so a restore through the ordinary layer cannot pass on matching totals.
+- [x] QUEUE-009 Two concurrent cancellations of one order release the stock and the coupon once and write one coupon_back row; the loser observes the committed cancellation.
+- [x] QUEUE-010 Payment success records exactly one effect for the order and hands that recorded row to the repair job, which runs the effect it was given; the row is never written by a second path.
+- [x] QUEUE-011 A repeated callback reuses the effect entry it already wrote, and one delivery claims it: a second concurrent delivery cannot run the same effect, a finished, freshly claimed or attempt-exhausted record is not re-delivered, an unknown or interrupted one is, and a failed effect records the unknown outcome with its attempt counted.
 - [x] ORDER-001 The retained purchase path over real HTTP: cart, confirm, computed, create — the order lands with the stock decremented and `order/computed` returns the same price the confirmation promised.
 - [x] ORDER-002 Order creation queues `UnpaidOrderCancelJob` for the new order, so abandoned orders expire and release stock.
 - [x] ORDER-003 An unpaid order can be cancelled once, a paid one never, and neither leaves a duplicate status row.
+- [x] ORDER-004 Over real HTTP, submitting an order with an already spent coupon is refused before any write: no order row, the product stock unchanged and the coupon still spent rather than returned.
 
 ## Authorization
 
@@ -52,6 +62,8 @@ against the seeded install SQL; payment transports stay offline.
 - [x] REFUND-002 A presale order restore moves the presale activity row, the presale SKU, the product row and the product SKU back to their exact prior stock and sales; the fixture uses deliberately different ids and SKUs for the presale and the product layers so a restore through the wrong layer cannot pass on matching totals.
 - [x] REFUND-003 An order sold from a group buy, a presale or ordinary stock restores through that layer only: the matching service is called once with the id and SKU the order carried, and the other two are never called.
 - [x] REFUND-004 When the stock restore returns false the refund stops with `库存回退失败` before the payment gateway is resolved, and no `refund_price` status row is written.
+- [x] REFUND-005 The refund number and amount are frozen on the first attempt and replayed on every retry: a second call with a higher amount reuses the persisted after-sale number and the originally frozen price, and both are persisted on the after-sale row.
+- [x] REFUND-006 Two refund attempts released together from separate processes freeze one gateway number and one amount, and the persisted row matches what both attempts agreed on.
 
 ## Registration and notifications
 
@@ -64,6 +76,9 @@ against the seeded install SQL; payment transports stay offline.
 - [x] COUPON-001 A retired member coupon (`receive_type = 4`, including the row the install SQL still ships) is absent from the storefront list, the PC list, the popup list, the quantity counts, the `receive_types = 1` search and the DIY `theme/coupon` component (both the every-user and the pinned-id form, while a component saved for the retired member audience returns an empty list), while an ordinary coupon stays listed.
 - [x] COUPON-002 Claiming a retired member coupon by id fails with `该优惠券所属业务已下线` before any write: no claim record, no user coupon and an unchanged `remain_count`.
 - [x] COUPON-003 An ordinary coupon can still be claimed and still consumes one from `remain_count`.
+- [x] COUPON-004 Redeeming the same coupon twice succeeds once: the first redemption marks the row used and records the use time, and a second attempt in a later second changes nothing and does not rewrite the use time.
+- [x] COUPON-005 A coupon that is not usable by this holder is refused in one conditional update and left in the state it was found: already used, marked failed, expired, not yet valid, and a coupon held by another uid each return zero affected rows.
+- [x] COUPON-006 Two redemptions of one coupon released together from separate processes leave exactly one winner: the loser observes zero affected rows and the row records a single use.
 
 ## Storefront paths broken by the removal
 
@@ -105,6 +120,9 @@ against the seeded install SQL; payment transports stay offline.
 - [x] MIG-012 `rollback` refuses, without touching a single table name or row, when any recorded row was edited after apply; the refusal happens before the first rename.
 - [x] MIG-013 `rollback` can be retried: after a rename completed but the data restore failed, a second run restores the remaining rows and repeating it again changes nothing.
 - [x] MIG-014 A refused `plan` leaves the database unmodified.
+- [x] MIG-015 A fresh install already ships the reliability schema: the payment-attempt and effect tables with their unique keys, and the two refund columns.
+- [x] MIG-016 The reliability migration adds every missing table and refund column to a database that predates them, verifies the result by re-reading the schema, leaves existing order and refund rows alone with an empty new refund number, and leaves nothing to do on a second run.
+- [x] MIG-017 The reliability migration finishes an interrupted release: a run that stopped after the first table is completed by the next one, and the object that already exists is not planned again.
 
 ## Maintenance tools
 

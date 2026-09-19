@@ -263,7 +263,16 @@ class StoreOrderCreateServices extends BaseServices
         /** @var StoreOrderCartInfoServices $cartServices */
         $cartServices = app()->make(StoreOrderCartInfoServices::class);
         $priceData['coupon_id'] = $couponId;
-        $order = $this->transaction(function () use ($cartIds, $orderInfo, $cartInfo, $key, $userInfo, $useIntegral, $priceData, $combinationId, $cartServices, $uid, $addressId, $advanceId) {
+        $order = $this->transaction(function () use ($cartIds, $orderInfo, $cartInfo, $key, $userInfo, $useIntegral, $priceData, $combinationId, $cartServices, $uid, $addressId, $advanceId, $couponId) {
+            // 核销优惠券：条件更新保证同一张券在并发下最多成功一次，
+            // 且与订单、库存处于同一事务，任何一步失败都会一起回滚。
+            if ($couponId && $priceData['coupon_price'] > 0) {
+                /** @var StoreCouponUserServices $couponUserServices */
+                $couponUserServices = app()->make(StoreCouponUserServices::class);
+                if ((int)$couponUserServices->redeemCoupon((int)$couponId, (int)$uid) !== 1) {
+                    throw new ApiException('选择的优惠劵无效');
+                }
+            }
             //创建订单
             $order = $this->dao->save($orderInfo);
             if (!$order) {

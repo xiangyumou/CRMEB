@@ -20,6 +20,7 @@ use app\services\order\{StoreCartServices,
     StoreOrderComputedServices,
     StoreOrderCreateServices,
     StoreOrderInvoiceServices,
+    StoreOrderPaymentAttemptServices,
     StoreOrderRefundServices,
     StoreOrderServices,
     StoreOrderStatusServices,
@@ -244,6 +245,8 @@ class StoreOrderController
             ['quitUrl', ''],
             ['type', 0]
         ], true);
+        //这个缓存锁只用来挡住同一用户的重复点击，不作为并发正确性保障：
+        //真正的串行化由订单行状态和支付尝试记录负责
         $payLock = CacheService::get('PAY_LOCK_' . $uni);
         if ($payLock) return app('json')->fail('订单支付中，请勿重复支付');
         CacheService::set('PAY_LOCK_' . $uni, 'PAY_LOCK', 2);
@@ -275,6 +278,24 @@ class StoreOrderController
                 return app('json')->status('success', '支付成功', ['order_id' => $orderInfo['order_id'], 'key' => $orderInfo['unique']]);
             else
                 return app('json')->status('pay_error', '支付失败');
+        }
+
+        /**
+         * 调用网关之前先落库这一次支付尝试。网关侧的商户订单号就是下面的
+         * order_id，而订单表的 order_id 会随付款人改写，回调只能靠这条记录
+         * 才能准确归属，取消流程也要靠它才能确认网关侧没有可收款的单子。
+         */
+        /** @var StoreOrderPaymentAttemptServices $attemptServices */
+        $attemptServices = app()->make(StoreOrderPaymentAttemptServices::class);
+        $attemptServices->record((int)$order['id'], (string)$order['order_id'], sys_config('pay_wechat_type') == 1 ? 'v3_wechat_pay' : 'wechat_pay', [
+            'channel' => (int)$orderInfo['is_channel'],
+            'pay_type' => $paytype,
+            'total_fee' => (string)$orderInfo['pay_price'],
+            'pay_uid' => $uid,
+        ]);
+        //落库之后重新读取订单，确认它在这段时间里没有被支付或取消
+        if (!$this->services->getForUpdate((int)$order['id']) instanceof \think\Model) {
+            return app('json')->fail('订单已经超过系统支付时间，无法支付，请重新下单');
         }
 
         $payInfo = $payServices->beforePay($order->toArray(), $paytype, ['quitUrl' => $quitUrl]);

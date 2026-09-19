@@ -47,7 +47,9 @@ class ChannelService
     public static function connet()
     {
         $config = config('workerman.channel');
-        Client::connect($config['ip'], $config['port']);
+        //拆容器部署时 workerman 监听 0.0.0.0，客户端必须连服务名而不是回环地址
+        $clientIp = $config['client_ip'] ?? $config['ip'] ?? '127.0.0.1';
+        Client::connect($clientIp, (int)($config['port'] ?? 40003));
     }
 
     /**
