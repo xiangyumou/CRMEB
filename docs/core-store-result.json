@@ -1,16 +1,16 @@
 {
   "baseline_commit": "66681c07d76ce79c6794721563029f8ea4af023b",
-  "head_commit": "3158d266940f9ab578626e231189c12cd14cfdd8",
+  "head_commit": "79f47cec019f47ba4ce3152e20fd253dad9ef014",
   "categories": {
     "source": {
-      "files": 2326,
-      "bytes": 29748476,
-      "lines": 490759
+      "files": 2327,
+      "bytes": 29809906,
+      "lines": 491941
     },
     "published-and-assets": {
       "files": 2359,
-      "bytes": 102290669,
-      "lines": 75796
+      "bytes": 102291015,
+      "lines": 75797
     },
     "vendored": {
       "files": 0,
@@ -19,16 +19,16 @@
     },
     "other": {
       "files": 277,
-      "bytes": 31032940,
-      "lines": 86973
+      "bytes": 31040894,
+      "lines": 87051
     }
   },
   "source_reduction": {
-    "files": 469,
-    "bytes": 20511392,
-    "lines": 176973
+    "files": 468,
+    "bytes": 20449962,
+    "lines": 175791
   },
-  "source_physical_line_reduction_percent": 26.5,
+  "source_physical_line_reduction_percent": 26.3,
   "validation": {
     "regression_tests": 179,
     "regression_assertions": 837,
@@ -45,7 +45,7 @@
       "wechat-payment-test"
     ],
     "source_checks": "sh scripts/check-maintenance.sh crmeb-test, on an image built with VCS_REF=$(git rev-parse HEAD): the regression suite, the PHP 7.4 lint and the nine static guards above",
-    "admin_build": "not re-run in this round; no admin source changed. Rebuild crmeb/public/admin and .build/release/admin with scripts/build-admin.sh before release",
+    "admin_build": "not re-run in this round; no admin source changed. The manifest baked into the image was re-assembled at this revision and reuses the artifacts built for 81ab0b1b with their recorded artifactSha256 values unchanged. Rebuild crmeb/public/admin and .build/release/admin with scripts/build-admin.sh before release",
     "h5_and_miniprogram_builds": "not re-run in this round; real H5 and MP-WEIXIN builds remain operator steps",
     "merchant_payment_acceptance": "not run; needs live WeChat merchant credentials and a device (purchase, group buy, presale, refund)",
     "production_migration": "the 2026-09-17 rehearsal used a copy of the pre-cleanup schema seeded with historical orders and predates this round's plan changes; the current script is covered by CoreStoreMigrationTest (18 cases) on a disposable schema, and no shop with historical business data has been migrated"

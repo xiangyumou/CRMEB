@@ -327,4 +327,7 @@ cases were red first: with the production fixes stashed, the four affected test
 classes reported 39 tests, 166 assertions, 1 error and 15 failures. This is source
 and behaviour verification only. No admin, H5 or mini-program bundle was rebuilt in
 this round, and no real-device or live-merchant payment/refund acceptance was run;
-those remain release steps.
+those remain release steps. The image carries the front-end artifacts built for
+`81ab0b1b` — the fix commit changes no front-end source, their recorded
+`artifactSha256` values still match the files on disk, and the release manifest was
+re-assembled for this revision so the image could be built from it at all.
