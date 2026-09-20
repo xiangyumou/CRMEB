@@ -67,6 +67,12 @@ try {
         case 'agree-refund':
             $result = Tests\Regression\Support\BusinessDriver::agreeRefund((int)$id, (string)$value);
             break;
+        case 'refund-agree':
+            // The full refund service entry (freeze + execute + complete), used
+            // when the admin controller shape is not the point of the test.
+            $service = app()->make(app\services\order\StoreOrderRefundServices::class);
+            $result = $service->agreeRefund((int)$id, ['refund_price' => (string)$value, 'pay_price' => (string)$value], []);
+            break;
         default:
             throw new RuntimeException('unknown action ' . $action);
     }

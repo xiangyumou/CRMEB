@@ -390,11 +390,21 @@ final class CoreStoreMigrationTest extends RegressionTestCase
         $this->registerCleanup(function () use ($backup) {
             if (is_file($backup)) unlink($backup);
         });
+        // The roster row is edited twice below. If an assertion fails in between,
+        // the edit would survive into the next run and turn this test's own
+        // precondition into "already changed", so the original value is restored
+        // on cleanup no matter how the test ends.
+        $rosterRow = Db::name('system_config')->where('menu_name', 'order_notice_admin_uids')->find();
+        self::assertIsArray($rosterRow, 'the install ships the order-notice roster setting');
+        $this->registerCleanup(function () use ($rosterRow): void {
+            Db::name('system_config')->where('id', (int)$rosterRow['id'])->update(['value' => $rosterRow['value']]);
+        });
         [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
         self::assertSame(0, $status, $output);
 
-        $rosterId = (int)Db::name('system_config')->where('menu_name', 'order_notice_admin_uids')->value('id');
+        $rosterId = (int)$rosterRow['id'];
         $afterApply = (string)Db::name('system_config')->where('id', $rosterId)->value('value');
+        self::assertNotSame('"4242"', $afterApply, 'the apply produced a roster value of its own to edit');
         Db::name('system_config')->where('id', $rosterId)->update(['value' => '"4242"']);
 
         [$status, $output] = $this->runScript('rollback ' . escapeshellarg($backup));

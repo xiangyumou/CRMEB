@@ -416,8 +416,8 @@ class StoreOrderController
                 if (!$price) {
                     return app('json')->fail('请输入退款金额');
                 }
-                $data['refunded_price'] = bcadd($price, $orderRefund['refunded_price'], 2);
-                $bj = bccomp((float)$orderRefund['refund_price'], (float)$data['refunded_price'], 2);
+                //累计与上限校验由服务在事务内按冻结请求完成
+                $bj = bccomp((float)$orderRefund['refund_price'], (float)$price, 2);
                 if ($bj < 0) {
                     return app('json')->fail('退款金额大于支付金额，请修改退款金额');
                 }

@@ -32,6 +32,11 @@ use think\console\Output;
  *   php think order:reconcile effects:retry <id> --ack-duplicate-risk --operator=<操作人>
  *                                                      显式确认重复执行风险后人工重试
  *
+ *   php think order:reconcile refunds:list             列出处理中或结果未知的退款
+ *   php think order:reconcile refunds:inspect <id>     展示退款冻结上下文与网关事实
+ *   php think order:reconcile refunds:retry <id> --operator=<操作人>
+ *                                                      按原退款单号查询后补齐本地写入
+ *
  * Class OrderReconcile
  * @package crmeb\command
  */
@@ -40,12 +45,12 @@ class OrderReconcile extends Command
     protected function configure()
     {
         $this->setName('order:reconcile')
-            ->addArgument('action', Argument::REQUIRED, 'payments:list|payments:inspect|payments:refund|effects:list|effects:inspect|effects:retry')
+            ->addArgument('action', Argument::REQUIRED, 'payments:list|payments:inspect|payments:refund|refunds:list|refunds:inspect|refunds:retry|effects:list|effects:inspect|effects:retry')
             ->addArgument('id', Argument::OPTIONAL, '记录ID')
             ->addOption('confirm-trade-no', null, Option::VALUE_REQUIRED, '人工确认的网关交易号，必须与记录一致')
             ->addOption('operator', null, Option::VALUE_REQUIRED, '操作人，退款与重试必填')
             ->addOption('ack-duplicate-risk', null, Option::VALUE_NONE, '显式确认重复执行可能带来的外部副作用')
-            ->setDescription('异常收款与未知副作用的人工核对');
+            ->setDescription('异常收款、未知退款与未知副作用的人工核对');
     }
 
     protected function execute(Input $input, Output $output)
@@ -59,6 +64,12 @@ class OrderReconcile extends Command
                 return $this->paymentsInspect($id, $output);
             case 'payments:refund':
                 return $this->paymentsRefund($id, $input, $output);
+            case 'refunds:list':
+                return $this->refundsList($output);
+            case 'refunds:inspect':
+                return $this->refundsInspect($id, $output);
+            case 'refunds:retry':
+                return $this->refundsRetry($id, $input, $output);
             case 'effects:list':
                 return $this->effectsList($output);
             case 'effects:inspect':
@@ -149,8 +160,81 @@ class OrderReconcile extends Command
         return 1;
     }
 
-    private function effectsList(Output $output): int
+    private function refundsList(Output $output): int
     {
+        /** @var \app\services\order\StoreOrderRefundServices $services */
+        $services = app()->make(\app\services\order\StoreOrderRefundServices::class);
+        $rows = $services->pendingReconcileList(200);
+        if (!$rows) {
+            $output->writeln('没有处理中或结果未知的退款。');
+
+            return 0;
+        }
+        $output->writeln(sprintf('%-6s %-8s %-24s %-10s %-10s %s', 'ID', '订单', '退款单号', '金额', '状态', '冻结时间'));
+        foreach ($rows as $row) {
+            $request = json_decode((string)$row['refund_request'], true);
+            $request = is_array($request) ? $request : [];
+            $output->writeln(sprintf(
+                '%-6d %-8d %-24s %-10s %-10s %s',
+                (int)$row['id'],
+                (int)$row['store_order_id'],
+                (string)$row['out_refund_no'],
+                (string)($request['refund_price'] ?? '0'),
+                (int)$row['refund_state'] === 2 ? '结果未知' : '处理中',
+                isset($request['frozen_time']) ? date('Y-m-d H:i:s', (int)$request['frozen_time']) : ''
+            ));
+        }
+        $output->writeln(sprintf('共 %d 条，用 refunds:inspect <id> 查看两侧事实。', count($rows)));
+
+        return 0;
+    }
+
+    private function refundsInspect(int $id, Output $output): int
+    {
+        /** @var \app\services\order\StoreOrderRefundServices $services */
+        $services = app()->make(\app\services\order\StoreOrderRefundServices::class);
+        try {
+            $detail = $services->inspectRefund($id);
+        } catch (\Throwable $e) {
+            $output->error($e->getMessage());
+
+            return 1;
+        }
+        $output->writeln('本地售后单:');
+        $output->writeln(json_encode($detail['refund'], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        $output->writeln('冻结的支付上下文:');
+        $output->writeln(json_encode($detail['context'], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        $output->writeln('网关退款事实:');
+        $output->writeln($detail['gateway'] === null
+            ? '无法查询（缺少冻结上下文或退款单号）'
+            : json_encode($detail['gateway'], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
+        return 0;
+    }
+
+    private function refundsRetry(int $id, Input $input, Output $output): int
+    {
+        $operator = (string)$input->getOption('operator');
+        if ($operator === '') {
+            $output->error('重试必须携带 --operator=<操作人>');
+
+            return 1;
+        }
+        /** @var \app\services\order\StoreOrderRefundServices $services */
+        $services = app()->make(\app\services\order\StoreOrderRefundServices::class);
+        try {
+            $result = $services->retryUnknownRefund($id, $operator);
+        } catch (\Throwable $e) {
+            $output->error($e->getMessage());
+
+            return 1;
+        }
+        $output->writeln(sprintf('按原退款单号 %s 核对并补齐本地写入完成。', $result['refund_no']));
+
+        return 0;
+    }
+
+    private function effectsList(Output $output): int    {
         /** @var StoreOrderEffectServices $services */
         $services = app()->make(StoreOrderEffectServices::class);
         $rows = $services->pendingIds(200);

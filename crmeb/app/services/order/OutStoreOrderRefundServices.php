@@ -203,8 +203,8 @@ class OutStoreOrderRefundServices extends BaseServices
                 throw new ApiException('已退完支付金额，不能再退款了');
             }
 
-            $data['refunded_price'] = bcadd($refundPrice, $orderRefund['refunded_price'], 2);
-            $bj = bccomp((string)$orderRefund['refund_price'], $data['refunded_price'], 2);
+            //金额上限与累计校验由服务在事务内按冻结请求完成
+            $bj = bccomp((string)$orderRefund['refund_price'], (string)$refundPrice, 2);
             if ($bj < 0) {
                 throw new ApiException('退款金额大于支付金额，请修改退款金额');
             }

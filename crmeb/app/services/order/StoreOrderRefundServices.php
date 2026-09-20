@@ -40,6 +40,17 @@ use think\facade\Db;
  */
 class StoreOrderRefundServices extends BaseServices
 {
+    /** 退款请求已冻结，尚未提交网关 */
+    const REFUND_STATE_SUBMITTED = 0;
+    /** 网关已受理，本地收尾未完成 */
+    const REFUND_STATE_PROCESSING = 1;
+    /** 网关结果未知，只能按原退款单号查询，不能换号重发 */
+    const REFUND_STATE_UNKNOWN = 2;
+    /** 退款成功且本地写入完成 */
+    const REFUND_STATE_SUCCESS = 3;
+    /** 网关明确关闭或失败 */
+    const REFUND_STATE_CLOSED = 4;
+
     /**
      * 订单services
      * @var StoreOrderServices
@@ -122,17 +133,23 @@ class StoreOrderRefundServices extends BaseServices
      */
     public function agreeRefund(int $id, array $refundData, array $completion = [])
     {
-        //先把稳定退款单号和请求上下文冻结到售后单上（独立提交，不受后面回滚影响）
+        //先把稳定退款单号、金额和完整支付上下文冻结到售后单上（独立提交，
+        //不受后面回滚影响）
         $freeze = $this->freezeRefundRequest($id, $refundData);
         $refundData['refund_id'] = $freeze['out_refund_no'];
         if ($freeze['refund_price'] !== null) {
             $refundData['refund_price'] = $freeze['refund_price'];
         }
-
-        $order = $this->transaction(function () use ($id, $refundData, $completion) {
+        //控制器不再自算完成金额：本地收尾状态由服务在事务内按冻结请求与锁内
+        //读到的累计生成
+        $order = $this->transaction(function () use ($id, $refundData, $freeze) {
             //退款拆分
             $orderRefundInfo = $this->dao->getForUpdate($id);
             if (!$orderRefundInfo) throw new AdminException('数据不存在');
+            //执行事务取得锁后重新检查：售后是否被取消、当前状态是否仍允许退款、
+            //冻结请求是否与本次输入一致
+            $this->assertRefundExecutable($orderRefundInfo, $freeze, $refundData);
+            $completion = $this->refundCompletion($refundData, $orderRefundInfo);
             $cart_ids = [];
             if ($orderRefundInfo['cart_info']) {
                 foreach ($orderRefundInfo['cart_info'] as $cart) {
@@ -184,18 +201,22 @@ class StoreOrderRefundServices extends BaseServices
                     $refundOrder = $splitOrderInfo;
                 }
                 $this->assertWechatRefundable($refundOrder);
+                //累计退款不得超过原支付金额（同一原订单下的多个售后单一起算）
+                $this->assertCumulativeRefundWithinPaid($refundOrder, $splitOrderInfo, $refundData['refund_price']);
                 $no = $refundOrder['order_id'];
                 if ($refundOrder['trade_no']) {
                     $no = $refundOrder['trade_no'];
                     $refundData['type'] = 'trade_no';
                 }
-                if (sys_config('pay_wechat_type')) {
-                    $drivers = 'v3_wechat_pay';
-                } else {
-                    $drivers = 'wechat_pay';
+                //驱动与渠道取自冻结的支付上下文：配置后来改了也不会退款到别的商户
+                $drivers = (string)($freeze['context']['driver'] ?? '');
+                if ($drivers === '') {
+                    $drivers = sys_config('pay_wechat_type') ? 'v3_wechat_pay' : 'wechat_pay';
                 }
                 /** @var Pay $pay */
                 $pay = app()->make(Pay::class, [$drivers]);
+                //网关受理不等于退款完成：先把状态置为处理中，成功后再置为成功
+                $this->dao->update($id, ['refund_state' => self::REFUND_STATE_PROCESSING, 'update_time' => time()]);
                 if ($refundOrder['is_channel'] == 1) {
                     $refundData['trade_no'] = $refundOrder['trade_no'];
                     $refundData['pay_new_weixin_open'] = sys_config('pay_new_weixin_open');
@@ -250,6 +271,9 @@ class StoreOrderRefundServices extends BaseServices
             if ($completion) {
                 $this->dao->update($id, $completion);
             }
+            //本地写入完成才把退款状态置为成功：网关受理但本地失败时保持处理中，
+            //重试先查询原请求再补齐本地写入
+            $this->dao->update($id, ['refund_state' => self::REFUND_STATE_SUCCESS, 'update_time' => time()]);
 
             return $splitOrderInfo;
         });
@@ -282,18 +306,20 @@ class StoreOrderRefundServices extends BaseServices
     }
 
     /**
-     * 冻结一次退款的稳定单号与请求金额
+     * 冻结一次退款的稳定单号、金额与完整支付上下文
      *
      * 退款单号取自售后单自身的售后单号（持久化且唯一），因此无论重试多少次
      * 都是同一个值，微信侧按 out_refund_no 幂等，不会重复退款。金额只在首次
-     * 记录，之后重试一律沿用，避免网关受理后金额被改大。
+     * 记录，之后重试一律沿用；重试携带不同金额时明确拒绝，不再静默忽略。
+     * 原支付订单、实际支付交易、驱动、商户、应用、渠道与币种一并冻结，执行
+     * 阶段不再读取当前配置来决定退到哪个商户。
      *
      * 这一步独立提交，不受 agreeRefund 主事务回滚影响；"网关已受理但本地回滚"
      * 的重试因此能够复用同一编号与金额。
      *
      * @param int $id 售后单ID
      * @param array $refundData
-     * @return array{out_refund_no:string,refund_price:float}
+     * @return array{out_refund_no:string,refund_price:string|null,context:array}
      * @throws \think\db\exception\DbException
      * @throws \think\db\exception\DataNotFoundException
      * @throws \think\db\exception\ModelNotFoundException
@@ -310,6 +336,9 @@ class StoreOrderRefundServices extends BaseServices
             if (!in_array((int)$orderRefundInfo['refund_type'], [1, 5], true)) {
                 throw new AdminException('售后订单状态不支持该操作');
             }
+            if ((int)($orderRefundInfo['is_cancel'] ?? 0) === 1) {
+                throw new AdminException('该售后单已取消，请勿重复操作');
+            }
 
             $storedRequest = [];
             if (!empty($orderRefundInfo['refund_request'])) {
@@ -323,27 +352,315 @@ class StoreOrderRefundServices extends BaseServices
                 $outRefundNo = (string)$orderRefundInfo['order_id'];
             }
 
-            //金额一旦冻结就不再接受新值，保证"网关受理后本地回滚"重试时金额不变
-            $refundPrice = array_key_exists('refund_price', $storedRequest)
-                ? (float)$storedRequest['refund_price']
-                : (float)($refundData['refund_price'] ?? 0);
+            if (!empty($storedRequest)) {
+                //已冻结：金额不一致明确拒绝，不再静默沿用（重试输入 20 元而首次
+                //冻结 10 元时，操作人必须知道这次请求被拒绝了）
+                $frozenPrice = (string)($storedRequest['refund_price'] ?? '0');
+                $inputPrice = (string)($refundData['refund_price'] ?? $frozenPrice);
+                if (bccomp($this->normalizeAmount($frozenPrice), $this->normalizeAmount($inputPrice), 2) !== 0) {
+                    throw new AdminException('退款请求已冻结，不能修改退款金额');
+                }
+                if (trim((string)$orderRefundInfo['out_refund_no']) === '') {
+                    $this->dao->update($id, ['out_refund_no' => $outRefundNo]);
+                }
 
-            if (empty($storedRequest)) {
-                $this->dao->update($id, [
+                return [
                     'out_refund_no' => $outRefundNo,
-                    'refund_request' => json_encode([
-                        'refund_price' => $refundPrice,
-                        'pay_price' => (string)($refundData['pay_price'] ?? ''),
-                        'order_id' => (string)($refundData['order_id'] ?? ''),
-                        'frozen_time' => time(),
-                    ], JSON_UNESCAPED_UNICODE),
-                ]);
-            } elseif (trim((string)$orderRefundInfo['out_refund_no']) === '') {
-                $this->dao->update($id, ['out_refund_no' => $outRefundNo]);
+                    'refund_price' => $frozenPrice,
+                    'context' => is_array($storedRequest['context'] ?? null) ? $storedRequest['context'] : [],
+                ];
             }
 
-            return ['out_refund_no' => $outRefundNo, 'refund_price' => $refundPrice];
+            $refundPrice = $this->normalizeAmount((string)($refundData['refund_price'] ?? '0'));
+            $context = $this->refundContext($orderRefundInfo, $refundData);
+            $this->dao->update($id, [
+                'out_refund_no' => $outRefundNo,
+                'refund_state' => self::REFUND_STATE_SUBMITTED,
+                'refund_request' => json_encode([
+                    'refund_price' => $refundPrice,
+                    'pay_price' => (string)($refundData['pay_price'] ?? ''),
+                    'order_id' => (string)($refundData['order_id'] ?? ''),
+                    'currency' => 'CNY',
+                    'context' => $context,
+                    'frozen_time' => time(),
+                ], JSON_UNESCAPED_UNICODE),
+            ]);
+
+            return ['out_refund_no' => $outRefundNo, 'refund_price' => $refundPrice, 'context' => $context];
         });
+    }
+
+    /**
+     * 处理中或结果未知的退款，供人工核对
+     * @param int $limit
+     * @return array
+     */
+    public function pendingReconcileList(int $limit = 100): array
+    {
+        return Db::name('store_order_refund')
+            ->whereIn('refund_state', [self::REFUND_STATE_PROCESSING, self::REFUND_STATE_UNKNOWN])
+            ->order('id')
+            ->limit($limit)
+            ->select()
+            ->toArray();
+    }
+
+    /**
+     * 人工核对一条退款：冻结上下文、本地状态与网关事实
+     * @param int $id
+     * @return array
+     */
+    public function inspectRefund(int $id): array
+    {
+        $row = $this->dao->get($id);
+        if (!$row) {
+            throw new AdminException('售后单不存在');
+        }
+        $row = $row->toArray();
+        $request = json_decode((string)$row['refund_request'], true);
+        $request = is_array($request) ? $request : [];
+        $context = is_array($request['context'] ?? null) ? $request['context'] : [];
+        $gateway = null;
+        $driver = (string)($context['driver'] ?? '');
+        if ($driver !== '' && trim((string)$row['out_refund_no']) !== '') {
+            try {
+                /** @var Pay $pay */
+                $pay = app()->make(Pay::class, [$driver]);
+                $gateway = $pay->queryRefund(
+                    (string)($context['trade_no'] ?? $context['order_id'] ?? ''),
+                    (string)$row['out_refund_no'],
+                    ['pay_new_weixin_open' => (bool)sys_config('pay_new_weixin_open')]
+                );
+            } catch (\Throwable $e) {
+                $gateway = ['state' => 'unknown', 'refund_no' => (string)$row['out_refund_no'], 'raw' => $e->getMessage()];
+            }
+        }
+
+        return ['refund' => $row, 'context' => $context, 'gateway' => $gateway];
+    }
+
+    /**
+     * 人工重试一条结果未知的退款
+     *
+     * 只按冻结的原退款单号查询，确认网关侧结果后再补齐本地写入；不换单号重发，
+     * 也不重复回库、拆单或记账。网关明确失败时保留未知状态交给人工决策。
+     *
+     * @param int $id
+     * @param string $operator
+     * @return array{status:string,refund_no:string}
+     */
+    public function retryUnknownRefund(int $id, string $operator): array
+    {
+        if (trim($operator) === '') {
+            throw new AdminException('重试必须记录操作人');
+        }
+        $row = $this->dao->get($id);
+        if (!$row) {
+            throw new AdminException('售后单不存在');
+        }
+        $row = $row->toArray();
+        if ((int)$row['refund_type'] === 6) {
+            throw new AdminException('该售后单已完成退款，请勿重复操作');
+        }
+        if ((string)$row['refund_state'] !== (string)self::REFUND_STATE_PROCESSING
+            && (int)$row['refund_state'] !== self::REFUND_STATE_UNKNOWN) {
+            throw new AdminException('该售后单当前状态不需要重试');
+        }
+        $detail = $this->inspectRefund($id);
+        $state = (string)($detail['gateway']['state'] ?? 'unknown');
+        if ($state !== 'success') {
+            $this->dao->update($id, [
+                'refund_state' => self::REFUND_STATE_UNKNOWN,
+                'update_time' => time(),
+            ]);
+            throw new AdminException('网关侧退款结果为 ' . $state . '，请人工核实后再处理');
+        }
+        //网关已确认退款成功：只补齐本地收尾，不再调用网关
+        $request = $detail['context'];
+        $refundPrice = (string)($detail['refund']['refund_price'] ?? '0');
+        $completion = $this->refundCompletion(['refund_price' => $refundPrice], $detail['refund']);
+        $this->dao->update($id, $completion + [
+            'refund_state' => self::REFUND_STATE_SUCCESS,
+            'refund_request' => json_encode(($request ? ['context' => $request] : []) + [
+                'refund_price' => $refundPrice,
+                'retried_by' => $operator,
+                'retried_time' => time(),
+            ], JSON_UNESCAPED_UNICODE),
+            'update_time' => time(),
+        ]);
+        //订单本地状态补齐：退款成功但本地未写入的订单
+        $orderId = (int)$row['store_order_id'];
+        if ($orderId > 0) {
+            $this->storeOrderServices->update($orderId, ['status' => -2, 'refund_status' => 2, 'refund_type' => 6, 'refund_price' => $refundPrice], 'id');
+            /** @var StoreOrderStatusServices $statusService */
+            $statusService = app()->make(StoreOrderStatusServices::class);
+            $statusService->save([
+                'oid' => $orderId,
+                'change_type' => 'refund_price',
+                'change_message' => '人工核对后补齐退款：' . $refundPrice . '元',
+                'change_time' => time(),
+            ]);
+        }
+
+        return ['status' => 'success', 'refund_no' => (string)$row['out_refund_no']];
+    }
+
+    /**
+     * 冻结的支付上下文：原支付订单、实际支付交易、驱动、商户、应用与渠道
+     *
+     * @param mixed $orderRefundInfo
+     * @param array $refundData
+     * @return array<string, string|int>
+     */
+    protected function refundContext($orderRefundInfo, array $refundData): array
+    {
+        $orderId = (int)($orderRefundInfo['store_order_id'] ?? 0);
+        $order = $orderId > 0 ? $this->storeOrderServices->get($orderId) : null;
+        $order = $order ? $order->toArray() : [];
+        if (!empty($order['pid'])) {
+            $parent = $this->storeOrderServices->get((int)$order['pid']);
+            if ($parent) $order = $parent->toArray();
+        }
+        $driver = sys_config('pay_wechat_type') ? 'v3_wechat_pay' : 'wechat_pay';
+        $identity = app()->make(StoreOrderPaymentAttemptServices::class)
+            ->configIdentity((int)($order['is_channel'] ?? 0));
+
+        return [
+            'store_order_id' => (int)($order['id'] ?? $orderId),
+            'order_id' => (string)($order['order_id'] ?? ''),
+            'trade_no' => (string)($order['trade_no'] ?? ''),
+            'driver' => $driver,
+            'mch_id' => (string)$identity['mch_id'],
+            'app_id' => (string)$identity['app_id'],
+            'channel' => (int)($order['is_channel'] ?? 0),
+            'pay_type' => (string)($order['pay_type'] ?? ''),
+        ];
+    }
+
+    /**
+     * 执行事务内的重检：售后单被取消、状态不再允许、或冻结请求与本次输入不一致
+     * 时拒绝执行，绝不带着旧金额或旧状态去调用网关
+     *
+     * @param mixed $orderRefundInfo
+     * @param array $freeze
+     * @param array $refundData
+     * @return void
+     */
+    protected function assertRefundExecutable($orderRefundInfo, array $freeze, array $refundData): void
+    {
+        $refundType = (int)$orderRefundInfo['refund_type'];
+        if ($refundType === 6) {
+            throw new AdminException('该售后单已完成退款，请勿重复操作');
+        }
+        if ($refundType === 3) {
+            throw new AdminException('该售后单已拒绝，无法退款');
+        }
+        if ((int)($orderRefundInfo['is_cancel'] ?? 0) === 1) {
+            throw new AdminException('该售后单已取消，请勿重复操作');
+        }
+        if (!in_array($refundType, [1, 5], true)) {
+            throw new AdminException('售后订单状态不支持该操作');
+        }
+        if ((string)$orderRefundInfo['out_refund_no'] !== (string)$freeze['out_refund_no']) {
+            throw new AdminException('退款请求已被其他操作冻结，请刷新后重试');
+        }
+    }
+
+    /**
+     * 同一原支付订单下的累计退款不得超过原支付金额
+     *
+     * 金额校验必须按"原支付订单"这一个付款事实来累计：拆分退款会把售后单重新
+     * 指向拆分出来的子订单，所以统计要覆盖父订单与它的全部子订单，否则同一笔
+     * 支付的第二张售后单会绕过上限。
+     *
+     * @param mixed $refundOrder 真正收到款的订单（子订单会回退到父订单）
+     * @param mixed $splitOrderInfo 本次退款的拆分订单
+     * @param string $refundPrice
+     * @return void
+     */
+    protected function assertCumulativeRefundWithinPaid($refundOrder, $splitOrderInfo, string $refundPrice): void
+    {
+        $refundOrder = is_object($refundOrder) ? $refundOrder->toArray() : (array)$refundOrder;
+        $splitOrderInfo = is_object($splitOrderInfo) ? $splitOrderInfo->toArray() : (array)$splitOrderInfo;
+        $paid = $this->normalizeAmount((string)($refundOrder['pay_price'] ?? '0'));
+        if (bccomp($paid, '0', 2) <= 0) {
+            return;
+        }
+        $family = $this->orderFamilyIds((int)$refundOrder['id']);
+        //已成功退款的售后单（排除本单）与本次金额之和
+        $refunded = Db::name('store_order_refund')
+            ->whereIn('store_order_id', $family)
+            ->where('id', '<>', (int)($splitOrderInfo['id'] ?? 0))
+            ->where('refund_type', 6)
+            ->sum('refunded_price');
+        $total = bcadd($this->normalizeAmount((string)$refunded), $this->normalizeAmount($refundPrice), 2);
+        if (bccomp($total, $paid, 2) > 0) {
+            throw new AdminException('累计退款金额超过原支付金额，请核对后重试');
+        }
+    }
+
+    /**
+     * 一个付款事实涉及的全部订单ID：父订单与它的子订单
+     *
+     * @param int $orderId
+     * @return int[]
+     */
+    protected function orderFamilyIds(int $orderId): array
+    {
+        if ($orderId <= 0) {
+            return [];
+        }
+        $root = $orderId;
+        $row = Db::name('store_order')->where('id', $orderId)->field('id,pid')->find();
+        while ($row && (int)$row['pid'] > 0) {
+            $root = (int)$row['pid'];
+            $row = Db::name('store_order')->where('id', $root)->field('id,pid')->find();
+        }
+        $children = Db::name('store_order')->where('pid', $root)->column('id');
+        $ids = array_map('intval', $children);
+        $ids[] = $root;
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * 生成本地收尾状态：金额由冻结请求决定，控制器不再自算 refunded_price
+     *
+     * refunded_price 是这张售后单上累计已退的金额（部分退款可以多次同意），
+     * 因此是"锁内读到的累计 + 本次退款"，全部用十进制定点字符串计算，不经过
+     * 浮点数，也不采信控制器可能已过期的输入。
+     *
+     * @param array $refundData
+     * @param mixed $lockedRefund 事务内加锁读到的售后单
+     * @return array
+     */
+    protected function refundCompletion(array $refundData, $lockedRefund): array
+    {
+        $refunded = $this->normalizeAmount((string)($refundData['refund_price'] ?? '0'));
+        $row = is_object($lockedRefund) ? $lockedRefund->toArray() : (array)$lockedRefund;
+        $alreadyRefunded = $this->normalizeAmount((string)($row['refunded_price'] ?? '0'));
+
+        return [
+            'refund_type' => 6,
+            'refunded_price' => bcadd($alreadyRefunded, $refunded, 2),
+            'refunded_time' => time(),
+        ];
+    }
+
+    /**
+     * 金额统一为两位小数的十进制定点字符串，不经过浮点数
+     *
+     * @param string $amount
+     * @return string
+     */
+    protected function normalizeAmount(string $amount): string
+    {
+        $amount = trim($amount);
+        if ($amount === '' || !preg_match('/^-?\d+(?:\.\d+)?$/', $amount)) {
+            return '0.00';
+        }
+
+        return bcadd($amount, '0', 2);
     }
 
     /**

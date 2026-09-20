@@ -256,6 +256,15 @@ final class StatefulGateway extends Pay
         );
     }
 
+    /** A refund row that already exists at the gateway (e.g. from a lost response). */
+    public function seedRefund(string $outRefundNo, string $outTradeNo, string $fee, string $state = 'success'): void
+    {
+        TestConnection::exec(
+            sprintf('REPLACE INTO %s (out_refund_no, out_trade_no, refund_fee, state, created) VALUES (?, ?, ?, ?, ?)', TestConnection::table(self::REFUND_TABLE)),
+            [$outRefundNo, $outTradeNo, $fee, $state, time()]
+        );
+    }
+
     // ------------------------------------------------------------------
     // Observation
     // ------------------------------------------------------------------

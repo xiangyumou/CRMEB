@@ -163,8 +163,10 @@ final class RefundTest extends RegressionTestCase
     /**
      * The refund gateway call cannot be rolled back with the transaction that raised
      * it, so a retry — the same admin after a local failure, or a concurrent one —
-     * has to replay the same gateway number and the same amount. A second attempt
-     * that asked for more money would be a second refund request, not a retry.
+     * has to replay the same gateway number and the same amount. An attempt that
+     * asks for a different amount is refused outright: silently reusing the frozen
+     * amount would hide an operator error, and sending the new amount would be a
+     * second refund request.
      */
     public function testRefundNumberAndAmountStayFrozenAcrossRetries(): void
     {
@@ -178,23 +180,36 @@ final class RefundTest extends RegressionTestCase
 
         $first = $service->exposeFreeze((int)$refund['id'], ['refund_price' => '10.00', 'pay_price' => '10.00']);
         self::assertSame((string)$refund['order_id'], $first['out_refund_no'], 'the persisted after-sale number is the gateway number');
-        self::assertSame(10.0, $first['refund_price']);
+        self::assertSame('10.00', $first['refund_price'], 'the frozen amount is a decimal string');
 
-        $second = $service->exposeFreeze((int)$refund['id'], ['refund_price' => '99.00', 'pay_price' => '99.00']);
-        self::assertSame($first['out_refund_no'], $second['out_refund_no'], 'the retry reuses the same gateway number');
-        self::assertSame(10.0, $second['refund_price'], 'the retry cannot raise the frozen amount');
+        // The identical retry replays the frozen number and amount.
+        $again = $service->exposeFreeze((int)$refund['id'], ['refund_price' => '10.00', 'pay_price' => '10.00']);
+        self::assertSame($first['out_refund_no'], $again['out_refund_no'], 'the retry reuses the same gateway number');
+        self::assertSame('10.00', $again['refund_price'], 'the retry reuses the frozen amount');
+
+        // A different amount is refused instead of being silently replaced.
+        try {
+            $service->exposeFreeze((int)$refund['id'], ['refund_price' => '99.00', 'pay_price' => '99.00']);
+            self::fail('a retry with a different amount must be refused');
+        } catch (\Throwable $e) {
+            self::assertStringContainsString('冻结', $e->getMessage());
+        }
 
         $stored = Db::name('store_order_refund')->where('id', $refund['id'])->find();
         self::assertSame($first['out_refund_no'], (string)$stored['out_refund_no']);
         $frozen = json_decode((string)$stored['refund_request'], true);
         self::assertIsArray($frozen, 'the frozen request is persisted');
-        self::assertSame(10.0, (float)$frozen['refund_price']);
+        self::assertSame('10.00', (string)$frozen['refund_price']);
+        self::assertIsArray($frozen['context'] ?? null, 'the frozen request carries the payment context');
+        self::assertArrayHasKey('driver', $frozen['context']);
+        self::assertArrayHasKey('mch_id', $frozen['context']);
     }
 
     /**
      * The freeze step is the only thing serializing two refund attempts for one
-     * after-sale row. Two processes released together must still agree on one
-     * number and one amount, otherwise a double submit refunds twice.
+     * after-sale row. Two processes released together with the same amount must
+     * still agree on one number and one amount; a competing attempt with a
+     * different amount is refused.
      */
     public function testConcurrentRefundsFreezeOneNumberAndAmount(): void
     {
@@ -205,7 +220,7 @@ final class RefundTest extends RegressionTestCase
             'refund_type' => 1, 'refund_price' => '10.00', 'out_refund_no' => '', 'refund_request' => '',
         ]);
 
-        $results = $this->race('refund-freeze', (int)$refund['id'], ['10.00', '99.00']);
+        $results = $this->race('refund-freeze', (int)$refund['id'], ['10.00', '10.00']);
 
         self::assertSame(
             $results[0]['out_refund_no'],
@@ -221,8 +236,8 @@ final class RefundTest extends RegressionTestCase
         $stored = Db::name('store_order_refund')->where('id', $refund['id'])->find();
         self::assertSame($results[0]['out_refund_no'], (string)$stored['out_refund_no']);
         self::assertSame(
-            (float)$results[0]['refund_price'],
-            (float)json_decode((string)$stored['refund_request'], true)['refund_price']
+            (string)$results[0]['refund_price'],
+            (string)json_decode((string)$stored['refund_request'], true)['refund_price']
         );
     }
 

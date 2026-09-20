@@ -27974,7 +27974,8 @@ CREATE TABLE IF NOT EXISTS `eb_store_order_refund` (
   `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '申请退款时间',
   `is_system_del` tinyint(1) DEFAULT '0' COMMENT '系统删除',
   `out_refund_no` varchar(64) NOT NULL DEFAULT '' COMMENT '提交给支付网关的退款单号，重试时必须复用',
-  `refund_request` text COMMENT '首次发起退款时冻结的请求上下文（金额、渠道、驱动）',
+  `refund_request` text COMMENT '首次发起退款时冻结的请求上下文（原支付订单、交易号、驱动、商户、应用、渠道、金额、币种）',
+  `refund_state` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0未提交 1处理中 2结果未知 3成功 4关闭/失败',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='退款订单表';
 

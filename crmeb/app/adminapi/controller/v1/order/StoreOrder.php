@@ -462,8 +462,8 @@ class StoreOrder extends AuthController
             $refund_price = $data['refund_price'];
         }
 
-        $data['refunded_price'] = bcadd($data['refund_price'], $orderRefund['refunded_price'], 2);
-        $bj = bccomp((string)$orderRefund['refund_price'], (string)$data['refunded_price'], 2);
+        //累计与上限校验由服务在事务内按冻结请求完成
+        $bj = bccomp((string)$orderRefund['refund_price'], (string)$refund_price, 2);
         if ($bj < 0) {
             return app('json')->fail('退款金额大于支付金额，请修改退款金额');
         }
