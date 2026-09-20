@@ -9,16 +9,16 @@ which items are still open for that reason.
 
 | Item | Value |
 |---|---|
-| Source commit | `817b4950d87efa569b4fbc87b58ae9e85db592c4` (`cleanup/retired-features`) |
-| Test image | `crmeb-test` (local) — `sha256:6e8782dcbc8516422829b19d9d48b86d42c171b92cc8f778051d915142f39524` |
-| Image revision label | `817b4950d87efa569b4fbc87b58ae9e85db592c4` (matches `git rev-parse HEAD`) |
+| Source commit | `50cd8dd7bd3ce467484509a0854876c00ab736de` (`cleanup/retired-features`) |
+| Test image | `crmeb-test` (local) — `sha256:55829506c62bba23f84d8e5469ee0d68e51f7f8b8df0ddb1be3e575699ef3d4a` |
+| Image revision label | `50cd8dd7bd3ce467484509a0854876c00ab736de` (matches `git rev-parse HEAD`) |
 | Frontend build | `scripts/build-release.sh` on Node 20.19.0 / npm 10.8.2, UniApp 2.0.2-5020420260813001 |
 | Admin digest | `a504aa8280f067eeb430045599cd39da3e28be78d32c4b56feeb330bd1cea927` |
-| H5 digest | `422c09ebfae2e369664b3ac5486c0b69aa63a325ffa40a33f9440796dabaaf97` |
-| Mini-program digest | `5c9886b6edaea1b889e24a9984182c9e572511b2f8a7809d6504daee0e722fda` (not publishable: no AppID configured) |
+| H5 digest | `3b018fecaf50dbf30f50584d917e5a87a1868805e7f81c08f59c73d44e82d0e7` |
+| Mini-program digest | `e519aed4466d760f7d473f9c4c610a198d38ea9d083c20dadc5a5d0006836bf1` (not publishable: no AppID configured) |
 | Gate command | `sh scripts/check-maintenance.sh crmeb-test` — exit 0 |
-| Core regression suite | 250 tests, 1281 assertions, 0 failures, 0 errors, 0 skipped |
-| Deployment rule suites | 8 publish checks + 7 upgrade/rollback checks, both against real infrastructure |
+| Core regression suite | 254 tests, 3530 assertions, 0 failures, 0 errors, 0 skipped |
+| Deployment rule suites | 8 publish checks against a local registry + 7 upgrade/rollback checks against a disposable stack + 10/10 concurrency-stability repetitions + 10/10 mutation targets detected |
 | Working tree | The image was built from this commit with a clean tree; `.build/release/build.json` names the same commit. |
 
 The revision label alone does not prove content. What makes the claim
@@ -40,12 +40,14 @@ git diff --name-only <recorded SHA>..<commit with this file> | grep -vE '^(docs/
 
 | Layer | Command | Result |
 |---|---|---|
-| PHPUnit (unit + DB integration + HTTP + concurrency) | `docker/run-regression.sh` inside the gate | 250 green |
+| PHPUnit (unit + DB integration + HTTP + concurrency + fixed-seed state sequence) | `docker/run-regression.sh` inside the gate | 254 green |
 | PHP syntax | `php -l` over `app`, `crmeb`, `route`, `upgrade` in the release image | green |
 | Static guards | core-store-front, admin-api-contract, retired-code-guard, install-sql-guard, model-relation-guard, php-symbol-guard, event-payload-guard, deployment-topology-guard, release-pipeline-guard, verify-release-test, wechat-payment-test | green |
 | Publish rules against a local registry | `tests/deployment/publish-release.sh` | 8/8 |
 | Upgrade/rollback rules against a real disposable stack | `tests/deployment/upgrade-rollback.sh` | 7/7 |
 | Full HTTP topology (real MySQL, Redis, php-fpm, workerman, queue, timer, nginx) | `docker/verify-http-stack.sh` | passed |
+| Concurrency stability (two orderings, ten repetitions each) | `tests/deployment/concurrency-stability.sh` | 10/10 (42 tests, 2440 assertions per repetition) |
+| Test strength (directed mutation, temporary copy only) | `tests/deployment/mutation-check.sh` | 10/10 protections detected |
 | Frontend build | `scripts/build-release.sh` (Node 20.19.0) | rebuilt for this SHA |
 
 The regression suite runs on MySQL 8 (with `ONLY_FULL_GROUP_BY`), Redis 5,
@@ -80,6 +82,22 @@ Two test-infrastructure defects were also found and fixed, because a failing
 test must not poison the next run: the migration test now resets the roster row
 it edits (`9fd06a02`, `f6ac0683`), and the reliability tests establish their own
 pre-check baseline and restore any probe column's type.
+
+### Test strength
+
+Two checks exist specifically to stop the suite from passing vacuously:
+
+- **Fixed-seed state sequence** (`OrderStateSequenceTest`, four seeds in the
+  suite): a randomized interleaving of real operations over three orders checks
+  the invariants after every step, and a failure prints the seed and the whole
+  event log so the run replays exactly with `CRMEB_STATE_SEQUENCE_SEED`.
+- **Directed mutation** (`tests/deployment/mutation-check.sh`): each of ten
+  protections is removed in a temporary copy of the workspace — never the
+  working tree — and the matching test must fail. All ten are detected: the
+  payment/cancel order lock, attempt immutability, the gateway-confirmed close,
+  the refund amount freeze, the coupon remaining-count guard, the virtual-card
+  atomic claim, the service-generated refund completion, TLS peer verification,
+  response signature validation, and the cancelled-order payment branch.
 
 ## 4. Risk matrix completion
 
