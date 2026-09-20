@@ -236,6 +236,51 @@ class StoreCouponIssueDao extends BaseDao
     }
 
     /**
+     * 加锁读取可领取的优惠券详情，供并发领取在同一把锁内复查
+     *
+     * @param int $id
+     * @return array|\think\Model|null
+     * @throws \think\db\exception\DataNotFoundException
+     * @throws \think\db\exception\DbException
+     * @throws \think\db\exception\ModelNotFoundException
+     */
+    public function getForUpdate(int $id)
+    {
+        return $this->getModel()->where('status', 1)
+            ->where('id', $id)
+            ->where('is_del', 0)
+            ->where(function ($query) {
+                $query->where(function ($query) {
+                    $query->where('start_time', '<', time())->where('end_time', '>', time());
+                })->whereOr(function ($query) {
+                    $query->where('start_time', 0)->where('end_time', 0);
+                });
+            })
+            ->lock(true)
+            ->find();
+    }
+
+    /**
+     * 原子扣减剩余领取数量，返回受影响行数
+     *
+     * 受影响行数为 0 表示券已被领完：调用方据此拒绝本次领取，绝不把剩余量
+     * 扣成负数，也不会让两个并发请求都拿到最后一张。
+     *
+     * @param int $id
+     * @param int $num
+     * @return int
+     */
+    public function decRemainCount(int $id, int $num = 1): int
+    {
+        return $this->getModel()
+            ->where('id', $id)
+            ->where('remain_count >= ' . $num)
+            ->where('is_permanent', 0)
+            ->dec('remain_count', $num)
+            ->update();
+    }
+
+    /**
      * 获取金大于额的优惠卷金额
      * @param string $totalPrice
      * @return float

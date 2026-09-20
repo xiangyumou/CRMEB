@@ -44,6 +44,18 @@ $result = null;
 $error = '';
 try {
     switch ($action) {
+        case 'coupon-claim':
+            // The real storefront claim entry: per-user limit, remaining count and
+            // the conditional decrement all run for real. The service takes the
+            // hydrated user object the middleware would have produced.
+            $user = app()->make(app\services\user\UserServices::class)->get((int)$value);
+            if (!$user) {
+                throw new RuntimeException('user not found: ' . $value);
+            }
+            app()->make(app\services\activity\coupon\StoreCouponIssueServices::class)
+                ->issueUserCoupon((int)$id, $user, true);
+            $result = true;
+            break;
         case 'coupon-redeem':
             $result = app()->make(app\services\activity\coupon\StoreCouponUserServices::class)
                 ->redeemCoupon((int)$id, (int)$value);

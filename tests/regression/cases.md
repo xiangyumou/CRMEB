@@ -66,6 +66,17 @@ against the seeded install SQL; payment transports stay offline.
 - [x] ORDER-003 An unpaid order can be cancelled once, a paid one never, and neither leaves a duplicate status row.
 - [x] ORDER-004 Over real HTTP, submitting an order with an already spent coupon is refused before any write: no order row, the product stock unchanged and the coupon still spent rather than returned.
 
+## Core business invariants (independent review)
+
+- [x] ORDER-005 Only an unpaid, cancelled or refunded order can be deleted by its owner: a paid or shipped one stays, a stranger cannot delete any order, and the refused attempts change nothing.
+- [x] ORDER-006 A cancelled order cannot be paid afterwards (the refusal leaves no attempt behind) and a refunded order cannot be confirmed as received.
+- [x] ORDER-007 A repeated receipt is refused and does not add a second receipt status row.
+- [x] ORDER-008 An order whose second stock deduction fails rolls back completely: no order row, the first item's product and SKU stock restored, and the failed item untouched.
+- [x] COUPON-007 The last coupon cannot be claimed twice: one concurrent claim wins, the other is refused, `remain_count` never goes negative and exactly one user holds it.
+- [x] COUPON-008 Two simultaneous claims by one user leave exactly one success, the loser refused by the per-user limit, and one claim record.
+- [x] AUTH-005 A stranger gets `订单不存在` (never the after-sale detail) from the storefront refund surface, and the admin refund route refuses an unauthenticated call without completing the after-sale.
+- [x] CLIENT-001 The retained purchase contract fields are accepted by the real routes; a paid order reports `已支付` rather than a new payment intent, and an order with an unknown gateway result is refused with a manual-handling message instead of a payment intent.
+
 ## Authorization
 
 - [x] AUTH-001 Standard and legacy authorization headers populate the authenticated request.

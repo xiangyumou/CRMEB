@@ -393,18 +393,27 @@ class StoreCouponIssueServices extends BaseServices
         $issueUserService = app()->make(StoreCouponIssueUserServices::class);
         /** @var StoreCouponUserServices $couponUserService */
         $couponUserService = app()->make(StoreCouponUserServices::class);
-        // 已经领取过的数量
-        $issueUserCount = $issueUserService->getIssueUserCount($uid, $id);
-        if ($issueUserCount >= $issueCouponInfo['receive_limit']) {
-            throw new ApiException('不能再次领取此优惠券');
-        }
         $this->transaction(function () use ($issueUserService, $uid, $id, $couponUserService, $issueCouponInfo, $is_receive) {
+            /**
+             * 每人限领与剩余量都必须在锁内重新读一次，并用带条件的更新扣减：
+             * 先读后写会让两个并发领取都通过限领检查、都把剩余量减 1，最后一张
+             * 券就能被领走两次。
+             */
+            $locked = $this->dao->getForUpdate((int)$id);
+            if (!$locked) throw new ApiException('领取的优惠劵已领完或已过期');
+            $limit = (int)$locked['receive_limit'];
+            $already = $issueUserService->getIssueUserCount($uid, (int)$id);
+            if ($limit > 0 && $already >= $limit) {
+                throw new ApiException('不能再次领取此优惠券');
+            }
+            if ($is_receive && (int)$locked['total_count'] > 0) {
+                //带条件的原子扣减：受影响行数为 0 说明最后一张已被别人领走
+                if ($this->dao->decRemainCount((int)$id) === 0) {
+                    throw new ApiException('该优惠券已领完');
+                }
+            }
             $issueUserService->save(['uid' => $uid, 'issue_coupon_id' => $id, 'add_time' => time()]);
             $couponUserService->addUserCoupon($uid, $issueCouponInfo, $is_receive ? 'get' : 'send');
-            if ($issueCouponInfo['total_count'] > 0 && $is_receive) {
-                $issueCouponInfo['remain_count'] -= 1;
-                $issueCouponInfo->save();
-            }
         });
     }
 
