@@ -152,6 +152,16 @@ against the seeded install SQL; payment transports stay offline.
 - [x] MIG-016 The reliability migration adds every missing table and refund column to a database that predates them, verifies the result by re-reading the schema, leaves existing order and refund rows alone with an empty new refund number, and leaves nothing to do on a second run.
 - [x] MIG-017 The reliability migration finishes an interrupted release: a run that stopped after the first table is completed by the next one, and the object that already exists is not planned again.
 
+## Release publishing (independent review)
+
+- [x] REL-001 The first publish of a commit creates its commit-scoped tags and reports a digest.
+- [x] REL-002 Republishing the same commit reuses the same digest and is reported as a no-op.
+- [x] REL-003 A candidate whose content differs from an existing tag fails the publish and names the digest it found, instead of silently republishing.
+- [x] REL-004 A registry query that cannot tell whether a tag exists aborts instead of being read as "absent".
+- [x] REL-005 Promotion refuses a candidate that was never published and a candidate from another commit, and moves the deployment tag only to the verified digest.
+- [x] REL-006 A static guard keeps the workflows calling the tested script (no inline publish helpers), keeps automated publishing from moving the deployment tag, requires the manual promotion inputs (digest, source SHA, acceptance record) and forbids the promotion workflow from rebuilding or pushing an image.
+- [x] REL-007 Releases are serialized repository-wide and never cancelled mid-publish.
+
 ## Deployment topology (independent review)
 
 - [x] OPS-001 The workerman health probe completes its Channel round trip through the address the configuration names: an empty `CLIENT_IP` is refused and there is no 127.0.0.1 fallback, so a bad address fails instead of passing inside its own container.

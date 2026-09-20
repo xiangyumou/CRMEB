@@ -1,0 +1,112 @@
+# Manual promotion of a verified candidate to the deployment tag.
+#
+# Publishing a candidate and moving `edge` are deliberately separate operations:
+# the automated workflow publishes commit-scoped, immutable tags, and this
+# workflow only moves the deployment tag — it never rebuilds anything, so the
+# digest that was tested is the digest that ships. It takes the candidate's
+# digest, the source commit and the acceptance record, verifies that the digest
+# really is the one the manifest of that commit resolves to, and then promotes
+# through the same tested script the automated path uses.
+name: Promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Source commit the candidate was built from (full SHA)
+        required: true
+      candidate_digest:
+        description: Candidate image digest (sha256:...)
+        required: true
+      acceptance_record:
+        description: Link or id of the acceptance record (release-readiness entry)
+        required: true
+      deployment_tag:
+        description: Deployment tag to move
+        required: false
+        default: edge
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: promote-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ghcr.io/xiangyumou/crmeb
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+
+      - name: Set up buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify the candidate digest belongs to the source commit
+        shell: bash
+        env:
+          CANDIDATE_DIGEST: ${{ inputs.candidate_digest }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -Eeuo pipefail
+          case "$SOURCE_SHA" in
+            *[!0-9a-f]*|'') echo "source_sha must be a full lowercase hex SHA" >&2; exit 1 ;;
+          esac
+          test "${#SOURCE_SHA}" -eq 40 || { echo "source_sha must be 40 characters" >&2; exit 1; }
+          case "$CANDIDATE_DIGEST" in
+            sha256:*) ;;
+            *) echo "candidate_digest must be a sha256:... digest" >&2; exit 1 ;;
+          esac
+
+          published="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$IMAGE_NAME:sha-$SOURCE_SHA")"
+          if [ -z "$published" ]; then
+            echo "no published candidate for $SOURCE_SHA" >&2
+            exit 1
+          fi
+          if [ "$published" != "$CANDIDATE_DIGEST" ]; then
+            echo "the tag for $SOURCE_SHA resolves to $published, not the requested $CANDIDATE_DIGEST" >&2
+            echo 'Promotion refuses to ship an image that was not built from this commit.' >&2
+            exit 1
+          fi
+          echo "candidate $CANDIDATE_DIGEST matches $SOURCE_SHA"
+
+      - name: Require the acceptance record
+        shell: bash
+        env:
+          ACCEPTANCE_RECORD: ${{ inputs.acceptance_record }}
+        run: |
+          set -Eeuo pipefail
+          test -n "${ACCEPTANCE_RECORD}" || { echo 'an acceptance record is required' >&2; exit 1; }
+          # The record is part of docs/release-readiness.md, so promotion cannot
+          # run for a build nobody signed off.
+          if ! grep -qF "$ACCEPTANCE_RECORD" docs/release-readiness.md; then
+            echo "acceptance record '$ACCEPTANCE_RECORD' is not in docs/release-readiness.md" >&2
+            exit 1
+          fi
+
+      - name: Promote the verified digest
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DEPLOYMENT_TAG: ${{ inputs.deployment_tag }}
+        run: |
+          set -Eeuo pipefail
+          # The deployment tag moves only to the already-published candidate; no
+          # image is built here, so the digest verified above is the digest served.
+          bash scripts/publish-release.sh promote \
+            "$IMAGE_NAME:$DEPLOYMENT_TAG" "$IMAGE_NAME:sha-$SOURCE_SHA" "$SOURCE_SHA"
+          echo "Promoted $IMAGE_NAME:sha-$SOURCE_SHA to $IMAGE_NAME:$DEPLOYMENT_TAG"

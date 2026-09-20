@@ -21,5 +21,8 @@ node tests/static/model-relation-guard.cjs
 node tests/static/php-symbol-guard.cjs
 node tests/static/event-payload-guard.cjs
 node tests/static/deployment-topology-guard.cjs
+node tests/static/release-pipeline-guard.cjs
 node tests/static/verify-release-test.cjs
+# 发布与备份/回滚规则要对着真实 registry 与真实数据库跑一遍，而不是只读脚本
+sh tests/deployment/publish-release.sh
 node tests/static/wechat-payment-test.mjs
