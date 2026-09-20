@@ -427,3 +427,25 @@ case was red first — on the pre-fix code `runById` was called zero times. Sour
 behaviour and container-topology verification only: no admin, H5 or mini-program
 bundle was rebuilt in this round, and no real-device or live-merchant
 payment/refund acceptance was run; those remain release steps.
+
+## Final pre-release review (2026-09-20)
+
+The next review added the missing `CREATING` payment-attempt state and aligned the
+queue fixtures with the persisted attempt schema. Payment creation freezes the
+attempt while the gateway request is in flight; cancellation sees that state under
+the order lock and keeps the resources. The gateway call is outside the database
+transaction to avoid holding a row lock across a network timeout, while the attempt
+state prevents cancellation from observing a false empty window. The final order
+read refuses a response after cancellation and leaves an uncertain gateway result
+for reconciliation.
+
+The previous paragraph claiming an unprotected cancellation window is obsolete and
+must not be used as a release finding. The remaining release blockers are human:
+production-backup restore rehearsal, a maintenance-window migration with the real
+seven orders and three ordinary coupon claims preserved, real WeChat v3 purchase
+and refund, and real-device normal/group/presale acceptance. The mini-program
+channel remains disabled until its query/close contract is verified.
+
+The current regression gate is 260 tests and 3567 assertions. The release record in
+`docs/release-readiness.md` is the authoritative list of automated evidence and
+open production conditions; this progress log is historical context.
