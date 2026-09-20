@@ -105,12 +105,19 @@ class StoreOrderSuccessServices extends BaseServices
             if ($outTradeNo !== '') {
                 $attemptServices->markPaidByOutTradeNo($outTradeNo, (string)($updata['trade_no'] ?? ''));
             }
-            $attemptServices->closeRemaining($orderId);
+            //其余未决尝试不再本地关闭：事务里登记逐尝试关单任务，提交后向网关
+            //真实关单，只有网关明确关闭成功才修改尝试状态
+            $paidAttemptId = 0;
+            if ($outTradeNo !== '') {
+                $paidAttempt = $attemptServices->findByOutTradeNo($outTradeNo);
+                $paidAttemptId = (int)($paidAttempt['id'] ?? 0);
+            }
+            $closeTaskIds = $effectServices->recordCloseTasks($orderId, $paidAttemptId > 0 ? [$paidAttemptId] : []);
             $effectId = $effectServices->record($orderId, StoreOrderEffectServices::EVENT_PAY_SUCCESS, [
                 'trade_no' => (string)($updata['trade_no'] ?? ''),
                 'out_trade_no' => $outTradeNo,
             ]);
-            return $effectId;
+            return ['effect_id' => $effectId, 'close_task_ids' => $closeTaskIds];
         });
         if (!$paid) {
             return false;
@@ -118,8 +125,10 @@ class StoreOrderSuccessServices extends BaseServices
         //事务提交之后再执行外部动作：队列可用时由消费者执行，队列关闭时同步执行。
         //执行失败或进程中断留下的待处理记录，由定时任务补投。
         try {
-            // 参数必须是参数数组：传裸值会被当成方法名，通知会静默丢失。
-            OrderEffectJob::dispatch([(int)$paid]);
+            foreach (array_merge([$paid['effect_id']], $paid['close_task_ids']) as $effectId) {
+                // 参数必须是参数数组：传裸值会被当成方法名，通知会静默丢失。
+                OrderEffectJob::dispatch([(int)$effectId]);
+            }
         } catch (\Throwable $e) {
             Log::error('订单支付后置动作执行失败:' . $e->getMessage(), ['order_id' => $orderId]);
         }

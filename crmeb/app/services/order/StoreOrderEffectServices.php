@@ -13,6 +13,8 @@ namespace app\services\order;
 
 use app\dao\order\StoreOrderEffectDao;
 use app\model\order\StoreOrderEffect;
+use app\model\order\StoreOrderPaymentAttempt;
+use app\model\order\StoreOrderPaymentException;
 use app\services\BaseServices;
 use think\facade\Log;
 
@@ -30,6 +32,8 @@ class StoreOrderEffectServices extends BaseServices
 {
     /** 支付成功后的通知、打印、开票、流水等后置动作 */
     const EVENT_PAY_SUCCESS = 'pay_success';
+    /** 逐尝试关单任务前缀，完整事件名为 close_attempt.<支付尝试ID> */
+    const EVENT_CLOSE_ATTEMPT_PREFIX = 'close_attempt.';
 
     /**
      * StoreOrderEffectServices constructor.
@@ -64,6 +68,35 @@ class StoreOrderEffectServices extends BaseServices
             'update_time' => $now,
         ]);
         return (int)$effect['id'];
+    }
+
+    /**
+     * 为订单名下每一条未决支付尝试登记一条关单任务
+     *
+     * 支付成功事务调用本方法：本地不会再认领这些尝试，但网关侧的支付单必须
+     * 逐条真实关闭，只有网关明确关闭成功才把尝试标记为已关闭。任务按尝试
+     * 拆分，一条失败不影响其他尝试。
+     *
+     * @param int $storeOrderId
+     * @param int[] $excludeAttemptIds 已确认支付、无需关单的尝试
+     * @return int[] 关单任务的副作用记录ID
+     */
+    public function recordCloseTasks(int $storeOrderId, array $excludeAttemptIds = []): array
+    {
+        /** @var StoreOrderPaymentAttemptServices $attemptServices */
+        $attemptServices = app()->make(StoreOrderPaymentAttemptServices::class);
+        $taskIds = [];
+        foreach ($attemptServices->openAttempts($storeOrderId) as $attempt) {
+            if (in_array((int)$attempt['id'], $excludeAttemptIds, true)) {
+                continue;
+            }
+            $taskIds[] = $this->record(
+                $storeOrderId,
+                self::EVENT_CLOSE_ATTEMPT_PREFIX . (int)$attempt['id'],
+                ['attempt_id' => (int)$attempt['id']]
+            );
+        }
+        return $taskIds;
     }
 
     /**
@@ -126,13 +159,78 @@ class StoreOrderEffectServices extends BaseServices
      */
     private function execute(array $effect): void
     {
-        switch ($effect['event_type']) {
+        $eventType = (string)$effect['event_type'];
+        if (strpos($eventType, self::EVENT_CLOSE_ATTEMPT_PREFIX) === 0) {
+            $this->closeAttempt($effect);
+            return;
+        }
+        switch ($eventType) {
             case self::EVENT_PAY_SUCCESS:
                 $this->paySuccess($effect['store_order_id']);
                 break;
             default:
-                throw new \RuntimeException('未知的订单副作用类型:' . $effect['event_type']);
+                throw new \RuntimeException('未知的订单副作用类型:' . $eventType);
         }
+    }
+
+    /**
+     * 执行一条关单任务：向网关真实关单，只有明确关闭成功才修改尝试状态
+     *
+     * 查到已收款说明订单支付之外还有一笔真实收款：落异常收款记录（人工退款），
+     * 不影响已支付订单本身。
+     *
+     * @param array $effect
+     * @return void
+     * @throws \RuntimeException 网关结果未知时抛出，任务标记未知等待补投
+     */
+    private function closeAttempt(array $effect): void
+    {
+        $payload = json_decode((string)$effect['payload'], true);
+        $attemptId = (int)($payload['attempt_id'] ?? 0);
+        $attemptId = $attemptId ?: (int)substr((string)$effect['event_type'], strlen(self::EVENT_CLOSE_ATTEMPT_PREFIX));
+        /** @var StoreOrderPaymentAttemptServices $attemptServices */
+        $attemptServices = app()->make(StoreOrderPaymentAttemptServices::class);
+        $attempt = $attemptServices->get($attemptId);
+        if (!$attempt) {
+            return; //尝试已不存在：任务完成
+        }
+        $attempt = $attempt->toArray();
+        /** @var \app\services\pay\PayTradeServices $payTrade */
+        $payTrade = app()->make(\app\services\pay\PayTradeServices::class);
+        $result = $payTrade->settleResult($attempt);
+        if (!empty($result['identity_mismatch'])) {
+            throw new \RuntimeException('支付配置与记录身份不匹配，请人工核对后处理');
+        }
+        if ($result['state'] === \app\services\pay\PayTradeServices::STATE_CLOSED) {
+            $attemptServices->mark($attemptId, StoreOrderPaymentAttempt::STATUS_CLOSED, 'close-task:closed');
+            return;
+        }
+        if ($result['state'] === \app\services\pay\PayTradeServices::STATE_PAID) {
+            //第二笔真实收款：落异常收款记录，由人工核对退款，不再动订单
+            /** @var StoreOrderPaymentExceptionServices $exceptions */
+            $exceptions = app()->make(StoreOrderPaymentExceptionServices::class);
+            $exceptions->record([
+                'store_order_id' => (int)$effect['store_order_id'],
+                'payment_attempt_id' => $attemptId,
+                'mch_id' => (string)($attempt['mch_id'] ?? ''),
+                'trade_no' => (string)($result['trade_no'] ?? ''),
+                'out_trade_no' => (string)($attempt['out_trade_no'] ?? ''),
+                'reason' => StoreOrderPaymentException::REASON_DUPLICATE,
+                'paid_amount' => (string)($attempt['total_fee'] ?? '0'),
+                'currency' => 'CNY',
+                'payment_context' => [
+                    'driver' => (string)($attempt['driver'] ?? ''),
+                    'channel' => (int)($attempt['channel'] ?? 0),
+                    'out_trade_no' => (string)($attempt['out_trade_no'] ?? ''),
+                ],
+            ]);
+            $attemptServices->mark($attemptId, StoreOrderPaymentAttempt::STATUS_PAID, 'close-task:paid', (string)($result['trade_no'] ?? ''));
+            return;
+        }
+        //未知或查无此单：保留尝试状态，等待补投或人工核对
+        throw new \RuntimeException(empty($result['not_exist'])
+            ? '关单结果未知，稍后重试'
+            : '网关查无此单但本地曾发起创建，保持待核对，请人工确认');
     }
 
     /**

@@ -69,6 +69,32 @@ CREATE TABLE IF NOT EXISTS `%s` (
   KEY `status` (`status`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单支付后置副作用';
 SQL,
+    'store_order_payment_exception' => <<<'SQL'
+CREATE TABLE IF NOT EXISTS `%s` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `store_order_id` int(11) NOT NULL DEFAULT '0' COMMENT '订单表ID，无法归属时为0',
+  `payment_attempt_id` int(11) NOT NULL DEFAULT '0' COMMENT '命中的支付尝试ID，无对应尝试时为0',
+  `mch_id` varchar(64) NOT NULL DEFAULT '' COMMENT '收款商户号',
+  `trade_no` varchar(100) NOT NULL DEFAULT '' COMMENT '网关交易号',
+  `out_trade_no` varchar(64) NOT NULL DEFAULT '' COMMENT '回调携带的商户订单号',
+  `reason` varchar(32) NOT NULL DEFAULT '' COMMENT '异常原因 duplicate_payment/cancelled_order_payment/unmatched_payment',
+  `paid_amount` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '实收金额',
+  `currency` varchar(8) NOT NULL DEFAULT 'CNY' COMMENT '币种',
+  `payment_context` text COMMENT '冻结的支付上下文（驱动、渠道、身份），不含密钥',
+  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0待处理 1已退款 2退款结果未知 3退款失败',
+  `refund_no` varchar(64) NOT NULL DEFAULT '' COMMENT '稳定退款单号，同一记录永远一致',
+  `refund_request` text COMMENT '退款请求与网关应答记录',
+  `operator` varchar(64) NOT NULL DEFAULT '' COMMENT '退款操作人',
+  `refund_time` int(11) NOT NULL DEFAULT '0' COMMENT '退款时间',
+  `alarm_time` int(11) NOT NULL DEFAULT '0' COMMENT '告警记录时间',
+  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '创建时间',
+  `update_time` int(11) NOT NULL DEFAULT '0' COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `mch_trade` (`mch_id`,`trade_no`) USING BTREE,
+  KEY `store_order_id` (`store_order_id`) USING BTREE,
+  KEY `status` (`status`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='异常收款记录';
+SQL,
 ];
 
 /** Columns the retained refund path needs on a table that already exists. */

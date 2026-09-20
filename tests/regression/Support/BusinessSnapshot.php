@@ -129,11 +129,12 @@ final class BusinessSnapshot
     }
 
     /**
-     * Capital flows linked to a merchant order number.
+     * Capital flows linked to a merchant order number (the table has no id
+     * column, so rows are ordered by their own flow id).
      */
     public static function capitalFlows(string $orderId): array
     {
-        return Db::name('capital_flow')->where('order_id', $orderId)->order('id')->select()->toArray();
+        return Db::name('capital_flow')->where('order_id', $orderId)->order('flow_id')->select()->toArray();
     }
 
     /**
@@ -170,6 +171,7 @@ final class BusinessSnapshot
 
     /**
      * Order status history rows (pay_success, refund_price, coupon_back, …).
+     * The table has no id column, so rows are ordered by their own time.
      */
     public static function orderStatusRows(int $orderId, ?string $changeType = null): array
     {
@@ -177,7 +179,7 @@ final class BusinessSnapshot
         if ($changeType !== null) {
             $query->where('change_type', $changeType);
         }
-        return $query->order('id')->select()->toArray();
+        return $query->order('change_time')->select()->toArray();
     }
 
     /**

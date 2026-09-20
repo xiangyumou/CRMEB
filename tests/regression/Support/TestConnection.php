@@ -91,4 +91,21 @@ final class TestConnection
 
         return $affected;
     }
+
+    /**
+     * Add a column to a test table when an older version of the suite created
+     * it without one. `CREATE TABLE IF NOT EXISTS` cannot evolve an existing
+     * table, so each test table declares its columns here as well.
+     */
+    public static function ensureColumn(string $unprefixedTable, string $column, string $definition): void
+    {
+        $table = self::table($unprefixedTable);
+        $exists = self::one(
+            'SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+            [$table, $column]
+        );
+        if (!$exists) {
+            self::exec(sprintf('ALTER TABLE `%s` ADD COLUMN `%s` %s', $table, $column, $definition));
+        }
+    }
 }

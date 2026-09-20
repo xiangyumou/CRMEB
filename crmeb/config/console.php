@@ -29,6 +29,7 @@ return [
         'workerman' => \crmeb\command\Workerman::class,
         'timer' => \crmeb\command\Timer::class,
         'util' => \crmeb\command\Util::class,
-        'npm' => \crmeb\command\Npm::class
+        'npm' => \crmeb\command\Npm::class,
+        'order:reconcile' => \crmeb\command\OrderReconcile::class
     ],
 ];

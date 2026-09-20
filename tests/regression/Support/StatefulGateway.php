@@ -77,6 +77,7 @@ final class StatefulGateway extends Pay
             respond_timeout tinyint NOT NULL DEFAULT 0,
             pay_before_response tinyint NOT NULL DEFAULT 0,
             fail_close tinyint NOT NULL DEFAULT 0,
+            fail_refund tinyint NOT NULL DEFAULT 0,
             query_timeout tinyint NOT NULL DEFAULT 0,
             close_timeout tinyint NOT NULL DEFAULT 0,
             hold_barrier varchar(64) NOT NULL DEFAULT "",
@@ -103,6 +104,8 @@ final class StatefulGateway extends Pay
             out_trade_no varchar(64) NOT NULL PRIMARY KEY,
             create_hold varchar(64) NOT NULL DEFAULT ""
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4', $p . self::SCENARIO_TABLE));
+        // Columns added to a table an earlier suite version already created.
+        TestConnection::ensureColumn(self::ORDER_TABLE, 'fail_refund', 'tinyint NOT NULL DEFAULT 0');
     }
 
     /**
@@ -208,6 +211,30 @@ final class StatefulGateway extends Pay
             sprintf('REPLACE INTO %s (out_refund_no, state, fail, created) VALUES (?, "closed", 1, ?)', TestConnection::table(self::REFUND_TABLE)),
             [$outRefundNo, time()]
         );
+    }
+
+    /**
+     * Every refund attempt for this merchant order number fails at the
+     * transport (the gateway can never confirm an outcome).
+     */
+    public function failRefundForTrade(string $outTradeNo): void
+    {
+        $this->upsertOrder($outTradeNo, ['fail_refund' => 1]);
+    }
+
+    /**
+     * How many distinct refund rows the gateway holds for an order: the proof
+     * that repeat executions did not pay out twice. The driver may identify the
+     * order by merchant order number or by trade number, so both are matched.
+     */
+    public function refundRowCount(string $identifier): int
+    {
+        $row = TestConnection::one(
+            sprintf('SELECT COUNT(*) AS total FROM %s WHERE out_trade_no = ? OR out_trade_no IN (SELECT trade_no FROM %s WHERE out_trade_no = ?)', TestConnection::table(self::REFUND_TABLE), TestConnection::table(self::ORDER_TABLE)),
+            [$identifier, $identifier]
+        );
+
+        return (int)($row['total'] ?? 0);
     }
 
     /** Refund is accepted (processing) and held on a barrier before the response. */
@@ -374,8 +401,19 @@ final class StatefulGateway extends Pay
             throw new \RuntimeException('offline gateway: refund without a refund number');
         }
         $order = $this->gatewayOrder($outTradeNo);
+        if (!$order) {
+            // A refund is identified by the merchant order number or by the
+            // gateway trade number; accept either, the way the real APIs do.
+            $order = TestConnection::one(
+                sprintf('SELECT * FROM %s WHERE trade_no = ?', TestConnection::table(self::ORDER_TABLE)),
+                [$outTradeNo]
+            );
+        }
         if (!$order || $order['state'] !== 'paid') {
             throw new \RuntimeException('offline gateway: refund against an unpaid gateway order');
+        }
+        if ((int)$order['fail_refund'] === 1) {
+            throw new \RuntimeException('offline gateway: refund transport error');
         }
         $existing = TestConnection::one(
             sprintf('SELECT * FROM %s WHERE out_refund_no = ?', TestConnection::table(self::REFUND_TABLE)),
