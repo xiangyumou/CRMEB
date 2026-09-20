@@ -9,22 +9,32 @@ which items are still open for that reason.
 
 | Item | Value |
 |---|---|
-| Source commit | `93e6844088648123c4acacdd589723d61fff140c` (`cleanup/retired-features`) |
-| Test image | `crmeb-test` (local) — `sha256:b9ad3fbf5039fb8b03987d21809e688850992b57afb3d8485df0db269d2df3a2` |
-| Image revision label | `93e6844088648123c4acacdd589723d61fff140c` (matches `git rev-parse HEAD`) |
+| Source commit | `817b4950d87efa569b4fbc87b58ae9e85db592c4` (`cleanup/retired-features`) |
+| Test image | `crmeb-test` (local) — `sha256:6e8782dcbc8516422829b19d9d48b86d42c171b92cc8f778051d915142f39524` |
+| Image revision label | `817b4950d87efa569b4fbc87b58ae9e85db592c4` (matches `git rev-parse HEAD`) |
 | Frontend build | `scripts/build-release.sh` on Node 20.19.0 / npm 10.8.2, UniApp 2.0.2-5020420260813001 |
 | Admin digest | `a504aa8280f067eeb430045599cd39da3e28be78d32c4b56feeb330bd1cea927` |
-| H5 digest | `5b7fde4746a03c0e965b6508437ca051407c27ffce9c8cfa5ca50528703fab6f` |
-| Mini-program digest | `b8412aba9e0549750bade6183c58e7a982cc2eb636bdd1e47b5f5274e310c814` (not publishable: no AppID configured) |
+| H5 digest | `422c09ebfae2e369664b3ac5486c0b69aa63a325ffa40a33f9440796dabaaf97` |
+| Mini-program digest | `5c9886b6edaea1b889e24a9984182c9e572511b2f8a7809d6504daee0e722fda` (not publishable: no AppID configured) |
 | Gate command | `sh scripts/check-maintenance.sh crmeb-test` — exit 0 |
 | Core regression suite | 250 tests, 1281 assertions, 0 failures, 0 errors, 0 skipped |
 | Deployment rule suites | 8 publish checks + 7 upgrade/rollback checks, both against real infrastructure |
 | Working tree | The image was built from this commit with a clean tree; `.build/release/build.json` names the same commit. |
 
-The revision label alone does not prove content: the image was built from the
-working tree at this SHA, the frontend was rebuilt for the same SHA, and
-`build.json` inside the image is checked by the Dockerfile against `VCS_REF`, so
-an image carrying a stale frontend fails its own build.
+The revision label alone does not prove content. What makes the claim
+verifiable here: the frontend was rebuilt for this exact SHA, `build.json`
+inside the image is compared by the Dockerfile against `VCS_REF` (so an image
+carrying a stale frontend refuses to build at all), the gate command took the
+image name and re-derived the revision from it, and the working tree was clean
+when the image was built.
+
+This record is itself a documentation file, so it lands in a docs-only commit
+after the revision it names. That is checkable rather than assumed:
+
+```sh
+git diff --name-only <recorded SHA>..<commit with this file> | grep -vE '^(docs/|README|tests/.*\.md$)'
+# expect no output: no source, schema, frontend or test code differs
+```
 
 ## 2. What the gate covers
 
