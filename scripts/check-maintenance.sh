@@ -26,4 +26,7 @@ node tests/static/verify-release-test.cjs
 # 发布与备份/回滚规则要对着真实 registry 与真实数据库跑一遍，而不是只读脚本
 bash tests/deployment/publish-release.sh
 bash tests/deployment/upgrade-rollback.sh "$image"
+# 并发场景至少覆盖两种执行顺序、每种重复 10 次；固定随机种子的状态序列失败时
+# 会输出可重放的种子与事件序列
+bash tests/deployment/concurrency-stability.sh "$image" 10
 node tests/static/wechat-payment-test.mjs

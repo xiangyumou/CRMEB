@@ -152,6 +152,12 @@ against the seeded install SQL; payment transports stay offline.
 - [x] MIG-016 The reliability migration adds every missing table and refund column to a database that predates them, verifies the result by re-reading the schema, leaves existing order and refund rows alone with an empty new refund number, and leaves nothing to do on a second run.
 - [x] MIG-017 The reliability migration finishes an interrupted release: a run that stopped after the first table is completed by the next one, and the object that already exists is not planned again.
 
+## Test strength and stability (independent review)
+
+- [x] SEQ-001 A fixed-seed sequence of real operations (create payment, gateway payment, cancel, refund, duplicate notification, close task) interleaved over three orders keeps every invariant after every step: a cancelled order keeps no collectible gateway payment, a paid attempt carries its trade number, money taken at the gateway is recorded locally, completed refunds never exceed the payment, and each stock layer keeps every unit in stock or sold. Four seeds run in the suite, and a failure prints the seed and the full event log for an exact replay.
+- [x] MUT-001 Removing any of ten protections (the payment/cancel order lock, attempt immutability, the gateway-confirmed close, the refund amount freeze, the coupon remaining-count guard, the virtual-card atomic claim, the service-generated refund completion, TLS peer verification, response signature validation, the cancelled-order payment branch) in a temporary copy makes the corresponding test fail; no protection is left unexercised.
+- [x] STAB-001 The concurrency set (payment creation vs cancellation, refund agreement in two processes, coupon races, the virtual-card race, multi-item rollback, the fixed-seed sequence) passes 10 consecutive repetitions with no flake.
+
 ## Backup, upgrade and rollback (independent review)
 
 - [x] OPS-005 `upgrade.sh` refuses a moving tag, records the running digest as the rollback target, and refuses a deployment whose roles run different images.
