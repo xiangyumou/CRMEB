@@ -854,7 +854,8 @@ class StoreOrderServices extends BaseServices
         }
 
         //事务二只锁定并冻结支付上下文；网关请求在事务提交后发起，避免取消
-        //流程在网关超时期间等待同一把订单锁。
+        //流程在网关超时期间等待同一把订单锁。CREATING 状态在网关调用期间
+        //保留资源，取消入口看到它会停止并等待下一次核对。
         $refused = false;
         try {
             $payInfo = $this->transaction(function () use ($order, $attempt, $paytype, $options, $attemptServices, &$refused) {

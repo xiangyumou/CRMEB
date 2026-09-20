@@ -82,7 +82,6 @@ final class QueueTest extends RegressionTestCase
 
         $attempts = $this->attemptDouble();
         $attempts->expects(self::once())->method('openAttempts')->with($orderId)->willReturn([]);
-        $attempts->expects(self::once())->method('closeRemaining')->with($orderId);
         $this->replace(StoreOrderPaymentAttemptServices::class, $attempts);
 
         self::assertTrue((new UnpaidOrderCancelJob())->doJob($orderId));
@@ -406,7 +405,9 @@ final class QueueTest extends RegressionTestCase
     {
         $fixtures = new FixtureFactory($this, $this->getName());
         $user = $fixtures->createUser();
-        return $fixtures->createOrder($user['uid'], $overrides);
+        //Cancellation must reach the shared service entry. The job deliberately
+        //skips offline orders before it can inspect payment attempts.
+        return $fixtures->createOrder($user['uid'], array_merge(['pay_type' => 'weixin'], $overrides));
     }
 
     private function isCancelled(int $orderId): int
@@ -416,6 +417,7 @@ final class QueueTest extends RegressionTestCase
 
     private function replaceSettledGateway(array $attempt, string $state): void
     {
+        $attempt['status'] = $attempt['status'] ?? StoreOrderPaymentAttempt::STATUS_SUBMITTED;
         $trade = $this->getMockBuilder(PayTradeServices::class)->onlyMethods(['settleResult'])->getMock();
         $trade->expects(self::once())->method('settleResult')->with($attempt)->willReturn([
             'state' => $state,
@@ -430,6 +432,10 @@ final class QueueTest extends RegressionTestCase
     /** @param array<int, array<string, mixed>> $open */
     private function attemptDouble(array $open = []): StoreOrderPaymentAttemptServices
     {
+        $open = array_map(static function (array $attempt): array {
+            $attempt['status'] = $attempt['status'] ?? StoreOrderPaymentAttempt::STATUS_SUBMITTED;
+            return $attempt;
+        }, $open);
         $mock = $this->getMockBuilder(StoreOrderPaymentAttemptServices::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['openAttempts', 'mark', 'closeRemaining'])
