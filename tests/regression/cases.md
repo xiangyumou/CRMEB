@@ -148,8 +148,8 @@ against the seeded install SQL; payment transports stay offline.
 - [x] MIG-012 `rollback` refuses, without touching a single table name or row, when any recorded row was edited after apply; the refusal happens before the first rename.
 - [x] MIG-013 `rollback` can be retried: after a rename completed but the data restore failed, a second run restores the remaining rows and repeating it again changes nothing.
 - [x] MIG-014 A refused `plan` leaves the database unmodified.
-- [x] MIG-015 A fresh install already ships the reliability schema: the payment-attempt and effect tables with their unique keys, and the two refund columns.
-- [x] MIG-016 The reliability migration adds every missing table and refund column to a database that predates them, verifies the result by re-reading the schema, leaves existing order and refund rows alone with an empty new refund number, and leaves nothing to do on a second run.
+- [x] MIG-015 A fresh install already ships the reliability schema: the payment-attempt, effect and exception-payment tables with their unique keys, and the three refund columns.
+- [x] MIG-016 The reliability migration adds every missing table, refund column and unique index to a database that predates them, verifies the result by re-reading the schema (types and indexes included), leaves existing order and refund rows alone with an empty new refund number, and leaves nothing to do on a second run.
 - [x] MIG-017 The reliability migration finishes an interrupted release: a run that stopped after the first table is completed by the next one, and the object that already exists is not planned again.
 
 ## Test strength and stability (independent review)
