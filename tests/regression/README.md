@@ -28,3 +28,33 @@ A checked item in `cases.md` must have executable assertions for the response, p
 - `FixtureFactory.php` — unique-prefix fixtures with per-row cleanup; `TestTokenFactory.php`/`AdminTokenFactory.php` mint real JWTs.
 
 The facilities exist only in the test stack: the gateway/barrier tables carry the `regression_` prefix, nothing in `crmeb/` reads them, and no production endpoint can trigger any of it.
+
+### Deployment-rule suites (`tests/deployment/`)
+
+These do not run inside the PHPUnit container: they exercise the release and
+upgrade rules against real infrastructure.
+
+- `publish-release.sh` — starts a throwaway registry and proves the publish rules
+  in `scripts/publish-release.sh`: a first publish creates the tags, republishing
+  the same commit is a no-op, a conflicting candidate fails and names both
+  digests, an unanswerable registry query aborts instead of being read as
+  "absent", and promotion only moves the deployment tag to a published candidate
+  of the same commit.
+- `upgrade-rollback.sh` — starts a disposable production-shaped stack seeded from
+  the install SQL and proves `deploy/production/upgrade.sh`: a moving tag is
+  refused, a dry run touches nothing, a failing migration keeps maintenance mode,
+  a truncated or unrestorable backup stops before any migration, the successful
+  path backs up, restores and verifies the backup, and `rollback.sh` refuses an
+  unavailable target.
+
+Both are part of `scripts/check-maintenance.sh`.
+
+### Where the results are recorded
+
+- `risk-matrix.md` — every retained business entry with its evidence and verdict.
+- `cases.md` — the executable cases, including this round's defects and
+  independent invariants.
+- `defects.md` — each defect with its pre-fix failure, the fix commit and the
+  passing case.
+- `../docs/release-readiness.md` — the release record for the final commit:
+  identifiers, gate results, defect-to-test mapping and the open acceptance items.

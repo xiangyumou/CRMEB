@@ -70,6 +70,147 @@ returns the standard result (state, fresh trade number, amount, driver,
 merchant identity, `not_exist`), and a "查无此单" answer for an attempt that
 was created keeps 待核对 state instead of being read as "safe to release".
 
+### PAY-010 / PAY-011 (P1, plan 3.3): the other payment orders were closed locally and anomalies vanished
+
+`closeRemaining()` marked every other open attempt `STATUS_CLOSED` without
+asking the gateway, and the three anomalous collection paths — a callback for a
+cancelled order, a second real payment with a different trade number, and a
+callback nobody can match — were written to the log and dropped. Baseline
+1559a52a: `PaymentExceptionTest::testCloseTasksReallyCloseOtherAttemptsAtTheGateway`
+fails because no close task exists at all (`paySuccess` wrote the local closure),
+and `testASecondRealPaymentBecomesAPersistedException`,
+`testAPaymentForACancelledOrderBecomesAPersistedException` and
+`testAnUnmatchablePaymentIsPersistedAndAcknowledged` fail because
+`store_order_payment_exception` does not exist — the money had no record to
+refund from.
+
+Fix (`1c68041a`): `paySuccess` records one close task per open attempt inside
+its transaction; after the commit each task really closes its gateway order
+through the standard settlement result, and a close that finds money records the
+second payment as an exception instead of touching the order. The new
+`store_order_payment_exception` table (install SQL + migration, unique on
+merchant + trade number) holds the order, attempt, merchant and trade numbers,
+the reason, the received amount and currency, the frozen payment context, the
+processing state, a stable refund number and the operator; callbacks are
+acknowledged only after the record commits, and a callback that cannot be
+persisted asks the gateway to retry. `php think order:reconcile` provides
+`payments:list|inspect|refund` and `effects:list|inspect|retry`, with refunds
+requiring `--confirm-trade-no` and `--operator` on one stable refund number and
+never touching stock, coupons or after-sale splitting.
+
+### REFUND-007 (P1, plan 3.4): the frozen refund could still ask for a different amount
+
+`freezeRefundRequest()` stored only an amount, ignored a retry that carried a
+different one, and left the driver and merchant to `sys_config` at execution
+time; the controllers computed `refunded_price` themselves, and
+"gateway accepted, local write failed" had no state, so the only recovery was
+another `agreeRefund()` with no way to know whether the money had already left.
+Baseline 1559a52a: `RefundConcurrencyTest::testARetryWithADifferentAmountIsRefused`
+completes the second after-sale silently (the old freeze returns the first
+amount), and `testTheServiceGeneratesTheLocalCompletionFromTheFrozenRequest`,
+`testGatewayAcceptedWithLocalFailureIsRecoveredByQuery` and
+`testCumulativeRefundsCannotExceedThePaidAmount` fail on the missing behaviour.
+
+Fix (`9fd06a02`): the freeze persists the original paid order, the payment trade
+number, the driver, merchant, app, channel and currency together with the
+amount, all as decimal strings; a retry with a different amount is refused with
+退款请求已冻结，不能修改退款金额. Execution re-checks the after-sale state under
+the row lock, refuses a cancelled/rejected/completed one or a frozen request
+that no longer matches the input, sums the refunds of the whole payment family
+so split children cannot exceed what was paid, and the service derives the
+completion from the locked row instead of the caller. A new `refund_state`
+column records submitted/processing/unknown/success/closed; `refunds:inspect`
+shows the frozen context against the gateway answer and `refunds:retry`
+completes the local write by querying the original refund number.
+
+### FULFILL-001 / QUEUE-012 / VIRTUAL-001 (P1, plan 3.5): fulfillment ran outside the payment transaction
+
+`OrderPaySuccessListener` wrote the pay-success status row, gift coupons, the
+capital flow, the invoice state and the virtual-card allocation after the
+payment had committed, and one effect record bundled the notice, print, invoice
+and push together. A failure left an order marked paid with part of its
+fulfillment missing, a retry re-ran the whole bundle, and the virtual card was
+claimed with `get`-then-`save` on a table with no unique key. Baseline
+1559a52a: `FulfillmentAtomicityTest::testAFailedGiftCouponIssueRollsTheWholePaymentBack`
+leaves `paid = 1` with no capital flow, `testTwoOrdersCannotClaimTheSameCard`
+assigns one card to both orders, and
+`testExternalActionsAreRegisteredPerTarget` finds one bundled `pay_success`
+record instead of a record per target.
+
+Fix (`967e886d`): `StoreOrderSuccessServices::fulfillLocally()` writes the order
+status, gift coupons, capital flow, virtual allocation and invoice state inside
+the payment transaction, each step idempotent on the order's own state; the
+listener keeps only the post-commit tail. Effects are registered per target
+(`pay_notice`, `pay_print`, `pay_invoice`), so a failing notice leaves the print
+and invoice records alone. `StoreProductVirtualDao::claimCard()` takes a card
+with a conditional update and an affected-row check, retries the next card when
+another order wins, and reuses the card already bound to the order.
+
+### TLS-001 (P1, plan 3.6): the payment transport trusted anyone
+
+`BaseClient::_doRequestCurl()` set `CURLOPT_SSL_VERIFYPEER` and
+`CURLOPT_SSL_VERIFYHOST` to `false` and never validated `Wechatpay-Signature`;
+the v2 WeChat application shipped `'verify' => false`; and
+`PayClient::handleNotify()` passed `json_decode(false)` (an undecryptable
+payload) to the handler as a successful payment. Baseline 1559a52a:
+`PaymentTransportTest::testTransportKeepsPeerAndHostVerificationOn` fails on the
+disabled verification, and `testAnUnverifiableV3NotificationIsRefused` fails on
+the unconditional success conversion.
+
+Fix (`14e1735e`): the v3 transport verifies the peer and the hostname with the
+trust store taken from the server environment (`CRMEB_PAY_CA_BUNDLE`, else the
+system bundle) and has no backend switch to disable it; the v2 Guzzle options
+trust the same store; the v3 client keeps the whole platform-certificate list so
+a response or notification is verified against the serial that signed it,
+rejecting stale timestamps, unknown serials and tampered bodies; the query and
+close wrappers carry the response headers, and `V3WechatPay` refuses to turn an
+unverified answer into paid/closed (an unverifiable query stays unknown). A v3
+notification is answered as a failure unless its signature verifies and its
+resource decrypts into a JSON object.
+
+### MIG-018…022 (P1/P2, plan 5.1): the migration verified only that objects existed
+
+`applyMissingObjects()` re-read `information_schema` for table and column names,
+which proves an object is present but not that it is the right shape: a
+`total_fee` changed to `varchar` or a dropped `out_trade_no` unique index passed
+verification while silently removing the protection. There was no pre-check for
+unresolved legacy money state and no evidence that business rows were untouched.
+Baseline 1559a52a: `OrderReliabilitySchemaTest::testAMissingUniqueIndexIsReportedAndRecreated`,
+`testAWrongColumnTypeBlocksApplyBeforeAnyChange` and
+`testAnUnresolvedPaymentBlocksApplyUntilItIsResolved` fail because the script
+reports success in all three situations.
+
+Fix (`f6ac0683`): column types are compared against a declared map, missing
+unique indexes are reported by `plan`, recreated by `apply` and re-read
+afterwards, and a type mismatch blocks `apply` before any avoidable DDL. The
+pre-check refuses `apply` while any payment attempt, in-flight refund or unknown
+effect is unresolved, naming the count and the `order:reconcile` command that
+lists it, and reads the live schema so a database predating `refund_state` is not
+asked about a column it does not have. Retained-table row counts are compared
+before and after, and a table this migration is supposed to create is not
+counted as a business change.
+
+### OPS-001…004 (P1, plan 5.2): the health probes could pass on a broken topology
+
+`healthCheckWorkerman()` tried the configured Channel address and then
+`127.0.0.1`. Inside the workerman container `127.0.0.1` is the local Channel
+server, so a wrong `CLIENT_IP` passed the container's own health check while
+every other container was cut off from the channel — the probe reported green on
+exactly the failure it exists to catch. Queue and timer checked only a heartbeat,
+and `/readyz` did not check the unique indexes, so a deployment that had lost
+the concurrency protection was reported ready. Baseline 1559a52a:
+`docker/verify-http-stack.sh` with a bad `CLIENT_IP` passes the workerman probe.
+
+Fix (`2015c048`): the fallback is gone and an empty `CLIENT_IP` is refused; queue
+and timer verify the Channel address they are configured with in addition to the
+heartbeat; `/readyz` requires the exception-payment table, the third refund
+column and the unique indexes, answering 503 (bare `{"ready":false}`, reason
+logged) until they are back. `verify-http-stack.sh` starts the queue and timer
+roles, proves their probes fail without a consumer and with a bad channel
+address, proves stopping the Channel server turns the queue unhealthy, and
+proves dropping the payment-attempt unique index turns `/readyz` red and then
+green once restored. A static guard keeps the probes and the role list in step.
+
 ## Retained-path audit (2026-09-19)
 
 The entries below were found by reviewing the deletion batch against the paths it

@@ -65,7 +65,7 @@ CRMEB High-quality Open Source E-commerce System (PHP Version)
 
 ### Maintained core-store variant
 
-This branch retains H5, WeChat mini-program, admin, WeChat payment, coupons, group buying, presales and coupon-only newcomer gifts. See [architecture](docs/maintenance/architecture.md), [maintenance checks](scripts/check-maintenance.sh), and [paired release instructions](docs/maintenance/build-release.md). Checked-in `crmeb/public` is historical output; build matched frontend artifacts before deployment.
+This branch retains H5, WeChat mini-program, admin, WeChat payment, coupons, group buying, presales and coupon-only newcomer gifts. See [architecture](docs/maintenance/architecture.md), [maintenance checks](scripts/check-maintenance.sh), [paired release instructions](docs/maintenance/build-release.md), and the [release readiness record](docs/release-readiness.md) for what the automated gate proves and what still needs merchant acceptance. Upgrade a deployment with `deploy/production/upgrade.sh <image@sha256:digest>`, which verifies its backup before migrating. Checked-in `crmeb/public` is historical output; build matched frontend artifacts before deployment.
 
 ### 📝 **Project Introduction**
 
