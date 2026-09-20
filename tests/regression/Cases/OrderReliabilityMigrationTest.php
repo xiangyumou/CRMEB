@@ -31,6 +31,22 @@ final class OrderReliabilityMigrationTest extends RegressionTestCase
         return [$status, implode("\n", $output)];
     }
 
+    /**
+     * Resolve any unresolved payment/refund/effect state so the migration's
+     * pre-check passes. The pre-check is global by design — a shop must not
+     * migrate while any of it is unresolved — so a test that only wants to prove
+     * the schema work needs a clean baseline first, exactly as an operator would
+     * establish one with order:reconcile before the maintenance window.
+     */
+    private function clearUnresolvedState(): void
+    {
+        Db::name('store_order_payment_attempt')->whereIn('status', [0, 3])->update(['status' => 2, 'last_result' => 'test:baseline']);
+        Db::name('store_order_effect')->where('status', 2)->update(['status' => 1]);
+        if (in_array('refund_state', $this->columnsOf('store_order_refund'), true)) {
+            Db::name('store_order_refund')->whereIn('refund_state', [1, 2])->update(['refund_state' => 3]);
+        }
+    }
+
     private function tableExists(string $table): bool
     {
         $rows = Db::query(
@@ -71,6 +87,7 @@ final class OrderReliabilityMigrationTest extends RegressionTestCase
      */
     public function testInstallSchemaAlreadyShipsEveryReliabilityObject(): void
     {
+        $this->clearUnresolvedState();
         [$status, $output] = $this->runScript('plan');
         self::assertSame(0, $status, $output);
         self::assertStringContainsString('up to date', $output, 'the restored install SQL must ship the reliability schema');
@@ -94,6 +111,7 @@ final class OrderReliabilityMigrationTest extends RegressionTestCase
      */
     public function testApplyAddsEveryMissingObjectAndRepeatsWithoutTouchingBusinessRows(): void
     {
+        $this->clearUnresolvedState();
         $factory = new FixtureFactory($this, 'order reliability migration');
         $user = $factory->createUser();
         $order = $factory->createOrder((int)$user['uid']);
@@ -129,7 +147,10 @@ final class OrderReliabilityMigrationTest extends RegressionTestCase
         foreach (self::REFUND_COLUMNS as $column) {
             self::assertContains($column, $this->columnsOf('store_order_refund'), 'apply added store_order_refund.' . $column);
         }
+        self::assertContains('refund_state', $this->columnsOf('store_order_refund'), 'apply added store_order_refund.refund_state');
         self::assertContains('status', $this->columnsOf('store_order_effect'));
+        self::assertTrue($this->tableExists('store_order_payment_exception'), 'apply created the exception-payment table');
+        self::assertContains('mch_trade', $this->indexesOf('store_order_payment_exception'), 'with its merchant+trade unique key');
 
         [$status, $output] = $this->runScript('plan');
         self::assertSame(0, $status, $output);
@@ -152,6 +173,7 @@ final class OrderReliabilityMigrationTest extends RegressionTestCase
      */
     public function testApplyFinishesAnInterruptedRun(): void
     {
+        $this->clearUnresolvedState();
         Db::execute('DROP TABLE IF EXISTS eb_store_order_effect');
         $this->registerCleanup(function (): void {
             $this->runScript('apply');

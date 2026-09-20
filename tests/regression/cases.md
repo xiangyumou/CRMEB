@@ -152,6 +152,14 @@ against the seeded install SQL; payment transports stay offline.
 - [x] MIG-016 The reliability migration adds every missing table and refund column to a database that predates them, verifies the result by re-reading the schema, leaves existing order and refund rows alone with an empty new refund number, and leaves nothing to do on a second run.
 - [x] MIG-017 The reliability migration finishes an interrupted release: a run that stopped after the first table is completed by the next one, and the object that already exists is not planned again.
 
+## Reliability schema verification (independent review)
+
+- [x] MIG-018 A unique index dropped from a shipped reliability table is reported by `plan` (non-zero) with the missing index named, and `apply` recreates it — verified by re-reading `information_schema`.
+- [x] MIG-019 A column of the wrong type is reported by `plan` and blocks `apply` before any avoidable DDL; the conflicting column is left as it was.
+- [x] MIG-020 An unresolved payment attempt (`status 0/3`) blocks `apply` with the count and the `order:reconcile payments:list` hint, and the migration proceeds once the state is resolved.
+- [x] MIG-021 An unknown effect and an in-flight refund each block `apply` (with `effects:list` / `refunds:list` hints) and release it once resolved.
+- [x] MIG-022 An interrupted run (a missing refund column on a database with the other objects) is completed by the next run, a second run is a no-op, and the retained order, cart, coupon and user rows keep their counts and states.
+
 ## Maintenance tools
 
 - [x] MAINT-001 The maintenance endpoints succeed over HTTP, the personal-centre menu skips removed pages, domain replacement rewrites retained media columns, "clear data" skips missing tables, refuses unsafe table names, and clears the retained order tables.
