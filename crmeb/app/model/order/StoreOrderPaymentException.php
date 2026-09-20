@@ -43,4 +43,6 @@ class StoreOrderPaymentException extends BaseModel
     const STATUS_REFUND_UNKNOWN = 2;
     /** 退款失败 */
     const STATUS_REFUND_FAILED = 3;
+    /** 已提交网关退款请求，禁止并发重复提交 */
+    const STATUS_REFUND_PROCESSING = 4;
 }

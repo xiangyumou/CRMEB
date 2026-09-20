@@ -17,6 +17,8 @@ declare(strict_types=1);
 //     -> {value: bool} from StoreOrderServices::cancelUnpaidOrder()
 //   agree-refund <refundId> <amount>
 //     -> {value: bool} from the full StoreOrderRefundServices::agreeRefund() flow
+//   notify <merchantOrderNo> <gatewayTradeNo>
+//     -> {value: bool} from the real payment notification path
 //
 // Set CRMEB_TEST_GATEWAY=1 to rebind Pay::class onto the shared offline gateway
 // before the action runs; the gateway state itself lives in the shared test
@@ -71,6 +73,14 @@ try {
             break;
         case 'pay-entry':
             $result = Tests\Regression\Support\BusinessDriver::payEntry((int)$id, (string)$value);
+            break;
+        case 'notify':
+            $result = app()->make(app\services\pay\PayNotifyServices::class)
+                ->wechatProduct((string)$id, (string)$value, 'weixin', [
+                    'paid_amount' => '10.00',
+                    'currency' => 'CNY',
+                    'merchant_id' => 'M1',
+                ]);
             break;
         case 'cancel-entry':
             $result = app()->make(app\services\order\StoreOrderServices::class)

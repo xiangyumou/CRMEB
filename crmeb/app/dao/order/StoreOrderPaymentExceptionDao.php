@@ -41,6 +41,12 @@ class StoreOrderPaymentExceptionDao extends BaseDao
         return $this->getOne(['mch_id' => $mchId, 'trade_no' => $tradeNo]);
     }
 
+    /** @param int $id @return array|\think\Model|null */
+    public function getForUpdate(int $id)
+    {
+        return $this->getModel()->where('id', $id)->lock(true)->find();
+    }
+
     /**
      * 未解决的异常收款，老记录在前
      * @param int $limit
@@ -49,7 +55,11 @@ class StoreOrderPaymentExceptionDao extends BaseDao
     public function pendingList(int $limit = 50): array
     {
         return $this->getModel()
-            ->where('status', StoreOrderPaymentException::STATUS_PENDING)
+            ->whereIn('status', [
+                StoreOrderPaymentException::STATUS_PENDING,
+                StoreOrderPaymentException::STATUS_REFUND_PROCESSING,
+                StoreOrderPaymentException::STATUS_REFUND_UNKNOWN,
+            ])
             ->order('id')
             ->limit($limit)
             ->select()

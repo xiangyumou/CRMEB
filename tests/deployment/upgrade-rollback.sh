@@ -16,12 +16,19 @@ root="$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)"
 image="${1:-crmeb-test}"
 work="$(mktemp -d)"
 project="crmeb-deploy-test-$$"
+registry_container="crmeb-deploy-registry-$$"
 passed=0
-# A fixed candidate in the form the script requires.
-candidate="ghcr.io/xiangyumou/crmeb@sha256:$(printf 'b%.0s' $(seq 1 64))"
+candidate_image="crmeb-deploy-candidate-$$"
+registry_port=''
+registry_repo=''
+candidate=''
+health_pid=''
 
 cleanup() {
-    docker compose -p "$project" -f "$work/compose.yaml" down --volumes --remove-orphans >/dev/null 2>&1 || true
+    docker compose -p "$project" --env-file "$work/deployment/deployment.env" -f "$work/compose.yaml" down --volumes --remove-orphans >/dev/null 2>&1 || true
+    docker rm -f "$registry_container" >/dev/null 2>&1 || true
+    [ -z "$health_pid" ] || kill "$health_pid" >/dev/null 2>&1 || true
+    docker rmi "$candidate_image" >/dev/null 2>&1 || true
     rm -rf "$work"
 }
 trap cleanup EXIT INT TERM
@@ -30,7 +37,25 @@ pass() { passed=$((passed + 1)); echo "ok - $1"; }
 fail() { echo "deployment rules verification failed: $1" >&2; exit 1; }
 
 docker image inspect "$image" >/dev/null 2>&1 || fail "image $image is not available locally"
-# Compose resolves a bare local name without a registry lookup.
+# Build a second real local image with a distinct config digest, then publish it
+# to a throwaway registry. The upgrade must pull and run this image by digest;
+# a fabricated digest would make the test stop before any migration.
+candidate_container="$(docker create "$image")"
+docker commit --change "LABEL crmeb.deployment-test=candidate-$$" "$candidate_container" "$candidate_image" >/dev/null
+docker rm "$candidate_container" >/dev/null
+docker run -d --name "$registry_container" -p 127.0.0.1::5000 registry:2 >/dev/null
+registry_port="$(docker port "$registry_container" 5000/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p')"
+[ -n "$registry_port" ] || fail 'the disposable registry did not publish a port'
+registry_repo="127.0.0.1:$registry_port/crmeb"
+docker tag "$candidate_image" "$registry_repo:candidate"
+docker push "$registry_repo:candidate" >/dev/null
+candidate="$(docker image inspect --format '{{index .RepoDigests 0}}' "$registry_repo:candidate")"
+case "$candidate" in
+    "$registry_repo"@sha256:*) ;;
+    *) fail "the candidate did not resolve to a registry digest: $candidate" ;;
+esac
+# Compose resolves the old image locally; its service image is parameterized so
+# upgrade.sh's settings change actually selects the candidate on restart.
 image_ref="$image"
 
 # A production-shaped project: MySQL seeded from the install SQL, the application
@@ -60,7 +85,7 @@ services:
       timeout: 5s
       retries: 60
   php:
-    image: $image_ref
+    image: \${CRMEB_IMAGE}
     command: ["sleep", "infinity"]
     entrypoint: []
     environment:
@@ -73,7 +98,7 @@ services:
       mysql:
         condition: service_healthy
   queue:
-    image: $image_ref
+    image: \${CRMEB_IMAGE}
     command: ["sleep", "infinity"]
     entrypoint: []
     environment:
@@ -82,7 +107,7 @@ services:
       - ./.env:/var/www/crmeb/.env:ro
       - ./.constant:/var/www/crmeb/.constant:ro
   timer:
-    image: $image_ref
+    image: \${CRMEB_IMAGE}
     command: ["sleep", "infinity"]
     entrypoint: []
     environment:
@@ -91,7 +116,7 @@ services:
       - ./.env:/var/www/crmeb/.env:ro
       - ./.constant:/var/www/crmeb/.constant:ro
   workerman:
-    image: $image_ref
+    image: \${CRMEB_IMAGE}
     command: ["sleep", "infinity"]
     entrypoint: []
     environment:
@@ -100,7 +125,7 @@ services:
       - ./.env:/var/www/crmeb/.env:ro
       - ./.constant:/var/www/crmeb/.constant:ro
   nginx:
-    image: $image_ref
+    image: \${CRMEB_IMAGE}
     command: ["sleep", "infinity"]
     entrypoint: []
     volumes:
@@ -122,13 +147,24 @@ echo "migration ran at $(date -u +%FT%TZ)"
 SH
 
 cd "$work"
-if ! docker compose -p "$project" -f "$work/compose.yaml" up -d --wait --wait-timeout 300 >"$work/stack-up.log" 2>&1; then
+if ! docker compose -p "$project" --env-file "$work/deployment/deployment.env" -f "$work/compose.yaml" up -d --wait --wait-timeout 300 >"$work/stack-up.log" 2>&1; then
     cat "$work/stack-up.log" >&2
     fail 'the disposable stack never became healthy'
 fi
+old_container="$(docker compose -p "$project" --env-file "$work/deployment/deployment.env" -f "$work/compose.yaml" ps -q php)"
+old_image_id="$(docker inspect --format '{{.Image}}' "$old_container")"
 
 say_stack_running() {
-    docker compose -p "$project" -f "$work/compose.yaml" ps php --status running | grep -q php
+    docker compose -p "$project" --env-file "$work/deployment/deployment.env" -f "$work/compose.yaml" ps php --status running | grep -q php
+}
+
+start_stack() {
+    docker compose -p "$project" --env-file "$work/deployment/deployment.env" -f "$work/compose.yaml" up -d --wait --wait-timeout 300 >/dev/null
+}
+
+reset_old_stack() {
+    sed -i "s|^CRMEB_IMAGE=.*|CRMEB_IMAGE=$image|" "$work/deployment/deployment.env"
+    start_stack
 }
 
 # upgrade.sh is invoked with this project as its world.
@@ -136,13 +172,14 @@ run_upgrade() {
     CRMEB_DEPLOY_ROOT="$work" \
     CRMEB_DEPLOY_PROJECT="$project" \
     CRMEB_DEPLOY_COMPOSE_FILE="$work/compose.yaml" \
+    CRMEB_IMAGE_REPOSITORY="$registry_repo" \
     CRMEB_BACKUP_DIR="$work/data/backups" \
     CRMEB_MIGRATION_COMMAND="sh $work/migrate.sh" \
     bash "$root/deploy/production/upgrade.sh" "$@"
 }
 
 # 1. A moving tag is refused before anything is touched.
-if run_upgrade "ghcr.io/xiangyumou/crmeb:edge" >"$work/bad-target.log" 2>&1; then
+if run_upgrade "$registry_repo:edge" >"$work/bad-target.log" 2>&1; then
     fail 'a moving tag was accepted as an upgrade target'
 fi
 grep -q 'Expected a fixed candidate' "$work/bad-target.log" || fail 'the moving-tag refusal did not explain itself'
@@ -170,6 +207,7 @@ pass 'a failing migration keeps maintenance mode and does not resume traffic'
 
 # 4. A truncated backup is detected before the migrations run. The run is pointed
 #    at the damaged file explicitly, because a normal run takes a fresh backup.
+reset_old_stack || fail 'could not reset the disposable stack before the truncated-backup case'
 latest="$(ls -t "$work/data/backups"/*.sql.gz | head -1)"
 cp "$latest" "$work/good.sql.gz"
 head -c 128 "$work/good.sql.gz" > "$work/data/backups/truncated.sql.gz"
@@ -190,6 +228,7 @@ pass 'a truncated backup stops the upgrade before any migration'
 # 5. A backup whose contents disagree with the live database fails the restore check.
 #    The dump is truncated mid-stream but still valid gzip, so the gzip check
 #    passes and only the restore comparison can catch it.
+reset_old_stack || fail 'could not reset the disposable stack before the tampered-backup case'
 gzip -dc "$work/good.sql.gz" > "$work/good.sql"
 head -c 1000 "$work/good.sql" > "$work/short.sql"
 gzip -c "$work/short.sql" > "$work/data/backups/tampered.sql.gz"
@@ -203,6 +242,7 @@ fi
 pass 'a backup that cannot be restored stops the upgrade before any migration'
 
 # 6. The successful path runs end to end and takes a fresh verified backup.
+reset_old_stack || fail 'could not reset the disposable stack before the successful upgrade case'
 run_upgrade "$candidate" >"$work/success.log" 2>&1 ||
     { cat "$work/success.log" >&2; fail 'a valid upgrade was refused'; }
 grep -q 'backup restored and the retained rows match' "$work/success.log" || fail 'the restore check did not report success'
@@ -213,10 +253,42 @@ gzip -t "$latest" || fail 'the produced backup is not a valid gzip stream'
 say_stack_running || fail 'the stack was not started again after a successful upgrade'
 pass 'a verified upgrade backs up, restores, migrates and resumes traffic'
 
-# 7. rollback.sh refuses a target that is not available locally, and refuses a
+# 7. The persistent manifest is sufficient for a recovery even after the
+# deployment settings already point at the candidate. A tiny host HTTP server
+# supplies the two liveness URLs because this disposable stack intentionally
+# runs sleep as its application command.
+health_dir="$work/health"
+mkdir -p "$health_dir/admin"
+touch "$health_dir/readyz" "$health_dir/admin/index.html"
+health_port="$(python3 - <<'PY'
+import socket
+s = socket.socket()
+s.bind(('127.0.0.1', 0))
+print(s.getsockname()[1])
+s.close()
+PY
+)"
+python3 -m http.server "$health_port" --directory "$health_dir" >"$work/health.log" 2>&1 &
+health_pid=$!
+until curl -fsS "http://127.0.0.1:$health_port/readyz" >/dev/null 2>&1; do sleep 1; done
+if ! CRMEB_DEPLOY_ROOT="$work" CRMEB_DEPLOY_PROJECT="$project" CRMEB_DEPLOY_COMPOSE_FILE="$work/compose.yaml" \
+        CRMEB_IMAGE_REPOSITORY="$registry_repo" \
+        CRMEB_ROLLBACK_HEALTH_BASE="http://127.0.0.1:$health_port" \
+        bash "$root/deploy/production/rollback.sh" --last-upgrade >"$work/manifest-rollback.log" 2>&1; then
+    cat "$work/manifest-rollback.log" >&2
+    cat "$work/data/backups"/upgrade-*.manifest >&2 || true
+    fail 'rollback could not use the persistent upgrade manifest'
+fi
+new_container="$(docker compose -p "$project" --env-file "$work/deployment/deployment.env" -f "$work/compose.yaml" ps -q php)"
+[ "$(docker inspect --format '{{.Image}}' "$new_container")" = "$old_image_id" ] || fail 'manifest rollback did not restore the previous image content'
+grep -qx "CRMEB_IMAGE=$image" "$work/deployment/deployment.env" || fail 'manifest rollback did not restore deployment settings'
+pass 'rollback restores the fixed image and settings recorded by the upgrade manifest'
+
+# 8. rollback.sh refuses a target that is not available locally, and refuses a
 #    mixed-image deployment instead of guessing.
 if CRMEB_DEPLOY_ROOT="$work" CRMEB_DEPLOY_PROJECT="$project" CRMEB_DEPLOY_COMPOSE_FILE="$work/compose.yaml" \
-        bash "$root/deploy/production/rollback.sh" "ghcr.io/xiangyumou/crmeb@sha256:$(printf 'c%.0s' $(seq 1 64))" >"$work/rollback.log" 2>&1; then
+        CRMEB_IMAGE_REPOSITORY="$registry_repo" \
+        bash "$root/deploy/production/rollback.sh" "$registry_repo@sha256:$(printf 'c%.0s' $(seq 1 64))" >"$work/rollback.log" 2>&1; then
     fail 'rollback accepted a digest that is not available'
 fi
 grep -qE 'not available locally|cannot be pinned|refusing|failed to resolve|manifest unknown|denied' "$work/rollback.log" || {

@@ -131,9 +131,13 @@ class PayTradeServices
      */
     public function options(array $attempt): array
     {
+        $context = json_decode((string)($attempt['payment_context'] ?? ''), true);
+        $newMiniOpen = is_array($context) && array_key_exists('pay_new_weixin_open', $context)
+            ? (bool)$context['pay_new_weixin_open']
+            : (bool)sys_config('pay_new_weixin_open');
         return [
             'is_channel' => (int)($attempt['channel'] ?? 0),
-            'pay_new_weixin_open' => (bool)sys_config('pay_new_weixin_open'),
+            'pay_new_weixin_open' => $newMiniOpen,
         ];
     }
 

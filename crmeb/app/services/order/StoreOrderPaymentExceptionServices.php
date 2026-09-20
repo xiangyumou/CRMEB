@@ -121,20 +121,37 @@ class StoreOrderPaymentExceptionServices extends BaseServices
         $context = json_decode((string)$row['payment_context'], true);
         $driver = is_array($context) ? (string)($context['driver'] ?? '') : '';
         $outTradeNo = is_array($context) ? (string)($context['out_trade_no'] ?? '') : '';
+        $newMiniOpen = is_array($context) && array_key_exists('pay_new_weixin_open', $context)
+            ? (bool)$context['pay_new_weixin_open']
+            : (bool)sys_config('pay_new_weixin_open');
         if ($driver !== '' && $outTradeNo !== '') {
             try {
                 /** @var Pay $pay */
                 $pay = app()->make(Pay::class, [$driver]);
                 $gateway = $pay->queryOrder($outTradeNo, [
                     'is_channel' => (int)($context['channel'] ?? 0),
-                    'pay_new_weixin_open' => (bool)sys_config('pay_new_weixin_open'),
+                    'pay_new_weixin_open' => $newMiniOpen,
                 ]);
             } catch (\Throwable $e) {
                 $gateway = ['state' => 'unknown', 'trade_no' => '', 'raw' => $e->getMessage()];
             }
         }
 
-        return ['record' => $row, 'gateway' => $gateway];
+        $refund = null;
+        $refundNo = trim((string)($row['refund_no'] ?? ''));
+        if ($refundNo !== '' && $driver !== '') {
+            try {
+                /** @var Pay $pay */
+                $pay = app()->make(Pay::class, [$driver]);
+                $refund = $pay->queryRefund($outTradeNo, $refundNo, [
+                    'pay_new_weixin_open' => $newMiniOpen,
+                ]);
+            } catch (\Throwable $e) {
+                $refund = ['state' => 'unknown', 'refund_no' => $refundNo, 'raw' => $e->getMessage()];
+            }
+        }
+
+        return ['record' => $row, 'gateway' => $gateway, 'refund' => $refund];
     }
 
     /**
@@ -151,79 +168,138 @@ class StoreOrderPaymentExceptionServices extends BaseServices
      */
     public function refund(int $id, string $confirmTradeNo, string $operator): array
     {
-        $row = $this->dao->get((int)$id);
-        if (!$row) {
-            throw new AdminException('异常收款记录不存在');
-        }
-        $row = $row->toArray();
-        if (trim($confirmTradeNo) !== trim((string)$row['trade_no'])) {
-            throw new AdminException('确认交易号与记录不符，拒绝退款');
-        }
-        if ((int)$row['status'] === StoreOrderPaymentException::STATUS_REFUNDED) {
-            throw new AdminException('该异常收款已退款，请勿重复操作');
-        }
-        if ((float)$row['paid_amount'] <= 0) {
-            throw new AdminException('记录缺少实收金额，无法退款，请人工核实');
-        }
         if (trim((string)$operator) === '') {
             throw new AdminException('退款必须记录操作人');
         }
 
-        $context = json_decode((string)$row['payment_context'], true);
-        $context = is_array($context) ? $context : [];
-        $driver = (string)($context['driver'] ?? '');
-        $outTradeNo = (string)($context['out_trade_no'] ?? '');
-        if ($driver === '' || $outTradeNo === '') {
-            throw new AdminException('记录缺少冻结的支付上下文，无法原路退款，请人工处理');
-        }
-
-        //稳定退款单号：首次执行时生成并持久化，之后永远一致
-        $refundNo = trim((string)$row['refund_no']);
-        if ($refundNo === '') {
-            $refundNo = 'PE' . (int)$row['id'] . substr(md5($row['mch_id'] . '|' . $row['trade_no']), 0, 12);
-            $this->dao->update((int)$row['id'], ['refund_no' => $refundNo, 'update_time' => time()]);
-        }
+        //先锁定异常收款并持久化 PROCESSING。网关调用不放在数据库事务里，
+        //因此超时或进程退出后不会把"已经可能退款"的事实回滚成待处理。
+        $prepared = $this->transaction(function () use ($id, $confirmTradeNo, $operator) {
+            $row = $this->dao->getForUpdate((int)$id);
+            if (!$row) throw new AdminException('异常收款记录不存在');
+            $row = $row->toArray();
+            if (trim($confirmTradeNo) !== trim((string)$row['trade_no'])) {
+                throw new AdminException('确认交易号与记录不符，拒绝退款');
+            }
+            if ((int)$row['status'] === StoreOrderPaymentException::STATUS_REFUNDED) {
+                throw new AdminException('该异常收款已退款，请勿重复操作');
+            }
+            if (in_array((int)$row['status'], [StoreOrderPaymentException::STATUS_REFUND_PROCESSING, StoreOrderPaymentException::STATUS_REFUND_UNKNOWN], true)) {
+                throw new AdminException('该异常收款已有退款请求，请先查询原退款单号');
+            }
+            if ((float)$row['paid_amount'] <= 0) throw new AdminException('记录缺少实收金额，无法退款，请人工核实');
+            $context = json_decode((string)$row['payment_context'], true);
+            $context = is_array($context) ? $context : [];
+            $context['pay_new_weixin_open'] = array_key_exists('pay_new_weixin_open', $context)
+                ? (bool)$context['pay_new_weixin_open']
+                : (bool)sys_config('pay_new_weixin_open');
+            $driver = (string)($context['driver'] ?? '');
+            $outTradeNo = (string)($context['out_trade_no'] ?? '');
+            if ($driver === '' || $outTradeNo === '') {
+                throw new AdminException('记录缺少冻结的支付上下文，无法原路退款，请人工处理');
+            }
+            $refundNo = trim((string)$row['refund_no']);
+            if ($refundNo === '') $refundNo = 'PE' . (int)$row['id'] . substr(md5($row['mch_id'] . '|' . $row['trade_no']), 0, 12);
+            $payPrice = (string)($context['total_fee'] ?? $row['paid_amount']);
+            $this->dao->update((int)$row['id'], [
+                'refund_no' => $refundNo,
+                'operator' => (string)$operator,
+                'status' => StoreOrderPaymentException::STATUS_REFUND_PROCESSING,
+                'refund_request' => json_encode([
+                    'refund_no' => $refundNo,
+                    'refund_price' => (string)$row['paid_amount'],
+                    'pay_price' => $payPrice,
+                    'trade_no' => (string)$row['trade_no'],
+                    'context' => $context,
+                    'submitted_time' => time(),
+                ], JSON_UNESCAPED_UNICODE),
+                'update_time' => time(),
+            ]);
+            return compact('row', 'context', 'driver', 'outTradeNo', 'refundNo', 'payPrice');
+        });
 
         /** @var Pay $pay */
-        $pay = app()->make(Pay::class, [$driver]);
+        $pay = app()->make(Pay::class, [$prepared['driver']]);
         $options = [
-            'refund_id' => $refundNo,
-            'refund_price' => (string)$row['paid_amount'],
-            'paid_amount' => (string)$row['paid_amount'],
+            'refund_id' => $prepared['refundNo'],
+            'refund_price' => (string)$prepared['row']['paid_amount'],
+            'pay_price' => $prepared['payPrice'],
+            'paid_amount' => (string)$prepared['row']['paid_amount'],
             'type' => 'trade_no',
-            'trade_no' => (string)$row['trade_no'],
-            'is_channel' => (int)($context['channel'] ?? 0),
-            'pay_new_weixin_open' => (bool)sys_config('pay_new_weixin_open'),
+            'trade_no' => (string)$prepared['row']['trade_no'],
+            'is_channel' => (int)($prepared['context']['channel'] ?? 0),
+            'pay_new_weixin_open' => (bool)$prepared['context']['pay_new_weixin_open'],
         ];
-        $gatewayAccepted = false;
+        //异常收款按冻结的标准支付事实原路退款。v2 的标准公众号/开放平台
+        //退款必须显式走 wechat 分支，不能因为没有售后控制器的标志而落到
+        //不匹配的小程序适配器。
+        if ((int)($prepared['context']['channel'] ?? 0) !== 1 || !(bool)$prepared['context']['pay_new_weixin_open']) {
+            $options['wechat'] = true;
+        }
+        $gatewayState = 'unknown';
         $error = '';
         try {
-            $gatewayAccepted = (bool)$pay->refund((string)$row['trade_no'], $options);
+            $result = $pay->refund((string)$prepared['row']['trade_no'], $options);
+            $gatewayState = is_array($result) ? (string)($result['state'] ?? 'unknown') : ((bool)$result ? 'success' : 'unknown');
         } catch (\Throwable $e) {
             $error = $e->getMessage();
         }
 
         $update = [
-            'operator' => (string)$operator,
             'refund_request' => json_encode([
-                'refund_no' => $refundNo,
-                'refund_price' => (string)$row['paid_amount'],
-                'trade_no' => (string)$row['trade_no'],
-                'gateway_accepted' => $gatewayAccepted,
+                'refund_no' => $prepared['refundNo'],
+                'refund_price' => (string)$prepared['row']['paid_amount'],
+                'pay_price' => $prepared['payPrice'],
+                'trade_no' => (string)$prepared['row']['trade_no'],
+                'gateway_state' => $gatewayState,
+                'gateway_accepted' => in_array($gatewayState, ['success', 'processing'], true),
                 'error' => $error,
                 'time' => time(),
             ], JSON_UNESCAPED_UNICODE),
             'update_time' => time(),
         ];
-        if ($gatewayAccepted) {
+        if ($gatewayState === 'success') {
             $update['status'] = StoreOrderPaymentException::STATUS_REFUNDED;
             $update['refund_time'] = time();
+        } elseif ($gatewayState === 'closed') {
+            $update['status'] = StoreOrderPaymentException::STATUS_REFUND_FAILED;
+        } elseif ($gatewayState === 'processing') {
+            //网关已受理但尚未完成：人工查询时复用同一退款单号
+            $update['status'] = StoreOrderPaymentException::STATUS_REFUND_PROCESSING;
         } else {
-            //受理结果未知：保持/标记未知状态，人工重试复用同一退款单号
+            //结果未知：人工查询时复用同一退款单号，绝不换号重发
             $update['status'] = StoreOrderPaymentException::STATUS_REFUND_UNKNOWN;
         }
-        $this->dao->update((int)$row['id'], $update);
+        $this->dao->update((int)$prepared['row']['id'], $update);
 
-        return ['status' => (int)$update['status'], 'refund_no' => $refundNo];
+        return ['status' => (int)$update['status'], 'refund_no' => $prepared['refundNo']];
+    }
+
+    /**
+     * 查询并收敛人工退款的持久状态。结果未知时只保留 UNKNOWN，绝不换退款
+     * 单号重发；确认成功后再次调用也只是幂等地保留 REFUNDED。
+     * @return array{status:int,refund_no:string}
+     */
+    public function reconcileRefund(int $id, string $operator): array
+    {
+        if (trim($operator) === '') throw new AdminException('查询退款必须记录操作人');
+        $row = $this->dao->get((int)$id);
+        if (!$row) throw new AdminException('异常收款记录不存在');
+        $row = $row->toArray();
+        if ((int)$row['status'] === StoreOrderPaymentException::STATUS_REFUNDED) {
+            return ['status' => (int)$row['status'], 'refund_no' => (string)$row['refund_no']];
+        }
+        $detail = $this->inspect($id);
+        $result = $detail['refund'] ?? [];
+        $state = is_array($result) ? (string)($result['state'] ?? 'unknown') : 'unknown';
+        $status = $state === 'success'
+            ? StoreOrderPaymentException::STATUS_REFUNDED
+            : ($state === 'processing'
+                ? StoreOrderPaymentException::STATUS_REFUND_PROCESSING
+                : ($state === 'closed' ? StoreOrderPaymentException::STATUS_REFUND_FAILED : StoreOrderPaymentException::STATUS_REFUND_UNKNOWN));
+        $data = ['status' => $status, 'operator' => $operator, 'update_time' => time()];
+        if ($status === StoreOrderPaymentException::STATUS_REFUNDED) $data['refund_time'] = time();
+        $this->dao->update($id, $data);
+        return ['status' => $status, 'refund_no' => (string)$row['refund_no']];
     }
 }

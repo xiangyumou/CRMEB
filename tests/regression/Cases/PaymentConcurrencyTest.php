@@ -65,8 +65,9 @@ final class PaymentConcurrencyTest extends RegressionTestCase
         touch($worker['start']);
 
         self::assertTrue(
-            $this->waitUntil(fn () => BusinessSnapshot::attemptByOutTradeNo($outTradeNo) !== null),
-            'the payment attempt is recorded before the gateway create lands'
+            $this->waitUntil(fn () => (($attempt = BusinessSnapshot::attemptByOutTradeNo($outTradeNo)) !== null
+                && (int)$attempt['status'] === StoreOrderPaymentAttempt::STATUS_CREATING)),
+            'the payment attempt is recorded and marked creating before the gateway create lands'
         );
         self::assertSame(
             'not_exist',

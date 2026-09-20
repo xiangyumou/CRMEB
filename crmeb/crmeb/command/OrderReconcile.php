@@ -27,6 +27,8 @@ use think\console\Output;
  *   php think order:reconcile payments:inspect <id>    展示本地与网关两侧事实
  *   php think order:reconcile payments:refund <id> --confirm-trade-no=<交易号> --operator=<操作人>
  *                                                      人工确认后按冻结金额原路退款
+ *   php think order:reconcile payments:reconcile <id> --operator=<操作人>
+ *                                                      查询原退款单号并收敛人工退款状态
  *   php think order:reconcile effects:list             列出结果未知或待处理的副作用
  *   php think order:reconcile effects:inspect <id>     展示副作用记录
  *   php think order:reconcile effects:retry <id> --ack-duplicate-risk --operator=<操作人>
@@ -45,7 +47,7 @@ class OrderReconcile extends Command
     protected function configure()
     {
         $this->setName('order:reconcile')
-            ->addArgument('action', Argument::REQUIRED, 'payments:list|payments:inspect|payments:refund|refunds:list|refunds:inspect|refunds:retry|effects:list|effects:inspect|effects:retry')
+            ->addArgument('action', Argument::REQUIRED, 'payments:list|payments:inspect|payments:refund|payments:reconcile|refunds:list|refunds:inspect|refunds:retry|effects:list|effects:inspect|effects:retry')
             ->addArgument('id', Argument::OPTIONAL, '记录ID')
             ->addOption('confirm-trade-no', null, Option::VALUE_REQUIRED, '人工确认的网关交易号，必须与记录一致')
             ->addOption('operator', null, Option::VALUE_REQUIRED, '操作人，退款与重试必填')
@@ -64,6 +66,8 @@ class OrderReconcile extends Command
                 return $this->paymentsInspect($id, $output);
             case 'payments:refund':
                 return $this->paymentsRefund($id, $input, $output);
+            case 'payments:reconcile':
+                return $this->paymentsReconcile($id, $input, $output);
             case 'refunds:list':
                 return $this->refundsList($output);
             case 'refunds:inspect':
@@ -128,6 +132,12 @@ class OrderReconcile extends Command
         $output->writeln($detail['gateway'] === null
             ? '无法查询（缺少冻结上下文）'
             : json_encode($detail['gateway'], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        if (array_key_exists('refund', $detail)) {
+            $output->writeln('网关退款事实:');
+            $output->writeln($detail['refund'] === null
+                ? '尚未发起退款或缺少退款单号'
+                : json_encode($detail['refund'], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        }
 
         return 0;
     }
@@ -156,6 +166,33 @@ class OrderReconcile extends Command
             return 0;
         }
         $output->warning(sprintf('网关受理结果未知，退款单号 %s 已冻结；请稍后用 payments:inspect 核对后重试，重试复用同一退款单号。', $result['refund_no']));
+
+        return 1;
+    }
+
+    private function paymentsReconcile(int $id, Input $input, Output $output): int
+    {
+        $operator = (string)$input->getOption('operator');
+        if ($operator === '') {
+            $output->error('查询退款必须携带 --operator=<操作人>');
+
+            return 1;
+        }
+        /** @var StoreOrderPaymentExceptionServices $services */
+        $services = app()->make(StoreOrderPaymentExceptionServices::class);
+        try {
+            $result = $services->reconcileRefund($id, $operator);
+        } catch (\Throwable $e) {
+            $output->error($e->getMessage());
+
+            return 1;
+        }
+        if ($result['status'] === \app\model\order\StoreOrderPaymentException::STATUS_REFUNDED) {
+            $output->writeln(sprintf('退款已确认完成，退款单号 %s。', $result['refund_no']));
+
+            return 0;
+        }
+        $output->warning(sprintf('退款仍未确认，退款单号 %s 保持人工核对状态。', $result['refund_no']));
 
         return 1;
     }

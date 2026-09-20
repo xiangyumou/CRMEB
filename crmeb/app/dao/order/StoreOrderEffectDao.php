@@ -42,15 +42,35 @@ class StoreOrderEffectDao extends BaseDao
     public function pendingIds(int $limit = 50): array
     {
         return $this->getModel()
-            ->whereRaw(
-                '(status IN (?, ?) OR (status = ? AND update_time < ?))',
-                [
-                    StoreOrderEffect::STATUS_PENDING,
-                    StoreOrderEffect::STATUS_UNKNOWN,
-                    StoreOrderEffect::STATUS_RUNNING,
-                    time() - StoreOrderEffect::STALE_SECONDS,
-                ]
-            )
+            ->where(function ($query) {
+                //只有开票和按支付尝试关单具备稳定业务键，可以自动恢复 UNKNOWN
+                //或中断的 RUNNING；通知、打印结果未知必须人工确认后重试。
+                $query->where(function ($safe) {
+                    $safe->where('event_type', 'pay_invoice')
+                        ->whereRaw('(status IN (?, ?) OR (status = ? AND update_time < ?))', [
+                            StoreOrderEffect::STATUS_PENDING,
+                            StoreOrderEffect::STATUS_UNKNOWN,
+                            StoreOrderEffect::STATUS_RUNNING,
+                            time() - StoreOrderEffect::STALE_SECONDS,
+                        ]);
+                })->whereOr(function ($safe) {
+                    $safe->where('event_type', 'like', 'close_attempt.%')
+                        ->whereRaw('(status IN (?, ?) OR (status = ? AND update_time < ?))', [
+                            StoreOrderEffect::STATUS_PENDING,
+                            StoreOrderEffect::STATUS_UNKNOWN,
+                            StoreOrderEffect::STATUS_RUNNING,
+                            time() - StoreOrderEffect::STALE_SECONDS,
+                        ]);
+                })->whereOr(function ($group) {
+                    $group->where('event_type', 'like', 'group_effect.%')
+                        ->where('status', StoreOrderEffect::STATUS_PENDING);
+                })->whereOr(function ($manual) {
+                    $manual->whereNotIn('event_type', ['pay_invoice'])
+                        ->where('event_type', 'not like', 'close_attempt.%')
+                        ->where('event_type', 'not like', 'group_effect.%')
+                        ->where('status', StoreOrderEffect::STATUS_PENDING);
+                });
+            })
             ->where('attempts', '<', StoreOrderEffect::MAX_ATTEMPTS)
             ->order('id asc')
             ->limit($limit)
@@ -70,24 +90,60 @@ class StoreOrderEffectDao extends BaseDao
     public function claim(int $id, int $attempts): bool
     {
         $now = time();
+        $effect = $this->getModel()->where('id', $id)->find();
+        if (!$effect || !$this->retryable($effect->toArray(), $now)) return false;
         $affected = $this->getModel()
             ->where('id', $id)
             ->where('attempts', '<', StoreOrderEffect::MAX_ATTEMPTS)
-            ->whereRaw(
-                '(status IN (?, ?) OR (status = ? AND update_time < ?))',
-                [
-                    StoreOrderEffect::STATUS_PENDING,
-                    StoreOrderEffect::STATUS_UNKNOWN,
-                    StoreOrderEffect::STATUS_RUNNING,
-                    $now - StoreOrderEffect::STALE_SECONDS,
-                ]
-            )
+            ->where(function ($query) use ($effect, $now) {
+                $event = (string)$effect['event_type'];
+                $safe = $event === 'pay_invoice' || strpos($event, 'close_attempt.') === 0;
+                if ($safe) {
+                    $query->whereRaw('(status IN (?, ?) OR (status = ? AND update_time < ?))', [
+                        StoreOrderEffect::STATUS_PENDING,
+                        StoreOrderEffect::STATUS_UNKNOWN,
+                        StoreOrderEffect::STATUS_RUNNING,
+                        $now - StoreOrderEffect::STALE_SECONDS,
+                    ]);
+                } elseif (strpos($event, 'group_effect.') === 0) {
+                    $query->where('status', StoreOrderEffect::STATUS_PENDING);
+                } else {
+                    $query->where('status', StoreOrderEffect::STATUS_PENDING);
+                }
+            })
             ->update([
                 'status' => StoreOrderEffect::STATUS_RUNNING,
                 'attempts' => $attempts,
                 'update_time' => $now,
             ]);
         return (int)$affected === 1;
+    }
+
+    /** @return int[] */
+    public function pendingIdsForOrder(int $orderId): array
+    {
+        return $this->getModel()
+            ->where('store_order_id', $orderId)
+            ->where('status', StoreOrderEffect::STATUS_PENDING)
+            ->where('attempts', '<', StoreOrderEffect::MAX_ATTEMPTS)
+            ->order('id asc')
+            ->column('id');
+    }
+
+    /** @param array $effect @param int $now */
+    private function retryable(array $effect, int $now): bool
+    {
+        $safe = (string)($effect['event_type'] ?? '') === 'pay_invoice'
+            || strpos((string)($effect['event_type'] ?? ''), 'close_attempt.') === 0;
+        if ($safe) {
+            return in_array((int)$effect['status'], [StoreOrderEffect::STATUS_PENDING, StoreOrderEffect::STATUS_UNKNOWN], true)
+                || ((int)$effect['status'] === StoreOrderEffect::STATUS_RUNNING
+                    && (int)$effect['update_time'] < $now - StoreOrderEffect::STALE_SECONDS);
+        }
+        if (strpos((string)($effect['event_type'] ?? ''), 'group_effect.') === 0) {
+            return (int)$effect['status'] === StoreOrderEffect::STATUS_PENDING;
+        }
+        return (int)$effect['status'] === StoreOrderEffect::STATUS_PENDING;
     }
 
 }

@@ -14,6 +14,7 @@ namespace app\services\activity\combination;
 
 use app\dao\activity\combination\StorePinkDao;
 use app\jobs\PinkJob;
+use app\services\order\StoreOrderEffectServices;
 use app\services\BaseServices;
 use app\services\order\StoreOrderDeliveryServices;
 use app\services\order\StoreOrderRefundServices;
@@ -354,20 +355,34 @@ class StorePinkServices extends BaseServices
      * @param $pinkT
      * @return int
      */
-    public function pinkComplete($uidAll, $idAll, $uid, $pinkT)
+    public function pinkComplete($uidAll, $idAll, $uid, $pinkT, bool $deferEffects = false)
     {
         $pinkBool = 6;
         try {
             if (!$this->dao->getCount([['id', 'in', $idAll], ['is_refund', '=', 1]])) {
                 $this->dao->update([['id', 'in', $idAll]], ['stop_time' => time(), 'status' => 2]);
                 if (in_array($uid, $uidAll)) {
-                    if ($this->dao->getCount([['uid', 'in', $uidAll], ['is_tpl', '=', 0], ['k_id|id', '=', $pinkT['id']]]))
-                        $this->orderPinkAfter($uidAll, $pinkT['id']);
+                    if ($this->dao->getCount([['uid', 'in', $uidAll], ['is_tpl', '=', 0], ['k_id|id', '=', $pinkT['id']]])) {
+                        if ($deferEffects) {
+                            $this->dao->update([['uid', 'in', $uidAll], ['id|k_id', '=', $pinkT['id']]], ['is_tpl' => 1]);
+                            $this->recordDeferredEffect((int)($pinkT['order_id_key'] ?? 0), 'complete', [
+                                'uid_all' => array_values($uidAll),
+                                'pink_id' => (int)$pinkT['id'],
+                            ]);
+                        } else {
+                            $this->orderPinkAfter($uidAll, $pinkT['id']);
+                        }
+                    }
                     $pinkBool = 1;
                 } else  $pinkBool = 3;
             }
             return $pinkBool;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            //支付核心事务把建团和副作用登记作为一体提交；如果本地建团或
+            //副作用登记失败，必须把异常抛回支付事务，避免留下已付款但无团的订单。
+            if ($deferEffects) {
+                throw $e;
+            }
             return $pinkBool;
         }
     }
@@ -428,7 +443,7 @@ class StorePinkServices extends BaseServices
      * @param $order
      * @return mixed
      */
-    public function createPink(array $orderInfo)
+    public function createPink(array $orderInfo, bool $deferEffects = false)
     {
         /** @var StoreCombinationServices $services */
         $services = app()->make(StoreCombinationServices::class);
@@ -442,6 +457,12 @@ class StorePinkServices extends BaseServices
         if ($orderInfo['pink_id']) {
             //拼团存在
             $res = false;
+            //不同参团订单不会锁同一订单行，必须锁团长行后再检查重复成员和人数，
+            //否则最后一席会被两个支付回调同时占用。
+            $leader = $this->dao->getForUpdate((int)$orderInfo['pink_id']);
+            if (!$leader || (int)$leader['status'] !== 1 || (int)$leader['stop_time'] <= time()) {
+                return false;
+            }
             $pink['uid'] = $orderInfo['uid'];//用户id
             $pink['nickname'] = $userInfo['nickname'];
             $pink['avatar'] = $userInfo['avatar'];
@@ -460,14 +481,22 @@ class StorePinkServices extends BaseServices
                 $pink['add_time'] = time();//开团时间
                 $res = $this->save($pink);
             }
-            // 拼团团成功发送模板消息
-            event('NoticeListener', [['orderInfo' => $orderInfo, 'title' => $product['title'], 'pink' => $pink], 'can_pink_success']);
+            if ($deferEffects) {
+                $this->recordDeferredEffect((int)$orderInfo['id'], 'join', [
+                    'order_info' => $orderInfo,
+                    'title' => $product['title'],
+                    'pink' => $pink,
+                ]);
+            } else {
+                // 拼团团成功发送模板消息
+                event('NoticeListener', [['orderInfo' => $orderInfo, 'title' => $product['title'], 'pink' => $pink], 'can_pink_success']);
+            }
 
             //处理拼团完成
             list($pinkAll, $pinkT, $count, $idAll, $uidAll) = $this->getPinkMemberAndPinkK($pink);
             if ($pinkT['status'] == 1) {
                 if (!$count)//组团完成
-                    $this->pinkComplete($uidAll, $idAll, $pink['uid'], $pinkT);
+                    $this->pinkComplete($uidAll, $idAll, $pink['uid'], $pinkT, $deferEffects);
                 else
                     $this->pinkFail($pinkAll, $pinkT, 0);
             }
@@ -500,13 +529,67 @@ class StorePinkServices extends BaseServices
                 $pink['id'] = $res1['id'];
             }
 
-            PinkJob::dispatchSecs((int)(($product->effective_time * 3600) + 60), [$pink['id']]);
-            // 开团成功发送模板消息
-            event('NoticeListener', [['orderInfo' => $orderInfo, 'title' => $product['title'], 'pink' => $pink], 'open_pink_success']);
+            if ($deferEffects) {
+                $this->recordDeferredEffect((int)$orderInfo['id'], 'open', [
+                    'delay' => (int)(($product->effective_time * 3600) + 60),
+                    'pink_id' => (int)$pink['id'],
+                    'order_info' => $orderInfo,
+                    'title' => $product['title'],
+                    'pink' => $pink,
+                ]);
+            } else {
+                PinkJob::dispatchSecs((int)(($product->effective_time * 3600) + 60), [$pink['id']]);
+                // 开团成功发送模板消息
+                event('NoticeListener', [['orderInfo' => $orderInfo, 'title' => $product['title'], 'pink' => $pink], 'open_pink_success']);
+            }
 
             if ($res) return true;
             else return false;
         }
+    }
+
+    /**
+     * 执行支付事务提交后才允许发生的拼团外部动作。
+     * @param array $payload
+     * @return void
+     */
+    public function executeDeferredEffect(array $payload): void
+    {
+        switch ((string)($payload['kind'] ?? '')) {
+            case 'open':
+                PinkJob::dispatchSecs((int)($payload['delay'] ?? 60), [(int)($payload['pink_id'] ?? 0)]);
+                event('NoticeListener', [[
+                    'orderInfo' => (array)($payload['order_info'] ?? []),
+                    'title' => (string)($payload['title'] ?? ''),
+                    'pink' => (array)($payload['pink'] ?? []),
+                ], 'open_pink_success']);
+                return;
+            case 'join':
+                event('NoticeListener', [[
+                    'orderInfo' => (array)($payload['order_info'] ?? []),
+                    'title' => (string)($payload['title'] ?? ''),
+                    'pink' => (array)($payload['pink'] ?? []),
+                ], 'can_pink_success']);
+                return;
+            case 'complete':
+                if ((int)($payload['pink_id'] ?? 0) > 0) {
+                    $this->orderPinkAfter((array)($payload['uid_all'] ?? []), (int)$payload['pink_id']);
+                }
+                return;
+            default:
+                throw new \RuntimeException('未知的拼团副作用类型');
+        }
+    }
+
+    /** @param int $orderId @param string $kind @param array $payload */
+    private function recordDeferredEffect(int $orderId, string $kind, array $payload): void
+    {
+        if ($orderId <= 0) {
+            throw new \RuntimeException('拼团副作用缺少订单ID');
+        }
+        /** @var StoreOrderEffectServices $effects */
+        $effects = app()->make(StoreOrderEffectServices::class);
+        $effects->record($orderId, StoreOrderEffectServices::EVENT_GROUP_EFFECT_PREFIX . $kind, array_merge(['kind' => $kind], $payload));
     }
 
     /**

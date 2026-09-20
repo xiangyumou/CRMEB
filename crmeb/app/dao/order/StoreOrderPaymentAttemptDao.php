@@ -54,6 +54,18 @@ class StoreOrderPaymentAttemptDao extends BaseDao
     }
 
     /**
+     * 条件状态迁移，避免并发回调覆盖创建中或已收款的结论。
+     * @param int $id
+     * @param int $from
+     * @param array $data
+     * @return int
+     */
+    public function transition(int $id, int $from, array $data): int
+    {
+        return (int)$this->getModel()->where('id', $id)->where('status', $from)->update($data);
+    }
+
+    /**
      * 订单下仍未关闭的尝试记录
      * @param int $storeOrderId
      * @return array
@@ -62,7 +74,7 @@ class StoreOrderPaymentAttemptDao extends BaseDao
     {
         return $this->getModel()
             ->where('store_order_id', $storeOrderId)
-            ->whereIn('status', [StoreOrderPaymentAttempt::STATUS_SUBMITTED, StoreOrderPaymentAttempt::STATUS_UNKNOWN])
+            ->whereIn('status', [StoreOrderPaymentAttempt::STATUS_SUBMITTED, StoreOrderPaymentAttempt::STATUS_UNKNOWN, StoreOrderPaymentAttempt::STATUS_CREATING])
             ->order('id asc')
             ->select()->toArray();
     }

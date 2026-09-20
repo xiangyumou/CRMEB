@@ -391,7 +391,7 @@ class PayClient extends BaseClient
         REFUND_SOURCE_UNSETTLED_FUNDS---未结算资金退款（默认使用未结算资金退款）
         REFUND_SOURCE_RECHARGE_FUNDS---可用余额退款
         */
-        $refundAccount = $opt['refund_account'] ?? 'AVAILABLE';
+        $refundAccount = $options['refund_account'] ?? 'AVAILABLE';
 
         $data = [
             'transaction_id' => $outTradeNo,
@@ -414,7 +414,11 @@ class PayClient extends BaseClient
             $data['sub_mchid'] = $this->app['config']['v3_payment']['sub_mch_id'];
         }
 
-        $res = $this->request(self::API_REFUND_URL, 'POST', ['json' => $data]);
+        $response = $this->requestWithStatus(self::API_REFUND_URL, 'POST', ['json' => $data]);
+        if (!$this->responseSignatureValid($response)) {
+            throw new PayException('微信支付退款响应验签失败，结果未知');
+        }
+        $res = $response['body'] ?? null;
 
         if (!$res) {
             throw new PayException('微信支付:发起退款失败');
@@ -434,7 +438,11 @@ class PayClient extends BaseClient
      */
     public function queryRefund(string $outRefundNo)
     {
-        $res = $this->request($this->getApiUrl(self::API_REFUND_QUERY_URL, ['out_refund_no'], [$outRefundNo]), 'GET');
+        $response = $this->requestWithStatus($this->getApiUrl(self::API_REFUND_QUERY_URL, ['out_refund_no'], [$outRefundNo]), 'GET');
+        if (!$this->responseSignatureValid($response)) {
+            throw new PayException('微信支付退款查询响应验签失败，结果未知');
+        }
+        $res = $response['body'] ?? null;
 
         if (!$res) {
             throw new PayException('发起退款查询失败');

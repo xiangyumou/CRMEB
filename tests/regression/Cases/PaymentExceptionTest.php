@@ -12,6 +12,7 @@ use Tests\Regression\Support\BusinessSnapshot;
 use Tests\Regression\Support\FixtureFactory;
 use Tests\Regression\Support\RegressionTestCase;
 use Tests\Regression\Support\StatefulGateway;
+use Tests\Regression\Support\WorkerProcess;
 use think\facade\Db;
 
 /**
@@ -123,6 +124,44 @@ final class PaymentExceptionTest extends RegressionTestCase
         // A genuinely different trade number is a third real payment: its own record.
         self::assertTrue($this->notify($this->trade('order-b'), $this->trade('trade-c'), $payload), 'the third payment is acknowledged');
         self::assertCount(2, BusinessSnapshot::paymentExceptions($orderId), 'the second real payment has its own record');
+    }
+
+    /**
+     * Two different gateway transactions enter the callback path together. A
+     * conditional paid transition may let only one fulfill, but the loser must
+     * become an exception rather than being acknowledged as a harmless repeat.
+     */
+    public function testConcurrentDifferentCallbacksRecordTheLosingPayment(): void
+    {
+        $fixtures = new FixtureFactory($this, $this->getName());
+        $user = $fixtures->createUser();
+        $order = $fixtures->createOrder($user['uid'], [
+            'pay_type' => 'weixin',
+            'order_id' => $this->trade('race-order-a'),
+            'pay_price' => '10.00',
+            'total_price' => '10.00',
+        ]);
+        $fixtures->createOrderCart($order['id'], $user['uid']);
+        $orderId = $this->track((int)$order['id']);
+        $attempts = app()->make(StoreOrderPaymentAttemptServices::class);
+        $base = ['mch_id' => 'M1', 'app_id' => 'wx1', 'channel' => '2', 'pay_type' => 'weixin', 'total_fee' => '10.00', 'pay_uid' => $user['uid']];
+        $attempts->record($orderId, $this->trade('race-order-a'), 'wechat_pay', $base);
+        $attempts->record($orderId, $this->trade('race-order-b'), 'wechat_pay', $base);
+
+        $results = WorkerProcess::run([
+            'a' => 'notify ' . $this->trade('race-order-a') . ' ' . $this->trade('race-trade-a'),
+            'b' => 'notify ' . $this->trade('race-order-b') . ' ' . $this->trade('race-trade-b'),
+        ]);
+        self::assertTrue($results['a']['ok'], 'callback A is acknowledged after durable handling');
+        self::assertTrue($results['b']['ok'], 'callback B is acknowledged after durable handling');
+        self::assertSame(1, (int)BusinessSnapshot::order($orderId)['paid']);
+        self::assertSame(1, (int)Db::name('store_order_payment_exception')->where('store_order_id', $orderId)->count());
+        self::assertSame(
+            StoreOrderPaymentException::REASON_DUPLICATE,
+            (string)Db::name('store_order_payment_exception')->where('store_order_id', $orderId)->value('reason')
+        );
+        self::assertSame(2, (int)Db::name('store_order_payment_attempt')->where('store_order_id', $orderId)->where('status', 1)->count(), 'both real receipts are individually recorded');
+        self::assertSame(1, (int)Db::name('capital_flow')->where('order_id', $this->trade('race-order-a'))->count(), 'local fulfillment runs once');
     }
 
     /**
@@ -265,6 +304,32 @@ final class PaymentExceptionTest extends RegressionTestCase
         $request = json_decode((string)$row['refund_request'], true);
         self::assertFalse((bool)($request['gateway_accepted'] ?? true), 'the recorded gateway answer is kept');
         self::assertNotSame('', (string)($request['error'] ?? ''), 'the transport error text is recorded');
+    }
+
+    /**
+     * A gateway response can be lost after it accepted the refund. The public
+     * reconcile path must query the same refund number and finish the state
+     * without sending a second refund request.
+     */
+    public function testAcceptedExceptionRefundIsRecoveredByQuery(): void
+    {
+        $outTradeNo = $this->trade('recover-exception');
+        $tradeNo = $this->trade('trade-recover-exception');
+        $id = $this->recordException($outTradeNo, $tradeNo, '5.00');
+        $refundNo = 'PE' . $id . substr(md5('M1|' . $tradeNo), 0, 12);
+        $this->gateway->seedRefund($refundNo, $tradeNo, '5.00', 'processing');
+
+        /** @var StoreOrderPaymentExceptionServices $services */
+        $services = app()->make(StoreOrderPaymentExceptionServices::class);
+        $first = $services->refund($id, $tradeNo, 'operator-recover');
+        self::assertSame(StoreOrderPaymentException::STATUS_REFUND_UNKNOWN, $first['status']);
+        self::assertSame(1, $this->gateway->requestCount('refund', $tradeNo));
+
+        $this->gateway->completeRefund($refundNo);
+        $reconciled = $services->reconcileRefund($id, 'operator-query');
+        self::assertSame(StoreOrderPaymentException::STATUS_REFUNDED, $reconciled['status']);
+        self::assertSame($refundNo, $reconciled['refund_no']);
+        self::assertSame(1, $this->gateway->requestCount('refund', $tradeNo), 'query recovery never resends the refund');
     }
 
     /**

@@ -23,6 +23,12 @@ use app\model\activity\combination\StorePink;
 class StorePinkDao extends BaseDao
 {
 
+    /** 锁定团长记录，所有参团请求按同一行串行计算剩余名额。 */
+    public function getForUpdate(int $id)
+    {
+        return $this->getModel()->where('id', $id)->lock(true)->find();
+    }
+
     /**
      * 设置模型
      * @return string

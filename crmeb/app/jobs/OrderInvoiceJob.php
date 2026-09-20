@@ -11,6 +11,7 @@
 namespace app\jobs;
 
 use app\services\order\StoreOrderInvoiceServices;
+use app\services\order\StoreOrderEffectServices;
 use crmeb\basic\BaseJobs;
 use crmeb\traits\QueueTrait;
 
@@ -26,16 +27,21 @@ class OrderInvoiceJob extends BaseJobs
      * @email 442384644@qq.com
      * @date 2024/5/16
      */
-    public function autoInvoice($id)
+    public function autoInvoice($id, $effectId = 0)
     {
         try {
             if (sys_config('elec_invoice', 1) != 1) {
+                if ((int)$effectId > 0) app()->make(StoreOrderEffectServices::class)->markAsyncDone((int)$effectId);
                 return true;
             }
             /** @var StoreOrderInvoiceServices $services */
             $services = app()->make(StoreOrderInvoiceServices::class);
             $services->invoiceIssuance($id);
-        } catch (\Exception $e) {
+            if ((int)$effectId > 0) app()->make(StoreOrderEffectServices::class)->markAsyncDone((int)$effectId);
+        } catch (\Throwable $e) {
+            if ((int)$effectId > 0) {
+                app()->make(StoreOrderEffectServices::class)->markAsyncUnknown((int)$effectId, $e->getMessage());
+            }
         }
         return true;
     }

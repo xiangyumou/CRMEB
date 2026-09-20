@@ -78,19 +78,23 @@ final class OrderEffectTest extends RegressionTestCase
         $effects = $this->createMock(StoreOrderEffectServices::class);
         // One record per external target: the notice is what the job carries, and
         // the print and the invoice get their own records.
-        $effects->expects(self::exactly(3))
+        $effects->expects(self::exactly(7))
             ->method('record')
             ->withConsecutive(
                 [$orderId, StoreOrderEffectServices::EVENT_PAY_NOTICE, self::isType('array')],
+                [$orderId, StoreOrderEffectServices::EVENT_PAY_NOTICE_ADMIN, self::isType('array')],
+                [$orderId, StoreOrderEffectServices::EVENT_PAY_NOTICE_PUSH, self::isType('array')],
+                [$orderId, StoreOrderEffectServices::EVENT_PAY_NOTICE_CUSTOM, self::isType('array')],
+                [$orderId, StoreOrderEffectServices::EVENT_PAY_NOTICE_EVENT, self::isType('array')],
                 [$orderId, StoreOrderEffectServices::EVENT_PAY_PRINT, self::isType('array')],
                 [$orderId, StoreOrderEffectServices::EVENT_PAY_INVOICE, self::isType('array')]
             )
-            ->willReturnOnConsecutiveCalls(4242, 4243, 4244);
+            ->willReturnOnConsecutiveCalls(4242, 4243, 4244, 4245, 4246, 4247, 4248);
         // The recorded row is what the queue job carries; the job has to end up
         // running exactly that row.
-        $effects->expects(self::once())
+        $effects->expects(self::exactly(7))
             ->method('runById')
-            ->with(4242)
+            ->withConsecutive([4242], [4243], [4244], [4245], [4246], [4247], [4248])
             ->willReturn(true);
         $this->replace(StoreOrderEffectServices::class, $effects);
 
@@ -148,12 +152,12 @@ final class OrderEffectTest extends RegressionTestCase
     {
         $orderId = random_int(900000000, 999999999);
         [$pending, $unknown, $done, $runningFresh, $runningStale, $exhausted] = $this->seedEffects($orderId, [
-            ['status' => StoreOrderEffect::STATUS_PENDING],
-            ['status' => StoreOrderEffect::STATUS_UNKNOWN],
-            ['status' => StoreOrderEffect::STATUS_DONE],
-            ['status' => StoreOrderEffect::STATUS_RUNNING, 'update_time' => time()],
-            ['status' => StoreOrderEffect::STATUS_RUNNING, 'update_time' => time() - StoreOrderEffect::STALE_SECONDS - 1],
-            ['status' => StoreOrderEffect::STATUS_PENDING, 'attempts' => StoreOrderEffect::MAX_ATTEMPTS],
+            ['event_type' => StoreOrderEffectServices::EVENT_PAY_NOTICE, 'status' => StoreOrderEffect::STATUS_PENDING],
+            ['event_type' => StoreOrderEffectServices::EVENT_PAY_INVOICE, 'status' => StoreOrderEffect::STATUS_UNKNOWN],
+            ['event_type' => StoreOrderEffectServices::EVENT_PAY_SUCCESS, 'status' => StoreOrderEffect::STATUS_DONE],
+            ['event_type' => StoreOrderEffectServices::EVENT_CLOSE_ATTEMPT_PREFIX . '1', 'status' => StoreOrderEffect::STATUS_RUNNING, 'update_time' => time()],
+            ['event_type' => StoreOrderEffectServices::EVENT_CLOSE_ATTEMPT_PREFIX . '2', 'status' => StoreOrderEffect::STATUS_RUNNING, 'update_time' => time() - StoreOrderEffect::STALE_SECONDS - 1],
+            ['event_type' => StoreOrderEffectServices::EVENT_CLOSE_ATTEMPT_PREFIX . '3', 'status' => StoreOrderEffect::STATUS_PENDING, 'attempts' => StoreOrderEffect::MAX_ATTEMPTS],
         ]);
 
         $pendingIds = $this->effectServices()->pendingIds(500);
@@ -180,13 +184,32 @@ final class OrderEffectTest extends RegressionTestCase
         self::assertSame(1, (int)$row['attempts']);
         self::assertNotSame('', (string)$row['last_error'], 'the failure is kept for the operator');
 
-        // The next cycle may try again, and counts the second attempt.
-        self::assertFalse((new OrderEffectJob())->doJob($id));
+        // An unknown non-idempotent action is manual-only. The next automatic
+        // cycle must leave it untouched until an operator explicitly resets it.
+        self::assertTrue((new OrderEffectJob())->doJob($id), 'an automatic cycle skips an unknown non-idempotent action');
+        self::assertSame(1, (int)Db::name('store_order_effect')->where('id', $id)->value('attempts'));
+
+        Db::name('store_order_effect')->where('id', $id)->update(['status' => StoreOrderEffect::STATUS_PENDING]);
+        self::assertFalse((new OrderEffectJob())->doJob($id), 'an operator reset may explicitly retry it');
         self::assertSame(2, (int)Db::name('store_order_effect')->where('id', $id)->value('attempts'));
 
         // A finished record is not executed a second time.
         Db::name('store_order_effect')->where('id', $id)->update(['status' => StoreOrderEffect::STATUS_DONE]);
         self::assertTrue((new OrderEffectJob())->doJob($id));
         self::assertSame(2, (int)Db::name('store_order_effect')->where('id', $id)->value('attempts'), 'a finished effect is left alone');
+    }
+
+    public function testGroupExternalEffectsAreManualAfterAnUnknownOutcome(): void
+    {
+        $orderId = random_int(900000000, 999999999);
+        [$id] = $this->seedEffects($orderId, [[
+            'event_type' => StoreOrderEffectServices::EVENT_GROUP_EFFECT_PREFIX . 'join',
+            'payload' => json_encode(['kind' => 'unknown']),
+            'status' => StoreOrderEffect::STATUS_UNKNOWN,
+        ]]);
+
+        self::assertNotContains($id, $this->effectServices()->pendingIds(500), 'a group notification with unknown result is not auto-replayed');
+        Db::name('store_order_effect')->where('id', $id)->update(['status' => StoreOrderEffect::STATUS_PENDING]);
+        self::assertContains($id, $this->effectServices()->pendingIds(500), 'an operator may explicitly put it back in the queue');
     }
 }

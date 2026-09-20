@@ -95,12 +95,14 @@ class StoreOrderSuccessServices extends BaseServices
             if (!$this->dao->markPaid($orderId, $updata)) {
                 return false;
             }
-            if ($orderInfo['combination_id'] && !$orderInfo['refund_status']) {
+            $paidOrder = $this->dao->get($orderId);
+            $paidOrderInfo = $paidOrder ? $paidOrder->toArray() : $orderInfo;
+            if ($paidOrderInfo['combination_id'] && !$paidOrderInfo['refund_status']) {
                 /** @var StorePinkServices $pinkServices */
                 $pinkServices = app()->make(StorePinkServices::class);
                 /** @var StoreOrderServices $orderServices */
                 $orderServices = app()->make(StoreOrderServices::class);
-                if (!$pinkServices->createPink($orderServices->tidyOrder($orderInfo, true))) {
+                if (!$pinkServices->createPink($orderServices->tidyOrder($paidOrderInfo, true), true)) {
                     //建团失败必须回滚整个支付事务，否则回调重试时订单已支付，建团永远不会执行
                     throw new ApiException('拼团创建失败');
                 }
@@ -113,8 +115,6 @@ class StoreOrderSuccessServices extends BaseServices
              * 虚拟商品分配、开票状态都必须与"已支付"一起成功或一起回滚。
              * 任何一步失败都不允许留下"已收款但没有履约"的订单。
              */
-            $paidOrder = $this->dao->get($orderId);
-            $paidOrderInfo = $paidOrder ? $paidOrder->toArray() : $orderInfo;
             $this->fulfillLocally($paidOrderInfo, $updata);
             //外部动作按目标拆分登记：某一条通知失败不会让流水、发卡或打印重跑
             $closeTaskIds = [];
@@ -124,13 +124,25 @@ class StoreOrderSuccessServices extends BaseServices
                 $paidAttemptId = (int)($paidAttempt['id'] ?? 0);
             }
             $closeTaskIds = $effectServices->recordCloseTasks($orderId, $paidAttemptId > 0 ? [$paidAttemptId] : []);
-            $effectId = $effectServices->record($orderId, StoreOrderEffectServices::EVENT_PAY_NOTICE, [
-                'trade_no' => (string)($updata['trade_no'] ?? ''),
-                'out_trade_no' => $outTradeNo,
-            ]);
-            $effectServices->record($orderId, StoreOrderEffectServices::EVENT_PAY_PRINT, ['trade_no' => (string)($updata['trade_no'] ?? '')]);
-            $effectServices->record($orderId, StoreOrderEffectServices::EVENT_PAY_INVOICE, ['trade_no' => (string)($updata['trade_no'] ?? '')]);
-            return ['effect_id' => $effectId, 'close_task_ids' => $closeTaskIds];
+            $noticeEffectIds = [];
+            foreach ([
+                StoreOrderEffectServices::EVENT_PAY_NOTICE,
+                StoreOrderEffectServices::EVENT_PAY_NOTICE_ADMIN,
+                StoreOrderEffectServices::EVENT_PAY_NOTICE_PUSH,
+                StoreOrderEffectServices::EVENT_PAY_NOTICE_CUSTOM,
+                StoreOrderEffectServices::EVENT_PAY_NOTICE_EVENT,
+            ] as $noticeEvent) {
+                $noticeEffectIds[] = $effectServices->record($orderId, $noticeEvent, [
+                    'trade_no' => (string)($updata['trade_no'] ?? ''),
+                    'out_trade_no' => $outTradeNo,
+                ]);
+            }
+            $printEffectId = $effectServices->record($orderId, StoreOrderEffectServices::EVENT_PAY_PRINT, ['trade_no' => (string)($updata['trade_no'] ?? '')]);
+            $invoiceEffectId = $effectServices->record($orderId, StoreOrderEffectServices::EVENT_PAY_INVOICE, ['trade_no' => (string)($updata['trade_no'] ?? '')]);
+            return [
+                'effect_ids' => array_merge($noticeEffectIds, [$printEffectId, $invoiceEffectId]),
+                'close_task_ids' => $closeTaskIds,
+            ];
         });
         if (!$paid) {
             return false;
@@ -138,7 +150,10 @@ class StoreOrderSuccessServices extends BaseServices
         //事务提交之后再执行外部动作：队列可用时由消费者执行，队列关闭时同步执行。
         //执行失败或进程中断留下的待处理记录，由定时任务补投。
         try {
-            foreach (array_merge([$paid['effect_id']], $paid['close_task_ids']) as $effectId) {
+            //拼团建团/参团也可能在支付事务里登记了提交后副作用；现在事务
+            //已经提交，可以把它们与普通通知一起投递。定时器仍会补投中断的任务。
+            $deferredGroupEffects = $effectServices->pendingIdsForOrder($orderId);
+            foreach (array_unique(array_merge($paid['effect_ids'], $paid['close_task_ids'], $deferredGroupEffects)) as $effectId) {
                 // 参数必须是参数数组：传裸值会被当成方法名，通知会静默丢失。
                 OrderEffectJob::dispatch([(int)$effectId]);
             }

@@ -122,6 +122,53 @@ final class PaymentTransportTest extends RegressionTestCase
     }
 
     /**
+     * The configured WeChat public-key mode and a platform-certificate rotation
+     * are both real verification paths. A cached list missing the response serial
+     * must trigger one refresh rather than silently rejecting or accepting it.
+     */
+    public function testPublicKeyModeAndCertificateRotationRefresh(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'crmeb-wx-public-');
+        if ($path === false) {
+            self::fail('unable to create temporary public-key file');
+        }
+        file_put_contents($path, $this->pems['cert']);
+        try {
+            $publicClient = $this->signatureClient([], [
+                'v3_payment' => [
+                    'v3_pay_public_key' => 'PUBLIC-SERIAL',
+                    'v3_pay_public_pem' => $path,
+                ],
+            ]);
+            $response = $this->signedResponse($this->pems['key'], 'PUBLIC-SERIAL');
+            self::assertTrue($publicClient->verifyResponseSignature($response), 'configured public-key mode verifies');
+
+            $rotated = $this->generateCertificatePair();
+            $rotatingClient = $this->signatureClient(
+                ['OLD-SERIAL' => $this->pems['cert']],
+                [],
+                ['ROTATED-SERIAL' => $rotated['cert']]
+            );
+            $rotatedResponse = $this->signedResponse($rotated['key'], 'ROTATED-SERIAL');
+            self::assertTrue($rotatingClient->verifyResponseSignature($rotatedResponse), 'a missing serial refreshes the certificate list once');
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    public function testV3RefundUsesThePersistedRefundNumberAndNormalizedState(): void
+    {
+        $source = (string)file_get_contents(CRMEB_TEST_ROOT . '/crmeb/services/pay/storage/V3WechatPay.php');
+        self::assertStringContainsString(
+            '$refundNo = trim((string)$outRequestNo) !== \'\' ? (string)$outRequestNo : $outTradeNo;',
+            $source,
+            'v3 refund queries use the persisted merchant refund number'
+        );
+        self::assertStringContainsString("'state' => \$state", $source, 'v3 refund queries expose the normalized state');
+        self::assertStringContainsString('$status === \'CLOSED\'', $source, 'closed is not treated as success');
+    }
+
+    /**
      * A certificate signed by an untrusted authority is rejected: the
      * verification uses the certificate chain, not just any public key.
      */
@@ -200,22 +247,31 @@ final class PaymentTransportTest extends RegressionTestCase
      *
      * @param array<string, string> $certificates serial => PEM
      */
-    private function signatureClient(array $certificates)
+    private function signatureClient(array $certificates, array $config = [], array $refreshed = [])
     {
-        return new class($certificates) {
+        return new class($certificates, $config, $refreshed) {
             use Certficates;
+
+            public array $app = [];
 
             /** @var array<string, string> */
             private array $certificates;
+            /** @var array<string, mixed> */
+            private array $config;
+            /** @var array<string, string> */
+            private array $refreshed;
 
-            public function __construct(array $certificates)
+            public function __construct(array $certificates, array $config, array $refreshed)
             {
                 $this->certificates = $certificates;
+                $this->config = $config ?: ['v3_payment' => []];
+                $this->refreshed = $refreshed;
+                $this->app = ['config' => $this->config];
             }
 
-            public function platformCertificates(): array
+            public function platformCertificates(bool $forceRefresh = false): array
             {
-                return $this->certificates;
+                return $forceRefresh && $this->refreshed ? $this->refreshed : $this->certificates;
             }
 
             /**
@@ -239,6 +295,27 @@ final class PaymentTransportTest extends RegressionTestCase
                 return $this->verifySignature($message, $signature, $serial);
             }
         };
+    }
+
+    /** @return array{status:int,body:array,raw:string,headers:array} */
+    private function signedResponse(string $key, string $serial): array
+    {
+        $body = '{"status":"SUCCESS","out_refund_no":"RF-1"}';
+        $timestamp = (string)time();
+        $nonce = 'nonce';
+        openssl_sign($timestamp . "\n" . $nonce . "\n" . $body . "\n", $signature, $key, OPENSSL_ALGO_SHA256);
+
+        return [
+            'status' => 200,
+            'body' => json_decode($body, true),
+            'raw' => $body,
+            'headers' => [
+                'wechatpay-signature' => base64_encode($signature),
+                'wechatpay-serial' => $serial,
+                'wechatpay-timestamp' => $timestamp,
+                'wechatpay-nonce' => $nonce,
+            ],
+        ];
     }
 
     /**

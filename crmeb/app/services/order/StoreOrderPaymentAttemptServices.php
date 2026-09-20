@@ -62,6 +62,9 @@ class StoreOrderPaymentAttemptServices extends BaseServices
             'pay_type' => (string)($context['pay_type'] ?? ''),
             'total_fee' => (string)($context['total_fee'] ?? '0'),
             'pay_uid' => (string)(int)($context['pay_uid'] ?? 0),
+            'payment_context' => json_encode([
+                'pay_new_weixin_open' => (bool)($context['pay_new_weixin_open'] ?? false),
+            ], JSON_UNESCAPED_UNICODE),
         ];
         $existing = $this->dao->getByOutTradeNo($outTradeNo);
         if ($existing) {
@@ -77,8 +80,13 @@ class StoreOrderPaymentAttemptServices extends BaseServices
                 'pay_type' => (string)$existing['pay_type'],
                 'total_fee' => (string)$existing['total_fee'],
                 'pay_uid' => (string)(int)$existing['pay_uid'],
+                'payment_context' => (string)($existing['payment_context'] ?? ''),
             ];
             foreach ($identity as $field => $value) {
+                if ($field === 'payment_context' && $stored[$field] === '') {
+                    // Older attempts predate the frozen adapter decision.
+                    continue;
+                }
                 if ($field === 'total_fee') {
                     //金额按固定两位小数比较，不受表示方式影响
                     if (bccomp($stored[$field] === '' ? '0' : $stored[$field], $value === '' ? '0' : $value, 2) !== 0) {
@@ -92,6 +100,9 @@ class StoreOrderPaymentAttemptServices extends BaseServices
             }
             if ((int)$existing['status'] === StoreOrderPaymentAttempt::STATUS_UNKNOWN) {
                 throw new ApiException('该支付存在未确认的网关结果，请人工核对后处理');
+            }
+            if ((int)$existing['status'] === StoreOrderPaymentAttempt::STATUS_CREATING) {
+                throw new ApiException('该支付正在创建中，请稍后重试');
             }
             if ((int)$existing['status'] === StoreOrderPaymentAttempt::STATUS_PAID) {
                 throw new ApiException('该支付尝试已确认收款，无法重复发起');
@@ -117,6 +128,7 @@ class StoreOrderPaymentAttemptServices extends BaseServices
             'pay_type' => $identity['pay_type'],
             'total_fee' => $identity['total_fee'],
             'pay_uid' => (int)$identity['pay_uid'],
+            'payment_context' => $identity['payment_context'],
             'status' => StoreOrderPaymentAttempt::STATUS_SUBMITTED,
             'trade_no' => '',
             'last_result' => '',
@@ -178,6 +190,41 @@ class StoreOrderPaymentAttemptServices extends BaseServices
     public function openAttempts(int $storeOrderId): array
     {
         return $this->dao->getOpenAttempts($storeOrderId);
+    }
+
+    /** 锁定一条支付尝试，调用方必须已处于事务中。 */
+    public function getForUpdate(int $id): ?array
+    {
+        $row = $this->dao->getForUpdate($id);
+        return $row ? $row->toArray() : null;
+    }
+
+    /** 只允许从预期状态迁移，避免回调覆盖支付创建或已收款结论。 */
+    public function transition(int $id, int $from, int $to, string $result = '', string $tradeNo = ''): bool
+    {
+        $data = [
+            'status' => $to,
+            'last_result' => $this->trim($result),
+            'update_time' => time(),
+        ];
+        if ($tradeNo !== '') $data['trade_no'] = $tradeNo;
+        return $this->dao->transition($id, $from, $data) === 1;
+    }
+
+    /**
+     * 在异常收款收尾阶段锁定尝试，保留已经登记的第一笔交易号。两个不同
+     * 交易号可能同时命中同一个商户订单号，后到的异常不能覆盖第一笔已确认
+     * 交易，否则后续关单和对账会失去真实归属。
+     */
+    public function markExceptionPaid(int $id, string $tradeNo, string $reason = ''): void
+    {
+        $this->transaction(function () use ($id, $tradeNo, $reason): void {
+            $row = $this->dao->getForUpdate($id);
+            if (!$row || (int)$row['status'] === StoreOrderPaymentAttempt::STATUS_PAID) {
+                return;
+            }
+            $this->mark($id, StoreOrderPaymentAttempt::STATUS_PAID, $reason, $tradeNo);
+        });
     }
 
     /**

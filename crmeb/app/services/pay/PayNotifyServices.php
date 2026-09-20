@@ -68,9 +68,6 @@ class PayNotifyServices
             if (array_key_exists('paid_amount', $payment)
                 && !$this->paymentMatches((string)$orderInfo->pay_price, $payment)) return false;
             if ($orderInfo->paid) {
-                if ($attempt) {
-                    $attemptServices->markPaidByOutTradeNo($outTradeNo, (string)$trade_no);
-                }
                 //同交易号的重复通知幂等确认；不同交易号说明这是一笔真实的
                 //第二笔收款，必须落异常记录，不能当作第一笔的重复通知吞掉
                 $knownTrade = trim((string)($orderInfo->trade_no ?? '')) ?: trim((string)($attempt['trade_no'] ?? ''));
@@ -83,6 +80,8 @@ class PayNotifyServices
                         $payment,
                         StoreOrderPaymentException::REASON_DUPLICATE
                     );
+                } elseif ($attempt) {
+                    $attemptServices->markPaidByOutTradeNo($outTradeNo, (string)$trade_no);
                 }
                 return true;
             }
@@ -105,8 +104,37 @@ class PayNotifyServices
             }
             $success = $services->paySuccess($orderInfo->toArray(), $payType, $other);
             if (!$success) {
-                $orderInfo = $services->getOne(['order_id' => $order_id]);
-                return $orderInfo && $orderInfo->paid;
+                //另一条回调可能已经抢先完成了订单。不能只用 paid=true
+                //吞掉不同交易号，否则第二笔真实收款不会进入人工核对队列。
+                $finalOrder = $attempt
+                    ? $services->getOne(['id' => (int)$attempt['store_order_id']])
+                    : $services->getOne(['order_id' => $order_id]);
+                if (!$finalOrder) return false;
+                $knownTrade = trim((string)($finalOrder->trade_no ?? ''));
+                if ($finalOrder->paid) {
+                    if ($knownTrade !== '' && trim((string)$trade_no) !== '' && $knownTrade !== trim((string)$trade_no)) {
+                        $this->recordPaymentException(
+                            (int)$finalOrder->id,
+                            (int)($attempt['id'] ?? 0),
+                            (string)$trade_no,
+                            (string)$outTradeNo,
+                            $payment,
+                            StoreOrderPaymentException::REASON_DUPLICATE
+                        );
+                    }
+                    return true;
+                }
+                if ((int)($finalOrder->is_cancel ?? 0) === 1) {
+                    $this->recordPaymentException(
+                        (int)$finalOrder->id,
+                        (int)($attempt['id'] ?? 0),
+                        (string)$trade_no,
+                        (string)$outTradeNo,
+                        $payment,
+                        StoreOrderPaymentException::REASON_CANCELLED
+                    );
+                }
+                return false;
             }
             return true;
         } catch (\Exception $e) {
@@ -131,6 +159,7 @@ class PayNotifyServices
         $exceptions = app()->make(StoreOrderPaymentExceptionServices::class);
         $driver = '';
         $channel = 0;
+        $attempt = null;
         if ($attemptId > 0) {
             $attempt = app()->make(StoreOrderPaymentAttemptServices::class)->get($attemptId);
             if ($attempt) {
@@ -140,6 +169,11 @@ class PayNotifyServices
         }
         if ($driver === '') {
             $driver = sys_config('pay_wechat_type') == 1 ? 'v3_wechat_pay' : 'wechat_pay';
+        }
+        $paymentContext = json_decode((string)($attempt['payment_context'] ?? ''), true);
+        $paymentContext = is_array($paymentContext) ? $paymentContext : [];
+        if (!array_key_exists('pay_new_weixin_open', $paymentContext)) {
+            $paymentContext['pay_new_weixin_open'] = (bool)sys_config('pay_new_weixin_open');
         }
         $exceptions->record([
             'store_order_id' => $storeOrderId,
@@ -154,8 +188,21 @@ class PayNotifyServices
                 'driver' => $driver,
                 'channel' => $channel,
                 'out_trade_no' => $outTradeNo,
+                'mch_id' => (string)($attempt['mch_id'] ?? ($payment['merchant_id'] ?? '')),
+                'app_id' => (string)($attempt['app_id'] ?? ''),
+                'total_fee' => (string)($attempt['total_fee'] ?? ($payment['paid_amount'] ?? '0')),
+                'pay_new_weixin_open' => (bool)$paymentContext['pay_new_weixin_open'],
             ],
         ]);
+        //只有异常记录提交成功后，才把这笔实际收款标记为已支付。这样关单
+        //任务不会再把已经收款的尝试当作仍可关闭的支付单。
+        if ($attemptId > 0 && $tradeNo !== '') {
+            app()->make(StoreOrderPaymentAttemptServices::class)->markExceptionPaid(
+                $attemptId,
+                $tradeNo,
+                'callback:exception:' . $reason
+            );
+        }
     }
 
     private function paymentMatches(string $expectedAmount, array $payment): bool

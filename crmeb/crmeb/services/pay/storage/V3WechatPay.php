@@ -204,7 +204,17 @@ class V3WechatPay extends BasePay implements PayInterface
      */
     public function refund(string $outTradeNo, array $options = [])
     {
-        return $this->instance->v3pay->refund($outTradeNo, $options);
+        $result = $this->instance->v3pay->refund($outTradeNo, $options);
+        $status = strtoupper((string)($result['status'] ?? ''));
+        $state = in_array($status, ['SUCCESS', 'COMPLETED'], true) ? 'success' :
+            ($status === 'PROCESSING' ? 'processing' :
+                ($status === 'CLOSED' ? 'closed' : 'unknown'));
+        return [
+            'state' => $state,
+            'refund_no' => (string)($result['out_refund_no'] ?? ($options['refund_id'] ?? '')),
+            'refund_price' => isset($result['amount']['refund']) ? bcdiv((string)$result['amount']['refund'], '100', 2) : (string)($options['refund_price'] ?? ''),
+            'raw' => $result,
+        ];
     }
 
     /**
@@ -216,7 +226,23 @@ class V3WechatPay extends BasePay implements PayInterface
      */
     public function queryRefund(string $outTradeNo, string $outRequestNo = null, array $other = [])
     {
-        return $this->instance->v3pay->queryRefund($outTradeNo);
+        // 微信 v3 查询接口的路径参数是商户退款单号。保留第一个参数只是
+        // 为了兼容统一 PayInterface；有持久化退款号时绝不能拿支付单号查询。
+        $refundNo = trim((string)$outRequestNo) !== '' ? (string)$outRequestNo : $outTradeNo;
+        $result = $this->instance->v3pay->queryRefund($refundNo);
+        $status = strtoupper((string)($result['status'] ?? ''));
+        $state = in_array($status, ['SUCCESS', 'COMPLETED'], true) ? 'success' :
+            ($status === 'PROCESSING' ? 'processing' :
+                ($status === 'CLOSED' ? 'closed' : 'unknown'));
+
+        return [
+            'state' => $state,
+            'refund_no' => (string)($result['out_refund_no'] ?? $refundNo),
+            'refund_price' => isset($result['amount']['refund'])
+                ? bcdiv((string)$result['amount']['refund'], '100', 2)
+                : '',
+            'raw' => $result,
+        ];
     }
 
     /**

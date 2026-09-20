@@ -8,7 +8,7 @@
  *
  * `drop-retired.php` removes retired features and rewrites settings inside one
  * business transaction. This script is deliberately separate and much smaller:
- * it only adds the two reliability tables and the two refund columns, so an
+ * it only adds the reliability tables and the refund/payment context columns, so an
  * existing shop gets the same schema a fresh install ships without touching a
  * single business row.
  *
@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS `%s` (
   `pay_type` varchar(32) NOT NULL DEFAULT '' COMMENT '支付方式',
   `total_fee` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '订单应付金额',
   `pay_uid` int(11) NOT NULL DEFAULT '0' COMMENT '支付用户uid',
+  `payment_context` text COMMENT '冻结的支付适配上下文，不含密钥',
   `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0已提交 1已支付 2已关闭 3结果未知',
   `trade_no` varchar(100) NOT NULL DEFAULT '' COMMENT '网关支付单号',
   `last_result` varchar(255) NOT NULL DEFAULT '' COMMENT '最近一次查单或关单结论',
@@ -81,7 +82,7 @@ CREATE TABLE IF NOT EXISTS `%s` (
   `paid_amount` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '实收金额',
   `currency` varchar(8) NOT NULL DEFAULT 'CNY' COMMENT '币种',
   `payment_context` text COMMENT '冻结的支付上下文（驱动、渠道、身份），不含密钥',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0待处理 1已退款 2退款结果未知 3退款失败',
+  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0待处理 1已退款 2退款结果未知 3退款失败 4退款处理中',
   `refund_no` varchar(64) NOT NULL DEFAULT '' COMMENT '稳定退款单号，同一记录永远一致',
   `refund_request` text COMMENT '退款请求与网关应答记录',
   `operator` varchar(64) NOT NULL DEFAULT '' COMMENT '退款操作人',
@@ -99,6 +100,9 @@ SQL,
 
 /** Columns the retained refund path needs on a table that already exists. */
 const RELIABILITY_COLUMNS = [
+    'store_order_payment_attempt' => [
+        'payment_context' => "text COMMENT '冻结的支付适配上下文，不含密钥'",
+    ],
     'store_order_refund' => [
         'out_refund_no' => "varchar(64) NOT NULL DEFAULT '' COMMENT '提交给支付网关的退款单号，重试时必须复用'",
         'refund_request' => "text COMMENT '首次发起退款时冻结的请求上下文（原支付订单、交易号、驱动、商户、应用、渠道、金额、币种）'",
@@ -125,6 +129,7 @@ const RELIABILITY_COLUMN_TYPES = [
     'store_order_payment_attempt.driver' => 'varchar',
     'store_order_payment_attempt.status' => 'tinyint',
     'store_order_payment_attempt.total_fee' => 'decimal',
+    'store_order_payment_attempt.payment_context' => 'text',
     'store_order_effect.event_type' => 'varchar',
     'store_order_effect.status' => 'tinyint',
     'store_order_payment_exception.mch_id' => 'varchar',
@@ -267,7 +272,7 @@ function precheckBlockers(): array
     $blockers = [];
     if (objectExists('store_order_payment_attempt')) {
         $row = Db::query(
-            'SELECT COUNT(*) AS total FROM `' . prefixed('store_order_payment_attempt') . '` WHERE status IN (0, 3)'
+            'SELECT COUNT(*) AS total FROM `' . prefixed('store_order_payment_attempt') . '` WHERE status IN (0, 3, 4)'
         );
         $pending = (int)($row[0]['total'] ?? 0);
         if ($pending > 0) {
@@ -280,11 +285,11 @@ function precheckBlockers(): array
     if (isset($refundColumns['refund_state'], $refundColumns['refund_request'])) {
         $row = Db::query(
             'SELECT COUNT(*) AS total FROM `' . prefixed('store_order_refund') . '`
-             WHERE refund_request <> "" AND refund_state IN (1, 2)'
+             WHERE refund_request <> "" AND refund_state IN (0, 1, 2)'
         );
         $unfinished = (int)($row[0]['total'] ?? 0);
         if ($unfinished > 0) {
-            $blockers[] = "有 {$unfinished} 条退款处于处理中或结果未知：请在迁移前通过 order:reconcile refunds:list 核对";
+            $blockers[] = "有 {$unfinished} 条退款请求尚未完成（状态 0/1/2）：请在迁移前通过 order:reconcile refunds:list 核对";
         }
     }
     if (isset($refundColumns['refund_request']) && !isset($refundColumns['refund_state'])) {
@@ -300,11 +305,11 @@ function precheckBlockers(): array
     }
     if (objectExists('store_order_effect')) {
         $row = Db::query(
-            'SELECT COUNT(*) AS total FROM `' . prefixed('store_order_effect') . '` WHERE status = 2'
+            'SELECT COUNT(*) AS total FROM `' . prefixed('store_order_effect') . '` WHERE status IN (2, 3)'
         );
         $unknown = (int)($row[0]['total'] ?? 0);
         if ($unknown > 0) {
-            $blockers[] = "有 {$unknown} 条副作用结果未知：请在迁移前通过 order:reconcile effects:list 核对";
+            $blockers[] = "有 {$unknown} 条副作用结果未知或执行中：请在迁移前通过 order:reconcile effects:list 核对";
         }
     }
     return $blockers;

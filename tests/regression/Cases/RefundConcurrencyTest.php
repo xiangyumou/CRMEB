@@ -143,7 +143,7 @@ final class RefundConcurrencyTest extends RegressionTestCase
         self::assertGreaterThanOrEqual(1, count($succeeded), 'at least one process completes the refund');
         foreach ($results as $name => $result) {
             if (!$result['ok']) {
-                self::assertStringContainsString('已完成', $result['error'], $name . ' lost the race cleanly: ' . $result['error']);
+                self::assertMatchesRegularExpression('/已完成|已有网关请求/', $result['error'], $name . ' lost the race cleanly: ' . $result['error']);
             }
         }
 

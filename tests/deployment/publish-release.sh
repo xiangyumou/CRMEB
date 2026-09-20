@@ -77,15 +77,24 @@ printf '%s\n' "$again" | grep -q 'resumed without change' || fail 'republishing 
 pass 'republishing the same commit reuses the same digest'
 
 # 3. A different candidate under the same tag aborts before anything is written.
-make_image "${arch_amd64%:*}:sha-$sha_a-amd64" 'amd64-v2'
-make_image "${arch_arm64%:*}:sha-$sha_a-arm64" 'arm64-v2'
-docker push -q "${arch_amd64%:*}:sha-$sha_a-amd64" >/dev/null
-docker push -q "${arch_arm64%:*}:sha-$sha_a-arm64" >/dev/null
-if bash "$script" tags "$image" "$sha_a" "${arch_amd64%:*}:sha-$sha_a-amd64" "${arch_arm64%:*}:sha-$sha_a-arm64" >"$tmp/conflict.log" 2>&1; then
+#    The conflicting source images use different tags, so this test can prove
+#    that the formal per-arch tags and the joined manifest remain unchanged.
+arch_amd64_b="127.0.0.1:${registry_port}/candidate-amd64:conflict-$sha_a-amd64"
+arch_arm64_b="127.0.0.1:${registry_port}/candidate-arm64:conflict-$sha_a-arm64"
+make_image "$arch_amd64_b" 'amd64-v2'
+make_image "$arch_arm64_b" 'arm64-v2'
+docker push -q "$arch_amd64_b" >/dev/null
+docker push -q "$arch_arm64_b" >/dev/null
+formal_amd64_before="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$image:sha-$sha_a-amd64")"
+formal_arm64_before="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$image:sha-$sha_a-arm64")"
+if bash "$script" tags "$image" "$sha_a" "$arch_amd64_b" "$arch_arm64_b" >"$tmp/conflict.log" 2>&1; then
     fail 'a different candidate was allowed to overwrite an existing tag'
 fi
 grep -q 'refusing a conflicting release' "$tmp/conflict.log" || fail 'the conflict refusal did not explain itself'
 grep -q "already held" "$tmp/conflict.log" || fail 'the conflict refusal did not name the digest it found'
+[ "$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$image:sha-$sha_a-amd64")" = "$formal_amd64_before" ] || fail 'the refused publish changed the formal amd64 tag'
+[ "$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$image:sha-$sha_a-arm64")" = "$formal_arm64_before" ] || fail 'the refused publish changed the formal arm64 tag'
+[ "$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$image:sha-$sha_a")" = "$digest_a" ] || fail 'the refused publish changed the formal manifest tag'
 pass 'a conflicting candidate fails the publish instead of silently republishing'
 
 # 4. A registry that cannot answer aborts instead of being read as "absent".

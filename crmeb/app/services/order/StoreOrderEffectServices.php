@@ -12,6 +12,8 @@
 namespace app\services\order;
 
 use app\dao\order\StoreOrderEffectDao;
+use app\jobs\OrderInvoiceJob;
+use app\jobs\notice\PrintJob;
 use app\model\order\StoreOrderEffect;
 use app\model\order\StoreOrderPaymentAttempt;
 use app\model\order\StoreOrderPaymentException;
@@ -36,8 +38,16 @@ class StoreOrderEffectServices extends BaseServices
      * 拆分之后，某一条通知失败只让那一条记录进入结果未知，支付流水、虚拟发卡
      * 和打印不会被连带重跑；本地履约已经在支付事务里提交，这里不重复。
      */
-    /** 订单支付成功的客户与管理员通知、推送（无幂等键，结果未知交人工） */
+    /** 订单支付成功的客户通知（无幂等键，结果未知交人工） */
     const EVENT_PAY_NOTICE = 'pay_notice';
+    /** 管理员通知，和其它通知目标分开记录，避免部分成功后整包重放 */
+    const EVENT_PAY_NOTICE_ADMIN = 'pay_notice.admin';
+    /** 推送通知，和其它通知目标分开记录 */
+    const EVENT_PAY_NOTICE_PUSH = 'pay_notice.push';
+    /** 自定义通知，和其它通知目标分开记录 */
+    const EVENT_PAY_NOTICE_CUSTOM = 'pay_notice.custom';
+    /** 自定义订单事件，和其它通知目标分开记录 */
+    const EVENT_PAY_NOTICE_EVENT = 'pay_notice.event';
     /** 小票打印（打印服务按单号可查，结果未知交人工） */
     const EVENT_PAY_PRINT = 'pay_print';
     /** 自动开票任务（开票按订单唯一，允许自动重试） */
@@ -46,6 +56,8 @@ class StoreOrderEffectServices extends BaseServices
     const EVENT_PAY_SUCCESS = 'pay_success';
     /** 逐尝试关单任务前缀，完整事件名为 close_attempt.<支付尝试ID> */
     const EVENT_CLOSE_ATTEMPT_PREFIX = 'close_attempt.';
+    /** 拼团外部动作，必须在支付事务提交后执行 */
+    const EVENT_GROUP_EFFECT_PREFIX = 'group_effect.';
 
     /**
      * StoreOrderEffectServices constructor.
@@ -121,6 +133,12 @@ class StoreOrderEffectServices extends BaseServices
         return array_map('intval', $this->dao->pendingIds($limit));
     }
 
+    /** @return int[] */
+    public function pendingIdsForOrder(int $orderId): array
+    {
+        return array_map('intval', $this->dao->pendingIdsForOrder($orderId));
+    }
+
     /**
      * 执行一条副作用并记录结果
      * @param int $id
@@ -149,8 +167,13 @@ class StoreOrderEffectServices extends BaseServices
             return true;
         }
         try {
-            $this->execute($effect);
-            $this->dao->update($id, ['status' => StoreOrderEffect::STATUS_DONE, 'last_error' => '', 'update_time' => time()]);
+            // An async job owns the final transition. Marking it DONE here
+            // would confuse "queued" with "the printer/invoice provider
+            // completed the external action".
+            $async = $this->execute($effect);
+            if (!$async) {
+                $this->dao->update($id, ['status' => StoreOrderEffect::STATUS_DONE, 'last_error' => '', 'update_time' => time()]);
+            }
             return true;
         } catch (\Throwable $e) {
             // 外部调用没有幂等能力，这里只能记录未知结果并等待补投或人工确认
@@ -167,56 +190,90 @@ class StoreOrderEffectServices extends BaseServices
     /**
      * 按类型执行副作用
      * @param array $effect
-     * @return void
+     * @return bool true when an asynchronous job owns the final transition
      */
-    private function execute(array $effect): void
+    private function execute(array $effect): bool
     {
         $eventType = (string)$effect['event_type'];
         if (strpos($eventType, self::EVENT_CLOSE_ATTEMPT_PREFIX) === 0) {
             $this->closeAttempt($effect);
-            return;
+            return false;
+        }
+        if (strpos($eventType, self::EVENT_GROUP_EFFECT_PREFIX) === 0) {
+            /** @var \app\services\activity\combination\StorePinkServices $pinkServices */
+            $pinkServices = app()->make(\app\services\activity\combination\StorePinkServices::class);
+            $payload = json_decode((string)$effect['payload'], true);
+            $pinkServices->executeDeferredEffect(is_array($payload) ? $payload : []);
+            return false;
         }
         switch ($eventType) {
             case self::EVENT_PAY_NOTICE:
-                $this->payNotice((int)$effect['store_order_id']);
+                $this->payNoticeUser((int)$effect['store_order_id']);
+                break;
+            case self::EVENT_PAY_NOTICE_ADMIN:
+                $this->payNoticeAdmin((int)$effect['store_order_id']);
+                break;
+            case self::EVENT_PAY_NOTICE_PUSH:
+                $this->payNoticePush((int)$effect['store_order_id']);
+                break;
+            case self::EVENT_PAY_NOTICE_CUSTOM:
+                $this->payNoticeCustom((int)$effect['store_order_id']);
+                break;
+            case self::EVENT_PAY_NOTICE_EVENT:
+                $this->payNoticeEvent((int)$effect['store_order_id']);
                 break;
             case self::EVENT_PAY_PRINT:
-                $this->payPrint((int)$effect['store_order_id']);
-                break;
+                return $this->payPrint((int)$effect['store_order_id'], (int)$effect['id']);
             case self::EVENT_PAY_INVOICE:
-                $this->payInvoice((int)$effect['store_order_id']);
-                break;
+                return $this->payInvoice((int)$effect['store_order_id'], (int)$effect['id']);
             case self::EVENT_PAY_SUCCESS:
                 //旧记录（本轮之前登记的整包事件）：本地履约已在支付事务里完成，
                 //这里只补外部动作
                 $orderId = (int)$effect['store_order_id'];
-                $this->payNotice($orderId);
-                $this->payPrint($orderId);
-                $this->payInvoice($orderId);
-                break;
+                $this->payNoticeUser($orderId);
+                $this->payNoticeAdmin($orderId);
+                $this->payNoticePush($orderId);
+                $this->payNoticeCustom($orderId);
+                $this->payNoticeEvent($orderId);
+                //这是历史整包事件，没有可安全共享给两个异步动作的独立
+                //副作用 ID；旧记录完成后由旧任务自身负责结果，避免两个
+                //任务竞争更新同一条记录。
+                $this->payPrint($orderId, 0);
+                $this->payInvoice($orderId, 0);
+                return false;
             default:
                 throw new \RuntimeException('未知的订单副作用类型:' . $eventType);
         }
     }
 
-    /**
-     * 订单支付成功的通知与推送
-     *
-     * 这些外部接口没有幂等键，重复执行会重复发消息，因此结果未知时只记录，
-     * 由人工通过 effects:retry 显式确认后重试。
-     *
-     * @param int $storeOrderId
-     * @return void
-     */
-    private function payNotice(int $storeOrderId): void
+    /** 每个通知目标独立执行，结果未知时只重试被确认的目标。 */
+    private function payNoticeUser(int $storeOrderId): void
+    {
+        event('NoticeListener', [$this->loadOrder($storeOrderId), 'order_pay_success']);
+    }
+
+    private function payNoticeAdmin(int $storeOrderId): void
+    {
+        event('NoticeListener', [$this->loadOrder($storeOrderId), 'admin_pay_success_code']);
+    }
+
+    private function payNoticePush(int $storeOrderId): void
+    {
+        $this->loadOrder($storeOrderId);
+        event('OutPushListener', ['order_pay_push', ['order_id' => $storeOrderId]]);
+    }
+
+    private function payNoticeCustom(int $storeOrderId): void
     {
         $orderInfo = $this->loadOrder($storeOrderId);
-        event('NoticeListener', [$orderInfo, 'order_pay_success']);
-        event('NoticeListener', [$orderInfo, 'admin_pay_success_code']);
-        event('OutPushListener', ['order_pay_push', ['order_id' => $storeOrderId]]);
         $orderInfo['time'] = date('Y-m-d H:i:s');
         $orderInfo['phone'] = $orderInfo['user_phone'];
         event('CustomNoticeListener', [$orderInfo['uid'], $orderInfo, 'order_pay_success']);
+    }
+
+    private function payNoticeEvent(int $storeOrderId): void
+    {
+        $orderInfo = $this->loadOrder($storeOrderId);
         event('CustomEventListener', ['order_pay', [
             'uid' => $orderInfo['uid'],
             'id' => $storeOrderId,
@@ -239,9 +296,13 @@ class StoreOrderEffectServices extends BaseServices
      * @param int $storeOrderId
      * @return void
      */
-    private function payPrint(int $storeOrderId): void
+    private function payPrint(int $storeOrderId, int $effectId): bool
     {
-        PrintJob::dispatch([$storeOrderId, 1]);
+        $queued = PrintJob::dispatch([$storeOrderId, 1, $effectId]);
+        if ($queued === false) {
+            throw new \RuntimeException('打印任务投递失败');
+        }
+        return true;
     }
 
     /**
@@ -249,21 +310,46 @@ class StoreOrderEffectServices extends BaseServices
      * @param int $storeOrderId
      * @return void
      */
-    private function payInvoice(int $storeOrderId): void
+    private function payInvoice(int $storeOrderId, int $effectId): bool
     {
         /** @var StoreOrderInvoiceServices $invoiceServices */
         $invoiceServices = app()->make(StoreOrderInvoiceServices::class);
         $invoiceInfo = $invoiceServices->get(['order_id' => $storeOrderId]);
         if (!$invoiceInfo) {
-            return;
+            return false;
         }
         if ((int)$invoiceInfo['is_pay'] !== 1) {
             $invoiceInfo->is_pay = 1;
             $invoiceInfo->save();
         }
         if (sys_config('elec_invoice', 1) == 1 && sys_config('auto_invoice', 1) == 1) {
-            OrderInvoiceJob::dispatchSecs(10, 'autoInvoice', [$invoiceInfo['id']]);
+            $queued = OrderInvoiceJob::dispatch('autoInvoice', [$invoiceInfo['id'], $effectId]);
+            if ($queued === false) {
+                throw new \RuntimeException('开票任务投递失败');
+            }
+            return true;
         }
+        return false;
+    }
+
+    /** The external job calls this only after its provider call succeeds. */
+    public function markAsyncDone(int $id): void
+    {
+        $this->dao->update($id, [
+            'status' => StoreOrderEffect::STATUS_DONE,
+            'last_error' => '',
+            'update_time' => time(),
+        ]);
+    }
+
+    /** Unknown external results are manual-only and must never be auto-replayed. */
+    public function markAsyncUnknown(int $id, string $error): void
+    {
+        $this->dao->update($id, [
+            'status' => StoreOrderEffect::STATUS_UNKNOWN,
+            'last_error' => mb_substr($error, 0, 240),
+            'update_time' => time(),
+        ]);
     }
 
     /**

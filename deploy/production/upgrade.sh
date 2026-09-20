@@ -50,14 +50,19 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-[[ "$target" =~ ^ghcr\.io/xiangyumou/crmeb@sha256:[a-f0-9]{64}$ ]] || {
-  echo 'Expected a fixed candidate: ghcr.io/xiangyumou/crmeb@sha256:<64 hex>' >&2
+image_repository="${CRMEB_IMAGE_REPOSITORY:-ghcr.io/xiangyumou/crmeb}"
+[[ "$target" =~ ^[a-zA-Z0-9._:/-]+@sha256:[a-f0-9]{64}$ ]] || {
+  echo "Expected a fixed candidate: ${image_repository}@sha256:<64 hex>" >&2
   exit 2
 }
+case "$target" in
+  "$image_repository"@sha256:*) ;;
+  *) echo "Candidate repository does not match CRMEB_IMAGE_REPOSITORY ($image_repository): $target" >&2; exit 2 ;;
+esac
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 deploy_root="${CRMEB_DEPLOY_ROOT:-$root}"
-compose_file="${CRMEB_DEPLOY_COMPOSE_FILE:-$deploy_root/compose.yaml}"
+compose_file="${CRMEB_DEPLOY_COMPOSE_FILE:-$deploy_root/compose.yml}"
 settings="$deploy_root/deployment/deployment.env"
 backup_dir="${CRMEB_BACKUP_DIR:-$deploy_root/data/backups}"
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -67,10 +72,11 @@ backup="${CRMEB_UPGRADE_BACKUP_FILE:-$backup_dir/pre-upgrade-$stamp.sql.gz}"
 [ -n "$backup_override" ] && backup="$backup_override"
 mysql_service="${CRMEB_UPGRADE_MYSQL_SERVICE:-mysql}"
 migration_command="${CRMEB_MIGRATION_COMMAND:-}"
+db_prefix="${CRMEB_DB_PREFIX:-eb_}"
 
 compose_args=(docker compose)
 [ -n "${CRMEB_DEPLOY_PROJECT:-}" ] && compose_args+=(-p "$CRMEB_DEPLOY_PROJECT")
-compose_args+=(--project-directory "$deploy_root" -f "$compose_file")
+compose_args+=(--project-directory "$deploy_root" -f "$compose_file" --env-file "$settings")
 compose() { "${compose_args[@]}" "$@"; }
 app_services="nginx php queue timer workerman"
 
@@ -78,14 +84,23 @@ say() { printf '%s\n' "$*"; }
 die() { printf '%s\n' "$*" >&2; exit 1; }
 
 # The stack must be describable before anything is touched.
-compose config >/dev/null || die 'the compose configuration cannot be parsed'
 test -f "$settings" || die "the deployment settings are missing: $settings"
+grep -q '^CRMEB_IMAGE=' "$settings" || die "CRMEB_IMAGE is missing from the deployment settings"
+compose config >/dev/null || die 'the compose configuration cannot be parsed'
+
+# Pull and pin the exact candidate before any writer is stopped. One-off
+# migrations and every restarted role then resolve the same immutable image.
+docker pull "$target" >/dev/null || die "could not pull candidate $target"
+docker image inspect "$target" >/dev/null 2>&1 || die "candidate is not available locally: $target"
 
 # Record what is running now so a rollback has a fixed target, and refuse to
 # continue when the application roles disagree about their image.
 captured=''
+captured_id=''
+captured_count=0
 for container in $(compose ps -q $app_services 2>/dev/null || true); do
   [ -n "$container" ] || continue
+  captured_count=$((captured_count + 1))
   image_id="$(docker inspect --format '{{.Image}}' "$container" 2>/dev/null || true)"
   [ -n "$image_id" ] || continue
   # Prefer the registry digest (a fixed, pullable recovery target). A locally
@@ -93,17 +108,26 @@ for container in $(compose ps -q $app_services 2>/dev/null || true); do
   # it is still an immutable reference, and the alternative — refusing to
   # upgrade a stack that runs a locally built image — would block the very
   # rehearsal this script exists for.
-  digest_ref="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$image_id" 2>/dev/null | grep '^ghcr.io/xiangyumou/crmeb@sha256:' | head -n1 || true)"
+  digest_ref="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$image_id" 2>/dev/null | grep -F "${image_repository}@sha256:" | head -n1 || true)"
   if [ -z "$digest_ref" ]; then
-    digest_ref="local-image:$image_id"
-    echo "warning: container $container runs an image with no registry digest; recording $digest_ref" >&2
+    # A local image has no pullable registry digest. Keep the exact image
+    # reference Compose used and separately record its content ID; fabricating
+    # local-image:sha256:... would be rejected by Docker as an image reference.
+    digest_ref="$(docker inspect --format '{{.Config.Image}}' "$container" 2>/dev/null || true)"
+    [ -n "$digest_ref" ] || die "could not determine the running image reference for $container"
+    docker image inspect "$digest_ref" >/dev/null 2>&1 || die "the local recovery image is unavailable: $digest_ref"
+    echo "warning: container $container runs a local image; recording $digest_ref with content ID $image_id" >&2
   fi
   if [ -z "$captured" ]; then
     captured="$digest_ref"
+    captured_id="$image_id"
   elif [ "$captured" != "$digest_ref" ]; then
     die "application roles run different images ($captured vs $digest_ref); refusing to upgrade"
+  elif [ "$captured_id" != "$image_id" ]; then
+    die "application roles run different image contents ($captured_id vs $image_id); refusing to upgrade"
   fi
 done
+[ "$captured_count" -ge 5 ] || die "could not capture all application roles (found $captured_count of 5); refusing to upgrade without a fixed rollback target"
 say "current image: ${captured:-<none running>}"
 say "candidate:     $target"
 say "backup target: $backup"
@@ -115,6 +139,17 @@ fi
 
 mkdir -p "$backup_dir"
 chmod 700 "$backup_dir"
+
+settings_backup="$backup_dir/deployment.env.$stamp"
+cp -p "$settings" "$settings_backup"
+settings_tmp="$(mktemp "$settings.XXXXXX")"
+if ! sed "s|^CRMEB_IMAGE=.*|CRMEB_IMAGE=$target|" "$settings" > "$settings_tmp"; then
+  rm -f "$settings_tmp"
+  die 'could not prepare the candidate deployment settings'
+fi
+chmod 600 "$settings_tmp"
+mv "$settings_tmp" "$settings"
+printf 'candidate=%s\nprevious_image=%s\nprevious_image_id=%s\nsettings_backup=%s\n' "$target" "$captured" "$captured_id" "$settings_backup" > "$backup_dir/upgrade-$stamp.manifest"
 
 # 1. Stop every writing role. A migration must never race live writers.
 say 'stopping writing roles'
@@ -147,7 +182,7 @@ size="$(wc -c < "$backup")"
 [ "$size" -gt 0 ] || die 'the backup file is empty'
 say "backup written and verified: $backup ($size bytes)"
 
-# 3. Restore the backup into an isolated database and compare retained counts.
+# 3. Restore the backup into an isolated database and compare retained rows.
 if [ "${CRMEB_UPGRADE_SKIP_RESTORE_CHECK:-0}" != "1" ]; then
   say 'restoring the backup into an isolated database to verify it'
   check_container="crmeb-restore-check-$stamp"
@@ -179,18 +214,25 @@ if [ "${CRMEB_UPGRADE_SKIP_RESTORE_CHECK:-0}" != "1" ]; then
     # internally consistent, not merely non-empty.
     # The password is read inside each container from its own environment: the
     # host has no copy of it, which is the point of container-managed secrets.
-    for table in store_order store_order_refund store_coupon_user user; do
+    for table_pk in store_order:id store_order_cart_info:id store_order_refund:id store_coupon_user:id user:uid store_order_payment_attempt:id store_order_effect:id store_order_payment_exception:id; do
+      table="$(printf '%s' "$table_pk" | cut -d: -f1)"
+      pk="$(printf '%s' "$table_pk" | cut -d: -f2)"
+      full_table="$db_prefix$table"
       # The password is read inside each container from its own environment: the
       # host never holds a copy of it.
       live="$(compose exec -T "$mysql_service" sh -c \
-        'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -N -B "$MYSQL_DATABASE" -e "SELECT COUNT(*) FROM eb_$1"' _ "$table" \
+        'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -N -B "$MYSQL_DATABASE" -e "SELECT COUNT(*) FROM $1"' _ "$full_table" \
         2>/dev/null || echo 'error')"
       restored="$(docker exec "$check_container" sh -c \
-        'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -N -B "$MYSQL_DATABASE" -e "SELECT COUNT(*) FROM eb_$1"' _ "$table" \
+        'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -N -B "$MYSQL_DATABASE" -e "SELECT COUNT(*) FROM $1"' _ "$full_table" \
         2>/dev/null || echo 'error')"
-      if [ "$live" != "$restored" ] || [ "$live" = 'error' ]; then
+      live_hash="$(compose exec -T "$mysql_service" sh -c \
+        'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --batch --raw --skip-column-names "$MYSQL_DATABASE" -e "SELECT * FROM $1 ORDER BY $2"' _ "$full_table" "$pk" 2>/dev/null | sha256sum | awk '{print $1}' || echo 'error')"
+      restored_hash="$(docker exec "$check_container" sh -c \
+        'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --batch --raw --skip-column-names "$MYSQL_DATABASE" -e "SELECT * FROM $1 ORDER BY $2"' _ "$full_table" "$pk" 2>/dev/null | sha256sum | awk '{print $1}' || echo 'error')"
+      if [ "$live" != "$restored" ] || [ "$live_hash" != "$restored_hash" ] || [ "$live" = 'error' ] || [ "$live_hash" = 'error' ]; then
         restore_failed=1
-        echo "retained-row mismatch for eb_$table: live=$live restored=$restored" >&2
+        echo "retained-row mismatch for $full_table: live=$live/$live_hash restored=$restored/$restored_hash" >&2
       fi
     done
   fi
@@ -206,11 +248,11 @@ if [ "$skip_migration" -eq 0 ]; then
     sh -c "$migration_command" \
       || die 'the migration failed; restore from the backup before retrying'
   else
-    compose run --rm --no-deps -T php php upgrade/core-store/drop-retired.php plan \
+    compose run --rm --no-deps -T --entrypoint php php upgrade/core-store/drop-retired.php plan \
       || die 'the migration pre-check could not run; nothing was migrated'
-    compose run --rm --no-deps -T php php upgrade/core-store/drop-retired.php apply \
+    compose run --rm --no-deps -T --entrypoint php php upgrade/core-store/drop-retired.php apply \
       || die 'the retired-feature migration failed; restore from the backup before retrying'
-    compose run --rm --no-deps -T php php upgrade/core-store/order-reliability.php apply \
+    compose run --rm --no-deps -T --entrypoint php php upgrade/core-store/order-reliability.php apply \
       || die 'the reliability migration failed; restore from the backup before retrying'
   fi
 else
@@ -220,11 +262,26 @@ fi
 # 5. Start the stack again and prove it became ready.
 say 'starting the stack'
 if ! compose up -d --wait --wait-timeout 300 >/dev/null; then
+  compose stop $app_services >/dev/null 2>&1 || true
   die 'the stack did not become healthy; it stays in maintenance mode and the backup is intact'
 fi
+
+for service in php queue timer workerman nginx; do
+  container="$(compose ps -q "$service" 2>/dev/null || true)"
+  if [ -z "$container" ]; then
+    compose stop $app_services >/dev/null 2>&1 || true
+    die "missing application service: $service"
+  fi
+  actual="$(docker inspect --format '{{.Config.Image}}' "$container" 2>/dev/null || true)"
+  if [ "$actual" != "$target" ]; then
+    compose stop $app_services >/dev/null 2>&1 || true
+    die "$service is using $actual instead of $target"
+  fi
+done
 
 maintenance_mode=0
 trap - EXIT
 say "upgrade complete: $target"
 say "rollback target: ${captured:-<none>}"
 say "backup: $backup"
+say "settings backup: $settings_backup"

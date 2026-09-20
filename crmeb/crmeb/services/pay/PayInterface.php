@@ -50,21 +50,24 @@ interface PayInterface
     public function merchantPay(string $openid, string $orderId, string $amount, array $options = []);
 
     /**
-     * 退款
-     * @param string $outTradeNo 退款单号
-     * @param string $totalAmount 退款金额
-     * @param string $refund_id 退款
-     * @param array $options 其他参数
-     * @return mixed
+     * 退款。
+     *
+     * Drivers return a normalized result: state is success, processing,
+     * closed, or unknown; refund_no is the durable merchant refund number;
+     * raw keeps the gateway response for reconciliation.
+     *
+     * @param string $outTradeNo 原支付单号或支付交易号
+     * @param array $options 退款金额、稳定退款单号与支付上下文
+     * @return array{state:string,refund_no:string,refund_price?:string,raw:mixed}|mixed
      */
     public function refund(string $outTradeNo, array $options = []);
 
     /**
-     * 查询订单
-     * @param string $outTradeNo 退款单号
-     * @param string $outRequestNo 支付商户单号
-     * @param array $other 其他参数
-     * @return mixed
+     * 查询退款订单。v3 必须使用持久化的 out_refund_no。
+     * @param string $outTradeNo 原支付单号或支付交易号（v2 兼容参数）
+     * @param string $outRequestNo 持久化的商户退款单号
+     * @param array $other 支付上下文
+     * @return array{state:string,refund_no:string,refund_price?:string,raw:mixed}|mixed
      */
     public function queryRefund(string $outTradeNo, string $outRequestNo, array $other = []);
 

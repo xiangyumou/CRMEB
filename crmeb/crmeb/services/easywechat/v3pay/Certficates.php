@@ -73,10 +73,10 @@ trait Certficates
      * @return array<string, string>
      * @throws \Psr\SimpleCache\InvalidArgumentException
      */
-    public function platformCertificates(): array
+    public function platformCertificates(bool $forceRefresh = false): array
     {
         $cacheKey = '_wx_v3_certs_' . ($this->app['config']['v3_payment']['serial_no'] ?? 'default');
-        if (CacheService::has($cacheKey)) {
+        if (!$forceRefresh && CacheService::has($cacheKey)) {
             $cached = CacheService::get($cacheKey);
             if (is_array($cached)) {
                 return $cached;
@@ -121,12 +121,24 @@ trait Certficates
         if ($signature === '' || $serial === '') {
             return false;
         }
-        try {
-            $certificates = $this->platformCertificates();
-        } catch (\Throwable $e) {
-            return false;
+        $config = $this->app['config']['v3_payment'] ?? [];
+        $configuredSerial = trim((string)($config['v3_pay_public_key'] ?? ''));
+        $configuredPem = (string)($config['v3_pay_public_pem'] ?? '');
+        if ($configuredSerial !== '' && $configuredSerial === $serial && is_readable($configuredPem)) {
+            $pem = (string)file_get_contents($configuredPem);
+        } else {
+            try {
+                $certificates = $this->platformCertificates();
+                $pem = $certificates[$serial] ?? '';
+                if ($pem === '') {
+                    //证书轮换期间旧缓存可能没有新 serial，只刷新一次。
+                    $certificates = $this->platformCertificates(true);
+                    $pem = $certificates[$serial] ?? '';
+                }
+            } catch (\Throwable $e) {
+                return false;
+            }
         }
-        $pem = $certificates[$serial] ?? '';
         if ($pem === '') {
             return false;
         }

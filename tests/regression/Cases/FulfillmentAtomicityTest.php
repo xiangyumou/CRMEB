@@ -157,9 +157,9 @@ final class FulfillmentAtomicityTest extends RegressionTestCase
 
         self::assertCount(1, BusinessSnapshot::orderStatusRows($orderId, 'pay_success'), 'one pay_success status row');
         self::assertCount(1, BusinessSnapshot::capitalFlows($orderIdString), 'one capital flow');
-        // 3 = one record per external target (notice, print, invoice); the
-        // second payment attempt adds no fourth record.
-        self::assertCount(3, BusinessSnapshot::effects($orderId), 'one record per target event, not per payment attempt');
+        // Five notification targets plus print and invoice are independent
+        // effects; the second payment attempt adds no eighth record.
+        self::assertCount(7, BusinessSnapshot::effects($orderId), 'one record per external target, not per payment attempt');
     }
 
     /**
@@ -180,6 +180,10 @@ final class FulfillmentAtomicityTest extends RegressionTestCase
 
         $events = array_column(BusinessSnapshot::effects($orderId), 'event_type');
         self::assertContains(StoreOrderEffectServices::EVENT_PAY_NOTICE, $events, 'the notice has its own record');
+        self::assertContains(StoreOrderEffectServices::EVENT_PAY_NOTICE_ADMIN, $events, 'the admin notice has its own record');
+        self::assertContains(StoreOrderEffectServices::EVENT_PAY_NOTICE_PUSH, $events, 'the push has its own record');
+        self::assertContains(StoreOrderEffectServices::EVENT_PAY_NOTICE_CUSTOM, $events, 'the custom notice has its own record');
+        self::assertContains(StoreOrderEffectServices::EVENT_PAY_NOTICE_EVENT, $events, 'the custom event has its own record');
         self::assertContains(StoreOrderEffectServices::EVENT_PAY_PRINT, $events, 'the print has its own record');
         self::assertContains(StoreOrderEffectServices::EVENT_PAY_INVOICE, $events, 'the invoice has its own record');
         self::assertNotContains(StoreOrderEffectServices::EVENT_PAY_SUCCESS, $events, 'the bundled legacy event is no longer written');
@@ -189,27 +193,29 @@ final class FulfillmentAtomicityTest extends RegressionTestCase
         $notice = Db::name('store_order_effect')->where('store_order_id', $orderId)->where('event_type', StoreOrderEffectServices::EVENT_PAY_NOTICE)->find();
         $effects = app()->make(StoreOrderEffectServices::class);
         self::assertTrue($effects->runById((int)$notice['id']), 'a notice with a live order runs');
-        // The print record runs on its own: with no printer configured the job
-        // cannot confirm the print, so its outcome is recorded as unknown and it
-        // is never bundled with, or replayed by, the notice.
+        // The print record runs on its own. The test adapter completes the
+        // local print operation and records that result independently.
         $printId = (int)Db::name('store_order_effect')->where('store_order_id', $orderId)->where('event_type', StoreOrderEffectServices::EVENT_PAY_PRINT)->value('id');
         $effects->runById($printId);
         $printRow = Db::name('store_order_effect')->where('id', $printId)->find();
         self::assertSame(
-            \app\model\order\StoreOrderEffect::STATUS_UNKNOWN,
+            \app\model\order\StoreOrderEffect::STATUS_DONE,
             (int)$printRow['status'],
-            'an unconfirmable print keeps the unknown outcome on its own record'
+            'the print outcome is kept on its own record'
         );
         $noticeRow = Db::name('store_order_effect')->where('id', (int)$notice['id'])->find();
         self::assertSame(
-            \app\model\order\StoreOrderEffect::STATUS_DONE,
+            \app\model\order\StoreOrderEffect::STATUS_UNKNOWN,
             (int)$noticeRow['status'],
-            'the notice is unaffected by the print outcome'
+            'the notice keeps its own unknown outcome'
         );
 
         // The invoice record runs on its own and finishes.
         $invoiceId = (int)Db::name('store_order_effect')->where('store_order_id', $orderId)->where('event_type', StoreOrderEffectServices::EVENT_PAY_INVOICE)->value('id');
-        self::assertTrue($effects->runById($invoiceId), 'the invoice runs on its own');
+        self::assertTrue(
+            $effects->runById($invoiceId),
+            'the invoice runs on its own: ' . (string)Db::name('store_order_effect')->where('id', $invoiceId)->value('last_error')
+        );
         self::assertSame(
             \app\model\order\StoreOrderEffect::STATUS_DONE,
             (int)Db::name('store_order_effect')->where('id', $invoiceId)->value('status'),

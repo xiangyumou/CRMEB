@@ -54,32 +54,48 @@ resolve_digest() {
 
 # Publish a commit-scoped tag and refuse to let it change value.
 #
-# The digest a tag will end up with cannot be predicted from its sources (buildx
-# rewraps the manifest, and a joined manifest never equals any one of its
-# sources), so the comparison happens after the write: a tag that already held a
-# different digest fails the run, and the operator sees which commit produced
-# what. These tags are commit-scoped, so the write is confined to the build being
-# published.
+# Build into a temporary registry reference first. A conflict is rejected while
+# the formal immutable tag is still untouched; a temporary reference may remain
+# after a failed run and is safe to garbage-collect by the registry policy.
 publish_tag() {
     local target="$1"
     shift
-    local before after
+    local before after candidate candidate_digest repo tag
     before="$(resolve_digest "$target")"
-    docker buildx imagetools create -t "$target" "$@"
+    repo="${target%:*}"
+    tag="${target##*:}"
+    candidate="$repo:__publish_${tag}_${BASHPID}_${RANDOM}"
+    docker buildx imagetools create -t "$candidate" "$@"
+    candidate_digest="$(resolve_digest "$candidate")"
+    if [ -z "$candidate_digest" ]; then
+        echo "Published temporary candidate $candidate but could not resolve its digest" >&2
+        return 1
+    fi
+    if [ -n "$before" ] && [ "$before" != "$candidate_digest" ]; then
+        echo "refusing a conflicting release for $target: it already held $before but the candidate is $candidate_digest" >&2
+        return 1
+    fi
+    if [ -n "$before" ]; then
+        printf '%s already held %s; resumed without change\n' "$target" "$before"
+        return 0
+    fi
+    # Recheck immediately before the first write to catch a concurrent publish.
+    before="$(resolve_digest "$target")"
+    if [ -n "$before" ] && [ "$before" != "$candidate_digest" ]; then
+        echo "refusing a conflicting release for $target: it appeared with $before while publishing" >&2
+        return 1
+    fi
+    docker buildx imagetools create -t "$target" "$candidate"
     after="$(resolve_digest "$target")"
     if [ -z "$after" ]; then
         echo "Published $target but could not read its digest back; refusing to continue" >&2
         return 1
     fi
-    if [ -n "$before" ] && [ "$before" != "$after" ]; then
-        echo "Republishing $target produced $after but it already held $before; refusing a conflicting release" >&2
+    [ "$after" = "$candidate_digest" ] || {
+        echo "Published $target as $after, expected $candidate_digest; refusing to continue" >&2
         return 1
-    fi
-    if [ -n "$before" ]; then
-        printf '%s already held %s; resumed without change\n' "$target" "$after"
-    else
-        printf '%s published as %s\n' "$target" "$after"
-    fi
+    }
+    printf '%s published as %s\n' "$target" "$after"
 }
 
 # Move a deployment tag to an already-published candidate, refusing BEFORE any
@@ -144,7 +160,13 @@ release-image)
     existing="$(resolve_digest "$image:$tag")"
     if [ -n "$existing" ]; then
         local_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$local_image" 2>/dev/null | sed 's/.*@//' || true)"
-        if [ -n "$local_digest" ] && [ "$local_digest" != "$existing" ]; then
+        if [ -z "$local_digest" ]; then
+            probe="$image:__release_probe_${BASHPID}_${RANDOM}"
+            docker tag "$local_image" "$probe"
+            docker push "$probe" >/dev/null
+            local_digest="$(resolve_digest "$probe")"
+        fi
+        if [ -z "$local_digest" ] || [ "$local_digest" != "$existing" ]; then
             echo "Refusing to overwrite $image:$tag: it holds $existing but the built image is $local_digest" >&2
             exit 1
         fi
@@ -160,7 +182,18 @@ assets)
         echo 'no assets given' >&2
         exit 1
     fi
-    if ! gh release view "$release_tag" >/dev/null 2>&1; then
+    release_view_error="$(mktemp)"
+    release_exists=0
+    if gh release view "$release_tag" >/dev/null 2>"$release_view_error"; then
+        release_exists=1
+    elif ! grep -qiE 'not found|release not found|http[[:space:]]*404' "$release_view_error"; then
+        cat "$release_view_error" >&2
+        rm -f "$release_view_error"
+        echo "Could not determine whether GitHub release $release_tag exists; refusing to create or modify it." >&2
+        exit 1
+    fi
+    rm -f "$release_view_error"
+    if [ "$release_exists" -eq 0 ]; then
         gh release create "$release_tag" "$@" --latest=false
         exit 0
     fi
@@ -190,11 +223,13 @@ promote)
     source_ref="${2:?usage: publish-release.sh promote <edge-tag> <source-ref> <sha>}"
     sha="${3:?usage: publish-release.sh promote <edge-tag> <source-ref> <sha>}"
     case "$source_ref" in
-        *"sha-$sha"*) ;;
-        *)
-            echo "candidate $source_ref does not belong to commit $sha; refusing to move $edge_tag" >&2
-            exit 1
+        *@sha256:*)
+            requested="${source_ref##*@}"
+            resolved="$(resolve_digest "$source_ref")"
+            [ "$resolved" = "$requested" ] || { echo "candidate digest cannot be verified; refusing to move $edge_tag" >&2; exit 1; }
             ;;
+        *"sha-$sha"*) ;;
+        *) echo "candidate $source_ref does not belong to commit $sha; refusing to move $edge_tag" >&2; exit 1 ;;
     esac
     promote_tag "$edge_tag" "$source_ref"
     ;;

@@ -8,6 +8,7 @@ use app\services\pay\PayServices;
 use app\services\pay\PayNotifyServices;
 use crmeb\services\CacheService;
 use crmeb\services\pay\Pay;
+use crmeb\services\pay\storage\WechatPay;
 use crmeb\services\SystemConfigService;
 use Tests\Regression\Support\RegressionTestCase;
 use think\Container;
@@ -98,6 +99,23 @@ final class GatewayNotifyContractTest extends RegressionTestCase
         self::assertSame('0', (string)$row['value']);
         self::assertStringContainsString('v2', (string)$row['parameter']);
         self::assertStringContainsString('v3', (string)$row['parameter']);
+    }
+
+    public function testV2RefundQueryUsesTheRefundNumberAndParsesTheV2Shape(): void
+    {
+        $driver = new WechatPay('wechat_pay');
+        $method = new \ReflectionMethod(WechatPay::class, 'normalizeRefundQuery');
+        $method->setAccessible(true);
+        $result = $method->invoke($driver, [
+            'return_code' => 'SUCCESS',
+            'result_code' => 'SUCCESS',
+            'out_refund_no_0' => 'RF-100',
+            'refund_status_0' => 'SUCCESS',
+            'refund_fee_0' => '1000',
+        ]);
+        self::assertSame('success', $result['state']);
+        self::assertSame('RF-100', $result['refund_no']);
+        self::assertSame('10.00', $result['refund_price']);
     }
 
     private function setWechatPaymentVersion(string $value): void

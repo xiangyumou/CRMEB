@@ -35,6 +35,8 @@ class StoreOrderPaymentAttempt extends BaseModel
     const STATUS_CLOSED = 2;
     /** 查询结果无法识别，禁止据此释放资源 */
     const STATUS_UNKNOWN = 3;
+    /** 已锁定订单并进入网关创建，取消必须等待其结果 */
+    const STATUS_CREATING = 4;
 
     /**
      * 模型名称

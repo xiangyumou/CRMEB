@@ -125,6 +125,8 @@ class WechatPay extends BasePay implements PayInterface
             if (isset($result['result_code']) && $result['result_code'] != 'SUCCESS') throw new AdminException($result['err_code_des']);
             if (isset($result['status']) && $result['status'] != 'SUCCESS') throw new AdminException($result['status']);
         }
+        //旧 v2 驱动成功时原本只返回 void，调用方无法区分成功和未知。
+        return ['state' => 'success', 'refund_no' => (string)$refundNo, 'raw' => $result ?? null];
     }
 
     /**
@@ -134,9 +136,30 @@ class WechatPay extends BasePay implements PayInterface
      * @param array $other
      * @return Collection|mixed|ResponseInterface
      */
-    public function queryRefund(string $outTradeNo, string $outRequestNo, array $other = [])
+    public function queryRefund(string $outTradeNo, string $outRequestNo = '', array $other = [])
     {
-        return WechatService::queryRefund($outTradeNo, $other['type'] ?? API::OUT_TRADE_NO);
+        $refundNo = trim($outRequestNo) !== '' ? $outRequestNo : $outTradeNo;
+        return $this->normalizeRefundQuery(
+            WechatService::queryRefund($refundNo, API::OUT_REFUND_NO)
+        );
+    }
+
+    /** @param mixed $result @return array{state:string,refund_no:string,refund_price:string,raw:mixed} */
+    protected function normalizeRefundQuery($result): array
+    {
+        $status = strtoupper((string)($result['refund_status'] ?? $result['refund_status_0'] ?? $result['status'] ?? ''));
+        $state = 'unknown';
+        if (in_array($status, ['SUCCESS', 'REFUND_SUCCESS'], true)) $state = 'success';
+        elseif (in_array($status, ['PROCESSING', 'REFUND_PROCESSING'], true)) $state = 'processing';
+        elseif (in_array($status, ['CLOSED', 'CHANGE', 'REFUND_CLOSED'], true)) $state = 'closed';
+        return [
+            'state' => $state,
+            'refund_no' => (string)($result['out_refund_no'] ?? $result['out_refund_no_0'] ?? ''),
+            'refund_price' => isset($result['refund_fee'])
+                ? bcdiv((string)$result['refund_fee'], '100', 2)
+                : (isset($result['refund_fee_0']) ? bcdiv((string)$result['refund_fee_0'], '100', 2) : ''),
+            'raw' => $result,
+        ];
     }
 
     /**

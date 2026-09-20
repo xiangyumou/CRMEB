@@ -102,11 +102,12 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
+          CANDIDATE_DIGEST: ${{ inputs.candidate_digest }}
           DEPLOYMENT_TAG: ${{ inputs.deployment_tag }}
         run: |
           set -Eeuo pipefail
           # The deployment tag moves only to the already-published candidate; no
           # image is built here, so the digest verified above is the digest served.
           bash scripts/publish-release.sh promote \
-            "$IMAGE_NAME:$DEPLOYMENT_TAG" "$IMAGE_NAME:sha-$SOURCE_SHA" "$SOURCE_SHA"
-          echo "Promoted $IMAGE_NAME:sha-$SOURCE_SHA to $IMAGE_NAME:$DEPLOYMENT_TAG"
+            "$IMAGE_NAME:$DEPLOYMENT_TAG" "$IMAGE_NAME@$CANDIDATE_DIGEST" "$SOURCE_SHA"
+          echo "Promoted $IMAGE_NAME@$CANDIDATE_DIGEST to $IMAGE_NAME:$DEPLOYMENT_TAG"
