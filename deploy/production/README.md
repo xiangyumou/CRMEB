@@ -53,7 +53,35 @@ docker image inspect "$(docker inspect crmeb-php --format '{{.Image}}')" \
   --format '{{range .RepoDigests}}{{println .}}{{end}}'
 ```
 
-During a maintenance window:
+During a maintenance window, run the scripted upgrade. It performs the same steps
+as the manual runbook below and refuses to continue when a step cannot be proven:
+
+```sh
+cd /home/ubuntu/apps/CRMEB
+# The candidate must be a fixed digest; a moving tag is refused.
+bash deploy/production/upgrade.sh ghcr.io/xiangyumou/crmeb@sha256:<64-hex-digit-digest>
+```
+
+What it does, in order:
+
+1. records the running image digest (the rollback target) and refuses to continue
+   if the application roles are running different images;
+2. stops every writing role — no migration runs against live writers;
+3. dumps the database with `mysqldump --single-transaction` and checks the result
+   is non-empty and a complete gzip stream;
+4. restores that dump into an isolated MySQL (no network) and compares the
+   retained order, refund, coupon and user row counts against the live database,
+   so an unusable backup is caught before anything is migrated;
+5. runs `drop-retired.php plan`, then `apply`, then the idempotent
+   `order-reliability.php apply`;
+6. starts the stack again and waits for every role to become healthy.
+
+Any failure leaves the stack stopped and prints `UPGRADE FAILED`: no traffic
+resumes automatically. Fix the cause and re-run, or restore from the backup the
+script reported. `--dry-run` prints the plan without touching the stack, and
+`--skip-migration` performs the backup and verification only.
+
+The manual steps, for reference:
 
 ```sh
 cd /home/ubuntu/apps/CRMEB
@@ -76,7 +104,8 @@ migrate -v "$PWD/deployment/retired-backups:/backups" php /var/www/crmeb/upgrade
 # 4. remove the retired settings and rename the retired tables
 migrate -v "$PWD/deployment/retired-backups:/backups" php /var/www/crmeb/upgrade/core-store/drop-retired.php apply "/backups/retired-$stamp.json"
 
-# 5. add the order-reliability tables and refund columns; safe to re-run
+# 5. add the order-reliability tables, refund columns and the exception-payment
+#    table; it verifies column types, unique indexes and the retained row counts
 migrate php /var/www/crmeb/upgrade/core-store/order-reliability.php apply
 
 # 6. start the pinned image and wait for every role
@@ -84,6 +113,11 @@ compose up -d --wait --wait-timeout 180
 compose ps
 curl -fsS https://x-zoo.vip/readyz
 ```
+
+`order-reliability.php apply` refuses to run while any payment attempt, in-flight
+refund or unknown effect is unresolved (it prints the count and the
+`php think order:reconcile` command that lists them), so the maintenance window
+cannot start on top of an ambiguous money state.
 
 `drop-retired.php apply` writes its backup before it changes anything and never
 overwrites one, so each attempt needs a new path. `order-reliability.php apply` only

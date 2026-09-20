@@ -152,6 +152,16 @@ against the seeded install SQL; payment transports stay offline.
 - [x] MIG-016 The reliability migration adds every missing table and refund column to a database that predates them, verifies the result by re-reading the schema, leaves existing order and refund rows alone with an empty new refund number, and leaves nothing to do on a second run.
 - [x] MIG-017 The reliability migration finishes an interrupted release: a run that stopped after the first table is completed by the next one, and the object that already exists is not planned again.
 
+## Backup, upgrade and rollback (independent review)
+
+- [x] OPS-005 `upgrade.sh` refuses a moving tag, records the running digest as the rollback target, and refuses a deployment whose roles run different images.
+- [x] OPS-006 A dry run reports the plan without stopping writers or taking a backup.
+- [x] OPS-007 A failing migration keeps maintenance mode and resumes no traffic; the backup stays intact.
+- [x] OPS-008 A truncated backup is diagnosed before any migration and keeps the stack stopped.
+- [x] OPS-009 A backup that cannot be restored (contents disagree with the live database) stops the upgrade before any migration.
+- [x] OPS-010 A valid upgrade dumps, verifies the dump by restoring it into an isolated database and comparing retained row counts, runs the migrations, resumes traffic and reports the rollback target.
+- [x] OPS-011 `rollback.sh` refuses an unavailable target instead of changing the deployment, and never claims a database was restored.
+
 ## Release publishing (independent review)
 
 - [x] REL-001 The first publish of a commit creates its commit-scoped tags and reports a digest.

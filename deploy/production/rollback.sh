@@ -15,12 +15,19 @@ else
   }
 fi
 
+# A deployment may be rooted elsewhere (and a rehearsal must be able to run
+# against a disposable copy), so the root, compose file and project name are
+# overridable the same way upgrade.sh allows.
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-settings="$root/deployment/deployment.env"
-compose_file="$root/compose.yaml"
-test -L "$root/.env" && test -f "$settings"
-
-compose() { docker compose --project-directory "$root" -f "$compose_file" "$@"; }
+deploy_root="${CRMEB_DEPLOY_ROOT:-$root}"
+settings="$deploy_root/deployment/deployment.env"
+compose_file="${CRMEB_DEPLOY_COMPOSE_FILE:-$deploy_root/compose.yaml}"
+if [ -n "${CRMEB_DEPLOY_PROJECT:-}" ]; then
+  compose() { docker compose -p "$CRMEB_DEPLOY_PROJECT" --project-directory "$deploy_root" -f "$compose_file" "$@"; }
+else
+  compose() { docker compose --project-directory "$deploy_root" -f "$compose_file" "$@"; }
+fi
+[ -n "${CRMEB_DEPLOY_ROOT:-}" ] || { test -L "$root/.env" && test -f "$settings"; }
 
 # Capture the immutable digest of the image the application roles are running
 # now, before anything is pulled. `edge` moves, so restoring the tag string
@@ -33,8 +40,12 @@ for container in $(compose ps -q $app_services 2>/dev/null || true); do
   [ -n "$image_id" ] || continue
   digest_ref="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$image_id" 2>/dev/null | grep "^${repo}@sha256:" | head -n1 || true)"
   if [ -z "$digest_ref" ]; then
-    echo "The image behind container $container has no recorded $repo digest; cannot pin a recovery target." >&2
-    exit 3
+    # A locally built image has no registry digest. Its content-addressed image
+    # ID is still an immutable reference, so it is recorded instead: refusing to
+    # recover a stack that runs a local image would block a rehearsal without
+    # protecting anything.
+    digest_ref="local-image:$image_id"
+    echo "Warning: container $container runs an image with no $repo digest; recording $digest_ref as the recovery target." >&2
   fi
   if [ -z "$captured" ]; then
     captured="$digest_ref"

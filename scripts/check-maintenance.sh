@@ -24,5 +24,6 @@ node tests/static/deployment-topology-guard.cjs
 node tests/static/release-pipeline-guard.cjs
 node tests/static/verify-release-test.cjs
 # 发布与备份/回滚规则要对着真实 registry 与真实数据库跑一遍，而不是只读脚本
-sh tests/deployment/publish-release.sh
+bash tests/deployment/publish-release.sh
+bash tests/deployment/upgrade-rollback.sh "$image"
 node tests/static/wechat-payment-test.mjs
