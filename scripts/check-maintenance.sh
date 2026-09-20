@@ -20,5 +20,6 @@ node tests/static/install-sql-guard.cjs
 node tests/static/model-relation-guard.cjs
 node tests/static/php-symbol-guard.cjs
 node tests/static/event-payload-guard.cjs
+node tests/static/deployment-topology-guard.cjs
 node tests/static/verify-release-test.cjs
 node tests/static/wechat-payment-test.mjs

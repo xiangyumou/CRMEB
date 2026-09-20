@@ -152,6 +152,13 @@ against the seeded install SQL; payment transports stay offline.
 - [x] MIG-016 The reliability migration adds every missing table and refund column to a database that predates them, verifies the result by re-reading the schema, leaves existing order and refund rows alone with an empty new refund number, and leaves nothing to do on a second run.
 - [x] MIG-017 The reliability migration finishes an interrupted release: a run that stopped after the first table is completed by the next one, and the object that already exists is not planned again.
 
+## Deployment topology (independent review)
+
+- [x] OPS-001 The workerman health probe completes its Channel round trip through the address the configuration names: an empty `CLIENT_IP` is refused and there is no 127.0.0.1 fallback, so a bad address fails instead of passing inside its own container.
+- [x] OPS-002 The queue and timer roles verify the Channel address they are configured with, not only a fresh heartbeat; stopping the Channel server turns them unhealthy.
+- [x] OPS-003 `/readyz` gates on the tables, the refund columns and the unique indexes the release needs, and returns 503 (with no credentials or error detail) when any of them is missing; it recovers once the index is restored.
+- [x] OPS-004 The production topology runs a probe for every role it starts (`php`, `queue`, `timer`, `workerman`), asserted by a static guard.
+
 ## Reliability schema verification (independent review)
 
 - [x] MIG-018 A unique index dropped from a shipped reliability table is reported by `plan` (non-zero) with the missing index named, and `apply` recreates it — verified by re-reading `information_schema`.

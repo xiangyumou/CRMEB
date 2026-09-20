@@ -13,10 +13,12 @@ workerman_container="crmeb-http-workerman-$$"
 nginx_container="crmeb-http-nginx-$$"
 mysql_container="crmeb-http-mysql-$$"
 redis_container="crmeb-http-redis-$$"
+queue_container="crmeb-http-queue-$$"
+timer_container="crmeb-http-timer-$$"
 fixture_dir="$(mktemp -d)"
 
 cleanup() {
-    docker rm -f "$nginx_container" "$php_container" "$workerman_container" "$mysql_container" "$redis_container" >/dev/null 2>&1 || true
+    docker rm -f "$nginx_container" "$php_container" "$workerman_container" "$mysql_container" "$redis_container" "$queue_container" "$timer_container" >/dev/null 2>&1 || true
     docker network rm "$network" >/dev/null 2>&1 || true
     rm -rf "$fixture_dir"
 }
@@ -66,6 +68,22 @@ docker run -d --name "$php_container" --network "$network" --network-alias php \
 docker run -d --name "$workerman_container" --network "$network" --network-alias workerman \
     -v "$fixture_dir/.env:/var/www/crmeb/.env:ro" \
     -v "$fixture_dir/.constant:/var/www/crmeb/.constant:ro" "$image" workerman >/dev/null
+# The queue and timer roles run the same worker image with their own command. They
+# were missing from this topology test entirely, so a release could ship with a
+# queue role whose heartbeat never appears and nobody would notice here.
+# Before the queue role exists, nothing has ever written its heartbeat: the probe
+# must refuse. Checked here — with no consumer running — rather than after the
+# consumer starts, where the only honest failure would take a stale-heartbeat
+# window to appear.
+if docker exec "$php_container" php /opt/crmeb/healthcheck.php queue >/dev/null 2>&1; then
+    fail 'the queue probe passed without a running consumer'
+fi
+docker run -d --name "$queue_container" --network "$network" \
+    -v "$fixture_dir/.env:/var/www/crmeb/.env:ro" \
+    -v "$fixture_dir/.constant:/var/www/crmeb/.constant:ro" "$image" queue >/dev/null
+docker run -d --name "$timer_container" --network "$network" \
+    -v "$fixture_dir/.env:/var/www/crmeb/.env:ro" \
+    -v "$fixture_dir/.constant:/var/www/crmeb/.constant:ro" "$image" timer >/dev/null
 docker run -d --name "$nginx_container" --network "$network" -p 127.0.0.1::80 \
     -v "$fixture_dir/.env:/var/www/crmeb/.env:ro" "$image" nginx >/dev/null
 
@@ -99,16 +117,72 @@ docker exec "$php_container" php /opt/crmeb/healthcheck.php php | grep -q 'healt
 docker exec "$php_container" php /opt/crmeb/healthcheck.php workerman | grep -q 'healthy\[workerman\]' \
     || fail 'the workerman probe could not complete a Channel round trip'
 
+# The queue and timer roles need a heartbeat before their probes can pass.
+attempt=0
+until docker exec "$queue_container" php /opt/crmeb/healthcheck.php queue | grep -q 'healthy\[queue\]'; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 60 ]; then
+        docker logs "$queue_container" >&2
+        fail 'the queue probe never passed with a running consumer'
+    fi
+    sleep 2
+done
+attempt=0
+until docker exec "$timer_container" php /opt/crmeb/healthcheck.php timer | grep -q 'healthy\[timer\]'; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 60 ]; then
+        docker logs "$timer_container" >&2
+        fail 'the timer probe never passed with a running timer'
+    fi
+    sleep 2
+done
+
 # ... and has to fail when the thing it checks is broken.
-if docker exec "$php_container" php /opt/crmeb/healthcheck.php queue >/dev/null 2>&1; then
-    fail 'the queue probe passed without a running consumer'
-fi
 if docker run --rm --entrypoint php --network "$network" \
         -v "$fixture_dir/.env.bad-channel:/var/www/crmeb/.env:ro" \
         -v "$fixture_dir/.constant:/var/www/crmeb/.constant:ro" \
         "$image" /opt/crmeb/healthcheck.php workerman >/dev/null 2>&1; then
     fail 'the workerman probe passed with an unreachable Channel address'
 fi
+# Queue and timer verify their own configured Channel address too, so the same
+# broken address must fail their probes even while their heartbeat is fresh.
+if docker run --rm --entrypoint php --network "$network" \
+        -v "$fixture_dir/.env.bad-channel:/var/www/crmeb/.env:ro" \
+        -v "$fixture_dir/.constant:/var/www/crmeb/.constant:ro" \
+        "$image" /opt/crmeb/healthcheck.php queue >/dev/null 2>&1; then
+    fail 'the queue probe passed with an unreachable Channel address'
+fi
+
+# Stopping workerman takes the Channel server down: every role that depends on it
+# must turn unhealthy instead of staying green on a stale heartbeat.
+docker stop "$workerman_container" >/dev/null
+if docker exec "$queue_container" php /opt/crmeb/healthcheck.php queue >/dev/null 2>&1; then
+    fail 'the queue probe stayed healthy after the Channel server stopped'
+fi
+
+# A missing unique index silently removes the concurrency protection, so /readyz
+# must refuse even though every table is still there.
+docker exec "$mysql_container" mysql -uroot -pregression -D crmeb_regression \
+    -e 'ALTER TABLE eb_store_order_payment_attempt DROP INDEX out_trade_no' >/dev/null 2>&1
+attempt=0
+until [ "$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:${port}/readyz")" = 503 ]; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 30 ]; then
+        fail 'the readiness endpoint stayed green without the payment-attempt unique index'
+    fi
+    sleep 1
+done
+docker exec "$mysql_container" mysql -uroot -pregression -D crmeb_regression \
+    -e 'ALTER TABLE eb_store_order_payment_attempt ADD UNIQUE KEY out_trade_no (out_trade_no)' >/dev/null 2>&1
+attempt=0
+until curl --fail --silent "http://127.0.0.1:${port}/readyz" | grep -q '"ready":true'; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 30 ]; then
+        fail 'the readiness endpoint did not recover after the index was restored'
+    fi
+    sleep 1
+done
+
 docker stop "$mysql_container" >/dev/null
 attempt=0
 until [ "$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:${port}/readyz")" = 503 ]; do

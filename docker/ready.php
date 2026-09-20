@@ -34,11 +34,23 @@ const READY_REQUIRED_TABLES = [
     'store_order_refund',
     'store_order_payment_attempt',
     'store_order_effect',
+    'store_order_payment_exception',
 ];
 
 /** Columns added by the order reliability migration on tables that already exist. */
 const READY_REQUIRED_COLUMNS = [
-    'store_order_refund' => ['out_refund_no', 'refund_request'],
+    'store_order_refund' => ['out_refund_no', 'refund_request', 'refund_state'],
+];
+
+/**
+ * Unique indexes the retained payment and refund paths rely on for concurrency
+ * protection. A missing index does not stop the app from starting, but it does
+ * silently remove the guarantee, so readiness reports it.
+ */
+const READY_REQUIRED_UNIQUE_INDEXES = [
+    'store_order_payment_attempt' => ['out_trade_no' => ['out_trade_no']],
+    'store_order_effect' => ['order_event' => ['store_order_id', 'event_type']],
+    'store_order_payment_exception' => ['mch_trade' => ['mch_id', 'trade_no']],
 ];
 
 /**
@@ -74,6 +86,30 @@ function readyCheckSchema(PDO $pdo, string $prefix): void
     }
     if ($missing) {
         throw new RuntimeException('missing columns: ' . implode(', ', $missing));
+    }
+
+    // 唯一索引：缺失时不报错也能启动，但并发保护已经失效，必须暴露出来
+    $indexRows = $pdo->query(
+        'SELECT TABLE_NAME AS table_name, INDEX_NAME AS index_name, COLUMN_NAME AS column_name, SEQ_IN_INDEX AS seq
+         FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND NON_UNIQUE = 0
+         ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    $indexes = [];
+    foreach ($indexRows as $row) {
+        $key = strtolower((string)$row['table_name'] . '.' . (string)$row['index_name']);
+        $indexes[$key][] = (string)$row['column_name'];
+    }
+    $missing = [];
+    foreach (READY_REQUIRED_UNIQUE_INDEXES as $table => $definitions) {
+        foreach ($definitions as $name => $expectedColumns) {
+            $key = strtolower($prefix . $table . '.' . $name);
+            if (!isset($indexes[$key]) || $indexes[$key] !== $expectedColumns) {
+                $missing[] = $prefix . $table . '.' . $name;
+            }
+        }
+    }
+    if ($missing) {
+        throw new RuntimeException('missing unique indexes: ' . implode(', ', $missing));
     }
 
     $total = (int)$pdo->query('SELECT COUNT(*) FROM `' . $prefix . 'system_config`')->fetchColumn();

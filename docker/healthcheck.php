@@ -290,24 +290,41 @@ function healthCheckPhp(): void
     }
 }
 
-/** @param array<string,string> $channelConfig */
+/**
+ * Workerman health: a Channel round trip through the address the role is
+ * CONFIGURED to use.
+ *
+ * The fallback to 127.0.0.1 is deliberately gone. Inside the workerman container
+ * that address is the local Channel server, so a misconfigured CLIENT_IP passed
+ * the check while every other container (php, queue, timer) was cut off from the
+ * channel — the probe reported green on exactly the failure it exists to catch.
+ * A role must prove the address its own configuration names.
+ *
+ * @param array<string,string> $channelConfig
+ */
 function healthCheckWorkerman(array $channelConfig): void
 {
     $port = (int)($channelConfig['port'] ?? 40003);
-    $hosts = array_values(array_unique(array_filter([
-        (string)($channelConfig['client_ip'] ?? ''),
-        '127.0.0.1',
-    ])));
-    $errors = [];
-    foreach ($hosts as $host) {
-        try {
-            healthChannelRoundTrip($host, $port);
-            return;
-        } catch (Throwable $error) {
-            $errors[] = $error->getMessage();
-        }
+    $configured = trim((string)($channelConfig['client_ip'] ?? ''));
+    if ($configured === '') {
+        throw new RuntimeException('CHANNEL.CLIENT_IP is not configured');
     }
-    throw new RuntimeException('Channel round trip failed: ' . implode('; ', $errors));
+    healthChannelRoundTrip($configured, $port);
+}
+
+/**
+ * Queue and timer roles depend on the Channel connection their configuration
+ * names: a fresh heartbeat alone would not notice a channel address that no
+ * longer resolves, and the queue worker would silently stop receiving work.
+ *
+ * @param string $role
+ * @param array<string,string> $redisConfig
+ * @param array<string,string> $channelConfig
+ */
+function healthCheckQueueRole(string $role, array $redisConfig, array $channelConfig): void
+{
+    healthCheckHeartbeat($role, $redisConfig);
+    healthCheckWorkerman($channelConfig);
 }
 
 /** @return array{db:array<string,string>,redis:array<string,string>,channel:array<string,string>} */
@@ -339,7 +356,9 @@ try {
             break;
         case 'queue':
         case 'timer':
-            healthCheckHeartbeat($healthRole, $healthSettings['redis']);
+            // 队列与定时任务都要证明它们配置的 Channel 地址可用：只查心跳会
+            // 让"连不上 Channel 但进程还在跑"的实例保持健康
+            healthCheckQueueRole($healthRole, $healthSettings['redis'], $healthSettings['channel']);
             break;
         case 'workerman':
             healthCheckWorkerman($healthSettings['channel']);
