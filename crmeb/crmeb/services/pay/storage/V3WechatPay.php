@@ -232,9 +232,16 @@ class V3WechatPay extends BasePay implements PayInterface
     public function queryOrder(string $outTradeNo, array $options = [])
     {
         try {
-            $res = $this->instance->v3pay->queryOrder($outTradeNo);
+            $res = $this->instance->v3pay->queryOrderWithStatus($outTradeNo);
             $status = (int)($res['status'] ?? 0);
             $body = $res['body'] ?? null;
+            /**
+             * 未通过平台签名校验的响应不能转换成业务结论：拿不到可信证书就
+             * 一律按 unknown 处理，调用方因此保留库存与优惠券。
+             */
+            if (!$this->instance->v3pay->responseSignatureValid($res)) {
+                return ['state' => 'unknown', 'trade_no' => '', 'raw' => 'signature-invalid'];
+            }
             if (!is_array($body)) {
                 return ['state' => 'unknown', 'trade_no' => '', 'raw' => $body];
             }
@@ -278,9 +285,11 @@ class V3WechatPay extends BasePay implements PayInterface
     public function closeOrder(string $outTradeNo, array $options = []): bool
     {
         try {
-            $res = $this->instance->v3pay->closeOrder($outTradeNo);
+            $res = $this->instance->v3pay->closeOrderWithStatus($outTradeNo);
             $status = (int)($res['status'] ?? 0);
             $body = $res['body'] ?? null;
+            //未通过签名校验的响应不能作为"已关闭"的依据
+            if (!$this->instance->v3pay->responseSignatureValid($res)) return false;
             if ($status === 204) return true;
             if (is_array($body)) {
                 $code = (string)($body['code'] ?? '');

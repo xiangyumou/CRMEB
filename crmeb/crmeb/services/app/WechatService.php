@@ -79,7 +79,12 @@ class WechatService
                 //支付网关调用的超时上限：连接 3 秒，单次总超时 15 秒
                 'connect_timeout' => 3.0,
                 'timeout' => 15.0,
-                'verify' => false
+                /**
+                 * TLS 校验保持开启：支付接口的响应决定资金与库存判断，跳过
+                 * 证书校验等于把判断交给中间人。信任库来自服务器环境，
+                 * 不提供任何后台开关来关闭它。
+                 */
+                'verify' => (getenv('CRMEB_PAY_CA_BUNDLE') ?: true),
             ],
         ];
         if (isset($wechat['wechat_encode']) && (int)$wechat['wechat_encode'] > 0 && isset($wechat['wechat_encodingaeskey']) && !empty($wechat['wechat_encodingaeskey']))

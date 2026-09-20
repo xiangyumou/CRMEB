@@ -5,6 +5,15 @@ the response or return value, the persisted effects, and a no-side-effect
 failure or repeat path. HTTP cases use production routing, middleware and JWT
 against the seeded install SQL; payment transports stay offline.
 
+## Payment transport security
+
+- [x] TLS-001 The WeChat v2 and v3 payment transports keep certificate-chain and hostname verification on: no `verify => false`, no `CURLOPT_SSL_VERIFYPEER/HOST` disable, and the trust store comes from the server environment (`CRMEB_PAY_CA_BUNDLE`) with no backend toggle.
+- [x] TLS-002 A platform-signed response verifies, while a tampered body, a wrong signature, an unknown platform serial and a stale timestamp all fail the check.
+- [x] TLS-003 A response whose platform certificate cannot be fetched is never trusted, so the caller treats the query result as unknown and keeps resources.
+- [x] TLS-004 A signature made with a key that does not match the published certificate is rejected.
+- [x] TLS-005 A v3 notification is answered as a failure unless its platform signature verifies and its resource decrypts into a JSON object, so a forged "money received" cannot be believed.
+- [x] TLS-006 The v3 driver refuses to convert an unverified query or close response into `closed`/`paid`.
+
 ## Payment concurrency and creation (offline gateway)
 
 - [x] PAYC-001 A payment create held at the gateway boundary while a cancellation commits can never leave a collectible gateway payment on a cancelled order: either the cancel settles the attempt first, or the create is refused under the order lock and the attempt is closed.

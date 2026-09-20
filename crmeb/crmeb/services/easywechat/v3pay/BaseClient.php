@@ -121,7 +121,7 @@ class BaseClient extends AbstractAPI
      * @param $method
      * @param $location
      * @param array $options
-     * @return array{status:int,body:mixed}
+     * @return array{status:int,body:mixed,headers:array}
      */
     private function _doRequestCurl($method, $location, $options = [])
     {
@@ -145,17 +145,91 @@ class BaseClient extends AbstractAPI
         curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 3);
         curl_setopt($curl, CURLOPT_TIMEOUT, 15);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
+        /**
+         * TLS 校验必须开启且没有关闭开关：支付接口的响应会直接决定是否释放
+         * 库存、是否当作已收款，跳过证书与主机名校验等于把资金判断交给中间人。
+         * 证书链从服务器（或 CRMEB_PAY_CA_BUNDLE 指定的本地信任库）读取，
+         * 该路径由服务器环境控制，不来自任何后台配置。
+         */
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
+        $caBundle = (string)(getenv('CRMEB_PAY_CA_BUNDLE') ?: '');
+        if ($caBundle === '') {
+            $systemBundle = '/etc/ssl/certs/ca-certificates.crt';
+            if (is_readable($systemBundle)) {
+                $caBundle = $systemBundle;
+            }
+        }
+        if ($caBundle !== '') {
+            curl_setopt($curl, CURLOPT_CAINFO, $caBundle);
+        }
         $content = curl_exec($curl);
-        $headerSize = curl_getinfo($curl, CURLINFO_HEADER_SIZE);
+        $headerSize = (int)curl_getinfo($curl, CURLINFO_HEADER_SIZE);
         $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $curlError = curl_errno($curl) !== 0 ? curl_error($curl) : '';
         curl_close($curl);
         if ($content === false) {
-            return ['status' => 0, 'body' => null];
+            return ['status' => 0, 'body' => null, 'headers' => [], 'error' => $curlError];
         }
-        $raw = substr($content, $headerSize);
-        return ['status' => $status, 'body' => $raw === '' ? null : json_decode($raw, true)];
+        $rawHeaders = substr((string)$content, 0, $headerSize);
+        $raw = substr((string)$content, $headerSize);
+
+        return [
+            'status' => $status,
+            'body' => $raw === '' ? null : json_decode($raw, true),
+            'headers' => $this->parseResponseHeaders($rawHeaders),
+            'raw' => $raw,
+        ];
+    }
+
+    /**
+     * 解析响应头为小写键名 => 值
+     *
+     * @param string $rawHeaders
+     * @return array<string, string>
+     */
+    private function parseResponseHeaders(string $rawHeaders): array
+    {
+        $headers = [];
+        foreach (explode("\n", $rawHeaders) as $line) {
+            $line = trim($line);
+            if ($line === '' || strpos($line, ':') === false) {
+                continue;
+            }
+            [$name, $value] = explode(':', $line, 2);
+            $headers[strtolower(trim($name))] = trim($value);
+        }
+
+        return $headers;
+    }
+
+    /**
+     * 校验响应签名
+     *
+     * 没有签名头（例如本地证书请求）或签名不匹配时返回 false，调用方必须把它
+     * 当作"结果未知"：未经验证的响应永远不会被转换成已关闭、已退款这类业务
+     * 结论。
+     *
+     * @param array{headers:array,raw?:string} $response
+     * @return bool
+     */
+    protected function verifyResponseSignature(array $response): bool
+    {
+        $headers = $response['headers'] ?? [];
+        $signature = (string)($headers['wechatpay-signature'] ?? '');
+        $serial = (string)($headers['wechatpay-serial'] ?? '');
+        $timestamp = (string)($headers['wechatpay-timestamp'] ?? '');
+        $nonce = (string)($headers['wechatpay-nonce'] ?? '');
+        if ($signature === '' || $serial === '' || $timestamp === '') {
+            return false;
+        }
+        //时间戳偏离过大一律拒绝，避免重放
+        if (abs(time() - (int)$timestamp) > 300) {
+            return false;
+        }
+        $message = $timestamp . "\n" . $nonce . "\n" . (string)($response['raw'] ?? '') . "\n";
+
+        return $this->verifySignature($message, $signature, $serial);
     }
 
     /**

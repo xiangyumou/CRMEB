@@ -448,15 +448,26 @@ class PayClient extends BaseClient
     }
 
     /**
-     * 查询支付单
+     * 查询支付单（带 HTTP 状态与响应头）
      *
      * 返回值可能是 null（网络异常、响应无法解析），调用方必须用 null 判断为
      * "结果未知"，不能当成"未支付"。
      *
      * @param string $outTradeNo
-     * @return array{status:int,body:mixed}
+     * @return array{status:int,body:mixed,headers:array,raw:string}
      */
     public function queryOrder(string $outTradeNo)
+    {
+        return $this->queryOrderWithStatus($outTradeNo);
+    }
+
+    /**
+     * 查询支付单，返回状态码、响应体与响应头，供签名校验使用
+     *
+     * @param string $outTradeNo
+     * @return array{status:int,body:mixed,headers:array,raw:string}
+     */
+    public function queryOrderWithStatus(string $outTradeNo): array
     {
         $merType = $this->app['config']['v3_payment']['mer_type'];
         if ($merType) {
@@ -473,9 +484,20 @@ class PayClient extends BaseClient
     /**
      * 关闭支付单
      * @param string $outTradeNo
-     * @return array{status:int,body:mixed}
+     * @return array{status:int,body:mixed,headers:array,raw:string}
      */
     public function closeOrder(string $outTradeNo)
+    {
+        return $this->closeOrderWithStatus($outTradeNo);
+    }
+
+    /**
+     * 关闭支付单，返回状态码、响应体与响应头，供签名校验使用
+     *
+     * @param string $outTradeNo
+     * @return array{status:int,body:mixed,headers:array,raw:string}
+     */
+    public function closeOrderWithStatus(string $outTradeNo): array
     {
         $merType = $this->app['config']['v3_payment']['mer_type'];
         if ($merType) {
@@ -489,6 +511,23 @@ class PayClient extends BaseClient
             $data = ['mchid' => (string)$this->app['config']['v3_payment']['mchid']];
         }
         return $this->requestWithStatus($url, 'POST', ['json' => $data]);
+    }
+
+    /**
+     * 查询响应是否通过平台签名校验
+     *
+     * 传入的必须是带响应头的完整结果（requestWithStatus 的返回值）。任何无法
+     * 验证的情况都返回 false，调用方据此按"结果未知"处理。
+     *
+     * @param mixed $response
+     * @return bool
+     */
+    public function responseSignatureValid($response): bool
+    {
+        if (!is_array($response)) {
+            return false;
+        }
+        return $this->verifyResponseSignature($response);
     }
 
     /**
@@ -569,10 +608,24 @@ class PayClient extends BaseClient
     public function handleNotify($callback)
     {
         $request = request();
+        $signatureOk = $this->verifyNotifySignature($request);
         $success = $request->post('event_type') === 'TRANSACTION.SUCCESS';
-        $data = $this->decrypt($request->post('resource', []));
+        /**
+         * 解密失败或签名校验失败时不能把 null 当成支付成功：未通过验证的报文
+         * 一律按失败回调，网关会重试，绝不会被转换成"已收款"。
+         */
+        $payload = null;
+        $decryptOk = false;
+        try {
+            $decrypted = $this->decrypt($request->post('resource', []));
+            $decryptOk = is_string($decrypted) && $decrypted !== '';
+            $payload = $decryptOk ? json_decode((string)$decrypted) : null;
+        } catch (\Throwable $e) {
+            $decryptOk = false;
+        }
+        $verified = $signatureOk && $decryptOk && is_object($payload);
 
-        $handleResult = call_user_func_array($callback, [json_decode($data), $success]);
+        $handleResult = call_user_func_array($callback, [$verified ? $payload : null, $success && $verified]);
         if (is_bool($handleResult) && $handleResult) {
             $response = [
                 'code' => 'SUCCESS',
@@ -586,6 +639,37 @@ class PayClient extends BaseClient
         }
 
         return response($response, 200, [], 'json');
+    }
+
+    /**
+     * 校验回调报文的平台签名
+     *
+     * 取报文原文与 Wechatpay-* 头，按微信规则拼出待验串交给平台证书验证。
+     * 失败时返回 false，调用方据此拒绝该回调，绝不按支付成功处理。
+     *
+     * @param mixed $request
+     * @return bool
+     */
+    protected function verifyNotifySignature($request): bool
+    {
+        $signature = (string)$request->header('Wechatpay-Signature', '');
+        $serial = (string)$request->header('Wechatpay-Serial', '');
+        $timestamp = (string)$request->header('Wechatpay-Timestamp', '');
+        $nonce = (string)$request->header('Wechatpay-Nonce', '');
+        if ($signature === '' || $serial === '' || $timestamp === '') {
+            return false;
+        }
+        //时间戳偏离过大一律拒绝，避免重放
+        if (abs(time() - (int)$timestamp) > 300) {
+            return false;
+        }
+        $body = (string)file_get_contents('php://input');
+        if ($body === '') {
+            return false;
+        }
+        $message = $timestamp . "\n" . $nonce . "\n" . $body . "\n";
+
+        return $this->verifySignature($message, $signature, $serial);
     }
 
     public function handleTransferNotify($callback)
