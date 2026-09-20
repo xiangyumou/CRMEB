@@ -30,7 +30,19 @@ use think\facade\Log;
  */
 class StoreOrderEffectServices extends BaseServices
 {
-    /** 支付成功后的通知、打印、开票、流水等后置动作 */
+    /**
+     * 待执行的外部动作按事件与目标拆分
+     *
+     * 拆分之后，某一条通知失败只让那一条记录进入结果未知，支付流水、虚拟发卡
+     * 和打印不会被连带重跑；本地履约已经在支付事务里提交，这里不重复。
+     */
+    /** 订单支付成功的客户与管理员通知、推送（无幂等键，结果未知交人工） */
+    const EVENT_PAY_NOTICE = 'pay_notice';
+    /** 小票打印（打印服务按单号可查，结果未知交人工） */
+    const EVENT_PAY_PRINT = 'pay_print';
+    /** 自动开票任务（开票按订单唯一，允许自动重试） */
+    const EVENT_PAY_INVOICE = 'pay_invoice';
+    /** 兼容保留：本轮之前登记的整包支付成功副作用事件名 */
     const EVENT_PAY_SUCCESS = 'pay_success';
     /** 逐尝试关单任务前缀，完整事件名为 close_attempt.<支付尝试ID> */
     const EVENT_CLOSE_ATTEMPT_PREFIX = 'close_attempt.';
@@ -165,12 +177,115 @@ class StoreOrderEffectServices extends BaseServices
             return;
         }
         switch ($eventType) {
+            case self::EVENT_PAY_NOTICE:
+                $this->payNotice((int)$effect['store_order_id']);
+                break;
+            case self::EVENT_PAY_PRINT:
+                $this->payPrint((int)$effect['store_order_id']);
+                break;
+            case self::EVENT_PAY_INVOICE:
+                $this->payInvoice((int)$effect['store_order_id']);
+                break;
             case self::EVENT_PAY_SUCCESS:
-                $this->paySuccess($effect['store_order_id']);
+                //旧记录（本轮之前登记的整包事件）：本地履约已在支付事务里完成，
+                //这里只补外部动作
+                $orderId = (int)$effect['store_order_id'];
+                $this->payNotice($orderId);
+                $this->payPrint($orderId);
+                $this->payInvoice($orderId);
                 break;
             default:
                 throw new \RuntimeException('未知的订单副作用类型:' . $eventType);
         }
+    }
+
+    /**
+     * 订单支付成功的通知与推送
+     *
+     * 这些外部接口没有幂等键，重复执行会重复发消息，因此结果未知时只记录，
+     * 由人工通过 effects:retry 显式确认后重试。
+     *
+     * @param int $storeOrderId
+     * @return void
+     */
+    private function payNotice(int $storeOrderId): void
+    {
+        $orderInfo = $this->loadOrder($storeOrderId);
+        event('NoticeListener', [$orderInfo, 'order_pay_success']);
+        event('NoticeListener', [$orderInfo, 'admin_pay_success_code']);
+        event('OutPushListener', ['order_pay_push', ['order_id' => $storeOrderId]]);
+        $orderInfo['time'] = date('Y-m-d H:i:s');
+        $orderInfo['phone'] = $orderInfo['user_phone'];
+        event('CustomNoticeListener', [$orderInfo['uid'], $orderInfo, 'order_pay_success']);
+        event('CustomEventListener', ['order_pay', [
+            'uid' => $orderInfo['uid'],
+            'id' => $storeOrderId,
+            'order_id' => $orderInfo['order_id'],
+            'real_name' => $orderInfo['real_name'],
+            'user_phone' => $orderInfo['user_phone'],
+            'user_address' => $orderInfo['user_address'],
+            'total_num' => $orderInfo['total_num'],
+            'pay_price' => $orderInfo['pay_price'],
+            'pay_postage' => $orderInfo['pay_postage'],
+            'deduction_price' => $orderInfo['deduction_price'],
+            'coupon_price' => $orderInfo['coupon_price'],
+            'store_name' => $orderInfo['storeName'],
+            'add_time' => date('Y-m-d H:i:s', $orderInfo['add_time']),
+        ]]);
+    }
+
+    /**
+     * 支付成功的小票打印
+     * @param int $storeOrderId
+     * @return void
+     */
+    private function payPrint(int $storeOrderId): void
+    {
+        PrintJob::dispatch([$storeOrderId, 1]);
+    }
+
+    /**
+     * 自动开票：开票记录按订单唯一，允许自动重试
+     * @param int $storeOrderId
+     * @return void
+     */
+    private function payInvoice(int $storeOrderId): void
+    {
+        /** @var StoreOrderInvoiceServices $invoiceServices */
+        $invoiceServices = app()->make(StoreOrderInvoiceServices::class);
+        $invoiceInfo = $invoiceServices->get(['order_id' => $storeOrderId]);
+        if (!$invoiceInfo) {
+            return;
+        }
+        if ((int)$invoiceInfo['is_pay'] !== 1) {
+            $invoiceInfo->is_pay = 1;
+            $invoiceInfo->save();
+        }
+        if (sys_config('elec_invoice', 1) == 1 && sys_config('auto_invoice', 1) == 1) {
+            OrderInvoiceJob::dispatchSecs(10, 'autoInvoice', [$invoiceInfo['id']]);
+        }
+    }
+
+    /**
+     * 载入订单并补齐通知需要的展示字段
+     * @param int $storeOrderId
+     * @return array
+     */
+    private function loadOrder(int $storeOrderId): array
+    {
+        /** @var StoreOrderServices $orderServices */
+        $orderServices = app()->make(StoreOrderServices::class);
+        $order = $orderServices->get($storeOrderId);
+        if (!$order) {
+            throw new \RuntimeException('订单不存在:' . $storeOrderId);
+        }
+        $orderInfo = $order->toArray();
+        /** @var StoreOrderCartInfoServices $cartInfoServices */
+        $cartInfoServices = app()->make(StoreOrderCartInfoServices::class);
+        $orderInfo['storeName'] = $cartInfoServices->getCarIdByProductTitle($storeOrderId);
+        $orderInfo['send_name'] = $orderInfo['real_name'];
+
+        return $orderInfo;
     }
 
     /**
@@ -231,56 +346,5 @@ class StoreOrderEffectServices extends BaseServices
         throw new \RuntimeException(empty($result['not_exist'])
             ? '关单结果未知，稍后重试'
             : '网关查无此单但本地曾发起创建，保持待核对，请人工确认');
-    }
-
-    /**
-     * 订单支付成功后的通知、推送、打印与流水
-     * @param int $storeOrderId
-     * @return void
-     */
-    private function paySuccess(int $storeOrderId): void
-    {
-        /** @var StoreOrderServices $orderServices */
-        $orderServices = app()->make(StoreOrderServices::class);
-        $order = $orderServices->get($storeOrderId);
-        if (!$order) {
-            throw new \RuntimeException('订单不存在:' . $storeOrderId);
-        }
-        $orderInfo = $order->toArray();
-        /** @var StoreOrderCartInfoServices $cartInfoServices */
-        $cartInfoServices = app()->make(StoreOrderCartInfoServices::class);
-        $orderInfo['storeName'] = $cartInfoServices->getCarIdByProductTitle($storeOrderId);
-        $orderInfo['send_name'] = $orderInfo['real_name'];
-
-        //订单支付成功后置事件
-        event('OrderPaySuccessListener', [$orderInfo]);
-        //用户推送消息事件
-        event('NoticeListener', [$orderInfo, 'order_pay_success']);
-        //支付成功给客服发送消息
-        event('NoticeListener', [$orderInfo, 'admin_pay_success_code']);
-        // 推送订单
-        event('OutPushListener', ['order_pay_push', ['order_id' => $storeOrderId]]);
-
-        //自定义消息-订单支付成功
-        $orderInfo['time'] = date('Y-m-d H:i:s');
-        $orderInfo['phone'] = $orderInfo['user_phone'];
-        event('CustomNoticeListener', [$orderInfo['uid'], $orderInfo, 'order_pay_success']);
-
-        //自定义事件-订单支付
-        event('CustomEventListener', ['order_pay', [
-            'uid' => $orderInfo['uid'],
-            'id' => $storeOrderId,
-            'order_id' => $orderInfo['order_id'],
-            'real_name' => $orderInfo['real_name'],
-            'user_phone' => $orderInfo['user_phone'],
-            'user_address' => $orderInfo['user_address'],
-            'total_num' => $orderInfo['total_num'],
-            'pay_price' => $orderInfo['pay_price'],
-            'pay_postage' => $orderInfo['pay_postage'],
-            'deduction_price' => $orderInfo['deduction_price'],
-            'coupon_price' => $orderInfo['coupon_price'],
-            'store_name' => $orderInfo['storeName'],
-            'add_time' => date('Y-m-d H:i:s', $orderInfo['add_time']),
-        ]]);
     }
 }

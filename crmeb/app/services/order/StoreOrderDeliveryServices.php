@@ -16,6 +16,7 @@ use app\services\activity\coupon\StoreCouponIssueServices;
 use app\services\BaseServices;
 use app\dao\order\StoreOrderDao;
 use app\services\message\MessageSystemServices;
+use app\dao\product\sku\StoreProductVirtualDao;
 use app\services\product\sku\StoreProductAttrValueServices;
 use app\services\product\sku\StoreProductVirtualServices;
 use app\services\serve\ServeServices;
@@ -802,6 +803,152 @@ class StoreOrderDeliveryServices extends BaseServices
                 'pages/goods/order_details/index?order_id=' . $orderInfo['order_id']
             ]);
         }
+    }
+
+    /**
+     * 虚拟卡密/密钥商品的本地分配（在支付事务内提交）
+     *
+     * 只做本地写入：原子领取一张卡密（同一张卡不会发给两个订单），订单状态、
+     * 发货信息与站内信一并落库。已经领过卡的订单直接复用，重复执行不会发
+     * 第二张卡。
+     *
+     * @param array $orderInfo
+     * @return void
+     * @throws \think\db\exception\DbException
+     */
+    public function assignVirtualGoods(array $orderInfo): void
+    {
+        $orderId = (int)$orderInfo['id'];
+        /** @var StoreProductVirtualDao $virtualDao */
+        $virtualDao = app()->make(StoreProductVirtualDao::class);
+        //已经分配过：复用原卡，只补齐订单展示字段（幂等重试）
+        $existing = $virtualDao->findByOrderId((string)$orderInfo['order_id']);
+        if ($existing) {
+            $this->markVirtualDelivered($orderInfo, (string)$existing['card_unique'], $existing, false);
+            return;
+        }
+        /** @var StoreOrderCartInfoServices $cartInfoServices */
+        $cartInfoServices = app()->make(StoreOrderCartInfoServices::class);
+        $cartInfo = $cartInfoServices->getOrderCartInfo($orderId);
+        $first = $cartInfo[(int)($orderInfo['cart_id'][0] ?? 0)] ?? reset($cartInfo);
+        $attrInfo = $first['cart_info']['productInfo']['attrInfo'] ?? [];
+        $unique = (string)($attrInfo['unique'] ?? '');
+        $diskInfo = (string)($attrInfo['disk_info'] ?? '');
+        if ($diskInfo !== '') {
+            //固定密钥商品：没有库存概念，直接写入订单
+            $this->markVirtualDelivered($orderInfo, $diskInfo, [
+                'card_no' => '',
+                'card_pwd' => '',
+            ], true, '密钥自动发放：' . $diskInfo);
+            return;
+        }
+        if ($unique === '') {
+            throw new ApiException('虚拟商品缺少规格信息，无法自动发货');
+        }
+        $card = $virtualDao->claimCard($unique, (string)$orderInfo['order_id'], (int)$orderInfo['uid']);
+        if (!$card) {
+            throw new ApiException('虚拟卡密库存不足，请联系客服');
+        }
+        $this->markVirtualDelivered($orderInfo, (string)$card['card_unique'], $card, true);
+    }
+
+    /**
+     * 写入虚拟商品发货结果与站内信（本地写，随支付事务提交）
+     *
+     * @param array $orderInfo
+     * @param string $virtualInfo
+     * @param array $card
+     * @param bool $notify 是否发送站内信（重试时不再重复发送）
+     * @param string $remark
+     * @return void
+     */
+    private function markVirtualDelivered(array $orderInfo, string $virtualInfo, array $card, bool $notify, string $remark = ''): void
+    {
+        /** @var StoreOrderServices $orderService */
+        $orderService = app()->make(StoreOrderServices::class);
+        if ($remark === '') {
+            $remark = '卡密已自动发放，卡号：' . ($card['card_no'] ?? '') . '；密码：' . ($card['card_pwd'] ?? '');
+        }
+        //只在尚未发货时改发货字段，重复执行保持原值
+        $current = $orderService->get((int)$orderInfo['id']);
+        if ($current && (int)$current['status'] === 0) {
+            $orderService->update(['id' => (int)$orderInfo['id']], [
+                'status' => 1,
+                'delivery_type' => 'fictitious',
+                'virtual_info' => $virtualInfo,
+                'remark' => $remark,
+            ]);
+            /** @var StoreOrderStatusServices $statusService */
+            $statusService = app()->make(StoreOrderStatusServices::class);
+            $statusService->save([
+                'oid' => (int)$orderInfo['id'],
+                'change_type' => 'delivery_fictitious',
+                'change_message' => '卡密自动发货',
+                'change_time' => time(),
+            ]);
+        }
+        if ($notify) {
+            $this->SystemSend((int)$orderInfo['uid'], [
+                'mark' => 'virtual_info',
+                'title' => '虚拟卡密发放',
+                'content' => '您购买的卡密商品已支付成功，支付金额' . $orderInfo['pay_price'] . '元，订单号：' . $orderInfo['order_id'] . '，'
+                    . ($virtualInfo !== '' && ($card['card_no'] ?? '') === ''
+                        ? '密钥：' . $virtualInfo . '，'
+                        : '卡号：' . ($card['card_no'] ?? '') . '；密码：' . ($card['card_pwd'] ?? '') . '，')
+                    . '感谢您的光临！',
+            ]);
+        }
+    }
+
+    /**
+     * 购买优惠券类虚拟商品的本地发放（在支付事务内提交）
+     *
+     * @param array $orderInfo
+     * @return void
+     */
+    public function assignVirtualCoupon(array $orderInfo): void
+    {
+        /** @var StoreOrderCartInfoServices $cartInfoServices */
+        $cartInfoServices = app()->make(StoreOrderCartInfoServices::class);
+        $cartInfo = $cartInfoServices->getOrderCartInfo((int)$orderInfo['id']);
+        $first = $cartInfo[(int)($orderInfo['cart_id'][0] ?? 0)] ?? reset($cartInfo);
+        $couponId = (int)($first['cart_info']['productInfo']['attrInfo']['coupon_id'] ?? 0);
+        if ($couponId <= 0) {
+            throw new ApiException('虚拟优惠券商品缺少优惠券信息，无法自动发放');
+        }
+        /** @var StoreCouponIssueServices $issueService */
+        $issueService = app()->make(StoreCouponIssueServices::class);
+        $coupon = $issueService->get($couponId);
+        if (!$coupon) {
+            throw new ApiException('优惠券不存在');
+        }
+        if (!$issueService->setCoupon($coupon, [(int)$orderInfo['uid']])) {
+            throw new ApiException('您已有这张优惠券，请勿重复购买');
+        }
+        /** @var StoreOrderServices $orderService */
+        $orderService = app()->make(StoreOrderServices::class);
+        $current = $orderService->get((int)$orderInfo['id']);
+        if ($current && (int)$current['status'] === 0) {
+            $orderService->update(['id' => (int)$orderInfo['id']], [
+                'status' => 1,
+                'delivery_type' => 'fictitious',
+                'virtual_info' => $couponId,
+                'remark' => '优惠券已自动发放',
+            ]);
+            /** @var StoreOrderStatusServices $statusService */
+            $statusService = app()->make(StoreOrderStatusServices::class);
+            $statusService->save([
+                'oid' => (int)$orderInfo['id'],
+                'change_type' => 'delivery_fictitious',
+                'change_message' => '优惠券自动发货',
+                'change_time' => time(),
+            ]);
+        }
+        $this->SystemSend((int)$orderInfo['uid'], [
+            'mark' => 'virtual_info',
+            'title' => '购买优惠券发放',
+            'content' => '您购买的优惠券已支付成功，支付金额' . $orderInfo['pay_price'] . '元，订单号' . $orderInfo['order_id'] . '请在个人中心优惠券中查看,感谢您的光临！',
+        ]);
     }
 
     /**

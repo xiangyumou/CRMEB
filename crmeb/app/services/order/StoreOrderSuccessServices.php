@@ -17,6 +17,9 @@ use app\jobs\OrderEffectJob;
 use app\services\activity\combination\StorePinkServices;
 use app\services\BaseServices;
 use app\services\pay\PayServices;
+use app\services\product\product\StoreProductCouponServices;
+use app\services\statistic\CapitalFlowServices;
+use app\services\user\UserServices;
 use crmeb\exceptions\ApiException;
 use think\facade\Log;
 
@@ -105,18 +108,28 @@ class StoreOrderSuccessServices extends BaseServices
             if ($outTradeNo !== '') {
                 $attemptServices->markPaidByOutTradeNo($outTradeNo, (string)($updata['trade_no'] ?? ''));
             }
-            //其余未决尝试不再本地关闭：事务里登记逐尝试关单任务，提交后向网关
-            //真实关单，只有网关明确关闭成功才修改尝试状态
+            /**
+             * 本地履约与支付状态同一次提交：订单状态记录、商品赠券、支付流水、
+             * 虚拟商品分配、开票状态都必须与"已支付"一起成功或一起回滚。
+             * 任何一步失败都不允许留下"已收款但没有履约"的订单。
+             */
+            $paidOrder = $this->dao->get($orderId);
+            $paidOrderInfo = $paidOrder ? $paidOrder->toArray() : $orderInfo;
+            $this->fulfillLocally($paidOrderInfo, $updata);
+            //外部动作按目标拆分登记：某一条通知失败不会让流水、发卡或打印重跑
+            $closeTaskIds = [];
             $paidAttemptId = 0;
             if ($outTradeNo !== '') {
                 $paidAttempt = $attemptServices->findByOutTradeNo($outTradeNo);
                 $paidAttemptId = (int)($paidAttempt['id'] ?? 0);
             }
             $closeTaskIds = $effectServices->recordCloseTasks($orderId, $paidAttemptId > 0 ? [$paidAttemptId] : []);
-            $effectId = $effectServices->record($orderId, StoreOrderEffectServices::EVENT_PAY_SUCCESS, [
+            $effectId = $effectServices->record($orderId, StoreOrderEffectServices::EVENT_PAY_NOTICE, [
                 'trade_no' => (string)($updata['trade_no'] ?? ''),
                 'out_trade_no' => $outTradeNo,
             ]);
+            $effectServices->record($orderId, StoreOrderEffectServices::EVENT_PAY_PRINT, ['trade_no' => (string)($updata['trade_no'] ?? '')]);
+            $effectServices->record($orderId, StoreOrderEffectServices::EVENT_PAY_INVOICE, ['trade_no' => (string)($updata['trade_no'] ?? '')]);
             return ['effect_id' => $effectId, 'close_task_ids' => $closeTaskIds];
         });
         if (!$paid) {
@@ -133,6 +146,73 @@ class StoreOrderSuccessServices extends BaseServices
             Log::error('订单支付后置动作执行失败:' . $e->getMessage(), ['order_id' => $orderId]);
         }
         return true;
+    }
+
+    /**
+     * 本地履约：与支付状态在同一个事务里提交，失败则整笔支付回滚
+     *
+     * 只做本地写入（订单状态记录、商品赠券、支付流水、虚拟商品分配、开票
+     * 状态），不发出任何外部调用。每一步都按订单自身状态幂等，重复执行不会
+     * 重复赠券、重复记流水或重复发卡。
+     *
+     * @param array $orderInfo
+     * @param array $updata 支付更新（含 pay_type、trade_no）
+     * @return void
+     */
+    private function fulfillLocally(array $orderInfo, array $updata): void
+    {
+        $orderId = (int)$orderInfo['id'];
+        $payType = (string)($updata['pay_type'] ?? $orderInfo['pay_type'] ?? '');
+        $orderInfo['pay_type'] = $payType;
+        $orderInfo['trade_no'] = (string)($updata['trade_no'] ?? $orderInfo['trade_no'] ?? '');
+
+        //写入订单状态事件（同一订单同一事件只写一次）
+        /** @var StoreOrderStatusServices $statusService */
+        $statusService = app()->make(StoreOrderStatusServices::class);
+        if (!$statusService->count(['oid' => $orderId, 'change_type' => 'pay_success'])) {
+            $statusService->save([
+                'oid' => $orderId,
+                'change_type' => 'pay_success',
+                'change_message' => '用户付款成功',
+                'change_time' => time(),
+            ]);
+        }
+
+        //赠送购买商品优惠券，仅普通商品订单才会赠送；发放记录随支付一起提交，
+        //重复执行按已发放记录跳过
+        if (!$orderInfo['seckill_id'] && !$orderInfo['bargain_id'] && !$orderInfo['combination_id']) {
+            /** @var StoreProductCouponServices $couponServices */
+            $couponServices = app()->make(StoreProductCouponServices::class);
+            $couponServices->giveOrderProductCoupon((int)$orderInfo['uid'], $orderId);
+        }
+
+        //虚拟商品本地分配：原子占用一张卡密，同一张卡不会发给两个订单
+        if (in_array((int)$orderInfo['virtual_type'], [1, 2], true) && (int)$orderInfo['combination_id'] === 0) {
+            /** @var StoreOrderDeliveryServices $deliveryServices */
+            $deliveryServices = app()->make(StoreOrderDeliveryServices::class);
+            if ((int)$orderInfo['virtual_type'] === 1) {
+                $deliveryServices->assignVirtualGoods($orderInfo);
+            } else {
+                $deliveryServices->assignVirtualCoupon($orderInfo);
+            }
+        }
+
+        //支付流水：同一订单只记一条，重试不会重复入账
+        if ($payType === PayServices::WEIXIN_PAY) {
+            /** @var CapitalFlowServices $capitalFlowServices */
+            $capitalFlowServices = app()->make(CapitalFlowServices::class);
+            if (!$capitalFlowServices->hasOrderFlow((string)$orderInfo['order_id'], 'order')) {
+                /** @var UserServices $userServices */
+                $userServices = app()->make(UserServices::class);
+                $userInfo = $userServices->get((int)$orderInfo['uid']);
+                $orderInfo['nickname'] = $userInfo['nickname'] ?? '';
+                $orderInfo['phone'] = $userInfo['phone'] ?? '';
+                $capitalFlowServices->setFlow($orderInfo, 'order');
+            }
+        }
+
+        //开票数据支付状态
+        app()->make(StoreOrderInvoiceServices::class)->update(['order_id' => $orderId], ['is_pay' => 1]);
     }
 
 }

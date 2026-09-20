@@ -61,10 +61,12 @@ final class OrderEffectTest extends RegressionTestCase
     }
 
     /**
-     * The payment path registers one effect per order and event and hands it to the
-     * repair job. Leaving the registration out is what let a paid order reach the
-     * storefront with no notice and no printed receipt, and only one entry may be
-     * written no matter how often the gateway repeats its callback.
+     * The payment path registers one effect per order and target and hands each to
+     * the repair job. Leaving the registration out is what let a paid order reach
+     * the storefront with no notice and no printed receipt, and the records are
+     * split per target so one failing notice cannot replay the print or the
+     * invoice. Only one entry per target may be written no matter how often the
+     * gateway repeats its callback.
      */
     public function testPaymentSuccessRegistersOneEffectAndHandsItToTheRepairJob(): void
     {
@@ -74,10 +76,16 @@ final class OrderEffectTest extends RegressionTestCase
         $orderId = (int)$order['id'];
 
         $effects = $this->createMock(StoreOrderEffectServices::class);
-        $effects->expects(self::once())
+        // One record per external target: the notice is what the job carries, and
+        // the print and the invoice get their own records.
+        $effects->expects(self::exactly(3))
             ->method('record')
-            ->with($orderId, StoreOrderEffectServices::EVENT_PAY_SUCCESS, self::isType('array'))
-            ->willReturn(4242);
+            ->withConsecutive(
+                [$orderId, StoreOrderEffectServices::EVENT_PAY_NOTICE, self::isType('array')],
+                [$orderId, StoreOrderEffectServices::EVENT_PAY_PRINT, self::isType('array')],
+                [$orderId, StoreOrderEffectServices::EVENT_PAY_INVOICE, self::isType('array')]
+            )
+            ->willReturnOnConsecutiveCalls(4242, 4243, 4244);
         // The recorded row is what the queue job carries; the job has to end up
         // running exactly that row.
         $effects->expects(self::once())

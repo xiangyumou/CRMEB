@@ -390,19 +390,21 @@ final class CoreStoreMigrationTest extends RegressionTestCase
         $this->registerCleanup(function () use ($backup) {
             if (is_file($backup)) unlink($backup);
         });
-        // The roster row is edited twice below. If an assertion fails in between,
-        // the edit would survive into the next run and turn this test's own
-        // precondition into "already changed", so the original value is restored
-        // on cleanup no matter how the test ends.
+        // The roster row is edited twice below, and its baseline decides whether
+        // `apply` records a change to compare against during rollback. A previous
+        // failed run could have left the applied value behind, so the row is reset
+        // to the shipped default first and put back to that default on cleanup:
+        // the test cannot poison its own next run.
         $rosterRow = Db::name('system_config')->where('menu_name', 'order_notice_admin_uids')->find();
         self::assertIsArray($rosterRow, 'the install ships the order-notice roster setting');
-        $this->registerCleanup(function () use ($rosterRow): void {
-            Db::name('system_config')->where('id', (int)$rosterRow['id'])->update(['value' => $rosterRow['value']]);
+        $rosterId = (int)$rosterRow['id'];
+        Db::name('system_config')->where('id', $rosterId)->update(['value' => '""']);
+        $this->registerCleanup(function () use ($rosterId): void {
+            Db::name('system_config')->where('id', $rosterId)->update(['value' => '""']);
         });
         [$status, $output] = $this->runScript('apply ' . escapeshellarg($backup));
         self::assertSame(0, $status, $output);
 
-        $rosterId = (int)$rosterRow['id'];
         $afterApply = (string)Db::name('system_config')->where('id', $rosterId)->value('value');
         self::assertNotSame('"4242"', $afterApply, 'the apply produced a roster value of its own to edit');
         Db::name('system_config')->where('id', $rosterId)->update(['value' => '"4242"']);

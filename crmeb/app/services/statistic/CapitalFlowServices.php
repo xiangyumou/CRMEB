@@ -18,12 +18,45 @@ use crmeb\exceptions\AdminException;
 
 class CapitalFlowServices extends BaseServices
 {
+    /** setFlow() 的 type 与流水交易类型的对应关系 */
+    const TRADING_TYPES = [
+        'order' => 1,
+        'refund' => 2,
+        'recharge' => 3,
+        'refund_recharge' => 4,
+        'luck' => 5,
+        'extract' => 6,
+        'pay_member' => 7,
+        'offline_scan' => 8,
+    ];
+
     /**
      * @param CapitalFlowDao $dao
      */
     public function __construct(CapitalFlowDao $dao)
     {
         $this->dao = $dao;
+    }
+
+    /**
+     * 该订单是否已经入账（同一订单只记一条流水，重试不会重复入账）
+     *
+     * @param string $orderId
+     * @param string $type 与 setFlow() 的 type 同名
+     * @return bool
+     */
+    public function hasOrderFlow(string $orderId, string $type = ''): bool
+    {
+        if ($orderId === '') {
+            return false;
+        }
+        $tradingType = self::TRADING_TYPES[$type] ?? null;
+        $where = ['order_id' => $orderId];
+        if ($tradingType !== null) {
+            $where['trading_type'] = $tradingType;
+        }
+
+        return $this->dao->count($where) > 0;
     }
 
     /**
