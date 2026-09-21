@@ -74,15 +74,7 @@ class StoreOrderRefundController
     public function cancelApply(Request $request, $uni)
     {
         if (!strlen(trim($uni))) return app('json')->fail('参数错误');
-        $orderRefund = $this->services->get(['order_id' => $uni, 'is_cancel' => 0]);
-        if (!$orderRefund || $orderRefund['uid'] != $request->uid()) {
-            return app('json')->fail('订单不存在');
-        }
-        if (!in_array($orderRefund['refund_type'], [1, 2, 4, 5])) {
-            return app('json')->fail('当前状态不能取消申请');
-        }
-        $this->services->update($orderRefund['id'], ['is_cancel' => 1]);
-        $this->services->cancelOrderRefundCartInfo((int)$orderRefund['id'], (int)$orderRefund['store_order_id'], $orderRefund);
+        $orderRefund = $this->services->cancelUserRefund((string)$uni, (int)$request->uid());
 
         //自定义事件-用户取消退款
         event('CustomEventListener', ['order_refund_cancel', [

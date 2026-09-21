@@ -62,6 +62,11 @@ cd /home/ubuntu/apps/CRMEB
 bash deploy/production/upgrade.sh ghcr.io/xiangyumou/crmeb@sha256:<64-hex-digit-digest>
 ```
 
+The default Compose entry point is the deployment root's `compose.yaml`.
+The release deployment archive includes `deploy/production/upgrade.sh`.
+Database access accepts the normalized production `USERNAME` / `PASSWORD` /
+`DATABASE` variables, with the MySQL image's root/database variables as fallback.
+
 What it does, in order:
 
 1. records the running image digest (the rollback target) and refuses to continue
@@ -70,10 +75,15 @@ What it does, in order:
 3. dumps the database with `mysqldump --single-transaction` and checks the result
    is non-empty and a complete gzip stream;
 4. restores that dump into an isolated MySQL (no network) and compares the
-   retained order, refund, coupon and user row counts against the live database,
+   retained order, refund, coupon and user row counts and content hashes against the live database,
    so an unusable backup is caught before anything is migrated;
 5. runs `drop-retired.php plan`, then `apply`, then the idempotent
-   `order-reliability.php apply`;
+   `order-reliability.php apply`. The retired-feature JSON backup is written to
+   `data/backups/retired-<timestamp>-<pid>/backup.json` (or beneath `CRMEB_BACKUP_DIR`),
+   mounted as `/backups` in the migration container and recorded in the upgrade
+   manifest. Keep this JSON together with the full SQL dump. The three new
+   reliability tables may be absent from both the live and restored legacy
+   databases; a one-sided absence or a missing core business table aborts;
 6. starts the stack again and waits for every role to become healthy.
 
 Any failure leaves the stack stopped and prints `UPGRADE FAILED`: no traffic

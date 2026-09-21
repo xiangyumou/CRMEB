@@ -7,8 +7,7 @@
 #   1. a fixed candidate digest is required (a moving tag is refused);
 #   2. the running image digest and the deployment configuration are recorded;
 #   3. every writing role is stopped — no migration runs against live writers;
-#   4. the database is dumped with `set -Eeuo pipefail
-# A consumer that closes its pipe early (head/grep) must not kill the upgrade.`, and the dump is checked
+#   4. the database dump must succeed, and the dump is checked
 #      for a non-empty result and a complete gzip stream;
 #   5. the backup is restored into an isolated database and the retained business
 #      counts are compared, so "the dump exists" is not mistaken for "the dump is
@@ -62,10 +61,10 @@ esac
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 deploy_root="${CRMEB_DEPLOY_ROOT:-$root}"
-compose_file="${CRMEB_DEPLOY_COMPOSE_FILE:-$deploy_root/compose.yml}"
+compose_file="${CRMEB_DEPLOY_COMPOSE_FILE:-$deploy_root/compose.yaml}"
 settings="$deploy_root/deployment/deployment.env"
 backup_dir="${CRMEB_BACKUP_DIR:-$deploy_root/data/backups}"
-stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+stamp="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 backup="${CRMEB_UPGRADE_BACKUP_FILE:-$backup_dir/pre-upgrade-$stamp.sql.gz}"
 # An explicit --backup-file wins over both the environment and the default: it
 # names the file this run must verify.
@@ -73,6 +72,8 @@ backup="${CRMEB_UPGRADE_BACKUP_FILE:-$backup_dir/pre-upgrade-$stamp.sql.gz}"
 mysql_service="${CRMEB_UPGRADE_MYSQL_SERVICE:-mysql}"
 migration_command="${CRMEB_MIGRATION_COMMAND:-}"
 db_prefix="${CRMEB_DB_PREFIX:-eb_}"
+
+[[ "$db_prefix" =~ ^[a-zA-Z0-9_]+$ ]] || { echo "invalid database prefix" >&2; exit 2; }
 
 compose_args=(docker compose)
 [ -n "${CRMEB_DEPLOY_PROJECT:-}" ] && compose_args+=(-p "$CRMEB_DEPLOY_PROJECT")
@@ -168,7 +169,7 @@ if [ -n "${backup_override:-}" ]; then
 else
   say 'dumping the database'
   if ! compose exec -T "$mysql_service" sh -c \
-      'exec mysqldump --single-transaction --routines --events --triggers --set-gtid-purged=OFF -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' \
+      'exec mysqldump --no-tablespaces --single-transaction --routines --events --triggers --set-gtid-purged=OFF -u"${USERNAME:-root}" -p"${PASSWORD:-$MYSQL_ROOT_PASSWORD}" "${DATABASE:-$MYSQL_DATABASE}"' \
       > "$backup".part; then
     rm -f "$backup".part
     die 'the database dump failed; nothing was migrated'
@@ -207,8 +208,8 @@ if [ "${CRMEB_UPGRADE_SKIP_RESTORE_CHECK:-0}" != "1" ]; then
     elif ! docker exec -i "$check_container" mysql -uroot -prestorecheck restorecheck < "$restore_sql"; then
       restore_failed=1
     fi
-    rm -f "$restore_sql"
   fi
+  rm -f "$restore_sql"
   if [ "$restore_failed" -eq 0 ]; then
     # Count the retained business rows in both databases: the backup has to be
     # internally consistent, not merely non-empty.
@@ -218,19 +219,35 @@ if [ "${CRMEB_UPGRADE_SKIP_RESTORE_CHECK:-0}" != "1" ]; then
       table="$(printf '%s' "$table_pk" | cut -d: -f1)"
       pk="$(printf '%s' "$table_pk" | cut -d: -f2)"
       full_table="$db_prefix$table"
+      # New reliability tables may be absent on both sides of a legacy backup.
+      existence_sql="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='$full_table'"
+      live_exists="$(compose exec -T "$mysql_service" sh -c \
+        'mysql -u"${USERNAME:-root}" -p"${PASSWORD:-$MYSQL_ROOT_PASSWORD}" -N -B "${DATABASE:-$MYSQL_DATABASE}" -e "$1"' _ "$existence_sql" 2>/dev/null)" || { restore_failed=1; break; }
+      restored_exists="$(docker exec "$check_container" sh -c \
+        'mysql -u"${USERNAME:-root}" -p"${PASSWORD:-$MYSQL_ROOT_PASSWORD}" -N -B "${DATABASE:-$MYSQL_DATABASE}" -e "$1"' _ "$existence_sql" 2>/dev/null)" || { restore_failed=1; break; }
+      if [ "$live_exists" = 0 ] && [ "$restored_exists" = 0 ]; then
+        case "$table" in
+          store_order_payment_attempt|store_order_effect|store_order_payment_exception) continue ;;
+        esac
+      fi
+      if [ "$live_exists" != 1 ] || [ "$restored_exists" != 1 ]; then
+        echo "retained-table mismatch or missing required table: $full_table" >&2
+        restore_failed=1
+        break
+      fi
       # The password is read inside each container from its own environment: the
       # host never holds a copy of it.
       live="$(compose exec -T "$mysql_service" sh -c \
-        'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -N -B "$MYSQL_DATABASE" -e "SELECT COUNT(*) FROM $1"' _ "$full_table" \
+        'mysql -u"${USERNAME:-root}" -p"${PASSWORD:-$MYSQL_ROOT_PASSWORD}" -N -B "${DATABASE:-$MYSQL_DATABASE}" -e "SELECT COUNT(*) FROM $1"' _ "$full_table" \
         2>/dev/null || echo 'error')"
       restored="$(docker exec "$check_container" sh -c \
-        'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -N -B "$MYSQL_DATABASE" -e "SELECT COUNT(*) FROM $1"' _ "$full_table" \
+        'mysql -u"${USERNAME:-root}" -p"${PASSWORD:-$MYSQL_ROOT_PASSWORD}" -N -B "${DATABASE:-$MYSQL_DATABASE}" -e "SELECT COUNT(*) FROM $1"' _ "$full_table" \
         2>/dev/null || echo 'error')"
       live_hash="$(compose exec -T "$mysql_service" sh -c \
-        'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --batch --raw --skip-column-names "$MYSQL_DATABASE" -e "SELECT * FROM $1 ORDER BY $2"' _ "$full_table" "$pk" 2>/dev/null | sha256sum | awk '{print $1}' || echo 'error')"
+        'mysql -u"${USERNAME:-root}" -p"${PASSWORD:-$MYSQL_ROOT_PASSWORD}" --batch --raw --skip-column-names "${DATABASE:-$MYSQL_DATABASE}" -e "SELECT * FROM $1 ORDER BY $2"' _ "$full_table" "$pk" 2>/dev/null | sha256sum | awk '{print $1}' || echo 'error')"
       restored_hash="$(docker exec "$check_container" sh -c \
-        'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --batch --raw --skip-column-names "$MYSQL_DATABASE" -e "SELECT * FROM $1 ORDER BY $2"' _ "$full_table" "$pk" 2>/dev/null | sha256sum | awk '{print $1}' || echo 'error')"
-      if [ "$live" != "$restored" ] || [ "$live_hash" != "$restored_hash" ] || [ "$live" = 'error' ] || [ "$live_hash" = 'error' ]; then
+        'mysql -u"${USERNAME:-root}" -p"${PASSWORD:-$MYSQL_ROOT_PASSWORD}" --batch --raw --skip-column-names "${DATABASE:-$MYSQL_DATABASE}" -e "SELECT * FROM $1 ORDER BY $2"' _ "$full_table" "$pk" 2>/dev/null | sha256sum | awk '{print $1}' || echo 'error')"
+      if [ "$live" != "$restored" ] || [ "$live_hash" != "$restored_hash" ] || [ "$live" = 'error' ] || [ "$(printf %s "$live_hash" | wc -c)" -ne 64 ] || [ "$(printf %s "$restored_hash" | wc -c)" -ne 64 ]; then
         restore_failed=1
         echo "retained-row mismatch for $full_table: live=$live/$live_hash restored=$restored/$restored_hash" >&2
       fi
@@ -250,7 +267,12 @@ if [ "$skip_migration" -eq 0 ]; then
   else
     compose run --rm --no-deps -T --entrypoint php php upgrade/core-store/drop-retired.php plan \
       || die 'the migration pre-check could not run; nothing was migrated'
-    compose run --rm --no-deps -T --entrypoint php php upgrade/core-store/drop-retired.php apply \
+    retired_backup_dir="$backup_dir/retired-$stamp"
+    mkdir -m 700 "$retired_backup_dir"
+    retired_backup_dir="$(cd "$retired_backup_dir" && pwd)"
+    printf 'retired_backup=%s/backup.json\n' "$retired_backup_dir" >> "$backup_dir/upgrade-$stamp.manifest"
+    say "retired-feature backup: $retired_backup_dir/backup.json"
+    compose run --rm --no-deps -T -v "$retired_backup_dir:/backups" --entrypoint php php upgrade/core-store/drop-retired.php apply /backups/backup.json \
       || die 'the retired-feature migration failed; restore from the backup before retrying'
     compose run --rm --no-deps -T --entrypoint php php upgrade/core-store/order-reliability.php apply \
       || die 'the reliability migration failed; restore from the backup before retrying'

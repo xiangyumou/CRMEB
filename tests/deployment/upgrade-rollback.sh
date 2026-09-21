@@ -80,7 +80,7 @@ services:
     volumes:
       - ./crmeb.sql:/docker-entrypoint-initdb.d/001-crmeb.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-uroot", "-prootpass", "--silent"]
+      test: ["CMD", "mysql", "-h127.0.0.1", "-uroot", "-prootpass", "-e", "SELECT 1"]
       interval: 3s
       timeout: 5s
       retries: 60
@@ -146,6 +146,7 @@ fi
 echo "migration ran at $(date -u +%FT%TZ)"
 SH
 
+touch "$work/.env" "$work/.constant"
 cd "$work"
 if ! docker compose -p "$project" --env-file "$work/deployment/deployment.env" -f "$work/compose.yaml" up -d --wait --wait-timeout 300 >"$work/stack-up.log" 2>&1; then
     cat "$work/stack-up.log" >&2
@@ -171,13 +172,13 @@ reset_old_stack() {
 run_upgrade() {
     CRMEB_DEPLOY_ROOT="$work" \
     CRMEB_DEPLOY_PROJECT="$project" \
-    CRMEB_DEPLOY_COMPOSE_FILE="$work/compose.yaml" \
     CRMEB_IMAGE_REPOSITORY="$registry_repo" \
     CRMEB_BACKUP_DIR="$work/data/backups" \
     CRMEB_MIGRATION_COMMAND="sh $work/migrate.sh" \
     bash "$root/deploy/production/upgrade.sh" "$@"
 }
 
+if [ "${CRMEB_DEPLOYMENT_TEST_ONLY:-}" != legacy ]; then
 # 1. A moving tag is refused before anything is touched.
 if run_upgrade "$registry_repo:edge" >"$work/bad-target.log" 2>&1; then
     fail 'a moving tag was accepted as an upgrade target'
@@ -252,6 +253,38 @@ latest="$(ls -t "$work/data/backups"/*.sql.gz | head -1)"
 gzip -t "$latest" || fail 'the produced backup is not a valid gzip stream'
 say_stack_running || fail 'the stack was not started again after a successful upgrade'
 pass 'a verified upgrade backs up, restores, migrates and resumes traffic'
+
+fi
+
+# Exercise the actual default migrations against a database without reliability tables.
+reset_old_stack
+cat > "$work/.env" <<'ENV'
+APP_DEBUG = false
+[DATABASE]
+TYPE = mysql
+HOSTNAME = mysql
+DATABASE = crmeb_deploy_test
+USERNAME = root
+PASSWORD = rootpass
+HOSTPORT = 3306
+PREFIX = eb_
+CHARSET = utf8mb4
+ENV
+touch "$work/.constant"
+docker compose -p "$project" --env-file "$work/deployment/deployment.env" -f "$work/compose.yaml" exec -T mysql mysql -uroot -prootpass crmeb_deploy_test -e 'DROP TABLE eb_store_order_payment_attempt, eb_store_order_effect, eb_store_order_payment_exception'
+CRMEB_DEPLOY_ROOT="$work" CRMEB_DEPLOY_PROJECT="$project" CRMEB_IMAGE_REPOSITORY="$registry_repo" CRMEB_MIGRATION_COMMAND='' \
+    bash "$root/deploy/production/upgrade.sh" "$candidate" >"$work/legacy.log" 2>&1 || { cat "$work/legacy.log"; fail 'legacy default upgrade failed'; }
+retired_backup="$(find "$work/data/backups" -name backup.json -type f)"
+[ -s "$retired_backup" ] || fail 'retired-feature backup did not persist on the host'
+for table in store_order_payment_attempt store_order_effect store_order_payment_exception; do
+    docker compose -p "$project" --env-file "$work/deployment/deployment.env" -f "$work/compose.yaml" exec -T mysql mysql -uroot -prootpass crmeb_deploy_test -e "SELECT COUNT(*) FROM eb_$table" >/dev/null || fail "migration did not create $table"
+done
+pass 'legacy default upgrade runs actual migrations and persists the retired-feature backup'
+
+if [ "${CRMEB_DEPLOYMENT_TEST_ONLY:-}" = legacy ]; then
+    echo "deployment legacy verification passed ($passed checks)"
+    exit 0
+fi
 
 # 7. The persistent manifest is sufficient for a recovery even after the
 # deployment settings already point at the candidate. A tiny host HTTP server

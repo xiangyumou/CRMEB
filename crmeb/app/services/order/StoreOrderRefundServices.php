@@ -1626,6 +1626,34 @@ class StoreOrderRefundServices extends BaseServices
         return $this->refundDetail($uni);
     }
 
+    /** Cancel under the same lock order used by gateway preparation. */
+    public function cancelUserRefund(string $uni, int $uid): array
+    {
+        $snapshot = $this->dao->get(['order_id' => $uni, 'uid' => $uid]);
+        if (!$snapshot) throw new ApiException('订单不存在');
+        $order = $this->storeOrderServices->get((int)$snapshot['store_order_id']);
+        if (!$order) throw new ApiException('订单不存在');
+        $rootId = (int)($order['pid'] ?: $order['id']);
+        $row = $this->transaction(function () use ($snapshot, $uid, $rootId) {
+            $this->storeOrderServices->getForUpdate($rootId);
+            $row = $this->dao->getForUpdate((int)$snapshot['id']);
+            if (!$row || (int)$row['uid'] !== $uid || (int)$row['is_cancel'] !== 0) {
+                throw new ApiException('订单不存在');
+            }
+            if (!in_array((int)$row['refund_type'], [1, 2, 4, 5], true)
+                || !in_array((int)$row['refund_state'], [self::REFUND_STATE_SUBMITTED, self::REFUND_STATE_CLOSED], true)) {
+                throw new ApiException('当前状态不能取消申请，请先核对退款结果');
+            }
+            $row = $row->toArray();
+            $this->dao->update((int)$row['id'], ['is_cancel' => 1]);
+            $this->cancelOrderRefundCartInfo((int)$row['id'], (int)$row['store_order_id'], $row, '', false);
+            return $row;
+        });
+        event('OrderRefundCancelAfterListener', [$row]);
+        event('OutPushListener', ['refund_cancel_push', ['order_id' => (int)$row['id']]]);
+        return $row;
+    }
+
     /**
      * 取消申请、后台拒绝处理cart_info refund_num数据
      * @param int $id
@@ -1636,7 +1664,7 @@ class StoreOrderRefundServices extends BaseServices
      * @throws \think\db\exception\DbException
      * @throws \think\db\exception\ModelNotFoundException
      */
-    public function cancelOrderRefundCartInfo(int $id, int $oid, $orderRefundInfo = [], string $title = '')
+    public function cancelOrderRefundCartInfo(int $id, int $oid, $orderRefundInfo = [], string $title = '', bool $emitEvents = true)
     {
         if (!$orderRefundInfo) {
             $orderRefundInfo = $this->dao->get(['id' => $id, 'is_cancel' => 0]);
@@ -1670,9 +1698,10 @@ class StoreOrderRefundServices extends BaseServices
         ]);
 
         //售后订单取消后置事件
-        event('OrderRefundCancelAfterListener', [$orderRefundInfo]);
-        // 推送订单
-        event('OutPushListener', ['refund_cancel_push', ['order_id' => (int)$orderRefundInfo['id']]]);
+        if ($emitEvents) {
+            event('OrderRefundCancelAfterListener', [$orderRefundInfo]);
+            event('OutPushListener', ['refund_cancel_push', ['order_id' => (int)$orderRefundInfo['id']]]);
+        }
         return true;
     }
 

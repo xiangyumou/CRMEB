@@ -71,10 +71,13 @@ class PublicController
             ['uploadToken', ''],
             ['pid', 0]
         ], true);
-        $service = app()->make(SystemAttachmentServices::class);
-        if (CacheService::get('scan_upload') != $uploadToken) {
+        $expectedToken = CacheService::get('scan_upload');
+        if (!is_string($uploadToken) || $uploadToken === ''
+            || !is_string($expectedToken) || $expectedToken === ''
+            || !hash_equals($expectedToken, $uploadToken)) {
             return app('json')->fail('配置已更改或token已失效');
         }
+        $service = app()->make(SystemAttachmentServices::class);
         $service->upload((int)$pid, $file, $upload_type, $type, '', $uploadToken);
         return app('json')->success('上传成功');
     }

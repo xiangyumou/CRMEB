@@ -194,7 +194,7 @@ jobs:
           tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 --numeric-owner \
             -czf .build/release/deployment-config.tar.gz \
             compose.yaml deploy/production/compose.yml deploy/production/nginx.conf \
-            deploy/production/normalize.sh deploy/production/rollback.sh \
+            deploy/production/normalize.sh deploy/production/rollback.sh deploy/production/upgrade.sh \
             deploy/production/migrate-all-in-one.sh docker/cache-assets.sh
       - name: Log in to GHCR
         uses: docker/login-action@v4

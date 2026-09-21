@@ -151,7 +151,7 @@ class SystemAttachment extends AuthController
         [$pid] = $this->request->getMore([
             ['pid', 0]
         ], true);
-        $uploadToken = md5(time());
+        $uploadToken = bin2hex(random_bytes(32));
         CacheService::set('scan_upload', $uploadToken, 600);
         $url = sys_config('site_url') . '/app/upload?pid=' . $pid . '&token=' . $uploadToken;
         return app('json')->success(['url' => $url]);

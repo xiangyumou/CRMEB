@@ -76,4 +76,7 @@ assert(
 );
 assert(/cancel-in-progress:\s*false/.test(container), 'a release is never cancelled mid-publish');
 
+
+assert(/deployment-config\.tar\.gz[\s\S]*?deploy\/production\/upgrade\.sh/.test(container), 'deployment archive includes the upgrade entry point');
+
 console.log('release-pipeline-guard: ok');
