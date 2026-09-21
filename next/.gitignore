@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.env
+.env.local
+
+# Aggregated by `pnpm gen` from per-domain files; never committed, so never conflicted.
+*.gen.ts
+openapi.json

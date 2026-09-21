@@ -1,0 +1,14 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "gen": { "dependsOn": ["^gen"], "outputs": ["src/**/*.gen.ts", "openapi.json"] },
+    "build": { "dependsOn": ["gen", "^build"], "outputs": ["dist/**", ".next/**", "!.next/cache/**"] },
+    "typecheck": { "dependsOn": ["gen", "^gen"] },
+    "lint": { "dependsOn": ["gen"] },
+    "test": { "dependsOn": ["gen", "^gen"] },
+    "test:unit": { "dependsOn": ["gen", "^gen"] },
+    "test:int": { "dependsOn": ["gen", "^gen"], "cache": false },
+    "guards": { "dependsOn": ["gen", "^gen"] },
+    "dev": { "dependsOn": ["gen"], "cache": false, "persistent": true }
+  }
+}
