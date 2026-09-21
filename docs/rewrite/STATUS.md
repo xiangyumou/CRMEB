@@ -27,7 +27,8 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | E1 user and login | in progress | `rewrite/ws-e1-user` |
 | D group buy and presale | dispatched 2026-09-23 | `rewrite/ws-d-marketing` |
 | F2 shipping, articles, statistics | dispatched 2026-09-23 | `rewrite/ws-f2-ops` |
-| E2 | ready; waiting on a free slot | — |
+| E2 WeChat OA and notifications | dispatched 2026-09-23 | `rewrite/ws-e2-wechat` |
+| S storefront contract gaps (CR-1..5-h) | briefed; starts after the B1 and C fix-ups merge | — |
 | F2, I, J (wave 3) | waiting | — |
 | K (wave 4) | waiting | — |
 
