@@ -1,5 +1,5 @@
 {
-  "id": "a21288c6-16af-407d-b471-1f4297b5a7ee",
+  "id": "da70d6ff-cfbb-4772-9538-282dc1b7410b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -7068,6 +7068,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "user_id": {
           "name": "user_id",
           "type": "bigint",
@@ -7329,6 +7335,28 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "orders_idempotency_uq": {
+          "name": "orders_idempotency_uq",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "idempotency_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "idempotency_key is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

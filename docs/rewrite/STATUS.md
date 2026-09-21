@@ -15,7 +15,8 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | P0-B admin shell and kit | merged (`d029a973`); Playwright smoke deferred to K | `rewrite/ws-p0b-shell` |
 | Golden slice (coupon) | merged (`ac928729`) | `rewrite/ws-golden-coupon` |
 | G1 DIY core | merged; panel API frozen (see `status/g1.md`) | `rewrite/ws-g1-diy` |
-| A, B1, C, F1 (wave 1) | dispatched | `rewrite/ws-{a,b1,c,f1}-*` |
+| B1 checkout | merged (`97ecc873`) | `rewrite/ws-b1-checkout` |
+| A, C, F1 (wave 1) | in progress | `rewrite/ws-{a,c,f1}-*` |
 | H | waiting on G1a | — |
 | D, B2, E1, E2, G2 (wave 2) | waiting | — |
 | F2, I, J (wave 3) | waiting | — |
@@ -35,3 +36,4 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 - 2026-09-22 — CR-1-c applied: `ORDER_STATUSES` now mirrors the `orders_status` enum (`pending_payment`, `refunded`); only an unpaid order can be cancelled, a paid one leaves through a full refund. CR-2-c: config groups live in `core/src/<domain>/`. CR-3-c: stream C owns the fake WeChat gateway. Wave 1 contracts for A, B1, C merged early (126 routes parse).
 - 2026-09-22 — Second usage-limit interruption (four executors); all resumed from committed checkpoints, nothing lost.
 - 2026-09-22 — G1 merged (33 component schemas, DIY core, 18 routes, editor shell, 30 previews, 3 reference panels, ETL mapper; 350 tests). CR-1-g1 decided: `diy_pages.content` stays `jsonb`; "byte-compatible" means no key or value is ever changed on the wire, and ETL verification compares parsed JSON, not text. Mock server now prefers static path segments over `:param`. Workspace: 622 unit + 240 integration tests, 149 routes.
+- 2026-09-22 — B1 merged (14 routes, 111 tests, six races). CR-1-b1 applied: `orders.idempotency_key` with a partial unique index, folded into `0000_init`; the code still claims the key through the effects ledger and moves to the column in the fix-up pass. CR-3-b1: `orders.coupon_discount` holds every goods-level discount. CR-4-b1: PRICE-001/002 retired with points; STOCK-004 and QUEUE-008 go to stream D. Known gap until F2: template freight quotes zero.

@@ -98,6 +98,8 @@ export const orders = pgTable(
     id: pk(),
     /** Customer-facing order number. The gateway's merchant order number lives on `payment_attempts`. */
     orderNo: varchar({ length: 32 }).notNull(),
+    /** Client-supplied submit key; a replay returns this same order. NULL for non-storefront orders. */
+    idempotencyKey: varchar({ length: 64 }),
     userId: fk()
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
@@ -112,6 +114,10 @@ export const orders = pgTable(
     /** Sum of the lines before any discount. */
     itemsAmount: money().notNull(),
     freightAmount: money().notNull().default('0.00'),
+    /**
+     * Every goods-level discount, not only the coupon: the coupon plus each `PricingContributor`.
+     * Each line's share is `order_items.discount_amount`; refunds use the line's `total_amount`.
+     */
     couponDiscount: money().notNull().default('0.00'),
     /** What the buyer owes. `itemsAmount + freightAmount - couponDiscount`, unless an operator re-priced. */
     payableAmount: money().notNull(),
@@ -164,6 +170,9 @@ export const orders = pgTable(
   },
   (t) => [
     uniqueIndex('orders_order_no_uq').on(t.orderNo),
+    uniqueIndex('orders_idempotency_uq')
+      .on(t.userId, t.idempotencyKey)
+      .where(sql`idempotency_key is not null`),
     index('orders_user_idx').on(t.userId, t.createdAt),
     index('orders_status_idx').on(t.status, t.createdAt),
     index('orders_refund_status_idx')
