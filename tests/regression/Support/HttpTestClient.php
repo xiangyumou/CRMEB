@@ -25,6 +25,25 @@ final class HttpTestClient
      */
     public function request(string $method, string $path, ?string $token, array $body = [], array $extraHeaders = []): array
     {
+        $response = $this->requestRaw($method, $path, $token, $body, $extraHeaders);
+        $decoded = json_decode($response['raw'], true);
+        if (!is_array($decoded)) {
+            throw new RuntimeException('HTTP response is not JSON: ' . substr($response['raw'], 0, 200));
+        }
+        return ['http_status' => $response['http_status'], 'headers' => $response['headers'], 'body' => $decoded];
+    }
+
+    /**
+     * Same request, without requiring a JSON body.
+     *
+     * A route that no longer exists answers with a bare 404 and an empty body,
+     * so `request()` cannot express "this path is gone" — it throws on the
+     * missing JSON before the status can be asserted.
+     *
+     * @return array{http_status:int,headers:array<string,string>,raw:string}
+     */
+    public function requestRaw(string $method, string $path, ?string $token, array $body = [], array $extraHeaders = []): array
+    {
         $url = parse_url($this->baseUrl . '/' . ltrim($path, '/'));
         if (!is_array($url) || empty($url['host'])) {
             throw new RuntimeException('Invalid regression HTTP base URL');
@@ -90,11 +109,7 @@ final class HttpTestClient
         if (strtolower($responseHeaders['transfer-encoding'] ?? '') === 'chunked') {
             $rawBody = $this->decodeChunkedBody($rawBody);
         }
-        $decoded = json_decode($rawBody, true);
-        if (!is_array($decoded)) {
-            throw new RuntimeException('HTTP response is not JSON: ' . substr($rawBody, 0, 200));
-        }
-        return ['http_status' => (int)$matches[1], 'headers' => $responseHeaders, 'body' => $decoded];
+        return ['http_status' => (int)$matches[1], 'headers' => $responseHeaders, 'raw' => $rawBody];
     }
 
     private function decodeChunkedBody(string $body): string

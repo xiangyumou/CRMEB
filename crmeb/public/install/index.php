@@ -384,6 +384,15 @@ switch ($step) {
             $strConfig = str_replace('#DB_PREFIX#', $dbPrefix, $strConfig);
             $strConfig = str_replace('#DB_CHARSET#', 'utf8', $strConfig);
 
+            // 签发 JWT 用的密钥必须每站唯一。上游把它写死成 `crmeb`，而那个值印在
+            // 公开源码里——用它签名等于任何人都能伪造任意用户和管理员的令牌。
+            if (function_exists('random_bytes')) {
+                $appKey = bin2hex(random_bytes(32));
+            } else {
+                $appKey = bin2hex(openssl_random_pseudo_bytes(32));
+            }
+            $strConfig = str_replace('#APP_KEY#', $appKey, $strConfig);
+
             //缓存配置
             $cachetype = $_POST['cache_type'] == 0 ? 'file' : 'redis';
             $strConfig = str_replace('#CACHE_TYPE#', $cachetype, $strConfig);

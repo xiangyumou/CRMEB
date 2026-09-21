@@ -142,7 +142,7 @@ class User extends AuthController
         if (strlen($data['pwd']) < 6 || strlen($data['pwd']) > 32) {
             return app('json')->fail('账号密码必须是在6到32位之间');
         }
-        $data['pwd'] = md5($data['pwd']);
+        $data['pwd'] = \app\services\login\UserPassword::hash((string)$data['pwd']);
         unset($data['true_pwd']);
         $data['avatar'] = sys_config('h5_avatar');
         $data['adminId'] = $this->adminId;
@@ -327,7 +327,7 @@ class User extends AuthController
             if (strlen($data['pwd']) < 6 || strlen($data['pwd']) > 32) {
                 return app('json')->fail('账号密码必须是在6到32位之间');
             }
-            $data['pwd'] = md5($data['pwd']);
+            $data['pwd'] = \app\services\login\UserPassword::hash((string)$data['pwd']);
         } else {
             unset($data['pwd']);
         }

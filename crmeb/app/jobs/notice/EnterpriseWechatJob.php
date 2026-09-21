@@ -34,6 +34,9 @@ class EnterpriseWechatJob extends BaseJobs
             return true;
         } catch (\Exception $e) {
             Log::error('发送企业群消息失败,失败原因:' . $e->getMessage());
+            // 缺了这一行，函数带着 `: bool` 声明走到末尾，PHP 抛 TypeError，
+            // 队列看到的是异常而不是"这次没成功"。
+            return false;
         }
     }
 }

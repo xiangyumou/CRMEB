@@ -82,6 +82,7 @@ crmeb/runtime/temp/readme.md
 .codebuddy/rules/project-intro.mdc
 tests/regression/vendor/
 tests/regression/artifacts/
+tests/static-analysis/vendor/
 
 # Local agent state
 .zcode/

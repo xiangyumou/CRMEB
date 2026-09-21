@@ -170,6 +170,57 @@ final class OrderEffectTest extends RegressionTestCase
     }
 
     /**
+     * 五个通知类副作用执行完之后必须被记成 DONE。
+     *
+     * `StoreOrderEffectServices::execute()` 声明返回 `bool`，但 EVENT_PAY_NOTICE、
+     * _ADMIN、_PUSH、_CUSTOM、_EVENT 这五个 case 是 `break` 出 switch 的，函数末尾没有
+     * return。PHP 7.4 下这会抛 TypeError（"Return value must be of the type bool,
+     * none returned"）——通知其实已经发出去了，异常发生在那之后，但调用方的
+     * catch 会把这条记录写成 STATUS_UNKNOWN。
+     *
+     * 后果：每一笔支付的五条通知副作用都会堆进 `order:reconcile effects:list` 的人工
+     * 队列，而重投会重复发通知。原有用例只断言"副作用记录被建出来"，没有真正执行过
+     * 一条通知类副作用并断言它的终态，所以这条路径一直没被走到。
+     *
+     * @dataProvider synchronousNoticeEvents
+     */
+    public function testANoticeEffectIsRecordedAsDone(string $eventType): void
+    {
+        $fixtures = new FixtureFactory($this, 'effect-notice');
+        $user = $fixtures->createUser();
+        $order = $fixtures->createOrder((int)$user['uid'], ['paid' => 1]);
+        $orderId = (int)$order['id'];
+        [$id] = $this->seedEffects($orderId, [['event_type' => $eventType]]);
+
+        self::assertTrue(
+            (new OrderEffectJob())->doJob($id),
+            $eventType . ' 的投递应当成功'
+        );
+
+        $row = Db::name('store_order_effect')->where('id', $id)->find();
+        self::assertSame(
+            StoreOrderEffect::STATUS_DONE,
+            (int)$row['status'],
+            $eventType . ' 执行完应当是 DONE，而不是留给人工处理的 UNKNOWN：' . (string)$row['last_error']
+        );
+        self::assertSame('', (string)$row['last_error'], $eventType . ' 不应当留下错误');
+    }
+
+    /**
+     * @return array<string, array{0:string}>
+     */
+    public function synchronousNoticeEvents(): array
+    {
+        return [
+            'user notice' => [StoreOrderEffectServices::EVENT_PAY_NOTICE],
+            'admin notice' => [StoreOrderEffectServices::EVENT_PAY_NOTICE_ADMIN],
+            'push' => [StoreOrderEffectServices::EVENT_PAY_NOTICE_PUSH],
+            'custom notice' => [StoreOrderEffectServices::EVENT_PAY_NOTICE_CUSTOM],
+            'custom event' => [StoreOrderEffectServices::EVENT_PAY_NOTICE_EVENT],
+        ];
+    }
+
+    /**
      * Running an effect that throws records the unknown outcome and counts the
      * attempt instead of reporting success.
      */

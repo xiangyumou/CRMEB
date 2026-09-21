@@ -60,8 +60,8 @@ class SystemCrontabServices extends BaseServices
     public function getTimerInfo($id)
     {
         $info = $this->dao->get($id);
-        $info['customCode'] = "<?php\n\n" . json_decode($info['customCode']);
         if (!$info) throw new AdminException('数据不存在');
+        $info['customCode'] = "<?php\n\n" . json_decode($info['customCode']);
         return $info->toArray();
     }
 

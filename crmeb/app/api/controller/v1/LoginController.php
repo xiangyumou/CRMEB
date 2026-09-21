@@ -19,6 +19,7 @@ use crmeb\services\CacheService;
 use app\services\user\LoginServices;
 use think\exception\ValidateException;
 use app\api\validate\user\RegisterValidates;
+use app\services\login\LoginThrottleGuard;
 
 /**
  * 微信小程序授权类
@@ -27,6 +28,12 @@ use app\api\validate\user\RegisterValidates;
  */
 class LoginController
 {
+    /** 同一账号在 LOGIN_COOLDOWN 秒内失败多少次后进入冷却。 */
+    const LOGIN_FAILURES_BEFORE_COOLDOWN = 5;
+
+    /** 冷却观察窗口（秒）。冷却时长的上界就是它。 */
+    const LOGIN_COOLDOWN = 60;
+
     protected $services;
 
     /**
@@ -55,7 +62,33 @@ class LoginController
         if (strlen(trim($password)) < 6 || strlen(trim($password)) > 32) {
             return app('json')->fail('账号密码必须是在6到32位之间');
         }
-        return app('json')->success('登录成功', $this->services->login($account, $password));
+
+        $ip = (string)$request->ip();
+        /** @var LoginThrottleGuard $guard */
+        $guard = app()->make(LoginThrottleGuard::class, ['user']);
+
+        // 这个接口此前没有验证码、没有计数、没有节流，任意顾客账号都可以被无限次
+        // 试口令。这里按账号维度节流：来源地址在反向代理后面对所有访客是同一个，
+        // 按来源限速会变成全站限速，而账号维度既不可伪造、影响面也只限于这一个
+        // 账号。判定在比对口令之前，所以被拒绝的请求不会泄露候选口令的对错。
+        //
+        // 判定只看最近 LOGIN_COOLDOWN 秒，而不是整个 15 分钟计数窗口：按整个窗口算，
+        // 任何人都能靠持续制造失败把某个顾客账号无限期锁在门外。只看最近几十秒，
+        // 冷却就有确定的上界——攻击者最多把爆破速率压到"每分钟 5 次"，顾客最多等
+        // 一分钟。后台没有采用任何冷却，是因为那里只有一个管理员，冷却等同于把
+        // 店主关在门外，所以后台用的是人机验证。
+        if ($guard->accountFailuresWithin((string)$account, self::LOGIN_COOLDOWN) >= self::LOGIN_FAILURES_BEFORE_COOLDOWN) {
+            return app('json')->fail('登录失败次数过多，请稍后再试');
+        }
+
+        try {
+            $result = $this->services->login($account, $password);
+        } catch (\Throwable $e) {
+            $guard->recordFailure((string)$account, $ip);
+            throw $e;
+        }
+        $guard->clear((string)$account, $ip);
+        return app('json')->success('登录成功', $result);
     }
 
     /**

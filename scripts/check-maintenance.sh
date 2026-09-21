@@ -13,6 +13,9 @@ sh docker/run-regression.sh "$image"
 # add there used to sit outside every check.
 docker run --rm --entrypoint sh -v "$root/crmeb:/lint:ro" crmeb-regression-regression \
     -c 'find /lint/app /lint/crmeb /lint/route /lint/upgrade -type f -name "*.php" -exec sh -c '\''for file do php -l "$file" >/dev/null || exit 1; done'\'' sh {} +'
+# PHP 静态分析：`php -l` 只看语法，类型错误、null 流、未定义变量此前完全没人管。
+# baseline 收住历史问题，门禁的含义是"不再新增"。不需要 MySQL/Redis，很快。
+sh docker/run-phpstan.sh "$image"
 node tests/static/core-store-front.cjs
 node tests/static/admin-api-contract.cjs
 node tests/static/retired-code-guard.cjs
@@ -30,3 +33,6 @@ bash tests/deployment/upgrade-rollback.sh "$image"
 # 会输出可重放的种子与事件序列
 bash tests/deployment/concurrency-stability.sh "$image" 10
 node tests/static/wechat-payment-test.mjs
+# 定向变异检查此前只在发布时手动跑，于是变异覆盖会在两次发布之间悄悄腐化。
+# 它自己建临时副本和一次性容器栈，不碰工作树。
+bash tests/deployment/mutation-check.sh

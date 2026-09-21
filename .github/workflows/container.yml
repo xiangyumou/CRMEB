@@ -110,7 +110,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: validate
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # 门禁现在还包含 phpstan 与定向变异检查；后者要自建一次性镜像并逐条跑 18 项保护，
+    # 原来的 10 分钟不够。
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: read
@@ -126,6 +128,20 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Retrieve verified image
         run: docker pull "$IMAGE_NAME:ci-${{ github.sha }}-amd64"
+
+      # The gate now also runs tests/deployment/mutation-check.sh, which reads
+      # .build/release/build.json to decide which revision to build its own
+      # throwaway image from. Without the release inputs that file is absent and
+      # the mutation step cannot start.
+      - name: Retrieve release inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "$RELEASE_NAME:input-$GITHUB_SHA"
+          container="$(docker create "$RELEASE_NAME:input-$GITHUB_SHA" /)"
+          mkdir -p .build/release
+          docker cp "$container:/release/." .build/release
+          docker rm "$container"
 
       - name: Run regression suite
         run: sh scripts/check-maintenance.sh "$IMAGE_NAME:ci-${{ github.sha }}-amd64"

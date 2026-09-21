@@ -50,6 +50,10 @@ abstract class BaseDao
      */
     protected function setJoinModel(): string
     {
+        // 这是给需要联表的 dao 覆写的钩子。空实现带着 `: string` 声明走到末尾，
+        // PHP 会抛 TypeError，报错位置在这里、看不出是哪个 dao 忘了覆写；
+        // 而且每个调用方都把返回值交给 app()->make()，返回空串只会在更远处炸。
+        throw new \LogicException(static::class . ' 需要联表却没有覆写 setJoinModel()');
     }
 
     /**

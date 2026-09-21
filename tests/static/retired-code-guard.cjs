@@ -37,6 +37,12 @@ const SYMBOLS = [
   'StoreOrderWriteOffServices', 'OtherOrderServices', 'OtherOrderStatusServices',
   'StoreActivityServices', 'PayTransferNotifyServices', 'AliPayService', 'UpgradeService',
   'CoreStoreAdmin', 'DISABLED_CONFIG',
+  // The storefront cron endpoints ran scheduled work for anyone who asked: the
+  // whole /api group is mounted with optional authentication, and this
+  // controller extended no authenticated base, so an anonymous GET could cancel
+  // orders, force auto-receipt and delete attachments. The timer container is
+  // the only scheduler this deployment uses.
+  'CrontabController',
 ];
 
 /**
@@ -147,6 +153,18 @@ const resolvedBaseline = [...baselined]
   .map(([file]) => file);
 assert.deepStrictEqual(resolvedBaseline, [],
   'These files no longer reference retired tables — drop them from TABLE_BASELINE:\n' + resolvedBaseline.join('\n'));
+
+// The storefront cron endpoints are gone. Re-registering any `crontab/` route
+// under /api would put scheduled work back behind optional authentication, so
+// the route files are checked directly rather than only through the symbol list
+// above — a route can be re-added pointing at a differently named controller.
+for (const routeFile of fs.readdirSync(path.join(root, 'crmeb/app/api/route'))) {
+  if (!routeFile.endsWith('.php')) continue;
+  const relative = `crmeb/app/api/route/${routeFile}`;
+  const source = stripComments(fs.readFileSync(path.join(root, relative), 'utf8'));
+  const hit = /['"]crontab\//.exec(source);
+  assert(!hit, `${relative} registers a storefront cron route again: ${hit && hit[0]}`);
+}
 
 // The hiding mechanism is gone, so its fixtures must not come back either.
 for (const gone of ['crmeb/config/core_store_removed_admin.json', 'crmeb/config/upgrade.php', 'crmeb/app/services/CoreStoreAdmin.php']) {

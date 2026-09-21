@@ -1,5 +1,66 @@
 # 上线前验证记录
 
+## 上线后复查（本轮，未验收）
+
+上线之后对整个仓库做了一次复查。下面是本轮改动与证据；**这一节还不是验收记录**，
+推广前仍需按第 6 节的人工条件走一遍。
+
+### 修掉的缺陷
+
+| # | 问题 | 证据 |
+|---|---|---|
+| 1 | `/api/crontab/*` 八个定时任务接口**匿名可达**。整个 `/api` 组挂的是 `AuthTokenMiddleware::class, false`（`$force=false` 时吞掉鉴权异常继续放行），而 `CrontabController` 不继承任何鉴权基类。任何人都能取消未支付订单、**强制确认收货**（压缩买家售后窗口）、删除昨日附件、反复触发无界开销的数据库操作。 | 改前实测八个端点全部返回 200，且一次匿名 GET 改写了 `runtime/.timer`。生产由独立 `timer` 容器跑定时任务，这组 HTTP 接口是冗余机制，整组删除。`StorefrontCronEndpointTest` + `retired-code-guard` 的路由回流检查。 |
+| 2 | 上传目录下的文件**会被当成 PHP 执行**。nginx 配置里没有任何 `/uploads` 规则，`.php` 直接命中通用的 `location ~ \.php$`；扩展名白名单是唯一一道防线，没有纵深防御。 | 改前实测：同一个文件返回 200 并执行了 PHP（回显 `RCE-EXECUTED`），改后 403。`UploadExecutionTest`（5 种可执行后缀 + 正常文件对照组）。 |
+| 3 | 前台 `/api/login` 没有验证码、没有失败计数、没有任何节流，任意顾客账号可被无限次试口令；口令存的是**无盐 MD5**，而后台用的是 bcrypt。 | 按账号维度节流（不按来源：代理后所有访客共用一个地址，按来源限速会变成全站限速），且冷却只看最近 60 秒而不是整个 15 分钟计数窗口——按整个窗口算，任何人都能靠持续制造失败把某个顾客账号**无限期**锁在门外；口令校验兼容历史 MD5 并在登录成功时就地升级为 bcrypt。`StorefrontLoginSecurityTest`。 |
+| 4 | `user.pwd` 是 `varchar(32)`，装不下 60 字符的 bcrypt。回归栈的 MySQL 非严格模式下会**静默截断**，被截断的哈希永远验不过——等于永久锁死账号。 | 新增 `upgrade/core-store/user-password-hash.php`（幂等、自校验、核对用户行数），已接进 `deploy/production/upgrade.sh`；`/readyz` 增加列宽检查。登录侧写完回读校验，验不过就写回原值，所以**代码与迁移谁先上线都不会锁死用户**，这条单独有用例。 |
+| 5 | `StoreOrderEffectServices::execute()` 声明返回 `bool`，但五个通知类 case 是 `break` 出 switch 的，函数末尾没有 return。PHP 7.4 抛 TypeError，通知其实已经发出去了，异常在那之后，于是**每一笔支付的五条通知副作用都被记成 UNKNOWN**，堆进人工对账队列，而重投会重复发通知。 | 由新引入的 phpstan 发现。`OrderEffectTest::testANoticeEffectIsRecordedAsDone`（5 个事件类型，修复前 5/5 失败）。注意 `FulfillmentAtomicityTest` 原本断言通知停在 UNKNOWN——**那条断言把缺陷当成了预期行为，这正是它能一直活着的原因**，已一并更正。 |
+| 6 | JWT 签名密钥兜底成字符串 `default`（四处 `Env::get('app.app_key', 'default')`）。那个值印在公开上游源码里，等于任何人都能伪造任意用户与管理员的令牌。生产已补随机值，但兜底本身还在，下一个部署照样会踩；安装模板还把 `APP_KEY = crmeb` 写死。 | 新增 `crmeb\utils\SigningKey`：读不到或读到已知弱值就抛异常，不再静默降级。安装器改为生成 32 字节随机密钥；`/readyz` 增加强度检查。 |
+| 7 | `AdminLoginGuard` 注释写明"缓存不可用时失败开放"，但实现走的 `CacheService::get()`/`delete()` **不吞异常**（只有 `set`/`remember`/`has` 包了 try/catch），Redis 一抖后台登录直接 500——正是设计要避免的结果。 | 计数机制抽到 `LoginThrottleGuard`（后台与前台共用，按 scope 隔开），缓存访问在内部兜底。 |
+| 9 | 异常收款、结果未知的退款与副作用**没有任何告警**，只能靠有人主动去敲 `php think order:reconcile`。发布文档自己把"真实收款开始前需要一个定时检查"列为开放条件。顺带发现：`effects:list` 用的是 `pendingIds()`，那是**自动补投**队列，通知与打印的未知结果被它刻意排除（必须人工确认后重试）——也就是说这份给人看的清单恰好漏掉了真正需要人处理的记录。 | 新增 `OrderReconcileAlertServices` 与定时任务 mark `paymentReconcileAlert`，判定复用人工核对用的同一批查询；新增 `StoreOrderEffectDao::manualIds()`（自动路径永远不会再碰的记录），告警与 `effects:list` 都改用它。`ReconcileAlertTest`。 |
+| 8 | 其它：安装模板 `[DATABASE] DEBUG = true`（上线时踩过的同一个泄露问题）；PHP 未显式关 `display_errors`（官方镜像不装 php.ini，缺省是开的）；`make_path()` 建 0777 目录；`BaseDao::setJoinModel()` 与 `EnterpriseWechatJob::doJob()` 同样缺 return；`getTimerInfo()` 判空在使用之后；遗留空控制器与失效的 `.travis.yml`。 | 逐条修正，其中后两类由 phpstan 发现。 |
+
+### 新增的工程化
+
+- **PHP 静态分析**（此前完全没有）：`tests/static-analysis/` 独立 composer 项目，phpstan 1.12.30 固定版本，跑在已构建镜像里（应用的 vendor 只存在于镜像内），不需要 MySQL/Redis——这同时是目前唯一一条不用起整套栈的快反馈回路。level 1 起步 + baseline，含义是"从今天起不再新增"；框架 facade 的误报用 `ignoreErrors` 排除而不是塞进 baseline。首次运行就找出了上表第 5、8 条。
+- **变异检查进门禁**：`tests/deployment/mutation-check.sh` 此前只在发布时手动跑，变异覆盖会在两次发布之间悄悄腐化，现在进了 `scripts/check-maintenance.sh`。CI 的 regression job 相应补了拉取发布产物的步骤（变异脚本要读 `.build/release/build.json` 决定构建哪个 revision），超时从 10 分钟放宽到 60 分钟。
+- 新增保护逐条加进变异检查：前台登录节流、冷却有上界、口令升级回读校验、历史 MD5 兼容、上传目录 PHP 拦截、对账巡检读的是人工清单而非自动补投队列。
+
+### 本轮门禁结果
+
+| 层次 | 结果 |
+|---|---|
+| PHPUnit（单元 + 真实 MySQL/Redis 集成 + HTTP + 并发） | **302 tests, 3714 assertions, 0 failure, 0 error**（上一轮 270 / 3628） |
+| PHP 7.4 语法检查 | 通过 |
+| phpstan（新增） | 0 errors（baseline 收住 289 条历史问题） |
+| 静态守卫（11 项） | 全部通过 |
+| 发布规则（真实本地 registry） | 8/8 |
+| 升级/回滚规则（真实一次性容器栈） | 9/9 |
+| 定向变异检查 | 20 detected, 0 undetected, 0 skipped（上一轮 14 项） |
+| 并发重复 | 20/20（另见下方说明） |
+
+并发用例在机器被其它容器栈同时占用时观察到 2/32 次抖动，失败点是
+`PaymentConcurrencyTest::testACreateResponseTimeoutKeepsTheAttemptAsUnknown`。
+机器空闲后本分支 20/20、未改动的 HEAD 基线同条件 20/20，均未复现；支付链路
+（`StoreOrderController::pay` → `OrderPayServices` → 网关替身）不经过本轮改动的任何文件。
+记录在此：这个用例对机器负载敏感，而 `concurrency-stability.sh` 要求 10/10。
+
+### 复查发现但**未修**的问题
+
+以下已核实存在，但都需要各自的并发用例或会动到已验证的产物可复现性，不适合并进本轮：
+
+1. `StoreOrderTakeServices::takeOrder()`（约 `:91-99`）与 `StoreOrderDeliveryServices::delivery()`（约 `:63`）是无锁的 check-then-act：读状态、判断、再 `save()`，保存没有以 `status` 为条件。两个并发请求都能通过判断。当前后果是重复触发通知事件而非重复发钱（积分/佣金随退役功能一起下线了），但这条不变量目前没有任何保护。
+2. `StoreOrderRefundServices::applyRefund()` 的"已有待处理退款"检查（约 `:1260-1267`）在事务之外、且没有订单行锁，两个并发申请可以各自建出一张退款单。金额仍被 `assertCumulativeRefundWithinPaid` 兜住，所以不会重复退款，但那条检查读起来像不变量，实际不是。
+3. `BaseDao::incStockDecSales()`（约 `:573`）是读-再-写，而不是像 `decStockIncSales()` 那样的条件更新。它在退款/取消侧，所以是多还或少还库存而不是超卖。
+4. `PayClient::handleTransferNotify()`（约 `:683`）不验签，与 `handleNotify()` 不对称。目前没有路由指向它。
+5. 前台用户令牌不绑定口令哈希（`UserAuthServices::parseToken` 只取 `[$id, $type]`），改密后旧令牌仍然有效直到 30 天缓存过期；后台侧是绑定的。
+6. `/adminapi/image/scan_upload` 的令牌是单一全局缓存键、10 分钟内可重复使用、不限次数、不与生成它的管理员绑定。
+7. `SystemAttachment::videoDataSave()` 把客户端传来的路径原样写进附件表，没有任何校验；`onlineUpload()` 会抓取客户端给的 URL（SSRF 面）。
+8. 注册短信验证码用后不删（`LoginController` 约 `:219`），在有效期内可重放；手机号登录与绑定手机则会删。
+9. `template/admin/package-lock.json` 声明了 `package.json` 里并不存在的四个运行时依赖（`@better-scroll/core`、`better-scroll`、`countup`、`cropperjs`），是退役功能清理的残留。**不建议顺手重新生成锁文件**：实测重新生成会产生 2.4 万行差异，直接威胁"前端产物逐字节可复现"这条已验证的保证，应当单独做并配前后产物摘要比对。
+10. 自定义定时器与自定义事件的 `eval()` 执行路径在生产没有开关：写入侧有 `app_debug` + 口令 + 超管三道闸，但 `CrontabRunServices::customTimer()` 与 `CustomEventListener` 的执行侧不看 `app_debug`，库里只要存在一行 `customCode` 就会在生产执行。
+
+---
+
 ## 已上线：acceptance-2026-09-21-production-cutover
 
 `x-zoo.vip` 已在 2026-09-21 切到本仓库的发布版本并通过验收。
@@ -63,7 +124,7 @@
 
 - **微信支付配置不完整**：`pay_weixin_key` 为空，公众号与小程序 `appid` 为空（商户号与证书序列号已配）。在补齐之前无法真实收款，真实商户支付/退款验收也无法进行。
 - 小程序包仍是 `publishable: false`（未配 `CRMEB_MP_APPID`），不能提交微信审核。
-- 异常收款、结果未知的退款与副作用只能由 `php think order:reconcile` 人工列出，没有告警。真实收款开始前需要一个定时检查。
+- ~~异常收款、结果未知的退款与副作用没有告警~~ 本轮已加 `paymentReconcileAlert` 定时巡检；**仍需在后台把这个定时任务实际启用**（定时任务是库驱动的，加了 mark 不等于建了任务行）。
 - ~~`.env` 没有 `APP_KEY`~~ 已于 2026-09-21 写入 32 字节随机值并重启四个应用角色，运行时确认读到的不再是 `default`（长度 64）。原文件备份为 `deployment/config/.env.bak-20260921T065432Z`。
 - 退役表以 `eb_retired_*` 保留，`finalize` 是验收期之后的独立操作。
 

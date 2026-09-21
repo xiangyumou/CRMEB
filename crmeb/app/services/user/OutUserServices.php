@@ -107,10 +107,10 @@ class OutUserServices extends BaseServices
         }
 
         if ($data['pwd']) {
-            $data['pwd'] = md5($data['pwd']);
+            $data['pwd'] = \app\services\login\UserPassword::hash((string)$data['pwd']);
         } else {
             if ($uid < 1) {
-                $data['pwd'] = md5(123456);
+                $data['pwd'] = \app\services\login\UserPassword::hash('123456');
             } else {
                 unset($data['pwd']);
             }

@@ -50257,7 +50257,7 @@ CREATE TABLE IF NOT EXISTS `eb_upgrade_log` (
 CREATE TABLE IF NOT EXISTS `eb_user` (
   `uid` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '用户id',
   `account` varchar(32) NOT NULL DEFAULT '' COMMENT '用户账号',
-  `pwd` varchar(32) NOT NULL DEFAULT '' COMMENT '用户密码',
+  `pwd` varchar(255) NOT NULL DEFAULT '' COMMENT '用户密码（bcrypt；历史值为无盐 MD5，登录成功时就地升级）',
   `real_name` varchar(25) NOT NULL DEFAULT '' COMMENT '真实姓名',
   `birthday` int(11) NOT NULL DEFAULT '0' COMMENT '生日',
   `card_id` varchar(20) NOT NULL DEFAULT '' COMMENT '身份证号码',

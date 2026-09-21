@@ -243,7 +243,7 @@ if (!function_exists('make_path')) {
                 break;
         }
         try {
-            if (is_dir(app()->getRootPath() . 'public' . DS . 'uploads' . $path) == true || mkdir(app()->getRootPath() . 'public' . DS . 'uploads' . $path, 0777, true) == true) {
+            if (is_dir(app()->getRootPath() . 'public' . DS . 'uploads' . $path) == true || mkdir(app()->getRootPath() . 'public' . DS . 'uploads' . $path, 0755, true) == true) {
                 return trim(str_replace(DS, '/', $path), '.');
             } else return '';
         } catch (\Exception $e) {

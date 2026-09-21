@@ -522,33 +522,6 @@ Route::group(function () {
         Route::get('lang_version', 'v1.PublicController/getLangVersion')->name('getLangVersion')->option(['real_name' => '获取当前后台设置的默认语言类型']);
     })->option(['mark' => 'lang', 'mark_name' => '多语言']);
 
-    Route::group(function () {
-        /** 定时任务接口 */
-        //定时任务调用接口
-        Route::get('crontab/run', 'v1.CrontabController/crontabRun')->name('crontabRun')->option(['real_name' => '定时任务调用接口']);
-        //检测定时任务接口
-        Route::get('crontab/check', 'v1.CrontabController/crontabCheck')->name('crontabCheck')->option(['real_name' => '检测定时任务接口']);
-        //未支付自动取消订单
-        Route::get('crontab/order_cancel', 'v1.CrontabController/orderUnpaidCancel')->name('orderUnpaidCancel')->option(['real_name' => '未支付自动取消订单']);
-        //拼团到期订单处理
-        Route::get('crontab/pink_expiration', 'v1.CrontabController/pinkExpiration')->name('pinkExpiration')->option(['real_name' => '拼团到期订单处理']);
-        //自动解绑上级绑定
-
-        //更新直播商品状态
-
-        //更新直播间状态
-
-        //自动收货
-        Route::get('crontab/take_delivery', 'v1.CrontabController/autoTakeOrder')->name('autoTakeOrder')->option(['real_name' => '自动收货']);
-        //查询预售到期商品自动下架
-        Route::get('crontab/advance_off', 'v1.CrontabController/downAdvance')->name('downAdvance')->option(['real_name' => '查询预售到期商品自动下架']);
-        //自动好评
-        Route::get('crontab/product_replay', 'v1.CrontabController/autoComment')->name('autoComment')->option(['real_name' => '自动好评']);
-        //清除昨日海报
-        Route::get('crontab/clear_poster', 'v1.CrontabController/emptyYesterdayAttachment')->name('emptyYesterdayAttachment')->option(['real_name' => '清除昨日海报']);
-
-    })->option(['mark' => 'crontab', 'mark_name' => '定时任务']);
-
 })->middleware(\app\http\middleware\AllowOriginMiddleware::class)
     ->middleware(\app\api\middleware\StationOpenMiddleware::class)
     ->middleware(\app\api\middleware\AuthTokenMiddleware::class, false);

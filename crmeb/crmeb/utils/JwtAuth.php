@@ -51,7 +51,7 @@ class JwtAuth
             'exp' => $exp_time,
         ];
         $params['jti'] = compact('id', 'type');
-        $token = JWT::encode($params, Env::get('app.app_key', 'default'));
+        $token = JWT::encode($params, \crmeb\utils\SigningKey::get());
 
         return compact('token', 'params');
     }
@@ -76,7 +76,7 @@ class JwtAuth
     {
         JWT::$leeway = 60;
 
-        JWT::decode($this->token, Env::get('app.app_key', 'default'), array('HS256'));
+        JWT::decode($this->token, \crmeb\utils\SigningKey::get(), array('HS256'));
 
         $this->token = null;
     }

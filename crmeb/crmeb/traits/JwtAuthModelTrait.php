@@ -39,7 +39,7 @@ trait JwtAuthModelTrait
             'exp' => strtotime('+30 days'),
         ];
         $params['jti'] = compact('id', 'type');
-        $token = JWT::encode($params, Env::get('app.app_key', 'default'));
+        $token = JWT::encode($params, \crmeb\utils\SigningKey::get());
 
         return compact('token', 'params');
     }
@@ -56,7 +56,7 @@ trait JwtAuthModelTrait
     {
         JWT::$leeway = 60;
 
-        $data = JWT::decode($jwt, Env::get('app.app_key', 'default'), array('HS256'));
+        $data = JWT::decode($jwt, \crmeb\utils\SigningKey::get(), array('HS256'));
 
         $model = new self();
         return [$model->where($model->getPk(), $data->jti->id)->find(), $data->jti->type];

@@ -188,8 +188,14 @@ final class FulfillmentAtomicityTest extends RegressionTestCase
         self::assertContains(StoreOrderEffectServices::EVENT_PAY_INVOICE, $events, 'the invoice has its own record');
         self::assertNotContains(StoreOrderEffectServices::EVENT_PAY_SUCCESS, $events, 'the bundled legacy event is no longer written');
 
-        // Failing the notice marks only the notice unknown; print and invoice
-        // finish and are never replayed with it.
+        // 每个目标各自记录自己的结果，一个目标的结果不会被另一个目标替它写掉。
+        //
+        // 这里原本断言通知会停在 UNKNOWN，注释写的是"failing the notice"。但通知
+        // 并不是因为什么业务原因失败的：`StoreOrderEffectServices::execute()` 声明
+        // 返回 bool，而五个通知 case 是 break 出 switch 的，函数末尾没有 return，
+        // PHP 7.4 因此抛 TypeError，调用方的 catch 把它记成 UNKNOWN。也就是说这条
+        // 断言把那个缺陷当成了预期行为——缺陷能一直活着，正是因为有测试在保护它。
+        // 补上 return 之后，有活订单的通知会正常完成。
         $notice = Db::name('store_order_effect')->where('store_order_id', $orderId)->where('event_type', StoreOrderEffectServices::EVENT_PAY_NOTICE)->find();
         $effects = app()->make(StoreOrderEffectServices::class);
         self::assertTrue($effects->runById((int)$notice['id']), 'a notice with a live order runs');
@@ -205,9 +211,9 @@ final class FulfillmentAtomicityTest extends RegressionTestCase
         );
         $noticeRow = Db::name('store_order_effect')->where('id', (int)$notice['id'])->find();
         self::assertSame(
-            \app\model\order\StoreOrderEffect::STATUS_UNKNOWN,
+            \app\model\order\StoreOrderEffect::STATUS_DONE,
             (int)$noticeRow['status'],
-            'the notice keeps its own unknown outcome'
+            'the notice keeps its own outcome: ' . (string)$noticeRow['last_error']
         );
 
         // The invoice record runs on its own and finishes.

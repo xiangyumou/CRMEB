@@ -274,7 +274,11 @@ class OrderReconcile extends Command
     private function effectsList(Output $output): int    {
         /** @var StoreOrderEffectServices $services */
         $services = app()->make(StoreOrderEffectServices::class);
-        $rows = $services->pendingIds(200);
+        // `pendingIds()` 只是**自动补投**队列：通知与打印的未知结果被它刻意排除
+        // （必须人工确认后重试），重试次数用尽的记录同样不在里面。也就是说，这份
+        // 给人看的清单原本恰好漏掉了真正需要人处理的那些记录。两份合起来列。
+        $rows = array_values(array_unique(array_merge($services->pendingIds(200), $services->manualIds(200))));
+        sort($rows);
         if (!$rows) {
             $output->writeln('没有待处理或结果未知的副作用。');
 
@@ -293,7 +297,7 @@ class OrderReconcile extends Command
                 (int)$effect['id'],
                 (int)$effect['store_order_id'],
                 (string)$effect['event_type'],
-                (int)$effect['status'] === StoreOrderEffect::STATUS_UNKNOWN ? '结果未知' : '待处理',
+                $this->effectStatusLabel($effect),
                 (int)$effect['attempts'],
                 (string)$effect['last_error']
             ));
@@ -301,6 +305,15 @@ class OrderReconcile extends Command
         $output->writeln(sprintf('共 %d 条。', count($rows)));
 
         return 0;
+    }
+
+    /** 重试次数用尽的记录自动路径不会再碰，必须让操作者一眼看出来。 */
+    private function effectStatusLabel(array $effect): string
+    {
+        if ((int)$effect['attempts'] >= StoreOrderEffect::MAX_ATTEMPTS) return '重试用尽';
+        if ((int)$effect['status'] === StoreOrderEffect::STATUS_UNKNOWN) return '结果未知';
+        if ((int)$effect['status'] === StoreOrderEffect::STATUS_RUNNING) return '执行中';
+        return '待处理';
     }
 
     private function effectsInspect(int $id, Output $output): int

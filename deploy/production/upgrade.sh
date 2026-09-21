@@ -276,6 +276,11 @@ if [ "$skip_migration" -eq 0 ]; then
       || die 'the retired-feature migration failed; restore from the backup before retrying'
     compose run --rm --no-deps -T --entrypoint php php upgrade/core-store/order-reliability.php apply \
       || die 'the reliability migration failed; restore from the backup before retrying'
+    # `user.pwd` 历史上是 varchar(32)（正好装一个 MD5）。登录路径现在写 bcrypt，
+    # 60 字符，列不加宽会被 MySQL 静默截断。登录侧有兜底（写完读回来验，验不过就
+    # 写回原值），所以先后顺序不会锁死用户，但升级要真正发生就得跑这一步。
+    compose run --rm --no-deps -T --entrypoint php php upgrade/core-store/user-password-hash.php apply \
+      || die 'the password column migration failed; restore from the backup before retrying'
   fi
 else
   say 'skipping the migrations as requested'

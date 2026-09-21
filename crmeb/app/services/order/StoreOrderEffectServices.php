@@ -133,6 +133,18 @@ class StoreOrderEffectServices extends BaseServices
         return array_map('intval', $this->dao->pendingIds($limit));
     }
 
+    /**
+     * 只能由人工处理的副作用 ID。
+     *
+     * 与 `pendingIds()` 互补：那条是自动补投队列，这条是自动路径永远不会再碰的记录。
+     *
+     * @return int[]
+     */
+    public function manualIds(int $limit = 50): array
+    {
+        return array_map('intval', $this->dao->manualIds($limit));
+    }
+
     /** @return int[] */
     public function pendingIdsForOrder(int $orderId): array
     {
@@ -244,6 +256,11 @@ class StoreOrderEffectServices extends BaseServices
             default:
                 throw new \RuntimeException('未知的订单副作用类型:' . $eventType);
         }
+        // 上面几个 `break` 出来的通知类副作用是同步做完的，没有异步任务接管它们的
+        // 终态。缺了这一行，函数带着 `: bool` 声明走到末尾，PHP 会抛 TypeError——
+        // 通知其实已经发出去了，异常在那之后，于是调用方把记录写成 UNKNOWN，
+        // 每一笔支付都往人工队列里堆五条，而重投会重复发通知。
+        return false;
     }
 
     /** 每个通知目标独立执行，结果未知时只重试被确认的目标。 */

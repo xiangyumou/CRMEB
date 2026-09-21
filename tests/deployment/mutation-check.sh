@@ -246,6 +246,76 @@ mutate "admin login server-side captcha requirement" \
     "$work/.mutations/admin_login_captcha.old" "$work/.mutations/admin_login_captcha.new" \
     "AdminLoginThrottleTest"
 
+# 15. 前台登录的账号维度节流：去掉之后 /api/login 又可以被无限次试口令。
+write_pair "storefront_login_throttle" \
+'        if ($guard->accountFailuresWithin((string)$account, self::LOGIN_COOLDOWN) >= self::LOGIN_FAILURES_BEFORE_COOLDOWN) {' \
+'        if (false) {'
+mutate "storefront login throttle" \
+    "crmeb/app/api/controller/v1/LoginController.php" \
+    "$work/.mutations/storefront_login_throttle.old" "$work/.mutations/storefront_login_throttle.new" \
+    "StorefrontLoginSecurityTest::testRepeatedFailuresCoolTheAccountDownBeforeTheCredentialIsChecked"
+
+# 16. 口令升级的回读校验：去掉之后，列还没加宽时写进去的 bcrypt 会被静默截断，
+#     那个账号从此再也登不进来。
+write_pair "password_upgrade_readback" \
+'                    if (!UserPassword::verify((string)$password, $stored)) {' \
+'                    if (false) {'
+mutate "password upgrade read-back" \
+    "crmeb/app/services/user/LoginServices.php" \
+    "$work/.mutations/password_upgrade_readback.old" "$work/.mutations/password_upgrade_readback.new" \
+    "StorefrontLoginSecurityTest::testAnUpgradeIsAbandonedWhenTheColumnCannotHoldABcryptHash"
+
+# 17. 前台口令校验对历史 MD5 的兼容：去掉之后，所有还没升级的老账号会被一次性
+#     全部挡在门外。
+write_pair "legacy_md5_compat" \
+'        if (self::isLegacyMd5($stored)) {' \
+'        if (false) {'
+mutate "legacy md5 password compatibility" \
+    "crmeb/app/services/login/UserPassword.php" \
+    "$work/.mutations/legacy_md5_compat.old" "$work/.mutations/legacy_md5_compat.new" \
+    "StorefrontLoginSecurityTest::testALegacyMd5PasswordIsUpgradedToBcryptOnSuccessfulLogin"
+
+# 18. 上传目录的 PHP 执行拦截：去掉之后，上传上来的 .php 会被 php-fpm 解释，
+#     扩展名白名单就重新变成唯一的一道防线。
+write_pair "uploads_php_deny" \
+'        location ~* \.(ph(p[3457]?|t|tml|ar))$ { deny all; }' \
+'        location ~* \.(never-matches-anything)$ { deny all; }'
+mutate "uploads php execution deny" \
+    "docker/regression/nginx.conf" \
+    "$work/.mutations/uploads_php_deny.old" "$work/.mutations/uploads_php_deny.new" \
+    "UploadExecutionTest::testAFileWithAnExecutableExtensionIsNotServedAsCode"
+
+# 18b. 上传目录里的点文件拦截：`^~` 会让 nginx 跳过全局那条 `location ~ /\.`，
+#      所以这条拒绝必须在上传目录的块里自己写一遍。去掉它，堵住 PHP 执行的同一个
+#      改动就顺手把点文件重新放了出来。
+write_pair "uploads_dotfile_deny" \
+'        location ~ /\. { deny all; access_log off; log_not_found off; }' \
+'        location ~ /never-matches-anything { deny all; }'
+mutate "uploads dotfile deny" \
+    "docker/regression/nginx.conf" \
+    "$work/.mutations/uploads_dotfile_deny.old" "$work/.mutations/uploads_dotfile_deny.new" \
+    "UploadExecutionTest::testADotFileUnderUploadsIsNotServed"
+
+# 19. 对账巡检读的是"人工清单"而不是自动补投队列：换回 pendingIds 之后，最需要
+#     人处理的那些记录（通知/打印结果未知、重试用尽）会被整批漏掉，告警变成安慰剂。
+write_pair "reconcile_manual_scope" \
+'        $effects = app()->make(StoreOrderEffectServices::class)->manualIds(self::SCAN_LIMIT);' \
+'        $effects = app()->make(StoreOrderEffectServices::class)->pendingIds(self::SCAN_LIMIT);'
+mutate "reconcile alert scans the manual list" \
+    "crmeb/app/services/order/OrderReconcileAlertServices.php" \
+    "$work/.mutations/reconcile_manual_scope.old" "$work/.mutations/reconcile_manual_scope.new" \
+    "ReconcileAlertTest"
+
+# 20. 冷却只看最近 LOGIN_COOLDOWN 秒：换成整个 15 分钟计数窗口之后，任何人都能靠
+#     持续制造失败把某个顾客账号无限期锁在门外。
+write_pair "storefront_cooldown_bound" \
+'        if ($guard->accountFailuresWithin((string)$account, self::LOGIN_COOLDOWN) >= self::LOGIN_FAILURES_BEFORE_COOLDOWN) {' \
+'        if ($guard->accountFailures((string)$account) >= self::LOGIN_FAILURES_BEFORE_COOLDOWN) {'
+mutate "storefront login cooldown is bounded" \
+    "crmeb/app/api/controller/v1/LoginController.php" \
+    "$work/.mutations/storefront_cooldown_bound.old" "$work/.mutations/storefront_cooldown_bound.new" \
+    "StorefrontLoginSecurityTest::testTheCooldownExpiresInsteadOfLockingTheAccountIndefinitely"
+
 echo
 echo "mutation check: $passed detected, $failed undetected, $skipped skipped"
 [ "$failed" -eq 0 ] || exit 1

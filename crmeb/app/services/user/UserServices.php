@@ -116,7 +116,7 @@ class UserServices extends BaseServices
     {
         $data = [
             'account' => $user['account'] ?? 'wx' . rand(1, 9999) . time(),
-            'pwd' => $user['pwd'] ?? md5('123456'),
+            'pwd' => $user['pwd'] ?? \app\services\login\UserPassword::hash('123456'),
             'nickname' => $user['nickname'] ?? '',
             'avatar' => $user['headimgurl'] ?? '',
             'phone' => $user['phone'] ?? '',

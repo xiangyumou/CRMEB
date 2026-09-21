@@ -39,6 +39,7 @@ class CrontabRunServices
         'productReplay' => '订单商品自动好评',
         'clearPoster' => '清除昨日海报',
         'autoInvoice' => '自动开具发票以及退款自动冲红',
+        'paymentReconcileAlert' => '异常收款与未知退款巡检告警',
 
         'customTimer' => '自定义定时任务',
     ];
@@ -223,6 +224,31 @@ class CrontabRunServices
      * @email 442384644@qq.com
      * @date 2024/6/6
      */
+    /**
+     * 异常收款、结果未知的退款与副作用的巡检告警。
+     *
+     * 这三类记录只能人工处理，此前唯一的出口是有人主动去敲 `php think order:reconcile`，
+     * 没有任何告警。发布文档把"真实收款开始前需要一个定时检查"列为开放条件。
+     */
+    public function paymentReconcileAlert()
+    {
+        try {
+            $summary = app()->make(\app\services\order\OrderReconcileAlertServices::class)->alert();
+            if ($summary['total'] > 0) {
+                $this->crontabLog(sprintf(
+                    ' 对账巡检：异常收款 %d、待收敛退款 %d、未知副作用 %d',
+                    $summary['payments'],
+                    $summary['refunds'],
+                    $summary['effects']
+                ));
+            } else {
+                $this->crontabLog(' 对账巡检：没有未收敛记录');
+            }
+        } catch (\Throwable $e) {
+            $this->crontabLog('对账巡检执行失败,失败原因:' . $e->getMessage());
+        }
+    }
+
     public function customTimer($customCode = '')
     {
         try {

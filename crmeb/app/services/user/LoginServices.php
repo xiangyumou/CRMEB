@@ -12,6 +12,8 @@ declare (strict_types=1);
 
 namespace app\services\user;
 
+use app\services\login\UserPassword;
+
 use app\dao\user\UserDao;
 use app\services\BaseServices;
 use app\services\message\notice\SmsService;
@@ -52,10 +54,30 @@ class LoginServices extends BaseServices
     {
         $user = $this->dao->getOne(['account|phone' => $account, 'is_del' => 0]);
         if ($user) {
-            if ($user->pwd !== md5((string)$password))
+            if (!UserPassword::verify((string)$password, (string)$user->pwd))
                 throw new ApiException('账号或密码错误');
-            if ($user->pwd === md5('123456'))
+            if (UserPassword::verify('123456', (string)$user->pwd))
                 throw new ApiException('请修改您的初始密码，再尝试登录');
+            // 口令正确，且库里还是历史的无盐 MD5——这是唯一能拿到明文的时刻，
+            // 就地换成 bcrypt。
+            //
+            // 写完必须读回来验一遍，不能假定写进去的就是写出去的那个值：
+            // `eb_user.pwd` 历史上是 varchar(32)（正好装一个 MD5），bcrypt 是 60 字符，
+            // 列没加宽时 MySQL 会静默截断，而被截断的哈希永远验不过——那等于把这个
+            // 用户永久锁在门外。验不过就立刻写回原值，这次登录照常成功，下次再试。
+            // 这样代码与迁移谁先上线都不会出事。
+            if (UserPassword::needsUpgrade((string)$user->pwd)) {
+                $previous = (string)$user->pwd;
+                try {
+                    $this->dao->update((int)$user['uid'], ['pwd' => UserPassword::hash((string)$password)], 'uid');
+                    $stored = (string)$this->dao->value(['uid' => (int)$user['uid']], 'pwd');
+                    if (!UserPassword::verify((string)$password, $stored)) {
+                        $this->dao->update((int)$user['uid'], ['pwd' => $previous], 'uid');
+                    }
+                } catch (\Throwable $e) {
+                    // 升级是尽力而为，任何失败都不该挡住一次合法登录。
+                }
+            }
         } else {
             throw new ApiException('账号或密码错误');
         }
@@ -127,7 +149,7 @@ class LoginServices extends BaseServices
         $userServices = app()->make(UserServices::class);
         $phone = $account;
         $data['account'] = $account;
-        $data['pwd'] = md5((string)$password);
+        $data['pwd'] = UserPassword::hash((string)$password);
         $data['phone'] = $phone;
         $data['real_name'] = '';
         $data['birthday'] = 0;
@@ -181,7 +203,7 @@ class LoginServices extends BaseServices
         if (!$user) {
             throw new ApiException('用户不存在');
         }
-        if (!$this->dao->update($user['uid'], ['pwd' => md5((string)$password)], 'uid')) {
+        if (!$this->dao->update($user['uid'], ['pwd' => UserPassword::hash((string)$password)], 'uid')) {
             throw new ApiException('修改密码失败');
         }
         return true;
@@ -378,7 +400,7 @@ class LoginServices extends BaseServices
             $data['uid'] = $info->uid;
             $data['account'] = $info->phone != '' ? $info->phone : 'out_' . $info->uid;
             $data['phone'] = $info->phone;
-            $data['pwd'] = md5('123456');
+            $data['pwd'] = UserPassword::hash('123456');
             $data['real_name'] = $info->nickname;
             $data['birthday'] = 0;
             $data['card_id'] = '';

@@ -43,6 +43,17 @@ const READY_REQUIRED_COLUMNS = [
 ];
 
 /**
+ * 列宽下限。只检查"列存在"不足以证明迁移做完了：`user.pwd` 历史上是 varchar(32)
+ * （正好装一个 MD5），而登录路径现在写的是 60 字符的 bcrypt。列没加宽时 MySQL 在
+ * 非严格模式下静默截断，被截断的哈希永远验不过。登录侧对此有兜底（写完读回来验，
+ * 验不过就写回原值），所以不会锁死用户，但升级会一直不发生——这属于"迁移没跑完"，
+ * 应该在流量进来之前就报出来。
+ */
+const READY_REQUIRED_COLUMN_LENGTHS = [
+    'user.pwd' => 60,
+];
+
+/**
  * Unique indexes the retained payment and refund paths rely on for concurrency
  * protection. A missing index does not stop the app from starting, but it does
  * silently remove the guarantee, so readiness reports it.
@@ -88,6 +99,27 @@ function readyCheckSchema(PDO $pdo, string $prefix): void
         throw new RuntimeException('missing columns: ' . implode(', ', $missing));
     }
 
+    $lengthRows = $pdo->query(
+        'SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, CHARACTER_MAXIMUM_LENGTH AS len
+         FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    $lengths = [];
+    foreach ($lengthRows as $row) {
+        $key = strtolower((string)$row['table_name'] . '.' . (string)$row['column_name']);
+        $lengths[$key] = $row['len'] === null ? null : (int)$row['len'];
+    }
+    $tooNarrow = [];
+    foreach (READY_REQUIRED_COLUMN_LENGTHS as $column => $minimum) {
+        $key = strtolower($prefix . $column);
+        $actual = $lengths[$key] ?? null;
+        if ($actual !== null && $actual < $minimum) {
+            $tooNarrow[] = $prefix . $column . ' is varchar(' . $actual . '), needs at least ' . $minimum;
+        }
+    }
+    if ($tooNarrow) {
+        throw new RuntimeException('columns too narrow: ' . implode(', ', $tooNarrow));
+    }
+
     // 唯一索引：缺失时不报错也能启动，但并发保护已经失效，必须暴露出来
     $indexRows = $pdo->query(
         'SELECT TABLE_NAME AS table_name, INDEX_NAME AS index_name, COLUMN_NAME AS column_name, SEQ_IN_INDEX AS seq
@@ -131,6 +163,16 @@ try {
     }
     if (!is_file('/var/www/crmeb/public/install.lock')) {
         throw new RuntimeException('the application is not installed');
+    }
+    // 签发 JWT 的密钥。上游代码曾经在读不到 APP_KEY 时兜底成字符串 `default`，
+    // 而那个值印在公开源码里——用它签名等于任何人都能伪造任意用户和管理员的令牌。
+    // 兜底已经去掉，这里再把弱值挡在流量之前。规则与 crmeb\utils\SigningKey 一致。
+    $appKey = (string)(array_change_key_case($settings['APP'] ?? [], CASE_LOWER)['app_key'] ?? '');
+    if ($appKey === '') {
+        throw new RuntimeException('APP_KEY is not configured');
+    }
+    if (strlen($appKey) < 16 || in_array(strtolower($appKey), ['default', 'crmeb'], true)) {
+        throw new RuntimeException('APP_KEY is a known weak or too short value');
     }
 
     $pdo = new PDO(
