@@ -24,7 +24,8 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | H uni-app API layer | in progress | `rewrite/ws-h-uniapp` |
 | G3 DIY follow-up; fix-ups for B1 (CR-7-c, CR-3-b2), C (CR-4/5/6-c) | in progress | `rewrite/ws-g3-diy-followup`, stream branches |
 | E1 user and login; kit maintenance (CR-1..5-f1) | dispatched 2026-09-23 | `rewrite/ws-e1-user`, `rewrite/ws-kit-f1crs` |
-| D, E2 (wave 2) | waiting (D on A, E2 on C) | — |
+| D group buy and presale | dispatched 2026-09-23 | `rewrite/ws-d-marketing` |
+| E2, F2 | ready (dependencies merged); waiting on a free slot | — |
 | F2, I, J (wave 3) | waiting | — |
 | K (wave 4) | waiting | — |
 
