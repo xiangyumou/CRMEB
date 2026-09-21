@@ -5,7 +5,7 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | Gate | State |
 |---|---|
 | G0 foundation freeze (`rewrite-p0-freeze`) | **passed** 2026-09-21 |
-| G1a contract PRs merged | A, B1, C, coupon in (126 routes); F1, G1 pending |
+| G1a contract PRs merged | passed 2026-09-22 — coupon, A, B1, C, G1, F1 in (186 routes parse) |
 | Cutover | not started |
 
 | Stream | State | Branch |
@@ -15,10 +15,11 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | P0-B admin shell and kit | merged (`d029a973`); Playwright smoke deferred to K | `rewrite/ws-p0b-shell` |
 | Golden slice (coupon) | merged (`ac928729`) | `rewrite/ws-golden-coupon` |
 | G1 DIY core | merged; panel API frozen (see `status/g1.md`) | `rewrite/ws-g1-diy` |
-| B1 checkout | merged (`97ecc873`) | `rewrite/ws-b1-checkout` |
+| B1 checkout | merged (`97ecc873`, fix-up `fa7f825b`) | `rewrite/ws-b1-checkout` |
 | A, C, F1 (wave 1) | in progress | `rewrite/ws-{a,c,f1}-*` |
-| H | waiting on G1a | — |
-| D, B2, E1, E2, G2 (wave 2) | waiting | — |
+| G2 DIY panels | in progress | `rewrite/ws-g2-panels` |
+| B2 fulfilment, H uni-app API layer | dispatched 2026-09-22 | `rewrite/ws-b2-fulfillment`, `rewrite/ws-h-uniapp` |
+| D, E1, E2 (wave 2) | waiting (D on A, E2 on C, E1 on a free slot) | — |
 | F2, I, J (wave 3) | waiting | — |
 | K (wave 4) | waiting | — |
 
@@ -37,3 +38,4 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 - 2026-09-22 — Second usage-limit interruption (four executors); all resumed from committed checkpoints, nothing lost.
 - 2026-09-22 — G1 merged (33 component schemas, DIY core, 18 routes, editor shell, 30 previews, 3 reference panels, ETL mapper; 350 tests). CR-1-g1 decided: `diy_pages.content` stays `jsonb`; "byte-compatible" means no key or value is ever changed on the wire, and ETL verification compares parsed JSON, not text. Mock server now prefers static path segments over `:param`. Workspace: 622 unit + 240 integration tests, 149 routes.
 - 2026-09-22 — B1 merged (14 routes, 111 tests, six races). CR-1-b1 applied: `orders.idempotency_key` with a partial unique index, folded into `0000_init`; the code still claims the key through the effects ledger and moves to the column in the fix-up pass. CR-3-b1: `orders.coupon_discount` holds every goods-level discount. CR-4-b1: PRICE-001/002 retired with points; STOCK-004 and QUEUE-008 go to stream D. Known gap until F2: template freight quotes zero.
+- 2026-09-22 — B1 fix-up merged (`fa7f825b`): duplicate submit is stopped by `orders_idempotency_uq`, with a fast-path read of the key before pricing so a sequential replay returns the first order instead of `ORDER_EMPTY`. F1 contracts merged early (system + storage, 37 routes); gate G1a passed with 186 routes. H and B2 unblocked.
