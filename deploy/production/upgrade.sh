@@ -193,11 +193,24 @@ if [ "${CRMEB_UPGRADE_SKIP_RESTORE_CHECK:-0}" != "1" ]; then
     mysql:8.0.42 --default-authentication-plugin=mysql_native_password >/dev/null
   restore_failed=0
   restore_sql="$(mktemp)"
-  # Wait for the server to accept this password, not merely to answer a ping:
-  # MySQL's init phase briefly runs with a temporary server that refuses the
-  # configured password, and restoring into that window loses the whole check.
+  # Wait for the *final* server, not merely for one that answers.
+  #
+  # MySQL's entrypoint initialises the data directory with a temporary server.
+  # That server already has the configured root password, so "the password is
+  # accepted" is NOT evidence that initialisation has finished -- the previous
+  # version of this wait believed it was, and it is wrong. The temporary server
+  # is then shut down and the real one is started, and a restore issued in that
+  # gap dies with "Can't connect to local MySQL server through socket", which is
+  # exactly how this check failed against production on 2026-09-21: the wait
+  # returned, the temporary server went away, and the whole backup verification
+  # was reported as an unusable backup.
+  #
+  # The two servers are distinguishable in the log: the temporary one reports
+  # `port: 0` (it listens on a socket only), the real one reports `port: 3306`.
+  # Require that line first, and only then a working connection.
   attempt=0
-  until docker exec "$check_container" mysql -uroot -prestorecheck -e 'SELECT 1' >/dev/null 2>&1; do
+  until docker logs "$check_container" 2>&1 | grep -q 'ready for connections.*port: 3306' \
+      && docker exec "$check_container" mysql -uroot -prestorecheck -e 'SELECT 1' >/dev/null 2>&1; do
     attempt=$((attempt + 1))
     if [ "$attempt" -ge 90 ]; then restore_failed=1; break; fi
     sleep 2
