@@ -8,11 +8,14 @@ import {
   dispatchEffectsOnce,
   drainEffects,
   findEffect,
+  findEffectById,
+  listEffects,
   listEffectsByStatus,
   recordEffect,
   registerEffectHandler,
   registeredEffectTypes,
   resetEffectHandlers,
+  retryEffect,
 } from './index';
 
 let harness: TestCtx;
@@ -270,5 +273,167 @@ describe('claim ordering', () => {
       .from(effectsTable)
       .where(eq(effectsTable.scopeId, 'early'));
     expect(early[0]?.status).toBe('done');
+  });
+});
+
+/**
+ * The operator console (CR-4-c).
+ *
+ * The read side is a screen; the write side is the only thing in the admin that
+ * can make a third-party call happen a second time, so it is a conditional
+ * update and the test that matters is the race.
+ */
+describe('listEffects', () => {
+  const page = { page: 1, pageSize: 20 };
+
+  async function parked(scopeId: string, eventType = 'order.paid'): Promise<void> {
+    await record({ scopeId, eventType });
+    await drainEffects(harness.ctx, { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 });
+  }
+
+  it('filters by status, scope and event type', async () => {
+    await record({ scopeId: '1' });
+    await record({ scope: 'refund', scopeId: '2', eventType: 'refund.approved' });
+    await record({ scope: 'user', scopeId: '3', eventType: 'user.registered' });
+
+    const all = await listEffects(harness.ctx.db, { status: 'pending', ...page });
+    expect(all.total).toBe(3);
+
+    const oneScope = await listEffects(harness.ctx.db, {
+      status: 'pending',
+      scope: 'refund',
+      ...page,
+    });
+    expect(oneScope.rows.map((row) => row.scopeId)).toEqual(['2']);
+
+    const oneType = await listEffects(harness.ctx.db, {
+      status: 'pending',
+      eventType: 'order.paid',
+      ...page,
+    });
+    expect(oneType.rows.map((row) => row.scopeId)).toEqual(['1']);
+
+    // Nothing is parked yet, so the console's default screen is empty.
+    expect((await listEffects(harness.ctx.db, { status: 'unknown', ...page })).total).toBe(0);
+  });
+
+  it('honours the caller scope allow-list, and never widens it', async () => {
+    await record({ scopeId: '1' });
+    await record({ scope: 'user', scopeId: '3', eventType: 'user.registered' });
+    const scopes = ['order', 'refund'] as const;
+
+    const allowed = await listEffects(harness.ctx.db, { status: 'pending', scopes, ...page });
+    expect(allowed.rows.map((row) => row.scope)).toEqual(['order']);
+    expect(allowed.total).toBe(1);
+
+    // Asking for a scope outside the list is not a way around the list.
+    const sneaky = await listEffects(harness.ctx.db, {
+      status: 'pending',
+      scopes,
+      scope: 'user',
+      ...page,
+    });
+    expect(sneaky.rows).toEqual([]);
+    expect(sneaky.total).toBe(0);
+  });
+
+  it('puts what changed most recently first, and pages', async () => {
+    for (const scopeId of ['1', '2', '3']) {
+      await record({ scopeId });
+      harness.clock.advance(1000);
+    }
+
+    const first = await listEffects(harness.ctx.db, { status: 'pending', page: 1, pageSize: 2 });
+    expect(first.rows.map((row) => row.scopeId)).toEqual(['3', '2']);
+    expect(first.total).toBe(3);
+
+    const second = await listEffects(harness.ctx.db, { status: 'pending', page: 2, pageSize: 2 });
+    expect(second.rows.map((row) => row.scopeId)).toEqual(['1']);
+    expect(second.total).toBe(3);
+  });
+
+  it('carries both timestamps, because "parked when?" is the triage question', async () => {
+    const createdAt = harness.clock.nowMs();
+    await parked('1');
+    harness.clock.advance(60_000);
+
+    const { rows } = await listEffects(harness.ctx.db, { status: 'unknown', ...page });
+    expect(rows[0]?.createdAt.getTime()).toBe(createdAt);
+    expect(rows[0]?.updatedAt.getTime()).toBe(createdAt);
+    expect(rows[0]?.attempts).toBe(1);
+    expect(rows[0]?.lastError).toContain('no handler');
+  });
+});
+
+describe('retryEffect', () => {
+  async function parkOne(): Promise<number> {
+    registerEffectHandler('order', 'order.paid', async () => {
+      throw new Error('permanently broken');
+    });
+    await record();
+    await drainEffects(harness.ctx, { maxAttempts: 3, baseBackoffMs: 0, maxBackoffMs: 0 });
+    const row = await findEffect(harness.ctx.db, key);
+    expect(row?.status).toBe('unknown');
+    return row!.id;
+  }
+
+  it('un-parks the row and gives it the whole backoff ladder back', async () => {
+    const id = await parkOne();
+    harness.clock.advance(60_000);
+
+    const { won } = await retryEffect(harness.ctx.db, id, harness.ctx.clock.now());
+    expect(won).toBe(true);
+
+    const row = await findEffectById(harness.ctx.db, id);
+    expect(row?.status).toBe('pending');
+    // Reset, not continued: otherwise the next failure parks it immediately.
+    expect(row?.attempts).toBe(0);
+    expect(row?.nextRunAt.getTime()).toBe(harness.clock.nowMs());
+
+    // It really is back in the dispatcher's hands.
+    resetEffectHandlers();
+    registerEffectHandler('order', 'order.paid', async () => {});
+    expect((await dispatchEffectsOnce(harness.ctx)).done).toBe(1);
+  });
+
+  it('refuses a row that is not parked — pending is the dispatcher’s, done is done', async () => {
+    registerEffectHandler('order', 'order.paid', async () => {});
+    await record();
+    const pending = await findEffect(harness.ctx.db, key);
+    expect((await retryEffect(harness.ctx.db, pending!.id, harness.ctx.clock.now())).won).toBe(
+      false,
+    );
+
+    await dispatchEffectsOnce(harness.ctx);
+    expect((await retryEffect(harness.ctx.db, pending!.id, harness.ctx.clock.now())).won).toBe(
+      false,
+    );
+    expect((await findEffect(harness.ctx.db, key))?.status).toBe('done');
+  });
+
+  it('runs the effect ONCE when two operators press 重试 together', async () => {
+    // Two people looking at the same 待处理任务 screen is the normal case, not
+    // the exotic one. If the guard were a read-then-write, the handler — which
+    // here would be "refund the buyer" — would fire twice.
+    const id = await parkOne();
+
+    let runs = 0;
+    resetEffectHandlers();
+    registerEffectHandler('order', 'order.paid', async () => {
+      runs += 1;
+    });
+
+    const report = await runConcurrently(
+      2,
+      () => retryEffect(harness.ctx.db, id, harness.ctx.clock.now()),
+      { isWinner: (result) => result.won },
+    );
+    expect(report.rejected).toEqual([]);
+    expect(report.winners).toBe(1);
+    expect(report.losers).toBe(1);
+
+    expect((await drainEffects(harness.ctx)).done).toBe(1);
+    expect(runs).toBe(1);
+    expect((await findEffect(harness.ctx.db, key))?.status).toBe('done');
   });
 });

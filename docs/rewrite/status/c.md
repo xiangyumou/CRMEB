@@ -282,17 +282,49 @@ able to re-point the payment host by hand (TLS-001).
     `StockPort.release(tx, orderId, lines, { committed: true, refundId })`. A
     shipped unit is still refundable as *money*; the parcel is the shop's
     problem, not the ledger's.
-14. **`config_values.value` round-trips through a `configText` preprocess.**
-    The column is `jsonb` and drizzle parses an already-parsed string a second
-    time, so an all-digit setting (商户号, a phone number) comes back as a
-    *number* and `z.string()` would repair the field to its default. Every text
-    field in the three groups accepts a number and stringifies it. Filed as
-    `CR-6-c`; the workaround is covered by `payment.config.test.ts` and
-    `refund.config.test.ts` so it can be removed safely once the repo is fixed.
+14. **Config text fields are plain `z.string()` again.** They briefly went
+    through a `configText` preprocess because `config.repo.ts` parsed the
+    `jsonb` column twice and an all-digit setting (商户号, a phone number) came
+    back as a *number*. `CR-6-c` fixed that in `@shop/db`, so the preprocess is
+    gone from all three groups; the proof moved from the schema — where it could
+    only assert the workaround — to a real database round trip in
+    `payment.int.test.ts` and `refund.int.test.ts`.
 15. **Domains register themselves from the worker job files.** Nothing in either
     app calls `registerPaymentDomain()` / `registerRefundDomain()`, so an effect
     claimed before its handler exists is settled as `unknown` permanently. The
     four sweeps call it at module scope, and `jobs.gen.ts` imports every job at
+    boot. Filed as `CR-8-c` for a generated `registerAllDomains()`.
+16. **The return address a buyer is shown is frozen on the refund row.**
+    `adminApprove` writes `refunds.return_address` at the approval that first
+    asks the buyer to ship — the operator's own input wins, the `refund` config
+    group is the fallback, and a re-approval never overwrites an address that is
+    already there. Every read afterwards comes from the row. Editing 售后设置
+    later changes what the *next* buyer is told, never what this one was.
+17. **`retryEffect` un-parks `unknown` only, and resets `attempts` to 0.**
+    `CR-4-c` asked for `unknown | failed → pending`, but `EFFECT_STATUSES` is
+    `pending | done | unknown` — a failing handler is either retried (`pending`,
+    still the dispatcher's, and re-queueing it would fight the lease) or parked
+    (`unknown`). The guard is the named constant `RETRYABLE_EFFECT_STATUSES`
+    so a future `failed` joins it and nothing else changes. Resetting the
+    counter is deliberate: an operator who fixed the cause wants the full
+    backoff ladder back, not a row that parks again on its first hiccup.
+18. **Approving a 仅退款 takes its units out of fulfilment at once** (B2's
+    decision 1). `order_items.refunded_quantity` is *derived*, not incremented:
+    one statement re-reads the refunds that count against the line — everything
+    settled, plus every open `refund_only` — and writes the sum under the mirror
+    of B2's dispatch bound (`counted <= quantity - shipped_quantity` for a line
+    that has not shipped). Deriving makes it idempotent at settlement and makes
+    release automatic: a `refund_only` the gateway refuses drops out of the set
+    and the units go back to the warehouse with no compensating update. Losing
+    the race means the goods shipped first, and the approval is refused with
+    `REFUND_LINE_ALREADY_SHIPPED` — the request is a return now, and the
+    operator says so rather than the system guessing.
+19. **The staff console is the admin services, not a copy of them.**
+    `registerRefundDomain()` registers `adminList` / `adminDetail` /
+    `adminApprove` / `adminReject` behind B2's `StaffRefundPort`, permission
+    checks and all, so a shop assistant reviewing on a phone goes through
+    exactly the code an operator does.
+20. **`adminFlowSummary`** answers the 资金流水 console's totals with one
     boot. Filed as `CR-8-c` for a generated `registerAllDomains()`. **Resolved:**
     `@shop/core/domains` is generated and imported once by each app at bootstrap,
     and the stop-gap in the four job files is removed.
@@ -313,9 +345,9 @@ global `fetch`, as the brief requires. `next/pnpm-lock.yaml` is untouched.
 | `CR-1-c` | `ORDER_STATUSES` vs the `orders_status` enum | resolved (port changed) |
 | `CR-2-c` | config group file location vs the CONVENTIONS table | resolved |
 | `CR-3-c` | fake WeChat gateway business rules | resolved (built here) |
-| `CR-4-c` | `/admin-api/payment-effects` needs a paginated effects read, and un-parking an `unknown` effect belongs upstream | open |
-| `CR-5-c` | `refunds.return_address jsonb` — the buyer's return address is frozen on approval and the column is missing | open |
-| `CR-6-c` | `config.repo.ts::loadGroup` double-parses `jsonb`, so numeric settings come back as numbers | open |
+| `CR-4-c` | `/admin-api/payment-effects` needs a paginated effects read, and un-parking an `unknown` effect belongs upstream | applied (delegated to C; `listEffects` / `retryEffect` now in `effects/`) |
+| `CR-5-c` | `refunds.return_address jsonb` — the buyer's return address is frozen on approval and the column is missing | applied (column exists; address frozen at approval) |
+| `CR-6-c` | `config.repo.ts::loadGroup` double-parses `jsonb`, so numeric settings come back as numbers | applied (fixed in `@shop/db`; workaround removed) |
 | `CR-7-c` | `cancelOrder` must call `closeOrderPayments` before it opens the cancelling transaction | open (B1) |
 | `CR-8-c` | nothing calls `register<Domain>Domain()` in either app; asks for a generated `registerAllDomains()` | applied (platform) — `@shop/core/domains` |
 
@@ -327,6 +359,12 @@ global `fetch`, as the brief requires. `next/pnpm-lock.yaml` is untouched.
 - **B2** — a refund settles `onOrderRefunded` and can end an order
   (`status = 'refunded'`); fulfilment must treat a refunded line as gone.
   Freight comes back only while `fulfillment_status = 'unfulfilled'`.
+  `StaffRefundPort` is registered from `registerRefundDomain()`. Two things B2
+  should pick up: `staffRefundReview` may now raise
+  `REFUND_LINE_ALREADY_SHIPPED` and its `errors` list does not say so (B2's
+  file, left alone), and the staff routes stay `INTERNAL` in the **web** app
+  until `CR-8-c`'s `registerAllDomains()` lands, because nothing there calls
+  `registerRefundDomain()` — only the worker jobs do.
 - **D** — the per-activity stock layers (presale, group buy) are the
   `StockPort` implementation's, not the refund domain's: it calls the port once
   with the order's unshipped lines and `{ committed: true, refundId }`. Legacy

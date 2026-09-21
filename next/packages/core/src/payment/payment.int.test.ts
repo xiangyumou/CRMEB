@@ -259,6 +259,31 @@ const flowRows = (kind: 'order_payment' | 'exception_refund' | 'order_refund') =
   harness.ctx.db.select().from(capitalFlows).where(eq(capitalFlows.kind, kind));
 
 // ---------------------------------------------------------------------------
+// CR-6-c — the setting that comes back is the setting that went in
+// ---------------------------------------------------------------------------
+
+describe('an all-digit setting survives the round trip through `config_values`', () => {
+  /**
+   * The column is `jsonb`, and a string that is all digits used to come back as
+   * a *number*: `z.string()` refused it and `ConfigService` repaired the field
+   * to its default. A WeChat 商户号 is always all digits, so the shop reported
+   * 支付尚未配置 with a filled-in form and no explanation. Fixed in `@shop/db`;
+   * this asserts it from the payment side against a real database rather than a
+   * schema.
+   */
+  it('keeps a numeric 商户号 a string, all the way onto the attempt', async () => {
+    // `beforeEach` already wrote it; the fake merchant id is `1900000001`,
+    // which is exactly the shape that used to break.
+    expect(gateway.keys.mchId).toMatch(/^\d+$/);
+    expect((await racer().config.get(paymentConfig)).mchId).toBe(gateway.keys.mchId);
+
+    // And the attempt records it, which is what PAYC-005 compares against.
+    const started = await startedPayment();
+    expect((await attemptRows(started.orderId))[0]!.mchId).toBe(gateway.keys.mchId);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // PAY-004 / CLIENT-001 — the ordinary successful payment
 // ---------------------------------------------------------------------------
 

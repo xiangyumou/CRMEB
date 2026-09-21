@@ -16,19 +16,18 @@ import type { Ctx } from '../kernel/context';
  */
 
 /**
- * A stored string that survives the round trip through `config_values.value`.
+ * A stored text setting.
  *
- * The column is `jsonb` and the driver sends a JavaScript string straight
- * through as the jsonb literal, so an all-digit value such as a phone number is
- * stored as a jsonb **number**, `z.string()` then refuses it, and
- * `ConfigService.get` repairs the field back to its default. `CR-6-c` asks for
- * the one-line fix in `kernel/config.repo.ts`; until it lands, the text fields
- * in the groups this stream owns take the number back.
+ * `config_values.value` is `jsonb`, and for a while a string written to it came
+ * back as a *number* whenever it was all digits — a 商户号, a phone number —
+ * because the value was parsed twice on the way out. `CR-6-c` is fixed in
+ * `@shop/db` (json and jsonb reach drizzle as text and are parsed once), so this
+ * is now a plain string again. The round trip is still covered by a test in
+ * every group this stream owns, because the failure mode was silent: the field
+ * fell back to its default and the shop reported 支付尚未配置 with a filled-in
+ * form.
  */
-const configText = (max: number) =>
-  z
-    .preprocess((value) => (typeof value === 'number' ? String(value) : value), z.string().max(max))
-    .default('');
+const configText = (max: number) => z.string().max(max).default('');
 
 export const refundConfig = defineConfigGroup({
   group: 'refund',

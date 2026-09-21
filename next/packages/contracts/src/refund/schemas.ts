@@ -233,6 +233,18 @@ export const adminRefundDetail = adminRefundListItem.extend({
   returnExpressCompanyName: z.string().nullable(),
   returnTrackingNo: z.string().nullable(),
   returnPhone: z.string().nullable(),
+  /**
+   * The address this buyer was actually told to ship to, frozen on the row at
+   * the approval. The operator sees the same string the buyer does, which is
+   * the only way a "where did you send it?" conversation can end.
+   */
+  returnAddress: z
+    .object({
+      name: z.string(),
+      phone: z.string(),
+      address: z.string(),
+    })
+    .nullable(),
   logs: z.array(refundLogEntry),
 });
 export type AdminRefundDetail = z.infer<typeof adminRefundDetail>;
@@ -375,6 +387,7 @@ export const adminRefundDetailExample: AdminRefundDetail = {
   returnExpressCompanyName: null,
   returnTrackingNo: null,
   returnPhone: null,
+  returnAddress: null,
   logs: [
     { toStatus: 'applied', message: '买家发起退款申请', createdAt: '2026-02-26T13:00:00+08:00' },
   ],

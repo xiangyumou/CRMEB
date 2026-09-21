@@ -17,8 +17,10 @@ import {
 import { resetEffectHandlers } from '../effects';
 import type { Actor, Ctx } from '../kernel/context';
 import { registerStockPort, resetOrderPorts, type StockLine } from '../order/ports';
+import { installFulfilmentHooks } from '../order';
 import { handleTransactionNotify, paymentConfig, startPayment } from '../payment';
 import { wechatConfig } from '../wechat';
+import { refundConfig } from './refund.config';
 import * as repo from './refund.repo';
 import * as admin from './refund.admin';
 import * as service from './refund.service';
@@ -58,6 +60,7 @@ beforeEach(async () => {
   harness.clock.set(NOW);
   resetEffectHandlers();
   resetOrderPorts();
+  installFulfilmentHooks();
   releases = [];
   releaseFails = false;
   registerStockPort({
@@ -84,6 +87,7 @@ beforeEach(async () => {
 afterEach(() => {
   resetEffectHandlers();
   resetOrderPorts();
+  installFulfilmentHooks();
 });
 
 // ---------------------------------------------------------------------------
@@ -283,6 +287,89 @@ const orderRow = (id: number) =>
 
 const flowRows = (kind: 'order_payment' | 'order_refund') =>
   harness.ctx.db.select().from(capitalFlows).where(eq(capitalFlows.kind, kind));
+
+// ---------------------------------------------------------------------------
+// CR-5-c — the return address is frozen at the approval
+// ---------------------------------------------------------------------------
+
+describe('the return address a buyer is shown', () => {
+  const CONFIGURED = {
+    returnName: '售后部',
+    returnPhone: '13800000000',
+    returnAddress: '浙江省杭州市西湖区文一西路 1 号',
+  };
+  const frozen = {
+    name: CONFIGURED.returnName,
+    phone: CONFIGURED.returnPhone,
+    address: CONFIGURED.returnAddress,
+  };
+
+  async function returnRequest(order: PaidOrder): Promise<number> {
+    const applied = await service.apply(racer(userActor(order.userId)), {
+      ...applyBody(order, 1),
+      kind: 'return_and_refund',
+    });
+    return Number(applied.id);
+  }
+
+  it('is written once, at the approval, and then read from the row', async () => {
+    await harness.ctx.config.set(refundConfig, CONFIGURED);
+    const order = await paidOrder();
+    const id = await returnRequest(order);
+
+    const approved = await admin.adminApprove(racer(adminActor(order.adminId)), { id: String(id) });
+    expect(approved.returnAddress).toEqual(frozen);
+    expect((await refundRow(id)).returnAddress).toEqual(frozen);
+  });
+
+  it('does not change when the shop edits 售后设置 afterwards', async () => {
+    await harness.ctx.config.set(refundConfig, CONFIGURED);
+    const order = await paidOrder();
+    const id = await returnRequest(order);
+    await admin.adminApprove(racer(adminActor(order.adminId)), { id: String(id) });
+
+    // The shop moves warehouse. The parcel already in the post does not.
+    await harness.ctx.config.set(refundConfig, {
+      returnName: '新仓库',
+      returnPhone: '13900000000',
+      returnAddress: '江苏省南京市雨花台区 2 号',
+    });
+
+    const seen = await service.myDetail(racer(userActor(order.userId)), { id: String(id) });
+    expect(seen.returnAddress).toEqual(frozen);
+  });
+
+  it('prefers the address the operator typed over the configured one', async () => {
+    await harness.ctx.config.set(refundConfig, CONFIGURED);
+    const order = await paidOrder();
+    const id = await returnRequest(order);
+
+    const typed = { name: '王五', phone: '13700000000', address: '上海市浦东新区 3 号' };
+    const approved = await admin.adminApprove(racer(adminActor(order.adminId)), {
+      id: String(id),
+      returnAddress: typed,
+    });
+    expect(approved.returnAddress).toEqual(typed);
+    // …and the timeline records where the goods were sent, on its own.
+    expect(approved.logs.some((log) => (log.message ?? '').includes(typed.address))).toBe(true);
+  });
+
+  it('shows nothing rather than half an address when the shop has configured none', async () => {
+    const order = await paidOrder();
+    const id = await returnRequest(order);
+    const approved = await admin.adminApprove(racer(adminActor(order.adminId)), { id: String(id) });
+    expect(approved.returnAddress).toBeNull();
+  });
+
+  it('never shows one on a refund that needs no parcel', async () => {
+    await harness.ctx.config.set(refundConfig, CONFIGURED);
+    const order = await paidOrder();
+    const id = await approvedRefund(order, 1);
+    expect((await refundRow(id)).returnAddress).toBeNull();
+    const seen = await service.myDetail(racer(userActor(order.userId)), { id: String(id) });
+    expect(seen.returnAddress).toBeNull();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // the ordinary refund

@@ -35,13 +35,16 @@ describe('secret fields', () => {
 });
 
 /**
- * CR-6-c, from the refund side: `config_values.value` is jsonb and drizzle
- * parses a stored string a second time on the way out, so an all-digit value
- * comes back as a number. A return phone is the field this bites first.
+ * CR-6-c, from the refund side. A return phone is the field the jsonb
+ * double-parse bit first — all digits, so it came back as a number and the
+ * whole return address silently fell back to empty. Fixed in `@shop/db`; the
+ * round trip is asserted against a real database in `refund.int.test.ts`.
  */
-describe('CR-6-c — a stored value that came back as a number is still a string', () => {
-  it('accepts a numeric return phone and hands back the digits', () => {
-    expect(refundConfig.schema.parse({ returnPhone: 13800000000 }).returnPhone).toBe('13800000000');
+describe('the schema is plain strings again', () => {
+  it('takes a return phone as the string it is', () => {
+    expect(refundConfig.schema.parse({ returnPhone: '13800000000' }).returnPhone).toBe(
+      '13800000000',
+    );
   });
 
   it('still answers the defaults for an unconfigured shop', () => {

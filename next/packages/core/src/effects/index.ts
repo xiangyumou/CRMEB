@@ -3,12 +3,17 @@ import type { Ctx } from '../kernel/context';
 import { withTx } from '../kernel/tx';
 import {
   claimDue,
+  findById,
   findOne,
   insertIgnore,
   listByStatus,
+  listEffects,
   markDone,
   markUnknown,
+  retryEffect,
   scheduleRetry,
+  type EffectConsoleRow,
+  type EffectListFilter,
   type EffectRow,
 } from './effects.repo';
 
@@ -280,5 +285,12 @@ export async function drainEffects(
   return total;
 }
 
-export { findOne as findEffect, listByStatus as listEffectsByStatus };
-export type { EffectRow };
+export {
+  findById as findEffectById,
+  findOne as findEffect,
+  listByStatus as listEffectsByStatus,
+  listEffects,
+  retryEffect,
+};
+export { RETRYABLE_EFFECT_STATUSES } from './effects.repo';
+export type { EffectConsoleRow, EffectListFilter, EffectRow };

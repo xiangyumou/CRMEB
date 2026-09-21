@@ -2,6 +2,14 @@
 
 **Stream** C · **Target** `next/packages/db/src/schema/refund.ts` (B1-owned) · **Severity** medium, silent
 
+**Status: applied.** `refunds.return_address jsonb` exists in the schema and in
+`0000_init`. `adminApprove` freezes it at the approval that first asks the buyer
+to ship — the operator's own address wins, the `refund` config group is the
+fallback, and a re-approval never overwrites one that is already there. Every
+read afterwards (`returnDetail`, both detail DTOs) comes from the row, never from
+the config. Covered by `refund.int.test.ts::the return address a buyer is shown`,
+including "does not change when the shop edits 售后设置 afterwards".
+
 ## What
 
 `refunds` carries the buyer's return _shipment_ (`returnExpressCompanyId`,

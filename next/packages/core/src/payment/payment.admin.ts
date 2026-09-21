@@ -19,7 +19,7 @@ import { DomainError } from '../kernel/errors';
 import { toId, toIdOrNull } from '../kernel/ids';
 import { Money } from '../kernel/money';
 import { paymentPermissions } from './permissions';
-import * as effectsRepo from './payment.effects.repo';
+import { findEffectById, listEffects, retryEffect, type EffectConsoleRow } from '../effects';
 import * as repo from './payment.repo';
 import { recheckException, refundException } from './payment.service';
 
@@ -290,12 +290,13 @@ export async function adminListEffects(
   query: PaymentEffectListQuery,
 ): Promise<{ items: PaymentEffectListItem[]; total: number; page: number; pageSize: number }> {
   requirePermission(ctx, paymentPermissions['effect:handle']);
-  const { rows, total } = await effectsRepo.listEffects(ctx.db, {
+  const { rows, total } = await listEffects(ctx.db, {
     scopes: EFFECT_SCOPES,
     status: query.status,
+    page: query.page,
+    pageSize: query.pageSize,
     ...optional('scope', query.scope),
     ...optional('eventType', query.eventType),
-    ...pageBounds(query),
   });
   return { items: rows.map(toEffectItem), total, page: query.page, pageSize: query.pageSize };
 }
@@ -315,11 +316,11 @@ export async function adminRetryEffect(
 ): Promise<PaymentEffectRetryResult> {
   requirePermission(ctx, paymentPermissions['effect:handle']);
   const id = Number(input.id);
-  const row = await effectsRepo.findEffectById(ctx.db, id, EFFECT_SCOPES);
+  const row = await findEffectById(ctx.db, id, EFFECT_SCOPES);
   if (!row) throw new DomainError('PAYMENT_EFFECT_NOT_FOUND');
 
-  const { won } = await effectsRepo.requeueEffect(ctx.db, id, ctx.clock.now());
-  const fresh = await effectsRepo.findEffectById(ctx.db, id, EFFECT_SCOPES);
+  const { won } = await retryEffect(ctx.db, id, ctx.clock.now());
+  const fresh = await findEffectById(ctx.db, id, EFFECT_SCOPES);
   return {
     effect: toEffectItem(fresh ?? row),
     succeeded: won,
@@ -327,7 +328,7 @@ export async function adminRetryEffect(
   };
 }
 
-function toEffectItem(row: effectsRepo.EffectConsoleRow): PaymentEffectListItem {
+function toEffectItem(row: EffectConsoleRow): PaymentEffectListItem {
   const status: PaymentEffectListItem['status'] =
     row.status === 'done' ? 'done' : row.status === 'unknown' ? 'unknown' : 'pending';
   return {

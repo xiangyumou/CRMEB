@@ -1,3 +1,5 @@
+import { registerStaffRefundPort } from '../order';
+import { adminApprove, adminDetail, adminList, adminReject } from './refund.admin';
 import { registerRefundEffects } from './refund.effects';
 
 /**
@@ -74,4 +76,16 @@ export { registerRefundEffects } from './refund.effects';
  */
 export function registerRefundDomain(): void {
   registerRefundEffects();
+  // B2's staff console owns the phone-sized surface, this domain owns the
+  // money: `/api/v1/staff/refunds*` forwards straight into the admin services,
+  // permission checks and all, so a store assistant and an operator审核 through
+  // exactly the same code. Until this runs, the staff routes answer INTERNAL —
+  // which is the right failure, because a staff console that silently reviewed
+  // nothing would be worse.
+  registerStaffRefundPort({
+    list: adminList,
+    detail: adminDetail,
+    approve: (ctx, params, body) => adminApprove(ctx, { ...params, ...body }),
+    reject: (ctx, params, body) => adminReject(ctx, { ...params, ...body }),
+  });
 }

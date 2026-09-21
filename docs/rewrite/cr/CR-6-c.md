@@ -2,6 +2,14 @@
 
 **Stream** C · **Target** `next/packages/core/src/kernel/config.repo.ts` (platform-owned) · **Severity** high, silent, data-losing
 
+**Status: applied.** Fixed platform-wide in `@shop/db`: `json` and `jsonb` reach
+drizzle as text and are parsed exactly once, with a regression test in
+`kernel/config.int.test.ts`. Stream C removed its `configText` preprocess from the
+`payment`, `refund` and `wechat` groups — they are plain `z.string()` again — and
+kept the round trip asserted where the bug actually lived, against a real
+database: `payment.int.test.ts::an all-digit setting survives the round trip
+through \`config_values\``.
+
 ## What
 
 Saving the WeChat 商户号 `'1900000001'` through `ConfigService.set` and reading it

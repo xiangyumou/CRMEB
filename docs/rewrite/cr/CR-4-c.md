@@ -2,6 +2,23 @@
 
 **Stream** C · **Target** `next/packages/core/src/effects/effects.repo.ts` and `index.ts` (platform-owned) · **Severity** medium, operational
 
+**Status: applied.** Accepted and delegated to stream C. `listEffects`,
+`findById` (exported as `findEffectById`) and `retryEffect` now live in
+`effects/effects.repo.ts` and are exported from `effects/index.ts`; the stop-gap
+`payment/payment.effects.repo.ts` is deleted and `payment.admin.ts` calls the
+platform functions. `listEffects` takes `{status, scope, scopes, eventType,
+page, pageSize}` and returns `{rows, total}` with both timestamps, ordered
+`updated_at desc, id asc`; `scopes` is the caller's allow-list and `scope` may
+only narrow inside it. `retryEffect(db, id, now)` is a conditional update that
+also resets `attempts` to 0, so an un-parked row gets the full backoff ladder
+back instead of being parked again on its next failure. One deviation: CR-4-c
+asked for `unknown | failed → pending`, but `EFFECT_STATUSES` is
+`pending | done | unknown` — there is no `failed` — so the guard is
+`RETRYABLE_EFFECT_STATUSES = ['unknown']`, a named constant a future `failed`
+can join. Covered by `effects.int.test.ts::listEffects` (4) and `::retryEffect`
+(3), the last being the `runConcurrently` race: two operators press 重试, one
+wins, the handler runs once.
+
 ## What
 
 `effects.repo.ts` exposes exactly one read for a human — `listByStatus(db,

@@ -228,19 +228,74 @@ export async function markOrderRefunded(
   });
 }
 
-export async function addItemRefunded(
+/**
+ * The units of one order line that are spoken for.
+ *
+ * A subquery rather than a running `+ q`, because `refunded_quantity` has two
+ * writers at two different moments and an increment cannot be replayed safely:
+ *
+ *  - a **`refund_only`** takes its units out of fulfilment the moment it is
+ *    approved. The warehouse must not ship goods an operator has already agreed
+ *    to refund, and B2's dispatch bound reads exactly this column
+ *    (`shipped + q <= quantity - refunded_quantity`);
+ *  - a **`return_and_refund`** counts only once the money is actually back —
+ *    those units were shipped, and they are already out of fulfilment.
+ *
+ * Deriving the number instead of accumulating it makes every write idempotent
+ * (settling a refund that was counted at approval changes nothing) and makes
+ * release automatic: a `refund_only` that fails at the gateway drops out of the
+ * set and the units come back to the warehouse with no compensating update.
+ */
+const countedUnits = (orderItemId: number) => sql<number>`(
+  select coalesce(sum(${refundItems.quantity}), 0)::int
+    from ${refundItems}
+    join ${refunds} on ${refunds.id} = ${refundItems.refundId}
+   where ${refundItems.orderItemId} = ${orderItemId}
+     and (${refunds.status} = 'succeeded'
+          or (${refunds.kind} = 'refund_only'
+              and ${refunds.status} in ('approved', 'processing', 'unknown')))
+)`;
+
+/**
+ * Re-derives `order_items.refunded_quantity` from the refunds themselves.
+ *
+ * `bound` is the mirror of B2's dispatch guard (FULFILL-002). For units that
+ * were never shipped — a `refund_only` on an undispatched line — the ceiling is
+ * `quantity - shipped_quantity`, computed *inside* the statement: a shipment
+ * that commits first pushes `shipped_quantity` up and this update refuses; if
+ * this one commits first the shipment's own `WHERE` sees the raised
+ * `refunded_quantity` and refuses. Exactly one wins, in either order, and
+ * `shipped + refunded <= quantity` never breaks.
+ *
+ * Goods that came back are a different path: they were shipped, so the ceiling
+ * is the line's whole quantity.
+ */
+export async function recomputeItemRefundedQuantity(
   tx: DbOrTx,
   orderItemId: number,
-  patch: { quantity: number; amount: string },
+  bound: 'unshipped' | 'whole-line',
+): Promise<ConditionalUpdateResult> {
+  const counted = countedUnits(orderItemId);
+  const ceiling =
+    bound === 'unshipped'
+      ? sql`${orderItems.quantity} - ${orderItems.shippedQuantity}`
+      : sql`${orderItems.quantity}`;
+  return conditionalUpdate(tx, orderItems, {
+    where: and(eq(orderItems.id, orderItemId), sql`${counted} <= ${ceiling}`),
+    set: { refundedQuantity: counted },
+  });
+}
+
+/** The money side, raised only when the money is actually back. */
+export async function addItemRefundedAmount(
+  tx: DbOrTx,
+  orderItemId: number,
+  amount: string,
 ): Promise<ConditionalUpdateResult> {
   return conditionalUpdate(tx, orderItems, {
-    where: and(
-      eq(orderItems.id, orderItemId),
-      sql`${orderItems.refundedQuantity} + ${patch.quantity} <= ${orderItems.quantity}`,
-    ),
+    where: eq(orderItems.id, orderItemId),
     set: {
-      refundedQuantity: sql`${orderItems.refundedQuantity} + ${patch.quantity}`,
-      refundedAmount: sql`least(${orderItems.refundedAmount} + ${patch.amount}::numeric, ${orderItems.totalAmount})`,
+      refundedAmount: sql`least(${orderItems.refundedAmount} + ${amount}::numeric, ${orderItems.totalAmount})`,
     },
   });
 }
@@ -368,6 +423,8 @@ export interface TransitionPatch {
   rejectReason?: string;
   adminRemark?: string;
   returnStage?: 'not_required' | 'awaiting_shipment' | 'shipped_back' | 'received';
+  /** Frozen once, at the approval that first asks the buyer to ship (CR-5-c). */
+  returnAddress?: { name: string; phone: string; address: string };
   succeededAt?: Date;
   failedAt?: Date;
   cancelledAt?: Date;

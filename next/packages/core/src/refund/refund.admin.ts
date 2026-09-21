@@ -15,6 +15,7 @@ import { requireAdminId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { toId, toIdOrNull } from '../kernel/ids';
 import { refundPermissions } from './permissions';
+import { returnAddress, type ReturnAddress } from './refund.config';
 import * as repo from './refund.repo';
 import {
   executeRefund,
@@ -88,6 +89,13 @@ export async function adminDetail(ctx: Ctx, input: { id: string }): Promise<Admi
  * `return_and_refund` waits at `awaiting_shipment` until somebody confirms the
  * goods are back. Both moves are one conditional update from `applied`, so an
  * approval racing the buyer's withdrawal ends with exactly one winner.
+ *
+ * This is also the moment the return address stops being a setting and becomes
+ * a fact (CR-5-c). The operator's own address wins, the configured one is the
+ * fallback, and whichever it is gets written to `refunds.return_address` — so
+ * editing 售后设置 next month cannot re-address a parcel that is already in the
+ * post. The config is read *before* the transaction opens, because it can touch
+ * Redis and a row lock is being held inside.
  */
 export async function adminApprove(
   ctx: Ctx,
@@ -96,14 +104,23 @@ export async function adminApprove(
   requirePermission(ctx, refundPermissions['request:review']);
   const adminId = requireAdminId(ctx);
   const id = Number(input.id);
+  const address = input.returnAddress ?? (await returnAddress(ctx));
 
   await ctx.withTx(async (tx) => {
     const row = await repo.lockRefund(tx, id);
     if (!row) throw new DomainError('REFUND_NOT_FOUND');
 
+    // Only a return needs an address, and only if one was never frozen: a
+    // re-approval after 驳回 must not quietly move the parcel.
+    const freeze =
+      row.kind === 'return_and_refund' && row.returnAddress === null && address !== null
+        ? { returnAddress: address }
+        : {};
+
     const { won } = await repo.transitionRefund(tx, id, ['applied'], 'approved', {
       reviewedByAdminId: adminId,
       reviewedAt: ctx.clock.now(),
+      ...freeze,
       ...(input.remark === undefined ? {} : { adminRemark: input.remark }),
     });
     if (!won) throw new DomainError('REFUND_NOT_ACTIONABLE', { details: { status: row.status } });
@@ -112,30 +129,67 @@ export async function adminApprove(
       refundId: id,
       fromStatus: row.status,
       toStatus: 'approved',
-      message: approvalMessage(row.kind, input),
+      message: approvalMessage(row.kind, input.remark, freeze.returnAddress ?? null),
       operatorAdminId: adminId,
     });
 
-    if (row.kind === 'refund_only') await queueExecution(tx, ctx, id);
+    if (row.kind === 'refund_only') {
+      await reserveUnits(tx, id, row.orderId);
+      await queueExecution(tx, ctx, id);
+    }
   });
 
   return detail(ctx, id);
 }
 
 /**
- * The per-request return address has nowhere to live on the row yet, so it is
- * written into the timeline, where an operator and the buyer can both read it.
- * `CR-5-c` asks for `refunds.return_address`; until then the address the buyer's
- * detail shows is the shop's configured one.
+ * Approving a 仅退款 takes its units out of fulfilment there and then.
+ *
+ * The warehouse must not ship goods an operator has just agreed to refund, and
+ * B2's dispatch guard reads `quantity - refunded_quantity`, so the only way to
+ * stop it is to raise that column now rather than when the money lands. The
+ * statement carries the mirror of B2's own bound
+ * (`refunded + q <= quantity - shipped_quantity`) for a line that has not
+ * shipped, so an approval racing a dispatch of the same units has exactly one
+ * winner whichever commits first. A line that already shipped is a money-only
+ * refund of goods the buyer keeps; there is nothing left to race for, and the
+ * ceiling is the whole line.
+ *
+ * Losing means the units went out of the door first. The approval rolls back
+ * and the operator is told, which is right: the request is now a return, not a
+ * refund.
  */
-function approvalMessage(kind: repo.RefundRow['kind'], input: RefundApproveBody): string {
+async function reserveUnits(tx: Tx, refundId: number, orderId: number): Promise<void> {
+  const lines = await repo.listRefundItems(tx, refundId);
+  const items = new Map(
+    (await repo.listOrderItems(tx, orderId)).map((item) => [item.id, item] as const),
+  );
+  for (const line of lines) {
+    const item = items.get(line.orderItemId);
+    const bound = item !== undefined && item.shippedQuantity === 0 ? 'unshipped' : 'whole-line';
+    const { won } = await repo.recomputeItemRefundedQuantity(tx, line.orderItemId, bound);
+    if (!won) {
+      throw new DomainError('REFUND_LINE_ALREADY_SHIPPED', {
+        details: { orderItemId: toId(line.orderItemId) },
+      });
+    }
+  }
+}
+
+/**
+ * The timeline entry says where the goods were asked to go, so the audit trail
+ * stands on its own even if somebody later edits the row.
+ */
+function approvalMessage(
+  kind: repo.RefundRow['kind'],
+  remark: string | undefined,
+  address: ReturnAddress | null,
+): string {
   const head = kind === 'return_and_refund' ? '商家同意退货退款' : '商家同意退款';
-  const remark = input.remark === undefined ? '' : `：${input.remark}`;
-  const address =
-    input.returnAddress === undefined
-      ? ''
-      : `（退货地址：${input.returnAddress.name} ${input.returnAddress.phone} ${input.returnAddress.address}）`;
-  return `${head}${remark}${address}`.slice(0, 500);
+  const note = remark === undefined ? '' : `：${remark}`;
+  const where =
+    address === null ? '' : `（退货地址：${address.name} ${address.phone} ${address.address}）`;
+  return `${head}${note}${where}`.slice(0, 500);
 }
 
 export async function adminReject(
@@ -284,7 +338,7 @@ async function detail(ctx: Ctx, id: number): Promise<AdminRefundDetail> {
       ? Promise.resolve(null)
       : repo.findExpressCompany(ctx.db, row.returnExpressCompanyId),
   ]);
-  const returns = await returnDetail(ctx, row, company);
+  const returns = returnDetail(row, company);
 
   return {
     ...toAdminItem(row, items.get(row.id) ?? []),
@@ -294,6 +348,7 @@ async function detail(ctx: Ctx, id: number): Promise<AdminRefundDetail> {
     returnExpressCompanyName: returns.returnExpressCompanyName,
     returnTrackingNo: returns.returnTrackingNo,
     returnPhone: returns.returnPhone,
+    returnAddress: returns.returnAddress,
     logs: logs.map(toLogEntry),
   };
 }

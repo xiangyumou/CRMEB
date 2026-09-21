@@ -23,24 +23,18 @@ import {
  */
 
 /**
- * A stored string that survives the round trip through `config_values.value`.
+ * A stored text setting.
  *
- * `config_values.value` is `jsonb`, and the driver sends a JavaScript string
- * straight through as the jsonb literal instead of quoting it. So `"1900000001"`
- * is stored as the jsonb **number** `1900000001`, `z.string()` then refuses it,
- * and `ConfigService.get` repairs the "broken" field back to its default. A
- * WeChat 商户号 is always all digits, which means the merchant id could never be
- * saved at all — the shop would report 支付尚未配置 forever with a filled-in form.
- *
- * `CR-6-c` asks for the one-line fix in `kernel/config.repo.ts`. Until it lands,
- * every text field in the groups this stream owns accepts the number back and
- * turns it into the string it was written as. `.default('')` still wins for a
- * missing key, because `ZodDefault` answers `undefined` before the coercion runs.
+ * `config_values.value` is `jsonb`, and for a while a string written to it came
+ * back as a *number* whenever it was all digits — a 商户号, a phone number —
+ * because the value was parsed twice on the way out. `CR-6-c` is fixed in
+ * `@shop/db` (json and jsonb reach drizzle as text and are parsed once), so this
+ * is now a plain string again. The round trip is still covered by a test in
+ * every group this stream owns, because the failure mode was silent: the field
+ * fell back to its default and the shop reported 支付尚未配置 with a filled-in
+ * form.
  */
-const configText = (max: number) =>
-  z
-    .preprocess((value) => (typeof value === 'number' ? String(value) : value), z.string().max(max))
-    .default('');
+const configText = (max: number) => z.string().max(max).default('');
 
 export const paymentConfig = defineConfigGroup({
   group: 'payment',
@@ -75,12 +69,7 @@ export const paymentConfig = defineConfigGroup({
      * client at the fake gateway. No `ui` entry, so the admin form never
      * renders it.
      */
-    apiBaseUrl: z
-      .preprocess(
-        (value) => (typeof value === 'number' ? String(value) : value),
-        z.string().max(255),
-      )
-      .default('https://api.mch.weixin.qq.com'),
+    apiBaseUrl: z.string().max(255).default('https://api.mch.weixin.qq.com'),
   }),
   ui: {
     mchId: { label: '商户号', type: 'text', section: '微信支付', order: 10 },

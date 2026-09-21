@@ -108,7 +108,11 @@ export * as orderConsole from './order.console.service';
 export * as orderInvoices from './order.invoice.service';
 export * as orderStaff from './order.staff.service';
 
-export { autoDeliver } from './order.fulfil.effects';
+// `installFulfilmentHooks` is re-exported for the reason it exists at all: a
+// test in another domain that calls `resetOrderPorts()` clears the order-paid
+// hook along with everything else, and the boundary rule means it can only
+// reach it through this file.
+export { autoDeliver, installFulfilmentHooks } from './order.fulfil.effects';
 
 /** The seams B2 needs from streams that have not landed (F2, C, E2). */
 export {

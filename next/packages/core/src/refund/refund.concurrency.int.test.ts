@@ -4,6 +4,7 @@ import { admins } from '@shop/db/schema/auth';
 import { products, productSkus } from '@shop/db/schema/catalog';
 import { orderItems, orders, type OrderItemSnapshot } from '@shop/db/schema/order';
 import { capitalFlows, paymentCallbacks } from '@shop/db/schema/payment';
+import { expressCompanies } from '@shop/db/schema/reference';
 import { refundItems, refunds } from '@shop/db/schema/refund';
 import { effects as effectsTable } from '@shop/db/schema/system';
 import { users } from '@shop/db/schema/user';
@@ -25,6 +26,7 @@ import {
   type StockLine,
   type StockReleaseOptions,
 } from '../order/ports';
+import { installFulfilmentHooks, shipOrder } from '../order';
 import { handleTransactionNotify, paymentConfig, startPayment } from '../payment';
 import { wechatConfig } from '../wechat';
 import { registerRefundEffects } from './refund.effects';
@@ -79,6 +81,7 @@ beforeEach(async () => {
   harness.clock.set(NOW);
   resetEffectHandlers();
   resetOrderPorts();
+  installFulfilmentHooks();
   releases = [];
   registerStockPort({
     async reserve() {
@@ -103,6 +106,7 @@ beforeEach(async () => {
 afterEach(() => {
   resetEffectHandlers();
   resetOrderPorts();
+  installFulfilmentHooks();
 });
 
 // ---------------------------------------------------------------------------
@@ -697,5 +701,120 @@ describe('REFUND-006 — reconciliation racing a refund callback', () => {
     // Goods that left the warehouse come back through the operator's inbound
     // step, not through the refund — an unchecked return must not become stock.
     expect(releases).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FULFILL-002 (the C half) — the warehouse and the operator, on the same units
+// ---------------------------------------------------------------------------
+
+/**
+ * B2's dispatch bound is `shipped + q <= quantity - refunded_quantity`; the
+ * mirror, on this side, is `refunded <= quantity - shipped_quantity`. Both are
+ * `WHERE` clauses, so the database decides and the two services never have to
+ * agree on an order of operations.
+ *
+ * Both services are the real ones here. A test with a hand-written `UPDATE`
+ * standing in for one of them proves the SQL, not the system: it cannot catch
+ * an approval that forgets to take the units at all, which is exactly the bug
+ * this pair of bounds exists to stop.
+ */
+describe('shipping the last unshipped units while a 仅退款 is approved', () => {
+  async function expressCompany(): Promise<number> {
+    sequence += 1;
+    const [row] = await harness.ctx.db
+      .insert(expressCompanies)
+      .values({ code: `sf-${sequence}`, name: `顺丰${sequence}` })
+      .returning({ id: expressCompanies.id });
+    return row!.id;
+  }
+
+  type Outcome = { who: 'warehouse' | 'operator'; won: boolean };
+
+  async function race(order: PaidOrder, refundId: number, shipFirst: boolean): Promise<Outcome[]> {
+    const companyId = await expressCompany();
+    const report = await runConcurrently<Outcome>(2, async (index) => {
+      const shipping = shipFirst ? index === 0 : index === 1;
+      try {
+        if (shipping) {
+          await shipOrder(racer(adminActor(order.adminId)), {
+            orderId: order.orderId,
+            operatorAdminId: order.adminId,
+            body: {
+              deliveryMode: 'express',
+              expressCompanyId: String(companyId),
+              trackingNo: `SF-${(sequence += 1).toString()}`,
+              lines: [{ orderItemId: String(order.itemIds[0]!), quantity: 1 }],
+            },
+          });
+          return { who: 'warehouse', won: true };
+        }
+        await admin.adminApprove(racer(adminActor(order.adminId)), { id: String(refundId) });
+        return { who: 'operator', won: true };
+      } catch {
+        return { who: shipping ? 'warehouse' : 'operator', won: false };
+      }
+    });
+    expect(report.rejected).toEqual([]);
+    return report.fulfilled;
+  }
+
+  async function applied(order: PaidOrder): Promise<number> {
+    const refund = await service.apply(
+      racer(userActor(order.userId)),
+      applyBody(order, [{ orderItemId: order.itemIds[0]!, quantity: 1 }]),
+    );
+    return Number(refund.id);
+  }
+
+  const theLine = (order: PaidOrder) =>
+    harness.ctx.db
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.id, order.itemIds[0]!))
+      .then((rows) => rows[0]!);
+
+  for (const shipFirst of [true, false]) {
+    it(`has exactly one winner when ${shipFirst ? 'the warehouse' : 'the operator'} goes first`, async () => {
+      const order = await paidOrder([{ quantity: 1, unitPrice: '100.00', totalAmount: '100.00' }]);
+      const refundId = await applied(order);
+
+      const outcomes = await race(order, refundId, shipFirst);
+      expect(outcomes.filter((outcome) => outcome.won)).toHaveLength(1);
+
+      const line = await theLine(order);
+      // The invariant, stated plainly: a unit is shipped or refunded, never
+      // both.
+      expect(line.shippedQuantity + line.refundedQuantity).toBeLessThanOrEqual(line.quantity);
+
+      const winner = outcomes.find((outcome) => outcome.won)!.who;
+      if (winner === 'warehouse') {
+        expect(line.shippedQuantity).toBe(1);
+        expect(line.refundedQuantity).toBe(0);
+        // The request is not dead — it is a return now, and it is still open
+        // for the operator to handle as one.
+        expect((await refundRow(refundId)).status).toBe('applied');
+      } else {
+        expect(line.shippedQuantity).toBe(0);
+        // Approving a 仅退款 takes the units out of fulfilment immediately,
+        // before the money moves: the warehouse must not ship them afterwards.
+        expect(line.refundedQuantity).toBe(1);
+        expect((await refundRow(refundId)).status).toBe('approved');
+      }
+    });
+  }
+
+  it('gives the units back to the warehouse when the gateway refuses the refund', async () => {
+    const order = await paidOrder([{ quantity: 1, unitPrice: '100.00', totalAmount: '100.00' }]);
+    const refundId = await applied(order);
+    await admin.adminApprove(racer(adminActor(order.adminId)), { id: String(refundId) });
+    expect((await theLine(order)).refundedQuantity).toBe(1);
+
+    gateway.behaviour.failNext = { status: 403, code: 'NOT_ENOUGH_FUNDS', message: '余额不足' };
+    await service.executeRefund(racer(), refundId);
+    expect((await refundRow(refundId)).status).toBe('failed');
+
+    // The money is not coming back, so the goods are the shop's to ship again.
+    expect((await theLine(order)).refundedQuantity).toBe(0);
   });
 });

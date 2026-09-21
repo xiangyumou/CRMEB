@@ -72,18 +72,18 @@ describe('secret fields are declared secret', () => {
 });
 
 /**
- * The CR-6-c workaround, as a unit test.
+ * CR-6-c, now fixed in `@shop/db`.
  *
- * `config_values.value` is jsonb and drizzle parses a stored string a second
- * time on the way out, so an all-digit value such as a WeChat 商户号 arrives
- * back as a *number*. Left alone, `z.string()` rejects it and `ConfigService`
- * repairs the field to its default — the shop would report 支付尚未配置 with a
- * filled-in form. Every text field takes the number back.
+ * An all-digit setting — a WeChat 商户号 is nothing else — used to come back
+ * from the `jsonb` column as a *number*, `z.string()` refused it, and
+ * `ConfigService` repaired the field to its default: the shop reported
+ * 支付尚未配置 with a filled-in form and said nothing about why. The schema is a
+ * plain `z.string()` again; the round trip itself is asserted against a real
+ * database in `payment.int.test.ts`, because that is where the bug lived.
  */
-describe('CR-6-c — a stored value that came back as a number is still a string', () => {
-  it('accepts a numeric 商户号 and hands back the digits', () => {
-    const parsed = paymentConfig.schema.parse({ mchId: 1900000001 });
-    expect(parsed.mchId).toBe('1900000001');
+describe('the schema is plain strings again', () => {
+  it('takes a 商户号 as the string it is', () => {
+    expect(paymentConfig.schema.parse({ mchId: '1900000001' }).mchId).toBe('1900000001');
   });
 
   it('still answers the default for a missing key', () => {

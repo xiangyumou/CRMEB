@@ -25,7 +25,6 @@ import {
   recordCapitalFlow,
   type WebhookResult,
 } from '../payment';
-import { returnAddress } from './refund.config';
 import * as repo from './refund.repo';
 import {
   freightRefundable,
@@ -623,10 +622,20 @@ export async function settleRefundSucceeded(
 
   const lines = await repo.listRefundItems(tx, refundId);
   for (const item of lines) {
-    await repo.addItemRefunded(tx, item.orderItemId, {
-      quantity: item.quantity,
-      amount: item.amount,
-    });
+    // The whole line is the ceiling here: a `refund_only` already took its
+    // units at approval and this re-derivation changes nothing, and a return
+    // is by definition made of units that were shipped.
+    const counted = await repo.recomputeItemRefundedQuantity(tx, item.orderItemId, 'whole-line');
+    if (!counted.won) {
+      // The database CHECK would refuse anything truly impossible; this is the
+      // readable version, and it must not be silent — the money is already
+      // back, so somebody has to look at the line.
+      ctx.logger.error(
+        { refundId: toId(refundId), orderItemId: toId(item.orderItemId) },
+        'refunded quantity could not be re-derived for a settled refund line',
+      );
+    }
+    await repo.addItemRefundedAmount(tx, item.orderItemId, item.amount);
   }
   await restock(tx, ctx, { orderId: row.orderId, refundId, lines });
 
@@ -759,6 +768,15 @@ async function failRefund(tx: Tx, ctx: Ctx, refundId: number, error: string): Pr
     toStatus: 'failed',
     message: `退款失败：${error.slice(0, 200)}`,
   });
+  // A failed 仅退款 gives its units back to the warehouse: they were taken out
+  // of fulfilment at approval, and the gateway has just said the money is not
+  // going anywhere. Re-deriving does it — the refund has dropped out of the set
+  // the column is computed from.
+  if (row.kind === 'refund_only') {
+    for (const line of await repo.listRefundItems(tx, refundId)) {
+      await repo.recomputeItemRefundedQuantity(tx, line.orderItemId, 'whole-line');
+    }
+  }
   await refreshOrderRefundStatus(tx, row.orderId);
 }
 
@@ -966,7 +984,7 @@ export async function detail(ctx: Ctx, refundId: number): Promise<RefundDetail> 
       { ...row, orderNo: order?.orderNo ?? '', userNickname: null },
       items.get(row.id) ?? [],
     ),
-    ...(await returnDetail(ctx, row, company)),
+    ...returnDetail(row, company),
     logs: logs.map(toLogEntry),
   };
 }
@@ -985,16 +1003,16 @@ type ReturnDetailFields = Pick<
 /**
  * The return half of a detail.
  *
- * The address is the shop's configured one (`refund` config group) and appears
- * only once a `return_and_refund` exists to ship anything back for. A
- * per-request override typed into 同意退款 goes into the timeline instead,
- * because `refunds` has no column for one — `CR-5-c` asks for that column.
+ * The address comes from `refunds.return_address`, frozen by the approval that
+ * first asked this buyer to ship something back (CR-5-c) — **never** from the
+ * config group. A shop that edits its return address afterwards must not
+ * silently re-address a parcel that is already in the post, and a buyer holding
+ * a screenshot of the old one must not be told they got it wrong.
  */
-export async function returnDetail(
-  ctx: Ctx,
+export function returnDetail(
   row: repo.RefundRow,
   company: { id: number; name: string } | null,
-): Promise<ReturnDetailFields> {
+): ReturnDetailFields {
   const wantsAddress = row.kind === 'return_and_refund' && row.returnStage !== 'not_required';
   return {
     explanation: row.explanation,
@@ -1003,7 +1021,7 @@ export async function returnDetail(
     returnExpressCompanyName: company?.name ?? null,
     returnTrackingNo: row.returnTrackingNo,
     returnPhone: row.returnPhone,
-    returnAddress: wantsAddress ? await returnAddress(ctx) : null,
+    returnAddress: wantsAddress ? (row.returnAddress ?? null) : null,
   };
 }
 

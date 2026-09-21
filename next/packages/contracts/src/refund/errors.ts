@@ -39,6 +39,12 @@ export const refundErrors = defineErrors({
   REFUND_NOT_ACTIONABLE: { status: 409, message: '该售后单当前状态无法执行此操作' },
   /** Return shipment info on a `refund_only`, or before the request was approved. */
   REFUND_RETURN_NOT_EXPECTED: { status: 409, message: '该售后单无需填写退货物流' },
+  /**
+   * Approving a 仅退款 lost the race with the warehouse: the units shipped
+   * first. `details` carries `orderItemId`. The request is not dead — it is a
+   * return now, and the operator says so rather than the system guessing.
+   */
+  REFUND_LINE_ALREADY_SHIPPED: { status: 409, message: '该商品已发货，请改为退货退款处理' },
 
   /**
    * A retry disagrees with the frozen request. `details` carries
