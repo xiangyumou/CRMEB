@@ -446,6 +446,18 @@ seven orders and three ordinary coupon claims preserved, real WeChat v3 purchase
 and refund, and real-device normal/group/presale acceptance. The mini-program
 channel remains disabled until its query/close contract is verified.
 
-The current regression gate is 260 tests and 3567 assertions. The release record in
-`docs/release-readiness.md` is the authoritative list of automated evidence and
-open production conditions; this progress log is historical context.
+The queue fixture fix that closed this round is described above. Two further
+findings came out of the final gate run: the `QueueTest` attempt double was missing
+the `status` column the cancellation path reads, and the uni-app build was not
+byte-reproducible because `scripts/build-uni.sh` compiled inside a random `mktemp`
+directory whose path reaches vue-loader's style module ids (plus an unstable key
+order in `components/home/index.json`). The build now uses a fixed work directory
+and normalises generated JSON, and `release-pipeline-guard.cjs` fails if the random
+directory returns.
+
+Final gate at `7e1d6414`: 260 tests / 3567 assertions, all static guards, 8/8
+publish rules, 8/8 upgrade-rollback rules, 10/10 concurrency repetitions
+(42 tests / 2444 assertions each) and 10/10 mutation protections detected. The
+release record in `docs/release-readiness.md` is the authoritative list of
+automated evidence and open production conditions; this progress log is
+historical context.
