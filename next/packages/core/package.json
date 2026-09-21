@@ -6,10 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./kernel": "./src/kernel/index.ts",
+    "./kernel/*": "./src/kernel/*.ts",
     "./order/ports": "./src/order/ports.ts",
-    "./effects": "./src/effects/index.ts",
-    "./auth": "./src/auth/index.ts",
-    "./*": "./src/*.ts"
+    "./*": "./src/*/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

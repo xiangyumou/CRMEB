@@ -29,14 +29,16 @@ A domain (`coupon`, `catalog`, `order`, …) owns exactly these paths and nothin
 | -------------- | ------------------------------------------------------------------------------------------- |
 | Contracts      | `packages/contracts/src/<domain>/*.contract.ts`, `errors.ts`, `schemas.ts`                  |
 | Domain logic   | `packages/core/src/<domain>/` (`*.service.ts`, `*.repo.ts`, `permissions.ts`, `effects.ts`) |
-| Admin API      | `apps/web/app/admin-api/<domain>/**/route.ts`                                               |
-| Storefront API | `apps/web/app/api/v1/<domain>/**/route.ts`                                                  |
+| Admin API      | `apps/web/app/admin-api/<resource>/**/route.ts` (mirrors the contract path)                 |
+| Storefront API | `apps/web/app/api/v1/<resource>/**/route.ts` (mirrors the contract path)                    |
 | Admin pages    | `apps/web/app/admin/(shell)/<domain>/**`                                                    |
 | Admin menu     | `apps/web/src/admin/menu/<domain>.menu.ts`                                                  |
 | Jobs           | `apps/worker/src/jobs/<domain>.*.ts`                                                        |
 | Config groups  | `packages/core/src/system/config/<group>.config.ts` (group named after the domain)          |
 | ETL            | `packages/etl/src/mappers/<domain>.ts`                                                      |
 | Tests          | next to the code as `*.test.ts` (unit) and `*.int.test.ts` (needs PG/Redis)                 |
+
+In the App Router the directory is the URL, so route files mirror the contract's `path` exactly. A domain owns the top-level resource segments its contracts declare (coupon owns `coupons/**` and `user-coupons/**`); the contracts gate rejects two routes with the same method and path. Import a core domain by directory: `@shop/core/<domain>`.
 
 Aggregation files (`*.gen.ts`) are produced by `pnpm gen` and gitignored. Add a file in the right place and it is picked up; there is no shared index to edit, so parallel streams do not conflict.
 

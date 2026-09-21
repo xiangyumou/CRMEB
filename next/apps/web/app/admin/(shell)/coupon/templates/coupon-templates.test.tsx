@@ -1,25 +1,11 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { configureApi, resetApiConfig } from '@/admin/api/config';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { CouponTemplatesPage } from './coupon-templates';
-
-/**
- * `CrudTable` reads paging and filters from the real URL, and `useRouter()`
- * throws outside an App Router tree. A page test therefore stubs
- * `next/navigation`; the kit's own tests pass `urlState={useMemoryUrlState()}`
- * instead, which a page cannot do because it owns its table.
- * `docs/rewrite/cr/CR-4-golden.md` asks for the fallback that would make this
- * stub unnecessary — until then, copy these six lines into every page test.
- */
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
-  usePathname: () => '/admin/coupon/templates',
-  useSearchParams: () => new URLSearchParams(),
-}));
 
 /**
  * The admin page as a component test: no browser, no server, one stub `fetch`.

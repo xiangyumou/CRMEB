@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { expireOverdueCoupons } from '@shop/core/coupon/index';
+import { expireOverdueCoupons } from '@shop/core/coupon';
 import { defineJob } from '../define-job';
 
 /**

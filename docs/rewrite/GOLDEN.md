@@ -21,20 +21,24 @@ is typed from them.
 
 ```ts
 export const couponAdminSetStatus = defineRoute({
-  id: 'coupon.adminSetStatus',
-  method: 'POST',
-  path: '/admin-api/coupons/:id/status',
-  auth: 'admin',
-  permission: 'coupon:template:write',
-  summary: '启用/停用优惠券',
-  tags: ['coupon'],
+  id: "coupon.adminSetStatus",
+  method: "POST",
+  path: "/admin-api/coupons/:id/status",
+  auth: "admin",
+  permission: "coupon:template:write",
+  summary: "启用/停用优惠券",
+  tags: ["coupon"],
   params: templateParams,
   body: couponTemplateStatusBody,
   response: couponTemplateDetail,
-  errors: ['COUPON_TEMPLATE_NOT_FOUND'],
+  errors: ["COUPON_TEMPLATE_NOT_FOUND"],
   examples: [
-    { name: 'disable', params: { id: '1' }, body: { status: 'disabled' },
-      response: { ...couponTemplateDetailExample, status: 'disabled' } },
+    {
+      name: "disable",
+      params: { id: "1" },
+      body: { status: "disabled" },
+      response: { ...couponTemplateDetailExample, status: "disabled" },
+    },
   ],
 });
 ```
@@ -47,7 +51,7 @@ export const couponAdminSetStatus = defineRoute({
   honest by assigning one to the other, and stops compiling if they drift.
 - **Not-CRUD is a POSTed sub-resource**, never `?action=` and never a PATCH
   with a magic field. Each gets its own permission and audit entry.
-- One error code per *decision the caller can act on*, not per internal branch.
+- One error code per _decision the caller can act on_, not per internal branch.
   `COUPON_NOT_USABLE` covers used / revoked / expired / not-yet-valid / someone
   else's, because `redeem` learns "no" from an UPDATE that affected zero rows
   and genuinely cannot tell which.
@@ -70,16 +74,16 @@ export async function redeemUserCoupon(
     where: and(
       eq(userCoupons.id, args.id),
       eq(userCoupons.userId, args.userId),
-      eq(userCoupons.status, 'unused'),
+      eq(userCoupons.status, "unused"),
       lte(userCoupons.validFrom, args.now),
       gte(userCoupons.validTo, args.now),
     ),
-    set: { status: 'used', usedAt: args.now, updatedAt: args.now },
+    set: { status: "used", usedAt: args.now, updatedAt: args.now },
   });
 }
 ```
 
-- **Every precondition goes in the `WHERE`.** Zero affected rows is the *only*
+- **Every precondition goes in the `WHERE`.** Zero affected rows is the _only_
   correct way to learn that a coupon was already spent; a prior
   `SELECT … status = 'unused'` proves nothing about the instant of the UPDATE.
   If you read a row to check something and then write it, you wrote a race.
@@ -95,7 +99,7 @@ Optional, and worth it whenever arithmetic or eligibility can be decided
 without the database: scope matching, the min-spend comparison, the discount
 cap, the validity window. Pure functions, with a plain `*.test.ts` — no Docker,
 milliseconds — holding the fiddly cases (`coupon.rules.test.ts`, 24 of them).
-The integration test is then free to be about *state*, not arithmetic.
+The integration test is then free to be about _state_, not arithmetic.
 
 ## 4. Service — `packages/core/src/<domain>/<domain>.service.ts`
 
@@ -122,9 +126,9 @@ export async function claim(ctx: Ctx, input: { id: string }): Promise<ClaimResul
 }
 ```
 
-- **Two signatures, and the difference matters.** A service the *route* calls
+- **Two signatures, and the difference matters.** A service the _route_ calls
   takes `(ctx, input)` and opens its own transaction with `ctx.withTx`. A
-  service *another domain* calls inside its transaction takes `(tx, ctx, input)`
+  service _another domain_ calls inside its transaction takes `(tx, ctx, input)`
   — the same order as the platform's `recordEffect(tx, ctx, input)`. `redeem`,
   `release`, `grantNewUser` and `grantOrderGifts` are all the second kind.
 - **Never `new Date()`.** `ctx.clock.now()`, always, or the fixed-clock tests
@@ -151,9 +155,11 @@ is the one reviewers read.
 `packages/core/src/coupon/coupon.concurrency.int.test.ts`
 
 ```ts
-it('hands the last one to exactly one claimant', async () => {
+it("hands the last one to exactly one claimant", async () => {
   const templateId = await makeTemplate({ totalCount: 1, remainingCount: 1 });
-  const userIds = await Promise.all(Array.from({ length: 12 }, () => makeUser()));
+  const userIds = await Promise.all(
+    Array.from({ length: 12 }, () => makeUser()),
+  );
 
   const report = await runConcurrently(userIds.length, (index) =>
     service.claim(racer(userIds[index]!), { id: String(templateId) }),
@@ -161,7 +167,8 @@ it('hands the last one to exactly one claimant', async () => {
 
   expect(report.fulfilled).toHaveLength(1);
   expect(report.rejected).toHaveLength(11);
-  for (const e of report.rejected) expect(e).toMatchObject({ code: 'COUPON_SOLD_OUT' });
+  for (const e of report.rejected)
+    expect(e).toMatchObject({ code: "COUPON_SOLD_OUT" });
   expect((await templateRow(templateId)).remainingCount).toBe(0);
   // The eleven losers left nothing behind: no half-issued wallet rows.
   expect(await walletRows()).toHaveLength(1);
@@ -177,7 +184,7 @@ it('hands the last one to exactly one claimant', async () => {
 - **`isWinner` when the result is a `conditionalUpdate`.** The default counts
   any resolved promise as a win, so `{ affected: 0, won: false }` reads as a
   winner and the test proves nothing: pass `{ isWinner: (r) => r.won }`.
-- Assert the *losers* too — no orphan rows, stock not consumed, counter not
+- Assert the _losers_ too — no orphan rows, stock not consumed, counter not
   negative. A winner-only assertion passes on a badly broken system.
 - `beforeEach`: `truncateAll()` **and** `clock.set(NOW)`. The clock is shared
   state, and a test that advanced it looks like flakiness in the next file.
@@ -197,7 +204,13 @@ and the types in their signatures; never the repo.
  * | `redeem`          | B1     | inside `createOrder`'s transaction       |
  * | `grantNewUser`    | E1     | inside the registration transaction      |
  */
-export { quote, redeem, release, grantNewUser, grantOrderGifts } from './coupon.service';
+export {
+  quote,
+  redeem,
+  release,
+  grantNewUser,
+  grantOrderGifts,
+} from "./coupon.service";
 ```
 
 Write the table: it is the first thing the stream that has to call you reads,
@@ -206,16 +219,20 @@ and where you say which argument order a function takes and what a retry does.
 ## 7. Permissions — `packages/core/src/<domain>/permissions.ts`
 
 ```ts
-export const couponPermissions = definePermissions('coupon', {
-  'template:read': '查看优惠券',
-  'template:write': '新建/编辑优惠券',
-  'template:delete': '删除优惠券',
-  'grant:write': '发放优惠券给用户',
-  'user-coupon:read': '查看已领取的优惠券',
-}, { section: '营销' });
+export const couponPermissions = definePermissions(
+  "coupon",
+  {
+    "template:read": "查看优惠券",
+    "template:write": "新建/编辑优惠券",
+    "template:delete": "删除优惠券",
+    "grant:write": "发放优惠券给用户",
+    "user-coupon:read": "查看已领取的优惠券",
+  },
+  { section: "营销" },
+);
 ```
 
-Five atoms, not fifteen: one per *job somebody actually does*. Split `delete`
+Five atoms, not fifteen: one per _job somebody actually does_. Split `delete`
 from `write` only where deleting means something different from editing (here
 it hides every coupon issued from the template). The string a route declares
 must exist here, and the label is what an operator reads in the role editor.
@@ -225,28 +242,30 @@ must exist here, and the label is what an operator reads in the role editor.
 `apps/web/app/admin-api/coupons/[id]/status/route.ts`
 
 ```ts
-export const POST = handle(couponAdminSetStatus, async (ctx, { params, body }) => {
-  const updated = await coupon.adminSetStatus(ctx, params, body);
-  ctx.audit(`coupon:${params.id}`);
-  return updated;
-});
+export const POST = handle(
+  couponAdminSetStatus,
+  async (ctx, { params, body }) => {
+    const updated = await coupon.adminSetStatus(ctx, params, body);
+    ctx.audit(`coupon:${params.id}`);
+    return updated;
+  },
+);
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 ```
 
 - **The directory is the URL**, mirroring the contract's `path:` exactly. A
   domain owns the resource segments its contracts declare — coupon owns
-  `coupons/**` *and* `user-coupons/**`. (CONVENTIONS says
-  `admin-api/<domain>/**`; that is wrong for the App Router — `CR-1-golden.md`.)
+  `coupons/**` _and_ `user-coupons/**`.
 - **No logic.** Auth, permission, parsing, error mapping and the status code all
   come from the contract through `handle()`. An `if` here belongs in the service.
 - `ctx.audit(resource)` on every write, `export const dynamic = 'force-dynamic'`
   on every file, and import the domain rather than the barrel:
-  `import * as coupon from '@shop/core/coupon/index'` (`CR-2-golden.md`).
+  `import * as coupon from '@shop/core/coupon'`.
 
 One HTTP-level test next to the routes
 (`apps/web/app/admin-api/coupons/coupons.int.test.ts`) covers what only exists
-at this layer: 401 vs 403 vs 200 per permission, the audit row, 422 *before* any
+at this layer: 401 vs 403 vs 200 per permission, the audit row, 422 _before_ any
 write, and a domain refusal arriving as its declared status and Chinese
 message. Do not re-test the service through HTTP.
 
@@ -254,13 +273,13 @@ message. Do not re-test the service through HTTP.
 
 ```ts
 export default defineJob({
-  name: 'coupon.expireUserCoupons',
+  name: "coupon.expireUserCoupons",
   schema: z.object({}).default({}),
   concurrency: 1,
-  repeat: { pattern: '7 * * * *' },
+  repeat: { pattern: "7 * * * *" },
   handler: async (ctx) => {
     const expired = await expireOverdueCoupons(ctx);
-    if (expired > 0) ctx.logger.info({ expired }, 'expired overdue coupons');
+    if (expired > 0) ctx.logger.info({ expired }, "expired overdue coupons");
   },
 });
 ```
@@ -294,25 +313,33 @@ One folder per domain: `<domain>-enums.tsx` next to a folder per page
 - **No `fetch`, no hand-written validation, no permission logic.** `CrudTable`
   calls the route; `ModalForm` takes the contract's own body schema, including
   the cross-field refinements that mirror the database CHECKs; `<Can>` and
-  `permission=` only *hide* things, and the server checks again.
+  `permission=` only _hide_ things, and the server checks again.
 - One `StatusMap<ContractUnion>` per enum in `<domain>-enums.tsx`, shared by the
   column, the filter and the form — so removing a value from the contract is a
   compile error here rather than a blank tag in production.
 - `visibleWhen` on fields a mode does not use; hiding the day count while a
   fixed window is selected is what stops operators being 422'd by their own form.
-- The page test asserts *wiring* — which route the table called, that
+- The page test asserts _wiring_ — which route the table called, that
   permissions hid the buttons, what body the action sent — and leaves paging and
-  form rendering to the kit's own tests. It needs a `vi.mock('next/navigation')`
-  stub; copy the six lines from `coupon-templates.test.tsx` (`CR-4-golden.md`).
+  form rendering to the kit's own tests. `src/test/setup.ts` already
+  stubs `next/navigation` for every test file.
 
 ## 11. Menu — `apps/web/src/admin/menu/<domain>.menu.ts`
 
 ```ts
 export default defineMenu({
-  key: 'coupon', label: '优惠券', icon: 'TagsOutlined', order: 300,
+  key: "coupon",
+  label: "优惠券",
+  icon: "TagsOutlined",
+  order: 300,
   children: [
-    { key: 'coupon.templates', label: '优惠券列表', path: '/admin/coupon/templates',
-      permission: 'coupon:template:read', order: 10 },
+    {
+      key: "coupon.templates",
+      label: "优惠券列表",
+      path: "/admin/coupon/templates",
+      permission: "coupon:template:read",
+      order: 10,
+    },
   ],
 });
 ```

@@ -3,7 +3,7 @@ import {
   couponAdminDetail,
   couponAdminUpdate,
 } from '@shop/contracts/coupon/coupon.admin.contract';
-import * as coupon from '@shop/core/coupon/index';
+import * as coupon from '@shop/core/coupon';
 import { handle } from '../../../../src/server';
 
 /** `/admin-api/coupons/:id` — read, edit, soft-delete one campaign. */

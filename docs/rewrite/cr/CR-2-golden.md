@@ -26,7 +26,7 @@ nobody noticed: those three are the only directories exported so far.
 Every route file in this slice therefore reads:
 
 ```ts
-import * as coupon from '@shop/core/coupon/index';
+import * as coupon from '@shop/core/coupon';
 ```
 
 It works, and it is what 15 streams will copy — an `/index` on the end of every

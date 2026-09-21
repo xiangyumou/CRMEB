@@ -90,7 +90,7 @@ await coupon.grantOrderGifts(tx, ctx, { userId, orderId, productIds, paidAmount 
 - **`grantNewUser` never fails a registration.** A sold-out welcome coupon is a
   no-op, not an exception. Idempotent by "already holds one from this template".
 - **Everything is exported from `core/src/coupon/index.ts` as plain functions.**
-  No class, no service object. Import `@shop/core/coupon/index` (the `/index` is
+  No class, no service object. Import `@shop/core/coupon` (the `/index` is
   CR-2).
 - **The checkout picker takes cart lines, not a cart id**:
   `listApplicable` / `quote` receive `{ productId, categoryIds, amount }[]` and
@@ -129,7 +129,7 @@ await coupon.grantOrderGifts(tx, ctx, { userId, orderId, productIds, paidAmount 
   When it lands the fake goes and the test uses real users.
 - **`adminListUserCoupons` shows user ids, not names.** Same reason; the column
   gets a name once E1's lookup exists.
-- **`@shop/core/coupon/index` → `@shop/core/coupon`** once CR-2 lands. One sed
+- **`@shop/core/coupon` → `@shop/core/coupon`** once CR-2 lands. One sed
   over ten route files.
 
 ## New package
@@ -158,7 +158,7 @@ Four CRs, all with a working workaround in this branch:
 | CR                | What                                                                             | Cost if unfixed                              |
 | ----------------- | -------------------------------------------------------------------------------- | -------------------------------------------- |
 | `CR-1-golden.md`  | CONVENTIONS says `app/admin-api/<domain>/**`, but the App Router makes the directory the URL, and one domain owns two resources | every stream guesses; wrong URLs found late   |
-| `CR-2-golden.md`  | `@shop/core`'s export map has no directory entry, so imports read `@shop/core/coupon/index` | `/index` on every domain import, forever      |
+| `CR-2-golden.md`  | `@shop/core`'s export map has no directory entry, so imports read `@shop/core/coupon` | `/index` on every domain import, forever      |
 | `CR-3-golden.md`  | two P0-A worker tests asserted the job-name list literally — **fixed in `0aa9c00e`, please keep it** | ~10 streams each editing the same two lines   |
 | `CR-4-golden.md`  | `CrudTable` binds to the real URL, so every page test must `vi.mock('next/navigation')` | six pasted lines × ~150 admin pages           |
 

@@ -1,5 +1,5 @@
 import { couponAdminGrant } from '@shop/contracts/coupon/coupon.admin.contract';
-import * as coupon from '@shop/core/coupon/index';
+import * as coupon from '@shop/core/coupon';
 import { handle } from '../../../../../src/server';
 
 /** `/admin-api/coupons/:id/grants` — hand this campaign's coupons to named users. */

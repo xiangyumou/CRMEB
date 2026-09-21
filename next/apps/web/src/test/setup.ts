@@ -3,6 +3,17 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
+// Page components own a `CrudTable`, which binds its state to the URL through
+// `next/navigation`. There is no app router in a component test, so every test file gets this
+// inert one; a test that cares about navigation declares its own `vi.mock('next/navigation')`.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => '/admin',
+  useSearchParams: () => new URLSearchParams(),
+  redirect: vi.fn(),
+  notFound: vi.fn(),
+}));
+
 // antd probes both of these at import time; happy-dom ships neither.
 if (!window.matchMedia) {
   window.matchMedia = ((query: string) => ({

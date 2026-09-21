@@ -1,5 +1,5 @@
 import { couponClaim } from '@shop/contracts/coupon/coupon.storefront.contract';
-import * as coupon from '@shop/core/coupon/index';
+import * as coupon from '@shop/core/coupon';
 import { handle } from '../../../../../../src/server';
 
 /**

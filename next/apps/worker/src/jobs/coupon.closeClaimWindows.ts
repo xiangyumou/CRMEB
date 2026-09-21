@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { disableClosedCampaigns } from '@shop/core/coupon/index';
+import { disableClosedCampaigns } from '@shop/core/coupon';
 import { defineJob } from '../define-job';
 
 /**
