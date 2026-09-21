@@ -7,6 +7,9 @@ dist/
 coverage/
 *.gen.ts
 openapi.json
+# Written by `next build`, so the Definition of Done's own order (build, then
+# `prettier --check .`) goes red without this. See docs/rewrite/status/golden.md.
+apps/web/next-env.d.ts
 
 # Data, not code. The DIY fixtures are production exports and must stay byte-exact.
 packages/contracts/src/diy/__fixtures__/

@@ -85,7 +85,21 @@ describe('syncRepeatables', () => {
   it('schedules the real job set this worker ships with', async () => {
     await syncRepeatables(queue, indexJobs(allJobs), logger);
     const names = (await queue.getJobSchedulers()).map((s) => s.name ?? s.key).sort();
-    expect(names).toEqual(['system.dispatchEffects', 'system.heartbeat', 'system.pruneSessions']);
+    // Every scheduled job this worker ships with really got a scheduler, and
+    // nothing was registered twice. Not a literal list: every domain stream
+    // adds jobs, and this file belongs to P0-A (`docs/rewrite/cr/CR-3-golden.md`).
+    const scheduled = allJobs
+      .filter((definition) => definition.repeat && !definition.disabled)
+      .map((definition) => definition.name)
+      .sort();
+    expect(names).toEqual(scheduled);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'system.dispatchEffects',
+        'system.heartbeat',
+        'system.pruneSessions',
+      ]),
+    );
   });
 
   it('uses Asia/Shanghai for a cron schedule', async () => {

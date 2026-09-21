@@ -76,7 +76,20 @@ describe('indexJobs', () => {
 describe('the generated job bucket', () => {
   it('picked up every file in src/jobs', () => {
     const names = allJobs.map((j) => j.name).sort();
-    expect(names).toEqual(['system.dispatchEffects', 'system.heartbeat', 'system.pruneSessions']);
+    // Asserted structurally rather than as a literal list: every domain stream
+    // adds jobs here, and a hard-coded list makes each of them edit this
+    // P0-A-owned file. See `docs/rewrite/cr/CR-3-golden.md`.
+    expect(names.length).toBeGreaterThanOrEqual(3);
+    expect(names).toEqual([...new Set(names)].sort());
+    for (const name of names) expect(name, name).toMatch(/^[a-z][a-z0-9-]*\.[a-zA-Z][a-zA-Z0-9]*$/);
+    // The platform's own jobs must never disappear.
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'system.dispatchEffects',
+        'system.heartbeat',
+        'system.pruneSessions',
+      ]),
+    );
   });
 
   it('indexes cleanly — no duplicate names across the whole system', () => {
