@@ -93,13 +93,10 @@ export function defineRoute<
   return def;
 }
 
-export type ParamsOf<R extends AnyRouteDef> = R['params'] extends z.ZodType
-  ? z.output<R['params']>
-  : undefined;
-export type QueryOf<R extends AnyRouteDef> = R['query'] extends z.ZodType
-  ? z.output<R['query']>
-  : undefined;
-export type BodyOf<R extends AnyRouteDef> = R['body'] extends z.ZodType
-  ? z.output<R['body']>
-  : undefined;
+// `NonNullable` because under `exactOptionalPropertyTypes` an optional property reads as
+// `T | undefined`, which never extends `z.ZodType`. A route that omits a part yields `unknown`.
+type PartOf<T> = NonNullable<T> extends z.ZodType ? z.output<NonNullable<T>> : undefined;
+export type ParamsOf<R extends AnyRouteDef> = PartOf<R['params']>;
+export type QueryOf<R extends AnyRouteDef> = PartOf<R['query']>;
+export type BodyOf<R extends AnyRouteDef> = PartOf<R['body']>;
 export type ResponseOf<R extends AnyRouteDef> = z.input<R['response']>;

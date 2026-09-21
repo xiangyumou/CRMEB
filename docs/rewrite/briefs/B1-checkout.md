@@ -5,6 +5,16 @@
 ## Scope
 Cart (add, set quantity, remove, list with validity flags, count, re-buy from an order). Checkout: `POST /api/v1/checkout/preview` (server-side recompute: items, address → freight, coupon choice, contributor adjustments) and `POST /api/v1/orders` (create) with an idempotency key. Pricing pipeline: item totals → `PricingContributor`s (marketing) → coupon (allocate across eligible items with `Money.allocate`) → freight (call `shipping`'s calculator through its index; until F2 lands, code against an interface with a flat-rate fake) → payable. Order numbers. Storefront order list/detail/counts. Cancel: user cancel, auto-cancel job (delayed per order + sweeping repeatable job), both through one entry point. You implement `OrderStateMachine.transition` declared in `core/src/order/ports.ts` and dispatch the `onOrder*` hooks inside the transaction.
 
+## Schema rules you must honour
+
+Read `next/packages/db/docs/SCHEMA.md` first. The ones that bite this stream:
+
+- A `virtual_card` product is limited to **quantity 1 per order item** (one card row is bound to one order item). Reject larger quantities in cart add, cart update, preview and create, with a domain error.
+- There is no order splitting. An order keeps all its items; partial shipment is expressed by `shipments` + `shipment_items` and `order_items.shipped_quantity` (stream B2).
+- `orders.status` and `orders.fulfillment_status` are separate columns; checkout and cancel only ever move `status`.
+- Coupon use is linked one way: `orders.user_coupon_id` points at the coupon; release it on cancel with a conditional update on `user_coupons.status`.
+- Stock moves are single atomic statements (`UPDATE … SET stock = stock - $n WHERE id = $1 AND stock >= $n`), decided by affected row count.
+
 ## Cancel vs pay
 Cancelling must not release stock or coupons while a payment attempt may still succeed. Call `PaymentPort.ensureNoOpenAttempts(tx, orderId)` (declared in ports; stream C implements it; use the fake from `@shop/testing` until then): confirmed closed → proceed; paid → run paid transition and refuse the cancel; unknown → refuse, keep everything, retry later.
 

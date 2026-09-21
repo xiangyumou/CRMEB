@@ -27,6 +27,17 @@ export function paged<T extends z.ZodType>(item: T) {
   });
 }
 
+/**
+ * Sortable lists take `sortBy` + `sortOrder`; merge into the list query with `.extend(...)`.
+ * The admin `CrudTable` sends exactly these two keys.
+ */
+export function sortQuery<const K extends readonly [string, ...string[]]>(keys: K) {
+  return z.object({
+    sortBy: z.enum(keys).optional(),
+    sortOrder: z.enum(['asc', 'desc']).optional(),
+  });
+}
+
 /** Which storefront client is calling; sent as the `X-Client-Platform` header. */
 export const clientPlatform = z.enum(['h5', 'wechat-oa', 'wechat-mini']);
 export type ClientPlatform = z.infer<typeof clientPlatform>;

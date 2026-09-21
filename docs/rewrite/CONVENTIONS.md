@@ -54,7 +54,7 @@ Every endpoint is a `defineRoute({...})` (see `packages/contracts/src/_conventio
 
 - Paths are plural nouns, kebab-case, `:param` placeholders. Actions that are not CRUD are sub-resources with POST: `POST /api/v1/orders/:id/cancel`.
 - JSON keys are camelCase. IDs are decimal strings. Money is a `"12.00"` string (`money`). Time is ISO-8601 with offset (`instant`). Booleans are booleans. Absent optional values are omitted or `null`, never `""` or `0`.
-- Lists use `pageQuery` and `paged(item)`.
+- Lists use `pageQuery` and `paged(item)`. Sortable lists add `sortQuery([...keys])` (`sortBy` + `sortOrder=asc|desc`); `CrudTable` sends exactly those keys.
 - Every route has at least one example; examples must parse against the schemas (CI checks). The mock server answers with the first example.
 - Errors: real HTTP status + `{code, message, details?}`. Declare domain codes with `defineErrors` in `contracts/src/<domain>/errors.ts`, prefixed by the domain. Messages are Simplified Chinese and user-safe.
 - Admin routes must declare `permission`. Storefront platform comes from the `X-Client-Platform` header.
@@ -77,6 +77,16 @@ Every endpoint is a `defineRoute({...})` (see `packages/contracts/src/_conventio
 - Data access goes through the generated TanStack Query hooks; no hand-written `fetch`.
 - Forms are typed from the contract's zod body schema.
 - All user-facing text is Simplified Chinese. No i18n layer.
+- Read `apps/web/src/admin/kit/README.md` before building a page; `/admin/dev/kit` shows every component live.
+- `exactOptionalPropertyTypes` is on: declare optional props as `?: T | undefined`, and spread `defined({...})` from `kit/props.ts` when handing a maybe-undefined value to an antd prop.
+- Real asset and link data reach the pickers through `<AssetSourceProvider>` / `<LinkSourceProvider>`; the kit itself does not change.
+- Secret config fields (`password` kind) travel to the browser as an "is set" boolean; plaintext goes back only when retyped.
+- In tests, match two-character CJK button labels with `zhName()` from `src/test/render.tsx` (antd inserts a space).
+
+## Tooling caveats
+
+- typescript-eslint does not yet support TypeScript 7, so lint runs through `scripts/eslint-ts6.mjs`, which resolves `typescript` to a side-by-side 6.x alias; `tsc` stays on 7. Plain `.js/.mjs` files are not linted. Remove the shim once typescript-eslint supports TS 7.
+- Vitest 5 transforms with oxc; React packages need `oxc: { jsx: { runtime: 'automatic' } }`.
 
 ## Scope guard
 
