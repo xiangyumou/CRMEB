@@ -11,8 +11,9 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "node scripts/eslint-ts6.mjs",
     "test": "vitest run",
-    "test:unit": "vitest run",
-    "test:watch": "vitest"
+    "test:unit": "vitest run --project unit --project unit-server",
+    "test:watch": "vitest",
+    "test:int": "vitest run --project int --passWithNoTests"
   },
   "dependencies": {
     "@ant-design/cssinjs": "^2.1.2",
@@ -23,12 +24,15 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@shop/contracts": "workspace:*",
+    "@shop/core": "workspace:*",
+    "@shop/db": "workspace:*",
     "@tanstack/react-query": "^5.103.2",
     "@tiptap/extension-image": "^3.31.3",
     "@tiptap/react": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
     "antd": "^6.6.5",
     "dayjs": "^1.11.23",
+    "ioredis": "^6.0.0",
     "next": "^16.3.5",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -36,6 +40,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@shop/config": "workspace:*",
+    "@shop/testing": "workspace:*",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

@@ -40,7 +40,10 @@ export const componentTokens: NonNullable<ThemeConfig['components']> = {
 };
 
 /** Non-antd surface colours used by the shell (sider, content background). */
-export const shellPalette: Record<ThemeMode, { siderBg: string; contentBg: string; headerBg: string; border: string }> = {
+export const shellPalette: Record<
+  ThemeMode,
+  { siderBg: string; contentBg: string; headerBg: string; border: string }
+> = {
   light: {
     siderBg: '#ffffff',
     contentBg: '#f5f6f8',

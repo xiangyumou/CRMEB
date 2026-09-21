@@ -51,7 +51,13 @@ const CONFIG_GROUP: ConfigGroupDescriptor = {
   fields: [
     { key: 'siteName', label: '站点名称', kind: 'text', required: true, span: 12 },
     { key: 'contactPhone', label: '客服电话', kind: 'text', span: 12 },
-    { key: 'apiSecret', label: '接口密钥', kind: 'password', span: 12, help: '演示：已设置的密钥不会回传到浏览器' },
+    {
+      key: 'apiSecret',
+      label: '接口密钥',
+      kind: 'password',
+      span: 12,
+      help: '演示：已设置的密钥不会回传到浏览器',
+    },
     { key: 'smsSecret', label: '短信密钥', kind: 'password', span: 12 },
     {
       key: 'deliveryMode',
@@ -98,9 +104,7 @@ export function KitDemo() {
     <PageContainer
       title="组件套件演示"
       subTitle="每个 kit 组件的可运行示例；数据来自内存中的假接口"
-      extra={
-        <Typography.Text type="secondary">源码：app/admin/(shell)/dev/kit/</Typography.Text>
-      }
+      extra={<Typography.Text type="secondary">源码：app/admin/(shell)/dev/kit/</Typography.Text>}
     >
       <Alert
         type="warning"
@@ -161,15 +165,29 @@ export function KitDemo() {
                   columns={[
                     idColumn<DemoWidget>({ sortable: true }),
                     imageColumn<DemoWidget>({ title: '图片', dataIndex: 'image' }),
-                    textColumn<DemoWidget>({ title: '名称', dataIndex: 'name', ellipsis: true, sortable: true }),
+                    textColumn<DemoWidget>({
+                      title: '名称',
+                      dataIndex: 'name',
+                      ellipsis: true,
+                      sortable: true,
+                    }),
                     moneyColumn<DemoWidget>({ title: '价格', dataIndex: 'price', sortable: true }),
-                    textColumn<DemoWidget>({ title: '库存', dataIndex: 'quantity', align: 'right', sortable: true }),
+                    textColumn<DemoWidget>({
+                      title: '库存',
+                      dataIndex: 'quantity',
+                      align: 'right',
+                      sortable: true,
+                    }),
                     enumColumn<DemoWidget, DemoWidget['status']>({
                       title: '状态',
                       dataIndex: 'status',
                       map: DEMO_STATUS,
                     }),
-                    instantColumn<DemoWidget>({ title: '创建时间', dataIndex: 'createdAt', sortable: true }),
+                    instantColumn<DemoWidget>({
+                      title: '创建时间',
+                      dataIndex: 'createdAt',
+                      sortable: true,
+                    }),
                     actionsColumn<DemoWidget>({
                       render: (row) => (
                         <>
@@ -319,7 +337,10 @@ export function KitDemo() {
                     { label: '金额', value: <MoneyText value="123456.70" /> },
                     { label: '负数金额', value: <MoneyText value="-12.00" colored /> },
                     { label: '时间', value: <InstantText value="2026-03-01T10:00:00+08:00" /> },
-                    { label: '相对时间', value: <InstantText value="2026-03-01T10:00:00+08:00" format="relative" /> },
+                    {
+                      label: '相对时间',
+                      value: <InstantText value="2026-03-01T10:00:00+08:00" format="relative" />,
+                    },
                     { label: '状态', value: <StatusTag value="active" map={DEMO_STATUS} /> },
                     { label: '空值', value: null },
                   ]}
@@ -327,10 +348,16 @@ export function KitDemo() {
 
                 <Card size="small" title="Can / 权限">
                   <Space direction="vertical">
-                    <Can permission="dev:demo:create" fallback={<span>（无 dev:demo:create 权限时的替代内容）</span>}>
+                    <Can
+                      permission="dev:demo:create"
+                      fallback={<span>（无 dev:demo:create 权限时的替代内容）</span>}
+                    >
                       <Button>只有拥有 dev:demo:create 才能看到</Button>
                     </Can>
-                    <Can permission="never:granted:atom" fallback={<span>没有 never:granted:atom 权限，已隐藏</span>}>
+                    <Can
+                      permission="never:granted:atom"
+                      fallback={<span>没有 never:granted:atom 权限，已隐藏</span>}
+                    >
                       <Button danger>不该出现</Button>
                     </Can>
                   </Space>

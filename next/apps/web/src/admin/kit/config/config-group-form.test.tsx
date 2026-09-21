@@ -38,7 +38,9 @@ const saveRoute = defineRoute({
   params: z.object({ group: z.string() }),
   body: z.object({ values: z.record(z.string(), z.unknown()) }),
   response: z.object({ ok: z.literal(true) }),
-  examples: [{ name: 'ok', params: { group: 'demo' }, body: { values: {} }, response: { ok: true } }],
+  examples: [
+    { name: 'ok', params: { group: 'demo' }, body: { values: {} }, response: { ok: true } },
+  ],
 });
 
 // `apiSecret` is already set (boolean flag, never the secret); `smsSecret` isn't.
@@ -80,7 +82,11 @@ describe('buildConfigPayload', () => {
   });
 
   it('leaves out fields hidden by visibleWhen', () => {
-    const payload = buildConfigPayload(descriptor, { ...values, mode: 'city', threshold: '9.00' }, {});
+    const payload = buildConfigPayload(
+      descriptor,
+      { ...values, mode: 'city', threshold: '9.00' },
+      {},
+    );
     expect(payload).not.toHaveProperty('threshold');
   });
 });
@@ -92,7 +98,10 @@ describe('isConfigFieldVisible', () => {
     expect(isConfigFieldVisible(field, { mode: 'express' })).toBe(true);
     expect(isConfigFieldVisible(field, { mode: 'city' })).toBe(false);
     expect(
-      isConfigFieldVisible({ ...field, visibleWhen: { key: 'mode', equals: ['express', 'city'] } }, { mode: 'city' }),
+      isConfigFieldVisible(
+        { ...field, visibleWhen: { key: 'mode', equals: ['express', 'city'] } },
+        { mode: 'city' },
+      ),
     ).toBe(true);
   });
 

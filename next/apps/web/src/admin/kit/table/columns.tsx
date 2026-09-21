@@ -39,7 +39,10 @@ export function textColumn<T>(
     ...base(options),
     ...(options.ellipsis ? { ellipsis: { showTitle: false } } : {}),
     render: (value: unknown) => {
-      const text = value === null || value === undefined || value === '' ? (options.placeholder ?? '—') : String(value);
+      const text =
+        value === null || value === undefined || value === ''
+          ? (options.placeholder ?? '—')
+          : String(value);
       return options.ellipsis ? (
         <Tooltip title={text}>
           <span>{text}</span>

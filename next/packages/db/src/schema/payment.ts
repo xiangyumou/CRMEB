@@ -9,9 +9,11 @@ import {
   text,
   uniqueIndex,
   varchar,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 import { createdAt, emptyJsonObject, fk, instant, money, pk, updatedAt } from './_shared';
+import { admins } from './auth';
 import { orders } from './order';
 import { users } from './user';
 
@@ -238,8 +240,7 @@ export const paymentExceptions = pgTable(
     refundNo: varchar({ length: 64 }),
     /** Frozen refund request plus the gateway's answers. */
     refundRequest: jsonb().$type<Record<string, unknown>>(),
-    /** FK to `admins` — wired by the orchestrator at merge, see SCHEMA.md. */
-    operatorAdminId: fk(),
+    operatorAdminId: fk().references((): AnyPgColumn => admins.id, { onDelete: 'set null' }),
     note: text(),
     refundedAt: instant(),
     resolvedAt: instant(),

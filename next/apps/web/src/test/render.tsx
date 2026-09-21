@@ -32,7 +32,11 @@ export interface AdminRenderOptions extends Omit<RenderOptions, 'wrapper'> {
 /** Renders a component inside the same providers the real admin gives it. */
 export function renderAdmin(
   ui: ReactElement,
-  { identity = testIdentity, queryClient = makeTestQueryClient(), ...options }: AdminRenderOptions = {},
+  {
+    identity = testIdentity,
+    queryClient = makeTestQueryClient(),
+    ...options
+  }: AdminRenderOptions = {},
 ): RenderResult & { queryClient: QueryClient } {
   function Wrapper({ children }: { children: ReactNode }) {
     const inner = identity ? (

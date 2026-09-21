@@ -52,9 +52,7 @@ export type EffectStatus = (typeof EFFECT_STATUSES)[number];
  * same event for the same aggregate can only ever be enqueued once, and the
  * handler itself still has to be idempotent because delivery is at-least-once.
  *
- * This is the *generic* table. The design note in PLAN.md §1 mentions an
- * order-specific `order_effects(order_id, event_type UNIQUE)`; the two must not
- * both exist. See the arbitration note in `docs/rewrite/status/p0a.md`.
+ * This is the only ledger: orders use `scope = 'order'`, `scope_id = String(orderId)`.
  */
 export const effects = pgTable(
   'effects',

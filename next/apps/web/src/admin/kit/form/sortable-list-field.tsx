@@ -109,7 +109,11 @@ export function SortableListField<T>({
   return (
     <div>
       {items.length === 0 ? (
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyText} style={{ margin: '8px 0' }} />
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={emptyText}
+          style={{ margin: '8px 0' }}
+        />
       ) : (
         <DndContext
           sensors={sensors}
@@ -191,13 +195,23 @@ function SortableRow({
         {...attributes}
         {...listeners}
         aria-label="拖动排序"
-        style={{ cursor: disabled ? 'not-allowed' : 'grab', color: 'var(--ant-color-text-quaternary)' }}
+        style={{
+          cursor: disabled ? 'not-allowed' : 'grab',
+          color: 'var(--ant-color-text-quaternary)',
+        }}
       >
         <HolderOutlined />
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
       {onRemove ? (
-        <Button type="text" danger size="small" icon={<DeleteOutlined />} aria-label="删除" onClick={onRemove} />
+        <Button
+          type="text"
+          danger
+          size="small"
+          icon={<DeleteOutlined />}
+          aria-label="删除"
+          onClick={onRemove}
+        />
       ) : null}
     </div>
   );

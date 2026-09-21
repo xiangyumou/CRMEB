@@ -9,9 +9,20 @@ import {
   text,
   uniqueIndex,
   varchar,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
-import { createdAt, deletedAt, emptyJsonArray, emptyJsonObject, fk, instant, pk, updatedAt } from './_shared';
+import {
+  createdAt,
+  deletedAt,
+  emptyJsonArray,
+  emptyJsonObject,
+  fk,
+  instant,
+  pk,
+  updatedAt,
+} from './_shared';
+import { admins } from './auth';
 import { users } from './user';
 
 /**
@@ -93,8 +104,8 @@ export const notificationMessages = pgTable(
     audience: notificationTemplatesAudience().notNull(),
     /** Set for `audience = 'user'`. */
     userId: fk().references(() => users.id, { onDelete: 'cascade' }),
-    /** Set for `audience = 'admin'`. FK to `admins` — wired by the orchestrator at merge. */
-    adminId: fk(),
+    /** Set for `audience = 'admin'`. */
+    adminId: fk().references((): AnyPgColumn => admins.id, { onDelete: 'cascade' }),
     title: varchar({ length: 255 }).notNull(),
     content: text().notNull(),
     /** Rendered variables plus anything the client needs to deep-link. */

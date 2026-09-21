@@ -44,8 +44,8 @@ export function DashboardPage() {
       {process.env.NODE_ENV === 'production' ? null : (
         <Card size="small" title="开发提示" style={{ marginTop: 16 }}>
           <Typography.Paragraph style={{ marginBottom: 0 }}>
-            组件套件的用法与示例见 <Link href="/admin/dev/kit">组件套件演示</Link>，
-            以及 <code>src/admin/kit/README.md</code>。
+            组件套件的用法与示例见 <Link href="/admin/dev/kit">组件套件演示</Link>， 以及{' '}
+            <code>src/admin/kit/README.md</code>。
           </Typography.Paragraph>
         </Card>
       )}

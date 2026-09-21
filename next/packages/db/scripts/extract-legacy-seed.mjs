@@ -172,7 +172,8 @@ async function main() {
   const codes = new Map();
   for (const c of cities) {
     if (c.code === null) continue;
-    if (codes.has(c.code)) problems.push(`duplicate city code ${c.code}: ${codes.get(c.code)} and ${c.name}`);
+    if (codes.has(c.code))
+      problems.push(`duplicate city code ${c.code}: ${codes.get(c.code)} and ${c.name}`);
     codes.set(c.code, c.name);
   }
   const expressCodes = new Set();

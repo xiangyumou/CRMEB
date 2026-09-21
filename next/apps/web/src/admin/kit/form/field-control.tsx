@@ -113,7 +113,11 @@ export function renderControl(spec: FieldSpec, disabled: boolean): ReactNode {
 
     case 'date':
       return (
-        <DateField showTime={spec.showTime ?? false} placeholder={spec.placeholder} disabled={off} />
+        <DateField
+          showTime={spec.showTime ?? false}
+          placeholder={spec.placeholder}
+          disabled={off}
+        />
       );
 
     case 'dateRange':

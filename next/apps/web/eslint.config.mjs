@@ -1,9 +1,11 @@
 import js from '@eslint/js';
 import next from 'eslint-config-next';
 
+const SERVER = ['src/server/**', 'app/admin-api/**', 'app/api/**'];
+
 /**
- * Minimal local config for P0-b. The orchestrator replaces this with the shared
- * preset from `@shop/config` at merge (see docs/rewrite/status/p0b.md).
+ * Admin UI rules. `SERVER` files (the route binder and route handlers) are the one part of
+ * this app allowed to import `@shop/core`; they must stay free of business logic instead.
  *
  * Type-aware linting is deliberately off: typescript-eslint 8.x declares a peer
  * range of `typescript <6.1.0` and this workspace is on TypeScript 7, so the
@@ -39,14 +41,18 @@ export default [
           patterns: [
             {
               group: ['@shop/core', '@shop/core/*', '@shop/db', '@shop/db/*'],
-              message: '后台 UI 只能引用 @shop/contracts 与 src/admin 下的客户端，不能引用 core/db。',
+              message:
+                '后台 UI 只能引用 @shop/contracts 与 src/admin 下的客户端，不能引用 core/db。',
             },
           ],
         },
       ],
       'no-restricted-globals': [
         'error',
-        { name: 'fetch', message: '页面不要直接 fetch，请使用 callRoute / useRouteQuery / useRouteMutation。' },
+        {
+          name: 'fetch',
+          message: '页面不要直接 fetch，请使用 callRoute / useRouteQuery / useRouteMutation。',
+        },
       ],
       'react/no-unescaped-entities': 'off',
       'react/react-in-jsx-scope': 'off',
@@ -67,6 +73,24 @@ export default [
     },
   },
   {
+    files: SERVER,
+    rules: {
+      'no-restricted-globals': 'off',
+      // Same boundary as the shared `app-server` preset: handlers reach data through core.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@shop/db/schema/*'],
+              message: 'route/server 层不得直接访问 Drizzle 表，走 core 的 *.repo.ts',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // The client itself is the one place allowed to call fetch.
     files: ['src/admin/api/**', 'src/admin/notifications/**', 'src/admin/kit/**/stub*.ts'],
     rules: { 'no-restricted-globals': 'off' },
@@ -74,5 +98,10 @@ export default [
   {
     files: ['**/*.test.ts', '**/*.test.tsx', 'src/test/**'],
     rules: { 'no-restricted-globals': 'off' },
+  },
+  {
+    // Tests assert on rows, so server tests may read tables directly.
+    files: SERVER.map((glob) => `${glob}/*.test.ts`),
+    rules: { 'no-restricted-imports': 'off' },
   },
 ];

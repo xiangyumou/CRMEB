@@ -90,9 +90,7 @@ const DEFAULT_SORT_KEYS = { field: 'sortBy', order: 'sortOrder' } as const;
  * />
  * ```
  */
-export function CrudTable<R extends AnyRouteDef, T = PagedItemOf<R>>(
-  props: CrudTableProps<R, T>,
-) {
+export function CrudTable<R extends AnyRouteDef, T = PagedItemOf<R>>(props: CrudTableProps<R, T>) {
   if (props.urlState) return <CrudTableInner {...props} urlState={props.urlState} />;
   return <WithRouterUrlState {...props} />;
 }

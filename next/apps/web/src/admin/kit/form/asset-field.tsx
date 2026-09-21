@@ -109,7 +109,8 @@ export function AssetField({
     onChange?.(multiple ? next : undefined);
   };
 
-  const canAdd = !disabled && (multiple ? max === undefined || entries.length < max : entries.length === 0);
+  const canAdd =
+    !disabled && (multiple ? max === undefined || entries.length < max : entries.length === 0);
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

@@ -275,10 +275,7 @@ export const wechatMedia = pgTable(
   (t) => [
     uniqueIndex('wechat_media_uq').on(t.kind, t.mediaId),
     index('wechat_media_attachment_idx').on(t.attachmentId),
-    check(
-      'wechat_media_temporary_expires',
-      sql`${t.isPermanent} or ${t.expiresAt} is not null`,
-    ),
+    check('wechat_media_temporary_expires', sql`${t.isPermanent} or ${t.expiresAt} is not null`),
   ],
 );
 

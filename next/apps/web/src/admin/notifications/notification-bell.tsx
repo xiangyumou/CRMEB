@@ -53,11 +53,7 @@ export function NotificationBell() {
             >
               <List.Item.Meta
                 title={
-                  item.link ? (
-                    <Link href={item.link}>{item.title}</Link>
-                  ) : (
-                    <span>{item.title}</span>
-                  )
+                  item.link ? <Link href={item.link}>{item.title}</Link> : <span>{item.title}</span>
                 }
                 description={
                   <div>

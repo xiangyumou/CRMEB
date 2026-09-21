@@ -139,7 +139,9 @@ export function ConfigGroupForm<R extends AnyRouteDef>({
         <Typography.Paragraph type="secondary">{descriptor.description}</Typography.Paragraph>
       ) : null}
       {header}
-      {banner ? <Alert type="error" showIcon message={banner} style={{ marginBottom: 16 }} /> : null}
+      {banner ? (
+        <Alert type="error" showIcon message={banner} style={{ marginBottom: 16 }} />
+      ) : null}
 
       <Form
         form={form}
@@ -208,7 +210,11 @@ function SecretField({
       label={
         <span>
           {field.label}{' '}
-          <Tag color={isSet ? 'success' : 'default'} bordered={false} data-testid={`secret-state-${field.key}`}>
+          <Tag
+            color={isSet ? 'success' : 'default'}
+            bordered={false}
+            data-testid={`secret-state-${field.key}`}
+          >
             {isSet ? '已设置' : '未设置'}
           </Tag>
         </span>
@@ -219,7 +225,7 @@ function SecretField({
         value={value}
         disabled={disabled}
         autoComplete="new-password"
-        placeholder={isSet ? '已设置，留空则不修改' : field.placeholder ?? '请输入'}
+        placeholder={isSet ? '已设置，留空则不修改' : (field.placeholder ?? '请输入')}
         data-testid={`secret-input-${field.key}`}
         onChange={(event) => onChange(event.target.value)}
       />

@@ -79,7 +79,8 @@ function compare(a: DemoWidget, b: DemoWidget, field: string): number {
 function handle(url: URL, init: RequestInit | undefined): Response | null {
   const path = url.pathname;
   const method = (init?.method ?? 'GET').toUpperCase();
-  const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : undefined;
+  const body =
+    typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : undefined;
 
   if (path === '/admin-api/dev-demo/widgets' && method === 'GET') {
     const q = url.searchParams;
@@ -107,7 +108,12 @@ function handle(url: URL, init: RequestInit | undefined): Response | null {
     }
 
     const start = (page - 1) * pageSize;
-    return json({ items: items.slice(start, start + pageSize), total: items.length, page, pageSize });
+    return json({
+      items: items.slice(start, start + pageSize),
+      total: items.length,
+      page,
+      pageSize,
+    });
   }
 
   if (path === '/admin-api/dev-demo/widgets' && method === 'POST') {
@@ -191,7 +197,8 @@ export function installDemoFetch(): void {
 
   configureApi({
     async fetch(input, init) {
-      const href = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      const href =
+        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
       const url = new URL(href, window.location.origin);
       if (url.pathname.startsWith('/admin-api/dev-demo/')) {
         // A little latency so loading states are visible.

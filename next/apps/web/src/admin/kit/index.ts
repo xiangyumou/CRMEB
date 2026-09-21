@@ -23,13 +23,7 @@ export {
   normaliseMoney,
 } from './money';
 export type { FormatMoneyOptions } from './money';
-export {
-  DISPLAY_TZ,
-  formatInstant,
-  fromInstant,
-  toDisplayDayjs,
-  toInstant,
-} from './instant';
+export { DISPLAY_TZ, formatInstant, fromInstant, toDisplayDayjs, toInstant } from './instant';
 export type { InstantFormat } from './instant';
 
 // ── Table ───────────────────────────────────────────────────────────────────

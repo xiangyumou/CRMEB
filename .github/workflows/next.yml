@@ -69,20 +69,10 @@ jobs:
       - name: Typecheck
         run: corepack pnpm typecheck
 
-      # TEMPORARY (P0-A): `apps/web` has no package.json yet, so `src/server`
-      # is not part of the turbo graph. P0-B removes this step when the app
-      # gets its own package.json and tsconfig.
-      - name: Typecheck apps/web/src/server
-        run: corepack pnpm --filter @shop/testing exec tsc -p ../../apps/web/src/server/tsconfig.json
 
       - name: Lint
         run: corepack pnpm lint
 
-      # Run from `apps/web` so ESLint's flat-config base path covers both
-      # `src/server` and the route files under `app/`.
-      - name: Lint apps/web/src/server
-        working-directory: next/apps/web
-        run: ../../packages/testing/node_modules/.bin/eslint --config src/server/eslint.config.js src/server app
 
       - name: Unit tests
         run: corepack pnpm test:unit

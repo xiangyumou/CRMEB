@@ -10,9 +10,11 @@ import {
   text,
   uniqueIndex,
   varchar,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 import { createdAt, deletedAt, emptyJsonArray, fk, instant, money, pk, updatedAt } from './_shared';
+import { admins } from './auth';
 import { orderItems, orders } from './order';
 import { paymentAttempts } from './payment';
 import { expressCompanies } from './reference';
@@ -133,8 +135,7 @@ export const refunds = pgTable(
     /** TRUE when the refund was opened automatically by a failed group buy. Legacy `is_pink_cancel`. */
     isAutomatic: boolean().notNull().default(false),
 
-    /** FK to `admins` — wired by the orchestrator at merge, see SCHEMA.md. */
-    reviewedByAdminId: fk(),
+    reviewedByAdminId: fk().references((): AnyPgColumn => admins.id, { onDelete: 'set null' }),
     reviewedAt: instant(),
     succeededAt: instant(),
     failedAt: instant(),
@@ -240,8 +241,7 @@ export const refundLogs = pgTable(
     fromStatus: refundsStatus(),
     toStatus: refundsStatus().notNull(),
     message: text(),
-    /** FK to `admins` — wired by the orchestrator at merge, see SCHEMA.md. */
-    operatorAdminId: fk(),
+    operatorAdminId: fk().references((): AnyPgColumn => admins.id, { onDelete: 'set null' }),
     operatorUserId: fk().references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
   },

@@ -70,9 +70,7 @@ export function StatusTag<K extends string = string>({
 }
 
 /** `Select`/`Radio` options derived from the same map. */
-export function statusOptions<K extends string>(
-  map: StatusMap<K>,
-): { label: string; value: K }[] {
+export function statusOptions<K extends string>(map: StatusMap<K>): { label: string; value: K }[] {
   return (Object.keys(map) as K[]).map((value) => ({
     label: map[value].label,
     value,

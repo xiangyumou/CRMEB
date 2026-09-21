@@ -147,7 +147,10 @@ describe('<CrudTable>', () => {
     stubList();
     let state!: { snapshot: Record<string, string> };
     renderAdmin(
-      <Harness initial={{ page: '2', keyword: '旧', status: 'active' }} onState={(next) => (state = next)} />,
+      <Harness
+        initial={{ page: '2', keyword: '旧', status: 'active' }}
+        onState={(next) => (state = next)}
+      />,
     );
 
     await user.click(screen.getByRole('button', { name: zhName('重置') }));

@@ -8,9 +8,7 @@ coverage/
 *.gen.ts
 openapi.json
 
-# Committed unformatted before P0-A started, and not ours to touch:
-# `_conventions/**` is frozen and `turbo.json` is orchestrator-owned.
-# See docs/rewrite/cr/CR-2-p0a.md — delete these two lines once the
-# orchestrator has run `prettier --write` on them.
-packages/contracts/src/_conventions/route.ts
-turbo.json
+# Data, not code. The DIY fixtures are production exports and must stay byte-exact.
+packages/contracts/src/diy/__fixtures__/
+packages/db/seed-data/
+packages/db/migrations/

@@ -244,10 +244,7 @@ export const groupbuyMembers = pgTable(
       .where(sql`role = 'leader' and status = 'joined'`),
     index('groupbuy_members_user_idx').on(t.userId),
     check('groupbuy_members_quantity_positive', sql`${t.quantity} >= 1`),
-    check(
-      'groupbuy_members_left_shape',
-      sql`(${t.status} = 'joined') = (${t.leftAt} is null)`,
-    ),
+    check('groupbuy_members_left_shape', sql`(${t.status} = 'joined') = (${t.leftAt} is null)`),
   ],
 );
 

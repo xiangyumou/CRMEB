@@ -38,9 +38,7 @@ export const demoWidgetForm = z.object({
   publishedAt: instant.optional(),
   window: z.tuple([instant, instant]).optional(),
   link: z.object({ type: z.string(), label: z.string(), url: z.string() }).optional(),
-  slides: z
-    .array(z.object({ title: z.string(), url: z.string() }))
-    .default([]),
+  slides: z.array(z.object({ title: z.string(), url: z.string() })).default([]),
   note: z.string().max(200, '备注最多 200 字').optional(),
   description: z.string().optional(),
 });
@@ -104,7 +102,12 @@ export const demoWidgetUpdate = defineRoute({
   body: demoWidgetForm,
   response: demoWidget,
   examples: [
-    { name: '成功', params: { id: '1' }, body: { name: '示例组件', price: '99.00' }, response: exampleWidget },
+    {
+      name: '成功',
+      params: { id: '1' },
+      body: { name: '示例组件', price: '99.00' },
+      response: exampleWidget,
+    },
   ],
 });
 
@@ -132,7 +135,11 @@ export const demoConfigGet = defineRoute({
   params: z.object({ group: z.string() }),
   response: z.object({ group: z.string(), values: z.record(z.string(), z.unknown()) }),
   examples: [
-    { name: '成功', params: { group: 'demo' }, response: { group: 'demo', values: { siteName: '示例商城' } } },
+    {
+      name: '成功',
+      params: { group: 'demo' },
+      response: { group: 'demo', values: { siteName: '示例商城' } },
+    },
   ],
 });
 
@@ -147,5 +154,7 @@ export const demoConfigSave = defineRoute({
   params: z.object({ group: z.string() }),
   body: z.object({ values: z.record(z.string(), z.unknown()) }),
   response: z.object({ ok: z.literal(true) }),
-  examples: [{ name: '成功', params: { group: 'demo' }, body: { values: {} }, response: { ok: true } }],
+  examples: [
+    { name: '成功', params: { group: 'demo' }, body: { values: {} }, response: { ok: true } },
+  ],
 });

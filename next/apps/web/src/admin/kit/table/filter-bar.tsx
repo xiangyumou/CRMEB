@@ -45,7 +45,10 @@ export type FilterSpec =
       kind: 'custom';
       name: string;
       label: string;
-      render: (value: string | undefined, onChange: (next: string | undefined) => void) => ReactNode;
+      render: (
+        value: string | undefined,
+        onChange: (next: string | undefined) => void,
+      ) => ReactNode;
       width?: number | undefined;
     };
 
@@ -195,9 +198,7 @@ function renderFilter(
         <DateRangeField
           showTime={spec.showTime ?? false}
           value={start && end ? [start, end] : undefined}
-          onChange={(next) =>
-            set({ [startKey]: next?.[0], [endKey]: next?.[1] })
-          }
+          onChange={(next) => set({ [startKey]: next?.[0], [endKey]: next?.[1] })}
         />
       );
     }

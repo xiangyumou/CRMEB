@@ -15,6 +15,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { createdAt, deletedAt, fk, instant, pk, updatedAt } from './_shared';
+import { admins } from './auth';
 import { cities } from './reference';
 
 /**
@@ -85,10 +86,7 @@ export const users = pgTable(
     index('users_created_at_idx').on(t.createdAt),
     check('users_password_version_positive', sql`${t.passwordVersion} >= 1`),
     // A hash without an algorithm (or the reverse) cannot be verified.
-    check(
-      'users_password_pair',
-      sql`(${t.passwordHash} is null) = (${t.passwordAlgo} is null)`,
-    ),
+    check('users_password_pair', sql`(${t.passwordHash} is null) = (${t.passwordAlgo} is null)`),
   ],
 );
 
@@ -309,8 +307,7 @@ export const userCancellationRequests = pgTable(
     reason: text(),
     status: userCancellationRequestsStatus().notNull().default('pending'),
     reviewRemark: varchar({ length: 255 }),
-    /** FK to `admins` — wired by the orchestrator at merge, see SCHEMA.md. */
-    reviewedByAdminId: fk(),
+    reviewedByAdminId: fk().references((): AnyPgColumn => admins.id, { onDelete: 'set null' }),
     reviewedAt: instant(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

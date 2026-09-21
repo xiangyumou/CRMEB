@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { addMoney, fenToMoney, formatMoney, isMoney, moneyToFen, multiplyMoney, normaliseMoney } from './money';
+import {
+  addMoney,
+  fenToMoney,
+  formatMoney,
+  isMoney,
+  moneyToFen,
+  multiplyMoney,
+  normaliseMoney,
+} from './money';
 
 describe('normaliseMoney', () => {
   it('pads to exactly two decimals', () => {

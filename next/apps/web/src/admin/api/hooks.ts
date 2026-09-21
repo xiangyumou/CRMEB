@@ -19,11 +19,10 @@ import { routeKeyPrefix, routeQueryKey } from './query-keys';
 
 type QueryKey = readonly unknown[];
 
-export interface UseRouteQueryOptions<R extends AnyRouteDef>
-  extends Omit<
-    UseQueryOptions<ResponseOf<R>, ApiError, ResponseOf<R>, QueryKey>,
-    'queryKey' | 'queryFn'
-  > {
+export interface UseRouteQueryOptions<R extends AnyRouteDef> extends Omit<
+  UseQueryOptions<ResponseOf<R>, ApiError, ResponseOf<R>, QueryKey>,
+  'queryKey' | 'queryFn'
+> {
   /** `false` suppresses the global error toast for this query. */
   presentError?: boolean | undefined;
   /** Passed straight through to `callRoute` (e.g. `onUnauthorized: 'throw'`). */
@@ -52,11 +51,10 @@ export function useRouteQuery<R extends AnyRouteDef>(
   });
 }
 
-export interface UseRouteMutationOptions<R extends AnyRouteDef>
-  extends Omit<
-    UseMutationOptions<ResponseOf<R>, ApiError, RouteInput<R>>,
-    'mutationFn' | 'meta'
-  > {
+export interface UseRouteMutationOptions<R extends AnyRouteDef> extends Omit<
+  UseMutationOptions<ResponseOf<R>, ApiError, RouteInput<R>>,
+  'mutationFn' | 'meta'
+> {
   /** Routes whose cached reads become stale once this mutation succeeds. */
   invalidate?: readonly AnyRouteDef[] | undefined;
   /** Shown with `message.success` on success. */

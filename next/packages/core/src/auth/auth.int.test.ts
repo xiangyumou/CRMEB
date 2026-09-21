@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { admins, adminRoles, rolePermissions, roles, userSessions } from '@shop/db/schema/auth';
+import { users } from '@shop/db/schema/user';
 import {
   createTestCtx,
   fakeCaptchaVerifier,
@@ -309,6 +310,14 @@ describe('admin sessions', () => {
 
 describe('storefront sessions', () => {
   const sessions = new UserSessionService();
+
+  // `user_sessions.user_id` references `users`, so the rows the fake lookup talks about must exist.
+  beforeEach(async () => {
+    await harness.ctx.db.insert(users).values([
+      { id: 7, account: 'user-7' },
+      { id: 8, account: 'user-8' },
+    ]);
+  });
 
   it('stores sha256(token) and never the token', async () => {
     registerUserLookup(fakeUserLookup([{ id: 7 }]));

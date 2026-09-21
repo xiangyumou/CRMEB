@@ -36,7 +36,11 @@ const PAGES: LinkPageGroup[] = [
 const NAMES = ['秋季新款外套', '云南普洱茶饼', '无线蓝牙耳机', '厨房收纳三件套', '儿童绘本套装'];
 
 function makeTargets(type: Exclude<LinkTargetType, 'page' | 'custom'>): LinkTarget[] {
-  const prefix = { product: '/pages/goods_details/index?id=', category: '/pages/goods_list/index?cid=', article: '/pages/news_details/index?id=' }[type];
+  const prefix = {
+    product: '/pages/goods_details/index?id=',
+    category: '/pages/goods_list/index?cid=',
+    article: '/pages/news_details/index?id=',
+  }[type];
   const label = { product: '商品', category: '分类', article: '文章' }[type];
   return Array.from({ length: 23 }, (_, index) => ({
     id: String(index + 1),

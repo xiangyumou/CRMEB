@@ -90,7 +90,14 @@ describe('buildPath', () => {
 describe('serialiseQuery', () => {
   it('sorts keys, repeats arrays and drops empty values', () => {
     expect(
-      serialiseQuery({ page: 2, keyword: '', tag: ['a', 'b'], flag: true, gone: undefined, nil: null }),
+      serialiseQuery({
+        page: 2,
+        keyword: '',
+        tag: ['a', 'b'],
+        flag: true,
+        gone: undefined,
+        nil: null,
+      }),
     ).toBe('?flag=true&page=2&tag=a&tag=b');
   });
 
@@ -138,7 +145,10 @@ describe('callRoute', () => {
 
   it('maps an error body onto ApiError', async () => {
     stubFetch(() =>
-      jsonResponse({ code: 'THING_LOCKED', message: '该记录已被锁定', details: { by: 'admin' } }, 409),
+      jsonResponse(
+        { code: 'THING_LOCKED', message: '该记录已被锁定', details: { by: 'admin' } },
+        409,
+      ),
     );
     const error = await callRoute(detailRoute, { params: { id: '1', noteId: '2' } }).catch(
       (cause: unknown) => cause,
@@ -175,9 +185,11 @@ describe('callRoute', () => {
     await callRoute(listRoute, { query: { page: 1, pageSize: 20 } }).catch(() => {});
     expect(onUnauthenticated).toHaveBeenCalledTimes(1);
 
-    await callRoute(listRoute, { query: { page: 1, pageSize: 20 } }, { onUnauthorized: 'throw' }).catch(
-      () => {},
-    );
+    await callRoute(
+      listRoute,
+      { query: { page: 1, pageSize: 20 } },
+      { onUnauthorized: 'throw' },
+    ).catch(() => {});
     expect(onUnauthenticated).toHaveBeenCalledTimes(1);
   });
 

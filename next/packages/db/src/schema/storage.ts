@@ -13,6 +13,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { createdAt, deletedAt, fk, pk, updatedAt } from './_shared';
+import { admins } from './auth';
 import { users } from './user';
 
 /**
@@ -79,8 +80,7 @@ export const attachments = pgTable(
     height: integer(),
     durationMs: integer(),
     thumbnailUrl: text(),
-    /** FK to `admins` — wired by the orchestrator at merge, see SCHEMA.md. */
-    uploadedByAdminId: fk(),
+    uploadedByAdminId: fk().references((): AnyPgColumn => admins.id, { onDelete: 'set null' }),
     uploadedByUserId: fk().references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

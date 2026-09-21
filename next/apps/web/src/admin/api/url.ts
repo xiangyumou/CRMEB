@@ -50,11 +50,7 @@ export function serialiseQuery(query?: Record<string, unknown> | undefined): str
     const value = query[key];
     if (Array.isArray(value)) {
       for (const item of value) pushPrimitive(sp, key, item as QueryPrimitive);
-    } else if (
-      value !== null &&
-      typeof value === 'object' &&
-      !(value instanceof Date)
-    ) {
+    } else if (value !== null && typeof value === 'object' && !(value instanceof Date)) {
       sp.append(key, JSON.stringify(value));
     } else {
       pushPrimitive(sp, key, value as QueryPrimitive);

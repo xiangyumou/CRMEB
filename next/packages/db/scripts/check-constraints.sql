@@ -105,7 +105,7 @@ VALUES (9002, 'SANITY-RF-2', 'SANITY-ORN-2', 9001, 9001, 'refund_only', 'applied
 INSERT INTO product_virtual_cards (id, product_id, sku_id, card_key, card_no, state, order_item_id, claimed_at)
 VALUES (9001, 9001, 9001, 'CARD-KEY-1', '1111-2222', 'claimed', 9001, now());
 
-INSERT INTO order_effects (id, order_id, event_type) VALUES (9001, 9001, 'order.paid');
+INSERT INTO effects (id, scope, scope_id, event_type, payload) VALUES (9001, 'order', '9001', 'order.paid', '{}');
 
 INSERT INTO capital_flows (id, kind, reference, direction, amount)
 VALUES (9001, 'order_payment', 'SANITY-OTN-1', 'in', '10.00');
@@ -159,7 +159,7 @@ SELECT pg_temp.expect_violation(
     VALUES ('order_payment', 'SANITY-OTN-1', 'in', '10.00')$$);
 SELECT pg_temp.expect_violation(
   '6. duplicate order effect',
-  $$INSERT INTO order_effects (order_id, event_type) VALUES (9001, 'order.paid')$$);
+  $$INSERT INTO effects (scope, scope_id, event_type, payload) VALUES ('order', '9001', 'order.paid', '{}')$$);
 
 SELECT pg_temp.section('refunds');
 SELECT pg_temp.expect_violation(

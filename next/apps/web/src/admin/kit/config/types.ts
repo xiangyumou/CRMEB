@@ -8,15 +8,7 @@
  */
 
 export type ConfigFieldKind =
-  | 'text'
-  | 'password'
-  | 'number'
-  | 'money'
-  | 'switch'
-  | 'select'
-  | 'textarea'
-  | 'asset'
-  | 'json';
+  'text' | 'password' | 'number' | 'money' | 'switch' | 'select' | 'textarea' | 'asset' | 'json';
 
 export interface ConfigSelectOption {
   label: string;
@@ -68,10 +60,7 @@ export interface ConfigGroupDescriptor {
  */
 export type ConfigValues = Record<string, unknown>;
 
-export function isConfigFieldVisible(
-  field: ConfigFieldDescriptor,
-  values: ConfigValues,
-): boolean {
+export function isConfigFieldVisible(field: ConfigFieldDescriptor, values: ConfigValues): boolean {
   const condition = field.visibleWhen;
   if (!condition) return true;
   if (typeof condition === 'function') return condition(values);

@@ -65,9 +65,7 @@ export function defineRoute<
   TQuery extends z.ZodType,
   TBody extends z.ZodType,
   TResponse extends z.ZodType,
->(
-  def: RouteDef<TParams, TQuery, TBody, TResponse>,
-): RouteDef<TParams, TQuery, TBody, TResponse> {
+>(def: RouteDef<TParams, TQuery, TBody, TResponse>): RouteDef<TParams, TQuery, TBody, TResponse> {
   if (!PATH_PREFIXES.some((p) => def.path.startsWith(p))) {
     throw new Error(`${def.id}: path must start with ${PATH_PREFIXES.join(' or ')}`);
   }

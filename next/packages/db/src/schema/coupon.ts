@@ -121,7 +121,10 @@ export const couponTemplates = pgTable(
       'coupon_templates_validity_shape',
       sql`(${t.validityMode} = 'fixed_window' and ${t.validFrom} is not null and ${t.validTo} is not null and ${t.validDays} is null) or (${t.validityMode} = 'days_after_claim' and ${t.validDays} >= 1 and ${t.validFrom} is null and ${t.validTo} is null)`,
     ),
-    check('coupon_templates_per_user_limit_positive', sql`${t.perUserLimit} is null or ${t.perUserLimit} >= 1`),
+    check(
+      'coupon_templates_per_user_limit_positive',
+      sql`${t.perUserLimit} is null or ${t.perUserLimit} >= 1`,
+    ),
   ],
 );
 
@@ -257,15 +260,14 @@ export const userCoupons = pgTable(
       .on(t.sourceOrderId, t.templateId)
       .where(sql`source_kind = 'gift_order'`),
     index('user_coupons_user_idx').on(t.userId, t.status, t.validTo),
-    index('user_coupons_expiry_idx').on(t.validTo).where(sql`status = 'unused'`),
+    index('user_coupons_expiry_idx')
+      .on(t.validTo)
+      .where(sql`status = 'unused'`),
     index('user_coupons_template_idx').on(t.templateId),
     check('user_coupons_slot_positive', sql`${t.claimSlot} >= 1`),
     check('user_coupons_amounts_non_negative', sql`${t.discountAmount} > 0 and ${t.minSpend} >= 0`),
     check('user_coupons_window_ordered', sql`${t.validTo} > ${t.validFrom}`),
-    check(
-      'user_coupons_used_at_present',
-      sql`(${t.status} = 'used') = (${t.usedAt} is not null)`,
-    ),
+    check('user_coupons_used_at_present', sql`(${t.status} = 'used') = (${t.usedAt} is not null)`),
     check(
       'user_coupons_gift_order_present',
       sql`${t.sourceKind} <> 'gift_order' or ${t.sourceOrderId} is not null`,

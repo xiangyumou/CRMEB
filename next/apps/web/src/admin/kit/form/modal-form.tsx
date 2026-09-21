@@ -34,13 +34,17 @@ export interface EntityFormProps<S extends AnyObjectSchema, R extends AnyRouteDe
   header?: ReactNode | undefined;
 }
 
-export interface ModalFormProps<S extends AnyObjectSchema, R extends AnyRouteDef>
-  extends EntityFormProps<S, R> {
+export interface ModalFormProps<
+  S extends AnyObjectSchema,
+  R extends AnyRouteDef,
+> extends EntityFormProps<S, R> {
   width?: number | undefined;
 }
 
-export interface DrawerFormProps<S extends AnyObjectSchema, R extends AnyRouteDef>
-  extends EntityFormProps<S, R> {
+export interface DrawerFormProps<
+  S extends AnyObjectSchema,
+  R extends AnyRouteDef,
+> extends EntityFormProps<S, R> {
   width?: number | string | undefined;
   placement?: 'right' | 'left' | undefined;
 }

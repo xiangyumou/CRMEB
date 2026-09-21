@@ -166,7 +166,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
               trigger={['click']}
               menu={{
                 items: [
-                  { key: 'account', disabled: true, label: `${identity.name}（${identity.account}）` },
+                  {
+                    key: 'account',
+                    disabled: true,
+                    label: `${identity.name}（${identity.account}）`,
+                  },
                   { type: 'divider' },
                   { key: 'profile', icon: <UserOutlined />, label: '个人资料' },
                   {

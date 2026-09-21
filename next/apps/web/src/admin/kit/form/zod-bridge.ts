@@ -7,10 +7,7 @@ import { toNamePath, type FieldName } from './types';
 type AnyObjectSchema = z.ZodObject<z.ZodRawShape>;
 
 /** The schema for one top-level field, or `undefined` for nested/unknown paths. */
-export function fieldSchemaOf(
-  schema: AnyObjectSchema,
-  name: FieldName,
-): z.ZodType | undefined {
+export function fieldSchemaOf(schema: AnyObjectSchema, name: FieldName): z.ZodType | undefined {
   const path = toNamePath(name);
   if (path.length !== 1) return undefined;
   const key = String(path[0]);
@@ -50,7 +47,11 @@ export function zodFieldRule(schema: AnyObjectSchema, name: FieldName): FormRule
 /** `['sku', 0, 'price']` from `"sku.0.price"`. */
 export function issuePathToName(path: readonly PropertyKey[]): (string | number)[] {
   return path.map((segment) =>
-    typeof segment === 'number' ? segment : /^\d+$/.test(String(segment)) ? Number(segment) : String(segment),
+    typeof segment === 'number'
+      ? segment
+      : /^\d+$/.test(String(segment))
+        ? Number(segment)
+        : String(segment),
   );
 }
 

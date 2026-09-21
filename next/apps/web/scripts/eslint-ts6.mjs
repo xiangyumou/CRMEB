@@ -31,7 +31,11 @@ const resolveFilename = Module._resolveFilename;
 Module._resolveFilename = function patched(request, ...rest) {
   if (request === 'typescript') return typescript6;
   if (request.startsWith('typescript/')) {
-    return resolveFilename.call(this, `typescript-6/${request.slice('typescript/'.length)}`, ...rest);
+    return resolveFilename.call(
+      this,
+      `typescript-6/${request.slice('typescript/'.length)}`,
+      ...rest,
+    );
   }
   return resolveFilename.call(this, request, ...rest);
 };

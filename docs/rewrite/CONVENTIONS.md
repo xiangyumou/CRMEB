@@ -25,18 +25,18 @@ Package scope is `@shop/*`. Node ≥ 24, pnpm via corepack (`corepack pnpm …`)
 
 A domain (`coupon`, `catalog`, `order`, …) owns exactly these paths and nothing else:
 
-| Concern | Path |
-|---|---|
-| Contracts | `packages/contracts/src/<domain>/*.contract.ts`, `errors.ts`, `schemas.ts` |
-| Domain logic | `packages/core/src/<domain>/` (`*.service.ts`, `*.repo.ts`, `permissions.ts`, `effects.ts`) |
-| Admin API | `apps/web/app/admin-api/<domain>/**/route.ts` |
-| Storefront API | `apps/web/app/api/v1/<domain>/**/route.ts` |
-| Admin pages | `apps/web/app/admin/(shell)/<domain>/**` |
-| Admin menu | `apps/web/src/admin/menu/<domain>.menu.ts` |
-| Jobs | `apps/worker/src/jobs/<domain>.*.ts` |
-| Config groups | `packages/core/src/system/config/<group>.config.ts` (group named after the domain) |
-| ETL | `packages/etl/src/mappers/<domain>.ts` |
-| Tests | next to the code as `*.test.ts` (unit) and `*.int.test.ts` (needs PG/Redis) |
+| Concern        | Path                                                                                        |
+| -------------- | ------------------------------------------------------------------------------------------- |
+| Contracts      | `packages/contracts/src/<domain>/*.contract.ts`, `errors.ts`, `schemas.ts`                  |
+| Domain logic   | `packages/core/src/<domain>/` (`*.service.ts`, `*.repo.ts`, `permissions.ts`, `effects.ts`) |
+| Admin API      | `apps/web/app/admin-api/<domain>/**/route.ts`                                               |
+| Storefront API | `apps/web/app/api/v1/<domain>/**/route.ts`                                                  |
+| Admin pages    | `apps/web/app/admin/(shell)/<domain>/**`                                                    |
+| Admin menu     | `apps/web/src/admin/menu/<domain>.menu.ts`                                                  |
+| Jobs           | `apps/worker/src/jobs/<domain>.*.ts`                                                        |
+| Config groups  | `packages/core/src/system/config/<group>.config.ts` (group named after the domain)          |
+| ETL            | `packages/etl/src/mappers/<domain>.ts`                                                      |
+| Tests          | next to the code as `*.test.ts` (unit) and `*.int.test.ts` (needs PG/Redis)                 |
 
 Aggregation files (`*.gen.ts`) are produced by `pnpm gen` and gitignored. Add a file in the right place and it is picked up; there is no shared index to edit, so parallel streams do not conflict.
 
@@ -61,7 +61,7 @@ Every endpoint is a `defineRoute({...})` (see `packages/contracts/src/_conventio
 
 ## Domain rules
 
-- **Transactions:** `withTx(async (tx) => …)`. Anything that calls a third party happens *after* commit, via the effects ledger — never inside the transaction.
+- **Transactions:** `withTx(async (tx) => …)`. Anything that calls a third party happens _after_ commit, via the effects ledger — never inside the transaction.
 - **State changes are conditional updates.** `UPDATE … WHERE id = $1 AND status = 'expected'` and decide on the affected row count. Read-then-write on status, stock, seats or counters is a defect. Use `lockRow` (`SELECT … FOR UPDATE`) when several rows must agree.
 - **Every conditional state change ships a concurrency test** using `runConcurrently` from `@shop/testing`.
 - **Money:** integer fen inside the domain via `Money`; never floats.

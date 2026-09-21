@@ -19,8 +19,17 @@
 import { Button } from 'antd';
 import { couponCreate, couponDelete, couponList, couponUpdate } from '@shop/contracts';
 import {
-  CrudTable, ModalForm, PageContainer, ConfirmButton, useFormModal,
-  actionsColumn, enumColumn, idColumn, instantColumn, moneyColumn, textColumn,
+  CrudTable,
+  ModalForm,
+  PageContainer,
+  ConfirmButton,
+  useFormModal,
+  actionsColumn,
+  enumColumn,
+  idColumn,
+  instantColumn,
+  moneyColumn,
+  textColumn,
 } from '@/admin/kit';
 import { Can } from '@/admin/session';
 
@@ -31,7 +40,9 @@ export default function CouponListPage() {
     <PageContainer
       extra={
         <Can permission="coupon:template:create">
-          <Button type="primary" onClick={() => modal.show()}>新建优惠券</Button>
+          <Button type="primary" onClick={() => modal.show()}>
+            新建优惠券
+          </Button>
         </Can>
       }
     >
@@ -51,7 +62,9 @@ export default function CouponListPage() {
           actionsColumn({
             render: (row) => (
               <>
-                <Button type="link" size="small" onClick={() => modal.show(row)}>编辑</Button>
+                <Button type="link" size="small" onClick={() => modal.show(row)}>
+                  编辑
+                </Button>
                 <ConfirmButton
                   route={couponDelete}
                   input={{ params: { id: row.id } }}
@@ -77,7 +90,8 @@ export default function CouponListPage() {
         initialValues={modal.record}
         route={modal.record ? couponUpdate : couponCreate}
         toInput={(values) =>
-          modal.record ? { params: { id: modal.record.id }, body: values } : { body: values }}
+          modal.record ? { params: { id: modal.record.id }, body: values } : { body: values }
+        }
         invalidate={[couponList]}
         successMessage="已保存"
       />
@@ -92,14 +106,14 @@ export default function CouponListPage() {
 
 `src/admin/api/`。这就是约定里说的"生成的客户端"——生成的是类型，没有代码生成步骤。
 
-| API | 说明 |
-|---|---|
-| `callRoute(route, input?, options?)` | 按 `RouteDef` 发请求。`input` 为 `{ params, query, body }`；URL 由 `:param` 占位符拼出，query 有序序列化（`undefined`/`null`/`""` 丢弃，数组重复键，`Date` 转 ISO），带 cookie，非 2xx 抛 `ApiError`。`options.onUnauthorized: 'throw'` 可以关掉 401 自动跳登录（登录页和 `SessionProvider` 用）。 |
-| `useRouteQuery(route, input?, options?)` | `useQuery` 包装。query key = `[route.id, { params, query }]`。`options.presentError: false` 关掉全局报错提示。 |
-| `useRouteMutation(route, options?)` | `useMutation` 包装。`mutate({ body })`；`invalidate: [routes…]` 成功后失效这些路由的全部缓存；`successMessage` 弹成功提示。 |
-| `useInvalidateRoutes()` | 手动失效，返回 `(...routes) => Promise<void>`。 |
-| `ApiError` | `{ status, code, message, details }`，外加 `fieldErrors` 取 422 的字段错误。分支判断请用 `code`，不要用 `message`。 |
-| `configureApi({ baseUrl, fetch, onUnauthenticated, validateResponses })` | 测试与演示页用；`validateResponses` 开发环境默认开，会用契约校验响应。 |
+| API                                                                      | 说明                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `callRoute(route, input?, options?)`                                     | 按 `RouteDef` 发请求。`input` 为 `{ params, query, body }`；URL 由 `:param` 占位符拼出，query 有序序列化（`undefined`/`null`/`""` 丢弃，数组重复键，`Date` 转 ISO），带 cookie，非 2xx 抛 `ApiError`。`options.onUnauthorized: 'throw'` 可以关掉 401 自动跳登录（登录页和 `SessionProvider` 用）。 |
+| `useRouteQuery(route, input?, options?)`                                 | `useQuery` 包装。query key = `[route.id, { params, query }]`。`options.presentError: false` 关掉全局报错提示。                                                                                                                                                                                     |
+| `useRouteMutation(route, options?)`                                      | `useMutation` 包装。`mutate({ body })`；`invalidate: [routes…]` 成功后失效这些路由的全部缓存；`successMessage` 弹成功提示。                                                                                                                                                                        |
+| `useInvalidateRoutes()`                                                  | 手动失效，返回 `(...routes) => Promise<void>`。                                                                                                                                                                                                                                                    |
+| `ApiError`                                                               | `{ status, code, message, details }`，外加 `fieldErrors` 取 422 的字段错误。分支判断请用 `code`，不要用 `message`。                                                                                                                                                                                |
+| `configureApi({ baseUrl, fetch, onUnauthenticated, validateResponses })` | 测试与演示页用；`validateResponses` 开发环境默认开，会用契约校验响应。                                                                                                                                                                                                                             |
 
 错误提示是全局的：TanStack Query 的 cache 级 `onError` 统一弹 `message`/`notification`，401 和被取消的请求不弹。单次调用可用 `presentError: false` 退出（表单默认就是 `false`，自己展示字段错误）。
 
@@ -111,15 +125,15 @@ export default function CouponListPage() {
 
 ### 布局与展示
 
-| 组件 | 主要 props |
-|---|---|
-| `PageContainer` | `title?` `subTitle?` `extra?` `breadcrumb?: BreadcrumbEntry[] \| false` `tabs?` `footer?` — 标题默认取当前菜单节点，面包屑默认由菜单树推导，详情页可用 `breadcrumb` 覆盖 |
-| `DescriptionsCard` | `title?` `extra?` `items: { label, value, span?, hidden? }[]` `column?=3` `loading?` `bordered?=true` |
-| `MoneyText` | `value: string \| null` `symbol?='¥'` `grouped?=true` `colored?=false` `placeholder?='—'` `strong?` |
-| `InstantText` | `value: string \| null` `format?: 'datetime'\|'minute'\|'date'\|'time'\|'relative'` `tooltip?` |
-| `StatusTag` | `value` `map: StatusMap` `bordered?` — 配 `statusOptions(map)` 给筛选/表单用同一份枚举 |
-| `ConfirmButton` | `route` `input?`（可为函数） `title` `description?` `invalidate?` `successMessage?` `onSuccess?` `permission?` `buttonProps?` |
-| `Can` / `RequirePermission` / `requirePermission()` | 见 `src/admin/session/` |
+| 组件                                                | 主要 props                                                                                                                                                               |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PageContainer`                                     | `title?` `subTitle?` `extra?` `breadcrumb?: BreadcrumbEntry[] \| false` `tabs?` `footer?` — 标题默认取当前菜单节点，面包屑默认由菜单树推导，详情页可用 `breadcrumb` 覆盖 |
+| `DescriptionsCard`                                  | `title?` `extra?` `items: { label, value, span?, hidden? }[]` `column?=3` `loading?` `bordered?=true`                                                                    |
+| `MoneyText`                                         | `value: string \| null` `symbol?='¥'` `grouped?=true` `colored?=false` `placeholder?='—'` `strong?`                                                                      |
+| `InstantText`                                       | `value: string \| null` `format?: 'datetime'\|'minute'\|'date'\|'time'\|'relative'` `tooltip?`                                                                           |
+| `StatusTag`                                         | `value` `map: StatusMap` `bordered?` — 配 `statusOptions(map)` 给筛选/表单用同一份枚举                                                                                   |
+| `ConfirmButton`                                     | `route` `input?`（可为函数） `title` `description?` `invalidate?` `successMessage?` `onSuccess?` `permission?` `buttonProps?`                                            |
+| `Can` / `RequirePermission` / `requirePermission()` | 见 `src/admin/session/`                                                                                                                                                  |
 
 ### CrudTable
 
@@ -166,25 +180,25 @@ scrollX / size / expandable / emptyText / title / bordered / onData
 
 字段类型（`FieldSpec`）：
 
-| kind | 值的形状 | 备注 |
-|---|---|---|
-| `text` / `password` | `string` | `placeholder` `maxLength` `prefix` `addonAfter` |
-| `textarea` | `string` | `rows` `maxLength` `showCount` |
-| `number` | `number` | `min` `max` `step` `precision` |
-| `money` | `string` `"12.00"` | `MoneyInput`，字符串进出，永不浮点 |
-| `switch` | `boolean` | `checkedText` `uncheckedText` |
-| `select` | `string \| string[]` | `options` `mode: 'multiple'\|'tags'` |
-| `radio` / `checkbox` | `string` / `string[]` | `options`，radio 支持 `optionType: 'button'` |
-| `date` | ISO instant | `showTime` |
-| `dateRange` | `[ISO, ISO]` | `wholeDays`（默认把两端对齐到当天起止） |
-| `treeSelect` | `string \| string[]` | `treeData` 或 `loadOptions` + `cacheKey`，`leafOnly` |
-| `cascader` | `string[]` | 省市区等，`options` 或 `loadOptions` + `cacheKey` |
-| `richText` | HTML `string` | Tiptap，懒加载；插图走 `AssetPicker` |
-| `asset` | `string` / `string[]` | `multiple` `max` `valueType: 'url'\|'id'\|'asset'`（默认 `url`） |
-| `link` | `{type,label,url}` | `LinkPicker` |
-| `sortableList` | `T[]` | dnd-kit 拖拽排序，`newItem` `renderItem` `max` `min` |
-| `custom` | 任意 | `render({ value, onChange, disabled })` |
-| `hidden` | 任意 | 只在值里，不渲染 |
+| kind                 | 值的形状              | 备注                                                             |
+| -------------------- | --------------------- | ---------------------------------------------------------------- |
+| `text` / `password`  | `string`              | `placeholder` `maxLength` `prefix` `addonAfter`                  |
+| `textarea`           | `string`              | `rows` `maxLength` `showCount`                                   |
+| `number`             | `number`              | `min` `max` `step` `precision`                                   |
+| `money`              | `string` `"12.00"`    | `MoneyInput`，字符串进出，永不浮点                               |
+| `switch`             | `boolean`             | `checkedText` `uncheckedText`                                    |
+| `select`             | `string \| string[]`  | `options` `mode: 'multiple'\|'tags'`                             |
+| `radio` / `checkbox` | `string` / `string[]` | `options`，radio 支持 `optionType: 'button'`                     |
+| `date`               | ISO instant           | `showTime`                                                       |
+| `dateRange`          | `[ISO, ISO]`          | `wholeDays`（默认把两端对齐到当天起止）                          |
+| `treeSelect`         | `string \| string[]`  | `treeData` 或 `loadOptions` + `cacheKey`，`leafOnly`             |
+| `cascader`           | `string[]`            | 省市区等，`options` 或 `loadOptions` + `cacheKey`                |
+| `richText`           | HTML `string`         | Tiptap，懒加载；插图走 `AssetPicker`                             |
+| `asset`              | `string` / `string[]` | `multiple` `max` `valueType: 'url'\|'id'\|'asset'`（默认 `url`） |
+| `link`               | `{type,label,url}`    | `LinkPicker`                                                     |
+| `sortableList`       | `T[]`                 | dnd-kit 拖拽排序，`newItem` `renderItem` `max` `min`             |
+| `custom`             | 任意                  | `render({ value, onChange, disabled })`                          |
+| `hidden`             | 任意                  | 只在值里，不渲染                                                 |
 
 公共 props：`name` `label` `help` `tooltip` `required` `disabled` `span`（24 栅格） `visibleWhen(values)` `rules`（额外 antd 规则）。
 
@@ -201,7 +215,7 @@ scrollX / size / expandable / emptyText / title / bordered / onData
 ```ts
 interface AssetSource {
   listCategories(): Promise<AssetCategory[]>;
-  listAssets(q: { categoryId?, page, pageSize, keyword? }): Promise<AssetListResult>;
+  listAssets(q: { categoryId?; page; pageSize; keyword? }): Promise<AssetListResult>;
   upload(file: File, categoryId?): Promise<AssetItem>;
   remove(ids: string[]): Promise<void>;
 }
@@ -219,7 +233,7 @@ interface AssetSource {
 
 ```tsx
 <ConfigGroupForm
-  descriptor={paymentGroup}   // { group, title, description?, fields: [...] }
+  descriptor={paymentGroup} // { group, title, description?, fields: [...] }
   values={data?.values}
   route={configSave}
   invalidate={[configGet]}

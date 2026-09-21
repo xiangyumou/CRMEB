@@ -91,7 +91,11 @@ export async function seedReference(db: DbOrTx): Promise<SeedCounts> {
     .values(agreementShells)
     .onConflictDoUpdate({
       target: agreements.code,
-      set: { title: sql`excluded.title`, sortOrder: sql`excluded.sort_order`, updatedAt: sql`now()` },
+      set: {
+        title: sql`excluded.title`,
+        sortOrder: sql`excluded.sort_order`,
+        updatedAt: sql`now()`,
+      },
     });
 
   await db

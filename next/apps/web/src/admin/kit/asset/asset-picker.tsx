@@ -38,7 +38,9 @@ export interface AssetPickerProps {
   accept?: string | undefined;
 }
 
-function toTreeData(categories: AssetCategory[]): { key: string; title: string; children?: unknown[] }[] {
+function toTreeData(
+  categories: AssetCategory[],
+): { key: string; title: string; children?: unknown[] }[] {
   const map = (list: AssetCategory[]): { key: string; title: string; children?: unknown[] }[] =>
     list.map((category) => ({
       key: category.id,
@@ -218,7 +220,12 @@ export function AssetPicker({
                       <img
                         src={item.url}
                         alt={item.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          display: 'block',
+                        }}
                       />
                       {active ? (
                         <span
@@ -244,7 +251,10 @@ export function AssetPicker({
                 })}
               </div>
             ) : (
-              <Empty description={list.isPending ? '加载中…' : '暂无素材'} style={{ padding: 48 }} />
+              <Empty
+                description={list.isPending ? '加载中…' : '暂无素材'}
+                style={{ padding: 48 }}
+              />
             )}
           </Spin>
 

@@ -94,9 +94,7 @@ export function PageContainer({
                 {heading}
               </Typography.Title>
             ) : null}
-            {subTitle ? (
-              <Typography.Text type="secondary">{subTitle}</Typography.Text>
-            ) : null}
+            {subTitle ? <Typography.Text type="secondary">{subTitle}</Typography.Text> : null}
           </div>
           {extra ? <div style={{ flexShrink: 0 }}>{extra}</div> : null}
         </div>

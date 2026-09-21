@@ -17,6 +17,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { createdAt, deletedAt, emptyJsonArray, fk, instant, money, pk, updatedAt } from './_shared';
+import { admins } from './auth';
 import { orderItems, orders } from './order';
 import { shippingTemplates } from './shipping';
 import { users } from './user';
@@ -161,7 +162,7 @@ export const products = pgTable(
     index('products_created_at_idx').on(t.createdAt),
     index('products_shipping_template_idx').on(t.shippingTemplateId),
     // Substring search for the storefront and the admin picker. Requires the
-    // pg_trgm extension, created by the orchestrator's 0000_init migration.
+    // pg_trgm extension, created at the top of the 0000_init migration.
     index('products_name_trgm_idx').using('gin', sql`${t.name} gin_trgm_ops`),
     index('products_keyword_trgm_idx').using('gin', sql`${t.keyword} gin_trgm_ops`),
     check(
@@ -298,7 +299,10 @@ export const productSkus = pgTable(
     /** Human-readable variant label joined with `|`, e.g. `红|XL`. Empty string for single-spec products. */
     specText: varchar({ length: 255 }).notNull().default(''),
     /** `{ "颜色": "红", "尺码": "XL" }`. Empty object for single-spec products. */
-    specValues: jsonb().$type<Record<string, string>>().notNull().default(sql`'{}'::jsonb`),
+    specValues: jsonb()
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     imageUrl: varchar({ length: 512 }),
     price: money().notNull(),
     originalPrice: money(),
@@ -614,8 +618,7 @@ export const productReviews = pgTable(
     status: productReviewsStatus().notNull().default('published'),
     replyContent: varchar({ length: 500 }),
     replyAt: instant(),
-    /** FK to `admins` — wired by the orchestrator at merge, see SCHEMA.md. */
-    replyByAdminId: fk(),
+    replyByAdminId: fk().references((): AnyPgColumn => admins.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     deletedAt: deletedAt(),

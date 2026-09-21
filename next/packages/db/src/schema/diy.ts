@@ -71,7 +71,10 @@ export const diyPages = pgTable(
       .on(t.isHome)
       .where(sql`is_home and deleted_at is null`),
     check('diy_pages_schema_version_positive', sql`${t.schemaVersion} >= 1`),
-    check('diy_pages_published_shape', sql`${t.status} <> 'published' or ${t.publishedAt} is not null`),
+    check(
+      'diy_pages_published_shape',
+      sql`${t.status} <> 'published' or ${t.publishedAt} is not null`,
+    ),
     check('diy_pages_home_is_home_kind', sql`not ${t.isHome} or ${t.kind} = 'home'`),
   ],
 );

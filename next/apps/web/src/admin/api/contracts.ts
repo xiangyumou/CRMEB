@@ -1,31 +1,12 @@
 /**
- * The single seam between the admin UI and the contract package.
- *
- * Everything the UI needs from contracts is re-exported here so that the
- * orchestrator's merge is a one-line change: replace the `./_p0-stubs/...`
- * import below with `@shop/contracts` and delete `_p0-stubs/`.
- *
- *   export { adminLogin, adminLogout, adminMe, adminIdentity } from '@shop/contracts';
- *   export type { AdminIdentity } from '@shop/contracts';
+ * The single seam between the admin UI and the contract package: everything the
+ * UI needs from contracts is re-exported here.
  */
-export {
-  adminIdentity,
-  adminLogin,
-  adminLogout,
-  adminMe,
-} from './_p0-stubs/auth.contract';
-export type { AdminIdentity } from './_p0-stubs/auth.contract';
+export { adminLogin, adminLogout, adminMe } from '@shop/contracts/auth/auth.contract';
+export { adminProfile as adminIdentity } from '@shop/contracts/auth/schemas';
+export type { AdminProfile as AdminIdentity } from '@shop/contracts/auth/schemas';
 
-// Conventions are already frozen and live in the real package.
-export {
-  asset,
-  errorBody,
-  id,
-  instant,
-  money,
-  pageQuery,
-  paged,
-} from '@shop/contracts';
+export { asset, errorBody, id, instant, money, pageQuery, paged } from '@shop/contracts';
 export type {
   AnyRouteDef,
   BodyOf,

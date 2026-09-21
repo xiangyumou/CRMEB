@@ -9,8 +9,10 @@ import {
   text,
   uniqueIndex,
   varchar,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { createdAt, deletedAt, fk, instant, pk, updatedAt } from './_shared';
+import { users } from './user';
 
 /**
  * Admin identities, RBAC and storefront sessions.
@@ -102,17 +104,14 @@ export const adminRoles = pgTable(
  * be revocable per user, so they live here.
  *
  * Only `sha256(token)` is stored. A dump of this table cannot be replayed.
- *
- * `userId` is deliberately a bare `fk()` with no `.references(...)`: the
- * `users` table belongs to stream P0-S/E1 and does not exist on this branch.
- * The orchestrator adds the reference when the two branches meet — see
- * `docs/rewrite/status/p0a.md`.
  */
 export const userSessions = pgTable(
   'user_sessions',
   {
     id: pk(),
-    userId: fk().notNull(),
+    userId: fk()
+      .notNull()
+      .references((): AnyPgColumn => users.id, { onDelete: 'cascade' }),
     /** Lowercase hex sha256 of the opaque bearer token. */
     tokenHash: varchar({ length: 64 }).notNull(),
     /** Snapshot of `users.password_version` when the session was minted. */

@@ -33,7 +33,13 @@ const registry: MenuNode[] = [
     label: '系统',
     order: 200,
     children: [
-      { key: 'system.admins', label: '管理员', path: '/admin/admins', permission: 'system:admin:list', order: 10 },
+      {
+        key: 'system.admins',
+        label: '管理员',
+        path: '/admin/admins',
+        permission: 'system:admin:list',
+        order: 10,
+      },
     ],
   }),
   defineMenu({ key: 'dev', label: '开发', order: 9000, devOnly: true, path: '/admin/dev' }),
@@ -87,7 +93,11 @@ describe('filterMenu', () => {
 });
 
 describe('findMenuTrail', () => {
-  const all = filterMenu(registry, { can: canFor([], true), includeHidden: true, includeDev: true });
+  const all = filterMenu(registry, {
+    can: canFor([], true),
+    includeHidden: true,
+    includeDev: true,
+  });
 
   it('returns the ancestor chain, root first', () => {
     expect(findMenuTrail(all, '/admin/coupons').map((node) => node.key)).toEqual([

@@ -12,7 +12,8 @@ import {
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
-import { createdAt, deletedAt, emptyJsonObject, fk, instant, money, pk, updatedAt } from './_shared';
+import { createdAt, deletedAt, fk, instant, money, pk, updatedAt } from './_shared';
+import { admins } from './auth';
 import { productSkus, products } from './catalog';
 import { userCoupons } from './coupon';
 import { cities, expressCompanies } from './reference';
@@ -165,7 +166,9 @@ export const orders = pgTable(
     uniqueIndex('orders_order_no_uq').on(t.orderNo),
     index('orders_user_idx').on(t.userId, t.createdAt),
     index('orders_status_idx').on(t.status, t.createdAt),
-    index('orders_refund_status_idx').on(t.refundStatus).where(sql`refund_status <> 'none'`),
+    index('orders_refund_status_idx')
+      .on(t.refundStatus)
+      .where(sql`refund_status <> 'none'`),
     index('orders_fulfillment_idx')
       .on(t.fulfillmentStatus)
       .where(sql`status = 'paid'`),
@@ -363,8 +366,7 @@ export const orderStatusLogs = pgTable(
     toStatus: ordersStatus(),
     message: varchar({ length: 512 }),
     operatorKind: orderStatusLogsOperatorKind().notNull().default('system'),
-    /** FK to `admins` — wired by the orchestrator at merge, see SCHEMA.md. */
-    operatorAdminId: fk(),
+    operatorAdminId: fk().references((): AnyPgColumn => admins.id, { onDelete: 'set null' }),
     operatorUserId: fk().references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
   },
@@ -388,11 +390,7 @@ export const shipmentsDeliveryMode = pgEnum('shipments_delivery_mode', [
   'virtual',
 ]);
 
-export const shipmentsStatus = pgEnum('shipments_status', [
-  'dispatched',
-  'delivered',
-  'cancelled',
-]);
+export const shipmentsStatus = pgEnum('shipments_status', ['dispatched', 'delivered', 'cancelled']);
 
 /** One dispatch. An order with several shipments was shipped in parts. */
 export const shipments = pgTable(
@@ -414,8 +412,7 @@ export const shipments = pgTable(
     /** `virtual` only: the card key, coupon note or text handed to the buyer. */
     virtualContent: text(),
     remark: varchar({ length: 255 }),
-    /** FK to `admins` — wired by the orchestrator at merge, see SCHEMA.md. */
-    operatorAdminId: fk(),
+    operatorAdminId: fk().references((): AnyPgColumn => admins.id, { onDelete: 'set null' }),
     dispatchedAt: instant().notNull().defaultNow(),
     deliveredAt: instant(),
     cancelledAt: instant(),
@@ -509,8 +506,7 @@ export const orderInvoices = pgTable(
     amount: money().notNull(),
     invoiceNumber: varchar({ length: 50 }),
     remark: varchar({ length: 255 }),
-    /** FK to `admins` — wired by the orchestrator at merge, see SCHEMA.md. */
-    issuedByAdminId: fk(),
+    issuedByAdminId: fk().references((): AnyPgColumn => admins.id, { onDelete: 'set null' }),
     issuedAt: instant(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -532,60 +528,3 @@ export const orderInvoices = pgTable(
 
 export type OrderInvoice = typeof orderInvoices.$inferSelect;
 export type NewOrderInvoice = typeof orderInvoices.$inferInsert;
-
-// ---------------------------------------------------------------------------
-// effect ledger
-// ---------------------------------------------------------------------------
-
-export const orderEffectsStatus = pgEnum('order_effects_status', [
-  'pending',
-  'running',
-  'done',
-  'unknown',
-  'failed',
-]);
-
-/**
- * Post-commit side effects for an order.
- *
- * A row is inserted inside the transaction that changed the order; the
- * dispatcher picks it up afterwards. `UNIQUE (order_id, event_type)` is what
- * makes "issued exactly once" true even if the payment callback arrives twice.
- *
- * `eventType` is a **registry key**, not a status code: handlers are declared
- * in `core/<domain>/effects.ts` and a new domain must be able to register one
- * without an `ALTER TYPE`, which cannot run inside a migration transaction.
- * Known keys are listed in `packages/db/docs/SCHEMA.md`.
- */
-export const orderEffects = pgTable(
-  'order_effects',
-  {
-    id: pk(),
-    orderId: fk()
-      .notNull()
-      .references(() => orders.id, { onDelete: 'cascade' }),
-    eventType: varchar({ length: 64 }).notNull(),
-    status: orderEffectsStatus().notNull().default('pending'),
-    payload: jsonb().$type<Record<string, unknown>>().notNull().default(emptyJsonObject),
-    attempts: integer().notNull().default(0),
-    lastError: varchar({ length: 512 }),
-    /** When the dispatcher may next pick the row up. Backoff is written here. */
-    nextRunAt: instant().notNull().defaultNow(),
-    /** Set when a worker claims the row; a stale claim is reclaimed after the lease expires. */
-    claimedAt: instant(),
-    completedAt: instant(),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  (t) => [
-    uniqueIndex('order_effects_order_event_uq').on(t.orderId, t.eventType),
-    index('order_effects_due_idx')
-      .on(t.nextRunAt)
-      .where(sql`status in ('pending','running')`),
-    index('order_effects_status_idx').on(t.status),
-    check('order_effects_attempts_non_negative', sql`${t.attempts} >= 0`),
-  ],
-);
-
-export type OrderEffect = typeof orderEffects.$inferSelect;
-export type NewOrderEffect = typeof orderEffects.$inferInsert;
