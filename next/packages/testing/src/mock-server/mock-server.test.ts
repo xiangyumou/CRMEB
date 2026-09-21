@@ -76,7 +76,12 @@ describe('serving examples', () => {
   it('serves every registered route from its first example', async () => {
     for (const route of allRoutes) {
       if (route.params) continue; // covered separately; needs a concrete id
-      const response = await fetch(`${server.url}${route.path}`, {
+      // A route with a required query only answers 200 when its own example's query is sent.
+      const query = new URLSearchParams();
+      for (const [key, value] of Object.entries(route.examples[0]?.query ?? {})) {
+        for (const item of Array.isArray(value) ? value : [value]) query.append(key, String(item));
+      }
+      const response = await fetch(`${server.url}${route.path}?${query.toString()}`, {
         method: route.method,
         ...(route.body
           ? {

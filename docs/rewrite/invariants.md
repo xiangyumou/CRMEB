@@ -151,6 +151,23 @@ Owner: **Golden slice**
 | COUPON-005 | A coupon that is not usable by this holder is refused in one conditional update and left in the state it was found: already used, marked failed, expired, not yet valid, and a coupon held by another uid each return zero affected rows. | `packages/core/src/coupon/coupon.int.test.ts::redeem > refuses every unusable shape with one code — COUPON-005` | ported |
 | COUPON-006 | Two redemptions of one coupon released together from separate processes leave exactly one winner: the loser observes zero affected rows and the row records a single use. | `packages/core/src/coupon/coupon.concurrency.int.test.ts::COUPON-006 — one coupon, two orders at the same instant > lets exactly one redemption win` | ported |
 
+## 页面装修 (DIY)
+
+Owner: **G1**
+
+New rows, not from `cases.md`. The rewrite does not touch the uni-app renderer, so the saved page is a wire contract with a program nobody is rewriting; these are the properties that make that safe.
+
+| Legacy ID | Invariant | New test ID | State |
+|---|---|---|---|
+| DIY-001 | A saved page survives parse → serialise byte for byte, including keys no schema in this build knows, for every production export. Validation hands back the caller's own object rather than zod's rebuilt one. | `packages/contracts/src/diy/schema/round-trip.test.ts::page value round trip > %s: parse -> serialise is byte-identical`; `packages/core/src/diy/diy.test.ts::validateDiyContent > hands back the caller’s own object, so the bytes never change` | ported |
+| DIY-002 | Retired components and links to removed storefront pages are filtered on **read**, never on write: the stored row keeps every node, and the same three checks run in the same order as `DiyCompatibilityServices::clean`. | `packages/core/src/diy/diy.test.ts::cleanDiyData — parity with DiyCompatibilityServices::clean > covers every branch of the PHP`; `packages/core/src/diy/diy.int.test.ts::the storefront read > serves the home page with the retired components stripped` | ported |
+| DIY-003 | Cleaning preserves key order and returns its input by identity when nothing is stripped, so a cleaned page still serialises byte for byte. | `packages/core/src/diy/diy.test.ts::cleanDiyData — parity with DiyCompatibilityServices::clean > keeps key order, so a cleaned page still serialises byte for byte` | ported |
+| DIY-004 | Two editors saving the same page do not overwrite each other: the version token covers both `updated_at` and the envelope's `version`, so a save from a stale editor fails with `DIY_VERSION_CONFLICT`. | `packages/core/src/diy/diy.int.test.ts::saving content > lets exactly one of several simultaneous saves win` | ported |
+| DIY-005 | The editor writes back a page it did not change, unchanged: timestamps and their derived `id`s are only rewritten once the page's order has actually moved. | `apps/web/src/admin/diy/store.test.ts::serialising > reproduces an untouched page byte for byte`; `apps/web/src/admin/diy/store.test.ts::serialising > rewrites timestamps and ids only once the order actually moves` | ported |
+| DIY-006 | Hiding a component never deletes it: `isHide` stays in the payload and the renderer skips it. | `apps/web/src/admin/diy/store.test.ts::editing > hides without deleting` | ported |
+| DIY-007 | A page kind that owns a footer always saves one (`pageFoot` on 首页, `bottomMenu` on 商品详情) and it always sorts last. | `apps/web/src/admin/diy/store.test.ts::serialising > appends the factory footer to a home page that has none`; `apps/web/src/admin/diy/store.test.ts::serialising > pushes the footer past the body when the body is restamped` | ported |
+| DIY-008 | PostgreSQL `jsonb` reorders the keys inside a node; the guarantee that survives storage is "every key and value is preserved", not the byte order. Pinned so nobody mistakes it for a bug in this code. See CR-1-g1. | `packages/core/src/diy/diy.int.test.ts::saving content > is the database, not this code, that reorders the keys inside a node` | ported |
+
 ## Storefront paths broken by the removal
 
 Owner: **H / I**
@@ -166,7 +183,7 @@ Owner: **H / I**
 | SMOKE-007 | Retired payment flags report off without their config rows instead of inverting to true. | | unmapped |
 | SMOKE-008 | The order-type statistic separates retained orders from historical ones instead of repeating the whole-table total. | | unmapped |
 | SMOKE-009 | The group-buy poster endpoint composes and uploads the poster offline (QR attachment pre-seeded), not a 500. | | unmapped |
-| SMOKE-010 | DIY data keeps the retained activities and drops the dead navigation entries whole. | | unmapped |
+| SMOKE-010 | DIY data keeps the retained activities and drops the dead navigation entries whole. | `packages/core/src/diy/diy.test.ts::cleanDiyData — parity with DiyCompatibilityServices::clean > covers every branch of the PHP`; `packages/core/src/diy/diy.int.test.ts::the storefront read > serves the home page with the retired components stripped` | ported |
 | SMOKE-011 | Presale expiry unlists only expired presale products. | | unmapped |
 | SMOKE-012 | A successful group updates leader and members once without repeated notifications. | | unmapped |
 

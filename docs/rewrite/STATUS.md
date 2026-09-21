@@ -14,7 +14,7 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | P0-A platform runtime | merged (`08135d13`) | `rewrite/ws-p0a-platform` |
 | P0-B admin shell and kit | merged (`d029a973`); Playwright smoke deferred to K | `rewrite/ws-p0b-shell` |
 | Golden slice (coupon) | merged (`ac928729`) | `rewrite/ws-golden-coupon` |
-| G1 DIY core | in progress (started early) | `rewrite/ws-g1-diy` |
+| G1 DIY core | merged; panel API frozen (see `status/g1.md`) | `rewrite/ws-g1-diy` |
 | A, B1, C, F1 (wave 1) | dispatched | `rewrite/ws-{a,b1,c,f1}-*` |
 | H | waiting on G1a | — |
 | D, B2, E1, E2, G2 (wave 2) | waiting | — |
@@ -34,3 +34,4 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 - 2026-09-21 — Golden slice merged; its CRs applied: route files mirror the contract path (CONVENTIONS fixed), `@shop/core/<domain>` directory imports, worker tests no longer enumerate job names, `next/navigation` stubbed globally in web tests. Gate G0 passed: typecheck, lint, format, build, 352 unit + 199 integration tests, 18 routes' examples. Tag `rewrite-p0-freeze`.
 - 2026-09-22 — CR-1-c applied: `ORDER_STATUSES` now mirrors the `orders_status` enum (`pending_payment`, `refunded`); only an unpaid order can be cancelled, a paid one leaves through a full refund. CR-2-c: config groups live in `core/src/<domain>/`. CR-3-c: stream C owns the fake WeChat gateway. Wave 1 contracts for A, B1, C merged early (126 routes parse).
 - 2026-09-22 — Second usage-limit interruption (four executors); all resumed from committed checkpoints, nothing lost.
+- 2026-09-22 — G1 merged (33 component schemas, DIY core, 18 routes, editor shell, 30 previews, 3 reference panels, ETL mapper; 350 tests). CR-1-g1 decided: `diy_pages.content` stays `jsonb`; "byte-compatible" means no key or value is ever changed on the wire, and ETL verification compares parsed JSON, not text. Mock server now prefers static path segments over `:param`. Workspace: 622 unit + 240 integration tests, 149 routes.

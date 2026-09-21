@@ -1,0 +1,19 @@
+import { z } from 'zod';
+
+import { defineDiyComponent, diyTabs, diyUpload } from './primitives';
+
+/**
+ * `videos` — 视频.
+ *
+ * Fields derived from `template/admin/src/components/mobilePage/home_video.vue`.
+ * Loose by construction: unknown keys round-trip untouched.
+ */
+export const videosSchema = defineDiyComponent('videos', {
+  titleLeft: z.string().optional(),
+  titleRight: z.string().optional(),
+  imgConfig: diyUpload.optional(),
+  videoConfig: diyUpload.optional(),
+  scaleConfig: diyTabs.optional(),
+});
+
+export type VideosComponent = z.infer<typeof videosSchema>;

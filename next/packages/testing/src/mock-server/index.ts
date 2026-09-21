@@ -61,6 +61,18 @@ export function compileRoute(route: AnyRouteDef): CompiledRoute {
   return { route, regex: new RegExp(`^${pattern}$`), paramNames };
 }
 
+/** Compares segment by segment; the first position where only one side is static decides. */
+function bySpecificity(a: CompiledRoute, b: CompiledRoute): number {
+  const left = a.route.path.split('/');
+  const right = b.route.path.split('/');
+  for (let i = 0; i < Math.min(left.length, right.length); i += 1) {
+    const leftParam = left[i]?.startsWith(':') ?? false;
+    const rightParam = right[i]?.startsWith(':') ?? false;
+    if (leftParam !== rightParam) return leftParam ? 1 : -1;
+  }
+  return 0;
+}
+
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -125,7 +137,9 @@ export function matchRoute(
 
 export async function startMockServer(options: MockServerOptions = {}): Promise<RunningMockServer> {
   const routes = options.routes ?? allRoutes;
-  const compiled = routes.map(compileRoute);
+  // Static segments beat `:param` ones, as in the App Router: `/refunds/applicable-items`
+  // must not be captured by `/refunds/:id`.
+  const compiled = routes.map(compileRoute).sort(bySpecificity);
 
   const server = createServer((req, res) => {
     void handleRequest(req, res, compiled, options.verbose ?? false);

@@ -1,0 +1,463 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
+import { themes } from '@shop/db/schema/diy';
+import { createTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+import type { Ctx } from '../kernel/context';
+import { type DomainError } from '../kernel/errors';
+import {
+  activateTheme,
+  copyPage,
+  createLink,
+  createPage,
+  deleteLink,
+  deletePage,
+  getHomePage,
+  getPage,
+  getPageVersion,
+  getStorefrontPage,
+  listLinks,
+  listPages,
+  listThemes,
+  publishPage,
+  restorePageDefault,
+  savePageAsDefault,
+  savePageContent,
+  setHomePage,
+  updateLink,
+  updatePage,
+  updateTheme,
+} from './index';
+
+let harness: TestCtx;
+let ctx: Ctx;
+
+const FIXTURES = path.join(
+  import.meta.dirname,
+  '..',
+  '..',
+  '..',
+  'contracts',
+  'src',
+  'diy',
+  '__fixtures__',
+);
+
+/**
+ * A real production page, read exactly as it is stored. `eb_diy.value` is a
+ * JSON string in some rows and already-decoded JSON in others, which is one of
+ * the reasons the legacy schema is what it is.
+ */
+function pageValueOf(fileName: string): Record<string, unknown> {
+  const row = JSON.parse(readFileSync(path.join(FIXTURES, fileName), 'utf8')) as {
+    value: unknown;
+  };
+  return (typeof row.value === 'string' ? JSON.parse(row.value) : row.value) as Record<
+    string,
+    unknown
+  >;
+}
+
+const PROD_PAGE = pageValueOf('prod-6.json');
+
+const RETIRED = JSON.parse(
+  readFileSync(path.join(FIXTURES, 'retired-components.json'), 'utf8'),
+) as Record<string, unknown>;
+
+beforeAll(async () => {
+  harness = await createTestCtx();
+  ctx = harness.ctx;
+}, 180_000);
+
+afterAll(async () => {
+  await harness?.close();
+});
+
+beforeEach(async () => {
+  await harness.db.truncateAll();
+  await harness.redis.flushdb();
+});
+
+async function seedHome(name = '默认首页') {
+  return createPage(ctx, { name, kind: 'home', title: '商城首页' });
+}
+
+describe('pages', () => {
+  it('creates, lists and reads back', async () => {
+    const created = await seedHome();
+    expect(created.status).toBe('draft');
+    expect(created.content).toEqual({});
+
+    const list = await listPages(ctx, { page: 1, pageSize: 20 });
+    expect(list.total).toBe(1);
+    expect(list.items[0]?.name).toBe('默认首页');
+
+    const detail = await getPage(ctx, { id: created.id });
+    expect(detail.id).toBe(created.id);
+  });
+
+  it('renames without touching the content', async () => {
+    const page = await seedHome();
+    await savePageContent(ctx, { id: page.id, content: PROD_PAGE });
+    const renamed = await updatePage(ctx, { id: page.id, name: '首页 2026' });
+    expect(renamed.name).toBe('首页 2026');
+    expect(renamed.content).toEqual(PROD_PAGE);
+  });
+
+  it('filters by kind and keyword', async () => {
+    await seedHome('首页模板');
+    await createPage(ctx, { name: '活动专题', kind: 'micro' });
+    expect((await listPages(ctx, { page: 1, pageSize: 20, kind: 'micro' })).total).toBe(1);
+    expect((await listPages(ctx, { page: 1, pageSize: 20, keyword: '专题' })).total).toBe(1);
+    expect((await listPages(ctx, { page: 1, pageSize: 20, keyword: '不存在' })).total).toBe(0);
+  });
+});
+
+describe('saving content', () => {
+  it('stores a production page without changing a single value', async () => {
+    const page = await seedHome();
+    const saved = await savePageContent(ctx, { id: page.id, content: PROD_PAGE });
+    // The whole point of the domain: nothing defaulted, nothing coerced,
+    // nothing dropped — including the keys no schema in this build knows.
+    expect(saved.content).toEqual(PROD_PAGE);
+
+    const reread = await getPage(ctx, { id: page.id });
+    expect(reread.content).toEqual(PROD_PAGE);
+    expect(Object.keys(reread.content)).toEqual(Object.keys(PROD_PAGE));
+  });
+
+  it('is the database, not this code, that reorders the keys inside a node', async () => {
+    // Worth pinning, because every schema in `contracts/src/diy` is built to
+    // preserve key order and it would be reasonable to assume the whole path
+    // does. It does not: PostgreSQL `jsonb` stores an object as a sorted map
+    // (by key length, then bytewise) and cannot represent insertion order.
+    //
+    // Harmless for the renderer, which addresses everything by key and sorts
+    // the components by `timestamp` itself — but it does mean a dump of a
+    // migrated row will not diff byte for byte against the MySQL original.
+    // The byte-exact guarantee lives at the wire, where `parseDiyPageValue`
+    // hands back its input; see CR-1-g1.
+    const page = await seedHome();
+    const node = { zzzz: 1, a: 2, name: 'titles', timestamp: 1 };
+    const saved = await savePageContent(ctx, { id: page.id, content: { '1': node } });
+    const stored = saved.content['1'] as Record<string, unknown>;
+    expect(stored).toEqual(node);
+    expect(Object.keys(stored)).toEqual(['a', 'name', 'zzzz', 'timestamp']);
+  });
+
+  it('keeps the unknown keys of the stored envelope', async () => {
+    const page = await seedHome();
+    await harness.db.db.execute(
+      // A row as the ETL leaves it: the legacy `version` and `order_status`
+      // live beside `value` in the same blob.
+      `update diy_pages set content = '{"value":{},"version":"67bd313ce57d7","orderStatus":2}'::jsonb where id = ${Number(page.id)}`,
+    );
+    const saved = await savePageContent(ctx, {
+      id: (await getPage(ctx, { id: page.id })).id,
+      content: { '1': { name: 'titles', timestamp: 1 } },
+    });
+    expect(saved.content).toEqual({ '1': { name: 'titles', timestamp: 1 } });
+
+    const [row] = await harness.db.db
+      .execute<{ content: Record<string, unknown> }>(
+        `select content from diy_pages where id = ${Number(page.id)}`,
+      )
+      .then((r) => (r as unknown as { rows: { content: Record<string, unknown> }[] }).rows);
+    // `orderStatus` is not ours to touch, so it is still there. `version` is
+    // ours: every content save mints a new one, exactly as the legacy editor
+    // wrote a fresh `uniqid()` into `eb_diy.version`.
+    expect(row?.content.orderStatus).toBe(2);
+    expect(row?.content.version).not.toBe('67bd313ce57d7');
+    expect(typeof row?.content.version).toBe('string');
+  });
+
+  it('refuses an invalid envelope and leaves the row alone', async () => {
+    const page = await seedHome();
+    await savePageContent(ctx, { id: page.id, content: PROD_PAGE });
+    await expect(
+      savePageContent(ctx, { id: page.id, content: { '1': { name: 'titles', isHide: 'yes' } } }),
+    ).rejects.toMatchObject({ code: 'DIY_CONTENT_INVALID' });
+
+    const after = await getPage(ctx, { id: page.id });
+    expect(after.content).toEqual(PROD_PAGE);
+  });
+
+  it('strips the hydrated product list down to ids', async () => {
+    const page = await seedHome();
+    const saved = await savePageContent(ctx, {
+      id: page.id,
+      content: {
+        '1': {
+          name: 'goodList',
+          timestamp: 1,
+          tabConfig: { tabVal: 1 },
+          goodsList: { list: [{ id: 3, store_name: 'a' }] },
+        },
+      },
+    });
+    expect(saved.content['1']).toMatchObject({ goodsList: { ids: [3] } });
+    expect(
+      (saved.content['1'] as { goodsList: Record<string, unknown> }).goodsList.list,
+    ).toBeUndefined();
+  });
+
+  it('refuses a version that is out of date', async () => {
+    const page = await seedHome();
+    const first = await savePageContent(ctx, { id: page.id, content: {}, version: page.version });
+    harness.clock.advance(1000);
+    await expect(
+      savePageContent(ctx, { id: page.id, content: {}, version: page.version }),
+    ).rejects.toMatchObject({ code: 'DIY_VERSION_CONFLICT' });
+    // The version the last save handed back still works.
+    await expect(
+      savePageContent(ctx, { id: page.id, content: {}, version: first.version }),
+    ).resolves.toBeTruthy();
+  });
+
+  it('lets exactly one of several simultaneous saves win', async () => {
+    const page = await seedHome();
+    const report = await runConcurrently(5, () =>
+      savePageContent(ctx, { id: page.id, content: {}, version: page.version }),
+    );
+    // Same millisecond, same guard: the losers see the row move underneath them.
+    expect(report.fulfilled).toHaveLength(1);
+    expect(report.rejected).toHaveLength(4);
+    for (const reason of report.rejected) {
+      expect((reason as DomainError).code).toBe('DIY_VERSION_CONFLICT');
+    }
+  });
+
+  it('publishes in the same round trip when asked', async () => {
+    const page = await seedHome();
+    const saved = await savePageContent(ctx, { id: page.id, content: {}, publish: true });
+    expect(saved.status).toBe('published');
+    expect(saved.publishedAt).not.toBeNull();
+  });
+});
+
+describe('publish, home and copy', () => {
+  it('publishes and sets the home page, unsetting the previous one', async () => {
+    const first = await seedHome('首页 A');
+    const second = await seedHome('首页 B');
+    await setHomePage(ctx, { id: first.id });
+    expect((await getPage(ctx, { id: first.id })).isHome).toBe(true);
+
+    await setHomePage(ctx, { id: second.id });
+    expect((await getPage(ctx, { id: first.id })).isHome).toBe(false);
+    expect((await getPage(ctx, { id: second.id })).isHome).toBe(true);
+    // Switching to a template also publishes it, as the legacy one-click did.
+    expect((await getPage(ctx, { id: second.id })).status).toBe('published');
+  });
+
+  it('refuses to make a 微页面 the home page', async () => {
+    const micro = await createPage(ctx, { name: '专题', kind: 'micro' });
+    await expect(setHomePage(ctx, { id: micro.id })).rejects.toMatchObject({
+      code: 'DIY_HOME_KIND_MISMATCH',
+    });
+  });
+
+  it('refuses to delete the home page and allows deleting the rest', async () => {
+    const home = await seedHome();
+    await setHomePage(ctx, { id: home.id });
+    await expect(deletePage(ctx, { id: home.id })).rejects.toMatchObject({
+      code: 'DIY_PAGE_UNDELETABLE',
+    });
+
+    const other = await createPage(ctx, { name: '专题', kind: 'micro' });
+    await deletePage(ctx, { id: other.id });
+    await expect(getPage(ctx, { id: other.id })).rejects.toMatchObject({
+      code: 'DIY_PAGE_NOT_FOUND',
+    });
+    expect((await listPages(ctx, { page: 1, pageSize: 20 })).total).toBe(1);
+  });
+
+  it('copies the envelope verbatim as a draft', async () => {
+    const page = await seedHome();
+    await savePageContent(ctx, { id: page.id, content: PROD_PAGE, publish: true });
+    await setHomePage(ctx, { id: page.id });
+
+    const copy = await copyPage(ctx, { id: page.id });
+    expect(copy.id).not.toBe(page.id);
+    expect(copy.name).toBe('默认首页 副本');
+    expect(copy.isHome).toBe(false);
+    expect(copy.status).toBe('draft');
+    expect(copy.content).toEqual(PROD_PAGE);
+  });
+
+  it('refuses to publish a page whose content does not parse', async () => {
+    const page = await seedHome();
+    await harness.db.db.execute(
+      `update diy_pages set content = '{"value":{"1":{"name":"titles","isHide":"yes"}}}'::jsonb where id = ${Number(page.id)}`,
+    );
+    await expect(publishPage(ctx, { id: page.id })).rejects.toMatchObject({
+      code: 'DIY_CONTENT_INVALID',
+    });
+  });
+});
+
+describe('factory defaults', () => {
+  async function seedTheme(data: Record<string, unknown>) {
+    const now = harness.clock.now();
+    await harness.db.db.insert(themes).values({
+      name: '默认主题',
+      kind: 'custom',
+      isActive: true,
+      data,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  it('restores the active theme’s factory content for the surface', async () => {
+    await seedTheme({ home: { value: { '1': { name: 'titles', timestamp: 1 } } } });
+    const page = await seedHome();
+    await savePageContent(ctx, { id: page.id, content: PROD_PAGE });
+
+    const restored = await restorePageDefault(ctx, { id: page.id });
+    expect(restored.content).toEqual({ '1': { name: 'titles', timestamp: 1 } });
+  });
+
+  it('round-trips through 设为默认数据', async () => {
+    await seedTheme({});
+    const page = await seedHome();
+    await savePageContent(ctx, { id: page.id, content: PROD_PAGE });
+    await savePageAsDefault(ctx, { id: page.id });
+
+    await savePageContent(ctx, { id: page.id, content: {} });
+    const restored = await restorePageDefault(ctx, { id: page.id });
+    expect(restored.content).toEqual(PROD_PAGE);
+  });
+
+  it('says so when there is no factory copy', async () => {
+    const page = await seedHome();
+    await expect(restorePageDefault(ctx, { id: page.id })).rejects.toMatchObject({
+      code: 'DIY_NO_DEFAULT_CONTENT',
+    });
+
+    await seedTheme({});
+    const micro = await createPage(ctx, { name: '专题', kind: 'micro' });
+    await expect(restorePageDefault(ctx, { id: micro.id })).rejects.toMatchObject({
+      code: 'DIY_NO_DEFAULT_CONTENT',
+    });
+  });
+});
+
+describe('the storefront read', () => {
+  it('serves the home page with the retired components stripped', async () => {
+    const page = await seedHome();
+    await savePageContent(ctx, { id: page.id, content: RETIRED, publish: true });
+    await setHomePage(ctx, { id: page.id });
+
+    const served = await getHomePage(ctx);
+    expect(Object.keys(served.content)).toEqual(['1600000000000002', '1600000000000004']);
+    // The row still has everything; only the read filters.
+    expect(Object.keys((await getPage(ctx, { id: page.id })).content)).toHaveLength(7);
+  });
+
+  it('hides a draft from shoppers', async () => {
+    const page = await createPage(ctx, { name: '专题', kind: 'micro' });
+    await expect(getStorefrontPage(ctx, { id: page.id })).rejects.toMatchObject({
+      code: 'DIY_PAGE_NOT_FOUND',
+    });
+    await savePageContent(ctx, { id: page.id, content: {}, publish: true });
+    await expect(getStorefrontPage(ctx, { id: page.id })).resolves.toMatchObject({ id: page.id });
+  });
+
+  it('says so when no page has been made the home page', async () => {
+    await expect(getHomePage(ctx)).rejects.toMatchObject({ code: 'DIY_HOME_PAGE_MISSING' });
+    await expect(getPageVersion(ctx, {})).rejects.toMatchObject({
+      code: 'DIY_HOME_PAGE_MISSING',
+    });
+  });
+
+  it('moves the version on every save, so the app knows to re-fetch', async () => {
+    const page = await seedHome();
+    await savePageContent(ctx, { id: page.id, content: {}, publish: true });
+    await setHomePage(ctx, { id: page.id });
+    const before = (await getPageVersion(ctx, {})).version;
+
+    harness.clock.advance(5000);
+    await savePageContent(ctx, { id: page.id, content: PROD_PAGE });
+    expect((await getPageVersion(ctx, {})).version).not.toBe(before);
+  });
+
+  it('sets a weak ETag when the call came through handle()', async () => {
+    const page = await seedHome();
+    await savePageContent(ctx, { id: page.id, content: {}, publish: true });
+    await setHomePage(ctx, { id: page.id });
+
+    const headers: Record<string, string> = {};
+    const withHeaders = Object.assign(Object.create(Object.getPrototypeOf(ctx) as object), ctx, {
+      setHeader: (name: string, value: string) => {
+        headers[name] = value;
+      },
+    }) as Ctx & { setHeader: (name: string, value: string) => void };
+
+    const served = await getHomePage(withHeaders);
+    expect(headers.ETag).toBe(`W/"${served.version}"`);
+  });
+});
+
+describe('themes', () => {
+  async function seedThemes() {
+    const now = harness.clock.now();
+    await harness.db.db.insert(themes).values([
+      { name: '内置', kind: 'built_in', isActive: true, data: {}, createdAt: now, updatedAt: now },
+      { name: '自定义', kind: 'custom', isActive: false, data: {}, createdAt: now, updatedAt: now },
+    ]);
+    return (await listThemes(ctx)).items;
+  }
+
+  it('edits the tokens of a custom theme and refuses a built-in one', async () => {
+    const [builtIn, custom] = await seedThemes();
+    await expect(
+      updateTheme(ctx, { id: builtIn!.id, tokens: { theme: '#000000' } }),
+    ).rejects.toMatchObject({ code: 'DIY_THEME_BUILT_IN_READONLY' });
+
+    const updated = await updateTheme(ctx, { id: custom!.id, tokens: { theme: '#00AA00' } });
+    expect(updated.tokens).toEqual({ theme: '#00AA00' });
+  });
+
+  it('activates exactly one theme at a time', async () => {
+    const [builtIn, custom] = await seedThemes();
+    await activateTheme(ctx, { id: custom!.id });
+    const items = (await listThemes(ctx)).items;
+    expect(items.filter((t) => t.isActive).map((t) => t.id)).toEqual([custom!.id]);
+    expect(items.find((t) => t.id === builtIn!.id)?.isActive).toBe(false);
+  });
+});
+
+describe('the link registry', () => {
+  it('creates, renames and deletes a link', async () => {
+    const link = await createLink(ctx, { name: '商品详情', url: '/pages/goods_details/index' });
+    expect((await listLinks(ctx, {})).items).toHaveLength(1);
+
+    const renamed = await updateLink(ctx, { id: link.id, name: '商品详情页' });
+    expect(renamed.name).toBe('商品详情页');
+
+    await deleteLink(ctx, { id: link.id });
+    expect((await listLinks(ctx, {})).items).toHaveLength(0);
+  });
+
+  it('refuses a duplicate url with a message instead of a 500', async () => {
+    await createLink(ctx, { name: 'A', url: '/pages/index/index' });
+    await expect(createLink(ctx, { name: 'B', url: '/pages/index/index' })).rejects.toMatchObject({
+      code: 'DIY_LINK_URL_EXISTS',
+    });
+  });
+
+  it('never offers a link to a page the storefront no longer ships', async () => {
+    await createLink(ctx, { name: '积分商城', url: '/pages/points_mall/index' });
+    await createLink(ctx, { name: '首页', url: '/pages/index/index' });
+    expect((await listLinks(ctx, {})).items.map((l) => l.url)).toEqual(['/pages/index/index']);
+  });
+
+  it('hides disabled links from the picker but not from the admin list', async () => {
+    const link = await createLink(ctx, { name: '首页', url: '/pages/index/index' });
+    await updateLink(ctx, { id: link.id, isEnabled: false });
+    expect((await listLinks(ctx, {})).items).toHaveLength(0);
+    expect((await listLinks(ctx, { includeDisabled: true })).items).toHaveLength(1);
+  });
+});

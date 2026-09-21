@@ -99,7 +99,10 @@ describe('fakeStockPort', () => {
 describe('fakeOrderStateMachine', () => {
   it('behaves like a conditional update: the second caller loses', async () => {
     const machine = fakeOrderStateMachine({ 1: 'pending_payment' });
-    expect(await machine.transition(tx, 1, ['pending_payment'], 'paid')).toEqual({ won: true, affected: 1 });
+    expect(await machine.transition(tx, 1, ['pending_payment'], 'paid')).toEqual({
+      won: true,
+      affected: 1,
+    });
     const second = await machine.transition(tx, 1, ['pending_payment'], 'paid');
     expect(second.won).toBe(false);
     expect(second.observed).toBe('paid');

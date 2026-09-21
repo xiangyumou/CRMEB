@@ -174,7 +174,9 @@ describe('port registration', () => {
       totalFen: 500,
       perLine: [500],
     });
-    expect((await getOrderStateMachine().transition(tx, 1, ['pending_payment'], 'paid')).won).toBe(true);
+    expect((await getOrderStateMachine().transition(tx, 1, ['pending_payment'], 'paid')).won).toBe(
+      true,
+    );
   });
 
   it('models the three payment answers the cancel path must handle', async () => {

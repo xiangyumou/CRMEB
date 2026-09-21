@@ -7,3 +7,4 @@
  * conflict on one line each.
  */
 export * as coupon from './mappers/coupon';
+export * as diy from './mappers/diy';
