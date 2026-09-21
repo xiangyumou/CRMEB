@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { cartItems } from '@shop/db/schema/cart';
-import { productSkus, products } from '@shop/db/schema/catalog';
+import { productSkus, productVirtualCards, products } from '@shop/db/schema/catalog';
 import { orderStatusLogs, orders } from '@shop/db/schema/order';
 import { couponTemplates, userCoupons } from '@shop/db/schema/coupon';
 import { userAddresses, users } from '@shop/db/schema/user';
@@ -9,6 +9,7 @@ import { createTestCtx, fakePaymentPort, type TestCtx } from '@shop/testing';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import * as order from './index';
+import { autoDeliver } from './order.fulfil.effects';
 import {
   registerOrderStateMachine,
   registerPaymentPort,
@@ -295,6 +296,76 @@ describe('checkout preview', () => {
       order.preview(as(userId), { source: 'cart', cartItemIds: [], kind: 'normal' }),
       'ORDER_VIRTUAL_CARD_QUANTITY',
     );
+  });
+
+  /**
+   * CR-3-b2, the other door in. 立即购买 never touches the cart, so the cart's
+   * own refusal does not cover it; the cap has to sit in `assertSellable`,
+   * where both sources meet.
+   */
+  it('refuses more than one card key on 立即购买 too', async () => {
+    const userId = await makeUser();
+    const item = await makeProduct({ kind: 'virtual_card' });
+
+    const body = {
+      source: 'buy-now' as const,
+      cartItemIds: [],
+      item: { skuId: String(item.skuId), quantity: 2 },
+      addressId: null,
+      kind: 'normal' as const,
+    };
+    await expectDomainError(order.preview(as(userId), body), 'ORDER_VIRTUAL_CARD_QUANTITY');
+    await expectDomainError(
+      order.create(as(userId), { ...body, idempotencyKey: idempotencyKey() }),
+      'ORDER_VIRTUAL_CARD_QUANTITY',
+    );
+    // Refused at the door: no order, and the stock was never touched.
+    expect(await harness.ctx.db.select().from(orders)).toHaveLength(0);
+    expect((await stockAndSalesOf(harness.ctx.db, item.skuId)).stock).toBe(10);
+  });
+
+  /**
+   * The other side of CR-3-b2: the cap is a cap, not a ban. One card goes
+   * through checkout and B2's `autoDeliver` hands over exactly one key — which
+   * is the whole reason the cap exists, since
+   * `product_virtual_cards_order_item_uq` would let a line of two claim one
+   * card and silently lose the other.
+   */
+  it('lets a single card key through checkout, and B2 delivers exactly one', async () => {
+    const userId = await makeUser();
+    const item = await makeProduct({ kind: 'virtual_card' });
+    await harness.ctx.db.insert(productVirtualCards).values([
+      { productId: item.productId, skuId: item.skuId, cardKey: 'KEY-1', cardNo: 'NO-1' },
+      { productId: item.productId, skuId: item.skuId, cardKey: 'KEY-2', cardNo: 'NO-2' },
+    ]);
+    const cartItemId = await addToCart(userId, item, 1);
+
+    const detail = await order.create(as(userId), {
+      source: 'cart',
+      cartItemIds: [String(cartItemId)],
+      kind: 'normal',
+      idempotencyKey: idempotencyKey(),
+    });
+    const orderId = Number(detail.id);
+    expect(detail.items[0]?.quantity).toBe(1);
+
+    // What stream C does when the money lands.
+    await harness.ctx.db
+      .update(orders)
+      .set({ status: 'paid', paidAt: harness.clock.now(), paidAmount: '60.00' })
+      .where(eq(orders.id, orderId));
+
+    const outcome = await autoDeliver(harness.ctx, orderId);
+    expect(outcome.delivered).toBe(true);
+    expect(outcome.shortOfCards).toEqual([]);
+
+    const claimed = await harness.ctx.db
+      .select()
+      .from(productVirtualCards)
+      .where(eq(productVirtualCards.state, 'claimed'));
+    // One line, one card. The second key is still on the shelf.
+    expect(claimed).toHaveLength(1);
+    expect(claimed[0]?.claimedByUserId).toBe(userId);
   });
 
   it('refuses an empty selection', async () => {
@@ -806,7 +877,7 @@ describe('auto-cancel', () => {
 
     const report = await order.sweepExpiredOrders(harness.ctx);
 
-    expect(report).toEqual({ scanned: 1, cancelled: 1 });
+    expect(report).toEqual({ scanned: 1, cancelled: 1, skipped: 0 });
     const rows = await harness.ctx.db.select().from(orders);
     const byId = new Map(rows.map((row) => [row.id, row.status]));
     expect(byId.get(expired.orderId)).toBe('cancelled');

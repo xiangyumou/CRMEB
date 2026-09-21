@@ -252,11 +252,19 @@ export interface StockPort {
  *
  * It is called inside the cancelling transaction with the order row already
  * locked, so it must not perform network I/O that can hang without a timeout.
+ * Being database-only it cannot resolve an attempt that is still open — it
+ * answers `unknown` rather than going to find out — so cancellation is a
+ * **two-call protocol** (CR-7-c): `closeOrderPayments` first, outside the
+ * transaction, where talking to WeChat costs nobody a row lock, and then
+ * `ensureNoOpenAttempts` as the re-check under the lock, which is what catches
+ * an attempt that opened in between.
  */
 export type PaymentState = 'closed' | 'paid' | 'unknown';
 
 export interface PaymentPort {
   ensureNoOpenAttempts(tx: Tx, orderId: number): Promise<PaymentState>;
+  /** Closes every open attempt at the gateway. Call outside a transaction. */
+  closeOrderPayments(ctx: Ctx, orderId: number): Promise<PaymentState>;
 }
 
 /**

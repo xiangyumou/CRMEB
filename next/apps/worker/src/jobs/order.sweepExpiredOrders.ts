@@ -13,6 +13,11 @@ import { defineJob } from '../define-job';
  *
  * Staggered off the hour (`:03`) so it does not start in the same second as
  * the other sweeps.
+ *
+ * `skipped` counts the orders whose payment the gateway would not confirm
+ * closed. They are not failures of this pass — they release nothing and come
+ * back on the next one — but a `skipped` that stays high across passes means
+ * WeChat, or our credentials, and it wants a human.
  */
 export default defineJob({
   name: 'order.sweepExpiredOrders',
@@ -20,7 +25,8 @@ export default defineJob({
   concurrency: 1,
   repeat: { pattern: '3/5 * * * *' },
   handler: async (ctx) => {
-    const { scanned, cancelled } = await sweepExpiredOrders(ctx);
-    if (scanned > 0) ctx.logger.info({ scanned, cancelled }, 'swept expired unpaid orders');
+    const { scanned, cancelled, skipped } = await sweepExpiredOrders(ctx);
+    if (scanned > 0)
+      ctx.logger.info({ scanned, cancelled, skipped }, 'swept expired unpaid orders');
   },
 });

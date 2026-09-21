@@ -11,18 +11,18 @@ import { defineJob } from '../define-job';
  * believing only a confirmed answer.
  *
  * It runs at `:01` of every fifth minute, two minutes ahead of
- * `order.sweepExpiredOrders` at `:03`, and the gap is load-bearing until
- * `CR-7-c` lands. `PaymentPort.ensureNoOpenAttempts` is database-only — it runs
- * under the order's row lock, so it may not call WeChat — and it answers
- * `unknown` for any order with an open attempt. B1's `cancelOrder` never calls
- * `closeOrderPayments` first, so without this job running ahead of it, every
- * expired order that ever reached the WeChat sheet would answer
- * `ORDER_PAYMENT_STATE_UNKNOWN` and sit on its stock forever.
+ * `order.sweepExpiredOrders` at `:03`. That gap used to be load-bearing:
+ * `PaymentPort.ensureNoOpenAttempts` is database-only — it runs under the
+ * order's row lock, so it may not call WeChat — and it answers `unknown` for
+ * any order with an open attempt, so before `CR-7-c` an expired order that had
+ * ever reached the WeChat sheet could only be swept if this job had closed it
+ * first.
  *
- * Ordering by schedule is a poor substitute for a function call, which is what
- * the CR asks for. It is, however, enough to keep the sweep working, because
- * both are backstops with no deadline of their own: an order this pass misses
- * is closed by the next one.
+ * `CR-7-c` has landed: `cancelOrder` calls `closeOrderPayments` itself, so the
+ * schedule is no longer standing in for a function call. The job still earns
+ * its place — it makes the payment side final on its own for orders nobody is
+ * trying to cancel, and it means the sweep two minutes later usually finds the
+ * attempts already closed and makes no gateway call at all.
  */
 export default defineJob({
   name: 'payment.closeExpiredPayments',

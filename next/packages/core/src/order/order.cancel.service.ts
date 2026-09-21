@@ -23,15 +23,25 @@ import { orderStateMachine } from './order.state-machine';
  *
  * The order of operations is the whole safety argument:
  *
+ *  0. **outside** any transaction, `PaymentPort.closeOrderPayments` asks the
+ *     gateway to close every open attempt: `closed` proceeds, `paid` refuses,
+ *     `unknown` refuses and releases *nothing* (risk matrix §4 — never guess).
+ *     It is outside because it talks to WeChat, and a row lock held for the
+ *     length of a gateway round trip is how a checkout table seizes up;
  *  1. `SELECT … FOR UPDATE` on the order, so a payment cannot start underneath;
- *  2. ask `PaymentPort` whether money can still arrive, **while holding it**:
- *     `closed` proceeds, `paid` refuses, `unknown` refuses and releases
- *     *nothing* (risk matrix §4 — never guess);
+ *  2. ask `PaymentPort` *again*, **while holding it** — `ensureNoOpenAttempts`
+ *     is database-only and this is the re-check that catches an attempt opened
+ *     between step 0 and the lock. Same three answers, same three outcomes;
  *  3. one conditional `pending_payment -> cancelled` transition. Exactly one
  *     caller can win it, which is what makes the auto-cancel job and the user's
  *     tap safe to race;
  *  4. only the winner gives back the stock and the coupon, in the same
  *     transaction, so QUEUE-006's "both or neither" holds by construction.
+ *
+ * Steps 0 and 2 are the two-call protocol C designed and CR-7-c wired up.
+ * Before it, every order whose buyer had opened the WeChat sheet and backed out
+ * answered `unknown` forever: the 取消订单 button refused them and the sweep
+ * skipped exactly the orders it exists for.
  *
  * A paid order is never cancelled — `ORDER_TRANSITIONS` has no such edge. It
  * leaves through stream C's full refund.
@@ -76,6 +86,25 @@ async function paymentState(ctx: Ctx, tx: Tx, orderId: number): Promise<PaymentS
 }
 
 /**
+ * Step 0: the gateway round trip, outside every transaction.
+ *
+ * Exported inside the domain (not from `index.ts`) so the sweep can run a batch
+ * of these in parallel before it starts cancelling one order at a time.
+ */
+export async function closeOrderPayments(ctx: Ctx, orderId: number): Promise<PaymentState> {
+  const port = resolvePaymentPort();
+  if (port) return port.closeOrderPayments(ctx, orderId);
+  ctx.logger.debug({ orderId }, 'no PaymentPort registered; nothing to close');
+  return 'closed';
+}
+
+/** `paid` and `unknown` are refusals, and they are refusals in both steps. */
+function refuseOn(state: PaymentState): void {
+  if (state === 'paid') throw new DomainError('ORDER_ALREADY_PAID');
+  if (state === 'unknown') throw new DomainError('ORDER_PAYMENT_STATE_UNKNOWN');
+}
+
+/**
  * The one cancellation. Everything else in the system — the route, the delayed
  * job, the sweep, a future admin action — calls this.
  */
@@ -83,6 +112,12 @@ export async function cancelOrder(ctx: Ctx, input: CancelInput): Promise<CancelO
   const now = ctx.clock.now();
   const strict = input.strict ?? false;
   const message = input.message?.trim() || DEFAULT_MESSAGE[input.reason];
+
+  // Step 0. Outside the transaction: this one talks to WeChat. `closed` here
+  // is not a promise that it will still be closed under the lock — step 2 is
+  // what makes that true — it is a promise that nothing we opened is still
+  // collectible.
+  refuseOn(await closeOrderPayments(ctx, input.orderId));
 
   const outcome = await ctx.withTx(async (tx): Promise<CancelOutcome> => {
     const order = await repo.lockOrder(tx, input.orderId);
@@ -100,9 +135,9 @@ export async function cancelOrder(ctx: Ctx, input: CancelInput): Promise<CancelO
       return { cancelled: false, status: order.status };
     }
 
-    const state = await paymentState(ctx, tx, input.orderId);
-    if (state === 'paid') throw new DomainError('ORDER_ALREADY_PAID');
-    if (state === 'unknown') throw new DomainError('ORDER_PAYMENT_STATE_UNKNOWN');
+    // Step 2. The re-check, under the lock. Database-only by contract, and the
+    // reason an attempt that opened between step 0 and here cannot slip past.
+    refuseOn(await paymentState(ctx, tx, input.orderId));
 
     const moved = await orderStateMachine.transition(
       tx,
@@ -193,6 +228,13 @@ export async function cancel(
 /**
  * The per-order delayed job. Never throws for a lost race: by the time it runs
  * the shopper may have paid, or cancelled it themselves, and both are fine.
+ *
+ * It goes through `cancelOrder`, so it runs the same two-call protocol: the
+ * buyer who opened the WeChat sheet and walked away has their attempt closed
+ * here rather than blocking the timeout forever. It *does* throw for
+ * `ORDER_ALREADY_PAID` and `ORDER_PAYMENT_STATE_UNKNOWN` — those are not lost
+ * races, they are the job declining to guess, and the queue's retry (or the
+ * sweep) is the right answer to both.
  */
 export async function autoCancel(ctx: Ctx, input: { orderId: number }): Promise<CancelOutcome> {
   return cancelOrder(ctx, {
@@ -203,9 +245,45 @@ export async function autoCancel(ctx: Ctx, input: { orderId: number }): Promise<
 }
 
 /**
+ * How many gateway closes the sweep has in flight at once.
+ *
+ * The sweep's limit is 200 orders, and each of them may owe WeChat a round
+ * trip. One at a time makes the sweep as slow as the gateway; all at once
+ * makes us the thing hammering it. Five is small enough to be polite and large
+ * enough that a single slow close does not set the pace.
+ */
+const SWEEP_CLOSE_CONCURRENCY = 5;
+
+/** `fn` over `items`, at most `limit` in flight, results in input order. */
+async function mapWithLimit<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const index = next++;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index]!);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/**
  * The backstop sweep. The delayed job does the real work; this exists because
  * a queue can lose a job and an order must not stay `pending_payment` forever
  * holding stock. Nothing depends on it for correctness.
+ *
+ * It runs the gateway closes first, `SWEEP_CLOSE_CONCURRENCY` at a time, and
+ * only then cancels — one order at a time, because that half is all database
+ * work under a row lock. An order whose close did not answer `closed` is
+ * skipped and logged; it keeps its stock and its coupon, and the next sweep
+ * tries it again. One silent gateway must never cost the other 199 orders
+ * their sweep.
  */
 export async function sweepExpiredOrders(ctx: Ctx, options: { limit?: number } = {}) {
   const { autoCancelSweepLimit } = await ctx.config.get(orderConfig);
@@ -214,16 +292,39 @@ export async function sweepExpiredOrders(ctx: Ctx, options: { limit?: number } =
     limit: options.limit ?? autoCancelSweepLimit,
   });
 
-  let cancelled = 0;
-  for (const orderId of ids) {
+  const states = await mapWithLimit(ids, SWEEP_CLOSE_CONCURRENCY, async (orderId) => {
     try {
+      return await closeOrderPayments(ctx, orderId);
+    } catch (error) {
+      // A close that throws is indistinguishable from one that answers
+      // `unknown`: we do not know, so we release nothing.
+      ctx.logger.warn({ err: error, orderId }, 'expired order sweep: closing the payment failed');
+      return 'unknown' as PaymentState;
+    }
+  });
+
+  let cancelled = 0;
+  let skipped = 0;
+  for (const [index, orderId] of ids.entries()) {
+    const state = states[index]!;
+    if (state !== 'closed') {
+      // `paid` is a shopper who beat the sweep; `unknown` is a gateway that
+      // would not say. Both keep every reservation and come back next sweep.
+      skipped += 1;
+      ctx.logger.info({ orderId, state }, 'expired order sweep: skipping, payment not closed');
+      continue;
+    }
+    try {
+      // `cancelOrder` closes again, which is now a database read finding
+      // nothing open — and the honest gateway call if an attempt opened since.
       const outcome = await autoCancel(ctx, { orderId });
       if (outcome.cancelled) cancelled += 1;
     } catch (error) {
-      // One order that cannot be cancelled — a gateway that will not answer —
-      // must not stop the sweep reaching the rest.
+      // One order that cannot be cancelled must not stop the sweep reaching
+      // the rest.
+      skipped += 1;
       ctx.logger.warn({ err: error, orderId }, 'expired order sweep: cancel failed');
     }
   }
-  return { scanned: ids.length, cancelled };
+  return { scanned: ids.length, cancelled, skipped };
 }

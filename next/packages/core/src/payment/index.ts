@@ -1,6 +1,6 @@
 import { registerPaymentPort } from '../order/ports';
 import { registerPaymentEffects } from './payment.effects';
-import { ensureNoOpenAttempts } from './payment.service';
+import { closeOrderPayments, ensureNoOpenAttempts } from './payment.service';
 
 /**
  * The payment domain's public surface.
@@ -107,6 +107,6 @@ export {
  * global port, and so `resetOrderPorts()` in a test can put it back.
  */
 export function registerPaymentDomain(): void {
-  registerPaymentPort({ ensureNoOpenAttempts });
+  registerPaymentPort({ ensureNoOpenAttempts, closeOrderPayments });
   registerPaymentEffects();
 }

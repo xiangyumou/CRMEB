@@ -161,7 +161,10 @@ describe('port registration', () => {
       release: async () => {},
       commit: async () => {},
     });
-    registerPaymentPort({ ensureNoOpenAttempts: async () => 'closed' });
+    registerPaymentPort({
+      ensureNoOpenAttempts: async () => 'closed',
+      closeOrderPayments: async () => 'closed',
+    });
     registerFreightPort({ quote: async () => ({ totalFen: 500, perLine: [500] }) });
     registerOrderStateMachine({
       table: ORDER_TRANSITIONS,
@@ -170,6 +173,7 @@ describe('port registration', () => {
 
     expect(await getStockPort().reserve(tx, 1, [])).toEqual([]);
     expect(await getPaymentPort().ensureNoOpenAttempts(tx, 1)).toBe('closed');
+    expect(await getPaymentPort().closeOrderPayments(ctx, 1)).toBe('closed');
     expect(await getFreightPort().quote(ctx, { addressCityId: null, lines: [] })).toEqual({
       totalFen: 500,
       perLine: [500],
@@ -181,8 +185,13 @@ describe('port registration', () => {
 
   it('models the three payment answers the cancel path must handle', async () => {
     for (const answer of ['closed', 'paid', 'unknown'] as const) {
-      registerPaymentPort({ ensureNoOpenAttempts: async () => answer });
+      registerPaymentPort({
+        ensureNoOpenAttempts: async () => answer,
+        closeOrderPayments: async () => answer,
+      });
       expect(await getPaymentPort().ensureNoOpenAttempts(tx, 1)).toBe(answer);
+      // Both halves of the two-call protocol speak the same three answers.
+      expect(await getPaymentPort().closeOrderPayments(ctx, 1)).toBe(answer);
     }
   });
 });

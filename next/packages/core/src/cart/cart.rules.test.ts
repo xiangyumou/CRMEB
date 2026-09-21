@@ -120,4 +120,18 @@ describe('capFor', () => {
   it('never drops below one, whatever the data says', () => {
     expect(capFor(sku({ purchaseLimitMode: 'per_order', purchaseLimitQuantity: 0 }))).toBe(1);
   });
+
+  it('is one for a card-key product, whatever limit the product carries', () => {
+    // CR-3-b2: the stepper must not offer a quantity `refuseQuantity` refuses.
+    expect(capFor(sku({ productKind: 'virtual_card' }))).toBe(1);
+    expect(
+      capFor(
+        sku({
+          productKind: 'virtual_card',
+          purchaseLimitMode: 'per_order',
+          purchaseLimitQuantity: 5,
+        }),
+      ),
+    ).toBe(1);
+  });
 });

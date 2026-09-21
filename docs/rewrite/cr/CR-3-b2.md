@@ -1,6 +1,7 @@
 # CR-3-b2 — a `virtual_card` line must be capped at quantity 1 at checkout
 
-**Stream** B2 · **Status** open · **Blocking** no (B2 degrades safely) ·
+**Stream** B2 · **Status** **applied** on `rewrite/ws-b1-checkout` ·
+**Blocking** no (B2 degrades safely) ·
 **Asked of** stream A (catalogue) and stream B1 (checkout)
 
 ## What
@@ -70,3 +71,53 @@ convenience of a quantity stepper.
 Nothing is blocked. The warning is in the logs, the order is delivered, and
 `autoDeliver` needs no change on the day the cap lands — the `quantity > 1`
 branch simply stops being reachable.
+
+## Applied
+
+Accepted, and B1's half was already most of the way there: `cart.rules.ts` and
+`order.checkout.service.ts` have refused a `virtual_card` line above one since
+`80d823fd`, both quoting `product_virtual_cards_order_item_uq` in the comment.
+What this pass added is the parts that were not covered.
+
+**Stream A needed nothing.** `SkuForSale` already carries `productKind`, and
+`catalog.sale.ts` already reports it, so the kind reaches both the cart rules
+and `assertSellable` without a port change.
+
+**The error codes stay `CART_VIRTUAL_CARD_QUANTITY` (422, 卡密商品每次只能购买 1
+件) and `ORDER_VIRTUAL_CARD_QUANTITY` (422, 卡密商品每单只能购买 1 件)**, not
+`ORDER_PURCHASE_LIMIT_REACHED`. Both are already in the frozen contracts and on
+the routes, and both say *why* — a 卡密 cap is a schema fact, not a
+merchandising limit an operator set and can change, and the storefront's copy
+differs accordingly. Reusing the purchase-limit code would have thrown that
+away and made `details: { limit }` a lie.
+
+Also note the CR's suggestion of forcing `purchaseLimitMode: 'per_order'` /
+`purchaseLimitQuantity: 1` on card products was **not** taken. It would put a
+schema invariant into operator-editable data, where the next person to edit the
+product can turn it off.
+
+What changed:
+
+- `capFor` returns **1** for a `virtual_card`. It was the one place the kind was
+  not consulted: it is both the clamp `addUnits` applies and the cap 再次购买
+  clamps a rebought line to, so without it those paths offered a quantity that
+  `refuseQuantity` then refused.
+- **立即购买 is covered explicitly.** Buy-now never touches the cart, so the
+  cart's refusal does not reach it; the cap lives in `assertSellable`, where
+  both sources meet, and there is now a test that says so for `preview` *and*
+  `create`.
+- **The cart's edit path is covered.** `addItem` was tested; `updateItem` sets
+  an absolute quantity and was the way round the add-time refusal.
+- **The cap is proved to be a cap, not a ban**: one card goes through B1's
+  checkout, C's payment marks it paid, and B2's `autoDeliver` claims exactly one
+  key while the second stays on the shelf.
+
+Tests: `cart.rules.test.ts::capFor > is one for a card-key product…`,
+`cart.int.test.ts::editing the cart > refuses to edit a card-key row up to two`,
+`order.int.test.ts::checkout preview > refuses more than one card key on 立即购买 too`,
+`order.int.test.ts::checkout preview > lets a single card key through checkout, and B2 delivers exactly one`,
+plus the two that already existed. Invariant row `CAT-010` cites them.
+
+`autoDeliver`'s `quantity > 1` warning branch is now unreachable through any
+route, exactly as the CR predicted. It is left in place: it is the backstop for
+a row written before this landed, or by a migration.

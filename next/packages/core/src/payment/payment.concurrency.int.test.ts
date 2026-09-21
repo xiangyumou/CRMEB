@@ -22,7 +22,11 @@ import {
 } from '@shop/testing';
 import { drainEffects, resetEffectHandlers } from '../effects';
 import type { Actor, Ctx } from '../kernel/context';
+import { DomainError } from '../kernel/errors';
+import * as order from '../order';
+import { registerOrderStateMachine, resetOrderPorts } from '../order/ports';
 import { wechatConfig } from '../wechat';
+import { registerPaymentDomain } from './index';
 import { paymentConfig } from './payment.config';
 import { registerPaymentEffects } from './payment.effects';
 import { reconcileStalePayments } from './payment.jobs';
@@ -86,6 +90,11 @@ beforeEach(async () => {
   gateway.behaviour.signResponsesWithWrongKey = false;
   gateway.behaviour.failNext = null;
   gateway.behaviour.dropNext = false;
+  // The cancel below is B1's real one, so it needs B1's state machine and this
+  // domain registered as the `PaymentPort` — both halves of it.
+  resetOrderPorts();
+  registerOrderStateMachine(order.orderStateMachine);
+  registerPaymentDomain();
   await configure();
 });
 
@@ -232,27 +241,30 @@ function notify(signed: SignedNotification): Promise<service.WebhookResult> {
 }
 
 /**
- * B1's cancel protocol, spelled out here so the race is tested rather than
- * assumed: close the gateway orders **outside** the transaction, then cancel
- * inside one, re-asking the port with the order row locked.
+ * B1's real `cancelOrder`, in the three words this file's assertions are
+ * written in.
+ *
+ * It used to be a local re-implementation of the two-call protocol, because
+ * B1's own cancel made only the second call and so answered `blocked` for every
+ * order in this file. `CR-7-c` wired the first call up, so the races below now
+ * run against the code that ships. All this wrapper does is turn B1's two
+ * refusals — both `DomainError`s — back into `paid` and `blocked`.
  */
 async function cancelOrder(ctx: Ctx, orderId: number): Promise<'cancelled' | 'paid' | 'blocked'> {
-  const state = await service.closeOrderPayments(ctx, orderId);
-  if (state === 'paid') return 'paid';
-  if (state === 'unknown') return 'blocked';
-
-  return ctx.withTx(async (tx) => {
-    const order = await repo.lockOrderForPayment(tx, orderId);
-    if (!order || order.status !== 'pending_payment') return 'blocked';
-    const again = await service.ensureNoOpenAttempts(tx, orderId);
-    if (again === 'paid') return 'paid';
-    if (again !== 'closed') return 'blocked';
-    await tx
-      .update(orders)
-      .set({ status: 'cancelled', cancelledAt: ctx.clock.now(), cancelReason: '买家取消' })
-      .where(eq(orders.id, orderId));
-    return 'cancelled';
-  });
+  try {
+    const outcome = await order.cancelOrder(ctx, {
+      orderId,
+      reason: 'user',
+      message: '买家取消',
+    });
+    return outcome.cancelled ? 'cancelled' : 'blocked';
+  } catch (error) {
+    if (DomainError.is(error)) {
+      if (error.code === 'ORDER_ALREADY_PAID') return 'paid';
+      if (error.code === 'ORDER_PAYMENT_STATE_UNKNOWN') return 'blocked';
+    }
+    throw error;
+  }
 }
 
 // --- readers ---------------------------------------------------------------

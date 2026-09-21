@@ -268,6 +268,26 @@ describe('editing the cart', () => {
     expect(unticked.item?.isSelected).toBe(false);
   });
 
+  /**
+   * CR-3-b2. The add path already refuses a second card; the edit path is the
+   * way round it, because it sets an absolute quantity rather than adding to
+   * one. `product_virtual_cards_order_item_uq` binds one card key to one order
+   * item, so a line of two could only ever be half delivered.
+   */
+  it('refuses to edit a card-key row up to two', async () => {
+    const userId = await makeUser();
+    const item = await makeProduct({ kind: 'virtual_card' });
+    const added = await cart.addItem(as(userId), { skuId: String(item.skuId), quantity: 1 });
+
+    await expectDomainError(
+      cart.updateItem(as(userId), { id: added.item!.id }, { quantity: 2 }),
+      'CART_VIRTUAL_CARD_QUANTITY',
+    );
+    // The row is left exactly as it was — a refused edit is not a partial one.
+    const listed = await cart.list(as(userId), { page: 1, pageSize: 20, filter: 'all' });
+    expect(listed.items.map((row) => row.quantity)).toEqual([1]);
+  });
+
   it('refuses to edit somebody else’s row, with the same code as a missing one', async () => {
     const owner = await makeUser();
     const stranger = await makeUser();

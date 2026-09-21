@@ -30,25 +30,46 @@ import type { CaptchaVerifier } from '@shop/core/auth';
 export interface FakePaymentPort extends PaymentPort {
   /** Every `ensureNoOpenAttempts` call, in order. */
   calls: number[];
-  /** Change the answer mid-test. */
+  /** Every `closeOrderPayments` call, in order — the pre-transaction half. */
+  closes: number[];
+  /** Change the answer mid-test. Sets both halves unless `closeResult` was given. */
   setResult(result: PaymentState): void;
+  /** Change only what `closeOrderPayments` answers, leaving the in-lock re-check alone. */
+  setCloseResult(result: PaymentState): void;
 }
 
 /**
  * `fakePaymentPort({ result: 'unknown' })` is how B1 proves the cancel path
  * refuses and keeps every reservation when the gateway will not answer.
+ *
+ * Both halves of the two-call protocol answer the same thing by default, which
+ * is what a real gateway does when nothing changes underneath. `closeResult`
+ * splits them, so a test can have the close succeed and the re-check under the
+ * lock find an attempt that opened in between (CR-7-c).
  */
-export function fakePaymentPort(options: { result?: PaymentState } = {}): FakePaymentPort {
+export function fakePaymentPort(
+  options: { result?: PaymentState; closeResult?: PaymentState } = {},
+): FakePaymentPort {
   let result: PaymentState = options.result ?? 'closed';
+  let closeResult: PaymentState | undefined = options.closeResult;
   const calls: number[] = [];
+  const closes: number[] = [];
   return {
     calls,
+    closes,
     setResult(next) {
       result = next;
+    },
+    setCloseResult(next) {
+      closeResult = next;
     },
     async ensureNoOpenAttempts(_tx, orderId) {
       calls.push(orderId);
       return result;
+    },
+    async closeOrderPayments(_ctx, orderId) {
+      closes.push(orderId);
+      return closeResult ?? result;
     },
   };
 }

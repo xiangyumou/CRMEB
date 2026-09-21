@@ -25,6 +25,24 @@ describe('fakePaymentPort', () => {
     port.setResult('unknown');
     expect(await port.ensureNoOpenAttempts(tx, 1)).toBe('unknown');
   });
+
+  it('answers both halves of the cancel protocol and records each separately', async () => {
+    const port = fakePaymentPort({ result: 'unknown' });
+    expect(await port.closeOrderPayments(ctx, 7)).toBe('unknown');
+    expect(port.closes).toEqual([7]);
+    // The close is not an `ensureNoOpenAttempts` call and must not be counted as one.
+    expect(port.calls).toEqual([]);
+  });
+
+  it('can split the two halves, so the re-check under the lock differs', async () => {
+    const port = fakePaymentPort({ result: 'paid', closeResult: 'closed' });
+    expect(await port.closeOrderPayments(ctx, 3)).toBe('closed');
+    expect(await port.ensureNoOpenAttempts(tx, 3)).toBe('paid');
+
+    port.setCloseResult('unknown');
+    expect(await port.closeOrderPayments(ctx, 3)).toBe('unknown');
+    expect(port.closes).toEqual([3, 3]);
+  });
 });
 
 describe('flatRateFreight', () => {

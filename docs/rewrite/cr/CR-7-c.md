@@ -1,6 +1,6 @@
 # CR-7-c — `cancelOrder` never closes the payment, so any order with an open attempt cannot be cancelled
 
-**Stream** C · **Target** `next/packages/core/src/order/order.cancel.service.ts` (B1-owned) · **Severity** high, user-visible
+**Stream** C · **Target** `next/packages/core/src/order/order.cancel.service.ts` (B1-owned) · **Severity** high, user-visible · **Status** **applied** on `rewrite/ws-b1-checkout`
 
 ## What
 
@@ -91,3 +91,42 @@ the auto-cancel sweep. It closes the attempts of expired orders, which lets the
 sweep that follows see `closed` and do its work. That is a scheduling
 coincidence standing in for a function call: it fixes the sweep, and it does
 nothing at all for the buyer pressing 取消订单.
+
+## Applied
+
+Accepted by the orchestrator and applied on `rewrite/ws-b1-checkout`, exactly
+as asked.
+
+- **`PaymentPort`** gained `closeOrderPayments(ctx, orderId): Promise<PaymentState>`
+  ("closes every open attempt at the gateway; call outside a transaction"), and
+  `registerPaymentDomain()` registers it — C's `closeOrderPayments` already had
+  that signature, so the registration is one property.
+- **`cancelOrder`** calls it before it opens the transaction and refuses on
+  `paid` (`ORDER_ALREADY_PAID`) and `unknown` (`ORDER_PAYMENT_STATE_UNKNOWN`).
+  The in-transaction `ensureNoOpenAttempts` re-check under the row lock is
+  untouched: it is what catches an attempt that opens in between. `autoCancel`
+  goes through `cancelOrder`, so it inherits both calls.
+- **`sweepExpiredOrders`** runs its gateway closes five at a time
+  (`SWEEP_CLOSE_CONCURRENCY`) and then cancels, one order at a time, only the
+  orders whose close answered `closed`. An order whose close said `paid`,
+  answered `unknown` or threw is counted in a new `skipped`, releases nothing
+  and is retried next pass — one silent gateway cannot cost the other 199
+  orders their sweep. The report is now `{ scanned, cancelled, skipped }`.
+- **The two-call protocol is tested, not assumed**, in
+  `packages/core/src/order/order.cancel.payment.int.test.ts`: 12 tests against
+  real PostgreSQL, the real payment domain and the fake WeChat gateway, on real
+  orders from B1's checkout so that "released" means stock and coupon that were
+  genuinely taken. One of them asserts the gateway is asked exactly **once** per
+  cancel, which is the standing proof that the re-check stayed database-only.
+- **`payment.concurrency.int.test.ts`'s local `cancelOrder` helper is gone.**
+  `QUEUE-003` and `TLS-006` now race B1's real `cancelOrder`; the wrapper that
+  remains only turns its two `DomainError`s back into this file's `paid` /
+  `blocked` vocabulary. All 21 tests stay green.
+- `payment.closeExpiredPayments`' comment no longer claims the `:01` / `:03`
+  schedule is standing in for a function call. The job keeps its place — it
+  makes the payment side final for orders nobody is cancelling, and it means
+  the sweep usually finds the attempts already closed and calls WeChat not at
+  all.
+
+Invariant rows `QUEUE-002`, `QUEUE-003`, `QUEUE-004`, `QUEUE-005` and
+`QUEUE-009` cite the new tests; the first four no longer say "B1 half done".

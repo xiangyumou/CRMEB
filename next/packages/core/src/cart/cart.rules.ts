@@ -69,8 +69,18 @@ export function refuseQuantity(
   return null;
 }
 
-/** The quantity an add may reach: never past the shop's cap or the variant's. */
+/**
+ * The quantity an add may reach: never past the shop's cap or the variant's.
+ *
+ * It is both the clamp `addUnits` applies and the `cap` the storefront's
+ * stepper is told about, so a kind that `refuseQuantity` would refuse has to
+ * be capped here too — otherwise the stepper offers a number the next request
+ * answers with a 422.
+ */
 export function capFor(sku: SkuForSale): number {
+  // `product_virtual_cards_order_item_uq`: one card key per order item, so the
+  // stepper on a 卡密 product does not go past 1 (CR-3-b2).
+  if (sku.productKind === 'virtual_card') return 1;
   const limit =
     sku.purchaseLimitMode !== 'none' && sku.purchaseLimitQuantity !== null
       ? sku.purchaseLimitQuantity

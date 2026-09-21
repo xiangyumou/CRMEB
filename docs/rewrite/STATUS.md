@@ -29,7 +29,8 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | F2 shipping, articles, statistics | dispatched 2026-09-23 | `rewrite/ws-f2-ops` |
 | E2 WeChat OA and notifications | dispatched 2026-09-23 | `rewrite/ws-e2-wechat` |
 | S storefront contract gaps (CR-1..5-h) | briefed; starts after the B1 and C fix-ups merge | — |
-| F2, I, J (wave 3) | waiting | — |
+| J ETL runner and deployment | dispatched 2026-09-23 | `rewrite/ws-j-etl-deploy` |
+| I storefront tests | waiting on H's second pass | — |
 | K (wave 4) | waiting | — |
 
 ## Decisions log
@@ -59,3 +60,5 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 - 2026-09-23 — F1's storage race fix merged (both sides lock the category row; 30-round tests). B2 merged (40 route handlers, 3 admin pages, 141 tests, 10 races; no new dependencies). Workspace int: core 569, web 105. CR-3-b2 accepted: a `virtual_card` line is quantity 1 — refused in cart and checkout (B1 fix-up). Integration pass still owed once the fix-ups land: register C's refund service behind B2's `StaffRefundPort`, prove ship-vs-refund with both real services, move the order-facts bridge into the order domain and reconcile A's `catalog.autoReview` with B2's received → completed job, delete B1's fallback catalogue adapter.
 - 2026-09-23 — Kit maintenance merged: `visibleWhen` and `section` on config fields, implicit `auth:profile:*` atoms, `formData` in `callRoute`, and `pnpm gen` in core writing `config-groups.gen.ts` and `domains.gen.ts`; `handle.ts` and the worker import `@shop/core/domains` once, so every process has every port, hook, effect handler and config group (CR-8-c closed; C's job-file stop-gaps removed). Rule: a domain registers at import or through one exported `register<Domain>Domain()`, nowhere else. The `payment`, `refund` and `wechat` config groups now appear on the settings index for the first time. Lockfile updated (`tsx` in core).
 - 2026-09-23 — H merged (new `request.js`, every live `api/*.js` export re-pointed, 11 mappers, route guard failing both ways, 229 tests; H5 and mp-weixin builds work headlessly for the first time). Two calls fixed at merge for C's final `refunds/applicable-items/:orderId`. 104 calls wait on contracts not yet written (E1 42, E2 14, D 11, F2 10) or on CR-1..5-h (order lookup by order number, cart SKU change / batch favourite, category version, seven staff-console gaps, upload field name); those CRs are routed to the owning streams' fix-up passes and H gets a second pass afterwards.
+- 2026-09-23 — B1 fix-up merged. CR-7-c: `PaymentPort.closeOrderPayments(ctx, orderId)`; `cancelOrder` closes at the gateway outside the transaction and re-checks under the lock; the expiry sweep closes five at a time and reports `{scanned, cancelled, skipped}`. C's local cancel helper is gone — its race test runs the real one. CR-3-b2: a card-key line is quantity 1 in the cart cap, cart edit, buy-now and checkout (`CART_/ORDER_VIRTUAL_CARD_QUANTITY`, deliberately not the purchase-limit code). Workspace int: core 585, web 105. Stream J (ETL runner and deployment) dispatched.
+
