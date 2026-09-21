@@ -1,0 +1,35 @@
+{
+  // TEMPORARY (P0-A). `apps/web` has no package.json yet — P0-B owns it — so
+  // this project file exists only so `src/server` can be typechecked and
+  // linted on its own. The `paths` below stand in for the node_modules links
+  // pnpm would create once `apps/web/package.json` lists these dependencies.
+  //
+  // P0-B: when you add `apps/web/package.json` with the dependencies listed in
+  // `docs/rewrite/status/p0a.md`, delete this file and let the app's own
+  // tsconfig cover `src/server`.
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "typeRoots": ["../../../../packages/testing/node_modules/@types"],
+    "lib": ["ES2023", "DOM"],
+    "paths": {
+      "@shop/contracts": ["../../../../packages/contracts/src/index.ts"],
+      "@shop/contracts/conventions": ["../../../../packages/contracts/src/_conventions/index.ts"],
+      "@shop/contracts/routes": ["../../../../packages/contracts/src/routes.gen.ts"],
+      "@shop/contracts/errors": ["../../../../packages/contracts/src/errors.gen.ts"],
+      "@shop/contracts/*": ["../../../../packages/contracts/src/*.ts"],
+      "@shop/core": ["../../../../packages/core/src/index.ts"],
+      "@shop/core/kernel": ["../../../../packages/core/src/kernel/index.ts"],
+      "@shop/core/auth": ["../../../../packages/core/src/auth/index.ts"],
+      "@shop/core/effects": ["../../../../packages/core/src/effects/index.ts"],
+      "@shop/core/*": ["../../../../packages/core/src/*.ts"],
+      "@shop/db": ["../../../../packages/db/src/index.ts"],
+      "@shop/db/*": ["../../../../packages/db/src/*.ts"],
+      "@shop/testing": ["../../../../packages/testing/src/index.ts"],
+      "zod": ["../../../../packages/contracts/node_modules/zod"],
+      "ioredis": ["../../../../packages/core/node_modules/ioredis"],
+      "vitest": ["../../../../packages/testing/node_modules/vitest"]
+    }
+  },
+  "include": [".", "../../app"]
+}

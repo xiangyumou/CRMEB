@@ -1,33 +1,33 @@
 {
-  "name": "@shop/contracts",
+  "name": "@shop/worker",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": {
-    ".": "./src/index.ts",
-    "./conventions": "./src/_conventions/index.ts",
-    "./routes": "./src/routes.gen.ts",
-    "./errors": "./src/errors.gen.ts",
-    "./openapi.json": "./openapi.json",
-    "./*": "./src/*.ts"
-  },
   "scripts": {
-    "gen": "tsx scripts/gen.ts && tsx scripts/openapi.ts",
-    "openapi": "tsx scripts/openapi.ts",
-    "check:examples": "tsx scripts/check-examples.ts",
+    "gen": "tsx scripts/gen.ts",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "build": "tsup",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test:unit": "vitest run --project unit",
     "test:int": "vitest run --project int --passWithNoTests"
   },
   "dependencies": {
+    "@shop/contracts": "workspace:*",
+    "@shop/core": "workspace:*",
+    "@shop/db": "workspace:*",
+    "bullmq": "^6.3.8",
+    "ioredis": "^6.0.0",
+    "pg": "^8.23.0",
+    "pino": "^10.3.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@shop/config": "workspace:*",
     "@types/node": "^24.0.0",
     "eslint": "^10.11.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.20.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"

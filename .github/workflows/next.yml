@@ -1,0 +1,160 @@
+name: next
+
+# The merge gate for the rewrite (PLAN §4 "合并门"): typecheck, lint with the
+# import boundaries, unit tests, integration tests on a real PostgreSQL 17 and
+# Redis 7, the contract example check, and formatting.
+#
+# Only runs for changes under `next/` — the legacy PHP tree has its own
+# workflows and must not be disturbed.
+
+on:
+  push:
+    branches: [master, 'rewrite/**']
+    paths:
+      - 'next/**'
+      - '.github/workflows/next.yml'
+  pull_request:
+    paths:
+      - 'next/**'
+      - '.github/workflows/next.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: next-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: next
+
+env:
+  # Response validation is a merge-gate check, not a production cost.
+  VALIDATE_RESPONSES: '1'
+  # Keep turbo quiet and deterministic in CI.
+  TURBO_TELEMETRY_DISABLED: '1'
+  DO_NOT_TRACK: '1'
+
+jobs:
+  static:
+    name: gen / typecheck / lint / unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: next/pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Cache turbo
+        uses: actions/cache@v4
+        with:
+          path: next/.turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
+
+      # `*.gen.ts` and `openapi.json` are gitignored, so everything downstream
+      # depends on this step having run.
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
+      - name: Typecheck
+        run: corepack pnpm typecheck
+
+      # TEMPORARY (P0-A): `apps/web` has no package.json yet, so `src/server`
+      # is not part of the turbo graph. P0-B removes this step when the app
+      # gets its own package.json and tsconfig.
+      - name: Typecheck apps/web/src/server
+        run: corepack pnpm --filter @shop/testing exec tsc -p ../../apps/web/src/server/tsconfig.json
+
+      - name: Lint
+        run: corepack pnpm lint
+
+      # Run from `apps/web` so ESLint's flat-config base path covers both
+      # `src/server` and the route files under `app/`.
+      - name: Lint apps/web/src/server
+        working-directory: next/apps/web
+        run: ../../packages/testing/node_modules/.bin/eslint --config src/server/eslint.config.js src/server app
+
+      - name: Unit tests
+        run: corepack pnpm test:unit
+
+      - name: Contract examples
+        run: corepack pnpm --filter @shop/contracts check:examples
+
+      - name: Prettier
+        run: corepack pnpm format:check
+
+      - name: Upload the OpenAPI document
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: next/packages/contracts/openapi.json
+          if-no-files-found: error
+
+  integration:
+    name: integration (testcontainers)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: next/pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
+      # Docker is preinstalled on the ubuntu runners, which is what
+      # Testcontainers needs. Pulling the images up front keeps the first
+      # container start from eating the per-test timeout.
+      - name: Pre-pull the service images
+        run: |
+          docker pull postgres:17-alpine
+          docker pull redis:7-alpine
+
+      - name: Integration tests
+        run: corepack pnpm test:int
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: static
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: next/pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
+      - name: Build
+        run: corepack pnpm build
