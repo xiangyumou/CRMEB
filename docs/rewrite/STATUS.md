@@ -16,10 +16,12 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | Golden slice (coupon) | merged (`ac928729`) | `rewrite/ws-golden-coupon` |
 | G1 DIY core | merged; panel API frozen (see `status/g1.md`) | `rewrite/ws-g1-diy` |
 | B1 checkout | merged (`97ecc873`, fix-up `fa7f825b`) | `rewrite/ws-b1-checkout` |
-| A, C, F1 (wave 1) | in progress | `rewrite/ws-{a,c,f1}-*` |
+| F1 system and storage | merged (`94f5720d`) | `rewrite/ws-f1-system` |
+| A, C (wave 1) | in progress | `rewrite/ws-{a,c}-*` |
 | G2 DIY panels | in progress | `rewrite/ws-g2-panels` |
 | B2 fulfilment, H uni-app API layer | dispatched 2026-09-22 | `rewrite/ws-b2-fulfillment`, `rewrite/ws-h-uniapp` |
-| D, E1, E2 (wave 2) | waiting (D on A, E2 on C, E1 on a free slot) | — |
+| E1 user and login; kit maintenance (CR-1..5-f1) | dispatched 2026-09-23 | `rewrite/ws-e1-user`, `rewrite/ws-kit-f1crs` |
+| D, E2 (wave 2) | waiting (D on A, E2 on C) | — |
 | F2, I, J (wave 3) | waiting | — |
 | K (wave 4) | waiting | — |
 
@@ -41,3 +43,4 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 - 2026-09-22 — B1 fix-up merged (`fa7f825b`): duplicate submit is stopped by `orders_idempotency_uq`, with a fast-path read of the key before pricing so a sequential replay returns the first order instead of `ORDER_EMPTY`. F1 contracts merged early (system + storage, 37 routes); gate G1a passed with 186 routes. H and B2 unblocked.
 - 2026-09-22 — Stream A's CRs decided. CR-1-a: `StockPort.release` takes `options?: {committed, refundId}` — `committed` brings `sales` down with the restock in one statement; `refundId` makes a refund release idempotent per refund, because an order is refunded line by line and a per-order key would swallow the second partial refund. CR-2-a: `OrderFactsPort` moves into `order/ports.ts` as the one inbound seam; A's read-only bridge moves into the order domain at A's merge. CR-3-a: superseded by CR-2-c (config groups live in `core/src/<domain>/<group>.config.ts`); `system/index.ts` stays F1's.
 - 2026-09-23 — Third usage-limit interruption (six executors); all resumed from committed checkpoints. B2 contracts merged early (42 routes; 228 in total). CR-1-b2: B2 keeps `express-companies` until F2 lands, then F2 takes both routes over with identical paths and shapes (written into F2's brief). CR-2-b2: exports stay CSV-in-JSON, capped by config — no binary escape hatch in `handle()`, no XLSX; F2's statistics exports use the same mechanism.
+- 2026-09-23 — F1 merged (37 routes, 9 config groups, 8 pages, 193 tests; no new dependencies, no thumbnails). Workspace: 784 unit + 422 integration tests, 228 routes. CR-1..5-f1 accepted and handed to a kit-maintenance executor (`visibleWhen` and `section` on config fields, `profile:*` implicit atoms, the generated config-group bucket, multipart in `callRoute`). CR-6-f1 decided: the domain that owns the behaviour owns the setting — `trade` is dissolved after A, C, B2 and F2 land (receive/review timers and the staff roster → `order`; stock warning → `catalog`; refund reasons and return address → `refund`; free-shipping threshold → `shipping`); until then it stays as it is.
