@@ -13,9 +13,10 @@ import {
 } from './fake-gateway';
 
 /**
- * The fake gateway is a skeleton for stream C, but the *crypto plumbing* has to
- * be real today — a fake that signs incorrectly would teach C's verifier to be
- * wrong too.
+ * The *crypto plumbing* has to be real: a fake that signs incorrectly would
+ * teach the client's verifier to be wrong too. So does the *rule* plumbing —
+ * the payment races are gateway races, and a gateway that says yes to
+ * everything cannot express them.
  */
 
 let gateway: FakeWechatGateway;
@@ -281,5 +282,416 @@ describe('postNotify', () => {
 
   it('refuses to notify about a transaction it never created', async () => {
     await expect(gateway.postNotify(notifyUrl, { outTradeNo: 'nope' })).rejects.toThrow('未知交易');
+  });
+});
+
+/**
+ * The business rules. A separate instance with its own clock, because these
+ * tests mutate `behaviour` and drive expiry, and neither should leak into the
+ * crypto tests above.
+ */
+describe('the rules that make the races testable', () => {
+  let rules: FakeWechatGateway;
+  let clockMs: number;
+
+  beforeAll(async () => {
+    clockMs = Date.parse('2026-01-01T00:00:00Z');
+    rules = await startFakeWechatGateway({ now: () => clockMs });
+  });
+
+  afterAll(async () => {
+    await rules?.close();
+  });
+
+  const post = (path: string, body: unknown) =>
+    fetch(`${rules.url}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+  const create = (outTradeNo: string, total = 1000, extra: Record<string, unknown> = {}) =>
+    post('/v3/pay/transactions/jsapi', {
+      appid: rules.keys.appId,
+      mchid: rules.keys.mchId,
+      out_trade_no: outTradeNo,
+      amount: { total, currency: 'CNY' },
+      payer: { openid: 'oTestOpenid' },
+      ...extra,
+    });
+
+  const refund = (body: Record<string, unknown>) => post('/v3/refund/domestic/refunds', body);
+
+  async function codeOf(response: Response): Promise<string> {
+    return (await response.json()).code;
+  }
+
+  describe('creating a transaction', () => {
+    it('refuses a second create once the money has arrived', async () => {
+      await create('R-paid');
+      rules.markPaid('R-paid');
+      const response = await create('R-paid');
+      expect(response.status).toBe(400);
+      expect(await codeOf(response)).toBe('ORDERPAID');
+    });
+
+    it('refuses a create on a closed order', async () => {
+      await create('R-closed');
+      await post('/v3/pay/transactions/out-trade-no/R-closed/close', {});
+      const response = await create('R-closed');
+      expect(await codeOf(response)).toBe('ORDER_CLOSED');
+    });
+
+    it('hands out a fresh prepay_id for an unchanged, unpaid order', async () => {
+      const first = await (await create('R-again')).json();
+      const second = await (await create('R-again')).json();
+      expect(second.prepay_id).toMatch(/^wx[0-9a-f]{32}$/);
+      expect(second.prepay_id).not.toBe(first.prepay_id);
+    });
+
+    it('refuses to reprice an order that is already collectible', async () => {
+      await create('R-repriced', 1000);
+      const response = await create('R-repriced', 2000);
+      expect(await codeOf(response)).toBe('INVALID_REQUEST');
+    });
+
+    it('checks the merchant and app identity it was sent', async () => {
+      const wrongMch = await post('/v3/pay/transactions/jsapi', {
+        appid: rules.keys.appId,
+        mchid: '1900000999',
+        out_trade_no: 'R-mch',
+        amount: { total: 1 },
+      });
+      expect(await codeOf(wrongMch)).toBe('PARAM_ERROR');
+
+      const wrongApp = await post('/v3/pay/transactions/jsapi', {
+        appid: 'wxdeadbeef',
+        mchid: rules.keys.mchId,
+        out_trade_no: 'R-app',
+        amount: { total: 1 },
+      });
+      expect(await codeOf(wrongApp)).toBe('APPID_MCHID_NOT_MATCH');
+    });
+
+    it('honours time_expire, so an unpaid order closes itself', async () => {
+      await create('R-expiring', 1000, {
+        time_expire: new Date(clockMs + 60_000).toISOString(),
+      });
+      const before = await (
+        await fetch(`${rules.url}/v3/pay/transactions/out-trade-no/R-expiring`)
+      ).json();
+      expect(before.trade_state).toBe('NOTPAY');
+
+      clockMs += 61_000;
+      const after = await (
+        await fetch(`${rules.url}/v3/pay/transactions/out-trade-no/R-expiring`)
+      ).json();
+      expect(after.trade_state).toBe('CLOSED');
+      clockMs -= 61_000;
+    });
+
+    it('expires on demand, for a test that would rather not move time', async () => {
+      await create('R-expire-now');
+      expect(rules.expireTransaction('R-expire-now').tradeState).toBe('CLOSED');
+    });
+  });
+
+  describe('closing', () => {
+    it('refuses to close a paid transaction — the cancel-vs-callback race', async () => {
+      await create('R-close-paid');
+      rules.markPaid('R-close-paid');
+      const response = await post('/v3/pay/transactions/out-trade-no/R-close-paid/close', {});
+      expect(response.status).toBe(400);
+      expect(await codeOf(response)).toBe('ORDERPAID');
+      expect(rules.transactions.get('R-close-paid')?.tradeState).toBe('SUCCESS');
+    });
+
+    it('is retryable: closing twice still answers 204', async () => {
+      await create('R-close-twice');
+      expect((await post('/v3/pay/transactions/out-trade-no/R-close-twice/close', {})).status).toBe(
+        204,
+      );
+      expect((await post('/v3/pay/transactions/out-trade-no/R-close-twice/close', {})).status).toBe(
+        204,
+      );
+    });
+
+    it('404s a close of an order it never saw', async () => {
+      const response = await post('/v3/pay/transactions/out-trade-no/R-never/close', {});
+      expect(response.status).toBe(404);
+      expect(await codeOf(response)).toBe('ORDERNOTEXIST');
+    });
+  });
+
+  describe('refunding', () => {
+    beforeAll(async () => {
+      await create('R-src', 1000);
+      rules.markPaid('R-src');
+    });
+
+    it('refuses to refund an order that was never paid', async () => {
+      await create('R-unpaid', 500);
+      const response = await refund({
+        out_trade_no: 'R-unpaid',
+        out_refund_no: 'RF-unpaid',
+        amount: { refund: 500, total: 500 },
+      });
+      expect(response.status).toBe(403);
+      expect(await codeOf(response)).toBe('TRADE_ERROR');
+    });
+
+    it('checks the total the app claims the original collected', async () => {
+      const response = await refund({
+        out_trade_no: 'R-src',
+        out_refund_no: 'RF-wrong-total',
+        amount: { refund: 100, total: 9999 },
+      });
+      expect(await codeOf(response)).toBe('PARAM_ERROR');
+    });
+
+    it('accumulates partial refunds and caps them at the total', async () => {
+      const first = await refund({
+        out_trade_no: 'R-src',
+        out_refund_no: 'RF-1',
+        amount: { refund: 400, total: 1000 },
+      });
+      expect(first.status).toBe(200);
+      expect(rules.transactions.get('R-src')?.refundedFen).toBe(400);
+
+      const second = await refund({
+        out_trade_no: 'R-src',
+        out_refund_no: 'RF-2',
+        amount: { refund: 700, total: 1000 },
+      });
+      expect(second.status).toBe(403);
+      expect(await codeOf(second)).toBe('REFUND_FEE_MISMATCH');
+      expect(rules.transactions.get('R-src')?.refundedFen).toBe(400);
+    });
+
+    it('is idempotent by merchant refund number, and rejects a changed amount', async () => {
+      const again = await refund({
+        out_trade_no: 'R-src',
+        out_refund_no: 'RF-1',
+        amount: { refund: 400, total: 1000 },
+      });
+      expect(again.status).toBe(200);
+      expect((await again.json()).refund_id).toBe(rules.refunds.get('RF-1')?.refundId);
+      expect(rules.transactions.get('R-src')?.refundedFen).toBe(400);
+
+      const changed = await refund({
+        out_trade_no: 'R-src',
+        out_refund_no: 'RF-1',
+        amount: { refund: 401, total: 1000 },
+      });
+      expect(await codeOf(changed)).toBe('INVALID_REQUEST');
+    });
+
+    it('reports NOTENOUGH when the merchant balance is short', async () => {
+      await create('R-balance', 1000);
+      rules.markPaid('R-balance');
+      rules.behaviour.refundBalanceFen = 100;
+      try {
+        const response = await refund({
+          out_trade_no: 'R-balance',
+          out_refund_no: 'RF-balance',
+          amount: { refund: 1000, total: 1000 },
+        });
+        expect(response.status).toBe(403);
+        expect(await codeOf(response)).toBe('NOTENOUGH');
+        expect(rules.transactions.get('R-balance')?.refundedFen).toBe(0);
+      } finally {
+        rules.behaviour.refundBalanceFen = null;
+      }
+    });
+
+    it('answers a query by merchant refund number, and 404s an unknown one', async () => {
+      const found = await fetch(`${rules.url}/v3/refund/domestic/refunds/RF-1`);
+      expect(found.status).toBe(200);
+      expect(await found.json()).toMatchObject({
+        out_refund_no: 'RF-1',
+        out_trade_no: 'R-src',
+        status: 'PROCESSING',
+      });
+
+      const missing = await fetch(`${rules.url}/v3/refund/domestic/refunds/RF-nope`);
+      expect(missing.status).toBe(404);
+      expect(await codeOf(missing)).toBe('RESOURCE_NOT_EXISTS');
+    });
+
+    it('gives the money back when a refund is closed rather than settled', async () => {
+      await create('R-closed-refund', 300);
+      rules.markPaid('R-closed-refund');
+      await refund({
+        out_trade_no: 'R-closed-refund',
+        out_refund_no: 'RF-closed',
+        amount: { refund: 300, total: 300 },
+      });
+      expect(rules.transactions.get('R-closed-refund')?.refundedFen).toBe(300);
+      rules.markRefunded('RF-closed', 'CLOSED');
+      expect(rules.transactions.get('R-closed-refund')?.refundedFen).toBe(0);
+    });
+  });
+
+  describe('failure injection', () => {
+    it('serves one canned error and then goes back to normal', async () => {
+      rules.behaviour.failNext = { status: 500, code: 'SYSTEM_ERROR', message: '系统繁忙' };
+      const failed = await create('R-canned');
+      expect(failed.status).toBe(500);
+      expect(await codeOf(failed)).toBe('SYSTEM_ERROR');
+      expect(rules.transactions.has('R-canned')).toBe(false);
+
+      expect((await create('R-canned')).status).toBe(200);
+    });
+
+    it('drops one connection, which the client sees as a transport failure', async () => {
+      rules.behaviour.dropNext = true;
+      await expect(create('R-dropped')).rejects.toThrow();
+      expect(rules.behaviour.dropNext).toBe(false);
+      expect((await create('R-dropped')).status).toBe(200);
+    });
+
+    it('can sign with a key the client does not trust', async () => {
+      rules.behaviour.signResponsesWithWrongKey = true;
+      try {
+        const response = await create('R-untrusted');
+        const payload = JSON.stringify(await response.json());
+        expect(
+          verifyWithKey(
+            rules.keys.platformPublicKeyPem,
+            signatureMessage(
+              response.headers.get('wechatpay-timestamp')!,
+              response.headers.get('wechatpay-nonce')!,
+              payload,
+            ),
+            response.headers.get('wechatpay-signature')!,
+          ),
+        ).toBe(false);
+      } finally {
+        rules.behaviour.signResponsesWithWrongKey = false;
+      }
+    });
+  });
+
+  describe('refund notifications', () => {
+    let app: Server;
+    let notifyUrl: string;
+    const received: Array<{ headers: Record<string, string>; body: string }> = [];
+
+    beforeAll(async () => {
+      app = createServer((req, res) => {
+        const chunks: Buffer[] = [];
+        req.on('data', (chunk: Buffer) => chunks.push(chunk));
+        req.on('end', () => {
+          received.push({
+            headers: Object.fromEntries(
+              Object.entries(req.headers).map(([k, v]) => [k, String(v ?? '')]),
+            ),
+            body: Buffer.concat(chunks).toString('utf8'),
+          });
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ code: 'SUCCESS' }));
+        });
+      });
+      await new Promise<void>((resolve) => app.listen(0, '127.0.0.1', resolve));
+      notifyUrl = `http://127.0.0.1:${(app.address() as AddressInfo).port}/api/v1/webhooks/wechat-refund`;
+    });
+
+    afterAll(async () => {
+      await new Promise<void>((resolve) => app.close(() => resolve()));
+    });
+
+    function decrypt(body: string): { envelope: Record<string, unknown>; plaintext: unknown } {
+      const envelope = JSON.parse(body);
+      const resource = envelope.resource;
+      const raw = Buffer.from(resource.ciphertext, 'base64');
+      const decipher = createDecipheriv(
+        'aes-256-gcm',
+        Buffer.from(rules.keys.apiV3Key, 'utf8'),
+        Buffer.from(resource.nonce),
+      );
+      decipher.setAAD(Buffer.from(resource.associated_data, 'utf8'));
+      decipher.setAuthTag(raw.subarray(raw.length - 16));
+      return {
+        envelope,
+        plaintext: JSON.parse(
+          Buffer.concat([
+            decipher.update(raw.subarray(0, raw.length - 16)),
+            decipher.final(),
+          ]).toString('utf8'),
+        ),
+      };
+    }
+
+    it('delivers a signed REFUND.SUCCESS with refund associated_data', async () => {
+      await create('N-refund', 800);
+      rules.markPaid('N-refund');
+      await refund({
+        out_trade_no: 'N-refund',
+        out_refund_no: 'RF-notify',
+        amount: { refund: 800, total: 800 },
+      });
+      rules.markRefunded('RF-notify');
+
+      const result = await rules.postRefundNotify(notifyUrl, { outRefundNo: 'RF-notify' });
+      expect(result.status).toBe(200);
+
+      const { headers, body } = received.at(-1)!;
+      expect(
+        verifyWithKey(
+          rules.keys.platformPublicKeyPem,
+          signatureMessage(headers['wechatpay-timestamp']!, headers['wechatpay-nonce']!, body),
+          headers['wechatpay-signature']!,
+        ),
+      ).toBe(true);
+
+      const { envelope, plaintext } = decrypt(body);
+      expect(envelope.event_type).toBe('REFUND.SUCCESS');
+      // A client that hard-codes 'transaction' as the AAD cannot read this.
+      expect((envelope.resource as { associated_data: string }).associated_data).toBe('refund');
+      expect(plaintext).toMatchObject({
+        out_refund_no: 'RF-notify',
+        out_trade_no: 'N-refund',
+        refund_status: 'SUCCESS',
+      });
+    });
+
+    it('delivers the abnormal outcome too', async () => {
+      const result = await rules.postRefundNotify(notifyUrl, {
+        outRefundNo: 'RF-notify',
+        eventType: 'REFUND.ABNORMAL',
+      });
+      expect(result.status).toBe(200);
+      const { plaintext } = decrypt(received.at(-1)!.body);
+      expect(plaintext).toMatchObject({ refund_status: 'ABNORMAL' });
+    });
+
+    it('refuses to notify about a refund it never issued', async () => {
+      await expect(rules.postRefundNotify(notifyUrl, { outRefundNo: 'nope' })).rejects.toThrow(
+        '未知退款单',
+      );
+    });
+  });
+
+  it('serves a genuinely encrypted certificate payload', async () => {
+    const response = await fetch(`${rules.url}/v3/certificates`);
+    expect(response.status).toBe(200);
+    const entry = (await response.json()).data[0];
+    expect(entry.serial_no).toBe(rules.keys.platformSerial);
+
+    const encrypted = entry.encrypt_certificate;
+    expect(encrypted.algorithm).toBe('AEAD_AES_256_GCM');
+    const raw = Buffer.from(encrypted.ciphertext, 'base64');
+    const decipher = createDecipheriv(
+      'aes-256-gcm',
+      Buffer.from(rules.keys.apiV3Key, 'utf8'),
+      Buffer.from(encrypted.nonce),
+    );
+    decipher.setAAD(Buffer.from(encrypted.associated_data, 'utf8'));
+    decipher.setAuthTag(raw.subarray(raw.length - 16));
+    const plaintext = Buffer.concat([
+      decipher.update(raw.subarray(0, raw.length - 16)),
+      decipher.final(),
+    ]).toString('utf8');
+    expect(plaintext).toBe(rules.keys.platformPublicKeyPem);
   });
 });

@@ -11,7 +11,7 @@ import {
   refundReasonList,
   refundReturnShipmentBody,
   refundableItemsExample,
-  refundableItemsQuery,
+  refundableItemsParams,
   refundableItemsResult,
 } from './schemas';
 
@@ -45,18 +45,18 @@ export const refundReasons = defineRoute({
 export const refundApplicableItems = defineRoute({
   id: 'refund.applicableItems',
   method: 'GET',
-  path: '/api/v1/refunds/applicable-items',
+  path: '/api/v1/refunds/applicable-items/:orderId',
   auth: 'user',
   summary: '可申请售后的商品',
   tags: ['refund'],
-  query: refundableItemsQuery,
+  params: refundableItemsParams,
   response: refundableItemsResult,
   errors: ['REFUND_ORDER_NOT_FOUND', 'REFUND_ORDER_NOT_REFUNDABLE'],
   examples: [
-    { name: 'one-line', query: { orderId: '3001' }, response: refundableItemsExample },
+    { name: 'one-line', params: { orderId: '3001' }, response: refundableItemsExample },
     {
       name: 'line-already-in-after-sales',
-      query: { orderId: '3001' },
+      params: { orderId: '3001' },
       response: {
         ...refundableItemsExample,
         refundableAmount: '99.00',

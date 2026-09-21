@@ -11,28 +11,40 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net';
 
 /**
- * Fake WeChat Pay v3 gateway — **skeleton**.
+ * Fake WeChat Pay v3 gateway.
  *
- * Why it exists now, in Phase 0: the production credentials are not
- * configured and the site is blocked at the edge (PLAN §Context), so the only
- * way payment and refund can ever be tested is against a gateway we control.
- * PLAN §7 lists "微信支付 v3 无凭据无法实测" as a top risk, mitigated by
- * signature vector tests and a fake gateway.
+ * Why it exists: the production credentials are not configured and the site is
+ * blocked at the edge (PLAN §Context), so the only way payment and refund can
+ * ever be tested is against a gateway we control. PLAN §7 lists
+ * "微信支付 v3 无凭据无法实测" as a top risk, mitigated by signature vector
+ * tests and this.
  *
- * What works today, and must keep working:
- *  - a real RSA-2048 key pair, generated per instance;
- *  - real `Wechatpay-Signature` generation over the documented
- *    `timestamp\nnonce\nbody\n` message, and verification of what the app signs;
- *  - real `AEAD_AES_256_GCM` encryption of the notify `resource`;
- *  - the four endpoint shapes, with the request recorded so a test can assert
- *    on what the client sent;
- *  - `postNotify()`, which delivers a correctly signed callback to the app.
+ * Everything security-shaped here is **real**: a real RSA-2048 key pair per
+ * instance, real `Wechatpay-Signature` generation over the documented
+ * `timestamp\nnonce\nbody\n` message, real verification of the app's
+ * `Authorization` signature over `METHOD\nurl\ntimestamp\nnonce\nbody\n`, and
+ * real `AEAD_AES_256_GCM`. A fake that signed incorrectly would teach the
+ * client's verifier to be wrong too.
  *
- * What is deliberately a stub, for **stream C** to finish:
- *  - business rules (amount checks, state machine, partial refunds);
- *  - the platform-certificate download endpoint beyond a single static cert;
- *  - error responses for the failure codes C needs to handle.
- * Every one of those is marked `TODO(C)`.
+ * ## What it now enforces
+ *
+ * The rules exist because the races this system has to survive are *gateway*
+ * races, and a gateway that says yes to everything cannot express them:
+ *
+ * | Rule                                             | The race it makes testable |
+ * | ------------------------------------------------ | -------------------------- |
+ * | a paid `out_trade_no` cannot be created again (`ORDERPAID`) | double-submit of the pay button |
+ * | a closed one cannot either (`ORDER_CLOSED`)      | pay after cancel |
+ * | closing a paid transaction fails (`ORDERPAID`)   | cancel racing the callback (risk §4) |
+ * | `time_expire` really expires an unpaid order     | late callback after close |
+ * | refunds are cumulative and capped at the total   | two refund requests on one order |
+ * | a repeated `out_refund_no` is idempotent, a *changed* one is rejected | duplicate refund submit |
+ * | `refundBalanceFen` can force `NOTENOUGH`         | the merchant balance failure path |
+ * | `dropNext` / `signResponsesWithWrongKey`         | "the answer cannot be trusted" (TLS-006) |
+ *
+ * Nothing here consults the clock except through `options.now`, so a test with
+ * a fake clock can still drive expiry deterministically — or call
+ * `expireTransaction()` and not think about time at all.
  */
 
 export interface FakeWechatKeys {
@@ -110,12 +122,82 @@ export interface RecordedCall {
   signatureValid: boolean | null;
 }
 
+export type FakeTradeState = 'NOTPAY' | 'SUCCESS' | 'CLOSED' | 'REFUND' | 'USERPAYING' | 'PAYERROR';
+
 export interface FakeTransaction {
   outTradeNo: string;
   transactionId: string;
   amountFen: number;
-  tradeState: 'NOTPAY' | 'SUCCESS' | 'CLOSED' | 'REFUND';
+  tradeState: FakeTradeState;
   openid: string;
+  /** Cumulative refunded 分. The cap every refund is checked against. */
+  refundedFen: number;
+  /** Epoch ms from `time_expire`, or `null` when the app sent none. */
+  expiresAtMs: number | null;
+  successTime: string | null;
+}
+
+export type FakeRefundStatus = 'PROCESSING' | 'SUCCESS' | 'CLOSED' | 'ABNORMAL';
+
+export interface FakeRefund {
+  outRefundNo: string;
+  refundId: string;
+  outTradeNo: string;
+  transactionId: string;
+  /** What this one refund gives back. */
+  refundFen: number;
+  /** What the original transaction collected, as the app declared it. */
+  totalFen: number;
+  status: FakeRefundStatus;
+  createTime: string;
+  successTime: string | null;
+}
+
+/**
+ * Knobs a test flips to force one specific gateway behaviour.
+ *
+ * Mutable on purpose: `gateway.behaviour.dropNext = true` immediately before
+ * the call under test reads better than threading options through a factory,
+ * and the one-shot fields reset themselves so a forgotten cleanup cannot leak
+ * into the next test.
+ */
+export interface FakeGatewayBehaviour {
+  /**
+   * Merchant balance in 分. `null` (the default) means unlimited; a number
+   * makes an over-large refund fail with `NOTENOUGH`, which is the one refund
+   * failure an operator actually meets in production.
+   */
+  refundBalanceFen: number | null;
+  /** What `POST /v3/refund/domestic/refunds` reports. Real gateways say `PROCESSING`. */
+  refundStatus: Extract<FakeRefundStatus, 'PROCESSING' | 'SUCCESS'>;
+  /**
+   * Signs responses and notifications with a key the app does not trust.
+   * The app must treat the answer as *unknown*, never as a state (TLS-006).
+   */
+  signResponsesWithWrongKey: boolean;
+  /** One-shot canned error, consumed by the next request whatever it is. */
+  failNext: { status: number; code: string; message: string } | null;
+  /** One-shot socket destruction: the app sees a transport failure, not a status. */
+  dropNext: boolean;
+}
+
+export interface NotifyResult {
+  status: number;
+  body: string;
+}
+
+/**
+ * A notification as it would arrive on the wire: the exact bytes and the five
+ * headers whose signature covers them.
+ *
+ * Handed out so a test can call the webhook *service* directly — which is the
+ * only way to make two deliveries collide inside one statement, since two HTTP
+ * requests would be serialised by the listener before they ever reached the
+ * database.
+ */
+export interface SignedNotification {
+  headers: Record<string, string>;
+  rawBody: string;
 }
 
 export interface FakeWechatGateway {
@@ -125,26 +207,81 @@ export interface FakeWechatGateway {
   /** Every request the app made, in order. */
   calls: RecordedCall[];
   transactions: Map<string, FakeTransaction>;
+  /** Keyed by merchant refund number — the number the app is certain it owns. */
+  refunds: Map<string, FakeRefund>;
+  behaviour: FakeGatewayBehaviour;
   /** Marks a transaction paid, as if the shopper completed payment. */
   markPaid(outTradeNo: string): FakeTransaction;
+  /** Forces any trade state, for the paths a shopper cannot reach on demand. */
+  setTradeState(outTradeNo: string, state: FakeTradeState): FakeTransaction;
+  /** Expires an unpaid transaction now, without waiting for `time_expire`. */
+  expireTransaction(outTradeNo: string): FakeTransaction;
+  /** Settles a refund the way the gateway's asynchronous processing would. */
+  markRefunded(outRefundNo: string, status?: FakeRefundStatus): FakeRefund;
   /**
-   * Delivers a signed `transaction.success` callback to the app.
+   * Delivers a signed `TRANSACTION.SUCCESS` callback to the app.
    * Returns the app's HTTP status and body so the test can assert the ack.
    */
   postNotify(
     notifyUrl: string,
     input: { outTradeNo: string; eventType?: string; resource?: Record<string, unknown> },
-  ): Promise<{ status: number; body: string }>;
+  ): Promise<NotifyResult>;
+  /** Delivers a signed refund callback (`REFUND.SUCCESS` and friends). */
+  postRefundNotify(
+    notifyUrl: string,
+    input: { outRefundNo: string; eventType?: string; resource?: Record<string, unknown> },
+  ): Promise<NotifyResult>;
+  /** The same payment notification, signed but not delivered. */
+  signTransactionNotification(input: {
+    outTradeNo: string;
+    eventType?: string;
+    resource?: Record<string, unknown>;
+    /** Reuse an earlier notification's id, which is how a replay is spelled. */
+    notifyId?: string;
+  }): SignedNotification;
+  /** The same refund notification, signed but not delivered. */
+  signRefundNotification(input: {
+    outRefundNo: string;
+    eventType?: string;
+    resource?: Record<string, unknown>;
+    notifyId?: string;
+  }): SignedNotification;
   close(): Promise<void>;
   server: Server;
 }
 
+export interface FakeWechatGatewayOptions {
+  keys?: FakeWechatKeys;
+  port?: number;
+  /** Epoch ms source. Injected so expiry is deterministic under a fake clock. */
+  now?: () => number;
+}
+
 export async function startFakeWechatGateway(
-  options: { keys?: FakeWechatKeys; port?: number } = {},
+  options: FakeWechatGatewayOptions = {},
 ): Promise<FakeWechatGateway> {
   const keys = options.keys ?? generateFakeWechatKeys();
+  const now = options.now ?? (() => Date.now());
   const calls: RecordedCall[] = [];
   const transactions = new Map<string, FakeTransaction>();
+  const refunds = new Map<string, FakeRefund>();
+  const behaviour: FakeGatewayBehaviour = {
+    refundBalanceFen: null,
+    refundStatus: 'PROCESSING',
+    signResponsesWithWrongKey: false,
+    failNext: null,
+    dropNext: false,
+  };
+
+  /** Generated on demand: most runs never ask for an untrusted signature. */
+  let strangerKeyPem: string | null = null;
+  const signingKey = (): string => {
+    if (!behaviour.signResponsesWithWrongKey) return keys.platformPrivateKeyPem;
+    strangerKeyPem ??= generateKeyPairSync('rsa', { modulusLength: 2048 })
+      .privateKey.export({ type: 'pkcs8', format: 'pem' })
+      .toString();
+    return strangerKeyPem;
+  };
 
   const server = createServer((req, res) => {
     void route(req, res);
@@ -189,7 +326,7 @@ export async function startFakeWechatGateway(
 
   function reply(res: ServerResponse, status: number, body: unknown): void {
     const payload = JSON.stringify(body);
-    const timestamp = String(Math.floor(Date.now() / 1000));
+    const timestamp = String(Math.floor(now() / 1000));
     const nonce = randomUUID().replace(/-/g, '').slice(0, 32);
     res.writeHead(status, {
       'content-type': 'application/json; charset=utf-8',
@@ -198,12 +335,35 @@ export async function startFakeWechatGateway(
       'wechatpay-timestamp': timestamp,
       'wechatpay-nonce': nonce,
       'wechatpay-serial': keys.platformSerial,
-      'wechatpay-signature': signWithKey(
-        keys.platformPrivateKeyPem,
-        signatureMessage(timestamp, nonce, payload),
-      ),
+      'wechatpay-signature': signWithKey(signingKey(), signatureMessage(timestamp, nonce, payload)),
     });
     res.end(payload);
+  }
+
+  /** A WeChat-shaped refusal: the code is what the app branches on. */
+  function fail(res: ServerResponse, status: number, code: string, message: string): void {
+    reply(res, status, { code, message });
+  }
+
+  /**
+   * Lazily applies `time_expire`. WeChat closes an unpaid order when its
+   * expiry passes, and the app must be able to meet an order that closed
+   * itself — that is the "late callback after close" path.
+   */
+  function refresh(transaction: FakeTransaction): FakeTransaction {
+    if (
+      transaction.tradeState === 'NOTPAY' &&
+      transaction.expiresAtMs !== null &&
+      transaction.expiresAtMs <= now()
+    ) {
+      transaction.tradeState = 'CLOSED';
+    }
+    return transaction;
+  }
+
+  function lookup(outTradeNo: string): FakeTransaction | undefined {
+    const transaction = transactions.get(outTradeNo);
+    return transaction ? refresh(transaction) : undefined;
   }
 
   async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -222,6 +382,21 @@ export async function startFakeWechatGateway(
       signatureValid: verifyAppSignature(req, raw),
     });
 
+    // One-shot failure injection, checked before anything else so it can stand
+    // in for a failure at any point in the gateway.
+    if (behaviour.dropNext) {
+      behaviour.dropNext = false;
+      req.destroy();
+      res.destroy();
+      return;
+    }
+    const canned = behaviour.failNext;
+    if (canned) {
+      behaviour.failNext = null;
+      fail(res, canned.status, canned.code, canned.message);
+      return;
+    }
+
     const method = (req.method ?? 'GET').toUpperCase();
     const body = (parsed ?? {}) as Record<string, unknown>;
 
@@ -230,27 +405,16 @@ export async function startFakeWechatGateway(
       method === 'POST' &&
       /^\/v3\/pay\/transactions\/(jsapi|h5|native|app)$/.test(url.pathname)
     ) {
-      const outTradeNo = String(body.out_trade_no ?? '');
-      const amount = (body.amount ?? {}) as { total?: number };
-      // TODO(C): reject a duplicate out_trade_no with ORDERPAID / ORDER_CLOSED,
-      // validate mchid/appid, and honour `time_expire`.
-      transactions.set(outTradeNo, {
-        outTradeNo,
-        transactionId: `42000${randomBytes(8).toString('hex')}`,
-        amountFen: amount.total ?? 0,
-        tradeState: 'NOTPAY',
-        openid: String((body.payer as { openid?: string } | undefined)?.openid ?? 'oFakeOpenid'),
-      });
-      reply(res, 200, { prepay_id: `wx${randomBytes(16).toString('hex')}` });
+      createTransaction(res, body);
       return;
     }
 
     // --- query by out_trade_no ---------------------------------------------
     const queryMatch = /^\/v3\/pay\/transactions\/out-trade-no\/([^/]+)$/.exec(url.pathname);
     if (method === 'GET' && queryMatch) {
-      const transaction = transactions.get(decodeURIComponent(queryMatch[1]!));
+      const transaction = lookup(decodeURIComponent(queryMatch[1]!));
       if (!transaction) {
-        reply(res, 404, { code: 'ORDERNOTEXIST', message: '订单不存在' });
+        fail(res, 404, 'ORDERNOTEXIST', '订单不存在');
         return;
       }
       reply(res, 200, transactionBody(transaction, keys));
@@ -260,44 +424,280 @@ export async function startFakeWechatGateway(
     // --- close --------------------------------------------------------------
     const closeMatch = /^\/v3\/pay\/transactions\/out-trade-no\/([^/]+)\/close$/.exec(url.pathname);
     if (method === 'POST' && closeMatch) {
-      const transaction = transactions.get(decodeURIComponent(closeMatch[1]!));
-      // TODO(C): a SUCCESS transaction must fail to close with ORDERPAID —
-      // that is exactly the payment-vs-cancel race in risk matrix §4.
-      if (transaction && transaction.tradeState === 'NOTPAY') transaction.tradeState = 'CLOSED';
-      res.writeHead(204).end();
+      closeTransaction(res, decodeURIComponent(closeMatch[1]!));
       return;
     }
 
     // --- refund -------------------------------------------------------------
     if (method === 'POST' && url.pathname === '/v3/refund/domestic/refunds') {
-      const transaction = transactions.get(String(body.out_trade_no ?? ''));
-      if (transaction) transaction.tradeState = 'REFUND';
-      // TODO(C): partial refunds, refund state callbacks, NOTENOUGH/... errors.
-      reply(res, 200, {
-        refund_id: `50000${randomBytes(8).toString('hex')}`,
-        out_refund_no: String(body.out_refund_no ?? ''),
-        transaction_id: transaction?.transactionId ?? '',
-        out_trade_no: String(body.out_trade_no ?? ''),
-        channel: 'ORIGINAL',
-        status: 'PROCESSING',
-      });
+      createRefund(res, body);
+      return;
+    }
+
+    const refundMatch = /^\/v3\/refund\/domestic\/refunds\/([^/]+)$/.exec(url.pathname);
+    if (method === 'GET' && refundMatch) {
+      const refund = refunds.get(decodeURIComponent(refundMatch[1]!));
+      if (!refund) {
+        fail(res, 404, 'RESOURCE_NOT_EXISTS', '退款单不存在');
+        return;
+      }
+      reply(res, 200, refundBody(refund));
       return;
     }
 
     // --- platform certificates ---------------------------------------------
     if (method === 'GET' && url.pathname === '/v3/certificates') {
-      // TODO(C): return a real encrypted certificate payload once the client
-      // does certificate rotation. The public key is exposed via `keys`.
-      reply(res, 200, {
-        data: [{ serial_no: keys.platformSerial, effective_time: new Date().toISOString() }],
-      });
+      reply(res, 200, { data: [certificateEntry()] });
       return;
     }
 
-    reply(res, 404, {
-      code: 'RESOURCE_NOT_EXISTS',
-      message: `fake gateway: ${url.pathname} 未实现`,
+    fail(res, 404, 'RESOURCE_NOT_EXISTS', `fake gateway: ${url.pathname} 未实现`);
+  }
+
+  function createTransaction(res: ServerResponse, body: Record<string, unknown>): void {
+    const outTradeNo = String(body.out_trade_no ?? '');
+    const amount = (body.amount ?? {}) as { total?: number };
+    const totalFen = amount.total ?? 0;
+
+    if (outTradeNo === '') {
+      fail(res, 400, 'PARAM_ERROR', '缺少 out_trade_no');
+      return;
+    }
+    // The app must send its own identity on every create. Getting this wrong
+    // in production looks like "payments silently go to the wrong merchant".
+    if (body.mchid !== undefined && body.mchid !== keys.mchId) {
+      fail(res, 400, 'PARAM_ERROR', 'mchid 与商户号不一致');
+      return;
+    }
+    if (body.appid !== undefined && body.appid !== keys.appId) {
+      fail(res, 400, 'APPID_MCHID_NOT_MATCH', 'appid 与 mchid 不匹配');
+      return;
+    }
+
+    const existing = lookup(outTradeNo);
+    if (existing) {
+      if (existing.tradeState === 'SUCCESS' || existing.tradeState === 'REFUND') {
+        fail(res, 400, 'ORDERPAID', '订单已支付');
+        return;
+      }
+      if (existing.tradeState === 'CLOSED') {
+        fail(res, 400, 'ORDER_CLOSED', '订单已关闭');
+        return;
+      }
+      if (existing.amountFen !== totalFen) {
+        // Same number, different money. WeChat will not let a merchant quietly
+        // reprice an order that is already collectible.
+        fail(res, 400, 'INVALID_REQUEST', '订单号重复，且金额与原单不一致');
+        return;
+      }
+      // Still unpaid and unchanged: a fresh prepay_id for the same order, which
+      // is what makes "tap pay twice" survivable.
+      reply(res, 200, { prepay_id: `wx${randomBytes(16).toString('hex')}` });
+      return;
+    }
+
+    const expire = typeof body.time_expire === 'string' ? Date.parse(body.time_expire) : NaN;
+    transactions.set(outTradeNo, {
+      outTradeNo,
+      transactionId: `42000${randomBytes(8).toString('hex')}`,
+      amountFen: totalFen,
+      tradeState: 'NOTPAY',
+      openid: String((body.payer as { openid?: string } | undefined)?.openid ?? 'oFakeOpenid'),
+      refundedFen: 0,
+      expiresAtMs: Number.isNaN(expire) ? null : expire,
+      successTime: null,
     });
+    reply(res, 200, { prepay_id: `wx${randomBytes(16).toString('hex')}` });
+  }
+
+  function closeTransaction(res: ServerResponse, outTradeNo: string): void {
+    const transaction = lookup(outTradeNo);
+    if (!transaction) {
+      fail(res, 404, 'ORDERNOTEXIST', '订单不存在');
+      return;
+    }
+    // The heart of the cancel-vs-callback race: money that has arrived cannot
+    // be un-arrived by closing the order. The app has to notice and reconcile.
+    if (transaction.tradeState === 'SUCCESS' || transaction.tradeState === 'REFUND') {
+      fail(res, 400, 'ORDERPAID', '订单已支付，不能关闭');
+      return;
+    }
+    if (transaction.tradeState === 'NOTPAY' || transaction.tradeState === 'USERPAYING') {
+      transaction.tradeState = 'CLOSED';
+    }
+    // Closing an already-closed order is a success: close must be retryable.
+    res.writeHead(204).end();
+  }
+
+  function createRefund(res: ServerResponse, body: Record<string, unknown>): void {
+    const outRefundNo = String(body.out_refund_no ?? '');
+    const amount = (body.amount ?? {}) as { refund?: number; total?: number };
+    const refundFen = amount.refund ?? 0;
+    const declaredTotal = amount.total ?? 0;
+
+    if (outRefundNo === '') {
+      fail(res, 400, 'PARAM_ERROR', '缺少 out_refund_no');
+      return;
+    }
+
+    const transaction =
+      (body.out_trade_no !== undefined ? lookup(String(body.out_trade_no)) : undefined) ??
+      [...transactions.values()].find((t) => t.transactionId === String(body.transaction_id ?? ''));
+
+    const existing = refunds.get(outRefundNo);
+    if (existing) {
+      // Idempotent by merchant refund number — the app retries on an unknown
+      // answer, and a retry must not refund twice.
+      if (existing.refundFen !== refundFen) {
+        fail(res, 400, 'INVALID_REQUEST', '退款单号重复，且金额与原单不一致');
+        return;
+      }
+      reply(res, 200, refundBody(existing));
+      return;
+    }
+
+    if (!transaction) {
+      fail(res, 404, 'RESOURCE_NOT_EXISTS', '原订单不存在');
+      return;
+    }
+    if (transaction.tradeState !== 'SUCCESS' && transaction.tradeState !== 'REFUND') {
+      fail(res, 403, 'TRADE_ERROR', '订单未支付，不能退款');
+      return;
+    }
+    // `amount.total` is the app asserting what the original payment collected.
+    // If that assertion is wrong its books are wrong, and the gateway is the
+    // last line of defence — so it is checked whenever it is sent. (An omitted
+    // total is left alone rather than treated as zero: the real API requires
+    // the field, and a caller that skips it is out of scope here, not lying.)
+    if (amount.total !== undefined && declaredTotal !== transaction.amountFen) {
+      fail(res, 400, 'PARAM_ERROR', '原订单金额与实际不一致');
+      return;
+    }
+    if (refundFen <= 0 || transaction.refundedFen + refundFen > transaction.amountFen) {
+      fail(res, 403, 'REFUND_FEE_MISMATCH', '累计退款金额超过支付金额');
+      return;
+    }
+    if (behaviour.refundBalanceFen !== null && refundFen > behaviour.refundBalanceFen) {
+      fail(res, 403, 'NOTENOUGH', '商户可用余额不足');
+      return;
+    }
+
+    if (behaviour.refundBalanceFen !== null) behaviour.refundBalanceFen -= refundFen;
+    transaction.refundedFen += refundFen;
+    transaction.tradeState = 'REFUND';
+
+    const status = behaviour.refundStatus;
+    const createTime = new Date(now()).toISOString();
+    const refund: FakeRefund = {
+      outRefundNo,
+      refundId: `50000${randomBytes(8).toString('hex')}`,
+      outTradeNo: transaction.outTradeNo,
+      transactionId: transaction.transactionId,
+      refundFen,
+      totalFen: transaction.amountFen,
+      status,
+      createTime,
+      successTime: status === 'SUCCESS' ? createTime : null,
+    };
+    refunds.set(outRefundNo, refund);
+    reply(res, 200, refundBody(refund));
+  }
+
+  /**
+   * A genuinely encrypted `/v3/certificates` payload.
+   *
+   * The encrypted blob is the platform *public key* PEM rather than an X.509
+   * certificate: Node cannot mint a certificate without a third-party
+   * dependency, and the client verifies a key by id in either mode, so the
+   * shape and the crypto are what matter here.
+   */
+  function certificateEntry(): Record<string, unknown> {
+    const effective = new Date(now());
+    const expire = new Date(now() + 365 * 24 * 3600 * 1000);
+    return {
+      serial_no: keys.platformSerial,
+      effective_time: effective.toISOString(),
+      expire_time: expire.toISOString(),
+      encrypt_certificate: encryptResource(keys.apiV3Key, keys.platformPublicKeyPem, 'certificate'),
+    };
+  }
+
+  /** Signs one envelope. The single place the notification bytes are produced. */
+  function sign(notification: Record<string, unknown>): SignedNotification {
+    const rawBody = JSON.stringify(notification);
+    const timestamp = String(Math.floor(now() / 1000));
+    const nonce = randomUUID().replace(/-/g, '').slice(0, 32);
+    return {
+      rawBody,
+      headers: {
+        'content-type': 'application/json',
+        'wechatpay-timestamp': timestamp,
+        'wechatpay-nonce': nonce,
+        'wechatpay-serial': keys.platformSerial,
+        'wechatpay-signature': signWithKey(
+          signingKey(),
+          signatureMessage(timestamp, nonce, rawBody),
+        ),
+      },
+    };
+  }
+
+  async function deliver(
+    notifyUrl: string,
+    notification: Record<string, unknown>,
+  ): Promise<NotifyResult> {
+    const signed = sign(notification);
+    const response = await fetch(notifyUrl, {
+      method: 'POST',
+      headers: signed.headers,
+      body: signed.rawBody,
+    });
+    return { status: response.status, body: await response.text() };
+  }
+
+  function transactionEnvelope(input: {
+    outTradeNo: string;
+    eventType?: string;
+    resource?: Record<string, unknown>;
+    notifyId?: string;
+  }): Record<string, unknown> {
+    const transaction = transactions.get(input.outTradeNo);
+    if (!transaction) throw new Error(`fake gateway: 未知交易 ${input.outTradeNo}`);
+    const plaintext = JSON.stringify(
+      input.resource ?? transactionBody({ ...transaction, tradeState: 'SUCCESS' }, keys),
+    );
+    return {
+      id: input.notifyId ?? randomUUID(),
+      create_time: new Date(now()).toISOString(),
+      event_type: input.eventType ?? 'TRANSACTION.SUCCESS',
+      resource_type: 'encrypt-resource',
+      summary: '支付成功',
+      resource: encryptResource(keys.apiV3Key, plaintext, 'transaction'),
+    };
+  }
+
+  function refundEnvelope(input: {
+    outRefundNo: string;
+    eventType?: string;
+    resource?: Record<string, unknown>;
+    notifyId?: string;
+  }): Record<string, unknown> {
+    const refund = refunds.get(input.outRefundNo);
+    if (!refund) throw new Error(`fake gateway: 未知退款单 ${input.outRefundNo}`);
+    const eventType = input.eventType ?? 'REFUND.SUCCESS';
+    const plaintext = JSON.stringify(
+      input.resource ?? refundNotifyBody(refund, keys, eventType, now),
+    );
+    return {
+      id: input.notifyId ?? randomUUID(),
+      create_time: new Date(now()).toISOString(),
+      event_type: eventType,
+      resource_type: 'encrypt-resource',
+      summary: '退款成功',
+      // Refund notifications use a different associated_data than payment
+      // ones; a client that hard-codes 'transaction' fails to decrypt here.
+      resource: encryptResource(keys.apiV3Key, plaintext, 'refund'),
+    };
   }
 
   return {
@@ -306,46 +706,53 @@ export async function startFakeWechatGateway(
     keys,
     calls,
     transactions,
+    refunds,
+    behaviour,
     server,
     markPaid(outTradeNo) {
       const transaction = transactions.get(outTradeNo);
       if (!transaction) throw new Error(`fake gateway: 未知交易 ${outTradeNo}`);
       transaction.tradeState = 'SUCCESS';
+      transaction.successTime ??= new Date(now()).toISOString();
       return transaction;
     },
+    setTradeState(outTradeNo, state) {
+      const transaction = transactions.get(outTradeNo);
+      if (!transaction) throw new Error(`fake gateway: 未知交易 ${outTradeNo}`);
+      transaction.tradeState = state;
+      if (state === 'SUCCESS' || state === 'REFUND') {
+        transaction.successTime ??= new Date(now()).toISOString();
+      }
+      return transaction;
+    },
+    expireTransaction(outTradeNo) {
+      const transaction = transactions.get(outTradeNo);
+      if (!transaction) throw new Error(`fake gateway: 未知交易 ${outTradeNo}`);
+      transaction.expiresAtMs = now();
+      return refresh(transaction);
+    },
+    markRefunded(outRefundNo, status = 'SUCCESS') {
+      const refund = refunds.get(outRefundNo);
+      if (!refund) throw new Error(`fake gateway: 未知退款单 ${outRefundNo}`);
+      refund.status = status;
+      refund.successTime = status === 'SUCCESS' ? new Date(now()).toISOString() : null;
+      if (status === 'CLOSED' || status === 'ABNORMAL') {
+        const transaction = transactions.get(refund.outTradeNo);
+        if (transaction) transaction.refundedFen -= refund.refundFen;
+      }
+      return refund;
+    },
     async postNotify(notifyUrl, input) {
-      const transaction = transactions.get(input.outTradeNo);
-      if (!transaction) throw new Error(`fake gateway: 未知交易 ${input.outTradeNo}`);
-      const plaintext = JSON.stringify(
-        input.resource ?? transactionBody({ ...transaction, tradeState: 'SUCCESS' }, keys),
-      );
-      const notification = {
-        id: randomUUID(),
-        create_time: new Date().toISOString(),
-        event_type: input.eventType ?? 'TRANSACTION.SUCCESS',
-        resource_type: 'encrypt-resource',
-        summary: '支付成功',
-        resource: encryptResource(keys.apiV3Key, plaintext, 'transaction'),
-      };
-      const payload = JSON.stringify(notification);
-      const timestamp = String(Math.floor(Date.now() / 1000));
-      const nonce = randomUUID().replace(/-/g, '').slice(0, 32);
-
-      const response = await fetch(notifyUrl, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'wechatpay-timestamp': timestamp,
-          'wechatpay-nonce': nonce,
-          'wechatpay-serial': keys.platformSerial,
-          'wechatpay-signature': signWithKey(
-            keys.platformPrivateKeyPem,
-            signatureMessage(timestamp, nonce, payload),
-          ),
-        },
-        body: payload,
-      });
-      return { status: response.status, body: await response.text() };
+      return deliver(notifyUrl, transactionEnvelope(input));
+    },
+    async postRefundNotify(notifyUrl, input) {
+      return deliver(notifyUrl, refundEnvelope(input));
+    },
+    signTransactionNotification(input) {
+      return sign(transactionEnvelope(input));
+    },
+    signRefundNotification(input) {
+      return sign(refundEnvelope(input));
     },
     close: () =>
       new Promise<void>((resolve, reject) =>
@@ -355,6 +762,7 @@ export async function startFakeWechatGateway(
 }
 
 function transactionBody(transaction: FakeTransaction, keys: FakeWechatKeys) {
+  const paid = transaction.tradeState === 'SUCCESS' || transaction.tradeState === 'REFUND';
   return {
     appid: keys.appId,
     mchid: keys.mchId,
@@ -362,11 +770,74 @@ function transactionBody(transaction: FakeTransaction, keys: FakeWechatKeys) {
     transaction_id: transaction.transactionId,
     trade_type: 'JSAPI',
     trade_state: transaction.tradeState,
-    trade_state_desc: transaction.tradeState === 'SUCCESS' ? '支付成功' : '订单未支付',
+    trade_state_desc: TRADE_STATE_DESC[transaction.tradeState],
     bank_type: 'OTHERS',
-    success_time: new Date().toISOString(),
+    success_time: transaction.successTime ?? new Date().toISOString(),
     payer: { openid: transaction.openid },
-    amount: { total: transaction.amountFen, payer_total: transaction.amountFen, currency: 'CNY' },
+    amount: {
+      total: transaction.amountFen,
+      payer_total: paid ? transaction.amountFen : 0,
+      currency: 'CNY',
+    },
+  };
+}
+
+const TRADE_STATE_DESC: Record<FakeTradeState, string> = {
+  SUCCESS: '支付成功',
+  REFUND: '转入退款',
+  NOTPAY: '订单未支付',
+  CLOSED: '已关闭',
+  USERPAYING: '用户支付中',
+  PAYERROR: '支付失败',
+};
+
+function refundBody(refund: FakeRefund) {
+  return {
+    refund_id: refund.refundId,
+    out_refund_no: refund.outRefundNo,
+    transaction_id: refund.transactionId,
+    out_trade_no: refund.outTradeNo,
+    channel: 'ORIGINAL',
+    user_received_account: '支付用户零钱',
+    create_time: refund.createTime,
+    success_time: refund.successTime,
+    status: refund.status,
+    funds_account: 'AVAILABLE',
+    amount: {
+      total: refund.totalFen,
+      refund: refund.refundFen,
+      payer_total: refund.totalFen,
+      payer_refund: refund.refundFen,
+      currency: 'CNY',
+    },
+    promotion_detail: [],
+  };
+}
+
+function refundNotifyBody(
+  refund: FakeRefund,
+  keys: FakeWechatKeys,
+  eventType: string,
+  now: () => number,
+) {
+  const status = eventType.startsWith('REFUND.')
+    ? (eventType.slice('REFUND.'.length) as FakeRefundStatus)
+    : refund.status;
+  return {
+    mchid: keys.mchId,
+    out_trade_no: refund.outTradeNo,
+    transaction_id: refund.transactionId,
+    out_refund_no: refund.outRefundNo,
+    refund_id: refund.refundId,
+    refund_status: status,
+    success_time: status === 'SUCCESS' ? (refund.successTime ?? new Date(now()).toISOString()) : '',
+    user_received_account: '支付用户零钱',
+    amount: {
+      total: refund.totalFen,
+      refund: refund.refundFen,
+      payer_total: refund.totalFen,
+      payer_refund: refund.refundFen,
+    },
   };
 }
 

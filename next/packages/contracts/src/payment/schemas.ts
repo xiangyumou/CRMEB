@@ -299,6 +299,13 @@ export type CapitalFlowListQuery = z.infer<typeof capitalFlowListQuery>;
 
 export const pagedCapitalFlows = paged(capitalFlowListItem);
 
+/**
+ * The same filter without the page: the summary is over everything that
+ * matches, which is the whole point of showing it above the table.
+ */
+export const capitalFlowSummaryQuery = capitalFlowListQuery.omit({ page: true, pageSize: true });
+export type CapitalFlowSummaryQuery = z.infer<typeof capitalFlowSummaryQuery>;
+
 /** The three numbers the finance page shows above the table, for the same filter. */
 export const capitalFlowSummary = z.object({
   inAmount: money,

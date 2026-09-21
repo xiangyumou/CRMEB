@@ -3,6 +3,7 @@ import { defineRoute } from '../_conventions/route';
 import {
   capitalFlowExample,
   capitalFlowListQuery,
+  capitalFlowSummaryQuery,
   capitalFlowSummary,
   pagedCapitalFlows,
   pagedPaymentAttempts,
@@ -209,7 +210,7 @@ export const paymentAdminCapitalFlowSummary = defineRoute({
   permission: 'payment:flow:read',
   summary: '资金流水汇总',
   tags: ['payment'],
-  query: capitalFlowListQuery.omit({ page: true, pageSize: true }),
+  query: capitalFlowSummaryQuery,
   response: capitalFlowSummary,
   examples: [
     {

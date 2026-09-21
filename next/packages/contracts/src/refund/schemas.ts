@@ -71,8 +71,13 @@ export const refundableItem = z.object({
 });
 export type RefundableItem = z.infer<typeof refundableItem>;
 
-export const refundableItemsQuery = z.object({ orderId: id });
-export type RefundableItemsQuery = z.infer<typeof refundableItemsQuery>;
+/**
+ * The order is a path segment rather than a query parameter: it is the one
+ * thing this screen cannot be asked without, and a missing path segment is a
+ * 404 rather than a 422 the client has to explain.
+ */
+export const refundableItemsParams = z.object({ orderId: id });
+export type RefundableItemsParams = z.infer<typeof refundableItemsParams>;
 
 /**
  * The apply screen in one call: what may be returned, the freight rule, and
