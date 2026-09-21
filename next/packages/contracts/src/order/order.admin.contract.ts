@@ -477,3 +477,41 @@ export const orderAdminExpressCompanies = defineRoute({
   response: expressCompanyList,
   examples: [{ name: 'ok', response: expressCompanyListExample }],
 });
+
+/**
+ * 确认收货, by an operator.
+ *
+ * The customer phoned to say the parcel arrived. It is the *same* conditional
+ * `shipped -> received` transition the buyer's own button and the auto-receive
+ * job run, so all three racing each other is one transition and one set of
+ * effects — which is the point of putting it behind the state machine rather
+ * than behind three copies of an UPDATE.
+ */
+export const orderAdminConfirmReceipt = defineRoute({
+  id: 'order.adminConfirmReceipt',
+  method: 'POST',
+  path: '/admin-api/orders/:id/receipt',
+  auth: 'admin',
+  permission: 'order:order:write',
+  summary: '后台确认收货',
+  tags: ['order'],
+  params: orderIdParams,
+  body: z.object({}).default({}),
+  response: adminOrderDetail,
+  errors: ['ORDER_NOT_FOUND', 'ORDER_NOT_RECEIVABLE'],
+  examples: [
+    {
+      name: 'ok',
+      params: { id: '9001' },
+      body: {},
+      response: {
+        ...adminOrderDetailExample,
+        status: 'received',
+        fulfillmentStatus: 'fulfilled',
+        shippedAt: '2026-02-02T09:00:00+08:00',
+        receivedAt: '2026-02-04T18:00:00+08:00',
+        autoReceiveAt: null,
+      },
+    },
+  ],
+});

@@ -64,3 +64,67 @@ export type {
   PurchaseLimitMode,
   SkuForSale,
 } from './catalog.port';
+
+// ---------------------------------------------------------------------------
+// stream B2 — fulfilment, the admin console, invoices, the staff console
+// ---------------------------------------------------------------------------
+
+/**
+ * Two more import side effects, for the same reason the state machine is one:
+ * `auth: 'staff'` fails closed until a `StaffCheck` is registered, and the
+ * order-paid hook plus the three notification handlers have to be installed
+ * before the first payment lands. Both belong to importing the order domain,
+ * not to a bootstrap file somebody can forget to call.
+ */
+import './order.fulfil.effects';
+import { installStaffCheck } from './order.staff.service';
+
+installStaffCheck();
+
+export { orderPermissions } from './permissions';
+export { orderFulfilConfig, orderStaffConfig } from './order.fulfil.config';
+
+export {
+  adminShip,
+  adminTrackShipment,
+  autoReceive,
+  cancelShipment,
+  completeOrder,
+  confirmReceipt,
+  listExpressCompanies,
+  myShipments,
+  myShipmentTracking,
+  receiveOrder,
+  shipOrder,
+  shipmentsOfOrder,
+  sweepAutoReceive,
+  sweepCompletions,
+  trackShipment,
+  updateShipment,
+} from './order.fulfil.service';
+export type { ReceiptInput, ReceiptOutcome, ShipInput } from './order.fulfil.service';
+
+export * as orderConsole from './order.console.service';
+export * as orderInvoices from './order.invoice.service';
+export * as orderStaff from './order.staff.service';
+
+export { autoDeliver } from './order.fulfil.effects';
+
+/** The seams B2 needs from streams that have not landed (F2, C, E2). */
+export {
+  registerFulfilmentNotifier,
+  registerLogisticsPort,
+  registerStaffRefundPort,
+  resetFulfilmentPorts,
+  resolveFulfilmentNotifier,
+  resolveLogisticsPort,
+  resolveStaffRefundPort,
+} from './order.fulfil.ports';
+export type {
+  FulfilmentNotice,
+  FulfilmentNotifier,
+  LogisticsPort,
+  StaffRefundPort,
+  TrackingResult,
+  TrackingTrace,
+} from './order.fulfil.ports';

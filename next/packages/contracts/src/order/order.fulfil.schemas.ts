@@ -313,6 +313,7 @@ export const orderStatusLogEntry = z.object({
 export type OrderStatusLogEntry = z.infer<typeof orderStatusLogEntry>;
 
 export const orderTimeline = z.object({ items: z.array(orderStatusLogEntry) });
+export type OrderTimeline = z.infer<typeof orderTimeline>;
 
 export const orderStatusLogExample = {
   id: '5001',
