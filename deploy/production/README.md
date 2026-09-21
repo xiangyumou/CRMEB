@@ -13,6 +13,12 @@ The first migration links root `.env` to `deployment/deployment.env`, switches `
 
 PHP-FPM runs as uid 33 (`www-data`), and the image is built with `public/uploads` and `runtime` owned by that user. A host bind mount replaces that ownership, so `chown -R 33:33 data/uploads data/runtime` once on the server: a root-owned `data/uploads` makes every product-image upload, the customer QR code upload and the group-buy poster fail with `mkdir(): Permission denied`.
 
+`deployment/config/.env` has to be readable by that same uid. The readiness script runs inside php-fpm, so it reads the file as `www-data`, and a `640 ubuntu:ubuntu` settings file makes `/readyz` answer 503 with `missing settings` — the php container never turns healthy and `up -d --wait` fails on an otherwise correct release. Keep the file out of everyone else's reach but let the runtime group read it:
+
+```sh
+sudo chgrp 33 deployment/config/.env && sudo chmod 640 deployment/config/.env
+```
+
 ## Routine update
 
 Run in `/home/ubuntu/apps/CRMEB`:
