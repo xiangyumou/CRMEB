@@ -114,7 +114,7 @@
 <script>
 import commonWrapper from "./commonWrapper.vue";
 import colors from "@/mixins/color";
-import { getlevelInfo, getRandCode, getUserInfo } from "@/api/user.js";
+import { getUserInfo } from "@/api/user.js";
 import { mapGetters } from "vuex";
 export default {
   components: { commonWrapper },
@@ -279,7 +279,6 @@ export default {
   created() {
     if (this.isLogin) {
       this.getDiyUserInfo();
-      this.getlevelInfo();
     }
   },
   watch: {
@@ -370,17 +369,6 @@ export default {
             title: err,
           });
         });
-    },
-    getlevelInfo() {
-      getlevelInfo().then((res) => {
-        const { level_info, level_list } = res.data;
-        const currentLevel = level_list.find(
-          (item) => item.grade == level_info.grade,
-        );
-        if (currentLevel) {
-          this.currentLevelColor = currentLevel.color;
-        }
-      });
     },
     colorToRgba(str, n) {
       // 十六进制颜色值的正则表达式

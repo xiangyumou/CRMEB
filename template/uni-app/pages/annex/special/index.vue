@@ -110,7 +110,6 @@
       </template>
     </PageDesign>
     <!-- #ifdef APP -->
-    <app-update ref="appUpdate" :force="true" :tabbar="false"></app-update>
     <!-- #endif -->
   </view>
 </template>
@@ -128,7 +127,7 @@ import { getTempIds } from "@/api/api.js";
 import { SUBSCRIBE_MESSAGE } from "@/config/cache";
 // #endif
 import { mapGetters, mapMutations } from "vuex";
-import { getDiy, getDiyVersion, getThemeInfo } from "@/api/api.js";
+import { getDiyVersion, getThemeInfo } from "@/api/api.js";
 import { getCartCounts } from "@/api/order.js";
 import { getCategoryList, getProductslist } from "@/api/store.js";
 import { goShopDetail } from "@/libs/order.js";
@@ -137,7 +136,6 @@ import { HTTP_REQUEST_URL } from "@/config/app";
 import pageFooter from "@/components/pageFooter/index.vue";
 import Loading from "@/components/Loading/index.vue";
 import Cache from "@/utils/cache";
-import appUpdate from "@/components/update/app-update.vue";
 import { applyTheme } from "@/utils/theme.js";
 import PageDesign from "@/subpackage/diyComponents/pageDesign.vue";
 
@@ -175,7 +173,6 @@ export default {
     waterfallsFlow,
     emptyPage,
     // #ifdef APP
-    appUpdate,
     // #endif
   },
   data() {

@@ -1,403 +1,478 @@
-// +----------------------------------------------------------------------
-// | CRMEB [ CRMEB赋能开发者，助力企业发展 ]
-// +----------------------------------------------------------------------
-// | Copyright (c) 2016~2024 https://www.crmeb.com All rights reserved.
-// +----------------------------------------------------------------------
-// | Licensed CRMEB并不是自由软件，未经许可不能去掉CRMEB相关版权
-// +----------------------------------------------------------------------
-// | Author: CRMEB Team <admin@crmeb.com>
-// +----------------------------------------------------------------------
+// 购物车 / 订单 / 售后
+//
+// Every URL below is a literal `/api/v1/...` path from
+// `next/packages/contracts/openapi.json`; `scripts/check-api-routes.mjs` proves it.
+// Reshaping lives in `api/mappers/`. See `api/README.md` for the resolved shape.
 
-import request from "@/utils/request.js";
+import request from '../utils/request.js';
+import {
+  toLegacyCartList,
+  toLegacyCartArray,
+  toLegacyCartCount,
+  toLegacyCartAddResult,
+  toLegacyRebuyResult,
+  fromLegacyCartQuery,
+} from './mappers/cart.js';
+import {
+  toLegacyOrderList,
+  toLegacyOrderDetail,
+  toLegacyOrderCounts,
+  toLegacyOrderConfirm,
+  toLegacyOrderComputed,
+  toLegacyOrderCreateResult,
+  toLegacyCashierOrder,
+  toLegacyOrderProduct,
+  fromLegacyOrderListQuery,
+  fromLegacyCheckoutInput,
+  fromLegacyOrderCreateInput,
+} from './mappers/order.js';
+import { toLegacyPayResult, payResultMessage, paymentChannelFor } from './mappers/payment.js';
+import {
+  toLegacyRefund,
+  toLegacyRefundList,
+  toLegacyRefundReasons,
+  toLegacyApplicableItems,
+  fromLegacyRefundApplyInput,
+  fromLegacyReturnShipmentInput,
+  fromLegacyRefundState,
+} from './mappers/refund.js';
+import {
+  toLegacyInvoice,
+  toLegacyInvoiceList,
+  toLegacyExpressView,
+  pickShipment,
+} from './mappers/fulfil.js';
+import { toLegacyStaffOrderDetail } from './mappers/staff.js';
+import { fromLegacyPage } from './mappers/_shared.js';
+import { toLegacyApplicableCoupons, fromLegacyApplicableInput } from './mappers/coupon.js';
+import { fromLegacyCommentInput } from './mappers/catalog.js';
+import { clientPlatform } from '../config/app';
+
+// ---------------------------------------------------------------------------
+// 购物车
+// ---------------------------------------------------------------------------
 
 /**
- * 获取购物车列表
- * @param numType boolean true 购物车数量,false=购物车产品数量
+ * 购物车数量
+ * @param numType boolean true 数量总和, false/0 条数
  */
 export function getCartCounts(numType) {
-	return request.get("cart/count", {
-		numType: numType === undefined ? 0 : numType
-	});
+  return request.get('/api/v1/cart/count', {}, { map: (dto) => toLegacyCartCount(dto, numType) });
 }
+
 /**
- * 获取购物车列表
- * 
+ * 购物车列表
+ * @param object data {page, limit, status} — status 1 有效, 0 失效
  */
 export function getCartList(data) {
-	return request.get("cart/list", data);
-}
-
-/**
- * 修改购物车
- * 
- */
-export function getResetCart(data) {
-	return request.post("v2/reset_cart", data);
-}
-
-/**
- * 修改购物车数量
- * @param int cartId  购物车id
- * @param int number 修改数量
- */
-export function changeCartNum(cartId, number) {
-	return request.post("cart/num", {
-		id: cartId,
-		number: number
-	});
-}
-/**
- * 清除购物车
- * @param object ids join(',') 切割成字符串
- */
-export function cartDel(ids) {
-	if (typeof ids === 'object')
-		ids = ids.join(',');
-	return request.post('cart/del', {
-		ids: ids
-	});
-}
-/**
- * 订单列表
- * @param object data
- */
-export function getOrderList(data) {
-	return request.get('order/list', data);
-}
-
-/**
- * 订单产品信息
- * @param string unique 
- */
-export function orderProduct(unique) {
-	return request.post('order/product', {
-		unique: unique
-	});
-}
-
-/**
- * 订单评价
- * @param object data
- * 
- */
-export function orderComment(data) {
-	return request.post('order/comment', data);
-}
-
-/**
- * 订单支付
- * @param object data
- */
-export function orderPay(data) {
-	return request.post('order/pay', data);
-}
-
-/**
- * 删除已退款和拒绝退款的订单
- * @param string uni
- * 
- */
-export function refundOrderDel(uni) {
-	return request.get('order/refund/del/' + uni, {});
-}
-
-/**
- * 订单统计数据
- */
-export function orderData() {
-	return request.get('order/data')
-}
-
-/**
- * 订单取消
- * @param string id
- * 
- */
-export function orderCancel(id) {
-	return request.post('order/cancel', {
-		id: id
-	});
-}
-
-/**
- * 删除已完成订单
- * @param string uni
- * 
- */
-export function orderDel(uni) {
-	return request.post('order/del', {
-		uni: uni
-	});
-}
-
-/**
- * 礼品订单详情
- * @param string uni 
- */
-export function getGiftOrderDetail(id) {
-	return request.get('order/gift_detail/' + id);
-}
-/**
- * 订单详情
- * @param string uni 
- */
-export function getOrderDetail(uni, cart_id) {
-	return request.get('order/detail/' + uni + `${cart_id ? `/${cart_id}`:''}`);
-}
-/**
- * 退款订单详情
- * @param string uni 
- */
-export function getRefundOrderDetail(uni, cart_id) {
-	return request.get('order/refund_detail/' + uni + `${cart_id ? `/${cart_id}`:''}`);
-}
-
-/**
- * 再次下单
- * @param string uni
- * 
- */
-export function orderAgain(uni) {
-	return request.post('order/again', {
-		uni: uni
-	});
-}
-
-/**
- * 订单收货
- * @param string uni
- * 
- */
-export function orderTake(uni) {
-	return request.post('order/take', {
-		uni: uni
-	});
-}
-
-/**
- * 订单查询物流信息
- * @returns {*}
- */
-export function express(uni, type) {
-	return request.get("order/express/" + uni + `${type?'/refund':''}`);
-}
-/**
- * 订单查询物流信息
- * @returns {*}
- */
-export function adminExpress(uni, type) {
-	return request.get("admin/order/express/" + uni + `${type?'/refund':''}`);
-}
-
-/**
- * 获取退款理由
- * 
- */
-export function ordeRefundReason() {
-	return request.get('order/refund/reason');
-}
-
-/**
- * 订单退款审核
- * @param object data
- */
-export function orderRefundVerify(data) {
-	return request.post('order/refund/verify', data);
-}
-
-/**
- * 订单确认获取订单详细信息
- * @param string cartId
- */
-export function orderConfirm(data) {
-	return request.post('order/confirm', data);
-}
-
-/**
- * 获取确认订单页面是否展示快递配送和到店自提
- * @param string cartId
- */
-export function checkShipping(cartId, news) {
-	return request.post('order/check_shipping', {
-		cartId,
-		'new': news
-	});
-}
-
-/**
- * 获取当前金额能使用的优惠卷
- * @param string price
- * 
- */
-export function getCouponsOrderPrice(price, data) {
-	return request.get('coupons/order/' + price, data)
-}
-
-/**
- * 订单创建
- * @param string key
- * @param object data
- * 
- */
-export function orderCreate(key, data) {
-	return request.post('order/create/' + key, data);
-}
-
-/**
- * 计算订单金额
- * @param key
- * @param data
- * @returns {*}
- */
-export function postOrderComputed(key, data) {
-	return request.post("order/computed/" + key, data);
-}
-
-/**
- * 订单优惠券
- * @param key
- * @param data
- * @returns {*}
- */
-export function orderCoupon(orderId) {
-	return request.post("v2/order/product_coupon/" + orderId);
-}
-
-/**
- * 计算会员线下付款金额
- * @param {Object} data
- */
-export function offlineCheckPrice(data) {
-	return request.post("order/offline/check/price", data);
-}
-
-/**
- * 线下扫码付款
- * @param {Object} data
- */
-export function offlineCreate(data) {
-	return request.post("order/offline/create", data);
-}
-
-/**
- * 支付方式开关
- */
-export function orderOfflinePayType() {
-	return request.get('order/offline/pay/type');
-}
-
-/**
- * 开票记录
- */
-export function orderInvoiceList(data) {
-	return request.get('v2/order/invoice_list', data);
-}
-
-/**
- * 开票订单详情
- * @param {Object} id
- */
-export function orderInvoiceDetail(id) {
-	return request.get(`v2/order/invoice_detail/${id}`);
-}
-
-
-/**
- * 支付宝支付
- * @param {Object} key
- * @param {Object} quitUrl
- */
-export function aliPay(key, quitUrl) {
-	return request.get('ali_pay', {
-		key,
-		quitUrl
-	}, {
-		noAuth: true
-	});
-}
-
-
-/**
- * 退货物流单号提交
- * @param {Object} data
- */
-export function refundExpress(data) {
-	return request.post("order/refund/express", data);
+  return request.get('/api/v1/cart', fromLegacyCartQuery(data), { map: toLegacyCartList });
 }
 
 /**
  * 分类购物车列表
  */
 export function vcartList() {
-	return request.get("v2/cart_list");
+  return request.get('/api/v1/cart', { filter: 'all', pageSize: 100 }, { map: toLegacyCartArray });
 }
 
 /**
- * 退款商品列表
+ * 修改购物车数量
+ * @param int cartId
+ * @param int number
  */
-export function refundGoodsList(orderId) {
-	return request.get(`order/refund/cart_info/${orderId}`);
+export function changeCartNum(cartId, number) {
+  return request.patch(`/api/v1/cart/items/${cartId}`, { quantity: Number(number) || 1 }, {
+    map: toLegacyCartAddResult,
+    msg: '修改成功',
+  });
 }
 
 /**
- * 申请退款商品列表
+ * 清除购物车
+ * @param object ids join(',') 切割成字符串
  */
-export function postRefundGoods(data) {
-	return request.post(`order/refund/cart_info`, data);
+export function cartDel(ids) {
+  const itemIds = Array.isArray(ids) ? ids.map(String) : String(ids || '').split(',').filter(Boolean);
+  return request.post('/api/v1/cart/items/removals', { itemIds, unavailableOnly: false }, {
+    msg: '删除成功',
+  });
 }
 
 /**
- * 退款商品提交
+ * 重选规格：先删掉旧行再按新规格加回。
+ * The API has no "change this row's sku" route — see docs/rewrite/cr/CR-2-h.md.
  */
-export function returnGoodsSubmit(id, data) {
-	return request.post(`order/refund/apply/${id}`, data);
+export function getResetCart(data) {
+  const src = data || {};
+  return request
+    .delete(`/api/v1/cart/items/${src.id}`)
+    .then(() =>
+      request.post(
+        '/api/v1/cart/items',
+        { skuId: String(src.unique || ''), quantity: Number(src.num) || 1 },
+        { map: toLegacyCartAddResult, msg: '添加购物车成功' },
+      ),
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 订单
+// ---------------------------------------------------------------------------
+
+/**
+ * 订单列表
+ * @param object data {type, page, limit}
+ */
+export function getOrderList(data) {
+  return request.get('/api/v1/orders', fromLegacyOrderListQuery(data), { map: toLegacyOrderList });
 }
 
 /**
- * 新订单列表 2.1版本
+ * 订单详情
+ * @param string uni 订单 id
+ */
+export function getOrderDetail(uni) {
+  return request.get(`/api/v1/orders/${uni}`, {}, { map: toLegacyOrderDetail });
+}
+
+/**
+ * 订单统计数据
+ */
+export function orderData() {
+  return request.get('/api/v1/orders/counts', {}, { map: toLegacyOrderCounts });
+}
+
+/**
+ * 订单取消
+ * @param string id
+ */
+export function orderCancel(id) {
+  return request.post(`/api/v1/orders/${id}/cancel`, { reason: '用户取消' }, {
+    map: toLegacyOrderDetail,
+    msg: '取消成功',
+  });
+}
+
+/**
+ * 再次下单：把订单里的商品放回购物车
+ * @param string uni 订单 id
+ */
+export function orderAgain(uni) {
+  return request.post('/api/v1/cart/rebuys', { orderId: String(uni) }, { map: toLegacyRebuyResult });
+}
+
+/**
+ * 订单确认获取订单详细信息
+ * @param object data {cartId, addressId, couponId}
+ */
+export function orderConfirm(data) {
+  return request.post('/api/v1/checkout/preview', fromLegacyCheckoutInput(data), {
+    map: toLegacyOrderConfirm,
+  });
+}
+
+/**
+ * 计算订单金额
+ * @param key  旧的 orderKey，新接口不需要，保留签名
+ * @param data
+ */
+export function postOrderComputed(key, data) {
+  return request.post('/api/v1/checkout/preview', fromLegacyCheckoutInput(data), {
+    map: toLegacyOrderComputed,
+  });
+}
+
+/**
+ * 订单创建
+ * @param string key 幂等键
  * @param object data
  */
-export function getNewOrderList(data) {
-	return request.get('order/refund/list', data);
+export function orderCreate(key, data) {
+  return request.post('/api/v1/orders', fromLegacyOrderCreateInput(key, data), {
+    map: toLegacyOrderCreateResult,
+    msg: '订单创建成功',
+  });
 }
 
 /**
- * 退款订单详情
- * @param string uni 
+ * 订单支付
+ * @param object data {uni: 订单 id}
  */
-export function refundOrderDetail(uni) {
-	return request.get('order/refund/detail/' + uni);
-}
-
-/**
- * 放弃申请退款
- * @param string uni 
- */
-export function cancelRefundOrder(uni) {
-	return request.post('order/refund/cancel/' + uni);
+export function orderPay(data) {
+  const src = data || {};
+  return request.post(
+    `/api/v1/orders/${src.uni}/payments`,
+    { channel: paymentChannelFor(clientPlatform()) },
+    { map: toLegacyPayResult, msg: payResultMessage },
+  );
 }
 
 /**
  * 收银台订单信息
- * @param object data
+ * @param string orderId
+ * @param string type 旧的支付来源，新接口不需要
  */
 export function getCashierOrder(orderId, type) {
-	return request.get(`order/cashier/${orderId}/${type}`);
+  return request.get(`/api/v1/orders/${orderId}`, {}, { map: toLegacyCashierOrder });
 }
 
 /**
- * 发票地址获取
+ * 订单产品信息（评价页）
+ * @param string unique  订单明细 id
+ * @param string orderId 订单 id（调用方 `options.uni`）
+ */
+export function orderProduct(unique, orderId) {
+  return request.get(`/api/v1/orders/${orderId}`, {}, {
+    map: (dto) => toLegacyOrderProduct(dto, unique),
+  });
+}
+
+/**
+ * 订单评价
  * @param object data
  */
-export function getInvoiceLink(id) {
-	return request.get(`v2/order/down_invoice/${id}`);
+export function orderComment(data) {
+  return request.post('/api/v1/catalog/reviews', fromLegacyCommentInput(data), {
+    map: () => ({ to_lottery: 0 }),
+    msg: '评价成功',
+  });
 }
 
 /**
- * 领取礼物
- * @param orderId
- * @param data
+ * 获取当前金额能使用的优惠卷
+ * @param string price
+ * @param object data
  */
-export function orderReceiveGift(orderId, data) {
-	return request.post("order/receive_gift/" + orderId, data);
+export function getCouponsOrderPrice(price, data) {
+  return request.post('/api/v1/user-coupons/applicable', fromLegacyApplicableInput(price, data), {
+    map: toLegacyApplicableCoupons,
+  });
+}
+
+/**
+ * 订单收货
+ * @param string uni 订单 id
+ */
+export function orderTake(uni) {
+  return request.post(`/api/v1/orders/${uni}/receipt`, {}, {
+    map: toLegacyOrderDetail,
+    msg: '确认收货成功',
+  });
+}
+
+// CONTRACT-PENDING(B1) — 删除已完成订单（仅从「我的订单」隐藏）. B2 named the
+// `hidden_by_user` change type but no storefront route writes it; see docs/rewrite/cr/CR-4-h.md.
+/**
+ * 删除已完成订单
+ * @param string uni 订单 id
+ */
+export function orderDel(uni) {
+  return request.delete(`/api/v1/orders/${uni}`, {}, { msg: '删除成功' });
+}
+
+/**
+ * 订单查询物流信息.
+ *
+ * Legacy answered this with one call because the order row carried the single
+ * `delivery_id` it had. An order now has a `shipments` collection and the trace feed
+ * hangs off a shipment, so this composes three reads — the order, its parcels and the
+ * tracking of the parcel the page will show — back into the old
+ * `{order, express: {result: {list}}}` payload.
+ *
+ * @param string uni 订单 id
+ * @param string type 旧的「退货物流」分支：订单详情把 refund_type 钉成 0，这里不再可达
+ */
+export function express(uni, type) {
+  return expressView(uni, `/api/v1/orders/${uni}`, toLegacyOrderDetail, '/api/v1/shipments');
+}
+
+/** 商家端物流轨迹 — the same composition against the staff surface. */
+export function adminExpress(uni, type) {
+  return expressView(
+    uni,
+    `/api/v1/staff/orders/${uni}`,
+    toLegacyStaffOrderDetail,
+    '/api/v1/staff/shipments',
+    true,
+  );
+}
+
+function expressView(orderId, orderPath, orderMap, trackingBase, staff) {
+  const shipmentsPath = staff
+    ? `/api/v1/staff/orders/${orderId}/shipments`
+    : `/api/v1/orders/${orderId}/shipments`;
+  return Promise.all([
+    request.get(orderPath, {}, { map: orderMap }),
+    request.get(shipmentsPath, {}),
+  ]).then(([orderRes, shipRes]) => {
+    const parcel = pickShipment(shipRes.data);
+    if (!parcel) {
+      return { data: toLegacyExpressView(orderRes.data, null, null), msg: '', status: 200 };
+    }
+    return request
+      .get(`${trackingBase}/${parcel.id}/tracking`, {})
+      .then((trackRes) => ({
+        data: toLegacyExpressView(orderRes.data, parcel, trackRes.data),
+        msg: '',
+        status: 200,
+      }))
+      // A parcel with no trace feed is still a parcel: show it without the timeline.
+      .catch(() => ({
+        data: toLegacyExpressView(orderRes.data, parcel, null),
+        msg: '',
+        status: 200,
+      }));
+  });
+}
+
+// CONTRACT-PENDING(B1) — 下单后赠送的优惠券. 目前没有对应路由。
+/**
+ * 订单赠送的优惠券
+ * @param string orderId
+ */
+export function orderCoupon(orderId) {
+  return request.get(`/api/v1/orders/${orderId}/gift-coupons`, {});
+}
+
+// ---------------------------------------------------------------------------
+// 发票
+// ---------------------------------------------------------------------------
+
+/**
+ * 开票记录
+ */
+export function orderInvoiceList(data) {
+  return request.get('/api/v1/invoices', fromLegacyPage(data), { map: toLegacyInvoiceList });
+}
+
+/**
+ * 开票申请详情。
+ *
+ * 旧接口返回的是「带发票的订单」，页面整页都按订单渲染，所以这里取回发票后再取它的订单，
+ * 拼回 `{...订单, invoice}`。调用处传的是开票申请 id（`user_invoice_list` 已改）。
+ *
+ * @param string id 开票申请 id
+ */
+export function orderInvoiceDetail(id) {
+  return request.get(`/api/v1/invoices/${id}`, {}, { map: toLegacyInvoice }).then((invRes) => {
+    const invoice = invRes.data;
+    return request
+      .get(`/api/v1/orders/${invoice.order_id}`, {}, { map: toLegacyOrderDetail })
+      .then((orderRes) => ({
+        data: Object.assign({}, orderRes.data, { invoice }),
+        msg: '',
+        status: 200,
+      }));
+  });
+}
+
+/**
+ * 取消开票申请
+ */
+export function orderInvoiceCancel(id) {
+  return request.post(`/api/v1/invoices/${id}/cancel`, {}, {
+    map: toLegacyInvoice,
+    msg: '已取消申请',
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 售后
+// ---------------------------------------------------------------------------
+
+/**
+ * 退款单列表（旧名：新订单列表 2.1 版本）
+ * @param object data {type, page, limit}
+ */
+export function getNewOrderList(data) {
+  const src = data || {};
+  const query = { state: fromLegacyRefundState(src.type) };
+  if (src.page !== undefined) query.page = Number(src.page) || 1;
+  if (src.limit !== undefined) query.pageSize = Number(src.limit) || 20;
+  return request.get('/api/v1/refunds', query, { map: toLegacyRefundList });
+}
+
+/**
+ * 退款订单详情
+ * @param string uni 退款单 id
+ */
+export function refundOrderDetail(uni) {
+  return request.get(`/api/v1/refunds/${uni}`, {}, { map: toLegacyRefund });
+}
+
+/**
+ * 退款订单详情（订单详情页复用）
+ */
+export function getRefundOrderDetail(uni) {
+  return request.get(`/api/v1/refunds/${uni}`, {}, { map: toLegacyRefund });
+}
+
+/**
+ * 放弃申请退款
+ * @param string uni 退款单 id
+ */
+export function cancelRefundOrder(uni) {
+  return request.post(`/api/v1/refunds/${uni}/cancel`, {}, { map: toLegacyRefund, msg: '已撤销申请' });
+}
+
+/**
+ * 删除已退款和拒绝退款的订单
+ * @param string uni 退款单 id
+ */
+export function refundOrderDel(uni) {
+  return request.delete(`/api/v1/refunds/${uni}`, {}, { msg: '删除成功' });
+}
+
+/**
+ * 获取退款理由
+ */
+export function ordeRefundReason() {
+  return request.get('/api/v1/refund-reasons', {}, { map: toLegacyRefundReasons, noAuth: true });
+}
+
+/**
+ * 退款商品列表
+ * @param string orderId
+ */
+export function refundGoodsList(orderId) {
+  return request.get(`/api/v1/refunds/applicable-items/${encodeURIComponent(String(orderId))}`, {}, {
+    map: toLegacyApplicableItems,
+  });
+}
+
+/**
+ * 申请退款商品列表
+ * @param object data {orderId}
+ */
+export function postRefundGoods(data) {
+  const src = data || {};
+  const orderId = String(src.orderId || src.id);
+  return request.get(`/api/v1/refunds/applicable-items/${encodeURIComponent(orderId)}`, {}, {
+    map: toLegacyApplicableItems,
+  });
+}
+
+/**
+ * 退款商品提交
+ * @param string id 订单 id
+ * @param object data
+ */
+export function returnGoodsSubmit(id, data) {
+  return request.post('/api/v1/refunds', fromLegacyRefundApplyInput(id, data), {
+    map: toLegacyRefund,
+    msg: '申请已提交',
+  });
+}
+
+/**
+ * 退货物流单号提交
+ * @param object data {id, delivery_code, delivery_id, delivery_phone}
+ */
+export function refundExpress(data) {
+  const src = data || {};
+  return request.post(
+    `/api/v1/refunds/${src.id}/return-shipment`,
+    fromLegacyReturnShipmentInput(src),
+    { map: toLegacyRefund, msg: '提交成功' },
+  );
 }

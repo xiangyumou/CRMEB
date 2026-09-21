@@ -47,9 +47,6 @@
 	import home from '@/components/home';
 	import parser from "@/components/jyf-parser/jyf-parser";
 	import colors from "@/mixins/color";
-	import {
-		userShare
-	} from "@/api/user.js";
 	export default {
 		components: {
 			shareInfo,
@@ -94,7 +91,6 @@
 		onShareAppMessage: function() {
 			let that = this;
 			that.$set(that, "actionSheetHidden", !that.actionSheetHidden);
-			userShare();
 			return {
 				title: this.articleInfo.title || "",
 				imageUrl: this.articleInfo.image_input.length ? this.articleInfo.image_input[0] : "",
@@ -103,7 +99,6 @@
 		},
 		onShareTimeline() {
 			let that = this;
-			userShare();
 			return {
 				title: this.articleInfo.title,
 				query: {

@@ -8,50 +8,16 @@
 // | Author: CRMEB Team <admin@crmeb.com>
 // +----------------------------------------------------------------------
 
-import { spread } from "@/api/user";
 import Cache from "@/utils/cache";
 import { getCustomerType } from "@/api/api.js";
-import { getWorkermanUrl } from "@/api/kefu.js";
 import store from "@/store";
 /**
  * 绑定用户授权
- * @param {Object} puid
+ *
+ * 分销（推广关系）已下线，没有「绑定上级」这个动作了。入口保留是因为 App.vue 和几个
+ * 页面在授权成功后都会调用它。
  */
-export function silenceBindingSpread(app) {
-  //#ifdef H5
-  let puid = Cache.get("spread"),
-    code = 0,
-    agent_id = Cache.get("agent_id");
-  //#endif
-
-  //#ifdef MP
-  let puid = app.spid,
-    code = app.code,
-    agent_id = 0;
-  //#endif
-
-  puid = parseInt(puid);
-  if (Number.isNaN(puid)) {
-    puid = 0;
-  }
-  if ((code || puid || agent_id) && store.state.app.token) {
-    spread({
-      puid,
-      code,
-      agent_id,
-    })
-      .then((res) => {
-        //#ifdef H5
-        Cache.clear("spread");
-        //#endif
-        //#ifdef MP
-        app.spid = 0;
-        app.code = 0;
-        //#endif
-      })
-      .catch((res) => {});
-  }
-}
+export function silenceBindingSpread() {}
 
 export function isWeixin() {
   return navigator.userAgent.toLowerCase().indexOf("micromessenger") !== -1;
@@ -110,15 +76,5 @@ export function updateURLParameter(url, param, paramVal) {
   var rows_txt = temp + "" + param + "=" + paramVal;
   return baseURL + "?" + newAdditionalURL + rows_txt;
 }
-
-let VUE_APP_WS_URL = Cache.get("WORKERMAN_URL") || "";
-setTimeout(() => {
-  getWorkermanUrl().then((res) => {
-    Cache.set("WORKERMAN_URL", res.data.chat);
-    VUE_APP_WS_URL = res.data.chat;
-  });
-}, 1000);
-
-export { VUE_APP_WS_URL };
 
 export default parseQuery;

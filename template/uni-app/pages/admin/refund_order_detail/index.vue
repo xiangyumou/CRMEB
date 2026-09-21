@@ -265,7 +265,6 @@
 		setAdminOrderPrice,
 		setAdminRefundRemark,
 		setAdminOrderRemark,
-		setOfflinePay,
 		setOrderRefund,
 		agreeExpress,
 		getUserInfo,
@@ -453,6 +452,7 @@
 						});
 					}
 					data.price = price;
+					data.pay_price = that.orderInfo.pay_price;
 					setAdminOrderPrice(data).then(
 						function() {
 							that.change = false;
@@ -536,25 +536,6 @@
 						}
 					);
 				}
-			},
-			offlinePay: function() {
-				if (this.openErp) return
-				setOfflinePay({
-					order_id: this.orderInfo.order_id
-				}).then(
-					res => {
-						this.$util.Tips({
-							title: res.msg,
-							icon: 'success'
-						});
-						this.getIndex();
-					},
-					err => {
-						this.$util.Tips({
-							title: err
-						});
-					}
-				);
 			},
 			copyNum(id) {
 				uni.setClipboardData({

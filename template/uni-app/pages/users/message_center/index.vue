@@ -74,7 +74,6 @@
 
 <script>
 	import {
-		serviceRecord,
 		messageSystem,
 		msgLookDel
 	} from '@/api/user.js';
@@ -282,42 +281,10 @@
 						})
 					})
 			},
-			// 客服list
+			// 客服会话（自建客服已下线，列表恒为空）
 			getList() {
-				if (this.loading || this.finished) {
-					return;
-				}
-				this.loading = true;
-				uni.showLoading({
-					title: '加载中'
-				});
-				serviceRecord({
-						page: this.page,
-						limit: this.limit
-					})
-					.then(res => {
-						uni.stopPullDownRefresh();
-						let data = res.data;
-						uni.hideLoading();
-						this.loading = false;
-						data.forEach(item => {
-							if (item.message_type === 1) {
-								item.message = this.replace_em(item.message);
-							}
-							if (item.message_type === 2) {
-								item.message = this.replace_em(item.message);
-							}
-						});
-						this.list = this.list.concat(data);
-						this.finished = data.length < this.limit;
-						this.page += 1;
-					})
-					.catch(err => {
-						uni.showToast({
-							title: err.msg,
-							icon: 'none'
-						})
-					})
+				this.loading = false;
+				this.finished = true;
 			},
 			replace_em(str) {
 				str = str.replace(/\[([^\[\]]+)\]/g, "<span class='em $1'/></span>");

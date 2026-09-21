@@ -169,20 +169,6 @@
           }
         },
         {
-          "path": "receive_gifts_status/index",
-          "style": {
-            "navigationBarTitleText": "领取结果"
-          }
-        },
-        {
-          "path": "receive_gift/index",
-          "style": {
-            "navigationBarTitleText": "领取礼物",
-            "navigationBarBackgroundColor": "#e93323",
-            "navigationBarTextStyle": "#fff"
-          }
-        },
-        {
           "path": "cashier/index",
           "style": {
             "navigationBarTitleText": "收银台"
@@ -223,12 +209,6 @@
           "path": "user_invoice_order/index",
           "style": {
             "navigationBarTitleText": "发票详情"
-          }
-        },
-        {
-          "path": "scan_login/index",
-          "style": {
-            "navigationBarTitleText": "授权登录"
           }
         },
         {
@@ -330,18 +310,6 @@
           }
         },
         {
-          "path": "payment_on_behalf/index",
-          "style": {
-            "navigationBarTitleText": "好友代付"
-          }
-        },
-        {
-          "path": "payment_on_behalf/pay_status",
-          "style": {
-            "navigationBarTitleText": "代付成功"
-          }
-        },
-        {
           "path": "auth/index",
           "style": {
             "navigationBarTitleText": ""
@@ -353,12 +321,6 @@
       "root": "pages/activity",
       "name": "activity",
       "pages": [
-        {
-          "path": "goods_bargain_details/index",
-          "style": {
-            "navigationBarTitleText": "砍价活动"
-          }
-        },
         {
           "path": "goods_combination/index",
           "style": {
@@ -375,13 +337,6 @@
           "path": "goods_combination_status/index",
           "style": {
             "navigationBarTitleText": "拼团"
-          }
-        },
-        {
-          "path": "goods_seckill_details/index",
-          "style": {
-            "navigationStyle": "custom",
-            "navigationBarTextStyle": "white"
           }
         },
         {
@@ -430,13 +385,6 @@
           "path": "delivery/index",
           "style": {
             "navigationBarTitleText": "订单发货"
-          }
-        },
-        {
-          "path": "refund/index",
-          "style": {
-            "navigationBarTitleText": "售后退款",
-            "navigationStyle": "custom"
           }
         },
         {
@@ -511,14 +459,6 @@
           "style": {
             "navigationBarTitleText": "精品推荐"
           }
-        },
-        {
-          "path": "HotNewGoods/feedback",
-          "style": {
-            "navigationBarTitleText": "我的客服",
-            "navigationBarTextStyle": "white",
-            "navigationBarBackgroundColor": "#3A3A3A"
-          }
         }
       ]
     },
@@ -542,12 +482,6 @@
                 "page-design": "view"
               }
             }
-          }
-        },
-        {
-          "path": "settled/index",
-          "style": {
-            "navigationBarTitleText": "分销申请"
           }
         }
       ]

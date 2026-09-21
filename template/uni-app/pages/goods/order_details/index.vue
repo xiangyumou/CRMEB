@@ -420,7 +420,6 @@
 						{{ $t(`确认收货`) }}
 					</view>
 					<view class="bnt bg-color" v-if="orderInfo.paid == 1 && !is_gift && isReturn != 1" @tap="goOrderConfirm">{{ $t(`再次购买`) }}</view>
-					<view class="bnt bg-color" v-if="orderInfo.paid == 1 && is_gift != 0 && orderInfo.gift_uid == 0" @tap="giftModalShow = true">{{ $t(`送给好友`) }}</view>
 					<view
 						class="bnt bg-color"
 						v-if="[1, 2, 4].includes(orderInfo.refund_type) && !orderInfo.is_cancel && orderInfo.type != 3 && orderInfo.refund_status != 2"
@@ -464,9 +463,8 @@
 		<!-- <authorize @onLoadFun="onLoadFun" :isAuto="isAuto" :isShowAuth="isShowAuth" @authColse="authColse"></authorize> -->
 		<!-- #endif -->
 		<invoiceModal :aleartStatus="aleartStatus" :invoiceData="invoiceData" @close="aleartStatus = false"></invoiceModal>
-		<view class="mask invoice-mask" v-if="aleartStatus || giftModalShow" @click="aleartStatus = false"></view>
+		<view class="mask invoice-mask" v-if="aleartStatus" @click="aleartStatus = false"></view>
 		<view class="mask more-mask" v-if="moreBtn" @click="moreBtn = false"></view>
-		<giftModal :aleartStatus="giftModalShow" :giftData="giftModalData" @shareH5="shareH5" @close="giftModalShow = false"></giftModal>
 		<canvas class="canvas" canvas-id="posterCanvas"></canvas>
 		<view class="share-box" v-if="H5ShareBox">
 			<image :src="imgHost + '/statics/images/share-info.png'" @click="H5ShareBox = false"></image>
@@ -503,16 +501,13 @@ import authorize from '@/components/Authorize';
 import colors from '@/mixins/color';
 import invoicePicker from '../components/invoicePicker/index.vue';
 import invoiceModal from '../components/invoiceModal/index.vue';
-import giftModal from '../order_pay_status/components/giftModal.vue';
 import { HTTP_REQUEST_URL } from '@/config/app.js';
-import { userShare } from '@/api/user.js';
 export default {
 	components: {
 		home,
 		invoicePicker,
 		invoiceModal,
 		orderGoods,
-		giftModal,
 		// #ifdef MP
 		authorize
 		// #endif
@@ -653,7 +648,6 @@ export default {
 	// #ifdef MP
 	onShareAppMessage: function () {
 		let that = this;
-		userShare();
 		return {
 			title: that.giftModalData.gift_mark || '',
 			imageUrl: that.mpGiftImg || '',
@@ -662,7 +656,6 @@ export default {
 	},
 	onShareTimeline() {
 		let that = this;
-		userShare();
 		return {
 			title: that.giftModalData.gift_mark,
 			query: {

@@ -102,9 +102,6 @@
 					</view>
 				</view>
 			</view>
-			<view v-if="is_gift == 2" class="receive-btn" @click="receiveGift">
-				立即领取
-			</view>
 			<view class='wrapper' v-if="!is_gift || is_gift == 1">
 				<view class='item acea-row row-between-wrapper' @tap='couponTap'
 					v-if="!pinkId && !BargainId && !combinationId && !seckillId&& !noCoupon && !discountId && !advanceId">
@@ -304,10 +301,7 @@
 		orderConfirm,
 		getCouponsOrderPrice,
 		orderCreate,
-		postOrderComputed,
-		checkShipping,
-		getGiftOrderDetail,
-		orderReceiveGift
+		postOrderComputed
 	} from '@/api/order.js';
 	import {
 		getAddressDefault,
@@ -318,9 +312,6 @@
 	import {
 		openPaySubscribe
 	} from '@/utils/SubscribeMessage.js';
-	import {
-		storeListApi
-	} from '@/api/store.js';
 	import {
 		CACHE_LONGITUDE,
 		CACHE_LATITUDE
@@ -535,11 +526,9 @@
 				this.invTitle = name;
 			}
 			this.textareaStatus = true;
-			if (this.isLogin && this.toPay == false && (this.is_gift == 0 || this.is_gift == 1)) {
+			if (this.isLogin && this.toPay == false) {
 				this.checkShipping();
-			}else if(this.is_gift && this.isLogin){
-				this.getOrderDetail()
-			} else {
+			} else if (!this.isLogin) {
 				toLogin();
 			}
 		},
@@ -599,39 +588,14 @@
 				}
 				// #endif
 			},
+			// 旧接口 `checkShipping` 已下线：新的结算预览只有快递配送一种方式。
 			checkShipping() {
-				let that = this;
-				checkShipping(that.cartId, that.news).then(res => {
-					if (res.data.type == 0) {
-						that.is_shipping = true;
-						that.shippingType = 0;
-						this.getaddressInfo();
-						this.getConfirm();
-						this.$nextTick(function() {
-							this.$refs.addressWindow.getAddressList();
-						})
-					} else {
-						if (res.data.type == 1) {
-							that.is_shipping = false;
-							that.shippingType = 0;
-							this.getaddressInfo();
-							this.getConfirm();
-							this.$nextTick(function() {
-								this.$refs.addressWindow.getAddressList();
-							})
-						} else if (res.data.type == 2) {
-							that.is_shipping = false;
-							that.shippingType = 1;
-							this.addressType(1)
-							this.getConfirm();
-							this.getList();
-						}
-					}
-				}).catch(err => {
-					uni.showToast({
-						title: err,
-						icon: 'none'
-					});
+				this.is_shipping = true;
+				this.shippingType = 0;
+				this.getaddressInfo();
+				this.getConfirm();
+				this.$nextTick(function() {
+					this.$refs.addressWindow.getAddressList();
 				});
 			},
 
@@ -729,22 +693,11 @@
 				this.SubOrder();
 			},
 			/**
-			 * 获取门店列表数据
+			 * 获取门店列表数据（门店自提已下线，列表恒为空）
 			 */
 			getList: function() {
-				let longitude = uni.getStorageSync("user_longitude") || ''; //经度
-				let latitude = uni.getStorageSync("user_latitude") || ''; //纬度
-				let data = {
-					latitude: latitude, //纬度
-					longitude: longitude, //经度
-					page: 1,
-					limit: 10
-				}
-				storeListApi(data).then(res => {
-					let list = res.data.list.list || [];
-					this.$set(this, 'storeList', list);
-					this.$set(this, 'system_store', list[0]);
-				}).catch(err => {})
+				this.$set(this, 'storeList', []);
+				this.$set(this, 'system_store', null);
 			},
 			// 关闭地址弹窗；
 			changeClose: function() {
@@ -899,35 +852,6 @@
 			},
 			bindHideKeyboard: function(e) {
 				this.mark = e.detail.value;
-			},
-			getOrderDetail() {
-				getGiftOrderDetail(this.orderId).then(res => {
-					this.giftData = res.data
-					this.$set(this, 'cartInfo', res.data.cartInfo);
-					this.store_self_mention = res.data.store_self_mention
-					if (res.data.type == 0) {
-						this.is_shipping = true;
-						this.shippingType = 0;
-						this.getaddressInfo();
-						this.$nextTick(()=> {
-							this.$refs.addressWindow.getAddressList();
-						})
-					} else {
-						if (res.data.type == 1) {
-							this.is_shipping = false;
-							this.shippingType = 0;
-							this.getaddressInfo();
-							this.$nextTick(()=> {
-								this.$refs.addressWindow.getAddressList();
-							})
-						} else if (res.data.type == 2) {
-							this.is_shipping = false;
-							this.shippingType = 1;
-							this.addressType(1)
-							this.getList();
-						}
-					}
-				})
 			},
 			/**
 			 * 获取当前订单详细信息
@@ -1275,26 +1199,6 @@
 				// #ifndef MP
 				that.payment(data);
 				// #endif
-			},
-			receiveGift() {
-				let data = {
-					gift_key: this.giftData.gift_key,
-					shipping_type: this.$util.$h.Add(this.shippingType, 1),
-					name: this.contacts,
-					phone: this.contactsTel,
-					address_id: this.addressId,
-					store_id: this.system_store ? this.system_store.id : 0,
-				}
-				orderReceiveGift(this.orderId, data).then(res => {
-					uni.reLaunch({
-						url: `/pages/goods/receive_gifts_status/index?status=${res.data.status}&order_id=${this.giftData.order_id}`
-					})
-				}).catch(err => {
-					uni.showToast({
-						icon: 'none',
-						title: err
-					})
-				})
 			},
 			bindDateChange: function(e, index) {
 				this.confirm[index].value = e.target.value

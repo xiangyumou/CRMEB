@@ -1,476 +1,151 @@
-// +----------------------------------------------------------------------
-// | CRMEB [ CRMEB赋能开发者，助力企业发展 ]
-// +----------------------------------------------------------------------
-// | Copyright (c) 2016~2024 https://www.crmeb.com All rights reserved.
-// +----------------------------------------------------------------------
-// | Licensed CRMEB并不是自由软件，未经许可不能去掉CRMEB相关版权
-// +----------------------------------------------------------------------
-// | Author: CRMEB Team <admin@crmeb.com>
-// +----------------------------------------------------------------------
+// 优惠券 / 装修 / 站点配置 / 文章 / 注册登录辅助
+//
+// Split by owning stream: the coupon and diy calls below are live against merged
+// contracts; everything marked CONTRACT-PENDING is listed in docs/rewrite/status/h.md.
 
-import request from "@/utils/request.js";
-/**
- * 公共接口 ，优惠券接口 , 行业此讯 , 手机号码注册
- *
- */
-export function getAjcaptcha(data) {
-  return request.get("ajcaptcha", data, {
-    noAuth: true,
-  });
-}
+import request from '../utils/request.js';
+import {
+  toLegacyCouponList,
+  toLegacyCouponArray,
+  toLegacyUserCouponList,
+  toLegacyClaimResult,
+  fromLegacyCouponState,
+} from './mappers/coupon.js';
+import { toLegacyDiyPage, toLegacyDiyVersion, toLegacyTheme } from './mappers/diy.js';
+import { toLegacyProductList } from './mappers/catalog.js';
+import { fromLegacyPage } from './mappers/_shared.js';
 
-export function ajcaptchaCheck(data) {
-  return request.post("ajcheck", data, {
-    noAuth: true,
-  });
-}
+// ---------------------------------------------------------------------------
+// 优惠券
+// ---------------------------------------------------------------------------
 
 /**
- * 获取主页数据 无需授权
- *
- */
-export function getIndexData() {
-  return request.get(
-    "v2/index",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-/**
- * 获取服务器类型
- *
- */
-export function getServerType() {
-  return request.get(
-    "v2/site_serve",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 获取登录授权login
- *
- */
-export function getLogo() {
-  return request.get(
-    "wechat/get_logo",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 保存form_id
- * @param string formId
- */
-export function setFormId(formId) {
-  return request.post("wechat/set_form_id", {
-    formId: formId,
-  });
-}
-
-/**
- * 领取优惠卷
- * @param int couponId
- *
- */
-export function setCouponReceive(couponId) {
-  return request.post("coupon/receive", {
-    couponId: couponId,
-  });
-}
-/**
- * 优惠券列表
- * @param object data
+ * 可领取的优惠券列表
+ * @param object data {page, limit, type}
  */
 export function getCoupons(data) {
-  return request.get("v2/coupons", data, {
+  return request.get('/api/v1/coupons', fromLegacyPage(data), {
     noAuth: true,
-  });
-}
-/**
- * 首页优惠券列表组件数据
- * @param object data
- */
-export function getCouponsIndex(data) {
-  return request.get("coupons", data, {
-    noAuth: true,
-  });
-}
-
-/**
- * 我的优惠券
- * @param int types 0全部  1未使用 2已使用
- */
-export function getUserCoupons(types, data) {
-  return request.get("coupons/user/" + types, data);
-}
-
-/**
- * 首页新人优惠券
- *
- */
-export function getNewCoupon() {
-  return request.get("v2/new_coupon");
-}
-
-/**
- * 文章分类列表
- *
- */
-export function getArticleCategoryList() {
-  return request.get(
-    "article/category/list",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 文章列表
- * @param int cid
- *
- */
-export function getArticleList(cid, data) {
-  return request.get("article/list/" + cid, data, {
-    noAuth: true,
-  });
-}
-
-/**
- * 文章 热门列表
- *
- */
-export function getArticleHotList() {
-  return request.get(
-    "article/hot/list",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 文章 轮播列表
- *
- */
-export function getArticleBannerList() {
-  return request.get(
-    "article/banner/list",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 文章详情
- * @param int id
- *
- */
-export function getArticleDetails(id) {
-  return request.get(
-    "article/details/" + id,
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 手机号+验证码登录接口
- * @param object data
- */
-export function loginMobile(data) {
-  return request.post("login/mobile", data, {
-    noAuth: true,
-  });
-}
-
-/**
- * 获取短信KEY
- * @param object phone
- */
-export function verifyCode() {
-  return request.get(
-    "verify_code",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 验证码发送
- * @param object phone
- */
-export function registerVerify(
-  phone,
-  reset,
-  key,
-  captchaType,
-  captchaVerification,
-) {
-  return request.post(
-    "register/verify",
-    {
-      phone: phone,
-      type: reset === undefined ? "reset" : reset,
-      key: key,
-      captchaType: captchaType,
-      captchaVerification: captchaVerification,
-    },
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 手机号注册
- * @param object data
- *
- */
-export function phoneRegister(data) {
-  return request.post("register", data, {
-    noAuth: true,
-  });
-}
-
-/**
- * 手机号修改密码
- * @param object data
- *
- */
-export function phoneRegisterReset(data) {
-  return request.post("register/reset", data, {
-    noAuth: true,
-  });
-}
-
-/**
- * 手机号+密码登录
- * @param object data
- *
- */
-export function phoneLogin(data) {
-  return request.post("login", data, {
-    noAuth: true,
-  });
-}
-
-/**
- * 切换H5登录
- * @param object data
- */
-// #ifdef MP
-export function switchH5Login() {
-  return request.post("switch_h5", {
-    from: "routine",
-  });
-}
-// #endif
-
-/*
- * h5切换公众号登录
- * */
-// #ifdef H5
-export function switchH5Login() {
-  return request.post("switch_h5", {
-    from: "wechat",
-  });
-}
-// #endif
-
-/**
- * 绑定手机号
- *
- */
-export function bindingPhone(data) {
-  return request.post("binding", data, {
-    noAuth: true,
-  });
-}
-
-/**
- * 绑定手机号
- *
- */
-export function bindingUserPhone(data) {
-  return request.post("user/binding", data);
-}
-
-/**
- * 退出登錄
- *
- */
-export function logout() {
-  return request.get("logout");
-}
-
-/**
- * 获取订阅消息id
- */
-export function getTempIds() {
-  return request.get(
-    "wechat/temp_ids",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 首页拼团数据
- */
-export function pink() {
-  return request.get(
-    "pink",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 获取城市信息
- */
-export function getCity() {
-  return request.get(
-    "city_list",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 获取列表
- */
-export function getLiveList(page, limit) {
-  return request.get(
-    "wechat/live",
-    {
-      page,
-      limit,
-    },
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 获取首页DIY；
- */
-export function getDiy(id) {
-  return request.get(
-    `v2/diy/get_diy/default${id ? "?id=" + id : ""}`,
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 一键换色；
- */
-export function colorChange(name) {
-  return request.get(
-    "v2/diy/color_change/" + name,
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 获取公众号关注
- * @returns {*}
- */
-export function follow() {
-  return request.get(
-    "wechat/follow",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 更换手机号码
- * @returns {*}
- */
-export function updatePhone(data) {
-  return request.post("user/updatePhone", data, {
-    noAuth: true,
+    map: toLegacyCouponList,
   });
 }
 
 /**
  * 首页优惠券弹窗
- * @returns {*}
  */
 export function getCouponV2() {
-  return request.get(
-    "v2/get_today_coupon",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 新用户优惠券弹窗
- * @returns {*}
- */
-export function getCouponNewUser() {
-  return request.get(
-    "v2/new_coupon",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-
-/**
- * 首页快速选择数据
- * @param {Object} data
- */
-export function category(data) {
-  return request.get("category", data, {
+  return request.get('/api/v1/coupons', { page: 1, pageSize: 20 }, {
     noAuth: true,
+    map: toLegacyCouponArray,
   });
 }
 
 /**
+ * 新用户优惠券弹窗
+ */
+export function getCouponNewUser() {
+  return request.get('/api/v1/coupons/new-user', {}, { noAuth: true, map: toLegacyCouponArray });
+}
+
+/**
+ * 领取优惠卷
+ * @param int couponId 模板 id
+ */
+export function setCouponReceive(couponId) {
+  return request.post(`/api/v1/coupons/${couponId}/claims`, {}, {
+    map: toLegacyClaimResult,
+    msg: '领取成功',
+  });
+}
+
+/**
+ * 我的优惠券
+ * @param int types 0 全部 1 未使用 2 已使用
+ * @param object data {page, limit}
+ */
+export function getUserCoupons(types, data) {
+  const query = fromLegacyPage(data);
+  query.state = fromLegacyCouponState(types);
+  return request.get('/api/v1/user-coupons', query, { map: toLegacyUserCouponList });
+}
+
+// ---------------------------------------------------------------------------
+// 装修 / 主题
+// ---------------------------------------------------------------------------
+
+/**
+ * 获取装修数据
+ * @param string type 'home' | 'category' | 'user' …
+ * @param object data {theme_id} 预览用
+ */
+export function getThemeInfo(type, data) {
+  const src = data || {};
+  if (type === 'home' || type === undefined) {
+    return request.get('/api/v1/diy/pages/home', {}, { noAuth: true, map: toLegacyDiyPage });
+  }
+  if (src.theme_id) {
+    return request.get(`/api/v1/diy/pages/${src.theme_id}`, {}, {
+      noAuth: true,
+      map: toLegacyDiyPage,
+    });
+  }
+  // CONTRACT-PENDING(G1) — 分类 / 个人中心 的版式开关 (`res.data.status`) 还没有路由。
+  return request.get(`/api/v1/diy/layouts/${type}`, {}, { noAuth: true });
+}
+
+// ---------------------------------------------------------------------------
+// 装修（合约已合并）
+// ---------------------------------------------------------------------------
+
+/**
+ * 获取 DIY 版本号
+ * @param string name 页面标识
+ */
+export function getDiyVersion(name) {
+  return request.get('/api/v1/diy/version', name ? { id: String(name) } : {}, {
+    noAuth: true,
+    map: toLegacyDiyVersion,
+  });
+}
+
+/**
+ * 一键换色
+ * @param string name
+ */
+export function colorChange(name) {
+  return request.get('/api/v1/diy/theme', {}, { noAuth: true, map: toLegacyTheme });
+}
+
+/**
+ * DIY 组件：商品列表
+ */
+export function getThemeProduct(data) {
+  const query = fromLegacyPage(data);
+  const src = data || {};
+  if (src.cid) query.categoryId = String(src.cid);
+  return request.get('/api/v1/catalog/products', query, { noAuth: true, map: toLegacyProductList });
+}
+
+/**
+ * DIY 组件：优惠券列表
+ */
+export function getThemeCoupon(data) {
+  return request.get('/api/v1/coupons', fromLegacyPage(data), {
+    noAuth: true,
+    map: toLegacyCouponArray,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 搜索历史
+// ---------------------------------------------------------------------------
+
+/**
  * 个人搜索历史
- * @param {Object} data
  */
 export function searchList(data) {
-  return request.get("v2/user/search_list", data, {
-    noAuth: true,
+  return request.get('/api/v1/me/search-history', {}, {
+    map: (dto) => (dto && dto.items ? dto.items.map((k) => ({ keyword: String(k.keyword || '') })) : []),
   });
 }
 
@@ -478,137 +153,117 @@ export function searchList(data) {
  * 删除搜索历史
  */
 export function clearSearch() {
-  return request.get("v2/user/clean_search");
+  return request.delete('/api/v1/me/search-history', {}, { msg: '清除成功' });
 }
-/**
- * 获取网站基础配置
- */
-export function siteConfig(data) {
-  return request.get("site_config", data, {
+
+// ---------------------------------------------------------------------------
+// CONTRACT-PENDING — 待其他 stream 的合约落地
+// ---------------------------------------------------------------------------
+
+// CONTRACT-PENDING(F2) — cms 域：文章分类 / 列表 / 详情 / 热门 / 轮播。
+export function getArticleCategoryList() {
+  return request.get('/api/v1/articles/categories', {}, { noAuth: true });
+}
+
+export function getArticleList(cid, data) {
+  return request.get('/api/v1/articles', Object.assign({ categoryId: String(cid) }, fromLegacyPage(data)), {
     noAuth: true,
   });
 }
 
-/**
- * App微信登录
- * @returns {*}
- */
-export function wechatAppAuth(data) {
-  return request.post("wechat/app_auth", data, {
-    noAuth: true,
-  });
-}
-/**
- * 获取客服类型
- * @returns {*}
- */
-export function getCustomerType(data) {
-  return request.get(
-    "get_customer_type",
-    {},
-    {
-      noAuth: true,
-    },
-  );
+export function getArticleHotList() {
+  return request.get('/api/v1/articles', { feature: 'hot' }, { noAuth: true });
 }
 
-/**
- * 获取开屏广告
- * @returns {*}
- */
-export function getOpenAdv(data) {
-  return request.get(
-    "get_open_adv",
-    {},
-    {
-      noAuth: true,
-    },
-  );
+export function getArticleBannerList() {
+  return request.get('/api/v1/articles', { feature: 'banner' }, { noAuth: true });
 }
 
-/**
- * 获取版权信息
- */
-export function getCrmebCopyRight() {
-  return request.get(
-    "copyright",
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-/**
- * 获取DIY版本接口
- * @param {Object} id
- */
-export function getDiyVersion(name) {
-  return request.get(
-    `v2/diy/get_version/${name}`,
-    {},
-    {
-      noAuth: true,
-    },
-  );
-}
-/**
- * 获取主题信息接口
- * @param {Object} id
- */
-export function getThemeInfo(type, data) {
-  return request.get(`theme_info/${type}`, data || {}, {
-    noAuth: true,
-  });
+export function getArticleDetails(id) {
+  return request.get(`/api/v1/articles/${id}`, {}, { noAuth: true });
 }
 
-/**
- * 获取DIY签到信息
- * @param {Object} id
- */
-export function getSign() {
-  return request.get(
-    "v2/diy/sign",
-    {},
-    {
-      noAuth: true,
-    },
-  );
+// CONTRACT-PENDING(F2) — 省市区。
+export function getCity() {
+  return request.get('/api/v1/regions', {}, { noAuth: true });
 }
-/**
- * @description 获取主题商品列表
- */
-export function getThemeProduct(data) {
-  return request.get("theme/product", data, {
-    noAuth: true,
-  });
-}
-/**
- * @description 获取文章列表
- */
+
+// CONTRACT-PENDING(F2) — DIY 文章组件。
 export function getThemeArticle(data) {
-  return request.get("theme/article", data, {
-    noAuth: true,
-  });
-}
-/**
- * @description 获取优惠券列表
- */
-export function getThemeCoupon(data) {
-  return request.get("theme/coupon", data, {
-    noAuth: true,
-  });
+  return request.get('/api/v1/articles', fromLegacyPage(data), { noAuth: true });
 }
 
-/**
- * 获取用户信息(DIY)
- *
- */
+// CONTRACT-PENDING(E1) — DIY 个人中心组件的用户卡片。
 export function getThemeUser() {
-  return request.get(
-    "theme/user",
-    {},
+  return request.get('/api/v1/me/profile', {}, { noAuth: true });
+}
+
+// CONTRACT-PENDING(F1) — 站点公开配置：版权、客服入口、开屏广告。
+export function getCrmebCopyRight() {
+  return request.get('/api/v1/site/copyright', {}, { noAuth: true });
+}
+
+export function getCustomerType() {
+  return request.get('/api/v1/site/customer-service', {}, { noAuth: true });
+}
+
+export function getOpenAdv() {
+  return request.get('/api/v1/site/splash-ad', {}, { noAuth: true });
+}
+
+// CONTRACT-PENDING(E2) — 订阅消息模板 id。
+export function getTempIds() {
+  return request.get('/api/v1/wechat/subscribe-templates', {}, { noAuth: true });
+}
+
+// CONTRACT-PENDING(D) — 首页拼团数据。
+export function pink() {
+  return request.get('/api/v1/groupbuys', {}, { noAuth: true });
+}
+
+// CONTRACT-PENDING(E1) — 图形/滑块验证码、短信验证码、手机号绑定与找回。
+export function getAjcaptcha(data) {
+  return request.get('/api/v1/auth/captcha', data, { noAuth: true });
+}
+
+export function ajcaptchaCheck(data) {
+  return request.post('/api/v1/auth/captcha/verifications', data, { noAuth: true });
+}
+
+export function verifyCode() {
+  return request.get('/api/v1/auth/sms-key', {}, { noAuth: true });
+}
+
+export function registerVerify(phone, reset, key, captchaType, captchaVerification) {
+  return request.post(
+    '/api/v1/auth/sms-codes',
     {
-      noAuth: true,
+      phone,
+      purpose: reset === undefined ? 'reset' : reset,
+      key,
+      captchaType,
+      captchaVerification,
     },
+    { noAuth: true },
   );
+}
+
+export function phoneRegisterReset(data) {
+  return request.post('/api/v1/auth/password-resets', data, { noAuth: true });
+}
+
+export function bindingPhone(data) {
+  return request.post('/api/v1/auth/phone-bindings', data, { noAuth: true });
+}
+
+export function bindingUserPhone(data) {
+  return request.post('/api/v1/me/phone', data);
+}
+
+export function updatePhone(data) {
+  return request.put('/api/v1/me/phone', data);
+}
+
+export function switchH5Login() {
+  return request.post('/api/v1/auth/session-transfers', {});
 }

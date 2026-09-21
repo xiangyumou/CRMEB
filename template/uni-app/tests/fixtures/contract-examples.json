@@ -1,0 +1,2765 @@
+{
+  "POST /api/v1/cart/items": {
+    "name": "ok",
+    "body": {
+      "skuId": "21",
+      "quantity": 2
+    },
+    "response": {
+      "item": {
+        "id": "5001",
+        "productId": "11",
+        "skuId": "21",
+        "quantity": 2,
+        "isSelected": true,
+        "available": true,
+        "state": "ok",
+        "productName": "有机三只松鼠坚果礼盒",
+        "productImageUrl": "https://cdn.example.com/p/11.jpg",
+        "productKind": "physical",
+        "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+        "specText": "混合装|1000g",
+        "unitName": "盒",
+        "unitPrice": "60.00",
+        "originalUnitPrice": "88.00",
+        "subtotal": "120.00",
+        "stock": 42,
+        "createdAt": "2026-02-01T10:00:00+08:00"
+      },
+      "cart": {
+        "items": 3,
+        "quantity": 5,
+        "availableCount": 2,
+        "unavailableCount": 1
+      }
+    }
+  },
+  "GET /api/v1/cart/count": {
+    "name": "ok",
+    "response": {
+      "items": 3,
+      "quantity": 5,
+      "availableCount": 2,
+      "unavailableCount": 1
+    }
+  },
+  "GET /api/v1/cart": {
+    "name": "ok",
+    "query": {
+      "page": 1,
+      "pageSize": 20,
+      "filter": "all"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "5001",
+          "productId": "11",
+          "skuId": "21",
+          "quantity": 2,
+          "isSelected": true,
+          "available": true,
+          "state": "ok",
+          "productName": "有机三只松鼠坚果礼盒",
+          "productImageUrl": "https://cdn.example.com/p/11.jpg",
+          "productKind": "physical",
+          "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+          "specText": "混合装|1000g",
+          "unitName": "盒",
+          "unitPrice": "60.00",
+          "originalUnitPrice": "88.00",
+          "subtotal": "120.00",
+          "stock": 42,
+          "createdAt": "2026-02-01T10:00:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20,
+      "availableCount": 1,
+      "unavailableCount": 0,
+      "selectedQuantity": 2,
+      "selectedTotal": "120.00"
+    }
+  },
+  "POST /api/v1/cart/rebuys": {
+    "name": "partly-available",
+    "body": {
+      "orderId": "9001"
+    },
+    "response": {
+      "added": 1,
+      "skippedSkuIds": [
+        "22"
+      ],
+      "cart": {
+        "items": 2,
+        "quantity": 3,
+        "availableCount": 2,
+        "unavailableCount": 0
+      }
+    }
+  },
+  "DELETE /api/v1/cart/items/:id": {
+    "name": "ok",
+    "params": {
+      "id": "5001"
+    },
+    "response": {
+      "item": null,
+      "cart": {
+        "items": 2,
+        "quantity": 3,
+        "availableCount": 2,
+        "unavailableCount": 1
+      }
+    }
+  },
+  "POST /api/v1/cart/items/removals": {
+    "name": "by-id",
+    "body": {
+      "itemIds": [
+        "5001",
+        "5002"
+      ],
+      "unavailableOnly": false
+    },
+    "response": {
+      "removed": 2,
+      "cart": {
+        "items": 1,
+        "quantity": 1,
+        "availableCount": 1,
+        "unavailableCount": 0
+      }
+    }
+  },
+  "POST /api/v1/cart/selections": {
+    "name": "select-all",
+    "body": {
+      "itemIds": [],
+      "all": true,
+      "isSelected": true
+    },
+    "response": {
+      "items": [
+        {
+          "id": "5001",
+          "productId": "11",
+          "skuId": "21",
+          "quantity": 2,
+          "isSelected": true,
+          "available": true,
+          "state": "ok",
+          "productName": "有机三只松鼠坚果礼盒",
+          "productImageUrl": "https://cdn.example.com/p/11.jpg",
+          "productKind": "physical",
+          "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+          "specText": "混合装|1000g",
+          "unitName": "盒",
+          "unitPrice": "60.00",
+          "originalUnitPrice": "88.00",
+          "subtotal": "120.00",
+          "stock": 42,
+          "createdAt": "2026-02-01T10:00:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20,
+      "availableCount": 1,
+      "unavailableCount": 0,
+      "selectedQuantity": 2,
+      "selectedTotal": "120.00"
+    }
+  },
+  "PATCH /api/v1/cart/items/:id": {
+    "name": "set-quantity",
+    "params": {
+      "id": "5001"
+    },
+    "body": {
+      "quantity": 3
+    },
+    "response": {
+      "item": {
+        "id": "5001",
+        "productId": "11",
+        "skuId": "21",
+        "quantity": 3,
+        "isSelected": true,
+        "available": true,
+        "state": "ok",
+        "productName": "有机三只松鼠坚果礼盒",
+        "productImageUrl": "https://cdn.example.com/p/11.jpg",
+        "productKind": "physical",
+        "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+        "specText": "混合装|1000g",
+        "unitName": "盒",
+        "unitPrice": "60.00",
+        "originalUnitPrice": "88.00",
+        "subtotal": "180.00",
+        "stock": 42,
+        "createdAt": "2026-02-01T10:00:00+08:00"
+      },
+      "cart": {
+        "items": 3,
+        "quantity": 6,
+        "availableCount": 2,
+        "unavailableCount": 1
+      }
+    }
+  },
+  "GET /api/v1/me/reviews": {
+    "name": "first-page",
+    "query": {
+      "page": 1,
+      "pageSize": 20
+    },
+    "response": {
+      "items": [
+        {
+          "id": "5001",
+          "skuId": "1001",
+          "specText": "白|M",
+          "authorNickname": "小明",
+          "authorAvatarUrl": "https://cdn.example.com/u/101.png",
+          "productScore": 5,
+          "serviceScore": 5,
+          "content": "料子很舒服，洗了不变形。",
+          "images": [
+            "https://cdn.example.com/r/5001-1.png"
+          ],
+          "replyContent": "感谢支持！",
+          "replyAt": "2026-03-02T10:00:00+08:00",
+          "createdAt": "2026-03-01T20:11:00+08:00",
+          "productId": "1",
+          "productName": "经典白T恤",
+          "productImageUrl": "https://cdn.example.com/p/1.png"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "GET /api/v1/catalog/products/:id/review-summary": {
+    "name": "ok",
+    "params": {
+      "id": "1"
+    },
+    "response": {
+      "total": 18,
+      "goodCount": 16,
+      "mediumCount": 1,
+      "badCount": 1,
+      "withImagesCount": 7,
+      "averageScore": 4.6,
+      "goodRate": 89
+    }
+  },
+  "GET /api/v1/catalog/products/:id/reviews": {
+    "name": "all",
+    "params": {
+      "id": "1"
+    },
+    "query": {
+      "page": 1,
+      "pageSize": 10,
+      "rating": "all"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "5001",
+          "skuId": "1001",
+          "specText": "白|M",
+          "authorNickname": "小明",
+          "authorAvatarUrl": "https://cdn.example.com/u/101.png",
+          "productScore": 5,
+          "serviceScore": 5,
+          "content": "料子很舒服，洗了不变形。",
+          "images": [
+            "https://cdn.example.com/r/5001-1.png"
+          ],
+          "replyContent": "感谢支持！",
+          "replyAt": "2026-03-02T10:00:00+08:00",
+          "createdAt": "2026-03-01T20:11:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 10
+    }
+  },
+  "POST /api/v1/catalog/reviews": {
+    "name": "ok",
+    "body": {
+      "orderItemId": "9101",
+      "productScore": 5,
+      "serviceScore": 5,
+      "content": "料子很舒服，洗了不变形。",
+      "images": [
+        "https://cdn.example.com/r/5001-1.png"
+      ]
+    },
+    "response": {
+      "id": "5001",
+      "skuId": "1001",
+      "specText": "白|M",
+      "authorNickname": "小明",
+      "authorAvatarUrl": "https://cdn.example.com/u/101.png",
+      "productScore": 5,
+      "serviceScore": 5,
+      "content": "料子很舒服，洗了不变形。",
+      "images": [
+        "https://cdn.example.com/r/5001-1.png"
+      ],
+      "replyContent": null,
+      "replyAt": null,
+      "createdAt": "2026-03-01T20:11:00+08:00"
+    }
+  },
+  "GET /api/v1/catalog/categories": {
+    "name": "tree",
+    "response": {
+      "items": [
+        {
+          "id": "7",
+          "name": "男装",
+          "iconUrl": "https://cdn.example.com/cate/men.png",
+          "bannerUrl": null,
+          "children": [
+            {
+              "id": "17",
+              "name": "T恤",
+              "iconUrl": null,
+              "bannerUrl": null,
+              "children": []
+            }
+          ]
+        }
+      ],
+      "version": "1742534400-17"
+    }
+  },
+  "DELETE /api/v1/me/search-history": {
+    "name": "ok"
+  },
+  "POST /api/v1/me/favorites": {
+    "name": "ok",
+    "body": {
+      "productId": "1"
+    },
+    "response": {
+      "favorited": true
+    }
+  },
+  "GET /api/v1/me/favorites": {
+    "name": "first-page",
+    "query": {
+      "page": 1,
+      "pageSize": 20
+    },
+    "response": {
+      "items": [
+        {
+          "product": {
+            "id": "1",
+            "name": "经典白T恤",
+            "subtitle": "100% 新疆长绒棉",
+            "imageUrl": "https://cdn.example.com/p/1.png",
+            "cardImageUrl": null,
+            "price": "59.00",
+            "originalPrice": "99.00",
+            "stock": 124,
+            "salesDisplay": 141,
+            "unitName": "件",
+            "kind": "physical",
+            "labels": [
+              {
+                "id": "3",
+                "name": "包邮",
+                "style": "text",
+                "fontColor": "#FFFFFF",
+                "backgroundColor": "#E93323",
+                "borderColor": null,
+                "imageUrl": null
+              }
+            ],
+            "canAddToCart": true
+          },
+          "createdAt": "2026-09-01T12:00:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "DELETE /api/v1/me/favorites/:productId": {
+    "name": "ok",
+    "params": {
+      "productId": "1"
+    }
+  },
+  "POST /api/v1/me/favorites/deletions": {
+    "name": "two",
+    "body": {
+      "productIds": [
+        "1",
+        "2"
+      ]
+    },
+    "response": {
+      "removed": 2
+    }
+  },
+  "DELETE /api/v1/me/history": {
+    "name": "ok"
+  },
+  "GET /api/v1/me/history": {
+    "name": "first-page",
+    "query": {
+      "page": 1,
+      "pageSize": 20
+    },
+    "response": {
+      "items": [
+        {
+          "product": {
+            "id": "1",
+            "name": "经典白T恤",
+            "subtitle": "100% 新疆长绒棉",
+            "imageUrl": "https://cdn.example.com/p/1.png",
+            "cardImageUrl": null,
+            "price": "59.00",
+            "originalPrice": "99.00",
+            "stock": 124,
+            "salesDisplay": 141,
+            "unitName": "件",
+            "kind": "physical",
+            "labels": [
+              {
+                "id": "3",
+                "name": "包邮",
+                "style": "text",
+                "fontColor": "#FFFFFF",
+                "backgroundColor": "#E93323",
+                "borderColor": null,
+                "imageUrl": null
+              }
+            ],
+            "canAddToCart": true
+          },
+          "viewedAt": "2026-09-21T10:15:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "POST /api/v1/me/history/deletions": {
+    "name": "one",
+    "body": {
+      "productIds": [
+        "1"
+      ]
+    },
+    "response": {
+      "removed": 3
+    }
+  },
+  "GET /api/v1/catalog/search/hot-keywords": {
+    "name": "top",
+    "response": {
+      "items": [
+        {
+          "keyword": "白T恤",
+          "count": 128
+        },
+        {
+          "keyword": "卫衣",
+          "count": 74
+        }
+      ]
+    }
+  },
+  "GET /api/v1/catalog/products/:id": {
+    "name": "signed-in",
+    "params": {
+      "id": "1"
+    },
+    "response": {
+      "id": "1",
+      "name": "经典白T恤",
+      "subtitle": "100% 新疆长绒棉",
+      "imageUrl": "https://cdn.example.com/p/1.png",
+      "cardImageUrl": null,
+      "price": "59.00",
+      "originalPrice": "99.00",
+      "stock": 124,
+      "salesDisplay": 141,
+      "unitName": "件",
+      "kind": "physical",
+      "labels": [
+        {
+          "id": "3",
+          "name": "包邮",
+          "style": "text",
+          "fontColor": "#FFFFFF",
+          "backgroundColor": "#E93323",
+          "borderColor": null,
+          "imageUrl": null
+        }
+      ],
+      "canAddToCart": true,
+      "sliderImages": [
+        "https://cdn.example.com/p/1.png",
+        "https://cdn.example.com/p/1-back.png"
+      ],
+      "videoUrl": null,
+      "specMode": true,
+      "minPurchaseQuantity": 1,
+      "purchaseLimitMode": "per_order",
+      "purchaseLimitQuantity": 5,
+      "freightMode": "template",
+      "fixedFreight": null,
+      "views": 3820,
+      "descriptionHtml": "<p>经典款，四季可穿。</p>",
+      "specs": [
+        {
+          "name": "颜色",
+          "values": [
+            {
+              "value": "白",
+              "imageUrl": "https://cdn.example.com/p/1-white.png"
+            }
+          ]
+        },
+        {
+          "name": "尺码",
+          "values": [
+            {
+              "value": "M",
+              "imageUrl": null
+            },
+            {
+              "value": "L",
+              "imageUrl": null
+            }
+          ]
+        }
+      ],
+      "skus": [
+        {
+          "id": "1001",
+          "skuCode": "SKU7K3M9QX2",
+          "specText": "白|M",
+          "specValues": {
+            "颜色": "白",
+            "尺码": "M"
+          },
+          "imageUrl": "https://cdn.example.com/p/1-white.png",
+          "price": "59.00",
+          "originalPrice": "99.00",
+          "stock": 120,
+          "weight": "0.250",
+          "volume": null
+        },
+        {
+          "id": "1002",
+          "skuCode": "SKU7K3M9QX3",
+          "specText": "白|L",
+          "specValues": {
+            "颜色": "白",
+            "尺码": "L"
+          },
+          "imageUrl": "https://cdn.example.com/p/1-white.png",
+          "price": "59.00",
+          "originalPrice": "99.00",
+          "stock": 4,
+          "weight": "0.250",
+          "volume": null
+        }
+      ],
+      "params": [
+        {
+          "name": "面料",
+          "value": "纯棉"
+        }
+      ],
+      "protections": [
+        {
+          "id": "1",
+          "title": "七天无理由退换",
+          "content": "自签收之日起 7 天内，商品保持完好可申请退换。",
+          "iconUrl": null
+        }
+      ],
+      "customForm": null,
+      "favorited": false,
+      "reviewSummary": {
+        "total": 18,
+        "goodCount": 16,
+        "mediumCount": 1,
+        "badCount": 1,
+        "withImagesCount": 7,
+        "averageScore": 4.6,
+        "goodRate": 89
+      },
+      "giftCouponIds": [
+        "1"
+      ]
+    }
+  },
+  "GET /api/v1/catalog/products": {
+    "name": "by-category",
+    "query": {
+      "page": 1,
+      "pageSize": 20,
+      "categoryId": "17"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "1",
+          "name": "经典白T恤",
+          "subtitle": "100% 新疆长绒棉",
+          "imageUrl": "https://cdn.example.com/p/1.png",
+          "cardImageUrl": null,
+          "price": "59.00",
+          "originalPrice": "99.00",
+          "stock": 124,
+          "salesDisplay": 141,
+          "unitName": "件",
+          "kind": "physical",
+          "labels": [
+            {
+              "id": "3",
+              "name": "包邮",
+              "style": "text",
+              "fontColor": "#FFFFFF",
+              "backgroundColor": "#E93323",
+              "borderColor": null,
+              "imageUrl": null
+            }
+          ],
+          "canAddToCart": true
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "GET /api/v1/catalog/products/:id/skus": {
+    "name": "two-sku",
+    "params": {
+      "id": "1"
+    },
+    "response": {
+      "productId": "1",
+      "specMode": true,
+      "specs": [
+        {
+          "name": "颜色",
+          "values": [
+            {
+              "value": "白",
+              "imageUrl": "https://cdn.example.com/p/1-white.png"
+            }
+          ]
+        },
+        {
+          "name": "尺码",
+          "values": [
+            {
+              "value": "M",
+              "imageUrl": null
+            },
+            {
+              "value": "L",
+              "imageUrl": null
+            }
+          ]
+        }
+      ],
+      "skus": [
+        {
+          "id": "1001",
+          "skuCode": "SKU7K3M9QX2",
+          "specText": "白|M",
+          "specValues": {
+            "颜色": "白",
+            "尺码": "M"
+          },
+          "imageUrl": "https://cdn.example.com/p/1-white.png",
+          "price": "59.00",
+          "originalPrice": "99.00",
+          "stock": 120,
+          "weight": "0.250",
+          "volume": null
+        },
+        {
+          "id": "1002",
+          "skuCode": "SKU7K3M9QX3",
+          "specText": "白|L",
+          "specValues": {
+            "颜色": "白",
+            "尺码": "L"
+          },
+          "imageUrl": "https://cdn.example.com/p/1-white.png",
+          "price": "59.00",
+          "originalPrice": "99.00",
+          "stock": 4,
+          "weight": "0.250",
+          "volume": null
+        }
+      ]
+    }
+  },
+  "GET /api/v1/me/search-history": {
+    "name": "recent",
+    "response": {
+      "items": [
+        {
+          "keyword": "白T恤",
+          "searchedAt": "2026-09-20T19:02:00+08:00"
+        },
+        {
+          "keyword": "卫衣",
+          "searchedAt": "2026-09-19T08:41:00+08:00"
+        }
+      ]
+    }
+  },
+  "GET /api/v1/catalog/skus/:skuCode": {
+    "name": "ok",
+    "params": {
+      "skuCode": "SKU7K3M9QX2"
+    },
+    "response": {
+      "productId": "1",
+      "sku": {
+        "id": "1001",
+        "skuCode": "SKU7K3M9QX2",
+        "specText": "白|M",
+        "price": "59.00",
+        "originalPrice": "99.00",
+        "stock": 120
+      }
+    }
+  },
+  "POST /api/v1/user-coupons/applicable": {
+    "name": "one-usable-one-not",
+    "body": {
+      "lines": [
+        {
+          "productId": "11",
+          "categoryIds": [
+            "7"
+          ],
+          "amount": "120.00"
+        },
+        {
+          "productId": "12",
+          "categoryIds": [
+            "8"
+          ],
+          "amount": "30.00"
+        }
+      ]
+    },
+    "response": {
+      "subtotal": "150.00",
+      "items": [
+        {
+          "coupon": {
+            "id": "9001",
+            "templateId": "1",
+            "title": "满 100 减 10",
+            "discountAmount": "10.00",
+            "minSpend": "100.00",
+            "scope": "all_products",
+            "status": "unused",
+            "sourceKind": "claim",
+            "validFrom": "2026-01-01T00:00:00+08:00",
+            "validTo": "2026-12-31T23:59:59+08:00",
+            "usedAt": null,
+            "createdAt": "2026-01-02T09:30:00+08:00"
+          },
+          "usable": true,
+          "discount": "10.00",
+          "eligibleLineIndexes": [
+            0,
+            1
+          ],
+          "reason": null
+        },
+        {
+          "coupon": {
+            "id": "9002",
+            "templateId": "3",
+            "title": "母婴满 200 减 30",
+            "discountAmount": "30.00",
+            "minSpend": "200.00",
+            "scope": "categories",
+            "status": "unused",
+            "sourceKind": "claim",
+            "validFrom": "2026-01-01T00:00:00+08:00",
+            "validTo": "2026-12-31T23:59:59+08:00",
+            "usedAt": null,
+            "createdAt": "2026-01-02T09:30:00+08:00"
+          },
+          "usable": false,
+          "discount": "0.00",
+          "eligibleLineIndexes": [
+            0
+          ],
+          "reason": "COUPON_MIN_SPEND_NOT_MET"
+        }
+      ]
+    }
+  },
+  "POST /api/v1/coupons/:id/claims": {
+    "name": "ok",
+    "params": {
+      "id": "1"
+    },
+    "body": {},
+    "response": {
+      "coupon": {
+        "id": "9001",
+        "templateId": "1",
+        "title": "满 100 减 10",
+        "discountAmount": "10.00",
+        "minSpend": "100.00",
+        "scope": "all_products",
+        "status": "unused",
+        "sourceKind": "claim",
+        "validFrom": "2026-01-01T00:00:00+08:00",
+        "validTo": "2026-12-31T23:59:59+08:00",
+        "usedAt": null,
+        "createdAt": "2026-01-02T09:30:00+08:00"
+      },
+      "remainingCount": 872
+    }
+  },
+  "GET /api/v1/coupons": {
+    "name": "signed-in",
+    "query": {
+      "page": 1,
+      "pageSize": 20
+    },
+    "response": {
+      "items": [
+        {
+          "templateId": "1",
+          "name": "满 100 减 10",
+          "discountAmount": "10.00",
+          "minSpend": "100.00",
+          "scope": "all_products",
+          "validityMode": "fixed_window",
+          "validFrom": "2026-01-01T00:00:00+08:00",
+          "validTo": "2026-12-31T23:59:59+08:00",
+          "validDays": null,
+          "claimTo": "2026-06-30T23:59:59+08:00",
+          "isUnlimitedSupply": false,
+          "remainingCount": 873,
+          "perUserLimit": 1,
+          "claimedCount": 0,
+          "canClaim": true
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "GET /api/v1/user-coupons": {
+    "name": "unused",
+    "query": {
+      "page": 1,
+      "pageSize": 20,
+      "state": "unused"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "9001",
+          "templateId": "1",
+          "title": "满 100 减 10",
+          "discountAmount": "10.00",
+          "minSpend": "100.00",
+          "scope": "all_products",
+          "status": "unused",
+          "sourceKind": "claim",
+          "validFrom": "2026-01-01T00:00:00+08:00",
+          "validTo": "2026-12-31T23:59:59+08:00",
+          "usedAt": null,
+          "createdAt": "2026-01-02T09:30:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "GET /api/v1/coupons/new-user": {
+    "name": "ok",
+    "response": {
+      "items": [
+        {
+          "templateId": "2",
+          "name": "新人专享 5 元券",
+          "discountAmount": "5.00",
+          "minSpend": "0.00",
+          "scope": "all_products",
+          "validityMode": "days_after_claim",
+          "validFrom": null,
+          "validTo": null,
+          "validDays": 30,
+          "claimTo": null,
+          "isUnlimitedSupply": true,
+          "remainingCount": null,
+          "perUserLimit": 1,
+          "claimedCount": 0,
+          "canClaim": false
+        }
+      ]
+    }
+  },
+  "GET /api/v1/diy/pages/home": {
+    "name": "ok",
+    "response": {
+      "id": "1",
+      "name": "默认首页",
+      "kind": "home",
+      "title": "商城首页",
+      "content": {
+        "1716451200000": {
+          "name": "titles",
+          "cname": "标题",
+          "timestamp": 1716451200000,
+          "setUp": {
+            "tabVal": 0
+          },
+          "titleConfig": {
+            "title": "标题内容",
+            "val": "为你推荐"
+          }
+        }
+      },
+      "schemaVersion": 1,
+      "background": {
+        "color": "#F5F5F5"
+      },
+      "version": "1716451200000"
+    }
+  },
+  "GET /api/v1/diy/pages/:id": {
+    "name": "ok",
+    "params": {
+      "id": "1"
+    },
+    "response": {
+      "id": "1",
+      "name": "默认首页",
+      "kind": "home",
+      "title": "商城首页",
+      "content": {
+        "1716451200000": {
+          "name": "titles",
+          "cname": "标题",
+          "timestamp": 1716451200000,
+          "setUp": {
+            "tabVal": 0
+          },
+          "titleConfig": {
+            "title": "标题内容",
+            "val": "为你推荐"
+          }
+        }
+      },
+      "schemaVersion": 1,
+      "background": {
+        "color": "#F5F5F5"
+      },
+      "version": "1716451200000"
+    }
+  },
+  "GET /api/v1/diy/version": {
+    "name": "ok",
+    "query": {},
+    "response": {
+      "version": "1716451200000"
+    }
+  },
+  "GET /api/v1/diy/theme": {
+    "name": "ok",
+    "response": {
+      "id": "1",
+      "name": "默认主题",
+      "tokens": {
+        "theme": "#E93323",
+        "accent": "#FF7E00"
+      },
+      "version": "1716451200000"
+    }
+  },
+  "GET /api/v1/health": {
+    "name": "ok",
+    "response": {
+      "status": "ok",
+      "time": "2026-01-01T12:00:00+08:00",
+      "version": "dev"
+    }
+  },
+  "POST /api/v1/checkout/preview": {
+    "name": "cart-with-coupon",
+    "body": {
+      "source": "cart",
+      "cartItemIds": [],
+      "addressId": "301",
+      "userCouponId": "9001",
+      "kind": "normal"
+    },
+    "response": {
+      "lines": [
+        {
+          "itemKey": "sku-21",
+          "productId": "11",
+          "skuId": "21",
+          "cartItemId": "5001",
+          "productName": "有机三只松鼠坚果礼盒",
+          "productImageUrl": "https://cdn.example.com/p/11.jpg",
+          "productKind": "physical",
+          "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+          "specText": "混合装|1000g",
+          "unitName": "盒",
+          "quantity": 2,
+          "unitPrice": "60.00",
+          "originalUnitPrice": "88.00",
+          "subtotal": "120.00",
+          "discountAmount": "10.00",
+          "totalAmount": "110.00"
+        }
+      ],
+      "receiver": {
+        "addressId": "301",
+        "name": "张三",
+        "phone": "13800138000",
+        "province": "浙江省",
+        "city": "杭州市",
+        "district": "西湖区",
+        "detail": "文三路 100 号 3 单元 501",
+        "postCode": "310012"
+      },
+      "addressRequired": true,
+      "totalQuantity": 2,
+      "itemsAmount": "120.00",
+      "freightAmount": "8.00",
+      "couponDiscount": "10.00",
+      "adjustments": [
+        {
+          "source": "coupon:full-reduction",
+          "label": "满 100 减 10",
+          "amount": "-10.00"
+        }
+      ],
+      "payableAmount": "118.00",
+      "userCouponId": "9001",
+      "payWindowMinutes": 30,
+      "customFormFields": []
+    }
+  },
+  "POST /api/v1/orders/:id/cancel": {
+    "name": "ok",
+    "params": {
+      "id": "9001"
+    },
+    "body": {
+      "reason": "不想要了"
+    },
+    "response": {
+      "id": "9001",
+      "orderNo": "202602011000000010123456",
+      "kind": "normal",
+      "status": "cancelled",
+      "fulfillmentStatus": "unfulfilled",
+      "refundStatus": "none",
+      "totalQuantity": 2,
+      "itemsAmount": "120.00",
+      "freightAmount": "8.00",
+      "couponDiscount": "10.00",
+      "payableAmount": "118.00",
+      "paidAmount": null,
+      "payExpiresAt": null,
+      "createdAt": "2026-02-01T10:00:00+08:00",
+      "items": [
+        {
+          "id": "7001",
+          "itemKey": "sku-21",
+          "productId": "11",
+          "skuId": "21",
+          "productName": "有机三只松鼠坚果礼盒",
+          "productImageUrl": "https://cdn.example.com/p/11.jpg",
+          "productKind": "physical",
+          "specText": "混合装|1000g",
+          "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+          "unitName": "盒",
+          "quantity": 2,
+          "unitPrice": "60.00",
+          "originalUnitPrice": "88.00",
+          "discountAmount": "10.00",
+          "totalAmount": "110.00",
+          "refundedQuantity": 0,
+          "shippedQuantity": 0
+        }
+      ],
+      "receiver": {
+        "addressId": "301",
+        "name": "张三",
+        "phone": "13800138000",
+        "province": "浙江省",
+        "city": "杭州市",
+        "district": "西湖区",
+        "detail": "文三路 100 号 3 单元 501",
+        "postCode": "310012"
+      },
+      "buyerRemark": "请在工作日送达",
+      "customForm": null,
+      "userCouponId": "9001",
+      "paidAt": null,
+      "shippedAt": null,
+      "receivedAt": null,
+      "completedAt": null,
+      "cancelledAt": "2026-02-01T10:05:00+08:00",
+      "cancelReason": "不想要了"
+    }
+  },
+  "GET /api/v1/orders/counts": {
+    "name": "ok",
+    "response": {
+      "all": 12,
+      "unpaid": 1,
+      "unshipped": 2,
+      "unreceived": 3,
+      "finished": 5,
+      "cancelled": 1,
+      "refunding": 0
+    }
+  },
+  "POST /api/v1/orders": {
+    "name": "ok",
+    "body": {
+      "source": "cart",
+      "cartItemIds": [
+        "5001"
+      ],
+      "addressId": "301",
+      "userCouponId": "9001",
+      "kind": "normal",
+      "idempotencyKey": "ck-20260201-7f3a9b21",
+      "buyerRemark": "请在工作日送达",
+      "expectedPayableAmount": "118.00"
+    },
+    "response": {
+      "id": "9001",
+      "orderNo": "202602011000000010123456",
+      "kind": "normal",
+      "status": "pending_payment",
+      "fulfillmentStatus": "unfulfilled",
+      "refundStatus": "none",
+      "totalQuantity": 2,
+      "itemsAmount": "120.00",
+      "freightAmount": "8.00",
+      "couponDiscount": "10.00",
+      "payableAmount": "118.00",
+      "paidAmount": null,
+      "payExpiresAt": "2026-02-01T10:30:00+08:00",
+      "createdAt": "2026-02-01T10:00:00+08:00",
+      "items": [
+        {
+          "id": "7001",
+          "itemKey": "sku-21",
+          "productId": "11",
+          "skuId": "21",
+          "productName": "有机三只松鼠坚果礼盒",
+          "productImageUrl": "https://cdn.example.com/p/11.jpg",
+          "productKind": "physical",
+          "specText": "混合装|1000g",
+          "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+          "unitName": "盒",
+          "quantity": 2,
+          "unitPrice": "60.00",
+          "originalUnitPrice": "88.00",
+          "discountAmount": "10.00",
+          "totalAmount": "110.00",
+          "refundedQuantity": 0,
+          "shippedQuantity": 0
+        }
+      ],
+      "receiver": {
+        "addressId": "301",
+        "name": "张三",
+        "phone": "13800138000",
+        "province": "浙江省",
+        "city": "杭州市",
+        "district": "西湖区",
+        "detail": "文三路 100 号 3 单元 501",
+        "postCode": "310012"
+      },
+      "buyerRemark": "请在工作日送达",
+      "customForm": null,
+      "userCouponId": "9001",
+      "paidAt": null,
+      "shippedAt": null,
+      "receivedAt": null,
+      "completedAt": null,
+      "cancelledAt": null,
+      "cancelReason": null
+    }
+  },
+  "GET /api/v1/orders/:id": {
+    "name": "ok",
+    "params": {
+      "id": "9001"
+    },
+    "response": {
+      "id": "9001",
+      "orderNo": "202602011000000010123456",
+      "kind": "normal",
+      "status": "pending_payment",
+      "fulfillmentStatus": "unfulfilled",
+      "refundStatus": "none",
+      "totalQuantity": 2,
+      "itemsAmount": "120.00",
+      "freightAmount": "8.00",
+      "couponDiscount": "10.00",
+      "payableAmount": "118.00",
+      "paidAmount": null,
+      "payExpiresAt": "2026-02-01T10:30:00+08:00",
+      "createdAt": "2026-02-01T10:00:00+08:00",
+      "items": [
+        {
+          "id": "7001",
+          "itemKey": "sku-21",
+          "productId": "11",
+          "skuId": "21",
+          "productName": "有机三只松鼠坚果礼盒",
+          "productImageUrl": "https://cdn.example.com/p/11.jpg",
+          "productKind": "physical",
+          "specText": "混合装|1000g",
+          "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+          "unitName": "盒",
+          "quantity": 2,
+          "unitPrice": "60.00",
+          "originalUnitPrice": "88.00",
+          "discountAmount": "10.00",
+          "totalAmount": "110.00",
+          "refundedQuantity": 0,
+          "shippedQuantity": 0
+        }
+      ],
+      "receiver": {
+        "addressId": "301",
+        "name": "张三",
+        "phone": "13800138000",
+        "province": "浙江省",
+        "city": "杭州市",
+        "district": "西湖区",
+        "detail": "文三路 100 号 3 单元 501",
+        "postCode": "310012"
+      },
+      "buyerRemark": "请在工作日送达",
+      "customForm": null,
+      "userCouponId": "9001",
+      "paidAt": null,
+      "shippedAt": null,
+      "receivedAt": null,
+      "completedAt": null,
+      "cancelledAt": null,
+      "cancelReason": null
+    }
+  },
+  "GET /api/v1/orders": {
+    "name": "unpaid-tab",
+    "query": {
+      "page": 1,
+      "pageSize": 20,
+      "tab": "unpaid"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "9001",
+          "orderNo": "202602011000000010123456",
+          "kind": "normal",
+          "status": "pending_payment",
+          "fulfillmentStatus": "unfulfilled",
+          "refundStatus": "none",
+          "totalQuantity": 2,
+          "itemsAmount": "120.00",
+          "freightAmount": "8.00",
+          "couponDiscount": "10.00",
+          "payableAmount": "118.00",
+          "paidAmount": null,
+          "payExpiresAt": "2026-02-01T10:30:00+08:00",
+          "createdAt": "2026-02-01T10:00:00+08:00",
+          "items": [
+            {
+              "id": "7001",
+              "itemKey": "sku-21",
+              "productId": "11",
+              "skuId": "21",
+              "productName": "有机三只松鼠坚果礼盒",
+              "productImageUrl": "https://cdn.example.com/p/11.jpg",
+              "productKind": "physical",
+              "specText": "混合装|1000g",
+              "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+              "unitName": "盒",
+              "quantity": 2,
+              "unitPrice": "60.00",
+              "originalUnitPrice": "88.00",
+              "discountAmount": "10.00",
+              "totalAmount": "110.00",
+              "refundedQuantity": 0,
+              "shippedQuantity": 0
+            }
+          ]
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "POST /api/v1/orders/:id/receipt": {
+    "name": "ok",
+    "params": {
+      "id": "9001"
+    },
+    "body": {},
+    "response": {
+      "id": "9001",
+      "orderNo": "202602011000000010123456",
+      "kind": "normal",
+      "status": "received",
+      "fulfillmentStatus": "fulfilled",
+      "refundStatus": "none",
+      "totalQuantity": 2,
+      "itemsAmount": "120.00",
+      "freightAmount": "8.00",
+      "couponDiscount": "10.00",
+      "payableAmount": "118.00",
+      "paidAmount": "118.00",
+      "payExpiresAt": null,
+      "createdAt": "2026-02-01T10:00:00+08:00",
+      "items": [
+        {
+          "id": "7001",
+          "itemKey": "sku-21",
+          "productId": "11",
+          "skuId": "21",
+          "productName": "有机三只松鼠坚果礼盒",
+          "productImageUrl": "https://cdn.example.com/p/11.jpg",
+          "productKind": "physical",
+          "specText": "混合装|1000g",
+          "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+          "unitName": "盒",
+          "quantity": 2,
+          "unitPrice": "60.00",
+          "originalUnitPrice": "88.00",
+          "discountAmount": "10.00",
+          "totalAmount": "110.00",
+          "refundedQuantity": 0,
+          "shippedQuantity": 2
+        }
+      ],
+      "receiver": {
+        "addressId": "301",
+        "name": "张三",
+        "phone": "13800138000",
+        "province": "浙江省",
+        "city": "杭州市",
+        "district": "西湖区",
+        "detail": "文三路 100 号 3 单元 501",
+        "postCode": "310012"
+      },
+      "buyerRemark": "请在工作日送达",
+      "customForm": null,
+      "userCouponId": "9001",
+      "paidAt": "2026-02-01T10:03:00+08:00",
+      "shippedAt": "2026-02-02T09:00:00+08:00",
+      "receivedAt": "2026-02-04T18:00:00+08:00",
+      "completedAt": null,
+      "cancelledAt": null,
+      "cancelReason": null
+    }
+  },
+  "GET /api/v1/shipments/:id/tracking": {
+    "name": "in-transit",
+    "params": {
+      "id": "4001"
+    },
+    "response": {
+      "shipmentId": "4001",
+      "shipmentNo": "SH20260201100000001234",
+      "expressCompanyName": "顺丰速运",
+      "trackingNo": "SF1234567890123",
+      "available": true,
+      "state": "in_transit",
+      "traces": [
+        {
+          "at": "2026-02-02T09:30:00+08:00",
+          "context": "快件已从杭州转运中心发出"
+        },
+        {
+          "at": "2026-02-02T09:05:00+08:00",
+          "context": "顺丰速运 已收取快件"
+        }
+      ],
+      "queriedAt": "2026-02-02T12:00:00+08:00"
+    }
+  },
+  "GET /api/v1/orders/:id/shipments": {
+    "name": "one-parcel",
+    "params": {
+      "id": "9001"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "4001",
+          "orderId": "9001",
+          "shipmentNo": "SH20260201100000001234",
+          "deliveryMode": "express",
+          "status": "dispatched",
+          "expressCompanyId": "12",
+          "expressCompanyName": "顺丰速运",
+          "trackingNo": "SF1234567890123",
+          "courierName": null,
+          "courierPhone": null,
+          "virtualContent": null,
+          "remark": null,
+          "dispatchedAt": "2026-02-02T09:00:00+08:00",
+          "deliveredAt": null,
+          "cancelledAt": null,
+          "lines": [
+            {
+              "orderItemId": "7001",
+              "itemKey": "sku-21",
+              "productName": "有机三只松鼠坚果礼盒",
+              "productImageUrl": "https://cdn.example.com/p/11.jpg",
+              "specText": "混合装|1000g",
+              "quantity": 2
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "POST /api/v1/invoices/:id/cancel": {
+    "name": "ok",
+    "params": {
+      "id": "3001"
+    },
+    "body": {},
+    "response": {
+      "id": "3001",
+      "orderId": "9001",
+      "orderNo": "202602011000000010123456",
+      "userId": "2001",
+      "status": "cancelled",
+      "headerType": "company",
+      "invoiceType": "plain",
+      "name": "杭州某某科技有限公司",
+      "dutyNumber": "91330100MA2XXXXX0A",
+      "drawerPhone": "13800138000",
+      "email": "finance@example.com",
+      "registeredTel": null,
+      "registeredAddress": null,
+      "bankName": null,
+      "bankAccount": null,
+      "amount": "118.00",
+      "invoiceNumber": null,
+      "remark": null,
+      "issuedAt": null,
+      "createdAt": "2026-02-03T10:00:00+08:00"
+    }
+  },
+  "GET /api/v1/invoices/:id": {
+    "name": "ok",
+    "params": {
+      "id": "3001"
+    },
+    "response": {
+      "id": "3001",
+      "orderId": "9001",
+      "orderNo": "202602011000000010123456",
+      "userId": "2001",
+      "status": "requested",
+      "headerType": "company",
+      "invoiceType": "plain",
+      "name": "杭州某某科技有限公司",
+      "dutyNumber": "91330100MA2XXXXX0A",
+      "drawerPhone": "13800138000",
+      "email": "finance@example.com",
+      "registeredTel": null,
+      "registeredAddress": null,
+      "bankName": null,
+      "bankAccount": null,
+      "amount": "118.00",
+      "invoiceNumber": null,
+      "remark": null,
+      "issuedAt": null,
+      "createdAt": "2026-02-03T10:00:00+08:00"
+    }
+  },
+  "GET /api/v1/invoices": {
+    "name": "ok",
+    "query": {
+      "page": 1,
+      "pageSize": 20
+    },
+    "response": {
+      "items": [
+        {
+          "id": "3001",
+          "orderId": "9001",
+          "orderNo": "202602011000000010123456",
+          "userId": "2001",
+          "status": "requested",
+          "headerType": "company",
+          "invoiceType": "plain",
+          "name": "杭州某某科技有限公司",
+          "dutyNumber": "91330100MA2XXXXX0A",
+          "drawerPhone": "13800138000",
+          "email": "finance@example.com",
+          "registeredTel": null,
+          "registeredAddress": null,
+          "bankName": null,
+          "bankAccount": null,
+          "amount": "118.00",
+          "invoiceNumber": null,
+          "remark": null,
+          "issuedAt": null,
+          "createdAt": "2026-02-03T10:00:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "POST /api/v1/orders/:id/invoice": {
+    "name": "company-plain",
+    "params": {
+      "id": "9001"
+    },
+    "body": {
+      "headerType": "company",
+      "invoiceType": "plain",
+      "name": "杭州某某科技有限公司",
+      "dutyNumber": "91330100MA2XXXXX0A",
+      "drawerPhone": "13800138000",
+      "email": "finance@example.com"
+    },
+    "response": {
+      "id": "3001",
+      "orderId": "9001",
+      "orderNo": "202602011000000010123456",
+      "userId": "2001",
+      "status": "requested",
+      "headerType": "company",
+      "invoiceType": "plain",
+      "name": "杭州某某科技有限公司",
+      "dutyNumber": "91330100MA2XXXXX0A",
+      "drawerPhone": "13800138000",
+      "email": "finance@example.com",
+      "registeredTel": null,
+      "registeredAddress": null,
+      "bankName": null,
+      "bankAccount": null,
+      "amount": "118.00",
+      "invoiceNumber": null,
+      "remark": null,
+      "issuedAt": null,
+      "createdAt": "2026-02-03T10:00:00+08:00"
+    }
+  },
+  "GET /api/v1/staff/express-companies": {
+    "name": "ok",
+    "response": {
+      "items": [
+        {
+          "id": "12",
+          "code": "SF",
+          "name": "顺丰速运",
+          "sortOrder": 100
+        },
+        {
+          "id": "13",
+          "code": "ZTO",
+          "name": "中通快递",
+          "sortOrder": 90
+        }
+      ]
+    }
+  },
+  "GET /api/v1/staff/me": {
+    "name": "is-staff",
+    "response": {
+      "isStaff": true,
+      "userId": "2001",
+      "nickname": "张三"
+    }
+  },
+  "POST /api/v1/staff/orders/:id/address": {
+    "name": "ok",
+    "params": {
+      "id": "9001"
+    },
+    "body": {
+      "name": "张三",
+      "phone": "13800138001",
+      "province": "浙江省",
+      "city": "杭州市",
+      "district": "滨江区",
+      "detail": "江南大道 588 号"
+    },
+    "response": {
+      "id": "9001",
+      "orderNo": "202602011000000010123456",
+      "kind": "normal",
+      "status": "paid",
+      "fulfillmentStatus": "unfulfilled",
+      "refundStatus": "none",
+      "totalQuantity": 2,
+      "itemsAmount": "120.00",
+      "freightAmount": "8.00",
+      "couponDiscount": "10.00",
+      "payableAmount": "118.00",
+      "paidAmount": "118.00",
+      "payExpiresAt": null,
+      "createdAt": "2026-02-01T10:00:00+08:00",
+      "items": [
+        {
+          "id": "7001",
+          "itemKey": "sku-21",
+          "productId": "11",
+          "skuId": "21",
+          "productName": "有机三只松鼠坚果礼盒",
+          "productImageUrl": "https://cdn.example.com/p/11.jpg",
+          "productKind": "physical",
+          "specText": "混合装|1000g",
+          "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+          "unitName": "盒",
+          "quantity": 2,
+          "unitPrice": "60.00",
+          "originalUnitPrice": "88.00",
+          "discountAmount": "10.00",
+          "totalAmount": "110.00",
+          "refundedQuantity": 0,
+          "shippedQuantity": 0
+        }
+      ],
+      "platform": "wechat-mini",
+      "user": {
+        "id": "2001",
+        "nickname": "张三",
+        "avatarUrl": "https://cdn.example.com/avatar/2001.jpg",
+        "phone": "13800138000"
+      },
+      "receiver": {
+        "addressId": null,
+        "name": "张三",
+        "phone": "13800138001",
+        "province": "浙江省",
+        "city": "杭州市",
+        "district": "滨江区",
+        "detail": "江南大道 588 号",
+        "postCode": null
+      },
+      "refundedAmount": "0.00",
+      "buyerRemark": "请在工作日送达",
+      "adminRemark": null,
+      "invoiceStatus": null,
+      "paidAt": "2026-02-01T10:03:00+08:00",
+      "shippedAt": null,
+      "receivedAt": null,
+      "completedAt": null,
+      "cancelledAt": null,
+      "customForm": null,
+      "userCouponId": "9001",
+      "cancelReason": null,
+      "transactionNo": "4200001234202602011234567890",
+      "autoReceiveAt": null,
+      "shipments": [],
+      "refundIds": []
+    }
+  },
+  "GET /api/v1/staff/orders/:id": {
+    "name": "ok",
+    "params": {
+      "id": "9001"
+    },
+    "response": {
+      "id": "9001",
+      "orderNo": "202602011000000010123456",
+      "kind": "normal",
+      "status": "paid",
+      "fulfillmentStatus": "unfulfilled",
+      "refundStatus": "none",
+      "totalQuantity": 2,
+      "itemsAmount": "120.00",
+      "freightAmount": "8.00",
+      "couponDiscount": "10.00",
+      "payableAmount": "118.00",
+      "paidAmount": "118.00",
+      "payExpiresAt": null,
+      "createdAt": "2026-02-01T10:00:00+08:00",
+      "items": [
+        {
+          "id": "7001",
+          "itemKey": "sku-21",
+          "productId": "11",
+          "skuId": "21",
+          "productName": "有机三只松鼠坚果礼盒",
+          "productImageUrl": "https://cdn.example.com/p/11.jpg",
+          "productKind": "physical",
+          "specText": "混合装|1000g",
+          "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+          "unitName": "盒",
+          "quantity": 2,
+          "unitPrice": "60.00",
+          "originalUnitPrice": "88.00",
+          "discountAmount": "10.00",
+          "totalAmount": "110.00",
+          "refundedQuantity": 0,
+          "shippedQuantity": 0
+        }
+      ],
+      "platform": "wechat-mini",
+      "user": {
+        "id": "2001",
+        "nickname": "张三",
+        "avatarUrl": "https://cdn.example.com/avatar/2001.jpg",
+        "phone": "13800138000"
+      },
+      "receiver": {
+        "addressId": "301",
+        "name": "张三",
+        "phone": "13800138000",
+        "province": "浙江省",
+        "city": "杭州市",
+        "district": "西湖区",
+        "detail": "文三路 100 号 3 单元 501",
+        "postCode": "310012"
+      },
+      "refundedAmount": "0.00",
+      "buyerRemark": "请在工作日送达",
+      "adminRemark": null,
+      "invoiceStatus": null,
+      "paidAt": "2026-02-01T10:03:00+08:00",
+      "shippedAt": null,
+      "receivedAt": null,
+      "completedAt": null,
+      "cancelledAt": null,
+      "customForm": null,
+      "userCouponId": "9001",
+      "cancelReason": null,
+      "transactionNo": "4200001234202602011234567890",
+      "autoReceiveAt": null,
+      "shipments": [],
+      "refundIds": []
+    }
+  },
+  "GET /api/v1/staff/orders": {
+    "name": "unshipped",
+    "query": {
+      "page": 1,
+      "pageSize": 20,
+      "status": "paid",
+      "fulfillmentStatus": "unfulfilled"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "9001",
+          "orderNo": "202602011000000010123456",
+          "kind": "normal",
+          "status": "paid",
+          "fulfillmentStatus": "unfulfilled",
+          "refundStatus": "none",
+          "totalQuantity": 2,
+          "itemsAmount": "120.00",
+          "freightAmount": "8.00",
+          "couponDiscount": "10.00",
+          "payableAmount": "118.00",
+          "paidAmount": "118.00",
+          "payExpiresAt": null,
+          "createdAt": "2026-02-01T10:00:00+08:00",
+          "items": [
+            {
+              "id": "7001",
+              "itemKey": "sku-21",
+              "productId": "11",
+              "skuId": "21",
+              "productName": "有机三只松鼠坚果礼盒",
+              "productImageUrl": "https://cdn.example.com/p/11.jpg",
+              "productKind": "physical",
+              "specText": "混合装|1000g",
+              "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+              "unitName": "盒",
+              "quantity": 2,
+              "unitPrice": "60.00",
+              "originalUnitPrice": "88.00",
+              "discountAmount": "10.00",
+              "totalAmount": "110.00",
+              "refundedQuantity": 0,
+              "shippedQuantity": 0
+            }
+          ],
+          "platform": "wechat-mini",
+          "user": {
+            "id": "2001",
+            "nickname": "张三",
+            "avatarUrl": "https://cdn.example.com/avatar/2001.jpg",
+            "phone": "13800138000"
+          },
+          "receiver": {
+            "addressId": "301",
+            "name": "张三",
+            "phone": "13800138000",
+            "province": "浙江省",
+            "city": "杭州市",
+            "district": "西湖区",
+            "detail": "文三路 100 号 3 单元 501",
+            "postCode": "310012"
+          },
+          "refundedAmount": "0.00",
+          "buyerRemark": "请在工作日送达",
+          "adminRemark": null,
+          "invoiceStatus": null,
+          "paidAt": "2026-02-01T10:03:00+08:00",
+          "shippedAt": null,
+          "receivedAt": null,
+          "completedAt": null,
+          "cancelledAt": null
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "POST /api/v1/staff/orders/:id/price": {
+    "name": "ten-off",
+    "params": {
+      "id": "9001"
+    },
+    "body": {
+      "operatorDiscount": "10.00"
+    },
+    "response": {
+      "id": "9001",
+      "orderNo": "202602011000000010123456",
+      "kind": "normal",
+      "status": "pending_payment",
+      "fulfillmentStatus": "unfulfilled",
+      "refundStatus": "none",
+      "totalQuantity": 2,
+      "itemsAmount": "120.00",
+      "freightAmount": "8.00",
+      "couponDiscount": "20.00",
+      "payableAmount": "108.00",
+      "paidAmount": null,
+      "payExpiresAt": "2026-02-01T10:30:00+08:00",
+      "createdAt": "2026-02-01T10:00:00+08:00",
+      "items": [
+        {
+          "id": "7001",
+          "itemKey": "sku-21",
+          "productId": "11",
+          "skuId": "21",
+          "productName": "有机三只松鼠坚果礼盒",
+          "productImageUrl": "https://cdn.example.com/p/11.jpg",
+          "productKind": "physical",
+          "specText": "混合装|1000g",
+          "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+          "unitName": "盒",
+          "quantity": 2,
+          "unitPrice": "60.00",
+          "originalUnitPrice": "88.00",
+          "discountAmount": "20.00",
+          "totalAmount": "100.00",
+          "refundedQuantity": 0,
+          "shippedQuantity": 0
+        }
+      ],
+      "platform": "wechat-mini",
+      "user": {
+        "id": "2001",
+        "nickname": "张三",
+        "avatarUrl": "https://cdn.example.com/avatar/2001.jpg",
+        "phone": "13800138000"
+      },
+      "receiver": {
+        "addressId": "301",
+        "name": "张三",
+        "phone": "13800138000",
+        "province": "浙江省",
+        "city": "杭州市",
+        "district": "西湖区",
+        "detail": "文三路 100 号 3 单元 501",
+        "postCode": "310012"
+      },
+      "refundedAmount": "0.00",
+      "buyerRemark": "请在工作日送达",
+      "adminRemark": null,
+      "invoiceStatus": null,
+      "paidAt": null,
+      "shippedAt": null,
+      "receivedAt": null,
+      "completedAt": null,
+      "cancelledAt": null,
+      "customForm": null,
+      "userCouponId": "9001",
+      "cancelReason": null,
+      "transactionNo": "4200001234202602011234567890",
+      "autoReceiveAt": null,
+      "shipments": [],
+      "refundIds": []
+    }
+  },
+  "POST /api/v1/staff/orders/:id/remark": {
+    "name": "ok",
+    "params": {
+      "id": "9001"
+    },
+    "body": {
+      "adminRemark": "已电话联系买家"
+    },
+    "response": {
+      "id": "9001",
+      "orderNo": "202602011000000010123456",
+      "kind": "normal",
+      "status": "paid",
+      "fulfillmentStatus": "unfulfilled",
+      "refundStatus": "none",
+      "totalQuantity": 2,
+      "itemsAmount": "120.00",
+      "freightAmount": "8.00",
+      "couponDiscount": "10.00",
+      "payableAmount": "118.00",
+      "paidAmount": "118.00",
+      "payExpiresAt": null,
+      "createdAt": "2026-02-01T10:00:00+08:00",
+      "items": [
+        {
+          "id": "7001",
+          "itemKey": "sku-21",
+          "productId": "11",
+          "skuId": "21",
+          "productName": "有机三只松鼠坚果礼盒",
+          "productImageUrl": "https://cdn.example.com/p/11.jpg",
+          "productKind": "physical",
+          "specText": "混合装|1000g",
+          "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+          "unitName": "盒",
+          "quantity": 2,
+          "unitPrice": "60.00",
+          "originalUnitPrice": "88.00",
+          "discountAmount": "10.00",
+          "totalAmount": "110.00",
+          "refundedQuantity": 0,
+          "shippedQuantity": 0
+        }
+      ],
+      "platform": "wechat-mini",
+      "user": {
+        "id": "2001",
+        "nickname": "张三",
+        "avatarUrl": "https://cdn.example.com/avatar/2001.jpg",
+        "phone": "13800138000"
+      },
+      "receiver": {
+        "addressId": "301",
+        "name": "张三",
+        "phone": "13800138000",
+        "province": "浙江省",
+        "city": "杭州市",
+        "district": "西湖区",
+        "detail": "文三路 100 号 3 单元 501",
+        "postCode": "310012"
+      },
+      "refundedAmount": "0.00",
+      "buyerRemark": "请在工作日送达",
+      "adminRemark": "已电话联系买家",
+      "invoiceStatus": null,
+      "paidAt": "2026-02-01T10:03:00+08:00",
+      "shippedAt": null,
+      "receivedAt": null,
+      "completedAt": null,
+      "cancelledAt": null,
+      "customForm": null,
+      "userCouponId": "9001",
+      "cancelReason": null,
+      "transactionNo": "4200001234202602011234567890",
+      "autoReceiveAt": null,
+      "shipments": [],
+      "refundIds": []
+    }
+  },
+  "GET /api/v1/staff/orders/:id/status-logs": {
+    "name": "ok",
+    "params": {
+      "id": "9001"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "5001",
+          "changeType": "shipped",
+          "fromStatus": "paid",
+          "toStatus": "shipped",
+          "message": "顺丰速运 SF1234567890123",
+          "operatorKind": "admin",
+          "operatorName": "超级管理员",
+          "createdAt": "2026-02-02T09:00:00+08:00"
+        }
+      ]
+    }
+  },
+  "GET /api/v1/staff/refunds/:id": {
+    "name": "ok",
+    "params": {
+      "id": "601"
+    },
+    "response": {
+      "id": "601",
+      "refundNo": "RF2602261300000601",
+      "orderId": "3001",
+      "orderNo": "SO2602261159001",
+      "kind": "return_and_refund",
+      "status": "applied",
+      "returnStage": "awaiting_shipment",
+      "quantity": 1,
+      "amount": "99.00",
+      "refundedAmount": "0.00",
+      "includesFreight": false,
+      "reason": "商品破损",
+      "rejectReason": null,
+      "items": [
+        {
+          "orderItemId": "7001",
+          "productName": "有机红富士苹果 5 斤装",
+          "productImageUrl": "https://cdn.example/p/apple.jpg",
+          "specText": "5 斤 / 箱",
+          "quantity": 1,
+          "amount": "99.00"
+        }
+      ],
+      "createdAt": "2026-02-26T13:00:00+08:00",
+      "succeededAt": null,
+      "userId": "77",
+      "userNickname": "小明",
+      "outRefundNo": "R2602261300000601C4D2",
+      "gatewayRefundId": null,
+      "paymentAttemptId": "5001",
+      "isAutomatic": false,
+      "adminRemark": null,
+      "lastError": null,
+      "reviewedByAdminId": null,
+      "reviewedAt": null,
+      "failedAt": null,
+      "cancelledAt": null,
+      "updatedAt": "2026-02-26T13:00:00+08:00",
+      "explanation": "收到时箱子被压坏，里面有三个苹果烂了",
+      "images": [
+        "https://cdn.example/u/77/refund-601-1.jpg"
+      ],
+      "returnExpressCompanyId": null,
+      "returnExpressCompanyName": null,
+      "returnTrackingNo": null,
+      "returnPhone": null,
+      "logs": [
+        {
+          "toStatus": "applied",
+          "message": "买家发起退款申请",
+          "createdAt": "2026-02-26T13:00:00+08:00"
+        }
+      ]
+    }
+  },
+  "GET /api/v1/staff/refunds": {
+    "name": "pending-review",
+    "query": {
+      "page": 1,
+      "pageSize": 20,
+      "status": "applied"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "601",
+          "refundNo": "RF2602261300000601",
+          "orderId": "3001",
+          "orderNo": "SO2602261159001",
+          "kind": "return_and_refund",
+          "status": "applied",
+          "returnStage": "awaiting_shipment",
+          "quantity": 1,
+          "amount": "99.00",
+          "refundedAmount": "0.00",
+          "includesFreight": false,
+          "reason": "商品破损",
+          "rejectReason": null,
+          "items": [
+            {
+              "orderItemId": "7001",
+              "productName": "有机红富士苹果 5 斤装",
+              "productImageUrl": "https://cdn.example/p/apple.jpg",
+              "specText": "5 斤 / 箱",
+              "quantity": 1,
+              "amount": "99.00"
+            }
+          ],
+          "createdAt": "2026-02-26T13:00:00+08:00",
+          "succeededAt": null,
+          "userId": "77",
+          "userNickname": "小明",
+          "outRefundNo": "R2602261300000601C4D2",
+          "gatewayRefundId": null,
+          "paymentAttemptId": "5001",
+          "isAutomatic": false,
+          "adminRemark": null,
+          "lastError": null,
+          "reviewedByAdminId": null,
+          "reviewedAt": null,
+          "failedAt": null,
+          "cancelledAt": null,
+          "updatedAt": "2026-02-26T13:00:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "POST /api/v1/staff/refunds/:id/review": {
+    "name": "approve",
+    "params": {
+      "id": "601"
+    },
+    "body": {
+      "decision": "approve"
+    },
+    "response": {
+      "id": "601",
+      "refundNo": "RF2602261300000601",
+      "orderId": "3001",
+      "orderNo": "SO2602261159001",
+      "kind": "return_and_refund",
+      "status": "approved",
+      "returnStage": "awaiting_shipment",
+      "quantity": 1,
+      "amount": "99.00",
+      "refundedAmount": "0.00",
+      "includesFreight": false,
+      "reason": "商品破损",
+      "rejectReason": null,
+      "items": [
+        {
+          "orderItemId": "7001",
+          "productName": "有机红富士苹果 5 斤装",
+          "productImageUrl": "https://cdn.example/p/apple.jpg",
+          "specText": "5 斤 / 箱",
+          "quantity": 1,
+          "amount": "99.00"
+        }
+      ],
+      "createdAt": "2026-02-26T13:00:00+08:00",
+      "succeededAt": null,
+      "userId": "77",
+      "userNickname": "小明",
+      "outRefundNo": "R2602261300000601C4D2",
+      "gatewayRefundId": null,
+      "paymentAttemptId": "5001",
+      "isAutomatic": false,
+      "adminRemark": null,
+      "lastError": null,
+      "reviewedByAdminId": null,
+      "reviewedAt": null,
+      "failedAt": null,
+      "cancelledAt": null,
+      "updatedAt": "2026-02-26T13:00:00+08:00",
+      "explanation": "收到时箱子被压坏，里面有三个苹果烂了",
+      "images": [
+        "https://cdn.example/u/77/refund-601-1.jpg"
+      ],
+      "returnExpressCompanyId": null,
+      "returnExpressCompanyName": null,
+      "returnTrackingNo": null,
+      "returnPhone": null,
+      "logs": [
+        {
+          "toStatus": "applied",
+          "message": "买家发起退款申请",
+          "createdAt": "2026-02-26T13:00:00+08:00"
+        }
+      ]
+    }
+  },
+  "POST /api/v1/staff/orders/:id/shipments": {
+    "name": "express",
+    "params": {
+      "id": "9001"
+    },
+    "body": {
+      "deliveryMode": "express",
+      "lines": [],
+      "expressCompanyId": "12",
+      "trackingNo": "SF1234567890123"
+    },
+    "response": {
+      "id": "4001",
+      "orderId": "9001",
+      "shipmentNo": "SH20260201100000001234",
+      "deliveryMode": "express",
+      "status": "dispatched",
+      "expressCompanyId": "12",
+      "expressCompanyName": "顺丰速运",
+      "trackingNo": "SF1234567890123",
+      "courierName": null,
+      "courierPhone": null,
+      "virtualContent": null,
+      "remark": null,
+      "dispatchedAt": "2026-02-02T09:00:00+08:00",
+      "deliveredAt": null,
+      "cancelledAt": null,
+      "lines": [
+        {
+          "orderItemId": "7001",
+          "itemKey": "sku-21",
+          "productName": "有机三只松鼠坚果礼盒",
+          "productImageUrl": "https://cdn.example.com/p/11.jpg",
+          "specText": "混合装|1000g",
+          "quantity": 2
+        }
+      ]
+    }
+  },
+  "GET /api/v1/staff/shipments/:id/tracking": {
+    "name": "in-transit",
+    "params": {
+      "id": "4001"
+    },
+    "response": {
+      "shipmentId": "4001",
+      "shipmentNo": "SH20260201100000001234",
+      "expressCompanyName": "顺丰速运",
+      "trackingNo": "SF1234567890123",
+      "available": true,
+      "state": "in_transit",
+      "traces": [
+        {
+          "at": "2026-02-02T09:30:00+08:00",
+          "context": "快件已从杭州转运中心发出"
+        },
+        {
+          "at": "2026-02-02T09:05:00+08:00",
+          "context": "顺丰速运 已收取快件"
+        }
+      ],
+      "queriedAt": "2026-02-02T12:00:00+08:00"
+    }
+  },
+  "GET /api/v1/staff/orders/:id/shipments": {
+    "name": "ok",
+    "params": {
+      "id": "9001"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "4001",
+          "orderId": "9001",
+          "shipmentNo": "SH20260201100000001234",
+          "deliveryMode": "express",
+          "status": "dispatched",
+          "expressCompanyId": "12",
+          "expressCompanyName": "顺丰速运",
+          "trackingNo": "SF1234567890123",
+          "courierName": null,
+          "courierPhone": null,
+          "virtualContent": null,
+          "remark": null,
+          "dispatchedAt": "2026-02-02T09:00:00+08:00",
+          "deliveredAt": null,
+          "cancelledAt": null,
+          "lines": [
+            {
+              "orderItemId": "7001",
+              "itemKey": "sku-21",
+              "productName": "有机三只松鼠坚果礼盒",
+              "productImageUrl": "https://cdn.example.com/p/11.jpg",
+              "specText": "混合装|1000g",
+              "quantity": 2
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "GET /api/v1/staff/statistics": {
+    "name": "ok",
+    "response": {
+      "pendingShipment": 12,
+      "pendingReceipt": 30,
+      "refunding": 2,
+      "today": {
+        "orderCount": 48,
+        "paidAmount": "5320.00"
+      },
+      "yesterday": {
+        "orderCount": 51,
+        "paidAmount": "6180.00"
+      },
+      "month": {
+        "orderCount": 902,
+        "paidAmount": "108400.00"
+      }
+    }
+  },
+  "POST /api/v1/orders/:id/payments": {
+    "name": "mini-program",
+    "params": {
+      "id": "3001"
+    },
+    "body": {
+      "channel": "wechat_mini"
+    },
+    "response": {
+      "attemptId": "5001",
+      "orderId": "3001",
+      "outTradeNo": "P2602261200003001A7F3",
+      "channel": "wechat_mini",
+      "amount": "99.00",
+      "status": "submitted",
+      "alreadyPaid": false,
+      "jsapi": {
+        "appId": "wx0000000000000001",
+        "timeStamp": "1767225600",
+        "nonceStr": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "package": "prepay_id=wx2612345678901234567890123456",
+        "signType": "RSA",
+        "paySign": "S3TJqKXZs2Yk0m6cM3s1J7xQd5r6Z0m0b4n3c2v1x9y8w7u6t5r4e3w2q1"
+      },
+      "h5Url": null,
+      "expiresAt": "2026-02-26T12:30:00+08:00"
+    }
+  },
+  "GET /api/v1/payments/:outTradeNo": {
+    "name": "paid",
+    "params": {
+      "outTradeNo": "P2602261200003001A7F3"
+    },
+    "response": {
+      "outTradeNo": "P2602261200003001A7F3",
+      "orderId": "3001",
+      "status": "paid",
+      "paid": true,
+      "paidAt": "2026-02-26T12:02:31+08:00"
+    }
+  },
+  "POST /api/v1/webhooks/wechat-pay": {
+    "name": "accepted",
+    "response": {
+      "code": "SUCCESS",
+      "message": "成功"
+    }
+  },
+  "POST /api/v1/webhooks/wechat-refund": {
+    "name": "refund-succeeded",
+    "response": {
+      "code": "SUCCESS",
+      "message": "成功"
+    }
+  },
+  "GET /api/v1/refunds/applicable-items": {
+    "name": "one-line",
+    "query": {
+      "orderId": "3001"
+    },
+    "response": {
+      "orderId": "3001",
+      "orderNo": "SO2602261159001",
+      "paidAmount": "99.00",
+      "refundedAmount": "0.00",
+      "refundableAmount": "99.00",
+      "freightAmount": "0.00",
+      "freightRefundable": false,
+      "items": [
+        {
+          "orderItemId": "7001",
+          "itemKey": "L1",
+          "productName": "有机红富士苹果 5 斤装",
+          "productImageUrl": "https://cdn.example/p/apple.jpg",
+          "specText": "5 斤 / 箱",
+          "quantity": 1,
+          "refundedQuantity": 0,
+          "shippedQuantity": 1,
+          "refundableQuantity": 1,
+          "unitPrice": "99.00",
+          "totalAmount": "99.00",
+          "refundableAmount": "99.00",
+          "blockedReason": null
+        }
+      ]
+    }
+  },
+  "POST /api/v1/refunds": {
+    "name": "return-and-refund",
+    "body": {
+      "orderId": "3001",
+      "kind": "return_and_refund",
+      "lines": [
+        {
+          "orderItemId": "7001",
+          "quantity": 1
+        }
+      ],
+      "reason": "商品破损",
+      "explanation": "收到时箱子被压坏，里面有三个苹果烂了",
+      "images": [
+        "https://cdn.example/u/77/refund-601-1.jpg"
+      ],
+      "includeFreight": false
+    },
+    "response": {
+      "id": "601",
+      "refundNo": "RF2602261300000601",
+      "orderId": "3001",
+      "orderNo": "SO2602261159001",
+      "kind": "return_and_refund",
+      "status": "applied",
+      "returnStage": "awaiting_shipment",
+      "quantity": 1,
+      "amount": "99.00",
+      "refundedAmount": "0.00",
+      "includesFreight": false,
+      "reason": "商品破损",
+      "rejectReason": null,
+      "items": [
+        {
+          "orderItemId": "7001",
+          "productName": "有机红富士苹果 5 斤装",
+          "productImageUrl": "https://cdn.example/p/apple.jpg",
+          "specText": "5 斤 / 箱",
+          "quantity": 1,
+          "amount": "99.00"
+        }
+      ],
+      "createdAt": "2026-02-26T13:00:00+08:00",
+      "succeededAt": null,
+      "explanation": "收到时箱子被压坏，里面有三个苹果烂了",
+      "images": [
+        "https://cdn.example/u/77/refund-601-1.jpg"
+      ],
+      "returnExpressCompanyId": null,
+      "returnExpressCompanyName": null,
+      "returnTrackingNo": null,
+      "returnPhone": null,
+      "returnAddress": null,
+      "logs": [
+        {
+          "toStatus": "applied",
+          "message": "买家发起退款申请",
+          "createdAt": "2026-02-26T13:00:00+08:00"
+        }
+      ]
+    }
+  },
+  "POST /api/v1/refunds/:id/cancel": {
+    "name": "withdrawn",
+    "params": {
+      "id": "601"
+    },
+    "body": {},
+    "response": {
+      "id": "601",
+      "refundNo": "RF2602261300000601",
+      "orderId": "3001",
+      "orderNo": "SO2602261159001",
+      "kind": "return_and_refund",
+      "status": "cancelled",
+      "returnStage": "awaiting_shipment",
+      "quantity": 1,
+      "amount": "99.00",
+      "refundedAmount": "0.00",
+      "includesFreight": false,
+      "reason": "商品破损",
+      "rejectReason": null,
+      "items": [
+        {
+          "orderItemId": "7001",
+          "productName": "有机红富士苹果 5 斤装",
+          "productImageUrl": "https://cdn.example/p/apple.jpg",
+          "specText": "5 斤 / 箱",
+          "quantity": 1,
+          "amount": "99.00"
+        }
+      ],
+      "createdAt": "2026-02-26T13:00:00+08:00",
+      "succeededAt": null,
+      "explanation": "收到时箱子被压坏，里面有三个苹果烂了",
+      "images": [
+        "https://cdn.example/u/77/refund-601-1.jpg"
+      ],
+      "returnExpressCompanyId": null,
+      "returnExpressCompanyName": null,
+      "returnTrackingNo": null,
+      "returnPhone": null,
+      "returnAddress": null,
+      "logs": [
+        {
+          "toStatus": "applied",
+          "message": "买家发起退款申请",
+          "createdAt": "2026-02-26T13:00:00+08:00"
+        },
+        {
+          "toStatus": "cancelled",
+          "message": "买家撤销申请",
+          "createdAt": "2026-02-26T13:10:00+08:00"
+        }
+      ]
+    }
+  },
+  "DELETE /api/v1/refunds/:id": {
+    "name": "hidden",
+    "params": {
+      "id": "601"
+    },
+    "response": {
+      "deleted": true
+    }
+  },
+  "GET /api/v1/refunds/:id": {
+    "name": "applied",
+    "params": {
+      "id": "601"
+    },
+    "response": {
+      "id": "601",
+      "refundNo": "RF2602261300000601",
+      "orderId": "3001",
+      "orderNo": "SO2602261159001",
+      "kind": "return_and_refund",
+      "status": "applied",
+      "returnStage": "awaiting_shipment",
+      "quantity": 1,
+      "amount": "99.00",
+      "refundedAmount": "0.00",
+      "includesFreight": false,
+      "reason": "商品破损",
+      "rejectReason": null,
+      "items": [
+        {
+          "orderItemId": "7001",
+          "productName": "有机红富士苹果 5 斤装",
+          "productImageUrl": "https://cdn.example/p/apple.jpg",
+          "specText": "5 斤 / 箱",
+          "quantity": 1,
+          "amount": "99.00"
+        }
+      ],
+      "createdAt": "2026-02-26T13:00:00+08:00",
+      "succeededAt": null,
+      "explanation": "收到时箱子被压坏，里面有三个苹果烂了",
+      "images": [
+        "https://cdn.example/u/77/refund-601-1.jpg"
+      ],
+      "returnExpressCompanyId": null,
+      "returnExpressCompanyName": null,
+      "returnTrackingNo": null,
+      "returnPhone": null,
+      "returnAddress": null,
+      "logs": [
+        {
+          "toStatus": "applied",
+          "message": "买家发起退款申请",
+          "createdAt": "2026-02-26T13:00:00+08:00"
+        }
+      ]
+    }
+  },
+  "GET /api/v1/refunds": {
+    "name": "all",
+    "query": {
+      "page": 1,
+      "pageSize": 20,
+      "state": "all"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "601",
+          "refundNo": "RF2602261300000601",
+          "orderId": "3001",
+          "orderNo": "SO2602261159001",
+          "kind": "return_and_refund",
+          "status": "applied",
+          "returnStage": "awaiting_shipment",
+          "quantity": 1,
+          "amount": "99.00",
+          "refundedAmount": "0.00",
+          "includesFreight": false,
+          "reason": "商品破损",
+          "rejectReason": null,
+          "items": [
+            {
+              "orderItemId": "7001",
+              "productName": "有机红富士苹果 5 斤装",
+              "productImageUrl": "https://cdn.example/p/apple.jpg",
+              "specText": "5 斤 / 箱",
+              "quantity": 1,
+              "amount": "99.00"
+            }
+          ],
+          "createdAt": "2026-02-26T13:00:00+08:00",
+          "succeededAt": null
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "GET /api/v1/refund-reasons": {
+    "name": "default",
+    "response": {
+      "items": [
+        "不想要了",
+        "商品破损",
+        "与描述不符",
+        "少件/漏发",
+        "质量问题",
+        "其他"
+      ]
+    }
+  },
+  "POST /api/v1/refunds/:id/return-shipment": {
+    "name": "shipped-back",
+    "params": {
+      "id": "601"
+    },
+    "body": {
+      "expressCompanyId": "4",
+      "trackingNo": "SF1234567890123",
+      "phone": "13800000000"
+    },
+    "response": {
+      "id": "601",
+      "refundNo": "RF2602261300000601",
+      "orderId": "3001",
+      "orderNo": "SO2602261159001",
+      "kind": "return_and_refund",
+      "status": "approved",
+      "returnStage": "shipped_back",
+      "quantity": 1,
+      "amount": "99.00",
+      "refundedAmount": "0.00",
+      "includesFreight": false,
+      "reason": "商品破损",
+      "rejectReason": null,
+      "items": [
+        {
+          "orderItemId": "7001",
+          "productName": "有机红富士苹果 5 斤装",
+          "productImageUrl": "https://cdn.example/p/apple.jpg",
+          "specText": "5 斤 / 箱",
+          "quantity": 1,
+          "amount": "99.00"
+        }
+      ],
+      "createdAt": "2026-02-26T13:00:00+08:00",
+      "succeededAt": null,
+      "explanation": "收到时箱子被压坏，里面有三个苹果烂了",
+      "images": [
+        "https://cdn.example/u/77/refund-601-1.jpg"
+      ],
+      "returnExpressCompanyId": "4",
+      "returnExpressCompanyName": "顺丰速运",
+      "returnTrackingNo": "SF1234567890123",
+      "returnPhone": "13800000000",
+      "returnAddress": {
+        "name": "售后仓",
+        "phone": "020-88888888",
+        "address": "广东省广州市天河区 xx 路 1 号"
+      },
+      "logs": [
+        {
+          "toStatus": "applied",
+          "message": "买家发起退款申请",
+          "createdAt": "2026-02-26T13:00:00+08:00"
+        }
+      ]
+    }
+  },
+  "POST /api/v1/attachments/scan-uploads/:token": {
+    "name": "from-the-phone",
+    "params": {
+      "token": "sJ9vQx2mR7pL4nT8wK1cF6hB3dZ5aY0e"
+    },
+    "response": {
+      "attachment": {
+        "id": "100",
+        "categoryId": "7",
+        "url": "/uploads/attachment/2026/09/2f8c1d9b4a7e4c1f9d0b6a3e5c2f7a10.png",
+        "name": "首页 banner",
+        "originalName": "banner.png",
+        "kind": "image",
+        "mime": "image/png",
+        "size": 48213,
+        "width": 750,
+        "height": 390,
+        "durationMs": null,
+        "driver": "local",
+        "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        "createdAt": "2026-09-21T15:20:00+08:00"
+      },
+      "deduped": false
+    }
+  },
+  "POST /api/v1/uploads": {
+    "name": "review-photo",
+    "query": {
+      "purpose": "review"
+    },
+    "response": {
+      "url": "/uploads/review/2026/09/7c3a1f8e9d2b4a6c8e0f1a2b3c4d5e6f.jpg",
+      "name": "7c3a1f8e9d2b4a6c8e0f1a2b3c4d5e6f.jpg",
+      "mime": "image/jpeg",
+      "size": 208431,
+      "width": 1080,
+      "height": 1440
+    }
+  },
+  "GET /api/v1/agreements/:key": {
+    "name": "user",
+    "params": {
+      "key": "user"
+    },
+    "response": {
+      "key": "user",
+      "title": "用户服务协议",
+      "content": "<p>欢迎使用本商城……</p>",
+      "updatedAt": "2026-09-20T18:30:00+08:00"
+    }
+  }
+}

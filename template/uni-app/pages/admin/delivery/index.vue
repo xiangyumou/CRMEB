@@ -245,15 +245,9 @@ import {
   orderExportTemp,
   orderDeliveryInfo,
   orderOrderDelivery,
-  orderSplitInfo,
-  orderSplitDelivery,
 } from "@/api/admin";
-import splitOrder from "../components/splitOrder";
 export default {
   name: "GoodsDeliver",
-  components: {
-    splitOrder,
-  },
   props: {},
   data: function () {
     return {
@@ -352,15 +346,7 @@ export default {
       this.delivery_type = 3;
       this.active = 2;
     }
-    if (
-      option.orderStatus == 8 ||
-      option.orderStatus == 4 ||
-      option.orderStatus == 9
-    ) {
-      this.curGoods = 1;
-      this.orderGoods.pop();
-      this.splitList();
-    }
+    // 拆单发货已下线（合约里没有对应路由），分单开关永远是关的。
     this.getIndex();
     this.getLogistics();
     this.orderDeliveryInfo();
@@ -382,29 +368,7 @@ export default {
       });
       this.cartIds = cartIds;
     },
-    splitList() {
-      orderSplitInfo(this.listId)
-        .then((res) => {
-          let list = res.data;
-          list.forEach((item) => {
-            item.checked = false;
-            item.numShow = item.surplus_num;
-          });
-          this.splitGoods = list;
-        })
-        .catch((err) => {
-          return this.$util.Tips({
-            title: err,
-          });
-        });
-    },
     // 点击获取拆单列表
-    changeGoods() {
-      this.curGoods = this.curGoods ? 0 : 1;
-      if (this.curGoods) {
-        this.splitList();
-      }
-    },
     // 扫描快递单号一维码
     scanCode() {
       // #ifdef MP
@@ -495,6 +459,7 @@ export default {
         save = {};
       save.delivery_type = delivery_type;
       save.delivery_code = that.logistics[that.seIndex].code;
+      save.delivery_company_id = that.logistics[that.seIndex].id;
       save.delivery_name = that.logistics[that.seIndex].name;
       save.type = that.active + 1;
       if (delivery_type == 1 && this.curExpress == 1) {
@@ -505,11 +470,7 @@ export default {
         }
         save.express_record_type = that.curExpress;
         save.delivery_id = delivery_id;
-        if (that.curGoods) {
-          that.setSplitInfo(save);
-        } else {
-          that.setInfo(save);
-        }
+        that.setInfo(save);
       }
 
       if (delivery_type == 1 && this.curExpress == 2) {
@@ -543,11 +504,7 @@ export default {
         save.to_tel = that.to_tel;
         save.to_addr = that.to_addr;
         save.express_temp_id = that.expTemp[that.expIndex].temp_id;
-        if (that.curGoods) {
-          that.setSplitInfo(save);
-        } else {
-          that.setInfo(save);
-        }
+        that.setInfo(save);
       }
       if (delivery_type == 2) {
         if (!that.postPeople.length) {
@@ -561,21 +518,13 @@ export default {
         params.sh_delivery_name = obj.wx_name;
         params.sh_delivery_id = obj.phone;
         params.sh_delivery_uid = obj.uid;
-        if (that.curGoods) {
-          that.setSplitInfo(params);
-        } else {
-          that.setInfo(params);
-        }
+        that.setInfo(params);
       }
       if (delivery_type == 3) {
         let params = {};
         params.type = that.delivery_type;
         params.fictitious_content = that.fictitious_content;
-        if (that.curGoods) {
-          that.setSplitInfo(params);
-        } else {
-          that.setInfo(params);
-        }
+        that.setInfo(params);
       }
     },
     setInfo: function (item) {
@@ -605,38 +554,6 @@ export default {
           });
         }
       );
-    },
-    setSplitInfo(item) {
-      if (!this.cartIds.length) {
-        return this.$util.Tips({
-          title: "请选择发货商品",
-        });
-      }
-      item.cart_ids = this.cartIds;
-      orderSplitDelivery(this.delivery.id, item)
-        .then((res) => {
-          this.$util.Tips({
-            title: res.msg,
-            icon: "success",
-            mask: true,
-          });
-          setTimeout((res) => {
-            if (this.comeType == 2) {
-              uni.navigateTo({
-                url: "/pages/admin/orderDetail/index?id=" + this.order_id,
-              });
-            } else {
-              uni.navigateTo({
-                url: "/pages/admin/orderList/index?types=1",
-              });
-            }
-          }, 2000);
-        })
-        .catch((err) => {
-          this.$util.Tips({
-            title: err,
-          });
-        });
     },
     bindPickerChange(e) {
       this.seIndex = e.detail.value;

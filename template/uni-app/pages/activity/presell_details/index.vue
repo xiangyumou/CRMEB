@@ -242,8 +242,7 @@
 		postCartAdd
 	} from '@/api/store.js';
 	import {
-		getUserInfo,
-		userShare
+		getUserInfo
 	} from '@/api/user.js';
 	import {
 		getCoupons
@@ -472,7 +471,6 @@
 		onShareAppMessage: function() {
 			let that = this;
 			that.$set(that, 'actionSheetHidden', !that.actionSheetHidden);
-			userShare();
 			return {
 				title: that.storeInfo.store_name || '',
 				imageUrl: that.storeInfo.image || '',

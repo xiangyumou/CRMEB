@@ -13,7 +13,6 @@ import {
 	checkLogin
 } from './login';
 import {
-	login,
 	routineLogin,
 	silenceAuth
 } from '../api/public';

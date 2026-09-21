@@ -256,7 +256,7 @@ import {
   postCartAdd,
   realPrice,
 } from "@/api/store.js";
-import { getUserInfo, userShare } from "@/api/user.js";
+import { getUserInfo } from "@/api/user.js";
 import { getCoupons, getThemeInfo } from "@/api/api.js";
 import { getCartCounts } from "@/api/order.js";
 import { toLogin } from "@/libs/login.js";
@@ -498,7 +498,6 @@ export default {
   onShareAppMessage: function () {
     let that = this;
     that.$set(that, "actionSheetHidden", !that.actionSheetHidden);
-    userShare();
     return {
       title: that.storeInfo.store_name || "",
       imageUrl: that.storeInfo.image || "",
@@ -507,7 +506,6 @@ export default {
   },
   onShareTimeline() {
     let that = this;
-    userShare();
     return {
       title: that.storeInfo.store_name,
       query: {

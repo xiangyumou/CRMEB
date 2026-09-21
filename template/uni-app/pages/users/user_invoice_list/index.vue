@@ -6,9 +6,13 @@
 		</view>
 		<view v-show="nav === 1" class="record-wrapper">
 			<view v-for="item in orderList" :key="item.id" class="item">
-				<view class="item-hd acea-row">
+				<!-- 发票合约里没有订单明细，只有金额；有行数据时才画缩略图。 -->
+				<view class="item-hd acea-row" v-if="item.order.cartInfo.length">
 					<image class="image" :src="item.order.cartInfo[0].productInfo.image"></image>
-					<view class="text">{{ item.order.cartInfo[0].productInfo.store_name + item.order.cartInfo[0].productInfo.attrInfo.suk || '' }}</view>
+					<view class="text">{{ item.order.cartInfo[0].productInfo.store_name }}</view>
+				</view>
+				<view class="item-hd acea-row" v-else>
+					<view class="text">{{ $t(`订单号`) }} {{ item.order.order_no }}</view>
 				</view>
 				<view class="item-bd acea-row row-between-wrapper">
 					<view>
@@ -23,8 +27,8 @@
 				<view class="item-ft acea-row row-between-wrapper">
 					<view>{{ item.is_invoice ? $t(`已开票`) : $t(`未开票`) }}</view>
 					<view class="acea-row row-center-wrapper">
-						<view class="link mr20" @click="getInvoiceLink(item.id)" v-if="item.is_invoice == 1 && item.unique_num != '' && item.red_invoice_num == ''">复制</view>
-						<navigator class="link" :url="`/pages/users/user_invoice_order/index?order_id=${item.order.order_id}`">{{ $t(`查看详情`) }}</navigator>
+						<view class="link mr20" @click="copyInvoiceNumber(item.invoice_number)" v-if="item.is_invoice == 1 && item.invoice_number">复制</view>
+						<navigator class="link" :url="`/pages/users/user_invoice_order/index?order_id=${item.id}`">{{ $t(`查看详情`) }}</navigator>
 					</view>
 				</view>
 			</view>
@@ -83,7 +87,7 @@
 import home from '@/components/home';
 import { mapGetters } from 'vuex';
 import { invoiceList, invoiceDelete, getUserInfo } from '@/api/user.js';
-import { orderInvoiceList, getInvoiceLink } from '@/api/order.js';
+import { orderInvoiceList } from '@/api/order.js';
 import colors from '@/mixins/color.js';
 import { HTTP_REQUEST_URL } from '@/config/app';
 export default {
@@ -130,18 +134,14 @@ export default {
 		this.getUserInfo();
 	},
 	methods: {
-		getInvoiceLink(id) {
-			uni.showLoading({
-				title: '复制中'
-			});
-			getInvoiceLink(id).then((res) => {
-				uni.setClipboardData({
-					data: res.data.downloadBase64.pdfUrl,
-					success: () =>
-						uni.showToast({
-							title: '链接已复制'
-						})
-				});
+		// 发票是人工开的，系统里只有发票号，没有下载地址。
+		copyInvoiceNumber(number) {
+			uni.setClipboardData({
+				data: String(number || ''),
+				success: () =>
+					uni.showToast({
+						title: '发票号已复制'
+					})
 			});
 		},
 		getUserInfo() {

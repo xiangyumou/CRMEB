@@ -78,7 +78,7 @@
 <script>
 import dayjs from '@/plugin/dayjs/dayjs.min.js';
 import sendVerifyCode from '@/mixins/SendVerifyCode';
-import { loginH5, loginMobile, registerVerify, register, getCodeApi, getUserInfo, appleLogin } from '@/api/user';
+import { loginH5, loginMobile, registerVerify, register, getCodeApi, getUserInfo } from '@/api/user';
 import attrs, { required, alpha_num, chs_phone } from '@/utils/validate';
 import { getLogo } from '@/api/public';
 // import cookie from "@/utils/store/cookie";
@@ -205,53 +205,9 @@ export default {
 			});
 		},
 		// 苹果登录Api
+		// 原生 App（含苹果登录）已下线，这个分支在 H5 / 小程序里不可达。
 		appleLoginApi() {
-			let self = this;
-			appleLogin({
-				openId: self.appleUserInfo.openId,
-				email: self.appleUserInfo.email || '',
-				phone: this.account,
-				captcha: this.captcha
-			})
-				.then(({ data }) => {
-					if (data.isbind) {
-						uni.showModal({
-							title: self.$t(`提示`),
-							content: self.$t(`请绑定手机号后，继续操作`),
-							showCancel: false,
-							success: function (res) {
-								if (res.confirm) {
-									self.current = 1;
-									self.appleLoginStatus = true;
-								}
-							}
-						});
-					} else {
-						self.$store.commit('LOGIN', {
-							token: data.token,
-							time: data.expires_time - self.$Cache.time()
-						});
-						let backUrl = self.$Cache.get(BACK_URL) || '/pages/index/index';
-						self.$Cache.clear(BACK_URL);
-						self.$store.commit('SETUID', data.userInfo.uid);
-						uni.reLaunch({
-							url: backUrl
-						});
-					}
-				})
-				.catch((error) => {
-					uni.showModal({
-						title: self.$t(`提示`),
-						content: self.$t(`错误信息`) + `${error}`,
-						success: function (res) {
-							if (res.confirm) {
-								console.log(self.$t(`用户点击确定`));
-							} else if (res.cancel) {
-								console.log(self.$t(`用户点击取消`));
-							}
-						}
-					});
-				});
+			return this.$util.Tips({ title: 'App 登录已下线' });
 		},
 		// App微信登录
 		wxLogin() {

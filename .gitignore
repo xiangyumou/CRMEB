@@ -25,6 +25,7 @@ crmeb/public/uploads/*
 /template/admin/node_modules/
 /template/uni-app/node_modules/
 /template/uni-app/unpackage/
+/template/uni-app/dist/
 /.build/
 /deployment/
 /data/

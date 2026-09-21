@@ -59,7 +59,6 @@
 
 <script>
 import commonWrapper from "./commonWrapper.vue";
-import { follow } from "@/api/api.js";
 import { getSubscribe } from "@/api/public";
 // #ifdef H5
 import Auth from "@/libs/wechat";

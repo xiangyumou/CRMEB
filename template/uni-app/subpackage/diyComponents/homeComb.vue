@@ -201,7 +201,7 @@
 <script>
 import commonWrapper from "./commonWrapper.vue";
 import { getCategoryList } from "@/api/store.js";
-import { getCategoryVersion } from "@/api/api.js";
+import { getCategoryVersion } from "@/api/public";
 let statusBarHeight = uni.getWindowInfo().statusBarHeight;
 export default {
   components: { commonWrapper },

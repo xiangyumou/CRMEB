@@ -522,17 +522,6 @@
         <view
           class="bnt delivery"
           v-if="
-            orderInfo.status == 0 &&
-            orderInfo.paid === 0 &&
-            orderInfo.is_cancel === 0
-          "
-          @click="confirmShow = true"
-        >
-          确认付款
-        </view>
-        <view
-          class="bnt delivery"
-          v-if="
             types == 1 &&
             orderInfo.shipping_type === 1 &&
             (orderInfo.pinkStatus === null || orderInfo.pinkStatus === 2)
@@ -584,7 +573,6 @@ import {
   setAdminOrderPrice,
   setAdminRefundRemark,
   setAdminOrderRemark,
-  setOfflinePay,
   setOrderRefund,
   getUserInfo,
 } from "@/api/admin";
@@ -784,6 +772,7 @@ export default {
           });
         }
         data.price = price;
+        data.pay_price = that.orderInfo.pay_price;
         setAdminOrderPrice(data)
           .then((res) => {
             that.change = false;
@@ -853,25 +842,6 @@ export default {
           },
         );
       }
-    },
-    offlinePay: function () {
-      setOfflinePay({
-        order_id: this.orderInfo.order_id,
-      }).then(
-        (res) => {
-          this.confirmShow = false;
-          this.$util.Tips({
-            title: res.msg,
-            icon: "success",
-          });
-          this.getIndex();
-        },
-        (err) => {
-          this.$util.Tips({
-            title: err,
-          });
-        },
-      );
     },
     copyNum(id) {
       uni.setClipboardData({

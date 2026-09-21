@@ -13,7 +13,6 @@ import {
 } from "@/api/store.js";
 import {
   scombinationCode, // 拼团code
-  seckillCode, // 秒杀
 } from "@/api/activity.js";
 import i18n from "../utils/lang.js";
 let sysHeight = uni.getWindowInfo().statusBarHeight + "px";
@@ -134,8 +133,6 @@ export const sharePoster = {
       let met =
         type === "scombination"
           ? scombinationCode(that.id)
-          : type === "seckill"
-          ? seckillCode(that.id, { time_id: this.time_id })
           : getProductCode(that.id);
       met
         .then((res) => {

@@ -131,7 +131,6 @@
 		getAdminOrderList,
 		setAdminOrderPrice,
 		setAdminRefundRemark,
-		setOfflinePay,
 		setOrderRefund,
 		agreeExpress,
 		adminRefundList,
@@ -352,6 +351,7 @@ import home from '@/components/home';
 						});
 					}
 					data.price = price;
+					data.pay_price = that.orderInfo.pay_price;
 					setAdminOrderPrice(data).then(
 						res => {
 							that.change = false;
@@ -449,23 +449,6 @@ import home from '@/components/home';
 				uni.navigateTo({
 					url: `/pages/admin/refund_order_detail/index?id=${item.order_id}`
 				})
-			},
-			offlinePay: function(item) {
-				if (this.openErp) return
-				setOfflinePay({
-					order_id: item.order_id
-				}).then(
-					res => {
-						this.$util.Tips({
-							title: res.msg,
-							icon: "success"
-						});
-						this.init();
-					},
-					error => {
-						this.$util.Tips(error);
-					}
-				);
 			},
 			dateChange(value) {
 				this.filterShow = false;

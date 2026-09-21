@@ -3,8 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build:h5": "UNI_PLATFORM=h5 vue-cli-service uni-build",
-    "build:mp-weixin": "UNI_PLATFORM=mp-weixin vue-cli-service uni-build"
+    "build:h5": "UNI_PLATFORM=h5 UNI_INPUT_DIR=. NODE_OPTIONS=\"--openssl-legacy-provider --require ./scripts/node-compat.cjs\" vue-cli-service uni-build",
+    "build:mp-weixin": "UNI_PLATFORM=mp-weixin UNI_INPUT_DIR=. NODE_OPTIONS=\"--openssl-legacy-provider --require ./scripts/node-compat.cjs\" vue-cli-service uni-build",
+    "check:routes": "node scripts/check-api-routes.mjs",
+    "report:fields": "node scripts/extract-page-fields.mjs",
+    "fixtures": "node scripts/dump-contract-examples.mjs",
+    "test": "../../next/packages/contracts/node_modules/.bin/vitest run --globals --root ."
   },
   "dependencies": {
     "@dcloudio/uni-app": "2.0.2-5020420260813001",

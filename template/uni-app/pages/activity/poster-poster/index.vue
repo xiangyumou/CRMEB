@@ -34,7 +34,7 @@
 
 <script>
 import zbCode from '@/components/zb-code/zb-code.vue';
-import { getBargainPoster, getCombinationPoster, getBargainPosterData, getCombinationPosterData } from '@/api/activity.js';
+import { getCombinationPosterData } from '@/api/activity.js';
 import { getUserInfo, imgToBase, routineCode } from '@/api/user.js';
 import colors from '@/mixins/color.js';
 export default {
@@ -217,29 +217,16 @@ export default {
 				title: that.$t(`海报生成中`),
 				mask: true
 			});
-			if (that.type == 1) {
-				await getBargainPosterData(that.id)
-					.then((res) => {
-						resData = res.data;
-					})
-					.catch((err) => {
-						that.$util.Tips({
-							title: that.$t(`海报图片获取失败`)
-						});
-						return;
+			await getCombinationPosterData(that.id)
+				.then((res) => {
+					resData = res.data;
+				})
+				.catch((err) => {
+					that.$util.Tips({
+						title: that.$t(`海报图片获取失败`)
 					});
-			} else {
-				await getCombinationPosterData(that.id)
-					.then((res) => {
-						resData = res.data;
-					})
-					.catch((err) => {
-						that.$util.Tips({
-							title: that.$t(`海报图片获取失败`)
-						});
-						return;
-					});
-			}
+					return;
+				});
 
 			// #ifdef H5
 			let imgData = await this.imgToBase(resData.image, resData.url);

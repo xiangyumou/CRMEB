@@ -75,15 +75,6 @@
 							{{$t(`点击更换手机号码`)}}<text class="iconfont icon-xiangyou"></text>
 						</navigator>
 					</view>
-					<view class="item acea-row row-between-wrapper" v-if="array.length">
-						<view>{{$t(`语言切换`)}}</view>
-						<view class="uni-list-cell-db">
-							<picker @change="bindPickerChange" range-key="name" :value="setIndex" :range="array">
-								<view class="uni-input input">{{array[setIndex].name}}<text
-										class="iconfont icon-xiangyou"></text></view>
-							</picker>
-						</view>
-					</view>
 					<view class="item acea-row row-between-wrapper">
 						<view>{{$t(`地址管理`)}}</view>
 						<navigator url="/pages/users/user_address_list/index" hover-class="none" class="input">
@@ -137,8 +128,6 @@
 		getUserInfo,
 		userEdit,
 		getLogout,
-		getLangList,
-		getLangJson,
 		mpBindingPhone
 	} from '@/api/user.js';
 	import {
@@ -157,7 +146,6 @@
 	// #endif
 	import Cache from '@/utils/cache';
 	import colors from '@/mixins/color.js';
-	import appUpdate from "@/components/update/app-update.vue";
 	export default {
 		components: {
 			// #ifdef MP
@@ -178,8 +166,6 @@
 				canvasStatus: false,
 				fileSizeString: '',
 				version: '',
-				array: [],
-				setIndex: 0,
 				mp_is_new: this.$Cache.get('MP_VERSION_ISNEW') || false
 			};
 		},
@@ -197,18 +183,11 @@
 		onLoad() {
 			if (this.isLogin) {
 				this.getUserInfo();
-				this.getLangList()
 			} else {
 				toLogin();
 			}
 		},
 		methods: {
-			getLangList() {
-				getLangList().then(res => {
-					this.array = res.data
-					this.setLang();
-				})
-			},
 			isNew() {
 				this.$util.Tips({
 					title: this.$t(`当前为最新版本`)
@@ -239,29 +218,6 @@
 							uni.hideLoading();
 						});
 				}
-			},
-			setLang() {
-				this.array.map((item, i) => {
-					if (this.$i18n.locale == item.value) {
-						this.setIndex = i
-					}
-				})
-			},
-			bindPickerChange(e, item) {
-				this.setIndex = e.detail.value
-				Cache.set('locale', this.array[this.setIndex].value)
-				getLangJson().then(res => {
-					uni.setStorageSync('localeJson', res.data);
-					this.$i18n.setLocaleMessage(this.array[this.setIndex].value, res.data[this.array[
-						this.setIndex].value]);
-					this.$nextTick(e => {
-						this.$i18n.locale = this.array[this.setIndex].value;
-					})
-				})
-			},
-
-			updateApp() {
-				this.$refs.appUpdate.update(); //调用子组件 检查更新
 			},
 			formatSize() {
 				let that = this;
@@ -440,7 +396,7 @@
 			uploadpic: function() {
 				let that = this;
 				this.canvasStatus = true
-				that.$util.uploadImageChange('upload/image', (res) => {
+				that.$util.uploadImageChange({ purpose: 'avatar' }, (res) => {
 					let userInfo = that.switchUserInfo[that.userIndex];
 					if (userInfo !== undefined) {
 						that.userInfo.avatar = res.data.url;
@@ -460,7 +416,7 @@
 				const {
 					avatarUrl
 				} = e.detail
-				this.$util.uploadImgs('upload/image', avatarUrl, (res) => {
+				this.$util.uploadImgs('avatar', avatarUrl, (res) => {
 					this.userInfo.avatar = res.data.url
 				}, (err) => {
 					console.log(err)

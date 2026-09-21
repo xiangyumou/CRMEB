@@ -8,10 +8,79 @@
 // | Author: CRMEB Team <admin@crmeb.com>
 // +----------------------------------------------------------------------
 
-import { TOKENNAME, HTTP_REQUEST_URL } from "../config/app.js";
+import {
+  TOKENNAME,
+  HTTP_REQUEST_URL,
+  API_PREFIX,
+  clientPlatform,
+} from "../config/app.js";
 import store from "../store";
 import i18n from "./lang.js";
 import { pathToBase64 } from "@/plugin/image-tools/index.js";
+import { toLegacyUpload, uploadPurposeFor } from "../api/mappers/system.js";
+
+/**
+ * `POST /api/v1/uploads?purpose=…`
+ *
+ * `uni.uploadFile` cannot send a JSON body, so it is the one caller that does not go
+ * through `utils/request.js`. It follows the same contract all the same: a real HTTP
+ * status, a `{code, message}` error body, and a resolved value shaped like the one
+ * `request.js` produces, so callers keep reading `res.data.url`.
+ */
+function uploadTo(opt, filePath, successCallback, errorCallback) {
+  const purpose = uploadPurposeFor(opt.purpose || opt.url);
+  const token = store.state.app.token;
+  const header = {
+    // #ifdef MP
+    "Content-Type": "multipart/form-data",
+    // #endif
+    Accept: "application/json",
+    "X-Client-Platform": clientPlatform(),
+  };
+  if (token) header[TOKENNAME] = "Bearer " + token;
+  return new Promise((resolve) => {
+    uni.uploadFile({
+      url: HTTP_REQUEST_URL + API_PREFIX + "/uploads?purpose=" + purpose,
+      filePath: filePath,
+      fileType: opt.fileType || "image",
+      name: "file",
+      header: header,
+      success: function (res) {
+        uni.hideLoading();
+        let body = {};
+        try {
+          body = res.data ? JSON.parse(res.data) : {};
+        } catch (e) {
+          body = {};
+        }
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          const value = { data: toLegacyUpload(body), msg: "", status: 200 };
+          successCallback && successCallback(value);
+          return resolve(value);
+        }
+        const message = body.message || i18n.t(`上传图片失败`);
+        const failure = {
+          status: res.statusCode,
+          code: body.code || "UPLOAD_FAILED",
+          message: message,
+          msg: message,
+        };
+        errorCallback && errorCallback(failure);
+        uni.showToast({ icon: "none", title: message });
+        return resolve(failure);
+      },
+      fail: function () {
+        uni.hideLoading();
+        const message = i18n.t(`上传图片失败`);
+        const failure = { status: 0, code: "NETWORK", message: message, msg: message };
+        errorCallback && errorCallback(failure);
+        uni.showToast({ icon: "none", title: message });
+        return resolve(failure);
+      },
+    });
+  });
+}
+
 export default {
   /**
    * opt  object | string
@@ -530,45 +599,7 @@ export default {
         uni.showLoading({
           title: i18n.t(`图片上传中`),
         });
-        uni.uploadFile({
-          url: HTTP_REQUEST_URL + "/api/" + uploadUrl,
-          filePath: res.tempFilePaths[0],
-          fileType: fileType,
-          name: inputName,
-          formData: {
-            filename: inputName,
-          },
-          header: {
-            // #ifdef MP
-            "Content-Type": "multipart/form-data",
-            // #endif
-            [TOKENNAME]: "Bearer " + store.state.app.token,
-          },
-          success: function (res) {
-            uni.hideLoading();
-            if (res.statusCode == 403) {
-              that.Tips({
-                title: res.data,
-              });
-            } else {
-              let data = res.data ? JSON.parse(res.data) : {};
-              if (data.status == 200) {
-                successCallback && successCallback(data);
-              } else {
-                errorCallback && errorCallback(data);
-                that.Tips({
-                  title: data.msg,
-                });
-              }
-            }
-          },
-          fail: function (res) {
-            uni.hideLoading();
-            that.Tips({
-              title: i18n.t(`上传图片失败`),
-            });
-          },
-        });
+        uploadTo(opt, res.tempFilePaths[0], successCallback, errorCallback);
       },
     });
   },
@@ -659,45 +690,7 @@ export default {
     });
 
     function uploadImg(filePath) {
-      uni.uploadFile({
-        url: HTTP_REQUEST_URL + "/api/" + uploadUrl,
-        filePath,
-        fileType: fileType,
-        name: inputName,
-        formData: {
-          filename: inputName,
-        },
-        header: {
-          // #ifdef MP
-          "Content-Type": "multipart/form-data",
-          // #endif
-          [TOKENNAME]: "Bearer " + store.state.app.token,
-        },
-        success: function (res) {
-          uni.hideLoading();
-          if (res.statusCode == 403) {
-            that.Tips({
-              title: res.data,
-            });
-          } else {
-            let data = res.data ? JSON.parse(res.data) : {};
-            if (data.status == 200) {
-              successCallback && successCallback(data);
-            } else {
-              errorCallback && errorCallback(data);
-              that.Tips({
-                title: data.msg,
-              });
-            }
-          }
-        },
-        fail: function (res) {
-          uni.hideLoading();
-          that.Tips({
-            title: i18n.t(`上传图片失败`),
-          });
-        },
-      });
+      uploadTo(opt, filePath, successCallback, errorCallback);
     }
   },
   /**
@@ -708,46 +701,7 @@ export default {
    * @param errorCallback err回调
    */
   uploadImgs(uploadUrl, filePath, successCallback, errorCallback) {
-    let that = this;
-    uni.uploadFile({
-      url: HTTP_REQUEST_URL + "/api/" + uploadUrl,
-      filePath: filePath,
-      fileType: "image",
-      name: "pics",
-      formData: {
-        filename: "pics",
-      },
-      header: {
-        // #ifdef MP
-        "Content-Type": "multipart/form-data",
-        // #endif
-        [TOKENNAME]: "Bearer " + store.state.app.token,
-      },
-      success: (res) => {
-        uni.hideLoading();
-        if (res.statusCode == 403) {
-          that.Tips({
-            title: res.data,
-          });
-        } else {
-          let data = res.data ? JSON.parse(res.data) : {};
-          if (data.status == 200) {
-            successCallback && successCallback(data);
-          } else {
-            errorCallback && errorCallback(data);
-            that.Tips({
-              title: data.msg,
-            });
-          }
-        }
-      },
-      fail: (err) => {
-        uni.hideLoading();
-        that.Tips({
-          title: i18n.t(`上传图片失败`),
-        });
-      },
-    });
+    uploadTo({ url: uploadUrl }, filePath, successCallback, errorCallback);
   },
   /**
    * 小程序比较版本信息

@@ -88,9 +88,6 @@
 						<view class="bnt" :class="openErp?'on':''" @click="modify(item, 0)" v-if="item._status == 1 && item.is_cancel == 0">
 							一键改价
 						</view>
-						<view class="bnt primary" :class="openErp?'on':''" v-if="item.status == 0 && item.paid == 0 && item.is_cancel == 0" @click="confirmPay(item)">
-							确认付款
-						</view>
 						<view class="bnt primary" :class="openErp?'on':''"
 							v-if="item._status == 2 && item.shipping_type == 1 && (item.pink_id == 0 || (item.pink_id > 0 && item.pinkStatus == 2))"
 							@click="goDelivery(item)">发送货
@@ -152,7 +149,6 @@
 		setAdminOrderPrice,
 		setAdminOrderRemark,
 		setAdminRefundRemark,
-		setOfflinePay,
 		setOrderRefund,
 		adminRefundList
 	} from "@/api/admin";
@@ -406,6 +402,7 @@
 						});
 					}
 					data.price = price;
+					data.pay_price = that.orderInfo.pay_price;
 					setAdminOrderPrice(data).then(
 						res => {
 							that.change = false;
@@ -490,28 +487,6 @@
 				uni.navigateTo({
 					url: `/pages/admin/orderDetail/index?id=${item.order_id}&types=${this.where.status}`
 				})
-			},
-			offlinePay: function() {
-				if (this.openErp) return
-				setOfflinePay({
-					order_id: this.confirmOrder.order_id
-				}).then(
-					res => {
-						this.confirmShow = false;
-						this.$util.Tips({
-							title: res.msg,
-							icon: "success"
-						});
-						this.init();
-					},
-					error => {
-						this.$util.Tips(error);
-					}
-				);
-			},
-			confirmPay(item) {
-				this.confirmOrder = item;
-				this.confirmShow = true;
 			},
 			dateChange(value) {
 				const date = new Date();

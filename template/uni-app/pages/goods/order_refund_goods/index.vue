@@ -162,7 +162,7 @@
 			 */
 			uploadpic: function() {
 				let that = this;
-				this.$util.uploadImageOne('upload/image', function(res) {
+				this.$util.uploadImageOne({ purpose: 'refund' }, function(res) {
 					that.refund_reason_wap_img.push(res.data.url);
 					that.$set(that, 'refund_reason_wap_img', that.refund_reason_wap_img);
 				});

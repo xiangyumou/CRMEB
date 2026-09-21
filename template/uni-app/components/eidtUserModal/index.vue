@@ -94,7 +94,7 @@
 			uploadpic: function() {
 				let that = this;
 				this.canvasStatus = true
-				that.$util.uploadImageChange('upload/image', (res) => {
+				that.$util.uploadImageChange({ purpose: 'avatar' }, (res) => {
 					let userInfo = that.userInfo;
 					if (userInfo !== undefined) {
 						that.userInfo.avatar = res.data.url;
@@ -112,7 +112,7 @@
 				const {
 					avatarUrl
 				} = e.detail
-				this.$util.uploadImgs('upload/image', avatarUrl, (res) => {
+				this.$util.uploadImgs('avatar', avatarUrl, (res) => {
 					this.userInfo.avatar = res.data.url
 				}, (err) => {
 					console.log(err)

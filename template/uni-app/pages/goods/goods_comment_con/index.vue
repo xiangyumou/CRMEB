@@ -138,7 +138,7 @@
 			 */
 			getOrderProduct: function() {
 				let that = this;
-				orderProduct(that.unique).then(res => {
+				orderProduct(that.unique, that.orderId).then(res => {
 					that.$set(that, 'productInfo', res.data.productInfo);
 					that.cart_num = res.data.cart_num;
 				});

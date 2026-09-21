@@ -76,7 +76,6 @@
 
 <script>
 	import {
-		getSeckillIndexTime,
 		getPresellList
 	} from '../../../api/activity.js';
 	import home from '@/components/home/index.vue'

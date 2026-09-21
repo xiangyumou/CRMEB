@@ -1,17 +1,10 @@
 <script>
 import { HTTP_REQUEST_URL } from "./config/app";
-import {
-  getShopConfig,
-  silenceAuth,
-  getSystemVersion,
-  basicConfig,
-  remoteRegister,
-} from "@/api/public";
+import { silenceAuth, basicConfig, remoteRegister } from "@/api/public";
 import Auth from "@/libs/wechat.js";
 import Routine from "./libs/routine.js";
 import { silenceBindingSpread } from "@/utils";
 import { getCrmebCopyRight, getThemeInfo } from "@/api/api.js";
-import { getLangJson, getLangVersion } from "@/api/user.js";
 import { mapGetters } from "vuex";
 import colors from "@/mixins/color.js";
 import Cache from "@/utils/cache";
@@ -130,19 +123,6 @@ export default {
     // #endif
     let previewThemeId = uni.getStorageSync("previewThemeId");
     applyTheme(previewThemeId);
-    getLangVersion().then((res) => {
-      let version = res.data.version;
-      if (version != uni.getStorageSync("LANG_VERSION")) {
-        getLangJson().then((res) => {
-          let value = Object.keys(res.data)[0];
-          Cache.set("locale", Object.keys(res.data)[0]);
-          this.$i18n.setLocaleMessage(value, res.data[value]);
-          uni.setStorageSync("localeJson", res.data);
-        });
-      }
-      uni.setStorageSync("LANG_VERSION", version);
-    });
-
     // #ifdef H5
     uni.getSystemInfo({
       success: function (res) {
