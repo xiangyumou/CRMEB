@@ -10,9 +10,9 @@
 // +----------------------------------------------------------------------
 namespace app\adminapi\controller;
 
-use crmeb\services\CacheService;
 use think\facade\App;
 use crmeb\utils\Captcha;
+use app\services\system\admin\AdminLoginGuard;
 use app\services\system\admin\SystemAdminServices;
 
 /**
@@ -98,29 +98,42 @@ class Login extends AuthController
             ['captchaType', '']
         ], true);
 
+        $ip = (string)$this->request->ip();
+        /** @var AdminLoginGuard $guard */
+        $guard = app()->make(AdminLoginGuard::class);
+
+        // 锁定和验证码要求都在校验口令之前判定，所以被拒绝的请求不会泄露口令对错。
+        $locked = $guard->lockedSeconds((string)$account, $ip);
+        if ($locked > 0) {
+            return app('json')->fail('登录失败次数过多，请在' . (int)ceil($locked / 60) . '分钟后重试', ['login_captcha' => 1]);
+        }
+
+        // 人机验证由服务端要求，不再由前端决定送不送：少了这一条，登录接口可以被无限爆破。
+        if ($guard->captchaRequired((string)$account, $ip)) {
+            if ($captchaVerification == '') {
+                return app('json')->fail('请先完成安全验证', ['login_captcha' => 1]);
+            }
+        }
         if ($captchaVerification != '') {
             try {
                 aj_captcha_check_two($captchaType, $captchaVerification);
             } catch (\Throwable $e) {
-                return app('json')->fail('验证码错误');
+                return app('json')->fail('验证码错误', ['login_captcha' => 1]);
             }
         }
 
         if (strlen(trim($password)) < 6 || strlen(trim($password)) > 32) {
-            return app('json')->fail('账号密码必须是在6到32位之间');
+            $guard->recordFailure((string)$account, $ip);
+            return app('json')->fail('账号密码必须是在6到32位之间', ['login_captcha' => 1]);
         }
 
         $this->validate(['account' => $account, 'pwd' => $password], \app\adminapi\validate\setting\SystemAdminValidata::class, 'get');
         $result = $this->services->login($account, $password, 'admin', $key);
         if (!$result) {
-            $num = CacheService::get('login_captcha', 1);
-            if ($num > 1) {
-                return app('json')->fail('账号或密码错误', ['login_captcha' => 1]);
-            }
-            CacheService::set('login_captcha', $num + 1, 60);
-            return app('json')->fail('账号或密码错误', ['login_captcha' => 0]);
+            $guard->recordFailure((string)$account, $ip);
+            return app('json')->fail('账号或密码错误', ['login_captcha' => 1]);
         }
-        CacheService::delete('login_captcha');
+        $guard->clear((string)$account, $ip);
         return app('json')->success($result);
     }
 

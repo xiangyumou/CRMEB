@@ -199,6 +199,59 @@ mutate "cancelled-order payment handling" \
     "$work/.mutations/cancelled_branch.old" "$work/.mutations/cancelled_branch.new" \
     "PaymentExceptionTest::testAPaymentForACancelledOrderBecomesAPersistedException"
 
+# 11. The user refund cancellation state gate: without it, a refund that is
+#     already processing, unknown or successful can still be cancelled.
+write_pair "refund_cancel_state" \
+"            if (!in_array((int)\$row['refund_type'], [1, 2, 4, 5], true)
+                || !in_array((int)\$row['refund_state'], [self::REFUND_STATE_SUBMITTED, self::REFUND_STATE_CLOSED], true)) {" \
+"            if (false) {"
+mutate "user refund cancellation state gate" \
+    "crmeb/app/services/order/StoreOrderRefundServices.php" \
+    "$work/.mutations/refund_cancel_state.old" "$work/.mutations/refund_cancel_state.new" \
+    "RefundConcurrencyTest"
+
+# 12. The order lock the cancellation shares with gateway preparation: without
+#     it, a cancel and a refund preparation can interleave.
+write_pair "refund_cancel_lock" \
+"            \$this->storeOrderServices->getForUpdate(\$rootId);
+            \$row = \$this->dao->getForUpdate((int)\$snapshot['id']);" \
+"            \$this->storeOrderServices->get(\$rootId);
+            \$row = \$this->dao->get((int)\$snapshot['id']);"
+mutate "user refund cancellation order lock" \
+    "crmeb/app/services/order/StoreOrderRefundServices.php" \
+    "$work/.mutations/refund_cancel_lock.old" "$work/.mutations/refund_cancel_lock.new" \
+    "RefundConcurrencyTest"
+
+# 13. The scan-upload token comparison: without it, anyone can upload.
+write_pair "scan_upload_token" \
+"        if (!is_string(\$uploadToken) || \$uploadToken === ''
+            || !is_string(\$expectedToken) || \$expectedToken === ''
+            || !hash_equals(\$expectedToken, \$uploadToken)) {" \
+"        if (false) {"
+mutate "scan upload token authorization" \
+    "crmeb/app/adminapi/controller/PublicController.php" \
+    "$work/.mutations/scan_upload_token.old" "$work/.mutations/scan_upload_token.new" \
+    "ScanUploadAuthorizationTest"
+
+# 14. The server-side captcha requirement on admin login: without it, the client
+#     decides whether to verify and the endpoint can be brute-forced again.
+write_pair "admin_login_captcha" \
+"        if (\$guard->captchaRequired((string)\$account, \$ip)) {" \
+"        if (false) {"
+mutate "admin login server-side captcha requirement" \
+    "crmeb/app/adminapi/controller/Login.php" \
+    "$work/.mutations/admin_login_captcha.old" "$work/.mutations/admin_login_captcha.new" \
+    "AdminLoginThrottleTest"
+
+# 15. The lockout for a sustained source.
+write_pair "admin_login_lock" \
+"        if (\$locked > 0) {" \
+"        if (false) {"
+mutate "admin login lockout" \
+    "crmeb/app/adminapi/controller/Login.php" \
+    "$work/.mutations/admin_login_lock.old" "$work/.mutations/admin_login_lock.new" \
+    "AdminLoginThrottleTest"
+
 echo
 echo "mutation check: $passed detected, $failed undetected, $skipped skipped"
 [ "$failed" -eq 0 ] || exit 1

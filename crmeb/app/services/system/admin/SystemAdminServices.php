@@ -193,7 +193,9 @@ class SystemAdminServices extends BaseServices
         } catch (\ReflectionException $e) {
         }
 
-        if (CacheService::get('login_captcha', 1) > 1) {
+        // 登录页一打开就知道这个来源是否已经欠着一次人机验证，和 Login::login 的
+        // 服务端判定用同一个计数，前端不再是唯一决定是否验证的一方。
+        if (app()->make(AdminLoginGuard::class)->captchaRequired('', (string)app('request')->ip())) {
             $data['login_captcha'] = 1;
         }
         return $data;
