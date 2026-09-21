@@ -10,6 +10,14 @@ You are one executor among several working in parallel, each in its own git work
 3. `next/packages/db/docs/SCHEMA.md` and your domain's `next/packages/db/src/schema/*.ts` — the schema is frozen. Need a change? File a CR.
 4. Your section of `docs/rewrite/briefs/reference-map.md` — where the old behaviour lives.
 5. `docs/rewrite/OWNERSHIP.md` — touch only your paths.
+6. `docs/rewrite/status/p0a.md`, sections "The kernel, in one line each" and "Things other streams must know" — the platform you build on (`withTx`, `conditionalUpdate`, `recordEffect(tx, ctx, input)`, `Money`, `Clock`, `handle()`, the test harness, `runConcurrently` and its `isWinner` option).
+7. `next/apps/web/src/admin/kit/README.md` — the admin UI kit.
+
+## Environment
+- Run `corepack enable --install-directory <some dir on your PATH> pnpm` once: turbo needs a `pnpm` binary on `PATH`. Then `pnpm install` in `next/`.
+- `pnpm gen` before typecheck, lint or tests in a fresh worktree. Integration tests need Docker (Testcontainers); they replay `packages/db/migrations/0000_init.sql`.
+- Contracts have no shared index: import a domain's routes by path, `@shop/contracts/<domain>/<file>`.
+- The side-effect ledger is the generic `effects` table (`scope`, `scope_id`, `event_type`); there is no `order_effects`.
 
 ## Order of work
 1. **Contract PR first.** Write every route of your stream in `packages/contracts/src/<domain>/` with zod schemas, error codes and realistic examples. Commit, then tell the orchestrator (`SendMessage` to `main`, first line "WS-<id> contracts ready") and carry on without waiting. Other streams and the storefront adapter build against your examples through the mock server, so make them truthful.
