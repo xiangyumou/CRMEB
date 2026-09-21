@@ -1,0 +1,272 @@
+'use client';
+
+import { Alert, Button, Input, Modal, Select, Space, Typography, message } from 'antd';
+import Link from 'next/link';
+import { useState } from 'react';
+import {
+  catalogAdminProductDetail,
+  catalogAdminVirtualCardImport,
+  catalogAdminVirtualCardList,
+  catalogAdminVirtualCardVoid,
+} from '@shop/contracts/catalog/catalog.product.admin.contract';
+import type { ProductVirtualCard } from '@shop/contracts/catalog/schemas';
+
+import { useRouteMutation, useRouteQuery } from '@/admin/api/hooks';
+import { PageContainer } from '@/admin/kit/page-container';
+import { StatusTag } from '@/admin/kit/status-tag';
+import { idColumn, instantColumn, textColumn } from '@/admin/kit/table/columns';
+import { CrudTable } from '@/admin/kit/table/crud-table';
+import { Can } from '@/admin/session/can';
+
+import { VIRTUAL_CARD_STATE, options } from '../../../catalog-enums';
+
+/**
+ * 卡密库存.
+ *
+ * The card pool **is** the stock: importing cards raises
+ * `product_skus.stock` in the same transaction, voiding an unclaimed card
+ * lowers it, and the product editor refuses a hand-typed stock for a card
+ * product. Legacy kept the two apart, let them drift, and sold cards that did
+ * not exist.
+ *
+ * Card numbers are readable here and nowhere else in the admin, under their own
+ * `catalog:card:read` atom — the rows are redeemable secrets, and seeing a card
+ * number is not the same job as seeing a product.
+ */
+export function VirtualCardsPage({ productId }: { productId: string }) {
+  const [importing, setImporting] = useState(false);
+
+  const product = useRouteQuery(catalogAdminProductDetail, { params: { id: productId } });
+  const skus = product.data?.skus ?? [];
+
+  const voidCards = useRouteMutation(catalogAdminVirtualCardVoid, {
+    invalidate: [catalogAdminVirtualCardList, catalogAdminProductDetail],
+  });
+
+  return (
+    <PageContainer
+      title={product.data ? `卡密库存：${product.data.name}` : '卡密库存'}
+      subTitle="导入的卡密数量就是该规格的库存；已发放的卡密不能作废"
+      breadcrumb={[{ label: '商品', href: '/admin/catalog/products' }, { label: '卡密库存' }]}
+      extra={
+        <Space>
+          <Link href={`/admin/catalog/products/${productId}`}>
+            <Button>编辑商品</Button>
+          </Link>
+          <Can permission="catalog:card:write">
+            <Button type="primary" onClick={() => setImporting(true)}>
+              导入卡密
+            </Button>
+          </Can>
+        </Space>
+      }
+    >
+      {product.data && product.data.kind !== 'virtual_card' ? (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="这个商品不是卡密商品，导入的卡密不会发放给买家。"
+        />
+      ) : null}
+
+      <CrudTable
+        route={catalogAdminVirtualCardList}
+        params={{ id: productId }}
+        scrollX={1100}
+        filters={[
+          {
+            kind: 'select',
+            name: 'skuId',
+            label: '规格',
+            options: skus.map((sku) => ({
+              label: sku.specText || '单规格',
+              value: sku.id,
+            })),
+          },
+          {
+            kind: 'select',
+            name: 'state',
+            label: '状态',
+            options: options(VIRTUAL_CARD_STATE),
+          },
+        ]}
+        batchActions={({ selectedRows, clear }) => (
+          <Can permission="catalog:card:write">
+            <Button
+              size="small"
+              danger
+              loading={voidCards.isPending}
+              onClick={() => {
+                const voidable = selectedRows.filter((row) => row.state === 'unclaimed');
+                if (voidable.length === 0) {
+                  void message.warning('只有未发放的卡密可以作废');
+                  return;
+                }
+                voidCards.mutate(
+                  {
+                    params: { id: productId },
+                    body: { cardIds: voidable.map((row) => row.id) },
+                  },
+                  {
+                    onSuccess: (result) => {
+                      void message.success(`已作废 ${result.voided} 条，剩余库存 ${result.stock}`);
+                      clear();
+                    },
+                  },
+                );
+              }}
+            >
+              批量作废
+            </Button>
+          </Can>
+        )}
+        columns={[
+          idColumn<ProductVirtualCard>(),
+          textColumn<ProductVirtualCard>({
+            title: '规格',
+            dataIndex: 'specText',
+            placeholder: '单规格',
+            width: 140,
+          }),
+          textColumn<ProductVirtualCard>({ title: '卡号', dataIndex: 'cardNo', width: 200 }),
+          textColumn<ProductVirtualCard>({
+            title: '卡密',
+            dataIndex: 'cardSecret',
+            width: 200,
+            ellipsis: true,
+          }),
+          {
+            title: '状态',
+            key: 'state',
+            width: 100,
+            render: (_value: unknown, row: ProductVirtualCard) => (
+              <StatusTag value={row.state} map={VIRTUAL_CARD_STATE} />
+            ),
+          },
+          textColumn<ProductVirtualCard>({
+            title: '订单明细 ID',
+            dataIndex: 'orderItemId',
+            width: 120,
+          }),
+          textColumn<ProductVirtualCard>({
+            title: '领取用户',
+            dataIndex: 'claimedByUserId',
+            width: 110,
+          }),
+          instantColumn<ProductVirtualCard>({ title: '发放时间', dataIndex: 'claimedAt' }),
+          instantColumn<ProductVirtualCard>({ title: '导入时间', dataIndex: 'createdAt' }),
+        ]}
+      />
+
+      <ImportModal
+        productId={productId}
+        skus={skus.map((sku) => ({ id: sku.id, specText: sku.specText }))}
+        open={importing}
+        onClose={() => setImporting(false)}
+      />
+    </PageContainer>
+  );
+}
+
+/**
+ * 导入卡密.
+ *
+ * One card per line, `卡号,卡密` — the shape the supplier's spreadsheet exports
+ * and the operator pastes. Duplicates inside the SKU's pool are reported back
+ * rather than rejected wholesale: re-pasting a batch that half-landed is the
+ * normal way this goes wrong, and it must be safe.
+ */
+function ImportModal({
+  productId,
+  skus,
+  open,
+  onClose,
+}: {
+  productId: string;
+  skus: readonly { id: string; specText: string }[];
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [skuId, setSkuId] = useState<string | undefined>(undefined);
+  const [raw, setRaw] = useState('');
+
+  const importCards = useRouteMutation(catalogAdminVirtualCardImport, {
+    invalidate: [catalogAdminVirtualCardList, catalogAdminProductDetail],
+  });
+
+  const close = (): void => {
+    setRaw('');
+    onClose();
+  };
+
+  const target = skuId ?? skus[0]?.id;
+
+  return (
+    <Modal
+      open={open}
+      title="导入卡密"
+      okText="导入"
+      confirmLoading={importCards.isPending}
+      onCancel={close}
+      onOk={() => {
+        const cards = parseCards(raw);
+        if (!target) {
+          void message.warning('该商品还没有规格，请先保存商品');
+          return;
+        }
+        if (cards.length === 0) {
+          void message.warning('请粘贴至少一条卡密');
+          return;
+        }
+        importCards.mutate(
+          { params: { id: productId }, body: { skuId: target, cards } },
+          {
+            onSuccess: (result) => {
+              void message.success(
+                result.skippedCardNos.length === 0
+                  ? `已导入 ${result.imported} 条，库存 ${result.stock}`
+                  : `已导入 ${result.imported} 条，${result.skippedCardNos.length} 条卡号重复已跳过`,
+              );
+              close();
+            },
+          },
+        );
+      }}
+    >
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <Select
+          style={{ width: '100%' }}
+          value={target}
+          onChange={setSkuId}
+          placeholder="选择规格"
+          options={skus.map((sku) => ({ label: sku.specText || '单规格', value: sku.id }))}
+        />
+        <Typography.Text type="secondary">
+          一行一条，格式「卡号,卡密」；只有卡号时卡密留空。单次最多 1000 条。
+        </Typography.Text>
+        <Input.TextArea
+          rows={10}
+          value={raw}
+          onChange={(event) => setRaw(event.target.value)}
+          placeholder={'8800-1234-5678,9f2a\n8800-1234-5679,7b1c'}
+        />
+      </Space>
+    </Modal>
+  );
+}
+
+/** `卡号,卡密` per line. Commas, tabs and full-width commas all separate. */
+export function parseCards(raw: string): { cardNo: string; cardSecret?: string }[] {
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 1000)
+    .map((line) => {
+      const [cardNo, ...rest] = line.split(/[,\t，]/).map((part) => part.trim());
+      const cardSecret = rest.join('').trim();
+      return { cardNo: cardNo ?? '', ...(cardSecret ? { cardSecret } : {}) };
+    })
+    .filter((card) => card.cardNo.length > 0);
+}

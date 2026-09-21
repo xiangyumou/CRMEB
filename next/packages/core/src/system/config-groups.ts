@@ -27,6 +27,9 @@ import './trade.config';
 import './wechat-mini.config';
 import './wechat-oa.config';
 
+// catalog — 商品设置.
+import '../catalog/index';
+
 // order — B1 owns `group: 'order'` (the pay window and the sweep limit); the
 // screen still has to list it, so the bucket loads it through the domain index.
 import '../order/index';

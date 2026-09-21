@@ -1,0 +1,544 @@
+'use client';
+
+import { Alert, Button, Form, Skeleton, Space } from 'antd';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo } from 'react';
+import {
+  catalogAdminProductCreate,
+  catalogAdminProductDetail,
+  catalogAdminProductList,
+  catalogAdminProductUpdate,
+} from '@shop/contracts/catalog/catalog.product.admin.contract';
+import {
+  catalogAdminLabelList,
+  catalogAdminParamTemplateList,
+  catalogAdminProtectionList,
+} from '@shop/contracts/catalog/catalog.taxonomy.admin.contract';
+import {
+  adminProductForm,
+  type AdminProductDetail,
+  type AdminProductForm,
+  type ProductKind,
+  type ProductParam,
+  type ProductSkuInput,
+  type ProductSpecInput,
+} from '@shop/contracts/catalog/schemas';
+
+import { useRouteMutation, useRouteQuery } from '@/admin/api/hooks';
+import type { FieldSpec, SelectOption } from '@/admin/kit/form/types';
+import { ZodForm } from '@/admin/kit/form/zod-form';
+import { PageContainer } from '@/admin/kit/page-container';
+
+import {
+  CATEGORY_TREE_CACHE_KEY,
+  PRODUCT_FREIGHT_MODE,
+  PRODUCT_KIND,
+  PRODUCT_PURCHASE_LIMIT_MODE,
+  PRODUCT_STATUS,
+  loadCategoryTreeOptions,
+  options,
+} from '../catalog-enums';
+import { ParamEditor, SkuMatrixEditor, SpecEditor, blankSku } from './product-sku-editor';
+
+/**
+ * 新建 / 编辑商品 — one component for both, because they are one form.
+ *
+ * The whole thing is `adminProductForm`: required markers, ranges and the
+ * cross-field rules that mirror the table CHECKs (`products_freight_source`,
+ * `products_limit_quantity`, the SKU rules) all come from the contract, so the
+ * browser and the server agree by construction and an impossible product is a
+ * field error rather than a 500 from a constraint violation.
+ *
+ * The three things the kit cannot express declaratively — the spec axes, the
+ * SKU matrix and the parameter rows — are `custom` fields backed by the
+ * controls in `product-sku-editor.tsx`. They are still form fields: the form
+ * owns the value, the contract validates it.
+ */
+export function ProductEditorPage({ productId }: { productId?: string | undefined }) {
+  const router = useRouter();
+  const [form] = Form.useForm();
+
+  const detail = useRouteQuery(
+    catalogAdminProductDetail,
+    { params: { id: productId ?? '' } },
+    { enabled: productId !== undefined },
+  );
+
+  // The three taxonomies the form offers as options. 200 is every label any
+  // shop has; these are pickers, not searches.
+  const labels = useRouteQuery(catalogAdminLabelList, {
+    query: { page: 1, pageSize: 200, isEnabled: 'true' },
+  });
+  const protections = useRouteQuery(catalogAdminProtectionList, {
+    query: { page: 1, pageSize: 200, isEnabled: 'true' },
+  });
+  const paramTemplates = useRouteQuery(catalogAdminParamTemplateList, {
+    query: { page: 1, pageSize: 200, isEnabled: 'true' },
+  });
+
+  const create = useRouteMutation(catalogAdminProductCreate, {
+    presentError: false,
+    invalidate: [catalogAdminProductList],
+    successMessage: '已创建',
+    onSuccess: (data) => router.replace(`/admin/catalog/products/${data.id}`),
+  });
+  const update = useRouteMutation(catalogAdminProductUpdate, {
+    presentError: false,
+    invalidate: [catalogAdminProductList, catalogAdminProductDetail],
+    successMessage: '已保存',
+  });
+  const saving = create.isPending || update.isPending;
+
+  // Drives the spec/SKU controls and the mode-dependent fields below.
+  const specMode = Form.useWatch<boolean | undefined>('specMode', form) ?? false;
+  const kind = (Form.useWatch<ProductKind | undefined>('kind', form) ?? 'physical') as ProductKind;
+  const specs = (Form.useWatch<ProductSpecInput[] | undefined>('specs', form) ??
+    []) as ProductSpecInput[];
+  const freightMode = Form.useWatch<string | undefined>('freightMode', form);
+  const purchaseLimitMode = Form.useWatch<string | undefined>('purchaseLimitMode', form);
+
+  /**
+   * Clear the fields the current mode does not use.
+   *
+   * antd keeps the value of an unmounted `Form.Item`, and the contract refuses
+   * a fixed freight on a template product ("当前计费方式不需要固定运费"). Without
+   * this, switching 固定运费 → 运费模板 leaves the old number in the payload and
+   * the save fails with an error about a field the operator cannot see.
+   *
+   * `undefined` means the watch has not reported yet, on the render before the
+   * initial values reach it — clearing then would wipe the template id the
+   * product was loaded with.
+   */
+  useEffect(() => {
+    if (freightMode === undefined) return;
+    if (freightMode !== 'fixed') form.setFieldValue('fixedFreight', undefined);
+    if (freightMode !== 'template') form.setFieldValue('shippingTemplateId', undefined);
+  }, [freightMode, form]);
+
+  useEffect(() => {
+    if (purchaseLimitMode === 'none') form.setFieldValue('purchaseLimitQuantity', undefined);
+  }, [purchaseLimitMode, form]);
+
+  const labelOptions: SelectOption[] = (labels.data?.items ?? []).map((row) => ({
+    label: row.name,
+    value: row.id,
+  }));
+  const protectionOptions: SelectOption[] = (protections.data?.items ?? []).map((row) => ({
+    label: row.title,
+    value: row.id,
+  }));
+  const templates = useMemo(
+    () =>
+      (paramTemplates.data?.items ?? []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        suggestedValues: row.suggestedValues,
+      })),
+    [paramTemplates.data],
+  );
+
+  const fields = useMemo(
+    () =>
+      buildFields({
+        labelOptions,
+        protectionOptions,
+        templates,
+        specs,
+        specMode,
+        kind,
+      }),
+    // `labelOptions`/`protectionOptions` are rebuilt every render; their data is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [labels.data, protections.data, templates, specs, specMode, kind],
+  );
+
+  if (productId !== undefined && detail.isPending) {
+    return (
+      <PageContainer title="编辑商品">
+        <Skeleton active paragraph={{ rows: 8 }} />
+      </PageContainer>
+    );
+  }
+
+  if (productId !== undefined && detail.isError) {
+    return (
+      <PageContainer title="编辑商品">
+        <Alert type="error" showIcon message={detail.error.message} />
+      </PageContainer>
+    );
+  }
+
+  const record = detail.data;
+
+  return (
+    <PageContainer
+      title={record ? `编辑商品：${record.name}` : '新建商品'}
+      subTitle="规格一旦有销量就不要删；改名和改价不会影响已下单的订单"
+      breadcrumb={[
+        { label: '商品', href: '/admin/catalog/products' },
+        { label: record ? '编辑商品' : '新建商品' },
+      ]}
+      extra={
+        <Space>
+          <Button onClick={() => router.push('/admin/catalog/products')}>返回列表</Button>
+          <Button type="primary" loading={saving} onClick={() => form.submit()}>
+            保存
+          </Button>
+        </Space>
+      }
+    >
+      <ZodForm
+        form={form}
+        schema={adminProductForm}
+        fields={fields}
+        columns={2}
+        initialValues={record ? formValuesOf(record) : NEW_PRODUCT}
+        submitting={saving}
+        error={create.error ?? update.error}
+        footer={false}
+        onSubmit={(values) => {
+          // `customForm` has no editor yet, so it is carried across untouched
+          // rather than dropped — see `docs/rewrite/status/a.md`.
+          const body: AdminProductForm = {
+            ...values,
+            ...(record?.customForm ? { customForm: record.customForm } : {}),
+          };
+          if (record) update.mutate({ params: { id: record.id }, body });
+          else create.mutate({ body });
+        }}
+      />
+    </PageContainer>
+  );
+}
+
+/** A new product starts as a draft with one implicit SKU, which is the common case. */
+const NEW_PRODUCT: Partial<AdminProductForm> = {
+  kind: 'physical',
+  status: 'draft',
+  specMode: false,
+  specs: [],
+  skus: [blankSku()],
+  freightMode: 'template',
+  purchaseLimitMode: 'none',
+  minPurchaseQuantity: 1,
+  displaySalesBoost: 0,
+  sortOrder: 0,
+  sliderImages: [],
+  categoryIds: [],
+  labelIds: [],
+  protectionIds: [],
+  params: [],
+  recommendedProductIds: [],
+  giftCouponIds: [],
+  descriptionHtml: '',
+};
+
+function buildFields({
+  labelOptions,
+  protectionOptions,
+  templates,
+  specs,
+  specMode,
+  kind,
+}: {
+  labelOptions: SelectOption[];
+  protectionOptions: SelectOption[];
+  templates: readonly { id: string; name: string; suggestedValues: string | null }[];
+  specs: readonly ProductSpecInput[];
+  specMode: boolean;
+  kind: ProductKind;
+}): FieldSpec<Extract<keyof AdminProductForm, string>>[] {
+  return [
+    { kind: 'text', name: 'name', label: '商品名称', span: 12, maxLength: 128 },
+    { kind: 'text', name: 'subtitle', label: '商品简介', span: 12, maxLength: 255 },
+    {
+      kind: 'select',
+      name: 'kind',
+      label: '商品类型',
+      span: 8,
+      options: options(PRODUCT_KIND),
+      help: '卡密商品的库存来自导入的卡密，虚拟商品不计运费',
+    },
+    { kind: 'select', name: 'status', label: '状态', span: 8, options: options(PRODUCT_STATUS) },
+    { kind: 'text', name: 'unitName', label: '单位', span: 8, maxLength: 32, placeholder: '件' },
+    { kind: 'text', name: 'spu', label: 'SPU 编码', span: 8, maxLength: 32 },
+    { kind: 'text', name: 'barCode', label: '商品条码', span: 8, maxLength: 32 },
+    {
+      kind: 'text',
+      name: 'keyword',
+      label: '搜索关键字',
+      span: 8,
+      maxLength: 255,
+      help: '与商品名一起参与搜索，空格分隔',
+    },
+
+    {
+      kind: 'treeSelect',
+      name: 'categoryIds',
+      label: '商品分类',
+      span: 12,
+      multiple: true,
+      loadOptions: loadCategoryTreeOptions,
+      cacheKey: CATEGORY_TREE_CACHE_KEY,
+      help: '至少一个；分类决定前台的入口和优惠券的适用范围',
+    },
+    {
+      kind: 'select',
+      name: 'labelIds',
+      label: '商品标签',
+      span: 12,
+      mode: 'multiple',
+      options: labelOptions,
+      allowClear: true,
+    },
+    {
+      kind: 'select',
+      name: 'protectionIds',
+      label: '保障服务',
+      span: 12,
+      mode: 'multiple',
+      options: protectionOptions,
+      allowClear: true,
+    },
+    {
+      kind: 'select',
+      name: 'recommendedProductIds',
+      label: '推荐商品 ID',
+      span: 12,
+      mode: 'tags',
+      options: [],
+      help: '详情页的「为你推荐」，输入商品 ID 回车确认',
+    },
+    {
+      kind: 'select',
+      name: 'giftCouponIds',
+      label: '赠送优惠券 ID',
+      span: 12,
+      mode: 'tags',
+      options: [],
+      help: '下单后自动发放，输入优惠券 ID 回车确认',
+    },
+
+    { kind: 'asset', name: 'imageUrl', label: '商品主图', span: 12 },
+    {
+      kind: 'asset',
+      name: 'cardImageUrl',
+      label: '拼团/秒杀封面',
+      span: 12,
+      visibleWhen: (values) => values.kind !== 'physical',
+    },
+    { kind: 'asset', name: 'sliderImages', label: '轮播图', span: 24, multiple: true, max: 10 },
+    {
+      kind: 'text',
+      name: 'videoUrl',
+      label: '主图视频',
+      span: 12,
+      maxLength: 512,
+      placeholder: 'https://…',
+    },
+    {
+      kind: 'money',
+      name: 'originalPrice',
+      label: '划线价',
+      span: 6,
+      help: '仅用于展示；真实售价在规格里',
+    },
+    { kind: 'number', name: 'sortOrder', label: '排序', span: 6, min: 0, max: 9999 },
+
+    {
+      kind: 'switch',
+      name: 'specMode',
+      label: '多规格',
+      span: 24,
+      checkedText: '多规格',
+      uncheckedText: '单规格',
+      help: '关闭时商品只有一条库存记录；切换会重建下面的规格表',
+    },
+    {
+      kind: 'custom',
+      name: 'specs',
+      label: '规格项',
+      span: 24,
+      visibleWhen: (values) => values.specMode === true,
+      render: ({ value, onChange, disabled }) => (
+        <SpecEditor
+          value={value as ProductSpecInput[] | undefined}
+          onChange={onChange}
+          disabled={disabled}
+        />
+      ),
+    },
+    {
+      kind: 'custom',
+      name: 'skus',
+      label: specMode ? '规格明细' : '价格与库存',
+      span: 24,
+      render: ({ value, onChange, disabled }) => (
+        <SkuMatrixEditor
+          value={value as ProductSkuInput[] | undefined}
+          onChange={onChange}
+          specs={specs}
+          specMode={specMode}
+          kind={kind}
+          disabled={disabled}
+        />
+      ),
+    },
+
+    {
+      kind: 'radio',
+      name: 'freightMode',
+      label: '运费',
+      span: 8,
+      optionType: 'button',
+      options: options(PRODUCT_FREIGHT_MODE),
+    },
+    {
+      kind: 'money',
+      name: 'fixedFreight',
+      label: '固定运费',
+      span: 8,
+      visibleWhen: (values) => values.freightMode === 'fixed',
+    },
+    {
+      kind: 'text',
+      name: 'shippingTemplateId',
+      label: '运费模板 ID',
+      span: 8,
+      visibleWhen: (values) => values.freightMode === 'template',
+      help: '运费模板选择器待 B2 流上线后替换',
+    },
+    {
+      kind: 'radio',
+      name: 'purchaseLimitMode',
+      label: '限购',
+      span: 8,
+      optionType: 'button',
+      options: options(PRODUCT_PURCHASE_LIMIT_MODE),
+    },
+    {
+      kind: 'number',
+      name: 'purchaseLimitQuantity',
+      label: '限购数量',
+      span: 8,
+      min: 1,
+      max: 100_000,
+      visibleWhen: (values) => values.purchaseLimitMode !== 'none',
+    },
+    { kind: 'number', name: 'minPurchaseQuantity', label: '起购数量', span: 8, min: 1 },
+
+    {
+      kind: 'number',
+      name: 'displaySalesBoost',
+      label: '虚拟销量',
+      span: 8,
+      min: 0,
+      help: '只加在前台展示的销量上，不影响真实销量统计',
+    },
+    { kind: 'switch', name: 'isHot', label: '热门', span: 4 },
+    { kind: 'switch', name: 'isNew', label: '新品', span: 4 },
+    { kind: 'switch', name: 'isBest', label: '精品', span: 4 },
+    { kind: 'switch', name: 'isBenefit', label: '促销', span: 4 },
+    { kind: 'switch', name: 'isRecommended', label: '推荐', span: 4 },
+
+    {
+      kind: 'custom',
+      name: 'params',
+      label: '商品参数',
+      span: 24,
+      render: ({ value, onChange, disabled }) => (
+        <ParamEditor
+          value={value as ProductParam[] | undefined}
+          onChange={onChange}
+          templates={templates}
+          disabled={disabled}
+        />
+      ),
+    },
+    { kind: 'richText', name: 'descriptionHtml', label: '商品详情', span: 24, minHeight: 320 },
+  ];
+}
+
+/**
+ * The detail response as form input.
+ *
+ * Two shapes, not one: the detail carries ids and computed fields the form does
+ * not own (`sales`, `views`, `skuCode` of an existing SKU), and every optional
+ * field is `null` there and absent here — `exactOptionalPropertyTypes` means an
+ * optional field is either missing or a real value, never `null`.
+ *
+ * The SKU rows keep their `specValues`, which is what the server matches an
+ * incoming row to an existing SKU by; that is how editing a price leaves the
+ * stock and the sales counter alone.
+ */
+export function formValuesOf(record: AdminProductDetail): Partial<AdminProductForm> {
+  const skus: ProductSkuInput[] = record.skus.map((sku) => ({
+    specValues: sku.specValues,
+    skuCode: sku.skuCode,
+    ...(sku.imageUrl === null ? {} : { imageUrl: sku.imageUrl }),
+    price: sku.price,
+    ...(sku.originalPrice === null ? {} : { originalPrice: sku.originalPrice }),
+    ...(sku.cost === null ? {} : { cost: sku.cost }),
+    stock: sku.stock,
+    ...(sku.barCode === null ? {} : { barCode: sku.barCode }),
+    ...(sku.weight === null ? {} : { weight: sku.weight }),
+    ...(sku.volume === null ? {} : { volume: sku.volume }),
+    isDefault: sku.isDefault,
+    isVisible: sku.isVisible,
+    sortOrder: sku.sortOrder,
+  }));
+
+  return {
+    name: record.name,
+    ...(record.subtitle === null ? {} : { subtitle: record.subtitle }),
+    ...(record.keyword === null ? {} : { keyword: record.keyword }),
+    ...(record.spu === null ? {} : { spu: record.spu }),
+    ...(record.barCode === null ? {} : { barCode: record.barCode }),
+    kind: record.kind,
+    status: record.status,
+    imageUrl: record.imageUrl,
+    ...(record.cardImageUrl === null ? {} : { cardImageUrl: record.cardImageUrl }),
+    sliderImages: record.sliderImages,
+    ...(record.videoUrl === null ? {} : { videoUrl: record.videoUrl }),
+    ...(record.unitName === null ? {} : { unitName: record.unitName }),
+    ...(record.originalPrice === null ? {} : { originalPrice: record.originalPrice }),
+    displaySalesBoost: record.displaySalesBoost,
+    specMode: record.specMode,
+    specs: record.specs.map((spec) => ({
+      name: spec.name,
+      values: spec.values.map((value) => ({
+        value: value.value,
+        ...(value.imageUrl === null ? {} : { imageUrl: value.imageUrl }),
+      })),
+    })),
+    skus: skus.length > 0 ? skus : [blankSku()],
+    freightMode: record.freightMode,
+    ...(record.fixedFreight === null ? {} : { fixedFreight: record.fixedFreight }),
+    ...(record.shippingTemplateId === null
+      ? {}
+      : { shippingTemplateId: record.shippingTemplateId }),
+    purchaseLimitMode: record.purchaseLimitMode,
+    ...(record.purchaseLimitQuantity === null
+      ? {}
+      : { purchaseLimitQuantity: record.purchaseLimitQuantity }),
+    minPurchaseQuantity: record.minPurchaseQuantity,
+    isHot: record.isHot,
+    isNew: record.isNew,
+    isBest: record.isBest,
+    isBenefit: record.isBenefit,
+    isRecommended: record.isRecommended,
+    sortOrder: record.sortOrder,
+    descriptionHtml: record.descriptionHtml,
+    categoryIds: record.categoryIds,
+    labelIds: record.labelIds,
+    protectionIds: record.protectionIds,
+    params: record.params.map((param, index) => ({
+      name: param.name,
+      value: param.value,
+      templateId: param.templateId,
+      sortOrder: index,
+    })),
+    recommendedProductIds: record.recommendedProductIds,
+    giftCouponIds: record.giftCouponIds,
+  };
+}

@@ -6,6 +6,7 @@
  * and is deliberately the *only* shared file, so streams adding a mapper
  * conflict on one line each.
  */
+export * as catalog from './mappers/catalog';
 export * as coupon from './mappers/coupon';
 export * as diy from './mappers/diy';
 export * as storage from './mappers/storage';
