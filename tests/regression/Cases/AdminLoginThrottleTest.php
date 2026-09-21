@@ -11,8 +11,9 @@ use Tests\Regression\Support\RegressionTestCase;
  * `/adminapi/login` 以前只是在响应里回一个 `login_captcha` 标记，验证码送不送由前端决定，
  * 服务端对不带验证码的请求照常受理，因此口令可以被无限次试。
  *
- * 下面两组用例分别证明：真实 HTTP 上服务端自己会要求人机验证（失败一次之后，
- * 不带验证码的请求在比对口令之前就被挡下），以及持续失败的来源会被暂时锁定。
+ * 下面的用例证明：真实 HTTP 上服务端自己会要求人机验证（失败一次之后，不带验证码
+ * 的请求在比对口令之前就被挡下），且这道闸不会退化成把所有人挡在门外的全局锁——
+ * 站点跑在反向代理之后，应用看到的来源地址对所有访客是同一个。
  */
 final class AdminLoginThrottleTest extends RegressionTestCase
 {
@@ -62,19 +63,21 @@ final class AdminLoginThrottleTest extends RegressionTestCase
         self::assertSame('验证码错误', $forged['msg'], '伪造的验证码不能当成通过的验证');
     }
 
-    public function testASustainedSourceIsLockedOutOverHttp(): void
+    public function testManyFailuresNeverRefuseALaterAttemptOutright(): void
     {
-        // 失败计数只有在人机验证通过之后才累加，所以单靠 HTTP 打不满阈值。
-        // 这里直接按被测栈会看到的来源地址播种，再打一次真实请求，验证那道闸确实在。
+        // 生产跑在反向代理之后，应用看到的来源地址对所有访客是同一个。任何"失败
+        // N 次后直接拒绝"的闸在这里都会变成全局锁，所以持续失败之后，后来的请求
+        // 仍然必须能走到人机验证那一步，而不是被直接挡回。
         /** @var AdminLoginGuard $guard */
         $guard = app()->make(AdminLoginGuard::class);
-        $ip = (string)gethostbyname((string)gethostname());
-        self::assertNotSame('', $ip, '拿不到本容器地址就无法播种');
-        for ($i = 0; $i < AdminLoginGuard::LOCK_AFTER; $i++) {
-            $guard->recordFailure(self::ACCOUNT, $ip);
+        $shared = (string)gethostbyname((string)gethostname());
+        for ($i = 0; $i < 30; $i++) {
+            $guard->recordFailure('someone-else', $shared);
         }
-        $locked = $this->attempt('wrong-password-after-lock');
-        self::assertStringContainsString('登录失败次数过多', $locked['msg'], '持续失败的来源应当被暂时锁定');
+        $response = $this->attempt('wrong-password-after-many-failures');
+        self::assertSame('请先完成安全验证', $response['msg'], '只应当要求验证，不应当直接拒绝');
+        self::assertSame(1, $response['data']['login_captcha'] ?? null);
+        $guard->clear('someone-else', $shared);
     }
 
     public function testTheGuardCountsWithinASlidingWindow(): void
@@ -83,36 +86,22 @@ final class AdminLoginThrottleTest extends RegressionTestCase
         $guard = app()->make(AdminLoginGuard::class);
         $ip = '198.51.100.7';
         self::assertFalse($guard->captchaRequired(self::ACCOUNT, $ip));
-        self::assertSame(0, $guard->lockedSeconds(self::ACCOUNT, $ip));
 
         $guard->recordFailure(self::ACCOUNT, $ip);
         self::assertTrue($guard->captchaRequired(self::ACCOUNT, $ip), '失败一次之后就要求人机验证');
-        self::assertSame(0, $guard->lockedSeconds(self::ACCOUNT, $ip), '一次失败还不该锁定');
-
-        for ($i = 1; $i < AdminLoginGuard::LOCK_AFTER; $i++) {
-            $guard->recordFailure(self::ACCOUNT, $ip);
-        }
-        $locked = $guard->lockedSeconds(self::ACCOUNT, $ip);
-        self::assertGreaterThan(0, $locked, '达到阈值的来源应当被锁定');
-        self::assertLessThanOrEqual(AdminLoginGuard::WINDOW, $locked);
 
         $guard->clear(self::ACCOUNT, $ip);
-        self::assertSame(0, $guard->lockedSeconds(self::ACCOUNT, $ip), '登录成功后应当清空');
-        self::assertFalse($guard->captchaRequired(self::ACCOUNT, $ip));
+        self::assertFalse($guard->captchaRequired(self::ACCOUNT, $ip), '登录成功后应当清空');
     }
 
-    public function testTheLockFollowsTheSourceAndNotTheAccount(): void
+    public function testTheCaptchaRequirementFollowsTheAccountToo(): void
     {
-        // 按账号硬锁意味着任何人都能用连续错误口令把店主关在门外，所以账号维度
-        // 只强制人机验证，硬锁只看来源。
+        // 账号维度不可伪造：换一个来源地址仍然要过验证。
         /** @var AdminLoginGuard $guard */
         $guard = app()->make(AdminLoginGuard::class);
-        for ($i = 0; $i < AdminLoginGuard::LOCK_AFTER + 2; $i++) {
-            $guard->recordFailure(self::ACCOUNT, '198.51.100.8');
-        }
-        self::assertGreaterThan(0, $guard->lockedSeconds(self::ACCOUNT, '198.51.100.8'));
-        self::assertSame(0, $guard->lockedSeconds(self::ACCOUNT, '203.0.113.9'), '店主从另一个地址仍然能登录');
-        self::assertTrue($guard->captchaRequired(self::ACCOUNT, '203.0.113.9'), '但仍然要过人机验证');
+        $guard->recordFailure(self::ACCOUNT, '198.51.100.8');
+        self::assertTrue($guard->captchaRequired(self::ACCOUNT, '203.0.113.9'));
+        self::assertFalse($guard->captchaRequired('a-different-account', '203.0.113.9'));
         $guard->clear(self::ACCOUNT, '198.51.100.8');
         $guard->clear(self::ACCOUNT, '203.0.113.9');
     }
@@ -140,7 +129,9 @@ final class AdminLoginThrottleTest extends RegressionTestCase
      */
     private function forgetThrottleState(): void
     {
-        CacheService::delete('admin_login_fail_account_' . md5(self::ACCOUNT));
+        foreach ([self::ACCOUNT, 'someone-else', 'a-different-account'] as $account) {
+            CacheService::delete('admin_login_fail_account_' . md5($account));
+        }
         $handler = \think\facade\Cache::store('redis')->handler();
         $prefix = (string)config('cache.stores.redis.prefix');
         foreach ((array)$handler->keys($prefix . 'admin_login_fail_ip_*') as $key) {

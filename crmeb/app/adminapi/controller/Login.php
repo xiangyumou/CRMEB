@@ -102,13 +102,8 @@ class Login extends AuthController
         /** @var AdminLoginGuard $guard */
         $guard = app()->make(AdminLoginGuard::class);
 
-        // 锁定和验证码要求都在校验口令之前判定，所以被拒绝的请求不会泄露口令对错。
-        $locked = $guard->lockedSeconds((string)$account, $ip);
-        if ($locked > 0) {
-            return app('json')->fail('登录失败次数过多，请在' . (int)ceil($locked / 60) . '分钟后重试', ['login_captcha' => 1]);
-        }
-
         // 人机验证由服务端要求，不再由前端决定送不送：少了这一条，登录接口可以被无限爆破。
+        // 判定在比对口令之前，所以被拒绝的请求不会泄露候选口令的对错。
         if ($guard->captchaRequired((string)$account, $ip)) {
             if ($captchaVerification == '') {
                 return app('json')->fail('请先完成安全验证', ['login_captcha' => 1]);

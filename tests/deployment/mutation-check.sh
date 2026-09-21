@@ -235,21 +235,15 @@ mutate "scan upload token authorization" \
 
 # 14. The server-side captcha requirement on admin login: without it, the client
 #     decides whether to verify and the endpoint can be brute-forced again.
+#     There is deliberately no lockout mutation: behind this deployment's reverse
+#     proxy every visitor shares one source address, so a lockout would be a
+#     global one. `testManyFailuresNeverRefuseALaterAttemptOutright` guards that.
 write_pair "admin_login_captcha" \
 "        if (\$guard->captchaRequired((string)\$account, \$ip)) {" \
 "        if (false) {"
 mutate "admin login server-side captcha requirement" \
     "crmeb/app/adminapi/controller/Login.php" \
     "$work/.mutations/admin_login_captcha.old" "$work/.mutations/admin_login_captcha.new" \
-    "AdminLoginThrottleTest"
-
-# 15. The lockout for a sustained source.
-write_pair "admin_login_lock" \
-"        if (\$locked > 0) {" \
-"        if (false) {"
-mutate "admin login lockout" \
-    "crmeb/app/adminapi/controller/Login.php" \
-    "$work/.mutations/admin_login_lock.old" "$work/.mutations/admin_login_lock.new" \
     "AdminLoginThrottleTest"
 
 echo

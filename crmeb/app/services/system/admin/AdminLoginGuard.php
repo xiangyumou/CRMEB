@@ -24,6 +24,12 @@ use crmeb\services\CacheService;
  *   客户端地址可能来自可伪造的转发头。
  * - 缓存不可用时一律放行（失败开放）：宁可暂时失去节流，也不能因为 Redis 抖动
  *   把管理员挡在门外。
+ *
+ * 这里刻意没有"失败 N 次后直接拒绝"的硬锁，两个方向都行不通：本站点跑在反向代理
+ * 之后，框架默认不信任转发头，应用看到的来源地址对所有访客是同一个，按来源锁会
+ * 变成全局锁——任何人连续失败若干次就能把所有人挡在后台之外；按账号锁同样不行，
+ * 站点只有一个管理员，谁都能用连续的错误口令把店主关在门外。人机验证没有这个
+ * 副作用：它对自动化是实打实的成本，而本人随时可以自己通过。
  */
 final class AdminLoginGuard
 {
@@ -32,9 +38,6 @@ final class AdminLoginGuard
 
     /** 窗口内失败多少次后，登录必须附带通过的人机验证。 */
     const CAPTCHA_AFTER = 1;
-
-    /** 窗口内失败多少次后，连人机验证也不再受理。 */
-    const LOCK_AFTER = 10;
 
     /** 单个键最多保留多少条失败时间戳，避免缓存值无限增长。 */
     const MAX_SAMPLES = 32;
@@ -45,24 +48,6 @@ final class AdminLoginGuard
     public function captchaRequired(string $account, string $ip): bool
     {
         return $this->failures($account, $ip) >= self::CAPTCHA_AFTER;
-    }
-
-    /**
-     * 距离解锁还有多少秒；0 表示未锁定。
-     *
-     * 硬锁只按来源 IP 计，不按账号：按账号锁意味着任何人都能用连续的错误口令
-     * 把店主关在门外，对只有一个管理员的站点来说这个代价比爆破本身更大。
-     * 账号维度只用来强制人机验证，本人随时可以自己通过。
-     */
-    public function lockedSeconds(string $account, string $ip): int
-    {
-        $key = $this->ipKey($ip);
-        if ($key === '') return 0;
-        $samples = $this->samples($key);
-        if (count($samples) < self::LOCK_AFTER) return 0;
-        // 锁定到第 LOCK_AFTER 次失败离开窗口为止：窗口内失败越多，解锁越晚。
-        $oldest = $samples[count($samples) - self::LOCK_AFTER];
-        return max(0, $oldest + self::WINDOW - time());
     }
 
     /**
