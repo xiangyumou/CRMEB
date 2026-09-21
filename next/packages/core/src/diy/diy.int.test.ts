@@ -160,11 +160,13 @@ describe('saving content', () => {
     });
     expect(saved.content).toEqual({ '1': { name: 'titles', timestamp: 1 } });
 
+    // A raw read gets jsonb as text (see `@shop/db`'s client), so parse it here.
     const [row] = await harness.db.db
-      .execute<{ content: Record<string, unknown> }>(
-        `select content from diy_pages where id = ${Number(page.id)}`,
-      )
-      .then((r) => (r as unknown as { rows: { content: Record<string, unknown> }[] }).rows);
+      .execute<{ content: string }>(`select content from diy_pages where id = ${Number(page.id)}`)
+      .then((r) => (r as unknown as { rows: { content: string }[] }).rows)
+      .then((rows) =>
+        rows.map((r) => ({ content: JSON.parse(r.content) as Record<string, unknown> })),
+      );
     // `orderStatus` is not ours to touch, so it is still there. `version` is
     // ours: every content save mints a new one, exactly as the legacy editor
     // wrote a fresh `uniqid()` into `eb_diy.version`.

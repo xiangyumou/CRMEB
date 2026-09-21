@@ -131,6 +131,13 @@ export const refunds = pgTable(
     returnExpressCompanyId: fk().references(() => expressCompanies.id, { onDelete: 'set null' }),
     returnTrackingNo: varchar({ length: 64 }),
     returnPhone: varchar({ length: 20 }),
+    /**
+     * The shop's return address as it was shown to the buyer when the return
+     * was approved. Frozen (CR-5-c): a later edit of the `refund` config must
+     * not change what a buyer was told to do with goods already in the post.
+     * Null for `refund_only` and for approvals made before an address was set.
+     */
+    returnAddress: jsonb().$type<{ name: string; phone: string; address: string }>(),
 
     /** TRUE when the refund was opened automatically by a failed group buy. Legacy `is_pink_cancel`. */
     isAutomatic: boolean().notNull().default(false),

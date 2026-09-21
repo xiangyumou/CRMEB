@@ -1082,6 +1082,7 @@ CREATE TABLE "refunds" (
 	"return_express_company_id" bigint,
 	"return_tracking_no" varchar(64),
 	"return_phone" varchar(20),
+	"return_address" jsonb,
 	"is_automatic" boolean DEFAULT false NOT NULL,
 	"reviewed_by_admin_id" bigint,
 	"reviewed_at" timestamp with time zone,

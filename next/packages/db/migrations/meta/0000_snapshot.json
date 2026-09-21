@@ -1,5 +1,5 @@
 {
-  "id": "da70d6ff-cfbb-4772-9538-282dc1b7410b",
+  "id": "10b44e1d-f0ca-4c60-a238-6a058762139a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -10479,6 +10479,12 @@
         "return_phone": {
           "name": "return_phone",
           "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "return_address": {
+          "name": "return_address",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },

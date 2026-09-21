@@ -111,6 +111,26 @@ describe('config.get', () => {
   });
 });
 
+describe('strings that look like JSON', () => {
+  // CR-6-c: node-postgres parsed jsonb, then drizzle parsed any string again, so
+  // an all-digit merchant id came back as a number and fell to its default.
+  it.each(['1900000001', 'true', 'null', '{"a":1}', '013800138000', 'abc'])(
+    'reads %j back as the string that was saved',
+    async (value) => {
+      await config.set(paymentConfig, { wechatMchId: value });
+      config.invalidate?.('payment');
+      const raw = await harness.ctx.db.select({ value: configValues.value }).from(configValues);
+      expect(raw.map((row) => row.value)).toContain(value);
+      expect((await config.get(paymentConfig)).wechatMchId).toBe(value);
+    },
+  );
+
+  it('still reads objects and arrays as values, parsed once', async () => {
+    await config.set(paymentConfig, { notifyUrls: ['https://a.example', '42'] });
+    expect((await config.get(paymentConfig)).notifyUrls).toEqual(['https://a.example', '42']);
+  });
+});
+
 describe('config.set', () => {
   it('writes only the keys that actually changed', async () => {
     await config.set(paymentConfig, { wechatEnabled: true });
