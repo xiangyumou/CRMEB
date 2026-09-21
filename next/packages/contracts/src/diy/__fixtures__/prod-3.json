@@ -1,0 +1,12 @@
+{
+  "id": 3,
+  "name": "分类页选择",
+  "type": 1,
+  "title": "",
+  "is_del": 0,
+  "is_diy": 0,
+  "status": 0,
+  "template_name": "category",
+  "value": 1,
+  "default_value": 1
+}

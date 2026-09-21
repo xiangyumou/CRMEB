@@ -1,0 +1,12 @@
+{
+  "id": 4,
+  "name": "个人中心",
+  "type": 1,
+  "title": "",
+  "is_del": 0,
+  "is_diy": 0,
+  "status": 0,
+  "template_name": "member",
+  "value": 2,
+  "default_value": 1
+}
