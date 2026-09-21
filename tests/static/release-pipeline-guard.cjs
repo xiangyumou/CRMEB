@@ -57,6 +57,18 @@ assert(
 );
 assert(/scripts\/publish-release\.sh promote/.test(promote), 'promotion uses the tested script');
 
+// 6. The front-end artefact build stays reproducible. Measured before the fix:
+//    two builds of one commit produced different H5 and mini-program digests,
+//    because the working directory was a random mktemp path that vue-loader
+//    feeds into every styled chunk's module id, and because the mini-program
+//    compiler emitted components/home/index.json with the keys in an
+//    unstable order. Either one makes a retried publish of the same commit
+//    look like a content conflict, so both have to stay fixed.
+const buildUni = fs.readFileSync(path.join(root, 'scripts/build-uni.sh'), 'utf8');
+assert(!/\$\(mktemp/.test(buildUni), 'the uni-app build must not use a random working directory');
+assert(/work="\$root\/\.build\/uni-work"/.test(buildUni), 'the uni-app build works from a fixed directory');
+assert(/Object\.keys\(value\)\.sort\(\)/.test(buildUni), 'generated JSON keeps a stable key order');
+
 // 5. Releases are serialized repository-wide, never cancelled mid-publish.
 assert(
   /group:\s*container-publish-\$\{\{\s*github\.repository\s*\}\}/.test(container),

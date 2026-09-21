@@ -14,7 +14,13 @@ if (url.protocol !== 'https:' || url.origin !== value || url.username || url.pas
 NODE
 
 source_dir="$root/template/uni-app"
-work="$(mktemp -d)"
+# A fixed work directory, not mktemp: the H5 and mini-program builds embed a
+# hash of the working path in every styled chunk (vue-loader's style module id),
+# so a random directory makes two builds of one source produce different
+# artifacts and different release digests.
+work="$root/.build/uni-work"
+rm -rf "$work"
+mkdir -p "$work"
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/input/src" "$output"
 tar -C "$source_dir" --exclude=node_modules --exclude=unpackage --exclude=.hbuilderx -cf - . | tar -C "$work/input/src" -xf -
@@ -52,3 +58,32 @@ for target in h5 mp-weixin; do
   rm -rf "$dest"
   cp -a "$built" "$dest"
 done
+
+# The mini-program compiler writes component descriptor keys in the order its
+# resolver happened to visit them, so two builds of one source can differ
+# byte-for-byte (components/home/index.json is the known case). JSON member
+# order carries no meaning, so normalise it to keep the release digest stable.
+node - "$output/h5" "$output/mpWeixin" <<'NODE'
+const fs = require('fs');
+const path = require('path');
+const sorted = (value) => {
+  if (Array.isArray(value)) return value.map(sorted);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sorted(value[key])]));
+  }
+  return value;
+};
+const normalize = (file) => {
+  const raw = fs.readFileSync(file, 'utf8');
+  const next = JSON.stringify(sorted(JSON.parse(raw)), null, 2);
+  if (next !== raw) fs.writeFileSync(file, next);
+};
+const walk = (dir) => {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const file = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(file);
+    else if (file.endsWith('.json')) normalize(file);
+  }
+};
+for (const dir of process.argv.slice(2)) walk(dir);
+NODE
