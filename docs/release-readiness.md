@@ -10,7 +10,7 @@
 | # | 问题 | 证据 |
 |---|---|---|
 | 1 | `/api/crontab/*` 八个定时任务接口**匿名可达**。整个 `/api` 组挂的是 `AuthTokenMiddleware::class, false`（`$force=false` 时吞掉鉴权异常继续放行），而 `CrontabController` 不继承任何鉴权基类。任何人都能取消未支付订单、**强制确认收货**（压缩买家售后窗口）、删除昨日附件、反复触发无界开销的数据库操作。 | 改前实测八个端点全部返回 200，且一次匿名 GET 改写了 `runtime/.timer`。生产由独立 `timer` 容器跑定时任务，这组 HTTP 接口是冗余机制，整组删除。`StorefrontCronEndpointTest` + `retired-code-guard` 的路由回流检查。 |
-| 2 | 上传目录下的文件**会被当成 PHP 执行**。nginx 配置里没有任何 `/uploads` 规则，`.php` 直接命中通用的 `location ~ \.php$`；扩展名白名单是唯一一道防线，没有纵深防御。 | 改前实测：同一个文件返回 200 并执行了 PHP（回显 `RCE-EXECUTED`），改后 403。`UploadExecutionTest`（5 种可执行后缀 + 正常文件对照组）。 |
+| 2 | 上传目录下的文件**会被当成 PHP 执行**。nginx 配置里没有任何 `/uploads` 规则，`.php` 直接命中通用的 `location ~ \.php$`；扩展名白名单是唯一一道防线，没有纵深防御。 | 改前实测：同一个文件返回 200 并执行了 PHP（回显 `RCE-EXECUTED`），改后 403。`UploadExecutionTest`（5 种可执行后缀 + 正常文件对照组 + 点文件 + 缓存头）。注意 `^~` 会让 nginx **跳过后面全部正则 location**，所以只写一个前缀块会在堵住 PHP 执行的同时把全局那条 `location ~ /\.` 让掉、并悄悄改掉上传文件的缓存语义；这两条都在块里重写了一遍，各自有用例和变异条目。生产 `data/uploads` 实测 79 个文件全是图片，没有任何 `.php`/点文件，这个面没有被用过。 |
 | 3 | 前台 `/api/login` 没有验证码、没有失败计数、没有任何节流，任意顾客账号可被无限次试口令；口令存的是**无盐 MD5**，而后台用的是 bcrypt。 | 按账号维度节流（不按来源：代理后所有访客共用一个地址，按来源限速会变成全站限速），且冷却只看最近 60 秒而不是整个 15 分钟计数窗口——按整个窗口算，任何人都能靠持续制造失败把某个顾客账号**无限期**锁在门外；口令校验兼容历史 MD5 并在登录成功时就地升级为 bcrypt。`StorefrontLoginSecurityTest`。 |
 | 4 | `user.pwd` 是 `varchar(32)`，装不下 60 字符的 bcrypt。回归栈的 MySQL 非严格模式下会**静默截断**，被截断的哈希永远验不过——等于永久锁死账号。 | 新增 `upgrade/core-store/user-password-hash.php`（幂等、自校验、核对用户行数），已接进 `deploy/production/upgrade.sh`；`/readyz` 增加列宽检查。登录侧写完回读校验，验不过就写回原值，所以**代码与迁移谁先上线都不会锁死用户**，这条单独有用例。 |
 | 5 | `StoreOrderEffectServices::execute()` 声明返回 `bool`，但五个通知类 case 是 `break` 出 switch 的，函数末尾没有 return。PHP 7.4 抛 TypeError，通知其实已经发出去了，异常在那之后，于是**每一笔支付的五条通知副作用都被记成 UNKNOWN**，堆进人工对账队列，而重投会重复发通知。 | 由新引入的 phpstan 发现。`OrderEffectTest::testANoticeEffectIsRecordedAsDone`（5 个事件类型，修复前 5/5 失败）。注意 `FulfillmentAtomicityTest` 原本断言通知停在 UNKNOWN——**那条断言把缺陷当成了预期行为，这正是它能一直活着的原因**，已一并更正。 |
@@ -23,26 +23,27 @@
 
 - **PHP 静态分析**（此前完全没有）：`tests/static-analysis/` 独立 composer 项目，phpstan 1.12.30 固定版本，跑在已构建镜像里（应用的 vendor 只存在于镜像内），不需要 MySQL/Redis——这同时是目前唯一一条不用起整套栈的快反馈回路。level 1 起步 + baseline，含义是"从今天起不再新增"；框架 facade 的误报用 `ignoreErrors` 排除而不是塞进 baseline。首次运行就找出了上表第 5、8 条。
 - **变异检查进门禁**：`tests/deployment/mutation-check.sh` 此前只在发布时手动跑，变异覆盖会在两次发布之间悄悄腐化，现在进了 `scripts/check-maintenance.sh`。CI 的 regression job 相应补了拉取发布产物的步骤（变异脚本要读 `.build/release/build.json` 决定构建哪个 revision），超时从 10 分钟放宽到 60 分钟。
-- 新增保护逐条加进变异检查：前台登录节流、冷却有上界、口令升级回读校验、历史 MD5 兼容、上传目录 PHP 拦截、对账巡检读的是人工清单而非自动补投队列。
+- 新增保护逐条加进变异检查（14 → 21 项）：前台登录节流、冷却有上界、口令升级回读校验、历史 MD5 兼容、上传目录 PHP 拦截、上传目录点文件拦截、对账巡检读的是人工清单而非自动补投队列。
 
 ### 本轮门禁结果
 
 | 层次 | 结果 |
 |---|---|
-| PHPUnit（单元 + 真实 MySQL/Redis 集成 + HTTP + 并发） | **302 tests, 3714 assertions, 0 failure, 0 error**（上一轮 270 / 3628） |
+| PHPUnit（单元 + 真实 MySQL/Redis 集成 + HTTP + 并发） | **304 tests, 3720 assertions, 0 failure, 0 error**（上一轮 270 / 3628） |
 | PHP 7.4 语法检查 | 通过 |
 | phpstan（新增） | 0 errors（baseline 收住 289 条历史问题） |
 | 静态守卫（11 项） | 全部通过 |
 | 发布规则（真实本地 registry） | 8/8 |
 | 升级/回滚规则（真实一次性容器栈） | 9/9 |
-| 定向变异检查 | 20 detected, 0 undetected, 0 skipped（上一轮 14 项） |
-| 并发重复 | 20/20（另见下方说明） |
+| 定向变异检查 | **21 detected, 0 undetected, 0 skipped**（上一轮 14 项） |
+| 并发重复 | 门禁内 10/10；另见下方说明 |
 
 并发用例在机器被其它容器栈同时占用时观察到 2/32 次抖动，失败点是
 `PaymentConcurrencyTest::testACreateResponseTimeoutKeepsTheAttemptAsUnknown`。
-机器空闲后本分支 20/20、未改动的 HEAD 基线同条件 20/20，均未复现；支付链路
-（`StoreOrderController::pay` → `OrderPayServices` → 网关替身）不经过本轮改动的任何文件。
-记录在此：这个用例对机器负载敏感，而 `concurrency-stability.sh` 要求 10/10。
+机器空闲后本分支 20/20、未改动的 HEAD 基线同条件 20/20，均未复现；上线前这一次完整
+门禁又跑到 10/10。支付链路（`StoreOrderController::pay` → `OrderPayServices` → 网关替身）
+不经过本轮改动的任何文件。记录在此：这个用例对机器负载敏感，而 `concurrency-stability.sh`
+要求 10/10——也就是说，机器上同时跑着别的容器栈时它可能会红，那不是回归。
 
 ### 复查发现但**未修**的问题
 
@@ -57,7 +58,8 @@
 7. `SystemAttachment::videoDataSave()` 把客户端传来的路径原样写进附件表，没有任何校验；`onlineUpload()` 会抓取客户端给的 URL（SSRF 面）。
 8. 注册短信验证码用后不删（`LoginController` 约 `:219`），在有效期内可重放；手机号登录与绑定手机则会删。
 9. `template/admin/package-lock.json` 声明了 `package.json` 里并不存在的四个运行时依赖（`@better-scroll/core`、`better-scroll`、`countup`、`cropperjs`），是退役功能清理的残留。**不建议顺手重新生成锁文件**：实测重新生成会产生 2.4 万行差异，直接威胁"前端产物逐字节可复现"这条已验证的保证，应当单独做并配前后产物摘要比对。
-10. 自定义定时器与自定义事件的 `eval()` 执行路径在生产没有开关：写入侧有 `app_debug` + 口令 + 超管三道闸，但 `CrontabRunServices::customTimer()` 与 `CustomEventListener` 的执行侧不看 `app_debug`，库里只要存在一行 `customCode` 就会在生产执行。
+10. 自定义定时器与自定义事件的 `eval()` 执行路径在生产没有开关：写入侧有 `app_debug` + 口令 + 超管三道闸，但 `CrontabRunServices::customTimer()` 与 `CustomEventListener` 的执行侧不看 `app_debug`，库里只要存在一行 `customCode` 就会在生产执行。**实测生产 `eb_system_timer` 的 7 条启用任务 `customCode` 全为空**，所以当前没有任何东西会被 eval，但这只是数据状态，不是保护。
+11. `SystemCrontabServices::crontabApiRun()` 在删掉 `CrontabController` 之后成了**不可达的死代码**（全仓库只剩它自己的定义）。它也是除定时器循环之外最后一条能走到 `customTimer()`/`eval()` 的路径，删掉可以直接缩小上一条的可达面。本轮没有一并删，是因为发现它时门禁已经在跑，而删一段不可达代码的运行时收益为零、却要让整条门禁重跑——留作单独改动。
 
 ---
 
