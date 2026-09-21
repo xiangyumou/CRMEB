@@ -3,3 +3,5 @@ packages:
   - packages/*
   - e2e/*
   - guards
+allowBuilds:
+  esbuild: true
