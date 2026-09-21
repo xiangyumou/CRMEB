@@ -20,8 +20,11 @@ During Phase 0 these are delegated to the P0 executors named below and revert to
 
 | Stream | Paths |
 |---|---|
-| P0-a platform | `next/packages/{config,db,core,contracts,testing}/**` (not `contracts/src/_conventions/{route,errors,common}.ts`), `next/apps/worker/**`, `next/apps/web/src/server/**`, `next/apps/web/app/{admin-api,api}/**`, root lockfile, `.github/workflows/next.yml` |
-| P0-b admin shell | `next/apps/web/**` except `src/server/**` and `app/{admin-api,api}/**` |
+| P0-S business schema | `next/packages/db/src/schema/<domain>.ts` for every business domain, `next/packages/db/{src/seed,seed-data,scripts,docs}/**` |
+| P0-A platform runtime | `next/packages/{config,core,testing}/**`, `next/packages/contracts/**` (not `_conventions/`), `next/packages/db/src/schema/{auth,system}.ts`, `next/apps/worker/**`, `next/apps/web/src/server/**`, `next/apps/web/app/{admin-api,api}/**`, `.github/workflows/next.yml` |
+| P0-B admin shell | `next/apps/web/**` except `src/server/**` and `app/{admin-api,api}/**` |
+
+The orchestrator owns the lockfile, `pnpm-workspace.yaml`, the `0000_init` migration and cross-file foreign keys, and wires them when merging the three.
 
 ## Domain streams
 
