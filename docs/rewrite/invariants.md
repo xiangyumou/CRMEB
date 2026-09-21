@@ -51,10 +51,10 @@ Owner: **B1**
 
 | Legacy ID | Invariant | New test ID | State |
 |---|---|---|---|
-| PRICE-001 | Integral deduction accounts for frozen points and the configured maximum. | | unmapped |
-| PRICE-002 | Disabled integral deduction leaves price and available points unchanged. | | unmapped |
-| PRICE-003 | Ordinary item pricing, coupon thresholds and freight boundaries. | | unmapped |
-| PRICE-004 | Multi-item order pricing returns the cart list with its spread ids and splits the coupon across every row. | | unmapped |
+| PRICE-001 | Integral deduction accounts for frozen points and the configured maximum. **Not B1's to port: points are a `PricingContributor`, and the contributor has not shipped. See CR-4-b1.** | | unmapped |
+| PRICE-002 | Disabled integral deduction leaves price and available points unchanged. **Not B1's to port — see CR-4-b1.** | | unmapped |
+| PRICE-003 | Ordinary item pricing, coupon thresholds and freight boundaries. | `packages/core/src/order/order.int.test.ts::checkout preview > prices the ticked cart rows with freight and a coupon`, `packages/core/src/order/order.pricing.test.ts::payableOf > is items + freight - discount`, `packages/core/src/order/order.pricing.test.ts::payableOf > floors at zero rather than owing the shopper money`, `packages/core/src/order/order.pricing.test.ts::payableOf > still charges freight when the goods are fully discounted`, `packages/core/src/order/order.pricing.test.ts::couponAdjustment > discounts only the lines inside the coupon scope` | ported |
+| PRICE-004 | Multi-item order pricing returns the cart list with its spread ids and splits the coupon across every row. | `packages/core/src/order/order.int.test.ts::order creation > per-line discount shares add back up to the order total`, `packages/core/src/order/order.pricing.test.ts::splitAdjustments > adds the shares back to the total for an awkward three-way split`, `packages/core/src/order/order.pricing.test.ts::distribute > gives the leftover fen to the largest remainder, deterministically` | ported |
 
 ## Stock
 
@@ -62,10 +62,27 @@ Owner: **B1**
 
 | Legacy ID | Invariant | New test ID | State |
 |---|---|---|---|
-| STOCK-001 | Zero and negative inventory deductions are rejected. | | unmapped |
-| STOCK-002 | A deduction larger than available stock is rejected without changing stock or sales. | | unmapped |
-| STOCK-003 | Two concurrent deductions of the last item yield one success, final stock 0 and sales 1. | | unmapped |
-| STOCK-004 | Activity inventory requires sufficient stock and quota in the same update. | | unmapped |
+| STOCK-001 | Zero and negative inventory deductions are rejected. | `packages/core/src/order/order.int.test.ts::the stock port > refuses a line of zero, negative or fractional units without touching anything` | ported |
+| STOCK-002 | A deduction larger than available stock is rejected without changing stock or sales. | `packages/core/src/order/order.int.test.ts::the stock port > takes nothing when one line of several is short, and names that line`, `packages/core/src/order/order.int.test.ts::order creation > refuses when the stock ran out between the preview and the submit` | ported |
+| STOCK-003 | Two concurrent deductions of the last item yield one success, final stock 0 and sales 1. | `packages/core/src/order/order.concurrency.int.test.ts::two checkouts for the last unit > sells it exactly once`, `packages/core/src/order/order.concurrency.int.test.ts::two checkouts for the last unit > sells ten units to exactly ten of twelve buyers` | ported |
+| STOCK-004 | Activity inventory requires sufficient stock and quota in the same update. **Not B1's to port: activity stock belongs to an `OrderKindHandler`. See CR-4-b1.** | | unmapped |
+
+## Risk matrix additions (cart, pricing and order creation)
+
+Owner: **B1**
+
+From `tests/regression/risk-matrix.md` sections 1 and 2, the entries whose
+verdict was "new" or "thin". The ids are B1's; the matrix names the entry, not
+an id.
+
+| Legacy ID | Invariant | New test ID | State |
+|---|---|---|---|
+| RISK-B1-001 | An off-shelf or deleted product refuses the order instead of being quietly dropped from the lines, and its cart row stays visible with a reason so the shopper can act on it. | `packages/core/src/order/order.int.test.ts::checkout preview > refuses an off-shelf line instead of quietly dropping it`, `packages/core/src/cart/cart.int.test.ts::listing the cart > shows a dead row with a reason instead of dropping it`, `packages/core/src/cart/cart.int.test.ts::listing the cart > filters to the sellable rows and to the dead ones` | ported |
+| RISK-B1-002 | A SKU whose price moved between the confirmation and the submit refuses the order rather than charging the new price: the client echoes the payable amount it was shown and a mismatch is `ORDER_PRICE_CHANGED`. | `packages/core/src/order/order.int.test.ts::order creation > refuses when the shopper was shown a different price` | ported |
+| RISK-B1-003 | The cart price is read live, never from the row, so the confirmation cannot promise a price the product no longer has. | `packages/core/src/cart/cart.int.test.ts::listing the cart > reads the price live rather than from the row` | ported |
+| RISK-B1-004 | A double submit of the same order key creates one order and answers every caller with it, decided by a UNIQUE constraint rather than by a cache lock. | `packages/core/src/order/order.concurrency.int.test.ts::the same idempotency key submitted several times at once > creates exactly one order and answers every caller with it`, `packages/core/src/order/order.concurrency.int.test.ts::the same idempotency key submitted several times at once > lets a key be reused after the order it was claiming rolled back`, `apps/web/app/api/v1/checkout.int.test.ts::/api/v1/checkout and /api/v1/orders > returns the same order for a replayed submit, still 201` | ported |
+| RISK-B1-005 | A creation that fails half-way leaves nothing behind: the coupon unspent, no order row, and every unit of stock already taken handed straight back. | `packages/core/src/order/order.concurrency.int.test.ts::two checkouts for the last unit > hands back every line it already took when a later line is short`, `packages/core/src/order/order.concurrency.int.test.ts::one coupon spent by two orders at once > is redeemed once, and the losing order does not exist`, `apps/web/app/api/v1/checkout.int.test.ts::/api/v1/checkout and /api/v1/orders > refuses a coupon that was already spent, and writes nothing` | ported |
+| RISK-B1-006 | The order and its items are one insert in one transaction, so there is no window in which an order exists without its lines, and a cancellation that cannot finish leaves the order exactly as it was. | `packages/core/src/order/order.int.test.ts::order creation > creates the order, takes the stock, empties the cart and schedules the cancel`, `packages/core/src/order/order.int.test.ts::cancellation > rolls the whole cancellation back when the stock cannot be returned` | ported |
 
 ## Queue and lifecycle
 
@@ -73,21 +90,21 @@ Owner: **B1 / C**
 
 | Legacy ID | Invariant | New test ID | State |
 |---|---|---|---|
-| QUEUE-001 | Paid, deleted, offline and already cancelled orders are not restored by the unpaid-cancel job. | | unmapped |
-| QUEUE-002 | An eligible unpaid order restores resources and persists cancellation state once. | | unmapped |
-| QUEUE-003 | A cancellation settles the payment gateway before it releases anything: settlement runs first, the attempt is marked closed, and only then are the coupon and the stock restored. | | unmapped |
-| QUEUE-004 | An unconfirmed gateway state (unknown or timeout) releases nothing: the attempt is neither closed nor marked, the coupon and the stock stay with the order and the job reports failure. | | unmapped |
-| QUEUE-005 | A gateway payment discovered during cancellation keeps the order alive, runs the unified local confirmation with the query's fresh trade number inside the original order lock, and releases no resource. | | unmapped |
-| QUEUE-006 | When the stock restore fails the coupon return, the stock restore and the cancel flag roll back together and no coupon_back status row survives. | | unmapped |
-| QUEUE-007 | When the coupon cannot be returned the stock restore never runs and no stock layer is touched. | | unmapped |
-| QUEUE-008 | Cancelling a presale order restores all four ledgers (the presale activity row, its type-6 SKU, the product row and its type-0 SKU) with deliberately different presale and product ids, so a restore through the ordinary layer cannot pass on matching totals. | | unmapped |
-| QUEUE-009 | Two concurrent cancellations of one order release the stock and the coupon once and write one coupon_back row; the loser observes the committed cancellation. | | unmapped |
-| QUEUE-010 | Payment success records exactly one effect for the order and hands that recorded row to the repair job, which runs the effect it was given; the row is never written by a second path. | | unmapped |
-| QUEUE-011 | A repeated callback reuses the effect entry it already wrote, and one delivery claims it: a second concurrent delivery cannot run the same effect, a finished, freshly claimed or attempt-exhausted record is not re-delivered, an unknown or interrupted one is, and a failed effect records the unknown outcome with its attempt counted. | | unmapped |
-| ORDER-001 | The retained purchase path over real HTTP: cart, confirm, computed, create — the order lands with the stock decremented and `order/computed` returns the same price the confirmation promised. | | unmapped |
-| ORDER-002 | Order creation queues `UnpaidOrderCancelJob` for the new order, so abandoned orders expire and release stock. | | unmapped |
-| ORDER-003 | An unpaid order can be cancelled once, a paid one never, and neither leaves a duplicate status row. | | unmapped |
-| ORDER-004 | Over real HTTP, submitting an order with an already spent coupon is refused before any write: no order row, the product stock unchanged and the coupon still spent rather than returned. | | unmapped |
+| QUEUE-001 | Paid, deleted, offline and already cancelled orders are not restored by the unpaid-cancel job. | `packages/core/src/order/order.int.test.ts::auto-cancel > does nothing while the payment window is still open`, `packages/core/src/order/order.int.test.ts::auto-cancel > is a no-op the second time, so the queue may retry it`, `packages/core/src/order/order.int.test.ts::cancellation > never cancels a paid order — that road leads through a refund` | ported |
+| QUEUE-002 | An eligible unpaid order restores resources and persists cancellation state once. | `packages/core/src/order/order.int.test.ts::auto-cancel > cancels once the window has closed, and logs it as automatic`, `packages/core/src/order/order.int.test.ts::auto-cancel > sweeps every expired order and leaves the live ones alone` | ported |
+| QUEUE-003 | A cancellation settles the payment gateway before it releases anything: settlement runs first, the attempt is marked closed, and only then are the coupon and the stock restored. **B1 half done** — the release runs only after `PaymentPort.ensureNoOpenAttempts` answered `closed`, under the order's row lock; C closes the “attempt is marked closed” half when the real port lands. | `packages/core/src/order/order.int.test.ts::cancellation > gives back the stock and the coupon, and stamps the row` | unmapped |
+| QUEUE-004 | An unconfirmed gateway state (unknown or timeout) releases nothing: the attempt is neither closed nor marked, the coupon and the stock stay with the order and the job reports failure. **B1 half done**; the attempt assertions are C's. | `packages/core/src/order/order.int.test.ts::cancellation > refuses, and releases nothing, when the gateway will not answer` | unmapped |
+| QUEUE-005 | A gateway payment discovered during cancellation keeps the order alive, runs the unified local confirmation with the query's fresh trade number inside the original order lock, and releases no resource. **B1 half done** — the order stays alive and nothing is released; the local confirmation is C's. | `packages/core/src/order/order.int.test.ts::cancellation > refuses, and releases nothing, when the gateway says the money arrived`, `packages/core/src/order/order.concurrency.int.test.ts::cancel racing the paid transition > refuses the cancellation outright when the gateway reports the money arrived` | unmapped |
+| QUEUE-006 | When the stock restore fails the coupon return, the stock restore and the cancel flag roll back together and no coupon_back status row survives. | `packages/core/src/order/order.int.test.ts::cancellation > rolls the whole cancellation back when the stock cannot be returned` | ported |
+| QUEUE-007 | When the coupon cannot be returned the stock restore never runs and no stock layer is touched. | `packages/core/src/order/order.int.test.ts::cancellation > gives nothing back when the coupon cannot be returned` | ported |
+| QUEUE-008 | Cancelling a presale order restores all four ledgers (the presale activity row, its type-6 SKU, the product row and its type-0 SKU) with deliberately different presale and product ids, so a restore through the ordinary layer cannot pass on matching totals. **Not B1's to port: presale is an `OrderKindHandler`, which restores its own ledgers from `onOrderCancelled`. See CR-4-b1.** | | unmapped |
+| QUEUE-009 | Two concurrent cancellations of one order release the stock and the coupon once and write one coupon_back row; the loser observes the committed cancellation. | `packages/core/src/order/order.concurrency.int.test.ts::auto-cancel racing the user cancel > cancels once, returns the stock once and returns the coupon once`, `packages/core/src/order/order.concurrency.int.test.ts::auto-cancel racing the user cancel > survives the sweep and the shopper arriving together on many orders` | ported |
+| QUEUE-010 | Payment success records exactly one effect for the order and hands that recorded row to the repair job, which runs the effect it was given; the row is never written by a second path. **C's: the payment-success effect is written by the payment domain.** | | unmapped |
+| QUEUE-011 | A repeated callback reuses the effect entry it already wrote, and one delivery claims it: a second concurrent delivery cannot run the same effect, a finished, freshly claimed or attempt-exhausted record is not re-delivered, an unknown or interrupted one is, and a failed effect records the unknown outcome with its attempt counted. **C's, with the dispatcher itself owned by the platform.** | | unmapped |
+| ORDER-001 | The retained purchase path over real HTTP: cart, confirm, computed, create — the order lands with the stock decremented and `order/computed` returns the same price the confirmation promised. | `apps/web/app/api/v1/checkout.int.test.ts::/api/v1/checkout and /api/v1/orders > previews without writing, then creates with 201`, `apps/web/app/api/v1/checkout.int.test.ts::/api/v1/cart > adds with 201 and lists what was added` | ported |
+| ORDER-002 | Order creation queues `UnpaidOrderCancelJob` for the new order, so abandoned orders expire and release stock. | `packages/core/src/order/order.int.test.ts::order creation > creates the order, takes the stock, empties the cart and schedules the cancel` | ported |
+| ORDER-003 | An unpaid order can be cancelled once, a paid one never, and neither leaves a duplicate status row. | `packages/core/src/order/order.int.test.ts::cancellation > gives back the stock and the coupon, and stamps the row`, `packages/core/src/order/order.int.test.ts::cancellation > refuses a second cancellation`, `packages/core/src/order/order.int.test.ts::cancellation > never cancels a paid order — that road leads through a refund`, `apps/web/app/api/v1/checkout.int.test.ts::/api/v1/checkout and /api/v1/orders > cancels through the sub-resource and refuses the second attempt with 409` | ported |
+| ORDER-004 | Over real HTTP, submitting an order with an already spent coupon is refused before any write: no order row, the product stock unchanged and the coupon still spent rather than returned. | `apps/web/app/api/v1/checkout.int.test.ts::/api/v1/checkout and /api/v1/orders > refuses a coupon that was already spent, and writes nothing` | ported |
 
 ## Core business invariants (independent review)
 

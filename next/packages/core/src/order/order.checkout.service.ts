@@ -1,0 +1,621 @@
+import type {
+  CheckoutCreateBody,
+  CheckoutLine,
+  CheckoutPreview,
+  CheckoutPreviewBody,
+  OrderDetail,
+  OrderReceiver,
+} from '@shop/contracts/order/schemas';
+import type { DbOrTx } from '@shop/db';
+import * as coupon from '../coupon';
+import { requireUserId, type Ctx } from '../kernel/context';
+import { DomainError } from '../kernel/errors';
+import { fromId, generateOrderNo, toId, toIdOrNull } from '../kernel/ids';
+import { Money } from '../kernel/money';
+import {
+  resolveCatalogPort,
+  resolveFreightPort,
+  resolveStockPort,
+  type CustomFormField,
+  type SkuForSale,
+} from './catalog.port';
+import { orderConfig } from './order.config';
+import {
+  couponAdjustment,
+  fallbackFreightQuote,
+  freightLineOf,
+  goodsTotalOf,
+  lineSubtotal,
+  payableOf,
+  pricingLineOf,
+  splitAdjustments,
+  type DiscountSplit,
+} from './order.pricing';
+import { detailOf } from './order.query.service';
+import * as repo from './order.repo';
+import type { OrderItemSnapshot } from './order.repo';
+import {
+  getOrderKindHandler,
+  getPricingContributors,
+  type PriceAdjustment,
+  type StockLine,
+} from './ports';
+
+/**
+ * 确认订单 and 提交订单.
+ *
+ * The design in one sentence: **preview and create take the same input and
+ * price it the same way, from scratch, on the server**. Legacy handed the
+ * client a cache key from `order/confirm`, priced it again in
+ * `order/computed/:key` and created the order from the key a third time — three
+ * chances for the cached draft and the world to disagree, and the source of the
+ * "price changed between confirm and submit" class of bug. Here there is one
+ * `buildDraft`, called by both, and the only thing the client may assert is
+ * `expectedPayableAmount`, which is checked and refused rather than trusted.
+ *
+ * The creating transaction, in order:
+ *
+ *  1. claim the idempotency key — **first**, so a loser has written nothing;
+ *  2. build the draft from the database inside the transaction;
+ *  3. insert the order and its items;
+ *  4. reserve stock, one conditional statement per line;
+ *  5. redeem the coupon, in this same transaction;
+ *  6. empty the cart rows the order consumed.
+ *
+ * Anything that fails aborts all six. The auto-cancel job is enqueued *after*
+ * the commit, because a queue is not transactional.
+ */
+
+const AUTO_CANCEL_JOB = 'order.autoCancel';
+
+/** The dedupe key that stops a retried submit queueing two cancellations. */
+export function autoCancelKey(orderId: number): string {
+  return `order-auto-cancel:${orderId}`;
+}
+
+// ---------------------------------------------------------------------------
+// draft
+// ---------------------------------------------------------------------------
+
+interface DraftLine {
+  /** `null` for 立即购买, which never touches the cart. */
+  cartItemId: number | null;
+  sku: SkuForSale;
+  quantity: number;
+  itemKey: string;
+  unitPrice: Money;
+  subtotal: Money;
+}
+
+interface Draft {
+  userId: number;
+  lines: DraftLine[];
+  address: repo.AddressRow | null;
+  addressRequired: boolean;
+  itemsAmount: Money;
+  discount: DiscountSplit;
+  freightAmount: Money;
+  payableAmount: Money;
+  userCouponId: number | null;
+  customFormFields: CustomFormField[];
+  payWindowMinutes: number;
+  /** The cart rows this draft consumed, for the delete after the order exists. */
+  cartItemIds: number[];
+}
+
+/** `order_items.item_key` — stable within an order, and one row per variant. */
+const itemKeyOf = (skuId: number): string => `sku-${skuId}`;
+
+/**
+ * `X-Client-Platform` spells the two WeChat surfaces with a hyphen
+ * (`wechat-mini`) and the `orders_platform` enum spells them with an
+ * underscore (`wechat_mini`). One translation, here, rather than a guess at
+ * each call site. Noted for B2 and C, who store the same value.
+ */
+const PLATFORM: Record<string, 'h5' | 'wechat_oa' | 'wechat_mini'> = {
+  h5: 'h5',
+  'wechat-oa': 'wechat_oa',
+  'wechat-mini': 'wechat_mini',
+};
+
+async function requestedLines(
+  db: DbOrTx,
+  userId: number,
+  input: CheckoutPreviewBody,
+): Promise<{ cartItemId: number | null; skuId: number; quantity: number }[]> {
+  if (input.source === 'buy-now') {
+    if (!input.item) throw new DomainError('ORDER_EMPTY');
+    return [{ cartItemId: null, skuId: fromId(input.item.skuId), quantity: input.item.quantity }];
+  }
+  const rows = await repo.selectCartLines(db, {
+    userId,
+    cartItemIds: input.cartItemIds.map(fromId),
+  });
+  return rows.map((row) => ({
+    cartItemId: row.cartItemId,
+    skuId: row.skuId,
+    quantity: row.quantity,
+  }));
+}
+
+/**
+ * Everything a line must satisfy before it may be priced at all. Stock is
+ * *not* checked here: the preview would only be telling the shopper about a
+ * number that can change before they submit, and the create path settles it
+ * for real with a conditional `reserve`.
+ */
+function assertSellable(
+  sku: SkuForSale | undefined,
+  skuId: number,
+  quantity: number,
+  purchased: number,
+): asserts sku is SkuForSale {
+  if (!sku || sku.deleted || !sku.onSale) {
+    throw new DomainError('ORDER_ITEM_UNAVAILABLE', { details: { skuIds: [toId(skuId)] } });
+  }
+  if (sku.productKind === 'virtual_card' && quantity > 1) {
+    // `product_virtual_cards_order_item_uq`: one card key binds to one order item.
+    throw new DomainError('ORDER_VIRTUAL_CARD_QUANTITY', { details: { skuId: toId(skuId) } });
+  }
+  if (quantity < sku.minPurchaseQuantity) {
+    throw new DomainError('ORDER_BELOW_MIN_PURCHASE', {
+      details: { skuId: toId(skuId), minimum: sku.minPurchaseQuantity },
+    });
+  }
+  const limit = sku.purchaseLimitQuantity;
+  if (sku.purchaseLimitMode === 'per_order' && limit !== null && quantity > limit) {
+    throw new DomainError('ORDER_PURCHASE_LIMIT_REACHED', {
+      details: { skuId: toId(skuId), limit },
+    });
+  }
+  if (sku.purchaseLimitMode === 'lifetime' && limit !== null && purchased + quantity > limit) {
+    throw new DomainError('ORDER_PURCHASE_LIMIT_REACHED', {
+      details: { skuId: toId(skuId), limit, purchased },
+    });
+  }
+}
+
+async function resolveAddress(
+  db: DbOrTx,
+  userId: number,
+  addressId: string | null | undefined,
+): Promise<repo.AddressRow | null> {
+  if (addressId === null) return null;
+  if (addressId === undefined) return repo.findDefaultAddress(db, userId);
+  const row = await repo.findAddress(db, { id: fromId(addressId), userId });
+  if (!row) throw new DomainError('ORDER_ADDRESS_NOT_FOUND');
+  return row;
+}
+
+/**
+ * Gathers every adjustment: the registered `PricingContributor`s in `priority`
+ * order first, then the coupon. The coupon runs last on purpose — it is the
+ * thing the shopper picked, so it should apply to what the automatic rules
+ * left, not the other way round.
+ */
+async function gatherAdjustments(
+  ctx: Ctx,
+  userId: number,
+  lines: readonly DraftLine[],
+  userCouponId: number | null,
+  selections: Record<string, string | undefined>,
+): Promise<PriceAdjustment[]> {
+  const draft = {
+    userId,
+    lines: lines.map(pricingLineOf),
+    goodsTotal: goodsTotalOf(lines),
+    selections,
+  };
+
+  const out: PriceAdjustment[] = [];
+  for (const contributor of getPricingContributors()) {
+    out.push(...(await contributor.contribute(ctx, draft)));
+  }
+
+  if (userCouponId !== null) {
+    const quoted = await coupon.quote(ctx, {
+      userCouponId,
+      userId,
+      lines: lines.map((line) => ({
+        productId: line.sku.productId,
+        categoryIds: line.sku.categoryIds,
+        amount: line.subtotal,
+      })),
+    });
+    out.push(
+      couponAdjustment({
+        label: '优惠券抵扣',
+        discount: quoted.discount,
+        lines,
+        eligibleLineIndexes: quoted.eligibleLineIndexes,
+      }),
+    );
+  }
+  return out;
+}
+
+async function quoteFreight(
+  ctx: Ctx,
+  lines: readonly DraftLine[],
+  address: repo.AddressRow | null,
+): Promise<Money> {
+  const physical = lines.filter((line) => line.sku.productKind === 'physical');
+  // Nothing to ship, or nowhere to ship it to: the shopper is shown zero and
+  // the create path refuses the order for want of an address anyway.
+  if (physical.length === 0 || address === null) return Money.ZERO;
+
+  const port = resolveFreightPort();
+  const quote = port
+    ? await port.quote(ctx, {
+        addressCityId: address.cityId,
+        lines: physical.map(freightLineOf),
+      })
+    : fallbackFreightQuote(physical);
+  return Money.fromFen(quote.totalFen);
+}
+
+function customFormFieldsOf(lines: readonly DraftLine[]): CustomFormField[] {
+  const seen = new Map<string, CustomFormField>();
+  for (const line of lines) {
+    for (const field of line.sku.customForm ?? []) {
+      if (!seen.has(field.key)) seen.set(field.key, field);
+    }
+  }
+  return [...seen.values()];
+}
+
+async function buildDraft(
+  ctx: Ctx,
+  db: DbOrTx,
+  userId: number,
+  input: CheckoutPreviewBody,
+): Promise<Draft> {
+  const requested = await requestedLines(db, userId, input);
+  if (requested.length === 0) throw new DomainError('ORDER_EMPTY');
+
+  const catalog = resolveCatalogPort();
+  const skus = await catalog.getSkusForSale(
+    db,
+    requested.map((line) => line.skuId),
+  );
+  const purchased = await repo.purchasedQuantity(db, {
+    userId,
+    productIds: [...skus.values()].map((sku) => sku.productId),
+  });
+
+  const lines: DraftLine[] = requested.map((line) => {
+    const sku = skus.get(line.skuId);
+    assertSellable(sku, line.skuId, line.quantity, purchased.get(sku?.productId ?? -1) ?? 0);
+    const unitPrice = Money.parse(sku.unitPrice);
+    return {
+      cartItemId: line.cartItemId,
+      sku,
+      quantity: line.quantity,
+      itemKey: itemKeyOf(line.skuId),
+      unitPrice,
+      subtotal: lineSubtotal(unitPrice, line.quantity),
+    };
+  });
+
+  const address = await resolveAddress(db, userId, input.addressId);
+  const userCouponId =
+    input.userCouponId === null || input.userCouponId === undefined
+      ? null
+      : fromId(input.userCouponId);
+
+  const adjustments = await gatherAdjustments(ctx, userId, lines, userCouponId, {
+    couponId: input.userCouponId ?? undefined,
+  });
+  const discount = splitAdjustments(lines, adjustments);
+  const itemsAmount = goodsTotalOf(lines);
+  const freightAmount = await quoteFreight(ctx, lines, address);
+  const { payWindowMinutes } = await ctx.config.get(orderConfig);
+
+  return {
+    userId,
+    lines,
+    address,
+    addressRequired: lines.some((line) => line.sku.productKind === 'physical'),
+    itemsAmount,
+    discount,
+    freightAmount,
+    payableAmount: payableOf(itemsAmount, freightAmount, discount.total),
+    userCouponId,
+    customFormFields: customFormFieldsOf(lines),
+    payWindowMinutes,
+    cartItemIds: lines
+      .map((line) => line.cartItemId)
+      .filter((cartItemId): cartItemId is number => cartItemId !== null),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// preview
+// ---------------------------------------------------------------------------
+
+function receiverOf(address: repo.AddressRow | null): OrderReceiver | null {
+  if (!address) return null;
+  return {
+    addressId: toId(address.id),
+    name: address.receiverName,
+    phone: address.receiverPhone,
+    province: address.provinceName,
+    city: address.cityName,
+    district: address.districtName,
+    detail: address.detail,
+    postCode: address.postCode,
+  };
+}
+
+function checkoutLineOf(line: DraftLine, index: number, discount: DiscountSplit): CheckoutLine {
+  const share = discount.perLine[index] ?? Money.ZERO;
+  return {
+    itemKey: line.itemKey,
+    productId: toId(line.sku.productId),
+    skuId: toId(line.sku.skuId),
+    cartItemId: toIdOrNull(line.cartItemId),
+    productName: line.sku.productName,
+    productImageUrl: line.sku.productImageUrl,
+    productKind: line.sku.productKind,
+    skuImageUrl: line.sku.skuImageUrl,
+    specText: line.sku.specText,
+    unitName: line.sku.unitName,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice.toString(),
+    originalUnitPrice: line.sku.originalUnitPrice,
+    subtotal: line.subtotal.toString(),
+    discountAmount: share.toString(),
+    totalAmount: line.subtotal.sub(share).toString(),
+  };
+}
+
+function toPreview(draft: Draft): CheckoutPreview {
+  return {
+    lines: draft.lines.map((line, index) => checkoutLineOf(line, index, draft.discount)),
+    receiver: receiverOf(draft.address),
+    addressRequired: draft.addressRequired,
+    totalQuantity: draft.lines.reduce((sum, line) => sum + line.quantity, 0),
+    itemsAmount: draft.itemsAmount.toString(),
+    freightAmount: draft.freightAmount.toString(),
+    couponDiscount: draft.discount.total.toString(),
+    adjustments: draft.discount.applied.map((applied) => ({
+      source: applied.source,
+      label: applied.label,
+      amount: applied.amount.toString(),
+    })),
+    payableAmount: draft.payableAmount.toString(),
+    userCouponId: toIdOrNull(draft.userCouponId),
+    payWindowMinutes: draft.payWindowMinutes,
+    customFormFields: draft.customFormFields.map((field) => ({
+      key: field.key,
+      label: field.label,
+      type: field.type,
+      required: field.required,
+      ...(field.options ? { options: field.options } : {}),
+      ...(field.placeholder ? { placeholder: field.placeholder } : {}),
+    })),
+  };
+}
+
+/** 确认订单. Writes nothing, so the client may call it on every change. */
+export async function preview(ctx: Ctx, body: CheckoutPreviewBody): Promise<CheckoutPreview> {
+  const userId = requireUserId(ctx);
+  return toPreview(await buildDraft(ctx, ctx.db, userId, body));
+}
+
+// ---------------------------------------------------------------------------
+// create
+// ---------------------------------------------------------------------------
+
+function assertCustomFormComplete(
+  draft: Draft,
+  answers: Record<string, unknown> | undefined,
+): void {
+  const missing = draft.customFormFields
+    .filter((field) => field.required)
+    .filter((field) => {
+      const value = answers?.[field.key];
+      return value === undefined || value === null || value === '';
+    })
+    .map((field) => field.key);
+  if (missing.length > 0) {
+    throw new DomainError('ORDER_CUSTOM_FORM_INCOMPLETE', { details: { fields: missing } });
+  }
+}
+
+function snapshotOf(sku: SkuForSale): OrderItemSnapshot {
+  return {
+    productName: sku.productName,
+    productImageUrl: sku.productImageUrl,
+    productKind: sku.productKind,
+    skuCode: sku.skuCode,
+    specText: sku.specText,
+    specValues: sku.specValues,
+    ...(sku.skuImageUrl ? { skuImageUrl: sku.skuImageUrl } : {}),
+    ...(sku.unitName ? { unitName: sku.unitName } : {}),
+    ...(sku.barCode ? { barCode: sku.barCode } : {}),
+    ...(sku.weight ? { weight: sku.weight } : {}),
+    ...(sku.volume ? { volume: sku.volume } : {}),
+  };
+}
+
+/**
+ * The cost total, for the margin report. A variant with no recorded cost
+ * contributes nothing rather than zero-ing the order: `orders.cost_amount` is
+ * nullable precisely so "we do not know" is expressible.
+ */
+function costAmountOf(lines: readonly DraftLine[]): string | null {
+  if (lines.every((line) => line.sku.costUnitPrice === null)) return null;
+  return Money.sum(
+    lines.map((line) => Money.parseOrZero(line.sku.costUnitPrice).mul(line.quantity)),
+  ).toString();
+}
+
+export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderDetail> {
+  const userId = requireUserId(ctx);
+  const now = ctx.clock.now();
+
+  const outcome = await ctx.withTx(async (tx) => {
+    // First statement of the transaction. A loser has written nothing.
+    const claim = await repo.claimIdempotencyKey(tx, { userId, key: body.idempotencyKey, now });
+    if (!claim.won) {
+      const existing = await repo.findIdempotentOrderId(tx, { userId, key: body.idempotencyKey });
+      // `ON CONFLICT DO NOTHING` waits for the other inserter to settle, so by
+      // the time we are here the winner has committed and its id is readable.
+      if (existing !== null) return { orderId: existing, replayed: true, payWindowMinutes: 0 };
+      throw new DomainError('ORDER_EMPTY', { message: '订单正在提交中，请稍后重试' });
+    }
+
+    const draft = await buildDraft(ctx, tx, userId, body);
+    if (draft.addressRequired && draft.address === null) {
+      throw new DomainError('ORDER_ADDRESS_REQUIRED');
+    }
+    assertCustomFormComplete(draft, body.customForm);
+
+    if (body.expectedPayableAmount !== undefined) {
+      const expected = Money.parse(body.expectedPayableAmount);
+      if (!expected.eq(draft.payableAmount)) {
+        throw new DomainError('ORDER_PRICE_CHANGED', {
+          details: { expected: expected.toString(), actual: draft.payableAmount.toString() },
+        });
+      }
+    }
+
+    // Group-buy and presale attach here rather than forking this service.
+    const handler = getOrderKindHandler(body.kind);
+    if (body.kind !== 'normal' && !handler) {
+      throw new DomainError('VALIDATION_FAILED', {
+        message: '该订单类型暂不可用',
+        details: { kind: body.kind },
+      });
+    }
+    const kindMeta = handler
+      ? await handler.beforeCreate(ctx, tx, {
+          userId,
+          lines: draft.lines.map(pricingLineOf),
+          goodsTotal: draft.itemsAmount,
+          selections: { ...(body.kindMeta as Record<string, string | undefined>) },
+        })
+      : {};
+
+    const address = draft.address;
+    const order = await repo.insertOrder(tx, {
+      orderNo: generateOrderNo(ctx.clock),
+      userId,
+      kind: body.kind,
+      status: 'pending_payment',
+      platform: PLATFORM[ctx.platform ?? 'h5'] ?? 'h5',
+      totalQuantity: draft.lines.reduce((sum, line) => sum + line.quantity, 0),
+      itemsAmount: draft.itemsAmount.toString(),
+      freightAmount: draft.freightAmount.toString(),
+      couponDiscount: draft.discount.total.toString(),
+      payableAmount: draft.payableAmount.toString(),
+      costAmount: costAmountOf(draft.lines),
+      userCouponId: draft.userCouponId,
+      receiverName: address?.receiverName ?? '',
+      receiverPhone: address?.receiverPhone ?? '',
+      receiverProvince: address?.provinceName ?? '',
+      receiverCity: address?.cityName ?? '',
+      receiverDistrict: address?.districtName ?? null,
+      receiverDetail: address?.detail ?? '',
+      receiverPostCode: address?.postCode ?? null,
+      receiverCityId: address?.cityId ?? null,
+      buyerRemark: body.buyerRemark ?? null,
+      customForm: body.customForm ?? null,
+      payExpiresAt: new Date(now.getTime() + draft.payWindowMinutes * 60_000),
+    });
+
+    await repo.insertOrderItems(
+      tx,
+      draft.lines.map((line, index) => {
+        const share = draft.discount.perLine[index] ?? Money.ZERO;
+        return {
+          orderId: order.id,
+          productId: line.sku.productId,
+          skuId: line.sku.skuId,
+          itemKey: line.itemKey,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice.toString(),
+          originalUnitPrice: line.sku.originalUnitPrice,
+          costUnitPrice: line.sku.costUnitPrice,
+          discountAmount: share.toString(),
+          totalAmount: line.subtotal.sub(share).toString(),
+          snapshot: snapshotOf(line.sku),
+        };
+      }),
+    );
+
+    // One conditional statement per line. The loser of a last-unit race gets
+    // the line back here, not a negative stock and a CHECK violation.
+    const stockLines: StockLine[] = draft.lines.map((line) => ({
+      skuId: line.sku.skuId,
+      quantity: line.quantity,
+    }));
+    const short = await resolveStockPort().reserve(tx, order.id, stockLines);
+    if (short.length > 0) {
+      throw new DomainError('ORDER_OUT_OF_STOCK', {
+        details: {
+          lines: short.map((line) => ({ skuId: toId(line.skuId), wanted: line.quantity })),
+        },
+      });
+    }
+
+    // Spending the coupon belongs in the order's own transaction, exactly
+    // where legacy called `redeemCoupon`: pricing must not write, and a
+    // redemption must not survive a rolled-back order.
+    if (draft.userCouponId !== null) {
+      await coupon.redeem(tx, ctx, {
+        userCouponId: draft.userCouponId,
+        userId,
+        orderId: order.id,
+      });
+    }
+
+    if (handler) await handler.afterCreate(ctx, tx, order.id, kindMeta);
+
+    await repo.deleteCartLines(tx, { userId, cartItemIds: draft.cartItemIds });
+    await repo.insertStatusLog(tx, {
+      orderId: order.id,
+      changeType: 'created',
+      toStatus: 'pending_payment',
+      operatorKind: 'user',
+      operatorUserId: userId,
+      message: `提交订单，应付 ${draft.payableAmount.toString()}`,
+    });
+    await repo.recordIdempotentOrder(tx, {
+      userId,
+      key: body.idempotencyKey,
+      orderId: order.id,
+    });
+
+    return { orderId: order.id, replayed: false, payWindowMinutes: draft.payWindowMinutes };
+  });
+
+  // After the commit: a queue is not transactional, and an enqueue inside the
+  // transaction can be delivered before — or without — the row it refers to.
+  if (!outcome.replayed) {
+    const delay = outcome.payWindowMinutes * 60_000;
+    await ctx.queue.enqueue(
+      AUTO_CANCEL_JOB,
+      { orderId: toId(outcome.orderId) },
+      { delay, dedupeKey: autoCancelKey(outcome.orderId) },
+    );
+  }
+
+  return detailOf(ctx, { orderId: outcome.orderId, userId });
+}
+
+/**
+ * The lines 再次购买 puts back into the cart. Lives here rather than in the
+ * cart domain because it reads `order_items`; the cart calls it through
+ * `order/index.ts`.
+ */
+export async function rebuyLines(
+  ctx: Ctx,
+  input: { orderId: number; userId: number },
+): Promise<{ skuId: number; quantity: number }[]> {
+  const order = await repo.findOrderForUser(ctx.db, { id: input.orderId, userId: input.userId });
+  if (!order) throw new DomainError('ORDER_NOT_FOUND');
+  const items = await repo.listItems(ctx.db, [order.id]);
+  return items.map((item) => ({ skuId: item.skuId, quantity: item.quantity }));
+}
