@@ -1,0 +1,29 @@
+# Stream J — ETL runner and deployment
+
+**Worktree** `../CRMEB-wt/ws-j` · **Branch** `rewrite/ws-j-etl-deploy` · **Owns** `next/packages/etl/**` except `src/mappers/<domain>.ts` (each domain owns its mapper), `next/docker/**`, `deploy/next/**`, the image job in `.github/workflows/next.yml` (file a CR with the exact YAML; the orchestrator applies it) · reference: `deploy/production/{compose.yml,nginx.conf,upgrade.sh,rollback.sh,README.md}`, `next/packages/db/docs/SCHEMA.md` §legacy mapping, plan §6
+
+You have no contracts and no admin pages. The template's "Order of work" does not apply; this file does.
+
+## 1. ETL runner (`packages/etl`)
+- CLI `pnpm --filter @shop/etl etl <command>` (tsx entry `src/cli.ts`): `plan` (list groups, source row counts, target tables), `run [--group <name>] [--dry-run]`, `verify`, `assets`. Source: MySQL via `mysql2` from `LEGACY_DATABASE_URL`; target: `DATABASE_URL` through `@shop/db`.
+- A **group** = one domain's mapper + the tables it fills, run in one PostgreSQL transaction, idempotent by truncate-and-reload of exactly its target tables (`TRUNCATE … RESTART IDENTITY CASCADE` is forbidden — name the tables; order groups by FK dependency, declared in `src/groups.ts`). Ids are preserved; after each group reset the identity sequences to `max(id)`.
+- Mappers are pure functions already written or being written by domain streams (`src/mappers/{coupon,diy}.ts` exist; catalog, system/storage, user, shipping, cms, wechat/notify follow). Define the `Mapper` interface they must satisfy in `src/mapper.ts` from the two that exist — do not change their shape; if one does not fit, file a CR against that stream. For domains whose mapper has not landed, the runner reports the group as `pending`, never silently skips.
+- Cross-cutting rules (implement once in `src/lib/`): epoch seconds → `timestamptz` in Asia/Shanghai, `0` → `null`; money `decimal` strings carried as strings; tinyint → enum through explicit tables that throw on an unknown value; `lower(account)` collision check before load; bcrypt carried as `password_algo='bcrypt'`, MD5 as `md5_legacy`; attachment paths rewritten to storage keys; **orders, carts, payments, refunds, user coupons of orders are not migrated** (assert the target tables stay empty).
+- Config: each config group declares `legacyKeys`; the runner reads `eb_system_config`, maps through them, validates with the group's zod schema, and writes `config_values`. Report: mapped / dropped-by-allow-list (`src/config-dropped.ts`, each with a reason) / **unmapped → the run fails**. Never print a config value: reports show keys and `<set>` / `<empty>` only. Secrets stay secret in logs, errors and test snapshots.
+- `verify`: row counts per group against declared expectations (source filter → target), money sums for coupons and SKUs, DIY pages compared as parsed JSON after the documented stripping (CR-1-g1), every attachment row's file exists under the uploads root with a sha256 manifest, every FK target present, sequences ahead of `max(id)`.
+- `assets`: rsync-style copy plan of the uploads directory (prints the command; copies only with `--execute`), manifest writer.
+- Tests: unit tests for every lib rule; one int test that loads `test/fixtures/legacy-mini.sql` (hand-written, ~10 rows per migrated table, **synthetic data only — never a production dump in the repo**) into a Testcontainers MySQL, runs `run` twice (idempotency) and `verify`. A rehearsal against a real dump is an orchestrator task; give it a script: `scripts/rehearse.sh <dump.sql>`.
+
+## 2. Images (`next/docker`)
+`web.Dockerfile` (Next standalone output, non-root, `node:24-slim`, only the standalone tree + static + public), `worker.Dockerfile` (bundle `apps/worker` with its workspace deps — `pnpm deploy --prod` or an esbuild bundle; justify the choice), `edge/` (nginx: H5 SPA at `/` with history fallback, `/admin` + `/admin-api` + `/api` → web, `/uploads/` served from the volume with script execution denied and `X-Content-Type-Options: nosniff`, SSE path unbuffered with a long read timeout, body size limit matching the upload limit). Health: `web` `/healthz` + `/readyz` (exist), worker heartbeat file or Redis key.
+
+## 3. `deploy/next`
+`compose.yml` (project `crmeb-next`): `postgres:17`, `redis:7` (`maxmemory-policy noeviction`, AOF), `web`, `worker`, `edge`; images pinned by digest through `.env`; memory limits summing under 1.6 GB (host is 2 cores / 3.6 GB and still runs the old stack during cutover); volumes for pgdata, redis, uploads; Traefik labels mirroring `deploy/production/compose.yml` but **disabled by default** behind a profile/env switch, so bringing the stack up cannot take traffic from the old one. `migrate` one-shot service running `@shop/db` migrate + seed. Scripts: `upgrade.sh` (backup `pg_dump` → pull → migrate → up → readiness gate → rollback on failure), `rollback.sh` (previous digests + optional restore), `backup.sh`, `cutover.md` runbook (plan §6 steps, including switching Traefik labels and the rollback to the old stack, which is stopped, never deleted). Shell: `set -euo pipefail`, shellcheck-clean, no secrets in argv.
+
+You never SSH and never touch the production host; everything is proven locally with `docker compose` and in CI.
+
+## Invariants to prove
+`docs/rewrite/invariants.md` sections "Migration", "Backup, upgrade and rollback", "Deployment topology", "Release publishing": map each row to a test/script check or mark it retired with the reason. Add: ETL twice = same database (dump-compare); a failing group leaves its tables untouched; an unmapped config key fails the run; upgrade with a failing readiness gate ends on the previous digests.
+
+## Out of scope
+MySQL decommission, deleting the old stack or directories, DNS/ICP matters, a registry choice beyond what CI already uses (GHCR).
