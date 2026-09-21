@@ -15,6 +15,9 @@
 | 小程序产物 | `7449ba1931001b9c027491e552481303199b71f10ac4077eedcf49db50c1be24`（`publishable: false`，未配置 AppID） |
 | 门禁命令 | `sh scripts/check-maintenance.sh crmeb-test-current:latest` — 退出码 0 |
 | 工作区 | 构建与门禁期间工作区干净，`.build/release/build.json` 记录的提交与被测提交一致 |
+| 验收记录编号 | `acceptance-2026-09-21-order-payment-refund` |
+
+推广时的参数约定：`source_sha` 传入实际推送并已由 CI 发布 `sha-<sha>` 标签的提交；本记录之后的提交若只修改 `docs/`（以及 `README`、测试文档），其中的镜像内容与本文档记录的源码完全一致，可以直接作为推广目标。`acceptance_record` 传入上面的验收记录编号，`candidate_digest` 传入该提交标签解析出的 digest。
 
 镜像来源可核验：Dockerfile 用 `VCS_REF` 与镜像内 `build.json.gitCommit` 比对，前端产物在构建时被重新汇编并计算摘要，三个摘要都能独立复现（见第 4 节），因此“镜像里的前端产物来自这个提交”不是仅凭标签得出的结论。
 
