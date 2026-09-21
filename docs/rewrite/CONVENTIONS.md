@@ -34,7 +34,7 @@ A domain (`coupon`, `catalog`, `order`, …) owns exactly these paths and nothin
 | Admin pages    | `apps/web/app/admin/(shell)/<domain>/**`                                                    |
 | Admin menu     | `apps/web/src/admin/menu/<domain>.menu.ts`                                                  |
 | Jobs           | `apps/worker/src/jobs/<domain>.*.ts`                                                        |
-| Config groups  | `packages/core/src/system/config/<group>.config.ts` (group named after the domain)          |
+| Config groups  | `packages/core/src/<domain>/<group>.config.ts`, registered from the domain's `index.ts`     |
 | ETL            | `packages/etl/src/mappers/<domain>.ts`                                                      |
 | Tests          | next to the code as `*.test.ts` (unit) and `*.int.test.ts` (needs PG/Redis)                 |
 

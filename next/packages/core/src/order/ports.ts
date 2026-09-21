@@ -36,12 +36,13 @@ import { DomainError } from '../kernel/errors';
  * `refundStatus` alongside this one.
  */
 export const ORDER_STATUSES = [
-  'unpaid',
+  'pending_payment',
   'paid',
   'shipped',
   'received',
   'completed',
   'cancelled',
+  'refunded',
 ] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
@@ -53,11 +54,14 @@ export type TransitionTable<S extends string> = Readonly<Partial<Record<S, reado
  * that D and C can write their guards before B1 lands.
  */
 export const ORDER_TRANSITIONS: TransitionTable<OrderStatus> = Object.freeze({
-  unpaid: ['paid', 'cancelled'],
-  paid: ['shipped', 'cancelled'],
-  shipped: ['received'],
-  received: ['completed'],
-  // `completed` and `cancelled` are terminal.
+  // Mirrors the `orders_status` enum and its diagram in `db/src/schema/order.ts`.
+  // Only an unpaid order is cancelled; a paid one leaves through a full refund (stream C).
+  pending_payment: ['paid', 'cancelled'],
+  paid: ['shipped', 'refunded'],
+  shipped: ['received', 'refunded'],
+  received: ['completed', 'refunded'],
+  completed: ['refunded'],
+  // `cancelled` and `refunded` are terminal.
 });
 
 export function canTransition(

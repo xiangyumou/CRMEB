@@ -98,16 +98,16 @@ describe('fakeStockPort', () => {
 
 describe('fakeOrderStateMachine', () => {
   it('behaves like a conditional update: the second caller loses', async () => {
-    const machine = fakeOrderStateMachine({ 1: 'unpaid' });
-    expect(await machine.transition(tx, 1, ['unpaid'], 'paid')).toEqual({ won: true, affected: 1 });
-    const second = await machine.transition(tx, 1, ['unpaid'], 'paid');
+    const machine = fakeOrderStateMachine({ 1: 'pending_payment' });
+    expect(await machine.transition(tx, 1, ['pending_payment'], 'paid')).toEqual({ won: true, affected: 1 });
+    const second = await machine.transition(tx, 1, ['pending_payment'], 'paid');
     expect(second.won).toBe(false);
     expect(second.observed).toBe('paid');
   });
 
   it('reports nothing observed for an order it has never seen', async () => {
     const machine = fakeOrderStateMachine();
-    expect(await machine.transition(tx, 9, ['unpaid'], 'paid')).toEqual({
+    expect(await machine.transition(tx, 9, ['pending_payment'], 'paid')).toEqual({
       won: false,
       affected: 0,
     });

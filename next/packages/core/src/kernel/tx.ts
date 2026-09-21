@@ -130,7 +130,7 @@ export interface ConditionalUpdateResult {
  *
  * @example
  * const { won } = await conditionalUpdate(tx, orders, {
- *   where: and(eq(orders.id, id), eq(orders.status, 'unpaid')),
+ *   where: and(eq(orders.id, id), eq(orders.status, 'pending_payment')),
  *   set: { status: 'paid', paidAt: ctx.clock.now() },
  * });
  * if (!won) throw new DomainError('ORDER_NOT_PAYABLE');

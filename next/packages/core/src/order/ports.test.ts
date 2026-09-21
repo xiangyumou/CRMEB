@@ -60,22 +60,29 @@ afterEach(() => {
 
 describe('the transition table', () => {
   it('allows only the documented moves', () => {
-    expect(canTransition('unpaid', 'paid')).toBe(true);
-    expect(canTransition('unpaid', 'cancelled')).toBe(true);
+    expect(canTransition('pending_payment', 'paid')).toBe(true);
+    expect(canTransition('pending_payment', 'cancelled')).toBe(true);
     expect(canTransition('paid', 'shipped')).toBe(true);
     expect(canTransition('shipped', 'received')).toBe(true);
     expect(canTransition('received', 'completed')).toBe(true);
   });
 
-  it('treats completed and cancelled as terminal', () => {
+  it('treats cancelled and refunded as terminal', () => {
     for (const to of ORDER_STATUSES) {
-      expect(canTransition('completed', to), `completed -> ${to}`).toBe(false);
       expect(canTransition('cancelled', to), `cancelled -> ${to}`).toBe(false);
+      expect(canTransition('refunded', to), `refunded -> ${to}`).toBe(false);
+    }
+  });
+
+  it('lets a paid order leave only through shipping or a full refund', () => {
+    expect(canTransition('paid', 'cancelled')).toBe(false);
+    for (const from of ['paid', 'shipped', 'received', 'completed'] as const) {
+      expect(canTransition(from, 'refunded'), `${from} -> refunded`).toBe(true);
     }
   });
 
   it('refuses the moves that would skip payment or delivery', () => {
-    expect(canTransition('unpaid', 'shipped')).toBe(false);
+    expect(canTransition('pending_payment', 'shipped')).toBe(false);
     expect(canTransition('paid', 'received')).toBe(false);
     expect(canTransition('shipped', 'cancelled')).toBe(false);
   });
@@ -167,7 +174,7 @@ describe('port registration', () => {
       totalFen: 500,
       perLine: [500],
     });
-    expect((await getOrderStateMachine().transition(tx, 1, ['unpaid'], 'paid')).won).toBe(true);
+    expect((await getOrderStateMachine().transition(tx, 1, ['pending_payment'], 'paid')).won).toBe(true);
   });
 
   it('models the three payment answers the cancel path must handle', async () => {
