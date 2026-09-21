@@ -137,4 +137,30 @@ docker buildx imagetools create -t "$image:temp" "$image:sha-$sha_a" >/dev/null
 docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$image:temp" >/dev/null
 pass 'a fresh tag can be created from a published manifest'
 
+# 8. The CI shape: the per-arch sources are `ci-<sha>-<arch>` tags living in the
+#    SAME repository as the release tags. This is what the workflow actually
+#    passes, and it is what the earlier tests never exercised -- they used
+#    sources already named `sha-<sha>-<arch>` in a *different* repository, so
+#    deriving the target as "the source's tag" happened to produce the right
+#    name. With CI's real inputs that derivation names the source itself, the
+#    republish re-wraps the manifest under a new digest, and the conflict guard
+#    refuses every release. Publishing was broken this way in production.
+sha_c="cccccccccccccccccccccccccccccccccccccccc"
+ci_amd64="$image:ci-$sha_c-amd64"
+ci_arm64="$image:ci-$sha_c-arm64"
+make_image "$ci_amd64" 'ci-amd64'
+make_image "$ci_arm64" 'ci-arm64'
+docker push -q "$ci_amd64" >/dev/null
+docker push -q "$ci_arm64" >/dev/null
+ci_amd64_before="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$ci_amd64")"
+digest_c="$(bash "$script" tags "$image" "$sha_c" "$ci_amd64" "$ci_arm64" | tail -1)"
+[ -n "$digest_c" ] || fail 'publishing from ci-scoped per-arch tags reported no digest'
+docker buildx imagetools inspect "$image:sha-$sha_c-amd64" >/dev/null 2>&1 ||
+    fail 'publishing from ci-scoped tags did not create the released amd64 tag'
+docker buildx imagetools inspect "$image:sha-$sha_c-arm64" >/dev/null 2>&1 ||
+    fail 'publishing from ci-scoped tags did not create the released arm64 tag'
+[ "$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$ci_amd64")" = "$ci_amd64_before" ] ||
+    fail 'publishing rewrote the ci-scoped source tag instead of leaving it alone'
+pass 'a release publishes sha- tags from ci- sources in the same repository'
+
 echo "publish rules verification passed ($passed checks)"

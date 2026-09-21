@@ -63,6 +63,50 @@
 
 ---
 
+## 已上线：acceptance-2026-09-21-post-review-hardening
+
+本轮复查的修复已于 2026-09-21 上线 `x-zoo.vip` 并通过验收。
+
+| 项目 | 值 |
+|---|---|
+| 源码提交 | `01bb567eeee6767d08df5d3369ac661e2928db96` |
+| 候选镜像 | `ghcr.io/xiangyumou/crmeb@sha256:50b0e2c57a94145ce6088f4f136018f2bd384fe394fb0affb03d7830608b2cb7` |
+| 回滚目标 | `ghcr.io/xiangyumou/crmeb@sha256:9ed42ebdc89f50a4f165589754c39b9dd6260f8cb7a8fa3433a7e34263765171`（`5b9a5f9b`） |
+| 前端产物 | 后台 `a7b569ec…`、H5 `3dbd3ce0…`、小程序 `7449ba19…`（`publishable: false`） |
+| 门禁 | `sh scripts/check-maintenance.sh` 退出码 0（本地），CI 同提交 regression job 亦通过 |
+| 验收记录编号 | `acceptance-2026-09-21-post-review-hardening` |
+
+H5 与小程序摘要与上一发布版本逐字节一致；后台摘要变化只来自本轮改动的一个后台页面与删除的 `cypress.json`，并在三次独立构建中复现同一摘要。
+
+### 上线后实测
+
+| 检查 | 结果 |
+|---|---|
+| `/readyz` | `{"ready":true}`（含 APP_KEY 强度与 `user.pwd` 列宽检查） |
+| `/admin/`、`/api/version`、`/pages/index/index`、`/healthz` | 200 |
+| `/api/crontab/*` 八个端点 | **全部 404**（上线前实测 200） |
+| `/uploads/*.php`、`/uploads/` 下点文件 | **403** |
+| 真实商品图 `/uploads/attach/2026/09/…jpg` | 200，271387 字节，`cache-control: no-cache, must-revalidate` 保持不变 |
+| 前台登录连续失败 | 第 7 次在比对口令之前被拒：`登录失败次数过多，请稍后再试` |
+| `user.pwd` 迁移 | `changed: true`，32 → 255，`users: 1`，`verified: true` |
+
+### 这次上线踩到的两个问题（都已修复并记录）
+
+1. **CI 自 `fc6957e1` 起从未发布过镜像。** regression job 改成跑完整门禁后，门禁里的 `core-store-front.cjs` 需要 `template/admin/node_modules` 里的 `@babel/parser`，而该 job 不装 npm 依赖，于是每次在 PHPUnit 全过之后死于 `MODULE_NOT_FOUND`，`publish` 作为下游 job 被跳过。已补依赖安装，并在 `release-pipeline-guard.cjs` 加断言：任何跑门禁的 job 必须先装 `template/admin` 依赖（删掉安装步骤该断言会红并点名 job，非空转）。
+2. **`publish-release.sh tags` 的每架构标签名算错。** `tag="${arch_image##*:}"` 取出的是 `ci-<sha>-<arch>`，于是它把 CI 标签重新发布到自己身上；`imagetools create` 重新包装后 digest 改变，冲突守卫正确地拒绝。重构前的内联代码是用 `ci-` 产出 `sha-<sha>-<arch>`，重构时丢了这次改名。**这条路径每次发布都会失败**，只是一直被上面第 1 条挡在前面没暴露。本次上线的 `sha-` 标签是用 CI 自己产出并验证过的 amd64/arm64 镜像手工合成的（未重新构建），`publish-release.sh` 的修复另行提交。
+
+### 一次非计划停机
+
+第一次升级尝试在「隔离还原校验」一步失败并按设计停在维护态，**数据库未做任何迁移**，随后手工回退镜像并拉起，停机约 2.5 分钟（写入角色停于 `12:16:0x UTC`，nginx 恢复于 `12:18:35 UTC`）。
+原因是 `upgrade.sh` 等待一次性 MySQL 就绪的判据不充分：MySQL 初始化期间的临时服务器已经接受配置好的 root 口令，"口令可用"并不等于"初始化完成"，临时服务器随后关闭、真正的服务器启动，还原命令落在空档里报 `ERROR 2002`，把一个可用的备份诊断成不可用。已改为先等日志出现 `ready for connections ... port: 3306`（临时服务器报 `port: 0`）。修复后重跑，`backup restored and the retained rows match` 正常出现，整个升级约 60 秒，维护窗口不到 1 分钟。
+本机 `upgrade-rollback.sh` 一直 9/9，是因为这个窗口很短、只有较慢的机器才会输掉这个竞态——这是一条被绿色测试掩盖了的真实缺陷。
+
+### 仍需人工完成
+
+`paymentReconcileAlert`（异常收款与未知退款巡检告警）的定时任务是**库驱动**的：`crontabCommandRun` 按 `eb_system_timer` 的行分发。代码里加了 mark，但**生产库里还没有这一行**，所以巡检目前不会运行。需要在后台「系统 → 定时任务」新建一条，任务选「异常收款与未知退款巡检告警」，周期建议"每隔几分"取 10 分钟（`type=2`, `minute=10`）。经由后台保存才会同时刷新 `crontabCache`，直接写库不刷缓存不会生效。
+
+---
+
 ## 已上线：acceptance-2026-09-21-production-cutover
 
 `x-zoo.vip` 已在 2026-09-21 切到本仓库的发布版本并通过验收。

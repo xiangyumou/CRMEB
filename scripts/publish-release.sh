@@ -142,9 +142,23 @@ tags)
     # different arch content is refused instead of silently mixing two builds.
     arch_tags=()
     for arch_image in "${arch_images[@]}"; do
-        tag="${arch_image##*:}"
-        publish_tag "$image:$tag" "$arch_image"
-        arch_tags+=("$image:$tag")
+        # The source is CI-scoped (`<image>:ci-<sha>-<arch>`); the released
+        # per-arch tag is `<image>:sha-<sha>-<arch>`. Taking the target as
+        # `${arch_image##*:}` yielded the SOURCE tag, so when the source lives in
+        # this same repository -- which is exactly what CI passes -- this
+        # republished the CI tag onto itself. `imagetools create` re-wraps the
+        # manifest under a new digest, so the conflict guard below then refused
+        # the release every single time. Derive the architecture instead and
+        # always name the target explicitly.
+        arch="${arch_image##*-}"
+        case "$arch" in
+            ''|*[!a-z0-9]*)
+                echo "cannot derive an architecture from $arch_image" >&2
+                exit 1
+                ;;
+        esac
+        publish_tag "$image:sha-$sha-$arch" "$arch_image"
+        arch_tags+=("$image:sha-$sha-$arch")
     done
     publish_tag "$image:sha-$sha" "${arch_tags[@]}"
     digest="$(resolve_digest "$image:sha-$sha")"
