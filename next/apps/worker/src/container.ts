@@ -1,4 +1,9 @@
 import { createDb, type DbHandle } from '@shop/db';
+// Side-effect import: installs every domain — its ports and its effect
+// handlers (CR-8-c) — before the dispatcher or the job registry can run.
+// `system.dispatchEffects` parks an effect it has no handler for, permanently,
+// so this has to happen at boot and not in a handler.
+import '@shop/core/domains';
 import {
   createConfigService,
   createCtx,

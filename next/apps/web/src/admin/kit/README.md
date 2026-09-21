@@ -106,16 +106,32 @@ export default function CouponListPage() {
 
 `src/admin/api/`。这就是约定里说的"生成的客户端"——生成的是类型，没有代码生成步骤。
 
-| API                                                                      | 说明                                                                                                                                                                                                                                                                                               |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `callRoute(route, input?, options?)`                                     | 按 `RouteDef` 发请求。`input` 为 `{ params, query, body }`；URL 由 `:param` 占位符拼出，query 有序序列化（`undefined`/`null`/`""` 丢弃，数组重复键，`Date` 转 ISO），带 cookie，非 2xx 抛 `ApiError`。`options.onUnauthorized: 'throw'` 可以关掉 401 自动跳登录（登录页和 `SessionProvider` 用）。 |
-| `useRouteQuery(route, input?, options?)`                                 | `useQuery` 包装。query key = `[route.id, { params, query }]`。`options.presentError: false` 关掉全局报错提示。                                                                                                                                                                                     |
-| `useRouteMutation(route, options?)`                                      | `useMutation` 包装。`mutate({ body })`；`invalidate: [routes…]` 成功后失效这些路由的全部缓存；`successMessage` 弹成功提示。                                                                                                                                                                        |
-| `useInvalidateRoutes()`                                                  | 手动失效，返回 `(...routes) => Promise<void>`。                                                                                                                                                                                                                                                    |
-| `ApiError`                                                               | `{ status, code, message, details }`，外加 `fieldErrors` 取 422 的字段错误。分支判断请用 `code`，不要用 `message`。                                                                                                                                                                                |
-| `configureApi({ baseUrl, fetch, onUnauthenticated, validateResponses })` | 测试与演示页用；`validateResponses` 开发环境默认开，会用契约校验响应。                                                                                                                                                                                                                             |
+| API                                                                      | 说明                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `callRoute(route, input?, options?)`                                     | 按 `RouteDef` 发请求。`input` 为 `{ params, query, body }`（上传时用 `formData` 代替 `body`，见下）；URL 由 `:param` 占位符拼出，query 有序序列化（`undefined`/`null`/`""` 丢弃，数组重复键，`Date` 转 ISO），带 cookie，非 2xx 抛 `ApiError`。`options.onUnauthorized: 'throw'` 可以关掉 401 自动跳登录（登录页和 `SessionProvider` 用）。 |
+| `useRouteQuery(route, input?, options?)`                                 | `useQuery` 包装。query key = `[route.id, { params, query }]`。`options.presentError: false` 关掉全局报错提示。                                                                                                                                                                                                                              |
+| `useRouteMutation(route, options?)`                                      | `useMutation` 包装。`mutate({ body })`；`invalidate: [routes…]` 成功后失效这些路由的全部缓存；`successMessage` 弹成功提示。                                                                                                                                                                                                                 |
+| `useInvalidateRoutes()`                                                  | 手动失效，返回 `(...routes) => Promise<void>`。                                                                                                                                                                                                                                                                                             |
+| `ApiError`                                                               | `{ status, code, message, details }`，外加 `fieldErrors` 取 422 的字段错误。分支判断请用 `code`，不要用 `message`。                                                                                                                                                                                                                         |
+| `configureApi({ baseUrl, fetch, onUnauthenticated, validateResponses })` | 测试与演示页用；`validateResponses` 开发环境默认开，会用契约校验响应。                                                                                                                                                                                                                                                                      |
 
 错误提示是全局的：TanStack Query 的 cache 级 `onError` 统一弹 `message`/`notification`，401 和被取消的请求不弹。单次调用可用 `presentError: false` 退出（表单默认就是 `false`，自己展示字段错误）。
+
+**上传文件。** `multipart/form-data` 的分隔符只能由浏览器生成，所以传
+`input.formData`（一个 `FormData`）而不是 `body`：请求**不带 `Content-Type`**，
+`body` 被忽略，`fetch` 之后的一切——URL 拼接、`credentials: 'include'`、
+`ApiError` 映射、401 跳登录、取消映射、响应校验——和普通路由完全一样。对应地，
+多部分路由在契约里**不声明 `body`**（`handle()` 只解析 JSON body），可选项放在
+`query` 里。
+
+单个文件用 `uploadFile(route, { params, query }, file, { signal, fieldName })`
+（`@/admin/storage/upload`）：它只是帮你拼出服务端约定的那一个字段（默认
+`file`），其余都走 `callRoute`。
+
+```ts
+await callRoute(storageAttachmentUpload, { query: { categoryId }, formData });
+await uploadFile(storageScanUpload, { params: { token } }, file);
+```
 
 **输入类型说明。** `params`/`query`/`body` 三个键都是可选的：`defineRoute` 的泛型在路由没声明某一项时会退化成 `z.ZodType`，若做成"声明了就必填"，没有 params 的路由反而会被要求传 `params`。传值时类型仍然完整校验。`query`/`body` 用 `z.input`，所以 schema 的默认值和 coercion 在调用处可省。
 
@@ -242,6 +258,10 @@ interface AssetSource {
 ```
 
 字段 `kind`：`text` `password` `number` `money` `switch` `select` `textarea` `asset` `json`；`visibleWhen: { key, equals }` 做条件显示（也接受函数，但 core 侧请用数据形式，方便 `defineConfigGroup` 直接发出来）。
+
+**分节（`section`）**：字段带 `section` 时，表单按 section **首次出现的顺序**把可见字段分组，每组上面加一条左对齐的分隔标题。没有 `section` 的字段排在最前面，整组都没有 `section` 就和以前一模一样——一个 `<Row>`，没有分隔线。只有当前可见的字段参与分组，所以被 `visibleWhen` 隐藏光的小节不会留下一个空标题。
+
+刻意不做 `<Tabs>`：配置表单是**一次提交**的，藏在别的标签页里的校验错误等于看不见。`trade` 有 11 个字段分四节、`storage` 12 个分两节、`site` 14 个——分节是让"退货地址"这种字段能被找到的唯一办法。
 
 **密钥约定（重要）**：`password` 字段在 `values` 里的值是 **布尔** —— `true` 表示已设置、`false`/缺省表示未设置，**服务端永远不回传明文**。界面显示 `已设置 / 未设置` + 一个空输入框；留空 = 不修改，填了才会把新值放进保存的 payload 里。描述符类型在 `config/types.ts`，刻意保持最小，方便 P0-A 的 `defineConfigGroup` 直接产出兼容结构。
 

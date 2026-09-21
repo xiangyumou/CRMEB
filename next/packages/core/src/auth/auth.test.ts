@@ -82,9 +82,11 @@ describe('definePermissions', () => {
     expect(() => definePermissions('dup', { 'a:b': '第一个' })).not.toThrow();
   });
 
-  it('declares the session atoms the frozen route contract needs', () => {
+  it('declares the own-account atoms the frozen route contracts need', () => {
     expect(authPermissions['session:read']).toBe('auth:session:read');
     expect(authPermissions['session:delete']).toBe('auth:session:delete');
+    expect(authPermissions['profile:read']).toBe('auth:profile:read');
+    expect(authPermissions['profile:update']).toBe('auth:profile:update');
   });
 });
 
@@ -104,7 +106,15 @@ describe('RBAC', () => {
     expect(hasPermission(actor, 'catalog:product:read')).toBe(false);
   });
 
-  it('grants the session atoms to every authenticated admin', () => {
+  it('grants the own-account atoms to every authenticated admin', () => {
+    // An account with an empty role must still reach its own profile and
+    // password, or the first login is a dead end.
+    expect([...IMPLICIT_ADMIN_PERMISSIONS].sort()).toEqual([
+      'auth:profile:read',
+      'auth:profile:update',
+      'auth:session:delete',
+      'auth:session:read',
+    ]);
     for (const atom of IMPLICIT_ADMIN_PERMISSIONS) {
       expect(hasPermission(admin(), atom)).toBe(true);
     }
@@ -143,6 +153,8 @@ describe('RBAC', () => {
   it('effectivePermissions unions the implicit atoms and sorts', () => {
     expect(effectivePermissions(['z:z:z', 'a:a:a'])).toEqual([
       'a:a:a',
+      'auth:profile:read',
+      'auth:profile:update',
       'auth:session:delete',
       'auth:session:read',
       'z:z:z',

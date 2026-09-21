@@ -89,10 +89,10 @@ export function SettingsGroupPage({ group }: { group: string }) {
 /**
  * Contract descriptor → kit descriptor.
  *
- * The two shapes agree field for field except for `section`, which the kit does
- * not render yet (CR-5-f1). Sections are folded into the field label's `help`
- * ordering instead of dropped silently: the server already sorts fields by
- * section, so the screen still reads in the intended order.
+ * The two shapes agree field for field, so this is a copy: the only work is
+ * dropping keys that are `undefined`, which `exactOptionalPropertyTypes`
+ * requires. The server sorts fields by section, and the kit renders each run
+ * under its heading.
  */
 function toKitField(field: {
   key: string;
@@ -107,11 +107,12 @@ function toKitField(field: {
 }): ConfigFieldDescriptor {
   return {
     key: field.key,
-    label: field.section ? `${field.section} · ${field.label}` : field.label,
+    label: field.label,
     kind: field.kind,
     ...(field.help === undefined ? {} : { help: field.help }),
     ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
     ...(field.options === undefined ? {} : { options: field.options }),
+    ...(field.section === undefined ? {} : { section: field.section }),
     ...(field.multiple === undefined ? {} : { multiple: field.multiple }),
     ...(field.visibleWhen === undefined ? {} : { visibleWhen: field.visibleWhen }),
   };

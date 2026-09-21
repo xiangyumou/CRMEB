@@ -1,7 +1,7 @@
 # CR-3-f1 — the config-group bucket, the patch CR-2-c asked for
 
 - **Stream:** F1 (system & storage)
-- **Status:** worked around by an explicit import list; patch below is ready to apply
+- **Status:** applied — `pnpm gen` writes `src/config-groups.gen.ts` (and, per CR-8-c, `src/domains.gen.ts`); the hand-written import list is gone, and it picked up three groups nobody had imported: `payment`, `refund`, `wechat`.
 - **Affects:** `next/packages/core/scripts/gen-config-groups.ts` (new),
   `next/packages/core/package.json` (orchestrator-owned), `.gitignore`
 - **Settles:** CR-2-c ("config groups live at `core/src/<domain>/<group>.config.ts`,

@@ -231,7 +231,7 @@ describe('/admin-api/admins', () => {
 
 describe('/admin-api/profile', () => {
   it('is readable by an admin holding no grants at all', async () => {
-    // `auth:session:read` is implicit, so an operator can always see their own
+    // `auth:profile:read` is implicit, so an operator can always see their own
     // account — otherwise a fresh hire logs in to a wall of 403s.
     const headers = await adminCookie([]);
     const { GET } = await import('../profile/route');

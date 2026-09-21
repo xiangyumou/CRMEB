@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { defineConfigGroup } from '../kernel/config-registry';
-import { defineConfigFieldExtras } from './config-ui-extras';
 
 /**
  * `wechat-oa` — 公众号 credentials and message-encryption settings.
@@ -48,6 +47,7 @@ export const wechatOaConfig = defineConfigGroup({
       type: 'password',
       secret: true,
       help: '仅安全模式/兼容模式需要',
+      visibleWhen: { key: 'messageMode', equals: ['compatible', 'safe'] },
       order: 6,
     },
     verificationFile: { label: '域名校验文件名', type: 'text', order: 7 },
@@ -60,8 +60,4 @@ export const wechatOaConfig = defineConfigGroup({
     messageMode: 'wechat_encode',
     verificationFile: 'weixin_ckeck_file',
   },
-});
-
-defineConfigFieldExtras('wechat-oa', {
-  encodingAesKey: { visibleWhen: { key: 'messageMode', equals: ['compatible', 'safe'] } },
 });

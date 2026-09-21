@@ -6,6 +6,7 @@ import { callRoute } from './call-route';
 import { configureApi, resetApiConfig } from './config';
 import { ApiError, CLIENT_ERROR_CODES, parseFieldErrors } from './errors';
 import { routeKeyPrefix, routeQueryKey } from './query-keys';
+import { uploadFile } from '../storage/upload';
 import { buildPath, serialiseQuery } from './url';
 
 const item = z.object({ id, name: z.string() });
@@ -48,6 +49,22 @@ const createRoute = defineRoute({
   response: item,
   status: 201,
   examples: [{ name: 'ok', body: { name: 'a' }, response: { id: '1', name: 'a' } }],
+});
+
+const uploadRoute = defineRoute({
+  id: 'test.upload',
+  method: 'POST',
+  path: '/admin-api/things/:id/files',
+  auth: 'admin',
+  permission: 'test:thing:create',
+  summary: '上传',
+  tags: ['test'],
+  // A multipart route declares no `body`: `handle()` parses only JSON bodies,
+  // so anything the caller may choose travels in `query`.
+  params: z.object({ id }),
+  query: z.object({ categoryId: z.string().optional() }),
+  response: item,
+  examples: [{ name: 'ok', params: { id: '1' }, response: { id: '9', name: 'a.png' } }],
 });
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -207,6 +224,103 @@ describe('callRoute', () => {
   it('returns undefined for a 204', async () => {
     stubFetch(() => new Response(null, { status: 204 }));
     await expect(callRoute(createRoute, { body: { name: 'x' } })).resolves.toBeUndefined();
+  });
+});
+
+describe('callRoute with FormData', () => {
+  function form(): FormData {
+    const data = new FormData();
+    data.append('file', new File(['png-bytes'], 'a.png', { type: 'image/png' }));
+    return data;
+  }
+
+  it('sends the FormData as-is and leaves Content-Type to the browser', async () => {
+    const { calls } = stubFetch(() => jsonResponse({ id: '9', name: 'a.png' }));
+    const data = form();
+    await callRoute(uploadRoute, {
+      params: { id: '7' },
+      query: { categoryId: '3' },
+      formData: data,
+    });
+
+    const init = calls[0]?.init;
+    expect(calls[0]?.url).toBe('/admin-api/things/7/files?categoryId=3');
+    expect(init?.method).toBe('POST');
+    // The browser generates the multipart boundary, so setting the header here
+    // would produce a request the server cannot parse.
+    expect(init?.headers as Record<string, string>).not.toHaveProperty('Content-Type');
+    expect((init?.headers as Record<string, string>)['Accept']).toBe('application/json');
+    expect(init?.body).toBe(data);
+    expect(init?.credentials).toBe('include');
+  });
+
+  it('ignores body when formData is present', async () => {
+    const { calls } = stubFetch(() => jsonResponse({ id: '9', name: 'a.png' }));
+    const data = form();
+    await callRoute(uploadRoute, { params: { id: '7' }, formData: data });
+    expect(calls[0]?.init?.body).toBe(data);
+  });
+
+  it('maps an upload error the same way as any other route', async () => {
+    stubFetch(() => jsonResponse({ code: 'STORAGE_FILE_TOO_LARGE', message: '文件过大' }, 413));
+    const error = (await callRoute(uploadRoute, {
+      params: { id: '7' },
+      formData: form(),
+    }).catch((cause: unknown) => cause)) as ApiError;
+    expect(error.status).toBe(413);
+    expect(error.code).toBe('STORAGE_FILE_TOO_LARGE');
+  });
+
+  it('still hands a 401 to onUnauthenticated', async () => {
+    const onUnauthenticated = vi.fn();
+    stubFetch(() => jsonResponse({ code: 'UNAUTHENTICATED', message: '请先登录' }, 401));
+    configureApi({ onUnauthenticated });
+    await callRoute(uploadRoute, { params: { id: '7' }, formData: form() }).catch(() => {});
+    expect(onUnauthenticated).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps an abort the same way as any other route', async () => {
+    configureApi({
+      fetch: () => Promise.reject(new DOMException('aborted', 'AbortError')),
+    });
+    const error = (await callRoute(uploadRoute, {
+      params: { id: '7' },
+      formData: form(),
+    }).catch((cause: unknown) => cause)) as ApiError;
+    expect(error.code).toBe(CLIENT_ERROR_CODES.aborted);
+  });
+
+  it('validates the response against the contract like any other route', async () => {
+    stubFetch(() => jsonResponse({ id: 9, name: 'a.png' }));
+    const error = (await callRoute(
+      uploadRoute,
+      { params: { id: '7' }, formData: form() },
+      { validateResponse: true },
+    ).catch((cause: unknown) => cause)) as ApiError;
+    expect(error.code).toBe(CLIENT_ERROR_CODES.schema);
+  });
+});
+
+describe('uploadFile', () => {
+  it('builds the one-field form the server expects', async () => {
+    const { calls } = stubFetch(() => jsonResponse({ id: '9', name: 'a.png' }));
+    const file = new File(['png-bytes'], 'a.png', { type: 'image/png' });
+    await uploadFile(uploadRoute, { params: { id: '7' }, query: { categoryId: '3' } }, file);
+
+    const body = calls[0]?.init?.body as FormData;
+    expect(body).toBeInstanceOf(FormData);
+    expect(body.get('file')).toBeInstanceOf(File);
+    expect((body.get('file') as File).name).toBe('a.png');
+    expect(calls[0]?.url).toBe('/admin-api/things/7/files?categoryId=3');
+  });
+
+  it('honours a custom field name', async () => {
+    const { calls } = stubFetch(() => jsonResponse({ id: '9', name: 'a.png' }));
+    const file = new File(['x'], 'b.png', { type: 'image/png' });
+    await uploadFile(uploadRoute, { params: { id: '7' } }, file, { fieldName: 'attachment' });
+    const body = calls[0]?.init?.body as FormData;
+    expect(body.get('attachment')).toBeInstanceOf(File);
+    expect(body.get('file')).toBeNull();
   });
 });
 

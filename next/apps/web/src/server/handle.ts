@@ -5,6 +5,13 @@ import { clientPlatform, surfaceOf } from '@shop/contracts/conventions';
 // Side-effect import: makes every zod field message Simplified Chinese, which
 // is what CONVENTIONS requires of anything a shopper can see.
 import '@shop/contracts/locale';
+// Side-effect import: installs every domain — its ports, its order-state
+// machine and its effect handlers (CR-8-c). A route module only imports the
+// domain it serves, so without this a checkout would run on the fallback
+// catalogue adapter and `refund.execute` would be parked as `unknown` by the
+// first dispatcher pass after boot. `handle()` is on the path of every request,
+// which is why it is here and not in the container.
+import '@shop/core/domains';
 import { anonymousActor, createCtx, DomainError, type Actor, type Ctx } from '@shop/core/kernel';
 import { getStaffCheck, hasPermission, insertAudit, readBearer } from '@shop/core/auth';
 import { getContainer, type Container } from './container';

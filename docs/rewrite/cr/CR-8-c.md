@@ -2,6 +2,8 @@
 
 **Stream** C · **Target** `next/apps/worker/src/` and `next/apps/web/src/server/` bootstraps, plus a `pnpm gen` bucket (platform-owned) · **Severity** high, affects every stream
 
+**Status:** applied — `pnpm gen` writes `packages/core/src/domains.gen.ts`, which imports every `src/<domain>/index.ts` and calls every `register<Name>Domain()` found by scanning the index source; `apps/web/src/server/handle.ts` and the worker container each `import '@shop/core/domains'` once at bootstrap, and this stream's module-scope stop-gap in the four payment/refund job files is removed.
+
 ## What
 
 Every domain in the rewrite publishes a registration function — this stream's

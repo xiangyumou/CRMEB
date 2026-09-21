@@ -1,7 +1,7 @@
 # CR-5-f1 — `ConfigGroupForm` has no section headings
 
 - **Stream:** F1 (system & storage)
-- **Status:** worked around locally (sections folded into labels); a real fix is wanted
+- **Status:** applied — `ConfigFieldDescriptor.section` reaches the kit, `ConfigGroupForm` lays visible fields out under first-appearance section dividers (no sections renders exactly as before), and F1's label-prefix workaround is dropped.
 - **Affects:** `next/apps/web/src/admin/kit/config/{types.ts,config-group-form.tsx}` (kit-owned)
 
 ## What is wrong

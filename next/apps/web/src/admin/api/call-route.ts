@@ -20,6 +20,17 @@ export interface RouteInput<R extends AnyRouteDef> {
   params?: ParamsInputOf<R> | undefined;
   query?: QueryInputOf<R> | undefined;
   body?: BodyInputOf<R> | undefined;
+  /**
+   * A body already in a wire format, for the one thing JSON cannot express.
+   *
+   * `multipart/form-data` has to be serialised by the browser — it generates
+   * the boundary — so an upload passes `formData` instead of `body` and the
+   * request goes out with **no `Content-Type`** header. A multipart route
+   * therefore declares no `body` schema and carries its options in `query`,
+   * which is how the server half already works: `handle()` parses only JSON
+   * bodies. When `formData` is present, `body` is ignored.
+   */
+  formData?: FormData | undefined;
 }
 
 // `NonNullable` matters: with `exactOptionalPropertyTypes`, `RouteDef['params']`
@@ -60,6 +71,11 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
  * `input.query`, sends `input.body` as JSON with the session cookie attached,
  * and returns the parsed response typed as `ResponseOf<R>`. Any non-2xx — and
  * any transport failure — throws `ApiError`.
+ *
+ * Pass `formData` instead of `body` to upload a file; everything after the
+ * `fetch` — the `ApiError` mapping, the 401 hook, response validation — is the
+ * same code either way, so an upload's 413 reaches the UI looking exactly like
+ * any other route's.
  */
 export async function callRoute<R extends AnyRouteDef>(
   route: R,
@@ -69,8 +85,11 @@ export async function callRoute<R extends AnyRouteDef>(
   const cfg = getApiConfig();
   const url = buildUrl(cfg.baseUrl, route.path, asRecord(input?.params), asRecord(input?.query));
 
+  const formData = input?.formData;
   const headers: Record<string, string> = { Accept: 'application/json', ...options.headers };
-  const hasBody = !METHODS_WITHOUT_BODY.has(route.method) && input?.body !== undefined;
+  const hasBody =
+    formData === undefined && !METHODS_WITHOUT_BODY.has(route.method) && input?.body !== undefined;
+  // Never `Content-Type` for FormData: the browser sets it, boundary and all.
   if (hasBody) headers['Content-Type'] = 'application/json';
 
   const init: RequestInit = {
@@ -79,7 +98,8 @@ export async function callRoute<R extends AnyRouteDef>(
     credentials: 'include',
     cache: 'no-store',
   };
-  if (hasBody) init.body = JSON.stringify(input?.body);
+  if (formData !== undefined) init.body = formData;
+  else if (hasBody) init.body = JSON.stringify(input?.body);
   if (options.signal) init.signal = options.signal;
 
   let response: Response;

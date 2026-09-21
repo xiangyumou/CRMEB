@@ -14,14 +14,21 @@ import { authPermissions } from './permissions';
  */
 
 /**
- * Atoms every authenticated admin holds without a grant. They only let an
- * admin see and end their own session, which is a precondition for the admin
- * UI to function at all — and `defineRoute` (frozen) demands a permission on
- * every `auth: 'admin'` route, so `/admin-api/auth/me` has to name something.
+ * Atoms every authenticated admin holds without a grant. They reach only the
+ * admin's *own* session and *own* account, which is a precondition for the
+ * admin UI to function at all: an account created with an empty role must
+ * still be able to see who it is and change its own password. `defineRoute`
+ * (frozen) also demands a permission on every `auth: 'admin'` route, so
+ * `/admin-api/auth/me` and `/admin-api/profile` have to name something.
+ *
+ * The role editor renders these checked and disabled rather than as choices —
+ * they must not be clearable.
  */
 export const IMPLICIT_ADMIN_PERMISSIONS: readonly string[] = Object.freeze([
   authPermissions['session:read'],
   authPermissions['session:delete'],
+  authPermissions['profile:read'],
+  authPermissions['profile:update'],
 ]);
 
 export function hasPermission(actor: Actor, atom: string): boolean {

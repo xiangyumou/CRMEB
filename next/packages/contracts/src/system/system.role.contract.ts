@@ -183,8 +183,10 @@ export const systemPermissionTree = defineRoute({
           {
             section: '账号',
             items: [
-              { atom: 'auth:session:read', label: '读取自己的登录信息', domain: 'auth' },
+              { atom: 'auth:profile:read', label: '查看自己的资料', domain: 'auth' },
+              { atom: 'auth:profile:update', label: '修改自己的资料与密码', domain: 'auth' },
               { atom: 'auth:session:delete', label: '退出登录', domain: 'auth' },
+              { atom: 'auth:session:read', label: '读取自己的登录信息', domain: 'auth' },
             ],
           },
           {
@@ -195,7 +197,12 @@ export const systemPermissionTree = defineRoute({
             ],
           },
         ],
-        implicit: ['auth:session:delete', 'auth:session:read'],
+        implicit: [
+          'auth:profile:read',
+          'auth:profile:update',
+          'auth:session:delete',
+          'auth:session:read',
+        ],
       },
     },
   ],

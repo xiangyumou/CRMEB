@@ -31,11 +31,11 @@
  *    change here.
  *
  * Importing this module registers every config group and every dashboard
- * contributor this stream owns, as a side effect. That is deliberate: a group
- * nobody imported cannot be edited, so the imports live in one file that is
- * obvious to grep.
+ * contributor there is, as a side effect. That is deliberate: a group nobody
+ * imported cannot be edited. The groups arrive through `config.service.ts`,
+ * which imports the gen'd `config-groups.gen.ts` bucket; the dashboard
+ * contributors this stream owns are below.
  */
-import './config-groups';
 import './dashboard-tiles';
 
 export {
@@ -77,11 +77,6 @@ export {
 } from './dashboard';
 
 export { systemPermissions } from './permissions';
-export {
-  configFieldExtra,
-  defineConfigFieldExtras,
-  type ConfigFieldExtra,
-} from './config-ui-extras';
 export { AGREEMENT_FIELDS, agreementConfig } from './agreement.config';
 export { logisticsConfig } from './logistics.config';
 export { mapConfig } from './map.config';

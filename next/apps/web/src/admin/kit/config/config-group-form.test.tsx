@@ -191,6 +191,115 @@ describe('<ConfigGroupForm> rendering', () => {
     expect(screen.queryByLabelText('门槛')).not.toBeInTheDocument();
   });
 
+  it('lets a group save while a required field is hidden', async () => {
+    // A shop on the local storage driver must be able to change an upload limit
+    // without filling in an S3 bucket. The hidden key is simply not sent, and
+    // the server keeps whatever it had stored.
+    const user = userEvent.setup();
+    const { bodies } = stubSave();
+    const conditional: ConfigGroupDescriptor = {
+      ...descriptor,
+      fields: [
+        ...descriptor.fields,
+        {
+          key: 'bucket',
+          label: 'Bucket',
+          kind: 'text',
+          required: true,
+          visibleWhen: { key: 'mode', equals: 'city' },
+        },
+      ],
+    };
+    renderAdmin(
+      <ConfigGroupForm
+        descriptor={conditional}
+        values={{ ...values, bucket: '' }}
+        route={saveRoute}
+      />,
+    );
+
+    expect(screen.queryByLabelText('Bucket')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: zhName('保存') }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect((bodies[0] as { values: Record<string, unknown> }).values).not.toHaveProperty('bucket');
+  });
+
+  it('renders a heading per section, in first-appearance order', () => {
+    stubSave();
+    const sectioned: ConfigGroupDescriptor = {
+      group: 'demo',
+      title: '演示配置',
+      fields: [
+        { key: 'siteName', label: '站点名称', kind: 'text' },
+        { key: 'a', label: '端点', kind: 'text', section: 'S3' },
+        { key: 'b', label: '桶', kind: 'text', section: 'S3' },
+        { key: 'c', label: '退货地址', kind: 'text', section: '售后' },
+      ],
+    };
+    const { container } = renderAdmin(
+      <ConfigGroupForm descriptor={sectioned} values={{}} route={saveRoute} />,
+    );
+
+    const headings = [...container.querySelectorAll('.ant-divider')].map((n) => n.textContent);
+    expect(headings).toEqual(['S3', '售后']);
+    // The sectionless field is still there, above the first heading.
+    expect(screen.getByLabelText('站点名称')).toBeInTheDocument();
+    expect(screen.getByLabelText('退货地址')).toBeInTheDocument();
+  });
+
+  it('renders a descriptor with no sections exactly as it did before', () => {
+    // Every existing caller passes a sectionless descriptor, so the grouping
+    // pass must collapse to the one `<Row>` the form has always rendered —
+    // same markup, no divider, nothing reordered.
+    stubSave();
+    const { container } = renderAdmin(
+      <ConfigGroupForm descriptor={descriptor} values={values} route={saveRoute} />,
+    );
+
+    expect(container.querySelectorAll('.ant-divider')).toHaveLength(0);
+    const rows = container.querySelectorAll('form > .ant-row');
+    expect(rows).toHaveLength(1);
+    expect([...rows[0]!.children].map((col) => col.querySelector('label')?.textContent)).toEqual([
+      '站点名称',
+      '接口密钥 已设置',
+      '短信密钥 未设置',
+      '模式',
+      '门槛',
+    ]);
+  });
+
+  it('only shows the headings whose fields survive visibleWhen', () => {
+    stubSave();
+    const sectioned: ConfigGroupDescriptor = {
+      group: 'demo',
+      title: '演示配置',
+      fields: [
+        {
+          key: 'mode',
+          label: '模式',
+          kind: 'select',
+          options: [{ label: '快递', value: 'express' }],
+        },
+        {
+          key: 'a',
+          label: '端点',
+          kind: 'text',
+          section: 'S3',
+          visibleWhen: { key: 'mode', equals: 's3' },
+        },
+        { key: 'c', label: '退货地址', kind: 'text', section: '售后' },
+      ],
+    };
+    const { container } = renderAdmin(
+      <ConfigGroupForm descriptor={sectioned} values={{ mode: 'express' }} route={saveRoute} />,
+    );
+    // An empty 'S3' heading over nothing would be worse than no heading.
+    expect([...container.querySelectorAll('.ant-divider')].map((n) => n.textContent)).toEqual([
+      '售后',
+    ]);
+  });
+
   it('shows a skeleton while the values are loading', () => {
     stubSave();
     renderAdmin(

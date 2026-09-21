@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { defineConfigGroup } from '../kernel/config-registry';
+import { defineConfigGroup, type ConfigVisibleWhen } from '../kernel/config-registry';
+
+/** `none` means no tracking at all, so the credentials have nothing to say. */
+const TRACKING_ON: ConfigVisibleWhen = { key: 'provider', equals: ['aliyun-market', 'kuaidi100'] };
 
 /**
  * `logistics` — express tracking.
@@ -39,9 +42,26 @@ export const logisticsConfig = defineConfigGroup({
       ],
       order: 1,
     },
-    appCode: { label: '查询密钥', type: 'password', secret: true, order: 2 },
-    customer: { label: '客户编号', type: 'text', help: '快递100 需要', order: 3 },
-    cacheMinutes: { label: '查询结果缓存（分钟）', type: 'number', order: 4 },
+    appCode: {
+      label: '查询密钥',
+      type: 'password',
+      secret: true,
+      visibleWhen: TRACKING_ON,
+      order: 2,
+    },
+    customer: {
+      label: '客户编号',
+      type: 'text',
+      help: '快递100 需要',
+      visibleWhen: { key: 'provider', equals: 'kuaidi100' },
+      order: 3,
+    },
+    cacheMinutes: {
+      label: '查询结果缓存（分钟）',
+      type: 'number',
+      visibleWhen: TRACKING_ON,
+      order: 4,
+    },
     senderName: { label: '发件人', type: 'text', section: '发件信息', order: 10 },
     senderPhone: { label: '发件电话', type: 'text', section: '发件信息', order: 11 },
     senderAddress: { label: '发件地址', type: 'text', section: '发件信息', order: 12 },

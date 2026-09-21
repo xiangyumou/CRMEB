@@ -12,5 +12,5 @@
       "@shop/testing/*": ["../testing/src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "scripts"]
 }

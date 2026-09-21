@@ -73,16 +73,20 @@ export function resetPermissionRegistry(): void {
 }
 
 /**
- * Session management, declared here because `contracts/src/auth` needs the
- * atoms and `defineRoute` (frozen) requires every `auth: 'admin'` route to name
- * one. Every authenticated admin holds these implicitly — see
- * `IMPLICIT_ADMIN_PERMISSIONS` in `rbac.ts`.
+ * The caller's own account, declared here because `contracts/src/auth` and
+ * `contracts/src/system` need the atoms and `defineRoute` (frozen) requires
+ * every `auth: 'admin'` route to name one. Every authenticated admin holds
+ * these implicitly — see `IMPLICIT_ADMIN_PERMISSIONS` in `rbac.ts` — because an
+ * account created with an empty role has to be able to see who it is and change
+ * its own password, or the first login is a dead end.
  */
 export const authPermissions = definePermissions(
   'auth',
   {
     'session:read': '读取自己的登录信息',
     'session:delete': '退出登录',
+    'profile:read': '查看自己的资料',
+    'profile:update': '修改自己的资料与密码',
   },
   { section: '账号' },
 );

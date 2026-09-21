@@ -49,7 +49,7 @@ export {
 
 export { cleanOrphanAttachments, type SweepReport } from './storage.jobs';
 export { storagePermissions } from './permissions';
-export { storageConfig, storageConfigFieldExtras } from './storage.config';
+export { storageConfig } from './storage.config';
 export { storageDashboardContributor } from './dashboard-tiles';
 export { readFilePart } from './multipart';
 

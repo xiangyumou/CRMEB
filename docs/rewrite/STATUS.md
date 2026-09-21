@@ -23,9 +23,11 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | B2 fulfilment | merged 2026-09-23 | `rewrite/ws-b2-fulfil` |
 | H uni-app API layer | in progress | `rewrite/ws-h-uniapp` |
 | G3 DIY follow-up; fix-ups for B1 (CR-7-c, CR-3-b2), C (CR-4/5/6-c) | in progress | `rewrite/ws-g3-diy-followup`, stream branches |
-| E1 user and login; kit maintenance (CR-1..5-f1) | dispatched 2026-09-23 | `rewrite/ws-e1-user`, `rewrite/ws-kit-f1crs` |
+| Kit maintenance (CR-1..5-f1, CR-8-c) | merged 2026-09-23 | `rewrite/ws-kit-f1crs` |
+| E1 user and login | in progress | `rewrite/ws-e1-user` |
 | D group buy and presale | dispatched 2026-09-23 | `rewrite/ws-d-marketing` |
-| E2, F2 | ready (dependencies merged); waiting on a free slot | — |
+| F2 shipping, articles, statistics | dispatched 2026-09-23 | `rewrite/ws-f2-ops` |
+| E2 | ready; waiting on a free slot | — |
 | F2, I, J (wave 3) | waiting | — |
 | K (wave 4) | waiting | — |
 
@@ -54,3 +56,4 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 - 2026-09-23 — F1 race found at merge: folder delete vs concurrent upload both succeed under READ COMMITTED (the NOT EXISTS guard cannot see the other transaction). Back with F1's executor: serialise on the category row.
 - 2026-09-23 — G2's CRs decided: CR-1-g2 accepted (eight editors promoted into `fields/`); CR-2-g2 option 3 (超级组件 leaves the palette — no production or demo page uses it and its inner designer is unscheduled; existing nodes stay editable and round-trip); CR-3-g2 accepted (factory defaults gain the groups the legacy panels inject on open; panels still never write on open). Brief `G3-diy-followup.md`, dispatched when a slot frees; it also swaps the DIY id-input pickers for real catalog pickers.
 - 2026-09-23 — F1's storage race fix merged (both sides lock the category row; 30-round tests). B2 merged (40 route handlers, 3 admin pages, 141 tests, 10 races; no new dependencies). Workspace int: core 569, web 105. CR-3-b2 accepted: a `virtual_card` line is quantity 1 — refused in cart and checkout (B1 fix-up). Integration pass still owed once the fix-ups land: register C's refund service behind B2's `StaffRefundPort`, prove ship-vs-refund with both real services, move the order-facts bridge into the order domain and reconcile A's `catalog.autoReview` with B2's received → completed job, delete B1's fallback catalogue adapter.
+- 2026-09-23 — Kit maintenance merged: `visibleWhen` and `section` on config fields, implicit `auth:profile:*` atoms, `formData` in `callRoute`, and `pnpm gen` in core writing `config-groups.gen.ts` and `domains.gen.ts`; `handle.ts` and the worker import `@shop/core/domains` once, so every process has every port, hook, effect handler and config group (CR-8-c closed; C's job-file stop-gaps removed). Rule: a domain registers at import or through one exported `register<Domain>Domain()`, nowhere else. The `payment`, `refund` and `wechat` config groups now appear on the settings index for the first time. Lockfile updated (`tsx` in core).

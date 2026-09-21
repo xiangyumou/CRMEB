@@ -8,9 +8,11 @@
     "./kernel": "./src/kernel/index.ts",
     "./kernel/*": "./src/kernel/*.ts",
     "./order/ports": "./src/order/ports.ts",
+    "./domains": "./src/domains.gen.ts",
     "./*": "./src/*/index.ts"
   },
   "scripts": {
+    "gen": "tsx scripts/gen-config-groups.ts",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test:unit": "vitest run --project unit",
@@ -30,6 +32,7 @@
     "@shop/config": "workspace:*",
     "@types/node": "^24.0.0",
     "eslint": "^10.11.0",
+    "tsx": "^4.20.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"
   }

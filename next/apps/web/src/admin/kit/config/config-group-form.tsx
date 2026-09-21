@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Col,
+  Divider,
   Form,
   Input,
   InputNumber,
@@ -15,7 +16,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import type { RouteInput } from '../../api/call-route';
 import type { AnyRouteDef, ResponseOf } from '../../api/contracts';
@@ -55,6 +56,10 @@ export interface ConfigGroupFormProps<R extends AnyRouteDef> {
  * Renders one settings group from a descriptor and saves it through a mutation
  * route. Every settings page in the admin is this component plus a descriptor —
  * the 575-key `sys_config` screen zoo is gone.
+ *
+ * Fields carrying a `section` are grouped under a left-aligned heading, in the
+ * order the sections first appear. A descriptor with no sections renders as one
+ * flat list, exactly as before.
  *
  * Secrets: a `password` field shows 已设置 / 未设置 and an empty box. Leaving it
  * empty keeps the stored credential; typing replaces it. The secret itself is
@@ -150,39 +155,48 @@ export function ConfigGroupForm<R extends AnyRouteDef>({
         {...defined({ initialValues: values })}
         onFinish={(raw) => submit(raw as ConfigValues)}
       >
-        <Row gutter={16}>
-          {descriptor.fields
-            .filter((field) => isConfigFieldVisible(field, current))
-            .map((field) => (
-              <Col key={field.key} xs={24} md={field.span ?? defaultSpan}>
-                {field.kind === 'password' ? (
-                  <SecretField
-                    field={field}
-                    isSet={Boolean(values?.[field.key])}
-                    value={secrets[field.key] ?? ''}
-                    disabled={disabled}
-                    onChange={(next) => setSecrets((prev) => ({ ...prev, [field.key]: next }))}
-                  />
-                ) : (
-                  <Form.Item
-                    name={field.key}
-                    label={field.label}
-                    extra={field.help}
-                    valuePropName={field.kind === 'switch' ? 'checked' : 'value'}
-                    rules={
-                      field.required
-                        ? [{ required: true, message: `请填写${field.label}` }]
-                        : field.kind === 'json'
-                          ? [{ validator: validateJson }]
-                          : []
-                    }
-                  >
-                    {renderConfigControl(field, disabled)}
-                  </Form.Item>
-                )}
-              </Col>
-            ))}
-        </Row>
+        {groupBySection(
+          descriptor.fields.filter((field) => isConfigFieldVisible(field, current)),
+        ).map(({ section, fields }) => (
+          <Fragment key={section ?? ''}>
+            {section === undefined ? null : (
+              <Divider titlePlacement="start" plain style={{ margin: '4px 0 16px' }}>
+                <Typography.Text strong>{section}</Typography.Text>
+              </Divider>
+            )}
+            <Row gutter={16}>
+              {fields.map((field) => (
+                <Col key={field.key} xs={24} md={field.span ?? defaultSpan}>
+                  {field.kind === 'password' ? (
+                    <SecretField
+                      field={field}
+                      isSet={Boolean(values?.[field.key])}
+                      value={secrets[field.key] ?? ''}
+                      disabled={disabled}
+                      onChange={(next) => setSecrets((prev) => ({ ...prev, [field.key]: next }))}
+                    />
+                  ) : (
+                    <Form.Item
+                      name={field.key}
+                      label={field.label}
+                      extra={field.help}
+                      valuePropName={field.kind === 'switch' ? 'checked' : 'value'}
+                      rules={
+                        field.required
+                          ? [{ required: true, message: `请填写${field.label}` }]
+                          : field.kind === 'json'
+                            ? [{ validator: validateJson }]
+                            : []
+                      }
+                    >
+                      {renderConfigControl(field, disabled)}
+                    </Form.Item>
+                  )}
+                </Col>
+              ))}
+            </Row>
+          </Fragment>
+        ))}
 
         <Button type="primary" htmlType="submit" loading={mutation.isPending}>
           保存
@@ -190,6 +204,32 @@ export function ConfigGroupForm<R extends AnyRouteDef>({
       </Form>
     </Card>
   );
+}
+
+/**
+ * Runs of fields sharing a `section`, in first-appearance order.
+ *
+ * A descriptor where no field has a section yields exactly one run with no
+ * heading, which renders the same single `<Row>` the form has always rendered.
+ *
+ * Deliberately not `<Tabs>`: a settings form saves as one payload, and a
+ * validation error on a hidden tab is invisible.
+ */
+function groupBySection(
+  fields: readonly ConfigFieldDescriptor[],
+): { section: string | undefined; fields: ConfigFieldDescriptor[] }[] {
+  const runs: { section: string | undefined; fields: ConfigFieldDescriptor[] }[] = [];
+  const bySection = new Map<string | undefined, ConfigFieldDescriptor[]>();
+  for (const field of fields) {
+    let bucket = bySection.get(field.section);
+    if (!bucket) {
+      bucket = [];
+      bySection.set(field.section, bucket);
+      runs.push({ section: field.section, fields: bucket });
+    }
+    bucket.push(field);
+  }
+  return runs;
 }
 
 function SecretField({

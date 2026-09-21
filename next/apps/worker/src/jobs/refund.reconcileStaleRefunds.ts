@@ -1,13 +1,6 @@
 import { z } from 'zod';
-import { reconcileStaleRefunds, registerRefundDomain } from '@shop/core/refund';
+import { reconcileStaleRefunds } from '@shop/core/refund';
 import { defineJob } from '../define-job';
-
-/**
- * At import, before the first effects pass — `refund.execute` is the handler
- * that moves money, and an unhandled claim parks it as `unknown` for good.
- * See `payment.closeExpiredPayments` for the full reasoning, and `CR-8-c`.
- */
-registerRefundDomain();
 
 /**
  * Resolves refunds whose result never arrived.

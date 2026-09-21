@@ -24,11 +24,9 @@ import {
  *
  * - `/admin-api/admins/**` manages *other people* and needs `system:admin:*`.
  * - `/admin-api/profile/**` is the caller's own account. It declares the
- *   implicitly-granted `auth:session:*` atoms so that an admin with no grants at
+ *   implicitly-granted `auth:profile:*` atoms so that an admin with no grants at
  *   all can still read their profile and change their own password — which is a
  *   precondition for the "password change revokes sessions" rule to be usable.
- *   CR-2-f1 asks for dedicated `system:profile:*` atoms in
- *   `IMPLICIT_ADMIN_PERMISSIONS`; until that lands, these are the honest choice.
  */
 
 const adminParams = z.object({ id });
@@ -236,7 +234,7 @@ export const systemProfileGet = defineRoute({
   method: 'GET',
   path: '/admin-api/profile',
   auth: 'admin',
-  permission: 'auth:session:read',
+  permission: 'auth:profile:read',
   summary: '我的资料',
   tags: ['system'],
   response: adminSelfProfile,
@@ -248,7 +246,7 @@ export const systemProfileUpdate = defineRoute({
   method: 'PUT',
   path: '/admin-api/profile',
   auth: 'admin',
-  permission: 'auth:session:read',
+  permission: 'auth:profile:update',
   summary: '修改我的资料',
   tags: ['system'],
   body: profileForm,
@@ -271,9 +269,7 @@ export const systemProfileChangePassword = defineRoute({
   method: 'POST',
   path: '/admin-api/profile/password',
   auth: 'admin',
-  // Ending every session of this account is exactly what `session:delete` means,
-  // and every authenticated admin holds it implicitly.
-  permission: 'auth:session:delete',
+  permission: 'auth:profile:update',
   summary: '修改我的密码',
   tags: ['system'],
   body: profilePasswordBody,

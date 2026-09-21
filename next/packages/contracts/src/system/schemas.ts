@@ -124,7 +124,12 @@ export const adminSelfProfileExample: AdminSelfProfile = {
   phone: '13800000000',
   isSuper: true,
   roleNames: [],
-  permissions: ['auth:session:delete', 'auth:session:read'],
+  permissions: [
+    'auth:profile:read',
+    'auth:profile:update',
+    'auth:session:delete',
+    'auth:session:read',
+  ],
   lastLoginAt: '2026-09-21T10:00:00+08:00',
 };
 

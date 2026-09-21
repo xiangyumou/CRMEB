@@ -34,6 +34,19 @@ export type ConfigFieldType =
   | 'password'
   | 'json';
 
+/**
+ * Data-only conditional visibility: render the field when `values[key]` matches.
+ *
+ * Only the data form exists on purpose — a predicate function cannot be
+ * serialised into the descriptor the browser receives, and the admin kit's
+ * `<ConfigGroupForm>` accepts exactly this shape.
+ */
+export interface ConfigVisibleWhen {
+  key: string;
+  /** A single value, or any of a list. */
+  equals: unknown;
+}
+
 export interface ConfigFieldUi {
   label: string;
   type: ConfigFieldType;
@@ -42,6 +55,16 @@ export interface ConfigFieldUi {
   options?: ReadonlyArray<{ label: string; value: string | number | boolean }>;
   /** Tab/section inside the group's form. */
   section?: string;
+  /**
+   * Render only when another field **of the same group** matches. The key is
+   * checked against the group's schema at declaration time.
+   *
+   * A hidden field is not part of the saved payload and its required-ness is
+   * not enforced in the browser, so the stored value survives untouched: a shop
+   * on the `local` storage driver never has to fill in an S3 bucket to change
+   * an upload limit.
+   */
+  visibleWhen?: ConfigVisibleWhen;
   /** Rendered write-only: the current value is never sent to the browser. */
   secret?: boolean;
   /** Display order inside the section; ties fall back to declaration order. */
@@ -83,6 +106,22 @@ export function defineConfigGroup<S extends z.ZodObject>(
   if (!probe.success) {
     const missing = probe.error.issues.map((i) => i.path.join('.')).join(', ');
     throw new Error(`config group "${def.group}": 每个字段都必须有 .default()（缺少：${missing}）`);
+  }
+  // `visibleWhen` may only point at a field of the same group: a typo here
+  // hides the field for ever with no error anywhere, which is the failure mode
+  // the whole registry exists to avoid.
+  const known = new Set(Object.keys(def.schema.shape));
+  for (const [key, ui] of Object.entries(def.ui as Record<string, ConfigFieldUi | undefined>)) {
+    const dependency = ui?.visibleWhen?.key;
+    if (dependency === undefined) continue;
+    if (!known.has(dependency)) {
+      throw new Error(
+        `config group "${def.group}": 字段 "${key}" 的 visibleWhen.key "${dependency}" 不是本分组的字段`,
+      );
+    }
+    if (dependency === key) {
+      throw new Error(`config group "${def.group}": 字段 "${key}" 的 visibleWhen 不能指向自己`);
+    }
   }
   registry.set(def.group, def as unknown as ConfigGroupDef);
   return def;

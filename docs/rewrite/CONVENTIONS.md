@@ -34,13 +34,15 @@ A domain (`coupon`, `catalog`, `order`, …) owns exactly these paths and nothin
 | Admin pages    | `apps/web/app/admin/(shell)/<domain>/**`                                                    |
 | Admin menu     | `apps/web/src/admin/menu/<domain>.menu.ts`                                                  |
 | Jobs           | `apps/worker/src/jobs/<domain>.*.ts`                                                        |
-| Config groups  | `packages/core/src/<domain>/<group>.config.ts`, registered from the domain's `index.ts`     |
+| Config groups  | `packages/core/src/<domain>/<group>.config.ts` — one file, nothing shared to edit           |
 | ETL            | `packages/etl/src/mappers/<domain>.ts`                                                      |
 | Tests          | next to the code as `*.test.ts` (unit) and `*.int.test.ts` (needs PG/Redis)                 |
 
 In the App Router the directory is the URL, so route files mirror the contract's `path` exactly. A domain owns the top-level resource segments its contracts declare (coupon owns `coupons/**` and `user-coupons/**`); the contracts gate rejects two routes with the same method and path. Import a core domain by directory: `@shop/core/<domain>`.
 
-Aggregation files (`*.gen.ts`) are produced by `pnpm gen` and gitignored. Add a file in the right place and it is picked up; there is no shared index to edit, so parallel streams do not conflict.
+Aggregation files (`*.gen.ts`) are produced by `pnpm gen` and gitignored. Add a file in the right place and it is picked up; there is no shared index to edit, so parallel streams do not conflict. In `core` that covers both buckets: `src/config-groups.gen.ts` (every `<domain>/*.config.ts`) and `src/domains.gen.ts` (every `<domain>/index.ts`). Adding a settings screen is one new `*.config.ts` file and nothing else — `gen` refuses two files that claim the same group name and says which two.
+
+**How a domain gets installed.** A domain registers **either** as a side effect of importing its `index.ts`, **or** through one exported `register<Domain>Domain()` that `index.ts` declares and that is safe to call twice — never anywhere else, and never from a job, a route or a service module. `src/domains.gen.ts` imports every index and calls every registrar it finds by scanning the index source; both apps import `@shop/core/domains` exactly once at bootstrap (`apps/web/src/server/handle.ts`, the worker container before the dispatcher and job registry exist). Registering from somewhere else means the registration depends on which module a request happened to load first: that is how `refund.execute` came to be parked as `unknown` (CR-8-c).
 
 ## Import boundaries (ESLint-enforced)
 
@@ -83,6 +85,7 @@ Every endpoint is a `defineRoute({...})` (see `packages/contracts/src/_conventio
 - `exactOptionalPropertyTypes` is on: declare optional props as `?: T | undefined`, and spread `defined({...})` from `kit/props.ts` when handing a maybe-undefined value to an antd prop.
 - Real asset and link data reach the pickers through `<AssetSourceProvider>` / `<LinkSourceProvider>`; the kit itself does not change.
 - Secret config fields (`password` kind) travel to the browser as an "is set" boolean; plaintext goes back only when retyped.
+- A config group shapes its own screen from `ui`, not from the page: `section: '对象存储'` puts the field under a heading (first-appearance order, no sections means no headings), and `visibleWhen: { key: 'driver', equals: 's3' }` — or `equals: ['tencent', 'amap']` for any-of — shows it only for the driver it belongs to. `defineConfigGroup` throws if `key` is not another field of the same group. A hidden field is not validated client-side and is not sent, so its stored value survives: never gate a field the group cannot do without.
 - In tests, match two-character CJK button labels with `zhName()` from `src/test/render.tsx` (antd inserts a space).
 
 ## Tooling caveats

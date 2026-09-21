@@ -1,7 +1,7 @@
 # CR-1-f1 — `ConfigFieldUi` cannot express conditional visibility
 
 - **Stream:** F1 (system & storage)
-- **Status:** worked around locally; needs an orchestrator change
+- **Status:** applied — `ConfigFieldUi.visibleWhen` now carries through `describeGroup` to the kit form, is validated against the group's own fields at `defineConfigGroup` time, and hides fields in `storage`, `sms`, `logistics`, `map` and the two WeChat groups; F1's `config-ui-extras.ts` workaround is deleted.
 - **Affects:** `next/packages/core/src/kernel/config-registry.ts` (orchestrator-owned)
 
 ## What is wrong

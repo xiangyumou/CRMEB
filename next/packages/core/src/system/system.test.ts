@@ -9,6 +9,7 @@ import {
 } from '../kernel/index';
 import { describe, expect, it, beforeEach } from 'vitest';
 import { allConfigGroups, getConfigGroup } from '../kernel/config-registry';
+import { isKnownPermission } from '../auth/permissions';
 import { permissionTree } from './role.service';
 import { describeGroup } from './config.service';
 import {
@@ -17,11 +18,11 @@ import {
   registerDashboardContributor,
   resetDashboardContributors,
 } from './dashboard';
-// The domain's own entry point, which is what a route imports: it registers
-// every permission atom, config group and dashboard contributor as a side
-// effect. Importing the individual modules instead would quietly test a
-// half-loaded registry.
-import './index';
+// The gen'd domain bucket, which is what `handle.ts` imports: it registers
+// every permission atom, config group and dashboard contributor there is, as a
+// side effect. Importing `./index` alone would quietly test a half-loaded
+// registry — and these sweeps are only worth anything over the whole of it.
+import '../domains.gen';
 
 /**
  * The parts of `system` that are pure: the descriptor a settings screen is
@@ -78,11 +79,31 @@ describe('describeGroup', () => {
   });
 
   it('carries conditional visibility through to the descriptor', () => {
-    // CR-1-f1: `visibleWhen` is merged from the local adapter until the kernel
-    // carries it. The storage screen must not show seven S3 boxes on local disk.
+    // The storage screen must not show seven S3 boxes on local disk.
     const storage = getConfigGroup('storage');
     const s3Bucket = describeGroup(storage!).fields.find((f) => f.key === 's3Bucket');
     expect(s3Bucket?.visibleWhen).toEqual({ key: 'driver', equals: 's3' });
+
+    const sms = describeGroup(getConfigGroup('sms')!);
+    expect(sms.fields.find((f) => f.key === 'aliyunSignName')?.visibleWhen).toEqual({
+      key: 'provider',
+      equals: 'aliyun',
+    });
+    // The provider switch itself is never conditional: hiding it would strand
+    // whoever picked the wrong provider.
+    expect(sms.fields.find((f) => f.key === 'provider')?.visibleWhen).toBeUndefined();
+  });
+
+  it('only lets a field depend on another field of its own group', () => {
+    // `defineConfigGroup` rejects a dangling key; this sweeps what is actually
+    // registered rather than restating the rule.
+    for (const group of allConfigGroups()) {
+      const keys = new Set(Object.keys(group.schema.shape));
+      for (const field of describeGroup(group).fields) {
+        if (!field.visibleWhen) continue;
+        expect(keys, `${group.group}.${field.key}`).toContain(field.visibleWhen.key);
+      }
+    }
   });
 
   it('orders fields the way the group was written', () => {
@@ -90,11 +111,17 @@ describe('describeGroup', () => {
     expect(site.fields[0]?.key).toBe('siteName');
   });
 
-  it('gives every group a readable title and a permission', () => {
+  it('gives every group a readable title and a permission that exists', () => {
+    // A group whose atom is not declared anywhere is a screen only a super
+    // admin can open, and nobody finds out until a 客服 account tries.
+    // `:write` is allowed: a group holding a merchant private key (`payment`)
+    // deliberately gates reading behind the write atom, and
+    // `writePermissionFor` returns that same atom rather than inventing one.
     for (const group of allConfigGroups()) {
       const descriptor = describeGroup(group);
       expect(descriptor.title.length, group.group).toBeGreaterThan(0);
-      expect(descriptor.permission, group.group).toMatch(/^[a-z-]+:[a-z-]+:read$/);
+      expect(descriptor.permission, group.group).toMatch(/^[a-z-]+:[a-z-]+:(read|write)$/);
+      expect(isKnownPermission(descriptor.permission), descriptor.permission).toBe(true);
       expect(descriptor.fields.length, group.group).toBeGreaterThan(0);
     }
   });
@@ -116,9 +143,15 @@ describe('permissionTree', () => {
   });
 
   it('names the atoms every admin holds implicitly', () => {
-    // An admin with zero grants can still read their own session and log out,
-    // so the role editor must not offer those as though they were choices.
-    expect(permissionTree().implicit).toEqual(['auth:session:delete', 'auth:session:read']);
+    // An admin with zero grants can still read their own session, log out, and
+    // read and edit their own profile, so the role editor must not offer those
+    // as though they were choices.
+    expect(permissionTree().implicit).toEqual([
+      'auth:profile:read',
+      'auth:profile:update',
+      'auth:session:delete',
+      'auth:session:read',
+    ]);
   });
 
   it('includes the storage atoms the contracts reference', () => {

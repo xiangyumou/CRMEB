@@ -1,9 +1,6 @@
 import { z } from 'zod';
-import { recheckExceptionRefunds, registerPaymentDomain } from '@shop/core/payment';
+import { recheckExceptionRefunds } from '@shop/core/payment';
 import { defineJob } from '../define-job';
-
-// At import, before the first effects pass. See `payment.closeExpiredPayments`.
-registerPaymentDomain();
 
 /**
  * Chases the automatic refunds of payment exceptions whose result never came

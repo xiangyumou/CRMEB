@@ -75,6 +75,33 @@ describe('defineConfigGroup', () => {
     ).toThrow('重复定义');
   });
 
+  it('refuses a visibleWhen that does not name a field of the same group', () => {
+    // A typo here hides the field for ever with no error anywhere, which is the
+    // failure mode the registry exists to prevent — so it throws at declaration.
+    expect(() =>
+      defineConfigGroup({
+        group: 'bad-visible-when',
+        title: 'x',
+        schema: z.object({ driver: z.string().default('local'), bucket: z.string().default('') }),
+        ui: {
+          driver: { label: '驱动', type: 'text' },
+          bucket: { label: 'Bucket', type: 'text', visibleWhen: { key: 'drivre', equals: 's3' } },
+        },
+      }),
+    ).toThrow('不是本分组的字段');
+
+    expect(() =>
+      defineConfigGroup({
+        group: 'self-visible-when',
+        title: 'x',
+        schema: z.object({ driver: z.string().default('local') }),
+        ui: {
+          driver: { label: '驱动', type: 'text', visibleWhen: { key: 'driver', equals: 's3' } },
+        },
+      }),
+    ).toThrow('不能指向自己');
+  });
+
   it('keeps the legacy key map the ETL needs', () => {
     expect(paymentConfig.legacyKeys?.wechatMchId).toEqual(['pay_weixin_mchid']);
   });

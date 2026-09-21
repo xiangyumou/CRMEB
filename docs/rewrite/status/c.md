@@ -293,7 +293,9 @@ able to re-point the payment host by hand (TLS-001).
     app calls `registerPaymentDomain()` / `registerRefundDomain()`, so an effect
     claimed before its handler exists is settled as `unknown` permanently. The
     four sweeps call it at module scope, and `jobs.gen.ts` imports every job at
-    boot. Filed as `CR-8-c` for a generated `registerAllDomains()`.
+    boot. Filed as `CR-8-c` for a generated `registerAllDomains()`. **Resolved:**
+    `@shop/core/domains` is generated and imported once by each app at bootstrap,
+    and the stop-gap in the four job files is removed.
 16. **`adminFlowSummary`** answers the 资金流水 console's totals with one
     aggregate over the *whole* filter (`repo.summariseCapitalFlows`) rather than
     summing a page, and `netAmount` is allowed to be negative — a day of refunds
@@ -315,7 +317,7 @@ global `fetch`, as the brief requires. `next/pnpm-lock.yaml` is untouched.
 | `CR-5-c` | `refunds.return_address jsonb` — the buyer's return address is frozen on approval and the column is missing | open |
 | `CR-6-c` | `config.repo.ts::loadGroup` double-parses `jsonb`, so numeric settings come back as numbers | open |
 | `CR-7-c` | `cancelOrder` must call `closeOrderPayments` before it opens the cancelling transaction | open (B1) |
-| `CR-8-c` | nothing calls `register<Domain>Domain()` in either app; asks for a generated `registerAllDomains()` | open (platform) |
+| `CR-8-c` | nothing calls `register<Domain>Domain()` in either app; asks for a generated `registerAllDomains()` | applied (platform) — `@shop/core/domains` |
 
 ## What other streams must know
 

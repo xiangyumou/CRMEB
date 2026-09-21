@@ -1,7 +1,7 @@
 # CR-4-f1 — `callRoute` cannot send a file
 
 - **Stream:** F1 (system & storage)
-- **Status:** worked around locally; the kit should own it
+- **Status:** applied — `callRoute` takes `formData` on its input (a field rather than the suggested overload: the base eslint `no-redeclare` is not TS-aware here), and `storage/upload.ts` is a thin wrapper over it with its signature unchanged.
 - **Affects:** `next/apps/web/src/admin/api/call-route.ts` (P0-b/kit-owned)
 
 ## What is wrong

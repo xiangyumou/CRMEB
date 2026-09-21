@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { defineConfigGroup } from '../kernel/config-registry';
+import { defineConfigGroup, type ConfigVisibleWhen } from '../kernel/config-registry';
+
+/** Nothing below the provider switch means anything while it is `none`. */
+const MAP_ON: ConfigVisibleWhen = { key: 'provider', equals: ['tencent', 'amap'] };
 
 /**
  * `map` — the map provider used for address picking and 门店 coordinates.
@@ -37,10 +40,17 @@ export const mapConfig = defineConfigGroup({
       label: '前端 Key',
       type: 'text',
       help: '会下发到浏览器，请在服务商控制台按域名限制',
+      visibleWhen: MAP_ON,
       order: 2,
     },
-    serverKey: { label: '服务端 Key', type: 'password', secret: true, order: 3 },
-    defaultCity: { label: '默认城市', type: 'text', order: 4 },
+    serverKey: {
+      label: '服务端 Key',
+      type: 'password',
+      secret: true,
+      visibleWhen: MAP_ON,
+      order: 3,
+    },
+    defaultCity: { label: '默认城市', type: 'text', visibleWhen: MAP_ON, order: 4 },
   },
   legacyKeys: {
     webKey: 'tengxun_map_key',

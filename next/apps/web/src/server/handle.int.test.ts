@@ -190,6 +190,8 @@ describe('the admin auth routes', () => {
     );
     expect(profile.status).toBe(200);
     expect((await profile.json()).permissions).toEqual([
+      'auth:profile:read',
+      'auth:profile:update',
       'auth:session:delete',
       'auth:session:read',
       'catalog:product:read',

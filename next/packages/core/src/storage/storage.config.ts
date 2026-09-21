@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { defineConfigGroup } from '../kernel/config-registry';
+import { defineConfigGroup, type ConfigVisibleWhen } from '../kernel/config-registry';
+
+/** The S3 credentials mean nothing on the local driver, so they are not shown. */
+const S3_ONLY: ConfigVisibleWhen = { key: 'driver', equals: 's3' };
+const LOCAL_ONLY: ConfigVisibleWhen = { key: 'driver', equals: 'local' };
 
 /**
  * `storage` — where uploaded files go, and what is allowed through the door.
@@ -83,23 +87,37 @@ export const storageConfig = defineConfigGroup({
       help: '阿里云 OSS、腾讯云 COS、七牛、华为 OBS、MinIO 都填 S3',
       order: 1,
     },
-    localPublicPrefix: { label: '本地访问前缀', type: 'text', section: '本地', order: 10 },
+    localPublicPrefix: {
+      label: '本地访问前缀',
+      type: 'text',
+      section: '本地',
+      visibleWhen: LOCAL_ONLY,
+      order: 10,
+    },
 
-    s3Bucket: { label: 'Bucket', type: 'text', section: 'S3', order: 20 },
-    s3Region: { label: 'Region', type: 'text', section: 'S3', order: 21 },
+    s3Bucket: { label: 'Bucket', type: 'text', section: 'S3', visibleWhen: S3_ONLY, order: 20 },
+    s3Region: { label: 'Region', type: 'text', section: 'S3', visibleWhen: S3_ONLY, order: 21 },
     s3Endpoint: {
       label: 'Endpoint',
       type: 'text',
       section: 'S3',
       placeholder: 'https://oss-cn-hangzhou.aliyuncs.com',
+      visibleWhen: S3_ONLY,
       order: 22,
     },
-    s3AccessKeyId: { label: 'AccessKeyId', type: 'text', section: 'S3', order: 23 },
+    s3AccessKeyId: {
+      label: 'AccessKeyId',
+      type: 'text',
+      section: 'S3',
+      visibleWhen: S3_ONLY,
+      order: 23,
+    },
     s3SecretAccessKey: {
       label: 'SecretAccessKey',
       type: 'password',
       secret: true,
       section: 'S3',
+      visibleWhen: S3_ONLY,
       order: 24,
     },
     s3PublicBaseUrl: {
@@ -107,6 +125,7 @@ export const storageConfig = defineConfigGroup({
       type: 'text',
       section: 'S3',
       placeholder: 'https://cdn.example.com',
+      visibleWhen: S3_ONLY,
       order: 25,
     },
     s3Addressing: {
@@ -117,6 +136,7 @@ export const storageConfig = defineConfigGroup({
         { label: '虚拟主机（bucket.endpoint）', value: 'virtual' },
         { label: '路径（endpoint/bucket）', value: 'path' },
       ],
+      visibleWhen: S3_ONLY,
       order: 26,
     },
 
@@ -197,26 +217,3 @@ export const storageConfig = defineConfigGroup({
     s3Region: 'jd_storageRegion',
   },
 });
-
-const S3_ONLY = { key: 'driver', equals: 's3' } as const;
-
-/**
- * Conditional visibility for the settings screen.
- *
- * Exported as plain data rather than registered here, because registering would
- * mean importing `system/config-ui-extras`, and a domain may only reach another
- * through its `index.ts` (ESLint `core-cross-domain`). `system/config-groups.ts`
- * imports this constant through `storage/index.ts` and registers it. When
- * **CR-1-f1** puts `visibleWhen` on `ConfigFieldUi`, this moves inline into `ui`
- * above and the constant disappears.
- */
-export const storageConfigFieldExtras = {
-  localPublicPrefix: { visibleWhen: { key: 'driver', equals: 'local' } },
-  s3Bucket: { visibleWhen: S3_ONLY },
-  s3Region: { visibleWhen: S3_ONLY },
-  s3Endpoint: { visibleWhen: S3_ONLY },
-  s3AccessKeyId: { visibleWhen: S3_ONLY },
-  s3SecretAccessKey: { visibleWhen: S3_ONLY },
-  s3PublicBaseUrl: { visibleWhen: S3_ONLY },
-  s3Addressing: { visibleWhen: S3_ONLY },
-} as const;

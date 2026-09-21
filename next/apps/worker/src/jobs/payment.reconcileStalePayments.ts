@@ -1,9 +1,6 @@
 import { z } from 'zod';
-import { reconcileStalePayments, registerPaymentDomain } from '@shop/core/payment';
+import { reconcileStalePayments } from '@shop/core/payment';
 import { defineJob } from '../define-job';
-
-// At import, before the first effects pass. See `payment.closeExpiredPayments`.
-registerPaymentDomain();
 
 /**
  * Asks the gateway about every attempt that has sat in a non-final state.

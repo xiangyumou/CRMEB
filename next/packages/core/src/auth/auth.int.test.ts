@@ -13,6 +13,7 @@ import {
 import { type DomainError } from '../kernel/errors';
 import { registerCaptchaVerifier, resetCaptchaVerifier } from './captcha';
 import { AdminAuthService } from './admin-auth.service';
+import { IMPLICIT_ADMIN_PERMISSIONS } from './rbac';
 import { hashPassword, sha256Hex } from './password';
 import { registerUserLookup, resetUserLookup } from './user-lookup';
 import { UserSessionService } from './user-session.service';
@@ -83,7 +84,7 @@ describe('admin login', () => {
       account: 'admin',
       isSuper: true,
     });
-    expect(result.profile.permissions).toEqual(['auth:session:delete', 'auth:session:read']);
+    expect(result.profile.permissions).toEqual([...IMPLICIT_ADMIN_PERMISSIONS].sort());
 
     const [row] = await harness.ctx.db.select().from(admins).where(eq(admins.id, id));
     expect(row?.lastLoginAt?.getTime()).toBe(harness.clock.nowMs());
@@ -100,12 +101,9 @@ describe('admin login', () => {
     const id = await seedAdmin();
     await grant(id, ['catalog:product:read', 'catalog:product:update']);
     const result = await auth.login(harness.ctx, { account: 'admin', password: PASSWORD });
-    expect(result.profile.permissions).toEqual([
-      'auth:session:delete',
-      'auth:session:read',
-      'catalog:product:read',
-      'catalog:product:update',
-    ]);
+    expect(result.profile.permissions).toEqual(
+      [...IMPLICIT_ADMIN_PERMISSIONS, 'catalog:product:read', 'catalog:product:update'].sort(),
+    );
   });
 
   it('gives the same error for a wrong password and an unknown account', async () => {

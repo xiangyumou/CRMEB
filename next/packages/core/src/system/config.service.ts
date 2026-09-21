@@ -16,9 +16,12 @@ import {
 } from '../kernel/config-registry';
 import { DomainError } from '../kernel/errors';
 import { hasPermission } from '../auth/rbac';
-import { configFieldExtra } from './config-ui-extras';
 import * as repo from './system.repo';
-import './config-groups';
+// The gen'd bucket: `defineConfigGroup` registers as a side effect of its
+// module being imported, so this is what makes a group exist. `pnpm gen`
+// collects every `src/<domain>/*.config.ts`, so adding a settings screen is one
+// new file and no shared index to edit.
+import '../config-groups.gen';
 
 /**
  * The generic settings screen.
@@ -53,12 +56,8 @@ const FIELD_KIND: Record<ConfigFieldType, ConfigFieldDescriptor['kind']> = {
   json: 'json',
 };
 
-function fieldDescriptor(group: string, key: string, ui: ConfigFieldUi): ConfigFieldDescriptor {
+function fieldDescriptor(key: string, ui: ConfigFieldUi): ConfigFieldDescriptor {
   const secret = ui.secret === true || ui.type === 'password';
-  // `visibleWhen` is not on `ConfigFieldUi` yet — CR-1-f1. Until it is, a group
-  // registers it beside its definition and it is merged in here, so the screen
-  // and the contract already behave as though the CR had landed.
-  const extra = configFieldExtra(group, key);
   return {
     key,
     label: ui.label,
@@ -68,7 +67,7 @@ function fieldDescriptor(group: string, key: string, ui: ConfigFieldUi): ConfigF
     ...(ui.options === undefined ? {} : { options: ui.options.map((o) => ({ ...o })) }),
     ...(ui.section === undefined ? {} : { section: ui.section }),
     ...(ui.type === 'images' || ui.type === 'multi-select' ? { multiple: true } : {}),
-    ...(extra?.visibleWhen === undefined ? {} : { visibleWhen: extra.visibleWhen }),
+    ...(ui.visibleWhen === undefined ? {} : { visibleWhen: { ...ui.visibleWhen } }),
     ...(secret ? { secret: true } : {}),
   };
 }
@@ -85,7 +84,7 @@ export function describeGroup(def: ConfigGroupDef): ConfigGroupDescriptor {
     // A key with no `ui` entry is deliberately not editable in the admin: it is
     // a value the ETL or a job writes, not an operator.
     if (!entry.ui) continue;
-    fields.push(fieldDescriptor(def.group, entry.key, entry.ui));
+    fields.push(fieldDescriptor(entry.key, entry.ui));
   }
   return {
     group: def.group,

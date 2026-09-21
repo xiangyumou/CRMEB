@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { defineConfigGroup } from '../kernel/config-registry';
-import { defineConfigFieldExtras } from './config-ui-extras';
 
 /**
  * `wechat-mini` — 小程序 credentials.
@@ -43,7 +42,13 @@ export const wechatMiniConfig = defineConfigGroup({
       ],
       order: 6,
     },
-    encodingAesKey: { label: 'EncodingAESKey', type: 'password', secret: true, order: 7 },
+    encodingAesKey: {
+      label: 'EncodingAESKey',
+      type: 'password',
+      secret: true,
+      visibleWhen: { key: 'messageMode', equals: ['compatible', 'safe'] },
+      order: 7,
+    },
     contactType: {
       label: '联系客服方式',
       type: 'select',
@@ -53,7 +58,13 @@ export const wechatMiniConfig = defineConfigGroup({
       ],
       order: 8,
     },
-    contactPhone: { label: '客服电话', type: 'text', help: '「拨打电话」时使用', order: 9 },
+    contactPhone: {
+      label: '客服电话',
+      type: 'text',
+      help: '「拨打电话」时使用',
+      visibleWhen: { key: 'contactType', equals: 'phone' },
+      order: 9,
+    },
   },
   legacyKeys: {
     name: 'routine_name',
@@ -64,9 +75,4 @@ export const wechatMiniConfig = defineConfigGroup({
     messageMode: 'routine_encode',
     contactType: 'routine_contact_type',
   },
-});
-
-defineConfigFieldExtras('wechat-mini', {
-  contactPhone: { visibleWhen: { key: 'contactType', equals: 'phone' } },
-  encodingAesKey: { visibleWhen: { key: 'messageMode', equals: ['compatible', 'safe'] } },
 });

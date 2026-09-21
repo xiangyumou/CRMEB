@@ -33,6 +33,11 @@ export interface ConfigFieldDescriptor {
   placeholder?: string | undefined;
   required?: boolean | undefined;
   visibleWhen?: (ConfigVisibleWhen | ((values: ConfigValues) => boolean)) | undefined;
+  /**
+   * Heading this field sits under. Fields with no section come first, and a
+   * descriptor where no field has one renders exactly as it did before.
+   */
+  section?: string | undefined;
   /** `asset` only. */
   multiple?: boolean | undefined;
   max?: number | undefined;

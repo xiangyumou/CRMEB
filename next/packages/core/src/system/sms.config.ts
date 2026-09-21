@@ -1,6 +1,9 @@
 import { z } from 'zod';
-import { defineConfigGroup } from '../kernel/config-registry';
-import { defineConfigFieldExtras } from './config-ui-extras';
+import { defineConfigGroup, type ConfigVisibleWhen } from '../kernel/config-registry';
+
+/** Each vendor's credentials are shown only while that vendor is selected. */
+const ALIYUN: ConfigVisibleWhen = { key: 'provider', equals: 'aliyun' };
+const TENCENT: ConfigVisibleWhen = { key: 'provider', equals: 'tencent' };
 
 /**
  * `sms` — the SMS provider.
@@ -51,28 +54,72 @@ export const smsConfig = defineConfigGroup({
       ],
       order: 1,
     },
-    aliyunAccessKeyId: { label: 'AccessKeyId', type: 'text', section: '阿里云', order: 10 },
+    aliyunAccessKeyId: {
+      label: 'AccessKeyId',
+      type: 'text',
+      section: '阿里云',
+      visibleWhen: ALIYUN,
+      order: 10,
+    },
     aliyunAccessKeySecret: {
       label: 'AccessKeySecret',
       type: 'password',
       secret: true,
       section: '阿里云',
+      visibleWhen: ALIYUN,
       order: 11,
     },
-    aliyunRegionId: { label: 'RegionId', type: 'text', section: '阿里云', order: 12 },
-    aliyunSignName: { label: '短信签名', type: 'text', section: '阿里云', order: 13 },
+    aliyunRegionId: {
+      label: 'RegionId',
+      type: 'text',
+      section: '阿里云',
+      visibleWhen: ALIYUN,
+      order: 12,
+    },
+    aliyunSignName: {
+      label: '短信签名',
+      type: 'text',
+      section: '阿里云',
+      visibleWhen: ALIYUN,
+      order: 13,
+    },
 
-    tencentAppId: { label: 'SdkAppId', type: 'text', section: '腾讯云', order: 20 },
-    tencentSecretId: { label: 'SecretId', type: 'text', section: '腾讯云', order: 21 },
+    tencentAppId: {
+      label: 'SdkAppId',
+      type: 'text',
+      section: '腾讯云',
+      visibleWhen: TENCENT,
+      order: 20,
+    },
+    tencentSecretId: {
+      label: 'SecretId',
+      type: 'text',
+      section: '腾讯云',
+      visibleWhen: TENCENT,
+      order: 21,
+    },
     tencentSecretKey: {
       label: 'SecretKey',
       type: 'password',
       secret: true,
       section: '腾讯云',
+      visibleWhen: TENCENT,
       order: 22,
     },
-    tencentSignName: { label: '短信签名', type: 'text', section: '腾讯云', order: 23 },
-    tencentRegion: { label: '地域', type: 'text', section: '腾讯云', order: 24 },
+    tencentSignName: {
+      label: '短信签名',
+      type: 'text',
+      section: '腾讯云',
+      visibleWhen: TENCENT,
+      order: 23,
+    },
+    tencentRegion: {
+      label: '地域',
+      type: 'text',
+      section: '腾讯云',
+      visibleWhen: TENCENT,
+      order: 24,
+    },
 
     templateVerifyCode: { label: '验证码模板 ID', type: 'text', section: '模板', order: 30 },
     templateOrderPaid: { label: '支付成功模板 ID', type: 'text', section: '模板', order: 31 },
@@ -93,19 +140,4 @@ export const smsConfig = defineConfigGroup({
     tencentSignName: 'tencent_sms_sign_name',
     tencentRegion: 'tencent_sms_region',
   },
-});
-
-const ALIYUN = { key: 'provider', equals: 'aliyun' } as const;
-const TENCENT = { key: 'provider', equals: 'tencent' } as const;
-
-defineConfigFieldExtras('sms', {
-  aliyunAccessKeyId: { visibleWhen: ALIYUN },
-  aliyunAccessKeySecret: { visibleWhen: ALIYUN },
-  aliyunRegionId: { visibleWhen: ALIYUN },
-  aliyunSignName: { visibleWhen: ALIYUN },
-  tencentAppId: { visibleWhen: TENCENT },
-  tencentSecretId: { visibleWhen: TENCENT },
-  tencentSecretKey: { visibleWhen: TENCENT },
-  tencentSignName: { visibleWhen: TENCENT },
-  tencentRegion: { visibleWhen: TENCENT },
 });

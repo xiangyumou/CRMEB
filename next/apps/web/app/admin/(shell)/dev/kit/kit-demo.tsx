@@ -47,7 +47,8 @@ installDemoFetch();
 const CONFIG_GROUP: ConfigGroupDescriptor = {
   group: 'demo',
   title: '演示配置组',
-  description: '这一页由描述符渲染；真实配置页只需要提供描述符和取值/保存两个路由。',
+  description:
+    '这一页由描述符渲染；真实配置页只需要提供描述符和取值/保存两个路由。带 section 的字段会按首次出现顺序分节显示。',
   fields: [
     { key: 'siteName', label: '站点名称', kind: 'text', required: true, span: 12 },
     { key: 'contactPhone', label: '客服电话', kind: 'text', span: 12 },
@@ -56,14 +57,16 @@ const CONFIG_GROUP: ConfigGroupDescriptor = {
       label: '接口密钥',
       kind: 'password',
       span: 12,
+      section: '密钥',
       help: '演示：已设置的密钥不会回传到浏览器',
     },
-    { key: 'smsSecret', label: '短信密钥', kind: 'password', span: 12 },
+    { key: 'smsSecret', label: '短信密钥', kind: 'password', span: 12, section: '密钥' },
     {
       key: 'deliveryMode',
       label: '配送方式',
       kind: 'select',
       span: 12,
+      section: '交易',
       options: [
         { label: '快递', value: 'express' },
         { label: '同城', value: 'city' },
@@ -74,12 +77,13 @@ const CONFIG_GROUP: ConfigGroupDescriptor = {
       label: '包邮门槛',
       kind: 'money',
       span: 12,
+      section: '交易',
       visibleWhen: { key: 'deliveryMode', equals: 'express' },
     },
-    { key: 'enableInvoice', label: '开启发票', kind: 'switch', span: 12 },
-    { key: 'maxPerOrder', label: '每单上限', kind: 'number', min: 1, span: 12 },
-    { key: 'logo', label: '站点 LOGO', kind: 'asset', span: 12 },
-    { key: 'extra', label: '额外参数', kind: 'json', span: 24 },
+    { key: 'enableInvoice', label: '开启发票', kind: 'switch', span: 12, section: '交易' },
+    { key: 'maxPerOrder', label: '每单上限', kind: 'number', min: 1, span: 12, section: '交易' },
+    { key: 'logo', label: '站点 LOGO', kind: 'asset', span: 12, section: '外观' },
+    { key: 'extra', label: '额外参数', kind: 'json', span: 24, section: '外观' },
   ],
 };
 

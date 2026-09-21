@@ -31,5 +31,10 @@ export const adminProfileExample: AdminProfile = {
   name: '超级管理员',
   avatar: null,
   isSuper: true,
-  permissions: ['auth:session:read', 'auth:session:delete'],
+  permissions: [
+    'auth:profile:read',
+    'auth:profile:update',
+    'auth:session:delete',
+    'auth:session:read',
+  ],
 };

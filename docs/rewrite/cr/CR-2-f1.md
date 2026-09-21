@@ -1,7 +1,7 @@
 # CR-2-f1 — the three "my own account" routes have no atom of their own
 
 - **Stream:** F1 (system & storage)
-- **Status:** worked around by borrowing `auth:session:*`; a rename is wanted
+- **Status:** applied — `auth:profile:read` and `auth:profile:update` exist, are implicit for every admin, and the three profile routes name them instead of borrowing `auth:session:*`.
 - **Affects:** `next/packages/core/src/auth/rbac.ts`,
   `next/packages/core/src/auth/permissions.ts` (both orchestrator-owned)
 
