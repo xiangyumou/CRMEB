@@ -55,14 +55,14 @@ import {
  *
  * The creating transaction, in order:
  *
- *  1. claim the idempotency key — **first**, so a loser has written nothing;
- *  2. build the draft from the database inside the transaction;
- *  3. insert the order and its items;
- *  4. reserve stock, one conditional statement per line;
- *  5. redeem the coupon, in this same transaction;
- *  6. empty the cart rows the order consumed.
+ *  1. build the draft from the database inside the transaction;
+ *  2. insert the order and its items, carrying the client's idempotency key;
+ *  3. reserve stock, one conditional statement per line;
+ *  4. redeem the coupon, in this same transaction;
+ *  5. empty the cart rows the order consumed.
  *
- * Anything that fails aborts all six. The auto-cancel job is enqueued *after*
+ * Anything that fails aborts all five. A duplicate submit is stopped by
+ * `orders_idempotency_uq` in step 2 and answered with the first order. The auto-cancel job is enqueued *after*
  * the commit, because a queue is not transactional.
  */
 
@@ -455,140 +455,153 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
   const userId = requireUserId(ctx);
   const now = ctx.clock.now();
 
-  const outcome = await ctx.withTx(async (tx) => {
-    // First statement of the transaction. A loser has written nothing.
-    const claim = await repo.claimIdempotencyKey(tx, { userId, key: body.idempotencyKey, now });
-    if (!claim.won) {
-      const existing = await repo.findIdempotentOrderId(tx, { userId, key: body.idempotencyKey });
-      // `ON CONFLICT DO NOTHING` waits for the other inserter to settle, so by
-      // the time we are here the winner has committed and its id is readable.
-      if (existing !== null) return { orderId: existing, replayed: true, payWindowMinutes: 0 };
-      throw new DomainError('ORDER_EMPTY', { message: '订单正在提交中，请稍后重试' });
-    }
+  // The ordinary replay — the shopper's second tap, a retried request — arrives
+  // long after the first one emptied the cart, so it would fail on `ORDER_EMPTY`
+  // before the index could refuse it. This read answers it with the order it
+  // already made. It is a fast path and nothing more: it takes no lock, and the
+  // simultaneous case below is still decided by `orders_idempotency_uq`.
+  const replayed = await repo.findOrderIdByIdempotencyKey(ctx.db, {
+    userId,
+    key: body.idempotencyKey,
+  });
+  if (replayed !== null) return detailOf(ctx, { orderId: replayed, userId });
 
-    const draft = await buildDraft(ctx, tx, userId, body);
-    if (draft.addressRequired && draft.address === null) {
-      throw new DomainError('ORDER_ADDRESS_REQUIRED');
-    }
-    assertCustomFormComplete(draft, body.customForm);
+  const submit = () =>
+    ctx.withTx(async (tx) => {
+      const draft = await buildDraft(ctx, tx, userId, body);
+      if (draft.addressRequired && draft.address === null) {
+        throw new DomainError('ORDER_ADDRESS_REQUIRED');
+      }
+      assertCustomFormComplete(draft, body.customForm);
 
-    if (body.expectedPayableAmount !== undefined) {
-      const expected = Money.parse(body.expectedPayableAmount);
-      if (!expected.eq(draft.payableAmount)) {
-        throw new DomainError('ORDER_PRICE_CHANGED', {
-          details: { expected: expected.toString(), actual: draft.payableAmount.toString() },
+      if (body.expectedPayableAmount !== undefined) {
+        const expected = Money.parse(body.expectedPayableAmount);
+        if (!expected.eq(draft.payableAmount)) {
+          throw new DomainError('ORDER_PRICE_CHANGED', {
+            details: { expected: expected.toString(), actual: draft.payableAmount.toString() },
+          });
+        }
+      }
+
+      // Group-buy and presale attach here rather than forking this service.
+      const handler = getOrderKindHandler(body.kind);
+      if (body.kind !== 'normal' && !handler) {
+        throw new DomainError('VALIDATION_FAILED', {
+          message: '该订单类型暂不可用',
+          details: { kind: body.kind },
         });
       }
-    }
+      const kindMeta = handler
+        ? await handler.beforeCreate(ctx, tx, {
+            userId,
+            lines: draft.lines.map(pricingLineOf),
+            goodsTotal: draft.itemsAmount,
+            selections: { ...(body.kindMeta as Record<string, string | undefined>) },
+          })
+        : {};
 
-    // Group-buy and presale attach here rather than forking this service.
-    const handler = getOrderKindHandler(body.kind);
-    if (body.kind !== 'normal' && !handler) {
-      throw new DomainError('VALIDATION_FAILED', {
-        message: '该订单类型暂不可用',
-        details: { kind: body.kind },
-      });
-    }
-    const kindMeta = handler
-      ? await handler.beforeCreate(ctx, tx, {
-          userId,
-          lines: draft.lines.map(pricingLineOf),
-          goodsTotal: draft.itemsAmount,
-          selections: { ...(body.kindMeta as Record<string, string | undefined>) },
-        })
-      : {};
-
-    const address = draft.address;
-    const order = await repo.insertOrder(tx, {
-      orderNo: generateOrderNo(ctx.clock),
-      userId,
-      kind: body.kind,
-      status: 'pending_payment',
-      platform: PLATFORM[ctx.platform ?? 'h5'] ?? 'h5',
-      totalQuantity: draft.lines.reduce((sum, line) => sum + line.quantity, 0),
-      itemsAmount: draft.itemsAmount.toString(),
-      freightAmount: draft.freightAmount.toString(),
-      couponDiscount: draft.discount.total.toString(),
-      payableAmount: draft.payableAmount.toString(),
-      costAmount: costAmountOf(draft.lines),
-      userCouponId: draft.userCouponId,
-      receiverName: address?.receiverName ?? '',
-      receiverPhone: address?.receiverPhone ?? '',
-      receiverProvince: address?.provinceName ?? '',
-      receiverCity: address?.cityName ?? '',
-      receiverDistrict: address?.districtName ?? null,
-      receiverDetail: address?.detail ?? '',
-      receiverPostCode: address?.postCode ?? null,
-      receiverCityId: address?.cityId ?? null,
-      buyerRemark: body.buyerRemark ?? null,
-      customForm: body.customForm ?? null,
-      payExpiresAt: new Date(now.getTime() + draft.payWindowMinutes * 60_000),
-    });
-
-    await repo.insertOrderItems(
-      tx,
-      draft.lines.map((line, index) => {
-        const share = draft.discount.perLine[index] ?? Money.ZERO;
-        return {
-          orderId: order.id,
-          productId: line.sku.productId,
-          skuId: line.sku.skuId,
-          itemKey: line.itemKey,
-          quantity: line.quantity,
-          unitPrice: line.unitPrice.toString(),
-          originalUnitPrice: line.sku.originalUnitPrice,
-          costUnitPrice: line.sku.costUnitPrice,
-          discountAmount: share.toString(),
-          totalAmount: line.subtotal.sub(share).toString(),
-          snapshot: snapshotOf(line.sku),
-        };
-      }),
-    );
-
-    // One conditional statement per line. The loser of a last-unit race gets
-    // the line back here, not a negative stock and a CHECK violation.
-    const stockLines: StockLine[] = draft.lines.map((line) => ({
-      skuId: line.sku.skuId,
-      quantity: line.quantity,
-    }));
-    const short = await resolveStockPort().reserve(tx, order.id, stockLines);
-    if (short.length > 0) {
-      throw new DomainError('ORDER_OUT_OF_STOCK', {
-        details: {
-          lines: short.map((line) => ({ skuId: toId(line.skuId), wanted: line.quantity })),
-        },
-      });
-    }
-
-    // Spending the coupon belongs in the order's own transaction, exactly
-    // where legacy called `redeemCoupon`: pricing must not write, and a
-    // redemption must not survive a rolled-back order.
-    if (draft.userCouponId !== null) {
-      await coupon.redeem(tx, ctx, {
-        userCouponId: draft.userCouponId,
+      const address = draft.address;
+      const order = await repo.insertOrder(tx, {
+        orderNo: generateOrderNo(ctx.clock),
         userId,
-        orderId: order.id,
+        // The whole duplicate-submit defence: `orders_idempotency_uq` blocks a
+        // concurrent twin here and raises 23505 once the first one commits.
+        idempotencyKey: body.idempotencyKey,
+        kind: body.kind,
+        status: 'pending_payment',
+        platform: PLATFORM[ctx.platform ?? 'h5'] ?? 'h5',
+        totalQuantity: draft.lines.reduce((sum, line) => sum + line.quantity, 0),
+        itemsAmount: draft.itemsAmount.toString(),
+        freightAmount: draft.freightAmount.toString(),
+        couponDiscount: draft.discount.total.toString(),
+        payableAmount: draft.payableAmount.toString(),
+        costAmount: costAmountOf(draft.lines),
+        userCouponId: draft.userCouponId,
+        receiverName: address?.receiverName ?? '',
+        receiverPhone: address?.receiverPhone ?? '',
+        receiverProvince: address?.provinceName ?? '',
+        receiverCity: address?.cityName ?? '',
+        receiverDistrict: address?.districtName ?? null,
+        receiverDetail: address?.detail ?? '',
+        receiverPostCode: address?.postCode ?? null,
+        receiverCityId: address?.cityId ?? null,
+        buyerRemark: body.buyerRemark ?? null,
+        customForm: body.customForm ?? null,
+        payExpiresAt: new Date(now.getTime() + draft.payWindowMinutes * 60_000),
       });
-    }
 
-    if (handler) await handler.afterCreate(ctx, tx, order.id, kindMeta);
+      await repo.insertOrderItems(
+        tx,
+        draft.lines.map((line, index) => {
+          const share = draft.discount.perLine[index] ?? Money.ZERO;
+          return {
+            orderId: order.id,
+            productId: line.sku.productId,
+            skuId: line.sku.skuId,
+            itemKey: line.itemKey,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice.toString(),
+            originalUnitPrice: line.sku.originalUnitPrice,
+            costUnitPrice: line.sku.costUnitPrice,
+            discountAmount: share.toString(),
+            totalAmount: line.subtotal.sub(share).toString(),
+            snapshot: snapshotOf(line.sku),
+          };
+        }),
+      );
 
-    await repo.deleteCartLines(tx, { userId, cartItemIds: draft.cartItemIds });
-    await repo.insertStatusLog(tx, {
-      orderId: order.id,
-      changeType: 'created',
-      toStatus: 'pending_payment',
-      operatorKind: 'user',
-      operatorUserId: userId,
-      message: `提交订单，应付 ${draft.payableAmount.toString()}`,
+      // One conditional statement per line. The loser of a last-unit race gets
+      // the line back here, not a negative stock and a CHECK violation.
+      const stockLines: StockLine[] = draft.lines.map((line) => ({
+        skuId: line.sku.skuId,
+        quantity: line.quantity,
+      }));
+      const short = await resolveStockPort().reserve(tx, order.id, stockLines);
+      if (short.length > 0) {
+        throw new DomainError('ORDER_OUT_OF_STOCK', {
+          details: {
+            lines: short.map((line) => ({ skuId: toId(line.skuId), wanted: line.quantity })),
+          },
+        });
+      }
+
+      // Spending the coupon belongs in the order's own transaction, exactly
+      // where legacy called `redeemCoupon`: pricing must not write, and a
+      // redemption must not survive a rolled-back order.
+      if (draft.userCouponId !== null) {
+        await coupon.redeem(tx, ctx, {
+          userCouponId: draft.userCouponId,
+          userId,
+          orderId: order.id,
+        });
+      }
+
+      if (handler) await handler.afterCreate(ctx, tx, order.id, kindMeta);
+
+      await repo.deleteCartLines(tx, { userId, cartItemIds: draft.cartItemIds });
+      await repo.insertStatusLog(tx, {
+        orderId: order.id,
+        changeType: 'created',
+        toStatus: 'pending_payment',
+        operatorKind: 'user',
+        operatorUserId: userId,
+        message: `提交订单，应付 ${draft.payableAmount.toString()}`,
+      });
+      return { orderId: order.id, replayed: false, payWindowMinutes: draft.payWindowMinutes };
     });
-    await repo.recordIdempotentOrder(tx, {
+
+  // The replay. A concurrent twin blocks on the index entry until this
+  // transaction settles, so by the time the violation surfaces the winner has
+  // committed and its order is readable; a submit that *failed* leaves a dead
+  // index entry, which is what lets the same key be tried again.
+  const outcome = await submit().catch(async (error: unknown) => {
+    if (!repo.isIdempotencyConflict(error)) throw error;
+    const existing = await repo.findOrderIdByIdempotencyKey(ctx.db, {
       userId,
       key: body.idempotencyKey,
-      orderId: order.id,
     });
-
-    return { orderId: order.id, replayed: false, payWindowMinutes: draft.payWindowMinutes };
+    if (existing === null) throw error;
+    return { orderId: existing, replayed: true, payWindowMinutes: 0 };
   });
 
   // After the commit: a queue is not transactional, and an enqueue inside the

@@ -4,7 +4,6 @@ import { cartItems } from '@shop/db/schema/cart';
 import { productSkus, products } from '@shop/db/schema/catalog';
 import { couponTemplates, userCoupons } from '@shop/db/schema/coupon';
 import { orders } from '@shop/db/schema/order';
-import { effects } from '@shop/db/schema/system';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, forkTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
 import type { Actor, Ctx } from '../kernel/context';
@@ -285,8 +284,11 @@ describe('the same idempotency key submitted several times at once', () => {
     const ids = new Set(report.fulfilled.map((outcome) => outcome.orderId));
     expect(ids.size).toBe(1);
 
-    expect(await harness.ctx.db.select().from(orders)).toHaveLength(1);
-    expect(await repo.countIdempotencyClaims(harness.ctx.db)).toBe(1);
+    const stored = await harness.ctx.db.select().from(orders);
+    expect(stored).toHaveLength(1);
+    // The key rode in on that one row; the unique index is what refused the
+    // other five.
+    expect(stored[0]?.idempotencyKey).toBe(sharedKey);
     // One order, one unit of stock.
     expect((await stockAndSalesOf(harness.ctx.db, item.skuId)).stock).toBe(49);
     // And exactly one auto-cancel scheduled.
@@ -306,7 +308,11 @@ describe('the same idempotency key submitted several times at once', () => {
       idempotencyKey: sharedKey,
     });
     expect(failed.won).toBe(false);
-    expect(await harness.ctx.db.select().from(effects)).toHaveLength(0);
+    // Nothing survives a rolled-back submit, so the key is free again.
+    expect(await harness.ctx.db.select().from(orders)).toHaveLength(0);
+    expect(
+      await repo.findOrderIdByIdempotencyKey(harness.ctx.db, { userId, key: sharedKey }),
+    ).toBeNull();
 
     await harness.ctx.db.update(cartItems).set({ quantity: 1 }).where(eq(cartItems.userId, userId));
     const retried = await attemptCreate(racer(userId), {

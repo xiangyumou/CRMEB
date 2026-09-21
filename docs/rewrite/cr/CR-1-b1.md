@@ -1,7 +1,7 @@
 # CR-1-b1 — `orders` needs an `idempotency_key` column
 
 - **Stream:** B1 (cart and checkout)
-- **Status:** worked around locally; needs a schema change owned by the orchestrator
+- **Status:** **resolved.** The column landed in `475f5921`; B1 now inserts the key with the order (`fix(order): …`). The workaround described below is gone and is kept here only as the record of what it was.
 - **Affects:** `next/packages/db/src/schema/order.ts` (schema, frozen), plus one migration
 
 ## What is missing

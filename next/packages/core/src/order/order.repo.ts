@@ -1,10 +1,8 @@
-import { createHash } from 'node:crypto';
 import type { DbOrTx, Tx } from '@shop/db';
 import { cartItems } from '@shop/db/schema/cart';
 import { orderItems, orderStatusLogs, orders } from '@shop/db/schema/order';
-import { effects } from '@shop/db/schema/system';
 import { userAddresses } from '@shop/db/schema/user';
-import { and, asc, desc, eq, gt, inArray, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 import {
   allOf,
   conditionalDelete,
@@ -19,7 +17,7 @@ import type { OrderStatus } from './ports';
  *
  * Statements, not decisions: every `if` about an affected row count lives in a
  * service. The two things worth reading closely are `transitionStatus` (one
- * guarded UPDATE, the whole state machine) and the idempotency trio at the
+ * guarded UPDATE, the whole state machine) and the idempotency pair at the
  * bottom, which is how a double submit is stopped by the database rather than
  * by a cache lock.
  */
@@ -421,102 +419,51 @@ export async function countStatusLogs(
  * Legacy guarded order creation with `CacheService::lock('orderCreate…')`: a
  * Redis key, never tested, gone after a restart, and with no relationship to
  * the transaction it was supposed to protect (risk matrix §2). The fix in the
- * brief is "an idempotency key with a UNIQUE column".
+ * brief is "an idempotency key with a UNIQUE column", and since CR-1-b1 landed
+ * that column exists:
  *
- * `orders` has no such column yet — **CR-1-b1** asks for
- * `orders.idempotency_key` plus a partial unique index — so until it lands the
- * claim is a row in the generic `effects` ledger, whose
- * `UNIQUE (scope, scope_id, event_type)` is exactly the constraint needed:
+ *     idempotency_key varchar(64)
+ *     UNIQUE (user_id, idempotency_key) WHERE idempotency_key IS NOT NULL
  *
- *  - `scope` is `order-idem`, a scope with no registered handler;
- *  - `status` is written as `done` with `dispatched_at` set, so the dispatcher
- *    (which claims `status = 'pending' AND next_run_at <= now()`) never sees it
- *    and never tries to deliver it;
- *  - `scope_id` is `sha256(userId:key)`, 64 hex characters, because the column
- *    is `varchar(64)` and a 64-character key plus a user id does not fit.
+ * So there is no claim step any more. The key is inserted *with* the order, and
+ * the index does the whole job:
  *
- * When CR-1 lands, these three functions change and nothing else does.
+ *  - a concurrent duplicate **blocks** on the index entry until the first
+ *    transaction settles;
+ *  - if that one committed, ours raises `23505` and the winner's order is
+ *    readable by `(user_id, idempotency_key)`;
+ *  - if it rolled back, the entry is dead and our insert simply goes through,
+ *    which is what lets a key be retried after a failed submit.
+ *
+ * The partial index is what keeps an order created by an admin, an import or
+ * any future non-storefront path — all of which have no key — from colliding
+ * on NULL.
  */
-const IDEMPOTENCY_SCOPE = 'order-idem';
-const IDEMPOTENCY_EVENT = 'create';
-
-function idempotencyId(userId: number, key: string): string {
-  return createHash('sha256').update(`${userId}:${key}`).digest('hex');
-}
-
-export interface IdempotencyClaim {
-  /** `false` means another submit with this key got there first. */
-  won: boolean;
-}
+const IDEMPOTENCY_CONSTRAINT = 'orders_idempotency_uq';
 
 /**
- * Must be the **first** statement of the creating transaction, so a loser has
- * written nothing it needs to undo.
- *
- * `ON CONFLICT DO NOTHING` waits for a concurrent inserter to settle: if that
- * transaction committed we lose and its order id is readable; if it rolled
- * back the conflicting tuple is dead and our insert goes through.
+ * True for the unique violation the duplicate submit raises, and only for that
+ * one. Drizzle wraps the driver error, so the cause chain is walked rather than
+ * the top-level error inspected.
  */
-export async function claimIdempotencyKey(
-  tx: Tx,
-  args: { userId: number; key: string; now: Date },
-): Promise<IdempotencyClaim> {
-  const rows = await tx
-    .insert(effects)
-    .values({
-      scope: IDEMPOTENCY_SCOPE,
-      scopeId: idempotencyId(args.userId, args.key),
-      eventType: IDEMPOTENCY_EVENT,
-      payload: { userId: args.userId },
-      status: 'done',
-      nextRunAt: args.now,
-      dispatchedAt: args.now,
-    })
-    .onConflictDoNothing()
-    .returning({ id: effects.id });
-  return { won: rows.length > 0 };
+export function isIdempotencyConflict(error: unknown): boolean {
+  for (let current = error, depth = 0; current && depth < 5; depth += 1) {
+    const candidate = current as { code?: unknown; constraint?: unknown; cause?: unknown };
+    if (candidate.code === '23505' && candidate.constraint === IDEMPOTENCY_CONSTRAINT) return true;
+    current = candidate.cause;
+  }
+  return false;
 }
 
-/** Second statement: stamp the order the claim produced onto the claim row. */
-export async function recordIdempotentOrder(
-  tx: Tx,
-  args: { userId: number; key: string; orderId: number },
-): Promise<void> {
-  await conditionalUpdate(tx, effects, {
-    where: and(
-      eq(effects.scope, IDEMPOTENCY_SCOPE),
-      eq(effects.scopeId, idempotencyId(args.userId, args.key)),
-      eq(effects.eventType, IDEMPOTENCY_EVENT),
-    ),
-    set: { payload: { userId: args.userId, orderId: args.orderId } },
-  });
-}
-
-/** What the loser of the race reads. `null` only if the winner is still mid-flight. */
-export async function findIdempotentOrderId(
+/** What the loser of the race reads, once the winner has committed. */
+export async function findOrderIdByIdempotencyKey(
   db: DbOrTx,
   args: { userId: number; key: string },
 ): Promise<number | null> {
   const rows = await db
-    .select({ payload: effects.payload })
-    .from(effects)
-    .where(
-      and(
-        eq(effects.scope, IDEMPOTENCY_SCOPE),
-        eq(effects.scopeId, idempotencyId(args.userId, args.key)),
-        eq(effects.eventType, IDEMPOTENCY_EVENT),
-      ),
-    )
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(eq(orders.userId, args.userId), eq(orders.idempotencyKey, args.key)))
     .limit(1);
-  const payload = rows[0]?.payload as { orderId?: number } | undefined;
-  return typeof payload?.orderId === 'number' ? payload.orderId : null;
-}
-
-/** Only the tests look at this. */
-export async function countIdempotencyClaims(db: DbOrTx): Promise<number> {
-  const rows = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(effects)
-    .where(and(eq(effects.scope, IDEMPOTENCY_SCOPE), gt(effects.id, 0)));
-  return Number(rows[0]?.n ?? 0);
+  return rows[0]?.id ?? null;
 }
