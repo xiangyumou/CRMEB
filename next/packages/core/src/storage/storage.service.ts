@@ -226,18 +226,26 @@ export async function categoryCreate(
   const parentId =
     form.parentId === undefined || form.parentId === null ? null : fromId(form.parentId);
   const parent = await resolveParent(ctx, parentId);
-  if (await repo.categoryNameTaken(ctx.db, parent.parentId, form.name)) {
-    throw new DomainError('STORAGE_CATEGORY_INVALID_PARENT', {
-      details: { reason: 'duplicate-name' },
+
+  return ctx.withTx(async (tx) => {
+    // A child is a thing filed into the parent, exactly like an attachment, and
+    // the delete guard counts live children too. Same lock, same reason.
+    if (parent.parentId !== null && !(await repo.lockCategoryAlive(tx, parent.parentId))) {
+      throw new DomainError('STORAGE_CATEGORY_INVALID_PARENT');
+    }
+    if (await repo.categoryNameTaken(tx, parent.parentId, form.name)) {
+      throw new DomainError('STORAGE_CATEGORY_INVALID_PARENT', {
+        details: { reason: 'duplicate-name' },
+      });
+    }
+    const row = await repo.insertCategory(tx, {
+      parentId: parent.parentId,
+      name: form.name,
+      path: parent.path,
+      sortOrder: form.sortOrder,
     });
-  }
-  const row = await repo.insertCategory(ctx.db, {
-    parentId: parent.parentId,
-    name: form.name,
-    path: parent.path,
-    sortOrder: form.sortOrder,
+    return toCategory(row);
   });
-  return toCategory(row);
 }
 
 export async function categoryUpdate(
@@ -280,6 +288,11 @@ export async function categoryUpdate(
 
   const now = ctx.clock.now();
   return ctx.withTx(async (tx) => {
+    // Re-parenting files this folder into another one; the destination must not
+    // be deleted out from under it. (Moving to the root needs no lock.)
+    if (parent.parentId !== null && !(await repo.lockCategoryAlive(tx, parent.parentId))) {
+      throw new DomainError('STORAGE_CATEGORY_INVALID_PARENT');
+    }
     const result = await repo.updateCategory(
       tx,
       id,
@@ -299,13 +312,29 @@ export async function categoryUpdate(
 export async function categoryDelete(ctx: Ctx, params: { id: string }): Promise<void> {
   const id = fromId(params.id);
   await requireCategory(ctx, id);
-  // The guard is in the statement, not in the read above: two operators may be
-  // deleting the folder and filing a picture into it at the same moment.
-  const result = await repo.deleteCategoryIfEmpty(ctx.db, id, ctx.clock.now());
-  if (!result.won) {
-    const still = await repo.findCategory(ctx.db, id);
-    throw new DomainError(still ? 'STORAGE_CATEGORY_NOT_EMPTY' : 'STORAGE_CATEGORY_NOT_FOUND');
-  }
+  const now = ctx.clock.now();
+
+  // Two locks, in this order, because the emptiness guard spans two tables.
+  //
+  // `not exists (select … from attachments …)` inside the UPDATE serialises
+  // this delete against another delete — but not against an upload, which
+  // writes a *different* table: under READ COMMITTED neither transaction sees
+  // the other's uncommitted row, both commit, and the picture lands in a
+  // deleted folder where nobody can find it. So everything that files into a
+  // category takes `FOR SHARE` on the category row first
+  // (`repo.lockCategoryAlive`); this takes the conflicting `FOR UPDATE` and
+  // only then runs the guarded update, as a separate statement so that it reads
+  // a snapshot taken after the lock was granted.
+  await ctx.withTx(async (tx) => {
+    if (!(await repo.lockCategoryForDelete(tx, id))) {
+      throw new DomainError('STORAGE_CATEGORY_NOT_FOUND');
+    }
+    const result = await repo.deleteCategoryIfEmpty(tx, id, now);
+    if (!result.won) {
+      const still = await repo.findCategory(tx, id);
+      throw new DomainError(still ? 'STORAGE_CATEGORY_NOT_EMPTY' : 'STORAGE_CATEGORY_NOT_FOUND');
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -382,9 +411,18 @@ export async function attachmentMoveMany(
   const categoryId = body.categoryId === null ? null : fromId(body.categoryId);
   if (categoryId !== null) await requireCategory(ctx, categoryId);
   const ids = body.ids.map(fromId);
-  const alive = await repo.aliveAttachmentIds(ctx.db, ids);
-  const affected = await repo.moveAttachments(ctx.db, [...alive], categoryId, ctx.clock.now());
-  return { affected, skippedIds: ids.filter((id) => !alive.has(id)).map(toId) };
+  const now = ctx.clock.now();
+
+  // Filing into a folder, so the same lock as an upload: a move and a delete of
+  // the destination must not both succeed.
+  return ctx.withTx(async (tx) => {
+    if (categoryId !== null && !(await repo.lockCategoryAlive(tx, categoryId))) {
+      throw new DomainError('STORAGE_CATEGORY_NOT_FOUND');
+    }
+    const alive = await repo.aliveAttachmentIds(tx, ids);
+    const affected = await repo.moveAttachments(tx, [...alive], categoryId, now);
+    return { affected, skippedIds: ids.filter((id) => !alive.has(id)).map(toId) };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -456,6 +494,15 @@ async function storeFile(ctx: Ctx, args: StoreArgs): Promise<UploadResult> {
   const displayName = (args.name ?? args.file.filename ?? '未命名文件').slice(0, 255);
 
   return ctx.withTx(async (tx: Tx) => {
+    // Before anything is written: hold the destination folder still. A folder
+    // delete takes `FOR UPDATE` on this row, so either it waits for us and then
+    // sees our attachment (and refuses as not-empty), or it committed first and
+    // this returns null (and the upload is refused). The check above in
+    // `attachmentUpload` is only there to answer quickly; this is the one that
+    // decides. See `repo.lockCategoryAlive`.
+    if (args.categoryId !== null && !(await repo.lockCategoryAlive(tx, args.categoryId))) {
+      throw new DomainError('STORAGE_CATEGORY_NOT_FOUND');
+    }
     await lockDigest(tx, digest);
 
     const existing = await repo.findByDigest(tx, digest, resolved.driver);

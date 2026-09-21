@@ -143,7 +143,64 @@ export async function reparentSubtree(
   return result.affected;
 }
 
-/** Soft-deletes a category only while it is empty of children and of files. */
+/**
+ * Locks a live category for reading, blocking a concurrent delete of it.
+ *
+ * **Why this exists.** The delete guard is a `NOT EXISTS` over `attachments`
+ * inside the UPDATE, and under READ COMMITTED that subquery cannot see an
+ * uncommitted insert from another transaction — while that other transaction's
+ * "is the folder alive" read cannot see the uncommitted soft-delete. Both
+ * commit, and a live file sits in a deleted folder, invisible in the library.
+ * A guard inside one statement only serialises writers touching the *same
+ * row*; these two touch different tables.
+ *
+ * So every path that files something into a category takes this lock first, in
+ * the same transaction as the insert, and `lockCategoryForDelete` takes the
+ * conflicting `FOR UPDATE`. Returns `null` when the category is gone — which,
+ * after waiting behind a delete, is exactly what the loser must see.
+ *
+ * `FOR SHARE`, not `FOR KEY SHARE`: the delete updates `deleted_at`, a
+ * non-key column, and `FOR KEY SHARE` does not conflict with that.
+ */
+export async function lockCategoryAlive(tx: DbOrTx, id: number): Promise<CategoryRow | null> {
+  const [row] = await tx
+    .select(CATEGORY_COLUMNS)
+    .from(attachmentCategories)
+    .where(and(eq(attachmentCategories.id, id), CATEGORY_ALIVE))
+    .limit(1)
+    .for('share');
+  return row ?? null;
+}
+
+/**
+ * The other side of `lockCategoryAlive`: `FOR UPDATE` on the category row, so
+ * a delete waits for any upload filing into it and then re-reads.
+ *
+ * Returns `null` when there is no such row at all. A row that exists but is
+ * already soft-deleted still comes back — the caller's conditional update
+ * carries the `deleted_at is null` guard and will simply lose.
+ */
+export async function lockCategoryForDelete(
+  tx: DbOrTx,
+  id: number,
+): Promise<{ id: number } | null> {
+  const [row] = await tx
+    .select({ id: attachmentCategories.id })
+    .from(attachmentCategories)
+    .where(eq(attachmentCategories.id, id))
+    .limit(1)
+    .for('update');
+  return row ?? null;
+}
+
+/**
+ * Soft-deletes a category only while it is empty of children and of files.
+ *
+ * Run this as its own statement **after** `lockCategoryForDelete`, never as the
+ * first thing the transaction does: in READ COMMITTED each statement takes a
+ * fresh snapshot, so the `NOT EXISTS` subqueries here see everything that
+ * committed while we waited for the lock.
+ */
 export async function deleteCategoryIfEmpty(
   db: DbOrTx,
   id: number,

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { admins } from '@shop/db/schema/auth';
-import { attachments } from '@shop/db/schema/storage';
+import { attachmentCategories, attachments } from '@shop/db/schema/storage';
+import { sql } from 'drizzle-orm';
 import { createTestCtx, forkTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
 import type { Actor, Ctx } from '../kernel/context';
 import type { DomainError } from '../kernel/errors';
@@ -27,6 +28,8 @@ let adminId: number;
 
 const NOW = '2026-09-22T08:00:00.000Z';
 const WORKERS = 6;
+/** Rounds for the two-writer races: the window is narrow, one attempt proves nothing. */
+const ROUNDS = 30;
 
 function png(salt = 0): IncomingFile {
   const bytes = new Uint8Array(25);
@@ -143,25 +146,70 @@ describe('deleting a folder', () => {
   });
 
   it('never deletes a folder that a concurrent upload just filed into', async () => {
-    // The guard is in the DELETE statement rather than in a prior read, so the
-    // two orderings are the only two outcomes: either the folder is gone and
-    // the upload failed, or the upload landed and the delete was refused.
+    // Thirty rounds, because this one is a *timing* window rather than a
+    // logical one: the first version of this code put the emptiness guard
+    // inside the DELETE and passed seven runs out of eight. Under READ
+    // COMMITTED that guard cannot see the uploader's uncommitted insert, and
+    // the uploader's "is the folder alive" read cannot see the uncommitted
+    // soft-delete, so both committed and the picture became invisible —
+    // in the folder tree it no longer had, and in no other folder either.
     const ctx = harness.ctx.as(adminActor(adminId));
-    const folder = await categoryCreate(ctx, { name: 'race', sortOrder: 0 });
 
-    const outcomes = await Promise.allSettled([
-      categoryDelete(fork(1), { id: folder.id }),
-      attachmentUpload(fork(2), { categoryId: folder.id }, png(1)),
-    ]);
+    for (let round = 0; round < ROUNDS; round += 1) {
+      const folder = await categoryCreate(ctx, { name: `race-${round}`, sortOrder: 0 });
 
-    const [deletion, upload] = outcomes;
-    const stored = await harness.ctx.db.select().from(attachments);
-    if (deletion?.status === 'fulfilled') {
-      // Deleted: the upload either lost the category or never landed in it.
-      for (const row of stored) expect(row.categoryId).not.toBe(Number(folder.id));
-    } else {
-      expect(upload?.status).toBe('fulfilled');
-      expect(stored).toHaveLength(1);
+      const [deletion, upload] = await Promise.allSettled([
+        categoryDelete(fork(1), { id: folder.id }),
+        // A distinct file each round: an identical one would dedupe onto the
+        // previous round's row and never test the insert.
+        attachmentUpload(fork(2), { categoryId: folder.id }, png(round + 1)),
+      ]);
+
+      // Exactly one of the two, which is the only thing a serial order allows:
+      // upload-then-delete refuses the delete as not-empty, delete-then-upload
+      // refuses the upload as not-found.
+      const won = [deletion, upload].filter((o) => o?.status === 'fulfilled');
+      expect(won, `round ${round}`).toHaveLength(1);
+
+      await expectNoOrphans(`round ${round}`);
+    }
+  });
+
+  it('never creates a child under a folder that is being deleted', async () => {
+    // Same window, other table: a live child in a deleted parent is a subtree
+    // the tree walk cannot reach, so the folder and everything under it vanish.
+    const ctx = harness.ctx.as(adminActor(adminId));
+
+    for (let round = 0; round < ROUNDS; round += 1) {
+      const parent = await categoryCreate(ctx, { name: `parent-${round}`, sortOrder: 0 });
+
+      const [deletion, creation] = await Promise.allSettled([
+        categoryDelete(fork(1), { id: parent.id }),
+        categoryCreate(fork(2), { name: `child-${round}`, parentId: parent.id, sortOrder: 0 }),
+      ]);
+
+      const won = [deletion, creation].filter((o) => o?.status === 'fulfilled');
+      expect(won, `round ${round}`).toHaveLength(1);
+
+      await expectNoOrphans(`round ${round}`);
     }
   });
 });
+
+/**
+ * The invariant both races exist to protect, asserted over the whole database
+ * rather than over the two promises: nothing live may hang off a tombstone.
+ */
+async function expectNoOrphans(label: string): Promise<void> {
+  const orphanedFiles = await harness.ctx.db.execute(sql`
+    select a.id from ${attachments} a
+      join ${attachmentCategories} c on c.id = a.category_id
+     where a.deleted_at is null and c.deleted_at is not null`);
+  expect(orphanedFiles.rows, `${label}: live file in a deleted folder`).toEqual([]);
+
+  const orphanedFolders = await harness.ctx.db.execute(sql`
+    select c.id from ${attachmentCategories} c
+      join ${attachmentCategories} p on p.id = c.parent_id
+     where c.deleted_at is null and p.deleted_at is not null`);
+  expect(orphanedFolders.rows, `${label}: live folder under a deleted parent`).toEqual([]);
+}
