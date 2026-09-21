@@ -210,10 +210,30 @@ export interface StockLine {
  * -write is the defect being fixed here — and every method is idempotent per
  * `orderId`, because the effect ledger may call `release` twice.
  */
+export interface StockReleaseOptions {
+  /**
+   * `commit` already ran for these lines (the order was paid), so `sales` must
+   * come back down in the same statement that puts `stock` back. Absent on the
+   * cancel / payment-timeout path, where `sales` never moved.
+   */
+  committed?: boolean;
+  /**
+   * The refund this release belongs to. An order can be refunded line by line,
+   * so a refund release is idempotent per refund, not per order: without this
+   * the second partial refund of an order would be swallowed as a replay.
+   */
+  refundId?: number;
+}
+
 export interface StockPort {
   /** Returns the lines that could NOT be satisfied. Empty array means success. */
   reserve(tx: Tx, orderId: number, lines: readonly StockLine[]): Promise<StockLine[]>;
-  release(tx: Tx, orderId: number, lines: readonly StockLine[]): Promise<void>;
+  release(
+    tx: Tx,
+    orderId: number,
+    lines: readonly StockLine[],
+    options?: StockReleaseOptions,
+  ): Promise<void>;
   /** Turns a reservation into a sale: stock stays down, `sales` goes up. */
   commit(tx: Tx, orderId: number, lines: readonly StockLine[]): Promise<void>;
 }
@@ -330,6 +350,43 @@ export interface OrderKindHandler {
   canTransition?(from: OrderStatus, to: OrderStatus): boolean;
 }
 
+/**
+ * Order facts — the one inbound seam. Every port above is order calling out;
+ * this is another domain asking the order domain a read-only question it cannot
+ * answer itself (CR-2-a: reviews, lifetime purchase limits, the delete guard).
+ * The order domain registers the implementation; callers never read `orders`.
+ */
+export interface ReviewableLine {
+  orderId: number;
+  orderItemId: number;
+  productId: number;
+  skuId: number;
+  /** Variant label frozen on the order line, so a later spec rename cannot rewrite a review. */
+  specText: string;
+  userId: number;
+}
+
+export interface OrderFactsPort {
+  /**
+   * The order line a shopper may review, or `null`. `null` covers every refusal
+   * — not theirs, not received, refunded, missing — because saying which would
+   * leak another shopper's order.
+   */
+  findReviewableLine(
+    tx: Tx,
+    args: { orderItemId: number; userId: number },
+  ): Promise<ReviewableLine | null>;
+  /** Units of the product this user bought on orders that still count (paid or beyond, not refunded). */
+  purchasedQuantity(tx: Tx, args: { userId: number; productId: number }): Promise<number>;
+  /** Lines of orders completed at or before the instant that still have no review, oldest first. */
+  findLinesAwaitingReview(
+    tx: Tx,
+    args: { completedBefore: Date; limit: number },
+  ): Promise<ReviewableLine[]>;
+  /** Whether any unfinished order still references the product. */
+  hasOpenOrders(tx: Tx, productId: number): Promise<boolean>;
+}
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -361,6 +418,7 @@ const stockSlot = slot<StockPort>('StockPort');
 const paymentSlot = slot<PaymentPort>('PaymentPort');
 const freightSlot = slot<FreightPort>('FreightPort');
 const stateMachineSlot = slot<OrderStateMachine>('OrderStateMachine');
+const orderFactsSlot = slot<OrderFactsPort>('OrderFactsPort');
 
 export const registerStockPort = stockSlot.set;
 export const getStockPort = stockSlot.get;
@@ -373,6 +431,9 @@ export const getFreightPort = freightSlot.get;
 
 export const registerOrderStateMachine = stateMachineSlot.set;
 export const getOrderStateMachine = stateMachineSlot.get;
+
+export const registerOrderFacts = orderFactsSlot.set;
+export const getOrderFacts = orderFactsSlot.get;
 
 const contributors: PricingContributor[] = [];
 
@@ -407,6 +468,7 @@ export function resetOrderPorts(): void {
   paymentSlot.clear();
   freightSlot.clear();
   stateMachineSlot.clear();
+  orderFactsSlot.clear();
   contributors.length = 0;
   kindHandlers.clear();
   onOrderPaid.clear();
