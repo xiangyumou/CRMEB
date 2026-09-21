@@ -20,7 +20,7 @@ You are one executor among several working in parallel, each in its own git work
 - The side-effect ledger is the generic `effects` table (`scope`, `scope_id`, `event_type`); there is no `order_effects`.
 
 ## Order of work
-1. **Contract PR first.** Write every route of your stream in `packages/contracts/src/<domain>/` with zod schemas, error codes and realistic examples. Commit, then tell the orchestrator (`SendMessage` to `main`, first line "WS-<id> contracts ready") and carry on without waiting. Other streams and the storefront adapter build against your examples through the mock server, so make them truthful.
+1. **Contract PR first.** Write every route of your stream in `packages/contracts/src/<domain>/` with zod schemas, error codes and realistic examples. Commit with a message starting `contracts(<stream>):`, add a section "Contracts ready" at the top of `docs/rewrite/status/<ws>.md` (the orchestrator polls for it and merges your contracts early), and carry on without waiting. Other streams and the storefront adapter build against your examples through the mock server, so make them truthful.
 2. Domain services + repos with unit and integration tests. Every conditional state change gets a `runConcurrently` test.
 3. Route handlers (thin), jobs, effects, config groups, permissions.
 4. Admin pages from the kit, menu file.
