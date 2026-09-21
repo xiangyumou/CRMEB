@@ -120,6 +120,20 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      # 门禁里的静态守卫有一条 (core-store-front.cjs) 是用 @babel/parser 和
+      # vue-template-compiler 真的去解析前端源码的，它从 template/admin/node_modules
+      # 里取这两个包。这个 job 原来只跑 docker/run-regression.sh，不需要 node；
+      # 改成跑整个 check-maintenance.sh 之后就需要了，但依赖一直没装，于是这一步
+      # 直接 MODULE_NOT_FOUND，regression 必然失败、publish 被跳过——从那时起
+      # master 上再没有发布过镜像。pr_check 那条路径没踩到，是因为它本来就先装了。
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+          cache: npm
+          cache-dependency-path: template/admin/package-lock.json
+      - name: Install admin dependencies
+        run: npm ci --prefix template/admin --no-audit --no-fund
+
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
