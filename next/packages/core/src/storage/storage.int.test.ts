@@ -1,0 +1,513 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { admins } from '@shop/db/schema/auth';
+import { users } from '@shop/db/schema/user';
+import { attachments } from '@shop/db/schema/storage';
+import { createTestCtx, type TestCtx } from '@shop/testing';
+import type { Actor, Ctx } from '../kernel/context';
+import { DomainError } from '../kernel/errors';
+import { cleanOrphanAttachments } from './storage.jobs';
+import { storageConfig } from './storage.config';
+import {
+  attachmentDeleteMany,
+  attachmentImport,
+  attachmentList,
+  attachmentMoveMany,
+  attachmentUpdate,
+  attachmentUpload,
+  categoryCreate,
+  categoryDelete,
+  categoryTree,
+  categoryUpdate,
+  resetStorageDriverCache,
+  scanTokenCreate,
+  scanTokenStatusGet,
+  scanUpload,
+  userUpload,
+  type IncomingFile,
+} from './storage.service';
+
+/**
+ * The media library against a real PostgreSQL and a real Redis.
+ *
+ * The cases that matter are the ones the old uploader got wrong: a file whose
+ * bytes disagree with its name, a remote URL pointing inside the network, and a
+ * scan token that could be used more than once.
+ */
+
+let harness: TestCtx;
+let adminId: number;
+let shopperId: number;
+let otherShopperId: number;
+
+const NOW = '2026-09-22T08:00:00.000Z';
+
+/** A structurally real 1×1 PNG, plus a salt so tests can vary the digest. */
+function png(width = 1, height = 1, salt = 0): IncomingFile {
+  const bytes = new Uint8Array(25);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(16, width, false);
+  view.setUint32(20, height, false);
+  bytes[24] = salt;
+  return { bytes, filename: 'banner.png', declaredMime: 'image/png' };
+}
+
+function file(content: string, filename: string, mime?: string): IncomingFile {
+  return { bytes: new TextEncoder().encode(content), filename, declaredMime: mime };
+}
+
+function adminActor(id: number, permissions: string[] = []): Actor {
+  return { kind: 'admin', id, permissions, isSuper: true };
+}
+
+function userActor(id: number): Actor {
+  return { kind: 'user', id, permissions: [], isSuper: false };
+}
+
+function as(actor: Actor): Ctx {
+  return harness.ctx.as(actor);
+}
+
+async function code(promise: Promise<unknown>): Promise<string> {
+  try {
+    await promise;
+  } catch (error) {
+    if (error instanceof DomainError) return error.code;
+    throw error;
+  }
+  throw new Error('expected a DomainError');
+}
+
+beforeAll(async () => {
+  harness = await createTestCtx({ now: NOW });
+}, 180_000);
+
+afterAll(async () => {
+  await harness?.close();
+});
+
+beforeEach(async () => {
+  await harness.db.truncateAll();
+  await harness.redis.flushdb();
+  harness.clock.set(NOW);
+  resetStorageDriverCache();
+  const [row] = await harness.ctx.db
+    .insert(admins)
+    .values({ account: 'admin', passwordHash: 'x', passwordAlgo: 'bcrypt', name: '管理员' })
+    .returning({ id: admins.id });
+  adminId = row!.id;
+
+  const shoppers = await harness.ctx.db
+    .insert(users)
+    .values([{ account: 'buyer-1' }, { account: 'buyer-2' }])
+    .returning({ id: users.id });
+  shopperId = shoppers[0]!.id;
+  otherShopperId = shoppers[1]!.id;
+});
+
+// ---------------------------------------------------------------------------
+
+describe('categories', () => {
+  it('builds a flat depth-first tree with direct-member counts', async () => {
+    const ctx = as(adminActor(adminId));
+    const parent = await categoryCreate(ctx, { name: '商品图', sortOrder: 0 });
+    const child = await categoryCreate(ctx, {
+      name: '详情页',
+      parentId: parent.id,
+      sortOrder: 0,
+    });
+    await attachmentUpload(ctx, { categoryId: child.id }, png());
+
+    const tree = await categoryTree(ctx);
+    expect(tree.items.map((i) => [i.name, i.depth, i.path, i.attachmentCount])).toEqual([
+      ['商品图', 0, '/', 0],
+      ['详情页', 1, `/${parent.id}/`, 1],
+    ]);
+  });
+
+  it('refuses to make a category its own descendant', async () => {
+    const ctx = as(adminActor(adminId));
+    const parent = await categoryCreate(ctx, { name: 'a', sortOrder: 0 });
+    const child = await categoryCreate(ctx, { name: 'b', parentId: parent.id, sortOrder: 0 });
+
+    expect(
+      await code(
+        categoryUpdate(ctx, { id: parent.id }, { name: 'a', parentId: child.id, sortOrder: 0 }),
+      ),
+    ).toBe('STORAGE_CATEGORY_INVALID_PARENT');
+  });
+
+  it('rewrites the whole subtree path when a folder moves', async () => {
+    const ctx = as(adminActor(adminId));
+    const a = await categoryCreate(ctx, { name: 'a', sortOrder: 0 });
+    const b = await categoryCreate(ctx, { name: 'b', sortOrder: 1 });
+    const inner = await categoryCreate(ctx, { name: 'inner', parentId: a.id, sortOrder: 0 });
+    const leaf = await categoryCreate(ctx, { name: 'leaf', parentId: inner.id, sortOrder: 0 });
+
+    await categoryUpdate(ctx, { id: inner.id }, { name: 'inner', parentId: b.id, sortOrder: 0 });
+
+    const byId = new Map((await categoryTree(ctx)).items.map((i) => [i.id, i]));
+    expect(byId.get(inner.id)?.path).toBe(`/${b.id}/`);
+    // The grandchild moved with it: this is the one a per-row update gets wrong.
+    expect(byId.get(leaf.id)?.path).toBe(`/${b.id}/${inner.id}/`);
+  });
+
+  it('refuses to delete a folder that still holds anything', async () => {
+    const ctx = as(adminActor(adminId));
+    const parent = await categoryCreate(ctx, { name: 'a', sortOrder: 0 });
+    await categoryCreate(ctx, { name: 'b', parentId: parent.id, sortOrder: 0 });
+    expect(await code(categoryDelete(ctx, { id: parent.id }))).toBe('STORAGE_CATEGORY_NOT_EMPTY');
+
+    const withFile = await categoryCreate(ctx, { name: 'c', sortOrder: 0 });
+    await attachmentUpload(ctx, { categoryId: withFile.id }, png());
+    expect(await code(categoryDelete(ctx, { id: withFile.id }))).toBe('STORAGE_CATEGORY_NOT_EMPTY');
+  });
+
+  it('deletes an empty folder', async () => {
+    const ctx = as(adminActor(adminId));
+    const empty = await categoryCreate(ctx, { name: 'empty', sortOrder: 0 });
+    await categoryDelete(ctx, { id: empty.id });
+    expect((await categoryTree(ctx)).items).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe('upload', () => {
+  it('stores a picture and records what it actually is', async () => {
+    const ctx = as(adminActor(adminId));
+    const result = await attachmentUpload(ctx, { directory: 'banner' }, png(750, 390));
+
+    expect(result.deduped).toBe(false);
+    expect(result.attachment).toMatchObject({
+      kind: 'image',
+      mime: 'image/png',
+      width: 750,
+      height: 390,
+      driver: 'local',
+    });
+    // The key is the server's, not the client's filename.
+    expect(result.attachment.url).toMatch(/^\/uploads\/banner\/2026\/09\/[0-9a-f]{32}\.png$/);
+    expect(result.attachment.originalName).toBe('banner.png');
+  });
+
+  it('returns the existing row for identical bytes instead of storing them twice', async () => {
+    const ctx = as(adminActor(adminId));
+    const first = await attachmentUpload(ctx, {}, png());
+    const second = await attachmentUpload(ctx, {}, png());
+
+    expect(second.deduped).toBe(true);
+    expect(second.attachment.id).toBe(first.attachment.id);
+    expect(await harness.ctx.db.select().from(attachments)).toHaveLength(1);
+  });
+
+  it('refuses a PHP script named .png with an image content-type', async () => {
+    const ctx = as(adminActor(adminId));
+    expect(
+      await code(
+        attachmentUpload(ctx, {}, file('<?php system($_GET["c"]);', 'shell.png', 'image/png')),
+      ),
+    ).toBe('STORAGE_FILE_TYPE_REJECTED');
+    expect(await harness.ctx.db.select().from(attachments)).toHaveLength(0);
+  });
+
+  it('refuses an SVG carrying a script', async () => {
+    const ctx = as(adminActor(adminId));
+    expect(
+      await code(
+        attachmentUpload(
+          ctx,
+          {},
+          file(
+            '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+            'logo.svg',
+            'image/svg+xml',
+          ),
+        ),
+      ),
+    ).toBe('STORAGE_FILE_TYPE_REJECTED');
+  });
+
+  it('refuses a PNG declared as a PDF rather than silently correcting it', async () => {
+    const ctx = as(adminActor(adminId));
+    const mismatched = { ...png(), declaredMime: 'application/pdf' };
+    expect(await code(attachmentUpload(ctx, {}, mismatched))).toBe('STORAGE_MIME_MISMATCH');
+  });
+
+  it('refuses a file over the configured ceiling', async () => {
+    const ctx = as(adminActor(adminId));
+    await ctx.config.set(storageConfig, { maxUploadBytes: 64 * 1024 });
+    const big: IncomingFile = { ...png(), bytes: new Uint8Array(70 * 1024) };
+    big.bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+    expect(await code(attachmentUpload(ctx, {}, big))).toBe('STORAGE_FILE_TOO_LARGE');
+  });
+
+  it('refuses an upload into a folder that does not exist', async () => {
+    const ctx = as(adminActor(adminId));
+    expect(await code(attachmentUpload(ctx, { categoryId: '999' }, png()))).toBe(
+      'STORAGE_CATEGORY_NOT_FOUND',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe('remote import', () => {
+  it('refuses the cloud metadata address', async () => {
+    const ctx = as(adminActor(adminId));
+    expect(
+      await code(attachmentImport(ctx, { url: 'http://169.254.169.254/latest/meta-data/' })),
+    ).toBe('STORAGE_REMOTE_URL_REFUSED');
+  });
+
+  it('refuses loopback and private addresses', async () => {
+    const ctx = as(adminActor(adminId));
+    for (const url of [
+      'http://127.0.0.1:6379/',
+      'http://10.0.0.5/logo.png',
+      'file:///etc/passwd',
+    ]) {
+      expect(await code(attachmentImport(ctx, { url })), url).toBe('STORAGE_REMOTE_URL_REFUSED');
+    }
+    expect(await harness.ctx.db.select().from(attachments)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe('listing, editing and batches', () => {
+  it('filters by folder, optionally including its descendants', async () => {
+    const ctx = as(adminActor(adminId));
+    const parent = await categoryCreate(ctx, { name: 'a', sortOrder: 0 });
+    const child = await categoryCreate(ctx, { name: 'b', parentId: parent.id, sortOrder: 0 });
+    await attachmentUpload(ctx, { categoryId: parent.id }, png(1, 1, 1));
+    await attachmentUpload(ctx, { categoryId: child.id }, png(1, 1, 2));
+
+    const direct = await attachmentList(ctx, {
+      page: 1,
+      pageSize: 20,
+      categoryId: parent.id,
+      includeSubcategories: false,
+    });
+    expect(direct.total).toBe(1);
+
+    const deep = await attachmentList(ctx, {
+      page: 1,
+      pageSize: 20,
+      categoryId: parent.id,
+      includeSubcategories: true,
+    });
+    expect(deep.total).toBe(2);
+  });
+
+  it('renames and re-files without touching the stored object', async () => {
+    const ctx = as(adminActor(adminId));
+    const folder = await categoryCreate(ctx, { name: 'a', sortOrder: 0 });
+    const uploaded = await attachmentUpload(ctx, {}, png());
+
+    const updated = await attachmentUpdate(
+      ctx,
+      { id: uploaded.attachment.id },
+      { name: '首页 banner', categoryId: folder.id },
+    );
+    expect(updated).toMatchObject({ name: '首页 banner', categoryId: folder.id });
+    expect(updated.url).toBe(uploaded.attachment.url);
+    expect(updated.sha256).toBe(uploaded.attachment.sha256);
+  });
+
+  it('reports ids that were already gone rather than failing the batch', async () => {
+    const ctx = as(adminActor(adminId));
+    const one = await attachmentUpload(ctx, {}, png(1, 1, 1));
+    const two = await attachmentUpload(ctx, {}, png(1, 1, 2));
+    await attachmentDeleteMany(ctx, { ids: [two.attachment.id] });
+
+    const result = await attachmentDeleteMany(ctx, {
+      ids: [one.attachment.id, two.attachment.id, '9999'],
+    });
+    expect(result.affected).toBe(1);
+    expect(result.skippedIds.sort()).toEqual([two.attachment.id, '9999'].sort());
+  });
+
+  it('moves a batch into a folder, and back out to the root', async () => {
+    const ctx = as(adminActor(adminId));
+    const folder = await categoryCreate(ctx, { name: 'a', sortOrder: 0 });
+    const one = await attachmentUpload(ctx, {}, png(1, 1, 1));
+
+    expect(
+      await attachmentMoveMany(ctx, { ids: [one.attachment.id], categoryId: folder.id }),
+    ).toEqual({ affected: 1, skippedIds: [] });
+    expect(await attachmentMoveMany(ctx, { ids: [one.attachment.id], categoryId: null })).toEqual({
+      affected: 1,
+      skippedIds: [],
+    });
+  });
+
+  it('hides a deleted attachment from the list without losing the row', async () => {
+    const ctx = as(adminActor(adminId));
+    const one = await attachmentUpload(ctx, {}, png());
+    await attachmentDeleteMany(ctx, { ids: [one.attachment.id] });
+
+    expect(
+      (await attachmentList(ctx, { page: 1, pageSize: 20, includeSubcategories: false })).total,
+    ).toBe(0);
+    // Soft: a description written years ago may still point at the URL.
+    expect(await harness.ctx.db.select().from(attachments)).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe('storefront upload', () => {
+  it('accepts an image and answers with the file, not the library', async () => {
+    const ctx = as(userActor(shopperId));
+    const result = await userUpload(ctx, { purpose: 'review' }, png(1080, 1440));
+    expect(result).toMatchObject({ mime: 'image/png', width: 1080, height: 1440 });
+    expect(result.url).toContain('/uploads/review/');
+    expect(Object.keys(result).sort()).toEqual(
+      ['height', 'mime', 'name', 'size', 'url', 'width'].sort(),
+    );
+  });
+
+  it('refuses a PDF: a review photo is not a document', async () => {
+    const ctx = as(userActor(shopperId));
+    expect(await code(userUpload(ctx, { purpose: 'review' }, file('%PDF-1.4', 'a.pdf')))).toBe(
+      'STORAGE_FILE_TYPE_REJECTED',
+    );
+  });
+
+  it('enforces the per-user hourly budget', async () => {
+    const ctx = as(userActor(shopperId));
+    await ctx.config.set(storageConfig, { userUploadsPerHour: 2 });
+    await userUpload(ctx, { purpose: 'review' }, png(1, 1, 1));
+    await userUpload(ctx, { purpose: 'review' }, png(1, 1, 2));
+    expect(await code(userUpload(ctx, { purpose: 'review' }, png(1, 1, 3)))).toBe(
+      'STORAGE_UPLOAD_RATE_LIMITED',
+    );
+
+    // A different shopper is unaffected — the limit is per subject, not global.
+    await expect(
+      userUpload(as(userActor(otherShopperId)), { purpose: 'review' }, png(1, 1, 4)),
+    ).resolves.toBeDefined();
+  });
+
+  it('attributes the row to the shopper and to no admin', async () => {
+    await userUpload(as(userActor(shopperId)), { purpose: 'avatar' }, png());
+    const [row] = await harness.ctx.db.select().from(attachments);
+    expect(row?.uploadedByUserId).toBe(shopperId);
+    expect(row?.uploadedByAdminId).toBeNull();
+    // And never into an admin's folder tree.
+    expect(row?.categoryId).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe('scan-to-upload', () => {
+  it('mints a token, accepts one upload, and refuses the second', async () => {
+    const ctx = as(adminActor(adminId));
+    const minted = await scanTokenCreate(ctx, { directory: 'scan' });
+
+    const first = await scanUpload(harness.ctx, { token: minted.token }, png(1, 1, 1));
+    expect(first.attachment.kind).toBe('image');
+
+    // The old system's token stayed valid for every scan until it expired.
+    expect(await code(scanUpload(harness.ctx, { token: minted.token }, png(1, 1, 2)))).toBe(
+      'STORAGE_SCAN_TOKEN_INVALID',
+    );
+  });
+
+  it('attributes the phone’s upload to the admin who minted the token', async () => {
+    const ctx = as(adminActor(adminId));
+    const minted = await scanTokenCreate(ctx, {});
+    await scanUpload(harness.ctx, { token: minted.token }, png());
+
+    const [row] = await harness.ctx.db.select().from(attachments);
+    expect(row?.uploadedByAdminId).toBe(adminId);
+  });
+
+  it('does not burn the token when the file is refused', async () => {
+    const ctx = as(adminActor(adminId));
+    const minted = await scanTokenCreate(ctx, {});
+
+    expect(
+      await code(
+        scanUpload(harness.ctx, { token: minted.token }, file('<?php ', 'a.png', 'image/png')),
+      ),
+    ).toBe('STORAGE_FILE_TYPE_REJECTED');
+    // The operator's QR code still works; they just picked the wrong file.
+    await expect(scanUpload(harness.ctx, { token: minted.token }, png())).resolves.toBeDefined();
+  });
+
+  it('reports the status to the minting admin and hides it from everybody else', async () => {
+    const ctx = as(adminActor(adminId));
+    const minted = await scanTokenCreate(ctx, {});
+    expect(await scanTokenStatusGet(ctx, { token: minted.token })).toEqual({
+      state: 'pending',
+      attachment: null,
+    });
+
+    await scanUpload(harness.ctx, { token: minted.token }, png());
+    const used = await scanTokenStatusGet(ctx, { token: minted.token });
+    expect(used.state).toBe('used');
+    expect(used.attachment?.kind).toBe('image');
+
+    // Another admin learns nothing, not even that the token exists.
+    const [other] = await harness.ctx.db
+      .insert(admins)
+      .values({ account: 'other', passwordHash: 'x', passwordAlgo: 'bcrypt', name: '其他' })
+      .returning({ id: admins.id });
+    expect(await scanTokenStatusGet(as(adminActor(other!.id)), { token: minted.token })).toEqual({
+      state: 'expired',
+      attachment: null,
+    });
+  });
+
+  it('refuses an unknown token', async () => {
+    expect(await code(scanUpload(harness.ctx, { token: 'nosuchtokenatall1234' }, png()))).toBe(
+      'STORAGE_SCAN_TOKEN_INVALID',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe('cleanOrphans', () => {
+  it('leaves a tombstone alone until the retention window has passed', async () => {
+    const ctx = as(adminActor(adminId));
+    const one = await attachmentUpload(ctx, {}, png());
+    await attachmentDeleteMany(ctx, { ids: [one.attachment.id] });
+
+    harness.clock.set('2026-09-25T08:00:00.000Z'); // 3 days, retention is 7
+    expect(await cleanOrphanAttachments(ctx)).toMatchObject({ removed: 0 });
+    expect(await harness.ctx.db.select().from(attachments)).toHaveLength(1);
+  });
+
+  it('purges the row and the object once it is old enough', async () => {
+    const ctx = as(adminActor(adminId));
+    const one = await attachmentUpload(ctx, {}, png());
+    const key = (
+      await harness.ctx.db
+        .select({ key: attachments.storageKey })
+        .from(attachments)
+        .where(eq(attachments.id, Number(one.attachment.id)))
+    )[0]!.key;
+    await attachmentDeleteMany(ctx, { ids: [one.attachment.id] });
+
+    harness.clock.set('2026-10-05T08:00:00.000Z');
+    expect(await cleanOrphanAttachments(ctx)).toMatchObject({ removed: 1, failed: 0 });
+    expect(await harness.ctx.db.select().from(attachments)).toHaveLength(0);
+    expect(await harness.ctx.storage.exists(key)).toBe(false);
+  });
+
+  it('does nothing at all when retention is disabled', async () => {
+    const ctx = as(adminActor(adminId));
+    await ctx.config.set(storageConfig, { orphanRetentionDays: 0 });
+    const one = await attachmentUpload(ctx, {}, png());
+    await attachmentDeleteMany(ctx, { ids: [one.attachment.id] });
+
+    harness.clock.set('2027-01-01T00:00:00.000Z');
+    expect(await cleanOrphanAttachments(ctx)).toEqual({ examined: 0, removed: 0, failed: 0 });
+    expect(await harness.ctx.db.select().from(attachments)).toHaveLength(1);
+  });
+});

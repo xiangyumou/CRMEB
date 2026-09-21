@@ -1,0 +1,340 @@
+/**
+ * Legacy admin tables and `eb_system_config` → the new `system` schema.
+ *
+ * Sources (`crmeb/public/install/crmeb.sql`):
+ *
+ * | Legacy                | New                                     |
+ * | --------------------- | --------------------------------------- |
+ * | `eb_system_admin`     | `admins`, `admin_roles`                 |
+ * | `eb_system_role`      | `roles` (grants are NOT translated)     |
+ * | `eb_system_config`    | `config_values`, via each group's `legacyKeys` |
+ *
+ * A pure function: rows in, rows and a report out. Nothing here opens a
+ * connection or looks at a clock.
+ *
+ * **Grants are deliberately not migrated.** A legacy role's `rules` column is a
+ * comma-separated list of `eb_system_menus` ids — rows in a table that no
+ * longer exists, describing a menu tree that no longer exists. There is no
+ * mapping from a menu id to a permission atom that is not a guess, and a guess
+ * here either hands somebody 退款 they did not have or takes it away silently.
+ * So roles arrive named, numbered and **empty**, every one of them is in the
+ * report, and re-granting them is a ten-minute job on a screen built for it.
+ * (An admin with `level = 0`, the legacy super admin, keeps everything through
+ * `isSuper` and is unaffected.)
+ */
+
+// ---------------------------------------------------------------------------
+// legacy row shapes
+// ---------------------------------------------------------------------------
+
+/** `eb_system_admin`. Timestamps are unix seconds; `0` means "never". */
+export interface LegacySystemAdmin {
+  id: number;
+  account: string;
+  /** 32-char MD5 in every deployment that has not been re-hashed. */
+  pwd: string;
+  real_name: string;
+  head_pic: string;
+  /** Comma-separated `eb_system_role.id` list, despite the column comment. */
+  roles: string;
+  last_time: number;
+  last_ip: string;
+  add_time: number;
+  login_count: number;
+  /** 0 = the built-in super admin. */
+  level: number;
+  /** 1 有效, 0 无效. */
+  status: number;
+  is_del: number;
+}
+
+/** `eb_system_role`. */
+export interface LegacySystemRole {
+  id: number;
+  role_name: string;
+  /** Comma-separated `eb_system_menus` ids. Untranslatable; see the header. */
+  rules: string | null;
+  level: number;
+  status: number;
+}
+
+/** `eb_system_config` — the 575-key soup, read as `menu_name` → `value`. */
+export interface LegacySystemConfig {
+  menu_name: string;
+  /** JSON-encoded in the legacy table for everything except plain inputs. */
+  value: string;
+}
+
+// ---------------------------------------------------------------------------
+// output row shapes (by hand, so `@shop/etl` does not depend on `@shop/db`)
+// ---------------------------------------------------------------------------
+
+export interface AdminRow {
+  id: number;
+  account: string;
+  passwordHash: string;
+  /** `md5` until the admin next logs in, which re-hashes with bcrypt. */
+  passwordAlgo: 'md5' | 'bcrypt';
+  name: string;
+  avatar: string | null;
+  phone: string | null;
+  isSuper: boolean;
+  status: number;
+  lastLoginAt: Date | null;
+  lastLoginIp: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
+export interface RoleRow {
+  id: number;
+  name: string;
+  remark: string | null;
+  status: number;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
+export interface AdminRoleRow {
+  adminId: number;
+  roleId: number;
+}
+
+/** One row of `config_values`: a group, a key, and the JSON value. */
+export interface ConfigValueRow {
+  group: string;
+  key: string;
+  value: unknown;
+}
+
+export interface SystemMigrationReport {
+  admins: number;
+  adminsDroppedDeleted: number;
+  adminsSuper: number;
+  /** Accounts still on MD5. They re-hash on first login; none are readable. */
+  adminsWithLegacyPassword: number;
+  roles: number;
+  adminRoleLinks: number;
+  adminRoleLinksDroppedUnknownRole: number;
+  /** Roles whose legacy menu-id grants could not be translated — i.e. all of them. */
+  rolesNeedingRegrant: number;
+  roleIdsNeedingRegrant: number[];
+  configKeysMapped: number;
+  /** Legacy keys no group claims. Listed, not dropped silently. */
+  configKeysUnclaimed: string[];
+}
+
+export interface SystemMigrationInput {
+  admins?: readonly LegacySystemAdmin[];
+  roles?: readonly LegacySystemRole[];
+  configs?: readonly LegacySystemConfig[];
+  /**
+   * `legacyKey → { group, key }`, built by the runner from the registered
+   * config groups' `legacyKeys` (`allConfigGroups()` in `@shop/core/system`).
+   * Passing it in keeps this file free of a dependency on `@shop/core`.
+   */
+  configKeyMap?: ReadonlyMap<string, { group: string; key: string }>;
+  /**
+   * Keys whose legacy value is hours but whose new value is minutes, and so on.
+   * Applied after the key mapping. The one we know about is
+   * `order_cancel_time` (legacy hours → `order.cancelAfterMinutes`).
+   */
+  configValueTransforms?: ReadonlyMap<string, (raw: string) => unknown>;
+}
+
+export interface SystemMigrationOutput {
+  admins: AdminRow[];
+  roles: RoleRow[];
+  adminRoles: AdminRoleRow[];
+  configValues: ConfigValueRow[];
+  report: SystemMigrationReport;
+}
+
+// ---------------------------------------------------------------------------
+// mapping
+// ---------------------------------------------------------------------------
+
+/** Legacy unix seconds; `0` is the legacy way of saying NULL. */
+function instant(seconds: number): Date | null {
+  return seconds > 0 ? new Date(seconds * 1000) : null;
+}
+
+function blankToNull(value: string | null | undefined): string | null {
+  const trimmed = (value ?? '').trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+/** `"1,2,3"` → `[1, 2, 3]`, skipping blanks and non-numbers. */
+export function parseIdList(raw: string | null | undefined): number[] {
+  return (raw ?? '')
+    .split(',')
+    .map((part) => Number.parseInt(part.trim(), 10))
+    .filter((id) => Number.isInteger(id) && id > 0);
+}
+
+/**
+ * The legacy table stores everything as a string, and JSON-encodes anything
+ * that is not a plain input. `"1"` must stay a string here rather than become a
+ * number: the target group's zod schema coerces, and guessing at this layer is
+ * how `"0755"` becomes `755`.
+ */
+export function decodeConfigValue(raw: string): unknown {
+  const trimmed = raw.trim();
+  if (trimmed === '') return '';
+  const first = trimmed[0];
+  if (first !== '{' && first !== '[' && first !== '"') return trimmed;
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return trimmed;
+  }
+}
+
+export function mapSystem(input: SystemMigrationInput): SystemMigrationOutput {
+  const admins: AdminRow[] = [];
+  const roles: RoleRow[] = [];
+  const adminRoles: AdminRoleRow[] = [];
+  const configValues: ConfigValueRow[] = [];
+
+  const roleIdsNeedingRegrant: number[] = [];
+  const configKeysUnclaimed: string[] = [];
+  let adminsDroppedDeleted = 0;
+  let adminsSuper = 0;
+  let adminsWithLegacyPassword = 0;
+  let adminRoleLinksDroppedUnknownRole = 0;
+
+  // The legacy schema has no created/updated timestamps on roles, and a
+  // migration must not invent "now" — it would make every role look edited on
+  // the day of the cutover. The oldest admin's add_time is the best honest
+  // stand-in for "this deployment started".
+  const epoch =
+    instant(Math.min(...(input.admins ?? []).map((row) => row.add_time).filter((t) => t > 0))) ??
+    new Date(0);
+
+  const knownRoleIds = new Set<number>();
+  for (const legacy of input.roles ?? []) {
+    knownRoleIds.add(legacy.id);
+    roles.push({
+      id: legacy.id,
+      name: legacy.role_name,
+      remark: '由旧系统迁移，权限需重新分配',
+      status: legacy.status === 1 ? 1 : 0,
+      createdAt: epoch,
+      updatedAt: epoch,
+      deletedAt: null,
+    });
+    if (parseIdList(legacy.rules).length > 0) roleIdsNeedingRegrant.push(legacy.id);
+  }
+
+  for (const legacy of input.admins ?? []) {
+    if (legacy.is_del === 1) {
+      adminsDroppedDeleted += 1;
+      continue;
+    }
+
+    const isSuper = legacy.level === 0;
+    if (isSuper) adminsSuper += 1;
+    const isMd5 = /^[0-9a-f]{32}$/i.test(legacy.pwd);
+    if (isMd5) adminsWithLegacyPassword += 1;
+
+    const createdAt = instant(legacy.add_time) ?? epoch;
+    admins.push({
+      id: legacy.id,
+      account: legacy.account,
+      passwordHash: legacy.pwd,
+      passwordAlgo: isMd5 ? 'md5' : 'bcrypt',
+      name: legacy.real_name === '' ? legacy.account : legacy.real_name,
+      avatar: blankToNull(legacy.head_pic),
+      phone: null,
+      isSuper,
+      status: legacy.status === 1 ? 1 : 0,
+      lastLoginAt: instant(legacy.last_time),
+      lastLoginIp: blankToNull(legacy.last_ip),
+      createdAt,
+      updatedAt: createdAt,
+      deletedAt: null,
+    });
+
+    for (const roleId of parseIdList(legacy.roles)) {
+      if (!knownRoleIds.has(roleId)) {
+        adminRoleLinksDroppedUnknownRole += 1;
+        continue;
+      }
+      adminRoles.push({ adminId: legacy.id, roleId });
+    }
+  }
+
+  const keyMap = input.configKeyMap ?? new Map();
+  const transforms = input.configValueTransforms ?? new Map();
+  const seen = new Set<string>();
+  for (const legacy of input.configs ?? []) {
+    const target = keyMap.get(legacy.menu_name);
+    if (!target) {
+      configKeysUnclaimed.push(legacy.menu_name);
+      continue;
+    }
+    // A legacy key can be listed by only one group, but the same *new* key can
+    // be fed by several legacy aliases (七牛/OSS/COS all become `s3AccessKeyId`).
+    // First wins, so the group's `legacyKeys` order is the precedence.
+    const slot = `${target.group}.${target.key}`;
+    if (seen.has(slot)) continue;
+    seen.add(slot);
+
+    const transform = transforms.get(legacy.menu_name);
+    configValues.push({
+      group: target.group,
+      key: target.key,
+      value: transform ? transform(legacy.value) : decodeConfigValue(legacy.value),
+    });
+  }
+
+  return {
+    admins,
+    roles,
+    adminRoles,
+    configValues,
+    report: {
+      admins: admins.length,
+      adminsDroppedDeleted,
+      adminsSuper,
+      adminsWithLegacyPassword,
+      roles: roles.length,
+      adminRoleLinks: adminRoles.length,
+      adminRoleLinksDroppedUnknownRole,
+      rolesNeedingRegrant: roleIdsNeedingRegrant.length,
+      roleIdsNeedingRegrant,
+      configKeysMapped: configValues.length,
+      configKeysUnclaimed,
+    },
+  };
+}
+
+/**
+ * The value transforms this domain knows about.
+ *
+ * Kept next to the mapper rather than in the runner because the *reason* is a
+ * domain fact: `order_cancel_time` was stored in hours and the new
+ * `order.cancelAfterMinutes` is in minutes, so copying the number across would
+ * cancel every unpaid order sixty times too early.
+ */
+export const CONFIG_VALUE_TRANSFORMS: ReadonlyMap<string, (raw: string) => unknown> = new Map<
+  string,
+  (raw: string) => unknown
+>([
+  [
+    'order_cancel_time',
+    (raw) => {
+      const hours = Number.parseFloat(raw);
+      return Number.isFinite(hours) ? Math.round(hours * 60) : 30;
+    },
+  ],
+  [
+    'order_activity_time',
+    (raw) => {
+      const hours = Number.parseFloat(raw);
+      return Number.isFinite(hours) ? Math.round(hours * 60) : 30;
+    },
+  ],
+]);

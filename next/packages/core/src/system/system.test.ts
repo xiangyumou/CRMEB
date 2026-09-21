@@ -1,0 +1,211 @@
+import {
+  createCtx,
+  fixedClock,
+  memoryQueue,
+  memoryStorage,
+  silentLogger,
+  systemActor,
+  type Ctx,
+} from '../kernel/index';
+import { describe, expect, it, beforeEach } from 'vitest';
+import { allConfigGroups, getConfigGroup } from '../kernel/config-registry';
+import { permissionTree } from './role.service';
+import { describeGroup } from './config.service';
+import {
+  countTile,
+  dashboardHeader,
+  registerDashboardContributor,
+  resetDashboardContributors,
+} from './dashboard';
+// The domain's own entry point, which is what a route imports: it registers
+// every permission atom, config group and dashboard contributor as a side
+// effect. Importing the individual modules instead would quietly test a
+// half-loaded registry.
+import './index';
+
+/**
+ * The parts of `system` that are pure: the descriptor a settings screen is
+ * built from, the permission tree the role editor renders, and the dashboard
+ * registry's failure behaviour. Everything that touches the database is in
+ * `system.int.test.ts`.
+ */
+
+/** A `Ctx` for code that only reads the clock, the logger and the actor. */
+function pureCtx(overrides: Partial<Ctx> = {}): Ctx {
+  return createCtx({
+    db: null as unknown as Ctx['db'],
+    redis: null as unknown as Ctx['redis'],
+    clock: fixedClock('2026-09-22T00:00:00.000Z'),
+    config: null as unknown as Ctx['config'],
+    logger: silentLogger(),
+    queue: memoryQueue(),
+    storage: memoryStorage(),
+    actor: systemActor,
+    platform: null,
+    requestId: 'test',
+    ...overrides,
+  });
+}
+
+describe('describeGroup', () => {
+  it('never describes a secret field as anything a browser would render as text', () => {
+    const wechat = getConfigGroup('wechat-oa');
+    expect(wechat).toBeDefined();
+    const descriptor = describeGroup(wechat!);
+    const appSecret = descriptor.fields.find((f) => f.key === 'appSecret');
+    expect(appSecret).toMatchObject({ secret: true, kind: 'password' });
+  });
+
+  it('marks every credential in every registered group as secret', () => {
+    // A credential that is not flagged is a credential `configGet` would return
+    // to a browser, so this sweeps the whole registry rather than one group.
+    //
+    // The *identifier* half of a key pair is deliberately not matched here:
+    // `AccessKeyId` and Tencent's `SecretId` are public names shown in every
+    // vendor console, and hiding them would leave an operator unable to tell
+    // which account is configured. The half that grants access must be secret,
+    // and that is what this pattern matches.
+    const suspicious = /(secret|password|appcode|serverkey|privatekey|aeskey|apikey)$/i;
+    const leaks: string[] = [];
+    for (const group of allConfigGroups()) {
+      for (const field of describeGroup(group).fields) {
+        if (suspicious.test(field.key) && field.secret !== true) {
+          leaks.push(`${group.group}.${field.key}`);
+        }
+      }
+    }
+    expect(leaks).toEqual([]);
+  });
+
+  it('carries conditional visibility through to the descriptor', () => {
+    // CR-1-f1: `visibleWhen` is merged from the local adapter until the kernel
+    // carries it. The storage screen must not show seven S3 boxes on local disk.
+    const storage = getConfigGroup('storage');
+    const s3Bucket = describeGroup(storage!).fields.find((f) => f.key === 's3Bucket');
+    expect(s3Bucket?.visibleWhen).toEqual({ key: 'driver', equals: 's3' });
+  });
+
+  it('orders fields the way the group was written', () => {
+    const site = describeGroup(getConfigGroup('site')!);
+    expect(site.fields[0]?.key).toBe('siteName');
+  });
+
+  it('gives every group a readable title and a permission', () => {
+    for (const group of allConfigGroups()) {
+      const descriptor = describeGroup(group);
+      expect(descriptor.title.length, group.group).toBeGreaterThan(0);
+      expect(descriptor.permission, group.group).toMatch(/^[a-z-]+:[a-z-]+:read$/);
+      expect(descriptor.fields.length, group.group).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('permissionTree', () => {
+  it('groups atoms into sections and keeps them sorted', () => {
+    const tree = permissionTree();
+    const sections = tree.sections.map((s) => s.section);
+    expect(sections).toContain('系统');
+    expect(sections).toContain('素材');
+    // Sorted, so the role editor does not reshuffle itself when an unrelated
+    // module changes its import order.
+    expect([...sections]).toEqual([...sections].sort((a, b) => a.localeCompare(b, 'zh-Hans-CN')));
+    for (const section of tree.sections) {
+      const atoms = section.items.map((i) => i.atom);
+      expect([...atoms], section.section).toEqual([...atoms].sort((a, b) => a.localeCompare(b)));
+    }
+  });
+
+  it('names the atoms every admin holds implicitly', () => {
+    // An admin with zero grants can still read their own session and log out,
+    // so the role editor must not offer those as though they were choices.
+    expect(permissionTree().implicit).toEqual(['auth:session:delete', 'auth:session:read']);
+  });
+
+  it('includes the storage atoms the contracts reference', () => {
+    const atoms = permissionTree()
+      .sections.flatMap((s) => s.items)
+      .map((n) => n.atom);
+    for (const atom of [
+      'storage:attachment:read',
+      'storage:attachment:write',
+      'storage:attachment:delete',
+      'storage:category:read',
+      'storage:category:write',
+      'storage:category:delete',
+    ]) {
+      expect(atoms, atom).toContain(atom);
+    }
+  });
+});
+
+describe('dashboardHeader', () => {
+  beforeEach(() => {
+    resetDashboardContributors();
+  });
+
+  it('degrades one contributor rather than the page', async () => {
+    registerDashboardContributor({
+      key: 'good',
+      async tiles() {
+        return [countTile({ key: 'good.one', label: '好', value: 1 })];
+      },
+    });
+    registerDashboardContributor({
+      key: 'bad',
+      async tiles() {
+        throw new Error('the orders database is having a day');
+      },
+    });
+
+    const header = await dashboardHeader(pureCtx());
+    expect(header.tiles.map((t) => t.key)).toEqual(['good.one']);
+    expect(header.degraded).toEqual(['bad']);
+  });
+
+  it('hides tiles the caller has no permission for', async () => {
+    registerDashboardContributor({
+      key: 'money',
+      permission: 'order:order:read',
+      async tiles() {
+        return [countTile({ key: 'money.today', label: '今日', value: 999 })];
+      },
+    });
+
+    const outsider = pureCtx({
+      actor: { kind: 'admin', id: 7, permissions: [], isSuper: false },
+    });
+    const insider = pureCtx({
+      actor: { kind: 'admin', id: 8, permissions: ['order:order:read'], isSuper: false },
+    });
+
+    expect((await dashboardHeader(outsider)).tiles).toEqual([]);
+    expect((await dashboardHeader(insider)).tiles).toHaveLength(1);
+  });
+
+  it('contributes nothing at all for a domain that is not loaded', async () => {
+    // No zero, no placeholder: the page shows what exists rather than inventing
+    // a number for a stream that has not landed yet.
+    const header = await dashboardHeader(pureCtx());
+    expect(header.tiles).toEqual([]);
+    expect(header.degraded).toEqual([]);
+  });
+
+  it('orders contributors by `order`, then by registration', async () => {
+    registerDashboardContributor({
+      key: 'late',
+      order: 900,
+      async tiles() {
+        return [countTile({ key: 'late', label: '后', value: 1 })];
+      },
+    });
+    registerDashboardContributor({
+      key: 'early',
+      order: 100,
+      async tiles() {
+        return [countTile({ key: 'early', label: '前', value: 1 })];
+      },
+    });
+    const header = await dashboardHeader(pureCtx());
+    expect(header.tiles.map((t) => t.key)).toEqual(['early', 'late']);
+  });
+});
