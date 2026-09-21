@@ -1,0 +1,192 @@
+import { defineRoute } from '@shop/contracts';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it } from 'vitest';
+import { z } from 'zod';
+
+import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { renderAdmin, zhName } from '@/test/render';
+
+import { ConfigGroupForm } from './config-group-form';
+import { buildConfigPayload, isConfigFieldVisible, type ConfigGroupDescriptor } from './types';
+
+const descriptor: ConfigGroupDescriptor = {
+  group: 'demo',
+  title: '演示配置',
+  fields: [
+    { key: 'siteName', label: '站点名称', kind: 'text', required: true },
+    { key: 'apiSecret', label: '接口密钥', kind: 'password' },
+    { key: 'smsSecret', label: '短信密钥', kind: 'password' },
+    { key: 'mode', label: '模式', kind: 'select', options: [{ label: '快递', value: 'express' }] },
+    {
+      key: 'threshold',
+      label: '门槛',
+      kind: 'money',
+      visibleWhen: { key: 'mode', equals: 'express' },
+    },
+  ],
+};
+
+const saveRoute = defineRoute({
+  id: 'test.configSave',
+  method: 'PUT',
+  path: '/admin-api/config/:group',
+  auth: 'admin',
+  permission: 'test:config:save',
+  summary: '保存配置',
+  tags: ['test'],
+  params: z.object({ group: z.string() }),
+  body: z.object({ values: z.record(z.string(), z.unknown()) }),
+  response: z.object({ ok: z.literal(true) }),
+  examples: [{ name: 'ok', params: { group: 'demo' }, body: { values: {} }, response: { ok: true } }],
+});
+
+// `apiSecret` is already set (boolean flag, never the secret); `smsSecret` isn't.
+const values = { siteName: '示例商城', apiSecret: true, smsSecret: false, mode: 'express' };
+
+function stubSave(): { bodies: unknown[] } {
+  const bodies: unknown[] = [];
+  configureApi({
+    async fetch(_input, init) {
+      bodies.push(typeof init?.body === 'string' ? JSON.parse(init.body) : undefined);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  });
+  return { bodies };
+}
+
+afterEach(() => resetApiConfig());
+
+describe('buildConfigPayload', () => {
+  it('omits a secret the operator did not retype', () => {
+    const payload = buildConfigPayload(descriptor, { ...values }, {});
+    expect(payload).not.toHaveProperty('apiSecret');
+    expect(payload).not.toHaveProperty('smsSecret');
+    expect(payload['siteName']).toBe('示例商城');
+  });
+
+  it('includes a secret that was retyped', () => {
+    const payload = buildConfigPayload(descriptor, { ...values }, { apiSecret: 'new-secret' });
+    expect(payload['apiSecret']).toBe('new-secret');
+    expect(payload).not.toHaveProperty('smsSecret');
+  });
+
+  it('treats an emptied secret box as "leave it alone", not "clear it"', () => {
+    const payload = buildConfigPayload(descriptor, { ...values }, { apiSecret: '' });
+    expect(payload).not.toHaveProperty('apiSecret');
+  });
+
+  it('leaves out fields hidden by visibleWhen', () => {
+    const payload = buildConfigPayload(descriptor, { ...values, mode: 'city', threshold: '9.00' }, {});
+    expect(payload).not.toHaveProperty('threshold');
+  });
+});
+
+describe('isConfigFieldVisible', () => {
+  const field = descriptor.fields[4]!;
+
+  it('matches a single value and a list of values', () => {
+    expect(isConfigFieldVisible(field, { mode: 'express' })).toBe(true);
+    expect(isConfigFieldVisible(field, { mode: 'city' })).toBe(false);
+    expect(
+      isConfigFieldVisible({ ...field, visibleWhen: { key: 'mode', equals: ['express', 'city'] } }, { mode: 'city' }),
+    ).toBe(true);
+  });
+
+  it('always shows a field with no condition', () => {
+    expect(isConfigFieldVisible(descriptor.fields[0]!, {})).toBe(true);
+  });
+});
+
+describe('<ConfigGroupForm> secrets', () => {
+  it('shows 已设置 / 未设置 instead of the secret', () => {
+    stubSave();
+    renderAdmin(<ConfigGroupForm descriptor={descriptor} values={values} route={saveRoute} />);
+
+    expect(screen.getByTestId('secret-state-apiSecret')).toHaveTextContent('已设置');
+    expect(screen.getByTestId('secret-state-smsSecret')).toHaveTextContent('未设置');
+    expect(screen.getByTestId('secret-input-apiSecret')).toHaveValue('');
+  });
+
+  it('does not send an untouched secret', async () => {
+    const user = userEvent.setup();
+    const { bodies } = stubSave();
+    renderAdmin(<ConfigGroupForm descriptor={descriptor} values={values} route={saveRoute} />);
+
+    await user.click(screen.getByRole('button', { name: zhName('保存') }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    const sent = (bodies[0] as { values: Record<string, unknown> }).values;
+    expect(sent).not.toHaveProperty('apiSecret');
+    expect(sent).not.toHaveProperty('smsSecret');
+    expect(sent['siteName']).toBe('示例商城');
+  });
+
+  it('sends only the secret that was changed', async () => {
+    const user = userEvent.setup();
+    const { bodies } = stubSave();
+    renderAdmin(<ConfigGroupForm descriptor={descriptor} values={values} route={saveRoute} />);
+
+    await user.type(screen.getByTestId('secret-input-apiSecret'), 'brand-new');
+    await user.click(screen.getByRole('button', { name: zhName('保存') }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    const sent = (bodies[0] as { values: Record<string, unknown> }).values;
+    expect(sent['apiSecret']).toBe('brand-new');
+    expect(sent).not.toHaveProperty('smsSecret');
+  });
+
+  it('clears the typed secret after a successful save', async () => {
+    const user = userEvent.setup();
+    stubSave();
+    renderAdmin(<ConfigGroupForm descriptor={descriptor} values={values} route={saveRoute} />);
+
+    await user.type(screen.getByTestId('secret-input-apiSecret'), 'brand-new');
+    await user.click(screen.getByRole('button', { name: zhName('保存') }));
+
+    await waitFor(() => expect(screen.getByTestId('secret-input-apiSecret')).toHaveValue(''));
+  });
+
+  it('sends the group as a path param', async () => {
+    const user = userEvent.setup();
+    const urls: string[] = [];
+    configureApi({
+      async fetch(input) {
+        urls.push(typeof input === 'string' ? input : (input as Request).url);
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    });
+    renderAdmin(<ConfigGroupForm descriptor={descriptor} values={values} route={saveRoute} />);
+
+    await user.click(screen.getByRole('button', { name: zhName('保存') }));
+    await waitFor(() => expect(urls[0]).toBe('/admin-api/config/demo'));
+  });
+});
+
+describe('<ConfigGroupForm> rendering', () => {
+  it('hides a field whose condition does not hold', () => {
+    stubSave();
+    renderAdmin(
+      <ConfigGroupForm
+        descriptor={descriptor}
+        values={{ ...values, mode: 'city' }}
+        route={saveRoute}
+      />,
+    );
+    expect(screen.queryByLabelText('门槛')).not.toBeInTheDocument();
+  });
+
+  it('shows a skeleton while the values are loading', () => {
+    stubSave();
+    renderAdmin(
+      <ConfigGroupForm descriptor={descriptor} values={undefined} loading route={saveRoute} />,
+    );
+    expect(screen.queryByTestId('secret-input-apiSecret')).not.toBeInTheDocument();
+  });
+});

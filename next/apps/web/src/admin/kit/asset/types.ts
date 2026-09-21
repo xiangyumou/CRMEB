@@ -1,0 +1,43 @@
+import type { z } from 'zod';
+
+import type { asset } from '../../api/contracts';
+
+/** Exactly the frozen `asset` shape from the contracts conventions. */
+export type AssetItem = z.infer<typeof asset>;
+
+export interface AssetCategory {
+  id: string;
+  name: string;
+  children?: AssetCategory[] | undefined;
+}
+
+export interface AssetListQuery {
+  /** `undefined` means "all categories". */
+  categoryId?: string | undefined;
+  page: number;
+  pageSize: number;
+  keyword?: string | undefined;
+}
+
+export interface AssetListResult {
+  items: AssetItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * Everything `<AssetPicker>` needs from the material library.
+ *
+ * P0-b ships the UI and an in-memory stub. Stream F1 (`system` / `storage`)
+ * implements this interface on top of the real `/admin-api/storage/*` routes
+ * and installs it with `<AssetSourceProvider source={…}>` in the shell layout.
+ * Nothing else in the kit changes.
+ */
+export interface AssetSource {
+  listCategories(): Promise<AssetCategory[]>;
+  listAssets(query: AssetListQuery): Promise<AssetListResult>;
+  /** Resolves with the stored asset. Throw to surface an upload failure. */
+  upload(file: File, categoryId?: string | undefined): Promise<AssetItem>;
+  remove(ids: string[]): Promise<void>;
+}
