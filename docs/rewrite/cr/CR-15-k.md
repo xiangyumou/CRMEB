@@ -1,6 +1,6 @@
 # CR-15-k — every delayed job the app schedules throws: BullMQ rejects a `jobId` with one colon in it
 
-**Stream:** K (hardening) **Status:** OPEN — for the orchestrator / P0-A (kernel queue adapter)
+**Stream:** K (hardening) **Status:** RESOLVED 2026-09-23 by the orchestrator — `toJobId` in `queue-bullmq.ts` maps the port's opaque key onto a BullMQ id (`:` → `__`, integer-looking keys prefixed); `queue-bullmq.int.test.ts` runs the adapter against a real Redis; the e2e journey `ship it, then confirm receipt` is un-fixme'd and green (30/30). `memoryQueue()` deliberately stays permissive: the port's contract is that the key is opaque, so the fake would be lying the other way.
 **Files:** `next/packages/core/src/kernel/queue-bullmq.ts`,
 `next/packages/core/src/order/order.checkout.service.ts`,
 `next/packages/core/src/order/order.fulfil.service.ts`

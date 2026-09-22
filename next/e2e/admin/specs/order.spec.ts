@@ -27,17 +27,13 @@ test('an express shipment needs a courier and a tracking number', async ({ admin
   await expect(modal.getByText('快递发货需要物流公司和运单号')).toBeVisible();
 });
 
-// CR-15-k. `POST /admin-api/orders/:id/shipments` answers **500** today: the
-// shipment commits, and the enqueue that follows it throws
-// `Custom Id cannot contain :` inside BullMQ, because every `dedupeKey` in the
-// system is `name:id` and BullMQ 6 rejects a custom job id with one colon in
-// it. 确认收货 enqueues the same way, so the whole flow is blocked at the HTTP
-// boundary even though the database moves. Every unit and integration test
-// uses `memoryQueue()`, which is why this only shows up from here.
-//
-// Un-fixme this the day the adapter maps the key (the CR proposes doing it in
-// `queue-bullmq.ts`, where the port's opaque string becomes a BullMQ id).
-test.fixme('ship it, then confirm receipt', async ({ adminPage, adminApi, shop }) => {
+// CR-15-k found here: every `dedupeKey` is `name:id`, and BullMQ 6 refuses a
+// custom job id with one colon in it, so this shipment used to commit and then
+// answer 500 from the enqueue that follows it. `queue-bullmq.ts` now maps the
+// port's opaque key onto a BullMQ id (`toJobId`); this journey is the proof that
+// the fix holds at the HTTP boundary, on a real Redis, which no unit or
+// integration suite reaches (they all run on `memoryQueue()`).
+test('ship it, then confirm receipt', async ({ adminPage, adminApi, shop }) => {
   const orderId = shop.fixtures.shippableOrderId;
   await adminPage.goto(`/admin/orders/${orderId}`);
 
@@ -52,8 +48,9 @@ test.fixme('ship it, then confirm receipt', async ({ adminPage, adminApi, shop }
   // what the warehouse depends on.
   await expect(modal).toBeHidden();
 
-  // The shipment is on the page, with the number that was typed.
-  await expect(adminPage.getByText('SF1234567890')).toBeVisible();
+  // The shipment is on the page, with the number that was typed — twice: the
+  // shipment card and the timeline entry.
+  await expect(adminPage.getByText('SF1234567890').first()).toBeVisible();
 
   // 确认收货 only appears once the order is shipped — it is in the page
   // header, not in the shipping card, and it is a Popconfirm.
@@ -79,22 +76,28 @@ test.fixme('ship it, then confirm receipt', async ({ adminPage, adminApi, shop }
   expect(targets.some((target) => target?.includes(String(orderId)))).toBe(true);
 });
 
-test('an order that is already shipped cannot be shipped again', async ({ adminPage, shop }) => {
+test('an order that is already shipped cannot be shipped again', async ({
+  adminPage,
+  adminApi,
+  shop,
+}) => {
   const orderId = shop.fixtures.shippableOrderId!;
-  // The test above would have shipped this order through the screen; while it
-  // is fixme'd for CR-15-k, the arrangement is made through the service, whose
-  // queue is in memory here. `lines: []` means "everything still outstanding",
-  // which is what 一键发货 sends.
-  await shipOrder(shop.ctx, {
-    orderId,
-    body: {
-      deliveryMode: 'express',
-      lines: [],
-      expressCompanyId: String(shop.fixtures.expressCompanyId),
-      trackingNo: 'SF1234567890',
-    },
-    operatorAdminId: shop.accounts.super!.id,
-  });
+  // The journey above ships this order through the screen; when this test runs
+  // on its own the arrangement is made through the service instead. `lines: []`
+  // means "everything still outstanding", which is what 一键发货 sends.
+  const before = await (await adminApi.get(`/admin-api/orders/${orderId}`)).json();
+  if (before.status !== 'shipped' && before.fulfillmentStatus !== 'fulfilled') {
+    await shipOrder(shop.ctx, {
+      orderId,
+      body: {
+        deliveryMode: 'express',
+        lines: [],
+        expressCompanyId: String(shop.fixtures.expressCompanyId),
+        trackingNo: 'SF1234567890',
+      },
+      operatorAdminId: shop.accounts.super!.id,
+    });
+  }
 
   await adminPage.goto(`/admin/orders/${orderId}`);
   // Every line is now on its way; the button is gone, because there is nothing
