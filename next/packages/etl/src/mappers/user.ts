@@ -229,6 +229,8 @@ export interface UserCancellationRow {
 }
 
 export interface WechatIdentityRow {
+  /** `eb_wechat_user.id`, carried over so a reload reproduces it (CR-3-j). */
+  id: number;
   userId: number;
   platform: 'oa';
   openid: string;
@@ -252,6 +254,12 @@ export interface UserMigrationReport {
   usersDroppedDuplicatePhone: number;
   addresses: number;
   addressesDroppedUnknownUser: number;
+  /**
+   * Addresses whose `city_id` is not in the new city dictionary, so the link
+   * was cleared to NULL. The address keeps its province / city / district text,
+   * which is what a customer actually reads (CR-3-j).
+   */
+  addressesCityCleared: number;
   groups: number;
   groupMemberships: number;
   labelCategories: number;
@@ -278,6 +286,23 @@ export interface UserMigrationInput {
   labelRelations?: readonly LegacyUserLabelRelation[];
   cancellations?: readonly LegacyUserCancel[];
   wechatUsers?: readonly LegacyWechatUser[];
+  /**
+   * The ids in the new `cities` dictionary, filled by the runner from the
+   * target database (`extras`).
+   *
+   * `user_addresses.city_id` is a real foreign key and the dictionary is
+   * **seeded**, not migrated — `packages/db/seed-data/cities.json`, with the
+   * legacy ids kept so an address can go on pointing at the same city. A dump
+   * whose `city_id` the dictionary does not have (a row an operator added, a
+   * dictionary edited over the years) would otherwise fail the insert, and
+   * because a group is one transaction that rolls back **every** member,
+   * address, group and label — on the day of the cutover.
+   *
+   * Absent means "unknown, do not check", which is what the mapper's own unit
+   * tests pass: this is a fact about the target database, not about the dump,
+   * and a pure function has no way to find it out for itself.
+   */
+  knownCityIds?: ReadonlySet<number>;
 }
 
 export interface UserMigrationOutput {
@@ -455,6 +480,7 @@ export function mapUsers(input: UserMigrationInput): UserMigrationOutput {
 
   const addresses: UserAddressRow[] = [];
   let addressesDroppedUnknownUser = 0;
+  let addressesCityCleared = 0;
   const defaultSeen = new Set<number>();
   for (const legacy of input.addresses ?? []) {
     if (!keptUserIds.has(legacy.uid)) {
@@ -469,6 +495,16 @@ export function mapUsers(input: UserMigrationInput): UserMigrationOutput {
     if (isDefault && defaultSeen.has(legacy.uid)) isDefault = false;
     if (isDefault) defaultSeen.add(legacy.uid);
 
+    // `0` is the legacy spelling of "no city chosen". Anything else is checked
+    // against the dictionary when the runner told us what is in it: an id the
+    // new `cities` table does not have cannot be kept, and clearing one link is
+    // a much smaller loss than a foreign key rolling back the whole group.
+    let cityId = legacy.city_id > 0 ? legacy.city_id : null;
+    if (cityId !== null && input.knownCityIds !== undefined && !input.knownCityIds.has(cityId)) {
+      cityId = null;
+      addressesCityCleared += 1;
+    }
+
     addresses.push({
       id: legacy.id,
       userId: legacy.uid,
@@ -479,7 +515,7 @@ export function mapUsers(input: UserMigrationInput): UserMigrationOutput {
       districtName: text(legacy.district, 64),
       // The legacy table stores only the city's division id, never the
       // province's or the district's, so the other two stay NULL.
-      cityId: legacy.city_id > 0 ? legacy.city_id : null,
+      cityId,
       detail: text(legacy.detail, 255) ?? '',
       postCode: legacy.post_code > 0 ? String(legacy.post_code) : null,
       lng: coordinate(legacy.longitude),
@@ -516,6 +552,7 @@ export function mapUsers(input: UserMigrationInput): UserMigrationOutput {
       usersDroppedDuplicatePhone,
       addresses: addresses.length,
       addressesDroppedUnknownUser,
+      addressesCityCleared,
       groups: groups.length,
       groupMemberships: groupMemberships.length,
       labelCategories: labelResult.categories.length,
@@ -688,6 +725,11 @@ function mapWechatIdentities(
 
     const created = instant(legacy.add_time) ?? new Date(0);
     rows.push({
+      // `eb_wechat_user.id` is carried over like every other legacy id
+      // (CR-3-j). Left to the identity sequence, the same follower would get a
+      // different id on a second run, and "migrate twice, compare" — the only
+      // proof that a cutover can be repeated — would fail on it.
+      id: legacy.id,
       userId: legacy.uid,
       platform: 'oa',
       openid,

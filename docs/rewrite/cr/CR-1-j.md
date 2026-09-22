@@ -2,6 +2,7 @@
 
 - **Stream:** J (ETL runner)
 - **Status:** decided — the duplicates are not intentional. `wechat` (C) owns `wechat_appid`/`wechat_appsecret`; E3 removes them from `wechat-oa` (it reads C's group). `trade` dissolves under CR-6-f1 after F2 merges. The runner's fan-out stays as the safety net; J's follow-up drops the `configKeyMap` input from `mappers/system.ts` since the runner owns config routing
+- **Landed:** `d226c341` — `mappers/system.ts` no longer takes `configKeyMap` or emits config rows; `config.test.ts` still fails on a key with no claimant. The `wechat`/`wechat-oa` and `trade` duplicates were left to E3 and CR-6-f1 as instructed.
 - **Affects:** `next/packages/etl/src/mappers/system.ts` (F1's `configKeyMap`
   input), `next/packages/etl/src/config.ts` (J)
 

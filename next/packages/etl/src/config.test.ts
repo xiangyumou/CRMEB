@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { DROPPED_CONFIG_KEYS, isDroppedConfigKey } from './config-dropped';
-import { IGNORED_CONFIG_CLAIMS } from './config-overrides';
+import { IGNORED_CONFIG_CLAIMS, isIgnoredClaim } from './config-overrides';
 import {
   ConfigMigrationError,
   buildLegacyKeyIndex,
@@ -34,7 +34,22 @@ const beta = defineConfigGroup({
   legacyKeys: { appId: 'etl_test_appid', secret: 'etl_test_secret' },
 });
 
-const groups = [alpha, beta];
+/**
+ * One field fed by three legacy aliases, which is `storage.s3AccessKeyId` in
+ * miniature: a shop that used one vendor has rows for all of them and the other
+ * two are empty strings.
+ */
+const gamma = defineConfigGroup({
+  group: 'etl-test-gamma',
+  title: 'γ',
+  schema: z.object({ accessKey: z.string().default('') }),
+  ui: {},
+  legacyKeys: {
+    accessKey: ['etl_test_key_a', 'etl_test_key_b', 'etl_test_key_c'],
+  },
+});
+
+const groups = [alpha, beta, gamma];
 
 function row(menu_name: string, value: string): LegacySystemConfigRow {
   return { menu_name, value };
@@ -43,7 +58,9 @@ function row(menu_name: string, value: string): LegacySystemConfigRow {
 describe('buildLegacyKeyIndex', () => {
   it('fans one legacy key out to every group that claims it', () => {
     const index = buildLegacyKeyIndex(groups);
-    expect(index.get('etl_test_site_name')).toEqual([{ group: 'etl-test-alpha', key: 'siteName' }]);
+    expect(index.get('etl_test_site_name')).toEqual([
+      { group: 'etl-test-alpha', key: 'siteName', alias: 0 },
+    ]);
   });
 
   it('really does fan out on the live registry — wechat_appid has two claimants', () => {
@@ -77,6 +94,77 @@ describe('mapConfig', () => {
   it('converts order_cancel_time from hours to minutes (ETL-F1-003)', () => {
     const { values } = mapConfig([row('order_cancel_time', '"2"')], { groups, now: NOW });
     expect(values[0]?.value).toBe(120);
+  });
+
+  describe('several legacy aliases feeding one field', () => {
+    // `storage.s3AccessKeyId` lists six of them (七牛/腾讯/京东/华为/天翼/…).
+    // The shop used one vendor, so five rows are empty strings — and all six
+    // are present in the dump.
+    const gammaOnly = { groups: [gamma], now: NOW };
+
+    it('一个有值的别名胜过空别名，无论 dump 里谁在后面', () => {
+      const { values, report } = mapConfig(
+        [
+          row('etl_test_key_a', '""'),
+          row('etl_test_key_b', '"real-key"'),
+          row('etl_test_key_c', '""'),
+        ],
+        gammaOnly,
+      );
+      expect(values).toEqual([
+        {
+          group: 'etl-test-gamma',
+          key: 'accessKey',
+          value: 'real-key',
+          updatedAt: NOW,
+          updatedBy: null,
+        },
+      ]);
+      // And the report says the other two did not migrate, so "腾讯云的 key
+      // 怎么没过来" has an answer instead of being a mystery.
+      expect(report.aliasesNotUsed.map((entry) => entry.legacyKey).sort()).toEqual([
+        'etl_test_key_a',
+        'etl_test_key_c',
+      ]);
+      expect(report.aliasesNotUsed.every((entry) => entry.insteadOf === 'etl_test_key_b')).toBe(
+        true,
+      );
+      // The report names the key the value really came from, once.
+      expect(report.mapped).toEqual([
+        {
+          legacyKey: 'etl_test_key_b',
+          group: 'etl-test-gamma',
+          key: 'accessKey',
+          marker: '<set>',
+        },
+      ]);
+    });
+
+    it('两个别名都有值时，按组里声明的顺序决定，而不是按 dump 的行序', () => {
+      const declared = mapConfig(
+        [row('etl_test_key_c', '"third"'), row('etl_test_key_a', '"first"')],
+        gammaOnly,
+      );
+      expect(declared.values[0]?.value).toBe('first');
+
+      // The same two rows the other way round must give the same answer —
+      // otherwise the migrated value depends on how the dump was written.
+      const reversed = mapConfig(
+        [row('etl_test_key_a', '"first"'), row('etl_test_key_c', '"third"')],
+        gammaOnly,
+      );
+      expect(reversed.values[0]?.value).toBe('first');
+    });
+
+    it('全都是空的时候也不报错，只是这个字段没有被迁移的值', () => {
+      const { values } = mapConfig([row('etl_test_key_a', '""'), row('etl_test_key_b', '""')], {
+        groups: [gamma],
+        now: NOW,
+      });
+      expect(values).toEqual([
+        { group: 'etl-test-gamma', key: 'accessKey', value: '', updatedAt: NOW, updatedBy: null },
+      ]);
+    });
   });
 
   it('writes only the fields a legacy key fed, not the schema defaults', () => {
@@ -158,7 +246,7 @@ describe('mapConfig', () => {
 
   it('reports groups no legacy key fed, so nobody assumes they migrated', () => {
     const { report } = mapConfig([row('etl_test_site_name', '"小店"')], { groups, now: NOW });
-    expect(report.groupsWithoutLegacyValues).toEqual(['etl-test-beta']);
+    expect(report.groupsWithoutLegacyValues).toEqual(['etl-test-beta', 'etl-test-gamma']);
   });
 });
 
@@ -206,5 +294,24 @@ describe('parked claims', () => {
     for (const override of IGNORED_CONFIG_CLAIMS) {
       expect(isDroppedConfigKey(override.legacyKey)).toBe(true);
     }
+  });
+
+  it('`isIgnoredClaim` answers for exactly the parked entries and nothing else', () => {
+    // The two tests above iterate the list, so an empty list makes them
+    // vacuous. This one says something either way: nothing is parked that is
+    // not on the list — today that is nothing at all, which is the state
+    // CR-2-j left behind.
+    for (const override of IGNORED_CONFIG_CLAIMS) {
+      expect(isIgnoredClaim(override.legacyKey, override.group, override.key)).toBe(true);
+    }
+    expect(isIgnoredClaim('order_activity_time', 'order-fulfil', 'reviewWindowDays')).toBe(false);
+  });
+
+  it('评价期认领 system_comment_time（天），不再是按小时计的活动订单超时（CR-2-j）', () => {
+    const fulfil = allConfigGroups().find((group) => group.group === 'order-fulfil');
+    expect(fulfil?.legacyKeys?.['reviewWindowDays']).toBe('system_comment_time');
+    // And the key it used to claim has no claimant at all now, only a reason.
+    expect(buildLegacyKeyIndex().has('order_activity_time')).toBe(false);
+    expect(isDroppedConfigKey('order_activity_time')).toBe(true);
   });
 });

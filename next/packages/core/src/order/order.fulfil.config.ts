@@ -23,7 +23,10 @@ export const orderFulfilConfig = defineConfigGroup({
     autoReceiveSweepLimit: z.number().int().min(1).max(2_000).default(200),
     /**
      * Days a `received` order waits for a review before it becomes `completed`.
-     * Legacy `order_activity_time`.
+     * Legacy `system_comment_time`, in days — the same unit on both sides, so
+     * the value carries over untouched. It claimed `order_activity_time` until
+     * CR-2-j: that key is 活动未支付订单取消时间 in *hours*, which would have
+     * arrived here as a sixty-day review window.
      */
     reviewWindowDays: z.number().int().min(0).max(90).default(7),
     completionSweepLimit: z.number().int().min(1).max(2_000).default(200),
@@ -63,7 +66,7 @@ export const orderFulfilConfig = defineConfigGroup({
   },
   legacyKeys: {
     autoReceiveDays: 'system_delivery_time',
-    reviewWindowDays: 'order_activity_time',
+    reviewWindowDays: 'system_comment_time',
   },
 });
 

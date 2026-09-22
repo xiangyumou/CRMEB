@@ -55,6 +55,16 @@ describe('admins', () => {
     expect(out.report.adminsWithLegacyPassword).toBe(0);
   });
 
+  it('不搬管理员的最后登录 IP：新库没有这一列，也没有功能读它（CR-4-j）', () => {
+    // `toMatchObject` above would not notice an extra field, and an extra field
+    // is not harmless here: the runner checks every key a mapper emits against
+    // the table's real columns and refuses the whole group when one has no home.
+    const out = mapSystem({ admins: [ADMIN], roles: [ROLE] });
+    expect(out.admins[0]).not.toHaveProperty('lastLoginIp');
+    // The *time* does have a column, and does come across.
+    expect(out.admins[0]?.lastLoginAt).toEqual(new Date(ADMIN.last_time * 1000));
+  });
+
   it('keeps an MD5 password as MD5 rather than pretending it is bcrypt', () => {
     // Re-hashing needs the plaintext, which nobody has. The column carries the
     // algorithm so login can verify the old hash once and upgrade it.
@@ -102,70 +112,37 @@ describe('roles', () => {
     const out = mapSystem({ roles: [{ ...ROLE, rules: '' }] });
     expect(out.report.rolesNeedingRegrant).toBe(0);
   });
+
+  it('不产出 deletedAt：roles 表没有软删除列，eb_system_role 也没有 is_del（CR-4-j）', () => {
+    const out = mapSystem({ roles: [ROLE], admins: [ADMIN] });
+    expect(out.roles[0]).not.toHaveProperty('deletedAt');
+    // Admins *are* soft-deletable, so that one keeps its field.
+    expect(out.admins[0]).toHaveProperty('deletedAt', null);
+  });
 });
 
 describe('config', () => {
-  const keyMap = new Map([
-    ['site_name', { group: 'site', key: 'siteName' }],
-    ['site_logo', { group: 'site', key: 'logo' }],
-    ['order_cancel_time', { group: 'order', key: 'cancelAfterMinutes' }],
-  ]);
+  // Routing `eb_system_config` used to live in this mapper, through a
+  // `configKeyMap` the runner built. It does not any more (CR-1-j): a legacy
+  // key can have more than one claimant, which a one-to-one map cannot express,
+  // and validating a value means running a group's zod schema, which a pure
+  // mapper cannot do. `config.ts` owns it and `config.test.ts` covers it —
+  // routing, unclaimed keys, the hours → minutes conversion and alias
+  // precedence all have tests there. What stays here is the domain knowledge.
 
-  it('routes legacy keys to the group that claimed them', () => {
-    const out = mapSystem({
-      configs: [
-        { menu_name: 'site_name', value: 'CRMEB 商城' },
-        { menu_name: 'site_logo', value: '/uploads/logo.png' },
-      ],
-      configKeyMap: keyMap,
-    });
-    expect(out.configValues).toEqual([
-      { group: 'site', key: 'siteName', value: 'CRMEB 商城' },
-      { group: 'site', key: 'logo', value: '/uploads/logo.png' },
-    ]);
+  it('这个 mapper 不再产出配置值', () => {
+    expect(mapSystem({ admins: [ADMIN], roles: [ROLE] })).not.toHaveProperty('configValues');
   });
 
-  it('lists a legacy key no group claims instead of dropping it silently', () => {
-    const out = mapSystem({
-      configs: [{ menu_name: 'copy_command', value: '1' }],
-      configKeyMap: keyMap,
-    });
-    expect(out.configValues).toEqual([]);
-    expect(out.report.configKeysUnclaimed).toEqual(['copy_command']);
-  });
-
-  it('converts order_cancel_time from hours to minutes', () => {
+  it('把小时换算成分钟的规则留在本域，因为理由是本域的事实', () => {
     // The one conversion that silently ruins the shop if it is missed: copying
     // `2` across would cancel every unpaid order after two minutes.
-    const out = mapSystem({
-      configs: [{ menu_name: 'order_cancel_time', value: '2' }],
-      configKeyMap: keyMap,
-      configValueTransforms: CONFIG_VALUE_TRANSFORMS,
-    });
-    expect(out.configValues[0]).toEqual({
-      group: 'order',
-      key: 'cancelAfterMinutes',
-      value: 120,
-    });
-  });
-
-  it('lets the first legacy alias win when several feed one key', () => {
-    // 七牛/OSS/COS all fold onto `s3AccessKeyId`; the group's `legacyKeys` order
-    // is the precedence, and a second alias must not overwrite the first.
-    const map = new Map([
-      ['accessKey', { group: 'storage', key: 's3AccessKeyId' }],
-      ['accessKeyId', { group: 'storage', key: 's3AccessKeyId' }],
-    ]);
-    const out = mapSystem({
-      configs: [
-        { menu_name: 'accessKey', value: 'qiniu-key' },
-        { menu_name: 'accessKeyId', value: 'oss-key' },
-      ],
-      configKeyMap: map,
-    });
-    expect(out.configValues).toEqual([
-      { group: 'storage', key: 's3AccessKeyId', value: 'qiniu-key' },
-    ]);
+    const transform = CONFIG_VALUE_TRANSFORMS.get('order_cancel_time');
+    expect(transform).toBeDefined();
+    expect(transform?.('2')).toBe(120);
+    // A value that is not a number at all falls back to the legacy default
+    // rather than writing NaN into the shop's cancel timer.
+    expect(transform?.('')).toBe(30);
   });
 });
 

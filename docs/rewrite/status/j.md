@@ -70,7 +70,9 @@ redacted label and never the raw string.
 6. **The config migration is not a mapper.** It is the union of every registered
    group's `legacyKeys`, validated by running each group's zod schema — which a
    pure mapper cannot do. It also fans one legacy key out to **every** claimant,
-   which F1's one-to-one `configKeyMap` cannot express (CR-1-j).
+   which a one-to-one key map cannot express. CR-1-j settled this the whole way:
+   `mapSystem` no longer takes a `configKeyMap` at all and no longer emits
+   config rows, so there is exactly one place that routes a legacy config key.
 7. **A config report prints keys and `<set>` / `<empty>`, never a value.** It is
    the single most likely place for a merchant private key to escape into a
    terminal scrollback, a CI log and a support ticket.
@@ -86,11 +88,24 @@ redacted label and never the raw string.
     the installer's real DDL with wholly invented rows; its header states that
     every row is made up. No production dump, credential or config value has
     been near this branch.
+11. **An alias list is resolved by declaration order, not by dump order.** A
+    field like `storage.s3AccessKeyId` lists six vendors' legacy keys and the
+    dump has all six, five of them empty. Taking the last row seen meant the
+    migrated key depended on how the dump was written — and an empty row could
+    blank a real one. The first **non-empty** alias in the order the group
+    declares wins, and every loser is reported with the key that beat it.
+12. **A foreign key the reference seed cannot satisfy becomes NULL, counted.**
+    A group is one transaction: one address pointing at a city the dictionary
+    does not have would take every member, address, group and label with it, on
+    cutover day. Clearing the link keeps the 省市区 text — which is what a
+    customer actually reads — and `addressesCityCleared` says how often it
+    happened. Decision 9 still stands: this is for ids the seed legitimately
+    never had, not a licence to run without the seed.
 
 ## Verification
 
 ```
-pnpm --filter @shop/etl typecheck lint test:unit test:int   # 250 unit, 9 int, green
+pnpm --filter @shop/etl typecheck lint test:unit test:int   # 292 unit, 9 int, green
 shellcheck packages/etl/scripts/rehearse.sh                 # clean
 ```
 
@@ -132,14 +147,18 @@ disagreeing because the migration instant defaulted to `now()` twice.
 `next/pnpm-lock.yaml` is committed on this branch, by the exception the brief
 granted this stream.
 
-## CRs filed
+## CRs filed — all four decided and closed
+
+The coordinator decided all four on `rewrite/integration` (`b9cf2a52`), and the
+fixes landed here after stream J was merged, because E1 and F1 are merged and
+nobody else owns those mappers any more. No workaround is left parked.
 
 | | |
 | --- | --- |
-| **CR-1-j** | `configKeyMap` is one-to-one, but several legacy keys have two claimants (`wechat_appid`, `system_delivery_time`, `store_stock`). The runner fans out instead; F1's mapper is untouched. |
-| **CR-2-j** | `order-fulfil.reviewWindowDays` claims `order_activity_time` — wrong setting, wrong unit; migrating it would set a 60-day review window from a 1-hour timer. The claim is parked, the key is on the drop list. |
-| **CR-3-j** | To E1: `wechat_identities` rows carry no legacy id (handled in the runner, but carrying the id would be better), and `city_id` is copied through without checking the city exists — an unknown city id rolls back the entire user group. |
-| **CR-4-j** | To F1: `mapSystem` emits `admins.lastLoginIp` (no such column; `users` has one) and `roles.deletedAt` (benign). Both parked as declared drops. |
+| **CR-1-j** | `configKeyMap` was one-to-one, but several legacy keys have two claimants (`wechat_appid`, `system_delivery_time`, `store_stock`). **Closed:** the input is gone from `mappers/system.ts` along with the config rows it used to emit; `config.ts` fans out and runs the schemas, and still **fails** on a key no group claims. The remaining duplicates are somebody else's to remove (`wechat`/`wechat-oa` → E3, `trade` → CR-6-f1) and were not touched. |
+| **CR-2-j** | `order-fulfil.reviewWindowDays` claimed `order_activity_time` — wrong setting, wrong unit; it would have set a 60-day review window from a 1-hour timer. **Closed:** the claim now points at `system_comment_time`, which is days on both sides and needs no transform; the parked-claim list is empty (the mechanism stays), and `order_activity_time` keeps its drop-list reason. |
+| **CR-3-j** | `wechat_identities` rows carried no legacy id, and `city_id` was copied through unchecked — one unknown city would roll back the whole user group. **Closed:** identities carry `eb_wechat_user.id`; the runner passes the seeded city ids to `mapUsers` through `extras` (new `GroupContext.idsOf`), and an id the dictionary lacks becomes NULL and is counted. |
+| **CR-4-j** | `mapSystem` emitted `admins.lastLoginIp` (no such column; `users` has one) and `roles.deletedAt` (benign). **Closed:** the mapper stops emitting both and the two `dropColumns` entries are gone — `system` now declares no drops at all. |
 
 CR-5-j is not filed: the finding behind it — `domains.gen.ts` using namespace
 imports, which esbuild and tsx elide, so only 6 of 15 config groups registered —
@@ -160,11 +179,18 @@ must never reach CI.
 its reason in its own cell — they describe the legacy in-place PHP migration
 tool (rename tables in the running database, delete seeds, roll back), and this
 rewrite loads a separate new database and never writes the old one. Their
-substance is replaced by **ETL-J-001…012**, every one mapped to a test that
+substance is replaced by **ETL-J-001…014**, every one mapped to a test that
 runs: repeatability, dry-run inertia, id and sequence carry-over, the
 `--require-complete` gate, the seed precondition, the eight `verify` families,
 the not-migrated tables, config-key accounting, "no value is ever printed",
 JSON-encoded config values, and legacy sentinels becoming NULL.
+
+The CR fixes changed two rows and added two. ETL-J-002 is now about ids that
+another system may quote surviving a reload — a WeChat identity keeps its legacy
+id, and the sequence restart stays as the general rule for tables that really do
+carry none. **ETL-J-013** is CR-3-j's other half (an unsatisfiable reference key
+becomes NULL and is counted, rather than rolling back the group), and
+**ETL-J-014** is alias precedence (decision 11).
 
 (MIG-018…022 sit in P0-S's section and are not this stream's to fill.)
 

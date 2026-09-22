@@ -2,6 +2,7 @@
 
 - **Stream:** J (ETL runner), against E1 (user domain)
 - **Status:** accepted, both parts — J's follow-up carries `eb_wechat_user.id` over in `mapUsers` and adds the `knownCityIds` input filled from the target through `extras`, nulling unknown cities and counting `addressesCityCleared`
+- **Landed:** `0710f83a` — identities carry `eb_wechat_user.id`; `GroupContext.idsOf` feeds `knownCityIds` to `mapUsers` through the `user` group's `extras`; an unknown city becomes NULL and is counted as `addressesCityCleared` (ETL-J-013).
 - **Affects:** `next/packages/etl/src/mappers/user.ts`,
   `next/packages/etl/src/runner.ts`
 

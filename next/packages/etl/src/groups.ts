@@ -49,37 +49,11 @@ const system = defineGroup({
   // `configValues` is deliberately not a target here: the runner maps config
   // itself, because one legacy key can feed several groups and because
   // validating a value means running a group's zod schema (see config.ts).
+  // No `dropColumns` any more: `admins.lastLoginIp` and `roles.deletedAt` were
+  // parked here until CR-4-j, and the mapper now simply does not emit them.
   targets: [
-    {
-      table: 'admins',
-      from: 'admins',
-      // F1's mapper emits `lastLoginIp` — `eb_system_admin.last_ip` — but the
-      // `admins` table has no such column, while `users` does. The parallel is
-      // where it came from, and for an admin account the value is a piece of
-      // personal data the new system has no feature that reads. Parked as a
-      // declared drop until CR-4-j settles which side changes.
-      dropColumns: [
-        {
-          column: 'lastLoginIp',
-          reason:
-            '新库 admins 表没有这一列（users 才有）；管理员最后登录 IP 目前无人使用。见 CR-4-j',
-        },
-      ],
-    },
-    {
-      table: 'roles',
-      from: 'roles',
-      // Benign, unlike the one above: `eb_system_role` has no `is_del`, so the
-      // mapper sets this to `null` for every row. Nothing is lost by dropping
-      // it — but it is declared rather than ignored, because the preflight
-      // cannot tell "always null" from "the column that mattered".
-      dropColumns: [
-        {
-          column: 'deletedAt',
-          reason: '新库 roles 表没有软删除列；旧库 eb_system_role 也没有 is_del，mapper 恒为 null',
-        },
-      ],
-    },
+    { table: 'admins', from: 'admins' },
+    { table: 'roles', from: 'roles' },
     { table: 'admin_roles', from: 'adminRoles' },
   ],
 });
@@ -211,6 +185,12 @@ const user = defineGroup({
         '并沿用旧库的 id，所以旧地址可以继续指向同一个城市',
     },
   ],
+  // The dictionary itself, so an address pointing at a city the new `cities`
+  // table does not have loses the link and is counted, instead of failing the
+  // foreign key and rolling back every member, address and label with it
+  // (CR-3-j). The seed check above has already run, so this is never empty
+  // because somebody forgot `db:seed`.
+  extras: async (context) => ({ knownCityIds: await context.idsOf('cities') }),
 });
 
 // ---------------------------------------------------------------------------

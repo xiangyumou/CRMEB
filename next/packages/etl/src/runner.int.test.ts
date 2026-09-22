@@ -147,10 +147,19 @@ describe('etl run + verify', () => {
     expect(await target.countRows('product_reviews')).toBe(2);
     expect(await target.countWhere('product_reviews', 'user_id is null')).toBe(0);
 
-    // 地址：city_id = 0 的那条必须落成 NULL，而不是指向 id 0 的外键。
-    expect(await target.countRows('user_addresses')).toBe(3);
-    expect(await target.countWhere('user_addresses', 'city_id is null')).toBe(1);
+    // 地址：city_id = 0 的那条必须落成 NULL，而不是指向 id 0 的外键；字典里查不到
+    // 的那条也落成 NULL 并被点名计数，而不是让一条外键把整个 group 一起回滚。
+    expect(await target.countRows('user_addresses')).toBe(4);
+    expect(await target.countWhere('user_addresses', 'city_id is null')).toBe(2);
     expect(await target.countWhere('user_addresses', 'city_id = 1')).toBe(2);
+    const userGroup = loaded.find((group) => group.group === 'user');
+    expect((userGroup?.report as { addressesCityCleared?: number }).addressesCityCleared).toBe(1);
+
+    // 微信身份沿用 eb_wechat_user.id，所以重跑一次同一个关注者还是同一个号。
+    const identityIds = await target.query<{ id: string }>(
+      'select id::text as id from wechat_identities order by id',
+    );
+    expect(identityIds.map((row) => row.id)).toEqual(['1']);
     const catalog = loaded.find((group) => group.group === 'catalog');
     expect(JSON.stringify(catalog?.report)).toMatch(/\d/);
 

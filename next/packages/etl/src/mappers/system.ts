@@ -7,10 +7,18 @@
  * | --------------------- | --------------------------------------- |
  * | `eb_system_admin`     | `admins`, `admin_roles`                 |
  * | `eb_system_role`      | `roles` (grants are NOT translated)     |
- * | `eb_system_config`    | `config_values`, via each group's `legacyKeys` |
  *
  * A pure function: rows in, rows and a report out. Nothing here opens a
  * connection or looks at a clock.
+ *
+ * **`eb_system_config` is not mapped here** (CR-1-j). It was, through a
+ * `configKeyMap` input the runner built — but that map is one legacy key to one
+ * destination, and a key can have more than one claimant while the rewrite is
+ * in flight, so one of them silently got nothing. Routing config also means
+ * running each group's zod schema, which needs `@shop/core` and would stop this
+ * file being pure. `src/config.ts` owns it, fans a key out to every claimant and
+ * validates the result; the two pieces of *domain* knowledge stay here, where
+ * their reason lives: `decodeConfigValue` and `CONFIG_VALUE_TRANSFORMS`.
  *
  * **Grants are deliberately not migrated.** A legacy role's `rules` column is a
  * comma-separated list of `eb_system_menus` ids — rows in a table that no
@@ -58,7 +66,13 @@ export interface LegacySystemRole {
   status: number;
 }
 
-/** `eb_system_config` — the 575-key soup, read as `menu_name` → `value`. */
+/**
+ * `eb_system_config` — the 575-key soup, read as `menu_name` → `value`.
+ *
+ * Kept here next to `decodeConfigValue`, which is the only thing in this file
+ * that still touches it; the rows themselves are read and routed by
+ * `src/config.ts` (CR-1-j).
+ */
 export interface LegacySystemConfig {
   menu_name: string;
   /** JSON-encoded in the legacy table for everything except plain inputs. */
@@ -81,7 +95,6 @@ export interface AdminRow {
   isSuper: boolean;
   status: number;
   lastLoginAt: Date | null;
-  lastLoginIp: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -94,19 +107,13 @@ export interface RoleRow {
   status: number;
   createdAt: Date;
   updatedAt: Date;
-  deletedAt: Date | null;
+  // No `deletedAt`: the `roles` table has no soft-delete column and
+  // `eb_system_role` has no `is_del` to carry over either (CR-4-j).
 }
 
 export interface AdminRoleRow {
   adminId: number;
   roleId: number;
-}
-
-/** One row of `config_values`: a group, a key, and the JSON value. */
-export interface ConfigValueRow {
-  group: string;
-  key: string;
-  value: unknown;
 }
 
 export interface SystemMigrationReport {
@@ -121,34 +128,17 @@ export interface SystemMigrationReport {
   /** Roles whose legacy menu-id grants could not be translated — i.e. all of them. */
   rolesNeedingRegrant: number;
   roleIdsNeedingRegrant: number[];
-  configKeysMapped: number;
-  /** Legacy keys no group claims. Listed, not dropped silently. */
-  configKeysUnclaimed: string[];
 }
 
 export interface SystemMigrationInput {
   admins?: readonly LegacySystemAdmin[];
   roles?: readonly LegacySystemRole[];
-  configs?: readonly LegacySystemConfig[];
-  /**
-   * `legacyKey → { group, key }`, built by the runner from the registered
-   * config groups' `legacyKeys` (`allConfigGroups()` in `@shop/core/system`).
-   * Passing it in keeps this file free of a dependency on `@shop/core`.
-   */
-  configKeyMap?: ReadonlyMap<string, { group: string; key: string }>;
-  /**
-   * Keys whose legacy value is hours but whose new value is minutes, and so on.
-   * Applied after the key mapping. The one we know about is
-   * `order_cancel_time` (legacy hours → `order.cancelAfterMinutes`).
-   */
-  configValueTransforms?: ReadonlyMap<string, (raw: string) => unknown>;
 }
 
 export interface SystemMigrationOutput {
   admins: AdminRow[];
   roles: RoleRow[];
   adminRoles: AdminRoleRow[];
-  configValues: ConfigValueRow[];
   report: SystemMigrationReport;
 }
 
@@ -196,10 +186,8 @@ export function mapSystem(input: SystemMigrationInput): SystemMigrationOutput {
   const admins: AdminRow[] = [];
   const roles: RoleRow[] = [];
   const adminRoles: AdminRoleRow[] = [];
-  const configValues: ConfigValueRow[] = [];
 
   const roleIdsNeedingRegrant: number[] = [];
-  const configKeysUnclaimed: string[] = [];
   let adminsDroppedDeleted = 0;
   let adminsSuper = 0;
   let adminsWithLegacyPassword = 0;
@@ -223,7 +211,6 @@ export function mapSystem(input: SystemMigrationInput): SystemMigrationOutput {
       status: legacy.status === 1 ? 1 : 0,
       createdAt: epoch,
       updatedAt: epoch,
-      deletedAt: null,
     });
     if (parseIdList(legacy.rules).length > 0) roleIdsNeedingRegrant.push(legacy.id);
   }
@@ -250,8 +237,10 @@ export function mapSystem(input: SystemMigrationInput): SystemMigrationOutput {
       phone: null,
       isSuper,
       status: legacy.status === 1 ? 1 : 0,
+      // `eb_system_admin.last_ip` is deliberately not carried over (CR-4-j):
+      // the `admins` table has no column for it, nothing in the new system
+      // reads an admin's last IP, and the new session records its own.
       lastLoginAt: instant(legacy.last_time),
-      lastLoginIp: blankToNull(legacy.last_ip),
       createdAt,
       updatedAt: createdAt,
       deletedAt: null,
@@ -266,35 +255,10 @@ export function mapSystem(input: SystemMigrationInput): SystemMigrationOutput {
     }
   }
 
-  const keyMap = input.configKeyMap ?? new Map();
-  const transforms = input.configValueTransforms ?? new Map();
-  const seen = new Set<string>();
-  for (const legacy of input.configs ?? []) {
-    const target = keyMap.get(legacy.menu_name);
-    if (!target) {
-      configKeysUnclaimed.push(legacy.menu_name);
-      continue;
-    }
-    // A legacy key can be listed by only one group, but the same *new* key can
-    // be fed by several legacy aliases (七牛/OSS/COS all become `s3AccessKeyId`).
-    // First wins, so the group's `legacyKeys` order is the precedence.
-    const slot = `${target.group}.${target.key}`;
-    if (seen.has(slot)) continue;
-    seen.add(slot);
-
-    const transform = transforms.get(legacy.menu_name);
-    configValues.push({
-      group: target.group,
-      key: target.key,
-      value: transform ? transform(legacy.value) : decodeConfigValue(legacy.value),
-    });
-  }
-
   return {
     admins,
     roles,
     adminRoles,
-    configValues,
     report: {
       admins: admins.length,
       adminsDroppedDeleted,
@@ -305,8 +269,6 @@ export function mapSystem(input: SystemMigrationInput): SystemMigrationOutput {
       adminRoleLinksDroppedUnknownRole,
       rolesNeedingRegrant: roleIdsNeedingRegrant.length,
       roleIdsNeedingRegrant,
-      configKeysMapped: configValues.length,
-      configKeysUnclaimed,
     },
   };
 }
@@ -330,11 +292,8 @@ export const CONFIG_VALUE_TRANSFORMS: ReadonlyMap<string, (raw: string) => unkno
       return Number.isFinite(hours) ? Math.round(hours * 60) : 30;
     },
   ],
-  [
-    'order_activity_time',
-    (raw) => {
-      const hours = Number.parseFloat(raw);
-      return Number.isFinite(hours) ? Math.round(hours * 60) : 30;
-    },
-  ],
+  // `order_activity_time` had the same hours → minutes entry until CR-2-j. It
+  // has no claimant now — activity-order expiry left with seckill and bargain —
+  // and a transform for a key nobody migrates is a trap: whatever field claims
+  // the key next would silently receive it multiplied by sixty.
 ]);

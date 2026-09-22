@@ -2,6 +2,7 @@
 
 - **Stream:** J (ETL runner)
 - **Status:** accepted — J's follow-up points `order-fulfil.legacyKeys.reviewWindowDays` at `system_comment_time` (days on both sides, no transform) and deletes the override entry
+- **Landed:** `eccea635` — `reviewWindowDays: 'system_comment_time'`; `IGNORED_CONFIG_CLAIMS` is now empty (the mechanism stays); `order_activity_time` keeps its drop-list reason.
 - **Affects:** the config group `order-fulfil` (`legacyKeys.reviewWindowDays`),
   `next/packages/etl/src/config-overrides.ts`,
   `next/packages/etl/src/config-dropped.ts`

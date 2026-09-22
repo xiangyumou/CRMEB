@@ -182,6 +182,18 @@ export interface GroupContext {
    * run's own options.
    */
   readonly allowInvalidConfig: boolean;
+  /**
+   * The ids already in a target table — for a **reference** table this
+   * migration does not write, which is the one case a mapper cannot reason
+   * about on its own.
+   *
+   * `user` uses it for the city dictionary: `user_addresses.city_id` is a real
+   * foreign key into rows that arrive from `packages/db`'s seed, so an id the
+   * dictionary does not have has to become NULL and be counted, rather than
+   * roll the whole group back (CR-3-j). Ids that survived another *group* do
+   * not come from here — those are `keptIds`, filled in group order.
+   */
+  readonly idsOf: (table: string, column?: string) => Promise<ReadonlySet<number>>;
   /** Free-text findings that end up in the run report. Never a value. */
   readonly notes: string[];
 }

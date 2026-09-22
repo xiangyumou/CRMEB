@@ -52,7 +52,8 @@ export const DROPPED_CONFIG_KEYS: readonly DroppedConfigKey[] = [
     key: 'order_activity_time',
     reason:
       '「活动未支付订单取消时间（小时）」随秒杀/砍价下线；拼团与预售各自带计时。' +
-      '注意：order-fulfil 目前把它认领为「评价期天数」，量纲与语义都不对，见 CR-2-j',
+      'order-fulfil 一度把它认领为「评价期天数」，量纲与语义都不对；CR-2-j 之后' +
+      '评价期改认领 system_comment_time，这个键就真的无人继承了',
   },
   { key: 'order_pink_time', reason: RETIRED_FEATURE('拼团') + '（拼团超时改由活动自身配置）' },
   { key: 'order_seckill_time', reason: RETIRED_FEATURE('秒杀') },

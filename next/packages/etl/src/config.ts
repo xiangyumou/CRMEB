@@ -88,6 +88,11 @@ export interface ConfigMigrationReport {
   coerced: { group: string; key: string }[];
   /** Legacy keys claimed by more than one group, and by which. */
   fannedOut: { legacyKey: string; groups: string[] }[];
+  /**
+   * Aliases that lost to another legacy key feeding the same field. Listed so
+   * "the 腾讯云 key did not migrate" is an answer rather than a mystery.
+   */
+  aliasesNotUsed: AliasNotUsed[];
   /** Registered groups no legacy key fed. They boot on their defaults. */
   groupsWithoutLegacyValues: string[];
 }
@@ -107,26 +112,76 @@ export class ConfigMigrationError extends Error {
   }
 }
 
-/** `legacyKey → [{group, key}, …]`, built from every registered group. */
+/** One field of one group claiming a legacy key. */
+export interface ConfigClaimant {
+  group: string;
+  key: string;
+  /**
+   * Where this legacy key sits in the field's own alias list.
+   *
+   * `storage.s3AccessKeyId` lists six: `accessKey`, `qiniu_accessKey`,
+   * `tengxun_accessKey`, … A shop that used 七牛 has all six rows in
+   * `eb_system_config` and five of them are empty strings, so "whichever row
+   * the dump happens to list last" — which is what a plain assignment does —
+   * can silently blank the storage credentials. The declared order is the
+   * intended precedence, and this is how `mapConfig` knows it.
+   */
+  alias: number;
+}
+
+/** `legacyKey → [{group, key, alias}, …]`, built from every registered group. */
 export function buildLegacyKeyIndex(
   groups: readonly ConfigGroupDef[] = allConfigGroups(),
-): Map<string, { group: string; key: string }[]> {
-  const index = new Map<string, { group: string; key: string }[]>();
+): Map<string, ConfigClaimant[]> {
+  const index = new Map<string, ConfigClaimant[]>();
   for (const group of groups) {
     for (const [field, legacy] of Object.entries(group.legacyKeys ?? {})) {
       const keys = typeof legacy === 'string' ? [legacy] : (legacy ?? []);
-      for (const legacyKey of keys) {
+      for (const [alias, legacyKey] of keys.entries()) {
         // A claim the migration has proved wrong is parked in
         // `config-overrides.ts` until the owning stream's CR lands.
         if (isIgnoredClaim(legacyKey, group.group, field)) continue;
         const bucket = index.get(legacyKey);
-        const entry = { group: group.group, key: field };
+        const entry = { group: group.group, key: field, alias };
         if (bucket) bucket.push(entry);
         else index.set(legacyKey, [entry]);
       }
     }
   }
   return index;
+}
+
+/** A value staged for one field, with where it came from. */
+interface StagedValue {
+  value: unknown;
+  /** The claimant's position in the field's alias list. Lower is preferred. */
+  alias: number;
+  legacyKey: string;
+  /** `''`, `null`, `[]`, `{}` — absence. `0` and `false` are values. */
+  empty: boolean;
+}
+
+/**
+ * Which of two legacy keys feeding one field wins.
+ *
+ * A value beats absence, whatever the declared order: a shop on 七牛 has
+ * `accessKey` filled and `tengxun_accessKey` as an empty string, and both are
+ * rows in `eb_system_config`. Between two values — or two absences — the
+ * declared alias order decides, so the outcome does not depend on the order the
+ * dump happens to list the rows in.
+ */
+function preferred(held: StagedValue, candidate: StagedValue): StagedValue {
+  if (held.empty !== candidate.empty) return held.empty ? candidate : held;
+  return candidate.alias < held.alias ? candidate : held;
+}
+
+/** An alias that lost, so the report can say the value was not thrown away. */
+export interface AliasNotUsed {
+  legacyKey: string;
+  group: string;
+  key: string;
+  /** The legacy key whose value is the one that migrated. */
+  insteadOf: string;
 }
 
 export interface MapConfigOptions {
@@ -150,8 +205,9 @@ export function mapConfig(
   const dropped: DroppedConfigEntry[] = [];
   const unmapped: string[] = [];
   const fannedOut: { legacyKey: string; groups: string[] }[] = [];
-  /** `group → { field: value }`, before validation. */
-  const staged = new Map<string, Record<string, unknown>>();
+  const aliasesNotUsed: AliasNotUsed[] = [];
+  /** `group → { field: staged }`, before validation. */
+  const staged = new Map<string, Record<string, StagedValue>>();
 
   for (const row of rows) {
     const legacyKey = row.menu_name;
@@ -188,14 +244,25 @@ export function mapConfig(
       const value = transform ? transform(decoded === null ? '' : String(decoded)) : decoded;
 
       const bucket = staged.get(claimant.group) ?? {};
-      bucket[claimant.key] = value;
-      staged.set(claimant.group, bucket);
-      mapped.push({
+      const candidate: StagedValue = {
+        value,
+        alias: claimant.alias,
         legacyKey,
-        group: claimant.group,
-        key: claimant.key,
-        marker: describeValue(value),
-      });
+        empty: describeValue(value) === '<empty>',
+      };
+      const held = bucket[claimant.key];
+      const winner = held === undefined ? candidate : preferred(held, candidate);
+      if (held !== undefined) {
+        const loser = winner === held ? candidate : held;
+        aliasesNotUsed.push({
+          legacyKey: loser.legacyKey,
+          group: claimant.group,
+          key: claimant.key,
+          insteadOf: winner.legacyKey,
+        });
+      }
+      bucket[claimant.key] = winner;
+      staged.set(claimant.group, bucket);
     }
   }
 
@@ -204,9 +271,25 @@ export function mapConfig(
   const values: ConfigValueRow[] = [];
   const coercedFields: { group: string; key: string }[] = [];
 
-  for (const [groupName, staging] of [...staged.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [groupName, stagedGroup] of [...staged.entries()].sort(([a], [b]) =>
+    a.localeCompare(b),
+  )) {
     const group = byName.get(groupName);
     if (!group) continue; // cannot happen: the index was built from these groups
+
+    // Unwrap the winners, and only now say what was mapped: a field fed by
+    // several legacy aliases has exactly one value, and the report should name
+    // the key it actually came from rather than every alias that was read.
+    const staging: Record<string, unknown> = {};
+    for (const [key, held] of Object.entries(stagedGroup).sort(([a], [b]) => a.localeCompare(b))) {
+      staging[key] = held.value;
+      mapped.push({
+        legacyKey: held.legacyKey,
+        group: groupName,
+        key,
+        marker: describeValue(held.value),
+      });
+    }
 
     // Every legacy value is a string: `eb_system_config.value` is a text column
     // holding JSON, and the old admin forms posted strings, so the stock
@@ -263,6 +346,7 @@ export function mapConfig(
     invalid,
     coerced: coercedFields,
     fannedOut,
+    aliasesNotUsed,
     groupsWithoutLegacyValues: groups
       .map((group) => group.group)
       .filter((name) => !staged.has(name))

@@ -2,6 +2,7 @@
 
 - **Stream:** J (ETL runner), against F1 (system & storage)
 - **Status:** decided — `admins.lastLoginIp` is not migrated (no column, no reader; the new admin session records its own); the mapper stops emitting it and `roles.deletedAt`; J's follow-up removes both `dropColumns` entries
+- **Landed:** `d226c341` — `mapSystem` emits neither field and the `system` group declares no `dropColumns` at all.
 - **Affects:** `next/packages/etl/src/mappers/system.ts` (F1),
   `next/packages/db/src/schema/system.ts` (F1),
   `next/packages/etl/src/groups.ts` (J)

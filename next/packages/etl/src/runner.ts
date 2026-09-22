@@ -196,6 +196,7 @@ export async function run(options: RunOptions): Promise<RunResult> {
       pending: pendingNames,
       uploadsRoot: options.uploadsRoot ?? null,
       allowInvalidConfig: options.allowInvalidConfig === true,
+      idsOf: (table, column) => loadSurvivingIds(options.target, table, column),
       notes,
     };
 

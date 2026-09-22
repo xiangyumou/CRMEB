@@ -280,6 +280,58 @@ describe('addresses', () => {
     expect(addresses).toEqual([]);
     expect(report.addressesDroppedUnknownUser).toBe(1);
   });
+
+  describe('city_id 与新库的城市字典对不上时（CR-3-j）', () => {
+    // The dictionary is seeded, not migrated, and `city_id` is a real foreign
+    // key. An id it does not have would fail the insert — and a group is one
+    // transaction, so it would take every member, address and label with it.
+    it('清掉链接并计数，地址本身照常迁移', () => {
+      const { addresses, report } = mapUsers({
+        users: [legacyUser()],
+        addresses: [legacyAddress({ city_id: 999_999 })],
+        knownCityIds: new Set([110100]),
+      });
+      expect(addresses).toHaveLength(1);
+      expect(addresses[0]?.cityId).toBeNull();
+      expect(report.addressesCityCleared).toBe(1);
+      // 省市区的文字是客户真正会读的东西，一个字都不能少。
+      expect(addresses[0]).toMatchObject({
+        provinceName: '北京市',
+        cityName: '北京市',
+        districtName: '朝阳区',
+        detail: '建国路 88 号',
+      });
+    });
+
+    it('字典里有的 id 原样保留', () => {
+      const { addresses, report } = mapUsers({
+        users: [legacyUser()],
+        addresses: [legacyAddress()],
+        knownCityIds: new Set([110100]),
+      });
+      expect(addresses[0]?.cityId).toBe(110100);
+      expect(report.addressesCityCleared).toBe(0);
+    });
+
+    it('旧库的 0 表示没选城市，既不算被清掉，也不会变成指向 0 的外键', () => {
+      const { addresses, report } = mapUsers({
+        users: [legacyUser()],
+        addresses: [legacyAddress({ city_id: 0 })],
+        knownCityIds: new Set([110100]),
+      });
+      expect(addresses[0]?.cityId).toBeNull();
+      expect(report.addressesCityCleared).toBe(0);
+    });
+
+    it('没有告诉 mapper 字典内容时不做检查——那是目标库的事实，纯函数无从得知', () => {
+      const { addresses, report } = mapUsers({
+        users: [legacyUser()],
+        addresses: [legacyAddress({ city_id: 999_999 })],
+      });
+      expect(addresses[0]?.cityId).toBe(999_999);
+      expect(report.addressesCityCleared).toBe(0);
+    });
+  });
 });
 
 describe('labels', () => {
@@ -400,6 +452,14 @@ describe('WeChat identities', () => {
       unionid: 'un_1',
       subscribed: true,
     });
+  });
+
+  it('沿用 eb_wechat_user.id，否则重跑一次同一行就换了号（CR-3-j）', () => {
+    const { wechatIdentities } = mapUsers({
+      users: [legacyUser()],
+      wechatUsers: [legacyWechatUser({ id: 77 })],
+    });
+    expect(wechatIdentities[0]?.id).toBe(77);
   });
 
   it('drops a second row for the same openid or the same customer', () => {
