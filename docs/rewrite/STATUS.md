@@ -37,8 +37,15 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | J ETL runner | merged 2026-09-23 (`427e858d`); follow-up merged (`4083e6c5`: CR-1..4-j) | `rewrite/ws-j-etl-deploy` |
 | J2 images and deployment | merged 2026-09-23 (`c2182657`) | `rewrite/ws-j2-deploy` |
 | H2 uni-app second pass | merged 2026-09-23 (`ab0f3c54`; 154 live / 37 pending / 0 broken) | `rewrite/ws-h2-uniapp` |
-| K1 hardening first pass | dispatched 2026-09-23 | `rewrite/ws-k-hardening` |
-| I storefront e2e | after H2 + J2 (unit tests for the api layer stay with H2) | — |
+| K1 hardening first pass | merged 2026-09-23 (`756fd9da0`): `next/guards` (10 checks, `pnpm guards`), `next/e2e/admin` (30 Playwright specs), AUDIT.md, CR-1..17-k | `rewrite/ws-k-hardening` |
+| A2 catalog follow-up (CR-4-h2 staff goods ×10, template select, `<SkuPicker>`) | dispatched 2026-09-23 (Opus) | `rewrite/ws-a2-catalog-followup` |
+| E4 user/wechat follow-up (CR-2-h2, CR-6-h2, CR-2-e3, CR-3-e3, CR-1-f3 §1, `routine_appId`, CR-17-k) | dispatched 2026-09-23 (Opus) | `rewrite/ws-e4-user-wechat-followup` |
+| F4 system/kit/DIY follow-up (CR-7-h2, CR-3-d2, CR-3-h2, CR-2-f2, read-only config field) | dispatched 2026-09-23 (Opus) | `rewrite/ws-f4-system-kit-followup` |
+| B3 order/cart/coupon follow-up (CR-1-d2, CR-1-f2, CR-6-f1 fold, CR-5-h2, CR-1-h2, CR-1-f3 §2) | dispatched 2026-09-23 (Opus) | `rewrite/ws-b3-order-followup` |
+| J3 deploy follow-up (CR-1..3-j2, CR-4-k, ETL drill harness, cutover runbook) | dispatched 2026-09-23 (Opus) | `rewrite/ws-j3-deploy-followup` |
+| I storefront e2e | brief `I-storefront-e2e.md`; worktree `ws-i` cut, dispatch paused (cap 5) — next free slot, Sonnet | `rewrite/ws-i-storefront-e2e` |
+| CR-2-k invariants ledger edits (51 rows) | queued for a Sonnet executor at the next free slot | — |
+| H3 uni-app third pass | after A2/E4/F4/B3 merge | — |
 | K2 hardening second pass (load smoke, final guard run) | after every stream is merged | — |
 
 ## Decisions log
@@ -81,3 +88,5 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 - 2026-09-23 — F2 merged. Two defects fixed at merge, both B1's: (1) `FreightPort.quote` now takes the caller's `db` — F2's port read through `ctx.db` while checkout held its transaction, and twelve buyers against a twelve-connection pool deadlocked (`order.concurrency` hung; production would have too); (2) the B1 freight fallback is deleted — legacy charges `postage × cart_num`, B1's fallback charged once per product and hid the difference behind the unregistered port. Rule from here: **no fallback behind an unregistered port**; tests register the owning domain. F2's express-companies takeover (CR-1-b2) already removed B2's routes/schemas. CR-1-f2 / CR-2-f2 still open.
 - 2026-09-23 — H2, J follow-up, J2, D follow-up, N1, E3, F3, D2 merged in that order (integration `902f6c36`; int core 1015 / web 184 / etl 9 / worker 6 / testing 9; 397 routes). E3's JS-SDK signer: `isTrustedHost` from `site` **plus** the account's own `wechat-oa-runtime.jsApiAllowedHosts`. Known flake: `@shop/web` unit suite under turbo alongside `build` occasionally dies with react-scheduler `window is not defined` (four streams saw it); passes standalone every time — to be pinned by K2.
 - 2026-09-23 — Open CRs routed to the next wave: CR-1..7-h2 (37 pending uni-app calls), CR-1-f3, CR-1-f2, CR-2-f2, CR-1-d2, CR-3-d2, CR-1..3-j2, CR-2-e3, CR-3-e3, CR-6-f1, the `routine_appId` two-claimants sibling of CR-1-j, N1's read-only config descriptor. See the wave-4 briefs.
+- 2026-09-23 — K1 merged; its pending lists (`pending-implementations.ts`, `pending-edits.ts`, `install-domains.ts`) brought to the post-D2/F3/E3 tree; the e2e seed's product image is an inline PNG because F3's dashboard tile really loads it. **CR-15-k** (every `dedupeKey` is `name:id`; BullMQ 6 refuses a custom id with one colon → checkout/ship/receipt answered 500 on a real Redis) fixed in the kernel adapter (`toJobId`, `9139c7627`) with an int test on real Redis; the ship→receive e2e journey is green. CR-1-k already resolved by the bare-import generator. CR-4-k routed to J3, CR-17-k to E4, CR-2-k queued.
+- 2026-09-23 — User lowered the concurrency cap to **5** and asked for model selection per task: Opus 5 for domain/contract/kernel work, Sonnet 5 for scaffolding, ledger/doc edits and test harnesses (I, CR-2-k). Wave 4 dispatched A2/E4/F4/B3/J3 on Opus; I stopped before it started and re-queued.
