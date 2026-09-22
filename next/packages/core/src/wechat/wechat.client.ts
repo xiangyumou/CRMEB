@@ -332,6 +332,9 @@ export function createWechatClient(ctx: Ctx): WechatCoreClient {
       if (!body.openid || !body.access_token) {
         throw new DomainError('INTERNAL', {
           message: `微信授权失败: ${body.errcode ?? '?'} ${body.errmsg ?? ''}`.trim(),
+          // The adapter over this client maps a spent / invalid code onto a
+          // refusal the shopper can act on; it needs the number, not the text.
+          details: { errcode: body.errcode ?? null },
         });
       }
       return {
@@ -361,6 +364,9 @@ export function createWechatClient(ctx: Ctx): WechatCoreClient {
       if (!body.openid) {
         throw new DomainError('INTERNAL', {
           message: `获取微信用户信息失败: ${body.errcode ?? '?'} ${body.errmsg ?? ''}`.trim(),
+          // The adapter over this client maps a spent / invalid code onto a
+          // refusal the shopper can act on; it needs the number, not the text.
+          details: { errcode: body.errcode ?? null },
         });
       }
       return {
@@ -384,6 +390,9 @@ export function createWechatClient(ctx: Ctx): WechatCoreClient {
       if (!body.openid) {
         throw new DomainError('INTERNAL', {
           message: `小程序登录失败: ${body.errcode ?? '?'} ${body.errmsg ?? ''}`.trim(),
+          // The adapter over this client maps a spent / invalid code onto a
+          // refusal the shopper can act on; it needs the number, not the text.
+          details: { errcode: body.errcode ?? null },
         });
       }
       return {

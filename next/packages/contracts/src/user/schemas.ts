@@ -348,8 +348,19 @@ export const adminUserListQuery = pageQuery
     /** Registration window, inclusive of both ends. */
     createdFrom: instant.optional(),
     createdTo: instant.optional(),
-    /** `true` = only accounts with a bound WeChat identity, `false` = only those without. */
-    hasWechat: z.coerce.boolean().optional(),
+    /**
+     * `true` = only accounts with a bound WeChat identity, `false` = only those
+     * without.
+     *
+     * Spelled as the two literal strings rather than `z.coerce.boolean()`,
+     * which turns the string `"false"` — the only way a query string can say
+     * false — into `true`, so the "未绑定" filter would have silently shown the
+     * bound accounts.
+     */
+    hasWechat: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .optional(),
   })
   .extend(sortQuery(['id', 'createdAt', 'lastLoginAt']).shape);
 export type AdminUserListQuery = z.infer<typeof adminUserListQuery>;

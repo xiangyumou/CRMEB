@@ -11,3 +11,4 @@ export * as coupon from './mappers/coupon';
 export * as diy from './mappers/diy';
 export * as storage from './mappers/storage';
 export * as system from './mappers/system';
+export * as user from './mappers/user';

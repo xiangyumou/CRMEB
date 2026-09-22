@@ -214,9 +214,20 @@ Owner: **E1 / E2**
 
 | Legacy ID | Invariant | New test ID | State |
 |---|---|---|---|
-| USER-001 | Self registration through the real `/api/register` route issues the configured newcomer coupon to the new uid only. | | unmapped |
-| USER-002 | A registration retry issues the coupon once and never credits money or points. | | unmapped |
+| USER-001 | Self registration through the real `/api/register` route issues the configured newcomer coupon to the new uid only. | `packages/core/src/user/storefront-auth.int.test.ts::register > issues the newcomer coupon to the new account and to nobody else` | ported |
+| USER-002 | A registration retry issues the coupon once and never credits money or points. | `packages/core/src/user/storefront-auth.int.test.ts::register > issues the newcomer coupon to the new account and to nobody else`, `packages/core/src/coupon/coupon.int.test.ts::grantNewUser > issues nothing the second time — a retried registration — USER-002` | ported |
 | USER-003 | The order-notice roster drives who receives the new-order in-site message, and nobody outside it. | | unmapped |
+
+E1 additions (the storefront sign-in invariants named in the E1 brief; numbered from 010 so they cannot collide with the legacy rows above):
+
+| Legacy ID | Invariant | New test ID | State |
+|---|---|---|---|
+| USER-010 | An SMS verification code is spent exactly once: two concurrent verifications of one code produce one sign-in and one refusal, and a wrong code burns an attempt. | `packages/core/src/user/user.concurrency.int.test.ts::SMS codes > lets exactly one of six concurrent verifications spend a code`, `packages/core/src/user/storefront-auth.int.test.ts::code verification > destroys the code on use, so it cannot be replayed` | ported |
+| USER-011 | Any password change — by the shopper, by a reset, or by an operator — revokes every live session of that account. | `packages/core/src/user/storefront-auth.int.test.ts::sessions > kills every session when the password changes` | ported |
+| USER-012 | A disabled account's already-issued token stops resolving immediately, not at expiry. | `packages/core/src/user/storefront-auth.int.test.ts::sessions > rejects a live token the moment the account is disabled`, `packages/core/src/user/user.concurrency.int.test.ts::disabling an account > bumps the version once and leaves no live session` | ported |
+| USER-013 | Login throttling counts an account+IP window and an account-only window separately, both over 900 s. | `packages/core/src/user/storefront-auth.int.test.ts::login throttling > counts the account window and the account+IP window separately` | ported |
+| USER-014 | Account and phone uniqueness is case-insensitive and enforced by the database, not by a prior read. | `packages/core/src/user/user.int.test.ts::account uniqueness > is case-insensitive on the account name` | ported |
+| USER-015 | One phone number is one account and one openid is one account, however many registrations arrive at the same instant. | `packages/core/src/user/user.concurrency.int.test.ts::registration > six concurrent creations of one phone number leave one account`, `packages/core/src/user/user.concurrency.int.test.ts::registration > six taps on 微信登录 create one account and sign every caller into it` | ported |
 
 ## Coupons
 

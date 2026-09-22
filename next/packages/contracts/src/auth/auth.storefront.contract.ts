@@ -295,7 +295,16 @@ export const authOaLogin = defineRoute({
   ],
 });
 
-/** Finish an OA sign-in: the OA has no `getPhoneNumber`, so it is an SMS code. */
+/**
+ * Finish an OA sign-in: the OA has no `getPhoneNumber`, so it is an SMS code.
+ *
+ * The code must be minted with **`scene: 'login'`**, not `bind-phone`. The
+ * caller has no session yet — that is the whole point of the route — and
+ * `bind-phone` is the signed-in "add a number to the account I am already
+ * using" scene, which `POST /auth/sms-codes` refuses to issue anonymously. The
+ * privilege is identical either way: holding a code sent to the number is what
+ * `auth.smsLogin` already accepts as proof of ownership.
+ */
 export const authOaPhoneLogin = defineRoute({
   id: 'auth.oaPhoneLogin',
   method: 'POST',

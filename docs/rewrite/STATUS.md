@@ -5,7 +5,7 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | Gate | State |
 |---|---|
 | G0 foundation freeze (`rewrite-p0-freeze`) | **passed** 2026-09-21 |
-| G1a contract PRs merged | passed 2026-09-22 — coupon, A, B1, C, G1, F1 in (186 routes parse) |
+| G1a contract PRs merged | passed 2026-09-22 — coupon, A, B1, C, G1, F1 in (186 routes parse); E1, D, E2, F2 contracts cherry-picked 2026-09-23 (391 routes) |
 | Cutover | not started |
 
 | Stream | State | Branch |
@@ -25,14 +25,20 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | G3 DIY follow-up | merged 2026-09-23 (CR-1/2/3-g2 applied; real catalog pickers; `labels` picker kind; `brand` dropped) | `rewrite/ws-g3-diy-followup` |
 | B1 / C fix-ups (CR-7-c, CR-3-b2, CR-4/5/6-c) | merged 2026-09-23 (`91a04b3d`, `03c74fe1`) | stream branches |
 | Kit maintenance (CR-1..5-f1, CR-8-c) | merged 2026-09-23 | `rewrite/ws-kit-f1crs` |
-| E1 user and login | in progress | `rewrite/ws-e1-user` |
-| D group buy and presale | dispatched 2026-09-23 | `rewrite/ws-d-marketing` |
-| F2 shipping, articles, statistics | dispatched 2026-09-23 | `rewrite/ws-f2-ops` |
-| E2 WeChat OA and notifications | dispatched 2026-09-23 | `rewrite/ws-e2-wechat` |
+| E1 user and login | merged 2026-09-23 | `rewrite/ws-e1-user` |
+| D group buy | in progress (presale split off to D2 at `8cd2936d`) | `rewrite/ws-d-marketing` |
+| D2 presale | dispatched 2026-09-23 | `rewrite/ws-d2-presale` |
+| F2 shipping, articles | in progress (stats split off to F3 at `06afd806`) | `rewrite/ws-f2-ops` |
+| F3 statistics | dispatched 2026-09-23 | `rewrite/ws-f3-stats` |
+| E2 notifications | in progress (WeChat OA split off to E3 at `dd40734c`) | `rewrite/ws-e2-notify` |
+| E3 WeChat OA | dispatched 2026-09-23 | `rewrite/ws-e3-wechat-oa` |
 | S storefront contract gaps (CR-1..5-h) | dispatched 2026-09-23 | `rewrite/ws-s-storefront-gaps` |
-| J ETL runner and deployment | dispatched 2026-09-23 | `rewrite/ws-j-etl-deploy` |
-| I storefront tests | waiting on H's second pass | — |
-| K (wave 4) | waiting | — |
+| J ETL runner | in progress (images + deploy split off to J2) | `rewrite/ws-j-etl-deploy` |
+| J2 images and deployment | dispatched 2026-09-23 | `rewrite/ws-j2-deploy` |
+| H2 uni-app second pass | dispatched 2026-09-23 against the 391-route contract set | `rewrite/ws-h2-uniapp` |
+| K1 hardening first pass | dispatched 2026-09-23 | `rewrite/ws-k-hardening` |
+| I storefront e2e | after H2 + J2 (unit tests for the api layer stay with H2) | — |
+| K2 hardening second pass (load smoke, final guard run) | after every stream is merged | — |
 
 ## Decisions log
 
@@ -65,3 +71,5 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 - 2026-09-23 — C fix-up merged. CR-4-c: `listEffects` / `retryEffect` (`unknown → pending`, attempts reset, one winner) in `core/src/effects`, 重试 in the 待处理任务 console behind `payment:effect:handle`. CR-5-c: return address frozen on the refund at approval. `StaffRefundPort` answered by the real refund services. `order_items.refunded_quantity` is now derived (settled + open refund-only) and written at approval under `counted <= quantity - shipped_quantity`; losing to a shipment answers `REFUND_LINE_ALREADY_SHIPPED`; ship-vs-refund raced with both real services in both commit orders. Workspace int: core 601. Stream S dispatched.
 - 2026-09-23 — Integration pass (`4eb53405`): B1's fallback catalogue adapter (`order/catalog.repo.ts`) and the fallback resolution are deleted — `resolveCatalogPort()` / `resolveStockPort()` fail closed and the domains bucket registers the real ports. A's `catalog.order-bridge.repo.ts` moved to `order/order.facts.repo.ts` (CR-2-a closed; the one remaining cross-domain read, the `product_reviews` join in `findLinesAwaitingReview`, is named in the file). The auto-review sweep keys on `orders.completed_at`, which the state machine stamps on received → completed — that is the reconciliation between A's `catalog.autoReview` and B2's `order.sweepCompletions`. `registerOrderDomain()` / `registerCatalogDomain()` added as the idempotent registrars. A's StockPort now refuses zero / negative / fractional lines (STOCK-001) rather than dropping them silently; STOCK-002 is asserted through the caller's rollback contract.
 - 2026-09-23 — G3 merged: 样式十一 is index 10 and already editable; the free-draw grid (index 11) is commented out in the legacy admin too, so it is not built. `brand` picker dropped (`eb_store_brand` not in the frozen schema). `customComponent` leaves the palette (27 creatable), existing nodes still render and edit.
+- 2026-09-23 — Concurrency cap raised to 12 by the user; streams split where the halves are independent: D → D2 (presale), F2 → F3 (stats), E2 → E3 (WeChat OA), J → J2 (images + deploy). Split branches are cut from the parent's HEAD; at merge the parent goes first and the child is `rebase --onto`'d so only its own commits remain. K1 (guards, invariants for merged rows, admin Playwright, security review) and H2 (uni-app second pass against the 391-route contract set) dispatched early. Stream I shrinks to the storefront e2e: the api-layer unit tests already live with H.
+- 2026-09-23 — E1 merged. `WechatIdentityPort` now takes `ctx` and is implemented over C's client in `user/wechat-identity.adapter.ts` (errcodes 40029/40163/41008/40226 → `AUTH_WECHAT_CODE_INVALID`; anything else stays `INTERNAL`); C's client now carries `errcode` in `DomainError.details`. `registerUserDomain()` added. The hand-written `system/config-groups.ts` shim is gone for good (E1 had re-added an import to it). Customers admin test fixture completed to the detail shape — it crashed the drawer only on a loaded machine.
