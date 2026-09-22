@@ -1,0 +1,211 @@
+# 统计口径 — one definition per figure
+
+Every number on every statistics screen, the admin home page included, is
+computed from exactly one of the definitions below. Nothing on a page may
+redefine a figure locally, and a figure that cannot be sourced is **dropped**
+rather than shown as zero.
+
+Why this file exists: the legacy system computed 营业额 three different ways
+(the trade page by `pay_time` excluding refunded orders, the order page by
+`add_time` including them, the dashboard by `add_time` because the option key
+was misspelled `'timekey'`), 退款 four ways, and 访客 twice. Three screens
+showed three different numbers for the same day and the operator had no way to
+know which was right. So: one figure, one definition, one SQL expression, read
+by every page.
+
+---
+
+## 1. The window
+
+- Both ends of a range are **Asia/Shanghai calendar days**. `from` is the
+  Shanghai midnight that opens the first day; `to` is the Shanghai midnight
+  that opens the day _after_ the last one, and every comparison is
+  `paid_at >= from and paid_at < to`. No `BETWEEN`, no `23:59:59`, so a
+  payment at 23:59:59.7 is never lost.
+- Omitting the range means **the last 30 Shanghai days ending today**
+  (today included), which is what the legacy pages defaulted to.
+- The range may not be inverted and may not exceed **1096 days** (three years
+  plus a leap day); either is `STATS_RANGE_INVALID` with `details.maxDays`.
+- The **bucket is derived from the length, never chosen**: up to 2 days →
+  `hour`, up to 92 days → `day`, beyond that → `month`. Legacy let the caller
+  ask for a 3-month window bucketed daily and then drew every third label of a
+  daily series, silently dropping two thirds of the data.
+- Bucket labels: `09` for an hour, `2026-02-03` for a day, `2026-02` for a
+  month. Every series has exactly one value per bucket, in bucket order, zero
+  where nothing happened — an empty bucket is a true zero, not a gap.
+- `previous` on a tile is the same figure over **the window of the same length
+  immediately before this one**. It is `null` for a running total (累计用户),
+  where a comparison is meaningless.
+
+**Shanghai, not UTC, and not the server's zone.** Bucketing is
+`date_trunc('day', ts at time zone 'Asia/Shanghai')`, cast back to an instant
+with `at time zone 'Asia/Shanghai'`. The TypeScript side builds the same
+boundaries from a fixed **+08:00** offset: mainland China has observed no
+daylight saving since 1991 and every row in this database is later than that,
+so the fixed offset and the tz database agree on every boundary this code can
+meet. `stats.int.test.ts` pins that agreement with a fixture that straddles a
+Shanghai midnight (`23:30 +08:00` and `00:30 +08:00` land in different days
+even though they are the same UTC day).
+
+## 2. The populations
+
+| Term                 | Exactly                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **paid order**       | `orders.paid_at is not null and orders.deleted_at is null`, bucketed by `paid_at`                                   |
+| **placed order**     | `orders.deleted_at is null`, bucketed by `created_at` — a submitted order, paid or not                              |
+| **succeeded refund** | `refunds.status = 'succeeded' and refunds.deleted_at is null`, bucketed by `succeeded_at`, amount `refunded_amount` |
+| **product view**     | `product_events.kind = 'view'`, bucketed by `created_at`                                                            |
+| **add to cart**      | `product_events.kind = 'cart'`, bucketed by `created_at`                                                            |
+| **favourite**        | `product_favorites`, bucketed by `created_at`                                                                       |
+| **page view**        | one `user_visits` row, bucketed by `created_at`                                                                     |
+| **registration**     | `users`, bucketed by `created_at`, cancelled accounts included                                                      |
+
+An admin-deleted order (`orders.deleted_at`) is out of every figure: the
+operator deleted it because it should not be counted. A buyer hiding an order
+from their own list (`hidden_by_user_at`) changes nothing.
+
+**Money is bucketed where the money moved.** A payment counts on the day it was
+taken; a refund counts on the day it went back, not on the day the order was
+paid. So a day's 营业额 never changes retroactively — which is the property an
+operator reading last month's chart needs, and the reason this file departs
+from F2's status-file decision 16 (`sum(paid_amount - refunded_amount)` by
+`paid_at`, which rewrites history whenever an old order is refunded). Decision
+17 (refunds by `succeeded_at`) is kept and is what forced the choice: the two
+cannot both hold, because 营业额 would then be neither the paid-day figure nor
+the cash figure. See `docs/rewrite/status/f3.md`.
+
+## 3. The figures
+
+### Trade — `GET /admin-api/stats/trade`
+
+| Key                 | 名称         | Definition                                                                     |
+| ------------------- | ------------ | ------------------------------------------------------------------------------ |
+| `revenue`           | 营业额       | `Σ orders.paid_amount` (paid orders) − `Σ refunds.refunded_amount` (succeeded) |
+| `goodsPaidAmount`   | 商品支付金额 | `Σ order_items.total_amount` over the paid orders of the bucket                |
+| `refundAmount`      | 商品退款金额 | `Σ refunds.refunded_amount` over the succeeded refunds of the bucket           |
+| `freightAmount`     | 运费收入     | `Σ orders.freight_amount` over the paid orders of the bucket                   |
+| `paidOrderCount`    | 支付订单数   | count of paid orders in the bucket                                             |
+| `averageOrderValue` | 客单价       | `revenue ÷ paidOrderCount`, two decimals, `0` when nothing was paid            |
+
+`order_items.total_amount` is the line after its share of every discount, so
+`goodsPaidAmount + freightAmount` equals `Σ paid_amount` except on an order an
+operator re-priced by hand; `revenue` follows the gateway, never the lines.
+A refund that returns freight (`refunds.includes_freight`) reduces `revenue`
+and `refundAmount`; it does not reduce `freightAmount`, which is what was
+collected.
+
+### Orders — `GET /admin-api/stats/orders`
+
+| Key                | 名称       | Definition                                                |
+| ------------------ | ---------- | --------------------------------------------------------- |
+| `paidOrderCount`   | 订单量     | same figure as 支付订单数 above                           |
+| `paidAmount`       | 订单销售额 | `Σ orders.paid_amount` over the paid orders of the bucket |
+| `refundOrderCount` | 退款订单数 | `count(distinct refunds.order_id)` over succeeded refunds |
+| `refundAmount`     | 退款金额   | same figure as 商品退款金额 above                         |
+
+Breakdowns: **订单来源** counts paid orders by `orders.platform`, **订单类型**
+sums `orders.paid_amount` by `orders.kind`. Percentages are of the window's
+total, two decimals, and a kind that never occurred is absent rather than 0 %.
+
+### Users — `GET /admin-api/stats/users`
+
+| Key           | 名称       | Definition                                                                |
+| ------------- | ---------- | ------------------------------------------------------------------------- |
+| `visitors`    | 访客数     | `count(distinct coalesce(user_id::text, 'ip:'                             |     | ip))` over page views |
+| `pageViews`   | 浏览量     | count of page views                                                       |
+| `newUsers`    | 新增用户   | registrations in the bucket                                               |
+| `payingUsers` | 成交用户数 | `count(distinct orders.user_id)` over paid orders                         |
+| `totalUsers`  | 累计用户   | live accounts (`deleted_at is null`) created before the end of the window |
+
+A distinct count is **not** additive: the window's 访客数 is its own query, not
+the sum of its buckets, and the same visitor on two days counts once in the
+tile and twice in the chart. That is correct and is what every analytics tool
+does; the legacy dashboard summed the buckets and over-counted.
+
+Breakdown: **下单来源** counts paid orders by `orders.platform`.
+
+### 用户地域 — `GET /admin-api/stats/users/regions`
+
+One row per province, and **each column carries the province that column
+actually knows**, which is stated here rather than fudged into one join:
+
+| Column       | Province comes from                                         |
+| ------------ | ----------------------------------------------------------- |
+| `totalUsers` | the user's default address (`user_addresses.province_name`) |
+| `newUsers`   | the same, for accounts registered inside the window         |
+| `visitors`   | `user_visits.province`, resolved from the IP at write time  |
+| `paidAmount` | `orders.receiver_province` — where the goods actually went  |
+
+A user with no address, or a visit with no resolved province, is grouped under
+**未知**, which is sorted last whatever the sort key. `totalUsers` ignores the
+window (it is a running total); the other three are inside it.
+
+### Products — `GET /admin-api/stats/products` and `…/ranking`
+
+| Key               | 名称            | Definition                                                                |
+| ----------------- | --------------- | ------------------------------------------------------------------------- |
+| `productViews`    | 商品浏览量      | product views in the bucket                                               |
+| `productVisitors` | 商品访客数      | `count(distinct user_id)` over product views, anonymous views excluded    |
+| `cartQuantity`    | 加购件数        | `Σ product_events.quantity` over add-to-cart events                       |
+| `orderQuantity`   | 下单件数        | `Σ order_items.quantity` over the **placed** orders of the bucket         |
+| `paidQuantity`    | 支付件数        | `Σ order_items.quantity` over the **paid** orders of the bucket           |
+| `paidAmount`      | 支付金额        | same figure as 商品支付金额                                               |
+| `refundQuantity`  | 退款件数        | `Σ refund_items.quantity` over succeeded refunds                          |
+| `refundAmount`    | 退款金额        | same figure as 商品退款金额                                               |
+| `payConversion`   | 访问-支付转化率 | `payingViewers ÷ productVisitors × 100`, two decimals, `0` when no viewer |
+| `favorites`       | 收藏数          | favourites added in the bucket (ranking rows only)                        |
+
+`payingViewers` is `count(distinct user_id)` over the paid orders of the
+window; on a ranking row it is that count for the one product. A signed-out
+visitor can be counted in 浏览量 but never in 访客数 — `product_events` has no
+session identity, only `user_id`, and inventing one would make the conversion
+rate a fiction.
+
+**Ranking rows** are the same figures grouped by product instead of by bucket,
+sorted by one of `views | visitors | cartQuantity | orderQuantity |
+paidQuantity | paidAmount | favorites` descending with the product id as the
+tie-break, so the page is stable between reloads. Only products with at least
+one non-zero figure in the window appear.
+
+## 4. What has no source yet
+
+Two figures are defined above but read **0** on a live shop, because nothing
+writes their rows yet. They are kept (not dropped) because the tables exist,
+the definitions are settled, and the gap is one insert in somebody else's
+domain — `docs/rewrite/cr/CR-1-f3.md` asks for both:
+
+- **访客数 / 浏览量 / 地域访客** need `user_visits`. No storefront code records
+  a page view; the table, its `province` and its `stay_ms` are unused.
+- **加购件数** needs `product_events` rows of `kind = 'cart'`. The cart domain
+  writes none; `cart_items` is not a substitute, because a row is deleted when
+  the order is placed, so yesterday's additions disappear from history exactly
+  when they start to matter.
+
+Everything else on every page is live today: `product_events` carries `view`
+and `favorite` rows from the catalog domain, and the order, payment and refund
+figures come from `orders` / `order_items` / `refunds` / `refund_items`
+directly, which is why this domain does **not** need `kind in ('order', 'pay',
+'refund')` events and must never write them.
+
+## 5. Retired — dropped, never zero-filled
+
+Gone with the features they measured, and deliberately absent from every
+response rather than present and zero: 余额 / 充值 / 佣金 / 积分 / 付费会员
+statistics, 资金流水 and 账单记录 (they were a balance ledger), 余额统计 (a
+route group with no routes in it), the WeChat-subscribe block, and the four
+legacy `home/*` dashboard endpoints. The home page's tiles now arrive through
+`registerDashboardContributor`, and its charts are `stats/orders`,
+`stats/users` and `stats/products/ranking` — the same three definitions as the
+pages, not a fourth copy.
+
+## 6. Reading rules
+
+- **Read-only, always.** `stats.repo.ts` is the only file in this domain that
+  touches a table, it contains nothing but `select`, and it is the one place in
+  the system allowed to read another domain's tables. No `insert`, no `update`,
+  no `delete`, no transaction: a statistics page that can write is a statistics
+  page that can corrupt.
+- **Every block is cached in Redis for 60 seconds**, keyed by the block, the
+  resolved window and the query's own arguments. `generatedAt` is the clock
+  reading of the computation, so a cached block visibly lags — which is the
+  honest thing to show.
