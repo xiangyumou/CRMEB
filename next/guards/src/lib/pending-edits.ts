@@ -30,17 +30,8 @@ export interface PendingEdit {
 
 export const PENDING_EDITS: readonly PendingEdit[] = [
   // --- rows whose section owner is "assign per row" -------------------------
-  {
-    id: 'ORDER-008',
-    resolution: {
-      kind: 'map',
-      testIds: [
-        'packages/core/src/order/order.concurrency.int.test.ts::two checkouts for the last unit > hands back every line it already took when a later line is short',
-        'packages/core/src/order/order.int.test.ts::the stock port > takes nothing when one line of several is short, and names that line',
-      ],
-      why: 'B1 ships the invariant under RISK-B1-005; the legacy id was never pointed at the tests that prove it',
-    },
-  },
+  // ORDER-008 used to sit here (`map`, B1's RISK-B1-005 evidence). CR-2-k
+  // applied it — the row reads `ported` now — so the entry is gone.
   {
     id: 'AUTH-005',
     resolution: {
@@ -52,42 +43,11 @@ export const PENDING_EDITS: readonly PendingEdit[] = [
   },
 
   // --- rows whose section owner names two streams --------------------------
-  // E1 has merged, so these three cannot be assigned to it any more. They do
-  // not need a stream: E1 shipped the behaviour and only the ledger row was
-  // left behind, so each is a `map` at tests that exist today.
-  {
-    id: 'AUTH-001',
-    resolution: {
-      kind: 'map',
-      testIds: [
-        'packages/core/src/auth/auth.test.ts::bearer parsing > reads a well-formed header and nothing else',
-        'packages/core/src/auth/auth.test.ts::bearer parsing > requireBearer throws 401 rather than returning null',
-      ],
-      why: 'the standard header is parsed and nothing else is; the *legacy* half of this row — CRMEB’s `Authori-zation` fallback — has no successor, and `grep -r "Authori-zation"` finds it nowhere in the tree, so the invariant cell should say **Adapted:** one header, not two',
-    },
-  },
-  {
-    id: 'AUTH-002',
-    resolution: {
-      kind: 'map',
-      testIds: [
-        'apps/web/src/server/handle.test.ts::authentication > user-optional stays anonymous without a token and resolves with one',
-      ],
-      why: '`user-optional` is the auth mode this row is about, and the test drives it through handle() both ways round — no token and a good one',
-    },
-  },
-  {
-    id: 'AUTH-003',
-    resolution: {
-      kind: 'map',
-      testIds: [
-        'packages/core/src/auth/auth.int.test.ts::storefront sessions > rejects an expired token',
-        'packages/core/src/order/order.ref.int.test.ts::GET /api/v1/orders/:id > gives a stranger the same 404 for a number as for an id',
-        'packages/core/src/order/order.int.test.ts::hiding a finished order > answers a second tap, a stranger and an unknown id all with the same 404',
-      ],
-      why: 'the row asks for two things — token expiry and cross-user order read/write isolation. The first is the storefront session test; the second is covered on both a read (detail, by id *and* by order number) and a write (hide), and in both cases a stranger gets the same 404 as an unknown id, which is the stronger property: the isolation does not leak existence',
-    },
-  },
+  // E1 has merged, so these three could not be assigned to it any more. They
+  // did not need a stream: E1 shipped the behaviour and only the ledger row
+  // was left behind, so each was a `map` at tests that exist today. CR-2-k
+  // applied all three (AUTH-001 also picked up its **Adapted:** reason) — the
+  // rows read `ported` now, so the entries are gone.
   ...['002', '003', '004', '005', '006', '007', '008', '009', '012'].map((n) => ({
     id: `SMOKE-${n}`,
     resolution: {
@@ -104,73 +64,20 @@ export const PENDING_EDITS: readonly PendingEdit[] = [
   // the entries are gone. The list may only shrink.
 
   // --- sections whose heading already says "dropped" ------------------------
-  // The section owner reads `dropped: …`, but the rows under it were left
-  // `unmapped`, so the ledger's own counts call them open work. The state is
-  // what CR-2-k asks to correct; the reason below is the section's own.
-  {
-    id: 'HIST-001',
-    resolution: {
-      kind: 'retire',
-      why: 'Dropped: no orders are migrated. The ETL carries products, users and configuration; order history stays in the legacy database, which keeps serving it. There is no 历史：… pay label to keep stable because there is no historical order in the new schema to label.',
-    },
-  },
-  // MIG-001 … MIG-017 used to sit here. The orchestrator applied that half of
-  // CR-2-k and they read `retired` now, so the entries are gone: the list may
-  // only shrink.
-  {
-    id: 'MAINT-001',
-    resolution: {
-      kind: 'retire',
-      why: 'Dropped: the maintenance endpoints (domain replacement, "clear data", the personal-centre menu editor) are not ported — CONVENTIONS.md § Scope guard. Nothing in the rewrite rewrites media columns in place or truncates tables over HTTP.',
-    },
-  },
+  // HIST-001 and MAINT-001 used to sit here (`retire`, "Dropped: …" reasons
+  // the section owner already gave). CR-2-k applied both — the rows read
+  // `dropped` now, so the entries are gone.
 
   // --- P0-S: a legacy migration tool the rewrite does not have --------------
-  ...['018', '019', '020', '021', '022'].map((n) => ({
-    id: `MIG-${n}`,
-    resolution: {
-      kind: 'retire' as const,
-      why: 'verified the legacy `order-reliability` MySQL migration, which has no successor: the rewrite ships one `0000_init` and the ETL, so there is no plan/apply to re-verify. The schema itself is asserted by the constraint tests P0-S shipped.',
-    },
-  })),
+  // MIG-001 … MIG-022 used to sit here (`retire`, same "no successor to the
+  // legacy order-reliability migration" reason for 018…022; 001…017 were
+  // applied in an earlier round). CR-2-k applied the rest — every one reads
+  // `dropped` now, so the entries are gone.
 
   // --- K's own rows --------------------------------------------------------
-  {
-    id: 'CORE-001',
-    resolution: {
-      kind: 'retire',
-      why: "the retired payment types, gift rewards and 拼团/预售 order parameters have no successor field to refuse: WeChat v3 is the only driver and the retired parameters are not in any contract. What can still rot — a retired feature coming back as an identifier or a URL — is what `pnpm guards`' `retired` check asserts on every commit.",
-    },
-  },
-  {
-    id: 'CORE-002',
-    resolution: {
-      kind: 'map',
-      testIds: [
-        'guards/src/checks/retired.test.ts::the retired blacklist > finds no retired identifier in next/ or the uni-app API layer',
-        'guards/src/checks/contracts.test.ts::contracts and route files > leaves no route file that no contract describes',
-      ],
-      why: 'a removed route answers 404 because no route file exists for it; the guard proves the stronger property — the set of reachable URLs *is* the set of contracts',
-    },
-  },
-  {
-    id: 'SQL-001',
-    resolution: {
-      kind: 'retire',
-      why: 'ONLY_FULL_GROUP_BY was a MySQL mode that could be off. PostgreSQL rejects an ungrouped column at parse time in every configuration, and every query here is a typed Drizzle builder, so there is no setting to assert.',
-    },
-  },
-  {
-    id: 'ROUTE-001',
-    resolution: {
-      kind: 'map',
-      testIds: [
-        'guards/src/checks/contracts.test.ts::contracts and route files > matches every contract to a route file that exports its method',
-        'guards/src/checks/contracts.test.ts::contracts and route files > leaves no route file that no contract describes',
-      ],
-      why: 'the App Router directory is the route table, so "every registered route resolves to a real handler" is the contracts guard, both ways round',
-    },
-  },
+  // CORE-001, CORE-002, SQL-001 and ROUTE-001 used to sit here. CR-2-k
+  // applied all four — they read `dropped` (CORE-001, SQL-001) or `ported`
+  // (CORE-002, ROUTE-001) now, so the entries are gone.
   {
     id: 'SEQ-001',
     resolution: {
@@ -217,38 +124,13 @@ export interface LedgerCorrection {
 }
 
 export const LEDGER_CORRECTIONS: readonly LedgerCorrection[] = [
-  {
-    id: 'TLS-001',
-    written:
-      'packages/core/src/payment/payment.config.test.ts::TLS-001 — no TLS toggle, in any group this stream owns > has no verification switch in',
-    corrected:
-      'packages/core/src/payment/payment.config.test.ts::TLS-001 — no TLS toggle, in any group this stream owns > has no verification switch in `payment` / `wechat`',
-    why: 'the cell writes each id inside single backticks and the ids themselves contain backticks (`` `payment` ``), so markdown closes the code span early: three of the four ids in that cell are unreadable. Fence them with double backticks. The tests exist — payment.config.test.ts:35 (`has no verification switch in \\`${group.group}\\``, run for payment and wechat), payment.config.test.ts:46, refund.config.test.ts:18.',
-  },
-  {
-    id: 'GATEWAY-001',
-    written:
-      'packages/core/src/payment/payment.int.test.ts::GATEWAY-001 — an amount that disagrees is never booked > refuses an over amount, however well signed it is',
-    corrected:
-      'packages/core/src/payment/payment.int.test.ts::GATEWAY-001 — an amount that disagrees is never booked > refuses a over amount, however well signed it is',
-    why: 'the test is written in a loop over the labels short/over, so vitest reports "refuses a over amount"; the ledger tidied the article and the id stopped resolving',
-  },
-  {
-    id: 'ETL-F1-003',
-    written:
-      'packages/etl/src/mappers/system.test.ts::config > lists a legacy key no group claims instead of dropping it silently',
-    corrected:
-      'packages/etl/src/config.test.ts::mapConfig > FAILS on a key nobody claims and nobody dropped',
-    why: 'CR-1-j moved config routing out of the system mapper (`mappers/system.test.ts:124` says so in a comment): one legacy key can have more than one claimant, which the old one-to-one map could not express. The invariant is not only kept but strengthened — an unclaimed key no longer gets *listed*, it fails the run.',
-  },
-  {
-    id: 'ETL-F1-003',
-    written:
-      'packages/etl/src/mappers/system.test.ts::config > converts order_cancel_time from hours to minutes',
-    corrected:
-      'packages/etl/src/config.test.ts::mapConfig > converts order_cancel_time from hours to minutes (ETL-F1-003)',
-    why: 'the same move. The conversion *rule* stayed in the domain (`CONFIG_VALUE_TRANSFORMS`, asserted by `mappers/system.test.ts::config > 把小时换算成分钟的规则留在本域…`); what moved is the mapper that applies it, and the end-to-end assertion went with it — the new test even names the row.',
-  },
+  // Empty since CR-2-k applied its four corrections (2026-09-23): TLS-001's
+  // cell now fences its ids so the ids resolve directly (the literal
+  // `payment`/`wechat` backticks a markdown fence cannot carry were replaced
+  // with a `<group>` hole — see CR-2-k.md's note on the correction),
+  // GATEWAY-001 reads "a over amount" and ETL-F1-003 points at
+  // `packages/etl/src/config.test.ts`. A row whose id no longer needs this
+  // crutch goes here with the id it used to write and what it should say.
 ];
 
 /**
@@ -271,11 +153,10 @@ export interface DuplicateRow {
 }
 
 export const DUPLICATE_ROWS: readonly DuplicateRow[] = [
-  {
-    id: 'SMOKE-001',
-    keepState: 'ported',
-    why: 'the freight section carries a complete SMOKE-001 — superseded by the `FreightPort` contract and pointed at `shipping.int.test.ts::FreightPort.quote > charges a fixed postage per unit` — while the storefront-smoke section still has the original, empty and `unmapped`. Delete the empty one: it is the same invariant, answered.',
-  },
+  // Empty since CR-2-k deleted the empty, unmapped SMOKE-001 in the
+  // storefront-smoke section (2026-09-23); the ported one in the freight
+  // section is the only SMOKE-001 left. An id the ledger writes twice again
+  // goes here with the state of the row that is meant to survive.
 ];
 
 export function duplicateRow(id: string): DuplicateRow | undefined {

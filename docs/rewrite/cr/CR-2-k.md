@@ -1,6 +1,6 @@
 # CR-2-k — 51 rows, 4 test ids and one duplicate in `invariants.md`
 
-**Stream:** K (hardening) **Status:** OPEN — partly applied; round 2 below needs the orchestrator (`docs/rewrite/invariants.md` is orchestrator-owned)
+**Stream:** K (hardening) **Status:** RESOLVED 2026-09-23 — every entry `pending-edits.ts` still carried (16 `PENDING_EDITS` rows, 4 `LEDGER_CORRECTIONS`, 1 `DUPLICATE_ROWS`) applied to `invariants.md` and deleted; `pnpm guards` goes from 94 to 74 pending with 0 failures and 0 `pending(orchestrator)` lines. 13 `PENDING_EDITS` entries stay (`AUTH-005`→C, `SMOKE-002…009,012`→I, `SEQ-001`/`MUT-001`/`STAB-001`→K's own second pass): each got its **Owner: stream X** marker written into the ledger, but the row stays `unmapped` — the work is still owed, so deleting the entry would either misreport it (I, K, not yet merged) or make the guard fail it outright (C, already merged — `pendingEdit`'s `cr: 'CR-3-k'` is what keeps that from failing). See §"Round 2 resolution" below for the one wording deviation (TLS-001).
 **Files:** `docs/rewrite/invariants.md`
 **Machine-readable copy:** `next/guards/src/lib/pending-edits.ts` (`PENDING_EDITS`, `LEDGER_CORRECTIONS`, `DUPLICATE_ROWS`)
 
@@ -138,3 +138,46 @@ The resolver reads three ways of writing a test title — a plain string, a
 template literal (a test written in a loop) and `it.each(table)('…')` — and
 lets a ledger id elide a repeated part with `<…>`. What it will not do is match
 loosely: a renamed test still fails. That is the point.
+
+## Round 2 resolution
+
+Applied 2026-09-23, orchestrator-granted write to `invariants.md`. All five
+sections above landed as written, with one wording deviation on TLS-001.
+
+**Baseline** (`pnpm guards`, `invariants` check): 223 ported, 23
+retired/dropped, 28 pending — 94 pending total, 28 rows awaiting a CR-2-k edit,
+20 of those lines reading `pending(orchestrator)`.
+
+**Final**: 229 ported, 32 retired/dropped, 13 pending — 74 pending total, 13
+rows still `unmapped` (owned by streams C, I and K's own second pass, each now
+carrying its `**Owner: stream X**` marker), 0 lines reading
+`pending(orchestrator)`. `pnpm guards`: 0 failures.
+
+Deltas match the sections above exactly: +6 ported (§2), +9 dropped (§1), one
+row deleted (§5, 275 → 274 rows), and the 15-row shrink of `PENDING_EDITS`
+(§1's 9 + §2's 6) plus the 4 `LEDGER_CORRECTIONS` and 1 `DUPLICATE_ROWS` entry
+account for all 20 cleared `pending(orchestrator)` lines. The 13 remaining
+`PENDING_EDITS` entries (§3: `AUTH-005`, the nine `SMOKE-*` rows, `SEQ-001`,
+`MUT-001`, `STAB-001`) stay by design — the row is still `unmapped` and the
+work is still owed, so the entry stays until the stream that owes it merges.
+
+**Test-id correction (deviation from §4's proposed wording):** TLS-001's
+proposed fix was to fence the same four ids with double backticks. That text
+cannot survive this ledger's parser as written: `parseTestIds` splits on every
+single backtick with no awareness of fence length or nesting, so the ids'
+own embedded `` `payment` ``/`` `wechat` `` backticks would still cut a
+double-backtick span short, in the same order the corrected reasoning here
+says fails today. Chosen instead: rewrite the cell to name the two group
+tests with a `<group>` hole (`` `… > has no verification switch in <group>` ``
+in place of the literal ``` `payment`/`wechat` ``` values), which the
+resolver's hole-matching already treats as a wildcard against the real
+(backtick-containing) `it()` titles in `payment.config.test.ts` — validated
+against the actual parser and resolver logic before the file was touched, not
+guessed. GATEWAY-001 and both ETL-F1-003 ids were applied exactly as §4 wrote
+them.
+
+**Also touched, not in this CR's file list:** `next/guards/src/lib/matrices.test.ts`'s
+`'gives every ledger row a known state'` test had `dropped` missing from its
+hardcoded expected-states array — its own comment already named this as the
+change CR-2-k would make. Updated the array and comment; `test:unit` was red
+without it and the Definition of Done requires it green.

@@ -95,11 +95,11 @@ describe('against the real ledgers', () => {
   it('gives every ledger row a known state', () => {
     const rows = parseInvariants(read(path.join(rewriteDocs, 'invariants.md')));
     expect(rows.length).toBeGreaterThanOrEqual(220);
-    // `dropped` is a state the checker understands but the ledger does not use
-    // yet: the sections whose owner already reads "dropped: …" still leave their
-    // rows `unmapped`, which is the correction CR-2-k asks for.
+    // `dropped` is the state CR-2-k gave the sections whose owner already read
+    // "dropped: …" while their rows still sat `unmapped` (HIST-001, MAINT-001,
+    // MIG-018…022, CORE-001, SQL-001).
     const states = new Set(rows.map((r) => r.state));
-    expect([...states].sort()).toEqual(['ported', 'retired', 'unmapped']);
+    expect([...states].sort()).toEqual(['dropped', 'ported', 'retired', 'unmapped']);
   });
 
   it('reads every risk-matrix entry', () => {
