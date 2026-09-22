@@ -1,6 +1,6 @@
 # CR-1-k — `domains.gen.ts` installs half the domains, in bundles only
 
-**Stream:** K (hardening) **Status:** OPEN — needs the orchestrator (generator is orchestrator-owned)
+**Stream:** K (hardening) **Status:** RESOLVED — the generator already emits a bare side-effect import per domain (`import './diy/index';`) plus the named registrars; esbuild keeps bare imports. Verified on `9139c762`: the tsup worker bundle carries every domain's atoms (`page:read` present, 22 config groups). The `grep '查看装修页面'` probe in §What is misleading after the fix because esbuild escapes non-ASCII strings as `\uXXXX` in its output — grep the ASCII atom names instead. `guards/src/lib/install-domains.ts` keeps its explicit list as belt-and-braces.
 **Files:** `next/packages/core/scripts/gen-config-groups.ts` (generator), `next/packages/core/src/domains.gen.ts` (generated), `next/apps/web/src/server/domains.test.ts`
 
 ## What
