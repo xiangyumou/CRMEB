@@ -5,6 +5,7 @@ import { InputNumber } from 'antd';
 
 import { hotspotDefault } from '../defaults/hotspot.default';
 import {
+  DiyCommonStyleSection,
   DiyFieldRow,
   DiyImageField,
   DiyLinkField,
@@ -13,7 +14,6 @@ import {
   DiySortableListField,
 } from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCommonStyleSection } from './_fields';
 
 /**
  * 热区 — ports `c_hotspot.vue`, whose 内容设置 tab is a single `c_one_pictrue`.

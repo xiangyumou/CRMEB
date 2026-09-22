@@ -29,6 +29,8 @@ import { ApiError, presentApiError, useRouteMutation, useRouteQuery } from '../a
 import { LinkSourceProvider, PageContainer } from '../kit';
 import { Can, useCan } from '../session';
 import { DiyCanvas } from './canvas';
+import { catalogLinkTargets, createCatalogDiyDataSource } from './catalog-source';
+import { DiyDataSourceProvider } from './data-source';
 import { DiyEditorProvider } from './editor-context';
 import { DiyInspector } from './inspector';
 import { createDiyLinkSource } from './link-source';
@@ -111,7 +113,10 @@ function DiyEditorInner({
   const [conflict, setConflict] = useState(false);
   const can = useCan();
   const canEdit = can('diy:page:update');
-  const linkSource = useMemo(() => createDiyLinkSource(), []);
+  // The catalog is merged, so the pickers read real products, categories and
+  // 商品标签 rather than the stub; 文章 / 优惠券 / 拼团 still fall through to it.
+  const linkSource = useMemo(() => createDiyLinkSource({ targets: catalogLinkTargets }), []);
+  const dataSource = useMemo(() => createCatalogDiyDataSource(), []);
 
   const saveSettings = useRouteMutation(diyPageUpdate, { presentError: false });
   const saveContent = useRouteMutation(diyPageSaveContent, {
@@ -158,110 +163,112 @@ function DiyEditorInner({
 
   return (
     <LinkSourceProvider source={linkSource}>
-      <DiyEditorProvider value={{ state, dispatch, readOnly, theme }}>
-        <PageContainer
-          breadcrumb={[{ label: '页面装修', href: '/admin/diy' }, { label: state.meta.name }]}
-          title={
-            <Space>
-              <Link href="/admin/diy" aria-label="返回列表">
-                <ArrowLeftOutlined />
-              </Link>
-              {state.meta.name}
-              <Tag color={state.meta.status === 'published' ? 'green' : 'default'}>
-                {state.meta.status === 'published' ? '已发布' : '草稿'}
-              </Tag>
-              {state.meta.isHome ? <Tag color="blue">首页</Tag> : null}
-              {dirty ? <Tag color="orange">未保存</Tag> : null}
-            </Space>
-          }
-          extra={
-            <Space>
-              <Tooltip title="撤销">
-                <Button
-                  icon={<UndoOutlined />}
-                  disabled={!canUndo(state) || readOnly}
-                  onClick={() => dispatch({ type: 'undo' })}
-                />
-              </Tooltip>
-              <Tooltip title="重做">
-                <Button
-                  icon={<RedoOutlined />}
-                  disabled={!canRedo(state) || readOnly}
-                  onClick={() => dispatch({ type: 'redo' })}
-                />
-              </Tooltip>
-              <Button icon={<QrcodeOutlined />} onClick={() => setPreview(true)}>
-                预览
-              </Button>
-              <Can permission="diy:page:update">
-                <Button icon={<SaveOutlined />} loading={busy} onClick={() => void save(false)}>
-                  保存
+      <DiyDataSourceProvider source={dataSource}>
+        <DiyEditorProvider value={{ state, dispatch, readOnly, theme }}>
+          <PageContainer
+            breadcrumb={[{ label: '页面装修', href: '/admin/diy' }, { label: state.meta.name }]}
+            title={
+              <Space>
+                <Link href="/admin/diy" aria-label="返回列表">
+                  <ArrowLeftOutlined />
+                </Link>
+                {state.meta.name}
+                <Tag color={state.meta.status === 'published' ? 'green' : 'default'}>
+                  {state.meta.status === 'published' ? '已发布' : '草稿'}
+                </Tag>
+                {state.meta.isHome ? <Tag color="blue">首页</Tag> : null}
+                {dirty ? <Tag color="orange">未保存</Tag> : null}
+              </Space>
+            }
+            extra={
+              <Space>
+                <Tooltip title="撤销">
+                  <Button
+                    icon={<UndoOutlined />}
+                    disabled={!canUndo(state) || readOnly}
+                    onClick={() => dispatch({ type: 'undo' })}
+                  />
+                </Tooltip>
+                <Tooltip title="重做">
+                  <Button
+                    icon={<RedoOutlined />}
+                    disabled={!canRedo(state) || readOnly}
+                    onClick={() => dispatch({ type: 'redo' })}
+                  />
+                </Tooltip>
+                <Button icon={<QrcodeOutlined />} onClick={() => setPreview(true)}>
+                  预览
                 </Button>
-              </Can>
-              <Can permission="diy:page:publish">
-                <Button type="primary" loading={busy} onClick={() => void save(true)}>
-                  保存并发布
-                </Button>
-              </Can>
-            </Space>
-          }
-        >
-          {canEdit ? null : (
-            <Alert
-              type="info"
-              showIcon
-              style={{ marginBottom: 12 }}
-              message="没有编辑权限，当前为只读预览"
-            />
-          )}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '260px minmax(0, 1fr) 340px',
-              gap: 12,
-              alignItems: 'start',
-            }}
+                <Can permission="diy:page:update">
+                  <Button icon={<SaveOutlined />} loading={busy} onClick={() => void save(false)}>
+                    保存
+                  </Button>
+                </Can>
+                <Can permission="diy:page:publish">
+                  <Button type="primary" loading={busy} onClick={() => void save(true)}>
+                    保存并发布
+                  </Button>
+                </Can>
+              </Space>
+            }
           >
-            <Pane title="组件库">
-              <DiyPalette />
-            </Pane>
+            {canEdit ? null : (
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message="没有编辑权限，当前为只读预览"
+              />
+            )}
             <div
-              style={{ background: 'var(--ant-color-fill-quaternary, #fafafa)', borderRadius: 8 }}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '260px minmax(0, 1fr) 340px',
+                gap: 12,
+                alignItems: 'start',
+              }}
             >
-              <DiyCanvas />
+              <Pane title="组件库">
+                <DiyPalette />
+              </Pane>
+              <div
+                style={{ background: 'var(--ant-color-fill-quaternary, #fafafa)', borderRadius: 8 }}
+              >
+                <DiyCanvas />
+              </div>
+              <Pane title="配置">
+                <DiyInspector />
+              </Pane>
             </div>
-            <Pane title="配置">
-              <DiyInspector />
-            </Pane>
-          </div>
-        </PageContainer>
+          </PageContainer>
 
-        <PreviewModal
-          open={preview}
-          onClose={() => setPreview(false)}
-          kind={state.meta.kind}
-          pageId={state.meta.id}
-        />
+          <PreviewModal
+            open={preview}
+            onClose={() => setPreview(false)}
+            kind={state.meta.kind}
+            pageId={state.meta.id}
+          />
 
-        <Modal
-          open={conflict}
-          title="页面已被其他人修改"
-          okText="放弃我的改动并重新载入"
-          cancelText="留在当前页面"
-          onOk={() => {
-            setConflict(false);
-            refetch();
-          }}
-          onCancel={() => setConflict(false)}
-        >
-          <Typography.Paragraph>
-            这个页面在你编辑期间被保存过，为避免覆盖对方的改动，本次保存没有生效。
-          </Typography.Paragraph>
-          <Typography.Paragraph type="secondary">
-            重新载入会丢弃你当前未保存的内容；如需保留，请先把改动复制出来。
-          </Typography.Paragraph>
-        </Modal>
-      </DiyEditorProvider>
+          <Modal
+            open={conflict}
+            title="页面已被其他人修改"
+            okText="放弃我的改动并重新载入"
+            cancelText="留在当前页面"
+            onOk={() => {
+              setConflict(false);
+              refetch();
+            }}
+            onCancel={() => setConflict(false)}
+          >
+            <Typography.Paragraph>
+              这个页面在你编辑期间被保存过，为避免覆盖对方的改动，本次保存没有生效。
+            </Typography.Paragraph>
+            <Typography.Paragraph type="secondary">
+              重新载入会丢弃你当前未保存的内容；如需保留，请先把改动复制出来。
+            </Typography.Paragraph>
+          </Modal>
+        </DiyEditorProvider>
+      </DiyDataSourceProvider>
     </LinkSourceProvider>
   );
 }

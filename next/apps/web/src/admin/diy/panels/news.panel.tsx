@@ -5,6 +5,7 @@ import { newsSchema, type NewsComponent } from '@shop/contracts/diy/schema/news.
 import { newsDefault } from '../defaults/news.default';
 import {
   DiyColourField,
+  DiyCommonStyleSection,
   DiyInputField,
   DiyLinkField,
   DiySection,
@@ -13,7 +14,7 @@ import {
   DiyUploadField,
 } from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyChildRowsField, DiyCommonStyleSection } from './_fields';
+import { DiyChildRowsField } from './_fields';
 
 /**
  * 新闻公告 — ports `c_news_roll.vue`.

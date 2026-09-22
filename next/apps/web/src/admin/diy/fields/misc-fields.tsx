@@ -4,17 +4,17 @@ import type { DiyGroup, DiyListBox, DiySlider } from '@shop/contracts/diy/schema
 import { Checkbox, DatePicker, Input, InputNumber, Switch } from 'antd';
 import dayjs from 'dayjs';
 
-import { DiyFieldRow, DiyLinkField, DiySortableListField } from '../../fields';
-import type { DiyFieldProps } from '../../panel-api';
+import type { DiyFieldProps } from '../panel-api';
+import { DiyLinkField, DiySortableListField } from './media-fields';
+import { DiyFieldRow } from './section';
 
 /**
- * The five `mobileConfigRight/c_*` widgets that have no counterpart in G1's
- * frozen `fields/` barrel, composed here from antd and from the frozen
- * editors. Private to stream G2 until the orchestrator promotes them; see
- * `docs/rewrite/cr/CR-1-g2.md`.
+ * Six `mobileConfigRight/c_*` widgets that the barrel's first seventeen editors
+ * had no counterpart for, composed here from antd and from the editors that do
+ * exist. Promoted into `fields/` by CR-1-g2.
  *
  * None of them forks an existing editor: each is a widget the legacy admin has
- * and `fields/` does not, and each follows the same rule as the frozen ones —
+ * and the barrel did not, and each follows the same rule as the rest —
  * **patch the config object, never rebuild it**, so sibling keys survive.
  */
 

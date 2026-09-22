@@ -6,9 +6,15 @@ import {
 } from '@shop/contracts/diy/schema/customerService.schema';
 
 import { customerServiceDefault } from '../defaults/customerService.default';
-import { DiyLinkField, DiySection, DiySetUpTabs, DiyTabsField, DiyUploadField } from '../fields';
+import {
+  DiyCommonStyleSection,
+  DiyLinkField,
+  DiySection,
+  DiySetUpTabs,
+  DiyTabsField,
+  DiyUploadField,
+} from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCommonStyleSection } from './_fields';
 
 /**
  * 悬浮按钮 — ports `c_home_service.vue`, the smallest panel in the set: one

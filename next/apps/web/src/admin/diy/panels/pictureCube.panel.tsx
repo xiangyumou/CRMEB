@@ -6,9 +6,15 @@ import {
 } from '@shop/contracts/diy/schema/pictureCube.schema';
 
 import { pictureCubeDefault } from '../defaults/pictureCube.default';
-import { DiyFilletField, DiySection, DiySetUpTabs, DiySliderField } from '../fields';
+import {
+  DiyCommonStyleSection,
+  DiyFilletField,
+  DiySection,
+  DiySetUpTabs,
+  DiySliderField,
+} from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCommonStyleSection, DiyCubeCellsField, DiyCubeStyleField } from './_fields';
+import { DiyCubeCellsField, DiyCubeStyleField } from './_fields';
 
 /**
  * 图片魔方 — ports `c_picture_cube.vue`.

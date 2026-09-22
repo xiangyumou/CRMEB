@@ -619,4 +619,234 @@ export const customComponentDefault = {
     val: 0,
     min: 0,
   },
+  /**
+   * CR-3-g2 — the seven groups `c_custom_component.vue:147-330` injects on
+   * open: the 组件设计 button's own config and the six `…DataConfig` groups the
+   * 数据样式 block (`DiyDataStyleSection`) edits. Without them 数据样式 drew
+   * nothing on a fresh node.
+   *
+   * `customComponents` is deliberately **not** added. `patchConfig` never
+   * creates it — only the inner designer's save does
+   * (`c_custom_component.vue:633`) — and that designer is out of scope
+   * (CR-2-g2). An absent key round-trips as absent; an invented empty one
+   * would not.
+   */
+  customBtnConfig: {
+    title: '设计组件',
+  },
+  filletDataConfig: {
+    title: '背景圆角',
+    type: 0,
+    list: [
+      {
+        val: '全部',
+        icon: 'iconcaozuo-zhengti',
+      },
+      {
+        val: '单个',
+        icon: 'iconcaozuo-bianjiao',
+      },
+    ],
+    valName: '圆角值',
+    val: 0,
+    min: 0,
+    valList: [
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+    ],
+  },
+  componentBgDataConfig: {
+    title: '背景样式',
+    tabVal: 0,
+    tabList: [
+      {
+        name: '颜色',
+      },
+      {
+        name: '图片',
+      },
+    ],
+    colorConfig: {
+      title: '背景颜色',
+      color: [
+        {
+          item: '#fff',
+        },
+      ],
+      default: [
+        {
+          item: '#fff',
+        },
+      ],
+    },
+    imageConfig: {
+      title: '背景图片',
+      url: '',
+    },
+    colorDirection: {
+      title: '渐变方向',
+      tabVal: 0,
+      tabList: [
+        {
+          name: '横向',
+        },
+        {
+          name: '纵向',
+        },
+        {
+          name: '左斜',
+        },
+        {
+          name: '右斜',
+        },
+      ],
+    },
+  },
+  marginDataConfig: {
+    title: '外边距',
+    val: 0,
+    min: 0,
+    max: 100,
+    isAll: false,
+    valList: [
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+    ],
+  },
+  paddingDataConfig: {
+    title: '内边距',
+    val: 0,
+    min: 0,
+    max: 100,
+    isAll: false,
+    valList: [
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+    ],
+  },
+  borderDataConfig: {
+    title: '边框设置',
+    tabVal: 0,
+    tabList: [
+      {
+        name: '隐藏',
+      },
+      {
+        name: '显示',
+      },
+    ],
+    val: 0,
+    styleConfig: {
+      title: '边框样式',
+      tabVal: 0,
+      tabList: [
+        {
+          name: '实线',
+          style: 'solid',
+        },
+        {
+          name: '虚线',
+          style: 'dashed',
+        },
+        {
+          name: '点状',
+          style: 'dotted',
+        },
+      ],
+    },
+    widthConfig: {
+      title: '边框粗细',
+      val: 1,
+      min: 1,
+    },
+    colorConfig: {
+      title: '边框颜色',
+      default: [
+        {
+          item: '#e5e5e5',
+        },
+      ],
+      color: [
+        {
+          item: '#e5e5e5',
+        },
+      ],
+    },
+  },
+  shadowDataConfig: {
+    title: '阴影设置',
+    tabVal: 0,
+    tabList: [
+      {
+        name: '隐藏',
+      },
+      {
+        name: '显示',
+      },
+    ],
+    val: 0,
+    colorConfig: {
+      title: '阴影颜色',
+      default: [
+        {
+          item: 'rgba(0,0,0,0.1)',
+        },
+      ],
+      color: [
+        {
+          item: 'rgba(0,0,0,0.1)',
+        },
+      ],
+    },
+    xConfig: {
+      title: 'X轴偏移',
+      val: 0,
+      min: -50,
+    },
+    yConfig: {
+      title: 'Y轴偏移',
+      val: 0,
+      min: -50,
+    },
+    blurConfig: {
+      title: '模糊半径',
+      val: 10,
+      min: 0,
+    },
+    spreadConfig: {
+      title: '扩展半径',
+      val: 0,
+      min: -50,
+    },
+  },
 } as unknown as CustomComponentComponent;

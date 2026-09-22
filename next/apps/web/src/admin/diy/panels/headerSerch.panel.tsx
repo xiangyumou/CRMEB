@@ -8,8 +8,11 @@ import {
 import { headerSerchDefault } from '../defaults/headerSerch.default';
 import {
   DiyColourField,
+  DiyCommonStyleSection,
+  DiyHotWordField,
   DiyInputField,
   DiyLinkField,
+  DiyNumberField,
   DiySection,
   DiySetUpTabs,
   DiySliderField,
@@ -17,7 +20,6 @@ import {
   DiyUploadField,
 } from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCommonStyleSection, DiyHotWordField, DiyNumberField } from './_fields';
 
 /**
  * 搜索框 — ports `c_search_box.vue`.

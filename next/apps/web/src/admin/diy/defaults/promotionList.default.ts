@@ -462,4 +462,50 @@ export const promotionListDefault = {
       },
     ],
   },
+  /**
+   * CR-3-g2: `c_home_product.vue:288-316` creates both groups on open. It is
+   * the one copy of this block with **no `max`** and with `isAll` after `min`;
+   * the shape is reproduced as written rather than normalised. No scalar
+   * sliders in this default, so every side is 0.
+   */
+  paddingConfig: {
+    title: '内边距',
+    val: 0,
+    min: 0,
+    isAll: false,
+    valList: [
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+    ],
+  },
+  marginConfig: {
+    title: '外边距',
+    val: 0,
+    min: 0,
+    isAll: false,
+    valList: [
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+    ],
+  },
 } as unknown as PromotionListComponent;

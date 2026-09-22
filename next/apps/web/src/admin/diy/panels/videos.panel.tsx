@@ -3,9 +3,15 @@
 import { videosSchema, type VideosComponent } from '@shop/contracts/diy/schema/videos.schema';
 
 import { videosDefault } from '../defaults/videos.default';
-import { DiySection, DiySetUpTabs, DiySliderField, DiyTabsField, DiyUploadField } from '../fields';
+import {
+  DiyCommonStyleSection,
+  DiySection,
+  DiySetUpTabs,
+  DiySliderField,
+  DiyTabsField,
+  DiyUploadField,
+} from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCommonStyleSection } from './_fields';
 
 /**
  * 视频 — ports `c_video.vue`.

@@ -3,8 +3,9 @@
 import type { DiyListBox } from '@shop/contracts/diy/schema/primitives';
 import { Input, Radio, Switch } from 'antd';
 
-import { DiyFieldRow, DiyImageField, DiyLinkField, DiySortableListField } from '../../fields';
-import type { DiyFieldProps } from '../../panel-api';
+import type { DiyFieldProps } from '../panel-api';
+import { DiyImageField, DiyLinkField, DiySortableListField } from './media-fields';
+import { DiyFieldRow } from './section';
 
 /**
  * `c_menu_list` — the 导航组 / 个人中心菜单 row editor.

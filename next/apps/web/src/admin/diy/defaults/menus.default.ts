@@ -618,4 +618,13 @@ export const menusDefault = {
       },
     ],
   },
+  /**
+   * CR-3-g2 — `c_home_menu.vue:252-256` injects this on open. It draws no row
+   * in either admin (the legacy row list has no `c_custom_btn` for 导航组), but
+   * it is what a 导航组 saved by the old admin carries, so a node created here
+   * now matches one created there.
+   */
+  customBtnConfig: {
+    title: '设计组件',
+  },
 } as unknown as MenusComponent;

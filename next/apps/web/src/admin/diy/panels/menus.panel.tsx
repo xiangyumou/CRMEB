@@ -3,17 +3,19 @@
 import { menusSchema, type MenusComponent } from '@shop/contracts/diy/schema/menus.schema';
 
 import { menusDefault } from '../defaults/menus.default';
-import { DiyColourField, DiyFilletField, DiySection, DiySetUpTabs, DiyTabsField } from '../fields';
-import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 import {
+  DiyColourField,
   DiyCommonStyleSection,
   DiyEnableField,
-  DiyGridItemStyleField,
-  DiyHeaderStyleField,
-  DiyIconStyleField,
+  DiyFilletField,
   DiyMenuListField,
+  DiySection,
+  DiySetUpTabs,
+  DiyTabsField,
   DiyTextConfigField,
-} from './_fields';
+} from '../fields';
+import { bindDiyPanel, defineDiyPanel } from '../panel-api';
+import { DiyGridItemStyleField, DiyHeaderStyleField, DiyIconStyleField } from './_fields';
 import type { DiyIconStyleValue } from './_fields';
 
 /**

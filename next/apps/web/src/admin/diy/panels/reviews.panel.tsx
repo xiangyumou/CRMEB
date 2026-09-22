@@ -3,9 +3,16 @@
 import { reviewsSchema, type ReviewsComponent } from '@shop/contracts/diy/schema/reviews.schema';
 
 import { reviewsDefault } from '../defaults/reviews.default';
-import { DiyColourField, DiySection, DiySetUpTabs, DiySliderField, DiyTabsField } from '../fields';
+import {
+  DiyCheckboxField,
+  DiyColourField,
+  DiyCommonStyleSection,
+  DiySection,
+  DiySetUpTabs,
+  DiySliderField,
+  DiyTabsField,
+} from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCheckboxField, DiyCommonStyleSection } from './_fields';
 
 /**
  * 商品评价 — ports `c_reviews.vue`.

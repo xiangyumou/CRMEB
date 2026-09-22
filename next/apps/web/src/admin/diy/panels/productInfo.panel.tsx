@@ -12,6 +12,7 @@ import { SortableListField } from '@/admin/kit/form/sortable-list-field';
 import { productInfoDefault } from '../defaults/productInfo.default';
 import {
   DiyColourField,
+  DiyCommonStyleSection,
   DiyFieldRow,
   DiySection,
   DiySetUpTabs,
@@ -19,7 +20,6 @@ import {
   DiyTabsField,
 } from '../fields';
 import { bindDiyPanel, defineDiyPanel, type DiyFieldProps } from '../panel-api';
-import { DiyCommonStyleSection } from './_fields';
 
 /**
  * 商品信息 — ports `c_product_info.vue` and the five one-off widgets it is the
@@ -39,11 +39,12 @@ import { DiyCommonStyleSection } from './_fields';
  *   sections: dragging reorders, the switch is `show`, and the per-section
  *   checkboxes are `checkList` over `checkBoxList`.
  *
- * `priceSettings` and `dataSettings` are not in the factory default — the
- * legacy panel injects them from its own `defaultConfig` when it opens a node
+ * `priceSettings` and `dataSettings` come from the legacy panel's own
+ * `defaultConfig`, merged into the node when it opens
  * (`c_product_info.vue:266-274`). This panel adds nothing, so those two
- * sections draw for a node that has them and are silent for one that does not.
- * See CR-3-g2, which asks G1 to put them in the default where they belong.
+ * sections draw for a node that has them and are silent for one that does not;
+ * CR-3-g2 put them in `productInfo.default.ts`, so a fresh node has them and an
+ * older one is left exactly as it was saved.
  */
 
 /** 色调 rows whose stored value is `tabList[].val`, not the index. */
@@ -264,8 +265,8 @@ export default defineDiyPanel<ProductInfoComponent>({
     const specStyle = Number(value.specStyle?.tabVal ?? 0);
     const patch = (key: string, next: unknown): void =>
       onChange({ ...value, [key]: next } as ProductInfoComponent);
-    // Not in the factory default, so the schema types them loosely; see the
-    // note above and CR-3-g2.
+    // Optional on the node — an older save may not carry them — so the schema
+    // types them loosely; see the note above and CR-3-g2.
     const priceSettings = value.priceSettings as DiyGroup | undefined;
     const dataSettings = value.dataSettings as DiyGroup | undefined;
 

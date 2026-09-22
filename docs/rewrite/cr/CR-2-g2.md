@@ -1,7 +1,14 @@
 # CR-2-g2 — 超级组件's inner designer is a surface nobody owns
 
 **Stream** G2 (DIY config panels) · **Against** the rewrite plan, not a frozen file
-· **Status** panel shipped without it, stored value preserved
+· **Status** **decided (option 3) and applied by G3**
+
+> **Applied.** `customComponent` is out of `CREATABLE_COMPONENT_KEYS`
+> (`packages/contracts/src/diy/schema/registry.ts`); it stays in
+> `RENDERABLE_COMPONENT_KEYS`, keeps `customComponent.panel.tsx` and
+> round-trips `customComponents` untouched. Pinned by
+> `round-trip.test.ts::the registry > keeps customComponent renderable but out
+of the palette (CR-2-g2)` and recorded as DIY-009 in `invariants.md`.
 
 ## What it is
 

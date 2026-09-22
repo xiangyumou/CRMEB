@@ -7,7 +7,9 @@ import {
 
 import { goodRecommendDefault } from '../defaults/goodRecommend.default';
 import {
+  DiyCheckboxField,
   DiyColourField,
+  DiyCommonStyleSection,
   DiyFilletField,
   DiyInputField,
   DiyProductPickerField,
@@ -19,12 +21,7 @@ import {
   DiyUploadField,
 } from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import {
-  DiyCheckboxField,
-  DiyClassListField,
-  DiyCommonStyleSection,
-  DiyGoodsLabelField,
-} from './_fields';
+import { DiyClassListField, DiyGoodsLabelField } from './_fields';
 
 /**
  * 优品推荐 — ports `c_good_recommend.vue`, six watchers over four indices.

@@ -3,9 +3,9 @@
 import { richTextSchema, type RichTextComponent } from '@shop/contracts/diy/schema/richText.schema';
 
 import { richTextDefault } from '../defaults/richText.default';
-import { DiySection, DiySetUpTabs } from '../fields';
+import { DiyCommonStyleSection, DiySection, DiySetUpTabs } from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCommonStyleSection, DiyRichTextField } from './_fields';
+import { DiyRichTextField } from './_fields';
 
 /** 富文本 — ports `c_ueditor_box.vue`: the HTML body and 通用样式. */
 export default defineDiyPanel<RichTextComponent>({

@@ -258,4 +258,52 @@ export const pictureCubeDefault = {
       },
     ],
   },
+  /**
+   * CR-3-g2: `c_picture_cube.vue:131-157` creates both groups on open. This
+   * default carries none of the older scalar sliders, so every side falls back
+   * to 0. The `c_common_style` key the same `patchConfig` injects is debris no
+   * renderer reads and is deliberately not added.
+   */
+  paddingConfig: {
+    isAll: false,
+    title: '内边距',
+    val: 0,
+    min: 0,
+    max: 100,
+    valList: [
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+    ],
+  },
+  marginConfig: {
+    isAll: false,
+    title: '外边距',
+    val: 0,
+    min: 0,
+    max: 100,
+    valList: [
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+    ],
+  },
 } as unknown as PictureCubeComponent;

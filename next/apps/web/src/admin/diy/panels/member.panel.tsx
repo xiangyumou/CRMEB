@@ -14,10 +14,13 @@ import { memberSchema, type MemberComponent } from '@shop/contracts/diy/schema/m
 
 import { memberDefault } from '../defaults/member.default';
 import {
+  DiyCheckboxField,
   DiyColourField,
+  DiyCommonStyleSection,
   DiyFilletField,
   DiyInputField,
   DiyLinkField,
+  DiyMenuListField,
   DiySection,
   DiySetUpTabs,
   DiySliderField,
@@ -27,12 +30,7 @@ import {
 } from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 import type { DiyIconStyleValue } from './_fields';
-import {
-  DiyCheckboxField,
-  DiyCommonStyleSection,
-  DiyIconStyleField,
-  DiyMenuListField,
-} from './_fields';
+import { DiyIconStyleField } from './_fields';
 
 /**
  * 会员中心 — ports `c_member.vue`, the panel with the largest key set (about
@@ -51,14 +49,13 @@ import {
  *
  * Three legacy behaviours are deliberately **not** reproduced:
  *
- * - **`patchConfig` writes 59 groups into the node on open** (`:60-700`), 46 of
- *   which `member.default.ts` does not carry. Panels here never add keys, so a row
- *   whose group the node does not have simply does not draw — exactly what the
- *   legacy panel rendered before its own patch ran. A factory-default 会员中心
- *   therefore offers 操作内容, 数据内容 and the four 图文 style keys, and the rest
- *   appears on nodes the old admin has already saved. The fix belongs in the
- *   factory default, not in a panel that would rewrite the node on open; see
- *   CR-3-g2.
+ * - **`patchConfig` writes 59 groups into the node on open** (`:490-1321`).
+ *   Panels here never add keys, so a row whose group the node does not have
+ *   simply does not draw — exactly what the legacy panel rendered before its
+ *   own patch ran. The 46 groups the factory default used to be missing were
+ *   put into `member.default.ts` instead (CR-3-g2), which is where they belong:
+ *   a fresh 会员中心 is now fully configurable without any panel rewriting a
+ *   node on open, and an older node keeps exactly the groups it was saved with.
  * - **The `styleConfig` watcher rewrites stored colours** (`:36-60`): moving to
  *   样式四 / 样式五 swaps `#fff` for `#333` in `nameColor`, `numColor`,
  *   `dataNumColor`, `dataTitleColor` and both `componentBgConfig` stops, and

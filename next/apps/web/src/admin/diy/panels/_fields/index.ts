@@ -1,38 +1,14 @@
 /**
- * Stream G2's private field composites.
+ * Panel-local field composites.
  *
- * `fields/` is G1-owned and frozen. Everything here is either a composition of
- * those frozen editors (`DiyCommonStyleSection`) or a `mobileConfigRight/c_*`
- * widget that has no counterpart in the barrel at all
- * (`c_checkbox`, `c_input_number`, `c_header_switch`, `c_text_config`,
- * `c_hot_word`, `c_menu_list`, `c_datetime_picker`). Nothing here forks an
- * existing editor.
- *
- * CR-1-g2 proposes promoting them into `fields/`.
+ * The eight editors CR-1-g2 asked for — `DiyCommonStyleSection`,
+ * `DiyDataStyleSection`, the six `misc-fields` widgets and `DiyMenuListField` —
+ * were promoted into `@/admin/diy/fields` and are imported from there.
+ * What is left here is the narrower set: compositions specific to one or two
+ * panels (`c_icon_style`, the 宫格 / 头部 style blocks, the hotspot cube, the
+ * promotion tabs, the remove-only goods-label picker, the rich-text box).
+ * Nothing here forks an editor in the barrel.
  */
-
-export { DiyCommonStyleSection, DiyDataStyleSection } from './common-style';
-export type { DiyCommonStyleSectionProps } from './common-style';
-
-export {
-  DiyCheckboxField,
-  DiyDateRangeField,
-  DiyEnableField,
-  DiyHotWordField,
-  DiyNumberField,
-  DiyTextConfigField,
-} from './misc-fields';
-export type {
-  DiyCheckboxFieldProps,
-  DiyDateRangeFieldProps,
-  DiyEnableFieldProps,
-  DiyHotWordFieldProps,
-  DiyNumberFieldProps,
-  DiyTextConfigFieldProps,
-} from './misc-fields';
-
-export { DiyMenuListField } from './menu-list';
-export type { DiyMenuListFieldProps, DiyMenuRow } from './menu-list';
 
 export { DiyGridItemStyleField, DiyHeaderStyleField } from './flat-style';
 export type { DiyGridItemStyleFieldProps, DiyHeaderStyleFieldProps } from './flat-style';

@@ -6,9 +6,15 @@ import {
 } from '@shop/contracts/diy/schema/promotionList.schema';
 
 import { promotionListDefault } from '../defaults/promotionList.default';
-import { DiyColourField, DiySection, DiySetUpTabs, DiyTabsField } from '../fields';
+import {
+  DiyColourField,
+  DiyCommonStyleSection,
+  DiySection,
+  DiySetUpTabs,
+  DiyTabsField,
+} from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCommonStyleSection, DiyPromotionTabsField } from './_fields';
+import { DiyPromotionTabsField } from './_fields';
 
 /**
  * 商品选项卡 — ports `c_home_product.vue`, whose `getRComStyle` is a four-deep

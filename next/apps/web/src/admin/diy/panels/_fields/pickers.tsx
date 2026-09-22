@@ -1,14 +1,26 @@
 'use client';
 
+import { PlusOutlined } from '@ant-design/icons';
 import type { DiyGroup } from '@shop/contracts/diy/schema/primitives';
-import { Radio, Select, Tag } from 'antd';
+import { Button, Radio, Tag } from 'antd';
+import { useState } from 'react';
 
-import { DiyCategoryPickerField, DiyFieldRow } from '../../fields';
+import { DiyCategoryPickerField, DiyFieldRow, DiyPickerModal } from '../../fields';
 import type { DiyFieldProps } from '../../panel-api';
 
 /**
- * Three more widgets with no counterpart in the frozen barrel. See CR-1-g2.
+ * Three more widgets with no counterpart in the barrel, each specific to one or
+ * two panels.
  */
+
+/**
+ * The legacy label API returns `id` as a JSON number and the page stores it as
+ * one; the contract types it as a string. Numeric ids go back to numbers so a
+ * node written here matches one written by the old admin, and anything else is
+ * stored verbatim rather than coerced.
+ */
+const labelId = (value: string): string | number =>
+  /^[0-9]+$/.test(value) ? Number(value) : value;
 
 // ---------------------------------------------------------------------------
 
@@ -94,14 +106,15 @@ export interface DiyGoodsLabelFieldProps extends DiyFieldProps<DiyGroup> {
 /**
  * `c_goods_label` — 商品标签, stored as `{activeValue: id[], list: [{id, label_name}]}`.
  *
- * The legacy widget opens `storeLabelList`, which pages the label API. The DIY
- * data-source port has kinds for products, articles, coupons and 拼团 and none
- * for labels, and a panel may not call a route, so labels already on the node
- * can be removed but new ones cannot be added here yet. Removing keeps the two
- * keys in step exactly as `closeStoreLabel` does: splice `list`, then recompute
- * `activeValue` from what is left.
+ * The legacy widget opens `storeLabelList`, which pages the label API. Since
+ * CR-3-g2 the port has a `labels` kind over `catalog.adminLabelList`, so this
+ * is an ordinary picker again: add through the modal, remove through the tag's
+ * close button.
  *
- * Adding needs a `labels` kind on `DiyDataSource`; see CR-3-g2.
+ * Both directions keep the two keys in step exactly as `closeStoreLabel` does —
+ * write `list`, then recompute `activeValue` from it — and the row keeps the
+ * legacy `label_name` key rather than the DTO's `name`, because the renderer
+ * reads `label_name`.
  */
 export function DiyGoodsLabelField({
   value,
@@ -109,36 +122,42 @@ export function DiyGoodsLabelField({
   disabled = false,
   label,
 }: DiyGoodsLabelFieldProps) {
+  const [open, setOpen] = useState(false);
   const config = value ?? {};
   const rows = (Array.isArray(config.list) ? config.list : []) as DiyGoodsLabelRow[];
 
-  const remove = (id: string | number | undefined): void => {
-    const next = rows.filter((row) => row.id !== id);
+  /** `activeValue` is always `list`'s ids, in `list`'s order. */
+  const emit = (next: DiyGoodsLabelRow[]): void =>
     onChange({ ...config, list: next, activeValue: next.map((row) => row.id) as never });
-  };
 
   return (
     <DiyFieldRow label={label ?? config.title ?? '商品标签'} stacked>
-      {rows.length === 0 ? (
-        <Select
-          disabled
-          style={{ width: '100%' }}
-          placeholder="暂不支持选择商品标签"
-          options={[]}
-        />
-      ) : (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {rows.map((row, index) => (
-            <Tag
-              key={`${String(row.id ?? index)}-${index}`}
-              closable={!disabled}
-              onClose={() => remove(row.id)}
-            >
-              {row.label_name ?? String(row.id ?? '')}
-            </Tag>
-          ))}
-        </div>
-      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+        {rows.map((row, index) => (
+          <Tag
+            key={`${String(row.id ?? index)}-${index}`}
+            closable={!disabled}
+            onClose={() => emit(rows.filter((candidate) => candidate.id !== row.id))}
+          >
+            {row.label_name ?? String(row.id ?? '')}
+          </Tag>
+        ))}
+        <Button
+          size="small"
+          icon={<PlusOutlined />}
+          disabled={disabled}
+          onClick={() => setOpen(true)}
+        >
+          添加
+        </Button>
+      </div>
+      <DiyPickerModal
+        kind="labels"
+        open={open}
+        onClose={() => setOpen(false)}
+        chosen={rows.map((row) => String(row.id ?? ''))}
+        onPick={(item) => emit([...rows, { id: labelId(item.id), label_name: item.name }])}
+      />
     </DiyFieldRow>
   );
 }

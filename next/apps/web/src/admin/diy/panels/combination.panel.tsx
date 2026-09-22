@@ -7,7 +7,9 @@ import {
 
 import { combinationDefault } from '../defaults/combination.default';
 import {
+  DiyCheckboxField,
   DiyColourField,
+  DiyCommonStyleSection,
   DiyFilletField,
   DiyInputField,
   DiySection,
@@ -17,7 +19,6 @@ import {
   DiyUploadField,
 } from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCheckboxField, DiyCommonStyleSection } from './_fields';
 
 /**
  * 拼团 — ports `c_home_pink.vue`, five indices and 26 `rCom` permutations.

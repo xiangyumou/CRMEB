@@ -6,9 +6,15 @@ import {
 } from '@shop/contracts/diy/schema/productService.schema';
 
 import { productServiceDefault } from '../defaults/productService.default';
-import { DiyColourField, DiySection, DiySetUpTabs, DiyTabsField } from '../fields';
+import {
+  DiyCheckboxField,
+  DiyColourField,
+  DiyCommonStyleSection,
+  DiySection,
+  DiySetUpTabs,
+  DiyTabsField,
+} from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCheckboxField, DiyCommonStyleSection } from './_fields';
 
 /**
  * 商品服务 — ports `c_product_service.vue`: the 活动 / 选择 / 参数 / 服务 rows of a

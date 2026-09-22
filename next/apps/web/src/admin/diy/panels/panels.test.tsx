@@ -327,6 +327,173 @@ describe('the swiperBg panel', () => {
   });
 });
 
+/**
+ * 优品推荐's 商品标签 source, which CR-3-g2 turned from an id box into a picker
+ * once the catalog merged `catalog.adminLabelList`.
+ *
+ * The rows keep the legacy shape — `list` of `{id, label_name}` with
+ * `activeValue` the same ids in the same order — because that is what the
+ * renderer reads. The data source here is the stub the provider falls back to,
+ * which is the point of the port: the field is tested without the network.
+ */
+describe('the goodRecommend panel, 商品标签 source', () => {
+  const panel = diyPanels.find((p) => p.key === 'goodRecommend')!;
+
+  const labelSourceNode = (goodsLabel: unknown): DiyComponentValue =>
+    ({
+      ...panel.createDefault(),
+      name: 'goodRecommend',
+      typeConfig: { title: '商品来源', activeValue: 4 },
+      goodsLabel,
+    }) as unknown as DiyComponentValue;
+
+  it('adds a label through the picker and keeps activeValue in step with list', async () => {
+    const user = userEvent.setup();
+    let value = labelSourceNode({ title: '商品标签', activeValue: [], list: [] });
+    const onChange = vi.fn((next: DiyComponentValue) => {
+      value = next;
+    });
+    const { rerender } = renderAdmin(
+      <DiyPanelHost
+        registry={diyPanelRegistry}
+        value={value}
+        onChange={onChange}
+        ctx={makeCtx({ componentKey: 'goodRecommend' })}
+      />,
+    );
+    expect(onChange).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: /添加/ }));
+    await user.click((await screen.findAllByRole('button', { name: '选择' }))[1]!);
+
+    const picked = value.goodsLabel as { activeValue: unknown[]; list: { id: unknown }[] };
+    expect(picked.list).toEqual([{ id: 2, label_name: '示例标签 2' }]);
+    // The id goes back as a number, the way the legacy API and page store it.
+    expect(picked.activeValue).toEqual([2]);
+    expect(diyComponentSchemas.goodRecommend.safeParse(value).success).toBe(true);
+
+    rerender(
+      <DiyPanelHost
+        registry={diyPanelRegistry}
+        value={value}
+        onChange={onChange}
+        ctx={makeCtx({ componentKey: 'goodRecommend' })}
+      />,
+    );
+    // The modal stays open after a pick, so the name is on screen twice: the
+    // tag is the one that is a tag.
+    const tag = screen
+      .getAllByText('示例标签 2')
+      .map((node) => node.closest('.ant-tag'))
+      .find(Boolean) as HTMLElement;
+    await user.click(tag.querySelector('.ant-tag-close-icon') as HTMLElement);
+    const cleared = value.goodsLabel as { activeValue: unknown[]; list: unknown[] };
+    expect(cleared.list).toEqual([]);
+    expect(cleared.activeValue).toEqual([]);
+  });
+
+  it('draws a legacy node read-only without writing, ids and all', () => {
+    const node = labelSourceNode({
+      title: '商品标签',
+      activeValue: [3, 5],
+      list: [
+        { id: 3, label_name: '包邮' },
+        { id: 5, label_name: '新品' },
+      ],
+    });
+    const before = structuredClone(node);
+    const onChange = vi.fn();
+    renderAdmin(
+      <DiyPanelHost
+        registry={diyPanelRegistry}
+        value={node}
+        onChange={onChange}
+        ctx={makeCtx({ componentKey: 'goodRecommend', disabled: true })}
+      />,
+    );
+    expect(screen.getByText('包邮')).toBeInTheDocument();
+    expect(screen.getByText('新品')).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(node).toEqual(before);
+  });
+});
+
+/**
+ * 图片魔方's free-draw layout, which CR-3-g2 asked to either rebuild or leave
+ * alone with a note. It is left alone, because it is not reachable:
+ * `styleConfig.tabVal` is a 0-based index into `c_button_style.vue:132-199`,
+ * whose eleventh and last live entry is index **10** (样式十一, one cell); the
+ * 16-cell free-draw grid is index 11 and is commented out there, so the shipped
+ * legacy admin cannot select it either. See `_fields/cube.tsx`.
+ *
+ * What still has to hold is that a page saved while it *was* live keeps its
+ * areas: the panel must never read or write `picStyle.docPicList`.
+ */
+describe('the pictureCube panel and the unreachable free-draw layout', () => {
+  const panel = diyPanels.find((p) => p.key === 'pictureCube')!;
+
+  /** A node as the old editor left it: tabVal 11, sixteen cells, sixteen areas. */
+  const freeDrawNode = (): DiyComponentValue =>
+    ({
+      ...panel.createDefault(),
+      name: 'pictureCube',
+      styleConfig: { title: '样式选择', tabVal: 11, count: 16 },
+      picStyle: {
+        title: '图片设置',
+        picList: Array.from({ length: 16 }, (_unused, i) => ({
+          image: `/uploads/cube-${i}.png`,
+          link: `/pages/goods_details/index?id=${i}`,
+        })),
+        docPicList: Array.from({ length: 16 }, (_unused, i) => ({
+          doc: { startX: (i % 4) * 90, startY: Math.floor(i / 4) * 90, w: 90, h: 90 },
+          img: `/uploads/cube-${i}.png`,
+          link: `/pages/goods_details/index?id=${i}`,
+        })),
+      },
+    }) as unknown as DiyComponentValue;
+
+  it('opens a free-draw node without writing, and the layout is not in the picker', () => {
+    const node = freeDrawNode();
+    const before = structuredClone(node);
+    const onChange = vi.fn();
+    renderAdmin(
+      <DiyPanelHost
+        registry={diyPanelRegistry}
+        value={node}
+        onChange={onChange}
+        ctx={makeCtx({ componentKey: 'pictureCube' })}
+      />,
+    );
+    expect(onChange).not.toHaveBeenCalled();
+    expect(node).toEqual(before);
+    // Eleven layouts, exactly what the old admin offers — no 16-cell entry.
+    expect(screen.queryByText(/16 格/)).not.toBeInTheDocument();
+  });
+
+  it('keeps docPicList when a cell is edited', async () => {
+    const user = userEvent.setup();
+    let value = freeDrawNode();
+    const areas = structuredClone((value.picStyle as { docPicList: unknown }).docPicList);
+    const onChange = vi.fn((next: DiyComponentValue) => {
+      value = next;
+    });
+    renderAdmin(
+      <DiyPanelHost
+        registry={diyPanelRegistry}
+        value={value}
+        onChange={onChange}
+        ctx={makeCtx({ componentKey: 'pictureCube' })}
+      />,
+    );
+    await user.type(screen.getAllByPlaceholderText('未选择链接')[0]!, '!');
+    expect(onChange).toHaveBeenCalled();
+    const picStyle = value.picStyle as { picList: { link?: string }[]; docPicList: unknown };
+    expect(picStyle.picList[0]?.link).toBe('/pages/goods_details/index?id=0!');
+    expect(picStyle.docPicList).toEqual(areas);
+    expect(diyComponentSchemas.pictureCube.safeParse(value).success).toBe(true);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // the two families every other panel is built from
 // ---------------------------------------------------------------------------
@@ -408,8 +575,8 @@ describe('the menus panel, for the c_menu_list family', () => {
 
 /**
  * The tabs-plus-style family — a panel whose sections are chosen by indices in
- * the node and which ends in 通用样式. 会员中心 is the extreme case: five indices,
- * and most of its keys are ones only a legacy-saved node carries (CR-3-g2).
+ * the node and which ends in 通用样式. 会员中心 is the extreme case: five indices
+ * over about eighty keys, 46 of which CR-3-g2 added to the factory default.
  */
 describe('the member panel, for the tabs-and-style family', () => {
   const panel = diyPanels.find((p) => p.key === 'member')!;
@@ -485,11 +652,12 @@ describe('the member panel, for the tabs-and-style family', () => {
   });
 
   it('draws no row for a group the node does not carry', () => {
-    // The factory default has none of the `ms2*` keys — CR-3-g2 — and the panel
-    // must leave it that way rather than inventing them to have something to
-    // render.
-    const bare = { ...panel.createDefault(), name: 'member' } as DiyComponentValue;
-    renderAdmin(host(bare, vi.fn()));
+    // Since CR-3-g2 the factory default carries all 59 groups, so the node that
+    // proves the rule has to be an older one: a 会员中心 saved before the `ms2*`
+    // family existed. The panel must leave it without those rows rather than
+    // inventing the keys to have something to render.
+    const { ms2TitleType: _a, assetMode: _b, ...older } = panel.createDefault();
+    renderAdmin(host({ ...older, name: 'member' } as DiyComponentValue, vi.fn()));
     expect(screen.queryByText('标题类型')).not.toBeInTheDocument();
     expect(screen.queryByText('展示模式')).not.toBeInTheDocument();
   });
@@ -528,11 +696,15 @@ describe('the member panel, for the tabs-and-style family', () => {
     });
     renderAdmin(host(value, onChange));
 
-    // 会员中心's only switches are the 操作内容 rows', one per row.
+    // The 状态 switches are the per-row ones `c_menu_list` draws. On the factory
+    // default (`styleConfig` 样式一, `memberStyleConfig` 样式一, `assetMode`
+    // 数据展示) the 内容设置 tab draws exactly two of the row lists CR-3-g2 put
+    // in the default: 操作内容 and the 会员卡's own two rows.
+    const rows = (key: string): number =>
+      (((panel.createDefault()[key] as { list?: unknown[] } | undefined)?.list ?? []) as unknown[])
+        .length;
     const switches = screen.getAllByRole('switch');
-    expect(switches).toHaveLength(
-      ((panel.createDefault().menuConfig as { list: unknown[] }).list ?? []).length,
-    );
+    expect(switches).toHaveLength(rows('menuConfig') + rows('memberConfig'));
     await user.click(switches[0]!);
     expect((value.menuConfig as { list: { show: boolean }[] }).list[0]!.show).toBe(false);
     expect(diyComponentSchemas.member.safeParse(value).success).toBe(true);
@@ -678,5 +850,212 @@ describe('the production fixtures', () => {
       }
       expect(JSON.stringify(value, null, 2)).toBe(before);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CR-3-g2 — the factory defaults carry every group their panel can draw
+// ---------------------------------------------------------------------------
+
+/**
+ * Thirty-one legacy panels run a `patchConfig(data)` (or a `defaultConfig`
+ * merge) on open that `$set`s every group the node is missing, so in the old
+ * admin **opening a page and saving it changed the stored JSON**. The panels
+ * here never do that — a row draws only when its key is present — which is
+ * what keeps the round-trip suite above meaningful.
+ *
+ * The price is that whatever the legacy panel injected and the factory default
+ * does not carry has no editor on a freshly dragged component. CR-3-g2
+ * measured that gap and it is now closed in `defaults/`: the table below is the
+ * complete list of keys each legacy `patchConfig` can inject, read off the
+ * `.vue`, and every one of them must be in the default.
+ *
+ * Two keys are deliberately excluded, and the assertions say so rather than
+ * quietly dropping them:
+ *
+ * - **`c_common_style`** — injected as a *key* (`{color, color2, lr, type}`) by
+ *   `c_video`, `c_picture_cube` and `c_home_coupon`. No uni-app renderer reads
+ *   it; it is debris from an older editor.
+ * - **`timestamp`** — in `c_product_info`'s `defaultConfig`, but the editor
+ *   store owns it (`createDefault()` returns the body only).
+ *
+ * `customComponents` is not in any list: `c_custom_component.vue`'s
+ * `patchConfig` never creates it, only the inner designer's save does, and that
+ * designer is out of scope (CR-2-g2).
+ */
+const LEGACY_INJECTED_GROUPS: Readonly<Record<string, readonly string[]>> = {
+  // c_member.vue:490-1321
+  member: [
+    'assetConfig',
+    'assetIconColor',
+    'assetIconSize',
+    'assetMode',
+    'assetTextColor',
+    'assetTextSize',
+    'borderConfig',
+    'cardBgColor',
+    'cardBgRadius',
+    'checkboxInfo',
+    'componentBgConfig',
+    'dataNumColor',
+    'dataStyle',
+    'dataTitleColor',
+    'iconStyleConfig',
+    'leftMenuConfig',
+    'marginConfig',
+    'memberConfig',
+    'memberStyleConfig',
+    'menuConfig',
+    'moduleBgColor',
+    'moduleRadius',
+    'moduleStyleText',
+    'moduleTextColor',
+    'ms2ButtonBgColor',
+    'ms2ButtonColor',
+    'ms2ButtonLink',
+    'ms2ButtonText',
+    'ms2ExplainColor',
+    'ms2ExplainIcons',
+    'ms2ExplainText',
+    'ms2IntroColor',
+    'ms2IntroText',
+    'ms2RightsColor',
+    'ms2RightsList',
+    'ms2TitleColor',
+    'ms2TitleImage',
+    'ms2TitleText',
+    'ms2TitleType',
+    'ms3BackgroundImage',
+    'ms3BgColor',
+    'ms3BgMode',
+    'ms3ButtonColor',
+    'ms3ButtonText',
+    'ms3PaddingConfig',
+    'ms3TitleColor',
+    'ms3TitleText',
+    'ms4BackgroundImage',
+    'ms4BgColor',
+    'ms4BgMode',
+    'nameColor',
+    'nameSize',
+    'numColor',
+    'numSize',
+    'paddingConfig',
+    'rightEntryConfig',
+    'shadowConfig',
+    'userInfoConfig',
+    'zIndexConfig',
+  ],
+  // c_custom_component.vue:147-330
+  customComponent: [
+    'borderConfig',
+    'borderDataConfig',
+    'bottomBgColor',
+    'componentBgConfig',
+    'componentBgDataConfig',
+    'customBtnConfig',
+    'fillet',
+    'filletDataConfig',
+    'marginConfig',
+    'marginDataConfig',
+    'paddingConfig',
+    'paddingDataConfig',
+    'selectType',
+    'setUp',
+    'shadowConfig',
+    'shadowDataConfig',
+  ],
+  // c_home_menu.vue:225-300
+  menus: ['bgColor', 'customBtnConfig', 'fillet', 'headerStyle', 'marginConfig', 'paddingConfig'],
+  // c_product_info.vue:266-274 (patchConfig + the defaultConfig merge)
+  productInfo: [
+    'borderConfig',
+    'cname',
+    'componentBgConfig',
+    'dataSettings',
+    'desc',
+    'indicatorConfig',
+    'marginConfig',
+    'name',
+    'paddingConfig',
+    'priceSettings',
+    'setUp',
+    'shadowConfig',
+    'sortList',
+    'specSettings',
+    'specStyle',
+    'titleConfig',
+    'zIndexConfig',
+  ],
+  // c_home_product.vue:288-316
+  promotionList: ['marginConfig', 'paddingConfig'],
+  // c_picture_cube.vue:131-157
+  pictureCube: ['marginConfig', 'paddingConfig'],
+  // c_video.vue:111-135
+  videos: ['marginConfig', 'paddingConfig'],
+  // c_new_list.vue:201-228
+  articleList: ['marginConfig', 'paddingConfig'],
+};
+
+describe('CR-3-g2 — factory defaults carry every group the legacy panel injects', () => {
+  const entries = Object.entries(LEGACY_INJECTED_GROUPS);
+
+  it.each(entries)('%s', (key, groups) => {
+    const panel = diyPanels.find((p) => p.key === key);
+    expect(panel, `${key} has no panel`).toBeDefined();
+    const node = panel!.createDefault() as Record<string, unknown>;
+    const missing = groups.filter((group) => node[group] === undefined);
+    expect(missing).toEqual([]);
+  });
+
+  it.each(entries)('%s: its default still satisfies the component schema', (key) => {
+    const panel = diyPanels.find((p) => p.key === key)!;
+    const result = diyComponentSchemas[key as keyof typeof diyComponentSchemas].safeParse({
+      ...panel.createDefault(),
+      name: key,
+    });
+    expect(result.error?.issues ?? []).toEqual([]);
+  });
+
+  it('keeps the c_common_style debris and the store-owned timestamp out', () => {
+    for (const key of ['videos', 'pictureCube']) {
+      const node = diyPanels.find((p) => p.key === key)!.createDefault() as Record<string, unknown>;
+      expect(node).not.toHaveProperty('c_common_style');
+    }
+    const productInfo = diyPanels.find((p) => p.key === 'productInfo')!.createDefault() as Record<
+      string,
+      unknown
+    >;
+    expect(productInfo).not.toHaveProperty('timestamp');
+    const custom = diyPanels.find((p) => p.key === 'customComponent')!.createDefault() as Record<
+      string,
+      unknown
+    >;
+    expect(custom).not.toHaveProperty('customComponents');
+  });
+
+  /**
+   * The four-sided spacing pairs are *derived* from the older scalar sliders
+   * (`c_video.vue:111-135` and its copies), and the scalars stay in the node
+   * because the uni renderer still falls back to them. Both must agree, or the
+   * editor and the renderer disagree about the same node.
+   */
+  it.each(['videos', 'articleList'])('%s keeps the scalar spacing in step with the pair', (key) => {
+    const node = diyPanels.find((p) => p.key === key)!.createDefault() as Record<string, unknown>;
+    const val = (group: string): number =>
+      Number((node[group] as { val?: unknown } | undefined)?.val ?? 0);
+    const sides = ((node.paddingConfig as { valList?: { val?: unknown }[] }).valList ?? []).map(
+      (side) => Number(side.val ?? 0),
+    );
+    expect(sides).toEqual([
+      val('topConfig'),
+      val('prConfig'),
+      val('bottomConfig'),
+      val('prConfig'),
+    ]);
+    const margins = ((node.marginConfig as { valList?: { val?: unknown }[] }).valList ?? []).map(
+      (side) => Number(side.val ?? 0),
+    );
+    expect(margins).toEqual([val('mbConfig'), 0, 0, 0]);
   });
 });

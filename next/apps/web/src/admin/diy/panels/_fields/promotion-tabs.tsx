@@ -33,9 +33,12 @@ import { DiyGoodsLabelField } from './pickers';
  * the node says, so opening such a tab does not silently reinterpret it as
  * something else.
  *
- * Brands have no picker: the brand tree came from an admin route and the DIY
- * data-source port has no kind for it. The stored `brandConfig.brandVal` is
- * shown read-only rather than dropped. See CR-3-g2.
+ * Brands have no picker, and will not get one: 品牌 (`eb_store_brand`) is not in
+ * the frozen schema, so no route lists brands and there is nothing to page
+ * through. CR-3-g2 asked for a `brand` kind on `DiyPickerKind` and it was
+ * dropped for that reason. The stored `brandConfig.brandVal` is shown read-only
+ * rather than discarded, so a tab saved against a brand still renders what it
+ * always rendered.
  */
 
 export interface DiyPromotionRow {

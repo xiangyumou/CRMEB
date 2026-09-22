@@ -30,9 +30,22 @@ import type { DiyFieldProps } from '../../panel-api';
  * editing the cells here leaves it untouched rather than writing a mirror of a
  * selection this panel does not have.
  *
- * `picStyle.docPicList` belongs to 样式十一, the free-draw layout whose areas are
- * dragged out on a canvas. That canvas is not rebuilt; its areas are carried
- * through untouched. See CR-3-g2.
+ * **The free-draw canvas is not 样式十一, and nothing can select it.** CR-3-g2
+ * read `c_pictrue.vue:178` (`v-if="style === 11"`) as 样式十一's editor, but
+ * `style` is `styleConfig.tabVal`, a **0-based** index into the list above.
+ * That list has eleven live entries, `cube2` … `cube12`, so its last index is
+ * 10 — 样式十一 is the one-cell `cube12` layout, edited here like any other.
+ * Index 11 is `cube1`, the 16-cell free-draw grid at
+ * `c_button_style.vue:199-204`, and it is **commented out**: the shipped legacy
+ * admin cannot select it either, so `docPicList` only ever reached a page saved
+ * while that entry was still live.
+ *
+ * So there is no reachable canvas to port and no selectable style to hide.
+ * `CUBE_OPTIONS` offers exactly the eleven layouts the old admin offers,
+ * `picStyle.docPicList` is never read or written here so such a page saves back
+ * byte-identical, and the storefront still draws the areas it carries
+ * (`pictureCube.vue:330-331`, `v-else-if="style == 11"` + `v-if="docPicList.length"`).
+ * Recorded in `docs/rewrite/status/g3.md`.
  */
 
 /** Cell count per layout, from `c_button_style.vue`'s `pictureCube` list. */

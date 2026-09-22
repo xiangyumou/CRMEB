@@ -513,4 +513,106 @@ export const productInfoDefault = {
       },
     ],
   },
+  /**
+   * CR-3-g2 — the two groups `c_product_info.vue:266-274` merges in from its
+   * own `defaultConfig` when a node is opened. 价格设置 and 数据设置 are the
+   * only two of that object's keys the default did not already carry; its
+   * `timestamp` is deliberately left out, because the store owns it.
+   */
+  priceSettings: {
+    title: '价格设置',
+    colorTone: {
+      title: '色调',
+      tabVal: 0,
+      tabList: [
+        {
+          name: '跟随主题风格',
+          val: 0,
+        },
+        {
+          name: '自定义',
+          val: 1,
+        },
+      ],
+    },
+    finalPriceColor: {
+      title: '到手价颜色',
+      name: 'finalPriceColor',
+      default: [
+        {
+          item: '#E93323',
+        },
+      ],
+      color: [
+        {
+          item: '#E93323',
+        },
+      ],
+    },
+    sellingPriceColor: {
+      title: '售价颜色',
+      name: 'sellingPriceColor',
+      default: [
+        {
+          item: '#333333',
+        },
+      ],
+      color: [
+        {
+          item: '#333333',
+        },
+      ],
+    },
+    priceFontSize: {
+      title: '价格字号',
+      val: 24,
+      min: 12,
+      max: 50,
+    },
+  },
+  dataSettings: {
+    title: '数据设置',
+    originalPriceColor: {
+      title: '原价颜色',
+      name: 'originalPriceColor',
+      default: [
+        {
+          item: '#999999',
+        },
+      ],
+      color: [
+        {
+          item: '#999999',
+        },
+      ],
+    },
+    stockColor: {
+      title: '库存颜色',
+      name: 'stockColor',
+      default: [
+        {
+          item: '#999999',
+        },
+      ],
+      color: [
+        {
+          item: '#999999',
+        },
+      ],
+    },
+    salesColor: {
+      title: '销量颜色',
+      name: 'salesColor',
+      default: [
+        {
+          item: '#999999',
+        },
+      ],
+      color: [
+        {
+          item: '#999999',
+        },
+      ],
+    },
+  },
 } as unknown as ProductInfoComponent;

@@ -40,8 +40,23 @@ export interface DiyTreeNode {
   children?: DiyTreeNode[] | undefined;
 }
 
-/** The record types a DIY component can point at or embed. */
-export type DiyPickerKind = 'product' | 'article' | 'coupon' | 'combination';
+/**
+ * The record types a DIY component can point at or embed.
+ *
+ * `labels` (商品标签) was added by CR-3-g2, once the catalog stream merged
+ * `catalog.adminLabelList`. **`brand` was not**: 品牌 (`eb_store_brand`) is not
+ * in the frozen schema, so there is no table, no route and nothing to page
+ * through. Exactly two legacy rows used the `c_brand` widget and neither gets a
+ * picker here:
+ *
+ * - `c_home_goods_list.vue:77-81` — 商品列表's `brandList`, in the 筛选商品
+ *   branch. The key is in neither `goodList.default.ts` nor `goodList.schema.ts`,
+ *   so the row was already unreachable; an older node carrying one keeps it.
+ * - `c_promotion.vue:75` — the per-tab `brandConfig.brandVal` of 商品选项卡.
+ *   `_fields/promotion-tabs.tsx` shows it read-only rather than dropping it, and
+ *   still draws the 品牌 source branch when a tab says that is what it is.
+ */
+export type DiyPickerKind = 'product' | 'article' | 'coupon' | 'combination' | 'labels';
 
 export interface DiyDataSource {
   list(kind: DiyPickerKind, query: DiyPickerQuery): Promise<DiyPickerResult>;
@@ -78,6 +93,10 @@ export function createStubDiyDataSource(): DiyDataSource {
       id: String(i + 1),
       name: `示例拼团 ${i + 1}`,
       subtitle: `¥${(i + 1) * 9}.90`,
+    })),
+    labels: Array.from({ length: 6 }, (_unused, i) => ({
+      id: String(i + 1),
+      name: `示例标签 ${i + 1}`,
     })),
   };
 

@@ -1,7 +1,18 @@
 # CR-1-g2 — eight field editors the frozen barrel is missing
 
 **Stream** G2 (DIY config panels) · **Against** G1, `next/apps/web/src/admin/diy/fields/`
-· **Status** workaround in place, panels unblocked
+· **Status** **accepted and applied by G3**
+
+> **Applied.** The three files moved verbatim into `fields/` and are exported
+> from `fields/index.ts`; twenty-six panels and the panel suite import them
+> from `../fields`, and `panels/_fields/` keeps only the panel-local
+> composites. No assertion was edited.
+>
+> The three notes below are **not** applied. Note 3 (`DiyCategoryPickerField`'s
+> `activeValue?: unknown`) was weighed during G3's picker work and deliberately
+> left alone: the brief asked for real pickers, not a frozen prop-type change,
+> and the two call sites that spell the props out still work. It stays an
+> ergonomics item for whoever next opens `fields/picker-fields.tsx`.
 
 ## What is missing
 

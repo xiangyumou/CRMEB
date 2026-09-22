@@ -3,9 +3,15 @@
 import { followSchema, type FollowComponent } from '@shop/contracts/diy/schema/follow.schema';
 
 import { followDefault } from '../defaults/follow.default';
-import { DiyInputField, DiySection, DiySetUpTabs, DiyTabsField, DiyUploadField } from '../fields';
+import {
+  DiyCommonStyleSection,
+  DiyInputField,
+  DiySection,
+  DiySetUpTabs,
+  DiyTabsField,
+  DiyUploadField,
+} from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCommonStyleSection } from './_fields';
 
 /**
  * 关注公众号 — ports `c_wechat_attention.vue`.

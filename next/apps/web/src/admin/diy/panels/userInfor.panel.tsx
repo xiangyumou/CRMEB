@@ -6,9 +6,16 @@ import {
 } from '@shop/contracts/diy/schema/userInfor.schema';
 
 import { userInforDefault } from '../defaults/userInfor.default';
-import { DiyColourField, DiySection, DiySetUpTabs, DiyTabsField, DiyUploadField } from '../fields';
+import {
+  DiyCheckboxField,
+  DiyColourField,
+  DiyCommonStyleSection,
+  DiySection,
+  DiySetUpTabs,
+  DiyTabsField,
+  DiyUploadField,
+} from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCheckboxField, DiyCommonStyleSection } from './_fields';
 
 /**
  * 用户信息 — ports `c_userInfor.vue`: the member card at the top of 个人中心.

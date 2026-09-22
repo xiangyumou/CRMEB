@@ -100,12 +100,20 @@ export const ADMIN_ONLY_COMPONENT_KEYS = ['bottomMenu'] as const;
 /**
  * Keys the editor palette offers. `pageFoot` and `bottomMenu` are singletons
  * owned by the page settings rather than draggable palette entries.
+ *
+ * `customComponent` (超级组件) is excluded for a third reason (CR-2-g2, option
+ * 3): its inner layout is drawn in a second drag-and-drop designer
+ * (`template/admin/src/components/CustomDesign/`) that this rewrite does not
+ * build, so a freshly created one would render nothing and could never be
+ * filled. It stays renderable, keeps its config panel and round-trips its
+ * `customComponents` tree untouched — existing nodes remain fully editable.
  */
 export const CREATABLE_COMPONENT_KEYS = DIY_COMPONENT_KEYS.filter(
   (key) =>
     !(RENDER_ONLY_COMPONENT_KEYS as readonly string[]).includes(key) &&
     key !== 'pageFoot' &&
-    key !== 'bottomMenu',
+    key !== 'bottomMenu' &&
+    key !== 'customComponent',
 );
 
 /** Keys `pageDesign.vue` will render. Mirrors uni `diyComponentNames`. */

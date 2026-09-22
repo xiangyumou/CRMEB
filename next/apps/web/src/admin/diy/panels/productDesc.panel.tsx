@@ -6,9 +6,16 @@ import {
 } from '@shop/contracts/diy/schema/productDesc.schema';
 
 import { productDescDefault } from '../defaults/productDesc.default';
-import { DiyColourField, DiySection, DiySetUpTabs, DiySliderField, DiyTabsField } from '../fields';
+import {
+  DiyColourField,
+  DiyCommonStyleSection,
+  DiySection,
+  DiySetUpTabs,
+  DiySliderField,
+  DiyTabsField,
+} from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyAlignField, DiyCommonStyleSection } from './_fields';
+import { DiyAlignField } from './_fields';
 
 /**
  * 产品介绍 — ports `c_product_desc.vue`. A商品详情 component: one switch on the

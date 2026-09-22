@@ -3,9 +3,15 @@
 import { couponSchema, type CouponComponent } from '@shop/contracts/diy/schema/coupon.schema';
 
 import { couponDefault } from '../defaults/coupon.default';
-import { DiyColourField, DiySection, DiySetUpTabs, DiySliderField, DiyTabsField } from '../fields';
+import {
+  DiyColourField,
+  DiyCommonStyleSection,
+  DiySection,
+  DiySetUpTabs,
+  DiySliderField,
+  DiyTabsField,
+} from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCommonStyleSection } from './_fields';
 
 /**
  * 优惠券 — ports `c_home_coupon.vue`.

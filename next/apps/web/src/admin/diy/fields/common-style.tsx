@@ -12,22 +12,17 @@ import type {
 } from '@shop/contracts/diy/schema/primitives';
 import { Fragment } from 'react';
 
-import {
-  DiyColourField,
-  DiyFilletField,
-  DiySection,
-  DiySliderField,
-  DiySpacingField,
-  DiyTabsField,
-  DiyUploadField,
-} from '../../fields';
-import type { DiyComponentValue } from '../../panel-api';
+import type { DiyComponentValue } from '../panel-api';
+import { DiyColourField, DiySliderField, DiyTabsField } from './basic-fields';
+import { DiyFilletField, DiySpacingField } from './box-fields';
+import { DiyUploadField } from './media-fields';
+import { DiySection } from './section';
 
 /**
  * 通用样式 — a faithful port of
  * `template/admin/src/components/mobileConfigRight/c_common_style.vue`.
  *
- * Composed entirely from the frozen field editors in `../../fields`; nothing
+ * Composed entirely from the other field editors in this directory; nothing
  * here forks or reimplements one. It exists because the legacy editor renders
  * exactly this block, in exactly this order, at the bottom of the 样式设置 tab of
  * 32 of the 33 config panels, and repeating twelve fields in every panel is how

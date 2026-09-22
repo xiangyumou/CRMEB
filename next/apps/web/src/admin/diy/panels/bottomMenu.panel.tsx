@@ -7,15 +7,17 @@ import {
 
 import { bottomMenuDefault } from '../defaults/bottomMenu.default';
 import {
+  DiyCheckboxField,
   DiyColourField,
+  DiyCommonStyleSection,
   DiyFilletField,
+  DiyMenuListField,
   DiySection,
   DiySetUpTabs,
   DiySliderField,
   DiyTabsField,
 } from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCheckboxField, DiyCommonStyleSection, DiyMenuListField } from './_fields';
 
 /**
  * 底部菜单 — ports `c_bottom_menu.vue`, the商品详情 footer bar. A singleton: the

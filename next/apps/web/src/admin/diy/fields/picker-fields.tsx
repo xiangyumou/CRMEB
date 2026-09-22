@@ -15,12 +15,14 @@ import type { DiyFieldProps } from '../panel-api';
 import { DiyFieldRow } from './section';
 
 /**
- * Record pickers: 商品 / 文章 / 优惠券 / 拼团 and the two category trees.
+ * Record pickers: 商品 / 文章 / 优惠券 / 拼团 / 商品标签 and the two category trees.
  *
- * They read through `DiyDataSource`, never through a route, so a panel using
- * them works against the stub until the owning domain ships. What the page
- * stores is the id list — resolving ids back to names is the picker's job on
- * open, not the payload's.
+ * They read through `DiyDataSource`, never through a route. The editor installs
+ * `createCatalogDiyDataSource`, which answers 商品, 商品分类 and 商品标签 from the
+ * catalog contracts and leaves 文章 / 优惠券 / 拼团 on the stub until streams F2
+ * and D ship their lists — so every picker renders either way and no panel
+ * changes when one arrives. What the page stores is the id list; resolving ids
+ * back to names is the picker's job on open, not the payload's.
  */
 
 const KIND_LABEL: Record<DiyPickerKind, string> = {
@@ -28,9 +30,10 @@ const KIND_LABEL: Record<DiyPickerKind, string> = {
   article: '文章',
   coupon: '优惠券',
   combination: '拼团商品',
+  labels: '商品标签',
 };
 
-interface PickerModalProps {
+export interface DiyPickerModalProps {
   kind: DiyPickerKind;
   open: boolean;
   onClose: () => void;
@@ -38,7 +41,12 @@ interface PickerModalProps {
   chosen: readonly string[];
 }
 
-function PickerModal({ kind, open, onClose, onPick, chosen }: PickerModalProps) {
+/**
+ * The searchable, paged modal behind every record picker. Exported so a
+ * composite that stores its rows in a shape of its own — `c_goods_label`'s
+ * `{id, label_name}`, say — reuses this one list rather than growing a second.
+ */
+export function DiyPickerModal({ kind, open, onClose, onPick, chosen }: DiyPickerModalProps) {
   const source = useDiyDataSource();
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(1);
@@ -175,7 +183,7 @@ export function DiyRecordPickerField({
           添加
         </Button>
       </div>
-      <PickerModal
+      <DiyPickerModal
         kind={kind}
         open={open}
         chosen={chosen}

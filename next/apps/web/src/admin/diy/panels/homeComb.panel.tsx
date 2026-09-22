@@ -5,8 +5,12 @@ import { homeCombSchema, type HomeCombComponent } from '@shop/contracts/diy/sche
 import { homeCombDefault } from '../defaults/homeComb.default';
 import {
   DiyColourField,
+  DiyCommonStyleSection,
   DiyFilletField,
+  DiyHotWordField,
   DiyInputField,
+  DiyMenuListField,
+  DiyNumberField,
   DiySection,
   DiySetUpTabs,
   DiySliderField,
@@ -14,13 +18,7 @@ import {
   DiyUploadField,
 } from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import {
-  DiyCommonStyleSection,
-  DiyHotWordField,
-  DiyMenuListField,
-  DiyNumberField,
-  DiyTabListField,
-} from './_fields';
+import { DiyTabListField } from './_fields';
 
 /**
  * 组合组件 — ports `c_home_comb.vue`: the page header, search box, category tabs

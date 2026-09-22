@@ -439,4 +439,52 @@ export const articleListDefault = {
       },
     ],
   },
+  /**
+   * CR-3-g2: `c_new_list.vue:201-228` creates both groups on open. The padding
+   * sides come from `topConfig` / `prConfig` / `bottomConfig` / `prConfig`
+   * (0 / 10 / 0 / 10 here) and the top margin from `mbConfig` (0). The scalars
+   * stay and are kept in step, as `userInfor.default.ts` does.
+   */
+  paddingConfig: {
+    isAll: false,
+    title: '内边距',
+    val: 0,
+    min: 0,
+    max: 100,
+    valList: [
+      {
+        val: 0,
+      },
+      {
+        val: 10,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 10,
+      },
+    ],
+  },
+  marginConfig: {
+    isAll: false,
+    title: '外边距',
+    val: 0,
+    min: 0,
+    max: 100,
+    valList: [
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+      {
+        val: 0,
+      },
+    ],
+  },
 } as unknown as ArticleListComponent;

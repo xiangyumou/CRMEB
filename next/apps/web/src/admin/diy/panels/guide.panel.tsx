@@ -3,9 +3,15 @@
 import { guideSchema, type GuideComponent } from '@shop/contracts/diy/schema/guide.schema';
 
 import { guideDefault } from '../defaults/guide.default';
-import { DiyColourField, DiySection, DiySetUpTabs, DiySliderField, DiyTabsField } from '../fields';
+import {
+  DiyColourField,
+  DiyCommonStyleSection,
+  DiySection,
+  DiySetUpTabs,
+  DiySliderField,
+  DiyTabsField,
+} from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCommonStyleSection } from './_fields';
 
 /**
  * 辅助线 — ports `c_auxiliary_line.vue`.

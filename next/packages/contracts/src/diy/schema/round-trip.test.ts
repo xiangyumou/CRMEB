@@ -187,12 +187,21 @@ describe('component schemas', () => {
   });
 
   it('keeps the three render-only keys out of the palette', () => {
-    expect(CREATABLE_COMPONENT_KEYS).toHaveLength(28);
+    expect(CREATABLE_COMPONENT_KEYS).toHaveLength(27);
     for (const key of RENDER_ONLY_COMPONENT_KEYS) {
       expect(CREATABLE_COMPONENT_KEYS).not.toContain(key);
     }
     expect(CREATABLE_COMPONENT_KEYS).not.toContain('pageFoot');
     expect(CREATABLE_COMPONENT_KEYS).not.toContain('bottomMenu');
+  });
+
+  it('keeps customComponent renderable but out of the palette (CR-2-g2)', () => {
+    // 超级组件's inner designer is not in this build, so an empty one could
+    // never be filled; existing nodes still render, parse and round-trip.
+    expect(CREATABLE_COMPONENT_KEYS).not.toContain('customComponent');
+    expect(RENDERABLE_COMPONENT_KEYS).toContain('customComponent');
+    expect(DIY_COMPONENT_KEYS).toContain('customComponent');
+    expect(RENDER_ONLY_COMPONENT_KEYS).not.toContain('customComponent');
   });
 
   it.each(DIY_COMPONENT_KEYS)('%s pins its own name', (key) => {

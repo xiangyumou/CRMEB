@@ -1,8 +1,34 @@
 # CR-3-g2 — factory defaults lag the keys the legacy panels inject on open
 
 **Stream** G2 (DIY config panels) · **Against** `next/apps/web/src/admin/diy/defaults/**`
-(G1-owned, frozen) and `schema/data-source.tsx` · **Status** panels shipped, rows
-that have no key do not draw
+(G1-owned, frozen) and `schema/data-source.tsx` · **Status** **accepted and
+applied by G3**
+
+> **Applied**, with two corrections to this document.
+>
+> 1. **The defaults are extended.** Eight `defaults/*.default.ts` gained exactly
+>    the groups and values their legacy `patchConfig` / `defaultConfig` merge
+>    injects, read off the `.vue` rather than guessed: `member` +46,
+>    `customComponent` +7, `productInfo` +2, `articleList` / `videos` /
+>    `pictureCube` / `promotionList` +2 each, `menus` +1. `c_common_style` is not
+>    added (debris, as this CR says) and neither is `timestamp` (the editor store
+>    owns it) nor `customComponents` (never injected by `patchConfig`, only by
+>    the inner designer's save; out of scope per CR-2-g2). The four-sided spacing
+>    pairs are kept in step with the scalars they derive from. No panel writes on
+>    open; the fixture round-trip is unchanged.
+> 2. **`DiyPickerKind` gains `labels`, not `brand`.** 品牌 has no table in the
+>    frozen schema, so there is no route to page and nothing to pick. The two
+>    legacy rows are named in `data-source.tsx`; one was already unreachable and
+>    the other stays read-only.
+> 3. **The 样式十一 canvas is a misreading — off by one.** `styleConfig.tabVal`
+>    is a **0-based** index into `c_button_style.vue:132-199`, whose last live
+>    entry is index 10 (样式十一, a one-cell layout `_fields/cube.tsx` already
+>    edits). The free-draw grid gated on `style === 11` is index 11, `cube1`,
+>    `count: 16` — and it is **commented out** at `c_button_style.vue:199-204`,
+>    so the shipped legacy admin cannot select it either. There is no reachable
+>    canvas to port and no style to hide. `picStyle.docPicList` is never read or
+>    written by the panel, so a page saved while that entry was live round-trips
+>    byte for byte and the storefront still draws its areas.
 
 ## What it is
 

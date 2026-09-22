@@ -9,6 +9,10 @@ import { Typography } from 'antd';
 import { customComponentDefault } from '../defaults/customComponent.default';
 import {
   DiyCategoryPickerField,
+  DiyCommonStyleSection,
+  DiyDataStyleSection,
+  DiyDateRangeField,
+  DiyNumberField,
   DiyRecordPickerField,
   DiySection,
   DiySelectField,
@@ -16,12 +20,6 @@ import {
   DiyTabsField,
 } from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import {
-  DiyCommonStyleSection,
-  DiyDataStyleSection,
-  DiyDateRangeField,
-  DiyNumberField,
-} from './_fields';
 
 /**
  * 超级组件 — ports `c_custom_component.vue`, the only panel whose row set is

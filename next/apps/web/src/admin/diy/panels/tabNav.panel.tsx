@@ -3,9 +3,15 @@
 import { tabNavSchema, type TabNavComponent } from '@shop/contracts/diy/schema/tabNav.schema';
 
 import { tabNavDefault } from '../defaults/tabNav.default';
-import { DiyColourField, DiySection, DiySetUpTabs, DiyTabsField } from '../fields';
+import {
+  DiyColourField,
+  DiyCommonStyleSection,
+  DiySection,
+  DiySetUpTabs,
+  DiyTabsField,
+} from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
-import { DiyCommonStyleSection, DiyTabListField } from './_fields';
+import { DiyTabListField } from './_fields';
 
 /**
  * 选项卡 — ports `c_nav_bar.vue`.
