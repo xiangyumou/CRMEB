@@ -38,12 +38,12 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | J2 images and deployment | merged 2026-09-23 (`c2182657`) | `rewrite/ws-j2-deploy` |
 | H2 uni-app second pass | merged 2026-09-23 (`ab0f3c54`; 154 live / 37 pending / 0 broken) | `rewrite/ws-h2-uniapp` |
 | K1 hardening first pass | merged 2026-09-23 (`756dc9da0`): `next/guards` (10 checks, `pnpm guards`), `next/e2e/admin` (30 Playwright specs), AUDIT.md, CR-1..17-k | `rewrite/ws-k-hardening` |
-| A2 catalog follow-up (CR-4-h2 staff goods ×10, template select, `<SkuPicker>`) | dispatched 2026-09-23 (Opus) | `rewrite/ws-a2-catalog-followup` |
+| A2 catalog follow-up (CR-4-h2 staff goods ×10, template select, `<SkuPicker>`) | merged 2026-09-23 (`a867050b7`; 407 routes; guards 0 failures / 123 pending on wave 4; admin e2e 30/30) | `rewrite/ws-a2-catalog-followup` |
 | E4 user/wechat follow-up (CR-2-h2, CR-6-h2, CR-2-e3, CR-3-e3, CR-1-f3 §1, `routine_appId`, CR-17-k) | dispatched 2026-09-23 (Opus) | `rewrite/ws-e4-user-wechat-followup` |
 | F4 system/kit/DIY follow-up (CR-7-h2, CR-3-d2, CR-3-h2, CR-2-f2, read-only config field) | dispatched 2026-09-23 (Opus) | `rewrite/ws-f4-system-kit-followup` |
 | B3 order/cart/coupon follow-up (CR-1-d2, CR-1-f2, CR-6-f1 fold, CR-5-h2, CR-1-h2, CR-1-f3 §2) | dispatched 2026-09-23 (Opus) | `rewrite/ws-b3-order-followup` |
 | J3 deploy follow-up (CR-1..3-j2, CR-4-k, ETL drill harness, cutover runbook) | dispatched 2026-09-23 (Opus) | `rewrite/ws-j3-deploy-followup` |
-| I storefront e2e | brief `I-storefront-e2e.md`; worktree `ws-i` cut, dispatch paused (cap 5) — next free slot, Sonnet | `rewrite/ws-i-storefront-e2e` |
+| I storefront e2e | dispatched 2026-09-23 (Sonnet 5) into A2's slot; told to merge integration (K1 admin e2e precedent, CR-15-k, A2) first; E4/F4/B3 routes → `test.fixme` | `rewrite/ws-i-storefront-e2e` |
 | CR-2-k invariants ledger edits (51 rows) | queued for a Sonnet executor at the next free slot | — |
 | H3 uni-app third pass | after A2/E4/F4/B3 merge | — |
 | K2 hardening second pass (load smoke, final guard run) | after every stream is merged | — |
@@ -90,3 +90,4 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 - 2026-09-23 — Open CRs routed to the next wave: CR-1..7-h2 (37 pending uni-app calls), CR-1-f3, CR-1-f2, CR-2-f2, CR-1-d2, CR-3-d2, CR-1..3-j2, CR-2-e3, CR-3-e3, CR-6-f1, the `routine_appId` two-claimants sibling of CR-1-j, N1's read-only config descriptor. See the wave-4 briefs.
 - 2026-09-23 — K1 merged; its pending lists (`pending-implementations.ts`, `pending-edits.ts`, `install-domains.ts`) brought to the post-D2/F3/E3 tree; the e2e seed's product image is an inline PNG because F3's dashboard tile really loads it. **CR-15-k** (every `dedupeKey` is `name:id`; BullMQ 6 refuses a custom id with one colon → checkout/ship/receipt answered 500 on a real Redis) fixed in the kernel adapter (`toJobId`, `9139c7627`) with an int test on real Redis; the ship→receive e2e journey is green. CR-1-k already resolved by the bare-import generator. CR-4-k routed to J3, CR-17-k to E4, CR-2-k queued.
 - 2026-09-23 — User lowered the concurrency cap to **5** and asked for model selection per task: Opus 5 for domain/contract/kernel work, Sonnet 5 for scaffolding, ledger/doc edits and test harnesses (I, CR-2-k). Wave 4 dispatched A2/E4/F4/B3/J3 on Opus; I stopped before it started and re-queued.
+- 2026-09-23 — A2 merged (`a867050b7`). Bringing the guards' stream table to wave 4 surfaced 27 marker failures + 13 risk-map failures: CONTRACT-PENDING markers whose route already exists now pend on **H3** (the pass that deletes the marker and binds the screen), marker ownership re-pointed to the wave-4 stream that owes the route (B3/E4/F4/H3), presale risk rows bound to STOCK-004/QUEUE-008/REFUND-002/003, `pending('J2')` rows moved to J3. I dispatched on Sonnet 5 (cap 5 full: E4, F4, B3, J3, I).
