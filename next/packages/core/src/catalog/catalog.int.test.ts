@@ -23,7 +23,8 @@ import {
   productForm,
   userActor,
 } from './catalog.fixtures.repo';
-import './catalog.order-bridge.repo';
+// The order domain answers `OrderFactsPort` (reviewable lines, purchase counts).
+import '../order';
 
 /**
  * The catalog against a real PostgreSQL 17.
@@ -589,8 +590,9 @@ describe('stock', () => {
     await harness.ctx.withTx((tx) => catalogStockPort.reserve(tx, 13, [{ skuId, quantity: 4 }]));
     await harness.ctx.withTx((tx) => catalogStockPort.commit(tx, 13, [{ skuId, quantity: 4 }]));
     // A refund on an order that was also, at some point, cancel-released must
-    // not be mistaken for the replay of that cancel.
-    await harness.ctx.withTx((tx) => catalogStockPort.release(tx, 13, [{ skuId, quantity: 0 }]));
+    // not be mistaken for the replay of that cancel. (An empty line list still
+    // claims the cancel key; a zero-quantity line is refused — STOCK-001.)
+    await harness.ctx.withTx((tx) => catalogStockPort.release(tx, 13, []));
     await harness.ctx.withTx((tx) =>
       catalogStockPort.release(tx, 13, [{ skuId, quantity: 4 }], {
         committed: true,

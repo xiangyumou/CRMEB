@@ -1,11 +1,6 @@
 import type { Tx } from '@shop/db';
 
-import {
-  registerStockPort,
-  type StockLine,
-  type StockPort,
-  type StockReleaseOptions,
-} from '../order/ports';
+import type { StockLine, StockPort, StockReleaseOptions } from '../order/ports';
 import * as repo from './catalog.repo';
 
 /**
@@ -46,11 +41,29 @@ async function rollupFor(tx: Tx, lines: readonly StockLine[]): Promise<void> {
   }
 }
 
+/**
+ * STOCK-001. A line of zero units would pass `stock >= 0` and report success
+ * against no movement at all; a negative one would *add* stock and call it a
+ * sale; a fractional one would leave a fractional shelf. The contracts already
+ * require an integer `quantity >= 1`, so reaching here with anything else is a
+ * programmer error — and one that must stop the caller's transaction rather
+ * than quietly mint inventory. Legacy's helper accepted any number.
+ */
+function assertPositive(lines: readonly StockLine[]): void {
+  for (const line of lines) {
+    if (!Number.isInteger(line.quantity) || line.quantity < 1) {
+      throw new Error(
+        `stock line for sku ${line.skuId} must be a positive integer, got ${line.quantity}`,
+      );
+    }
+  }
+}
+
 /** Collapses duplicate lines: two cart rows of the same SKU are one decrement of two. */
 function mergeLines(lines: readonly StockLine[]): StockLine[] {
+  assertPositive(lines);
   const byId = new Map<number, number>();
   for (const line of lines) {
-    if (line.quantity <= 0) continue;
     byId.set(line.skuId, (byId.get(line.skuId) ?? 0) + line.quantity);
   }
   return [...byId].map(([skuId, quantity]) => ({ skuId, quantity }));
@@ -145,5 +158,3 @@ export const catalogStockPort: StockPort = {
     await rollupFor(tx, merged);
   },
 };
-
-registerStockPort(catalogStockPort);

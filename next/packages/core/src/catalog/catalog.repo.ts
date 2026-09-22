@@ -2313,3 +2313,16 @@ export async function clearSearchHistory(tx: Tx, userId: number): Promise<number
     .returning({ id: searchLogs.id });
   return rows.length;
 }
+
+/** Only the tests need this; everything else goes through the port. */
+export async function stockAndSalesOf(
+  db: DbOrTx,
+  skuId: number,
+): Promise<{ stock: number; sales: number }> {
+  const rows = await db
+    .select({ stock: productSkus.stock, sales: productSkus.sales })
+    .from(productSkus)
+    .where(eq(productSkus.id, skuId))
+    .limit(1);
+  return rows[0] ?? { stock: 0, sales: 0 };
+}

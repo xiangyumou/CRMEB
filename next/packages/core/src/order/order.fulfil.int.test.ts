@@ -13,6 +13,7 @@ import { expressCompanies } from '@shop/db/schema/reference';
 import { admins } from '@shop/db/schema/auth';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, type TestCtx } from '@shop/testing';
+import { registerCatalogDomain } from '../catalog';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { withTx } from '../kernel/tx';
@@ -57,6 +58,7 @@ beforeEach(async () => {
   // `resetOrderPorts` empties the hook registries too, so the paid hook has to
   // go back in or every virtual order below would quietly skip delivery.
   resetOrderPorts();
+  registerCatalogDomain();
   resetFulfilmentPorts();
   registerOrderStateMachine(orderStateMachine);
   installFulfilmentHooks();

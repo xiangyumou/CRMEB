@@ -1,8 +1,8 @@
-// Importing the stand-in adapters installs them as the catalogue/stock
-// fallbacks; the day stream A registers the real ports this line goes away.
-import './catalog.repo';
+import { installFulfilmentHooks } from './order.fulfil.effects';
+import { orderFacts } from './order.facts.repo';
 import { orderStateMachine } from './order.state-machine';
-import { registerOrderStateMachine } from './ports';
+import { installStaffCheck } from './order.staff.service';
+import { registerOrderFacts, registerOrderStateMachine } from './ports';
 
 /**
  * The order domain's public surface.
@@ -23,17 +23,28 @@ import { registerOrderStateMachine } from './ports';
  *
  * **Direction of dependency.** The cart imports the order domain; the order
  * domain never imports the cart. That is why the catalogue seam
- * (`catalog.port.ts`, B1's stand-in until stream A lands) is re-exported from
- * here, and why the two `cart_items` statements checkout needs live in
- * `order.repo.ts`. Recorded in `docs/rewrite/status/b1.md`.
+ * (`catalog.port.ts`, the read interface the catalog implements) is
+ * re-exported from here, and why the two `cart_items` statements checkout
+ * needs live in `order.repo.ts`. Recorded in `docs/rewrite/status/b1.md`.
  */
 
 /**
- * Registering the state machine is a side effect of importing this domain,
- * exactly like a config group or an effect handler: streams C, B2 and D reach
- * it through `getOrderStateMachine()` and never import the implementation.
+ * Everything the order domain registers, in one idempotent call (the shape
+ * `@shop/core/domains` looks for): the state machine streams C, B2 and D reach
+ * through `getOrderStateMachine()`; the `OrderFactsPort` the catalog asks
+ * about purchases and reviewable lines; the staff check `auth: 'staff'` fails
+ * closed without; and the order-paid hook plus the notification handlers that
+ * have to be installed before the first payment lands. Importing the domain
+ * calls it once; a test that `resetOrderPorts()` calls it again.
  */
-registerOrderStateMachine(orderStateMachine);
+export function registerOrderDomain(): void {
+  registerOrderStateMachine(orderStateMachine);
+  registerOrderFacts(orderFacts);
+  installStaffCheck();
+  installFulfilmentHooks();
+}
+
+registerOrderDomain();
 
 export { create, preview, rebuyLines } from './order.checkout.service';
 export { autoCancel, cancel, cancelOrder, sweepExpiredOrders } from './order.cancel.service';
@@ -42,11 +53,7 @@ export { counts, detail, detailOf, list } from './order.query.service';
 export { orderStateMachine } from './order.state-machine';
 export { orderConfig } from './order.config';
 
-/**
- * The catalogue seam. These three disappear the day stream A registers a real
- * `CatalogPort` and `StockPort`; until then the cart and checkout both read
- * variants through them.
- */
+/** The catalogue seam: the read interface the catalog domain registers into. */
 export {
   registerCatalogPort,
   resolveCatalogPort,
@@ -68,18 +75,6 @@ export type {
 // ---------------------------------------------------------------------------
 // stream B2 — fulfilment, the admin console, invoices, the staff console
 // ---------------------------------------------------------------------------
-
-/**
- * Two more import side effects, for the same reason the state machine is one:
- * `auth: 'staff'` fails closed until a `StaffCheck` is registered, and the
- * order-paid hook plus the three notification handlers have to be installed
- * before the first payment lands. Both belong to importing the order domain,
- * not to a bootstrap file somebody can forget to call.
- */
-import './order.fulfil.effects';
-import { installStaffCheck } from './order.staff.service';
-
-installStaffCheck();
 
 export { orderPermissions } from './permissions';
 export { orderFulfilConfig, orderStaffConfig } from './order.fulfil.config';

@@ -6,10 +6,10 @@ import { couponTemplates, userCoupons } from '@shop/db/schema/coupon';
 import { orders } from '@shop/db/schema/order';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, forkTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
+import { registerCatalogDomain, stockAndSalesOf } from '../catalog';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { withTx } from '../kernel/tx';
-import { stockAndSalesOf } from './catalog.repo';
 import * as order from './index';
 import * as repo from './order.repo';
 import { orderStateMachine } from './order.state-machine';
@@ -52,6 +52,7 @@ beforeEach(async () => {
   harness.clock.set(NOW);
   harness.queue.reset();
   resetOrderPorts();
+  registerCatalogDomain();
   registerOrderStateMachine(orderStateMachine);
 });
 

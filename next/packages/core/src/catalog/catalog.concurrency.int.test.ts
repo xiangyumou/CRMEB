@@ -18,7 +18,8 @@ import {
   makeUser,
   userActor,
 } from './catalog.fixtures.repo';
-import './catalog.order-bridge.repo';
+// The order domain answers `OrderFactsPort` (reviewable lines, purchase counts).
+import '../order';
 
 /**
  * One race per conditional state change in the catalog.

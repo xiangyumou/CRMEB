@@ -9,25 +9,15 @@ import {
 } from './ports';
 
 /**
- * The catalog seam, as B1 needs it.
+ * The catalog seam, as the order domain needs it.
  *
- * `order/ports.ts` is frozen and owned by the orchestrator; it declares the
- * `StockPort` but not the *read* side of the catalog, which cart and checkout
- * cannot do without. So this file is the narrow interface B1 codes against
- * until stream A lands, written from A's brief ("Exports other streams rely
- * on": price, stock, product status, kind, freight template id, weight/volume,
- * snapshot payload).
- *
- * When A ships:
- *  1. A calls `registerCatalogPort(...)` and `registerStockPort(...)` from
- *     `core/src/catalog/index.ts`;
- *  2. `catalog.repo.ts` — B1's repo-backed stand-in — is deleted;
- *  3. this file either moves into `ports.ts` or becomes a re-export of A's
- *     types. Nothing in the services changes.
- *
- * Until then `resolveCatalogPort()` / `resolveStockPort()` fall back to B1's
- * own adapters, which read the same tables A owns. That is a deliberate,
- * time-boxed overstep, recorded in `docs/rewrite/status/b1.md`.
+ * `order/ports.ts` declares the `StockPort` (the *write* side of inventory);
+ * this file declares the *read* side — the batch variant read the cart and
+ * checkout price against — because it was written by stream B1 before stream
+ * A existed, and A then implemented it (`catalog/catalog.sale.ts`). B1's own
+ * repo-backed stand-in and the fallback resolution that used it were retired
+ * at merge: every `resolve*()` below now fails closed, and the domain bucket
+ * (`@shop/core/domains`) is what registers the real ports.
  */
 
 export type ProductKind = 'physical' | 'virtual_card' | 'virtual_coupon' | 'virtual_manual';
@@ -100,7 +90,7 @@ export function registerCatalogPort(port: CatalogPort): void {
   registered = port;
 }
 
-/** Test helper; also what stream A's merge uses to prove the fallback is gone. */
+/** Test helper: the buckets test asserts the catalog domain registered itself. */
 export function peekCatalogPort(): CatalogPort | undefined {
   return registered;
 }
@@ -109,33 +99,15 @@ export function resetCatalogPort(): void {
   registered = undefined;
 }
 
-let fallbackCatalog: CatalogPort | undefined;
-let fallbackStock: StockPort | undefined;
-
-/** Installed by `catalog.repo.ts` at import time. Never call this from a service. */
-export function setCatalogFallbacks(catalog: CatalogPort, stock: StockPort): void {
-  fallbackCatalog = catalog;
-  fallbackStock = stock;
-}
-
 export function resolveCatalogPort(): CatalogPort {
-  if (registered) return registered;
-  if (!fallbackCatalog) throw new Error('CatalogPort 未注册，且 B1 的兜底适配器未加载');
-  return fallbackCatalog;
+  if (!registered)
+    throw new Error('CatalogPort 未注册：请先加载 @shop/core/domains 或 @shop/core/catalog');
+  return registered;
 }
 
-/**
- * `getStockPort()` throws until somebody registers one, and stream A has not
- * shipped yet — so B1 catches that and uses its own adapter. The moment A
- * registers the real port this returns it instead, with no other change.
- */
+/** The stock port, as registered by the catalog domain; throws until it is. */
 export function resolveStockPort(): StockPort {
-  try {
-    return getStockPort();
-  } catch {
-    if (!fallbackStock) throw new Error('StockPort 未注册，且 B1 的兜底适配器未加载');
-    return fallbackStock;
-  }
+  return getStockPort();
 }
 
 /**

@@ -7,6 +7,7 @@ import { expressCompanies } from '@shop/db/schema/reference';
 import { admins } from '@shop/db/schema/auth';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, forkTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
+import { registerCatalogDomain } from '../catalog';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { Money } from '../kernel/money';
@@ -51,6 +52,7 @@ beforeEach(async () => {
   harness.clock.set(NOW);
   harness.queue.reset();
   resetOrderPorts();
+  registerCatalogDomain();
   resetFulfilmentPorts();
   registerOrderStateMachine(orderStateMachine);
   installFulfilmentHooks();

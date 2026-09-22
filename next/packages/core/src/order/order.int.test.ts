@@ -6,6 +6,7 @@ import { orderStatusLogs, orders } from '@shop/db/schema/order';
 import { couponTemplates, userCoupons } from '@shop/db/schema/coupon';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, fakePaymentPort, type TestCtx } from '@shop/testing';
+import { registerCatalogDomain, stockAndSalesOf } from '../catalog';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import * as order from './index';
@@ -15,8 +16,8 @@ import {
   registerPaymentPort,
   registerStockPort,
   resetOrderPorts,
+  type StockLine,
 } from './ports';
-import { stockAndSalesOf } from './catalog.repo';
 import { orderStateMachine } from './order.state-machine';
 
 /**
@@ -49,6 +50,7 @@ beforeEach(async () => {
   // The registry is module-level; a port left behind by one test would decide
   // the next one's cancellation.
   resetOrderPorts();
+  registerCatalogDomain();
   registerOrderStateMachine(orderStateMachine);
 });
 
@@ -658,18 +660,31 @@ describe('the stock port', () => {
     expect(await stockAndSalesOf(harness.ctx.db, item.skuId)).toEqual({ stock: 10, sales: 0 });
   });
 
-  /** STOCK-002, at the port itself rather than through checkout. */
+  /**
+   * STOCK-002, at the port itself rather than through checkout. The port's
+   * contract is "name the short lines; the caller aborts its transaction" —
+   * which is what checkout does — so the test plays the caller and proves the
+   * abort leaves the plentiful line untouched too.
+   */
   it('takes nothing when one line of several is short, and names that line', async () => {
     const plenty = await makeProduct({ stock: 10 });
     const scarce = await makeProduct({ stock: 1 });
 
-    const short = await harness.ctx.withTx(async (tx) =>
-      order.resolveStockPort().reserve(tx, 1, [
-        { skuId: plenty.skuId, quantity: 2 },
-        { skuId: scarce.skuId, quantity: 2 },
-      ]),
-    );
+    let short: StockLine[] = [];
+    const aborted = await harness.ctx
+      .withTx(async (tx) => {
+        short = await order.resolveStockPort().reserve(tx, 1, [
+          { skuId: plenty.skuId, quantity: 2 },
+          { skuId: scarce.skuId, quantity: 2 },
+        ]);
+        if (short.length > 0) throw new DomainError('ORDER_OUT_OF_STOCK');
+      })
+      .then(
+        () => false,
+        () => true,
+      );
 
+    expect(aborted).toBe(true);
     expect(short).toEqual([{ skuId: scarce.skuId, quantity: 2 }]);
     expect(await stockAndSalesOf(harness.ctx.db, plenty.skuId)).toEqual({ stock: 10, sales: 0 });
     expect(await stockAndSalesOf(harness.ctx.db, scarce.skuId)).toEqual({ stock: 1, sales: 0 });

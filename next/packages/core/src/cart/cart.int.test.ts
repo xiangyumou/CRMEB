@@ -4,6 +4,8 @@ import { cartItems } from '@shop/db/schema/cart';
 import { productSkus, products } from '@shop/db/schema/catalog';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, forkTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
+// The cart reads variants through the catalog's port, which registers on import.
+import '../catalog';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import * as order from '../order';

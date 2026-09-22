@@ -128,9 +128,10 @@ export async function firstSkuId(harness: TestCtx, productId: string): Promise<n
 /**
  * An order with one line, in a state the catalog cares about.
  *
- * `createdAt` / `updatedAt` are written from the test clock rather than left to
- * `now()`: the auto-review sweep selects on `orders.updated_at`, so a row
- * stamped with the container's wall clock would never come due.
+ * `createdAt` / `updatedAt` / `completedAt` are written from the test clock
+ * rather than left to `now()`: the auto-review sweep selects on
+ * `orders.completed_at`, so a row stamped with the container's wall clock
+ * would never come due.
  */
 export async function makeOrderLine(
   harness: TestCtx,
@@ -163,6 +164,8 @@ export async function makeOrderLine(
       payableAmount: '99.00',
       paidAmount: '99.00',
       paidAt: now,
+      receivedAt: status === 'received' || status === 'completed' ? now : null,
+      completedAt: status === 'completed' ? now : null,
       receiverName: '张三',
       receiverPhone: '13800000000',
       receiverProvince: '广东省',

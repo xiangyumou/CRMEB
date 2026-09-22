@@ -26,14 +26,15 @@
  * transaction the *caller* owns — matching `recordEffect(tx, ctx, input)`, the
  * platform's other "join the transaction you are already in" primitive.
  *
- * ## Four things importing this file does
+ * ## What importing this file registers
  *
  * Importing `@shop/core/catalog` registers the `StockPort` (from
- * `catalog.stock.ts`), the `CatalogPort` B1 reads variants through (from
- * `catalog.sale.ts`, which retires B1's fallback adapter), the 商品设置 config
- * group and the temporary `OrderFactsPort` bridge (from
- * `catalog.order-bridge.repo.ts`). All four are module side effects, which is
- * how `registerStockPort` is meant to be reached; see `order/ports.ts`.
+ * `catalog.stock.ts`), the `CatalogPort` the cart and checkout read variants
+ * through (from `catalog.sale.ts`) and the 商品设置 config group. The two ports
+ * go through `registerCatalogDomain()`, the idempotent shape
+ * `@shop/core/domains` looks for, so a test that `resetOrderPorts()` can put
+ * them back with one call. (The `OrderFactsPort` stand-in that used to live
+ * here moved into the order domain at merge — CR-2-a closed.)
  *
  * ## Not an effect handler
  *
@@ -46,11 +47,20 @@
  * buyer.
  */
 
-// The StockPort, the CatalogPort and the order-facts bridge register
-// themselves on import.
-import './catalog.stock';
-import './catalog.sale';
-import './catalog.order-bridge.repo';
+import { registerCatalogPort } from '../order';
+import { registerStockPort } from '../order/ports';
+import { catalogSalePort } from './catalog.sale';
+import { catalogStockPort } from './catalog.stock';
+// The config group registers itself on import.
+import './catalog.config';
+
+/** Registers the stock and sale ports; called once on import, again after a reset. */
+export function registerCatalogDomain(): void {
+  registerStockPort(catalogStockPort);
+  registerCatalogPort(catalogSalePort);
+}
+
+registerCatalogDomain();
 
 export {
   // admin: categories
@@ -159,6 +169,9 @@ export { catalogSalePort } from './catalog.sale';
 export { catalogConfig } from './catalog.config';
 
 export { catalogPermissions } from './permissions';
+
+/** Test helper for the streams that move stock through the port (order, refund). */
+export { stockAndSalesOf } from './catalog.repo';
 
 /** Pure rules, re-exported for the streams that render the same numbers. */
 export {

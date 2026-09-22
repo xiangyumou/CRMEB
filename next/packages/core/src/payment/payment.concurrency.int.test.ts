@@ -24,6 +24,7 @@ import { drainEffects, resetEffectHandlers } from '../effects';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import * as order from '../order';
+import { registerCatalogDomain } from '../catalog';
 import { registerOrderStateMachine, resetOrderPorts } from '../order/ports';
 import { wechatConfig } from '../wechat';
 import { registerPaymentDomain } from './index';
@@ -94,6 +95,7 @@ beforeEach(async () => {
   // domain registered as the `PaymentPort` — both halves of it.
   resetOrderPorts();
   registerOrderStateMachine(order.orderStateMachine);
+  registerCatalogDomain();
   registerPaymentDomain();
   await configure();
 });

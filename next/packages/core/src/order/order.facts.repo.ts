@@ -2,24 +2,20 @@ import { productReviews } from '@shop/db/schema/catalog';
 import { orderItems, orders } from '@shop/db/schema/order';
 import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm';
 
-import { registerOrderFacts, type OrderFactsPort, type ReviewableLine } from '../order/ports';
+import type { OrderFactsPort, ReviewableLine } from './ports';
 
 /**
- * **Temporary.** The only file in this stream that reads another domain's
- * tables, and the only reason it is allowed to is that it exists to be deleted.
+ * The order domain's answers to the catalog's questions — `OrderFactsPort`
+ * (CR-2-a). Stream A wrote these as a stand-in inside `catalog/` while B1 had
+ * not landed; the orchestrator moved them here at merge, which is where a read
+ * of `orders` belongs. Everything is a read.
  *
- * `CR-2-a` asked for the seam and got it: `OrderFactsPort` now lives in
- * `core/src/order/ports.ts` beside `StockPort`. What is still missing is an
- * *implementation* — the order domain registers none yet — so this file stays
- * as the stand-in that keeps the review routes, the purchase limit and the
- * auto-review job working end to end. The orchestrator moves it into the order
- * domain at merge; the moment anything calls `registerOrderFacts()` later in
- * the import order, this registration is replaced and nothing else changes.
- *
- * Everything here is a read. Nothing in this stream writes an order row.
+ * One deliberate cross-domain touch remains: `findLinesAwaitingReview` joins
+ * `product_reviews` to skip lines the shopper (or an earlier sweep) already
+ * reviewed. The alternative — hand the catalog a cursor and let it filter —
+ * would make the sweep re-scan the same already-reviewed page forever, so the
+ * join stays and is named here rather than hidden.
  */
-
-const REVIEWABLE_STATUSES = ['received', 'completed'] as const;
 
 /** `snapshot` carries the variant label the buyer actually saw. */
 interface OrderItemSnapshotShape {
@@ -34,7 +30,7 @@ function specTextOf(snapshot: unknown): string {
   return '';
 }
 
-export const orderBridge: OrderFactsPort = {
+export const orderFacts: OrderFactsPort = {
   async findReviewableLine(tx, args): Promise<ReviewableLine | null> {
     const rows = await tx
       .select({
@@ -44,8 +40,6 @@ export const orderBridge: OrderFactsPort = {
         skuId: orderItems.skuId,
         snapshot: orderItems.snapshot,
         userId: orders.userId,
-        quantity: orderItems.quantity,
-        refundedQuantity: orderItems.refundedQuantity,
       })
       .from(orderItems)
       .innerJoin(orders, eq(orders.id, orderItems.orderId))
@@ -93,6 +87,12 @@ export const orderBridge: OrderFactsPort = {
     return rows[0]?.total ?? 0;
   },
 
+  /**
+   * Keyed on `completed_at`, which the state machine stamps on the
+   * `received -> completed` transition (B2's sweep or the shopper's own
+   * confirmation), so "N days after completion" means exactly that and not
+   * "N days since anything last touched the row".
+   */
   async findLinesAwaitingReview(tx, args): Promise<ReviewableLine[]> {
     const rows = await tx
       .select({
@@ -109,7 +109,7 @@ export const orderBridge: OrderFactsPort = {
       .where(
         and(
           eq(orders.status, 'completed'),
-          lte(orders.updatedAt, args.completedBefore),
+          lte(orders.completedAt, args.completedBefore),
           isNull(productReviews.id),
           sql`${orderItems.refundedQuantity} < ${orderItems.quantity}`,
         ),
@@ -142,7 +142,3 @@ export const orderBridge: OrderFactsPort = {
     return rows.length > 0;
   },
 };
-
-registerOrderFacts(orderBridge);
-
-export { REVIEWABLE_STATUSES };

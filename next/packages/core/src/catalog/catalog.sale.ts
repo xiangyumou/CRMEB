@@ -2,7 +2,7 @@ import type { DbOrTx } from '@shop/db';
 
 // Through `order/index.ts`, which is the only door `boundaries/core-cross-domain`
 // opens; the interface itself lives in `order/catalog.port.ts`.
-import { registerCatalogPort, type CatalogPort, type SkuForSale } from '../order';
+import type { CatalogPort, SkuForSale } from '../order';
 import * as repo from './catalog.repo';
 
 /**
@@ -18,9 +18,7 @@ import * as repo from './catalog.repo';
  *
  * Both reads sit on the same repo functions, so there is one definition of
  * "on the shelf" (`status = 'on_shelf'`, not soft-deleted, variant visible) and
- * it lives here. Importing this file replaces B1's fallback adapter
- * (`order/catalog.repo.ts`), which reads the catalog's own tables and exists
- * only until this registration happens.
+ * it lives here. `registerCatalogDomain()` in `index.ts` installs it.
  */
 export const catalogSalePort: CatalogPort = {
   async getSkusForSale(db: DbOrTx, skuIds: readonly number[]): Promise<Map<number, SkuForSale>> {
@@ -75,5 +73,3 @@ export const catalogSalePort: CatalogPort = {
     return out;
   },
 };
-
-registerCatalogPort(catalogSalePort);

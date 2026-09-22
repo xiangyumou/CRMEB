@@ -16,6 +16,7 @@ import {
   type TestCtx,
 } from '@shop/testing';
 import { resetEffectHandlers } from '../effects';
+import { registerCatalogDomain, stockAndSalesOf } from '../catalog';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import {
@@ -25,7 +26,6 @@ import {
   startPayment,
 } from '../payment';
 import { wechatConfig } from '../wechat';
-import { stockAndSalesOf } from './catalog.repo';
 import * as order from './index';
 import { orderStateMachine } from './order.state-machine';
 import { registerOrderStateMachine, resetOrderPorts } from './ports';
@@ -88,6 +88,7 @@ beforeEach(async () => {
   gateway.behaviour.signResponsesWithWrongKey = false;
 
   resetOrderPorts();
+  registerCatalogDomain();
   registerOrderStateMachine(orderStateMachine);
   // The real thing, not `fakePaymentPort`. This is the whole point of the file.
   registerPaymentDomain();

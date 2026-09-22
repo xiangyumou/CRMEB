@@ -8,6 +8,7 @@ import { admins } from '@shop/db/schema/auth';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import type { AdminOrderListQuery } from '@shop/contracts/order/order.fulfil.schemas';
+import { registerCatalogDomain } from '../catalog';
 import type { Actor, Ctx } from '../kernel/context';
 import { Money } from '../kernel/money';
 import { withTx } from '../kernel/tx';
@@ -44,6 +45,7 @@ beforeEach(async () => {
   harness.clock.set(NOW);
   harness.queue.reset();
   resetOrderPorts();
+  registerCatalogDomain();
   resetFulfilmentPorts();
   registerOrderStateMachine(orderStateMachine);
   installFulfilmentHooks();
