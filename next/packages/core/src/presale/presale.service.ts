@@ -1,0 +1,402 @@
+import type { PageQuery } from '@shop/contracts/conventions';
+import type {
+  PresaleActivityDetail,
+  PresaleActivityForm,
+  PresaleActivityListItem,
+  PresaleActivityListQuery,
+  PresaleActivityStatusBody,
+  PresaleCard,
+  PresaleDetail,
+  PresaleOrderItem,
+  PresaleOrderListQuery,
+} from '@shop/contracts/presale/schemas';
+import type { Ctx } from '../kernel/context';
+import { DomainError } from '../kernel/errors';
+import { toId, toIdOrNull } from '../kernel/ids';
+import * as repo from './presale.repo';
+import { assertFullPayment, canBuy } from './presale.rules';
+
+/**
+ * Presale services: everything a route file calls.
+ *
+ * The split CONVENTIONS asks for holds throughout — the service decides, the
+ * repo states. Every `if` about an affected row count is here; every SQL
+ * statement is in `presale.repo.ts`. What is *not* here is buying a presale
+ * item: that is an order, and it lives in `presale.order.ts` behind B1's seams.
+ *
+ * The admin surface is audited for free: `handle()` writes an `audit_logs` row
+ * for every mutating admin route, so an operator shortening a 发货承诺 is on the
+ * record without this file writing a line.
+ */
+
+type Paged<T> = { items: T[]; total: number; page: number; pageSize: number };
+
+// ---------------------------------------------------------------------------
+// admin — activities
+// ---------------------------------------------------------------------------
+
+export async function adminActivityList(
+  ctx: Ctx,
+  query: PresaleActivityListQuery,
+): Promise<Paged<PresaleActivityListItem>> {
+  const { rows, total } = await repo.listActivities(ctx.db, {
+    keyword: query.keyword,
+    statuses: asArray(query.status),
+    productId: query.productId === undefined ? undefined : Number(query.productId),
+    sortBy: query.sortBy,
+    sortOrder: query.sortOrder,
+    ...pageBounds(query),
+  });
+  return { items: rows.map(toListItem), total, page: query.page, pageSize: query.pageSize };
+}
+
+export async function adminActivityDetail(
+  ctx: Ctx,
+  input: { id: string },
+): Promise<PresaleActivityDetail> {
+  return toDetail(ctx, await mustFindActivity(ctx, Number(input.id)));
+}
+
+export async function adminActivityCreate(
+  ctx: Ctx,
+  body: PresaleActivityForm,
+): Promise<PresaleActivityDetail> {
+  return ctx.withTx(async (tx) => {
+    assertFullPayment(body);
+    await assertSkusBelongToProduct(tx, body);
+    const now = ctx.clock.now();
+    const row = await repo.insertActivity(tx, {
+      ...activityValues(body),
+      createdAt: now,
+      updatedAt: now,
+    });
+    await repo.replaceActivitySkus(tx, { activityId: row.id, skus: skuValues(body) });
+    return toDetail(ctx, await mustFindActivity(ctx, row.id, tx), tx);
+  });
+}
+
+/**
+ * Edit.
+ *
+ * `shipAfterDays` is copied onto every order when it is *paid*
+ * (`presale_orders.ship_not_before_at`), so shortening or lengthening it
+ * mid-campaign cannot move a promise already made to a shopper. That is the
+ * whole reason the column is duplicated on the order row, and it is the bug
+ * behind legacy's "my 15-day presale suddenly says 30 days".
+ */
+export async function adminActivityUpdate(
+  ctx: Ctx,
+  input: { id: string },
+  body: PresaleActivityForm,
+): Promise<PresaleActivityDetail> {
+  const id = Number(input.id);
+  return ctx.withTx(async (tx) => {
+    assertFullPayment(body);
+    await mustFindActivity(ctx, id, tx);
+    await assertSkusBelongToProduct(tx, body);
+    const now = ctx.clock.now();
+    const moved = await repo.updateActivity(tx, id, { ...activityValues(body), updatedAt: now });
+    if (!moved.won) throw new DomainError('PRESALE_ACTIVITY_NOT_FOUND');
+    await repo.replaceActivitySkus(tx, { activityId: id, skus: skuValues(body) });
+    return toDetail(ctx, await mustFindActivity(ctx, id, tx), tx);
+  });
+}
+
+export async function adminActivitySetStatus(
+  ctx: Ctx,
+  input: { id: string },
+  body: PresaleActivityStatusBody,
+): Promise<PresaleActivityDetail> {
+  const id = Number(input.id);
+  return ctx.withTx(async (tx) => {
+    const moved = await repo.setActivityStatus(tx, {
+      id,
+      // `ended` is terminal: an expired campaign is not re-opened, it is copied.
+      // The window sweep relies on this too — a closed campaign it re-opened
+      // would be closed again a minute later, forever.
+      from: ['draft', 'active', 'paused'],
+      to: body.status,
+      now: ctx.clock.now(),
+    });
+    if (!moved.won) {
+      const existing = await repo.findActivity(tx, id);
+      if (!existing) throw new DomainError('PRESALE_ACTIVITY_NOT_FOUND');
+      throw new DomainError('PRESALE_ACTIVITY_NOT_OPEN', { details: { status: existing.status } });
+    }
+    return toDetail(ctx, await mustFindActivity(ctx, id, tx), tx);
+  });
+}
+
+/**
+ * Soft delete, refused while an order still owes goods.
+ *
+ * Legacy deleted the `eb_store_advance` row outright (`is_del = 1`) and left
+ * every live presale order pointing at nothing, which is why the 预售订单 screen
+ * had an "活动已失效" branch showing an empty card. Here the foreign key is
+ * `ON DELETE RESTRICT` and this guard gives the operator a sentence instead of
+ * a constraint error.
+ */
+export async function adminActivityDelete(ctx: Ctx, input: { id: string }): Promise<void> {
+  const id = Number(input.id);
+  await ctx.withTx(async (tx) => {
+    await mustFindActivity(ctx, id, tx);
+    const live = await repo.countLiveOrders(tx, id);
+    if (live > 0) {
+      throw new DomainError('PRESALE_ACTIVITY_IN_USE', { details: { liveOrders: live } });
+    }
+    await repo.softDeleteActivity(tx, { id, now: ctx.clock.now() });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// admin — orders
+// ---------------------------------------------------------------------------
+
+/**
+ * 预售订单.
+ *
+ * One row per presale order, with the two dates an operator is actually asked
+ * about on the phone: when the money landed and the earliest the parcel may
+ * leave. Both are frozen on the order row, so this list never recomputes a
+ * promise from today's campaign settings.
+ */
+export async function adminOrderList(
+  ctx: Ctx,
+  query: PresaleOrderListQuery,
+): Promise<Paged<PresaleOrderItem>> {
+  const { rows, total } = await repo.listPresaleOrders(ctx.db, {
+    activityId: query.activityId === undefined ? undefined : Number(query.activityId),
+    stages: asArray(query.stage),
+    userId: query.userId === undefined ? undefined : Number(query.userId),
+    sortBy: query.sortBy,
+    sortOrder: query.sortOrder,
+    ...pageBounds(query),
+  });
+  return {
+    items: rows.map((row) => ({
+      orderId: toId(row.orderId),
+      orderNo: row.orderNo,
+      activityId: toId(row.activityId),
+      activityTitle: row.activityTitle,
+      userId: toId(row.userId),
+      nickname: row.nickname,
+      paymentMode: row.paymentMode,
+      stage: row.stage,
+      quantity: row.quantity,
+      payableAmount: row.payableAmount,
+      finalAmount: row.finalAmount,
+      finalPaidAt: row.finalPaidAt?.toISOString() ?? null,
+      finalDueAt: row.finalDueAt?.toISOString() ?? null,
+      shipNotBeforeAt: row.shipNotBeforeAt?.toISOString() ?? null,
+      createdAt: row.createdAt.toISOString(),
+    })),
+    total,
+    page: query.page,
+    pageSize: query.pageSize,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// storefront
+// ---------------------------------------------------------------------------
+
+export async function list(ctx: Ctx, query: PageQuery): Promise<Paged<PresaleCard>> {
+  const now = ctx.clock.now();
+  const { rows, total } = await repo.listActivities(ctx.db, {
+    visibleAt: now,
+    sortBy: 'sortOrder',
+    sortOrder: 'desc',
+    ...pageBounds(query),
+  });
+  return {
+    items: rows.map((row) => toCard(row, now)),
+    total,
+    page: query.page,
+    pageSize: query.pageSize,
+  };
+}
+
+export async function detail(ctx: Ctx, input: { id: string }): Promise<PresaleDetail> {
+  const id = Number(input.id);
+  const now = ctx.clock.now();
+  const activity = await repo.findActivity(ctx.db, id);
+  if (!activity) throw new DomainError('PRESALE_ACTIVITY_NOT_FOUND');
+
+  const [skus, description] = await Promise.all([
+    repo.listActivitySkus(ctx.db, [id]),
+    repo.findProductDescription(ctx.db, activity.productId),
+  ]);
+
+  return {
+    ...toCard(activity, now),
+    sliderImages: activity.sliderImages,
+    perOrderQuantity: activity.perOrderQuantity,
+    description,
+    skus: skus
+      .filter((sku) => sku.isEnabled)
+      .map((sku) => ({
+        skuId: toId(sku.skuId),
+        specText: sku.specText,
+        specValues: sku.specValues,
+        imageUrl: sku.imageUrl,
+        price: sku.price,
+        // The struck-through price is the catalogue's, not the campaign's:
+        // showing 预售价 twice would be a discount of nothing.
+        originalPrice: sku.skuOriginalPrice ?? sku.skuPrice,
+        stock: sku.stock,
+      })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// mapping
+// ---------------------------------------------------------------------------
+
+async function mustFindActivity(
+  ctx: Ctx,
+  id: number,
+  tx?: Parameters<typeof repo.findActivity>[0],
+): Promise<repo.ActivityRow> {
+  const row = await repo.findActivity(tx ?? ctx.db, id);
+  if (!row) throw new DomainError('PRESALE_ACTIVITY_NOT_FOUND');
+  return row;
+}
+
+/**
+ * A SKU the form names must really belong to the product. Without this an
+ * operator (or a hand-crafted body) could attach a 1 元 presale price to
+ * somebody else's SKU and the `product_skus` join would happily serve it.
+ */
+async function assertSkusBelongToProduct(
+  tx: Parameters<typeof repo.skuIdsOfProduct>[0],
+  body: PresaleActivityForm,
+): Promise<void> {
+  if (body.skus.length === 0) return;
+  const owned = new Set(await repo.skuIdsOfProduct(tx, Number(body.productId)));
+  for (const sku of body.skus) {
+    if (!owned.has(Number(sku.skuId))) {
+      throw new DomainError('PRESALE_SKU_NOT_IN_ACTIVITY', { details: { skuId: sku.skuId } });
+    }
+  }
+}
+
+/**
+ * The form's values as columns.
+ *
+ * The four deposit columns are written as `null` unconditionally:
+ * `presale_activities_deposit_shape` insists a `full` campaign has no deposit
+ * and no balance window, and the contract refuses `paymentMode: 'deposit'`
+ * before we get here. Spelling them out beats relying on the default, because
+ * an *edit* of a migrated deposit campaign has to clear them.
+ */
+function activityValues(body: PresaleActivityForm) {
+  return {
+    productId: Number(body.productId),
+    title: body.title,
+    intro: body.intro ?? null,
+    imageUrl: body.imageUrl ?? null,
+    sliderImages: body.sliderImages,
+    status: body.status,
+    paymentMode: 'full' as const,
+    price: body.price,
+    originalPrice: body.originalPrice ?? null,
+    depositAmount: null,
+    stock: body.stock,
+    totalQuota: body.totalQuota ?? null,
+    perOrderQuantity: body.perOrderQuantity,
+    startAt: new Date(body.startAt),
+    endAt: new Date(body.endAt),
+    finalPaymentStartAt: null,
+    finalPaymentEndAt: null,
+    shipAfterDays: body.shipAfterDays,
+    shippingTemplateId:
+      body.shippingTemplateId === undefined ? null : Number(body.shippingTemplateId),
+    sortOrder: body.sortOrder,
+  };
+}
+
+function skuValues(body: PresaleActivityForm): repo.ActivitySkuInput[] {
+  return body.skus.map((sku) => ({
+    skuId: Number(sku.skuId),
+    price: sku.price,
+    stock: sku.stock,
+    quota: sku.quota ?? null,
+    isEnabled: sku.isEnabled,
+  }));
+}
+
+function toListItem(row: repo.ActivityRow): PresaleActivityListItem {
+  return {
+    id: toId(row.id),
+    productId: toId(row.productId),
+    productName: row.productName,
+    title: row.title,
+    intro: row.intro,
+    imageUrl: row.imageUrl,
+    status: row.status,
+    paymentMode: row.paymentMode,
+    price: row.price,
+    originalPrice: row.originalPrice,
+    stock: row.stock,
+    sales: row.sales,
+    totalQuota: row.totalQuota,
+    perOrderQuantity: row.perOrderQuantity,
+    startAt: row.startAt.toISOString(),
+    endAt: row.endAt.toISOString(),
+    shipAfterDays: row.shipAfterDays,
+    sortOrder: row.sortOrder,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+async function toDetail(
+  ctx: Ctx,
+  row: repo.ActivityRow,
+  tx?: Parameters<typeof repo.listActivitySkus>[0],
+): Promise<PresaleActivityDetail> {
+  const skus = await repo.listActivitySkus(tx ?? ctx.db, [row.id]);
+  return {
+    ...toListItem(row),
+    sliderImages: row.sliderImages,
+    shippingTemplateId: toIdOrNull(row.shippingTemplateId),
+    skus: skus.map((sku) => ({
+      skuId: toId(sku.skuId),
+      specText: sku.specText,
+      price: sku.price,
+      stock: sku.stock,
+      sales: sku.sales,
+      quota: sku.quota,
+      isEnabled: sku.isEnabled,
+    })),
+  };
+}
+
+function toCard(row: repo.ActivityRow, now: Date): PresaleCard {
+  return {
+    activityId: toId(row.id),
+    productId: toId(row.productId),
+    title: row.title,
+    intro: row.intro,
+    imageUrl: row.imageUrl,
+    price: row.price,
+    originalPrice: row.originalPrice,
+    stock: row.stock,
+    sales: row.sales,
+    startAt: row.startAt.toISOString(),
+    endAt: row.endAt.toISOString(),
+    shipAfterDays: row.shipAfterDays,
+    // The server's decision, never the client's: the button is disabled by the
+    // same rule the `OrderKindHandler` will enforce a moment later.
+    canBuy: canBuy(row, now),
+  };
+}
+
+function pageBounds(query: PageQuery): { offset: number; limit: number } {
+  return { offset: (query.page - 1) * query.pageSize, limit: query.pageSize };
+}
+
+/** `status=a&status=b` reaches the service as an array; one value as a scalar. */
+function asArray<T extends string>(value: T | readonly T[] | undefined): T[] | undefined {
+  if (value === undefined) return undefined;
+  return Array.isArray(value) ? [...value] : [value as T];
+}

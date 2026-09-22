@@ -1,0 +1,1166 @@
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { products, productSkus } from '@shop/db/schema/catalog';
+import { effects } from '@shop/db/schema/system';
+import { presaleActivities, presaleActivitySkus, presaleOrders } from '@shop/db/schema/presale';
+import { orderItems, orders } from '@shop/db/schema/order';
+import { refunds } from '@shop/db/schema/refund';
+import { users } from '@shop/db/schema/user';
+import { createTestCtx, type TestCtx } from '@shop/testing';
+import type { Actor, Ctx } from '../kernel/context';
+import { Money } from '../kernel/money';
+import { withTx } from '../kernel/tx';
+import {
+  onOrderCancelled,
+  onOrderPaid,
+  onOrderRefunded,
+  registerPricingContributor,
+  resetOrderPorts,
+} from '../order/ports';
+import { presaleConfig } from './presale.config';
+import { sweepPresaleWindows } from './presale.jobs';
+import { presaleKindHandler } from './presale.order';
+import * as repo from './presale.repo';
+import { isBalanced } from './presale.rules';
+import * as service from './presale.service';
+import { clearAutoRefundPort, registerAutoRefundPort, registerPresaleDomain } from './index';
+
+/**
+ * The presale domain against a real PostgreSQL 17.
+ *
+ * The races live next door in `presale.concurrency.int.test.ts`; this file
+ * proves the *shapes*: what an order refuses before a row exists, what a
+ * payment does to the campaign's own counters, what a cancel and a refund put
+ * back, and that the window sweep opens and closes on time.
+ *
+ * Orders are written directly rather than through B1's checkout. This stream
+ * attaches to the order aggregate through `order/ports.ts`, and driving the
+ * whole checkout here would be testing B1. What the two halves of the kind
+ * handler do inside one transaction is exactly what B1 does with them.
+ */
+
+let harness: TestCtx;
+
+const NOW = '2026-06-01T00:00:00.000Z';
+
+beforeAll(async () => {
+  harness = await createTestCtx({ now: NOW });
+}, 180_000);
+
+afterAll(async () => {
+  await harness?.close();
+});
+
+beforeEach(async () => {
+  await harness.db.truncateAll();
+  // `truncateAll` empties the settings table but not the config cache, and a
+  // test that narrows the sweep's lookback would otherwise leak it into the next.
+  await harness.ctx.config.invalidate(presaleConfig.group);
+  harness.clock.set(NOW);
+  resetOrderPorts();
+  clearAutoRefundPort();
+  registerPresaleDomain();
+});
+
+afterEach(() => {
+  resetOrderPorts();
+  clearAutoRefundPort();
+});
+
+// ---------------------------------------------------------------------------
+// fixtures
+// ---------------------------------------------------------------------------
+
+const userActor = (id: number): Actor => ({ kind: 'user', id, permissions: [], isSuper: false });
+const asUser = (id: number): Ctx => harness.as(userActor(id));
+const asAdmin = (permissions: string[]): Ctx =>
+  harness.as({ kind: 'admin', id: 1, permissions, isSuper: false });
+
+let sequence = 0;
+
+async function makeUser(nickname?: string): Promise<number> {
+  sequence += 1;
+  const [row] = await harness.ctx.db
+    .insert(users)
+    .values({
+      account: `ps-u-${sequence}`,
+      nickname: nickname ?? `顾客${sequence}`,
+      avatarUrl: `https://example.test/u/${sequence}.png`,
+    })
+    .returning({ id: users.id });
+  return row!.id;
+}
+
+interface ActivityFixture {
+  activityId: number;
+  productId: number;
+  skuId: number;
+  price: string;
+  shipAfterDays: number;
+}
+
+async function makeActivity(
+  over: {
+    stock?: number;
+    totalQuota?: number | null;
+    skuQuota?: number | null;
+    perOrderQuantity?: number;
+    price?: string;
+    status?: 'draft' | 'active' | 'paused' | 'ended';
+    paymentMode?: 'full' | 'deposit';
+    shipAfterDays?: number;
+    startAt?: Date;
+    endAt?: Date;
+    skuEnabled?: boolean;
+  } = {},
+): Promise<ActivityFixture> {
+  sequence += 1;
+  const stock = over.stock ?? 100;
+  const price = over.price ?? '59.00';
+  const shipAfterDays = over.shipAfterDays ?? 15;
+  const deposit = over.paymentMode === 'deposit';
+
+  const [product] = await harness.ctx.db
+    .insert(products)
+    .values({
+      name: `明前龙井${sequence}`,
+      imageUrl: 'https://example.test/p.png',
+      // `products_freight_source` insists a `template` product names a template.
+      freightMode: 'free',
+      price: '88.00',
+      stock: 1_000,
+    })
+    .returning({ id: products.id });
+  const [sku] = await harness.ctx.db
+    .insert(productSkus)
+    .values({
+      productId: product!.id,
+      skuCode: `SKU-${sequence}`,
+      specText: '一级|250g',
+      specValues: { 等级: '一级' },
+      price: '88.00',
+      originalPrice: '108.00',
+      stock: 1_000,
+    })
+    .returning({ id: productSkus.id });
+
+  const [activity] = await harness.ctx.db
+    .insert(presaleActivities)
+    .values({
+      productId: product!.id,
+      title: `春茶预售${sequence}`,
+      imageUrl: 'https://example.test/p.png',
+      status: over.status ?? 'active',
+      paymentMode: deposit ? 'deposit' : 'full',
+      price,
+      originalPrice: '88.00',
+      // `presale_activities_deposit_shape` insists the four move together.
+      ...(deposit
+        ? {
+            depositAmount: '10.00',
+            finalPaymentStartAt: new Date('2026-06-10T00:00:00.000Z'),
+            finalPaymentEndAt: new Date('2026-06-20T00:00:00.000Z'),
+          }
+        : {}),
+      stock,
+      totalQuota: over.totalQuota === undefined ? null : over.totalQuota,
+      perOrderQuantity: over.perOrderQuantity ?? 2,
+      startAt: over.startAt ?? new Date('2026-05-01T00:00:00.000Z'),
+      endAt: over.endAt ?? new Date('2026-07-01T00:00:00.000Z'),
+      shipAfterDays,
+    })
+    .returning({ id: presaleActivities.id });
+
+  await harness.ctx.db.insert(presaleActivitySkus).values({
+    activityId: activity!.id,
+    skuId: sku!.id,
+    price,
+    stock,
+    quota: over.skuQuota === undefined ? null : over.skuQuota,
+    isEnabled: over.skuEnabled ?? true,
+  });
+
+  return {
+    activityId: activity!.id,
+    productId: product!.id,
+    skuId: sku!.id,
+    price,
+    shipAfterDays,
+  };
+}
+
+async function makeOrder(args: {
+  userId: number;
+  fixture: ActivityFixture;
+  quantity?: number;
+  amount?: string;
+}): Promise<{ orderId: number; orderNo: string }> {
+  sequence += 1;
+  const quantity = args.quantity ?? 1;
+  const amount = args.amount ?? args.fixture.price;
+  const orderNo = `PS${String(sequence).padStart(10, '0')}`;
+  const [order] = await harness.ctx.db
+    .insert(orders)
+    .values({
+      orderNo,
+      userId: args.userId,
+      platform: 'h5',
+      kind: 'presale',
+      status: 'pending_payment',
+      totalQuantity: quantity,
+      itemsAmount: amount,
+      payableAmount: amount,
+      receiverName: '张三',
+      receiverPhone: '13800000000',
+      receiverProvince: '广东省',
+      receiverCity: '深圳市',
+      receiverDetail: '某路 1 号',
+    })
+    .returning({ id: orders.id });
+  await harness.ctx.db.insert(orderItems).values({
+    orderId: order!.id,
+    productId: args.fixture.productId,
+    skuId: args.fixture.skuId,
+    itemKey: `line-${sequence}`,
+    quantity,
+    unitPrice: amount,
+    totalAmount: amount,
+    snapshot: { name: '明前龙井' } as never,
+  });
+  return { orderId: order!.id, orderNo };
+}
+
+/**
+ * The whole "place a presale order" path as B1 would drive it: the kind
+ * handler's two halves inside one transaction.
+ *
+ * `lines` is a single line on purpose — `assertOrderShape` refuses anything
+ * else, and `presale_stock_ledger_order_reason_uq` is why.
+ */
+async function placeOrder(args: {
+  userId: number;
+  fixture: ActivityFixture;
+  quantity?: number;
+  amount?: string;
+  skuId?: number;
+}): Promise<number> {
+  const order = await makeOrder(args);
+  const ctx = asUser(args.userId);
+  const quantity = args.quantity ?? 1;
+  const total = Money.parse(args.amount ?? args.fixture.price).mul(quantity);
+  await withTx(harness.ctx.db, async (tx) => {
+    const meta = await presaleKindHandler.beforeCreate(ctx, tx, {
+      userId: args.userId,
+      lines: [
+        {
+          skuId: args.skuId ?? args.fixture.skuId,
+          productId: args.fixture.productId,
+          quantity,
+          unitPrice: Money.parse(args.amount ?? args.fixture.price),
+          subtotal: total,
+        },
+      ],
+      goodsTotal: total,
+      selections: { kind: 'presale', activityId: String(args.fixture.activityId) },
+    });
+    await presaleKindHandler.afterCreate(ctx, tx, order.orderId, meta);
+  });
+  return order.orderId;
+}
+
+/** Marks the order paid and fires the hook, the way stream C's callback does. */
+async function pay(orderId: number): Promise<void> {
+  const at = harness.clock.now();
+  await withTx(harness.ctx.db, async (tx) => {
+    const [before] = await tx.select().from(orders).where(eq(orders.id, orderId));
+    await tx
+      .update(orders)
+      .set({ status: 'paid', paidAt: at, paidAmount: before!.payableAmount })
+      .where(eq(orders.id, orderId));
+    await onOrderPaid.dispatch(tx, harness.ctx, {
+      orderId,
+      orderNo: before!.orderNo,
+      userId: before!.userId,
+      at,
+      paidAmount: Money.parse(before!.payableAmount),
+    });
+  });
+}
+
+/**
+ * Cancels the order and fires the hook.
+ *
+ * `moveOrder: false` fires the hook alone. That is not an artificial case: it
+ * is the cancel that *lost* the race to a payment, and the order aggregate
+ * itself will not let the row move — `orders_paid_shape` forbids a cancelled
+ * order that has a `paid_at`. What this domain has to prove is that the losing
+ * hook changes nothing.
+ */
+async function cancel(orderId: number, moveOrder = true): Promise<void> {
+  const at = harness.clock.now();
+  await withTx(harness.ctx.db, async (tx) => {
+    if (moveOrder) {
+      // `orders_cancelled_shape` insists the two move together.
+      await tx
+        .update(orders)
+        .set({ status: 'cancelled', cancelledAt: at })
+        .where(eq(orders.id, orderId));
+    }
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId));
+    await onOrderCancelled.dispatch(tx, harness.ctx, {
+      orderId,
+      orderNo: order!.orderNo,
+      userId: order!.userId,
+      at,
+      reason: 'timeout',
+    });
+  });
+}
+
+/**
+ * Refunds the order and fires the hook.
+ *
+ * The row only moves when there is money to give back: `orders_paid_shape`
+ * insists a `refunded` order has a `paid_at`, so a refund callback for an
+ * unpaid order is a hook firing over a row that stays where it is.
+ */
+async function refund(orderId: number, partial = false): Promise<void> {
+  const at = harness.clock.now();
+  await withTx(harness.ctx.db, async (tx) => {
+    const [before] = await tx.select().from(orders).where(eq(orders.id, orderId));
+    if (!partial && before!.paidAt !== null) {
+      await tx.update(orders).set({ status: 'refunded' }).where(eq(orders.id, orderId));
+    }
+    await onOrderRefunded.dispatch(tx, harness.ctx, {
+      orderId,
+      orderNo: before!.orderNo,
+      userId: before!.userId,
+      at,
+      refundId: 1,
+      refundedAmount: Money.parse(before!.payableAmount),
+      partial,
+    });
+  });
+}
+
+async function readCounters(fixture: ActivityFixture) {
+  const [activity] = await harness.ctx.db
+    .select({ stock: presaleActivities.stock, sales: presaleActivities.sales })
+    .from(presaleActivities)
+    .where(eq(presaleActivities.id, fixture.activityId));
+  const [sku] = await harness.ctx.db
+    .select({ stock: presaleActivitySkus.stock, sales: presaleActivitySkus.sales })
+    .from(presaleActivitySkus)
+    .where(eq(presaleActivitySkus.activityId, fixture.activityId));
+  return { activity: activity!, sku: sku! };
+}
+
+const readPresaleOrder = (orderId: number) =>
+  harness.ctx.db
+    .select()
+    .from(presaleOrders)
+    .where(eq(presaleOrders.orderId, orderId))
+    .then((rows) => rows[0]);
+
+async function effectsFor(scopeId: string, eventType: string) {
+  const rows = await harness.ctx.db.select().from(effects).where(eq(effects.scopeId, scopeId));
+  return rows.filter((row) => row.eventType === eventType);
+}
+
+// ---------------------------------------------------------------------------
+
+describe('beforeCreate', () => {
+  it('accepts an order the campaign repriced, at the catalogue price (CR-1-d)', async () => {
+    const fixture = await makeActivity();
+    const userId = await makeUser();
+    // 88.00 is the catalogue price, which is what the *lines* carry: a
+    // contributor never rewrites a line, it contributes an adjustment that
+    // lands in `orders.coupon_discount` (CR-3-b1). The guard compares the
+    // discount the campaign owes against what the contributor produces, so
+    // this — the ordinary, correctly priced presale order — passes.
+    await expect(placeOrder({ userId, fixture, amount: '88.00' })).resolves.toBeGreaterThan(0);
+    expect(await readCounters(fixture)).toMatchObject({ activity: { stock: 99, sales: 0 } });
+  });
+
+  it('refuses an order the pricing contributor did not reprice (CR-1-d)', async () => {
+    const fixture = await makeActivity();
+    const userId = await makeUser();
+    // The registry replaces by name, so a no-op under the presale contributor's
+    // own name is exactly "the contributor stopped firing" — the one failure
+    // that would bill a shopper 88.00 for a 59.00 presale.
+    registerPricingContributor({
+      name: 'presale:activity-price',
+      priority: 50,
+      contribute: async () => [],
+    });
+    await expect(placeOrder({ userId, fixture, amount: '88.00' })).rejects.toMatchObject({
+      code: 'PRESALE_PRICE_NOT_APPLIED',
+    });
+    // Nothing was taken: the refusal happens before any counter moves.
+    expect(await readCounters(fixture)).toMatchObject({ activity: { stock: 100, sales: 0 } });
+  });
+
+  it('refuses a campaign that is paused, not started, or already over', async () => {
+    const userId = await makeUser();
+
+    const paused = await makeActivity({ status: 'paused' });
+    await expect(placeOrder({ userId, fixture: paused })).rejects.toMatchObject({
+      code: 'PRESALE_ACTIVITY_NOT_OPEN',
+    });
+
+    const future = await makeActivity({
+      startAt: new Date('2026-06-10T00:00:00.000Z'),
+      endAt: new Date('2026-06-20T00:00:00.000Z'),
+    });
+    await expect(placeOrder({ userId, fixture: future })).rejects.toMatchObject({
+      code: 'PRESALE_ACTIVITY_NOT_OPEN',
+    });
+
+    const past = await makeActivity({
+      startAt: new Date('2026-04-01T00:00:00.000Z'),
+      endAt: new Date('2026-05-01T00:00:00.000Z'),
+    });
+    await expect(placeOrder({ userId, fixture: past })).rejects.toMatchObject({
+      code: 'PRESALE_ACTIVITY_NOT_OPEN',
+    });
+  });
+
+  it('refuses a deposit campaign outright rather than half-selling it', async () => {
+    const fixture = await makeActivity({ paymentMode: 'deposit' });
+    const userId = await makeUser();
+    await expect(placeOrder({ userId, fixture })).rejects.toMatchObject({
+      code: 'PRESALE_DEPOSIT_NOT_SUPPORTED',
+    });
+  });
+
+  it('refuses an over-large quantity and a SKU outside the campaign', async () => {
+    const userId = await makeUser();
+
+    const capped = await makeActivity({ perOrderQuantity: 1 });
+    await expect(placeOrder({ userId, fixture: capped, quantity: 2 })).rejects.toMatchObject({
+      code: 'PRESALE_QUANTITY_NOT_ALLOWED',
+    });
+
+    const other = await makeActivity();
+    await expect(placeOrder({ userId, fixture: capped, skuId: other.skuId })).rejects.toMatchObject(
+      { code: 'PRESALE_SKU_NOT_IN_ACTIVITY' },
+    );
+  });
+
+  it('refuses an unknown campaign', async () => {
+    const fixture = await makeActivity();
+    const userId = await makeUser();
+    await expect(
+      placeOrder({ userId, fixture: { ...fixture, activityId: 999_999 } }),
+    ).rejects.toMatchObject({ code: 'PRESALE_ACTIVITY_NOT_FOUND' });
+  });
+});
+
+describe('placing an order', () => {
+  it('holds the campaign stock, records the reservation and starts on final_pending', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser('小明');
+    const orderId = await placeOrder({ userId, fixture, quantity: 2, amount: '59.00' });
+
+    const counters = await readCounters(fixture);
+    // A placed order holds stock but has sold nothing: `sales` waits for money.
+    expect(counters.activity).toEqual({ stock: 8, sales: 0 });
+    expect(counters.sku).toEqual({ stock: 8, sales: 0 });
+
+    const presale = await readPresaleOrder(orderId);
+    expect(presale).toMatchObject({
+      activityId: fixture.activityId,
+      paymentMode: 'full',
+      stage: 'final_pending',
+      depositAmount: null,
+      finalAmount: '118.00',
+      // B1 owns the payment deadline; a second countdown would be a second
+      // answer to the same question.
+      finalDueAt: null,
+      finalPaidAt: null,
+      shipNotBeforeAt: null,
+    });
+
+    const ledger = await repo.listStockLedger(harness.ctx.db, orderId);
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0]).toMatchObject({
+      reason: 'reserve',
+      quantity: 2,
+      activityStockDelta: -2,
+      activitySalesDelta: 0,
+      productStockDelta: -2,
+      productSalesDelta: 0,
+    });
+  });
+
+  it('refuses when the campaign is out of its own stock, even though the SKU is not', async () => {
+    // STOCK-004: the campaign's 500 units are not the warehouse's 10 000.
+    const fixture = await makeActivity({ stock: 1 });
+    const first = await makeUser();
+    const second = await makeUser();
+    await placeOrder({ userId: first, fixture });
+    await expect(placeOrder({ userId: second, fixture })).rejects.toMatchObject({
+      code: 'PRESALE_OUT_OF_STOCK',
+    });
+    expect((await readCounters(fixture)).activity).toEqual({ stock: 0, sales: 0 });
+  });
+
+  it('enforces the campaign quota in the same statement as the stock', async () => {
+    // Legacy checked `total_quota` with a separate SELECT, then decremented.
+    const fixture = await makeActivity({ stock: 10, totalQuota: 1 });
+    const first = await makeUser();
+    const second = await makeUser();
+    const orderId = await placeOrder({ userId: first, fixture });
+    await pay(orderId);
+    await expect(placeOrder({ userId: second, fixture })).rejects.toMatchObject({
+      code: 'PRESALE_OUT_OF_STOCK',
+    });
+  });
+
+  it('treats a disabled SKU as not being in the campaign at all', async () => {
+    const fixture = await makeActivity({ stock: 10, skuEnabled: false });
+    const userId = await makeUser();
+    // Not 库存不足 — the shopper is told the spec is not on sale, which is what
+    // an operator who unticked 可售 meant, and it is refused before any counter
+    // is touched.
+    await expect(placeOrder({ userId, fixture })).rejects.toMatchObject({
+      code: 'PRESALE_SKU_NOT_IN_ACTIVITY',
+    });
+    expect((await readCounters(fixture)).activity).toEqual({ stock: 10, sales: 0 });
+  });
+
+  it('reserves once however often the creation is replayed (QUEUE-008)', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture });
+
+    // A retried `afterCreate` for the same order: the ledger claim returns null
+    // and nothing at all happens a second time.
+    const ctx = asUser(userId);
+    await withTx(harness.ctx.db, (tx) =>
+      presaleKindHandler.afterCreate(ctx, tx, orderId, {
+        activityId: fixture.activityId,
+        userId,
+        skuId: fixture.skuId,
+        quantity: 1,
+        goodsTotal: fixture.price,
+        shipAfterDays: fixture.shipAfterDays,
+      }),
+    );
+
+    expect((await readCounters(fixture)).activity).toEqual({ stock: 9, sales: 0 });
+    expect(await repo.listStockLedger(harness.ctx.db, orderId)).toHaveLength(1);
+  });
+});
+
+describe('paying', () => {
+  it('turns the reservation into a sale and freezes the 发货承诺', async () => {
+    const fixture = await makeActivity({ stock: 10, shipAfterDays: 15 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture });
+    await pay(orderId);
+
+    const counters = await readCounters(fixture);
+    // Stock stays down — it left the shelf when the order was placed.
+    expect(counters.activity).toEqual({ stock: 9, sales: 1 });
+    expect(counters.sku).toEqual({ stock: 9, sales: 1 });
+
+    const presale = await readPresaleOrder(orderId);
+    expect(presale?.stage).toBe('final_paid');
+    expect(presale?.finalPaidAt?.toISOString()).toBe(NOW);
+    expect(presale?.shipNotBeforeAt?.toISOString()).toBe('2026-06-16T00:00:00.000Z');
+
+    expect(await effectsFor(String(orderId), 'presale.paid')).toHaveLength(1);
+  });
+
+  it('records the sale on the reservation row, so the ledger can still balance', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture, quantity: 2, amount: '59.00' });
+    await pay(orderId);
+
+    const [reservation] = await repo.listStockLedger(harness.ctx.db, orderId);
+    // The sale has no row of its own — two reasons, frozen schema — so the
+    // reservation row is amended to say what it now means.
+    expect(reservation).toMatchObject({
+      reason: 'reserve',
+      activityStockDelta: -2,
+      activitySalesDelta: 2,
+      productStockDelta: -2,
+      productSalesDelta: 2,
+    });
+  });
+
+  it('commits the sale once however often the callback is replayed', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture });
+    await pay(orderId);
+    await pay(orderId);
+    await pay(orderId);
+
+    // The stage guard, not the effect ledger, is what makes this safe: a second
+    // callback finds `stage = 'final_paid'` and `from: ['final_pending']` matches
+    // nothing.
+    expect((await readCounters(fixture)).activity).toEqual({ stock: 9, sales: 1 });
+    expect(await effectsFor(String(orderId), 'presale.paid')).toHaveLength(1);
+  });
+
+  it('keeps the promise a later edit of the campaign tries to move', async () => {
+    const fixture = await makeActivity({ stock: 10, shipAfterDays: 15 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture });
+    await pay(orderId);
+
+    await harness.ctx.db
+      .update(presaleActivities)
+      .set({ shipAfterDays: 30 })
+      .where(eq(presaleActivities.id, fixture.activityId));
+
+    // 15 days from payment, not 30: the operator shortened nobody's promise.
+    const presale = await readPresaleOrder(orderId);
+    expect(presale?.shipNotBeforeAt?.toISOString()).toBe('2026-06-16T00:00:00.000Z');
+  });
+
+  it('ignores an order that is not a presale', async () => {
+    const fixture = await makeActivity();
+    const userId = await makeUser();
+    const { orderId } = await makeOrder({ userId, fixture });
+    await expect(pay(orderId)).resolves.toBeUndefined();
+    expect(await readPresaleOrder(orderId)).toBeUndefined();
+  });
+
+  /**
+   * STOCK-004: 限购总量 is a ceiling on units **sold**, and `sales` only moves
+   * when the money arrives — so the quota has to be enforced *here*, not only
+   * at checkout. Two shoppers can both hold a reservation against a quota of
+   * one; only one of them can be sold to.
+   */
+  describe('限购总量 refuses a payment', () => {
+    it('gives the units back and asks for the money back', async () => {
+      const fixture = await makeActivity({ stock: 10, totalQuota: 1 });
+      const first = await placeOrder({ userId: await makeUser('先付的'), fixture });
+      const second = await placeOrder({ userId: await makeUser('后付的'), fixture });
+
+      await pay(first);
+      await pay(second);
+
+      // One sale, and the loser's two units are back on the shelf.
+      expect((await readCounters(fixture)).activity).toEqual({ stock: 9, sales: 1 });
+      expect((await readCounters(fixture)).sku).toEqual({ stock: 9, sales: 1 });
+
+      expect((await readPresaleOrder(first))?.stage).toBe('final_paid');
+      expect((await readPresaleOrder(second))?.stage).toBe('cancelled');
+
+      // The money is already the shop's, so it has to be given back — and it is
+      // asked for as an effect, because the refund domain has no
+      // system-initiated entry point yet (CR-3-d).
+      expect(await effectsFor(String(second), 'presale.refund')).toHaveLength(1);
+      expect(await effectsFor(String(second), 'presale.paid')).toHaveLength(0);
+      expect(await effectsFor(String(first), 'presale.refund')).toHaveLength(0);
+
+      // REFUND-002 on the loser: reservation and release cancel out exactly,
+      // and `sales` never moved on either row.
+      const ledger = await repo.listStockLedger(harness.ctx.db, second);
+      expect(ledger).toHaveLength(2);
+      expect(isBalanced(ledger)).toBe(true);
+      expect(ledger.map((row) => row.activitySalesDelta)).toEqual([0, 0]);
+    });
+
+    it('enforces the per-SKU quota the same way', async () => {
+      const fixture = await makeActivity({ stock: 10, skuQuota: 1 });
+      const first = await placeOrder({ userId: await makeUser(), fixture });
+      const second = await placeOrder({ userId: await makeUser(), fixture });
+
+      await pay(first);
+      await pay(second);
+
+      expect((await readCounters(fixture)).sku).toEqual({ stock: 9, sales: 1 });
+      expect(await effectsFor(String(second), 'presale.refund')).toHaveLength(1);
+    });
+
+    it('does not half-apply the sale when only the campaign quota refuses', async () => {
+      // The SKU has room, the campaign does not — the case that needs the undo.
+      const fixture = await makeActivity({ stock: 10, totalQuota: 1, skuQuota: 5 });
+      const first = await placeOrder({ userId: await makeUser(), fixture });
+      const second = await placeOrder({ userId: await makeUser(), fixture });
+
+      await pay(first);
+      await pay(second);
+
+      const counters = await readCounters(fixture);
+      expect(counters.activity.sales).toBe(1);
+      // Without the compensating update this would read 2: the SKU half landed
+      // before the campaign half refused.
+      expect(counters.sku.sales).toBe(1);
+    });
+
+    it('asks for the refund once however often the callback is replayed', async () => {
+      const fixture = await makeActivity({ stock: 10, totalQuota: 1 });
+      const first = await placeOrder({ userId: await makeUser(), fixture });
+      const second = await placeOrder({ userId: await makeUser(), fixture });
+
+      await pay(first);
+      await pay(second);
+      await pay(second);
+      await pay(second);
+
+      expect(await effectsFor(String(second), 'presale.refund')).toHaveLength(1);
+      expect((await readCounters(fixture)).activity).toEqual({ stock: 9, sales: 1 });
+      expect(isBalanced(await repo.listStockLedger(harness.ctx.db, second))).toBe(true);
+    });
+  });
+});
+
+describe('cancelling', () => {
+  it('gives the reservation back and leaves sales alone', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture, quantity: 2, amount: '59.00' });
+    await cancel(orderId);
+
+    const counters = await readCounters(fixture);
+    expect(counters.activity).toEqual({ stock: 10, sales: 0 });
+    expect(counters.sku).toEqual({ stock: 10, sales: 0 });
+    expect((await readPresaleOrder(orderId))?.stage).toBe('cancelled');
+
+    // REFUND-002: the two ledger rows cancel out on all four columns.
+    const ledger = await repo.listStockLedger(harness.ctx.db, orderId);
+    expect(ledger.map((row) => row.reason)).toEqual(['reserve', 'release']);
+    expect(isBalanced(ledger)).toBe(true);
+    expect(await effectsFor(String(orderId), 'presale.released')).toHaveLength(1);
+  });
+
+  it('releases once however often the cancellation is replayed', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture });
+    await cancel(orderId);
+    await cancel(orderId);
+
+    expect((await readCounters(fixture)).activity).toEqual({ stock: 10, sales: 0 });
+    expect(await repo.listStockLedger(harness.ctx.db, orderId)).toHaveLength(2);
+  });
+
+  it('does nothing when the cancellation lost the race to a payment', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture });
+    await pay(orderId);
+    await cancel(orderId, false);
+
+    // A paid presale is refunded, not cancelled: the stage guard finds nothing
+    // in `final_pending`, the hook returns, and the sale stands.
+    expect((await readCounters(fixture)).activity).toEqual({ stock: 9, sales: 1 });
+    expect((await readPresaleOrder(orderId))?.stage).toBe('final_paid');
+    expect(await repo.listStockLedger(harness.ctx.db, orderId)).toHaveLength(1);
+  });
+});
+
+describe('refunding', () => {
+  it('walks stock and sales back together', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture, quantity: 2, amount: '59.00' });
+    await pay(orderId);
+    expect((await readCounters(fixture)).activity).toEqual({ stock: 8, sales: 2 });
+
+    await refund(orderId);
+
+    // REFUND-003: back exactly where the campaign started.
+    expect((await readCounters(fixture)).activity).toEqual({ stock: 10, sales: 0 });
+    expect((await readCounters(fixture)).sku).toEqual({ stock: 10, sales: 0 });
+    expect((await readPresaleOrder(orderId))?.stage).toBe('cancelled');
+
+    const ledger = await repo.listStockLedger(harness.ctx.db, orderId);
+    expect(ledger[1]).toMatchObject({
+      reason: 'release',
+      activityStockDelta: 2,
+      activitySalesDelta: -2,
+      productStockDelta: 2,
+      productSalesDelta: -2,
+    });
+    expect(isBalanced(ledger)).toBe(true);
+  });
+
+  it('leaves everything alone on a partial refund', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture, quantity: 2, amount: '59.00' });
+    await pay(orderId);
+    await refund(orderId, true);
+
+    // The shopper still holds the presale; they got money back for part of it.
+    expect((await readCounters(fixture)).activity).toEqual({ stock: 8, sales: 2 });
+    expect((await readPresaleOrder(orderId))?.stage).toBe('final_paid');
+    expect(await repo.listStockLedger(harness.ctx.db, orderId)).toHaveLength(1);
+  });
+
+  it('restores once however often the refund callback arrives', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture });
+    await pay(orderId);
+    await refund(orderId);
+    await refund(orderId);
+    await refund(orderId);
+
+    expect((await readCounters(fixture)).activity).toEqual({ stock: 10, sales: 0 });
+    expect(await repo.listStockLedger(harness.ctx.db, orderId)).toHaveLength(2);
+  });
+
+  it('refunds an unpaid order without taking sales below zero', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture });
+    // Never paid, so `sales` was never raised; the release must not lower it.
+    await refund(orderId);
+
+    expect((await readCounters(fixture)).activity).toEqual({ stock: 10, sales: 0 });
+    expect(isBalanced(await repo.listStockLedger(harness.ctx.db, orderId))).toBe(true);
+  });
+});
+
+describe('the window sweep', () => {
+  it('closes a campaign whose window has passed and records it once', async () => {
+    const fixture = await makeActivity({
+      startAt: new Date('2026-05-01T00:00:00.000Z'),
+      endAt: new Date('2026-05-20T00:00:00.000Z'),
+    });
+
+    const first = await sweepPresaleWindows(harness.ctx);
+    expect(first).toMatchObject({ scanned: 1, closed: 1 });
+
+    const [row] = await harness.ctx.db
+      .select()
+      .from(presaleActivities)
+      .where(eq(presaleActivities.id, fixture.activityId));
+    expect(row?.status).toBe('ended');
+    expect(await effectsFor(String(fixture.activityId), 'presale.closed')).toHaveLength(1);
+
+    // SMOKE-011: a second pass is free and changes nothing.
+    const second = await sweepPresaleWindows(harness.ctx);
+    expect(second).toMatchObject({ scanned: 0, closed: 0 });
+    expect(await effectsFor(String(fixture.activityId), 'presale.closed')).toHaveLength(1);
+  });
+
+  it('leaves a running campaign alone', async () => {
+    const fixture = await makeActivity();
+    await sweepPresaleWindows(harness.ctx);
+    const [row] = await harness.ctx.db
+      .select()
+      .from(presaleActivities)
+      .where(eq(presaleActivities.id, fixture.activityId));
+    expect(row?.status).toBe('active');
+  });
+
+  it('records a campaign opening exactly once, and never twice', async () => {
+    const fixture = await makeActivity({
+      startAt: new Date('2026-05-31T23:00:00.000Z'),
+      endAt: new Date('2026-07-01T00:00:00.000Z'),
+    });
+
+    expect(await sweepPresaleWindows(harness.ctx)).toMatchObject({ opened: 1 });
+    expect(await effectsFor(String(fixture.activityId), 'presale.opened')).toHaveLength(1);
+    // A minute later the same campaign is still open; nothing new happened.
+    harness.clock.set('2026-06-01T00:01:00.000Z');
+    expect(await sweepPresaleWindows(harness.ctx)).toMatchObject({ opened: 0 });
+    expect(await effectsFor(String(fixture.activityId), 'presale.opened')).toHaveLength(1);
+  });
+
+  it('does not look further back than the configured lookback', async () => {
+    // Opened a week ago: outside the 24h window, so the sweep does not rediscover
+    // it every minute forever.
+    const fixture = await makeActivity({
+      startAt: new Date('2026-05-24T00:00:00.000Z'),
+      endAt: new Date('2026-07-01T00:00:00.000Z'),
+    });
+    expect(await sweepPresaleWindows(harness.ctx)).toMatchObject({ opened: 0 });
+    expect(await effectsFor(String(fixture.activityId), 'presale.opened')).toHaveLength(0);
+  });
+});
+
+describe('the admin surface', () => {
+  const ADMIN = ['presale:activity:read', 'presale:activity:write', 'presale:activity:delete'];
+
+  const form = (over: Record<string, unknown> = {}) => ({
+    productId: '0',
+    title: '春茶预售',
+    sliderImages: [],
+    status: 'draft' as const,
+    paymentMode: 'full' as const,
+    price: '59.00',
+    stock: 100,
+    perOrderQuantity: 2,
+    startAt: '2026-06-01T00:00:00.000Z',
+    endAt: '2026-07-01T00:00:00.000Z',
+    shipAfterDays: 15,
+    sortOrder: 0,
+    skus: [] as { skuId: string; price: string; stock: number; isEnabled: boolean }[],
+    ...over,
+  });
+
+  it('creates a campaign with its SKU prices and reads it back', async () => {
+    const fixture = await makeActivity();
+    const ctx = asAdmin(ADMIN);
+
+    const created = await service.adminActivityCreate(
+      ctx,
+      form({
+        productId: String(fixture.productId),
+        skus: [{ skuId: String(fixture.skuId), price: '49.00', stock: 30, isEnabled: true }],
+      }) as never,
+    );
+
+    expect(created).toMatchObject({ title: '春茶预售', status: 'draft', stock: 100, sales: 0 });
+    expect(created.skus).toEqual([
+      expect.objectContaining({ skuId: String(fixture.skuId), price: '49.00', stock: 30 }),
+    ]);
+
+    const detail = await service.adminActivityDetail(ctx, { id: created.id });
+    expect(detail.skus).toHaveLength(1);
+  });
+
+  it('refuses a SKU that belongs to another product', async () => {
+    const fixture = await makeActivity();
+    const other = await makeActivity();
+    await expect(
+      service.adminActivityCreate(
+        asAdmin(ADMIN),
+        form({
+          productId: String(fixture.productId),
+          skus: [{ skuId: String(other.skuId), price: '49.00', stock: 5, isEnabled: true }],
+        }) as never,
+      ),
+    ).rejects.toMatchObject({ code: 'PRESALE_SKU_NOT_IN_ACTIVITY' });
+  });
+
+  it('keeps 已售 across an edit', async () => {
+    // Legacy's `saveAdvance` rewrote the row wholesale and zeroed 已售 every time
+    // somebody fixed a typo in the title.
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser();
+    await pay(await placeOrder({ userId, fixture }));
+    expect((await readCounters(fixture)).activity).toEqual({ stock: 9, sales: 1 });
+
+    const ctx = asAdmin(ADMIN);
+    await service.adminActivityUpdate(
+      ctx,
+      { id: String(fixture.activityId) },
+      form({
+        productId: String(fixture.productId),
+        title: '春茶预售（改名）',
+        status: 'active',
+        stock: 20,
+        skus: [{ skuId: String(fixture.skuId), price: '59.00', stock: 20, isEnabled: true }],
+      }) as never,
+    );
+
+    const after = await readCounters(fixture);
+    // The operator restated how many units are left; what was sold is the
+    // server's own total and stays.
+    expect(after.activity).toEqual({ stock: 20, sales: 1 });
+    expect(after.sku).toEqual({ stock: 20, sales: 1 });
+  });
+
+  it('refuses to delete a campaign that still owes a shopper goods', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture });
+    const ctx = asAdmin(ADMIN);
+
+    await expect(
+      service.adminActivityDelete(ctx, { id: String(fixture.activityId) }),
+    ).rejects.toMatchObject({ code: 'PRESALE_ACTIVITY_IN_USE' });
+
+    // Once the order is off the books the campaign can go.
+    await cancel(orderId);
+    await service.adminActivityDelete(ctx, { id: String(fixture.activityId) });
+
+    const [row] = await harness.ctx.db
+      .select()
+      .from(presaleActivities)
+      .where(eq(presaleActivities.id, fixture.activityId));
+    expect(row?.deletedAt).not.toBeNull();
+    expect(row?.status).toBe('ended');
+    await expect(
+      service.adminActivityDetail(ctx, { id: String(fixture.activityId) }),
+    ).rejects.toMatchObject({ code: 'PRESALE_ACTIVITY_NOT_FOUND' });
+  });
+
+  it('will not re-open an ended campaign', async () => {
+    const fixture = await makeActivity({ status: 'ended' });
+    await expect(
+      service.adminActivitySetStatus(
+        asAdmin(ADMIN),
+        { id: String(fixture.activityId) },
+        { status: 'active' },
+      ),
+    ).rejects.toMatchObject({ code: 'PRESALE_ACTIVITY_NOT_OPEN' });
+  });
+
+  it('lists presale orders with the two dates an operator is asked about', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const userId = await makeUser('小红');
+    const orderId = await placeOrder({ userId, fixture });
+    await pay(orderId);
+
+    const page = await service.adminOrderList(asAdmin(['presale:order:read']), {
+      page: 1,
+      pageSize: 20,
+      activityId: String(fixture.activityId),
+    } as never);
+
+    expect(page.total).toBe(1);
+    expect(page.items[0]).toMatchObject({
+      orderId: String(orderId),
+      activityTitle: expect.stringContaining('春茶预售'),
+      nickname: '小红',
+      stage: 'final_paid',
+      quantity: 1,
+      finalPaidAt: NOW,
+      shipNotBeforeAt: '2026-06-16T00:00:00.000Z',
+    });
+  });
+});
+
+describe('the storefront surface', () => {
+  it('shows only campaigns inside their window, and says whether they are buyable', async () => {
+    const live = await makeActivity({ stock: 5 });
+    await makeActivity({ status: 'draft' });
+    await makeActivity({
+      startAt: new Date('2026-06-10T00:00:00.000Z'),
+      endAt: new Date('2026-06-20T00:00:00.000Z'),
+    });
+    const soldOut = await makeActivity({ stock: 0 });
+
+    const ctx = asUser(await makeUser());
+    const page = await service.list(ctx, { page: 1, pageSize: 20 } as never);
+
+    const byId = new Map(page.items.map((item) => [item.activityId, item]));
+    expect(byId.size).toBe(2);
+    expect(byId.get(String(live.activityId))?.canBuy).toBe(true);
+    // The button is disabled by the same rule the kind handler enforces a moment
+    // later — the server's decision, never the client's.
+    expect(byId.get(String(soldOut.activityId))?.canBuy).toBe(false);
+  });
+
+  it('serves the detail with enabled SKUs only and the catalogue price struck through', async () => {
+    const fixture = await makeActivity({ stock: 5 });
+    const ctx = asUser(await makeUser());
+    const detail = await service.detail(ctx, { id: String(fixture.activityId) });
+
+    expect(detail).toMatchObject({ canBuy: true, perOrderQuantity: 2, shipAfterDays: 15 });
+    expect(detail.skus).toEqual([
+      expect.objectContaining({
+        skuId: String(fixture.skuId),
+        price: '59.00',
+        originalPrice: '108.00',
+        stock: 5,
+      }),
+    ]);
+
+    await harness.ctx.db
+      .update(presaleActivitySkus)
+      .set({ isEnabled: false })
+      .where(eq(presaleActivitySkus.activityId, fixture.activityId));
+    expect((await service.detail(ctx, { id: String(fixture.activityId) })).skus).toHaveLength(0);
+  });
+
+  it('hides a deleted campaign from the detail route', async () => {
+    const fixture = await makeActivity();
+    await harness.ctx.db
+      .update(presaleActivities)
+      .set({ deletedAt: harness.clock.now() })
+      .where(eq(presaleActivities.id, fixture.activityId));
+    await expect(
+      service.detail(asUser(await makeUser()), { id: String(fixture.activityId) }),
+    ).rejects.toMatchObject({ code: 'PRESALE_ACTIVITY_NOT_FOUND' });
+  });
+});
+
+describe('the CR-3-d refund seam', () => {
+  /** Two orders, a quota of one: the second payment is the one that needs it. */
+  async function loseTheQuota(): Promise<number> {
+    const fixture = await makeActivity({ stock: 10, totalQuota: 1 });
+    const first = await placeOrder({ userId: await makeUser(), fixture });
+    const second = await placeOrder({ userId: await makeUser(), fixture });
+    await pay(first);
+    await pay(second);
+    return second;
+  }
+
+  /** Drains every `presale.refund` effect the order has, the way the dispatcher does. */
+  async function driveRefundEffects(orderId: number): Promise<void> {
+    const handler = await import('../effects/index').then((m) =>
+      m.getEffectHandler('order', 'presale.refund'),
+    );
+    for (const row of await effectsFor(String(orderId), 'presale.refund')) {
+      await handler!(harness.ctx, {
+        id: row.id,
+        scope: row.scope,
+        scopeId: row.scopeId,
+        eventType: row.eventType,
+        payload: row.payload,
+        attempts: 1,
+      });
+    }
+  }
+
+  const refundsFor = (orderId: number) =>
+    harness.ctx.db.select().from(refunds).where(eq(refunds.orderId, orderId));
+
+  it('gives the shopper exactly one refund, however many callbacks arrive', async () => {
+    const orderId = await loseTheQuota();
+    // Two more payment callbacks and two more drains: four chances to refund
+    // the same order twice. `UNIQUE (scope, scope_id, event_type)` makes one
+    // effect, and `refundSystemInitiated` is idempotent per (order, reason) on
+    // top of that.
+    await pay(orderId);
+    await pay(orderId);
+    await driveRefundEffects(orderId);
+    await driveRefundEffects(orderId);
+
+    const rows = await refundsFor(orderId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      status: 'approved',
+      isAutomatic: true,
+      reason: '预售未成行，系统自动退款',
+      amount: '59.00',
+      reviewedByAdminId: null,
+    });
+
+    // And the gateway call is queued once, post-commit, like every other.
+    const queued = await harness.ctx.db
+      .select()
+      .from(effects)
+      .where(eq(effects.scopeId, String(rows[0]!.id)));
+    expect(queued.filter((row) => row.eventType === 'refund.execute')).toHaveLength(1);
+  });
+
+  it('refunds nobody whose payment the campaign could honour', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const orderId = await placeOrder({ userId: await makeUser(), fixture });
+    await pay(orderId);
+
+    expect(await effectsFor(String(orderId), 'presale.refund')).toHaveLength(0);
+    expect(await refundsFor(orderId)).toHaveLength(0);
+  });
+
+  it('lets a test substitute the refund seam', async () => {
+    const seen: Array<{ orderId: number; reason: string }> = [];
+    registerAutoRefundPort({
+      async refund(_tx, _ctx, input) {
+        seen.push({ orderId: input.orderId, reason: input.reason });
+        return { refundId: 77, created: true };
+      },
+    });
+
+    const orderId = await loseTheQuota();
+    await driveRefundEffects(orderId);
+
+    expect(seen).toEqual([{ orderId, reason: 'presale_expired' }]);
+    expect(await refundsFor(orderId)).toHaveLength(0);
+  });
+});
