@@ -759,16 +759,7 @@ export async function adminTrackShipment(
   return trackShipment(ctx, params);
 }
 
-export async function listExpressCompanies(ctx: Ctx): Promise<{
-  items: { id: string; code: string; name: string; sortOrder: number }[];
-}> {
-  const rows = await fulfilRepo.listExpressCompanies(ctx.db);
-  return {
-    items: rows.map((row) => ({
-      id: toId(row.id),
-      code: row.code,
-      name: row.name,
-      sortOrder: row.sortOrder,
-    })),
-  };
-}
+// The 快递公司 picker moved to stream F2's `shipping` domain (CR-1-b2,
+// settled): `expressCompanies.pickerList` in `core/src/shipping/`, same body,
+// same order. `fulfilRepo.listExpressCompanies` / `findExpressCompany` stay —
+// 发货 still has to validate the carrier it was handed.

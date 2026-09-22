@@ -236,24 +236,9 @@ export const shipmentTrackingExample = {
   queriedAt: '2026-02-02T12:00:00+08:00',
 } satisfies ShipmentTracking;
 
-/** The picker on the 发货 form. Reference data, seeded; F2 takes this over when `shipping` lands. */
-export const expressCompany = z.object({
-  id,
-  code: z.string(),
-  name: z.string(),
-  /** Companies an operator uses often sort first. */
-  sortOrder: z.number().int(),
-});
-export type ExpressCompany = z.infer<typeof expressCompany>;
-
-export const expressCompanyList = z.object({ items: z.array(expressCompany) });
-
-export const expressCompanyListExample = {
-  items: [
-    { id: '12', code: 'SF', name: '顺丰速运', sortOrder: 100 },
-    { id: '13', code: 'ZTO', name: '中通快递', sortOrder: 90 },
-  ],
-} satisfies z.infer<typeof expressCompanyList>;
+// The 快递公司 picker shape moved to `contracts/src/shipping/schemas.ts`
+// (`expressCompany` / `expressCompanyList` / `expressCompanyListExample`) when
+// stream F2 took the two routes over — CR-1-b2, settled. Import it from there.
 
 // ---------------------------------------------------------------------------
 // the order timeline

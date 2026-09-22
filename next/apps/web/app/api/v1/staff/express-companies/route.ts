@@ -1,8 +1,8 @@
-import { staffExpressCompanies } from '@shop/contracts/order/order.staff.contract';
-import { orderStaff } from '@shop/core/order';
+import { staffExpressCompanyPicker } from '@shop/contracts/shipping/shipping.express.contract';
+import { expressCompanies } from '@shop/core/shipping';
 import { handle } from '../../../../../src/server';
 
-/** `/api/v1/staff/express-companies` — B2's until F2's `shipping` lands (CR-1-b2). */
-export const GET = handle(staffExpressCompanies, (ctx) => orderStaff.expressCompanies(ctx));
+/** `/api/v1/staff/express-companies` — same list, same body, for the mobile staff console (CR-1-b2). */
+export const GET = handle(staffExpressCompanyPicker, (ctx) => expressCompanies.pickerList(ctx));
 
 export const dynamic = 'force-dynamic';

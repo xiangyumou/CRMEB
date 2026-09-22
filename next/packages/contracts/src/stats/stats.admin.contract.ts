@@ -111,7 +111,11 @@ export const statsProductRanking = defineRoute({
   response: productRanking,
   errors: ['STATS_RANGE_INVALID'],
   examples: [
-    { name: 'by-amount', query: { sortBy: 'paidAmount', limit: 20 }, response: productRankingExample },
+    {
+      name: 'by-amount',
+      query: { sortBy: 'paidAmount', limit: 20 },
+      response: productRankingExample,
+    },
   ],
 });
 

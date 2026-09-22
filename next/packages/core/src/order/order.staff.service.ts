@@ -241,11 +241,7 @@ export async function shipmentTracking(
   return fulfil.trackShipment(ctx, params);
 }
 
-export async function expressCompanies(
-  ctx: Ctx,
-): Promise<{ items: { id: string; code: string; name: string; sortOrder: number }[] }> {
-  return fulfil.listExpressCompanies(ctx);
-}
+// 快递公司 for the staff console: F2's `shipping` domain answers it now (CR-1-b2).
 
 // ---------------------------------------------------------------------------
 // after-sales, forwarded to stream C

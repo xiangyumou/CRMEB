@@ -9,8 +9,6 @@ import {
   pagedAdminRefunds,
 } from '../refund/schemas';
 import {
-  expressCompanyList,
-  expressCompanyListExample,
   orderAddressBody,
   orderIdParams,
   orderPriceBody,
@@ -270,16 +268,8 @@ export const staffShipmentTracking = defineRoute({
   examples: [{ name: 'in-transit', params: { id: '4001' }, response: shipmentTrackingExample }],
 });
 
-export const staffExpressCompanies = defineRoute({
-  id: 'order.staffExpressCompanies',
-  method: 'GET',
-  path: '/api/v1/staff/express-companies',
-  auth: 'staff',
-  summary: '店员物流公司列表',
-  tags: ['order'],
-  response: expressCompanyList,
-  examples: [{ name: 'ok', response: expressCompanyListExample }],
-});
+// Moved to stream F2 as `shipping.staffExpressCompanyPicker` (CR-1-b2),
+// same path and same body.
 
 // ---------------------------------------------------------------------------
 // after-sales, handed to stream C

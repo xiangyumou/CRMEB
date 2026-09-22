@@ -86,7 +86,6 @@ export {
   cancelShipment,
   completeOrder,
   confirmReceipt,
-  listExpressCompanies,
   myShipments,
   myShipmentTracking,
   receiveOrder,

@@ -5,13 +5,13 @@ import { Alert, Button, Card, Empty, InputNumber, Space, Table, Typography } fro
 import {
   orderAdminCancelShipment,
   orderAdminDetail,
-  orderAdminExpressCompanies,
   orderAdminList,
   orderAdminShip,
   orderAdminShipmentTracking,
   orderAdminShipments,
   orderAdminTimeline,
 } from '@shop/contracts/order/order.admin.contract';
+import { expressCompanyPicker } from '@shop/contracts/shipping/shipping.express.contract';
 import {
   shipBody,
   type AdminOrderDetail,
@@ -48,7 +48,7 @@ export function ShipPanel({
   loading: boolean;
 }) {
   const shipModal = useFormModal<AdminOrderDetail>();
-  const companies = useRouteQuery(orderAdminExpressCompanies, {}, { enabled: shipModal.open });
+  const companies = useRouteQuery(expressCompanyPicker, {}, { enabled: shipModal.open });
   const [lines, setLines] = useState<Record<string, number>>({});
 
   const outstanding = useMemo(

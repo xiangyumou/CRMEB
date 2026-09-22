@@ -278,7 +278,13 @@ export const productStatsExample: ProductStats = {
     { key: 'paidAmount', label: '支付金额', value: 82310.4, format: 'money', previous: 79204.1 },
     { key: 'refundQuantity', label: '退款件数', value: 12, format: 'count', previous: 9 },
     { key: 'refundAmount', label: '退款金额', value: 1820.0, format: 'money', previous: 1400.0 },
-    { key: 'payConversion', label: '访问-支付转化率', value: 15.12, format: 'percent', previous: 14.4 },
+    {
+      key: 'payConversion',
+      label: '访问-支付转化率',
+      value: 15.12,
+      format: 'percent',
+      previous: 14.4,
+    },
   ],
   chart: {
     bucket: 'day',
@@ -315,8 +321,20 @@ export const tradeStatsExample: TradeStats = {
   ...WINDOW,
   metrics: [
     { key: 'revenue', label: '营业额', value: 80490.4, format: 'money', previous: 77804.1 },
-    { key: 'goodsPaidAmount', label: '商品支付金额', value: 82310.4, format: 'money', previous: 79204.1 },
-    { key: 'refundAmount', label: '商品退款金额', value: 1820.0, format: 'money', previous: 1400.0 },
+    {
+      key: 'goodsPaidAmount',
+      label: '商品支付金额',
+      value: 82310.4,
+      format: 'money',
+      previous: 79204.1,
+    },
+    {
+      key: 'refundAmount',
+      label: '商品退款金额',
+      value: 1820.0,
+      format: 'money',
+      previous: 1400.0,
+    },
     { key: 'freightAmount', label: '运费收入', value: 1240.0, format: 'money', previous: 1180.0 },
     { key: 'paidOrderCount', label: '支付订单数', value: 318, format: 'count', previous: 302 },
     { key: 'averageOrderValue', label: '客单价', value: 258.84, format: 'money', previous: 262.26 },

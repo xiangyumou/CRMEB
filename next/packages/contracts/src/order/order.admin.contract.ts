@@ -5,8 +5,6 @@ import {
   adminOrderDetailExample,
   adminOrderListItemExample,
   adminOrderListQuery,
-  expressCompanyList,
-  expressCompanyListExample,
   orderAddressBody,
   orderDeletionsBody,
   orderDeletionsResult,
@@ -459,24 +457,9 @@ export const orderAdminShipmentTracking = defineRoute({
   ],
 });
 
-/**
- * The 物流公司 picker.
- *
- * Reference data (`express_companies`), seeded, read-only. It lives on B2's
- * surface only because the 发货 form needs it before stream F2's `shipping`
- * domain exists; F2 should take the route over unchanged (CR-1-b2).
- */
-export const orderAdminExpressCompanies = defineRoute({
-  id: 'order.adminExpressCompanies',
-  method: 'GET',
-  path: '/admin-api/express-companies',
-  auth: 'admin',
-  permission: 'order:order:read',
-  summary: '物流公司列表',
-  tags: ['order'],
-  response: expressCompanyList,
-  examples: [{ name: 'ok', response: expressCompanyListExample }],
-});
+// The 物流公司 picker moved to stream F2 (CR-1-b2, settled): it is now
+// `shipping.expressCompanyPicker` in `contracts/src/shipping/`, on the same
+// path, with the same body and the same `order:order:read` permission.
 
 /**
  * 确认收货, by an operator.
