@@ -1,8 +1,7 @@
 # CR-4-j — `mapSystem` emits two fields the target tables do not have
 
 - **Stream:** J (ETL runner), against F1 (system & storage)
-- **Status:** both parked as declared drops so the migration runs; one of them
-  is a real decision
+- **Status:** decided — `admins.lastLoginIp` is not migrated (no column, no reader; the new admin session records its own); the mapper stops emitting it and `roles.deletedAt`; J's follow-up removes both `dropColumns` entries
 - **Affects:** `next/packages/etl/src/mappers/system.ts` (F1),
   `next/packages/db/src/schema/system.ts` (F1),
   `next/packages/etl/src/groups.ts` (J)

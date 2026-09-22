@@ -1,8 +1,7 @@
 # CR-3-j — two things `mapUsers` leaves to chance: identity ids and `city_id`
 
 - **Stream:** J (ETL runner), against E1 (user domain)
-- **Status:** (1) handled in the runner, E1 may still prefer to carry the id;
-  (2) open — a real dump can abort the `user` group
+- **Status:** accepted, both parts — J's follow-up carries `eb_wechat_user.id` over in `mapUsers` and adds the `knownCityIds` input filled from the target through `extras`, nulling unknown cities and counting `addressesCityCleared`
 - **Affects:** `next/packages/etl/src/mappers/user.ts`,
   `next/packages/etl/src/runner.ts`
 

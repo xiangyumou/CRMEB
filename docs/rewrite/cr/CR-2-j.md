@@ -1,8 +1,7 @@
 # CR-2-j — `order-fulfil.reviewWindowDays` claims `order_activity_time`, which is neither
 
 - **Stream:** J (ETL runner)
-- **Status:** the claim is ignored by the ETL until the owning stream decides;
-  nothing wrong migrates in the meantime
+- **Status:** accepted — J's follow-up points `order-fulfil.legacyKeys.reviewWindowDays` at `system_comment_time` (days on both sides, no transform) and deletes the override entry
 - **Affects:** the config group `order-fulfil` (`legacyKeys.reviewWindowDays`),
   `next/packages/etl/src/config-overrides.ts`,
   `next/packages/etl/src/config-dropped.ts`

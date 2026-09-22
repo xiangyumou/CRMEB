@@ -1,8 +1,7 @@
 # CR-1-j — `configKeyMap` is one-to-one; several legacy config keys have two claimants
 
 - **Stream:** J (ETL runner)
-- **Status:** worked around in the ETL; a decision is wanted from F1 and whoever
-  ends up owning the duplicated groups
+- **Status:** decided — the duplicates are not intentional. `wechat` (C) owns `wechat_appid`/`wechat_appsecret`; E3 removes them from `wechat-oa` (it reads C's group). `trade` dissolves under CR-6-f1 after F2 merges. The runner's fan-out stays as the safety net; J's follow-up drops the `configKeyMap` input from `mappers/system.ts` since the runner owns config routing
 - **Affects:** `next/packages/etl/src/mappers/system.ts` (F1's `configKeyMap`
   input), `next/packages/etl/src/config.ts` (J)
 
