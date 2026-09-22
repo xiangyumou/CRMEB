@@ -174,6 +174,10 @@ services:
       UPLOADS_DIR: /data/uploads
       UPLOADS_PUBLIC_PREFIX: /uploads
       DB_POOL_MAX: ${WEB_DB_POOL_MAX:-10}
+      # `/api/v1/readyz` decides whether the worker heartbeat is fresh, so it
+      # needs the same interval the worker beats at — the two are read from one
+      # variable here so they cannot drift into disagreeing about a live worker.
+      HEARTBEAT_INTERVAL_MS: ${HEARTBEAT_INTERVAL_MS:-15000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       # Off in production on purpose: the merge gate validates every response
       # against its contract, and paying for it again per request is latency
@@ -248,13 +252,20 @@ services:
     depends_on:
       web: { condition: service_healthy }
     healthcheck:
-      # Both: `/healthz` is nginx answering for itself, `/readyz` is the chain
-      # through to the app. An edge that is up but cannot reach `web` is not a
-      # healthy edge.
+      # Both: `/healthz` is nginx answering for itself, `/api/v1/health` is the
+      # chain through to the app. An edge that is up but cannot reach `web` is
+      # not a healthy edge.
+      #
+      # Deliberately **not** `/readyz`. Since CR-1-j2 that path is the deep
+      # check and answers 503 while PostgreSQL or Redis is down — so probing it
+      # here would restart the edge because the database blipped, which is the
+      # outage-from-a-degradation that `apps/web/src/server/health.ts` exists to
+      # refuse. Nothing acts on readiness; `deploy/next/lib/readiness.sh` reads
+      # it to gate a release, and a human or a monitor reads it to know why.
       test:
         [
           'CMD-SHELL',
-          'wget -q -O /dev/null http://127.0.0.1/healthz && wget -q -O /dev/null http://127.0.0.1/readyz',
+          'wget -q -O /dev/null http://127.0.0.1/healthz && wget -q -O /dev/null http://127.0.0.1/api/v1/health',
         ]
       interval: 15s
       timeout: 10s

@@ -31,7 +31,8 @@ export interface RiskMapping {
 }
 
 const invariants = (...ids: string[]): RiskResolution => ({ kind: 'invariants', ids });
-const pending = (stream: string, why: string): RiskResolution => ({ kind: 'pending', stream, why });
+// Every row is decided since J3 merged (2026-09-23); the `pending` kind stays in the
+// type so the check keeps failing a parked row on a merged stream if one returns.
 const retired = (why: string): RiskResolution => ({ kind: 'retired', why });
 const manual = (why: string): RiskResolution => ({ kind: 'manual', why });
 
@@ -369,7 +370,7 @@ export const RISK_MAP: readonly RiskMapping[] = [
   {
     section: '9. Migration and deployment',
     entry: 'Upgrade adds missing objects, rerun no-op',
-    resolution: pending('J3', 'drizzle migrations and the ETL runner'),
+    resolution: invariants('ETL-J-001', 'OPS-010'),
   },
   {
     section: '9. Migration and deployment',
@@ -381,12 +382,12 @@ export const RISK_MAP: readonly RiskMapping[] = [
   {
     section: '9. Migration and deployment',
     entry: 'Pre-checks of pending payments/refunds before upgrade',
-    resolution: pending('J3', 'the ETL runner’s pre-flight'),
+    resolution: invariants('ETL-J-008'),
   },
   {
     section: '9. Migration and deployment',
     entry: 'Before/after data snapshots',
-    resolution: pending('J3', 'ETL verification counts'),
+    resolution: invariants('ETL-J-007', 'OPS-010'),
   },
   {
     section: '9. Migration and deployment',
@@ -396,44 +397,46 @@ export const RISK_MAP: readonly RiskMapping[] = [
   {
     section: '9. Migration and deployment',
     entry: 'Health check reflects real topology',
-    resolution: pending('J3', 'OPS-001/002/004'),
+    resolution: invariants('OPS-002', 'OPS-004'),
   },
   {
     section: '9. Migration and deployment',
     entry: 'Health check cannot be masked by localhost',
-    resolution: pending('J3', 'OPS-001'),
+    resolution: retired(
+      'OPS-001: no Workerman, no Channel address to mask; the probe that survives is OPS-002 (each role verifies the dependency it is configured with)',
+    ),
   },
   {
     section: '9. Migration and deployment',
     entry: 'ready.php schema gate',
-    resolution: pending('J3', 'OPS-003, now /readyz on the web app'),
+    resolution: invariants('OPS-003'),
   },
   {
     section: '9. Migration and deployment',
     entry: 'Release publish refuses conflicts',
-    resolution: pending('J3', 'REL-001..007'),
+    resolution: invariants('REL-003', 'REL-004'),
   },
   {
     section: '9. Migration and deployment',
     entry: 'Manual promotion of a verified digest',
-    resolution: pending('J3', 'REL-005'),
+    resolution: invariants('REL-005'),
   },
   {
     section: '9. Migration and deployment',
     entry: 'Upgrade backup verified before migration',
-    resolution: pending('J3', 'OPS-008/009/010'),
+    resolution: invariants('OPS-008', 'OPS-009', 'OPS-010'),
   },
   {
     section: '9. Migration and deployment',
     entry: 'Rollback integrity',
-    resolution: pending('J3', 'OPS-011'),
+    resolution: invariants('OPS-011'),
   },
 
   // 10 ----------------------------------------------------------------------
   {
     section: '10. Client surfaces',
     entry: 'Admin/H5/MP builds',
-    resolution: pending('J3', 'the release pipeline builds and records digests'),
+    resolution: invariants('REL-001', 'REL-006'),
   },
   {
     section: '10. Client surfaces',

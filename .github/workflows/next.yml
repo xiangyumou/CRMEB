@@ -4,19 +4,31 @@ name: next
 # import boundaries, unit tests, integration tests on a real PostgreSQL 17 and
 # Redis 7, the contract example check, and formatting.
 #
-# Only runs for changes under `next/` — the legacy PHP tree has its own
-# workflows and must not be disturbed.
+# It also builds and publishes the three container images and rehearses a
+# deploy against them (CR-3-j2). `deploy/next/**` is in the paths filter for
+# that reason: the compose file and the upgrade scripts are part of what this
+# workflow gates.
+#
+# Runs for changes under `next/` and `deploy/next/` only — the legacy PHP tree
+# has its own workflows and must not be disturbed. Nothing here touches the
+# production host: the cutover is `deploy/next/cutover.md`, run by a person.
 
 on:
   push:
     branches: [master, 'rewrite/**']
     paths:
       - 'next/**'
+      - 'deploy/next/**'
       - '.github/workflows/next.yml'
   pull_request:
     paths:
       - 'next/**'
+      - 'deploy/next/**'
       - '.github/workflows/next.yml'
+  # The concurrency soak below is a flake hunt, not a gate, so it runs on a
+  # clock rather than on every push (CR-4-k §2).
+  schedule:
+    - cron: '0 18 * * *' # 02:00 CST, after the day's merges
   workflow_dispatch:
 
 concurrency:
@@ -73,12 +85,39 @@ jobs:
       - name: Lint
         run: corepack pnpm lint
 
+      # `next/guards` (CR-4-k §1): the checks that no single stream can make —
+      # a retired legacy route with no replacement, a secret that reached a
+      # response, a menu entry pointing at nothing. It exits non-zero on `fail`
+      # and zero on `pending`, so it gates today while streams are still in
+      # flight, and starts failing on its own once the last one merges.
+      - name: Guards
+        run: corepack pnpm guards
+
+      # The JSON is only worth uploading when something failed; on a green run
+      # it is noise in the artifact list.
+      - name: Guards (JSON for annotations)
+        if: failure()
+        run: corepack pnpm --filter @shop/guards guards --json > guards.json
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: guards
+          path: next/guards.json
 
       - name: Unit tests
         run: corepack pnpm test:unit
 
       - name: Contract examples
         run: corepack pnpm --filter @shop/contracts check:examples
+
+      # Migrations stay additive, or the statement that is not says so in
+      # writing: `deploy/next/upgrade.sh` rolls a failed release back to the
+      # previous images unattended, and that is only safe while the previous
+      # image tolerates the new schema (OPS-007).
+      - name: Migrations stay additive
+        working-directory: .
+        run: node tests/static/next-migration-guard.cjs
 
       - name: Prettier
         run: corepack pnpm format:check
@@ -123,6 +162,118 @@ jobs:
       - name: Integration tests
         run: corepack pnpm test:int
 
+  # CR-4-k §3. No `pnpm gen` and no `pnpm build` step here on purpose: the
+  # suite's `webServer` is `e2e/admin/scripts/serve.ts`, which generates,
+  # starts the containers, seeds and builds before it serves. Playwright
+  # starts `webServer` before `globalSetup`, so a globalSetup that created the
+  # database would create it after the server had already failed to connect.
+  e2e-admin:
+    name: admin e2e (playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: next/pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      # Chromium only: these are assertions about the admin's own behaviour —
+      # an authorisation boundary, an audit row, a masked secret — not about
+      # browser compatibility.
+      - name: Install the browser
+        run: corepack pnpm --filter @shop/e2e-admin exec playwright install --with-deps chromium
+
+      - name: Pre-pull the service images
+        run: |
+          docker pull postgres:17-alpine
+          docker pull redis:7-alpine
+
+      - name: Admin e2e
+        run: corepack pnpm --filter @shop/e2e-admin e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: next/e2e/admin/playwright-report
+
+  # CR-4-k §2 (STAB-001). The races the concurrency suite covers — the last
+  # unit of stock, two refund approvals, a callback meeting the reconciliation
+  # sweep — are decided by the database, so one green run proves the statement
+  # is right and fifty prove the *test* is right, catching the one that passes
+  # because two transactions happened not to overlap.
+  #
+  # It never talks to a real WeChat, SMS or Aliyun endpoint and never runs
+  # against anything but a Testcontainers database (K-hardening.md §4).
+  concurrency-soak:
+    name: concurrency soak (50 rounds)
+    # Nightly and on demand — never on a pull request: this is a flake hunt,
+    # not a gate, and a gate that takes 40 minutes stops being read.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: next/pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
+      - name: Pre-pull the service images
+        run: |
+          docker pull postgres:17-alpine
+          docker pull redis:7-alpine
+
+      # One container set, fifty rounds, a different ordering seed each time.
+      # Every round that fails is recorded and the loop continues: "round 37
+      # failed" is a fact about the schedule, and stopping at the first failure
+      # throws away the distribution, which is the thing worth knowing.
+      - name: 50 rounds
+        run: |
+          set -uo pipefail
+          mkdir -p soak
+          failed=0
+          for round in $(seq 1 50); do
+            echo "::group::round $round"
+            if ! corepack pnpm exec vitest run --project int \
+                 --sequence.seed="$round" --sequence.shuffle \
+                 'packages/core/src/**/*.concurrency.int.test.ts' \
+                 > "soak/round-$round.log" 2>&1; then
+              failed=$((failed + 1))
+              echo "round $round FAILED" | tee -a soak/failures.txt
+              tail -80 "soak/round-$round.log"
+            fi
+            echo "::endgroup::"
+          done
+          echo "$failed of 50 rounds failed"
+          test "$failed" -eq 0
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: soak-logs
+          path: next/soak
+
   build:
     name: build
     runs-on: ubuntu-latest
@@ -148,3 +299,211 @@ jobs:
 
       - name: Build
         run: corepack pnpm build
+
+  shell:
+    name: shellcheck (deploy/next)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v5
+
+      # `-x` follows `. lib/common.sh`, and --source-path=SCRIPTDIR resolves it
+      # relative to each script rather than to the working directory — without
+      # it the library is invisible and every variable it sets reads as unset.
+      - name: shellcheck
+        run: |
+          shellcheck --source-path=SCRIPTDIR -x \
+            deploy/next/*.sh deploy/next/lib/*.sh deploy/next/rehearsal/*.sh
+
+  images:
+    name: images (web, worker, edge)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: [static, build]
+    # Publishing happens for the branches that can become a release. A pull
+    # request builds in `rehearsal` below and pushes nothing.
+    if: github.event_name == 'push'
+    # A release is never cancelled mid-publish. The workflow-level group cancels
+    # in progress, which is right for the merge-gate jobs and would kill a
+    # publish halfway, so this job carries its own repository-wide group
+    # (REL-007).
+    concurrency:
+      group: next-images-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    defaults:
+      run:
+        working-directory: .
+    env:
+      WEB_IMAGE: ghcr.io/xiangyumou/crmeb-next-web
+      WORKER_IMAGE: ghcr.io/xiangyumou/crmeb-next-worker
+      EDGE_IMAGE: ghcr.io/xiangyumou/crmeb-next-edge
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The storefront. The edge image defaults to a placeholder page, which is
+      # right for a stack that only serves /admin and the APIs and **wrong for a
+      # release** — so a release builds the real H5 bundle, and a checkout where
+      # that build fails says so loudly instead of shipping the placeholder
+      # quietly. Stream H proved the build runs headlessly (docs/rewrite/status/h.md).
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: template/uni-app/package-lock.json
+
+      - name: Build the H5 storefront
+        id: h5
+        continue-on-error: true
+        working-directory: template/uni-app
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build:h5
+
+      # `dist/<NODE_ENV>/h5` — the uni-app CLI names the directory after the
+      # mode it built in, so the job finds the bundle rather than assuming one
+      # of the two names and silently falling back to the placeholder.
+      - name: Resolve the H5 bundle
+        id: bundle
+        run: |
+          set -euo pipefail
+          dist=''
+          for candidate in template/uni-app/dist/build/h5 template/uni-app/dist/dev/h5; do
+            if [ -f "$candidate/index.html" ]; then
+              dist="$candidate"
+              break
+            fi
+          done
+          if [ -n "$dist" ]; then
+            storefront=real
+          else
+            storefront=placeholder
+            dist=next/docker/edge/h5-placeholder
+            echo "::warning title=Edge image has no storefront::The H5 build produced no bundle; the edge image falls back to the placeholder page and this release must not be deployed to a site that serves shoppers."
+          fi
+          printf 'dist=%s\n' "$dist" >> "$GITHUB_OUTPUT"
+          printf 'storefront=%s\n' "$storefront" >> "$GITHUB_OUTPUT"
+
+      # One architecture. The production host is a single amd64 box (PLAN §7),
+      # so a second one would double the build for an image nothing will run.
+      #
+      # `docker/build-push-action` rather than a bare `docker buildx build`:
+      # `type=gha` needs the Actions cache token, which the action puts in the
+      # environment and a plain `run:` step does not have.
+      - name: web
+        uses: docker/build-push-action@v6
+        with:
+          context: ./next
+          file: next/docker/web.Dockerfile
+          push: true
+          tags: ${{ env.WEB_IMAGE }}:ci-${{ github.sha }}-amd64
+          cache-from: type=gha,scope=next-web
+          cache-to: type=gha,scope=next-web,mode=max
+
+      - name: worker
+        uses: docker/build-push-action@v6
+        with:
+          context: ./next
+          file: next/docker/worker.Dockerfile
+          push: true
+          tags: ${{ env.WORKER_IMAGE }}:ci-${{ github.sha }}-amd64
+          cache-from: type=gha,scope=next-worker
+          cache-to: type=gha,scope=next-worker,mode=max
+
+      # Context is the repository root: the edge image copies the nginx config
+      # from `next/docker/edge/` and the storefront from `template/`.
+      - name: edge
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: next/docker/edge/Dockerfile
+          push: true
+          build-args: H5_DIST=${{ steps.bundle.outputs.dist }}
+          tags: ${{ env.EDGE_IMAGE }}:ci-${{ github.sha }}-amd64
+          cache-from: type=gha,scope=next-edge
+          cache-to: type=gha,scope=next-edge,mode=max
+
+      # The publish rules live in scripts/publish-release.sh (proved against a
+      # real registry by tests/deployment/publish-release.sh), not inline here,
+      # so they are exercised rather than read. REL-006 is the guard that keeps
+      # it that way.
+      - name: Publish the commit-scoped tags
+        id: publish
+        run: |
+          set -euo pipefail
+          for role in web worker edge; do
+            case "$role" in
+              web) image="$WEB_IMAGE" ;;
+              worker) image="$WORKER_IMAGE" ;;
+              edge) image="$EDGE_IMAGE" ;;
+            esac
+            digest="$(bash scripts/publish-release.sh tags "$image" "$GITHUB_SHA" \
+              "$image:ci-$GITHUB_SHA-amd64" | tail -1)"
+            test -n "$digest"
+            printf '%s=%s@%s\n' "$role" "$image" "$digest" >> "$GITHUB_OUTPUT"
+          done
+
+      # The three lines an operator pastes into `deployment.env`, and the three
+      # arguments `upgrade.sh` wants. A release whose digests have to be dug out
+      # of a log is a release that gets deployed by tag.
+      - name: Release summary
+        run: |
+          {
+            printf '## crmeb-next images\n\n'
+            printf 'storefront in the edge image: **%s**\n\n' '${{ steps.bundle.outputs.storefront }}'
+            printf '```sh\ndeploy/next/upgrade.sh --app-version %s \\\n' "$GITHUB_SHA"
+            printf '  --web    %s \\\n'   '${{ steps.publish.outputs.web }}'
+            printf '  --worker %s \\\n'   '${{ steps.publish.outputs.worker }}'
+            printf '  --edge   %s\n```\n' '${{ steps.publish.outputs.edge }}'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  rehearsal:
+    name: deploy rehearsal
+    runs-on: ubuntu-latest
+    # The drill brings a full stack up several times over; it is the slowest
+    # job here and still the cheapest place to find out that a release cannot
+    # be rolled back.
+    timeout-minutes: 45
+    needs: [shell]
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Failing a release for an unrelated registry hiccup mid-drill teaches
+      # people to rerun rather than to read, so the fixed dependencies are
+      # pulled up front.
+      - name: Pre-pull
+        run: |
+          set -euo pipefail
+          docker pull registry:2
+          grep -E '^NEXT_(POSTGRES|REDIS)_IMAGE=' deploy/next/deployment.env.example |
+            cut -d= -f2- | xargs -rn1 docker pull
+
+      # It builds the three images itself, publishes them to a registry
+      # container it starts, and deploys, fails, and rolls back a stack several
+      # times. Nothing leaves the runner.
+      - name: Drill
+        run: deploy/next/rehearsal/drill.sh
+
+      - name: What it covers
+        if: always()
+        run: deploy/next/rehearsal/drill.sh --list >> "$GITHUB_STEP_SUMMARY"

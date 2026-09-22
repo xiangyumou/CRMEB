@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defineCheck, fail, note, pending, result, type Finding } from '../framework';
 import { parseCases, parseInvariants, parseRiskMatrix, type InvariantRow } from '../lib/matrices';
-import { nextRoot, regressionDir, rewriteDocs } from '../lib/paths';
+import { nextRoot, regressionDir, repoRoot, rewriteDocs } from '../lib/paths';
 import {
   DUPLICATE_ROWS,
   LEDGER_CORRECTIONS,
@@ -98,23 +98,68 @@ function titleMatches(written: string, wanted: string): boolean {
 }
 
 /**
+ * Does this file write `leaf` anywhere, as a line of its own text?
+ *
+ * Not every proof in the ledger is a vitest test. The deployment rows (OPS-*,
+ * REL-*) are proved by the shell drills — `deploy/next/rehearsal/drill.sh`
+ * names sixteen stable case ids, `tests/deployment/publish-release.sh` calls
+ * `pass '<name>'` against a real registry — and two are proved by a static
+ * guard under `tests/static/`, whose "test name" is the message its `assert`
+ * carries. None of those are `it(…)`, so `titlesIn` sees nothing in them and a
+ * row that cites one would read as "no such test" while the test exists and
+ * runs in CI.
+ *
+ * The match is per line, so a `.*` hole cannot bridge two unrelated statements,
+ * and the holes are the same two `titleMatches` knows about plus the shell's
+ * bare `$var` — `pass "a first publish creates sha-$sha_a"` is the name the
+ * ledger writes as `a first publish creates sha-<sha>`.
+ *
+ * It is a substring match and deliberately so: renaming a case id still breaks
+ * the row, which is the property that matters.
+ */
+function mentions(source: string, leaf: string): boolean {
+  const holes = /\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*|<[^>]*>/g;
+  const pattern = leaf
+    .split(holes)
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('.*');
+  const expression = new RegExp(pattern);
+  return source.split('\n').some((line) => expression.test(line));
+}
+
+/** Vitest reads titles; everything else is read as text. */
+function isVitestModule(file: string): boolean {
+  return /\.[cm]?tsx?$/.test(file);
+}
+
+/**
  * `packages/core/src/x.int.test.ts::describe > it` resolves when the file exists
  * and the leaf name is one of the titles it writes. The leaf is matched rather
  * than the whole chain because vitest composes the reported name from nested
  * `describe`s that live on different lines; the leaf is the one string that is
  * written out.
+ *
+ * The path is read relative to `next/` first and to the repository root second,
+ * because the deployment suites (`deploy/next/rehearsal/`, `tests/deployment/`,
+ * `tests/static/`) live outside the workspace and the ledger cites them the way
+ * a person would run them, from the root.
  */
 function resolveTestId(testId: string): string | null {
   const split = testId.indexOf('::');
   if (split < 0) return `"${testId}" is not <file>::<test name>`;
   const file = testId.slice(0, split);
   const name = testId.slice(split + 2).trim();
-  const absolute = path.join(nextRoot, file);
-  if (!fs.existsSync(absolute)) return `no such test file: next/${file}`;
+  const inWorkspace = path.join(nextRoot, file);
+  const absolute = fs.existsSync(inWorkspace) ? inWorkspace : path.join(repoRoot, file);
+  if (!fs.existsSync(absolute)) return `no such test file: ${file}`;
   // ` > ` with spaces: `refuses <each of five>` has a `>` of its own.
   const leaf = (name.split(' > ').at(-1) ?? name).trim();
   if (leaf.length === 0) return `"${testId}" names no test`;
-  const titles = titlesIn(fs.readFileSync(absolute, 'utf8'));
+  const source = fs.readFileSync(absolute, 'utf8');
+  if (!isVitestModule(file)) {
+    return mentions(source, leaf) ? null : `${file} writes no case named "${leaf}"`;
+  }
+  const titles = titlesIn(source);
   if (!titles.some((title) => titleMatches(title, leaf))) {
     return `next/${file} contains no test named "${leaf}"`;
   }

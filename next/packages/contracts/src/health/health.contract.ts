@@ -46,3 +46,56 @@ export const adminHealth = defineRoute({
   response: healthPayload,
   examples: [example],
 });
+
+// ---------------------------------------------------------------------------
+// Readiness (CR-1-j2)
+// ---------------------------------------------------------------------------
+
+const checkResult = z.enum(['ok', 'failed']);
+
+export const readinessPayload = z.object({
+  status: z.literal('ok'),
+  time: instant,
+  version: z.string(),
+  /** One entry per dependency this process needs before it can serve. */
+  checks: z.object({
+    database: checkResult,
+    redis: checkResult,
+    /** The schema is at least as new as the one this build was compiled against. */
+    migrations: checkResult,
+    /** The worker heartbeat is fresh — a stack whose jobs are not running is not ready. */
+    worker: checkResult,
+  }),
+});
+export type ReadinessPayload = z.infer<typeof readinessPayload>;
+
+export const storefrontReadiness = defineRoute({
+  id: 'health.readiness',
+  method: 'GET',
+  path: '/api/v1/readyz',
+  // Public for the same reason `/api/v1/health` is: the caller is a probe and
+  // has no session. It returns no data an attacker does not already have by
+  // watching whether the site works.
+  auth: 'public',
+  summary: '就绪检查（深度）',
+  tags: ['health'],
+  response: readinessPayload,
+  errors: ['HEALTH_NOT_READY'],
+  // "Not ready yet" is this route's success case, not an incident. The
+  // readiness gate polls it on every deploy, so at `error` a forty-second start
+  // writes forty lines that describe nothing wrong — and buries the one that
+  // does, in the window where somebody is deciding whether to roll back
+  // (CR-1-j3).
+  expectedStatuses: [503],
+  examples: [
+    {
+      name: 'ready',
+      response: {
+        status: 'ok',
+        time: '2026-01-01T12:00:00+08:00',
+        version: 'dev',
+        checks: { database: 'ok', redis: 'ok', migrations: 'ok', worker: 'ok' },
+      },
+    },
+  ],
+});

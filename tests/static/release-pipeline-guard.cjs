@@ -100,4 +100,124 @@ assert(/deployment-config\.tar\.gz[\s\S]*?deploy\/production\/upgrade\.sh/.test(
   }
 }
 
+// --- the rewrite's images (CR-3-j2) --------------------------------------
+//
+// REL-006 and REL-007 are properties of *the release pipeline*, not of one
+// workflow file. `next.yml` publishes three more images through the same
+// tested script, so it gets the same assertions — otherwise the rule is
+// enforced for the legacy pipeline and quietly not for the new one.
+const next = fs.readFileSync(path.join(root, '.github/workflows/next.yml'), 'utf8');
+
+assert(
+  /scripts\/publish-release\.sh tags/.test(next),
+  'the next workflow publishes tags through the tested script'
+);
+assert(
+  !/resolve_digest\(\)/.test(next) && !/imagetools create/.test(next),
+  'the next workflow must not carry its own publish helpers'
+);
+assert(
+  !/publish-release\.sh promote/.test(next),
+  'automated publishing never moves a deployment tag'
+);
+// A release is never cancelled mid-publish. `next.yml` cancels in progress for
+// the merge-gate jobs, which is right, so the publishing job carries its own
+// repository-wide concurrency group instead.
+assert(
+  /group:\s*next-images-\$\{\{\s*github\.repository\s*\}\}/.test(next) &&
+    /next-images[\s\S]{0,200}cancel-in-progress:\s*false/.test(next),
+  'image publishing is serialized repository-wide and never cancelled'
+);
+assert(
+  /deploy\/next\/rehearsal\/drill\.sh/.test(next),
+  'the deploy rehearsal runs in CI'
+);
+
+// --- the jobs CR-4-k adds -------------------------------------------------
+//
+// The three jobs `next/guards` and `next/e2e/admin` needed. They are asserted
+// here rather than trusted to review for the same reason the image job is: a
+// gate that is deleted, renamed or quietly made conditional stops running and
+// nothing says so — the workflow simply goes green faster. Each assertion
+// below names the property, not the YAML, so a job can be reorganised freely
+// and can only fail this by ceasing to do its job.
+{
+  const jobs = Object.fromEntries(
+    next
+      .split(/\n  (?=[a-z][a-z0-9-]*:\n)/)
+      .map((chunk) => [(chunk.match(/^\s*([a-z][a-z0-9-]*):/) || [null, ''])[1], chunk])
+  );
+
+  // 1. The guards run inside the merge gate, not in a job of their own that a
+  //    required-check list could forget to require.
+  assert(
+    /corepack pnpm guards/.test(jobs.static || ''),
+    'the `static` merge-gate job runs `pnpm guards` (CR-4-k §1)'
+  );
+
+  // 2. The soak is nightly and on demand, and never a pull-request gate: it is
+  //    a flake hunt of ~50× the integration suite, and a 40-minute gate stops
+  //    being read. The `schedule:` trigger is what makes "nightly" true — the
+  //    `if:` alone would make the job simply never run.
+  const soak = jobs['concurrency-soak'] || '';
+  assert(soak !== '', 'the 50-round concurrency soak job exists (STAB-001, CR-4-k §2)');
+  assert(
+    /schedule:\s*\n\s*- cron:/.test(next),
+    'the soak has a schedule to run on; without one the `if` makes it dead code'
+  );
+  assert(
+    /github\.event_name == 'schedule'/.test(soak) &&
+      /github\.event_name == 'workflow_dispatch'/.test(soak),
+    'the soak runs nightly and on demand only'
+  );
+  assert(
+    /seq 1 50/.test(soak) && /--sequence\.shuffle/.test(soak),
+    'the soak is 50 rounds with a different ordering seed each time, or it is not a soak'
+  );
+  // Stopping at the first failure throws away the distribution, which is the
+  // thing worth knowing: "round 37 of 50" is a fact, "it failed" is not.
+  assert(
+    /failed=\$\(\(failed \+ 1\)\)/.test(soak) && /test "\$failed" -eq 0/.test(soak),
+    'every round runs and the job fails on the count, rather than stopping at the first failure'
+  );
+  assert(
+    /if: always\(\)/.test(soak) && /soak-logs/.test(soak),
+    'the round logs are uploaded even when the job fails — especially then'
+  );
+
+  // 3. Admin e2e. Playwright cannot run a browser it has not installed, and
+  //    the failure mode is a 30-minute job that fails in its last step.
+  const e2e = jobs['e2e-admin'] || '';
+  assert(e2e !== '', 'the admin e2e job exists (CR-4-k §3)');
+  assert(
+    /playwright install --with-deps chromium/.test(e2e),
+    'the admin e2e job installs the browser before it runs the suite'
+  );
+  assert(
+    e2e.indexOf('playwright install') < e2e.indexOf('@shop/e2e-admin e2e'),
+    'the browser is installed before the suite runs, not after'
+  );
+  assert(
+    /--filter @shop\/e2e-admin e2e/.test(e2e),
+    'the admin e2e job runs the suite through its own `e2e` script'
+  );
+  assert(
+    /playwright-report/.test(e2e),
+    'a failed admin e2e run uploads its report; a trace nobody can read is not evidence'
+  );
+
+  // None of the three may publish. Only the image job does, and it is the one
+  // the REL-006/007 assertions above are about.
+  for (const [name, job] of [
+    ['static', jobs.static || ''],
+    ['concurrency-soak', soak],
+    ['e2e-admin', e2e],
+  ]) {
+    assert(
+      !/publish-release\.sh/.test(job) && !/docker\s+push/.test(job),
+      `job ${name} must not publish anything: releases go through the image job alone`
+    );
+  }
+}
+
 console.log('release-pipeline-guard: ok');

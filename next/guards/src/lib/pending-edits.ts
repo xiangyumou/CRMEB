@@ -97,26 +97,11 @@ export const PENDING_EDITS: readonly PendingEdit[] = [
     },
   })),
 
-  // --- the deployment rows, which J left to J2 ------------------------------
-  // J shipped the ETL and the release scripts; the drills that would *prove*
-  // these rows are J2's (`deploy/next/**`, the rehearsal suite). J2's own
-  // status file already carries CR-2-j2, which asks the orchestrator to map
-  // these rows to drill case ids and to retire or adapt six of them with
-  // reasons. So this entry does not propose a different answer — it names the
-  // CR that owns the answer, and keeps the guard from calling the rows a
-  // failure in the meantime.
-  ...[
-    ...Array.from({ length: 11 }, (_, i) => `OPS-${String(i + 1).padStart(3, '0')}`),
-    ...Array.from({ length: 7 }, (_, i) => `REL-${String(i + 1).padStart(3, '0')}`),
-  ].map((id) => ({
-    id,
-    resolution: {
-      kind: 'assign' as const,
-      stream: 'J2',
-      cr: 'CR-2-j2',
-      why: 'J shipped the ETL and the release scripts, but the deploy rehearsal that proves these rows is J2’s — CR-2-j2 (status/j2.md) already asks for exactly this mapping',
-    },
-  })),
+  // OPS-001 … OPS-011 and REL-001 … REL-007 used to sit here, assigned to J2
+  // with `CR-2-j2` as the change request that owed them an answer. J3 applied
+  // CR-2-j2: every one of those rows now reads `ported` (or `retired`, for
+  // OPS-001) and names the drill case or the static guard that proves it, so
+  // the entries are gone. The list may only shrink.
 
   // --- sections whose heading already says "dropped" ------------------------
   // The section owner reads `dropped: …`, but the rows under it were left

@@ -61,7 +61,26 @@ export function compileRoute(route: AnyRouteDef): CompiledRoute {
   return { route, regex: new RegExp(`^${pattern}$`), paramNames };
 }
 
-/** Compares segment by segment; the first position where only one side is static decides. */
+/**
+ * Compares segment by segment; the first position where only one side is static
+ * decides. Ties break on the path, which is what makes this a **total order**
+ * and is not cosmetic.
+ *
+ * Without the tie-break this returns 0 for every pair of unrelated paths, and a
+ * comparator that reports 0 for pairs it cannot order is not transitive: `a < b`
+ * and `b == c` and `c == a` can all hold at once. `Array.prototype.sort` is
+ * allowed to do anything with such a comparator, and TimSort only compares a
+ * subset of the pairs — so two routes that *are* ordered relative to each other
+ * can still come out the wrong way round, depending on where the sort happens to
+ * place them, which depends on the order the routes were registered in.
+ *
+ * That is how this surfaced: `/api/v1/my-messages/unread-count` and
+ * `/api/v1/my-messages/:id` were ordered correctly for 397 routes and
+ * incorrectly for 398, so adding one unrelated route (`/api/v1/readyz`) made the
+ * static path lose to the dynamic one and the mock server answered a request for
+ * the unread count with a 422 about an id that was not a number. Nothing about
+ * either route had changed.
+ */
 function bySpecificity(a: CompiledRoute, b: CompiledRoute): number {
   const left = a.route.path.split('/');
   const right = b.route.path.split('/');
@@ -70,6 +89,7 @@ function bySpecificity(a: CompiledRoute, b: CompiledRoute): number {
     const rightParam = right[i]?.startsWith(':') ?? false;
     if (leftParam !== rightParam) return leftParam ? 1 : -1;
   }
+  if (a.route.path !== b.route.path) return a.route.path < b.route.path ? -1 : 1;
   return 0;
 }
 
