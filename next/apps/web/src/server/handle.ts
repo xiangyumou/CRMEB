@@ -200,6 +200,7 @@ export function handle<
   options: HandleOptions = {},
 ): (request: Request, context?: NextRouteContext) => Promise<Response> {
   const anyRoute = route as unknown as AnyRouteDef;
+  const expectedStatuses = new Set(anyRoute.expectedStatuses ?? []);
 
   return async function routeHandler(request, context) {
     const container = options.container ?? getContainer();
@@ -216,7 +217,16 @@ export function handle<
 
     const finish = (status: number, body: unknown): Response => {
       for (const cookie of cookies) headers.append('set-cookie', cookie);
-      const level = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
+      // A status the route declares as an ordinary answer is logged as one
+      // (CR-1-j3: `/readyz`'s 503 during a rolling start is "not yet", not a
+      // fault, and at `error` it buried the one line that was).
+      const level = expectedStatuses.has(status)
+        ? 'info'
+        : status >= 500
+          ? 'error'
+          : status >= 400
+            ? 'warn'
+            : 'info';
       logger[level](
         {
           method: request.method,

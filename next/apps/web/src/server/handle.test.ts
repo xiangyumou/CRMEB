@@ -684,6 +684,44 @@ describe('request id and logging', () => {
       'request',
     );
   });
+
+  // CR-1-j3: a readiness probe's 503 is "not yet", polled on every deploy;
+  // logged at `error` it buries the one line that is. The route declares the
+  // status; nothing is inferred, and a route that says nothing logs as before.
+  it('logs a status the route declares as expected at info, and the same status elsewhere as before', async () => {
+    const spyLogger = () => {
+      const logger = silentLogger();
+      const child = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+      vi.spyOn(logger, 'child').mockReturnValue(child as never);
+      return { logger, child };
+    };
+    const notFound = async () => {
+      throw new DomainError('NOT_FOUND');
+    };
+
+    const declared = spyLogger();
+    const probe = defineRoute({ ...okRoute, id: 'test.probe', expectedStatuses: [404] });
+    const probed = await handle(probe, notFound, { container: fakeContainer(declared) })(
+      new Request('https://shop.example/api/v1/things'),
+    );
+    expect(probed.status).toBe(404);
+    expect(declared.child.info).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 404 }),
+      'request',
+    );
+    expect(declared.child.warn).not.toHaveBeenCalled();
+
+    const silent = spyLogger();
+    const plain = await handle(okRoute, notFound, { container: fakeContainer(silent) })(
+      new Request('https://shop.example/api/v1/things'),
+    );
+    expect(plain.status).toBe(404);
+    expect(silent.child.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 404 }),
+      'request',
+    );
+    expect(silent.child.info).not.toHaveBeenCalled();
+  });
 });
 
 describe('audit log', () => {

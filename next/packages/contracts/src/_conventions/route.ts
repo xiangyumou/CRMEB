@@ -49,6 +49,13 @@ export interface RouteDef<
   status?: 200 | 201 | 202 | 204;
   /** Error codes this route may return, from the owning domain's `errors.ts`. */
   errors?: readonly string[];
+  /**
+   * Error statuses that are an ordinary answer for this route and are logged at
+   * `info` instead of `warn`/`error`. Declared per route, never inferred: a
+   * readiness probe's 503 is "not yet", polled on every deploy (CR-1-j3); the
+   * same 503 anywhere else is a dependency failure and stays `error`.
+   */
+  expectedStatuses?: readonly number[];
   examples: readonly RouteExample[];
 }
 
