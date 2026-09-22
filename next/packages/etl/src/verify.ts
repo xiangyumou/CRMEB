@@ -72,6 +72,11 @@ interface CountExpectation {
   sourceTable: string;
   sourceWhere?: string;
   targetTable: string;
+  /**
+   * Counts only part of the target table — for a table several sources feed.
+   * A constant in this file, never interpolated, and printed with the check.
+   */
+  targetWhere?: string;
   mode: 'exact' | 'atMost';
   /** Why `atMost` rather than `exact`, so the looseness is a decision. */
   note?: string;
@@ -135,6 +140,18 @@ const COUNTS: readonly CountExpectation[] = [
     mode: 'atMost',
     note: 'template_name 行是设置不是页面，value 不是 JSON 的行也不是页面',
   },
+  {
+    // 分类页 / 个人中心 版式：旧库把它们放在 eb_diy 里，新库是 diy 配置组的
+    // 两个字段，由 config group 搬运（见 config.ts）。放在这里计数，是因为
+    // "运营迁完还得自己重挑一次版式" 正是这条路径存在之前的状况。
+    group: 'config',
+    sourceTable: 'eb_diy',
+    sourceWhere: "template_name in ('category', 'member')",
+    targetTable: 'config_values',
+    targetWhere: `"group" = 'diy'`,
+    mode: 'atMost',
+    note: 'value 不是数字的行说明不了任何事，按"没设过"处理，留给 schema 的默认值',
+  },
 ];
 
 export async function verify(options: VerifyOptions): Promise<VerifyResult> {
@@ -152,16 +169,23 @@ export async function verify(options: VerifyOptions): Promise<VerifyResult> {
   for (const expectation of COUNTS) {
     if (pendingGroups.has(expectation.group)) continue;
     const expected = await source.count(expectation.sourceTable, expectation.sourceWhere);
-    const actual = await target.countRows(expectation.targetTable);
+    const actual =
+      expectation.targetWhere === undefined
+        ? await target.countRows(expectation.targetTable)
+        : await target.countWhere(expectation.targetTable, expectation.targetWhere);
     const ok = expectation.mode === 'exact' ? actual === expected : actual <= expected;
     const where = expectation.sourceWhere === undefined ? '' : ` where ${expectation.sourceWhere}`;
+    const targetWhere =
+      expectation.targetWhere === undefined ? '' : ` where ${expectation.targetWhere}`;
     add({
       group: expectation.group,
-      name: `rows:${expectation.targetTable}`,
+      // A table two expectations look at needs two distinguishable names, or
+      // the second check silently reads as a restatement of the first.
+      name: `rows:${expectation.targetTable}${targetWhere}`,
       ok,
       detail:
         `${expectation.sourceTable}${where} = ${String(expected)} → ` +
-        `${expectation.targetTable} = ${String(actual)} (${expectation.mode})` +
+        `${expectation.targetTable}${targetWhere} = ${String(actual)} (${expectation.mode})` +
         (expectation.note === undefined ? '' : `；${expectation.note}`),
     });
   }

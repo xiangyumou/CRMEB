@@ -428,9 +428,9 @@ describe('/api/v1/staff/users', () => {
     const listed = await (await callRoute(0, String(row!.id), headers)).json();
     expect(listed.items[0].phone).toBe('138****8000');
     expect(JSON.stringify(listed)).not.toContain(PHONE);
-    // Nothing is known about their orders: no stream registers
-    // `UserOrderStatsPort` yet (CR-2-e4), and `null` is how that is said.
-    expect(listed.items[0]).toMatchObject({ orderCount: null, spendTotal: null });
+    // The order domain registers `UserOrderStatsPort` (CR-2-e4, W4T), so a
+    // customer with no paid order is a real zero, not "not known".
+    expect(listed.items[0]).toMatchObject({ orderCount: 0, spendTotal: '0.00' });
   });
 
   it('422s a uid that is not an id, before touching the database', async () => {

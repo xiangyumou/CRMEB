@@ -213,17 +213,44 @@ export interface DroppedRow {
  * The three settings rows the legacy editor kept in `eb_diy` beside the pages.
  * Their `value` is a bare number — the index of the built-in layout the
  * operator picked — so they are not pages and cannot become `diy_pages` rows.
- * They are reported rather than dropped silently: stream A/E1 owns whatever
- * the new 分类页 / 个人中心 layout switch turns into.
+ * They are reported rather than dropped silently.
+ *
+ * Two of the three now have a home and an ETL path: `category` and `member`
+ * are `diy.categoryLayout` / `diy.userCenterLayout` in the config registry
+ * (`core/src/diy/diy.config.ts`), and the **config** group carries them into
+ * `config_values` through `DIY_LAYOUT_FIELDS` below. `color_change` has none —
+ * 一键换色 is not ported — so it stays a reported number and nothing else.
  */
 export interface LegacyDiySettings {
-  /** `color_change` — index into the legacy 一键换色 palette. */
+  /** `color_change` — index into the legacy 一键换色 palette. Not ported. */
   themeColourIndex: number | null;
-  /** `category` — which built-in 分类页 layout is in use. */
+  /** `category` — which built-in 分类页 layout is in use. `diy.categoryLayout`. */
   categoryLayout: number | null;
-  /** `member` — which built-in 个人中心 layout is in use. */
+  /** `member` — which built-in 个人中心 layout is in use. `diy.userCenterLayout`. */
   userCenterLayout: number | null;
 }
+
+/** The two settings the `diy` config group has a field for. */
+export type DiyLayoutField = 'categoryLayout' | 'userCenterLayout';
+
+/**
+ * `eb_diy.template_name` → the field of the `diy` config group it becomes, or
+ * `undefined` for a settings row with no new home (`color_change`, and the
+ * `product_detail` template row a shop may also carry).
+ *
+ * The one place the correspondence is written down: this mapper calls it to
+ * fill `report.settings`, and `config.ts` calls it to stage the same two
+ * numbers as `config_values` rows. Two copies of "`member` means 个人中心" is
+ * how one of them ends up carrying a value the other does not.
+ */
+export function diyLayoutField(templateName: string): DiyLayoutField | undefined {
+  if (templateName === 'category') return 'categoryLayout';
+  if (templateName === 'member') return 'userCenterLayout';
+  return undefined;
+}
+
+/** The `eb_diy` columns the config group reads. A subset of `LegacyDiy`. */
+export type LegacyDiyLayoutRow = Pick<LegacyDiy, 'template_name' | 'value'>;
 
 export interface DiyMigrationReport {
   pages: number;
@@ -300,8 +327,16 @@ function jsonObject(value: unknown): Record<string, unknown> | null {
   }
 }
 
-/** The bare number a settings row keeps in `value`. */
-function settingNumber(value: unknown): number | null {
+/**
+ * The bare number a settings row keeps in `value`.
+ *
+ * Exported because `config.ts` reads the same two rows out of `eb_diy` and has
+ * to read them the same way — the column is a longtext, so a dump hands the
+ * number over as `'2'` while an already-parsed row hands over `2`. Anything
+ * that is not a finite number (including the page JSON a `product_detail`
+ * settings row holds) is `null`, which means "this row says nothing".
+ */
+export function settingNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && value.trim() !== '') {
     const parsed = Number(value);
@@ -395,9 +430,11 @@ function mapPages(rows: readonly LegacyDiy[], report: DiyMigrationReport): DiyPa
     if (row.template_name !== '') {
       report.pagesDroppedSettingsRow += 1;
       const picked = settingNumber(row.value);
-      if (row.template_name === 'color_change') report.settings.themeColourIndex = picked;
-      else if (row.template_name === 'category') report.settings.categoryLayout = picked;
-      else if (row.template_name === 'member') report.settings.userCenterLayout = picked;
+      const field: keyof LegacyDiySettings | undefined =
+        row.template_name === 'color_change'
+          ? 'themeColourIndex'
+          : diyLayoutField(row.template_name);
+      if (field !== undefined) report.settings[field] = picked;
       report.dropped.push({
         table: 'eb_diy',
         id: row.id,

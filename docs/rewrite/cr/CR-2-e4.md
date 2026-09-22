@@ -1,7 +1,7 @@
 # CR-2-e4 — 累计订单 / 累计消费 on the staff 用户 screen needs a port nobody implements yet
 
 - **Stream:** E4 (user & WeChat follow-up)
-- **Status:** open — the seam is in, the implementation is the order stream's
+- **Status:** **RESOLVED** by W4T — `registerOrderDomain()` registers the port, `orderRepo.statsForUsers` is the query
 - **Affects:** `next/packages/core/src/user/user-order-stats.port.ts` (E4, done), `next/packages/core/src/order/index.ts` (B/B2/B3, one call)
 
 ## What the screen asks for
@@ -30,15 +30,18 @@ in the same shape as the ports `order/ports.ts` already publishes:
 
 ```ts
 export interface UserOrderStats {
-  orderCount: number;   // paid, not fully refunded
-  spendTotal: string;   // Money's spelling: "3980.00"
+  orderCount: number; // paid, not fully refunded
+  spendTotal: string; // Money's spelling: "3980.00"
 }
 
 export interface UserOrderStatsPort {
-  statsFor(db: DbOrTx, userIds: readonly number[]): Promise<Map<number, UserOrderStats>>;
+  statsFor(
+    db: DbOrTx,
+    userIds: readonly number[],
+  ): Promise<Map<number, UserOrderStats>>;
 }
 
-registerUserOrderStatsPort(impl)   // exported from `@shop/core/user`
+registerUserOrderStatsPort(impl); // exported from `@shop/core/user`
 ```
 
 Batched, because the list route asks about twenty customers at once. A user
@@ -75,3 +78,37 @@ same column `adminStatistics` sums so the 店员's number and the console's
 number cannot disagree. E4 has no opinion on the query, only on where it lives.
 
 Nothing breaks while this is open; the two fields stay `null`.
+
+## Resolution (W4T)
+
+`registerOrderDomain()` now registers the port, exactly as asked. The rule is
+written down once, on `order.repo.ts::statsForUsers`:
+
+> a **paid order** as `stats/DEFINITIONS.md` §2 defines one — `paid_at is not
+null and deleted_at is null` — **minus** `refund_status = 'refunded'`;
+> `orderCount = count(*)`, `spendTotal = sum(orders.paid_amount)`.
+
+`paid_amount` is the same column the console's 营业额 sums
+(`order.console.service.ts::adminStatistics` → `order.fulfil.repo.ts::rangeTotals`,
+`stats/DEFINITIONS.md` §3 `revenue`), which is what the CR asked for. Two
+consequences worth stating, because both are decisions rather than accidents:
+
+- a **partially** refunded order counts, at what the gateway took, not net of
+  the refund. Netting it here would be a third definition of 消费总额 — the
+  drift this CR exists to prevent — and the console already reports refunds as
+  their own figure, on the day the money moved;
+- a **fully** refunded order is out of the population entirely, so it
+  contributes neither a count nor an amount. That is the case a 店员 would
+  actually notice, and it is the clause this figure adds to the shared "paid
+  order" definition.
+
+An admin-deleted order is out (it is out of every figure); an order the buyer
+hid from their own list is in (删除订单 is visibility only, CR-4-h §6).
+
+Pinned by `order/order.user-stats.int.test.ts`. The user-side `null` behaviour
+is unchanged and still pinned by
+`user/user-staff.int.test.ts::answers null, not zero, while no stream has
+registered the port`, which resets the registry itself. The HTTP test
+`apps/web/app/api/v1/user.int.test.ts::lets a 店员 through all six and never
+unmasks a phone` imports `@shop/core/order`, so its `null` assertion now reads
+`{ orderCount: 0, spendTotal: '0.00' }` — see `docs/rewrite/status/w4t.md`.

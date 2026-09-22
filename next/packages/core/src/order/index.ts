@@ -1,5 +1,7 @@
+import { registerUserOrderStatsPort } from '../user';
 import { installFulfilmentHooks } from './order.fulfil.effects';
 import { orderFacts } from './order.facts.repo';
+import * as orderRepo from './order.repo';
 import { orderStateMachine } from './order.state-machine';
 import { installStaffCheck } from './order.staff.service';
 import { registerOrderFacts, registerOrderStateMachine } from './ports';
@@ -34,14 +36,25 @@ import { registerOrderFacts, registerOrderStateMachine } from './ports';
  * `@shop/core/domains` looks for): the state machine streams C, B2 and D reach
  * through `getOrderStateMachine()`; the `OrderFactsPort` the catalog asks
  * about purchases and reviewable lines; the staff check `auth: 'staff'` fails
- * closed without; and the order-paid hook plus the notification handlers that
- * have to be installed before the first payment lands. Importing the domain
- * calls it once; a test that `resetOrderPorts()` calls it again.
+ * closed without; the `UserOrderStatsPort` the staff 用户 screen's 累计订单 /
+ * 累计消费 need (CR-2-e4); and the order-paid hook plus the notification
+ * handlers that have to be installed before the first payment lands. Importing
+ * the domain calls it once; a test that `resetOrderPorts()` calls it again.
+ *
+ * `UserOrderStatsPort` is declared by the *user* domain and implemented here
+ * for the reason the port exists at all: "how many orders has this customer
+ * placed" is not a `count(*)`, the rules about which orders count live in this
+ * aggregate, and a join written from the user side would be a second, silently
+ * diverging definition of 消费总额. The rule itself is written down once, on
+ * `orderRepo.statsForUsers`.
  */
 export function registerOrderDomain(): void {
   registerOrderStateMachine(orderStateMachine);
   registerOrderFacts(orderFacts);
   installStaffCheck();
+  registerUserOrderStatsPort({
+    statsFor: (db, userIds) => orderRepo.statsForUsers(db, userIds),
+  });
   installFulfilmentHooks();
 }
 

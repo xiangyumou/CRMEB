@@ -1,5 +1,5 @@
 /**
- * `eb_system_config` → `config_values`.
+ * `eb_system_config` → `config_values` (plus the two 版式 rows out of `eb_diy`).
  *
  * This is the one group the runner maps itself rather than delegating to a
  * mapper, for a reason that is worth stating: the mapping is not a property of
@@ -24,6 +24,15 @@
  * mapper rather than reimplemented, so `order_cancel_time`'s hours → minutes
  * conversion (ETL-F1-003) has exactly one definition.
  *
+ * **One group owns `config_values`, and it is this one.** `diy.categoryLayout`
+ * and `diy.userCenterLayout` were never `eb_system_config` rows — the legacy
+ * editor kept them in `eb_diy` — but they are still config values, so the
+ * `config` group reads those two rows itself (`stageDiyLayouts`) instead of the
+ * `diy` group growing a `config_values` target. That is not a preference: `run`
+ * empties a group's target tables before reloading them, so a second group
+ * writing `config_values` would delete everything this one had just written.
+ *
+
  * **Nothing here ever prints a value.** The report carries keys and `<set>` /
  * `<empty>` (`lib/secrets.ts`). A config migration report is the single most
  * likely place for a merchant private key to escape into a terminal
@@ -37,6 +46,7 @@ import { droppedReason } from './config-dropped';
 import { isIgnoredClaim } from './config-overrides';
 import { coerceToExpected, isCoercibleType } from './lib/coerce';
 import { describeValue, type ValueMarker } from './lib/secrets';
+import { diyLayoutField, settingNumber, type LegacyDiyLayoutRow } from './mappers/diy';
 import { CONFIG_VALUE_TRANSFORMS, decodeConfigValue } from './mappers/system';
 
 /** A row of `eb_system_config`. Only these three columns matter. */
@@ -78,8 +88,15 @@ export interface InvalidConfigValue {
 }
 
 export interface ConfigMigrationReport {
-  /** Rows read from `eb_system_config`. */
+  /** Rows read from `eb_system_config`. Not every mapped value comes from one — see `mapped`. */
   read: number;
+  /**
+   * Every field a legacy value fed, with where it came from.
+   *
+   * `legacyKey` is an `eb_system_config.menu_name` for all but two entries: the
+   * 版式 switches were never config rows, so they carry `eb_diy.category` /
+   * `eb_diy.member` — the table and `template_name` they really came out of.
+   */
   mapped: MappedConfigKey[];
   dropped: DroppedConfigEntry[];
   /** Keys on neither list. A non-empty list fails the run. */
@@ -193,6 +210,54 @@ export interface MapConfigOptions {
   groups?: readonly ConfigGroupDef[];
   /** The instant written into `updated_at`. */
   now: Date;
+  /** `eb_diy`'s 版式 rows — see `stageDiyLayouts`. */
+  diy?: readonly LegacyDiyLayoutRow[];
+}
+
+/**
+ * The two 版式 numbers, staged as if they had been `eb_system_config` rows.
+ *
+ * `diy.categoryLayout` and `diy.userCenterLayout` are the only settings in the
+ * registry whose legacy home was **not** `eb_system_config`: the old editor
+ * kept them in `eb_diy`, as rows whose `template_name` is `category` / `member`
+ * and whose `value` is a bare number instead of a component tree. `diy.config.ts`
+ * therefore has no `legacyKeys` to claim and `buildLegacyKeyIndex` can never
+ * reach them, so without this a migrated shop comes up on the defaults and
+ * re-picks its 分类页 and 个人中心 layout by hand (F4's leftover).
+ *
+ * They are staged rather than written directly, which is the whole point: from
+ * here on they are indistinguishable from any other config value and go through
+ * the same coercion, the same group-wide zod parse and the same
+ * `config_values` rows as everything else. A layout number the schema refuses
+ * fails the run — or falls back to the default under `--allow-invalid-config` —
+ * exactly like a stock threshold would.
+ *
+ * Only a row that exists **and says something** is staged. A shop that never
+ * touched either screen has no row, or a row whose `value` is not a number; in
+ * both cases the field is left to the schema's default rather than written as
+ * one, because storing a default turns it into a value that survives a later
+ * change of that default.
+ */
+function stageDiyLayouts(
+  rows: readonly LegacyDiyLayoutRow[],
+  staged: Map<string, Record<string, StagedValue>>,
+): void {
+  for (const row of rows) {
+    const field = diyLayoutField(row.template_name);
+    if (field === undefined) continue;
+    const picked = settingNumber(row.value);
+    if (picked === null) continue;
+    const bucket = staged.get('diy') ?? {};
+    bucket[field] = {
+      value: picked,
+      alias: 0,
+      // Not a `menu_name`: naming the table and the `template_name` is what
+      // makes the report answer "where did this come from" honestly.
+      legacyKey: `eb_diy.${row.template_name}`,
+      empty: false,
+    };
+    staged.set('diy', bucket);
+  }
 }
 
 export function mapConfig(
@@ -267,6 +332,10 @@ export function mapConfig(
       staged.set(claimant.group, bucket);
     }
   }
+
+  // The two settings that never lived in `eb_system_config`. Staged here, so
+  // everything below treats them as ordinary config values.
+  stageDiyLayouts(options.diy ?? [], staged);
 
   // --- validate each group as a whole, the way the admin screen would -------
   const invalid: InvalidConfigValue[] = [];
@@ -421,6 +490,15 @@ function coerceAgainstSchema(
 /** `config`'s input, in the shape `defineGroup` expects. */
 export interface ConfigMigrationInput {
   configs?: readonly LegacySystemConfigRow[];
+  /**
+   * `eb_diy`'s 版式 rows, filtered to `template_name in ('category', 'member')`
+   * by the group's source spec. Read by the **config** group rather than the
+   * `diy` one because `config_values` is the config group's table: one group
+   * owns a table, and `run` empties a group's targets before it reloads them,
+   * so a second group writing `config_values` would delete every other group's
+   * settings on its way past. See `stageDiyLayouts`.
+   */
+  diy?: readonly LegacyDiyLayoutRow[];
   /** Supplied by the runner through the group's `extras`. */
   now?: Date;
   allowInvalid?: boolean;
@@ -434,6 +512,7 @@ export interface ConfigMigrationInput {
 export function configMapper(input: ConfigMigrationInput): ConfigMigrationOutput {
   return mapConfig(input.configs ?? [], {
     now: input.now ?? new Date(),
+    ...(input.diy === undefined ? {} : { diy: input.diy }),
     ...(input.allowInvalid === undefined ? {} : { allowInvalid: input.allowInvalid }),
   });
 }

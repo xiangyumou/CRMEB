@@ -59,7 +59,8 @@ const system = defineGroup({
 });
 
 // ---------------------------------------------------------------------------
-// 2. config — eb_system_config through every group's `legacyKeys`.
+// 2. config — eb_system_config through every group's `legacyKeys`, plus the
+//    two 版式 numbers `eb_diy` kept beside the pages.
 // ---------------------------------------------------------------------------
 
 const config = defineGroup({
@@ -67,7 +68,27 @@ const config = defineGroup({
   title: '系统配置',
   owner: 'J',
   mapper: configMapper,
-  sources: [{ table: 'eb_system_config', into: 'configs' }],
+  sources: [
+    { table: 'eb_system_config', into: 'configs' },
+    /**
+     * 分类页 / 个人中心 版式 — `diy.categoryLayout` and `diy.userCenterLayout`.
+     *
+     * Config values whose legacy home happened to be `eb_diy`, so they are read
+     * *here* rather than by the `diy` group: `config_values` has one owner, and
+     * `run` empties a group's targets before reloading them, so a second group
+     * writing this table would wipe every other group's settings on its way
+     * past. Filtered to the two rows in SQL — the rest of `eb_diy` is the diy
+     * group's business and its `value` column holds whole page payloads.
+     * Optional, because a partial dump without the decoration tables is just a
+     * shop that keeps the default layouts.
+     */
+    {
+      table: 'eb_diy',
+      into: 'diy',
+      where: "template_name in ('category', 'member')",
+      optional: true,
+    },
+  ],
   targets: [{ table: 'config_values', from: 'values' }],
   extras: (context) => ({
     now: context.migratedAt,

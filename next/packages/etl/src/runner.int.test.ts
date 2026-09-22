@@ -191,6 +191,35 @@ describe('etl run + verify', () => {
     expect(row?.value).toBe('5');
   });
 
+  it('分类页 / 个人中心 的版式跟着迁过来，运营不用重挑一次', async () => {
+    // 旧库把这两个数字放在 eb_diy 里（template_name = category / member，
+    // value 是个裸数字），而不是 eb_system_config，所以它们没有 legacyKeys 可
+    // 认领。不专门搬一趟，迁完的商城前台「分类」和「我的」两页就悄悄回到版式
+    // 一，而且没有任何报告会提这件事。
+    const rows = await target.query<{ key: string; value: string }>(
+      `select key, value::text as value from config_values
+        where "group" = 'diy' order by key`,
+    );
+    expect(rows).toEqual([
+      { key: 'categoryLayout', value: '2' },
+      { key: 'userCenterLayout', value: '3' },
+    ]);
+
+    // 写进去的是 jsonb 数字，不是字符串 "2"——配置读出来要能直接喂给 schema。
+    const [typed] = await target.query<{ kind: string }>(
+      `select jsonb_typeof(value) as kind from config_values
+        where "group" = 'diy' and key = 'categoryLayout'`,
+    );
+    expect(typed?.kind).toBe('number');
+
+    // 这两行是 config group 写的，而 diy group 排在它后面。config_values 只能
+    // 有一个 owner：run 在重灌一个 group 之前会清空它的目标表，所以 diy group
+    // 要是也写这张表，上面那次完整迁移跑到 diy 时就会把 config 刚写进去的几十
+    // 项设置一起删掉。下面这条断言就是在钉死"它们还在"。
+    expect(await target.countWhere('config_values', `"group" = 'order'`)).toBeGreaterThan(0);
+    expect(await target.countWhere('config_values', `"group" = 'catalog'`)).toBeGreaterThan(0);
+  });
+
   it('配置里没有无人认领的键，值一个都没被打印出来', async () => {
     const result = await run({
       source,

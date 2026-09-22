@@ -849,7 +849,13 @@ INSERT INTO `eb_store_coupon_user` (`id`,`cid`,`uid`,`coupon_title`,`coupon_pric
 INSERT INTO `eb_diy` (`id`,`version`,`name`,`template_name`,`value`,`default_value`,`add_time`,`update_time`,`status`,`type`,`is_show`,`is_bg_color`,`is_bg_pic`,`color_picker`,`bg_pic`,`bg_tab_val`,`is_del`,`is_diy`,`title`) VALUES
 (1,'1.0','示例首页','','{\"is_diy\":1,\"title\":\"示例首页\",\"name\":\"首页\",\"value\":[{\"name\":\"headerSerch\",\"num\":0,\"timestamp\":1600000000},{\"name\":\"swiperBg\",\"num\":1,\"timestamp\":1600000001}]}','',1600000000,1600000000,1,0,1,0,0,'#ffffff','',1,0,1,'示例首页'),
 (2,'1.0','示例活动页','','{\"is_diy\":1,\"title\":\"示例活动页\",\"value\":[{\"name\":\"titles\",\"num\":0}]}','',1600000100,1600000100,0,0,1,0,0,'#f5f5f5','',1,0,1,'示例活动页'),
-(3,'1.0','商品详情模板','product_detail','{\"value\":[{\"name\":\"detail\",\"num\":0}]}','',1600000200,1600000200,1,1,1,0,0,'#ffffff','',1,0,1,'商品详情模板');
+(3,'1.0','商品详情模板','product_detail','{\"value\":[{\"name\":\"detail\",\"num\":0}]}','',1600000200,1600000200,1,1,1,0,0,'#ffffff','',1,0,1,'商品详情模板'),
+-- 下面两行不是页面：template_name = category / member 的行，value 是运营挑的
+-- 内置版式编号（一个裸数字）。它们是 diy 配置组的 categoryLayout /
+-- userCenterLayout，由 config group 搬进 config_values；不搬的话，迁完的商城
+-- 前台「分类」和「我的」两页会悄悄回到版式一。
+(4,'1.0','分类页版式','category','2','',1600000300,1600000300,0,1,0,0,0,'','',0,0,0,''),
+(5,'1.0','个人中心版式','member','3','',1600000400,1600000400,0,1,0,0,0,'','',0,0,0,'');
 
 INSERT INTO `eb_theme` (`id`,`version`,`title`,`info`,`type`,`page_type`,`is_use`,`is_del`,`add_time`,`up_time`) VALUES
 (1,'1.0','示例主题（橙）','用于测试的主题',0,0,1,0,1600000000,1600000000),

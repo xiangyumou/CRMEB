@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  diyLayoutField,
   mapDiy,
+  settingNumber,
   type LegacyDiy,
   type LegacyPageCategory,
   type LegacyPageLink,
@@ -254,6 +256,30 @@ describe('mapDiy — pages', () => {
       userCenterLayout: 1,
     });
     expect(report.dropped.filter((row) => row.table === 'eb_diy' && row.id === 2)).toHaveLength(1);
+  });
+
+  it('names the config field each 版式 row becomes, and only those two', () => {
+    // The correspondence `config.ts` stages `config_values` rows from. Written
+    // down once, here, so `report.settings.categoryLayout` and the
+    // `diy.categoryLayout` a migrated shop boots on cannot come apart.
+    expect(diyLayoutField('category')).toBe('categoryLayout');
+    expect(diyLayoutField('member')).toBe('userCenterLayout');
+    // 一键换色 is not ported, and a `product_detail` template row is a page
+    // payload rather than a number — neither has a config field to land in.
+    expect(diyLayoutField('color_change')).toBeUndefined();
+    expect(diyLayoutField('product_detail')).toBeUndefined();
+    expect(diyLayoutField('')).toBeUndefined();
+  });
+
+  it('reads the bare number the same way the config group has to', () => {
+    // The column is a longtext: a dump hands `2` over as `'2'`, an
+    // already-parsed row as `2`, and a page payload as JSON that is not a
+    // number at all. `config.ts` calls this same function.
+    expect(settingNumber('2')).toBe(2);
+    expect(settingNumber(2)).toBe(2);
+    expect(settingNumber('')).toBeNull();
+    expect(settingNumber(null)).toBeNull();
+    expect(settingNumber('{"value":[]}')).toBeNull();
   });
 
   it('copies the page envelope byte for byte — DIY-001', () => {

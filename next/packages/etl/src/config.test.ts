@@ -341,6 +341,114 @@ describe('mapConfig', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// the two 版式 numbers, which were never eb_system_config rows
+// ---------------------------------------------------------------------------
+
+/**
+ * `diy.categoryLayout` / `diy.userCenterLayout` (F4's leftover).
+ *
+ * Against the **real** `diy` group rather than a throwaway one, because half of
+ * what is being tested is that the legacy number satisfies the schema the admin
+ * screen validates against: CR-3-h2 §3 described these as booleans, the
+ * production fixtures carry `category: 1` and `member: 2`, and a boolean would
+ * have collapsed two of the three layouts into one.
+ */
+describe('版式 rows out of eb_diy', () => {
+  const diyGroup = allConfigGroups().find((group) => group.group === 'diy');
+  const only = { groups: diyGroup === undefined ? [] : [diyGroup], now: NOW };
+
+  /** One `eb_diy` row, as the group's `where` clause hands it over. */
+  const diyRow = (
+    template_name: string,
+    value: unknown,
+  ): { template_name: string; value: unknown } => ({
+    template_name,
+    value,
+  });
+
+  it('the diy group is on the live registry, with both fields', () => {
+    expect(diyGroup).toBeDefined();
+    expect(diyGroup!.schema.safeParse({ categoryLayout: 2, userCenterLayout: 3 }).success).toBe(
+      true,
+    );
+  });
+
+  it('carries both numbers into config_values, out of a longtext column', () => {
+    const { values, report } = mapConfig([], {
+      ...only,
+      // The column is a longtext, so a real dump hands the number over as a
+      // string while an already-parsed row hands over a number. Both must land.
+      diy: [diyRow('category', '2'), diyRow('member', 3)],
+    });
+
+    expect(values).toEqual([
+      { group: 'diy', key: 'categoryLayout', value: 2, updatedAt: NOW, updatedBy: null },
+      { group: 'diy', key: 'userCenterLayout', value: 3, updatedAt: NOW, updatedBy: null },
+    ]);
+    // Named by the table and `template_name` they really came from — there is
+    // no `menu_name` to quote, and inventing one would be a lie in the report
+    // an operator reads to answer "did my settings come across".
+    expect(report.mapped).toEqual([
+      { legacyKey: 'eb_diy.category', group: 'diy', key: 'categoryLayout', marker: '<set>' },
+      { legacyKey: 'eb_diy.member', group: 'diy', key: 'userCenterLayout', marker: '<set>' },
+    ]);
+    expect(report.groupsWithoutLegacyValues).toEqual([]);
+  });
+
+  it('writes only the row that exists, and leaves the other to its default', () => {
+    const { values, report } = mapConfig([], { ...only, diy: [diyRow('category', '3')] });
+
+    // Not `userCenterLayout: 1`: storing a default turns it into a value that
+    // survives a later change of that default.
+    expect(values).toEqual([
+      { group: 'diy', key: 'categoryLayout', value: 3, updatedAt: NOW, updatedBy: null },
+    ]);
+    expect(report.invalid).toEqual([]);
+  });
+
+  it('ignores a settings row that says nothing, and the ones with no new home', () => {
+    const { values } = mapConfig([], {
+      ...only,
+      diy: [
+        diyRow('category', ''), // the operator never touched the screen
+        diyRow('member', null), // ditto, in a dump that writes NULL
+        diyRow('color_change', '1'), // 一键换色 is not ported
+        diyRow('product_detail', '{"value":[]}'), // a template row, not a number
+      ],
+    });
+    expect(values).toEqual([]);
+  });
+
+  it('走的是同一条校验路径：schema 不收的版式号照样让迁移停下来', () => {
+    let error: ConfigMigrationError | undefined;
+    try {
+      mapConfig([], { ...only, diy: [diyRow('category', '9')] });
+    } catch (thrown) {
+      error = thrown as ConfigMigrationError;
+    }
+    expect(error).toBeInstanceOf(ConfigMigrationError);
+    expect(error?.message).toContain('diy.categoryLayout');
+  });
+
+  it('--allow-invalid-config 让坏掉的那个回落到默认值，好的那个照迁', () => {
+    const { values, report } = mapConfig([], {
+      ...only,
+      allowInvalid: true,
+      diy: [diyRow('category', '9'), diyRow('member', '2')],
+    });
+    expect(report.invalid).toHaveLength(1);
+    expect(values).toEqual([
+      { group: 'diy', key: 'userCenterLayout', value: 2, updatedAt: NOW, updatedBy: null },
+    ]);
+  });
+
+  it('跑两遍得到一模一样的行（ETL-J-001）', () => {
+    const input = { ...only, diy: [diyRow('category', '2'), diyRow('member', '3')] };
+    expect(mapConfig([], input).values).toEqual(mapConfig([], input).values);
+  });
+});
+
 describe('the drop list and the live registry together account for every key', () => {
   it('claims and drops are disjoint', () => {
     const claimed = new Set(buildLegacyKeyIndex().keys());
