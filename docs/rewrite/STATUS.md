@@ -30,7 +30,8 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | D2 presale | dispatched 2026-09-23 | `rewrite/ws-d2-presale` |
 | F2 shipping, articles | in progress (stats split off to F3 at `06afd806`) | `rewrite/ws-f2-ops` |
 | F3 statistics | dispatched 2026-09-23 | `rewrite/ws-f3-stats` |
-| E2 notifications | in progress (WeChat OA split off to E3 at `dd40734c`) | `rewrite/ws-e2-notify` |
+| E2 notifications | merged 2026-09-23 (carries the pre-split WeChat OA core `dd40734c` + `f2e35432`) | `rewrite/ws-e2-wechat` |
+| N1 notification wiring (CR-2-e2, CR-1-e2) | dispatched 2026-09-23 | `rewrite/ws-n1-notify-wiring` |
 | E3 WeChat OA | dispatched 2026-09-23 | `rewrite/ws-e3-wechat-oa` |
 | S storefront contract gaps (CR-1..5-h) | dispatched 2026-09-23 | `rewrite/ws-s-storefront-gaps` |
 | J ETL runner | in progress (images + deploy split off to J2) | `rewrite/ws-j-etl-deploy` |
@@ -73,3 +74,4 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 - 2026-09-23 — G3 merged: 样式十一 is index 10 and already editable; the free-draw grid (index 11) is commented out in the legacy admin too, so it is not built. `brand` picker dropped (`eb_store_brand` not in the frozen schema). `customComponent` leaves the palette (27 creatable), existing nodes still render and edit.
 - 2026-09-23 — Concurrency cap raised to 12 by the user; streams split where the halves are independent: D → D2 (presale), F2 → F3 (stats), E2 → E3 (WeChat OA), J → J2 (images + deploy). Split branches are cut from the parent's HEAD; at merge the parent goes first and the child is `rebase --onto`'d so only its own commits remain. K1 (guards, invariants for merged rows, admin Playwright, security review) and H2 (uni-app second pass against the 391-route contract set) dispatched early. Stream I shrinks to the storefront e2e: the api-layer unit tests already live with H.
 - 2026-09-23 — E1 merged. `WechatIdentityPort` now takes `ctx` and is implemented over C's client in `user/wechat-identity.adapter.ts` (errcodes 40029/40163/41008/40226 → `AUTH_WECHAT_CODE_INVALID`; anything else stays `INTERNAL`); C's client now carries `errcode` in `DomainError.details`. `registerUserDomain()` added. The hand-written `system/config-groups.ts` shim is gone for good (E1 had re-added an import to it). Customers admin test fixture completed to the detail shape — it crashed the drawer only on a loaded machine.
+- 2026-09-23 — E2 merged (notification domain, admin pages, ETL mapper, NOTIF-001…006; USER-003 adapted: admin recipients resolve from the event's permission atom, not a roster). CR-2-e2 accepted (option B: direct `notify()` calls at the six call sites in order/refund/payment/catalog) and CR-1-e2 accepted (`publicOrigin` / `extraOrigins` on the `site` group, env-derived, no `legacyKeys`; notification's two stand-in fields go) — both dispatched as stream N1. E2's `buckets.test.ts` alias fix superseded by the bare-import generator (`cdc04601`).

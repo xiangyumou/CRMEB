@@ -1,0 +1,193 @@
+import type {
+  WechatMenu,
+  WechatMenuButtonShape,
+  WechatMenuForm,
+} from '@shop/contracts/wechat-oa/schemas';
+import { requirePermission } from '../auth/rbac';
+import type { Ctx } from '../kernel/context';
+import { DomainError } from '../kernel/errors';
+import { fromId, toId } from '../kernel/ids';
+import { publishMenu as publishRemoteMenu } from './wechat-oa.client';
+import { requireOaCredentials } from './wechat-oa.credentials';
+import { wechatOaPermissions } from './permissions';
+import * as repo from './wechat-oa.repo';
+
+/**
+ * The bottom menu, as a draft-and-publish pair.
+ *
+ * The legacy design kept one menu in `sys_config` and POSTed it to WeChat on
+ * save, so "what is live" and "what is in the box" were the same thing and a
+ * half-finished edit reached every follower. Here a menu is a row, editing it
+ * changes nothing anyone sees, and `publish` is the moment it goes live —
+ * recorded on the row as `published_at`, with WeChat's own complaint kept in
+ * `publish_error` when it refuses.
+ */
+
+interface Paged<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * The structural rules WeChat enforces, enforced here first.
+ *
+ * Sending an invalid tree costs a round trip and comes back as
+ * `40017 invalid button type` with no indication of *which* button — so the
+ * check runs locally and names the path. The rules are WeChat's, not ours:
+ * three top-level buttons, five children, a parent has no action, a `view`
+ * needs a URL, a `click` needs a key, a `miniprogram` needs both an appid and
+ * a page.
+ */
+export function validateMenuTree(buttons: readonly WechatMenuButtonShape[]): void {
+  if (buttons.length === 0 || buttons.length > 3) {
+    throw new DomainError('WECHAT_OA_MENU_INVALID', {
+      message: '一级菜单需要 1 到 3 个按钮',
+    });
+  }
+  buttons.forEach((button, index) => validateButton(button, `${index + 1}`, true));
+}
+
+function validateButton(button: WechatMenuButtonShape, path: string, top: boolean): void {
+  const children = button.sub_button ?? [];
+  const fail = (message: string): never => {
+    throw new DomainError('WECHAT_OA_MENU_INVALID', { message: `菜单「${path}」${message}` });
+  };
+
+  if (button.name.trim() === '') fail('缺少名称');
+
+  if (children.length > 0) {
+    if (!top) fail('二级菜单不能再有子菜单');
+    if (children.length > 5) fail('最多只能有 5 个子菜单');
+    // A parent button is a label. WeChat ignores any action on it, which is how
+    // an operator ends up convinced the URL "does not work".
+    if (button.type !== undefined) fail('含子菜单时不能再设置动作类型');
+    children.forEach((child, index) => validateButton(child, `${path}-${index + 1}`, false));
+    return;
+  }
+
+  switch (button.type) {
+    case 'view':
+      if (!button.url?.trim()) fail('缺少跳转链接');
+      break;
+    case 'click':
+      if (!button.key?.trim()) fail('缺少 key');
+      break;
+    case 'miniprogram':
+      if (!button.appid?.trim()) fail('缺少小程序 appid');
+      if (!button.pagepath?.trim()) fail('缺少小程序页面路径');
+      if (!button.url?.trim()) fail('缺少低版本客户端的兜底链接');
+      break;
+    default:
+      fail('缺少动作类型');
+  }
+}
+
+export async function list(
+  ctx: Ctx,
+  query: { page: number; pageSize: number },
+): Promise<Paged<WechatMenu>> {
+  requirePermission(ctx, wechatOaPermissions['menu:read']);
+  const { rows, total } = await repo.listMenus(ctx.db, {
+    offset: (query.page - 1) * query.pageSize,
+    limit: query.pageSize,
+  });
+  return { items: rows.map(toMenu), total, page: query.page, pageSize: query.pageSize };
+}
+
+/** The live menu, or `null` when nothing has been published yet. */
+export async function current(ctx: Ctx): Promise<WechatMenu | null> {
+  requirePermission(ctx, wechatOaPermissions['menu:read']);
+  const row = await repo.findActiveMenu(ctx.db);
+  return row ? toMenu(row) : null;
+}
+
+export async function create(ctx: Ctx, body: WechatMenuForm): Promise<WechatMenu> {
+  requirePermission(ctx, wechatOaPermissions['menu:write']);
+  validateMenuTree(body.buttons);
+  const row = await repo.insertMenu(ctx.db, { name: body.name, buttons: [...body.buttons] });
+  return toMenu(row);
+}
+
+export async function update(
+  ctx: Ctx,
+  params: { id: string },
+  body: WechatMenuForm,
+): Promise<WechatMenu> {
+  requirePermission(ctx, wechatOaPermissions['menu:write']);
+  validateMenuTree(body.buttons);
+  const id = fromId(params.id);
+  const { affected } = await repo.updateMenu(ctx.db, id, {
+    name: body.name,
+    buttons: [...body.buttons],
+    now: ctx.clock.now(),
+  });
+  if (affected === 0) throw new DomainError('WECHAT_OA_MENU_NOT_FOUND');
+
+  // An edit to the live menu does not reach WeChat: publishing is a separate
+  // permission and a separate decision. The row stays `is_active` and the
+  // operator sees "已发布" next to a draft that has moved on — which is the
+  // truth, and the publish button is right there.
+  const row = await repo.findMenu(ctx.db, id);
+  if (!row) throw new DomainError('WECHAT_OA_MENU_NOT_FOUND');
+  return toMenu(row);
+}
+
+export async function remove(ctx: Ctx, params: { id: string }): Promise<void> {
+  requirePermission(ctx, wechatOaPermissions['menu:write']);
+  const id = fromId(params.id);
+  const row = await repo.findMenu(ctx.db, id);
+  if (!row) throw new DomainError('WECHAT_OA_MENU_NOT_FOUND');
+  // The live menu cannot be deleted: the row is the only record of what the
+  // followers are looking at.
+  if (row.isActive) {
+    throw new DomainError('WECHAT_OA_MENU_INVALID', { message: '已发布的菜单不能删除' });
+  }
+  await repo.softDeleteMenu(ctx.db, id, ctx.clock.now());
+}
+
+/**
+ * Sends the tree to WeChat and, only if WeChat accepts it, marks the row live.
+ *
+ * The order matters and it is the opposite of the legacy flow. Marking first
+ * and calling second leaves a row saying 已发布 for a menu the followers never
+ * saw whenever the call fails — and it fails often, because WeChat validates
+ * URLs against the account's own 业务域名. Calling first means a failure
+ * changes nothing except `publish_error`, which is exactly what an operator
+ * needs to read.
+ */
+export async function publish(ctx: Ctx, params: { id: string }): Promise<WechatMenu> {
+  requirePermission(ctx, wechatOaPermissions['menu:publish']);
+  await requireOaCredentials(ctx);
+
+  const id = fromId(params.id);
+  const row = await repo.findMenu(ctx.db, id);
+  if (!row) throw new DomainError('WECHAT_OA_MENU_NOT_FOUND');
+  validateMenuTree(row.buttons);
+
+  try {
+    await publishRemoteMenu(ctx, row.buttons);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '发布失败';
+    await repo.recordMenuPublishError(ctx.db, id, message, ctx.clock.now());
+    throw error;
+  }
+
+  await ctx.withTx((tx) => repo.activateMenu(tx, id, ctx.clock.now()));
+  const fresh = await repo.findMenu(ctx.db, id);
+  return toMenu(fresh ?? row);
+}
+
+function toMenu(row: repo.WechatOaMenu): WechatMenu {
+  return {
+    id: toId(row.id),
+    name: row.name,
+    buttons: row.buttons as WechatMenu['buttons'],
+    isActive: row.isActive,
+    publishedAt: row.publishedAt?.toISOString() ?? null,
+    publishError: row.publishError,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
