@@ -102,10 +102,26 @@ describe('domains.gen.ts', () => {
       }
     }
     const generated = await readFile(path.join(srcDir, 'domains.gen.ts'), 'utf8');
-    const called = [...generated.matchAll(/^ {2}(\w+)\.(register\w+Domain)\(\);$/gm)].map(
-      ([, domain, fn]) => `${domain}.${fn}`,
+    const imported = new Map<string, string>();
+    for (const [, fns, name] of generated.matchAll(
+      /^import \{ ([^}]+) \} from '\.\/([\w-]+)\/index';$/gm,
+    )) {
+      for (const fn of fns!.split(',')) imported.set(fn.trim(), name!);
+    }
+    const called = [...generated.matchAll(/^ {2}(register\w+Domain)\(\);$/gm)].map(
+      ([, fn]) => `${imported.get(fn!) ?? '?'}.${fn}`,
     );
     expect(called.sort()).toEqual(expected.sort());
+  });
+
+  it('imports every domain for its side effects with a bare import', async () => {
+    // A namespace import that is never read is elided by esbuild / tsx, which
+    // silently dropped every domain that registers on import (found by J).
+    const generated = await readFile(path.join(srcDir, 'domains.gen.ts'), 'utf8');
+    for (const name of DOMAIN_NAMES) {
+      expect(generated).toContain(`import './${name}/index';`);
+    }
+    expect(generated).not.toMatch(/^import \* as /m);
   });
 
   it('installs the ports importing one domain would not', () => {
