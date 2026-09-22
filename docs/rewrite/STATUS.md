@@ -37,7 +37,7 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | J ETL runner | merged 2026-09-23 (`427e858d`); follow-up merged (`4083e6c5`: CR-1..4-j) | `rewrite/ws-j-etl-deploy` |
 | J2 images and deployment | merged 2026-09-23 (`c2182657`) | `rewrite/ws-j2-deploy` |
 | H2 uni-app second pass | merged 2026-09-23 (`ab0f3c54`; 154 live / 37 pending / 0 broken) | `rewrite/ws-h2-uniapp` |
-| K1 hardening first pass | merged 2026-09-23 (`756fd9da0`): `next/guards` (10 checks, `pnpm guards`), `next/e2e/admin` (30 Playwright specs), AUDIT.md, CR-1..17-k | `rewrite/ws-k-hardening` |
+| K1 hardening first pass | merged 2026-09-23 (`756dc9da0`): `next/guards` (10 checks, `pnpm guards`), `next/e2e/admin` (30 Playwright specs), AUDIT.md, CR-1..17-k | `rewrite/ws-k-hardening` |
 | A2 catalog follow-up (CR-4-h2 staff goods ×10, template select, `<SkuPicker>`) | dispatched 2026-09-23 (Opus) | `rewrite/ws-a2-catalog-followup` |
 | E4 user/wechat follow-up (CR-2-h2, CR-6-h2, CR-2-e3, CR-3-e3, CR-1-f3 §1, `routine_appId`, CR-17-k) | dispatched 2026-09-23 (Opus) | `rewrite/ws-e4-user-wechat-followup` |
 | F4 system/kit/DIY follow-up (CR-7-h2, CR-3-d2, CR-3-h2, CR-2-f2, read-only config field) | dispatched 2026-09-23 (Opus) | `rewrite/ws-f4-system-kit-followup` |
