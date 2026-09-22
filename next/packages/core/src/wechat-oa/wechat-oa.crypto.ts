@@ -225,7 +225,19 @@ export function encryptMessage(args: {
  * Nested elements are not supported because the dialect has none, except
  * `<ScanCodeInfo>` on a scan event, which we do not use.
  */
-const ELEMENT = /<([A-Za-z0-9_]+)>(?:<!\[CDATA\[([\s\S]*?)\]\]>|([\s\S]*?))<\/\1>/g;
+/**
+ * The bare-value branch is `[^<]*` and not `[\s\S]*?`, which is the difference
+ * between reading a callback and reading nothing at all.
+ *
+ * With a lazy any-character branch the very first thing the engine meets is
+ * `<xml>`, and the value expands until `</xml>` — so the whole document matches
+ * as one element named `xml`, which this function skips, and every callback
+ * parses to `{}`. Forbidding `<` inside a bare value makes the wrapper
+ * unmatchable and the children match one at a time; a nested element such as
+ * `<Image><MediaId>…</MediaId></Image>` yields its leaf, which is the part
+ * anybody wants.
+ */
+const ELEMENT = /<([A-Za-z0-9_]+)>(?:<!\[CDATA\[([\s\S]*?)\]\]>|([^<]*))<\/\1>/g;
 
 export function parseXml(xml: string): Record<string, string> {
   const out: Record<string, string> = {};

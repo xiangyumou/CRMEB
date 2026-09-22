@@ -174,9 +174,36 @@ export async function publish(ctx: Ctx, params: { id: string }): Promise<WechatM
     throw error;
   }
 
-  await ctx.withTx((tx) => repo.activateMenu(tx, id, ctx.clock.now()));
+  await activate(ctx, id);
   const fresh = await repo.findMenu(ctx.db, id);
   return toMenu(fresh ?? row);
+}
+
+/**
+ * Marks the row live, retrying once if another publish got there first.
+ *
+ * `activateMenu` clears every `is_active` and then sets this one, in one
+ * transaction. When no menu is active yet the first statement matches no rows
+ * and therefore locks nothing, so two operators publishing at the same moment
+ * both reach the second statement and the partial unique index
+ * `wechat_oa_menus_active_uq` rejects the later one. The rejection is not the
+ * truth of the situation: WeChat has already accepted this menu, it *is* what
+ * the followers see, and the row must say so. On the second attempt the
+ * winner's row is visible and committed, the clearing statement finds it, locks
+ * it, and this publish wins the way a later publish always should.
+ *
+ * Once, not in a loop: the retry can only lose again if a third publish
+ * committed in between, and at that point the operator clicking last is no
+ * longer the one whose menu should be live.
+ */
+async function activate(ctx: Ctx, id: number): Promise<void> {
+  try {
+    await ctx.withTx((tx) => repo.activateMenu(tx, id, ctx.clock.now()));
+  } catch (error) {
+    if (!repo.isUniqueViolation(error, 'wechat_oa_menus_active_uq')) throw error;
+    ctx.logger.warn({ menuId: id }, 'menu activate lost a race; retrying once');
+    await ctx.withTx((tx) => repo.activateMenu(tx, id, ctx.clock.now()));
+  }
 }
 
 function toMenu(row: repo.WechatOaMenu): WechatMenu {

@@ -152,14 +152,15 @@ export async function uploadMedium(
   url.searchParams.set('access_token', token);
   url.searchParams.set('type', args.kind);
 
-  // A copy into a plain `ArrayBuffer`: `Uint8Array` may be backed by a
-  // `SharedArrayBuffer`, which `Blob` does not accept, and the apps compile with
-  // the DOM lib where that distinction is a type error rather than a surprise.
-  const buffer = new ArrayBuffer(args.bytes.byteLength);
-  new Uint8Array(buffer).set(args.bytes);
-
   const form = new FormData();
-  form.append('media', new Blob([buffer], { type: args.contentType }), args.filename);
+  // `new Uint8Array(bytes)` rather than `bytes`: a `Uint8Array<ArrayBufferLike>`
+  // is not a `BlobPart` under the DOM lib (it could be backed by a
+  // `SharedArrayBuffer`), and the copy is the one-line way to say it is not.
+  form.append(
+    'media',
+    new Blob([new Uint8Array(args.bytes)], { type: args.contentType }),
+    args.filename,
+  );
 
   const response = await fetch(url, { method: 'POST', body: form });
   const text = await response.text();
@@ -245,15 +246,44 @@ const TICKET_TTL_MARGIN_SECONDS = 300;
  * the quota and every page loses `wx.chooseWXPay` — which is the payment
  * button.
  *
- * The single flight here is only the Redis key: two processes refreshing at
- * once each get a valid ticket (unlike the access token, issuing a ticket does
- * not invalidate the last one), so a lock would buy nothing but a stall.
+ * The cache is cold exactly when it matters: a deploy, a restart, or the two
+ * hours running out mid-morning. At that moment every request in flight misses
+ * together, so the refresh is shared in-process — the first caller fetches and
+ * the rest await the same promise. There is deliberately no cross-process lock,
+ * as there is for the access token: issuing a ticket does not invalidate the
+ * last one, so a second process refreshing at the same moment costs one extra
+ * call, while a lock would cost every request in this process a stall.
  */
 export async function jsapiTicket(ctx: Ctx, appId: string): Promise<string> {
-  const key = `wechat:jsapi-ticket:${appId}`;
+  const key = jsapiTicketCacheKey(appId);
   const cached = await ctx.redis.get(key);
   if (cached) return cached;
 
+  const existing = ticketFlight.get(key);
+  if (existing) return existing;
+
+  const promise = fetchTicket(ctx, key);
+  ticketFlight.set(key, promise);
+  try {
+    return await promise;
+  } finally {
+    ticketFlight.delete(key);
+  }
+}
+
+/**
+ * In-process single flight, keyed by cache key. Module-level for the same
+ * reason the token's is: two `Ctx` objects in one process are still one process
+ * as far as WeChat's quota is concerned.
+ */
+const ticketFlight = new Map<string, Promise<string>>();
+
+/** Test helper. Never call this from app code. */
+export function resetJsapiTicketFlight(): void {
+  ticketFlight.clear();
+}
+
+async function fetchTicket(ctx: Ctx, key: string): Promise<string> {
   const result = await oaCall<Envelope & { ticket?: string; expires_in?: number }>(
     ctx,
     { method: 'GET', path: '/cgi-bin/ticket/getticket', query: { type: 'jsapi' } },
@@ -268,4 +298,9 @@ export async function jsapiTicket(ctx: Ctx, appId: string): Promise<string> {
   const ttl = Math.max(60, (result.expires_in ?? 7200) - TICKET_TTL_MARGIN_SECONDS);
   await ctx.redis.set(key, result.ticket, 'EX', ttl);
   return result.ticket;
+}
+
+/** The Redis key the ticket is cached under, for tests and for the admin's 诊断 view. */
+export function jsapiTicketCacheKey(appId: string): string {
+  return `wechat:jsapi-ticket:${appId}`;
 }

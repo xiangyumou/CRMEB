@@ -63,12 +63,22 @@ describe('buildLegacyKeyIndex', () => {
     ]);
   });
 
-  it('really does fan out on the live registry — wechat_appid has two claimants', () => {
-    // `wechat` (C's) and `wechat-oa` (F1's) both claim it while the transition
-    // runs. A one-to-one map would drop one of them silently: CR-1-j.
+  it('gives wechat_appid to the wechat group alone', () => {
+    // `wechat` (C's) and `wechat-oa` both used to claim it, so a migrated shop
+    // held the app id in one screen and a blank in the other. CR-1-j settled it
+    // the other way round: the `wechat` group owns the Official Account
+    // credentials and `wechat-oa` reads them. This guards that decision.
     const claimants = buildLegacyKeyIndex().get('wechat_appid') ?? [];
+    expect(claimants).toEqual([{ group: 'wechat', key: 'oaAppId', alias: 0 }]);
+  });
+
+  it('really does fan out on the live registry — routine_appId has two claimants', () => {
+    // The mini-program app id is the sibling case CR-1-j did not cover: the
+    // `wechat` and `wechat-mini` groups both still claim it. A one-to-one map
+    // would drop one of them silently.
+    const claimants = buildLegacyKeyIndex().get('routine_appId') ?? [];
     expect(claimants.length).toBeGreaterThan(1);
-    expect(claimants.map((c) => c.group).sort()).toEqual(['wechat', 'wechat-oa']);
+    expect(claimants.map((c) => c.group).sort()).toEqual(['wechat', 'wechat-mini']);
   });
 });
 

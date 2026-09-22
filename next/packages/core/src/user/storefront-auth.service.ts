@@ -30,6 +30,7 @@ import { randomToken } from '../kernel/ids';
 import { fixedWindow, resetFixedWindow } from '../kernel/rate-limit';
 import { sendVerificationCode, verifyCode } from '../sms';
 import { wechatMiniConfig, wechatOaConfig } from '../system';
+import { wechatConfig } from '../wechat';
 import { storefrontAuthConfig, type StorefrontAuthConfig } from './storefront-auth.config';
 import { getWechatIdentityPort, type WechatIdentityPort } from './wechat-identity.port';
 import {
@@ -869,6 +870,23 @@ export async function miniPhoneLogin(
 }
 
 /**
+ * "Is there an Official Account, and what is its app id."
+ *
+ * Two groups, on purpose: the `wechat-oa` group holds the operator's 启用
+ * switch and the callback settings, while the app id lives in the `wechat`
+ * group and nowhere else (CR-1-j — both used to map `wechat_appid`, so a
+ * migrated shop held it in one screen and a blank in the other).
+ */
+async function oaApp(ctx: Ctx): Promise<{ enabled: boolean; appId: string }> {
+  const [oa, core] = await Promise.all([
+    ctx.config.get(wechatOaConfig),
+    ctx.config.get(wechatConfig),
+  ]);
+  const appId = core.oaAppId.trim();
+  return { enabled: oa.enabled && appId !== '', appId };
+}
+
+/**
  * The 公众号 authorisation URL.
  *
  * `redirectUrl` is checked against the configured `siteUrl` before it is handed
@@ -880,8 +898,8 @@ export async function oaAuthorizeUrl(
   ctx: Ctx,
   query: OaAuthorizeUrlQuery,
 ): Promise<{ url: string; state: string }> {
-  const oa = await ctx.config.get(wechatOaConfig);
-  if (!oa.enabled || !oa.appId) throw new DomainError('AUTH_WECHAT_NOT_CONFIGURED');
+  const oa = await oaApp(ctx);
+  if (!oa.enabled) throw new DomainError('AUTH_WECHAT_NOT_CONFIGURED');
   const config = await settings(ctx);
   if (!isAllowedRedirect(query.redirectUrl, config.siteUrl)) {
     throw new DomainError('AUTH_REDIRECT_NOT_ALLOWED');
@@ -922,8 +940,8 @@ export async function oaLogin(
   body: OaLoginBody,
   meta: RequestMeta = {},
 ): Promise<WechatLoginResult> {
-  const oa = await ctx.config.get(wechatOaConfig);
-  if (!oa.enabled || !oa.appId) throw new DomainError('AUTH_WECHAT_NOT_CONFIGURED');
+  const oa = await oaApp(ctx);
+  if (!oa.enabled) throw new DomainError('AUTH_WECHAT_NOT_CONFIGURED');
   const user = await wechatPort().oaCodeToUser(ctx, body.code);
   return signInWithIdentity(
     ctx,

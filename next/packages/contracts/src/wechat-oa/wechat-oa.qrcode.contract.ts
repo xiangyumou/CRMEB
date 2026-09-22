@@ -68,6 +68,7 @@ export const wechatOaQrcodeCategoryCreate = defineRoute({
   body: wechatQrcodeCategoryForm,
   response: wechatQrcodeCategory,
   status: 201,
+  errors: ['WECHAT_OA_CATEGORY_NAME_TAKEN'],
   examples: [
     {
       name: 'ok',
@@ -88,7 +89,7 @@ export const wechatOaQrcodeCategoryUpdate = defineRoute({
   params: qrcodeParams,
   body: wechatQrcodeCategoryForm,
   response: wechatQrcodeCategory,
-  errors: ['WECHAT_OA_CATEGORY_NOT_FOUND'],
+  errors: ['WECHAT_OA_CATEGORY_NOT_FOUND', 'WECHAT_OA_CATEGORY_NAME_TAKEN'],
   examples: [
     {
       name: 'rename',

@@ -6,17 +6,25 @@ import {
 import { wechatOaQrcode } from '@shop/core/wechat-oa';
 import { handle } from '../../../../src/server';
 
+/**
+ * `/admin-api/wechat-qrcodes/:id` — read, edit, retire one code.
+ *
+ * The body cannot carry `scene`: it is printed on posters that are already on
+ * walls, and changing it would detach every future scan from its channel.
+ */
 export const GET = handle(wechatOaQrcodeDetail, (ctx, { params }) =>
   wechatOaQrcode.detail(ctx, params),
 );
 
-/** The scene is not editable here: it is printed on posters already on walls. */
-export const PUT = handle(wechatOaQrcodeUpdate, (ctx, { params, body }) =>
-  wechatOaQrcode.update(ctx, params, body),
-);
+export const PUT = handle(wechatOaQrcodeUpdate, async (ctx, { params, body }) => {
+  const updated = await wechatOaQrcode.update(ctx, params, body);
+  ctx.audit(`wechat-qrcode:${params.id}`);
+  return updated;
+});
 
-export const DELETE = handle(wechatOaQrcodeDelete, (ctx, { params }) =>
-  wechatOaQrcode.remove(ctx, params),
-);
+export const DELETE = handle(wechatOaQrcodeDelete, async (ctx, { params }) => {
+  await wechatOaQrcode.remove(ctx, params);
+  ctx.audit(`wechat-qrcode:${params.id}`);
+});
 
 export const dynamic = 'force-dynamic';

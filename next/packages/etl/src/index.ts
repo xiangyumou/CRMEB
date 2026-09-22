@@ -16,3 +16,4 @@ export * as shipping from './mappers/shipping';
 export * as storage from './mappers/storage';
 export * as system from './mappers/system';
 export * as user from './mappers/user';
+export * as wechatOa from './mappers/wechat-oa';

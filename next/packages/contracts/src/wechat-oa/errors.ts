@@ -42,6 +42,15 @@ export const wechatOaErrors = defineErrors({
   /** A category that still has QR codes filed under it. */
   WECHAT_OA_CATEGORY_NOT_EMPTY: { status: 409, message: '该分类下还有渠道码，无法删除' },
   WECHAT_OA_CATEGORY_NOT_FOUND: { status: 404, message: '渠道码分类不存在' },
+  /**
+   * `wechat_qrcode_categories_name_uq`, which covers deleted rows as well as
+   * live ones — hence the second half of the message. Without it, recreating a
+   * category an operator deleted last month fails with no visible cause.
+   */
+  WECHAT_OA_CATEGORY_NAME_TAKEN: {
+    status: 409,
+    message: '该分类名称已被占用（也可能属于一个已删除的分类）',
+  },
 
   WECHAT_OA_MEDIA_NOT_FOUND: { status: 404, message: '素材不存在' },
   /** The attachment is not a kind WeChat accepts for that media type. */

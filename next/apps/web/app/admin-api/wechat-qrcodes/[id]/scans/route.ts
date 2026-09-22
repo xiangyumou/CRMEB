@@ -2,7 +2,7 @@ import { wechatOaQrcodeScans } from '@shop/contracts/wechat-oa/wechat-oa.qrcode.
 import { wechatOaQrcode } from '@shop/core/wechat-oa';
 import { handle } from '../../../../../src/server';
 
-/** Openids are masked: this list is read by anybody with `wechat-oa:qrcode:read`. */
+/** `/admin-api/wechat-qrcodes/:id/scans` — who scanned, newest first, openid masked. */
 export const GET = handle(wechatOaQrcodeScans, (ctx, { params, query }) =>
   wechatOaQrcode.scans(ctx, params, query),
 );

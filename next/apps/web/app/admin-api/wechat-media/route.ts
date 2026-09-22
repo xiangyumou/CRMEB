@@ -6,13 +6,18 @@ import { wechatOaMedia } from '@shop/core/wechat-oa';
 import { handle } from '../../../src/server';
 
 /**
- * `/admin-api/wechat-media` — WeChat's copy of the media library.
+ * `/admin-api/wechat-media` — the handles WeChat gave us for material we hold.
  *
- * The POST takes an attachment id, not a file: the bytes are already ours and a
- * second multipart endpoint would be a second place to get the checks wrong.
+ * `POST` takes an **attachment id**, not a file: the bytes are already in F1's
+ * media library, and a second multipart endpoint would be a second place to get
+ * the MIME check wrong.
  */
 export const GET = handle(wechatOaMediaList, (ctx, { query }) => wechatOaMedia.list(ctx, query));
 
-export const POST = handle(wechatOaMediaUpload, (ctx, { body }) => wechatOaMedia.upload(ctx, body));
+export const POST = handle(wechatOaMediaUpload, async (ctx, { body }) => {
+  const created = await wechatOaMedia.upload(ctx, body);
+  ctx.audit(`wechat-medium:${created.id}`);
+  return created;
+});
 
 export const dynamic = 'force-dynamic';

@@ -43,11 +43,14 @@ interface Paged<T> {
 // ---------------------------------------------------------------------------
 
 /**
- * Every category, paged in memory.
+ * Every category, paged.
  *
- * There are a handful of them and the page picks them up for a select box, so
- * the query is unconditional and the slice is local; a second round trip to
- * count six rows is not a trade worth making.
+ * The page is applied in JavaScript rather than in SQL because the list is
+ * bounded by what an operator can be bothered to name — a shop with more than a
+ * screen of channel categories does not exist — and because the count each row
+ * carries is a correlated subquery that would otherwise be paged separately
+ * from the rows it belongs to. The contract pages it anyway so the table
+ * component and the mock server see the same shape as every other list.
  */
 export async function listCategories(
   ctx: Ctx,
@@ -75,10 +78,7 @@ export async function createCategory(
   body: WechatQrcodeCategoryForm,
 ): Promise<WechatQrcodeCategory> {
   requirePermission(ctx, wechatOaPermissions['qrcode:write']);
-  const row = await repo.insertQrcodeCategory(ctx.db, {
-    name: body.name,
-    sortOrder: body.sortOrder,
-  });
+  const row = await insertCategoryOrConflict(ctx, { name: body.name, sortOrder: body.sortOrder });
   return {
     id: toId(row.id),
     name: row.name,
@@ -95,11 +95,13 @@ export async function updateCategory(
 ): Promise<WechatQrcodeCategory> {
   requirePermission(ctx, wechatOaPermissions['qrcode:write']);
   const id = fromId(params.id);
-  const { affected } = await repo.updateQrcodeCategory(ctx.db, id, {
-    name: body.name,
-    sortOrder: body.sortOrder,
-    now: ctx.clock.now(),
-  });
+  const { affected } = await categoryNameConflictAsDomainError(() =>
+    repo.updateQrcodeCategory(ctx.db, id, {
+      name: body.name,
+      sortOrder: body.sortOrder,
+      now: ctx.clock.now(),
+    }),
+  );
   if (affected === 0) throw new DomainError('WECHAT_OA_CATEGORY_NOT_FOUND');
   const rows = await repo.listQrcodeCategories(ctx.db);
   const row = rows.find((candidate) => candidate.id === id);
@@ -111,6 +113,32 @@ export async function updateCategory(
     qrcodeCount: row.qrcodeCount,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+function insertCategoryOrConflict(
+  ctx: Ctx,
+  values: { name: string; sortOrder: number },
+): Promise<repo.WechatQrcodeCategory> {
+  return categoryNameConflictAsDomainError(() => repo.insertQrcodeCategory(ctx.db, values));
+}
+
+/**
+ * `wechat_qrcode_categories_name_uq` as a 409 instead of a 500.
+ *
+ * Two of these happen in a real shop. The ordinary one is two people naming a
+ * category 地推 at once. The surprising one is a name that was *deleted*: the
+ * index is not restricted to live rows, so a soft-deleted 地推 keeps its name
+ * for ever and recreating it fails with no visible cause at all. Both read the
+ * same to the operator, which is why the message names the possibility — and
+ * why CR-3-e3 asks for the index to be made partial.
+ */
+async function categoryNameConflictAsDomainError<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (!repo.isUniqueViolation(error, 'wechat_qrcode_categories_name_uq')) throw error;
+    throw new DomainError('WECHAT_OA_CATEGORY_NAME_TAKEN');
+  }
 }
 
 export async function deleteCategory(ctx: Ctx, params: { id: string }): Promise<void> {
@@ -178,19 +206,29 @@ export async function create(ctx: Ctx, body: WechatQrcodeForm): Promise<WechatQr
   const remote = await createRemoteQrcode(ctx, { scene, expireSeconds: body.expireSeconds });
   const now = ctx.clock.now();
 
-  const row = await repo.insertQrcode(ctx.db, {
-    ...(body.categoryId === undefined ? {} : { categoryId: fromId(body.categoryId) }),
-    name: body.name,
-    scene,
-    ticket: remote.ticket,
-    imageUrl: qrcodeImageUrl(remote.ticket),
-    ...(body.expireSeconds > 0
-      ? { expiresAt: new Date(now.getTime() + body.expireSeconds * 1000) }
-      : {}),
-    ...(body.replyType === undefined
-      ? {}
-      : { replyType: body.replyType, replyPayload: body.replyPayload ?? {} }),
-  });
+  let row;
+  try {
+    row = await repo.insertQrcode(ctx.db, {
+      ...(body.categoryId === undefined ? {} : { categoryId: fromId(body.categoryId) }),
+      name: body.name,
+      scene,
+      ticket: remote.ticket,
+      imageUrl: qrcodeImageUrl(remote.ticket),
+      ...(body.expireSeconds > 0
+        ? { expiresAt: new Date(now.getTime() + body.expireSeconds * 1000) }
+        : {}),
+      ...(body.replyType === undefined
+        ? {}
+        : { replyType: body.replyType, replyPayload: body.replyPayload ?? {} }),
+    });
+  } catch (error) {
+    // The check above is a read and this is the write; between them another
+    // operator can take the scene. The index is what decides, and a scene taken
+    // twice is two posters reporting into one row — so the refusal has to reach
+    // the operator as 该场景值已被占用 rather than as a 500.
+    if (!repo.isUniqueViolation(error, 'wechat_qrcodes_scene_uq')) throw error;
+    throw new DomainError('WECHAT_OA_QRCODE_SCENE_TAKEN', { details: { scene } });
+  }
   const fresh = await repo.findQrcode(ctx.db, row.id);
   return toQrcode(fresh ?? { ...row, categoryName: null });
 }
@@ -202,10 +240,12 @@ export async function create(ctx: Ctx, body: WechatQrcodeForm): Promise<WechatQr
  * silently detach every future scan of them from the channel they belong to.
  * A new channel is a new code.
  */
+export type WechatQrcodeEditForm = Omit<WechatQrcodeForm, 'scene' | 'expireSeconds'>;
+
 export async function update(
   ctx: Ctx,
   params: { id: string },
-  body: Omit<WechatQrcodeForm, 'scene' | 'expireSeconds'>,
+  body: WechatQrcodeEditForm,
 ): Promise<WechatQrcode> {
   requirePermission(ctx, wechatOaPermissions['qrcode:write']);
   const id = fromId(params.id);

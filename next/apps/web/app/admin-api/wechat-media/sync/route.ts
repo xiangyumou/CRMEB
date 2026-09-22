@@ -2,7 +2,16 @@ import { wechatOaMediaSync } from '@shop/contracts/wechat-oa/wechat-oa.media.con
 import { wechatOaMedia } from '@shop/core/wechat-oa';
 import { handle } from '../../../../src/server';
 
-/** Reconciles our rows with WeChat's store, in that direction only. */
-export const POST = handle(wechatOaMediaSync, (ctx) => wechatOaMedia.sync(ctx));
+/**
+ * `/admin-api/wechat-media/sync` — reconcile our rows with 公众平台.
+ *
+ * One direction: WeChat is the truth about what exists, because material
+ * deleted there renders here as an empty chat bubble.
+ */
+export const POST = handle(wechatOaMediaSync, async (ctx) => {
+  const result = await wechatOaMedia.sync(ctx);
+  ctx.audit('wechat-media:sync');
+  return result;
+});
 
 export const dynamic = 'force-dynamic';

@@ -129,8 +129,10 @@ describe('describeGroup', () => {
     const wechat = getConfigGroup('wechat-oa');
     expect(wechat).toBeDefined();
     const descriptor = describeGroup(wechat!);
-    const appSecret = descriptor.fields.find((f) => f.key === 'appSecret');
-    expect(appSecret).toMatchObject({ secret: true, kind: 'password' });
+    // The group's secret is the EncodingAESKey; the app credentials moved to
+    // the `wechat` group under CR-1-j.
+    const aesKey = descriptor.fields.find((f) => f.key === 'encodingAesKey');
+    expect(aesKey).toMatchObject({ secret: true, kind: 'password' });
   });
 
   it('marks every credential in every registered group as secret', () => {

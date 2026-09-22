@@ -7,7 +7,7 @@ import type {
 import { createHash, randomBytes } from 'node:crypto';
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
-import { publicOrigin } from '../system';
+import { isTrustedHost } from '../system';
 import { wechatOaRuntimeConfig } from './wechat-oa.config';
 import { jsapiTicket } from './wechat-oa.client';
 import { requireOaCredentials } from './wechat-oa.credentials';
@@ -46,16 +46,9 @@ import { requireOaCredentials } from './wechat-oa.credentials';
  */
 export async function jssdkConfigFor(ctx: Ctx, query: JssdkConfigQuery): Promise<JssdkConfig> {
   const credentials = await requireOaCredentials(ctx);
-  const [runtime, origin] = await Promise.all([
-    ctx.config.get(wechatOaRuntimeConfig),
-    // The deployment's own origin, from `site` (CR-1-e2). It used to come from
-    // 通知设置, which meant this endpoint imported the notification domain to
-    // ask a question that has nothing to do with notifications.
-    publicOrigin(ctx),
-  ]);
 
   const url = query.url.split('#')[0] ?? '';
-  assertAllowed(url, origin, runtime.jsApiAllowedHosts);
+  await assertAllowed(ctx, url);
 
   const ticket = await jsapiTicket(ctx, credentials.appId);
   const nonceStr = randomBytes(8).toString('hex');
@@ -86,14 +79,15 @@ export function jsapiSignature(args: {
 }
 
 /**
- * Host allow-list.
+ * Refuses a URL that is not ours before it is ever signed.
  *
- * The site's own origin is always allowed — a shop that has configured nothing
- * still has to be able to sign its own pages. Everything else must be listed,
- * and the comparison is on the **host**, not on a prefix: `shop.example.com`
- * must not match `shop.example.com.attacker.test`.
+ * Which hosts are ours is the deployment's business, not this domain's, so the
+ * question goes to `isTrustedHost` in `@shop/core/system`, plus the account's
+ * own 授权域名 list in `wechat-oa-runtime`. Everything this function still
+ * decides is WeChat-specific: the scheme must be http(s), the fragment is
+ * already gone, and a URL that does not parse is a refusal rather than a crash.
  */
-export function assertAllowed(url: string, siteOrigin: string, allowedHosts: string): void {
+export async function assertAllowed(ctx: Ctx, url: string): Promise<void> {
   let host: string;
   try {
     const parsed = new URL(url);
@@ -106,30 +100,30 @@ export function assertAllowed(url: string, siteOrigin: string, allowedHosts: str
     throw new DomainError('WECHAT_OA_URL_NOT_ALLOWED', { message: '待签名的地址不是合法的 URL' });
   }
 
-  const allowed = new Set<string>();
-  if (siteOrigin.trim() !== '') {
-    try {
-      allowed.add(new URL(siteOrigin).host.toLowerCase());
-    } catch {
-      // A misconfigured base URL must not become "allow everything".
-    }
-  }
-  for (const entry of allowedHosts.split(',')) {
-    const trimmed = entry.trim().toLowerCase();
-    if (trimmed === '') continue;
-    // Accept both `example.com` and `https://example.com` — operators paste both.
-    allowed.add(trimmed.includes('://') ? safeHost(trimmed) : trimmed);
-  }
-  allowed.delete('');
-
-  if (!allowed.has(host)) {
+  // The deployment's own hosts come from `site` (CR-1-e2); the 公众号 JS 安全域名
+  // list is a statement about the WeChat account and stays in this domain's
+  // runtime group. Either is enough.
+  if (!(await isTrustedHost(ctx, host)) && !(await isListedJsApiHost(ctx, host))) {
     throw new DomainError('WECHAT_OA_URL_NOT_ALLOWED', { details: { host } });
   }
 }
 
-function safeHost(value: string): string {
+/** A host an operator listed under JS-SDK 授权域名, in either spelling. */
+async function isListedJsApiHost(ctx: Ctx, host: string): Promise<boolean> {
+  const runtime = await ctx.config.get(wechatOaRuntimeConfig);
+  return runtime.jsApiAllowedHosts.split(',').some((entry) => hostOf(entry) === host);
+}
+
+/**
+ * The host of `https://m.example.com/x`, of `m.example.com:8443` and of
+ * `m.example.com` alike — operators paste both spellings — and `''` for
+ * anything that is neither, so a bad entry never becomes "allow everything".
+ */
+function hostOf(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed === '') return '';
   try {
-    return new URL(value).host.toLowerCase();
+    return new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`).host;
   } catch {
     return '';
   }

@@ -46,10 +46,11 @@ export type {
  * Three of them carry a decision the services depend on:
  *
  * - **`activateMenu` clears the flag before it sets one.** The partial unique
- *   index `wechat_oa_menus_active_uq` allows exactly one active menu, so two
- *   publishes racing would otherwise fail on the constraint rather than on the
- *   row; doing both inside one transaction turns "who published last" into an
- *   ordinary row lock.
+ *   index `wechat_oa_menus_active_uq` allows exactly one active menu, so the
+ *   two halves belong in one transaction or the shop has no live menu in
+ *   between. That is not enough by itself: with no menu active yet the first
+ *   statement locks nothing, two publishes both reach the second one and one of
+ *   them loses on the constraint — which is why `menu.publish` retries once.
  * - **`bumpQrcodeCounters` is `UPDATE … SET n = n + 1`, never read-modify-write.**
  *   Scans arrive concurrently from WeChat's own fan-out; reading 128 in two
  *   requests and writing 129 twice is how the legacy counter drifted low.
@@ -58,6 +59,29 @@ export type {
  *   twice has to produce the same answer, or an operator debugging a keyword
  *   sees it work every other time.
  */
+
+/** PostgreSQL's unique-violation SQLSTATE. */
+const UNIQUE_VIOLATION = '23505';
+
+/**
+ * Whether this is PostgreSQL refusing a duplicate, optionally on one named index.
+ *
+ * Every "is this name free?" check in this domain is a read followed by a write,
+ * and the gap between them belongs to whoever else is clicking 保存. The index
+ * is what actually decides; this is how the service reads that decision and
+ * answers 409 instead of 500. Drizzle wraps the driver error, and a pool error
+ * can wrap it again, so the chain is walked rather than peeled once.
+ */
+export function isUniqueViolation(error: unknown, constraint?: string): boolean {
+  for (let current: unknown = error, depth = 0; current != null && depth < 5; depth += 1) {
+    const candidate = current as { code?: string; constraint?: string; cause?: unknown };
+    if (candidate.code === UNIQUE_VIOLATION) {
+      return constraint === undefined || candidate.constraint === constraint;
+    }
+    current = candidate.cause;
+  }
+  return false;
+}
 
 // ---------------------------------------------------------------------------
 // menus

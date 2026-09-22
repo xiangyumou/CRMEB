@@ -326,6 +326,12 @@ async function recordScan(
         ...(identity ? { userId: identity.userId } : {}),
         openid: args.openid,
         isNewFollower: args.isNew,
+        // The injected clock, not the column's `now()` default: the daily
+        // channel report buckets on this column, and a row timed by the database
+        // while the counter next to it is timed by `ctx.clock` makes the two
+        // disagree — visibly so under a fake clock, invisibly so when the
+        // database and the app are in different timezones.
+        createdAt: now,
       });
       await repo.bumpQrcodeCounters(tx, qrcode.id, { scan: true, follow: args.isNew, now });
     });

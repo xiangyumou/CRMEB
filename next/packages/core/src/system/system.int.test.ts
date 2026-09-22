@@ -344,10 +344,14 @@ describe('roles', () => {
 describe('config', () => {
   it('never returns a stored secret — only whether one is set', async () => {
     const ctx = as(superId);
-    await configSave(ctx, { group: 'wechat-oa' }, { values: { appSecret: 'super-secret-value' } });
+    await configSave(
+      ctx,
+      { group: 'wechat-oa' },
+      { values: { encodingAesKey: 'super-secret-value' } },
+    );
 
     const read = await configGet(ctx, { group: 'wechat-oa' });
-    expect(read.values['appSecret']).toBe(true);
+    expect(read.values['encodingAesKey']).toBe(true);
     // Belt and braces: the literal must appear nowhere in the payload.
     expect(JSON.stringify(read)).not.toContain('super-secret-value');
 
@@ -355,28 +359,34 @@ describe('config', () => {
     const [row] = await harness.ctx.db
       .select()
       .from(configValues)
-      .where(eq(configValues.key, 'appSecret'));
+      .where(eq(configValues.key, 'encodingAesKey'));
     expect(row?.value).toContain('super-secret-value');
   });
 
   it('reports an unset secret as false', async () => {
     const read = await configGet(as(superId), { group: 'wechat-oa' });
-    expect(read.values['appSecret']).toBe(false);
+    expect(read.values['encodingAesKey']).toBe(false);
   });
 
   it('leaves the stored secret alone when the form is saved without retyping it', async () => {
     // The browser round-trips the "is set" flag. Saving the site name must not
     // blank out a credential.
     const ctx = as(superId);
-    await configSave(ctx, { group: 'wechat-oa' }, { values: { appSecret: 'keep-me' } });
-    await configSave(ctx, { group: 'wechat-oa' }, { values: { appSecret: true, appId: 'wx123' } });
+    await configSave(ctx, { group: 'wechat-oa' }, { values: { encodingAesKey: 'keep-me' } });
+    await configSave(
+      ctx,
+      { group: 'wechat-oa' },
+      { values: { encodingAesKey: true, verificationFile: 'MP_verify_abc.txt' } },
+    );
 
     const [row] = await harness.ctx.db
       .select()
       .from(configValues)
-      .where(eq(configValues.key, 'appSecret'));
+      .where(eq(configValues.key, 'encodingAesKey'));
     expect(row?.value).toContain('keep-me');
-    expect((await configGet(ctx, { group: 'wechat-oa' })).values['appId']).toBe('wx123');
+    expect((await configGet(ctx, { group: 'wechat-oa' })).values['verificationFile']).toBe(
+      'MP_verify_abc.txt',
+    );
   });
 
   it('refuses a key the group does not declare', async () => {

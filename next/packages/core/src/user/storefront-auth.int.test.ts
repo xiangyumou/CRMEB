@@ -6,6 +6,7 @@ import { UserSessionService } from '../auth/user-session.service';
 import type { Actor, Ctx } from '../kernel/context';
 import { fakeSmsSender, registerSmsSender, resetSmsSender, type FakeSmsSender } from '../sms';
 import { smsConfig, wechatMiniConfig, wechatOaConfig } from '../system';
+import { wechatConfig } from '../wechat';
 import './index';
 import * as auth from './storefront-auth.service';
 import { storefrontAuthConfig } from './storefront-auth.config';
@@ -806,7 +807,9 @@ describe('WeChat mini-program sign-in', () => {
 
 describe('WeChat Official Account sign-in', () => {
   beforeEach(async () => {
-    await harness.ctx.config.set(wechatOaConfig, { enabled: true, appId: 'wx-oa' });
+    // The switch is the OA group's; the app id is the `wechat` group's (CR-1-j).
+    await harness.ctx.config.set(wechatOaConfig, { enabled: true });
+    await harness.ctx.config.set(wechatConfig, { oaAppId: 'wx-oa' });
     await harness.ctx.config.set(storefrontAuthConfig, { siteUrl: 'https://shop.example.com' });
   });
 

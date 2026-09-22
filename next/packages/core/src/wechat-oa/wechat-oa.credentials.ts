@@ -7,17 +7,19 @@ import { wechatConfig } from '../wechat';
  * One answer to "what are this shop's Official Account credentials", assembled
  * from the two groups that hold parts of it.
  *
- * Stream C's `wechat` group carries what the API client needs (`appId`,
- * `appSecret`); stream F1's `wechat-oa` group carries what the operator types
- * into 公众平台 (token, EncodingAESKey, 消息加解密方式). Both were declared
- * before this stream existed and both map the same legacy keys, so an install
- * imported from CRMEB has the token in both places and a fresh one has it in
- * whichever screen the operator found first.
+ * Stream C's `wechat` group owns the app credentials (`appId`, `appSecret`).
+ * That is CR-1-j: both groups used to declare them and both mapped the legacy
+ * keys `wechat_appid` / `wechat_appsecret`, so a migrated shop held the app id
+ * in one screen and a blank in the other, and whichever screen was saved last
+ * won. Stream F1's `wechat-oa` group now owns only what an operator types into
+ * 公众平台 for the callback: the token, the EncodingAESKey and 消息加解密方式.
  *
- * Reading F1's first and falling back to C's is the local adapter for that.
- * CR-3-e2 proposes retiring the duplicated fields from one of them; until it
- * lands this function is the single place that knows they overlap, which is the
- * property that matters.
+ * The token and the AES key are still declared in both (C maps the same legacy
+ * keys for those two), so they keep the "F1 first, C as the fallback" rule:
+ * F1's is the screen an operator actually fills in, C's is what an install
+ * migrated before that screen existed carries. CR-3-e2 asks for that half to be
+ * merged too; until it lands this function is the single place that knows they
+ * overlap, which is the property that matters.
  */
 export interface OaCredentials {
   enabled: boolean;
@@ -31,7 +33,7 @@ export async function oaCredentials(ctx: Ctx): Promise<OaCredentials> {
     ctx.config.get(wechatOaConfig),
     ctx.config.get(wechatConfig),
   ]);
-  const appId = oa.appId.trim() || core.oaAppId.trim();
+  const appId = core.oaAppId.trim();
   return {
     // F1's switch is the operator's intent; an appId with no secret cannot work
     // whatever the switch says, and the client refuses that on its own.

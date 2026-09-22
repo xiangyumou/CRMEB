@@ -88,16 +88,20 @@ export async function create(ctx: Ctx, body: WechatAutoReplyForm): Promise<Wecha
   validateReplyPayload(body.replyType, body.payload);
   await assertFree(ctx, body);
 
-  const row = await repo.insertReply(ctx.db, {
-    triggerKind: body.triggerKind,
-    keyword: body.keyword ?? null,
-    matchMode: body.triggerKind === 'keyword' ? (body.matchMode ?? 'exact') : null,
-    replyType: body.replyType,
-    payload: body.payload,
-    isEnabled: body.isEnabled,
-    sortOrder: body.sortOrder,
-  });
-  return toReply(row);
+  try {
+    const row = await repo.insertReply(ctx.db, {
+      triggerKind: body.triggerKind,
+      keyword: body.keyword ?? null,
+      matchMode: body.triggerKind === 'keyword' ? (body.matchMode ?? 'exact') : null,
+      replyType: body.replyType,
+      payload: body.payload,
+      isEnabled: body.isEnabled,
+      sortOrder: body.sortOrder,
+    });
+    return toReply(row);
+  } catch (error) {
+    throw conflictFor(error, body);
+  }
 }
 
 export async function update(
@@ -112,16 +116,20 @@ export async function update(
   if (!existing) throw new DomainError('WECHAT_OA_REPLY_NOT_FOUND');
   await assertFree(ctx, body, id);
 
-  await repo.updateReply(ctx.db, id, {
-    triggerKind: body.triggerKind,
-    keyword: body.keyword ?? null,
-    matchMode: body.triggerKind === 'keyword' ? (body.matchMode ?? 'exact') : null,
-    replyType: body.replyType,
-    payload: body.payload,
-    isEnabled: body.isEnabled,
-    sortOrder: body.sortOrder,
-    now: ctx.clock.now(),
-  });
+  try {
+    await repo.updateReply(ctx.db, id, {
+      triggerKind: body.triggerKind,
+      keyword: body.keyword ?? null,
+      matchMode: body.triggerKind === 'keyword' ? (body.matchMode ?? 'exact') : null,
+      replyType: body.replyType,
+      payload: body.payload,
+      isEnabled: body.isEnabled,
+      sortOrder: body.sortOrder,
+      now: ctx.clock.now(),
+    });
+  } catch (error) {
+    throw conflictFor(error, body);
+  }
   const fresh = await repo.findReply(ctx.db, id);
   return toReply(fresh ?? existing);
 }
@@ -163,6 +171,28 @@ async function assertFree(ctx: Ctx, body: WechatAutoReplyForm, exceptId?: number
       details: { triggerKind: body.triggerKind },
     });
   }
+}
+
+/**
+ * The same 409s again, this time as the index reports them.
+ *
+ * `assertFree` reads and then writes, and the gap between the two belongs to
+ * whoever else is clicking 保存 — two operators adding the keyword 退货 in the
+ * same second both pass the check and the second insert hits
+ * `wechat_auto_replies_keyword_uq`. Translating it here is what makes the
+ * second operator read 该关键词已被其他自动回复占用 instead of 服务器开小差了,
+ * and it is the only version of the check that is actually true.
+ */
+function conflictFor(error: unknown, body: WechatAutoReplyForm): unknown {
+  if (repo.isUniqueViolation(error, 'wechat_auto_replies_keyword_uq')) {
+    return new DomainError('WECHAT_OA_KEYWORD_TAKEN', { details: { keyword: body.keyword ?? '' } });
+  }
+  if (repo.isUniqueViolation(error, 'wechat_auto_replies_singleton_uq')) {
+    return new DomainError('WECHAT_OA_REPLY_DUPLICATE', {
+      details: { triggerKind: body.triggerKind },
+    });
+  }
+  return error;
 }
 
 function toReply(row: repo.WechatAutoReply): WechatAutoReply {
