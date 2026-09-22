@@ -1,0 +1,227 @@
+import { z } from 'zod';
+import { id } from '../_conventions/common';
+import { defineRoute } from '../_conventions/route';
+import {
+  pagedShippingTemplates,
+  shippingTemplateDetail,
+  shippingTemplateDetailExample,
+  shippingTemplateExample,
+  shippingTemplateForm,
+  shippingTemplateListQuery,
+  shippingTemplateOptions,
+} from './schemas';
+
+/**
+ * 运费模板, `/admin-api/shipping/templates`.
+ *
+ * The URL is namespaced under `shipping/` for the reason stream A namespaced
+ * the catalog: "templates", "cities" and "regions" are words several domains
+ * would like, and in the App Router the directory *is* the URL, so an
+ * unqualified segment is a merge collision waiting to happen. The two routes
+ * this stream inherits from B2 (`/admin-api/express-companies` and
+ * `/api/v1/staff/express-companies`) are the deliberate exceptions: their paths
+ * are frozen by CR-1-b2.
+ */
+
+const templateParams = z.object({ id });
+
+export const shippingTemplateList = defineRoute({
+  id: 'shipping.templateList',
+  method: 'GET',
+  path: '/admin-api/shipping/templates',
+  auth: 'admin',
+  permission: 'shipping:template:read',
+  summary: '运费模板列表',
+  tags: ['shipping'],
+  query: shippingTemplateListQuery,
+  response: pagedShippingTemplates,
+  examples: [
+    {
+      name: 'first-page',
+      query: { page: 1, pageSize: 20 },
+      response: { items: [shippingTemplateExample], total: 1, page: 1, pageSize: 20 },
+    },
+    {
+      name: 'empty',
+      query: { page: 1, pageSize: 20, keyword: '空运' },
+      response: { items: [], total: 0, page: 1, pageSize: 20 },
+    },
+  ],
+});
+
+/**
+ * The 运费模板 select on the product editor.
+ *
+ * Its own route rather than a page of the list, because the picker wants every
+ * template in one call and none of the region detail. Stream A's product form
+ * currently stores `shippingTemplateId` as free text (status/a.md decision 11);
+ * swapping in a `select` with `loadOptions` over this route is the one-line
+ * change that decision anticipates.
+ */
+export const shippingTemplateOptionList = defineRoute({
+  id: 'shipping.templateOptions',
+  method: 'GET',
+  path: '/admin-api/shipping/template-options',
+  auth: 'admin',
+  permission: 'shipping:template:read',
+  summary: '运费模板下拉选项',
+  tags: ['shipping'],
+  response: shippingTemplateOptions,
+  examples: [
+    {
+      name: 'ok',
+      response: { items: [{ id: '1', name: '全国包邮（满 5 件）', chargeMode: 'quantity' }] },
+    },
+  ],
+});
+
+export const shippingTemplateDetailRoute = defineRoute({
+  id: 'shipping.templateDetail',
+  method: 'GET',
+  path: '/admin-api/shipping/templates/:id',
+  auth: 'admin',
+  permission: 'shipping:template:read',
+  summary: '运费模板详情',
+  tags: ['shipping'],
+  params: templateParams,
+  response: shippingTemplateDetail,
+  errors: ['SHIPPING_TEMPLATE_NOT_FOUND'],
+  examples: [{ name: 'ok', params: { id: '1' }, response: shippingTemplateDetailExample }],
+});
+
+export const shippingTemplateCreate = defineRoute({
+  id: 'shipping.templateCreate',
+  method: 'POST',
+  path: '/admin-api/shipping/templates',
+  auth: 'admin',
+  permission: 'shipping:template:write',
+  summary: '新建运费模板',
+  tags: ['shipping'],
+  body: shippingTemplateForm,
+  response: shippingTemplateDetail,
+  status: 201,
+  errors: ['SHIPPING_CITY_UNKNOWN', 'SHIPPING_REGION_OVERLAP'],
+  examples: [
+    {
+      name: 'by-piece',
+      body: {
+        name: '全国包邮（满 5 件）',
+        chargeMode: 'quantity',
+        hasFreeRules: true,
+        hasNoDeliveryRules: true,
+        sortOrder: 10,
+        regions: [
+          {
+            isFallback: true,
+            cityIds: [],
+            firstUnit: 1,
+            firstPrice: '10.00',
+            additionalUnit: 1,
+            additionalPrice: '5.00',
+          },
+          {
+            isFallback: false,
+            cityIds: ['110100', '310100'],
+            firstUnit: 2,
+            firstPrice: '6.00',
+            additionalUnit: 1,
+            additionalPrice: '2.00',
+          },
+        ],
+        freeRules: [{ cityIds: ['110100'], minUnits: 5, minAmount: '199.00' }],
+        noDeliveryCityIds: ['820000'],
+      },
+      response: shippingTemplateDetailExample,
+    },
+    {
+      name: 'by-weight-minimal',
+      body: {
+        name: '按重量计费',
+        chargeMode: 'weight',
+        regions: [
+          {
+            isFallback: true,
+            cityIds: [],
+            firstUnit: 1,
+            firstPrice: '8.00',
+            additionalUnit: 0.5,
+            additionalPrice: '3.00',
+          },
+        ],
+      },
+      response: {
+        ...shippingTemplateDetailExample,
+        id: '2',
+        name: '按重量计费',
+        chargeMode: 'weight',
+        hasFreeRules: false,
+        hasNoDeliveryRules: false,
+        sortOrder: 0,
+        productCount: 0,
+        regions: [
+          {
+            isFallback: true,
+            cityIds: [],
+            firstUnit: 1,
+            firstPrice: '8.00',
+            additionalUnit: 0.5,
+            additionalPrice: '3.00',
+          },
+        ],
+        freeRules: [],
+        noDeliveryCityIds: [],
+      },
+    },
+  ],
+});
+
+export const shippingTemplateUpdate = defineRoute({
+  id: 'shipping.templateUpdate',
+  method: 'PUT',
+  path: '/admin-api/shipping/templates/:id',
+  auth: 'admin',
+  permission: 'shipping:template:write',
+  summary: '编辑运费模板',
+  tags: ['shipping'],
+  params: templateParams,
+  body: shippingTemplateForm,
+  response: shippingTemplateDetail,
+  errors: ['SHIPPING_TEMPLATE_NOT_FOUND', 'SHIPPING_CITY_UNKNOWN', 'SHIPPING_REGION_OVERLAP'],
+  examples: [
+    {
+      name: 'rename',
+      params: { id: '1' },
+      body: {
+        name: '全国包邮（满 5 件）',
+        chargeMode: 'quantity',
+        hasFreeRules: true,
+        hasNoDeliveryRules: true,
+        sortOrder: 10,
+        regions: shippingTemplateDetailExample.regions,
+        freeRules: shippingTemplateDetailExample.freeRules,
+        noDeliveryCityIds: shippingTemplateDetailExample.noDeliveryCityIds,
+      },
+      response: shippingTemplateDetailExample,
+    },
+  ],
+});
+
+/**
+ * Deleting is a soft delete, and it is refused while a product still points at
+ * the template: the alternative is silently moving those products onto "no
+ * template", which quotes zero freight and nobody notices until the month's
+ * postage bill.
+ */
+export const shippingTemplateDelete = defineRoute({
+  id: 'shipping.templateDelete',
+  method: 'DELETE',
+  path: '/admin-api/shipping/templates/:id',
+  auth: 'admin',
+  permission: 'shipping:template:delete',
+  summary: '删除运费模板',
+  tags: ['shipping'],
+  params: templateParams,
+  response: z.object({ deleted: z.literal(true) }),
+  errors: ['SHIPPING_TEMPLATE_NOT_FOUND', 'SHIPPING_TEMPLATE_IN_USE'],
+  examples: [{ name: 'ok', params: { id: '9' }, response: { deleted: true } }],
+});
