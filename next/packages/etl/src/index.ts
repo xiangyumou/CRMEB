@@ -9,6 +9,7 @@
 export * as catalog from './mappers/catalog';
 export * as coupon from './mappers/coupon';
 export * as diy from './mappers/diy';
+export * as groupbuy from './mappers/groupbuy';
 export * as notification from './mappers/notification';
 export * as storage from './mappers/storage';
 export * as system from './mappers/system';

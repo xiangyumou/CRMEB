@@ -1,7 +1,26 @@
-# Stream D — Group buy and presale
+# Stream D — Group buy
 
 Branch `rewrite/ws-d-marketing`, worktree `../CRMEB-wt/ws-d`.
-Domains `groupbuy` and `presale`. Nothing pushed.
+Domain `groupbuy`. Nothing pushed.
+
+## Scope change: presale is stream D2
+
+The orchestrator split `presale` out into stream D2 (branch
+`rewrite/ws-d2-presale`, cut from commit `8cd2936d`). From that point this
+stream owns **`groupbuy` only** — core, routes, admin pages, jobs, the ETL
+mapper, the invariants rows and this file.
+
+**There is no presale work to hand over.** Nothing under `core/src/presale`,
+`app/**/presale-*`, `app/admin/(shell)/presale`, or a `presale.*` worker job was
+ever written on this branch; the last presale commit is the contract one, which
+was merged into `rewrite/integration` before the split, so D2 has everything it
+needs from `origin/rewrite/integration` and needs to cherry-pick nothing from
+here.
+
+What is left below that still says "presale" is history: the contract tables,
+the decisions that were taken while both domains were one stream, and the
+invariants rows whose presale halves are now D2's. They are kept because D2's
+brief points at them.
 
 ## Contracts ready
 
@@ -144,6 +163,43 @@ Recorded rather than asked, per the brief.
    (`StorePinkServices::pinkComplete`). Here `onOrderPaid` and the expiry job
    only ever call `recordEffect`.
 
+### Decisions taken while building (the races found two of them)
+
+9. **The quota ceiling is enforced where `sales` moves, not at checkout.**
+   `total_quota` is a lifetime ceiling on units _sold_, and `sales` only moves on
+   payment. Checking it at reservation time let N unpaid orders through a quota
+   of 1: six simultaneous checkouts against a quota of 2 all passed, and all six
+   later paid. The check now lives inside `commitActivitySales`, the one
+   statement that increments `sales`; a payment that loses it gives its seat back
+   and takes the existing refund path with reason `quota_reached`. Stock is still
+   taken at reservation. (Found by
+   `the activity ledgers > never oversell the quota either`.)
+10. **One lock order everywhere: the team row first, the membership under it.**
+    Two members refunding at once deadlocked — one path held the group row and
+    wanted the membership, the other the reverse. `handleCancelled` and
+    `handleRefunded` now lock the team row first and re-read the membership under
+    it. `settleDeparture` takes the seat count read _before_ the seat was freed,
+    so a team emptied by a refund settles as `failed` rather than `cancelled`.
+    (Found by `leadership > survives two members refunding at once`.)
+11. **The expiry clock is a delayed effect, not a delayed BullMQ job.** A job
+    enqueued inside B1's order transaction is a message that survives a rollback
+    and a timer that vanishes on a Redis flush. `afterCreate` records a
+    `groupbuy.expire` effect with `delayMs = groupTtlSeconds * 1000`; it commits
+    with the order or not at all. `groupbuy.sweepExpiredGroups` stays as the
+    backstop for a parked effect or a stopped runner, and is safe to run twice.
+12. **A member who refunds keeps their row, marked `refunded`.** Legacy deleted
+    the participation row, which is why a failed team's history was
+    unrecoverable and 团长 could appear to be somebody else. Leadership is
+    recomputed to the earliest remaining paid member.
+13. **The admin edit form reads the activity before it writes it back.** The
+    list row does not carry the per-SKU rows, and a form seeded from it would
+    send `skus: []` and wipe every group price. `EditActivityModal` mounts only
+    once `groupbuy.adminActivityDetail` has answered.
+14. **拼团有效时长 is typed in seconds in the admin form.** `ZodForm` runs the
+    contract's own schema in the browser, so an hours field would fail
+    `min(60)` before anything could multiply it. The help text carries the
+    arithmetic (`86400 = 24 小时`).
+
 ## Change requests filed
 
 | CR     | About                                                                                       | Status |
@@ -156,12 +212,35 @@ Recorded rather than asked, per the brief.
 
 **None.** `next/pnpm-lock.yaml` is untouched.
 
+## Files outside this stream's ownership
+
+Two files the orchestrator should look at when merging, both one line each:
+
+| File                                        | Change                                                                    |
+| ------------------------------------------- | ------------------------------------------------------------------------- |
+| `packages/core/src/system/config-groups.ts` | imports the `groupbuy` config group so `pnpm gen` and 系统设置 can see it |
+| `packages/etl/src/index.ts`                 | `export * as groupbuy from './mappers/groupbuy';`                         |
+
+Both are aggregation points several streams touch; the conflicts are trivial.
+
 ## Progress
 
 - [x] Contracts (26 routes), `check:examples` green
-- [ ] Core domains, repos, services, ports
-- [ ] Route files
-- [ ] Jobs
-- [ ] Admin pages and menu
-- [ ] ETL mappers
-- [ ] Invariants rows
+- [x] Core domain: repo, rules, service, order seams, effects, config, permissions
+- [x] Integration tests on real PostgreSQL (`groupbuy.int.test.ts`)
+- [x] Concurrency tests, one per conditional state change
+      (`groupbuy.concurrency.int.test.ts`) — the last seat, the two activity
+      ledgers and their rollback, pay-vs-expiry, leader-refund-vs-join, one
+      shopper two clicks
+- [x] Route files (11 admin + 8 storefront) and the HTTP slice test
+- [x] Jobs: `groupbuy.sweepExpiredGroups` (backstop; the per-team clock is an
+      effect)
+- [x] Admin pages and menu: 拼团活动 / 拼团列表 / 拼团统计, `groupbuy.menu.ts`,
+      component tests for the first two
+- [x] ETL mapper `eb_store_combination` → activities + activity SKUs, with tests
+      (`eb_store_pink` deliberately not migrated)
+- [x] Invariants rows: STOCK-004 and REFUND-003 group-buy halves, and a new
+      「Group buys (risk matrix §5)」 section, RISK-D-001 … RISK-D-008
+- [ ] Presale — **not this stream's any more**; stream D2 owns it, including the
+      presale halves of STOCK-004, QUEUE-008, REFUND-002, REFUND-003 and
+      SMOKE-011

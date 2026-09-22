@@ -316,6 +316,7 @@ export const groupbuyCard = z.object({
 export type GroupbuyCard = z.infer<typeof groupbuyCard>;
 
 export const groupbuyListQuery = pageQuery;
+export type GroupbuyListQuery = z.infer<typeof groupbuyListQuery>;
 export const pagedGroupbuyCards = paged(groupbuyCard);
 
 /** The SKU picker on the activity page. */

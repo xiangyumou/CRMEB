@@ -1,0 +1,927 @@
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { products, productSkus } from '@shop/db/schema/catalog';
+import { effects } from '@shop/db/schema/system';
+import {
+  groupbuyActivities,
+  groupbuyActivitySkus,
+  groupbuyGroups,
+  groupbuyMembers,
+} from '@shop/db/schema/groupbuy';
+import { orderItems, orders } from '@shop/db/schema/order';
+import { users } from '@shop/db/schema/user';
+import { createTestCtx, type TestCtx } from '@shop/testing';
+import type { Actor, Ctx } from '../kernel/context';
+import { DomainError } from '../kernel/errors';
+import { Money } from '../kernel/money';
+import { withTx } from '../kernel/tx';
+import { onOrderCancelled, onOrderPaid, onOrderRefunded, resetOrderPorts } from '../order/ports';
+import { groupbuyConfig } from './groupbuy.config';
+import { clearAutoRefundPort, registerAutoRefundPort } from './groupbuy.effects';
+import { settleExpiredGroups, settleGroup } from './groupbuy.jobs';
+import { groupbuyKindHandler } from './groupbuy.order';
+import * as repo from './groupbuy.repo';
+import * as service from './groupbuy.service';
+import { registerGroupbuyDomain } from './index';
+
+/**
+ * The group-buy domain against a real PostgreSQL 17.
+ *
+ * Everything that matters here is a row count or a CHECK constraint, so none of
+ * it can be proved with a fake. The races live next door in
+ * `groupbuy.concurrency.int.test.ts`; this file proves the *shapes*: what a
+ * paid order does to a team, what a cancel and a refund put back, and that a
+ * failed team never loses a shopper's money silently.
+ *
+ * Orders are written directly rather than through B1's checkout. This stream
+ * attaches to the order aggregate through `order/ports.ts`, and driving the
+ * whole checkout here would be testing B1.
+ */
+
+let harness: TestCtx;
+
+const NOW = '2026-06-01T00:00:00.000Z';
+
+beforeAll(async () => {
+  harness = await createTestCtx({ now: NOW });
+}, 180_000);
+
+afterAll(async () => {
+  await harness?.close();
+});
+
+beforeEach(async () => {
+  await harness.db.truncateAll();
+  // `truncateAll` empties the settings table but not the config cache, and a
+  // test that switches 虚拟成团 on would otherwise leak it into the next one.
+  await harness.ctx.config.invalidate(groupbuyConfig.group);
+  harness.clock.set(NOW);
+  resetOrderPorts();
+  clearAutoRefundPort();
+  registerGroupbuyDomain();
+});
+
+afterEach(() => {
+  resetOrderPorts();
+  clearAutoRefundPort();
+});
+
+// ---------------------------------------------------------------------------
+// fixtures
+// ---------------------------------------------------------------------------
+
+const userActor = (id: number): Actor => ({ kind: 'user', id, permissions: [], isSuper: false });
+const asUser = (id: number): Ctx => harness.as(userActor(id));
+const asAdmin = (permissions: string[]): Ctx =>
+  harness.as({ kind: 'admin', id: 1, permissions, isSuper: false });
+
+let sequence = 0;
+
+async function makeUser(nickname?: string): Promise<number> {
+  sequence += 1;
+  const [row] = await harness.ctx.db
+    .insert(users)
+    .values({
+      account: `gb-u-${sequence}`,
+      nickname: nickname ?? `顾客${sequence}`,
+      avatarUrl: `https://example.test/u/${sequence}.png`,
+    })
+    .returning({ id: users.id });
+  return row!.id;
+}
+
+interface ActivityFixture {
+  activityId: number;
+  productId: number;
+  skuId: number;
+  seatsRequired: number;
+  ttlSeconds: number;
+}
+
+async function makeActivity(
+  over: {
+    seatsRequired?: number;
+    ttlSeconds?: number;
+    stock?: number;
+    totalQuota?: number | null;
+    perOrderQuantity?: number;
+    price?: string;
+    status?: 'draft' | 'active' | 'paused' | 'ended';
+    endAt?: Date;
+  } = {},
+): Promise<ActivityFixture> {
+  sequence += 1;
+  const stock = over.stock ?? 100;
+  const price = over.price ?? '59.00';
+
+  const [product] = await harness.ctx.db
+    .insert(products)
+    .values({
+      name: `坚果礼盒${sequence}`,
+      imageUrl: 'https://example.test/p.png',
+      // `products_freight_source` insists a `template` product names a template.
+      freightMode: 'free',
+      price: '88.00',
+      stock: 1_000,
+    })
+    .returning({ id: products.id });
+  const [sku] = await harness.ctx.db
+    .insert(productSkus)
+    .values({
+      productId: product!.id,
+      skuCode: `SKU-${sequence}`,
+      specText: '混合装|1000g',
+      specValues: { 规格: '混合装' },
+      price: '88.00',
+      originalPrice: '108.00',
+      stock: 1_000,
+    })
+    .returning({ id: productSkus.id });
+
+  const seatsRequired = over.seatsRequired ?? 3;
+  const ttlSeconds = over.ttlSeconds ?? 86_400;
+  const [activity] = await harness.ctx.db
+    .insert(groupbuyActivities)
+    .values({
+      productId: product!.id,
+      title: `${seatsRequired}人成团${sequence}`,
+      imageUrl: 'https://example.test/p.png',
+      status: over.status ?? 'active',
+      price,
+      originalPrice: '88.00',
+      seatsRequired,
+      groupTtlSeconds: ttlSeconds,
+      stock,
+      totalQuota: over.totalQuota === undefined ? null : over.totalQuota,
+      perOrderQuantity: over.perOrderQuantity ?? 2,
+      startAt: new Date('2026-05-01T00:00:00.000Z'),
+      endAt: over.endAt ?? new Date('2026-07-01T00:00:00.000Z'),
+    })
+    .returning({ id: groupbuyActivities.id });
+
+  await harness.ctx.db.insert(groupbuyActivitySkus).values({
+    activityId: activity!.id,
+    skuId: sku!.id,
+    price,
+    stock,
+    quota: over.totalQuota === undefined ? null : over.totalQuota,
+    isEnabled: true,
+  });
+
+  return {
+    activityId: activity!.id,
+    productId: product!.id,
+    skuId: sku!.id,
+    seatsRequired,
+    ttlSeconds,
+  };
+}
+
+async function makeOrder(args: {
+  userId: number;
+  fixture: ActivityFixture;
+  quantity?: number;
+  amount?: string;
+}): Promise<{ orderId: number; orderNo: string }> {
+  sequence += 1;
+  const quantity = args.quantity ?? 1;
+  const amount = args.amount ?? '59.00';
+  const orderNo = `GB${String(sequence).padStart(10, '0')}`;
+  const [order] = await harness.ctx.db
+    .insert(orders)
+    .values({
+      orderNo,
+      userId: args.userId,
+      platform: 'h5',
+      kind: 'groupbuy',
+      status: 'pending_payment',
+      totalQuantity: quantity,
+      itemsAmount: amount,
+      payableAmount: amount,
+      receiverName: '张三',
+      receiverPhone: '13800000000',
+      receiverProvince: '广东省',
+      receiverCity: '深圳市',
+      receiverDetail: '某路 1 号',
+    })
+    .returning({ id: orders.id });
+  await harness.ctx.db.insert(orderItems).values({
+    orderId: order!.id,
+    productId: args.fixture.productId,
+    skuId: args.fixture.skuId,
+    itemKey: `line-${sequence}`,
+    quantity,
+    unitPrice: amount,
+    totalAmount: amount,
+    snapshot: { name: '坚果礼盒' } as never,
+  });
+  return { orderId: order!.id, orderNo };
+}
+
+/**
+ * The whole "place a group-buy order" path as B1 would drive it: the kind
+ * handler's two halves inside one transaction.
+ */
+async function placeOrder(args: {
+  userId: number;
+  fixture: ActivityFixture;
+  groupId?: number;
+  quantity?: number;
+  amount?: string;
+}): Promise<{ orderId: number; groupId: number }> {
+  const order = await makeOrder(args);
+  const ctx = asUser(args.userId);
+  await withTx(harness.ctx.db, async (tx) => {
+    const meta = await groupbuyKindHandler.beforeCreate(ctx, tx, {
+      userId: args.userId,
+      lines: [
+        {
+          skuId: args.fixture.skuId,
+          productId: args.fixture.productId,
+          quantity: args.quantity ?? 1,
+          unitPrice: Money.parse(args.amount ?? '59.00'),
+          subtotal: Money.parse(args.amount ?? '59.00'),
+        },
+      ],
+      goodsTotal: Money.parse(args.amount ?? '59.00'),
+      selections: {
+        kind: 'groupbuy',
+        activityId: String(args.fixture.activityId),
+        ...(args.groupId ? { groupId: String(args.groupId) } : {}),
+      },
+    });
+    await groupbuyKindHandler.afterCreate(ctx, tx, order.orderId, meta);
+  });
+  const member = await repo.findMemberByOrder(harness.ctx.db, order.orderId);
+  return { orderId: order.orderId, groupId: member!.groupId };
+}
+
+/** Marks the order paid and fires the hook, the way stream C's callback does. */
+async function pay(orderId: number): Promise<void> {
+  const at = harness.clock.now();
+  await withTx(harness.ctx.db, async (tx) => {
+    await tx
+      .update(orders)
+      .set({ status: 'paid', paidAt: at, paidAmount: '59.00' })
+      .where(eq(orders.id, orderId));
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId));
+    await onOrderPaid.dispatch(tx, harness.ctx, {
+      orderId,
+      orderNo: order!.orderNo,
+      userId: order!.userId,
+      at,
+      paidAmount: Money.parse('59.00'),
+    });
+  });
+}
+
+async function cancel(orderId: number): Promise<void> {
+  const at = harness.clock.now();
+  await withTx(harness.ctx.db, async (tx) => {
+    // `orders_cancelled_shape` insists the two move together.
+    await tx
+      .update(orders)
+      .set({ status: 'cancelled', cancelledAt: at })
+      .where(eq(orders.id, orderId));
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId));
+    await onOrderCancelled.dispatch(tx, harness.ctx, {
+      orderId,
+      orderNo: order!.orderNo,
+      userId: order!.userId,
+      at,
+      reason: 'timeout',
+    });
+  });
+}
+
+async function refund(orderId: number, partial = false): Promise<void> {
+  const at = harness.clock.now();
+  await withTx(harness.ctx.db, async (tx) => {
+    if (!partial) await tx.update(orders).set({ status: 'refunded' }).where(eq(orders.id, orderId));
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId));
+    await onOrderRefunded.dispatch(tx, harness.ctx, {
+      orderId,
+      orderNo: order!.orderNo,
+      userId: order!.userId,
+      at,
+      refundId: 1,
+      refundedAmount: Money.parse('59.00'),
+      partial,
+    });
+  });
+}
+
+async function readGroup(groupId: number) {
+  const [row] = await harness.ctx.db
+    .select()
+    .from(groupbuyGroups)
+    .where(eq(groupbuyGroups.id, groupId));
+  return row!;
+}
+
+async function readActivityCounters(fixture: ActivityFixture) {
+  const [activity] = await harness.ctx.db
+    .select({ stock: groupbuyActivities.stock, sales: groupbuyActivities.sales })
+    .from(groupbuyActivities)
+    .where(eq(groupbuyActivities.id, fixture.activityId));
+  const [sku] = await harness.ctx.db
+    .select({ stock: groupbuyActivitySkus.stock, sales: groupbuyActivitySkus.sales })
+    .from(groupbuyActivitySkus)
+    .where(eq(groupbuyActivitySkus.activityId, fixture.activityId));
+  return { activity: activity!, sku: sku! };
+}
+
+async function effectsFor(orderId: number, eventType: string) {
+  return harness.ctx.db
+    .select()
+    .from(effects)
+    .where(eq(effects.scopeId, String(orderId)))
+    .then((rows) => rows.filter((row) => row.eventType === eventType));
+}
+
+// ---------------------------------------------------------------------------
+
+describe('beforeCreate', () => {
+  it('refuses an order the pricing contributor did not reprice (CR-1-d)', async () => {
+    const fixture = await makeActivity();
+    const userId = await makeUser();
+    // 88.00 is the catalogue price — what B1 produces today, because
+    // `buildDraft` never passes `kindMeta` into the pricing selections.
+    await expect(placeOrder({ userId, fixture, amount: '88.00' })).rejects.toMatchObject({
+      code: 'GROUPBUY_PRICE_NOT_APPLIED',
+    });
+  });
+
+  it('refuses a closed activity, an over-large quantity and a foreign SKU', async () => {
+    const paused = await makeActivity({ status: 'paused' });
+    const userId = await makeUser();
+    await expect(placeOrder({ userId, fixture: paused })).rejects.toMatchObject({
+      code: 'GROUPBUY_ACTIVITY_NOT_OPEN',
+    });
+
+    const capped = await makeActivity({ perOrderQuantity: 1 });
+    await expect(
+      placeOrder({ userId, fixture: capped, quantity: 2, amount: '118.00' }),
+    ).rejects.toMatchObject({ code: 'GROUPBUY_QUANTITY_NOT_ALLOWED' });
+
+    const other = await makeActivity();
+    await expect(
+      placeOrder({ userId, fixture: { ...capped, skuId: other.skuId } }),
+    ).rejects.toMatchObject({ code: 'GROUPBUY_SKU_NOT_IN_ACTIVITY' });
+  });
+
+  it('refuses joining a team the shopper is already in', async () => {
+    const fixture = await makeActivity();
+    const leader = await makeUser();
+    const { groupId } = await placeOrder({ userId: leader, fixture });
+    await expect(placeOrder({ userId: leader, fixture, groupId })).rejects.toMatchObject({
+      code: 'GROUPBUY_ALREADY_IN_GROUP',
+    });
+  });
+});
+
+describe('placing an order', () => {
+  it('opens a team with no seat taken and holds the activity stock', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser('小明');
+    const { groupId } = await placeOrder({ userId: leader, fixture });
+
+    const group = await readGroup(groupId);
+    expect(group.status).toBe('forming');
+    // The seat waits for the money. A `forming` team with `seats_taken: 0` is
+    // a team whose leader has not paid yet.
+    expect(group.seatsTaken).toBe(0);
+    expect(group.leaderUserId).toBe(leader);
+    expect(group.expiresAt.toISOString()).toBe('2026-06-02T00:00:00.000Z');
+
+    const counters = await readActivityCounters(fixture);
+    expect(counters.activity).toEqual({ stock: 9, sales: 0 });
+    expect(counters.sku).toEqual({ stock: 9, sales: 0 });
+
+    // Identity is frozen onto the row, so a later rename cannot rewrite the card.
+    const member = await repo.findMemberByOrder(
+      harness.ctx.db,
+      (await allMembers(groupId))[0]!.orderId,
+    );
+    expect(member).toMatchObject({ role: 'leader', status: 'joined', nickname: '小明' });
+  });
+
+  it('starts the team clock in the same transaction, as a delayed effect', async () => {
+    const fixture = await makeActivity({ stock: 10, ttlSeconds: 3_600 });
+    const leader = await makeUser();
+    const { groupId } = await placeOrder({ userId: leader, fixture });
+
+    // A queue is not transactional; the effects ledger is. The timer therefore
+    // exists exactly when the team does, and never without it.
+    const [timer] = await harness.ctx.db
+      .select()
+      .from(effects)
+      .where(eq(effects.scopeId, String(groupId)));
+    expect(timer).toMatchObject({ scope: 'groupbuy', eventType: 'groupbuy.expire' });
+    expect(timer!.nextRunAt.toISOString()).toBe('2026-06-01T01:00:00.000Z');
+
+    // And when it fires, the team settles exactly as the sweep would.
+    harness.clock.set('2026-06-01T02:00:00.000Z');
+    const handler = await import('../effects/index').then((m) =>
+      m.getEffectHandler('groupbuy', 'groupbuy.expire'),
+    );
+    await handler!(harness.ctx, {
+      id: timer!.id,
+      scope: timer!.scope,
+      scopeId: timer!.scopeId,
+      eventType: timer!.eventType,
+      payload: timer!.payload,
+      attempts: 1,
+    });
+    expect(await readGroup(groupId)).toMatchObject({ status: 'cancelled' });
+  });
+
+  it('refuses when the activity is out of its own stock, even though the SKU is not', async () => {
+    const fixture = await makeActivity({ stock: 1 });
+    const first = await makeUser();
+    const second = await makeUser();
+    await placeOrder({ userId: first, fixture });
+    await expect(placeOrder({ userId: second, fixture })).rejects.toMatchObject({
+      code: 'GROUPBUY_OUT_OF_STOCK',
+    });
+  });
+
+  it('enforces the campaign quota in the same statement as the stock', async () => {
+    // STOCK-004: legacy checked `total_quota` with a separate SELECT.
+    const fixture = await makeActivity({ stock: 10, totalQuota: 1 });
+    const first = await makeUser();
+    const second = await makeUser();
+    const opened = await placeOrder({ userId: first, fixture });
+    await pay(opened.orderId);
+    await expect(placeOrder({ userId: second, fixture })).rejects.toMatchObject({
+      code: 'GROUPBUY_OUT_OF_STOCK',
+    });
+  });
+});
+
+describe('paying', () => {
+  it('takes the seat and turns the reservation into a sale', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser();
+    const { orderId, groupId } = await placeOrder({ userId: leader, fixture });
+    await pay(orderId);
+
+    expect(await readGroup(groupId)).toMatchObject({ seatsTaken: 1, status: 'forming' });
+    const counters = await readActivityCounters(fixture);
+    expect(counters.activity).toEqual({ stock: 9, sales: 1 });
+    expect(counters.sku).toEqual({ stock: 9, sales: 1 });
+    expect(await effectsFor(orderId, 'groupbuy.join')).toHaveLength(1);
+  });
+
+  it('completes the team in the same transaction as the last seat', async () => {
+    const fixture = await makeActivity({ seatsRequired: 2, stock: 10 });
+    const leader = await makeUser();
+    const joiner = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    const joined = await placeOrder({ userId: joiner, fixture, groupId: opened.groupId });
+    await pay(joined.orderId);
+
+    const group = await readGroup(opened.groupId);
+    expect(group).toMatchObject({ status: 'succeeded', seatsTaken: 2 });
+    expect(group.succeededAt).not.toBeNull();
+  });
+});
+
+describe('cancelling an unpaid order', () => {
+  it('gives the activity stock back and leaves no seat behind', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser();
+    const { orderId, groupId } = await placeOrder({ userId: leader, fixture });
+    await cancel(orderId);
+
+    expect(await readActivityCounters(fixture)).toEqual({
+      activity: { stock: 10, sales: 0 },
+      sku: { stock: 10, sales: 0 },
+    });
+    // Nobody ever paid into it, so the team is cancelled rather than failed.
+    expect(await readGroup(groupId)).toMatchObject({ status: 'cancelled', seatsTaken: 0 });
+    const members = await allMembers(groupId);
+    expect(members[0]).toMatchObject({ status: 'cancelled' });
+    expect(members[0]!.leftAt).not.toBeNull();
+  });
+
+  it('hands the team to the next member when the leader walks away', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser();
+    const joiner = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    const joined = await placeOrder({ userId: joiner, fixture, groupId: opened.groupId });
+
+    await cancel(opened.orderId);
+
+    expect(await readGroup(opened.groupId)).toMatchObject({
+      status: 'forming',
+      leaderUserId: joiner,
+    });
+    const members = await allMembers(opened.groupId);
+    expect(members.find((m) => m.orderId === joined.orderId)).toMatchObject({
+      role: 'leader',
+      status: 'joined',
+    });
+    // The outgoing row keeps saying who opened the team — that is the truth,
+    // and `groupbuy_members_leader_uq` is partial on `status = 'joined'`, so it
+    // does not block the heir.
+    expect(members.find((m) => m.orderId === opened.orderId)).toMatchObject({
+      role: 'leader',
+      status: 'cancelled',
+    });
+  });
+});
+
+describe('refunding a paid order', () => {
+  it('returns every activity ledger to where it started', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser();
+    const { orderId, groupId } = await placeOrder({ userId: leader, fixture });
+    await pay(orderId);
+    expect(await readActivityCounters(fixture)).toEqual({
+      activity: { stock: 9, sales: 1 },
+      sku: { stock: 9, sales: 1 },
+    });
+
+    await refund(orderId);
+
+    expect(await readActivityCounters(fixture)).toEqual({
+      activity: { stock: 10, sales: 0 },
+      sku: { stock: 10, sales: 0 },
+    });
+    // Everybody left a team that had held a seat: failed, not cancelled.
+    expect(await readGroup(groupId)).toMatchObject({ status: 'failed', seatsTaken: 0 });
+  });
+
+  it('ignores a partial refund — the shopper is still in the team', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser();
+    const { orderId, groupId } = await placeOrder({ userId: leader, fixture });
+    await pay(orderId);
+    await refund(orderId, true);
+
+    expect(await readGroup(groupId)).toMatchObject({ status: 'forming', seatsTaken: 1 });
+    expect((await allMembers(groupId))[0]).toMatchObject({ status: 'joined' });
+  });
+
+  it('keeps a succeeded team full when a member refunds afterwards', async () => {
+    const fixture = await makeActivity({ seatsRequired: 2, stock: 10 });
+    const leader = await makeUser();
+    const joiner = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    const joined = await placeOrder({ userId: joiner, fixture, groupId: opened.groupId });
+    await pay(joined.orderId);
+
+    await refund(joined.orderId);
+
+    // `groupbuy_groups_succeeded_is_full` says a completed group is exactly
+    // full, and it is true: the team did complete. Freeing the seat would abort
+    // the whole transaction on a CHECK violation.
+    expect(await readGroup(opened.groupId)).toMatchObject({
+      status: 'succeeded',
+      seatsTaken: 2,
+    });
+    expect(await readActivityCounters(fixture)).toEqual({
+      activity: { stock: 9, sales: 1 },
+      sku: { stock: 9, sales: 1 },
+    });
+  });
+
+  it('promotes the earliest remaining paid member when the leader refunds', async () => {
+    const fixture = await makeActivity({ seatsRequired: 3, stock: 10 });
+    const leader = await makeUser();
+    const paidMember = await makeUser();
+    const unpaidMember = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    const second = await placeOrder({ userId: paidMember, fixture, groupId: opened.groupId });
+    await pay(second.orderId);
+    // Joins but never pays: not a candidate for leadership.
+    await placeOrder({ userId: unpaidMember, fixture, groupId: opened.groupId });
+
+    await refund(opened.orderId);
+
+    expect(await readGroup(opened.groupId)).toMatchObject({
+      status: 'forming',
+      seatsTaken: 1,
+      leaderUserId: paidMember,
+    });
+  });
+});
+
+describe('the expiry sweep', () => {
+  it('fails an under-filled team and asks for one refund per paid member', async () => {
+    const fixture = await makeActivity({ seatsRequired: 3, ttlSeconds: 3_600, stock: 10 });
+    const leader = await makeUser();
+    const joiner = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    const joined = await placeOrder({ userId: joiner, fixture, groupId: opened.groupId });
+    await pay(joined.orderId);
+
+    harness.clock.set('2026-06-01T02:00:00.000Z');
+    const report = await settleExpiredGroups(harness.ctx);
+
+    expect(report).toMatchObject({ scanned: 1, failed: 1, refunds: 2 });
+    expect(await readGroup(opened.groupId)).toMatchObject({ status: 'failed', seatsTaken: 2 });
+    expect(await effectsFor(opened.orderId, 'groupbuy.refund')).toHaveLength(1);
+    expect(await effectsFor(joined.orderId, 'groupbuy.refund')).toHaveLength(1);
+    // The members stay `joined` and the stock stays committed: the ledgers move
+    // back when the refund actually lands, through `onOrderRefunded`. Marking
+    // them refunded here would claim money had moved when it had not.
+    expect(await readActivityCounters(fixture)).toEqual({
+      activity: { stock: 8, sales: 2 },
+      sku: { stock: 8, sales: 2 },
+    });
+  });
+
+  it('is idempotent — a second sweep records no second refund', async () => {
+    const fixture = await makeActivity({ seatsRequired: 3, ttlSeconds: 3_600, stock: 10 });
+    const leader = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+
+    harness.clock.set('2026-06-01T02:00:00.000Z');
+    await settleExpiredGroups(harness.ctx);
+    const second = await settleExpiredGroups(harness.ctx);
+
+    expect(second.scanned).toBe(0);
+    expect(await effectsFor(opened.orderId, 'groupbuy.refund')).toHaveLength(1);
+  });
+
+  it('fills the team virtually when the shop has said it may', async () => {
+    const fixture = await makeActivity({ seatsRequired: 3, ttlSeconds: 3_600, stock: 10 });
+    const leader = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    await setVirtualFill(true);
+
+    harness.clock.set('2026-06-01T02:00:00.000Z');
+    const report = await settleExpiredGroups(harness.ctx);
+
+    expect(report).toMatchObject({ succeeded: 1, refunds: 0 });
+    expect(await readGroup(opened.groupId)).toMatchObject({
+      status: 'succeeded',
+      seatsTaken: 3,
+    });
+    // One real buyer in a three-seat team: the admin list must say so.
+    const detail = await service.adminGroupDetail(asAdmin(['groupbuy:group:read']), {
+      id: String(opened.groupId),
+    });
+    expect(detail.virtuallyFilled).toBe(true);
+  });
+
+  it('cancels a team nobody ever paid into', async () => {
+    const fixture = await makeActivity({ ttlSeconds: 3_600 });
+    const leader = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+
+    harness.clock.set('2026-06-01T02:00:00.000Z');
+    const report = await settleExpiredGroups(harness.ctx);
+
+    expect(report).toMatchObject({ cancelled: 1, refunds: 0 });
+    expect(await readGroup(opened.groupId)).toMatchObject({ status: 'cancelled' });
+  });
+
+  it('leaves a team alone while it still has time', async () => {
+    const fixture = await makeActivity({ ttlSeconds: 86_400 });
+    const leader = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+
+    expect(await settleGroup(harness.ctx, opened.groupId)).toMatchObject({
+      outcome: 'unchanged',
+    });
+  });
+});
+
+describe('the CR-3-d auto-refund port', () => {
+  it('parks the refund effect for a human when no port is registered', async () => {
+    const fixture = await makeActivity({ ttlSeconds: 3_600 });
+    const leader = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    harness.clock.set('2026-06-01T02:00:00.000Z');
+    await settleExpiredGroups(harness.ctx);
+
+    const [row] = await effectsFor(opened.orderId, 'groupbuy.refund');
+    const handler = await import('../effects/index').then((m) =>
+      m.getEffectHandler('order', 'groupbuy.refund'),
+    );
+    await expect(
+      handler!(harness.ctx, {
+        id: row!.id,
+        scope: row!.scope,
+        scopeId: row!.scopeId,
+        eventType: row!.eventType,
+        payload: row!.payload,
+        attempts: 1,
+      }),
+    ).rejects.toBeInstanceOf(DomainError);
+  });
+
+  it('forwards to the port once stream C registers one', async () => {
+    const seen: number[] = [];
+    registerAutoRefundPort({
+      async refund(_tx, _ctx, input) {
+        seen.push(input.orderId);
+      },
+    });
+
+    const fixture = await makeActivity({ ttlSeconds: 3_600 });
+    const leader = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    harness.clock.set('2026-06-01T02:00:00.000Z');
+    await settleExpiredGroups(harness.ctx);
+
+    const [row] = await effectsFor(opened.orderId, 'groupbuy.refund');
+    const handler = await import('../effects/index').then((m) =>
+      m.getEffectHandler('order', 'groupbuy.refund'),
+    );
+    await handler!(harness.ctx, {
+      id: row!.id,
+      scope: row!.scope,
+      scopeId: row!.scopeId,
+      eventType: row!.eventType,
+      payload: row!.payload,
+      attempts: 1,
+    });
+    expect(seen).toEqual([opened.orderId]);
+  });
+});
+
+describe('the storefront surface', () => {
+  it('offers a team only once its leader has paid', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+
+    const before = await service.openGroups(
+      harness.ctx,
+      { id: String(fixture.activityId) },
+      { page: 1, pageSize: 20 },
+    );
+    expect(before.items).toHaveLength(0);
+
+    await pay(opened.orderId);
+    const after = await service.openGroups(
+      harness.ctx,
+      { id: String(fixture.activityId) },
+      { page: 1, pageSize: 20 },
+    );
+    expect(after.items).toHaveLength(1);
+    expect(after.items[0]).toMatchObject({ seatsTaken: 1, seatsLeft: 2 });
+  });
+
+  it('shows paid, unrefunded members only', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser('小明');
+    const joiner = await makeUser('小红');
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    await placeOrder({ userId: joiner, fixture, groupId: opened.groupId });
+
+    const view = await service.groupDetail(asUser(joiner), { id: String(opened.groupId) });
+    expect(view.members.map((m) => m.nickname)).toEqual(['小明']);
+    expect(view.me).toMatchObject({ role: 'member', status: 'joined', paid: false });
+    expect(view.canJoin).toBe(false);
+  });
+
+  it('lets a leader withdraw a team nobody paid into, and not one they did', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+
+    const view = await service.withdraw(asUser(leader), { id: String(opened.groupId) });
+    expect(view.status).toBe('cancelled');
+
+    const other = await makeActivity({ stock: 10 });
+    const second = await placeOrder({ userId: leader, fixture: other });
+    await pay(second.orderId);
+    await expect(
+      service.withdraw(asUser(leader), { id: String(second.groupId) }),
+    ).rejects.toMatchObject({ code: 'GROUPBUY_GROUP_NOT_WITHDRAWABLE' });
+  });
+
+  it('answers the poster with data and a payload, never an image', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser('小明');
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+
+    const poster = await service.poster(asUser(leader), { id: String(opened.groupId) });
+    expect(poster.qrPayload).toContain(String(opened.groupId));
+    expect(poster.seatsLeft).toBe(2);
+    expect(poster.leaderNickname).toBe('小明');
+  });
+});
+
+describe('the admin surface', () => {
+  it('refuses to delete an activity with a team still forming', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser();
+    await placeOrder({ userId: leader, fixture });
+
+    await expect(
+      service.adminActivityDelete(asAdmin(['groupbuy:activity:delete']), {
+        id: String(fixture.activityId),
+      }),
+    ).rejects.toMatchObject({ code: 'GROUPBUY_ACTIVITY_IN_USE' });
+  });
+
+  it('refuses 立即成团 while the shop has 虚拟成团 switched off', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+
+    const admin = asAdmin(['groupbuy:group:read', 'groupbuy:group:complete']);
+    await expect(
+      service.adminGroupComplete(admin, { id: String(opened.groupId) }, {}),
+    ).rejects.toMatchObject({ code: 'GROUPBUY_VIRTUAL_FILL_DISABLED' });
+
+    await setVirtualFill(true);
+    const detail = await service.adminGroupComplete(admin, { id: String(opened.groupId) }, {});
+    expect(detail).toMatchObject({ status: 'succeeded', seatsTaken: 3, virtuallyFilled: true });
+  });
+
+  it('keeps the sales counter across an edit', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+
+    const admin = asAdmin(['groupbuy:activity:read', 'groupbuy:activity:write']);
+    const before = await service.adminActivityDetail(admin, { id: String(fixture.activityId) });
+    const edited = await service.adminActivityUpdate(
+      admin,
+      { id: String(fixture.activityId) },
+      {
+        productId: String(fixture.productId),
+        title: '改过名字的活动',
+        sliderImages: [],
+        status: 'active',
+        price: '59.00',
+        seatsRequired: before.seatsRequired,
+        groupTtlSeconds: before.groupTtlSeconds,
+        stock: 50,
+        perOrderQuantity: 2,
+        startAt: before.startAt,
+        endAt: before.endAt,
+        sortOrder: 0,
+        skus: [{ skuId: String(fixture.skuId), price: '59.00', stock: 50, isEnabled: true }],
+      },
+    );
+
+    // Legacy's `saveCombination` reset the counters on every edit.
+    expect(edited.skus[0]).toMatchObject({ stock: 50, sales: 1 });
+    expect(edited.title).toBe('改过名字的活动');
+  });
+
+  it('reports what a campaign did', async () => {
+    const fixture = await makeActivity({ seatsRequired: 2, stock: 10 });
+    const leader = await makeUser();
+    const joiner = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    const joined = await placeOrder({ userId: joiner, fixture, groupId: opened.groupId });
+    await pay(joined.orderId);
+
+    const admin = asAdmin(['groupbuy:activity:read']);
+    const stats = await service.adminStatistics(admin, { page: 1, pageSize: 20 });
+    expect(stats.items[0]).toMatchObject({
+      activityId: String(fixture.activityId),
+      groups: 1,
+      succeededGroups: 1,
+      paidMembers: 2,
+      paidAmount: '118.00',
+      refundedMembers: 0,
+    });
+
+    const list = await service.adminActivityOrders(
+      admin,
+      { id: String(fixture.activityId) },
+      { page: 1, pageSize: 20, paid: true },
+    );
+    expect(list.total).toBe(2);
+    expect(list.items.every((item) => item.paid)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+async function allMembers(groupId: number) {
+  return harness.ctx.db
+    .select()
+    .from(groupbuyMembers)
+    .where(eq(groupbuyMembers.groupId, groupId))
+    .orderBy(groupbuyMembers.id);
+}
+
+async function setVirtualFill(enabled: boolean): Promise<void> {
+  await harness.ctx.config.set(groupbuyConfig, { virtualFillOnExpiry: enabled });
+}
