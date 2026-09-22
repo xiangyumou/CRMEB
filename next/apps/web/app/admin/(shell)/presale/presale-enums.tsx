@@ -1,6 +1,7 @@
 'use client';
 
-import { InputNumber, Space, Switch, Typography } from 'antd';
+import { Button, Form, InputNumber, Space, Switch, Typography } from 'antd';
+import { useState } from 'react';
 import type {
   PresaleActivityForm,
   PresaleActivityStatus,
@@ -8,6 +9,7 @@ import type {
   PresalePaymentMode,
 } from '@shop/contracts/presale/schemas';
 
+import { SkuPicker } from '@/admin/kit/sku-picker';
 import type { FieldSpec } from '@/admin/kit/form/types';
 import type { StatusMap } from '@/admin/kit/status-tag';
 
@@ -63,6 +65,62 @@ interface SkuRow {
 }
 
 /**
+ * The 规格 cell: the kit's picker, with the typed-in id as the fallback.
+ *
+ * Until A2 the id was pasted from the product page, which let an operator name
+ * a real SKU of the *wrong* product. The server refuses it
+ * (`PRESALE_SKU_NOT_IN_ACTIVITY`) but only after the whole form is filled in;
+ * 选择 opens `<SkuPicker>` scoped to the activity's own 商品 ID, so the wrong
+ * product is never on offer.
+ *
+ * The id stays editable because a migrated activity can name a SKU whose
+ * product has since left the shelf, and the picker lists on-shelf products.
+ */
+function SkuIdField({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  disabled: boolean;
+  onChange: (skuId: string) => void;
+}) {
+  const form = Form.useFormInstance();
+  const productId = Form.useWatch<string | undefined>('productId', form);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <InputNumber
+        value={value === '' ? null : Number(value)}
+        min={1}
+        placeholder="规格 ID"
+        disabled={disabled}
+        addonBefore="SKU"
+        onChange={(next) => onChange(next === null ? '' : String(next))}
+      />
+      <Button
+        size="small"
+        disabled={disabled || productId === undefined || productId === ''}
+        onClick={() => setOpen(true)}
+      >
+        选择
+      </Button>
+      <SkuPicker
+        open={open}
+        multiple={false}
+        productId={productId === '' ? undefined : productId}
+        onClose={() => setOpen(false)}
+        onSelect={(picked) => {
+          const first = picked[0];
+          if (first !== undefined) onChange(first.skuId);
+        }}
+      />
+    </>
+  );
+}
+
+/**
  * The create/edit form.
  *
  * Every rule comes from `presaleAdminActivityCreate.body` — required markers,
@@ -74,17 +132,23 @@ interface SkuRow {
  * the service overwrites it anyway. A disabled radio group offering a choice
  * that is always refused would be a worse lie than not offering it.
  *
- * The 规格 rows are a `sortableList` of plain controls rather than a picker,
- * for the same reason the coupon page lists product ids: stream A owns the SKU
- * picker, and until it ships an operator pastes ids from the product page. The
- * server checks every id really belongs to the product
- * (`PRESALE_SKU_NOT_IN_ACTIVITY`), so a wrong paste is a 422, not a mispriced
- * sale.
+ * The 规格 rows are a `sortableList`, each with the kit's `<SkuPicker>` behind
+ * a 选择 button (A2). The server still checks every id really belongs to the
+ * product (`PRESALE_SKU_NOT_IN_ACTIVITY`), so a hand-typed id is a 422 rather
+ * than a mispriced sale — the picker is what stops the operator reaching that
+ * 422 in the first place.
  */
 export const presaleFields: FieldSpec<Extract<keyof PresaleActivityForm, string>>[] = [
   // Ids cross the wire as decimal strings (CONVENTIONS), so they are typed in
   // as text; a numeric control would hand the contract a `number` and be 422'd.
-  { kind: 'text', name: 'productId', label: '商品 ID', span: 6, placeholder: '12' },
+  {
+    kind: 'text',
+    name: 'productId',
+    label: '商品 ID',
+    span: 6,
+    placeholder: '12',
+    help: '填好后用下面每行的「选择」挑规格',
+  },
   { kind: 'text', name: 'title', label: '活动标题', span: 12, placeholder: '春茶预售 · 明前龙井' },
   {
     kind: 'select',
@@ -155,13 +219,10 @@ export const presaleFields: FieldSpec<Extract<keyof PresaleActivityForm, string>
       const patch = (next: Partial<SkuRow>) => helpers.set({ ...sku, ...next } as unknown as never);
       return (
         <Space wrap>
-          <InputNumber
-            value={sku.skuId === '' ? null : Number(sku.skuId)}
-            min={1}
-            placeholder="规格 ID"
+          <SkuIdField
+            value={sku.skuId}
             disabled={helpers.disabled}
-            addonBefore="SKU"
-            onChange={(value) => patch({ skuId: value === null ? '' : String(value) })}
+            onChange={(skuId) => patch({ skuId })}
           />
           <InputNumber
             value={sku.price === '' ? null : Number(sku.price)}

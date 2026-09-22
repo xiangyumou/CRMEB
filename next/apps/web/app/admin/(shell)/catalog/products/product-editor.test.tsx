@@ -125,11 +125,18 @@ function stubApi(): Call[] {
       });
       const payload = url.includes('/category-tree')
         ? { items: [] }
-        : url.includes('/labels') ||
-            url.includes('/protections') ||
-            url.includes('/param-templates')
-          ? { items: [], total: 0, page: 1, pageSize: 200 }
-          : detail;
+        : url.includes('/shipping/template-options')
+          ? {
+              items: [
+                { id: '3', name: '江浙沪包邮', chargeMode: 'quantity' },
+                { id: '4', name: '大件走重量', chargeMode: 'weight' },
+              ],
+            }
+          : url.includes('/labels') ||
+              url.includes('/protections') ||
+              url.includes('/param-templates')
+            ? { items: [], total: 0, page: 1, pageSize: 200 }
+            : detail;
       return new Response(JSON.stringify(payload), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -195,6 +202,42 @@ describe('商品编辑器', () => {
       expect(body.customForm).toEqual(detail.customForm);
       // A template product must not also carry a fixed freight.
       expect(body.fixedFreight).toBeUndefined();
+      // The select round-trips the id it was loaded with.
+      expect(body.shippingTemplateId).toBe('3');
     });
+  });
+
+  /**
+   * 运费模板 is a select over F2's options route, not a typed id (A's decision
+   * 11, now closed). The 计费方式 is part of the label because two templates can
+   * share a name and charge differently, and picking the wrong one is a
+   * freight bug nobody notices until a customer complains.
+   */
+  it('offers the shipping templates as a select, and only in 运费模板 mode', async () => {
+    stubApi();
+    renderAdmin(<ProductEditorPage productId="1" />, { identity: editor });
+
+    await waitFor(() => expect(screen.getByLabelText('商品名称')).toHaveValue('简约白 T 恤'));
+
+    // Loaded as 运费模板, so the select is there, showing the template's name.
+    // `getByRole` and not `getByLabelText`: the 运费 radio group has an option
+    // labelled 运费模板 too.
+    const select = screen.getByRole('combobox', { name: '运费模板' });
+    await waitFor(() => expect(screen.getByTitle('江浙沪包邮（按件数）')).toBeInTheDocument());
+
+    await userEvent.click(select);
+    await waitFor(() => expect(screen.getByTitle('大件走重量（按重量）')).toBeInTheDocument());
+    await userEvent.click(screen.getByTitle('大件走重量（按重量）'));
+
+    // 固定运费 hides the template select and says the charge is per unit —
+    // legacy multiplied `postage` by `cart_num` and the rewrite kept that.
+    // antd's radio button puts `pointer-events: none` on the input itself.
+    await userEvent
+      .setup({ pointerEventsCheck: 0 })
+      .click(screen.getByRole('radio', { name: '固定运费' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('combobox', { name: '运费模板' })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText('按件收取：下单数量 × 该金额')).toBeInTheDocument();
   });
 });

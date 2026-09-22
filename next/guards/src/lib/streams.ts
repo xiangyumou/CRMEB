@@ -34,17 +34,24 @@ export const STREAM_STATE: Readonly<Record<string, StreamState>> = {
   H: 'merged',
   J: 'merged',
   S: 'merged',
-  // Split out of their parent streams after this branch was cut: the contracts
-  // merged with D, E2 and F2, the implementations did not.
-  D2: 'in-flight', // presale
-  E3: 'in-flight', // WeChat OA admin surface
-  F2: 'in-flight', // shipping, CMS
-  F3: 'in-flight', // statistics
-  H2: 'in-flight', // uni-app second pass
+  D2: 'merged',
+  E3: 'merged',
+  F2: 'merged',
+  F3: 'merged',
+  H2: 'merged',
+  J2: 'merged',
+  N1: 'merged',
+  K1: 'merged',
+  // Wave 4 (2026-09-23): follow-ups on the merged domains, the uni-app third
+  // pass that flips the markers those follow-ups unblock, and the tail.
+  A2: 'merged', // catalog follow-up: staff 商品管理, template select, SkuPicker
+  E4: 'in-flight', // user/wechat follow-up
+  F4: 'in-flight', // system/kit/DIY follow-up
+  B3: 'in-flight', // order/cart/coupon follow-up
+  J3: 'in-flight', // deploy follow-up: /readyz, CI jobs, invariants, cutover runbook
+  H3: 'in-flight', // uni-app third pass: marker flips for A2/E4/F4/B3, captcha removal
   I: 'in-flight', // storefront e2e
-  J2: 'in-flight', // images and deployment
-  N1: 'in-flight', // notification wiring
-  K: 'in-flight', // K's own second pass
+  K: 'in-flight', // K's own second pass (K2)
 };
 
 export const STREAMS: ReadonlySet<string> = new Set(Object.keys(STREAM_STATE));

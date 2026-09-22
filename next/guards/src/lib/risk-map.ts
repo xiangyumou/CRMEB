@@ -217,11 +217,11 @@ export const RISK_MAP: readonly RiskMapping[] = [
   // RISK-D-001, which *inverts* it — the team is opened when the order is
   // placed, inside the order's own transaction, so there is no paid order
   // without a team — and that is the stronger answer to the risk, not a miss.
-  // The two presale entries stay parked, on D2 rather than on D.
+  // D2 merged: the presale ledgers are proven by the STOCK/QUEUE/REFUND rows it ported.
   {
     section: '5. Group buys and presale',
     entry: 'Presale activity window',
-    resolution: pending('D2', '预售 lifecycle — D shipped 拼团, the presale half is D2’s'),
+    resolution: invariants('STOCK-004', 'QUEUE-008'),
   },
   {
     section: '5. Group buys and presale',
@@ -241,10 +241,7 @@ export const RISK_MAP: readonly RiskMapping[] = [
   {
     section: '5. Group buys and presale',
     entry: 'Presale cancel/restore',
-    resolution: pending(
-      'D2',
-      'QUEUE-008 / REFUND-002 / REFUND-003 are the presale ledgers, which D2 owns',
-    ),
+    resolution: invariants('QUEUE-008', 'REFUND-002', 'REFUND-003'),
   },
 
   // 6 -----------------------------------------------------------------------
@@ -372,7 +369,7 @@ export const RISK_MAP: readonly RiskMapping[] = [
   {
     section: '9. Migration and deployment',
     entry: 'Upgrade adds missing objects, rerun no-op',
-    resolution: pending('J2', 'drizzle migrations and the ETL runner'),
+    resolution: pending('J3', 'drizzle migrations and the ETL runner'),
   },
   {
     section: '9. Migration and deployment',
@@ -384,12 +381,12 @@ export const RISK_MAP: readonly RiskMapping[] = [
   {
     section: '9. Migration and deployment',
     entry: 'Pre-checks of pending payments/refunds before upgrade',
-    resolution: pending('J2', 'the ETL runner’s pre-flight'),
+    resolution: pending('J3', 'the ETL runner’s pre-flight'),
   },
   {
     section: '9. Migration and deployment',
     entry: 'Before/after data snapshots',
-    resolution: pending('J2', 'ETL verification counts'),
+    resolution: pending('J3', 'ETL verification counts'),
   },
   {
     section: '9. Migration and deployment',
@@ -399,44 +396,44 @@ export const RISK_MAP: readonly RiskMapping[] = [
   {
     section: '9. Migration and deployment',
     entry: 'Health check reflects real topology',
-    resolution: pending('J2', 'OPS-001/002/004'),
+    resolution: pending('J3', 'OPS-001/002/004'),
   },
   {
     section: '9. Migration and deployment',
     entry: 'Health check cannot be masked by localhost',
-    resolution: pending('J2', 'OPS-001'),
+    resolution: pending('J3', 'OPS-001'),
   },
   {
     section: '9. Migration and deployment',
     entry: 'ready.php schema gate',
-    resolution: pending('J2', 'OPS-003, now /readyz on the web app'),
+    resolution: pending('J3', 'OPS-003, now /readyz on the web app'),
   },
   {
     section: '9. Migration and deployment',
     entry: 'Release publish refuses conflicts',
-    resolution: pending('J2', 'REL-001..007'),
+    resolution: pending('J3', 'REL-001..007'),
   },
   {
     section: '9. Migration and deployment',
     entry: 'Manual promotion of a verified digest',
-    resolution: pending('J2', 'REL-005'),
+    resolution: pending('J3', 'REL-005'),
   },
   {
     section: '9. Migration and deployment',
     entry: 'Upgrade backup verified before migration',
-    resolution: pending('J2', 'OPS-008/009/010'),
+    resolution: pending('J3', 'OPS-008/009/010'),
   },
   {
     section: '9. Migration and deployment',
     entry: 'Rollback integrity',
-    resolution: pending('J2', 'OPS-011'),
+    resolution: pending('J3', 'OPS-011'),
   },
 
   // 10 ----------------------------------------------------------------------
   {
     section: '10. Client surfaces',
     entry: 'Admin/H5/MP builds',
-    resolution: pending('J2', 'the release pipeline builds and records digests'),
+    resolution: pending('J3', 'the release pipeline builds and records digests'),
   },
   {
     section: '10. Client surfaces',

@@ -80,6 +80,9 @@ function collect(): UniCall[] {
   return calls;
 }
 
+/** The uni-app pass that owns marker flips for routes landing now. */
+const UNIAPP_PASS = 'H3';
+
 export const uniappCalls = defineCheck(
   'uniapp',
   'every storefront call resolves, and no CONTRACT-PENDING marker outlives its route',
@@ -108,10 +111,17 @@ export const uniappCalls = defineCheck(
       if (known.has(`${call.method} ${url}`)) {
         live += 1;
         if (call.pending) {
+          // The route landed; the marker and the screen binding are the uni-app
+          // layer's to flip, which is the next H pass — a defect only once that
+          // pass has merged.
+          const reassigned = reassignmentFor(call.pending.trim(), call.method, url);
+          if (reassigned) {
+            reassignmentsHit.add(`${reassigned.marked} ${reassigned.method} ${reassigned.url}`);
+          }
           findings.push(
-            fail(
+            (isMerged(UNIAPP_PASS) ? fail : (w: string, m: string) => pending(w, UNIAPP_PASS, m))(
               where,
-              `is marked CONTRACT-PENDING(${call.pending}) but ${call.method} ${url} now exists — delete the marker`,
+              `is marked CONTRACT-PENDING(${call.pending}) but ${call.method} ${url} now exists — ${UNIAPP_PASS} deletes the marker and binds the screen`,
             ),
           );
         }

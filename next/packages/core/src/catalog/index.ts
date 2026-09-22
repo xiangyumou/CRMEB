@@ -119,6 +119,19 @@ export {
   adminProtectionUpdate,
 } from './catalog.taxonomy.service';
 
+/** 移动端商家管理 — 商品管理 (CR-4-h2). Ten calls, `auth: 'staff'`, no new capability. */
+export {
+  staffAssignCategories,
+  staffAssignLabels,
+  staffProductCategories,
+  staffProductCreate,
+  staffProductLabels,
+  staffProductList,
+  staffProductSkus,
+  staffSetVisibility,
+  staffUpdateSkus,
+} from './catalog.staff.service';
+
 export {
   adminReviewBatchSetStatus,
   adminReviewCreate,

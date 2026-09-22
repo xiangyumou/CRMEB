@@ -340,8 +340,24 @@ export async function findSellableProduct(db: DbOrTx, id: number): Promise<Produ
   return rows[0] ?? null;
 }
 
+/**
+ * `not_on_shelf` is the phone's 仓库中 and has no console tab.
+ *
+ * The console separates "taken off the shelf" from "never published" because an
+ * operator building a catalogue cares about the difference; the phone's
+ * 商家管理 has one `is_show` switch and four tabs, so its 仓库中 is everything
+ * live that is not on sale. Without it a draft would be reachable from the
+ * phone's 全部 tab and from nowhere else.
+ */
 export type ProductTab =
-  'all' | 'on_shelf' | 'off_shelf' | 'draft' | 'sold_out' | 'stock_warning' | 'deleted';
+  | 'all'
+  | 'on_shelf'
+  | 'off_shelf'
+  | 'not_on_shelf'
+  | 'draft'
+  | 'sold_out'
+  | 'stock_warning'
+  | 'deleted';
 
 export interface ProductListFilter {
   tab: ProductTab;
@@ -374,17 +390,19 @@ function productWhere(filter: ProductListFilter): SQL | undefined {
         ? and(eq(products.status, 'on_shelf'), liveProduct())
         : filter.tab === 'off_shelf'
           ? and(eq(products.status, 'off_shelf'), liveProduct())
-          : filter.tab === 'draft'
-            ? and(eq(products.status, 'draft'), liveProduct())
-            : filter.tab === 'sold_out'
-              ? and(eq(products.stock, 0), liveProduct())
-              : filter.tab === 'stock_warning'
-                ? and(
-                    lte(products.stock, filter.stockThreshold ?? 0),
-                    gt(products.stock, 0),
-                    liveProduct(),
-                  )
-                : liveProduct();
+          : filter.tab === 'not_on_shelf'
+            ? and(inArray(products.status, ['off_shelf', 'draft']), liveProduct())
+            : filter.tab === 'draft'
+              ? and(eq(products.status, 'draft'), liveProduct())
+              : filter.tab === 'sold_out'
+                ? and(eq(products.stock, 0), liveProduct())
+                : filter.tab === 'stock_warning'
+                  ? and(
+                      lte(products.stock, filter.stockThreshold ?? 0),
+                      gt(products.stock, 0),
+                      liveProduct(),
+                    )
+                  : liveProduct();
 
   return allOf(
     tabCondition,
@@ -947,6 +965,26 @@ export async function listVisibleSkus(db: DbOrTx, productId: number): Promise<Sk
 export async function findSku(db: DbOrTx, id: number): Promise<SkuRow | null> {
   const rows = await db.select().from(productSkus).where(eq(productSkus.id, id)).limit(1);
   return rows[0] ?? null;
+}
+
+/**
+ * One product's SKUs with `FOR UPDATE`, in ascending id order.
+ *
+ * The staff 修改价格/库存 editor writes several rows from one screen and then
+ * rolls the product up, so the rows have to agree — CONVENTIONS' "use `lockRow`
+ * when several rows must agree". Ordering by id is what keeps two operators
+ * editing overlapping rows from deadlocking each other, and holding the lock is
+ * what makes a concurrent `reserve` queue behind the edit and decrement the new
+ * number instead of racing it. The stock decrement itself is still the single
+ * conditional statement in `decStock`; this lock only serialises the roll-up.
+ */
+export async function lockSkusOfProduct(tx: Tx, productId: number): Promise<SkuRow[]> {
+  return tx
+    .select()
+    .from(productSkus)
+    .where(eq(productSkus.productId, productId))
+    .orderBy(asc(productSkus.id))
+    .for('update');
 }
 
 export async function findSkuByCode(db: DbOrTx, skuCode: string): Promise<SkuRow | null> {

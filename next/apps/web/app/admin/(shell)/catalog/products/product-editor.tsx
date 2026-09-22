@@ -14,6 +14,7 @@ import {
   catalogAdminParamTemplateList,
   catalogAdminProtectionList,
 } from '@shop/contracts/catalog/catalog.taxonomy.admin.contract';
+import { shippingTemplateOptionList } from '@shop/contracts/shipping/shipping.template.admin.contract';
 import {
   adminProductForm,
   type AdminProductDetail,
@@ -38,6 +39,7 @@ import {
   loadCategoryTreeOptions,
   options,
 } from '../catalog-enums';
+import { SHIPPING_CHARGE_MODE } from '../../shipping/shipping-enums';
 import { ParamEditor, SkuMatrixEditor, SpecEditor, blankSku } from './product-sku-editor';
 
 /**
@@ -75,6 +77,8 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
   const paramTemplates = useRouteQuery(catalogAdminParamTemplateList, {
     query: { page: 1, pageSize: 200, isEnabled: 'true' },
   });
+  // F2's options route: id, name and 计费方式, every template, no paging.
+  const shippingTemplates = useRouteQuery(shippingTemplateOptionList, {});
 
   const create = useRouteMutation(catalogAdminProductCreate, {
     presentError: false,
@@ -127,6 +131,19 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
     label: row.title,
     value: row.id,
   }));
+  /**
+   * 运费模板 — F2's options route, not a typed id any more (A's decision 11).
+   *
+   * The select carries the template's 计费方式 in its label because the same
+   * template name can charge by 件 or by 重量 and the operator picking one from
+   * the product form has no other way to tell.
+   */
+  const shippingTemplateOptions: SelectOption[] = (shippingTemplates.data?.items ?? []).map(
+    (row) => ({
+      label: `${row.name}（${SHIPPING_CHARGE_MODE[row.chargeMode].label}）`,
+      value: row.id,
+    }),
+  );
   const templates = useMemo(
     () =>
       (paramTemplates.data?.items ?? []).map((row) => ({
@@ -142,6 +159,7 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
       buildFields({
         labelOptions,
         protectionOptions,
+        shippingTemplateOptions,
         templates,
         specs,
         specMode,
@@ -149,7 +167,7 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
       }),
     // `labelOptions`/`protectionOptions` are rebuilt every render; their data is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [labels.data, protections.data, templates, specs, specMode, kind],
+    [labels.data, protections.data, shippingTemplates.data, templates, specs, specMode, kind],
   );
 
   if (productId !== undefined && detail.isPending) {
@@ -236,6 +254,7 @@ const NEW_PRODUCT: Partial<AdminProductForm> = {
 function buildFields({
   labelOptions,
   protectionOptions,
+  shippingTemplateOptions,
   templates,
   specs,
   specMode,
@@ -243,6 +262,7 @@ function buildFields({
 }: {
   labelOptions: SelectOption[];
   protectionOptions: SelectOption[];
+  shippingTemplateOptions: SelectOption[];
   templates: readonly { id: string; name: string; suggestedValues: string | null }[];
   specs: readonly ProductSpecInput[];
   specMode: boolean;
@@ -399,14 +419,21 @@ function buildFields({
       label: '固定运费',
       span: 8,
       visibleWhen: (values) => values.freightMode === 'fixed',
+      // Legacy charged `postage × cart_num`, and the rewrite kept it: the
+      // number below is per unit, not per order. Operators read "固定运费 8 元"
+      // as "8 元 regardless of quantity" unless the form says otherwise.
+      help: '按件收取：下单数量 × 该金额',
     },
     {
-      kind: 'text',
+      kind: 'select',
       name: 'shippingTemplateId',
-      label: '运费模板 ID',
+      label: '运费模板',
       span: 8,
+      options: shippingTemplateOptions,
+      showSearch: true,
+      allowClear: true,
       visibleWhen: (values) => values.freightMode === 'template',
-      help: '运费模板选择器待 B2 流上线后替换',
+      help: '在「物流 — 运费模板」里维护',
     },
     {
       kind: 'radio',

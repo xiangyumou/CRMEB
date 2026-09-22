@@ -50,6 +50,16 @@ export const catalogErrors = defineErrors({
   CATALOG_NOT_A_CARD_PRODUCT: { status: 422, message: '只有卡密商品可以导入卡密' },
   /** The pool ran dry between the order and the hand-over. The order stands; an operator tops up. */
   CATALOG_CARD_POOL_EMPTY: { status: 409, message: '卡密库存不足，请联系客服' },
+  /**
+   * Somebody typed a stock for a card-key SKU. The pool *is* the stock
+   * (`adminProductForm` refuses the same thing with a field error); the staff
+   * SKU editor has no card-import screen behind it, so it says no rather than
+   * writing a number the next import would overwrite.
+   */
+  CATALOG_CARD_STOCK_NOT_EDITABLE: {
+    status: 422,
+    message: '卡密商品的库存由导入的卡密数量决定，请在后台导入卡密',
+  },
 
   // -- labels, params, protections -----------------------------------------
   CATALOG_LABEL_NOT_FOUND: { status: 404, message: '商品标签不存在' },

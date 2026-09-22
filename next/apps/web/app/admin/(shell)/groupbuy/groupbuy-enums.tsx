@@ -1,6 +1,7 @@
 'use client';
 
-import { InputNumber, Space, Switch, Typography } from 'antd';
+import { Button, Form, InputNumber, Space, Switch, Typography } from 'antd';
+import { useState } from 'react';
 import type {
   GroupbuyActivityForm,
   GroupbuyActivitySkuInput,
@@ -11,6 +12,7 @@ import type {
 } from '@shop/contracts/groupbuy/schemas';
 
 import { MoneyInput } from '@/admin/kit/form/money-input';
+import { SkuPicker } from '@/admin/kit/sku-picker';
 import type { SortableItemHelpers } from '@/admin/kit/form/sortable-list-field';
 import type { FieldSpec } from '@/admin/kit/form/types';
 import type { StatusMap } from '@/admin/kit/status-tag';
@@ -54,13 +56,62 @@ export const optionsOf = <K extends string>(map: StatusMap<K>) =>
   (Object.keys(map) as K[]).map((value) => ({ label: map[value].label, value }));
 
 /**
- * One row of the 规格 editor.
+ * The 规格 cell: the kit's picker, with the typed-in id as the fallback.
  *
  * A group-buy SKU is a price and a stock ledger of its own, hanging off a
- * `product_skus.id`. There is no product picker in the kit yet, so the id is
- * typed in; the server refuses a SKU that does not belong to the chosen product
- * (`GROUPBUY_SKU_NOT_IN_ACTIVITY`) rather than trusting this form.
+ * `product_skus.id`. Until A2 the id was typed in, which let an operator name
+ * a real SKU of the *wrong* product — the server refuses it
+ * (`GROUPBUY_SKU_NOT_IN_ACTIVITY`), but only after the form has been filled
+ * in. 选择 opens `<SkuPicker>` scoped to the activity's own 商品 ID, so the
+ * wrong product is not on offer in the first place.
+ *
+ * The id stays visible and stays editable: a migrated activity can carry a
+ * SKU whose product is no longer on the shelf, and the picker (which lists
+ * on-shelf products) would not be able to show it.
  */
+function SkuIdField({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string | undefined;
+  disabled: boolean;
+  onChange: (skuId: string) => void;
+}) {
+  const form = Form.useFormInstance();
+  const productId = Form.useWatch<string | number | undefined>('productId', form);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <InputNumber
+        min={1}
+        value={value === undefined || value === '' ? null : Number(value)}
+        disabled={disabled}
+        onChange={(next) => onChange(next === null ? '' : String(next))}
+      />
+      <Button
+        size="small"
+        disabled={disabled || productId === undefined || productId === ''}
+        onClick={() => setOpen(true)}
+      >
+        选择
+      </Button>
+      <SkuPicker
+        open={open}
+        multiple={false}
+        productId={productId === undefined ? undefined : String(productId)}
+        onClose={() => setOpen(false)}
+        onSelect={(picked) => {
+          const first = picked[0];
+          if (first !== undefined) onChange(first.skuId);
+        }}
+      />
+    </>
+  );
+}
+
+/** One row of the 规格 editor. */
 function SkuRow(item: never, helpers: SortableItemHelpers<never>) {
   const sku = item as unknown as Partial<GroupbuyActivitySkuInput>;
   const set = (patch: Partial<GroupbuyActivitySkuInput>) =>
@@ -69,12 +120,11 @@ function SkuRow(item: never, helpers: SortableItemHelpers<never>) {
   return (
     <Space wrap size="middle">
       <Space size={4}>
-        <Typography.Text type="secondary">规格 ID</Typography.Text>
-        <InputNumber
-          min={1}
-          value={sku.skuId === undefined ? null : Number(sku.skuId)}
+        <Typography.Text type="secondary">规格</Typography.Text>
+        <SkuIdField
+          value={sku.skuId}
           disabled={helpers.disabled}
-          onChange={(value) => set({ skuId: value === null ? '' : String(value) })}
+          onChange={(skuId) => set({ skuId })}
         />
       </Space>
       <Space size={4}>
@@ -137,7 +187,7 @@ export const groupbuyActivityFields: FieldSpec<Extract<keyof GroupbuyActivityFor
     label: '商品 ID',
     span: 6,
     min: 1,
-    help: '拼团挂在已有商品上；商品选择器待 A 流上线后替换',
+    help: '拼团挂在已有商品上；填好后用下面每行的「选择」挑规格',
   },
   { kind: 'text', name: 'title', label: '活动标题', span: 12, placeholder: '三人成团 · 坚果礼盒' },
   {

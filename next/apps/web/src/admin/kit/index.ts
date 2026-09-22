@@ -95,6 +95,10 @@ export type {
   AssetSource,
 } from './asset/types';
 
+// ── Product SKUs ────────────────────────────────────────────────────────────
+export { SkuPicker } from './sku-picker';
+export type { PickedSku, SkuPickerProps } from './sku-picker';
+
 // ── Storefront links ────────────────────────────────────────────────────────
 export { LinkPicker, LinkSourceProvider, useLinkSource } from './link/link-picker';
 export type { LinkPickerProps } from './link/link-picker';
