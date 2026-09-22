@@ -285,34 +285,35 @@ export function orderDel(uni) {
  * @param string type 旧的「退货物流」分支：订单详情把 refund_type 钉成 0，这里不再可达
  */
 export function express(uni, type) {
-  return expressView(uni, `/api/v1/orders/${uni}`, toLegacyOrderDetail, '/api/v1/shipments');
+  return expressView(
+    () => request.get(`/api/v1/orders/${uni}`, {}, { map: toLegacyOrderDetail }),
+    () => request.get(`/api/v1/orders/${uni}/shipments`, {}),
+    (shipmentId) => request.get(`/api/v1/shipments/${shipmentId}/tracking`, {}),
+  );
 }
 
 /** 商家端物流轨迹 — the same composition against the staff surface. */
 export function adminExpress(uni, type) {
   return expressView(
-    uni,
-    `/api/v1/staff/orders/${uni}`,
-    toLegacyStaffOrderDetail,
-    '/api/v1/staff/shipments',
-    true,
+    () => request.get(`/api/v1/staff/orders/${uni}`, {}, { map: toLegacyStaffOrderDetail }),
+    () => request.get(`/api/v1/staff/orders/${uni}/shipments`, {}),
+    (shipmentId) => request.get(`/api/v1/staff/shipments/${shipmentId}/tracking`, {}),
   );
 }
 
-function expressView(orderId, orderPath, orderMap, trackingBase, staff) {
-  const shipmentsPath = staff
-    ? `/api/v1/staff/orders/${orderId}/shipments`
-    : `/api/v1/orders/${orderId}/shipments`;
-  return Promise.all([
-    request.get(orderPath, {}, { map: orderMap }),
-    request.get(shipmentsPath, {}),
-  ]).then(([orderRes, shipRes]) => {
+/**
+ * The composition itself, handed three thunks rather than three path fragments: every
+ * URL then sits at a `request.*` call as a literal, which is the only shape
+ * `scripts/check-api-routes.mjs` can read. A guard that cannot see a call is worse
+ * than no guard, because the table it prints looks complete.
+ */
+function expressView(readOrder, readShipments, readTracking) {
+  return Promise.all([readOrder(), readShipments()]).then(([orderRes, shipRes]) => {
     const parcel = pickShipment(shipRes.data);
     if (!parcel) {
       return { data: toLegacyExpressView(orderRes.data, null, null), msg: '', status: 200 };
     }
-    return request
-      .get(`${trackingBase}/${parcel.id}/tracking`, {})
+    return readTracking(parcel.id)
       .then((trackRes) => ({
         data: toLegacyExpressView(orderRes.data, parcel, trackRes.data),
         msg: '',
@@ -327,7 +328,8 @@ function expressView(orderId, orderPath, orderMap, trackingBase, staff) {
   });
 }
 
-// CONTRACT-PENDING(B1) — 下单后赠送的优惠券. 目前没有对应路由。
+// CONTRACT-PENDING(B1) — 下单后赠送的优惠券。支付成功页的「恭喜获得优惠券」弹层读它，
+// 合约里没有对应路由；见 docs/rewrite/cr/CR-5-h2.md §1。
 /**
  * 订单赠送的优惠券
  * @param string orderId

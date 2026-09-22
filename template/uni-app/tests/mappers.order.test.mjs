@@ -236,22 +236,78 @@ describe('fromLegacyOrderListQuery', () => {
 describe('the buy-now ticket', () => {
   it('round-trips', () => {
     expect(buyNowTicket('21', 2)).toBe('buynow:21:2');
-    expect(parseBuyNowTicket('buynow:21:2')).toEqual({ skuId: '21', quantity: 2 });
+    expect(parseBuyNowTicket('buynow:21:2')).toEqual({
+      skuId: '21',
+      quantity: 2,
+      kind: 'normal',
+      activityId: '',
+      groupId: '',
+    });
   });
 
   it('defaults the quantity and rejects anything that is not a ticket', () => {
-    expect(parseBuyNowTicket('buynow:21')).toEqual({ skuId: '21', quantity: 1 });
+    expect(parseBuyNowTicket('buynow:21')).toMatchObject({ skuId: '21', quantity: 1 });
     expect(parseBuyNowTicket('5001')).toBeNull();
     expect(parseBuyNowTicket('')).toBeNull();
     expect(parseBuyNowTicket(null)).toBeNull();
   });
 
+  it('carries 拼团 / 预售 through, because the confirm page forwards only cartId', () => {
+    expect(buyNowTicket('21', 1, 'groupbuy', '1')).toBe('buynow:21:1:groupbuy:1');
+    expect(buyNowTicket('21', 1, 'groupbuy', '1', '501')).toBe('buynow:21:1:groupbuy:1:501');
+    expect(buyNowTicket('21', 1, 'groupbuy', '1', 0)).toBe('buynow:21:1:groupbuy:1');
+    expect(buyNowTicket('31', 3, 'presale', '2')).toBe('buynow:31:3:presale:2');
+    // a kind without an activity is still an ordinary purchase
+    expect(buyNowTicket('21', 1, 'groupbuy', '')).toBe('buynow:21:1');
+    expect(parseBuyNowTicket('buynow:21:1:groupbuy:1:501')).toEqual({
+      skuId: '21',
+      quantity: 1,
+      kind: 'groupbuy',
+      activityId: '1',
+      groupId: '501',
+    });
+    // an unknown kind is not trusted into the body
+    expect(parseBuyNowTicket('buynow:21:1:seckill:9').kind).toBe('normal');
+  });
+
   it('makes orderConfirm ask for a buy-now preview instead of a cart one', () => {
+    // `checkoutInput` nests the variant; a flat {skuId, quantity} fails the refine.
     expect(fromLegacyCheckoutInput({ cartId: 'buynow:21:2' })).toEqual({
       kind: 'normal',
       source: 'buy-now',
-      skuId: '21',
-      quantity: 2,
+      item: { skuId: '21', quantity: 2 },
+    });
+  });
+
+  it('turns a 开团 ticket into kind groupbuy with no groupId', () => {
+    expect(fromLegacyCheckoutInput({ cartId: 'buynow:21:1:groupbuy:1' })).toEqual({
+      kind: 'groupbuy',
+      source: 'buy-now',
+      item: { skuId: '21', quantity: 1 },
+      kindMeta: { activityId: '1' },
+    });
+  });
+
+  it('takes the team from the ticket or from the confirm page query, either way', () => {
+    expect(fromLegacyCheckoutInput({ cartId: 'buynow:21:1:groupbuy:1:501' }).kindMeta).toEqual({
+      activityId: '1',
+      groupId: '501',
+    });
+    expect(
+      fromLegacyCheckoutInput({ cartId: 'buynow:21:1:groupbuy:1', pinkId: 501 }).kindMeta,
+    ).toEqual({ activityId: '1', groupId: '501' });
+    // `pinkId` is parseInt'ed to 0 on the 开团 path and must not become a team id
+    expect(fromLegacyCheckoutInput({ cartId: 'buynow:21:1:groupbuy:1', pinkId: 0 }).kindMeta).toEqual(
+      { activityId: '1' },
+    );
+  });
+
+  it('never puts a groupId on a 预售 order', () => {
+    expect(fromLegacyCheckoutInput({ cartId: 'buynow:31:3:presale:2', pinkId: 7 })).toEqual({
+      kind: 'presale',
+      source: 'buy-now',
+      item: { skuId: '31', quantity: 3 },
+      kindMeta: { activityId: '2' },
     });
   });
 });

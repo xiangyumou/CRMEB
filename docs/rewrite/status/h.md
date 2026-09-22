@@ -1,55 +1,69 @@
 # H — the uni-app storefront API layer
 
-Branch `rewrite/ws-h-uniapp`, worktree `../CRMEB-wt/ws-h`. Nothing pushed.
+Branch `rewrite/ws-h2-uniapp`, worktree `../CRMEB-wt/ws-h2`, rebased onto
+`rewrite/integration` after stream S. Nothing pushed.
 
-Brief: `docs/rewrite/briefs/H-uniapp-api.md`. Scope: `template/uni-app/api/**`,
-`utils/request.js`, `config/app.js`, `libs/`, plus the minimal call-site edits
-the re-pointing forces. Pages and components are **not** rewritten.
+Briefs: `docs/rewrite/briefs/H-uniapp-api.md` (first pass),
+`docs/rewrite/briefs/H2-uniapp-second-pass.md` (this one). Scope:
+`template/uni-app/api/**`, `utils/request.js`, `config/app.js`, `libs/`,
+`tests/`, `scripts/`, plus the minimal call-site edits the re-pointing forces.
+Pages and components are **not** rewritten.
 
 ## Where it stands
 
 ```
 $ npm run check:routes
-189 calls: 85 live, 104 pending, 0 broken
+191 calls: 154 live, 37 pending, 0 broken
 $ npm test
-Test Files  9 passed | 1 skipped (10)   Tests  229 passed | 8 skipped (237)
-$ MOCK_URL=http://127.0.0.1:4010 npm test     # with the contract mock running
-Test Files  10 passed (10)              Tests  237 passed (237)
+Test Files  13 passed | 1 skipped (14)   Tests  306 passed | 13 skipped (319)
+$ MOCK_URL=http://127.0.0.1:4013 npm test     # with the contract mock running
+Test Files  14 passed (14)                Tests  314 passed (314)
 $ npm run build:h5          → dist/dev/h5        DONE
 $ npm run build:mp-weixin   → dist/dev/mp-weixin DONE
 ```
 
+The first pass left `189 calls: 85 live, 104 pending`. E1, E2, D, F2 and S have
+landed since; what is left is 37 calls against routes nobody has written.
+
 Every `request.*` call in `api/*.js` is either a literal path that exists in
 `next/packages/contracts/openapi.json` or carries a `CONTRACT-PENDING(<stream>)`
-marker. The guard fails both ways: an unknown route **and** a marker left over a
-route that has since landed, so the table below cannot rot.
+marker. The guard fails three ways — an unknown route, a marker left over a
+route that has since landed, and a URL it cannot read at all — so the table
+below cannot rot.
 
-| Module          | live | pending | note                                                       |
-| --------------- | ---: | ------: | ---------------------------------------------------------- |
-| `api/order.js`  |   38 |       2 | cart, checkout, orders, 收货, 包裹, 发票, 售后              |
-| `api/store.js`  |   18 |       2 | catalog, 评价, 收藏, 足迹                                   |
-| `api/admin.js`  |   21 |      22 | 商家管理; the 22 belong to A / E1 / B1 / F2, not B2         |
-| `api/api.js`    |    4 |      20 | the grab-bag module                                         |
-| `api/public.js` |    2 |      15 | 微信 / 站点配置                                             |
-| `api/user.js`   |    2 |      36 | 用户中心; E1 owns almost all of it                          |
-| `api/activity.js` |  0 |       9 | 拼团 / 预售 (stream D)                                      |
+| Module            | live | pending | note                                                  |
+| ----------------- | ---: | ------: | ----------------------------------------------------- |
+| `api/order.js`    |   41 |       1 | cart, checkout, orders, 收货, 包裹, 发票, 售后        |
+| `api/admin.js`    |   18 |      18 | 商家管理; the 18 are A (10), E1 (6), B1 (2)           |
+| `api/user.js`     |   30 |       4 | 用户中心, 地址簿, 登录注册, 站内信                     |
+| `api/api.js`      |   27 |       6 | the grab-bag module                                    |
+| `api/store.js`    |   20 |       1 | catalog, 评价, 收藏, 足迹                              |
+| `api/activity.js` |   10 |       2 | 拼团 / 预售                                            |
+| `api/public.js`   |    7 |       5 | 微信身份 / 站点配置                                    |
+| `utils/util.js`   |    1 |       0 | the upload, asserted by hand — it is not a `request.*` |
 
 ### What is still CONTRACT-PENDING, by stream
 
-| Stream | n  | What                                                                     |
-| ------ | -: | ------------------------------------------------------------------------ |
-| E1     | 42 | 登录/注册/短信, `me`, 地址簿, and the staff 用户管理 screens              |
-| E2     | 14 | 微信 JS-SDK, 授权, 订阅消息, 小程序码, 站内信                             |
-| D      | 11 | 拼团 (`/groupbuys`, `/groupbuy-teams`) and 预售 (`/presales`)             |
-| F2     | 10 | 文章, 地区, plus 电子面单 / 配送员 (CR-4-h §4, §5)                        |
-| A      | 10 | the staff 商品管理 screens — B2's contract assigns them to A              |
-| F1     |  8 | 站点配置, logo, 分享, 图片转 base64                                       |
-| B1     |  4 | 删除订单 (CR-4-h §6), 订单赠券, staff 赠送优惠券                          |
-| B2     |  3 | 统计明细 ×2 (CR-4-h §1), 售后备注 (CR-4-h §2)                             |
-| G1     |  2 | DIY 页面布局 and 导航                                                     |
+Every one of the 37 has a change request against the stream that owns it. None
+is waiting on H.
 
-Each marker names the stream and sits above the call; `node
-scripts/check-api-routes.mjs --json` prints the full list with file and line.
+| Stream | n  | What | CR |
+| ------ | -: | ---- | -- |
+| A  | 10 | the staff 商品管理 screens (`pages/admin/goods/**`)        | [CR-4-h2](../cr/CR-4-h2.md) |
+| E1 |  9 | 行为验证码 ×2, 小程序一键绑定手机号, staff 用户管理 ×6      | [CR-2-h2](../cr/CR-2-h2.md) |
+| F1 |  8 | 站点公开配置 ×6, 图片转 base64 ×2                          | [CR-7-h2](../cr/CR-7-h2.md) |
+| E2 |  3 | 小程序码 for the three poster screens                      | [CR-6-h2](../cr/CR-6-h2.md) |
+| G1 |  3 | 个人中心菜单, 底部导航, 分类/个人中心 版式开关              | [CR-3-h2](../cr/CR-3-h2.md) |
+| B1 |  3 | 下单送券, staff 赠送优惠券 ×2                              | [CR-5-h2](../cr/CR-5-h2.md) |
+| D  |  1 | 全店拼团人气条 (`avatars` + `pink_count`)                   | [CR-1-h2](../cr/CR-1-h2.md) |
+
+`node scripts/check-api-routes.mjs --json` prints the list with file and line.
+
+**The two that block a whole surface**, if anyone is choosing what to write
+next: the behaviour captcha (CR-2-h2 §1 — without it *no SMS code can be sent
+on any screen*, so 手机号登录, 注册, 找回密码 and 绑定/更换手机号 are all dead), and
+F1's site config (CR-7-h2 — the app runs unbranded, with a 客服 button that
+goes nowhere).
 
 ## The shape of the layer
 
@@ -72,9 +86,18 @@ an `api/*.js` function that needs a toast supplies the text itself through
 `opt.msg`.
 
 **Mappers are pure.** No `Date.now()`, no store access, no locale lookups —
-that is what lets `tests/` run them under plain Node with no uni runtime. The
-one place that reads a clock is `unixSeconds`, and it reads the payload's own
-instant.
+that is what lets `tests/` run them under plain Node with no uni runtime.
+
+**A legacy call may fan out to several routes.** Nine do now
+(`express`, `adminExpress`, `getCombinationDetail`, `getCombinationPink`,
+`getUserInfo`, `getTempIds`, `collectAll`, `postCartNum`, `getStatisticsTime`).
+The rule they all follow: the read the screen is *about* may fail loudly, and
+everything decorating it is `.catch`-ed to an empty value. A 拼团 detail whose
+team list 500s still renders the product.
+
+**Every URL sits at a `request.*` call as a literal.** `expressView` takes three
+thunks rather than three path fragments for exactly this reason — see the guard,
+below.
 
 **Retired features are collapsed at the mapper, not in the pages.** The flags
 below are pinned to falsy constants so the page branch that renders them is
@@ -86,53 +109,82 @@ dead without the page being edited:
 | `yue_pay_status`, `yue_price`, `now_money` | `0` | 余额支付与充值 |
 | `store_self_mention`, `shipping_type: 0` (storefront) | `0` | 门店自提与核销 |
 | `is_gift`, `gift_price`, `gift_uid`, `pay_uid` | `0` | 赠品 / 送礼 / 好友代付 |
-| `seckill_id`, `bargain_id`, `combination_id`, `pink_id`, `advance_id` | `0` | 秒杀 / 砍价 / 拼团 / 预售 entry points |
+| `seckill_id`, `bargain_id` | `0` | 秒杀 / 砍价 |
 | `use_integral`, `deduction_price`, `integral_count` | `0` | 积分抵扣与签到 |
-| `is_invoice` on an order | from the invoice's own status | — (invoices are live) |
+| `spread_uid`, `brokerage_price`, `is_promoter` | `0` | 分销 |
+| `switchUserInfo` | `[]` | 多账号切换 |
 | `split` | `[]` | 拆单发货 |
-| `product_type`, `virtual_type` | `0` unless the product says otherwise | 虚拟商品的旧分支 |
+
+`combination_id`, `pink_id` and `advance_id` are **no longer pinned**: 拼团 and
+预售 are live (stream D), and those fields now carry real activity ids.
 
 ## Decisions other streams must know
 
-- **`order_id` is the surrogate id, not the order number.** Pages both print
-  and route on it, and only the surrogate is routable — CR-1-h asks B1 to take
-  either. `order_no` and `trade_no` carry the real number.
-- **Buy-now has no hidden cart row.** `order_confirm` receives a synthetic
-  ticket `buynow:<skuId>:<qty>`; `parseBuyNowTicket` turns it back into the
-  checkout body. Legacy created a cart row with `is_new: 1` and relied on the
-  order creation to delete it.
+- **`order_id` carries the order number on the storefront and the surrogate id
+  in 商家管理.** S's CR-1-h answer: `orderRef` resolves either, but only where an
+  owner scopes the lookup, so the staff routes keep the surrogate.
+  `api/mappers/order.js` and `api/mappers/staff.js` differ deliberately.
+- **Buy-now has no hidden cart row, and the活动 rides in the ticket.**
+  `order_confirm` receives `buynow:<skuId>:<qty>[:<kind>:<activityId>[:<groupId>]]`;
+  `parseBuyNowTicket` turns it back into `{source: 'buy-now', item, kind,
+  kindMeta}`. The confirm page forwards nothing but `cartId` to the preview,
+  which is why 拼团/预售 could not be passed alongside it.
+  `checkoutInput.item` is a nested object — a flat `{skuId, quantity}` is
+  refused by the `buyNowNeedsAnItem` refine before the handler sees it.
 - **`unique` carries the SKU id, not the SKU code**, everywhere a page hands a
-  spec back to the API, so `POST /api/v1/cart/items {skuId}` round-trips.
-- **发票抬头 is device-local.** B2 did not port the address book and said the
-  storefront should remember the last header itself; `libs/invoiceTitles.js` is
-  that memory, and `makeUpinvoice` freezes the chosen header onto
-  `POST /api/v1/orders/:id/invoice`. Nothing about it is authoritative.
-- **物流 is composed client-side.** An order has a `shipments` collection and
-  the trace feed hangs off a shipment, so `express()` reads the order, its
-  parcels and the tracking of the parcel it will show, and hands the page the
-  old `{order, express: {result: {list}}}` payload. A parcel whose tracking
-  call fails is still rendered, without a timeline.
-- **改价 posts a discount.** The staff pages now send the current `pay_price`
-  next to the typed total and `fromLegacyPriceInput` computes the difference,
-  because B2's `orderPriceBody` deliberately has no "set the total" field.
-- **The staff console's `_status` is an integer in the list and an object in
-  the detail.** That is how the legacy payloads were; `api/mappers/staff.js`
-  documents the scale.
-- **Uploads go to `POST /api/v1/uploads?purpose=…` with the multipart field
-  named `file`.** The contract does not name the field — CR-5-h.
+  spec back to the API.
+- **拼团/预售 detail pages are assembled from an activity DTO.**
+  `api/mappers/activity.js` rebuilds the picker columns from `sku.specValues`
+  and re-keys the SKUs the way the 商品详情 renderer expects, so the pages did
+  not have to change. `pink_bool` is derived from the group status
+  (succeeded → 1, failed/cancelled → −1, open → 0).
+- **One generation of WeChat auth, not two.** `authType` mints the session in
+  one call; `authLogin` answers from a module-level cache because the `wx.login`
+  code it spent is single-use. The MP 「手机号 + 短信验证码」 screens post to
+  `/auth/sessions/sms` — a typed phone and a typed code is a platform-agnostic
+  sign-in, and the openid binds on the next `authLogin`.
+- **`getPhoneNumber` sends `{phoneCode}`.** The `encryptedData` + `iv` path is
+  not ported: decrypting it client-side needs `session_key` to leave the server.
+- **发票抬头 is device-local** (`libs/invoiceTitles.js`); nothing about it is
+  authoritative.
+- **物流 is composed client-side** from the order, its `shipments` and the
+  tracking of the parcel being shown. A parcel whose tracking call fails still
+  renders, without a timeline.
+- **改价 posts a discount**, because `orderPriceBody` has no "set the total".
+- **Uploads go to `POST /api/v1/uploads?purpose=…`, field name `file`.**
+  `uploadPurposeFor` guesses the purpose from the legacy path and a caller that
+  knows says so. 商家管理's 添加商品 says `{purpose: 'staff'}` — it was landing in
+  `review`, the shopper-photo bucket.
+- **订阅消息 is asked for per moment** (`order-create`, `order-pay`,
+  `order-ship`, `refund`), not as one map. `utils/SubscribeMessage.js` resolves
+  without prompting when a scene has no templates, rather than calling
+  `requestSubscribeMessage` with `tmplIds: []`, which throws.
+
+## The guard, and why it grew a third failure mode
+
+`scripts/check-api-routes.mjs` matched `request.get(` and nothing else. A
+composed call is usually written
+
+```js
+request
+  .get('/api/v1/…', { … })
+  .then(…)
+```
+
+and the guard could not see a single one of them — the summary still read
+`0 broken`, which is the one thing a route guard must never do. It now matches
+the chained spelling too, and it fails on any `request.*(` whose first argument
+is not a string literal. Seven calls appeared the moment it could see them, one
+of them a live route sitting under a stale `CONTRACT-PENDING(F1)` marker.
+
+That is also why `expressView` takes three thunks: it used to assemble the
+tracking URL out of a `trackingBase` fragment, which is unreadable by
+construction.
 
 ## Ownership extensions
 
-The brief scoped this stream to `api/**`, `utils/request.js`, `config/app.js`
-and `libs/`. Two directories were added under `template/uni-app/` and are H's:
-
-- `scripts/` — `check-api-routes.mjs` (the guard), `extract-page-fields.mjs`
-  (the field report, output committed under `scripts/reports/`),
-  `dump-contract-examples.mjs` (regenerates the test fixtures from
-  `next/packages/contracts/src/routes.gen.ts`).
-- `tests/` — Vitest specs and `tests/fixtures/contract-examples.json`.
-
-Also H's by necessity: `libs/invoiceTitles.js` (new).
+`scripts/` and `tests/` under `template/uni-app/` are H's, as is
+`libs/invoiceTitles.js`.
 
 ## Deleted
 
@@ -149,11 +201,25 @@ Pages and components: `components/update/`,
 `pages/admin/refund/index.vue`, `pages/admin/components/splitOrder/`, and the
 matching routes in `pages.json`.
 
-Exports: the 83 the field report found unreferenced, plus `setOfflinePay`,
-`orderSplitInfo`, `orderSplitDelivery` (B2's contract records that the last two
-never had a route at all), `getInvoiceLink`, `spread`, `appleLogin`.
+Exports, second pass — each with its reason, because "no route" alone is not one:
+
+| Export | Why it is gone |
+| ------ | -------------- |
+| `silenceAuth` | asked "does this shop use 静默 or 手动 授权" — a question only two auth generations made necessary |
+| `remoteRegister` | "hand me a token for a user I name" is the shape the contract exists to refuse; it had no call site |
+| `getSubscribe` | 「已关注公众号?」 means reading the OA's follower list for a person; `diyComponents/follow.vue` now always renders the 未关注 state |
+| `switchH5Login` | 多账号切换 needed two coexisting token formats |
+| `getCodeApi`, `verifyCode` | the graphic captcha has no successor; both resolve `{key: ''}` locally |
+| `openExtrctSubscribe`, `openBargainSubscribe`, `openRechargeSubscribe`, `openRevenueSubscribe` | subscribe helpers for 核销 / 砍价 / 充值 / 佣金, all retired; zero call sites |
+| `orderExportTemp`, `orderDeliveryInfo`, `orderOrderDelivery` | 电子面单 and the 配送员 list — CR-4-h §4/§5, ruled out of scope by S |
+
+First pass: the 83 unreferenced exports the field report found, plus
+`setOfflinePay`, `orderSplitInfo`, `orderSplitDelivery`, `getInvoiceLink`,
+`spread`, `appleLogin`.
 
 ### Call sites edited (the minimum the re-pointing forced)
+
+First pass:
 
 | File | Why |
 | ---- | --- |
@@ -163,21 +229,33 @@ never had a route at all), `getInvoiceLink`, `spread`, `appleLogin`.
 | `pages/users/user_info/`, `eidtUserModal` | upload calls pass `{purpose: 'avatar'}` |
 | `pages/admin/delivery/index.vue` | 拆单 removed; the 发货 form also sends `delivery_company_id` |
 | `pages/admin/{orderList,orderDetail,refund_order_list,refund_order_detail}` | 线下付款 removed; 改价 also sends `pay_price` |
-| `pages/users/user_invoice_list/index.vue` | 复制 copies the invoice number; the row links by invoice id; the goods thumbnail is guarded |
+| `pages/users/user_invoice_list/index.vue` | the row links by invoice id; the goods thumbnail is guarded |
 | `pages/users/login/index.vue`, `utils/index.js`, `App.vue`, `libs/{wechat,routine}.js` | imports of retired exports |
-| `subpackage/diyComponents/{tabNav,homeComb}.vue` | `getCategoryVersion` was imported from the wrong module — a pre-existing break |
+| `subpackage/diyComponents/{tabNav,homeComb}.vue` | `getCategoryVersion` imported from the wrong module — a pre-existing break |
+
+Second pass:
+
+| File | Why |
+| ---- | --- |
+| `pages/activity/goods_combination_status/index.vue` | 参团 must pass `pinkId`; it was in page state only |
+| `pages/user/index.vue`, `pages/users/user_info/index.vue` | `setVisit` gone, `switchH5Login` branch gone, `getPhoneNumber` sends `{phoneCode}` |
+| `pages/users/components/login_mobile/{index,routine_phone}.vue`, `pages/users/wechat_login/index.vue`, `pages/users/auth/index.vue` | `{phoneCode}`, and the `silenceAuth` imports |
+| `App.vue`, `components/Authorize.vue`, `libs/routine.js` | imports of `remoteRegister` / `silenceAuth`, and the dead methods behind them |
+| `subpackage/diyComponents/presale.vue` | `getAdvancellList` → `getPresellList` (a pre-existing dangling import, fixed now that 预售 is contracted) |
+| `subpackage/diyComponents/follow.vue` | `getSubscribe` gone |
+| `pages/admin/goods/addGoods.vue` | uploads pass `{purpose: 'staff'}` |
+| `utils/SubscribeMessage.js` | rewritten around the four scenes |
 
 ## Known dangling imports (all predate this stream)
 
-Both builds finish clean apart from eight `export … was not found` warnings.
-Every one of them is broken on `master` too — checked import by import against
-`git show master:<file>` — and none is an api function this stream re-pointed:
+Both builds finish clean apart from seven `export … was not found` warnings —
+`getAdvancellList` was the eighth and is fixed. Every one is broken on `master`
+too, and none is an api function this stream re-pointed:
 
 | Import | From | Why it stays |
 | ------ | ---- | ------------ |
 | `postAddress` | `pages/users/user_address_list` | never existed; the page's other calls work |
 | `newcomerList` | `subpackage/diyComponents/newVip.vue` | 新人专享 is retired |
-| `getAdvancellList` | `subpackage/diyComponents/presale.vue` | 预售 is stream D's, not yet contracted |
 | `VUE_APP_API_URL` | `pages/users/login/index.vue` ← `@/utils` | `utils/index.js` exports `VUE_APP_WS_URL`, never this |
 | `required`, `alpha_num`, `chs_phone`, `attrs` | same page ← `@/utils/validate` | a validation kit that was never committed |
 | `handleError` | `pages/admin/goods/components/label/index.vue` ← `vue` | Vue 2 has no such named export |
@@ -187,13 +265,20 @@ so whoever owns those screens (E1 for 登录, A for 商品管理) picks them up.
 
 ## Change requests
 
-| CR | Against | About |
-| -- | ------- | ----- |
-| [CR-1-h](../cr/CR-1-h.md) | B1 | `GET /api/v1/orders/:id` should accept an order number |
-| [CR-2-h](../cr/CR-2-h.md) | B1 | change a cart row's SKU, decrement by SKU, batch favourite |
-| [CR-3-h](../cr/CR-3-h.md) | A  | a cheap "has the category tree changed?" |
-| [CR-4-h](../cr/CR-4-h.md) | B2, C | seven gaps left in the mobile staff console |
-| [CR-5-h](../cr/CR-5-h.md) | F1 | the upload's multipart field name, and a purpose for staff uploads |
+| CR | Against | About | Status |
+| -- | ------- | ----- | ------ |
+| [CR-1-h](../cr/CR-1-h.md) | B1 | `GET /api/v1/orders/:id` should accept an order number | done (S) |
+| [CR-2-h](../cr/CR-2-h.md) | B1 | change a cart row's SKU, decrement by SKU, batch favourite | done (S) |
+| [CR-3-h](../cr/CR-3-h.md) | A  | a cheap "has the category tree changed?" | done (S) |
+| [CR-4-h](../cr/CR-4-h.md) | B2, C | seven gaps in the mobile staff console | §1,§2,§6,§7 done (S); §4,§5 retired; §3 accepted |
+| [CR-5-h](../cr/CR-5-h.md) | F1 | the upload's multipart field name, and a purpose for staff uploads | done (S) |
+| [CR-1-h2](../cr/CR-1-h2.md) | D  | a shop-wide 拼团 summary for the 人气条 | open |
+| [CR-2-h2](../cr/CR-2-h2.md) | E1 | 行为验证码, 小程序绑定手机号, the staff 用户管理 surface | open |
+| [CR-3-h2](../cr/CR-3-h2.md) | G1 | 个人中心菜单, 底部导航, the 版式 switch | open |
+| [CR-4-h2](../cr/CR-4-h2.md) | A  | the staff 商品管理 surface | open |
+| [CR-5-h2](../cr/CR-5-h2.md) | B1 | 下单送券, and a staff-side coupon grant | open |
+| [CR-6-h2](../cr/CR-6-h2.md) | E2 | a mini-program code for the three poster screens | open |
+| [CR-7-h2](../cr/CR-7-h2.md) | F1 | the shop's public settings, and 图片转 base64 | open |
 
 ## How to run any of it
 
@@ -207,20 +292,23 @@ npm run fixtures            # after a contract changes, before the tests
 npm test                    # vitest, borrowed from next/packages/contracts
 
 # the same api functions over real HTTP, against the contract mock:
-(cd ../../next/packages/testing && pnpm mock) &   # http://127.0.0.1:4010
-MOCK_URL=http://127.0.0.1:4010 npm test
+(cd ../../next/packages/testing && MOCK_PORT=4013 pnpm mock) &
+MOCK_URL=http://127.0.0.1:4013 npm test
 
 npm run build:h5
 npm run build:mp-weixin
 ```
 
-`dump-contract-examples.mjs` reads `next/packages/contracts/src/routes.gen.ts`,
-not `openapi.json`: the OpenAPI writer drops `examples`, and the examples are
-the whole point of the fixtures.
+`npm run fixtures` (`dump-contract-examples.mjs`) reads
+`next/packages/contracts/src/routes.gen.ts`, not `openapi.json`: the OpenAPI
+writer drops `examples`, and the examples are the whole point of the fixtures.
+Run `pnpm gen` in `next/` first if a contract changed — both files are
+generated, and a stale `openapi.json` makes the guard report routes as missing
+that are merely not built yet.
 
 Two things about the build scripts, both fixed here because nothing built
 before: this project keeps its sources at the package root rather than in
-`src/`, so the scripts now pass `UNI_INPUT_DIR=.`; and Node ≥ 22 removed
+`src/`, so the scripts pass `UNI_INPUT_DIR=.`; and Node ≥ 22 removed
 `util.isRegExp`, which `postcss-urlrewrite` calls while the mp-weixin config is
 validated, so they `--require ./scripts/node-compat.cjs`. Output lands in
 `dist/dev/<platform>/` and is gitignored.

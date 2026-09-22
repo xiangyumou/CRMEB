@@ -12,114 +12,74 @@ import {
 	SUBSCRIBE_MESSAGE
 } from '../config/cache.js';
 
+/**
+ * The cached subscribe-template map, as `api/api.js`'s `getTempIds` writes it.
+ *
+ * Keyed by the contract's four scenes — `order-create`, `order-pay`, `order-ship`,
+ * `refund` — where legacy keyed it by an internal template name per notification
+ * (`order_pay_success`, `order_take`, `user_extract`, …). One scene now covers every
+ * template that moment needs, which is why the helpers below ask for a scene and not
+ * for a list of names.
+ */
 export function auth() {
-	let tmplIds = {};
 	let messageTmplIds = uni.getStorageSync(SUBSCRIBE_MESSAGE);
-	tmplIds = messageTmplIds ? JSON.parse(messageTmplIds) : {};
-	return tmplIds;
+	return messageTmplIds ? JSON.parse(messageTmplIds) : {};
+}
+
+/** Every template configured for one moment, or none if the shop configured none. */
+function scene(name) {
+	let tmplIds = auth();
+	let ids = tmplIds[name];
+	return Array.isArray(ids) ? ids.filter(Boolean) : [];
 }
 
 /**
- * 支付成功后订阅消息id
- * 订阅  确认收货通知 订单支付成功  新订单管理员提醒 
+ * 支付成功后订阅消息：支付成功本身，以及之后的发货通知。
  */
 export function openPaySubscribe() {
-	let tmplIds = auth();
-	return subscribe([
-		tmplIds.order_pay_success,
-		tmplIds.order_deliver_success,
-		tmplIds.order_postage_success,
-	]);
+	return subscribe(scene('order-pay').concat(scene('order-ship')));
 }
 
 /**
- * 订单相关订阅消息
- * 送货 发货 取消订单
+ * 下单相关订阅消息
  */
 export function openOrderSubscribe() {
-	let tmplIds = auth();
-	return subscribe([
-		tmplIds.order_take,
-		tmplIds.integral_accout
-	]);
+	return subscribe(scene('order-create'));
 }
 
 /**
- * 提现消息订阅
- * 成功 和 失败 消息
- */
-export function openExtrctSubscribe() {
-	let tmplIds = auth();
-	return subscribe([
-		tmplIds.user_extract
-	]);
-}
-
-/**
- * 拼团成功
+ * 拼团成功。拼团成团就是下单成功，走同一批模板。
  */
 export function openPinkSubscribe() {
-	let tmplIds = auth();
-	return subscribe([
-		tmplIds.order_user_groups_success
-	]);
-}
-
-/**
- * 砍价成功
- */
-export function openBargainSubscribe() {
-	let tmplIds = auth();
-	return subscribe([
-		tmplIds.bargain_success
-	]);
+	return subscribe(scene('order-create'));
 }
 
 /**
  * 订单退款
  */
 export function openOrderRefundSubscribe() {
-	let tmplIds = auth();
-	return subscribe([
-		tmplIds.order_refund
-	]);
-}
-
-/**
- * 充值成功
- */
-export function openRechargeSubscribe() {
-	let tmplIds = auth();
-	return subscribe([
-		tmplIds.recharge_success
-	]);
-}
-
-/**
- * 提现成功
- */
-export function openRevenueSubscribe() {
-	let tmplIds = auth();
-	return subscribe([
-		tmplIds.revenue_received
-	]);
+	return subscribe(scene('refund'));
 }
 
 /**
  * 调起订阅界面
- * array tmplIds 模板id
+ * @param array tmplIds 模板 id
+ *
+ * An empty list is the normal answer for a shop that configured no templates, and
+ * `requestSubscribeMessage` with `tmplIds: []` throws — so it resolves without asking.
+ * 提现、砍价、充值 subscriptions are gone with the features they announced.
  */
-export function subscribe(subscrip443tionmessagee502call) {
-	 let weChat = wx;
-	return new Promise((reslove, reject) => {
-		weChat.requestSubscribeMessage({
-			tmplIds: subscrip443tionmessagee502call,
+export function subscribe(tmplIds) {
+	if (!tmplIds || !tmplIds.length) return Promise.resolve({});
+	return new Promise((resolve) => {
+		uni.requestSubscribeMessage({
+			tmplIds: tmplIds,
 			success(res) {
-				return reslove(res);
+				return resolve(res);
 			},
 			fail(res) {
-				return reslove(res);
+				return resolve(res);
 			}
-		})
+		});
 	});
 }

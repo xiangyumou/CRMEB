@@ -42,9 +42,6 @@
 		BACK_URL
 	} from '@/config/cache';
 	import {
-		silenceAuth
-	} from '@/api/public';
-	import {
 		bindingPhone,
 		verifyCode
 	} from '@/api/api.js';

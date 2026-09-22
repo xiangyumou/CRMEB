@@ -121,7 +121,6 @@ import editUserModal from "@/components/eidtUserModal/index.vue";
 import privacyAgreementPopup from "@/components/privacyAgreementPopup/index.vue";
 import {
   getLogo,
-  silenceAuth,
   routineBindingPhone,
   wechatAuthV2,
   authType,
@@ -409,24 +408,14 @@ export default {
       uni.showLoading({
         title: this.$t(`正在登录中`),
       });
-      Routine.getCode()
-        .then((code) => {
-          this.getUserPhoneNumber(e.detail.encryptedData, e.detail.iv, code);
-        })
-        .catch((error) => {
-          uni.$emit("closePage", false);
-          uni.hideLoading();
-        });
+      // `e.detail.code` 是 getPhoneNumber 现在给的、由服务端兑换的 code；
+      // 旧的 encryptedData + iv 客户端解密需要 session_key 离开服务端，已不再支持。
+      this.getUserPhoneNumber(e.detail.code);
     },
     // 小程序获取手机号码回调
-    getUserPhoneNumber(encryptedData, iv, code) {
+    getUserPhoneNumber(phoneCode) {
       routineBindingPhone({
-        encryptedData: encryptedData,
-        iv: iv,
-        code: code,
-        spread_spid: app.globalData.spid,
-        spread_code: app.globalData.code,
-        agent_id: app.globalData.agent_id,
+        phoneCode: phoneCode,
         key: this.authKey,
       })
         .then((res) => {

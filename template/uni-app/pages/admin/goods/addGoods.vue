@@ -250,7 +250,7 @@ export default {
 		uploadPicture(){
 			let that = this;
 			this.canvasStatus = true
-			that.$util.uploadImageChange({ count: 9, url: 'upload/image' }, function(res) {
+			that.$util.uploadImageChange({ count: 9, purpose: 'staff' }, function(res) {
 				that.setFormData.slider_image.push(res.data.url);
 				if(that.setFormData.slider_image.length >= 9) that.setFormData.slider_image.length = 9;
 				that.setFormData.image = that.setFormData.slider_image[0];
@@ -265,7 +265,7 @@ export default {
 		uploadContentPicture(){
 			let that = this;
 			this.canvasStatus = true
-			that.$util.uploadImageChange({ count: 9, url: 'upload/image' }, function(res) {
+			that.$util.uploadImageChange({ count: 9, purpose: 'staff' }, function(res) {
 				that.contentPicture.push(res.data.url);
 			}, (res) => {
 				this.canvasStatus = false

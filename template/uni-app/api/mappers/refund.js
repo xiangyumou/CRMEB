@@ -131,7 +131,7 @@ export function toLegacyRefundReasons(dto) {
 }
 
 /**
- * `GET /api/v1/refunds/applicable-items` → the 申请退款 商品列表.
+ * `GET /api/v1/refunds/applicable-items/:orderId` → the 申请退款 商品列表.
  * `surplus_num` is the quantity still refundable; the page clamps its stepper to it.
  */
 export function toLegacyApplicableItems(dto) {

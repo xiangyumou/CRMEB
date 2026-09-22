@@ -13,8 +13,7 @@ import {
 	checkLogin
 } from './login';
 import {
-	routineLogin,
-	silenceAuth
+	routineLogin
 } from '../api/public';
 import Cache from '../utils/cache';
 import {

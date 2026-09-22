@@ -8,6 +8,8 @@
 import request from '../utils/request.js';
 import wechat from '../libs/wechat.js';
 import { toLegacyCategoryVersion } from './mappers/catalog.js';
+import { toLegacySession, toLegacyWechatLogin } from './mappers/user.js';
+import { toLegacyJssdkConfig } from './mappers/wechat.js';
 
 /**
  * 商品分类版本号
@@ -24,60 +26,161 @@ export function getCategoryVersion() {
   });
 }
 
-// CONTRACT-PENDING(E2) — 公众号 JS-SDK 配置。
+/**
+ * 公众号 JS-SDK 配置
+ */
 export function getWechatConfig() {
-  return request.get('/api/v1/wechat/js-config', { url: wechat.signLink() }, { noAuth: true });
+  return request.get('/api/v1/wechat/jssdk-config', { url: wechat.signLink() }, {
+    noAuth: true,
+    map: toLegacyJssdkConfig,
+  });
 }
 
-// CONTRACT-PENDING(E2) — 公众号 code 换登录态。
+// ---------------------------------------------------------------------------
+// 微信身份
+//
+// One generation of auth, not two. The legacy system carried `mp_auth` /
+// `wechat/auth_login` **and** `routine/auth_*` / `v2/wechat/auth_*` side by side, each
+// with its own token format and its own notion of "bound", and the uni-app picked
+// between them at runtime — which is why there were four exports below for two
+// operations. There are two routes now: 公众号 and 小程序, each answering
+// `{status, session, bindToken}`.
+//
+// `status: 'phone-required'` means the openid resolved but nothing is bound to it yet;
+// `bindToken` stands in for the openid for a few minutes so finishing the sign-in does
+// not have to redeem the single-use WeChat `code` again. The legacy 「请重新授权」 loop
+// came from exactly that.
+// ---------------------------------------------------------------------------
+
+/**
+ * 公众号 code 换登录态
+ */
 export function wechatAuthLogin(data) {
-  return request.post('/api/v1/auth/wechat-oa/sessions', data, { noAuth: true });
+  const src = data || {};
+  return request.post('/api/v1/auth/sessions/wechat-oa', { code: String(src.code || '') }, {
+    noAuth: true,
+    map: toLegacyWechatLogin,
+  });
 }
 
-// CONTRACT-PENDING(E2) — 公众号静默授权。
-export function wechatAuthV2(code, spread) {
-  return request.post('/api/v1/auth/wechat-oa/authorizations', { code, spread }, { noAuth: true });
+/**
+ * 公众号授权（`libs/wechat.js` 的位置参数版本）。`spread` (分销上级) 已废弃。
+ */
+export function wechatAuthV2(code) {
+  return wechatAuthLogin({ code });
 }
 
-// CONTRACT-PENDING(E2) — 公众号 / 小程序授权类型探测。
-export function silenceAuth(data) {
-  return request.get('/api/v1/auth/wechat/authorization-type', data, { noAuth: true });
-}
-
-// CONTRACT-PENDING(E2) — 小程序 code 换登录态。
+/**
+ * 小程序 code 换登录态。
+ *
+ * 旧版分两步：`authType` 先探测「这个 openid 要不要绑手机号」，再由 `authLogin` 用探
+ * 测拿到的 key 真正换 token。新合约一步给完 —— 已绑定就直接是 `signed-in`，没绑定就是
+ * `phone-required` 加一个 `bindToken`。`authType` 就是那一步。
+ */
 export function authType(data) {
-  return request.get('/api/v1/auth/wechat-mini/authorization-type', data, { noAuth: true });
+  const src = data || {};
+  return request
+    .post('/api/v1/auth/sessions/wechat-mini', { code: String(src.code || '') }, {
+      noAuth: true,
+      map: toLegacyWechatLogin,
+    })
+    .then((res) => {
+      lastMiniLogin = res.data;
+      return res;
+    });
 }
 
-export function authLogin(data) {
-  return request.post('/api/v1/auth/wechat-mini/sessions', data, { noAuth: true });
+/**
+ * 小程序授权登录（「授权登录」按钮）。
+ *
+ * There is no second round trip left to make: `authType` already minted the session,
+ * and the `wx.login` code it spent is single-use. So this hands back what that call
+ * resolved with, and asks for a fresh authorisation if the page somehow got here
+ * without one.
+ */
+export function authLogin() {
+  if (lastMiniLogin && lastMiniLogin.token) {
+    return Promise.resolve({ data: lastMiniLogin, msg: '', status: 200 });
+  }
+  const message = '请重新授权';
+  return Promise.reject({ message, msg: message, status: 401 });
 }
 
+/** `libs/routine.js` calls this one; same route, and it does carry a fresh code. */
 export function routineLogin(data) {
-  return request.post('/api/v1/auth/wechat-mini/sessions', data, { noAuth: true });
+  return authType(data);
 }
 
-// CONTRACT-PENDING(E1) — 公众号绑定手机号。
+/** The last mini-program sign-in, so `authLogin` has something to answer with. */
+let lastMiniLogin = null;
+
+// 授权类型探测 (`silenceAuth`) is gone: it asked "does this shop use 静默 or 手动
+// 授权", a question the two auth generations made necessary. Its only call sites were
+// already commented out.
+
+/**
+ * 公众号绑定手机号并登录。
+ *
+ * `key` is the `bindToken` the OA sign-in handed back on `phone-required`. The OA has
+ * no `getPhoneNumber`, so the proof is an SMS code — which is exactly what the page
+ * already collects.
+ */
 export function wechatBindingPhone(data) {
-  return request.post('/api/v1/auth/wechat-oa/phone-bindings', data, { noAuth: true });
+  const src = data || {};
+  return request.post(
+    '/api/v1/auth/sessions/wechat-oa/phone',
+    {
+      bindToken: String(src.key || src.bindToken || ''),
+      phone: String(src.phone || ''),
+      code: String(src.captcha || src.code || ''),
+    },
+    { noAuth: true, map: toLegacyWechatLogin },
+  );
 }
 
-// CONTRACT-PENDING(E1) — 小程序绑定手机号。
+/**
+ * 小程序授权手机号登录。
+ *
+ * `phoneCode` is what `getPhoneNumber`'s callback gives in the current API — a code
+ * redeemed server-side. The old `encryptedData` + `iv` path is deliberately not
+ * ported: decrypting it client-side needed `session_key` to leave the server, which
+ * is the one thing WeChat's own docs say never to do. The two call sites now pass
+ * `e.detail.code`.
+ */
 export function routineBindingPhone(data) {
-  return request.post('/api/v1/auth/wechat-mini/phone-bindings', data, { noAuth: true });
+  const src = data || {};
+  return request.post(
+    '/api/v1/auth/sessions/wechat-mini/phone',
+    {
+      bindToken: String(src.key || src.bindToken || ''),
+      phoneCode: String(src.phoneCode || ''),
+    },
+    { noAuth: true, map: toLegacyWechatLogin },
+  );
 }
 
-// CONTRACT-PENDING(E1) — 小程序手机号一键登录。
+/**
+ * 小程序「手机号 + 短信验证码」登录。
+ *
+ * Not a WeChat route: a typed phone and a typed SMS code is a plain SMS sign-in on any
+ * platform, and `POST /auth/sessions/sms` registers the phone if it is new. The
+ * `wx.login` code the page fetched first is unused; the openid is bound by the next
+ * `authLogin`. See `api/user.js`'s `phoneSilenceAuth`, which is the same screen.
+ */
 export function phoneLogin(data) {
-  return request.post('/api/v1/auth/wechat-mini/phone-sessions', data, { noAuth: true });
+  const src = data || {};
+  return request.post(
+    '/api/v1/auth/sessions/sms',
+    { phone: String(src.phone || ''), code: String(src.captcha || src.code || '') },
+    { noAuth: true, map: toLegacySession },
+  );
 }
 
-// CONTRACT-PENDING(E1) — iframe / 单点登录换 token。
-export function remoteRegister(data) {
-  return request.get('/api/v1/auth/remote-sessions', data, { noAuth: true });
-}
+// iframe / 单点登录换 token (`remoteRegister`) is gone: it had no call site, and the
+// route it stood for — hand me a token for a user I name — is the shape the whole
+// contract is built to refuse.
 
-// CONTRACT-PENDING(F1) — 站点公开配置。
+// CONTRACT-PENDING(F1) — 站点公开配置；见 docs/rewrite/cr/CR-7-h2.md。
 export function basicConfig() {
   return request.get('/api/v1/site/config', {}, { noAuth: true });
 }
@@ -90,17 +193,22 @@ export function getShare() {
   return request.get('/api/v1/site/share', {}, { noAuth: true });
 }
 
-// CONTRACT-PENDING(E2) — 订阅消息开关。
-export function getSubscribe() {
-  return request.get('/api/v1/wechat/subscribe-config', {}, { noAuth: true });
-}
+// 「当前访客是否已关注公众号」 (`getSubscribe`) is gone: answering it means reading the
+// OA's follower list for a person, and the storefront surface deliberately exposes
+// nothing about who is on the other end. `diyComponents/follow.vue` now always renders
+// the 未关注 state, which is what it already did whenever the call failed.
 
-// CONTRACT-PENDING(G1) — 底部导航（装修）。
+// ---------------------------------------------------------------------------
+// CONTRACT-PENDING(G1) — 底部导航（装修）。G1 的前台只有首页 / 指定页 / 主题 / 版本号
+// 四条路由，底部导航不在其中；见 docs/rewrite/cr/CR-3-h2.md。
+// ---------------------------------------------------------------------------
+
 export function getNavigation(data) {
   return request.get('/api/v1/diy/navigation', data, { noAuth: true });
 }
 
-// CONTRACT-PENDING(F1) — 海报用的图片转 base64（服务端代抓，走 storage 的 safe-fetch）。
+// CONTRACT-PENDING(F1) — 海报用的图片转 base64（服务端代抓，只允许本店附件，见
+// docs/rewrite/cr/CR-7-h2.md 的 SSRF 说明）。
 export function imageBase64(image, code) {
   return request.post('/api/v1/site/image-data-urls', { image, code }, { noAuth: true });
 }

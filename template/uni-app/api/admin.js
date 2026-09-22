@@ -83,9 +83,10 @@ export function getStatisticsMonth(where) {
  * neither end). Legacy made the same comparison, inside one call.
  */
 export function getStatisticsTime(data) {
-  // Both calls are written as `request.get(...)` rather than chained off a promise:
-  // `scripts/check-api-routes.mjs` matches that spelling, and a call it cannot see is a
-  // call nothing proves a contract for.
+  // Both URLs are written out at the call rather than built from a fragment, which is
+  // the only shape `scripts/check-api-routes.mjs` can read — it refuses a computed one
+  // now rather than skipping it, because a call the guard cannot see is a call nothing
+  // proves a contract for.
   const current = request.get('/api/v1/staff/statistics/series', fromLegacyStatisticsRange(data));
   return current.then((res) => {
     const previous = request.get(
@@ -241,8 +242,9 @@ export function setAdminRefundRemark(data) {
 }
 
 // ---------------------------------------------------------------------------
-// CONTRACT-PENDING(A) — 商品管理. B2's contract hands these screens to stream A
-// (`admin/product/*`, nine of the nineteen non-order staff routes).
+// CONTRACT-PENDING(A) — 商品管理. B2's contract hands these screens to stream A; the
+// capability exists under `/admin-api/catalog/*` but only for an admin session, and a
+// 店员 has a shopper session with a role on it. See docs/rewrite/cr/CR-4-h2.md.
 // ---------------------------------------------------------------------------
 
 /**
@@ -317,8 +319,10 @@ export function productCreate(data) {
 }
 
 // ---------------------------------------------------------------------------
-// CONTRACT-PENDING(E1) — 用户管理. B2's contract hands these screens to stream E1
-// (`admin/user/*`, the other ten non-order staff routes).
+// CONTRACT-PENDING(E1) — 用户管理. B2's contract hands these screens to stream E1;
+// same shape as 商品管理 — `/admin-api/users*` does it all, for an admin.
+// See docs/rewrite/cr/CR-2-h2.md §3, which also asks how much of a customer a
+// 店员 should be shown.
 // ---------------------------------------------------------------------------
 
 /**
@@ -368,7 +372,9 @@ export function postUserSetLabel(uid, labelId) {
 }
 
 // ---------------------------------------------------------------------------
-// CONTRACT-PENDING(B1) — 赠送优惠券. The coupon domain has no staff-side grant route.
+// CONTRACT-PENDING(B1) — 赠送优惠券. The coupon domain grants from the console
+// (`POST /admin-api/coupons/:id/grants`) and nowhere else; see
+// docs/rewrite/cr/CR-5-h2.md.
 // ---------------------------------------------------------------------------
 
 /**

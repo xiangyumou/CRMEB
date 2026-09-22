@@ -131,9 +131,6 @@
 		mpBindingPhone
 	} from '@/api/user.js';
 	import {
-		switchH5Login,
-	} from '@/api/api.js';
-	import {
 		toLogin
 	} from '@/libs/login.js';
 	import {
@@ -195,14 +192,10 @@
 			},
 			getphonenumber(e) {
 				if (e.detail.errMsg == 'getPhoneNumber:ok') {
-					Routine.getCode()
-						.then(code => {
-							let data = {
-								code,
-								iv: e.detail.iv,
-								encryptedData: e.detail.encryptedData,
-							}
-							mpBindingPhone(data).then(res => {
+					// `e.detail.code` 是 getPhoneNumber 现在给的、由服务端兑换的 code。
+					Promise.resolve(e.detail.code)
+						.then(phoneCode => {
+							mpBindingPhone({ phoneCode }).then(res => {
 								this.getUserInfo()
 								this.$util.Tips({
 									title: res.msg,
@@ -315,30 +308,12 @@
 				if (userInfo === undefined) return that.$util.Tips({
 					title: that.$t(`切换的账号不存在`)
 				});
-				if (userInfo.user_type === 'h5') {
-					uni.showLoading({
-						title: that.$t(`正在切换中`)
-					});
-					switchH5Login().then(res => {
-						uni.hideLoading();
-						that.$store.commit("LOGIN", {
-							'token': res.data.token,
-							'time': this.$Cache.strTotime(res.data.expires_time) - this.$Cache.time()
-						});
-						that.getUserInfo();
-					}).catch(err => {
-						uni.hideLoading();
-						return that.$util.Tips({
-							title: err
-						});
-					})
-				} else {
-					that.$store.commit("LOGOUT");
-					uni.showLoading({
-						title: that.$t(`正在切换中`)
-					});
-					toLogin();
-				}
+				// 多账号切换没有继任者：一个 token 就是一个账号，换账号就是重新登录。
+				that.$store.commit("LOGOUT");
+				uni.showLoading({
+					title: that.$t(`正在切换中`)
+				});
+				toLogin();
 			},
 			/**
 			 * 退出登录

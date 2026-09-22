@@ -1,4 +1,281 @@
 {
+  "POST /api/v1/auth/phone": {
+    "name": "ok",
+    "body": {
+      "phone": "13700137000",
+      "code": "123456"
+    },
+    "response": {
+      "ok": true
+    }
+  },
+  "PUT /api/v1/auth/password": {
+    "name": "with-old-password",
+    "body": {
+      "oldPassword": "crmeb123456",
+      "password": "crmeb654321"
+    },
+    "response": {
+      "ok": true
+    }
+  },
+  "PUT /api/v1/auth/phone": {
+    "name": "ok",
+    "body": {
+      "phone": "13900139000",
+      "code": "123456"
+    },
+    "response": {
+      "ok": true
+    }
+  },
+  "DELETE /api/v1/auth/sessions/current": {
+    "name": "ok",
+    "response": {
+      "ok": true
+    }
+  },
+  "DELETE /api/v1/auth/sessions": {
+    "name": "ok",
+    "response": {
+      "revoked": 3
+    }
+  },
+  "POST /api/v1/auth/sessions/wechat-mini": {
+    "name": "known-openid",
+    "body": {
+      "code": "081Kf2Ga1abcDE0xyz3Ga9KfXa1Kf2Gb"
+    },
+    "response": {
+      "status": "signed-in",
+      "session": {
+        "token": "u_8f2b7c1d9e4a6053f1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "expiresAt": "2026-10-22T10:00:00+08:00",
+        "user": {
+          "id": "1002",
+          "account": "wx_2b7c1d9e",
+          "phone": "13800138000",
+          "nickname": "小明",
+          "avatarUrl": "https://cdn.example.com/2026/09/a1b2c3d4.png",
+          "realName": null,
+          "birthday": null,
+          "registerSource": "wechat_mini",
+          "hasPassword": false,
+          "boundWechat": [
+            "mini"
+          ],
+          "createdAt": "2026-01-05T10:00:00+08:00"
+        }
+      },
+      "registered": false,
+      "bindToken": null,
+      "bindTokenExpiresInSec": null
+    }
+  },
+  "POST /api/v1/auth/sessions/wechat-mini/phone": {
+    "name": "new-account",
+    "body": {
+      "bindToken": "wxb_4f1c8a2d7e6b5039",
+      "phoneCode": "e0c1f2d3a4b5968778695a4b3c2d1e0f"
+    },
+    "response": {
+      "status": "signed-in",
+      "session": {
+        "token": "u_8f2b7c1d9e4a6053f1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "expiresAt": "2026-10-22T10:00:00+08:00",
+        "user": {
+          "id": "1002",
+          "account": "wx_2b7c1d9e",
+          "phone": "13800138000",
+          "nickname": "小明",
+          "avatarUrl": "https://cdn.example.com/2026/09/a1b2c3d4.png",
+          "realName": null,
+          "birthday": null,
+          "registerSource": "wechat_mini",
+          "hasPassword": false,
+          "boundWechat": [
+            "mini"
+          ],
+          "createdAt": "2026-01-05T10:00:00+08:00"
+        }
+      },
+      "registered": true,
+      "bindToken": null,
+      "bindTokenExpiresInSec": null
+    }
+  },
+  "GET /api/v1/auth/wechat-oa/authorize-url": {
+    "name": "base",
+    "query": {
+      "redirectUrl": "https://shop.example.com/pages/users/auth",
+      "scope": "base"
+    },
+    "response": {
+      "url": "https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx1234567890abcdef&redirect_uri=https%3A%2F%2Fshop.example.com%2Fapi%2Fv1%2Fauth%2Fwechat-oa%2Fcallback&response_type=code&scope=snsapi_base&state=9f1c8a2d#wechat_redirect",
+      "state": "9f1c8a2d"
+    }
+  },
+  "POST /api/v1/auth/sessions/wechat-oa": {
+    "name": "known-openid",
+    "body": {
+      "code": "071Kf2Ga1abcDE0xyz3Ga9KfXa1Kf2Gc"
+    },
+    "response": {
+      "status": "signed-in",
+      "session": {
+        "token": "u_8f2b7c1d9e4a6053f1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "expiresAt": "2026-10-22T10:00:00+08:00",
+        "user": {
+          "id": "1002",
+          "account": "wx_2b7c1d9e",
+          "phone": "13800138000",
+          "nickname": "小明",
+          "avatarUrl": "https://cdn.example.com/2026/09/a1b2c3d4.png",
+          "realName": null,
+          "birthday": null,
+          "registerSource": "wechat_oa",
+          "hasPassword": false,
+          "boundWechat": [
+            "oa"
+          ],
+          "createdAt": "2026-01-05T10:00:00+08:00"
+        }
+      },
+      "registered": false,
+      "bindToken": null,
+      "bindTokenExpiresInSec": null
+    }
+  },
+  "POST /api/v1/auth/sessions/wechat-oa/phone": {
+    "name": "links-existing-account",
+    "body": {
+      "bindToken": "wxb_7a3e9c1b2d4f6058",
+      "phone": "13800138000",
+      "code": "123456"
+    },
+    "response": {
+      "status": "signed-in",
+      "session": {
+        "token": "u_8f2b7c1d9e4a6053f1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "expiresAt": "2026-10-22T10:00:00+08:00",
+        "user": {
+          "id": "1001",
+          "account": "13800138000",
+          "phone": "13800138000",
+          "nickname": "小明",
+          "avatarUrl": "https://cdn.example.com/2026/09/a1b2c3d4.png",
+          "realName": null,
+          "birthday": null,
+          "registerSource": "h5",
+          "hasPassword": true,
+          "boundWechat": [
+            "oa"
+          ],
+          "createdAt": "2026-01-05T10:00:00+08:00"
+        }
+      },
+      "registered": false,
+      "bindToken": null,
+      "bindTokenExpiresInSec": null
+    }
+  },
+  "POST /api/v1/auth/sessions/password": {
+    "name": "ok",
+    "body": {
+      "account": "13800138000",
+      "password": "crmeb123456"
+    },
+    "response": {
+      "token": "u_8f2b7c1d9e4a6053f1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "expiresAt": "2026-10-22T10:00:00+08:00",
+      "user": {
+        "id": "1001",
+        "account": "13800138000",
+        "phone": "13800138000",
+        "nickname": "小明",
+        "avatarUrl": "https://cdn.example.com/2026/09/a1b2c3d4.png",
+        "realName": null,
+        "birthday": null,
+        "registerSource": "h5",
+        "hasPassword": true,
+        "boundWechat": [],
+        "createdAt": "2026-01-05T10:00:00+08:00"
+      }
+    }
+  },
+  "POST /api/v1/auth/registrations": {
+    "name": "ok",
+    "body": {
+      "phone": "13700137000",
+      "code": "123456",
+      "password": "crmeb123456",
+      "nickname": "新用户"
+    },
+    "response": {
+      "token": "u_8f2b7c1d9e4a6053f1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "expiresAt": "2026-10-22T10:00:00+08:00",
+      "user": {
+        "id": "1003",
+        "account": "13700137000",
+        "phone": "13700137000",
+        "nickname": "新用户",
+        "avatarUrl": null,
+        "realName": null,
+        "birthday": null,
+        "registerSource": "h5",
+        "hasPassword": true,
+        "boundWechat": [],
+        "createdAt": "2026-09-22T10:00:00+08:00"
+      }
+    }
+  },
+  "POST /api/v1/auth/password-resets": {
+    "name": "ok",
+    "body": {
+      "phone": "13800138000",
+      "code": "123456",
+      "password": "crmeb654321"
+    },
+    "response": {
+      "ok": true
+    }
+  },
+  "POST /api/v1/auth/sms-codes": {
+    "name": "login",
+    "body": {
+      "phone": "13800138000",
+      "scene": "login"
+    },
+    "response": {
+      "expiresInSec": 300,
+      "resendAfterSec": 60
+    }
+  },
+  "POST /api/v1/auth/sessions/sms": {
+    "name": "existing-user",
+    "body": {
+      "phone": "13800138000",
+      "code": "123456"
+    },
+    "response": {
+      "token": "u_8f2b7c1d9e4a6053f1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "expiresAt": "2026-10-22T10:00:00+08:00",
+      "user": {
+        "id": "1001",
+        "account": "13800138000",
+        "phone": "13800138000",
+        "nickname": "小明",
+        "avatarUrl": "https://cdn.example.com/2026/09/a1b2c3d4.png",
+        "realName": null,
+        "birthday": null,
+        "registerSource": "h5",
+        "hasPassword": true,
+        "boundWechat": [],
+        "createdAt": "2026-01-05T10:00:00+08:00"
+      },
+      "registered": false
+    }
+  },
   "POST /api/v1/cart/items": {
     "name": "ok",
     "body": {
@@ -815,6 +1092,86 @@
       }
     }
   },
+  "GET /api/v1/article-categories": {
+    "name": "ok",
+    "response": {
+      "items": [
+        {
+          "id": "3",
+          "title": "新闻资讯",
+          "imageUrl": "/uploads/2026/01/news.png",
+          "children": [
+            {
+              "id": "4",
+              "title": "商城公告",
+              "imageUrl": null
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "GET /api/v1/articles/:id": {
+    "name": "ok",
+    "params": {
+      "id": "101"
+    },
+    "response": {
+      "id": "101",
+      "categoryId": "3",
+      "categoryTitle": "新闻资讯",
+      "title": "双十一活动说明",
+      "slug": "double-eleven-2026",
+      "author": "运营部",
+      "coverImageUrl": "/uploads/2026/10/cover.png",
+      "summary": "活动时间、优惠券发放与常见问题。",
+      "sourceUrl": null,
+      "isHot": true,
+      "isBanner": false,
+      "views": 3422,
+      "sortOrder": 50,
+      "publishedAt": "2026-10-20T10:00:00+08:00",
+      "contentHtml": "<p>活动时间：11 月 1 日至 11 月 11 日。</p><p>全场满 199 减 20。</p>",
+      "product": {
+        "id": "77",
+        "name": "云南小粒咖啡豆 500g",
+        "imageUrl": "/uploads/2026/01/coffee.png",
+        "price": "69.00",
+        "originalPrice": "99.00"
+      }
+    }
+  },
+  "GET /api/v1/articles": {
+    "name": "by-category",
+    "query": {
+      "page": 1,
+      "pageSize": 10,
+      "categoryId": "3"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "101",
+          "categoryId": "3",
+          "categoryTitle": "新闻资讯",
+          "title": "双十一活动说明",
+          "slug": "double-eleven-2026",
+          "author": "运营部",
+          "coverImageUrl": "/uploads/2026/10/cover.png",
+          "summary": "活动时间、优惠券发放与常见问题。",
+          "sourceUrl": null,
+          "isHot": true,
+          "isBanner": false,
+          "views": 3421,
+          "sortOrder": 50,
+          "publishedAt": "2026-10-20T10:00:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 10
+    }
+  },
   "POST /api/v1/user-coupons/applicable": {
     "name": "one-usable-one-not",
     "body": {
@@ -1072,12 +1429,310 @@
       "version": "1716451200000"
     }
   },
+  "GET /api/v1/groupbuy/banners": {
+    "name": "two-banners",
+    "response": {
+      "items": [
+        {
+          "imageUrl": "https://cdn.example.com/banner/groupbuy-1.jpg",
+          "link": null
+        },
+        {
+          "imageUrl": "https://cdn.example.com/banner/groupbuy-2.jpg",
+          "link": "/pages/activity/groupbuy/index"
+        }
+      ]
+    }
+  },
+  "GET /api/v1/groupbuy/activities/:id": {
+    "name": "anonymous",
+    "params": {
+      "id": "1"
+    },
+    "response": {
+      "activityId": "1",
+      "productId": "11",
+      "title": "三人成团 · 坚果礼盒",
+      "intro": "三人成团立减 29 元",
+      "imageUrl": "https://cdn.example.com/p/11.jpg",
+      "price": "59.00",
+      "originalPrice": "88.00",
+      "seatsRequired": 3,
+      "stock": 200,
+      "sales": 46,
+      "startAt": "2026-09-01T00:00:00+08:00",
+      "endAt": "2026-10-31T23:59:59+08:00",
+      "formingGroups": 4,
+      "canBuy": true,
+      "sliderImages": [
+        "https://cdn.example.com/p/11-1.jpg"
+      ],
+      "groupTtlSeconds": 86400,
+      "perOrderQuantity": 1,
+      "description": "<p>每日坚果，三人成团。</p>",
+      "skus": [
+        {
+          "skuId": "21",
+          "specText": "混合装|1000g",
+          "specValues": {
+            "口味": "混合装",
+            "规格": "1000g"
+          },
+          "imageUrl": "https://cdn.example.com/sku/21.jpg",
+          "price": "59.00",
+          "originalPrice": "88.00",
+          "stock": 200
+        }
+      ],
+      "myOpenGroupId": null
+    }
+  },
+  "GET /api/v1/groupbuy/groups/:id": {
+    "name": "member-view",
+    "params": {
+      "id": "501"
+    },
+    "response": {
+      "groupId": "501",
+      "activityId": "1",
+      "title": "三人成团 · 坚果礼盒",
+      "imageUrl": "https://cdn.example.com/p/11.jpg",
+      "price": "59.00",
+      "status": "forming",
+      "seatsTotal": 3,
+      "seatsTaken": 2,
+      "seatsLeft": 1,
+      "expiresAt": "2026-09-23T10:00:00+08:00",
+      "succeededAt": null,
+      "members": [
+        {
+          "userId": "101",
+          "nickname": "小明",
+          "avatarUrl": "https://cdn.example.com/u/101.jpg",
+          "role": "leader"
+        },
+        {
+          "userId": "102",
+          "nickname": "小红",
+          "avatarUrl": "https://cdn.example.com/u/102.jpg",
+          "role": "member"
+        }
+      ],
+      "me": {
+        "role": "member",
+        "status": "joined",
+        "orderId": "7002",
+        "paid": true
+      },
+      "canJoin": false
+    }
+  },
+  "GET /api/v1/groupbuy/activities": {
+    "name": "first-page",
+    "query": {
+      "page": 1,
+      "pageSize": 20
+    },
+    "response": {
+      "items": [
+        {
+          "activityId": "1",
+          "productId": "11",
+          "title": "三人成团 · 坚果礼盒",
+          "intro": "三人成团立减 29 元",
+          "imageUrl": "https://cdn.example.com/p/11.jpg",
+          "price": "59.00",
+          "originalPrice": "88.00",
+          "seatsRequired": 3,
+          "stock": 200,
+          "sales": 46,
+          "startAt": "2026-09-01T00:00:00+08:00",
+          "endAt": "2026-10-31T23:59:59+08:00",
+          "formingGroups": 4,
+          "canBuy": true
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "GET /api/v1/groupbuy/my-groups": {
+    "name": "forming",
+    "query": {
+      "page": 1,
+      "pageSize": 20,
+      "status": "forming"
+    },
+    "response": {
+      "items": [
+        {
+          "groupId": "501",
+          "activityId": "1",
+          "title": "三人成团 · 坚果礼盒",
+          "imageUrl": "https://cdn.example.com/p/11.jpg",
+          "status": "forming",
+          "role": "member",
+          "memberStatus": "joined",
+          "orderId": "7002",
+          "seatsTotal": 3,
+          "seatsTaken": 2,
+          "expiresAt": "2026-09-23T10:00:00+08:00",
+          "createdAt": "2026-09-22T10:20:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "GET /api/v1/groupbuy/activities/:id/groups": {
+    "name": "one-team-waiting",
+    "params": {
+      "id": "1"
+    },
+    "query": {
+      "page": 1,
+      "pageSize": 20
+    },
+    "response": {
+      "items": [
+        {
+          "groupId": "501",
+          "leaderNickname": "小明",
+          "leaderAvatarUrl": "https://cdn.example.com/u/101.jpg",
+          "seatsTotal": 3,
+          "seatsTaken": 2,
+          "seatsLeft": 1,
+          "expiresAt": "2026-09-23T10:00:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "GET /api/v1/groupbuy/groups/:id/poster": {
+    "name": "ok",
+    "params": {
+      "id": "501"
+    },
+    "response": {
+      "groupId": "501",
+      "title": "三人成团 · 坚果礼盒",
+      "imageUrl": "https://cdn.example.com/p/11.jpg",
+      "price": "59.00",
+      "originalPrice": "88.00",
+      "seatsLeft": 1,
+      "expiresAt": "2026-09-23T10:00:00+08:00",
+      "leaderNickname": "小明",
+      "leaderAvatarUrl": "https://cdn.example.com/u/101.jpg",
+      "qrPayload": "https://shop.example.com/pages/activity/groupbuy_status/index?groupId=501",
+      "page": "pages/activity/groupbuy_status/index?groupId=501"
+    }
+  },
+  "POST /api/v1/groupbuy/groups/:id/withdrawal": {
+    "name": "nobody-had-paid",
+    "params": {
+      "id": "501"
+    },
+    "body": {},
+    "response": {
+      "groupId": "501",
+      "activityId": "1",
+      "title": "三人成团 · 坚果礼盒",
+      "imageUrl": "https://cdn.example.com/p/11.jpg",
+      "price": "59.00",
+      "status": "cancelled",
+      "seatsTotal": 3,
+      "seatsTaken": 0,
+      "seatsLeft": 3,
+      "expiresAt": "2026-09-23T10:00:00+08:00",
+      "succeededAt": null,
+      "members": [],
+      "me": null,
+      "canJoin": false
+    }
+  },
   "GET /api/v1/health": {
     "name": "ok",
     "response": {
       "status": "ok",
       "time": "2026-01-01T12:00:00+08:00",
       "version": "dev"
+    }
+  },
+  "DELETE /api/v1/my-messages/:id": {
+    "name": "ok",
+    "params": {
+      "id": "5001"
+    }
+  },
+  "GET /api/v1/my-messages/:id": {
+    "name": "ok",
+    "params": {
+      "id": "5001"
+    },
+    "response": {
+      "id": "5001",
+      "code": "order_shipped",
+      "title": "您的订单已发货",
+      "content": "订单 20260106000000000000001 已由 顺丰速运 发出，运单号 SF1234567890。",
+      "data": {
+        "orderId": "1024",
+        "link": "/orders/1024"
+      },
+      "readAt": null,
+      "createdAt": "2026-01-06T09:00:00+08:00"
+    }
+  },
+  "GET /api/v1/my-messages": {
+    "name": "first-page",
+    "query": {
+      "page": 1,
+      "pageSize": 20
+    },
+    "response": {
+      "items": [
+        {
+          "id": "5001",
+          "code": "order_shipped",
+          "title": "您的订单已发货",
+          "content": "订单 20260106000000000000001 已由 顺丰速运 发出，运单号 SF1234567890。",
+          "data": {
+            "orderId": "1024",
+            "link": "/orders/1024"
+          },
+          "readAt": null,
+          "createdAt": "2026-01-06T09:00:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "POST /api/v1/my-messages/read-all": {
+    "name": "marked-two",
+    "body": {},
+    "response": {
+      "marked": 2
+    }
+  },
+  "POST /api/v1/my-messages/:id/read": {
+    "name": "marked",
+    "params": {
+      "id": "5001"
+    },
+    "body": {},
+    "response": {
+      "marked": 1
+    }
+  },
+  "GET /api/v1/my-messages/unread-count": {
+    "name": "two",
+    "response": {
+      "unread": 2
     }
   },
   "POST /api/v1/checkout/preview": {
@@ -1693,25 +2348,6 @@
       },
       "issuedAt": null,
       "createdAt": "2026-02-03T10:00:00+08:00"
-    }
-  },
-  "GET /api/v1/staff/express-companies": {
-    "name": "ok",
-    "response": {
-      "items": [
-        {
-          "id": "12",
-          "code": "SF",
-          "name": "顺丰速运",
-          "sortOrder": 100
-        },
-        {
-          "id": "13",
-          "code": "ZTO",
-          "name": "中通快递",
-          "sortOrder": 90
-        }
-      ]
     }
   },
   "GET /api/v1/staff/me": {
@@ -2600,6 +3236,75 @@
       "message": "成功"
     }
   },
+  "GET /api/v1/presale/activities/:id": {
+    "name": "ok",
+    "params": {
+      "id": "2"
+    },
+    "response": {
+      "activityId": "2",
+      "productId": "12",
+      "title": "春茶预售 · 明前龙井",
+      "intro": "付款后 15 天内发货",
+      "imageUrl": "https://cdn.example.com/p/12.jpg",
+      "price": "128.00",
+      "originalPrice": "168.00",
+      "stock": 500,
+      "sales": 87,
+      "startAt": "2026-09-01T00:00:00+08:00",
+      "endAt": "2026-11-30T23:59:59+08:00",
+      "shipAfterDays": 15,
+      "canBuy": true,
+      "sliderImages": [
+        "https://cdn.example.com/p/12-1.jpg"
+      ],
+      "perOrderQuantity": 5,
+      "description": "<p>明前采摘，付款后 15 天内发货。</p>",
+      "skus": [
+        {
+          "skuId": "31",
+          "specText": "特级|250g",
+          "specValues": {
+            "等级": "特级",
+            "规格": "250g"
+          },
+          "imageUrl": "https://cdn.example.com/sku/31.jpg",
+          "price": "128.00",
+          "originalPrice": "168.00",
+          "stock": 500
+        }
+      ]
+    }
+  },
+  "GET /api/v1/presale/activities": {
+    "name": "first-page",
+    "query": {
+      "page": 1,
+      "pageSize": 20
+    },
+    "response": {
+      "items": [
+        {
+          "activityId": "2",
+          "productId": "12",
+          "title": "春茶预售 · 明前龙井",
+          "intro": "付款后 15 天内发货",
+          "imageUrl": "https://cdn.example.com/p/12.jpg",
+          "price": "128.00",
+          "originalPrice": "168.00",
+          "stock": 500,
+          "sales": 87,
+          "startAt": "2026-09-01T00:00:00+08:00",
+          "endAt": "2026-11-30T23:59:59+08:00",
+          "shipAfterDays": 15,
+          "canBuy": true
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
   "GET /api/v1/refunds/applicable-items/:orderId": {
     "name": "one-line",
     "params": {
@@ -2920,6 +3625,76 @@
       ]
     }
   },
+  "GET /api/v1/cities": {
+    "name": "ok",
+    "response": {
+      "items": [
+        {
+          "id": "110000",
+          "name": "北京",
+          "level": 0,
+          "children": [
+            {
+              "id": "110100",
+              "name": "北京市",
+              "level": 1,
+              "children": [
+                {
+                  "id": "110101",
+                  "name": "东城区",
+                  "level": 2
+                },
+                {
+                  "id": "110102",
+                  "name": "西城区",
+                  "level": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "310000",
+          "name": "上海",
+          "level": 0,
+          "children": [
+            {
+              "id": "310100",
+              "name": "上海市",
+              "level": 1,
+              "children": [
+                {
+                  "id": "310101",
+                  "name": "黄浦区",
+                  "level": 2
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "version": "cities-3939-820000"
+    }
+  },
+  "GET /api/v1/staff/express-companies": {
+    "name": "ok",
+    "response": {
+      "items": [
+        {
+          "id": "12",
+          "code": "SF",
+          "name": "顺丰速运",
+          "sortOrder": 100
+        },
+        {
+          "id": "13",
+          "code": "ZTO",
+          "name": "中通快递",
+          "sortOrder": 90
+        }
+      ]
+    }
+  },
   "POST /api/v1/attachments/scan-uploads/:token": {
     "name": "from-the-phone",
     "params": {
@@ -2970,5 +3745,308 @@
       "content": "<p>欢迎使用本商城……</p>",
       "updatedAt": "2026-09-20T18:30:00+08:00"
     }
+  },
+  "POST /api/v1/addresses": {
+    "name": "ok",
+    "body": {
+      "receiverName": "张三",
+      "receiverPhone": "13800138000",
+      "provinceId": "110000",
+      "cityId": "110100",
+      "districtId": "110105",
+      "provinceName": "北京市",
+      "cityName": "北京市",
+      "districtName": "朝阳区",
+      "detail": "建国路 88 号 SOHO 尚都 1201",
+      "postCode": "100022",
+      "isDefault": true
+    },
+    "response": {
+      "id": "5001",
+      "receiverName": "张三",
+      "receiverPhone": "13800138000",
+      "provinceId": "110000",
+      "cityId": "110100",
+      "districtId": "110105",
+      "provinceName": "北京市",
+      "cityName": "北京市",
+      "districtName": "朝阳区",
+      "detail": "建国路 88 号 SOHO 尚都 1201",
+      "postCode": "100022",
+      "lng": "116.472644",
+      "lat": "39.913423",
+      "isDefault": true,
+      "createdAt": "2026-01-06T09:00:00+08:00",
+      "updatedAt": "2026-01-06T09:00:00+08:00"
+    }
+  },
+  "DELETE /api/v1/addresses/:id": {
+    "name": "ok",
+    "params": {
+      "id": "5001"
+    }
+  },
+  "GET /api/v1/addresses/:id": {
+    "name": "ok",
+    "params": {
+      "id": "5001"
+    },
+    "response": {
+      "id": "5001",
+      "receiverName": "张三",
+      "receiverPhone": "13800138000",
+      "provinceId": "110000",
+      "cityId": "110100",
+      "districtId": "110105",
+      "provinceName": "北京市",
+      "cityName": "北京市",
+      "districtName": "朝阳区",
+      "detail": "建国路 88 号 SOHO 尚都 1201",
+      "postCode": "100022",
+      "lng": "116.472644",
+      "lat": "39.913423",
+      "isDefault": true,
+      "createdAt": "2026-01-06T09:00:00+08:00",
+      "updatedAt": "2026-01-06T09:00:00+08:00"
+    }
+  },
+  "GET /api/v1/addresses": {
+    "name": "ok",
+    "query": {
+      "page": 1,
+      "pageSize": 20
+    },
+    "response": {
+      "items": [
+        {
+          "id": "5001",
+          "receiverName": "张三",
+          "receiverPhone": "13800138000",
+          "provinceId": "110000",
+          "cityId": "110100",
+          "districtId": "110105",
+          "provinceName": "北京市",
+          "cityName": "北京市",
+          "districtName": "朝阳区",
+          "detail": "建国路 88 号 SOHO 尚都 1201",
+          "postCode": "100022",
+          "lng": "116.472644",
+          "lat": "39.913423",
+          "isDefault": true,
+          "createdAt": "2026-01-06T09:00:00+08:00",
+          "updatedAt": "2026-01-06T09:00:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "POST /api/v1/addresses/:id/default": {
+    "name": "ok",
+    "params": {
+      "id": "5001"
+    },
+    "body": {},
+    "response": {
+      "id": "5001",
+      "receiverName": "张三",
+      "receiverPhone": "13800138000",
+      "provinceId": "110000",
+      "cityId": "110100",
+      "districtId": "110105",
+      "provinceName": "北京市",
+      "cityName": "北京市",
+      "districtName": "朝阳区",
+      "detail": "建国路 88 号 SOHO 尚都 1201",
+      "postCode": "100022",
+      "lng": "116.472644",
+      "lat": "39.913423",
+      "isDefault": true,
+      "createdAt": "2026-01-06T09:00:00+08:00",
+      "updatedAt": "2026-01-06T09:00:00+08:00"
+    }
+  },
+  "PUT /api/v1/addresses/:id": {
+    "name": "ok",
+    "params": {
+      "id": "5001"
+    },
+    "body": {
+      "receiverName": "张三",
+      "receiverPhone": "13800138000",
+      "provinceName": "北京市",
+      "cityName": "北京市",
+      "districtName": "朝阳区",
+      "detail": "建国路 88 号 SOHO 尚都 1801",
+      "isDefault": true
+    },
+    "response": {
+      "id": "5001",
+      "receiverName": "张三",
+      "receiverPhone": "13800138000",
+      "provinceId": "110000",
+      "cityId": "110100",
+      "districtId": "110105",
+      "provinceName": "北京市",
+      "cityName": "北京市",
+      "districtName": "朝阳区",
+      "detail": "建国路 88 号 SOHO 尚都 1801",
+      "postCode": "100022",
+      "lng": "116.472644",
+      "lat": "39.913423",
+      "isDefault": true,
+      "createdAt": "2026-01-06T09:00:00+08:00",
+      "updatedAt": "2026-01-06T09:00:00+08:00"
+    }
+  },
+  "GET /api/v1/account-cancellations/current": {
+    "name": "pending",
+    "response": {
+      "request": {
+        "id": "31",
+        "userId": "1001",
+        "nickname": "小明",
+        "phone": "138****8000",
+        "reason": "不再使用了",
+        "status": "pending",
+        "reviewRemark": null,
+        "reviewedAt": null,
+        "createdAt": "2026-09-01T14:20:00+08:00"
+      }
+    }
+  },
+  "GET /api/v1/addresses/default": {
+    "name": "has-one",
+    "response": {
+      "address": {
+        "id": "5001",
+        "receiverName": "张三",
+        "receiverPhone": "13800138000",
+        "provinceId": "110000",
+        "cityId": "110100",
+        "districtId": "110105",
+        "provinceName": "北京市",
+        "cityName": "北京市",
+        "districtName": "朝阳区",
+        "detail": "建国路 88 号 SOHO 尚都 1201",
+        "postCode": "100022",
+        "lng": "116.472644",
+        "lat": "39.913423",
+        "isDefault": true,
+        "createdAt": "2026-01-06T09:00:00+08:00",
+        "updatedAt": "2026-01-06T09:00:00+08:00"
+      }
+    }
+  },
+  "GET /api/v1/profile": {
+    "name": "ok",
+    "response": {
+      "id": "1001",
+      "account": "13800138000",
+      "phone": "13800138000",
+      "nickname": "小明",
+      "avatarUrl": "https://cdn.example.com/2026/09/a1b2c3d4.png",
+      "realName": null,
+      "birthday": null,
+      "registerSource": "h5",
+      "hasPassword": true,
+      "boundWechat": [],
+      "createdAt": "2026-01-05T10:00:00+08:00"
+    }
+  },
+  "POST /api/v1/account-cancellations": {
+    "name": "ok",
+    "body": {
+      "reason": "不再使用了"
+    },
+    "response": {
+      "id": "31",
+      "userId": "1001",
+      "nickname": "小明",
+      "phone": "138****8000",
+      "reason": "不再使用了",
+      "status": "pending",
+      "reviewRemark": null,
+      "reviewedAt": null,
+      "createdAt": "2026-09-01T14:20:00+08:00"
+    }
+  },
+  "PUT /api/v1/profile": {
+    "name": "nickname-and-avatar",
+    "body": {
+      "nickname": "小明",
+      "avatarUrl": "https://cdn.example.com/2026/09/a1b2c3d4.png"
+    },
+    "response": {
+      "id": "1001",
+      "account": "13800138000",
+      "phone": "13800138000",
+      "nickname": "小明",
+      "avatarUrl": "https://cdn.example.com/2026/09/a1b2c3d4.png",
+      "realName": null,
+      "birthday": null,
+      "registerSource": "h5",
+      "hasPassword": true,
+      "boundWechat": [],
+      "createdAt": "2026-01-05T10:00:00+08:00"
+    }
+  },
+  "DELETE /api/v1/account-cancellations/current": {
+    "name": "ok",
+    "response": {
+      "id": "31",
+      "userId": "1001",
+      "nickname": "小明",
+      "phone": "138****8000",
+      "reason": "不再使用了",
+      "status": "withdrawn",
+      "reviewRemark": null,
+      "reviewedAt": null,
+      "createdAt": "2026-09-01T14:20:00+08:00"
+    }
+  },
+  "GET /api/v1/wechat/jssdk-config": {
+    "name": "signed",
+    "query": {
+      "url": "https://shop.example.com/pages/index/index"
+    },
+    "response": {
+      "appId": "wx1234567890abcdef",
+      "timestamp": "1767668400",
+      "nonceStr": "A1b2C3d4E5f6G7h8",
+      "signature": "0f9de62fce790f9a083d5c99e95740ceb90c27ed"
+    }
+  },
+  "GET /api/v1/wechat/subscribe-templates": {
+    "name": "order-pay",
+    "query": {
+      "scene": "order-pay"
+    },
+    "response": {
+      "templateIds": [
+        "ZCQ1oT0cD2mYy1Q-kLJbo2kQ3s6cxJ5Zx9pLb-7xQ1A",
+        "HdLq2mW5vN8kR3pT-yUxZ6bA1cE4gJ7nM0oP9sV2iK"
+      ]
+    }
+  },
+  "POST /api/v1/webhooks/wechat-oa": {
+    "name": "nothing-to-say",
+    "query": {
+      "signature": "0f9de62fce790f9a083d5c99e95740ceb90c27ed",
+      "timestamp": "1767668400",
+      "nonce": "1372623149"
+    },
+    "response": "success"
+  },
+  "GET /api/v1/webhooks/wechat-oa": {
+    "name": "verified",
+    "query": {
+      "signature": "0f9de62fce790f9a083d5c99e95740ceb90c27ed",
+      "timestamp": "1767668400",
+      "nonce": "1372623149",
+      "echostr": "5935446184556592210"
+    },
+    "response": "5935446184556592210"
   }
 }

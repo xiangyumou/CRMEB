@@ -244,7 +244,7 @@
 
 <script>
 import commonWrapper from "./commonWrapper.vue";
-import { getAdvancellList } from "@/api/activity.js";
+import { getPresellList } from "@/api/activity.js";
 export default {
   components: { commonWrapper },
   name: "presale",
@@ -482,10 +482,10 @@ export default {
     },
     getList() {
       let limit = this.$config.LIMIT;
-      getAdvancellList({
+      // `getAdvancellList` never existed; 预售 is D's `getPresellList` now.
+      getPresellList({
         page: 1,
         limit: this.numberConfig >= limit ? limit : this.numberConfig,
-        time_type: 0,
       }).then((res) => {
         this.productList = res.data.list;
       });

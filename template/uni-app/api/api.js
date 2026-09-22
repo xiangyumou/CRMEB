@@ -13,6 +13,20 @@ import {
 } from './mappers/coupon.js';
 import { toLegacyDiyPage, toLegacyDiyVersion, toLegacyTheme } from './mappers/diy.js';
 import { toLegacyProductList } from './mappers/catalog.js';
+import {
+  toLegacyArticleList,
+  toLegacyArticleDetail,
+  toLegacyArticleCategories,
+} from './mappers/cms.js';
+import { toLegacyCityTree } from './mappers/region.js';
+import {
+  toLegacyProfile,
+  toLegacyWechatLogin,
+  toLegacyOk,
+  fromLegacySmsCodeInput,
+  toLegacySmsCodeResult,
+} from './mappers/user.js';
+import { toLegacySubscribeTemplates } from './mappers/wechat.js';
 import { fromLegacyPage } from './mappers/_shared.js';
 
 // ---------------------------------------------------------------------------
@@ -89,7 +103,8 @@ export function getThemeInfo(type, data) {
       map: toLegacyDiyPage,
     });
   }
-  // CONTRACT-PENDING(G1) — 分类 / 个人中心 的版式开关 (`res.data.status`) 还没有路由。
+  // CONTRACT-PENDING(G1) — 分类 / 个人中心 的版式开关 (`res.data.status`) 还没有路由；
+  // 见 docs/rewrite/cr/CR-3-h2.md §3。两页拿不到就各自保持默认版式。
   return request.get(`/api/v1/diy/layouts/${type}`, {}, { noAuth: true });
 }
 
@@ -160,45 +175,96 @@ export function clearSearch() {
 // CONTRACT-PENDING — 待其他 stream 的合约落地
 // ---------------------------------------------------------------------------
 
-// CONTRACT-PENDING(F2) — cms 域：文章分类 / 列表 / 详情 / 热门 / 轮播。
-export function getArticleCategoryList() {
-  return request.get('/api/v1/articles/categories', {}, { noAuth: true });
-}
+// ---------------------------------------------------------------------------
+// 资讯（F2 / cms）
+//
+// Five legacy routes collapsed into two: `article/hot/list` and
+// `article/banner/list` were the same query with one `where` swapped, so they are
+// now `feature=hot` / `feature=banner` on the list.
+// ---------------------------------------------------------------------------
 
-export function getArticleList(cid, data) {
-  return request.get('/api/v1/articles', Object.assign({ categoryId: String(cid) }, fromLegacyPage(data)), {
+/**
+ * 文章分类
+ */
+export function getArticleCategoryList() {
+  return request.get('/api/v1/article-categories', {}, {
     noAuth: true,
+    map: toLegacyArticleCategories,
   });
 }
 
+/**
+ * 文章列表
+ * @param int cid 分类 id，0 表示全部
+ * @param object data {page, limit}
+ */
+export function getArticleList(cid, data) {
+  const query = fromLegacyPage(data);
+  if (cid) query.categoryId = String(cid);
+  return request.get('/api/v1/articles', query, { noAuth: true, map: toLegacyArticleList });
+}
+
+/**
+ * 热门文章
+ */
 export function getArticleHotList() {
-  return request.get('/api/v1/articles', { feature: 'hot' }, { noAuth: true });
+  return request.get('/api/v1/articles', { feature: 'hot' }, {
+    noAuth: true,
+    map: toLegacyArticleList,
+  });
 }
 
+/**
+ * 文章轮播
+ */
 export function getArticleBannerList() {
-  return request.get('/api/v1/articles', { feature: 'banner' }, { noAuth: true });
+  return request.get('/api/v1/articles', { feature: 'banner' }, {
+    noAuth: true,
+    map: toLegacyArticleList,
+  });
 }
 
+/**
+ * 文章详情
+ * @param int id
+ */
 export function getArticleDetails(id) {
-  return request.get(`/api/v1/articles/${id}`, {}, { noAuth: true });
+  return request.get(`/api/v1/articles/${id}`, {}, {
+    noAuth: true,
+    map: toLegacyArticleDetail,
+  });
 }
 
-// CONTRACT-PENDING(F2) — 省市区。
+/**
+ * 省市区三级地区树
+ */
 export function getCity() {
-  return request.get('/api/v1/regions', {}, { noAuth: true });
+  return request.get('/api/v1/cities', {}, { noAuth: true, map: toLegacyCityTree });
 }
 
-// CONTRACT-PENDING(F2) — DIY 文章组件。
+/**
+ * DIY 文章组件
+ */
 export function getThemeArticle(data) {
-  return request.get('/api/v1/articles', fromLegacyPage(data), { noAuth: true });
+  return request.get('/api/v1/articles', fromLegacyPage(data), {
+    noAuth: true,
+    map: toLegacyArticleList,
+  });
 }
 
-// CONTRACT-PENDING(E1) — DIY 个人中心组件的用户卡片。
+/**
+ * DIY 个人中心组件的用户卡片。只渲染头像和昵称，所以就是我的资料本身；
+ * 和 `getUserInfo` 不同的是它不需要订单角标，一次读取就够。
+ */
 export function getThemeUser() {
-  return request.get('/api/v1/me/profile', {}, { noAuth: true });
+  return request.get('/api/v1/profile', {}, { map: (dto) => toLegacyProfile(dto) });
 }
 
-// CONTRACT-PENDING(F1) — 站点公开配置：版权、客服入口、开屏广告。
+// ---------------------------------------------------------------------------
+// CONTRACT-PENDING(F1) — 站点公开配置：版权、客服入口、开屏广告。后台写得下
+// (`/admin-api/system/config/:group`)，前台读不出来；见 docs/rewrite/cr/CR-7-h2.md。
+// ---------------------------------------------------------------------------
+
 export function getCrmebCopyRight() {
   return request.get('/api/v1/site/copyright', {}, { noAuth: true });
 }
@@ -211,17 +277,51 @@ export function getOpenAdv() {
   return request.get('/api/v1/site/splash-ad', {}, { noAuth: true });
 }
 
-// CONTRACT-PENDING(E2) — 订阅消息模板 id。
+// ---------------------------------------------------------------------------
+// 微信订阅消息（合约已合并）
+// ---------------------------------------------------------------------------
+
+/**
+ * 小程序订阅消息模板 id.
+ *
+ * The contract asks per moment in the journey — `order-create`, `order-pay`,
+ * `order-ship`, `refund` — where legacy answered with one map of every template it had
+ * configured, keyed by an internal name. The page caches the whole thing once and
+ * `utils/SubscribeMessage.js` keys into it, so the four reads are composed back into
+ * one object here. An empty array is a normal answer: a shop with no templates
+ * configured simply skips `wx.requestSubscribeMessage`, and a red toast about a
+ * feature it deliberately does not use would be worse than silence — which is why
+ * every one of the four is allowed to fail.
+ */
+const SUBSCRIBE_SCENES = ['order-create', 'order-pay', 'order-ship', 'refund'];
+
 export function getTempIds() {
-  return request.get('/api/v1/wechat/subscribe-templates', {}, { noAuth: true });
+  return Promise.all(
+    SUBSCRIBE_SCENES.map((scene) =>
+      request
+        .get('/api/v1/wechat/subscribe-templates', { scene }, { noAuth: true })
+        .then((res) => toLegacySubscribeTemplates(res.data))
+        .catch(() => []),
+    ),
+  ).then((lists) => {
+    const data = {};
+    SUBSCRIBE_SCENES.forEach((scene, i) => {
+      data[scene] = lists[i];
+    });
+    return { data, msg: '', status: 200 };
+  });
 }
 
-// CONTRACT-PENDING(D) — 首页拼团数据。
-export function pink() {
-  return request.get('/api/v1/groupbuys', {}, { noAuth: true });
-}
+// 首页拼团人气条。`subpackage/diyComponents/combination.vue` 读的和
+// `pages/activity/goods_combination` 读的是同一份 `{avatars, pink_count}`，所以这里
+// 不再复制一遍实现，直接转出 `api/activity.js` 的那一个（它带着 CR-1-h2 的 marker）。
+export { getPink as pink } from './activity.js';
 
-// CONTRACT-PENDING(E1) — 图形/滑块验证码、短信验证码、手机号绑定与找回。
+// ---------------------------------------------------------------------------
+// CONTRACT-PENDING(E1) — 滑块/点选验证码。`pages/users/components/verify/**` 是一整套
+// 行为验证码前端，前台没有出题和核验的路由；见 docs/rewrite/cr/CR-2-h2.md。
+// ---------------------------------------------------------------------------
+
 export function getAjcaptcha(data) {
   return request.get('/api/v1/auth/captcha', data, { noAuth: true });
 }
@@ -230,40 +330,94 @@ export function ajcaptchaCheck(data) {
   return request.post('/api/v1/auth/captcha/verifications', data, { noAuth: true });
 }
 
+// ---------------------------------------------------------------------------
+// 短信验证码 / 手机号
+// ---------------------------------------------------------------------------
+
+/**
+ * 验证码 key。见 `api/user.js` 的 `getCodeApi`：图形验证码没有继任者，本地返回空 key。
+ */
 export function verifyCode() {
-  return request.get('/api/v1/auth/sms-key', {}, { noAuth: true });
+  return Promise.resolve({ data: { key: '' }, msg: '', status: 200 });
 }
 
+/**
+ * 发送短信验证码（位置参数版本，`pages/users/user_phone` 这样调）
+ */
 export function registerVerify(phone, reset, key, captchaType, captchaVerification) {
-  return request.post(
-    '/api/v1/auth/sms-codes',
-    {
-      phone,
-      purpose: reset === undefined ? 'reset' : reset,
-      key,
-      captchaType,
-      captchaVerification,
-    },
-    { noAuth: true },
+  return sendSmsCode({
+    phone,
+    type: reset === undefined ? 'reset' : reset,
+    captchaVerification,
+  });
+}
+
+/**
+ * 已登录用户改密码。旧接口走的是「手机号 + 验证码 + 新密码」的找回路径；新模型里
+ * `PUT /api/v1/auth/password` 才是这一个 —— 它认当前登录态，改完把所有设备下线。
+ */
+export function phoneRegisterReset(data) {
+  const src = data || {};
+  return request.put(
+    '/api/v1/auth/password',
+    { code: String(src.captcha || src.code || ''), password: String(src.password || '') },
+    { map: toLegacyOk, msg: '修改成功' },
   );
 }
 
-export function phoneRegisterReset(data) {
-  return request.post('/api/v1/auth/password-resets', data, { noAuth: true });
-}
-
+/**
+ * 公众号绑定手机号并登录。`key` 是公众号登录在 `phone-required` 时发的 `bindToken`。
+ */
 export function bindingPhone(data) {
-  return request.post('/api/v1/auth/phone-bindings', data, { noAuth: true });
+  const src = data || {};
+  return request.post(
+    '/api/v1/auth/sessions/wechat-oa/phone',
+    {
+      bindToken: String(src.key || src.bindToken || ''),
+      phone: String(src.phone || ''),
+      code: String(src.captcha || src.code || ''),
+    },
+    { noAuth: true, map: toLegacyWechatLogin },
+  );
 }
 
+/**
+ * 绑定手机号（已登录）。
+ *
+ * 旧接口的两步 `step` 流程（手机号已属于另一个账号时问「是否合并」）没有继任者：
+ * 合并两个账号会把订单、退款、发票一起搬家，新模型直接 `AUTH_PHONE_TAKEN`。页面读
+ * `res.data.is_bind` 拿不到值，就走它原来的成功分支。
+ */
 export function bindingUserPhone(data) {
-  return request.post('/api/v1/me/phone', data);
+  const src = data || {};
+  return request.post(
+    '/api/v1/auth/phone',
+    { phone: String(src.phone || ''), code: String(src.captcha || src.code || '') },
+    { map: toLegacyOk, msg: '绑定成功' },
+  );
 }
 
+/**
+ * 更换手机号。只要新号码上的验证码 —— 旧号码上也要一条读着漂亮，却正好锁死了这个
+ * 页面存在的全部人群：换了号的人。
+ */
 export function updatePhone(data) {
-  return request.put('/api/v1/me/phone', data);
+  const src = data || {};
+  return request.put(
+    '/api/v1/auth/phone',
+    { phone: String(src.phone || ''), code: String(src.captcha || src.code || '') },
+    { map: toLegacyOk, msg: '修改成功' },
+  );
 }
 
-export function switchH5Login() {
-  return request.post('/api/v1/auth/session-transfers', {});
+/** Shared by both spellings of 发送验证码. */
+function sendSmsCode(data) {
+  return request.post('/api/v1/auth/sms-codes', fromLegacySmsCodeInput(data), {
+    noAuth: true,
+    map: toLegacySmsCodeResult,
+    msg: '发送成功',
+  });
 }
+
+// 多账号切换 (`switchH5Login`) 没有继任者：v1/v2 两套登录态并存才需要它，新模型里
+// 一个 token 就是一个账号。`pages/users/user_info` 的 h5 切换分支已删除。

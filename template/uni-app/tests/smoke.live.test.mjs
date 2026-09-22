@@ -66,12 +66,18 @@ d('the api layer against the contract mock', () => {
   let order;
   let store;
   let admin;
+  let activity;
+  let user;
+  let api;
 
   beforeAll(async () => {
     installUniRequest();
     order = await import('../api/order.js');
     store = await import('../api/store.js');
     admin = await import('../api/admin.js');
+    activity = await import('../api/activity.js');
+    user = await import('../api/user.js');
+    api = await import('../api/api.js');
   });
 
   /** Every id the mock's examples use, so a detail call asks for something that exists. */
@@ -137,6 +143,52 @@ d('the api layer against the contract mock', () => {
     const res = await admin.getStatisticsInfo();
     expect(res.status).toBe(200);
     expect(res.data).toBeTruthy();
+  });
+
+  // The five compositions H2 added. Each one fans a legacy call out across two or
+  // more routes, and a fan-out is exactly what the mocked-`uni.request` suites cannot
+  // prove: the URLs have to be right and the pieces have to come back in the shape
+  // the page destructures.
+
+  it('拼团详情 composes the activity with its open teams', async () => {
+    const id = exampleId('GET /api/v1/groupbuy/activities', 'id');
+    const res = await activity.getCombinationDetail(id);
+    expect(res.status).toBe(200);
+    expect(res.data).toHaveProperty('storeInfo');
+    expect(Array.isArray(res.data.pink)).toBe(true);
+  });
+
+  it('预售列表 maps to the legacy activity card', async () => {
+    const res = await activity.getPresellList({ page: 1, limit: 10 });
+    expect(res.status).toBe(200);
+    const list = Array.isArray(res.data) ? res.data : res.data.list;
+    expect(list.length).toBeGreaterThan(0);
+    expect(list[0]).toHaveProperty('store_name');
+  });
+
+  it('个人中心 composes the profile with the order badges', async () => {
+    const res = await user.getUserInfo();
+    expect(res.status).toBe(200);
+    expect(res.data).toHaveProperty('nickname');
+    // nine keys, always present, so the badge row never renders `undefined`
+    expect(res.data.orderStatusNum).toHaveProperty('unpaid_count');
+    expect(res.data.orderStatusNum).toHaveProperty('refund_count');
+  });
+
+  it('站内信 maps to the {list, count} the 消息中心 concats onto', async () => {
+    const res = await user.messageSystem({ page: 1, limit: 10 });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.data.list)).toBe(true);
+    expect(res.data.list[0]).toHaveProperty('look');
+  });
+
+  it('订阅消息模板 fans out to the four scenes and keys them back', async () => {
+    const res = await api.getTempIds();
+    expect(res.status).toBe(200);
+    expect(Object.keys(res.data).sort()).toEqual(
+      ['order-create', 'order-pay', 'order-ship', 'refund'],
+    );
+    for (const ids of Object.values(res.data)) expect(Array.isArray(ids)).toBe(true);
   });
 
   it('rejects a 404 with both message and msg', async () => {

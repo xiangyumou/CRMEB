@@ -18,7 +18,7 @@
 <script>
 const app = getApp();
 import Cache from '../utils/cache';
-import { getLogo, silenceAuth, routineBindingPhone } from '../api/public';
+import { getLogo, routineBindingPhone } from '../api/public';
 import { LOGO_URL, EXPIRES_TIME, USER_INFO, STATE_R_KEY } from '../config/cache';
 import { mapGetters } from 'vuex';
 import Routine from '../libs/routine';

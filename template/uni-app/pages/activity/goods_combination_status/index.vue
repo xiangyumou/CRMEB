@@ -492,6 +492,8 @@
 				data.cartNum = that.attr.productSelect.cart_num;
 				data.uniqueId = that.attr.productSelect.unique;
 				data.combinationId = that.storeCombination.id;
+				// 参团：团单 id 得跟着「立即购买」的 ticket 走，确认页只把 cartId 交给预览。
+				data.pinkId = that.pinkId;
 				data.new = 1;
 				postCartAdd(data)
 					.then(res => {

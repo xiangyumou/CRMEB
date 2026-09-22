@@ -34,9 +34,6 @@
 	import {
 		bindingPhone
 	} from '@/api/api.js'
-	import {
-		silenceAuth
-	} from '@/api/public.js'
 	export default {
 		name: 'login_mobile',
 		components: {

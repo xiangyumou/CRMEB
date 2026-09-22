@@ -90,7 +90,11 @@ function loadOpenApi() {
   return known;
 }
 
-const CALL = /request\.(get|post|put|patch|delete)\(\s*(['"`])((?:\\.|(?!\2)[\s\S])*)\2/g;
+// `request.get(` and the chained `request\n  .get(` spelling both count: a composed
+// call (`.then(...)` on the end) is usually written the second way, and a guard that
+// could not see it would go quiet exactly where the interesting calls are.
+const CALL = /\brequest\s*\.\s*(get|post|put|patch|delete)\s*\(\s*(['"`])((?:\\.|(?!\2)[\s\S])*)\2/g;
+const ANY_CALL = /\brequest\s*\.\s*(get|post|put|patch|delete)\s*\(\s*/g;
 const MARKER = /CONTRACT-PENDING\(([^)]+)\)/;
 const DIVIDER = /^\s*\/\/\s*-{10,}\s*$/;
 
@@ -137,6 +141,23 @@ function scan(file) {
   const active = pendingByLine(lines);
   const found = [];
   let m;
+  // Every `request.*(` must be followed by a string literal. A URL assembled out of
+  // variables is invisible to this script, and an invisible call is the one failure
+  // mode a route guard cannot have: the count would still read "0 broken".
+  ANY_CALL.lastIndex = 0;
+  while ((m = ANY_CALL.exec(src)) !== null) {
+    if (/^['"`]/.test(src.slice(ANY_CALL.lastIndex))) continue;
+    // Prose mentions `request.get(...)` too; only code counts.
+    const before = src.slice(src.lastIndexOf('\n', m.index) + 1, m.index);
+    if (before.includes('//') || /^\s*\*/.test(before)) continue;
+    found.push({
+      file: path.relative(APP, file),
+      line: src.slice(0, m.index).split('\n').length,
+      method: m[1].toUpperCase(),
+      url: null,
+      pending: null,
+    });
+  }
   CALL.lastIndex = 0;
   while ((m = CALL.exec(src)) !== null) {
     const line = src.slice(0, m.index).split('\n').length;
@@ -178,6 +199,10 @@ const live = [];
 const pending = [];
 
 for (const c of calls) {
+  if (c.url === null) {
+    failures.push({ ...c, url: '(computed)', why: 'the URL is not a literal, so this script cannot check it' });
+    continue;
+  }
   const url = c.url.split('?')[0];
   if (!url.startsWith('/api/v1/')) {
     failures.push({ ...c, why: 'not a /api/v1 route' });

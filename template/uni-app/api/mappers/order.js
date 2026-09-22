@@ -308,16 +308,33 @@ export function fromLegacyOrderListQuery(data) {
  * A "buy now" purchase used to be written into the cart as a hidden row so the confirm
  * page could refer to it by `cartId`. Nothing is written any more, so `postCartAdd` with
  * `new: 1` hands the page this ticket instead and `orderConfirm` unpacks it into a
- * `buy-now` preview. Format: `buynow:<skuId>:<quantity>`.
+ * `buy-now` preview.
+ *
+ * Format: `buynow:<skuId>:<quantity>[:<kind>:<activityId>[:<groupId>]]`.
+ *
+ * 拼团 and 预售 travel in the ticket rather than in the page state, because the confirm
+ * page only forwards `cartId` to the **preview** (`getConfirm` sends
+ * `{cartId, new, addressId, shipping_type}` and nothing else), and B1 needs `kind` on
+ * both the preview and the create — the `OrderKindHandler` reserves the activity stock.
+ * A colon can never appear inside an id, so the join is unambiguous.
  */
-export function buyNowTicket(skuId, quantity) {
-  return `buynow:${skuId}:${toInt(quantity, 1)}`;
+export function buyNowTicket(skuId, quantity, kind, activityId, groupId) {
+  const head = `buynow:${skuId}:${toInt(quantity, 1)}`;
+  if (!kind || kind === 'normal' || !activityId) return head;
+  const tail = `${head}:${kind}:${activityId}`;
+  return groupId && String(groupId) !== '0' ? `${tail}:${groupId}` : tail;
 }
 
 export function parseBuyNowTicket(value) {
   const parts = String(value === undefined || value === null ? '' : value).split(':');
   if (parts[0] !== 'buynow' || !parts[1]) return null;
-  return { skuId: parts[1], quantity: toInt(parts[2], 1) };
+  return {
+    skuId: parts[1],
+    quantity: toInt(parts[2], 1),
+    kind: parts[3] === 'groupbuy' || parts[3] === 'presale' ? parts[3] : 'normal',
+    activityId: parts[4] || '',
+    groupId: parts[5] || '',
+  };
 }
 
 /** Legacy `orderConfirm`/`order/computed` input → `POST /api/v1/checkout/preview` body. */
@@ -327,8 +344,19 @@ export function fromLegacyCheckoutInput(data) {
   const body = { kind: 'normal' };
   if (ticket) {
     body.source = 'buy-now';
-    body.skuId = ticket.skuId;
-    body.quantity = ticket.quantity;
+    // `checkoutInput.item` is a nested object; a flat `{skuId, quantity}` is rejected
+    // by the `buyNowNeedsAnItem` refine before the handler ever sees it.
+    body.item = { skuId: ticket.skuId, quantity: ticket.quantity };
+    if (ticket.kind !== 'normal' && ticket.activityId) {
+      body.kind = ticket.kind;
+      body.kindMeta = { activityId: String(ticket.activityId) };
+      // 参团 passes the team through the confirm page's query string, so accept it
+      // from either side; absent means 开团.
+      const groupId = src.pinkId || ticket.groupId;
+      if (ticket.kind === 'groupbuy' && groupId && String(groupId) !== '0') {
+        body.kindMeta.groupId = String(groupId);
+      }
+    }
   } else {
     body.source = 'cart';
     body.cartItemIds = splitIds(src.cartId);

@@ -44,14 +44,9 @@
 </template>
 <script>
 let sysHeight = uni.getWindowInfo().statusBarHeight + "px";
-import {
-  getMenuList,
-  getUserInfo,
-  setVisit,
-  mpBindingPhone,
-} from "@/api/user.js";
+import { getMenuList, getUserInfo, mpBindingPhone } from "@/api/user.js";
 import { getThemeInfo } from "@/api/api.js";
-import { wechatAuthV2, silenceAuth } from "@/api/public.js";
+import { wechatAuthV2 } from "@/api/public.js";
 import { toLogin } from "@/libs/login.js";
 import { mapState, mapGetters } from "vuex";
 // #ifdef H5
@@ -248,7 +243,6 @@ export default {
     let that = this;
     if (that.isLogin) {
       this.getUserInfo();
-      this.setVisit();
     }
     this.getMyMenus();
     this.getDiyData();
@@ -355,12 +349,6 @@ export default {
     closeEdit() {
       this.editModal = false;
     },
-    // 记录会员访问
-    setVisit() {
-      setVisit({
-        url: "/pages/user/index",
-      }).then((res) => {});
-    },
     // 打开授权
     openAuto() {
       toLogin();
@@ -370,7 +358,6 @@ export default {
       this.getUserInfo();
       this.getMyMenus();
       this.getDiyData();
-      this.setVisit();
     },
     Setting: function () {
       uni.openSetting({
@@ -389,14 +376,10 @@ export default {
     },
     getphonenumber(e) {
       if (e.detail.errMsg == "getPhoneNumber:ok") {
-        Routine.getCode()
-          .then((code) => {
-            let data = {
-              code,
-              iv: e.detail.iv,
-              encryptedData: e.detail.encryptedData,
-            };
-            mpBindingPhone(data)
+        // `e.detail.code` 是 getPhoneNumber 现在给的、由服务端兑换的 code。
+        Promise.resolve(e.detail.code)
+          .then((phoneCode) => {
+            mpBindingPhone({ phoneCode })
               .then((res) => {
                 this.getUserInfo();
                 this.$util.Tips({

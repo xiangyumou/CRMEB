@@ -16,7 +16,9 @@ import {
   toLegacyCollectAllResult,
   fromLegacyIdList,
 } from './mappers/catalog.js';
+import { toLegacyPresaleDetail } from './mappers/activity.js';
 import { toLegacyCartAddResult, fromLegacyCartAddInput } from './mappers/cart.js';
+import { buyNowTicket } from './mappers/order.js';
 import { fromLegacyPage } from './mappers/_shared.js';
 
 /**
@@ -240,26 +242,32 @@ export function getGroomList(type, data) {
   });
 }
 
+/**
+ * 预售详情。预售现在是 D 域的一个活动，不是商品上的几个字段，所以这里的 id 是**活动
+ * id**，而返回值由 `mappers/activity.js` 组装成商品详情页认得的
+ * `{storeInfo, productAttr, productValue}`。
+ *
+ * @param int id 活动 id
+ */
+export function getPresellProductDetail(id) {
+  return request.get(`/api/v1/presale/activities/${id}`, {}, {
+    noAuth: true,
+    map: toLegacyPresaleDetail,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // CONTRACT-PENDING — 待其他 stream 的合约落地
 // ---------------------------------------------------------------------------
 
-// CONTRACT-PENDING(E2) — 商品分享二维码 (公众号/小程序码) lives in the wechat domain.
+// CONTRACT-PENDING(E2) — 商品海报的小程序码。前台只有 jssdk-config 和 subscribe-
+// templates 两条微信路由；见 docs/rewrite/cr/CR-6-h2.md。
 /**
  * 产品分享二维码
  * @param int id
  */
 export function getProductCode(id) {
-  return request.get(`/api/v1/wechat/qrcodes/product/${id}`, {}, { noAuth: true });
-}
-
-// CONTRACT-PENDING(D) — 预售详情. groupbuy/presale contracts are still being written.
-/**
- * 预售详情
- * @param int id
- */
-export function getPresellProductDetail(id) {
-  return request.get(`/api/v1/presales/${id}`, {}, { map: toLegacyProductDetail });
+  return request.get('/api/v1/wechat/mini-qrcodes', { scene: 'product', id }, { noAuth: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -268,14 +276,19 @@ export function getPresellProductDetail(id) {
 
 /**
  * 购车添加
- * @param object data {productId, cartNum, uniqueId, new}
+ * @param object data {productId, cartNum, uniqueId, new, combinationId, advanceId, pinkId}
  */
 export function postCartAdd(data) {
   const src = data || {};
-  // `new: 1` is 立即购买. Nothing is written to the cart any more; the confirm page
-  // gets a ticket it can turn into a `buy-now` checkout preview.
-  if (src.new) {
-    const ticket = `buynow:${src.uniqueId || ''}:${Number(src.cartNum) || 1}`;
+  // `new: 1` is 立即购买 (`goods_combination_details` spells the same flag `is_new`).
+  // Nothing is written to the cart any more; the confirm page gets a ticket it can turn
+  // into a `buy-now` checkout preview. 拼团 (`combinationId`, plus `pinkId` when joining
+  // an existing team) and 预售 (`advanceId`) ride along inside the ticket, because the
+  // confirm page forwards nothing but `cartId` to the preview.
+  if (src.new || src.is_new) {
+    const activityId = src.combinationId || src.advanceId || '';
+    const kind = src.combinationId ? 'groupbuy' : src.advanceId ? 'presale' : 'normal';
+    const ticket = buyNowTicket(src.uniqueId || '', src.cartNum, kind, activityId, src.pinkId);
     return Promise.resolve({ data: { cartId: ticket }, msg: '', status: 200 });
   }
   return request.post('/api/v1/cart/items', fromLegacyCartAddInput(src), {

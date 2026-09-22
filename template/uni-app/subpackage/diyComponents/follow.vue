@@ -59,7 +59,6 @@
 
 <script>
 import commonWrapper from "./commonWrapper.vue";
-import { getSubscribe } from "@/api/public";
 // #ifdef H5
 import Auth from "@/libs/wechat";
 // #endif
@@ -173,13 +172,6 @@ export default {
     },
   },
   created() {},
-  mounted() {
-    getSubscribe()
-      .then((res) => {
-        this.subscribe = res.data.subscribe || false;
-      })
-      .catch(() => {});
-  },
   methods: {
     savePic() {
       // #ifdef H5

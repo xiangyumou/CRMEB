@@ -1,6 +1,6 @@
 <script>
 import { HTTP_REQUEST_URL } from "./config/app";
-import { silenceAuth, basicConfig, remoteRegister } from "@/api/public";
+import { basicConfig } from "@/api/public";
 import Auth from "@/libs/wechat.js";
 import Routine from "./libs/routine.js";
 import { silenceBindingSpread } from "@/utils";
@@ -116,9 +116,6 @@ export default {
       this.globalData.isIframe = true;
     } else {
       this.globalData.isIframe = false;
-    }
-    if (!this.isLogin && option.query.hasOwnProperty("remote_token")) {
-      this.remoteRegister(option.query.remote_token);
     }
     // #endif
     let previewThemeId = uni.getStorageSync("previewThemeId");
@@ -275,23 +272,6 @@ export default {
     this.$Cache.clear("previewThemeId");
   },
   methods: {
-    remoteRegister(remote_token) {
-      remoteRegister({
-        remote_token,
-      }).then((res) => {
-        let data = res.data;
-        if (data.get_remote_login_url) {
-          location.href = data.get_remote_login_url;
-        } else {
-          this.$store.commit("LOGIN", {
-            token: data.token,
-            time: data.expires_time - this.$Cache.time(),
-          });
-          this.$store.commit("SETUID", data.userInfo.uid);
-          location.reload();
-        }
-      });
-    },
     // 小程序静默授权
     // silenceAuth(code) {
     // 	let that = this;
