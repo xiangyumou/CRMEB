@@ -10,6 +10,7 @@ import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { generateOrderNo, generateOutTradeNo, toId } from '../kernel/ids';
 import { Money } from '../kernel/money';
+import { notify } from '../notification';
 import { requireOrderRef } from '../order';
 import { onOrderPaid } from '../order/ports';
 import {
@@ -556,6 +557,18 @@ export async function settlePayment(
   return { kind: 'paid', orderId: order.id };
 }
 
+/**
+ * What 支付异常待处理 says happened. The reason is an enum on the row and the
+ * admin list colours it from its own map; a 站内信 has to spell it out, and
+ * `core` cannot import the admin's.
+ */
+const EXCEPTION_REASONS: Record<repo.NewExceptionInput['reason'], string> = {
+  duplicate_payment: '重复支付',
+  cancelled_order_payment: '订单已取消',
+  unmatched_payment: '无法匹配订单',
+  amount_mismatch: '金额不符',
+};
+
 async function exception(
   tx: Tx,
   ctx: Ctx,
@@ -603,6 +616,22 @@ async function exception(
       scopeId: String(row.id),
       eventType: 'payment.exception.refund',
       payload: { exceptionId: toId(row.id), reason: input.reason },
+    });
+
+    // CR-2-e2. Inside the same `if (row)`, so a replayed callback that found
+    // the row already there wakes nobody a second time — and inside the
+    // settlement transaction, so an exception that rolls back is not announced
+    // at all. The automatic refund above does not make this redundant: it can
+    // fail, and somebody has to know money arrived that the shop cannot book.
+    await notify(tx, ctx, {
+      event: 'admin_payment_exception',
+      subject: { scope: 'payment_exception', id: row.id },
+      data: {
+        exceptionId: row.id,
+        outTradeNo: input.outTradeNo ?? input.facts.transactionId,
+        amount: row.paidAmount,
+        reason: EXCEPTION_REASONS[input.reason],
+      },
     });
   }
 

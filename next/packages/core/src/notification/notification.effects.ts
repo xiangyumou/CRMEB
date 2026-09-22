@@ -135,7 +135,25 @@ const CANCEL_REASONS: Record<string, string> = {
   'payment-failed': '支付失败',
 };
 
-installNotificationHooks();
+/**
+ * **`installNotificationHooks()` is deliberately not called here.**
+ *
+ * It used to be, and that was survivable only while nothing in `order`
+ * imported this domain back. Since CR-2-e2 the checkout and the order console
+ * call `notify`, so `order/index.ts` and `notification/index.ts` are a cycle,
+ * and a cycle entered from the order side reaches this module's body while
+ * `../order` is still evaluating — at which point `registerFulfilmentNotifier`
+ * is not yet a function and the whole app fails to import. (Same family as the
+ * bug in cdc04601d: what a bundler or a transform does with a re-exported
+ * binding mid-cycle is not something to rely on.)
+ *
+ * `registerNotificationDomain()` in `index.ts` calls it instead, from
+ * `@shop/core/domains` at bootstrap, which is where CONVENTIONS says
+ * registration belongs and which runs after every module has been evaluated.
+ * The `registerEffectHandler` above stays at module scope on purpose: it
+ * depends on nothing outside this domain, and the integration tests import
+ * this file precisely to get it.
+ */
 
 /** Imported for its side effects; this keeps a bundler from eliding the module. */
 export const notificationEffectsInstalled = true;

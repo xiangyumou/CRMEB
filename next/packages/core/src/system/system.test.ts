@@ -12,6 +12,8 @@ import { allConfigGroups, getConfigGroup } from '../kernel/config-registry';
 import { isKnownPermission } from '../auth/permissions';
 import { permissionTree } from './role.service';
 import { describeGroup } from './config.service';
+import { isTrustedHost, publicOrigin, siteConfig } from './site.config';
+import type { z } from 'zod';
 import {
   countTile,
   dashboardHeader,
@@ -47,6 +49,80 @@ function pureCtx(overrides: Partial<Ctx> = {}): Ctx {
     ...overrides,
   });
 }
+
+type SiteConfig = z.input<typeof siteConfig.schema>;
+
+/** A `Ctx` whose `config.get` answers with one fixed `site` group. */
+function siteCtx(values: Partial<SiteConfig>): Ctx {
+  const site = siteConfig.schema.parse(values);
+  return pureCtx({
+    config: {
+      async get() {
+        return site as never;
+      },
+      async getRaw() {
+        return { ...site };
+      },
+      async set() {
+        throw new Error('not used');
+      },
+      async invalidate() {},
+    },
+  });
+}
+
+describe('the public origin (CR-1-e2)', () => {
+  it('is not an operator setting: neither field is on the settings screen', () => {
+    const descriptor = describeGroup(getConfigGroup('site')!);
+    const keys = descriptor.fields.map((field) => field.key);
+    expect(keys).not.toContain('publicOrigin');
+    expect(keys).not.toContain('extraOrigins');
+    // And nothing carries the legacy value across — that is the one value that
+    // must not come, because the installer rewrote it on every deploy.
+    expect(getConfigGroup('site')!.legacyKeys).not.toHaveProperty('publicOrigin');
+  });
+
+  it('comes from the environment, with no trailing slash', async () => {
+    expect(await publicOrigin(siteCtx({ publicOrigin: 'https://shop.example.com/' }))).toBe(
+      'https://shop.example.com',
+    );
+  });
+
+  it('is empty when nobody told the deployment its own address', async () => {
+    expect(await publicOrigin(siteCtx({}))).toBe('');
+  });
+});
+
+describe('isTrustedHost', () => {
+  const ctx = siteCtx({
+    publicOrigin: 'https://shop.example.com',
+    extraOrigins: 'h5.example.com, https://staging.example.com ,',
+  });
+
+  it('trusts the deployment’s own host and the extras, written either way', async () => {
+    expect(await isTrustedHost(ctx, 'shop.example.com')).toBe(true);
+    expect(await isTrustedHost(ctx, 'h5.example.com')).toBe(true);
+    expect(await isTrustedHost(ctx, 'staging.example.com')).toBe(true);
+    expect(await isTrustedHost(ctx, 'SHOP.EXAMPLE.COM')).toBe(true);
+  });
+
+  it('compares the whole host, so a suffix cannot borrow the shop’s name', async () => {
+    expect(await isTrustedHost(ctx, 'shop.example.com.attacker.test')).toBe(false);
+    expect(await isTrustedHost(ctx, 'notshop.example.com')).toBe(false);
+  });
+
+  it('trusts nothing when nothing is configured, and nothing empty or malformed', async () => {
+    expect(await isTrustedHost(siteCtx({}), 'shop.example.com')).toBe(false);
+    expect(await isTrustedHost(ctx, '')).toBe(false);
+    expect(await isTrustedHost(ctx, '  ')).toBe(false);
+  });
+
+  it('does not let a misconfigured entry become “trust everything”', async () => {
+    const broken = siteCtx({ publicOrigin: 'not a url', extraOrigins: ':::,' });
+    expect(await isTrustedHost(broken, 'shop.example.com')).toBe(false);
+    expect(await isTrustedHost(broken, 'not a url')).toBe(false);
+  });
+});
 
 describe('describeGroup', () => {
   it('never describes a secret field as anything a browser would render as text', () => {

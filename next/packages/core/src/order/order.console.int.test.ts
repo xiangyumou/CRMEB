@@ -5,10 +5,12 @@ import { productSkus, products } from '@shop/db/schema/catalog';
 import { orderItems, orderStatusLogs, orders } from '@shop/db/schema/order';
 import { expressCompanies } from '@shop/db/schema/reference';
 import { admins } from '@shop/db/schema/auth';
+import { effects as effectsTable } from '@shop/db/schema/system';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import type { AdminOrderListQuery } from '@shop/contracts/order/order.fulfil.schemas';
 import { registerCatalogDomain } from '../catalog';
+import { registerNotificationDomain } from '../notification';
 import { registerShippingFreightPort } from '../shipping';
 import type { Actor, Ctx } from '../kernel/context';
 import { Money } from '../kernel/money';
@@ -49,9 +51,25 @@ beforeEach(async () => {
   registerCatalogDomain();
   registerShippingFreightPort();
   resetFulfilmentPorts();
+  // `resetOrderPorts` clears every hook registry, so the notification domain
+  // is reinstalled with the rest. Without it `notify` drops the event — which
+  // is the right behaviour for an unregistered code and would also make an
+  // assertion here pass while proving nothing.
+  registerNotificationDomain();
   registerOrderStateMachine(orderStateMachine);
   installFulfilmentHooks();
 });
+
+/** The 改价 notifications recorded so far, newest key last. */
+async function priceChangeEffects() {
+  const rows = await harness.ctx.db
+    .select()
+    .from(effectsTable)
+    .where(eq(effectsTable.scope, 'notification'));
+  return rows
+    .filter((row) => row.scopeId.startsWith('order_price_changed:'))
+    .sort((a, b) => a.scopeId.localeCompare(b.scopeId));
+}
 
 // ---------------------------------------------------------------------------
 // fixtures
@@ -405,6 +423,73 @@ describe('改价', () => {
     );
     expect(detail.freightAmount).toBe('12.00');
     expect(detail.payableAmount).toBe('72.00');
+  });
+
+  /**
+   * CR-2-e2. A buyer who is not told pays the amount they were shown, the
+   * gateway takes the wrong total, and the order sits there.
+   */
+  it('tells the buyer, with both amounts, in the same transaction', async () => {
+    const adminId = await makeAdmin();
+    const placed = await placeOrder();
+
+    await order.orderConsole.adminAdjustPrice(
+      asAdmin(adminId),
+      { id: String(placed.orderId) },
+      { operatorDiscount: '20.00' },
+    );
+
+    const [row] = await priceChangeEffects();
+    expect(row).toMatchObject({ scope: 'notification', status: 'pending' });
+    expect(row?.scopeId).toBe(`order_price_changed:order-price:${placed.orderId}:40.00`);
+    expect(row?.payload).toMatchObject({
+      event: 'order_price_changed',
+      userId: placed.userId,
+      data: { orderId: placed.orderId, oldAmount: '60.00', amount: '40.00' },
+    });
+  });
+
+  it('tells nobody when the repricing itself was refused', async () => {
+    const adminId = await makeAdmin();
+    const placed = await placeOrder();
+    await pay(placed);
+
+    await expect(
+      order.orderConsole.adminAdjustPrice(
+        asAdmin(adminId),
+        { id: String(placed.orderId) },
+        { operatorDiscount: '5.00' },
+      ),
+    ).rejects.toMatchObject({ code: 'ORDER_PRICE_NOT_ADJUSTABLE' });
+    expect(await priceChangeEffects()).toEqual([]);
+  });
+
+  /**
+   * The subject carries the resulting amount rather than only the order id.
+   * An order may legitimately be repriced more than once — the operator's
+   * discount is *added* to what is already there — and a per-order key would
+   * deduplicate every change after the first into silence. A save that leaves
+   * the total where it was still notifies once.
+   */
+  it('tells the buyer again when the price moves again, and not when it does not', async () => {
+    const adminId = await makeAdmin();
+    const placed = await placeOrder();
+    const reprice = (operatorDiscount: string) =>
+      order.orderConsole.adminAdjustPrice(
+        asAdmin(adminId),
+        { id: String(placed.orderId) },
+        { operatorDiscount },
+      );
+
+    expect((await reprice('20.00')).payableAmount).toBe('40.00');
+    // Adds nothing, so the buyer owes what they were already told.
+    expect((await reprice('0.00')).payableAmount).toBe('40.00');
+    expect((await reprice('10.00')).payableAmount).toBe('30.00');
+
+    expect((await priceChangeEffects()).map((row) => row.scopeId)).toEqual([
+      `order_price_changed:order-price:${placed.orderId}:30.00`,
+      `order_price_changed:order-price:${placed.orderId}:40.00`,
+    ]);
   });
 });
 

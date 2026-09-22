@@ -21,6 +21,7 @@ import {
 } from '@shop/testing';
 import { resetEffectHandlers } from '../effects';
 import type { Actor, Ctx } from '../kernel/context';
+import { registerNotificationDomain } from '../notification';
 import { wechatConfig } from '../wechat';
 import { paymentConfig } from './payment.config';
 import * as repo from './payment.repo';
@@ -61,6 +62,10 @@ beforeEach(async () => {
   await flushTestRedis(harness.redis);
   harness.clock.set(NOW);
   resetEffectHandlers();
+  // `notify` drops an event nobody registered rather than failing a payment,
+  // which is right — and would also let the assertions below pass while
+  // proving nothing. Registration is idempotent.
+  registerNotificationDomain();
   gateway.transactions.clear();
   gateway.refunds.clear();
   gateway.calls.length = 0;
@@ -255,6 +260,17 @@ const callbackRows = () => harness.ctx.db.select().from(paymentCallbacks);
 const exceptionRows = () => harness.ctx.db.select().from(paymentExceptions);
 const effectRows = (eventType: string) =>
   harness.ctx.db.select().from(effectsTable).where(eq(effectsTable.eventType, eventType));
+/**
+ * The exception notifications recorded so far. `notify` records; the
+ * dispatcher sends. The order's own 支付成功 pair is filtered out — a paid
+ * order records those on the way in, and they are the order domain's test.
+ */
+const notificationRows = () =>
+  harness.ctx.db
+    .select()
+    .from(effectsTable)
+    .where(eq(effectsTable.scope, 'notification'))
+    .then((rows) => rows.filter((row) => row.scopeId.startsWith('admin_payment_exception:')));
 const flowRows = (kind: 'order_payment' | 'exception_refund' | 'order_refund') =>
   harness.ctx.db.select().from(capitalFlows).where(eq(capitalFlows.kind, kind));
 
@@ -457,6 +473,58 @@ describe('PAY-002 — an order that is already paid', () => {
     expect(await effectRows('payment.exception.refund')).toHaveLength(1);
     expect(await flowRows('order_payment')).toHaveLength(1);
     expect((await orderRow(paid.orderId)).paidAmount).toBe(paid.amount);
+  });
+
+  /**
+   * CR-2-e2. The automatic refund above does not make this redundant: it can
+   * fail, and somebody has to know money arrived that the shop cannot book.
+   */
+  it('puts the exception on an operator’s list, once however often it is delivered', async () => {
+    const paid = await paidAtGateway();
+    await notify(gateway.signTransactionNotification({ outTradeNo: paid.outTradeNo }));
+    const second = () =>
+      gateway.signTransactionNotification({
+        outTradeNo: paid.outTradeNo,
+        resource: resource(paid.outTradeNo, { transaction_id: 'WXTX-SECOND' }),
+      });
+    await notify(second());
+    // Delivered again: the unique index finds the exception already there and
+    // nobody is woken a second time.
+    await notify(second());
+
+    const [exception] = await exceptionRows();
+    const rows = await notificationRows();
+    expect(rows.map((row) => row.scopeId)).toEqual([
+      `admin_payment_exception:payment_exception:${exception!.id}`,
+    ]);
+    expect(rows[0]).toMatchObject({ scope: 'notification', status: 'pending' });
+    expect(rows[0]?.payload).toMatchObject({
+      event: 'admin_payment_exception',
+      data: { exceptionId: exception!.id, amount: exception!.paidAmount, reason: '重复支付' },
+    });
+    // An admin event carries no recipient: fan-out resolves whoever holds the
+    // permission atom at the time it is sent.
+    expect(rows[0]?.payload).not.toHaveProperty('userId');
+  });
+
+  it('announces no exception when the settlement transaction rolls back', async () => {
+    const paid = await paidAtGateway();
+    await notify(gateway.signTransactionNotification({ outTradeNo: paid.outTradeNo }));
+    const before = await notificationRows();
+
+    const second = gateway.signTransactionNotification({
+      outTradeNo: paid.outTradeNo,
+      resource: resource(paid.outTradeNo, { transaction_id: 'WXTX-ROLLBACK' }),
+    });
+    const broken: Ctx = { ...racer(), withTx: () => Promise.reject(new Error('数据库暂时不可用')) };
+    const result = await service.handleTransactionNotify(broken, {
+      headers: second.headers,
+      rawBody: second.rawBody,
+    });
+    expect(result.status).toBe(500);
+
+    expect(await exceptionRows()).toHaveLength(0);
+    expect(await notificationRows()).toEqual(before);
   });
 });
 

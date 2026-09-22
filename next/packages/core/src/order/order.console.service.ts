@@ -21,6 +21,7 @@ import { requireActorId, requireAdminId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
 import { Money } from '../kernel/money';
+import { notify } from '../notification';
 import { orderFulfilConfig } from './order.fulfil.config';
 import * as fulfilRepo from './order.fulfil.repo';
 import * as rules from './order.fulfil.rules';
@@ -430,6 +431,31 @@ export async function adminAdjustPrice(
         body.reason ? ` (${body.reason})` : ''
       }`.slice(0, 512),
       ...logActor(operator),
+    });
+
+    // CR-2-e2. The buyer has to be told the amount moved, or they pay the old
+    // one and the order sticks. Inside the transaction: an operator whose
+    // repricing lost the race against a payment (`applied.won === false`
+    // above) must not have sent 订单金额已修改 for a price that never changed.
+    // `oldAmount` comes from the locked row read before the update, so it is
+    // the amount the buyer actually saw.
+    //
+    // The subject carries the **resulting amount**, not just the order id, for
+    // the reason the CR gives about two partial refunds of one order. An order
+    // is legitimately repriced more than once — `operatorDiscount` is *added*
+    // to what is already there — so a per-order key would deduplicate every
+    // change after the first into silence. Keyed on the amount, a save that
+    // leaves the total where it was is the one thing that notifies once.
+    await notify(tx, ctx, {
+      event: 'order_price_changed',
+      subject: { scope: 'order-price', id: `${orderId}:${outcome.payableAmount.toString()}` },
+      userId: order.userId,
+      data: {
+        orderId,
+        orderNo: order.orderNo,
+        oldAmount: order.payableAmount,
+        amount: outcome.payableAmount.toString(),
+      },
     });
   });
 

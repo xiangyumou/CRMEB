@@ -4,6 +4,7 @@ import { cartItems } from '@shop/db/schema/cart';
 import { productSkus, productVirtualCards, products } from '@shop/db/schema/catalog';
 import { orderStatusLogs, orders } from '@shop/db/schema/order';
 import { couponTemplates, userCoupons } from '@shop/db/schema/coupon';
+import { effects as effectsTable } from '@shop/db/schema/system';
 import { userAddresses, users } from '@shop/db/schema/user';
 import {
   createTestCtx,
@@ -13,6 +14,7 @@ import {
   type TestCtx,
 } from '@shop/testing';
 import { registerCatalogDomain, stockAndSalesOf } from '../catalog';
+import { registerNotificationDomain } from '../notification';
 import { registerShippingFreightPort } from '../shipping';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
@@ -59,8 +61,23 @@ beforeEach(async () => {
   resetOrderPorts();
   registerCatalogDomain();
   registerShippingFreightPort();
+  // `resetOrderPorts` clears every hook registry, so the notification domain
+  // has to be reinstalled with the rest — and it has to be installed at all,
+  // because `notify` drops an event nobody registered rather than failing the
+  // order it belongs to. That is the right behaviour and it also means a test
+  // that forgot this would pass while asserting nothing.
+  registerNotificationDomain();
   registerOrderStateMachine(orderStateMachine);
 });
+
+/** The notification effects recorded so far, by key, sorted for comparison. */
+async function notificationKeys(): Promise<string[]> {
+  const rows = await harness.ctx.db
+    .select({ scopeId: effectsTable.scopeId })
+    .from(effectsTable)
+    .where(eq(effectsTable.scope, 'notification'));
+  return rows.map((row) => row.scopeId).sort();
+}
 
 // ---------------------------------------------------------------------------
 // fixtures
@@ -639,6 +656,97 @@ describe('order creation', () => {
       }),
       'VALIDATION_FAILED',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// the notifications checkout owes (CR-2-e2)
+// ---------------------------------------------------------------------------
+
+describe('order-created notifications', () => {
+  it('records the buyer’s and the admins’ notification in the checkout transaction', async () => {
+    const userId = await makeUser();
+    const item = await makeProduct({ price: '60.00', stock: 10, freight: '0.00' });
+    const cartItemId = await addToCart(userId, item, 2);
+    await makeAddress(userId);
+
+    const detail = await order.create(as(userId), {
+      source: 'cart',
+      cartItemIds: [String(cartItemId)],
+      kind: 'normal',
+      idempotencyKey: idempotencyKey(),
+    });
+    const orderId = Number(detail.id);
+
+    // One row per event, keyed on the order, still pending: `notify` records
+    // and the dispatcher sends. Nothing was asked of WeChat inside the
+    // checkout transaction.
+    expect(await notificationKeys()).toEqual([
+      `admin_order_created:order:${orderId}`,
+      `order_created:order:${orderId}`,
+    ]);
+
+    const [row] = await harness.ctx.db
+      .select()
+      .from(effectsTable)
+      .where(eq(effectsTable.scopeId, `order_created:order:${orderId}`));
+    expect(row).toMatchObject({ scope: 'notification', status: 'pending' });
+    expect(row?.payload).toMatchObject({
+      event: 'order_created',
+      userId,
+      data: { orderNo: detail.orderNo, amount: detail.payableAmount },
+    });
+  });
+
+  it('records nothing when the checkout rolls back', async () => {
+    const userId = await makeUser();
+    const item = await makeProduct({ stock: 1 });
+    const cartItemId = await addToCart(userId, item, 1);
+    await makeAddress(userId);
+
+    // Somebody else took the last unit after the shopper opened 确认订单. The
+    // whole transaction goes, and a 订单提交成功 about an order that does not
+    // exist is the worst kind of message to leave behind.
+    await harness.ctx.db
+      .update(productSkus)
+      .set({ stock: 0 })
+      .where(eq(productSkus.id, item.skuId));
+
+    await expectDomainError(
+      order.create(as(userId), {
+        source: 'cart',
+        cartItemIds: [String(cartItemId)],
+        kind: 'normal',
+        idempotencyKey: idempotencyKey(),
+      }),
+      'ORDER_OUT_OF_STOCK',
+    );
+    expect(await notificationKeys()).toEqual([]);
+  });
+
+  it('announces one order once, however many times the shopper taps 提交', async () => {
+    const userId = await makeUser();
+    const item = await makeProduct({ stock: 10 });
+    const cartItemId = await addToCart(userId, item, 1);
+    await makeAddress(userId);
+    const key = idempotencyKey();
+
+    const first = await order.create(as(userId), {
+      source: 'cart',
+      cartItemIds: [String(cartItemId)],
+      kind: 'normal',
+      idempotencyKey: key,
+    });
+    // The replay returns the first order without re-entering the transaction.
+    const again = await order.create(as(userId), {
+      source: 'cart',
+      cartItemIds: [String(cartItemId)],
+      kind: 'normal',
+      idempotencyKey: key,
+    });
+
+    expect(again.id).toBe(first.id);
+    expect(await notificationKeys()).toHaveLength(2);
   });
 });
 

@@ -7,7 +7,7 @@ import type {
 import { createHash, randomBytes } from 'node:crypto';
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
-import { notificationConfig } from '../notification';
+import { publicOrigin } from '../system';
 import { wechatOaRuntimeConfig } from './wechat-oa.config';
 import { jsapiTicket } from './wechat-oa.client';
 import { requireOaCredentials } from './wechat-oa.credentials';
@@ -46,13 +46,16 @@ import { requireOaCredentials } from './wechat-oa.credentials';
  */
 export async function jssdkConfigFor(ctx: Ctx, query: JssdkConfigQuery): Promise<JssdkConfig> {
   const credentials = await requireOaCredentials(ctx);
-  const [runtime, notification] = await Promise.all([
+  const [runtime, origin] = await Promise.all([
     ctx.config.get(wechatOaRuntimeConfig),
-    ctx.config.get(notificationConfig),
+    // The deployment's own origin, from `site` (CR-1-e2). It used to come from
+    // 通知设置, which meant this endpoint imported the notification domain to
+    // ask a question that has nothing to do with notifications.
+    publicOrigin(ctx),
   ]);
 
   const url = query.url.split('#')[0] ?? '';
-  assertAllowed(url, notification.siteBaseUrl, runtime.jsApiAllowedHosts);
+  assertAllowed(url, origin, runtime.jsApiAllowedHosts);
 
   const ticket = await jsapiTicket(ctx, credentials.appId);
   const nonceStr = randomBytes(8).toString('hex');
@@ -90,7 +93,7 @@ export function jsapiSignature(args: {
  * and the comparison is on the **host**, not on a prefix: `shop.example.com`
  * must not match `shop.example.com.attacker.test`.
  */
-export function assertAllowed(url: string, siteBaseUrl: string, allowedHosts: string): void {
+export function assertAllowed(url: string, siteOrigin: string, allowedHosts: string): void {
   let host: string;
   try {
     const parsed = new URL(url);
@@ -104,9 +107,9 @@ export function assertAllowed(url: string, siteBaseUrl: string, allowedHosts: st
   }
 
   const allowed = new Set<string>();
-  if (siteBaseUrl.trim() !== '') {
+  if (siteOrigin.trim() !== '') {
     try {
-      allowed.add(new URL(siteBaseUrl).host.toLowerCase());
+      allowed.add(new URL(siteOrigin).host.toLowerCase());
     } catch {
       // A misconfigured base URL must not become "allow everything".
     }

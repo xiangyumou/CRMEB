@@ -1,5 +1,6 @@
 import type { NotificationChannel } from '@shop/contracts/notification/schemas';
 import type { Ctx } from '../kernel/context';
+import { publicOrigin } from '../system';
 import { findOpenid, getWechatClient } from '../wechat';
 import { notificationConfig } from './notification.config';
 import { resolveSmsPort } from './notification.ports';
@@ -45,8 +46,8 @@ export interface SendContext {
 /**
  * Turns the event's `link` into something a WeChat message can open.
  *
- * A relative path is joined onto `notification.siteBaseUrl`; an absolute URL is
- * left alone. With no base URL configured the link is dropped rather than sent
+ * A relative path is joined onto `site.publicOrigin` (CR-1-e2); an absolute URL
+ * is left alone. With no origin configured the link is dropped rather than sent
  * as a bare path, because WeChat renders an unopenable link as a dead blue
  * word and the customer taps it anyway.
  */
@@ -72,9 +73,8 @@ export async function sendWechatOa(ctx: Ctx, input: SendContext): Promise<Channe
   const openid = await findOpenid(ctx.db, input.userId, 'oa');
   if (openid === null) return { kind: 'skipped', reason: 'user has no oa openid' };
 
-  const { siteBaseUrl } = await ctx.config.get(notificationConfig);
   const url = absoluteLink(
-    siteBaseUrl,
+    await publicOrigin(ctx),
     render(config.linkUrl ?? input.event.link ?? '', input.data),
   );
 

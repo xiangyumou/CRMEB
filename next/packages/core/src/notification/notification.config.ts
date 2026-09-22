@@ -9,32 +9,19 @@ import { defineConfigGroup } from '../kernel/config-registry';
  * provider in F1's `sms`. Group names are global, so this stream declares one
  * group and reads the other four.
  *
- * `siteBaseUrl` is a **local adapter for `CR-1-e2`**. Two things need to know
- * the shop's public origin and neither can work it out: a notification link
- * (`/orders/1024` has to become a URL a WeChat template message can open) and
- * the JS-SDK signature endpoint, which must refuse to sign a page that is not
- * ours. F1 deliberately dropped `site_url` from the `site` group because the
- * legacy installer kept rewriting it — the CR asks for it back as a read-only,
- * environment-derived field. Until then it is configured here, and
- * `wechat-oa` reads it through this domain's `index.ts`.
+ * The shop's public origin is **not** here either, any more. It was, as a
+ * local adapter for CR-1-e2 (`siteBaseUrl` / `jsApiExtraHosts`); the CR was
+ * accepted and the fields moved to F1's `site` group as `publicOrigin` /
+ * `extraOrigins`, read through `publicOrigin(ctx)` and `isTrustedHost(ctx, …)`
+ * from `@shop/core/system`. 站点公开地址 under 通知设置 was not where an
+ * operator looked for it, and the JS-SDK signer had to import this domain to
+ * ask a question that has nothing to do with notifications.
  */
 export const notificationConfig = defineConfigGroup({
   group: 'notification',
   title: '通知设置',
   permission: 'system:config:read',
   schema: z.object({
-    /**
-     * Absolute origin, no trailing slash, e.g. `https://shop.example.com`.
-     * Empty disables both the OA link rendering and the JS-SDK endpoint, which
-     * is the safe default: signing an unknown origin is worse than not signing.
-     */
-    siteBaseUrl: z.string().max(255).default(''),
-    /**
-     * Extra hostnames the JS-SDK endpoint may sign for, comma-separated. A
-     * shop often serves the H5 storefront from a second domain that is also
-     * registered as a JS 安全域名.
-     */
-    jsApiExtraHosts: z.string().max(500).default(''),
     /**
      * `mini_program_state` for subscribe messages. `formal` in production;
      * `trial`/`developer` exist because a shop testing a new template
@@ -45,18 +32,6 @@ export const notificationConfig = defineConfigGroup({
     retentionDays: z.number().int().min(0).max(3650).default(180),
   }),
   ui: {
-    siteBaseUrl: {
-      label: '站点公开地址',
-      type: 'text',
-      help: '例如 https://shop.example.com，用于通知里的链接与 JS-SDK 域名校验',
-      order: 1,
-    },
-    jsApiExtraHosts: {
-      label: 'JS-SDK 额外域名',
-      type: 'text',
-      help: '多个用英文逗号分隔，需与公众号的 JS 安全域名一致',
-      order: 2,
-    },
     miniProgramState: {
       label: '小程序版本',
       type: 'select',

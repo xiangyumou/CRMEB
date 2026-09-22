@@ -81,7 +81,12 @@ export { AGREEMENT_FIELDS, agreementConfig } from './agreement.config';
 export { logisticsConfig } from './logistics.config';
 export { mapConfig } from './map.config';
 export { tradeConfig } from './trade.config';
-export { siteConfig } from './site.config';
+/**
+ * `publicOrigin` / `isTrustedHost` are the origin's one home (CR-1-e2). Any
+ * domain that needs an absolute URL, or has to decide whether a host is ours,
+ * asks here rather than keeping its own copy of the answer.
+ */
+export { isTrustedHost, publicOrigin, siteConfig } from './site.config';
 export { smsConfig } from './sms.config';
 export { wechatMiniConfig } from './wechat-mini.config';
 export { wechatOaConfig } from './wechat-oa.config';

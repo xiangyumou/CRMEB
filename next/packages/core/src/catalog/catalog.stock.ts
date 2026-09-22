@@ -1,6 +1,9 @@
 import type { Tx } from '@shop/db';
 
+import type { Ctx } from '../kernel/context';
+import { notify } from '../notification';
 import type { StockLine, StockPort, StockReleaseOptions } from '../order/ports';
+import { catalogConfig } from './catalog.config';
 import * as repo from './catalog.repo';
 
 /**
@@ -59,6 +62,62 @@ function assertPositive(lines: readonly StockLine[]): void {
   }
 }
 
+/**
+ * 库存预警, at the moment a SKU falls under the line (CR-2-e2).
+ *
+ * **On the crossing, never on the state.** Every decrement below the threshold
+ * would notify on every subsequent order of a SKU that is simply low, which is
+ * how an operator learns to ignore the badge. So the condition is *from above
+ * to at-or-below*: the quantity just taken is what says where the SKU was a
+ * statement ago, and only the order that pushed it under says anything.
+ *
+ * The ledger's `UNIQUE (scope, scope_id, event_type)` deduplicates per
+ * subject + event as well, which catches the restock-and-cross-again case
+ * within one row's lifetime — but it is the backstop, not the mechanism.
+ *
+ * Threshold `0` turns 库存预警 off, the same as it does for the admin list.
+ *
+ * `ctx` is optional on `reserve` and this is why: the port's other callers —
+ * the fakes, the concurrency tests that drive the port directly — have no
+ * request context, and inventing one to keep a signature uniform would be a
+ * worse trade than a warning those callers do not want anyway.
+ */
+async function warnOnLowStock(tx: Tx, ctx: Ctx, lines: readonly StockLine[]): Promise<void> {
+  const { stockWarningThreshold: threshold } = await ctx.config.get(catalogConfig);
+  if (threshold <= 0) return;
+
+  const skus = await repo.skusByIds(
+    tx,
+    lines.map((line) => line.skuId),
+  );
+  const crossed = lines.filter((line) => {
+    const sku = skus.get(line.skuId);
+    if (sku === undefined) return false;
+    return sku.stock <= threshold && sku.stock + line.quantity > threshold;
+  });
+  if (crossed.length === 0) return;
+
+  const names = await repo.productsByIds(
+    tx,
+    crossed.map((line) => skus.get(line.skuId)!.productId),
+  );
+  for (const line of crossed) {
+    const sku = skus.get(line.skuId)!;
+    await notify(tx, ctx, {
+      // The SKU, not the product: a product with twenty variants runs out one
+      // variant at a time, and the operator has to be told which.
+      subject: { scope: 'sku', id: sku.id },
+      event: 'admin_low_stock',
+      data: {
+        productId: sku.productId,
+        productName: names.get(sku.productId)?.name ?? '',
+        stock: sku.stock,
+        threshold,
+      },
+    });
+  }
+}
+
 /** Collapses duplicate lines: two cart rows of the same SKU are one decrement of two. */
 function mergeLines(lines: readonly StockLine[]): StockLine[] {
   assertPositive(lines);
@@ -82,7 +141,12 @@ export const catalogStockPort: StockPort = {
    * SKUs in opposite cart order would otherwise be able to deadlock on each
    * other; a fixed order makes that impossible.
    */
-  async reserve(tx: Tx, orderId: number, lines: readonly StockLine[]): Promise<StockLine[]> {
+  async reserve(
+    tx: Tx,
+    orderId: number,
+    lines: readonly StockLine[],
+    ctx?: Ctx,
+  ): Promise<StockLine[]> {
     void orderId;
     const merged = mergeLines(lines).sort((a, b) => a.skuId - b.skuId);
     const failed: StockLine[] = [];
@@ -94,6 +158,7 @@ export const catalogStockPort: StockPort = {
     if (failed.length > 0) return failed;
 
     await rollupFor(tx, merged);
+    if (ctx !== undefined) await warnOnLowStock(tx, ctx, merged);
     return [];
   },
 

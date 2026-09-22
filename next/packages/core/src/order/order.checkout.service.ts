@@ -12,6 +12,7 @@ import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, generateOrderNo, toId, toIdOrNull } from '../kernel/ids';
 import { Money } from '../kernel/money';
+import { notify } from '../notification';
 import {
   resolveCatalogPort,
   resolveFreightPort,
@@ -558,7 +559,9 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
         skuId: line.sku.skuId,
         quantity: line.quantity,
       }));
-      const short = await resolveStockPort().reserve(tx, order.id, stockLines);
+      // `ctx` lets A record 库存预警 for a SKU this reservation pushed under
+      // its threshold, in this transaction (CR-2-e2).
+      const short = await resolveStockPort().reserve(tx, order.id, stockLines, ctx);
       if (short.length > 0) {
         throw new DomainError('ORDER_OUT_OF_STOCK', {
           details: {
@@ -589,6 +592,30 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
         operatorUserId: userId,
         message: `提交订单，应付 ${draft.payableAmount.toString()}`,
       });
+
+      // CR-2-e2. Inside this transaction, so a submit that rolls back on stock
+      // or on a coupon leaves no 订单提交成功 behind; `notify` only writes an
+      // effect row and the dispatcher fans out after the commit, so no channel
+      // can fail a checkout. The return value is not an error signal — `false`
+      // would mean this order was already announced, which is the outcome
+      // either way, and the replay path above never reaches here at all.
+      const announcement = {
+        orderId: order.id,
+        orderNo: order.orderNo,
+        amount: draft.payableAmount.toString(),
+      };
+      await notify(tx, ctx, {
+        event: 'order_created',
+        subject: { scope: 'order', id: order.id },
+        userId,
+        data: announcement,
+      });
+      await notify(tx, ctx, {
+        event: 'admin_order_created',
+        subject: { scope: 'order', id: order.id },
+        data: announcement,
+      });
+
       return { orderId: order.id, replayed: false, payWindowMinutes: draft.payWindowMinutes };
     });
 

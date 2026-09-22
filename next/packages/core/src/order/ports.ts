@@ -227,8 +227,17 @@ export interface StockReleaseOptions {
 }
 
 export interface StockPort {
-  /** Returns the lines that could NOT be satisfied. Empty array means success. */
-  reserve(tx: Tx, orderId: number, lines: readonly StockLine[]): Promise<StockLine[]>;
+  /**
+   * Returns the lines that could NOT be satisfied. Empty array means success.
+   *
+   * `ctx` is optional, and trailing, because the decrement itself needs
+   * nothing from it: it is there so that A can record 库存预警 for a SKU this
+   * reservation pushed under its threshold (CR-2-e2), inside the caller's
+   * transaction. A caller that has a context passes it; the fakes and the
+   * tests that drive the port directly do not, and get no warning — which is
+   * what they want.
+   */
+  reserve(tx: Tx, orderId: number, lines: readonly StockLine[], ctx?: Ctx): Promise<StockLine[]>;
   release(
     tx: Tx,
     orderId: number,

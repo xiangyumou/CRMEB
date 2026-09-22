@@ -14,6 +14,7 @@ import { recordEffect } from '../effects';
 import { requireAdminId, requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { toId, toIdOrNull } from '../kernel/ids';
+import { notify } from '../notification';
 import { refundPermissions } from './permissions';
 import { returnAddress, type ReturnAddress } from './refund.config';
 import * as repo from './refund.repo';
@@ -137,9 +138,44 @@ export async function adminApprove(
       await reserveUnits(tx, id, row.orderId);
       await queueExecution(tx, ctx, id);
     }
+
+    // CR-2-e2. Last, so that an approval `reserveUnits` rolls back — the units
+    // went out of the door first and the request is now a return — never tells
+    // the buyer their refund was agreed.
+    await notifyReview(tx, ctx, row, 'refund_approved', { amount: row.amount });
   });
 
   return detail(ctx, id);
+}
+
+/**
+ * The buyer's half of a review decision.
+ *
+ * `orderNo` is what the templates show — a shopper knows their order number,
+ * not the refund's internal order id — and it is not on the refund row, so it
+ * costs one read inside the transaction that already holds the lock.
+ */
+async function notifyReview(
+  tx: Tx,
+  ctx: Ctx,
+  row: repo.RefundRow,
+  event: 'refund_approved' | 'refund_rejected',
+  extra: Record<string, unknown>,
+): Promise<void> {
+  const order = await repo.findOrder(tx, row.orderId);
+  await notify(tx, ctx, {
+    event,
+    // The refund, not the order: one order can be refunded line by line, and
+    // each request gets its own answer.
+    subject: { scope: 'refund', id: row.id },
+    userId: row.userId,
+    data: {
+      refundId: row.id,
+      refundNo: row.refundNo,
+      orderNo: order?.orderNo ?? '',
+      ...extra,
+    },
+  });
 }
 
 /**
@@ -222,6 +258,11 @@ export async function adminReject(
       operatorAdminId: adminId,
     });
     await refreshOrderRefundStatus(tx, row.orderId);
+
+    // CR-2-e2. The reason travels with it: a rejection the buyer cannot
+    // explain later is the complaint that reaches the shop owner, and the
+    // database makes the reason mandatory for the same reason.
+    await notifyReview(tx, ctx, row, 'refund_rejected', { reason: input.rejectReason });
   });
 
   return detail(ctx, id);

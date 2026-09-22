@@ -14,6 +14,7 @@ import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { generateOrderNo, toId, toIdOrNull } from '../kernel/ids';
 import { Money } from '../kernel/money';
+import { notify } from '../notification';
 import { requireOrderRef, resolveStockPort } from '../order';
 import { onOrderRefunded } from '../order/ports';
 import {
@@ -283,6 +284,29 @@ export async function apply(ctx: Ctx, body: RefundApplyBody): Promise<RefundDeta
       toStatus: 'applied',
       message: `买家发起${body.kind === 'return_and_refund' ? '退货退款' : '仅退款'}申请`,
       operatorUserId: userId,
+    });
+
+    // CR-2-e2. The receipt and the 待处理 badge, both inside this transaction
+    // — a request that lost the `refund_items_open_uq` race above must leave
+    // neither behind. The subject is the **refund**, not the order: two
+    // partial refunds of one order are two notifications, which is exactly
+    // what a per-order key would have swallowed.
+    const applied = {
+      refundId: refund.id,
+      refundNo: refund.refundNo,
+      orderNo: order.orderNo,
+      amount: amount.toString(),
+    };
+    await notify(tx, ctx, {
+      event: 'refund_applied',
+      subject: { scope: 'refund', id: refund.id },
+      userId,
+      data: applied,
+    });
+    await notify(tx, ctx, {
+      event: 'admin_refund_applied',
+      subject: { scope: 'refund', id: refund.id },
+      data: { ...applied, reason: body.reason },
     });
 
     return refund.id;

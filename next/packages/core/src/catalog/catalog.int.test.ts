@@ -1,10 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { productReviews, productSkus, productVirtualCards } from '@shop/db/schema/catalog';
+import { effects as effectsTable } from '@shop/db/schema/system';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 
 import { DomainError } from '../kernel/errors';
 import type { Ctx } from '../kernel/context';
+import { registerNotificationDomain } from '../notification';
+import { catalogConfig } from './catalog.config';
 import * as repo from './catalog.repo';
 import * as service from './catalog.service';
 import * as reviews from './catalog.review.service';
@@ -51,7 +54,16 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await harness.db.truncateAll();
+  // `truncateAll` empties the settings table but not the config cache, so a
+  // 库存预警值 set by one test would answer `get` in the next one — and `set`
+  // itself reads through that cache, so a stale value equal to the new one
+  // makes the write a no-op and leaves the group on its defaults.
+  await harness.ctx.config.invalidate(catalogConfig.group);
   harness.clock.set(NOW);
+  // `notify` drops an event nobody registered rather than failing the order it
+  // belongs to — which is right, and would also let 库存预警 assertions pass
+  // while proving nothing. Registration is idempotent.
+  registerNotificationDomain();
   adminId = await makeAdmin(harness);
 });
 
@@ -659,6 +671,127 @@ describe('stock', () => {
     expect((failure as { cause?: { constraint?: string } }).cause?.constraint).toBe(
       'product_skus_stock_non_negative',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 库存预警 (CR-2-e2)
+// ---------------------------------------------------------------------------
+
+describe('低库存提醒', () => {
+  /** The notifications recorded so far, by key. */
+  async function warnings() {
+    const rows = await harness.ctx.db
+      .select()
+      .from(effectsTable)
+      .where(eq(effectsTable.scope, 'notification'));
+    return rows.sort((a, b) => a.scopeId.localeCompare(b.scopeId));
+  }
+
+  async function withThreshold(threshold: number): Promise<void> {
+    await harness.ctx.config.set(catalogConfig, { stockWarningThreshold: threshold });
+  }
+
+  const reserve = (skuId: number, quantity: number, orderId: number) =>
+    harness.ctx.withTx((tx) =>
+      catalogStockPort.reserve(tx, orderId, [{ skuId, quantity }], harness.ctx),
+    );
+
+  it('warns on the crossing, not on every decrement below the line', async () => {
+    await withThreshold(3);
+    const product = await makeProduct(asAdmin());
+    const skuId = await firstSkuId(harness, product.id);
+
+    // 10 -> 5. Still above the line: nothing to say.
+    await reserve(skuId, 5, 101);
+    expect(await warnings()).toEqual([]);
+
+    // 5 -> 2. This is the order that took it under.
+    await reserve(skuId, 3, 102);
+    const [warning] = await warnings();
+    expect(warning).toMatchObject({ scope: 'notification', status: 'pending' });
+    expect(warning?.scopeId).toBe(`admin_low_stock:sku:${skuId}`);
+    expect(warning?.payload).toMatchObject({
+      event: 'admin_low_stock',
+      data: { productId: Number(product.id), productName: product.name, stock: 2, threshold: 3 },
+    });
+
+    // 2 -> 1. Low, but it was low before; an operator who is told twice stops
+    // reading the badge.
+    await reserve(skuId, 1, 103);
+    expect(await warnings()).toHaveLength(1);
+  });
+
+  it('warns about the SKU, so a twenty-variant product says which one ran out', async () => {
+    await withThreshold(3);
+    const product = await makeProduct(asAdmin(), {
+      specMode: true,
+      specs: [{ name: '颜色', values: [{ value: '黑' }, { value: '白' }] }],
+      skus: [
+        {
+          specValues: { 颜色: '黑' },
+          price: '99.00',
+          stock: 10,
+          isDefault: true,
+          isVisible: true,
+          sortOrder: 0,
+        },
+        {
+          specValues: { 颜色: '白' },
+          price: '99.00',
+          stock: 10,
+          isDefault: false,
+          isVisible: true,
+          sortOrder: 1,
+        },
+      ],
+    });
+    const skus = await repo.listSkus(harness.ctx.db, Number(product.id));
+    const [black, white] = skus;
+
+    await reserve(black!.id, 8, 110);
+    expect((await warnings()).map((row) => row.scopeId)).toEqual([
+      `admin_low_stock:sku:${black!.id}`,
+    ]);
+    expect(white!.stock).toBe(10);
+  });
+
+  it('records nothing when the reservation’s transaction rolls back', async () => {
+    await withThreshold(3);
+    const product = await makeProduct(asAdmin());
+    const skuId = await firstSkuId(harness, product.id);
+
+    // B1 aborts its transaction on a short line, and a 库存预警 about stock
+    // that was never taken would send somebody to restock a full shelf.
+    await expect(
+      harness.ctx.withTx(async (tx) => {
+        await catalogStockPort.reserve(tx, 120, [{ skuId, quantity: 8 }], harness.ctx);
+        throw new DomainError('ORDER_OUT_OF_STOCK');
+      }),
+    ).rejects.toBeInstanceOf(DomainError);
+
+    expect(await warnings()).toEqual([]);
+    expect((await repo.findSku(harness.ctx.db, skuId))!.stock).toBe(10);
+  });
+
+  it('says nothing at all when 库存预警值 is 0', async () => {
+    await withThreshold(0);
+    const product = await makeProduct(asAdmin());
+    const skuId = await firstSkuId(harness, product.id);
+
+    await reserve(skuId, 10, 130);
+    expect(await warnings()).toEqual([]);
+  });
+
+  it('says nothing to a caller with no context — the port still reserves', async () => {
+    await withThreshold(3);
+    const product = await makeProduct(asAdmin());
+    const skuId = await firstSkuId(harness, product.id);
+
+    await harness.ctx.withTx((tx) => catalogStockPort.reserve(tx, 140, [{ skuId, quantity: 8 }]));
+
+    expect((await repo.findSku(harness.ctx.db, skuId))!.stock).toBe(2);
+    expect(await warnings()).toEqual([]);
   });
 });
 

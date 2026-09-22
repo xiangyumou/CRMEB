@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Ctx } from '../kernel/context';
 import { defineConfigGroup } from '../kernel/config-registry';
 
 /**
@@ -14,6 +15,30 @@ import { defineConfigGroup } from '../kernel/config-registry';
  * refuses a group that cannot be read before anybody has saved it, because a
  * fresh install has to boot.
  */
+
+/**
+ * The public origin as the environment states it (CR-1-e2).
+ *
+ * `PUBLIC_ORIGIN` is the name the CR gave it; `APP_ORIGIN` is the one
+ * `apps/web/src/server/env.ts` already requires of every deployment for the
+ * CSRF `Origin` check, and it means exactly the same thing — the origin the
+ * storefront is served from. Honouring both means a shop that is already
+ * running needs no new variable, and a deployment that wants to be explicit
+ * can be.
+ *
+ * Read on every `config.get`, not captured at import: the worker and the web
+ * app both boot from the same environment, and a value read once at module
+ * scope would be pinned by whichever process first imported this file in a
+ * test.
+ */
+function originFromEnv(): string {
+  return trimOrigin(process.env['PUBLIC_ORIGIN'] ?? process.env['APP_ORIGIN'] ?? '');
+}
+
+/** No trailing slash, ever: every caller concatenates a path onto this. */
+function trimOrigin(value: string): string {
+  return value.trim().replace(/\/+$/, '');
+}
 export const siteConfig = defineConfigGroup({
   group: 'site',
   title: '站点设置',
@@ -45,6 +70,38 @@ export const siteConfig = defineConfigGroup({
     shareTitle: z.string().max(64).default(''),
     shareSummary: z.string().max(255).default(''),
     shareImage: z.string().max(512).default(''),
+
+    /**
+     * Absolute public origin, no trailing slash, e.g. `https://shop.example.com`.
+     *
+     * Environment-derived and **not** an operator setting: it is a deployment
+     * fact, which is exactly what the legacy installer kept getting wrong when
+     * it rewrote `site_url` on every deploy and left shops with
+     * `http://localhost` in their WeChat links. There is no `ui` entry, so the
+     * generic settings screen neither renders nor submits it, and no
+     * `legacyKeys`, because the old value is precisely the one that must not
+     * come across.
+     *
+     * Empty is the safe default: with no origin an outbound link is dropped
+     * rather than sent as a bare path, and `isTrustedHost` trusts nothing.
+     */
+    publicOrigin: z
+      .string()
+      .max(255)
+      .default(() => originFromEnv()),
+    /**
+     * Extra hosts also served by this deployment, comma-separated. Same source
+     * of truth: `EXTRA_ALLOWED_ORIGINS`, which the web app already parses for
+     * the CSRF check, so a staging domain is listed once.
+     *
+     * This is *not* where an operator lists 公众号 JS 安全域名 — that stays
+     * editable in `wechat-oa-runtime.jsApiAllowedHosts`, because it is a
+     * statement about the WeChat account rather than about this deployment.
+     */
+    extraOrigins: z
+      .string()
+      .max(500)
+      .default(() => (process.env['EXTRA_ALLOWED_ORIGINS'] ?? '').trim()),
   }),
   ui: {
     siteName: { label: '商城名称', type: 'text', section: '基础', order: 1 },
@@ -97,3 +154,57 @@ export const siteConfig = defineConfigGroup({
     shareImage: 'wechat_share_img',
   },
 });
+
+/**
+ * The origin the storefront is served from, or `''` (CR-1-e2).
+ *
+ * Three things need it and none can work it out: a notification link
+ * (`/orders/1024` has to become something a WeChat web view can open), the
+ * JS-SDK signature endpoint, and anything later that composes an absolute URL
+ * for a poster or a share card. A request's `Host` header answers none of them
+ * — the effect dispatcher runs in the worker with no request at all, and for
+ * the JS-SDK case trusting `Host` is the hole being closed.
+ *
+ * `''` is a real answer and every caller must handle it: it means nobody told
+ * this deployment its own address, and guessing is worse than abstaining.
+ */
+export async function publicOrigin(ctx: Ctx): Promise<string> {
+  const config = await ctx.config.get(siteConfig);
+  return trimOrigin(config.publicOrigin);
+}
+
+/**
+ * Whether a host is one this deployment serves.
+ *
+ * The comparison is on the **host**, never on a prefix: `shop.example.com`
+ * must not match `shop.example.com.attacker.test`. An entry may be written as
+ * a bare host or as a whole origin, because operators paste both. Nothing is
+ * trusted when nothing is configured, which is why an unconfigured shop signs
+ * no JS-SDK URLs rather than signing every one of them.
+ */
+export async function isTrustedHost(ctx: Ctx, host: string): Promise<boolean> {
+  const wanted = hostOf(host);
+  if (wanted === '') return false;
+  const config = await ctx.config.get(siteConfig);
+  const trusted = new Set<string>();
+  for (const entry of [config.publicOrigin, ...config.extraOrigins.split(',')]) {
+    const value = hostOf(entry);
+    if (value !== '') trusted.add(value);
+  }
+  return trusted.has(wanted);
+}
+
+/**
+ * The host of `https://shop.example.com/x`, of `shop.example.com:8443` and of
+ * `shop.example.com` alike; `''` for anything that is neither.
+ */
+function hostOf(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed === '') return '';
+  try {
+    return new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`).host;
+  } catch {
+    // A misconfigured entry must never become "trust everything".
+    return '';
+  }
+}

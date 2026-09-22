@@ -14,8 +14,10 @@ import {
   type FakeWechatGateway,
   type TestCtx,
 } from '@shop/testing';
+import { effects as effectsTable } from '@shop/db/schema/system';
 import { resetEffectHandlers } from '../effects';
 import type { Actor, Ctx } from '../kernel/context';
+import { registerNotificationDomain } from '../notification';
 import { registerStockPort, resetOrderPorts, type StockLine } from '../order/ports';
 import { installFulfilmentHooks } from '../order';
 import { handleTransactionNotify, paymentConfig, startPayment } from '../payment';
@@ -61,6 +63,10 @@ beforeEach(async () => {
   resetEffectHandlers();
   resetOrderPorts();
   installFulfilmentHooks();
+  // `resetOrderPorts` clears every hook registry. Without this `notify` drops
+  // the event — which is the right behaviour for an unregistered code, and
+  // would also let the assertions below pass while proving nothing.
+  registerNotificationDomain();
   releases = [];
   releaseFails = false;
   registerStockPort({
@@ -287,6 +293,134 @@ const orderRow = (id: number) =>
 
 const flowRows = (kind: 'order_payment' | 'order_refund') =>
   harness.ctx.db.select().from(capitalFlows).where(eq(capitalFlows.kind, kind));
+
+/** Every notification recorded so far, by key. `notify` records; nothing sends. */
+async function notificationEffects() {
+  const rows = await harness.ctx.db
+    .select()
+    .from(effectsTable)
+    .where(eq(effectsTable.scope, 'notification'));
+  return rows.sort((a, b) => a.scopeId.localeCompare(b.scopeId));
+}
+
+const notificationKeys = async () => (await notificationEffects()).map((row) => row.scopeId);
+
+/** Just the after-sales ones: `paidOrder()` records the order's own on the way in. */
+const refundNotificationKeys = async () =>
+  (await notificationKeys()).filter((key) => key.includes(':refund:'));
+
+const notificationFor = async (key: string) =>
+  (await notificationEffects()).find((row) => row.scopeId === key);
+
+// ---------------------------------------------------------------------------
+// CR-2-e2 — the four notifications the after-sales flow owes
+// ---------------------------------------------------------------------------
+
+describe('after-sales notifications', () => {
+  it('records the buyer’s receipt and the 待处理 badge in the apply transaction', async () => {
+    const order = await paidOrder();
+    const applied = await service.apply(racer(userActor(order.userId)), applyBody(order, 1));
+    const id = Number(applied.id);
+
+    expect(await refundNotificationKeys()).toEqual([
+      `admin_refund_applied:refund:${id}`,
+      `refund_applied:refund:${id}`,
+    ]);
+
+    const orderNo = (await orderRow(order.orderId)).orderNo;
+    const userRow = await notificationFor(`refund_applied:refund:${id}`);
+    const adminRow = await notificationFor(`admin_refund_applied:refund:${id}`);
+    expect(userRow).toMatchObject({ status: 'pending' });
+    expect(userRow?.payload).toMatchObject({
+      event: 'refund_applied',
+      userId: order.userId,
+      // The order number the shopper knows, not the internal order id.
+      data: { refundNo: applied.refundNo, orderNo, amount: '50.00' },
+    });
+    // The admin copy has no recipient: fan-out resolves whoever holds
+    // `refund:request:read`, and it carries the reason the buyer gave.
+    expect(adminRow?.payload).toMatchObject({
+      event: 'admin_refund_applied',
+      data: { amount: '50.00', reason: '不想要了' },
+    });
+    expect(adminRow?.payload).not.toHaveProperty('userId');
+  });
+
+  it('records nothing when the request loses the open-line race', async () => {
+    const order = await paidOrder();
+    await service.apply(racer(userActor(order.userId)), applyBody(order, 1));
+    const before = await notificationKeys();
+
+    // A second request for a line somebody already has open: `refund_items_open_uq`
+    // decides it, the whole transaction goes, and no 退款申请已提交 is left over.
+    await expect(
+      service.apply(racer(userActor(order.userId)), applyBody(order, 1)),
+    ).rejects.toMatchObject({ code: 'REFUND_ALREADY_OPEN' });
+    expect(await notificationKeys()).toEqual(before);
+  });
+
+  it('two partial refunds of one order are two notifications, not one', async () => {
+    const order = await paidOrder();
+    const first = Number(
+      (await service.apply(racer(userActor(order.userId)), applyBody(order, 1))).id,
+    );
+    await admin.adminReject(racer(adminActor(order.adminId)), {
+      id: String(first),
+      rejectReason: '超出售后期',
+    });
+    const second = Number(
+      (await service.apply(racer(userActor(order.userId)), applyBody(order, 1))).id,
+    );
+
+    expect(await notificationKeys()).toContain(`refund_applied:refund:${first}`);
+    expect(await notificationKeys()).toContain(`refund_applied:refund:${second}`);
+  });
+
+  it('tells the buyer when the review approves, with the order number they know', async () => {
+    const order = await paidOrder();
+    const id = await approvedRefund(order, 1);
+
+    const approved = await notificationFor(`refund_approved:refund:${id}`);
+    expect(approved).toMatchObject({ scope: 'notification', status: 'pending' });
+    expect(approved?.payload).toMatchObject({
+      event: 'refund_approved',
+      userId: order.userId,
+      data: { refundId: id, amount: '50.00' },
+    });
+    expect((approved?.payload as { data: { orderNo: string } }).data.orderNo).toMatch(/^RO\d+$/);
+  });
+
+  it('tells the buyer why when the review rejects', async () => {
+    const order = await paidOrder();
+    const applied = await service.apply(racer(userActor(order.userId)), applyBody(order, 1));
+    const id = Number(applied.id);
+
+    await admin.adminReject(racer(adminActor(order.adminId)), {
+      id: String(id),
+      rejectReason: '已超过 7 天无理由期限',
+    });
+
+    const rejected = await notificationFor(`refund_rejected:refund:${id}`);
+    expect(rejected?.payload).toMatchObject({
+      event: 'refund_rejected',
+      userId: order.userId,
+      data: { refundNo: applied.refundNo, reason: '已超过 7 天无理由期限' },
+    });
+  });
+
+  it('tells nobody when the review itself was refused', async () => {
+    const order = await paidOrder();
+    const id = await approvedRefund(order, 1);
+    const before = await notificationKeys();
+
+    // Already approved: `transitionRefund` affects no rows and the whole
+    // review transaction goes, notification included.
+    await expect(
+      admin.adminApprove(racer(adminActor(order.adminId)), { id: String(id) }),
+    ).rejects.toMatchObject({ code: 'REFUND_NOT_ACTIONABLE' });
+    expect(await notificationKeys()).toEqual(before);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // CR-5-c — the return address is frozen at the approval
