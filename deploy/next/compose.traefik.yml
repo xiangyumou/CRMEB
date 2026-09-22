@@ -1,0 +1,44 @@
+# The overlay that lets the new stack take traffic. **Never** applied by
+# `upgrade.sh`, `rollback.sh` or a routine `up`; it is one explicit step of the
+# cutover runbook and one explicit step of the rollback.
+#
+#   docker compose --env-file deployment.env -f compose.yml -f compose.traefik.yml up -d --wait
+#
+# Why a second file rather than `traefik.enable=${NEXT_TRAEFIK:-false}` on the
+# service:
+#
+#   - a label that says `false` still puts the container in front of the
+#     provider, and one mistyped value in an env file flips it;
+#   - `server-internal-net` is where Traefik reaches a backend. A service that
+#     is not on that network cannot be routed to *whatever* its labels claim,
+#     and an external network cannot be made conditional inside one file.
+#
+# So without this file the new stack is not merely unlabelled — it is not
+# reachable from the router at all. That is the property the cutover needs:
+# bringing the stack up for a smoke test must be incapable of taking the
+# domain away from the old one.
+#
+# The labels mirror deploy/production/compose.yml. `NEXT_HOST` is normally the
+# same domain the old stack serves, which is the whole point: applying this
+# file moves the router, stopping the old stack is a separate step, and the old
+# stack's data is never touched.
+
+services:
+  edge:
+    networks:
+      - default
+      - server-internal-net
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=server-internal-net
+      - traefik.http.routers.crmeb-next-http.rule=Host(`${NEXT_HOST:?set NEXT_HOST before switching traffic}`)
+      - traefik.http.routers.crmeb-next-http.entrypoints=web
+      - traefik.http.routers.crmeb-next-https.rule=Host(`${NEXT_HOST:?}`)
+      - traefik.http.routers.crmeb-next-https.entrypoints=websecure
+      - traefik.http.routers.crmeb-next-https.tls=true
+      - traefik.http.routers.crmeb-next-https.tls.certresolver=myresolver
+      - traefik.http.services.crmeb-next.loadbalancer.server.port=80
+
+networks:
+  server-internal-net:
+    external: true
