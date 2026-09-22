@@ -35,6 +35,23 @@ const beta = defineConfigGroup({
 });
 
 /**
+ * A second claimant of `etl_test_site_name`.
+ *
+ * Two groups claiming one legacy key is a defect on the live registry (see the
+ * "one claimant" test below) — but the *fan-out* code has to keep working,
+ * because it is what makes that defect visible instead of silently writing the
+ * value into whichever group the map happened to iterate first. So the
+ * behaviour is covered here, on a registry that exists only in this file.
+ */
+const delta = defineConfigGroup({
+  group: 'etl-test-delta',
+  title: 'δ',
+  schema: z.object({ siteName: z.string().max(8).default('') }),
+  ui: {},
+  legacyKeys: { siteName: 'etl_test_site_name' },
+});
+
+/**
  * One field fed by three legacy aliases, which is `storage.s3AccessKeyId` in
  * miniature: a shop that used one vendor has rows for all of them and the other
  * two are empty strings.
@@ -56,10 +73,21 @@ function row(menu_name: string, value: string): LegacySystemConfigRow {
 }
 
 describe('buildLegacyKeyIndex', () => {
-  it('fans one legacy key out to every group that claims it', () => {
+  it('lists the one group that claims a key', () => {
     const index = buildLegacyKeyIndex(groups);
     expect(index.get('etl_test_site_name')).toEqual([
       { group: 'etl-test-alpha', key: 'siteName', alias: 0 },
+    ]);
+  });
+
+  it('fans one legacy key out to every group that claims it', () => {
+    // Synthetic on purpose: no live key has two claimants any more (the test
+    // below is what keeps it that way), and the fan-out is what would report
+    // the next one rather than silently picking a winner.
+    const index = buildLegacyKeyIndex([...groups, delta]);
+    expect(index.get('etl_test_site_name')).toEqual([
+      { group: 'etl-test-alpha', key: 'siteName', alias: 0 },
+      { group: 'etl-test-delta', key: 'siteName', alias: 0 },
     ]);
   });
 
@@ -72,13 +100,66 @@ describe('buildLegacyKeyIndex', () => {
     expect(claimants).toEqual([{ group: 'wechat', key: 'oaAppId', alias: 0 }]);
   });
 
-  it('really does fan out on the live registry — routine_appId has two claimants', () => {
-    // The mini-program app id is the sibling case CR-1-j did not cover: the
-    // `wechat` and `wechat-mini` groups both still claim it. A one-to-one map
-    // would drop one of them silently.
+  it('gives routine_appId to the wechat group alone', () => {
+    // The mini-program sibling of the case above, settled by E4 the same way:
+    // every WeChat credential belongs to the `wechat` group, and `wechat-mini`
+    // keeps only the switch and the 客服 settings.
     const claimants = buildLegacyKeyIndex().get('routine_appId') ?? [];
-    expect(claimants.length).toBeGreaterThan(1);
-    expect(claimants.map((c) => c.group).sort()).toEqual(['wechat', 'wechat-mini']);
+    expect(claimants).toEqual([{ group: 'wechat', key: 'miniAppId', alias: 0 }]);
+  });
+
+  it('no legacy key on the live registry has two claimants, beyond the one that is tracked', () => {
+    // The general form of the two tests above, and the reason CR-1-j was filed:
+    // a key claimed twice migrates into one screen and leaves the other blank,
+    // with nothing on either screen to say why. A group that copies an existing
+    // `legacyKeys` entry fails here rather than in a migrated shop.
+    //
+    // The exceptions are spelled out with their reason rather than skipped, and
+    // the assertion is an equality: a new duplicate fails, and so does removing
+    // one of these without deleting its line — which is how the entry gets
+    // cleaned up when CR-6-f1 lands instead of outliving it.
+    const EXPECTED: Record<string, string> = {
+      // B3 folded `trade` away (CR-6-f1, 2026-09-23): the four keys it shared
+      // with `catalog`, `order-fulfil` and `order-staff` now have one claimant
+      // each, which is what this test wants to stay true.
+      // Not a duplicate of the CR-1-j kind: one legacy value that two domains
+      // genuinely read — the pay-notify callback host and the storefront's own
+      // base url. They are separately editable afterwards (a shop that moves
+      // its H5 site keeps the notify host), so both claim the seed value.
+      site_url: 'payment, storefront-auth',
+    };
+
+    const shared = Object.fromEntries(
+      [...buildLegacyKeyIndex().entries()]
+        // The throwaway groups above register themselves like any other, so
+        // they turn up in the live index too. `etl_test_site_name` is claimed
+        // twice on purpose by the fan-out test.
+        .map(
+          ([legacyKey, claimants]) =>
+            [
+              legacyKey,
+              [...new Set(claimants.map((c) => c.group))].filter(
+                (group) => !group.startsWith('etl-test-'),
+              ),
+            ] as const,
+        )
+        .filter(([, groups]) => groups.length > 1)
+        .map(([legacyKey, groups]) => [legacyKey, [...groups].sort().join(', ')]),
+    );
+    expect(shared).toEqual(EXPECTED);
+  });
+
+  it('no WeChat credential is claimed twice', () => {
+    // The part of the rule above that E4 is answerable for, stated so it cannot
+    // be widened by adding a line to that table: nothing under `wechat_*` or
+    // `routine_*` may be claimed by two groups, whatever else is.
+    const shared = [...buildLegacyKeyIndex().entries()]
+      .filter(([key]) => key.startsWith('wechat_') || key.startsWith('routine_'))
+      .filter(([, claimants]) => new Set(claimants.map((c) => c.group)).size > 1)
+      .map(
+        ([legacyKey, claimants]) => `${legacyKey} → ${claimants.map((c) => c.group).join(', ')}`,
+      );
+    expect(shared).toEqual([]);
   });
 });
 

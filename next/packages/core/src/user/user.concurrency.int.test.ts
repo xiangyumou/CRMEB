@@ -9,6 +9,7 @@ import type { Actor, Ctx } from '../kernel/context';
 import type { DomainError } from '../kernel/errors';
 import { fakeSmsSender, registerSmsSender, resetSmsSender, type FakeSmsSender } from '../sms';
 import { smsConfig, wechatMiniConfig } from '../system';
+import { wechatConfig } from '../wechat';
 import './index';
 import * as auth from './storefront-auth.service';
 import { storefrontAuthConfig } from './storefront-auth.config';
@@ -219,7 +220,8 @@ describe('registration', () => {
     // lets one commit and rolls the other five accounts back with their failed
     // insert. The losers then read the winner's identity and sign in to it —
     // being second must not cost a shopper their sign-in.
-    await harness.ctx.config.set(wechatMiniConfig, { enabled: true, appId: 'wx-app' });
+    await harness.ctx.config.set(wechatMiniConfig, { enabled: true });
+    await harness.ctx.config.set(wechatConfig, { miniAppId: 'wx-app' });
     await harness.ctx.config.set(storefrontAuthConfig, { requirePhoneForWechat: false });
     wechat.setMiniSession('mini-code', { openid: 'o_mini_1' });
 

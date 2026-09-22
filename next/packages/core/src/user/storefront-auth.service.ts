@@ -5,6 +5,7 @@ import type {
   LogoutEverywhereResult,
   OaAuthorizeUrlQuery,
   OaLoginBody,
+  MiniBindPhoneBody,
   MiniLoginBody,
   MiniPhoneLoginBody,
   PasswordLoginBody,
@@ -562,6 +563,35 @@ export async function bindPhone(ctx: Ctx, body: BindPhoneBody): Promise<{ ok: tr
 }
 
 /**
+ * The same, with WeChat's word for the number instead of an SMS code.
+ *
+ * 微信授权手机号 inside the mini program: the shopper taps a button, WeChat
+ * hands the client a single-use `code`, and the number comes back over a
+ * server-to-server call. No SMS is sent — the shop would be paying to prove
+ * something the platform has just proved — and the number is never taken from
+ * the request body, which is the whole point of the exchange.
+ *
+ * Everything after that is `bindPhone`'s path, including `attachPhone`'s
+ * conditional update: a shopper who binds from two devices at once, or binds a
+ * number another account already holds, is refused there rather than here.
+ * `AUTH_PHONE_ALREADY_BOUND` is checked first all the same, so a double tap
+ * does not burn the WeChat code before finding out there was nothing to do.
+ */
+export async function bindPhoneFromMini(ctx: Ctx, body: MiniBindPhoneBody): Promise<{ ok: true }> {
+  const userId = requireUserId(ctx);
+  const user = await reload(ctx, userId);
+  assertUsable(user);
+  if (user.phone !== null) throw new DomainError('AUTH_PHONE_ALREADY_BOUND');
+
+  const mini = await miniApp(ctx);
+  if (!mini.enabled) throw new DomainError('AUTH_WECHAT_NOT_CONFIGURED');
+
+  const number = await wechatPort().miniPhoneNumber(ctx, body.phoneCode);
+  await attachPhone(ctx, user, number.phone, null);
+  return { ok: true };
+}
+
+/**
  * Rebind.
  *
  * A code on the **new** number only. Demanding one on the old number too reads
@@ -831,13 +861,31 @@ async function completeWithPhone(
   return signedIn(await issueSession(ctx, created.user, meta), created.created);
 }
 
+/**
+ * "Is there a mini program, and what is its app id."
+ *
+ * The same two-group split as `oaApp`, for the same reason: the `wechat-mini`
+ * group holds the operator's 启用 switch, and every WeChat credential lives in
+ * the `wechat` group (CR-1-j, extended to the mini program by E4 — both groups
+ * used to claim `routine_appId`, so a migrated shop held the app id in one
+ * screen and a blank in the other).
+ */
+async function miniApp(ctx: Ctx): Promise<{ enabled: boolean; appId: string }> {
+  const [mini, core] = await Promise.all([
+    ctx.config.get(wechatMiniConfig),
+    ctx.config.get(wechatConfig),
+  ]);
+  const appId = core.miniAppId.trim();
+  return { enabled: mini.enabled && appId !== '', appId };
+}
+
 export async function miniLogin(
   ctx: Ctx,
   body: MiniLoginBody,
   meta: RequestMeta = {},
 ): Promise<WechatLoginResult> {
-  const config = await ctx.config.get(wechatMiniConfig);
-  if (!config.enabled || !config.appId) throw new DomainError('AUTH_WECHAT_NOT_CONFIGURED');
+  const mini = await miniApp(ctx);
+  if (!mini.enabled) throw new DomainError('AUTH_WECHAT_NOT_CONFIGURED');
   const session = await wechatPort().miniCodeToSession(ctx, body.code);
   return signInWithIdentity(
     ctx,

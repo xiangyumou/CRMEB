@@ -8,7 +8,7 @@ import { resetWechatTokenFlight, wechatConfig } from '../wechat';
 import { jsapiTicketCacheKey, resetJsapiTicketFlight } from './wechat-oa.client';
 import { wechatOaRuntimeConfig } from './wechat-oa.config';
 import { signatureOf } from './wechat-oa.crypto';
-import { startFakeOaServer, type FakeOaServer } from './wechat-oa.fake-oa';
+import { startFakeOaServer, type FakeOaServer } from '@shop/testing/wechat';
 import * as menu from './wechat-oa.menu.service';
 import * as qrcode from './wechat-oa.qrcode.service';
 import * as reply from './wechat-oa.reply.service';

@@ -253,6 +253,42 @@ describe('matchRoute', () => {
     });
     expect(matchRoute([withParam], 'GET', '/api/v1/things/1/2')).toBeNull();
   });
+
+  /**
+   * CR-3-e4. The server sorts its routes so that a static segment wins over a
+   * `:param` one, and for a long time it did that with a comparator that
+   * returned 0 for any two paths that never disagreed about staticness. That
+   * is not a total order, and `Array.prototype.sort` given one may reorder
+   * elements that the comparator *did* have an opinion about — so a route
+   * added anywhere in the table could push `/api/v1/addresses/default` behind
+   * `/api/v1/addresses/:id`, and the server would then answer
+   * `VALIDATION_FAILED` on an `id` the caller never sent.
+   *
+   * Sorting a shuffled copy of the whole live table is the test that catches
+   * that class of bug: a comparator with a hole in it gives different answers
+   * for different input orders, and a correct one cannot.
+   */
+  it('puts every static path ahead of every :param path that would swallow it', () => {
+    // The property, stated over the whole live table rather than over the one
+    // route a particular sort happened to misplace: if a `:param` route's
+    // regex matches another route's literal path, the literal one has to come
+    // first, or the mock answers the wrong route.
+    const sorted = allRoutes.map(compileRoute).sort(bySpecificity);
+    const at = new Map(sorted.map((entry, index) => [entry.route, index]));
+
+    const offenders: string[] = [];
+    for (const shadowed of sorted) {
+      if (shadowed.paramNames.length > 0) continue;
+      for (const shadower of sorted) {
+        if (shadower.paramNames.length === 0) continue;
+        if (!shadower.regex.test(shadowed.route.path)) continue;
+        if (at.get(shadower.route)! < at.get(shadowed.route)!) {
+          offenders.push(`${shadower.route.path} shadows ${shadowed.route.path}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
 });
 
 describe('pickExample', () => {

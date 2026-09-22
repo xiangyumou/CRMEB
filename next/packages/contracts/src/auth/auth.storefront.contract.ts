@@ -4,6 +4,7 @@ import {
   bindPhoneBody,
   changePasswordBody,
   logoutEverywhereResult,
+  miniBindPhoneBody,
   miniLoginBody,
   miniPhoneLoginBody,
   oaAuthorizeUrlQuery,
@@ -489,6 +490,33 @@ export const authBindPhone = defineRoute({
   examples: [
     { name: 'ok', body: { phone: '13700137000', code: '123456' }, response: { ok: true } },
   ],
+});
+
+/**
+ * 微信授权手机号, for an account that is already signed in.
+ *
+ * Separate from `POST /api/v1/auth/phone` rather than an optional field on it:
+ * that route proves the number with an SMS code this shop paid to send, this
+ * one takes WeChat's word for it, and the two refuse for entirely different
+ * reasons. There is no `PUT` sibling — replacing a number the customer already
+ * has is 更换手机号, and that flow keeps its SMS code.
+ */
+export const authBindPhoneWechatMini = defineRoute({
+  id: 'auth.bindPhoneWechatMini',
+  method: 'POST',
+  path: '/api/v1/auth/phone/wechat-mini',
+  auth: 'user',
+  summary: '小程序一键绑定手机号',
+  tags: ['auth'],
+  body: miniBindPhoneBody,
+  response: okResult,
+  errors: [
+    'AUTH_WECHAT_NOT_CONFIGURED',
+    'AUTH_WECHAT_CODE_INVALID',
+    'AUTH_PHONE_TAKEN',
+    'AUTH_PHONE_ALREADY_BOUND',
+  ],
+  examples: [{ name: 'ok', body: { phoneCode: 'mp-phone-code-abc' }, response: { ok: true } }],
 });
 
 export const authChangePhone = defineRoute({

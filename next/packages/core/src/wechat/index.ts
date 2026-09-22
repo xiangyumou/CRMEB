@@ -29,12 +29,16 @@ export {
   type TemplateMessageInput,
   type WechatApp,
   type WechatCall,
+  type WechatBytesResult,
   type WechatCoreClient,
   type WechatProfile,
   type WechatSendResult,
 } from './wechat.client';
 
 export { wechatConfig, type WechatConfig } from './wechat.config';
+
+/** `GET /api/v1/wechat/mini-qrcodes` — 小程序码, generated once and cached. */
+export { miniCodeUrl, SCENE_MAX_BYTES } from './wechat.mini-code.service';
 
 /** Read-only; the writes belong to E1's login flow. */
 export { findOpenid } from './wechat.repo';

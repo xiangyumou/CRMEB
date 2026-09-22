@@ -125,12 +125,12 @@ function insertCategoryOrConflict(
 /**
  * `wechat_qrcode_categories_name_uq` as a 409 instead of a 500.
  *
- * Two of these happen in a real shop. The ordinary one is two people naming a
- * category 地推 at once. The surprising one is a name that was *deleted*: the
- * index is not restricted to live rows, so a soft-deleted 地推 keeps its name
- * for ever and recreating it fails with no visible cause at all. Both read the
- * same to the operator, which is why the message names the possibility — and
- * why CR-3-e3 asks for the index to be made partial.
+ * There used to be two ways to get here. The ordinary one is two people naming
+ * a category 地推 at once. The other was a name that had been *deleted*: the
+ * index covered soft-deleted rows, so a 地推 nothing on the screen showed kept
+ * its name for ever and recreating it failed with no visible cause. CR-3-e3
+ * (closed by E4) scoped the index to `deleted_at is null`, so only the first
+ * one is left and the 409 now means what it says.
  */
 async function categoryNameConflictAsDomainError<T>(run: () => Promise<T>): Promise<T> {
   try {

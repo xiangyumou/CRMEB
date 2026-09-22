@@ -1,6 +1,15 @@
 # CR-17-k — nineteen admin writes on the notification and WeChat OA surfaces name no audit target
 
-**Stream:** K (hardening) **Status:** OPEN — for streams N1 (notifications) and E3 (WeChat OA)
+**Stream:** K (hardening) **Status:** CLOSED by E4 — every route on the table
+below names a target and the twenty-one `AUDIT_EXEMPT` entries are deleted, so
+`route-hygiene` now fails the next route that merges without one. E3 had
+already fixed its eighteen by the time E4 merged `rewrite/integration`; what
+was left was N1's three, which E4 was handed for this CR only:
+`notification-log:<id>` for a retry (the act is on one customer's undelivered
+message, not on the template), `notification-template:<code>` for a template
+save, and `notification-template:<code>:<channel>` for a channel toggle —
+"谁把短信通知关了" is a different question from "谁改了这个模板", and the log
+should answer both.
 **Files:** `next/apps/web/app/admin-api/notification-logs/**`,
 `next/apps/web/app/admin-api/notification-templates/**`,
 `next/apps/web/app/admin-api/wechat-auto-replies/**`,

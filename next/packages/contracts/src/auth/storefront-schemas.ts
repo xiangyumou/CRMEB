@@ -221,6 +221,23 @@ export const miniPhoneLoginBody = z.object({
 });
 export type MiniPhoneLoginBody = z.infer<typeof miniPhoneLoginBody>;
 
+/**
+ * Bind a number to the account that is **already signed in**, from inside the
+ * mini program.
+ *
+ * The sibling of `bindPhoneBody` for a shopper who got in some other way and
+ * then taps 微信授权手机号 in 个人中心: no `bindToken`, because there is a
+ * session, and no SMS code, because WeChat has already verified the number —
+ * asking for one as well would cost the shop a message to prove something the
+ * platform just proved, and cost the shopper the one screen this button exists
+ * to avoid.
+ */
+export const miniBindPhoneBody = z.object({
+  /** The `code` from `getPhoneNumber`'s callback. Single-use, redeemed server-side. */
+  phoneCode: z.string().min(1).max(512),
+});
+export type MiniBindPhoneBody = z.infer<typeof miniBindPhoneBody>;
+
 export const oaLoginBody = z.object({
   /** The `code` on the OAuth redirect back from WeChat. */
   code: z.string().min(1).max(512),

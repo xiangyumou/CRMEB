@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { id, instant, pageQuery, paged, sortQuery } from '../_conventions/common';
+import {
+  clientPlatform,
+  id,
+  instant,
+  money,
+  pageQuery,
+  paged,
+  sortQuery,
+} from '../_conventions/common';
 
 /**
  * Shapes shared by the user routes.
@@ -507,3 +515,200 @@ export const adminUserDetailExample: AdminUserDetail = {
   deletedAt: null,
   updatedAt: '2026-09-20T08:31:00+08:00',
 };
+
+// ---------------------------------------------------------------------------
+// staff: 商家管理 → 用户
+// ---------------------------------------------------------------------------
+
+/**
+ * What a 店员 may see of a customer (CR-2-h2 §3).
+ *
+ * This is the one decision in the staff surface that is not a copy of the
+ * admin one. The console's 用户详情 carries the unmasked phone, the address
+ * book, the registration IP, the operator remark and the account controls; the
+ * legacy 商家管理 screen showed most of that to anyone the shop owner had added
+ * to `order_notice_admin_uids`. A phone in a shop assistant's hand is a
+ * different threat model from a console behind an office login — the handset is
+ * shared, left on a counter and not revoked when somebody stops working there.
+ *
+ * So the staff shapes are an allow-list, not the admin shape minus a few
+ * fields, and everything below was chosen for a reason:
+ *
+ * | Field | Why a 店员 needs it |
+ * | --- | --- |
+ * | `nickname`, `avatarUrl` | recognise the customer standing in front of them |
+ * | `phone` (masked) | read the last four digits back to confirm identity |
+ * | `groups`, `labels` | the two drawers this surface exists for |
+ * | `orderCount`, `spendTotal` | decide whether to offer the 会员 discount |
+ * | `status` | explain why a customer cannot place an order — read-only |
+ * | `createdAt` | 老客 or new, the other half of the same judgement |
+ *
+ * Absent on purpose: the unmasked phone, `account` (which *is* the phone for
+ * every phone-registered customer, so returning it would undo the mask),
+ * `realName`, `birthday`, `registerIp` / `lastLoginIp`, `adminRemark`,
+ * `addressCount` and the address book, `boundWechat`, `hasPassword`.
+ */
+export const staffUserListItem = z.object({
+  id,
+  nickname: z.string().nullable(),
+  avatarUrl: z.string().nullable(),
+  /** `138****8000`, always. There is no staff route that unmasks it. */
+  phone: maskedPhone.nullable(),
+  status: userStatus,
+  groups: z.array(namedRef),
+  labels: z.array(namedRef),
+  /**
+   * Paid orders and what they came to, or `null`.
+   *
+   * `null` is not zero: it means the order stream has not registered
+   * `UserOrderStatsPort` in this deployment (CR-2-e4), and a client must
+   * render 「--」 rather than 「0 单」. A customer with no orders is `0` /
+   * `"0.00"`.
+   */
+  orderCount: z.number().int().min(0).nullable(),
+  spendTotal: money.nullable(),
+  createdAt: instant,
+});
+export type StaffUserListItem = z.infer<typeof staffUserListItem>;
+
+/**
+ * 用户详情 for a 店员 — deliberately the same shape as one row of the list.
+ *
+ * There is no extra field behind the tap. The detail route exists because
+ * `pages/admin/user/index.vue` is reached from a scan or a notification with
+ * only a uid in hand, not because there is more to show.
+ */
+export const staffUserDetail = staffUserListItem;
+export type StaffUserDetail = z.infer<typeof staffUserDetail>;
+
+export const staffUserListQuery = pageQuery.extend({
+  /**
+   * Matches the nickname or the **whole** phone number.
+   *
+   * A 店员 types the number the customer reads out, so the search takes all
+   * eleven digits — but not a fragment of them: `ilike '%1380%'` over a phone
+   * column is a way to enumerate the customer base four digits at a time, which
+   * is exactly what masking the column is meant to prevent. `account` and
+   * `realName` are not searched at all (the console searches both).
+   */
+  keyword: z.string().max(64).optional(),
+  groupId: id.optional(),
+  labelId: id.optional(),
+});
+export type StaffUserListQuery = z.infer<typeof staffUserListQuery>;
+
+export const pagedStaffUsers = paged(staffUserListItem);
+
+/** The group picker: every group, shortest form, no member counts. */
+export const staffUserGroups = z.object({
+  items: z.array(z.object({ id, name: z.string() })),
+});
+export type StaffUserGroups = z.infer<typeof staffUserGroups>;
+
+/**
+ * The 标签 drawer: the whole catalogue, grouped by category, with this
+ * customer's labels flagged.
+ *
+ * One request, because the drawer needs both halves to draw a single chip and
+ * two requests would let them disagree. Labels with no category come back under
+ * a group whose `categoryId` is `null`.
+ */
+export const staffUserLabels = z.object({
+  categories: z.array(
+    z.object({
+      categoryId: id.nullable(),
+      categoryName: z.string().nullable(),
+      labels: z.array(z.object({ id, name: z.string(), assigned: z.boolean() })),
+    }),
+  ),
+});
+export type StaffUserLabels = z.infer<typeof staffUserLabels>;
+
+/**
+ * 设置分组 — the customer ends up in exactly this group, or in none.
+ *
+ * The console's route is a batch with a `replace` / `add` / `remove` mode over
+ * many customers and many groups; this is one customer and one group, because
+ * the drawer is a radio picker (`pages/admin/user/index.vue` binds a
+ * `<picker>`). `null` is 未分组 and is how a 店员 undoes a mistake — without it
+ * the only way out of a wrong group would be the web console.
+ */
+export const staffUserGroupBody = z.object({
+  groupId: id.nullable(),
+});
+export type StaffUserGroupBody = z.infer<typeof staffUserGroupBody>;
+
+/**
+ * 设置标签 — the customer's labels become exactly this set.
+ *
+ * Plural where CR-2-h2 wrote `{ labelId }`, because the drawer submits the
+ * whole selection on 确定 (`components/userLable/index.vue` builds a
+ * `labelIds` array) and a singular field has no way to say "take this one
+ * off". An empty array clears them.
+ */
+export const staffUserLabelBody = z.object({
+  labelIds: z.array(id).max(50),
+});
+export type StaffUserLabelBody = z.infer<typeof staffUserLabelBody>;
+
+export const staffUserListItemExample: StaffUserListItem = {
+  id: '1001',
+  nickname: '小明',
+  avatarUrl: 'https://cdn.example.com/2026/09/a1b2c3d4.png',
+  phone: '138****8000',
+  status: 'active',
+  groups: [{ id: '3', name: '高价值客户' }],
+  labels: [{ id: '7', name: '母婴' }],
+  orderCount: 12,
+  spendTotal: '3980.00',
+  createdAt: '2026-01-05T10:00:00+08:00',
+};
+
+export const staffUserLabelsExample: StaffUserLabels = {
+  categories: [
+    {
+      categoryId: '2',
+      categoryName: '消费偏好',
+      labels: [
+        { id: '7', name: '母婴', assigned: true },
+        { id: '8', name: '数码', assigned: false },
+      ],
+    },
+    {
+      categoryId: null,
+      categoryName: null,
+      labels: [{ id: '9', name: '未分类标签', assigned: false }],
+    },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// the visits beacon
+// ---------------------------------------------------------------------------
+
+/**
+ * One storefront page view (CR-1-f3 §1).
+ *
+ * `path` is the **route**, not the URL: no origin, no query string, and no
+ * fragment. Two reasons, and both have bitten this table's ancestors. A query
+ * string carries `?code=` from the WeChat OAuth redirect and `?phone=` from a
+ * share link, so storing it turns an analytics table into a credential log
+ * that nobody remembers to purge. And 访客数 is grouped by path: with the query
+ * string attached, one product page becomes one row per referrer and the
+ * 热门页面 list is noise.
+ *
+ * The visitor is never named in the body. Who they are is the bearer token, or
+ * — for somebody who has not signed in — the address the request came from,
+ * both read off the request by the server. A `userId` a client could put in a
+ * beacon body would let anybody write page views onto anybody's account.
+ */
+export const visitBody = z.object({
+  path: z
+    .string()
+    .min(1)
+    .max(255)
+    .regex(/^\/[^?#\s]*$/, '页面路径格式不正确'),
+  /** Omitted means "whatever `X-Client-Platform` said", which is the usual case. */
+  platform: clientPlatform.optional(),
+});
+export type VisitBody = z.infer<typeof visitBody>;

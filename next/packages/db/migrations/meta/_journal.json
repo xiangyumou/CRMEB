@@ -8,6 +8,13 @@
       "when": 1790030693371,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790088725415,
+      "tag": "0001_wechat_mini_codes",
+      "breakpoints": true
     }
   ]
 }

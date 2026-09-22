@@ -14,12 +14,13 @@ import { wechatConfig } from '../wechat';
  * won. Stream F1's `wechat-oa` group now owns only what an operator types into
  * 公众平台 for the callback: the token, the EncodingAESKey and 消息加解密方式.
  *
- * The token and the AES key are still declared in both (C maps the same legacy
- * keys for those two), so they keep the "F1 first, C as the fallback" rule:
- * F1's is the screen an operator actually fills in, C's is what an install
- * migrated before that screen existed carries. CR-3-e2 asks for that half to be
- * merged too; until it lands this function is the single place that knows they
- * overlap, which is the property that matters.
+ * The token and the AES key are still *declared* in both, and keep the "F1
+ * first, C as the fallback" rule: F1's is the screen an operator actually fills
+ * in, C's is what an install that only ever used C's form carries. What
+ * CR-3-e2 asked for has landed on the migration side (E4): C no longer maps
+ * `wechat_token` / `wechat_encodingaeskey`, so a migrated shop's values arrive
+ * in F1's group alone and there is no second copy to go stale. This function
+ * stays the single place that knows the two declarations overlap.
  */
 export interface OaCredentials {
   enabled: boolean;

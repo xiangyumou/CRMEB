@@ -178,7 +178,16 @@ export const wechatQrcodeCategories = pgTable(
     updatedAt: updatedAt(),
     deletedAt: deletedAt(),
   },
-  (t) => [uniqueIndex('wechat_qrcode_categories_name_uq').on(t.name)],
+  (t) => [
+    // Scoped to the live rows (CR-3-e3). Unscoped, a deleted folder held its
+    // name for ever: 渠道二维码分类 is a short list of short words, an operator
+    // deletes 双十一 and cannot create it again next year, and the 409 says the
+    // name is taken while the screen shows nothing of the sort. Both
+    // soft-deleting siblings above are scoped the same way.
+    uniqueIndex('wechat_qrcode_categories_name_uq')
+      .on(t.name)
+      .where(sql`deleted_at is null`),
+  ],
 );
 
 export type WechatQrcodeCategory = typeof wechatQrcodeCategories.$inferSelect;
@@ -243,6 +252,48 @@ export const wechatQrcodeScans = pgTable(
 
 export type WechatQrcodeScan = typeof wechatQrcodeScans.$inferSelect;
 export type NewWechatQrcodeScan = typeof wechatQrcodeScans.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// mini-program codes
+// ---------------------------------------------------------------------------
+
+/**
+ * Generated 小程序码 (`wxa/getwxacodeunlimit`), one row per `(page, scene)`.
+ *
+ * A cache, not an asset library: the PNG is identical for a given pair, the
+ * call costs a WeChat quota, and the storefront asks for the same code every
+ * time a shopper opens a share sheet. The table is what makes the second ask
+ * free — the bytes go through the storage driver like any other generated
+ * artefact and only the key and the public URL are kept here.
+ *
+ * Deliberately not `attachments`: nobody browses these in the media library,
+ * and putting them there would bury the operator's own images under one row
+ * per product per poster.
+ *
+ * There is no `deleted_at`. Dropping a row is how the code is regenerated, and
+ * a soft delete would only mean the unique index had to be scoped for no
+ * reason anybody can act on.
+ */
+export const wechatMiniCodes = pgTable(
+  'wechat_mini_codes',
+  {
+    id: pk(),
+    /** Mini-program page path, from the contract's allow-list. */
+    page: varchar({ length: 128 }).notNull(),
+    /** WeChat's own cap is 32 **bytes**, which the service checks before this. */
+    scene: varchar({ length: 32 }).notNull(),
+    /** Storage key the PNG was written to. */
+    storageKey: varchar({ length: 512 }).notNull(),
+    /** Public URL at the time of generation; site-relative for the local driver. */
+    url: varchar({ length: 1024 }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('wechat_mini_codes_page_scene_uq').on(t.page, t.scene)],
+);
+
+export type WechatMiniCode = typeof wechatMiniCodes.$inferSelect;
+export type NewWechatMiniCode = typeof wechatMiniCodes.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // media

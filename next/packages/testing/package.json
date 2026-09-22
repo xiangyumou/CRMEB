@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./global-setup": "./src/harness/global-setup.ts",
     "./mock-server": "./src/mock-server/index.ts",
+    "./wechat": "./src/wechat/index.ts",
     "./*": "./src/*.ts"
   },
   "bin": {

@@ -13,6 +13,7 @@ import {
   userProfile,
   userProfileExample,
   userProfileForm,
+  visitBody,
 } from './schemas';
 
 /**
@@ -264,6 +265,47 @@ export const userWithdrawCancellation = defineRoute({
     {
       name: 'ok',
       response: { ...cancellationRequestExample, status: 'withdrawn' },
+    },
+  ],
+});
+
+/**
+ * The page-view beacon (CR-1-f3 §1).
+ *
+ * 访客数 / 浏览量 and the 地域分布 column have had a table, tested SQL and a
+ * frozen contract since F3, and nothing has ever written a row: the legacy
+ * `setVisit` call was dropped when stream H found no route behind it. This is
+ * that route.
+ *
+ * `user-optional` and **204**, because of what a beacon is. It is fired from
+ * `navigator.sendBeacon` or an `onShow` hook while the page is busy doing the
+ * thing the visitor came for; it must not be able to fail visibly, block a
+ * render, or require a session that most storefront traffic does not have.
+ * There is no body to read back and nothing a client could do with one.
+ *
+ * Rate-limited per visitor, path and minute in Redis — a mini-program `onShow`
+ * fires on every return from a sub-page, and an unthrottled beacon would let
+ * one shopper walking back and forth through a category outweigh a thousand
+ * real visitors in 浏览量. The refusal is silent (still 204): telling a beacon
+ * it was throttled invites a retry loop, and the figure is better served by
+ * dropping the row than by answering 429 to a caller that cannot react.
+ */
+export const userRecordVisit = defineRoute({
+  id: 'user.recordVisit',
+  method: 'POST',
+  path: '/api/v1/visits',
+  auth: 'user-optional',
+  summary: '记录页面访问',
+  tags: ['user'],
+  body: visitBody,
+  response: z.void(),
+  status: 204,
+  examples: [
+    { name: 'signed-in', body: { path: '/pages/goods_details/index' }, response: undefined },
+    {
+      name: 'anonymous-mini',
+      body: { path: '/pages/index/index', platform: 'wechat-mini' },
+      response: undefined,
     },
   ],
 });

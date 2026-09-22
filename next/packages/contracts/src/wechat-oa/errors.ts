@@ -43,14 +43,14 @@ export const wechatOaErrors = defineErrors({
   WECHAT_OA_CATEGORY_NOT_EMPTY: { status: 409, message: '该分类下还有渠道码，无法删除' },
   WECHAT_OA_CATEGORY_NOT_FOUND: { status: 404, message: '渠道码分类不存在' },
   /**
-   * `wechat_qrcode_categories_name_uq`, which covers deleted rows as well as
-   * live ones — hence the second half of the message. Without it, recreating a
-   * category an operator deleted last month fails with no visible cause.
+   * `wechat_qrcode_categories_name_uq`, now scoped to `deleted_at is null`
+   * (CR-3-e3, closed by E4). While the index covered deleted rows too, a name
+   * the operator deleted last month stayed taken by a row nothing on the screen
+   * showed, and the message had to hedge: 「也可能属于一个已删除的分类」. That
+   * cannot happen any more, so it says the one thing that is now true and can
+   * be acted on — some live category has the name.
    */
-  WECHAT_OA_CATEGORY_NAME_TAKEN: {
-    status: 409,
-    message: '该分类名称已被占用（也可能属于一个已删除的分类）',
-  },
+  WECHAT_OA_CATEGORY_NAME_TAKEN: { status: 409, message: '该分类名称已被占用' },
 
   WECHAT_OA_MEDIA_NOT_FOUND: { status: 404, message: '素材不存在' },
   /** The attachment is not a kind WeChat accepts for that media type. */

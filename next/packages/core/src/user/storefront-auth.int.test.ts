@@ -165,6 +165,37 @@ describe('sendSmsCode', () => {
     ).rejects.toMatchObject({ code: 'AUTH_SMS_TOO_FREQUENT' });
   });
 
+  it('enforces the per-IP daily budget across different numbers', async () => {
+    // The per-phone budgets stop one number being spammed; this is the one that
+    // stops one machine walking a phone book, and it is the only control that
+    // sees the second number at all. Legacy `maxIpCount` at
+    // `LoginController.php:117-140`, now `storefront-auth.codePerIpPerDay`.
+    // Ten, not two: the field's own floor is 10, because an operator who types
+    // a small number here locks out a whole office behind one NAT.
+    const limit = 10;
+    await harness.ctx.config.set(storefrontAuthConfig, { codePerIpPerDay: limit });
+    const meta = { ip: '203.0.113.7' };
+    const phone = (n: number) => `1380013${String(8100 + n)}`;
+
+    for (let i = 0; i < limit; i += 1) {
+      await auth.sendSmsCode(asAnonymous(), { phone: phone(i), scene: 'login' }, meta);
+    }
+    await expect(
+      auth.sendSmsCode(asAnonymous(), { phone: phone(limit), scene: 'login' }, meta),
+    ).rejects.toMatchObject({ code: 'AUTH_SMS_TOO_FREQUENT' });
+
+    // …and it is the address that is spent, not the shop: another source
+    // address is still served, so one customer behind a busy NAT cannot lock
+    // everybody else out the way an IP-only login throttle would.
+    await expect(
+      auth.sendSmsCode(
+        asAnonymous(),
+        { phone: phone(limit), scene: 'login' },
+        { ip: '198.51.100.4' },
+      ),
+    ).resolves.toBeDefined();
+  });
+
   it('does not leave a usable code behind when the provider refuses', async () => {
     // Otherwise the shopper is told to wait 60 seconds for a code that was
     // never sent, and the stored one is dead weight an attacker can guess at.
@@ -635,7 +666,8 @@ describe('resetPassword', () => {
 describe('phone binding', () => {
   async function wechatCustomer(): Promise<number> {
     await harness.ctx.config.set(storefrontAuthConfig, { requirePhoneForWechat: false });
-    await harness.ctx.config.set(wechatMiniConfig, { enabled: true, appId: 'wx-mini' });
+    await harness.ctx.config.set(wechatMiniConfig, { enabled: true });
+    await harness.ctx.config.set(wechatConfig, { miniAppId: 'wx-mini' });
     wechat.setMiniSession('code-1', { openid: 'o_mini_bind' });
     const result = await auth.miniLogin(asAnonymous(), { code: 'code-1' });
     return Number(result.session!.user.id);
@@ -714,7 +746,8 @@ describe('phone binding', () => {
 
 describe('WeChat mini-program sign-in', () => {
   beforeEach(async () => {
-    await harness.ctx.config.set(wechatMiniConfig, { enabled: true, appId: 'wx-mini' });
+    await harness.ctx.config.set(wechatMiniConfig, { enabled: true });
+    await harness.ctx.config.set(wechatConfig, { miniAppId: 'wx-mini' });
   });
 
   it('asks for a phone number first when the shop requires one', async () => {
@@ -869,7 +902,8 @@ describe('WeChat Official Account sign-in', () => {
   it('recognises the same person on the other WeChat app through the unionid', async () => {
     // The legacy system gave this shopper a second, empty account with none of
     // their orders in it.
-    await harness.ctx.config.set(wechatMiniConfig, { enabled: true, appId: 'wx-mini' });
+    await harness.ctx.config.set(wechatMiniConfig, { enabled: true });
+    await harness.ctx.config.set(wechatConfig, { miniAppId: 'wx-mini' });
     wechat.setOaUser('oa-code-1', { openid: 'o_oa_1', unionid: 'u_1' });
     const started = await auth.oaLogin(asAnonymous(), { code: 'oa-code-1' });
     const code = await codeFor('login');

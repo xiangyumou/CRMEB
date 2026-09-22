@@ -13,7 +13,7 @@ import type { Actor, Ctx } from '../kernel/context';
 import { wechatOaConfig } from '../system';
 import { resetWechatTokenFlight, wechatConfig } from '../wechat';
 import { encryptMessage, signatureOf } from './wechat-oa.crypto';
-import { startFakeOaServer, type FakeOaServer } from './wechat-oa.fake-oa';
+import { startFakeOaServer, type FakeOaServer } from '@shop/testing/wechat';
 import * as media from './wechat-oa.media.service';
 import * as menu from './wechat-oa.menu.service';
 import * as qrcode from './wechat-oa.qrcode.service';
@@ -670,6 +670,28 @@ describe('channel QR codes', () => {
 
     await qrcode.remove(ctx(), { id: code.id });
     await expect(qrcode.deleteCategory(ctx(), { id: category.id })).resolves.toBeUndefined();
+  });
+
+  it('frees a deleted category’s name for reuse (CR-3-e3)', async () => {
+    // A code's scene must stay taken for ever — the poster is on a wall. A
+    // *category* name is only a label in an admin dropdown, so the opposite is
+    // true: 地推 deleted in March has to be available again in April. The
+    // unique index is partial on `deleted_at is null` for exactly this.
+    const first = await qrcode.createCategory(ctx(), { name: '地推', sortOrder: 0 });
+    await expect(qrcode.createCategory(ctx(), { name: '地推', sortOrder: 1 })).rejects.toThrow(
+      /WECHAT_OA_CATEGORY_NAME_TAKEN|已被占用/,
+    );
+
+    await qrcode.deleteCategory(ctx(), { id: first.id });
+    const second = await qrcode.createCategory(ctx(), { name: '地推', sortOrder: 1 });
+    expect(second.id).not.toBe(first.id);
+
+    // And the old row stays deleted rather than being resurrected under the
+    // new name, so its historical codes keep pointing where they pointed.
+    const listed = await qrcode.listCategories(ctx(), { page: 1, pageSize: 20 });
+    expect(listed.items.filter((item) => item.name === '地推').map((item) => item.id)).toEqual([
+      second.id,
+    ]);
   });
 
   it('reports scans per day and masks the openid', async () => {

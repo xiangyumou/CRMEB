@@ -58,7 +58,9 @@ describe('TLS-001 — no TLS toggle, in any group this stream owns', () => {
 describe('secret fields are declared secret', () => {
   const SECRETS: Record<string, readonly string[]> = {
     payment: ['apiV3Key', 'merchantPrivateKey', 'platformPublicKey'],
-    wechat: ['oaAppSecret', 'oaToken', 'oaAesKey', 'miniAppSecret'],
+    // `miniToken` / `miniAesKey` joined the group in E4, when the mini
+    // program's callback credentials moved off F1's `wechat-mini` group.
+    wechat: ['oaAppSecret', 'oaToken', 'oaAesKey', 'miniAppSecret', 'miniToken', 'miniAesKey'],
   };
 
   for (const group of GROUPS) {

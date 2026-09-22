@@ -2,10 +2,22 @@ import { z } from 'zod';
 import { defineConfigGroup } from '../kernel/config-registry';
 
 /**
- * `wechat-mini` — 小程序 credentials.
+ * `wechat-mini` — how the 小程序 behaves, **not** what it signs in with.
  *
  * Legacy source: `eb_system_config` tabs 7 / 132 / 133 (小程序配置).
- * Consumed by E1 (login) and E2 (subscribe messages).
+ *
+ * Every WeChat credential lives in the `wechat` group and nowhere else
+ * (CR-1-j, extended to the mini program by E4). `routine_appId` used to be
+ * claimed here *and* there, so a migrated shop saw the app id on one settings
+ * screen and a blank on the other — the exact symptom CR-1-j was filed about,
+ * one app along. The AppID, the AppSecret, the callback token, the AES key and
+ * the message mode are therefore all `wechat`'s now (`miniAppId`,
+ * `miniAppSecret`, `miniToken`, `miniAesKey`, `miniMessageMode`), and this
+ * group keeps the two things that are about the shop rather than the app: is
+ * the mini program switched on, and how does 联系客服 behave.
+ *
+ * Readers: E1's sign-in checks `enabled` here and reads the app id from
+ * `wechat`; the storefront reads `contactType` / `contactPhone`.
  */
 export const wechatMiniConfig = defineConfigGroup({
   group: 'wechat-mini',
@@ -14,11 +26,6 @@ export const wechatMiniConfig = defineConfigGroup({
   schema: z.object({
     enabled: z.boolean().default(false),
     name: z.string().max(64).default(''),
-    appId: z.string().max(64).default(''),
-    appSecret: z.string().max(128).default(''),
-    token: z.string().max(64).default(''),
-    encodingAesKey: z.string().max(64).default(''),
-    messageMode: z.enum(['plain', 'compatible', 'safe']).default('plain'),
     /**
      * How 联系客服 behaves: the mini-program's own chat window, or a phone
      * number. 自建客服 is not ported (scope guard), so there is no third option.
@@ -27,28 +34,13 @@ export const wechatMiniConfig = defineConfigGroup({
     contactPhone: z.string().max(32).default(''),
   }),
   ui: {
-    enabled: { label: '启用小程序', type: 'switch', order: 1 },
+    enabled: {
+      label: '启用小程序',
+      type: 'switch',
+      help: 'AppID 与 AppSecret 在「微信公众号 / 小程序」设置中填写',
+      order: 1,
+    },
     name: { label: '小程序名称', type: 'text', order: 2 },
-    appId: { label: 'AppID', type: 'text', order: 3 },
-    appSecret: { label: 'AppSecret', type: 'password', secret: true, order: 4 },
-    token: { label: '验证 Token', type: 'text', order: 5 },
-    messageMode: {
-      label: '消息加解密方式',
-      type: 'select',
-      options: [
-        { label: '明文模式', value: 'plain' },
-        { label: '兼容模式', value: 'compatible' },
-        { label: '安全模式', value: 'safe' },
-      ],
-      order: 6,
-    },
-    encodingAesKey: {
-      label: 'EncodingAESKey',
-      type: 'password',
-      secret: true,
-      visibleWhen: { key: 'messageMode', equals: ['compatible', 'safe'] },
-      order: 7,
-    },
     contactType: {
       label: '联系客服方式',
       type: 'select',
@@ -68,11 +60,6 @@ export const wechatMiniConfig = defineConfigGroup({
   },
   legacyKeys: {
     name: 'routine_name',
-    appId: 'routine_appId',
-    appSecret: 'routine_appsecret',
-    token: 'routine_token',
-    encodingAesKey: 'routine_encodingaeskey',
-    messageMode: 'routine_encode',
     contactType: 'routine_contact_type',
   },
 });

@@ -75,6 +75,19 @@ export interface WechatCall {
   body?: unknown;
 }
 
+/**
+ * What a binary endpoint answered.
+ *
+ * A handful of WeChat endpoints — `wxa/getwxacodeunlimit`, `qrcode/showqrcode`,
+ * `media/get` — answer **200 with the file** on success and **200 with a JSON
+ * `errcode` body** on failure. The status line says nothing either way, so the
+ * caller has to look at what came back; a client that assumed JSON would store
+ * a 43-byte error message as a PNG and the shop would serve broken images with
+ * nothing in the log.
+ */
+export type WechatBytesResult =
+  { ok: true; bytes: Buffer; contentType: string } | { ok: false; errcode: number; errmsg: string };
+
 export interface WechatCoreClient {
   oaCodeExchange(code: string): Promise<OaCodeExchange>;
   oaUserInfo(args: { accessToken: string; openid: string }): Promise<WechatProfile>;
@@ -84,6 +97,8 @@ export interface WechatCoreClient {
   sendTemplateMessage(input: TemplateMessageInput): Promise<WechatSendResult>;
   sendSubscribeMessage(input: SubscribeMessageInput): Promise<WechatSendResult>;
   call<T>(app: WechatApp, req: WechatCall): Promise<T>;
+  /** For the endpoints that answer a file on success and JSON on failure. */
+  callBytes(app: WechatApp, req: WechatCall): Promise<WechatBytesResult>;
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +196,54 @@ export function createWechatClient(ctx: Ctx): WechatCoreClient {
     return parsed;
   }
 
+  /**
+   * The same request, kept as bytes.
+   *
+   * Separate from `request` rather than a flag on it, because the two differ in
+   * what they do with the response and agree on nothing else: this one decides
+   * from the `content-type` whether it is holding a file or a refusal, and a
+   * refusal is a return value here exactly as it is everywhere else in this
+   * client.
+   */
+  async function requestBytes(baseUrl: string, req: WechatCall): Promise<WechatBytesResult> {
+    const url = new URL(req.path, baseUrl);
+    for (const [key, value] of Object.entries(req.query ?? {})) url.searchParams.set(key, value);
+
+    const response = await fetch(url, {
+      method: req.method,
+      headers: {
+        accept: '*/*',
+        ...(req.body === undefined ? {} : { 'content-type': 'application/json; charset=utf-8' }),
+      },
+      ...(req.body === undefined ? {} : { body: JSON.stringify(req.body) }),
+    });
+
+    if (!response.ok) {
+      throw new DomainError('INTERNAL', {
+        message: `微信接口 ${req.path} 返回 HTTP ${response.status}`,
+      });
+    }
+
+    const contentType = response.headers.get('content-type') ?? '';
+    const bytes = Buffer.from(await response.arrayBuffer());
+    // JSON here means WeChat refused. Anything else is the file.
+    if (!/^(application\/json|text\/plain)/i.test(contentType)) {
+      return { ok: true, bytes, contentType: contentType || 'application/octet-stream' };
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(bytes.toString('utf8'));
+    } catch {
+      throw new DomainError('INTERNAL', { message: `微信接口返回了非 JSON 响应 (${req.path})` });
+    }
+    const envelope = envelopeOf(parsed);
+    return {
+      ok: false,
+      errcode: envelope.errcode ?? -1,
+      errmsg: envelope.errmsg ?? '',
+    };
+  }
+
   /** Fetches a fresh token and caches it. Only ever called behind both locks. */
   async function refresh(config: WechatConfig, app: WechatApp): Promise<string> {
     const { appId, secret } = credentials(config, app);
@@ -273,6 +336,24 @@ export function createWechatClient(ctx: Ctx): WechatCoreClient {
       return result as T;
     }
     // Unreachable: the loop returns on its second pass.
+    throw new DomainError('INTERNAL', { message: '微信接口重试后仍然失败' });
+  }
+
+  /** `authedCall`'s binary twin, with the same one-shot retry on a dead token. */
+  async function authedBytes(app: WechatApp, req: WechatCall): Promise<WechatBytesResult> {
+    const config = await load();
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const token = await acquire(app);
+      const result = await requestBytes(config.apiBaseUrl, {
+        ...req,
+        query: { ...req.query, access_token: token },
+      });
+      if (!result.ok && TOKEN_ERRCODES.has(result.errcode) && attempt === 0) {
+        await invalidate(app);
+        continue;
+      }
+      return result;
+    }
     throw new DomainError('INTERNAL', { message: '微信接口重试后仍然失败' });
   }
 
@@ -436,6 +517,7 @@ export function createWechatClient(ctx: Ctx): WechatCoreClient {
     },
 
     call: authedCall,
+    callBytes: authedBytes,
   };
 }
 

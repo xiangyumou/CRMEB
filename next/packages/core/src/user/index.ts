@@ -19,8 +19,10 @@ import './storefront-auth.config';
  * | `POST /api/v1/auth/registrations`, `…/password-resets`, `PUT …/password` | `register` / `resetPassword` / `changePassword` |
  * | `POST/PUT /api/v1/auth/phone` | `bindPhone` / `changePhone` |
  * | `GET /api/v1/auth/wechat-oa/authorize-url` | `oaAuthorizeUrl` |
+ * | `POST /api/v1/visits` | `recordVisit` |
  * | `/admin-api/users…` | `adminList` / `adminDetail` / `adminUpdate` / `adminSetStatus` / `adminResetPassword` / `adminAddressList` / `adminBatchSetGroups` / `adminBatchSetLabels` |
  * | `/admin-api/user-groups…`, `/admin-api/user-labels…`, `/admin-api/user-label-categories…` | the taxonomy CRUD below |
+ * | `/api/v1/staff/users…`, `/api/v1/staff/user-groups` | `staffList` / `staffDetail` / `staffGroupList` / `staffSetGroup` / `staffLabelList` / `staffSetLabels` |
  * | `/admin-api/user-cancellations…` | `adminCancellationList` / `adminApproveCancellation` / `adminRejectCancellation` / `adminRemarkCancellation` |
  *
  * **What importing this module registers**, through `registerUserDomain()`
@@ -79,6 +81,7 @@ export {
 
 export {
   bindPhone,
+  bindPhoneFromMini,
   changePassword,
   changePhone,
   isAllowedRedirect,
@@ -96,6 +99,8 @@ export {
   smsLogin,
   type RequestMeta,
 } from './storefront-auth.service';
+
+export { recordVisit } from './user.visit.service';
 
 // ---------------------------------------------------------------------------
 // admin
@@ -129,6 +134,19 @@ export {
 } from './user-admin.service';
 
 // ---------------------------------------------------------------------------
+// staff — 商家管理 → 用户
+// ---------------------------------------------------------------------------
+
+export {
+  staffDetail,
+  staffGroupList,
+  staffLabelList,
+  staffList,
+  staffSetGroup,
+  staffSetLabels,
+} from './user-staff.service';
+
+// ---------------------------------------------------------------------------
 // seams
 // ---------------------------------------------------------------------------
 
@@ -146,5 +164,15 @@ export {
   type WechatOaUser,
   type WechatPhoneNumber,
 } from './wechat-identity.port';
+
+export {
+  fakeUserOrderStatsPort,
+  getUserOrderStatsPort,
+  registerUserOrderStatsPort,
+  resetUserOrderStatsPort,
+  type FakeUserOrderStatsPort,
+  type UserOrderStats,
+  type UserOrderStatsPort,
+} from './user-order-stats.port';
 
 export { maskPhone } from './user.rules';

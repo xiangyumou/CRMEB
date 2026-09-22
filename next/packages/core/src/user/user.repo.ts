@@ -1044,6 +1044,18 @@ export async function loadLabelsFor(
 
 export interface AdminListFilters {
   keyword?: string | undefined;
+  /**
+   * How `keyword` is matched. Omitted means the console's search: a substring
+   * of the account, the phone, the nickname or the real name.
+   *
+   * `'staff-narrow'` is the 商家管理 search — the nickname as a substring, the
+   * phone only as the **whole** number. A 店员's screen masks the phone
+   * column, and `ilike '%1380%'` over it would hand that mask straight back:
+   * four digits at a time, a shared handset can enumerate the customer base.
+   * The real name is not searched at all, because a name a 店员 can confirm by
+   * guessing is a name they have been told.
+   */
+  keywordMatch?: 'console' | 'staff-narrow' | undefined;
   groupId?: number | undefined;
   labelId?: number | undefined;
   status?: 'active' | 'disabled' | undefined;
@@ -1057,12 +1069,15 @@ function adminListWhere(filters: AdminListFilters): SQL | undefined {
   const conditions: SQL[] = [isNull(users.deletedAt)];
   if (filters.keyword) {
     const like = `%${filters.keyword}%`;
-    const keyword = or(
-      ilike(users.account, like),
-      ilike(users.phone, like),
-      ilike(users.nickname, like),
-      ilike(users.realName, like),
-    );
+    const keyword =
+      filters.keywordMatch === 'staff-narrow'
+        ? or(eq(users.phone, filters.keyword), ilike(users.nickname, like))
+        : or(
+            ilike(users.account, like),
+            ilike(users.phone, like),
+            ilike(users.nickname, like),
+            ilike(users.realName, like),
+          );
     if (keyword) conditions.push(keyword);
   }
   if (filters.status) conditions.push(eq(users.status, filters.status));

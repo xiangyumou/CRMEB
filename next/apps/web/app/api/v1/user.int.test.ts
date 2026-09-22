@@ -8,6 +8,7 @@ import {
 import { smsConfig } from '@shop/core/system';
 import { storefrontAuthConfig } from '@shop/core/user';
 import { adminRoles, admins, auditLogs, rolePermissions, roles } from '@shop/db/schema/auth';
+import { userVisits } from '@shop/db/schema/stats';
 import { users } from '@shop/db/schema/user';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -245,6 +246,36 @@ describe('/api/v1/profile', () => {
   });
 });
 
+describe('POST /api/v1/auth/phone/wechat-mini', () => {
+  // What the WeChat exchange itself does is pinned against a fake
+  // `api.weixin.qq.com` in `core/src/user/storefront-auth.mini.int.test.ts`.
+  // The question here is narrower: is an anonymous caller refused before
+  // anything reaches WeChat, and is the body checked before anything happens.
+  it('401s without a token, 422s an empty code, and 409s an account that has a number', async () => {
+    const { POST } = await import('./auth/phone/wechat-mini/route');
+
+    const anonymous = await POST(
+      json('POST', '/api/v1/auth/phone/wechat-mini', { phoneCode: 'mp-phone-code-abc' }),
+    );
+    expect(anonymous.status).toBe(401);
+
+    const { headers } = await shopper();
+    const empty = await POST(
+      json('POST', '/api/v1/auth/phone/wechat-mini', { phoneCode: '' }, headers),
+    );
+    expect(empty.status).toBe(422);
+
+    // The shopper signed in with an SMS code, so a number is already on the
+    // account: the refusal comes before any WeChat call, and a perfectly good
+    // single-use code is not spent finding that out.
+    const bound = await POST(
+      json('POST', '/api/v1/auth/phone/wechat-mini', { phoneCode: 'mp-phone-code-abc' }, headers),
+    );
+    expect(bound.status).toBe(409);
+    expect((await bound.json()).code).toBe('AUTH_PHONE_ALREADY_BOUND');
+  });
+});
+
 describe('DELETE /api/v1/auth/sessions/current', () => {
   it('revokes the bearer token it was called with, and only that one', async () => {
     const first = await shopper();
@@ -308,5 +339,159 @@ describe('/admin-api/users', () => {
     // The ban takes effect on the session the shopper already holds.
     const { GET } = await import('./profile/route');
     expect((await GET(get('/api/v1/profile', shopperHeaders))).status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// staff — 商家管理 → 用户
+// ---------------------------------------------------------------------------
+
+/**
+ * The six `/api/v1/staff/*` user routes as HTTP (CR-2-h2 §3).
+ *
+ * The services are covered in `@shop/core`; the two things only a request can
+ * prove are here. First, `auth: 'staff'` is on every one of the six: a shopper
+ * with a perfectly good session gets 403, which is the whole reason these are
+ * separate routes from `/admin-api/users`. Second, the staff list really does
+ * hand back a masked phone over the wire — a response that leaked the number
+ * would be a leak in production even though every unit test passed, because
+ * the schema, not the service, is what `VALIDATE_RESPONSES` checks.
+ *
+ * `installStaffCheck()` comes from importing `@shop/core/order`, exactly as it
+ * does in the running app; who is staff is `orderStaffConfig`, B2's config
+ * group, and the tests set it rather than stubbing the check.
+ */
+describe('/api/v1/staff/users', () => {
+  /** The six, as [module path, method, url, body]. */
+  const ROUTES = [
+    ['./staff/users/route', 'GET', '/api/v1/staff/users?page=1&pageSize=20', undefined],
+    ['./staff/users/[uid]/route', 'GET', '/api/v1/staff/users/1', undefined],
+    ['./staff/user-groups/route', 'GET', '/api/v1/staff/user-groups', undefined],
+    ['./staff/users/[uid]/group/route', 'POST', '/api/v1/staff/users/1/group', { groupId: null }],
+    ['./staff/users/[uid]/labels/route', 'GET', '/api/v1/staff/users/1/labels', undefined],
+    ['./staff/users/[uid]/labels/route', 'POST', '/api/v1/staff/users/1/labels', { labelIds: [] }],
+  ] as const;
+
+  async function callRoute(
+    index: number,
+    uid: string,
+    headers: Record<string, string>,
+  ): Promise<Response> {
+    const [modulePath, method, url, body] = ROUTES[index]!;
+    const mod = (await import(/* @vite-ignore */ modulePath)) as Record<
+      string,
+      (request: Request, context?: { params: Record<string, string> }) => Promise<Response>
+    >;
+    const handler = mod[method]!;
+    const path = url.replace('/1', `/${uid}`);
+    const request = method === 'GET' ? get(path, headers) : json(method, path, body, headers);
+    return handler(request, { params: { uid } });
+  }
+
+  it('403s an ordinary shopper on every one of the six', async () => {
+    const { headers } = await shopper();
+    const [row] = await harness.ctx.db.select({ id: users.id }).from(users);
+
+    for (let index = 0; index < ROUTES.length; index += 1) {
+      const response = await callRoute(index, String(row!.id), headers);
+      expect({ route: ROUTES[index]![2], status: response.status }).toEqual({
+        route: ROUTES[index]![2],
+        status: 403,
+      });
+      expect((await response.json()).code).toBe('FORBIDDEN');
+    }
+  });
+
+  it('401s without any session at all', async () => {
+    const response = await callRoute(0, '1', {});
+    expect(response.status).toBe(401);
+  });
+
+  it('lets a 店员 through all six and never unmasks a phone', async () => {
+    const { headers } = await shopper();
+    const [row] = await harness.ctx.db.select({ id: users.id }).from(users);
+    const order = await import('@shop/core/order');
+    await harness.ctx.config.set(order.orderStaffConfig, { staffUserIds: [row!.id] });
+
+    for (let index = 0; index < ROUTES.length; index += 1) {
+      const response = await callRoute(index, String(row!.id), headers);
+      expect({ route: ROUTES[index]![2], status: response.status }).toEqual({
+        route: ROUTES[index]![2],
+        status: 200,
+      });
+    }
+
+    // The 店员 is looking at their own account here, which is the sharpest
+    // version of the test: their real number is `PHONE`, and it still must not
+    // come back. The response passed `VALIDATE_RESPONSES`, so the shape is the
+    // contract's too.
+    const listed = await (await callRoute(0, String(row!.id), headers)).json();
+    expect(listed.items[0].phone).toBe('138****8000');
+    expect(JSON.stringify(listed)).not.toContain(PHONE);
+    // Nothing is known about their orders: no stream registers
+    // `UserOrderStatsPort` yet (CR-2-e4), and `null` is how that is said.
+    expect(listed.items[0]).toMatchObject({ orderCount: null, spendTotal: null });
+  });
+
+  it('422s a uid that is not an id, before touching the database', async () => {
+    const { headers } = await shopper();
+    const [row] = await harness.ctx.db.select({ id: users.id }).from(users);
+    const order = await import('@shop/core/order');
+    await harness.ctx.config.set(order.orderStaffConfig, { staffUserIds: [row!.id] });
+
+    const response = await callRoute(1, 'me', headers);
+    expect(response.status).toBe(422);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// the visits beacon
+// ---------------------------------------------------------------------------
+
+describe('POST /api/v1/visits', () => {
+  it('takes a beacon with no session at all and answers 204 with no body', async () => {
+    const { POST } = await import('./visits/route');
+    const response = await POST(
+      json(
+        'POST',
+        '/api/v1/visits',
+        { path: '/pages/index/index' },
+        {
+          'x-forwarded-for': '198.51.100.4',
+        },
+      ),
+    );
+    expect(response.status).toBe(204);
+    expect(await response.text()).toBe('');
+
+    const [row] = await harness.ctx.db.select().from(userVisits);
+    expect(row).toMatchObject({ userId: null, path: '/pages/index/index', ip: '198.51.100.4' });
+  });
+
+  it('attributes the row to the signed-in shopper when a token is sent', async () => {
+    const { headers } = await shopper();
+    const [user] = await harness.ctx.db.select({ id: users.id }).from(users);
+
+    const { POST } = await import('./visits/route');
+    const response = await POST(
+      json('POST', '/api/v1/visits', { path: '/pages/goods_details/index' }, headers),
+    );
+    expect(response.status).toBe(204);
+
+    const [row] = await harness.ctx.db.select().from(userVisits);
+    expect(row!.userId).toBe(user!.id);
+  });
+
+  it('422s a path carrying a query string, before writing anything', async () => {
+    // A beacon path is the route, not the URL: `?code=` off the WeChat OAuth
+    // redirect and `?phone=` off a share link would turn this table into a
+    // credential log nobody purges. The contract refuses it rather than the
+    // service stripping it, so the client learns during development.
+    const { POST } = await import('./visits/route');
+    const response = await POST(
+      json('POST', '/api/v1/visits', { path: '/pages/index/index?code=081abc' }),
+    );
+    expect(response.status).toBe(422);
+    expect(await harness.ctx.db.select().from(userVisits)).toHaveLength(0);
   });
 });

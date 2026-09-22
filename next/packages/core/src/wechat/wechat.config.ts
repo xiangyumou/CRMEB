@@ -40,12 +40,42 @@ export const wechatConfig = defineConfigGroup({
   schema: z.object({
     oaAppId: configText(64),
     oaAppSecret: configText(128),
-    /** The token the OA message callback signs with. */
+    /**
+     * The token the OA message callback signs with, and the 43-character AES
+     * key for its message encryption (optional: plaintext mode works).
+     *
+     * These two are the one WeChat credential pair this group does **not** own
+     * the legacy keys for. F1's `wechat-oa` group declares the same settings
+     * and maps `wechat_token` / `wechat_encodingaeskey`, and a legacy key with
+     * two claimants is the CR-1-j bug: the ETL fans the value out to both
+     * groups, the operator edits one screen, and the other keeps a stale copy.
+     * CR-3-e2 closes here by making F1's group the sole claimant — it is the
+     * screen 公众号消息配置 lives on — while the fields stay declared here so
+     * an install that only ever filled in this screen keeps working.
+     * `oaCredentials()` reads F1's first and falls back to these.
+     */
     oaToken: configText(64),
-    /** 43 characters, for the OA's own AES message encryption. Optional: plaintext mode works. */
     oaAesKey: configText(64),
     miniAppId: configText(64),
     miniAppSecret: configText(128),
+    /**
+     * The token and AES key of the mini program's own message callback, and
+     * the mode it is configured in.
+     *
+     * They came over from F1's `wechat-mini` group when this group took over
+     * every WeChat credential (CR-1-j, extended to the mini program by E4).
+     * **Nothing reads them yet**: the mini-program message push is not ported
+     * (scope guard — 自建客服 and the mini message callback are out), so there
+     * is no callback to verify a signature for. They are carried rather than
+     * dropped because a migrated shop has the values in
+     * `routine_token` / `routine_encodingaeskey` / `routine_encode` and the ETL
+     * refuses a legacy key that nobody claims and nobody dropped: losing them
+     * would mean retyping credentials that the operator can no longer read off
+     * the old admin.
+     */
+    miniToken: configText(64),
+    miniAesKey: configText(64),
+    miniMessageMode: z.enum(['plain', 'compatible', 'safe']).default('plain'),
     /**
      * `api.weixin.qq.com`, overridable so integration tests can point the whole
      * client at a local fake. Never settable from the admin UI: it has no `ui`
@@ -85,14 +115,44 @@ export const wechatConfig = defineConfigGroup({
       section: '小程序',
       order: 20,
     },
+    miniToken: {
+      label: '小程序消息 Token',
+      type: 'password',
+      secret: true,
+      help: '小程序消息推送尚未启用，此处仅保留迁移过来的值',
+      section: '小程序',
+      order: 30,
+    },
+    miniMessageMode: {
+      label: '小程序消息加解密方式',
+      type: 'select',
+      options: [
+        { label: '明文模式', value: 'plain' },
+        { label: '兼容模式', value: 'compatible' },
+        { label: '安全模式', value: 'safe' },
+      ],
+      section: '小程序',
+      order: 40,
+    },
+    miniAesKey: {
+      label: '小程序 EncodingAESKey',
+      type: 'password',
+      secret: true,
+      visibleWhen: { key: 'miniMessageMode', equals: ['compatible', 'safe'] },
+      section: '小程序',
+      order: 50,
+    },
   },
   legacyKeys: {
     oaAppId: 'wechat_appid',
     oaAppSecret: 'wechat_appsecret',
-    oaToken: 'wechat_token',
-    oaAesKey: 'wechat_encodingaeskey',
+    // `wechat_token` / `wechat_encodingaeskey` are deliberately absent: they
+    // belong to F1's `wechat-oa` group alone (see `oaToken` above, CR-3-e2).
     miniAppId: 'routine_appId',
     miniAppSecret: 'routine_appsecret',
+    miniToken: 'routine_token',
+    miniAesKey: 'routine_encodingaeskey',
+    miniMessageMode: 'routine_encode',
   },
 });
 
