@@ -200,13 +200,38 @@ Recorded rather than asked, per the brief.
     `min(60)` before anything could multiply it. The help text carries the
     arithmetic (`86400 = 24 小时`).
 
+15. **The CR-1-d price guard belongs in `afterCreate`, not `beforeCreate`.**
+    `PricingDraft.goodsTotal` is documented as the sum of the line _subtotals_,
+    i.e. the price before any adjustment, and B1 books the 拼团价 as an
+    adjustment rather than rewriting the unit price. Comparing the activity
+    total with it therefore refused every correctly priced group-buy order once
+    CR-1-d landed — which the new end-to-end test found. The check now runs in
+    `afterCreate`, inside B1's transaction, against `sum(order_items.total_amount)`
+    — the money the order actually charges. A mismatch still rolls back the
+    order, its lines and the stock reservation. Charging _less_ is allowed, so a
+    coupon stacked on a group buy is not refused.
+16. **The system refund is a new file, and its idempotency key is the reason
+    string.** `refundSystemInitiated` went into `refund/refund.system.service.ts`
+    rather than into `refund.service.ts`, which another stream is editing; the
+    two things it would have shared are three lines each over the pure helpers in
+    `refund.rules.ts`. The frozen schema has no "which automatic process opened
+    this" column, so the customer-facing reason string carries it and the
+    idempotency lookup matches on it exactly, under the order's own row lock,
+    with `refund_items_open_uq` as the backstop. It writes straight to
+    `approved` with a null `reviewed_by_admin_id`, because `executeRefund` only
+    claims rows past review and no admin decided this.
+17. **A failed team's refunds are one transaction per member.** The effect
+    handler opens the transaction, not the sweep: a team of five that fails is
+    five refunds, and one bad order must not roll back the other four. A throw
+    still parks the row in the 待处理任务 console for a person.
+
 ## Change requests filed
 
-| CR     | About                                                                                       | Status |
-| ------ | ------------------------------------------------------------------------------------------- | ------ |
-| CR-1-d | The pricing pipeline never sees `kind` / `kindMeta`, so an activity price cannot be applied | open   |
-| CR-2-d | `groupbuy_activities` has no per-activity 虚拟成团 column                                   | open   |
-| CR-3-d | The refund domain has no system-initiated refund entry point for a failed group             | open   |
+| CR     | About                                                                                       | Status                                                                                                           |
+| ------ | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| CR-1-d | The pricing pipeline never sees `kind` / `kindMeta`, so an activity price cannot be applied | done — applied on integration; this stream added the end-to-end checkout tests and moved the guard (decision 15) |
+| CR-2-d | `groupbuy_activities` has no per-activity 虚拟成团 column                                   | closed — shop-wide, as recommended; nothing to change                                                            |
+| CR-3-d | The refund domain has no system-initiated refund entry point for a failed group             | done — `refundSystemInitiated` built by this stream (decision 16)                                                |
 
 ## New dependencies
 
@@ -214,14 +239,25 @@ Recorded rather than asked, per the brief.
 
 ## Files outside this stream's ownership
 
-Two files the orchestrator should look at when merging, both one line each:
+All merged. `packages/core/src/system/config-groups.ts` no longer exists —
+integration generates `config-groups.gen.ts` and `domains.gen.ts` instead, and
+the generated bucket already imports `./groupbuy/index`, so nothing has to be
+edited by hand any more. `packages/etl/src/index.ts` carries
+`export * as groupbuy from './mappers/groupbuy';`.
 
-| File                                        | Change                                                                    |
-| ------------------------------------------- | ------------------------------------------------------------------------- |
-| `packages/core/src/system/config-groups.ts` | imports the `groupbuy` config group so `pnpm gen` and 系统设置 can see it |
-| `packages/etl/src/index.ts`                 | `export * as groupbuy from './mappers/groupbuy';`                         |
+The CR-3-d follow-up added three files to a folder this stream does not own,
+`packages/core/src/refund/`:
 
-Both are aggregation points several streams touch; the conflicts are trivial.
+| File                        | Why                                                                          |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| `refund.system.service.ts`  | the new entry point (CR-3-d, accepted; the orchestrator asked D to build it) |
+| `refund.system.repo.ts`     | its one query — a `*.repo.ts` so the Drizzle boundary rule holds             |
+| `refund.system.int.test.ts` | its tests                                                                    |
+
+plus **one export line** in `refund/index.ts` and its header paragraph.
+`refund.service.ts` and `refund.repo.ts` are untouched: stream N1 is editing the
+first for notification calls, and a new file merges where an insertion into a
+thousand-line one does not.
 
 ## Progress
 
@@ -241,6 +277,9 @@ Both are aggregation points several streams touch; the conflicts are trivial.
       (`eb_store_pink` deliberately not migrated)
 - [x] Invariants rows: STOCK-004 and REFUND-003 group-buy halves, and a new
       「Group buys (risk matrix §5)」 section, RISK-D-001 … RISK-D-008
+- [x] CR follow-ups: CR-1-d end-to-end checkout tests + the guard moved to
+      `afterCreate`; CR-3-d `refundSystemInitiated` and the group-buy effect
+      wired to it; invariants REFUND-010 … REFUND-013 and RISK-D-009
 - [ ] Presale — **not this stream's any more**; stream D2 owns it, including the
       presale halves of STOCK-004, QUEUE-008, REFUND-002, REFUND-003 and
       SMOKE-011

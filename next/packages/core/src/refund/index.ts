@@ -24,11 +24,14 @@ import { registerRefundEffects } from './refund.effects';
  * | `handleRefundNotify`    | route  | `POST /api/v1/webhooks/wechat-refund`         |
  * | `executeRefund`         | C only | the effect handler and the admin retry        |
  * | `reconcileStaleRefunds` | worker | the sweep                                     |
+ * | `refundSystemInitiated` | D / D2 | a failed group buy, an expired presale        |
  *
- * There is deliberately no "create a refund on behalf of a user" export. A
- * group-buy that fails (`is_automatic`) is a future caller and will get its own
- * entry point with its own ceiling check; nothing may insert a `refunds` row by
- * reaching past this file.
+ * There is still no "create a refund on behalf of a user" export, and there
+ * never will be: `apply` needs a `ctx` whose actor is the buyer. What CR-3-d
+ * added is the other thing — a refund the **shop** owes without anybody asking,
+ * with its own ceiling check and no approval step
+ * (`refund.system.service.ts`). Nothing may insert a `refunds` row by reaching
+ * past this file.
  */
 
 export {
@@ -58,6 +61,13 @@ export {
   adminRemark,
   adminRetry,
 } from './refund.admin';
+
+export {
+  refundSystemInitiated,
+  type SystemRefundInput,
+  type SystemRefundReason,
+  type SystemRefundResult,
+} from './refund.system.service';
 
 export {
   reconcileStaleRefunds,

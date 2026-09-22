@@ -1,6 +1,6 @@
 # CR-1-d — the pricing pipeline never sees `kind` or `kindMeta`
 
-**Stream:** D (group buy and presale) **Status:** accepted — applied by the orchestrator on integration (`buildDraft` passes `kind` and the `kindMeta` keys to the contributors); the D follow-up adds the end-to-end checkout test and removes the "until then" stub wording
+**Stream:** D (group buy and presale) **Status:** done — applied by the orchestrator on integration (`buildDraft` passes `kind` and the `kindMeta` keys to the contributors) and closed by the D follow-up, which added the end-to-end checkout tests and moved the fail-closed guard to where it can see the answer
 **Files:** `next/packages/core/src/order/order.checkout.service.ts` (stream B1)
 
 ## What
@@ -61,18 +61,31 @@ the presence of an id.
 
 The keys stream D reads are `kind`, `activityId` and `groupId`.
 
-## Until then
+## As built
 
-`GroupbuyKindHandler.beforeCreate` and `PresaleKindHandler.beforeCreate`
-recompute what the order _should_ cost — the activity's per-SKU price times the
-line quantity, summed — and compare it with `draft.goodsTotal`. A disagreement
-throws `GROUPBUY_PRICE_NOT_APPLIED` / `PRESALE_PRICE_NOT_APPLIED` (409,
-拼团价未生效，请稍后重试), so no order is ever sold at the wrong price. Today that
-means every activity whose price differs from the SKU price refuses at checkout;
-the moment this CR lands, the contributor fires and the check passes silently.
+The ask landed as written. What the end-to-end test then found is that the
+guard on this stream's side was checking the wrong number: `beforeCreate` is
+handed `draft.goodsTotal`, which `order/ports.ts` defines as "sum of the line
+subtotals" — the price _before_ any adjustment — and B1 books the 拼团价 as an
+adjustment rather than rewriting the unit price. So with the contributor
+firing, payable came out at the group price and the guard compared the group
+price with the catalogue price and refused every real group-buy order.
 
-Both halves are pinned by tests:
-`groupbuy.int.test.ts::beforeCreate > refuses an order the contributor did not
-reprice` and
-`groupbuy.pricing.test.ts::contributes the group price when the selections name
-the activity`.
+The check therefore moved to `afterCreate`, which runs inside the same
+transaction once the order lines exist, and compares what those lines actually
+charge (`sum(order_items.total_amount)`) with what the activity says they cost.
+That is strictly stronger — it sees the result of the whole pricing pipeline
+rather than one input to it — and a mismatch still rolls back the order, its
+lines and the stock reservation. Charging _less_ is now allowed: a coupon on
+top of a group buy is the shopper's own business.
+
+No further seam is needed, and no change to `order/**`.
+
+Pinned by `groupbuy.int.test.ts::the group-buy price through the real checkout
+(CR-1-d)` — three cases through the real `checkout.preview`/`create`: a
+group-buy order priced at the activity price with the adjustment labelled
+拼团价 and a team row written, the same SKU on an ordinary order still at the
+catalogue price with no adjustment and no team, and a second shopper joining by
+`groupId` — plus `groupbuy.int.test.ts::beforeCreate > refuses an order whose
+draft is not at the activity price (CR-1-d)` and the unit cases in
+`groupbuy.rules.test.ts`.

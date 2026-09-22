@@ -1055,6 +1055,22 @@ export async function findUserIdentity(
   return row ?? null;
 }
 
+/**
+ * What the order's goods actually charge, after every adjustment B1 applied.
+ *
+ * The other half of the CR-1-d guard. `order_items.total_amount` is the line
+ * subtotal minus its share of the discounts, and it is the only place the
+ * 拼团价 can be read back from once it has been through the pricing pipeline —
+ * the contributor books a *discount*, it does not rewrite the unit price.
+ */
+export async function orderGoodsCharged(db: DbOrTx, orderId: number): Promise<string> {
+  const [row] = await db
+    .select({ total: sql<string>`coalesce(sum(${orderItems.totalAmount}), 0)::numeric(12, 2)` })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, orderId));
+  return row?.total ?? '0.00';
+}
+
 /** What the order actually carries — the hooks are handed only an id. */
 export async function orderLines(
   db: DbOrTx,

@@ -52,6 +52,8 @@ interface KindMeta {
   lines: { skuId: number; quantity: number }[];
   seatsRequired: number;
   groupTtlSeconds: number;
+  /** What the活动 says these lines cost; checked against the written order. */
+  expectedGoodsTotal: string;
 }
 
 function readMeta(meta: Record<string, unknown>): KindMeta {
@@ -78,14 +80,11 @@ export const groupbuyKindHandler: OrderKindHandler = {
   /**
    * Everything that can refuse the order, before a row exists.
    *
-   * The price check is the fail-closed half of **CR-1-d**. B1's `buildDraft`
-   * passes only `{ couponId }` into the pricing `selections`, so the
-   * contributor below cannot see which activity is being bought and the draft
-   * arrives at the ordinary SKU price. Rather than sell at that price we
-   * recompute the activity total here and refuse the mismatch. When CR-1-d
-   * lands the contributor fires, the two agree, and this becomes a silent
-   * assertion — which it should stay: an activity price that fails to reach an
-   * order is a bug whichever layer drops it.
+   * The activity's own price is computed here and carried in the meta, but it
+   * is *checked* in `afterCreate` — `draft.goodsTotal` is the sum of the line
+   * subtotals before any adjustment, so at this point it is the catalogue
+   * price even on a correctly priced group-buy order. What the shopper is
+   * actually charged only exists once the lines are written.
    */
   async beforeCreate(ctx: Ctx, tx: Tx, draft: PricingDraft): Promise<Record<string, unknown>> {
     const activityId = readSelection(draft, 'activityId');
@@ -103,11 +102,9 @@ export const groupbuyKindHandler: OrderKindHandler = {
     const skus = await repo.listActivitySkus(tx, [activityId]);
     const prices = new Map(skus.filter((s) => s.isEnabled).map((s) => [s.skuId, s.price]));
     const lines = draft.lines.map((line) => ({ skuId: line.skuId, quantity: line.quantity }));
-    assertActivityPriceApplied({
-      expected: expectedGoodsTotal(lines, prices),
-      actual: draft.goodsTotal,
-      activityId,
-    });
+    // Refuses a line that is not part of the activity at all, here, where there
+    // is still nothing to roll back.
+    const expected = expectedGoodsTotal(lines, prices);
 
     if (groupId !== null) {
       const group = await repo.findGroup(tx, groupId);
@@ -127,6 +124,7 @@ export const groupbuyKindHandler: OrderKindHandler = {
       lines,
       seatsRequired: activity.seatsRequired,
       groupTtlSeconds: activity.groupTtlSeconds,
+      expectedGoodsTotal: expected.toString(),
     };
     return meta as unknown as Record<string, unknown>;
   },
@@ -138,10 +136,21 @@ export const groupbuyKindHandler: OrderKindHandler = {
    * Two things happen and neither is a seat: the activity's own stock ledger
    * comes down, and a membership row is written as a statement of *intent*.
    * The seat itself waits for the money.
+   *
+   * It also carries the fail-closed half of **CR-1-d**: the order's lines exist
+   * by now, so what they charge can be compared with what the activity says
+   * they cost. Throwing rolls back B1's whole transaction — the order, its
+   * lines, the stock reservation — which is the point.
    */
   async afterCreate(ctx: Ctx, tx: Tx, orderId: number, rawMeta: Record<string, unknown>) {
     const meta = readMeta(rawMeta);
     const now = ctx.clock.now();
+
+    assertActivityPriceApplied({
+      expected: Money.parse(meta.expectedGoodsTotal),
+      charged: Money.parse(await repo.orderGoodsCharged(tx, orderId)),
+      activityId: meta.activityId,
+    });
 
     for (const line of meta.lines) {
       const reserved = await repo.reserveActivityStock(tx, {
@@ -214,10 +223,10 @@ export const groupbuyKindHandler: OrderKindHandler = {
  * Priority 50 — before coupons (100), because a coupon's 满减 threshold should
  * be judged against what the shopper actually pays.
  *
- * Today this returns `[]` for every order, because `selections` never carries
- * `kind` (CR-1-d). It is written, registered and tested anyway: the day B1
- * passes `kindMeta` through, group-buy pricing starts working with no further
- * change, and `assertActivityPriceApplied` in `beforeCreate` stops refusing.
+ * It fires on `kind === 'groupbuy'` alone, which B1 puts into `selections`
+ * alongside every `kindMeta` key (CR-1-d). An ordinary order naming the same
+ * SKU keeps the catalogue price, and `assertActivityPriceApplied` in
+ * `afterCreate` refuses any group-buy order this did not reach.
  */
 export const groupbuyPricingContributor: PricingContributor = {
   name: 'groupbuy:activity-price',

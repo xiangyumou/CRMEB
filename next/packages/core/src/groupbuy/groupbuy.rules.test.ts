@@ -173,26 +173,38 @@ describe('the CR-1-d price guard', () => {
     );
   });
 
-  it('fails closed when the contributor did not reprice the draft', () => {
-    // 88.00 is the catalogue price: what B1 produces today, because
-    // `buildDraft` never passes `kindMeta` into the pricing selections.
+  it('fails closed when the order charges the catalogue price', () => {
+    // 88.00 is the catalogue price: what the order carries when the pricing
+    // contributor never ran.
     expect(
       codeOf(() =>
         assertActivityPriceApplied({
           expected: Money.parse('59.00'),
-          actual: Money.parse('88.00'),
+          charged: Money.parse('88.00'),
           activityId: 1,
         }),
       ),
     ).toBe('GROUPBUY_PRICE_NOT_APPLIED');
   });
 
-  it('is silent once the two agree', () => {
+  it('is silent once the order charges the activity price', () => {
     expect(
       codeOf(() =>
         assertActivityPriceApplied({
           expected: Money.parse('59.00'),
-          actual: Money.parse('59.00'),
+          charged: Money.parse('59.00'),
+          activityId: 1,
+        }),
+      ),
+    ).toBe('NO_THROW');
+  });
+
+  it('allows a coupon to take more off on top', () => {
+    expect(
+      codeOf(() =>
+        assertActivityPriceApplied({
+          expected: Money.parse('59.00'),
+          charged: Money.parse('49.00'),
           activityId: 1,
         }),
       ),
@@ -203,7 +215,7 @@ describe('the CR-1-d price guard', () => {
     try {
       assertActivityPriceApplied({
         expected: Money.parse('59.00'),
-        actual: Money.parse('88.00'),
+        charged: Money.parse('88.00'),
         activityId: 7,
       });
       expect.unreachable();
@@ -211,7 +223,7 @@ describe('the CR-1-d price guard', () => {
       expect((error as DomainError).details).toEqual({
         activityId: '7',
         expected: '59.00',
-        actual: '88.00',
+        charged: '88.00',
       });
     }
   });

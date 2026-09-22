@@ -9,13 +9,22 @@ import {
   groupbuyMembers,
 } from '@shop/db/schema/groupbuy';
 import { orderItems, orders } from '@shop/db/schema/order';
-import { users } from '@shop/db/schema/user';
+import { refunds } from '@shop/db/schema/refund';
+import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, type TestCtx } from '@shop/testing';
+import { registerCatalogDomain } from '../catalog';
+import { registerShippingFreightPort } from '../shipping';
 import type { Actor, Ctx } from '../kernel/context';
-import { DomainError } from '../kernel/errors';
 import { Money } from '../kernel/money';
 import { withTx } from '../kernel/tx';
-import { onOrderCancelled, onOrderPaid, onOrderRefunded, resetOrderPorts } from '../order/ports';
+import * as checkout from '../order';
+import {
+  onOrderCancelled,
+  onOrderPaid,
+  onOrderRefunded,
+  registerOrderStateMachine,
+  resetOrderPorts,
+} from '../order/ports';
 import { groupbuyConfig } from './groupbuy.config';
 import { clearAutoRefundPort, registerAutoRefundPort } from './groupbuy.effects';
 import { settleExpiredGroups, settleGroup } from './groupbuy.jobs';
@@ -119,6 +128,9 @@ async function makeActivity(
     .values({
       name: `坚果礼盒${sequence}`,
       imageUrl: 'https://example.test/p.png',
+      // On the shelf so the CR-1-d tests below can buy it through B1's real
+      // checkout; the rest of this file writes its orders directly.
+      status: 'on_shelf',
       // `products_freight_source` insists a `template` product names a template.
       freightMode: 'free',
       price: '88.00',
@@ -341,12 +353,125 @@ async function effectsFor(orderId: number, eventType: string) {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * CR-1-d, applied: `buildDraft` passes `kind` and every `kindMeta` key into the
+ * pricing `selections`, so the contributor sees which activity the shopper
+ * picked and the 拼团价 reaches the order by itself.
+ *
+ * These are the only tests in this file that drive B1's real checkout. They
+ * have to: the whole point is that the price travels from the activity table
+ * through `preview`/`create` without this domain writing the number itself.
+ */
+describe('the group-buy price through the real checkout (CR-1-d)', () => {
+  beforeEach(() => {
+    // The catalogue port `buildDraft` reads SKUs through, the freight port it
+    // quotes with, and the state machine its inserts are validated against.
+    registerCatalogDomain();
+    registerShippingFreightPort();
+    registerOrderStateMachine(checkout.orderStateMachine);
+  });
+
+  async function shopper(): Promise<{ userId: number; ctx: Ctx }> {
+    const userId = await makeUser();
+    await harness.ctx.db.insert(userAddresses).values({
+      userId,
+      receiverName: '张三',
+      receiverPhone: '13800138000',
+      provinceName: '浙江省',
+      cityName: '杭州市',
+      districtName: '西湖区',
+      detail: '文三路 100 号',
+      isDefault: true,
+    });
+    return { userId, ctx: asUser(userId) };
+  }
+
+  const buyNow = (fixture: ActivityFixture, kindMeta?: Record<string, string>) => ({
+    source: 'buy-now' as const,
+    cartItemIds: [],
+    item: { skuId: String(fixture.skuId), quantity: 1 },
+    kind: kindMeta === undefined ? ('normal' as const) : ('groupbuy' as const),
+    ...(kindMeta === undefined ? {} : { kindMeta }),
+  });
+
+  it('prices a group-buy order at the activity price, preview and create', async () => {
+    const fixture = await makeActivity();
+    const { userId, ctx } = await shopper();
+    const meta = { activityId: String(fixture.activityId) };
+
+    const preview = await checkout.preview(ctx, buyNow(fixture, meta));
+    // 88.00 in the catalogue, 59.00 in the activity. B1 books the difference as
+    // an adjustment rather than rewriting the unit price, so `itemsAmount`
+    // stays the catalogue total and the shopper is shown where the 29.00 went.
+    expect(preview.itemsAmount).toBe('88.00');
+    expect(preview.payableAmount).toBe('59.00');
+    expect(preview.lines[0]?.totalAmount).toBe('59.00');
+    expect(preview.adjustments.map((row) => row.amount)).toEqual(['-29.00']);
+    expect(preview.adjustments[0]?.label).toContain('拼团价');
+
+    const created = await checkout.create(ctx, {
+      ...buyNow(fixture, meta),
+      idempotencyKey: `gb-${fixture.activityId}`,
+    });
+    expect(created.payableAmount).toBe('59.00');
+    expect(created.kind).toBe('groupbuy');
+
+    // …and the order really is in a team, at that price.
+    const [line] = await harness.ctx.db
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.orderId, Number(created.id)));
+    expect(line!.totalAmount).toBe('59.00');
+    const member = await repo.findMemberByOrder(harness.ctx.db, Number(created.id));
+    expect(member).toMatchObject({ userId, role: 'leader', status: 'joined' });
+    expect((await readGroup(member!.groupId)).activityId).toBe(fixture.activityId);
+  });
+
+  it('leaves the same SKU at its ordinary price on an ordinary order', async () => {
+    const fixture = await makeActivity();
+    const { ctx } = await shopper();
+
+    const preview = await checkout.preview(ctx, buyNow(fixture));
+    expect(preview.itemsAmount).toBe('88.00');
+    expect(preview.payableAmount).toBe('88.00');
+    expect(preview.adjustments).toEqual([]);
+
+    const created = await checkout.create(ctx, {
+      ...buyNow(fixture),
+      idempotencyKey: `normal-${fixture.activityId}`,
+    });
+    expect(created.payableAmount).toBe('88.00');
+    expect(created.kind).toBe('normal');
+    expect(await repo.findMemberByOrder(harness.ctx.db, Number(created.id))).toBeNull();
+  });
+
+  it('prices a shopper joining an open team the same way', async () => {
+    const fixture = await makeActivity();
+    const leaderId = await makeUser();
+    const leader = await placeOrder({ userId: leaderId, fixture });
+    await pay(leader.orderId);
+
+    const { ctx } = await shopper();
+    const meta = { activityId: String(fixture.activityId), groupId: String(leader.groupId) };
+    const created = await checkout.create(ctx, {
+      ...buyNow(fixture, meta),
+      idempotencyKey: `join-${fixture.activityId}`,
+    });
+
+    expect(created.payableAmount).toBe('59.00');
+    const member = await repo.findMemberByOrder(harness.ctx.db, Number(created.id));
+    expect(member?.groupId).toBe(leader.groupId);
+  });
+});
+
 describe('beforeCreate', () => {
-  it('refuses an order the pricing contributor did not reprice (CR-1-d)', async () => {
+  it('refuses an order whose draft is not at the activity price (CR-1-d)', async () => {
     const fixture = await makeActivity();
     const userId = await makeUser();
-    // 88.00 is the catalogue price — what B1 produces today, because
-    // `buildDraft` never passes `kindMeta` into the pricing selections.
+    // 88.00 is the catalogue price. With CR-1-d applied a real checkout can no
+    // longer produce it for a `groupbuy` order, which is exactly why this guard
+    // stays: it is what would catch the contributor being dropped, reordered or
+    // silently returning `[]` again.
     await expect(placeOrder({ userId, fixture, amount: '88.00' })).rejects.toMatchObject({
       code: 'GROUPBUY_PRICE_NOT_APPLIED',
     });
@@ -698,36 +823,84 @@ describe('the expiry sweep', () => {
   });
 });
 
-describe('the CR-3-d auto-refund port', () => {
-  it('parks the refund effect for a human when no port is registered', async () => {
-    const fixture = await makeActivity({ ttlSeconds: 3_600 });
-    const leader = await makeUser();
-    const opened = await placeOrder({ userId: leader, fixture });
-    await pay(opened.orderId);
-    harness.clock.set('2026-06-01T02:00:00.000Z');
-    await settleExpiredGroups(harness.ctx);
-
-    const [row] = await effectsFor(opened.orderId, 'groupbuy.refund');
+/**
+ * CR-3-d, accepted and implemented: a failed team gives the money back by
+ * itself, through `refund.refundSystemInitiated`.
+ *
+ * What these two prove is the join — that the effect the sweep records reaches
+ * the refund domain, and that draining it again does not open a second refund.
+ * The refund's own arithmetic (the ceiling, the freight, shipped lines) is
+ * proved next door in `refund/refund.system.int.test.ts`.
+ */
+describe('the CR-3-d system refund', () => {
+  async function driveRefundEffects(orderIds: number[]): Promise<void> {
     const handler = await import('../effects/index').then((m) =>
       m.getEffectHandler('order', 'groupbuy.refund'),
     );
-    await expect(
-      handler!(harness.ctx, {
-        id: row!.id,
-        scope: row!.scope,
-        scopeId: row!.scopeId,
-        eventType: row!.eventType,
-        payload: row!.payload,
-        attempts: 1,
-      }),
-    ).rejects.toBeInstanceOf(DomainError);
+    for (const orderId of orderIds) {
+      for (const row of await effectsFor(orderId, 'groupbuy.refund')) {
+        await handler!(harness.ctx, {
+          id: row.id,
+          scope: row.scope,
+          scopeId: row.scopeId,
+          eventType: row.eventType,
+          payload: row.payload,
+          attempts: 1,
+        });
+      }
+    }
+  }
+
+  const refundsFor = (orderId: number) =>
+    harness.ctx.db.select().from(refunds).where(eq(refunds.orderId, orderId));
+
+  it('gives every paid member exactly one refund, however many sweeps run', async () => {
+    const fixture = await makeActivity({ ttlSeconds: 3_600 });
+    const leaderId = await makeUser();
+    const leader = await placeOrder({ userId: leaderId, fixture });
+    await pay(leader.orderId);
+    const joinerId = await makeUser();
+    const joiner = await placeOrder({ userId: joinerId, fixture, groupId: leader.groupId });
+    await pay(joiner.orderId);
+
+    // A member who never paid is owed nothing, and must not get a refund row.
+    const ghostId = await makeUser();
+    const ghost = await placeOrder({ userId: ghostId, fixture, groupId: leader.groupId });
+
+    harness.clock.set('2026-06-01T02:00:00.000Z');
+    // Two sweeps, each drained twice: four chances to refund somebody twice.
+    await settleExpiredGroups(harness.ctx);
+    await settleExpiredGroups(harness.ctx);
+    const orderIds = [leader.orderId, joiner.orderId, ghost.orderId];
+    await driveRefundEffects(orderIds);
+    await driveRefundEffects(orderIds);
+
+    expect(await refundsFor(ghost.orderId)).toHaveLength(0);
+    for (const orderId of [leader.orderId, joiner.orderId]) {
+      const rows = await refundsFor(orderId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        status: 'approved',
+        isAutomatic: true,
+        reason: '拼团未成团，系统自动退款',
+        amount: '59.00',
+        reviewedByAdminId: null,
+      });
+      // And the gateway call is queued once, post-commit, like every other.
+      const queued = await harness.ctx.db
+        .select()
+        .from(effects)
+        .where(eq(effects.scopeId, String(rows[0]!.id)));
+      expect(queued.filter((row) => row.eventType === 'refund.execute')).toHaveLength(1);
+    }
   });
 
-  it('forwards to the port once stream C registers one', async () => {
+  it('lets a test substitute the refund seam', async () => {
     const seen: number[] = [];
     registerAutoRefundPort({
       async refund(_tx, _ctx, input) {
         seen.push(input.orderId);
+        return { refundId: 77, created: true };
       },
     });
 
@@ -737,20 +910,10 @@ describe('the CR-3-d auto-refund port', () => {
     await pay(opened.orderId);
     harness.clock.set('2026-06-01T02:00:00.000Z');
     await settleExpiredGroups(harness.ctx);
+    await driveRefundEffects([opened.orderId]);
 
-    const [row] = await effectsFor(opened.orderId, 'groupbuy.refund');
-    const handler = await import('../effects/index').then((m) =>
-      m.getEffectHandler('order', 'groupbuy.refund'),
-    );
-    await handler!(harness.ctx, {
-      id: row!.id,
-      scope: row!.scope,
-      scopeId: row!.scopeId,
-      eventType: row!.eventType,
-      payload: row!.payload,
-      attempts: 1,
-    });
     expect(seen).toEqual([opened.orderId]);
+    expect(await refundsFor(opened.orderId)).toHaveLength(0);
   });
 });
 

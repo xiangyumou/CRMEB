@@ -9,8 +9,9 @@
  * Almost nothing here is called by another domain. Group buy does not *ask* for
  * anything: it attaches to the order aggregate through the frozen seams in
  * `order/ports.ts` and is invoked, never invoking. The exceptions are the two
- * jobs the worker runs and the `AutoRefundPort`, which is the one thing this
- * stream needs and cannot have yet (**CR-3-d**).
+ * jobs the worker runs and, in the other direction, the one call this domain
+ * makes into another — `refund.refundSystemInitiated`, added by **CR-3-d**, for
+ * the money a failed team owes back.
  */
 
 export {
@@ -46,8 +47,9 @@ export { groupbuyConfig, type GroupbuyConfig } from './groupbuy.config';
 export { groupbuyPermissions } from './permissions';
 
 /**
- * Stream C's seam, inverted. When `refundSystemInitiated` exists this becomes a
- * one-line forward inside `registerGroupbuyDomain()` and the port is deleted.
+ * The refund seam. It forwards to `refund.refundSystemInitiated` by default —
+ * registering anything else is a test substituting a spy, not a configuration
+ * point.
  */
 export {
   clearAutoRefundPort,

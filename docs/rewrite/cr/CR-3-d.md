@@ -1,6 +1,6 @@
 # CR-3-d — the refund domain has no system-initiated refund entry point
 
-**Stream:** D (group buy and presale) **Status:** accepted — implemented by the D follow-up as `refundSystemInitiated(tx, ctx, input)` in a new file under `core/src/refund/` (exported from the refund index), with the groupbuy port forwarding to it; D2 registers presale's port the same way
+**Stream:** D (group buy and presale) **Status:** done — `refundSystemInitiated(tx, ctx, input)` lives in `core/src/refund/refund.system.service.ts` and is exported from the refund index; the group-buy effect handler forwards to it by default. D2's presale expiry calls the same function with `reason: 'presale_expired'`
 **Files:** `next/packages/core/src/refund/index.ts`, `refund.service.ts` (stream C)
 
 ## What
@@ -50,36 +50,51 @@ taking `(tx, ctx, input)` like every other cross-domain entry point, applying
 C's own cumulative ceiling check, and settling the order through the same
 `onOrderRefunded` path an operator-approved refund uses.
 
-## Until then
+## As built
 
-`core/src/groupbuy/groupbuy.effects.ts` declares an `AutoRefundPort`:
+Exactly the signature above, in a **new file** — `refund.system.service.ts`,
+with its one extra query in `refund.system.repo.ts` — rather than a function
+added to `refund.service.ts`, which another stream is editing. The refund
+index gained one export line. Nothing in `refund.service.ts` or
+`refund.repo.ts` was touched.
 
 ```ts
-export interface AutoRefundPort {
-  refund(
-    tx: Tx,
-    ctx: Ctx,
-    input: { orderId: number; reason: "groupbuy_failed"; note?: string },
-  ): Promise<void>;
-}
-export function registerAutoRefundPort(port: AutoRefundPort): void;
+export async function refundSystemInitiated(
+  tx: Tx,
+  ctx: Ctx,
+  input: {
+    orderId: number;
+    reason: "groupbuy_failed" | "presale_expired";
+    note?: string;
+  },
+): Promise<{ refundId: number; created: boolean }>;
 ```
 
-A failing group records one effect per paid member —
-`scope: 'order'`, `scope_id: String(orderId)`,
-`event_type: 'groupbuy.refund'` — inside the transaction that fails the group,
-which is `UNIQUE (scope, scope_id, event_type)` and therefore exactly-once
-however many sweeps run. The handler calls the registered port; with **no port
-registered it throws a `DomainError` with a message naming the order**, so the
-row parks in stream C's 待处理任务 console
-(`GET /admin-api/payment-effects`, which filters `scope in
-('payment','refund','order')`) and an operator refunds it by hand. Nothing is
-lost and nothing is silently skipped.
+What it does, in the caller's transaction: locks the order, refuses one that
+is missing or never collected anything, and answers a caller whose refund
+already exists with its id and `created: false`. Otherwise it takes every
+_unshipped_ line's remaining units at `lineRefundAmount`, adds the freight when
+nothing shipped at all, caps the total at C's cumulative ceiling (spreading the
+cap over the lines so `refunds.amount` and its `refund_items` still agree),
+inserts the refund **straight to `approved`** with `is_automatic` and a null
+`reviewed_by_admin_id`, raises `refunded_quantity` on each line so the
+warehouse cannot ship what is being refunded, and records the ordinary
+`refund.execute` effect. The gateway call, the capital flow, the restock and
+`onOrderRefunded` are then the same path an operator's 同意 takes.
 
-When C exports the entry point, `registerGroupbuyDomain()` registers a one-line
-port that forwards to it and the local interface is deleted.
+Idempotency is per `(orderId, reason)`, decided by a lookup under the order's
+own row lock rather than by trusting the caller's ledger — the frozen schema
+has no reason-key column, so the customer-facing reason string carries it
+(`拼团未成团，系统自动退款` / `预售未成行，系统自动退款`). The partial unique
+index `refund_items(order_item_id) WHERE is_open` is the backstop, and a
+buyer's own open request on a line wins: the shop stands aside with
+`REFUND_ALREADY_OPEN`.
 
-Pinned by `groupbuy.concurrency.int.test.ts::expiry racing the last join >
-records exactly one refund effect per paid member` and
-`groupbuy.int.test.ts::the failure sweep > parks the refund effect when no
-AutoRefundPort is registered`.
+`groupbuy.effects.ts` keeps the `AutoRefundPort` seam, now defaulted to this
+function; the "no port registered" throw is gone. Registering anything else is
+a test substituting a spy.
+
+Invariants: REFUND-010 … REFUND-013. Tests:
+`refund/refund.system.int.test.ts` (eleven cases, including six callers
+released together on one order) and `groupbuy.int.test.ts::the CR-3-d system
+refund`.

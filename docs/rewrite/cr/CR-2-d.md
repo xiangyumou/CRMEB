@@ -34,9 +34,10 @@ Either
 allowVirtualFill: boolean().notNull().default(false),
 ```
 
-on `groupbuy_activities`, or an explicit decision that the switch is shop-wide.
+on `groupbuy_activities`, or an explicit decision that the switch is shop-wide. The orchestrator closed this
+in favour of shop-wide, which is what the stream had already built.
 
-## Until then — and the recommendation
+## As built — and the recommendation
 
 Shop-wide, in the `groupbuy` config group:
 

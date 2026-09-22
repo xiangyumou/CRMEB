@@ -1,7 +1,7 @@
 import type { Tx } from '@shop/db';
 import type { Ctx } from '../kernel/context';
-import { DomainError } from '../kernel/errors';
 import { registerEffectHandler, type Effect } from '../effects/index';
+import { refundSystemInitiated } from '../refund';
 import { settleGroup } from './groupbuy.jobs';
 
 /**
@@ -33,42 +33,47 @@ import { settleGroup } from './groupbuy.jobs';
  */
 
 // ---------------------------------------------------------------------------
-// CR-3-d: the missing system-initiated refund entry point
+// CR-3-d: the system-initiated refund
 // ---------------------------------------------------------------------------
 
 /**
- * A local stand-in for an export stream C has not written.
+ * How a failed team gives the money back.
  *
- * `core/src/refund/index.ts`:
+ * CR-3-d was accepted and `refund/index.ts` now exports
+ * `refundSystemInitiated`, so this is no longer a stand-in for a missing
+ * export — it is an ordinary seam. It stays because a unit test that wants to
+ * watch the effect handler should not have to stand up a paid order, a payment
+ * attempt and a refundable line; `registerAutoRefundPort` lets it substitute a
+ * spy, and the default is the real thing.
  *
- * > There is deliberately no "create a refund on behalf of a user" export. A
- * > group-buy that fails (`is_automatic`) is a future caller and will get its
- * > own entry point with its own ceiling check.
- *
- * So this stream declares the shape it needs and registers nothing. When C
- * exports `refundSystemInitiated`, `registerGroupbuyDomain()` gains one line
- * forwarding to it and this interface is deleted.
+ * What it is *not* is an extension point: the only registration outside a test
+ * is the default below, and anything that opens a `refunds` row still goes
+ * through the refund domain's own entry point, ceiling check and all.
  */
 export interface AutoRefundPort {
   refund(
     tx: Tx,
     ctx: Ctx,
     input: { orderId: number; reason: 'groupbuy_failed'; note?: string },
-  ): Promise<void>;
+  ): Promise<{ refundId: number; created: boolean }>;
 }
 
-let autoRefundPort: AutoRefundPort | undefined;
+const defaultAutoRefundPort: AutoRefundPort = {
+  refund: (tx, ctx, input) => refundSystemInitiated(tx, ctx, input),
+};
+
+let autoRefundPort: AutoRefundPort = defaultAutoRefundPort;
 
 export function registerAutoRefundPort(port: AutoRefundPort): void {
   autoRefundPort = port;
 }
 
-/** Test helper, and the reset a process that re-registers domains needs. */
+/** Test helper: puts the real refund entry point back. */
 export function clearAutoRefundPort(): void {
-  autoRefundPort = undefined;
+  autoRefundPort = defaultAutoRefundPort;
 }
 
-export function peekAutoRefundPort(): AutoRefundPort | undefined {
+export function peekAutoRefundPort(): AutoRefundPort {
   return autoRefundPort;
 }
 
@@ -79,30 +84,42 @@ interface RefundPayload {
 }
 
 /**
- * With no port registered this **throws**, on purpose.
+ * Gives a member their money back when the team did not happen.
  *
- * The dispatcher retries and then parks the row as `unknown`, where stream C's
- * `GET /admin-api/payment-effects` console lists it (it filters
- * `scope in ('payment','refund','order')`, and this effect's scope is `order`)
- * and an operator refunds it by hand. Silently succeeding would lose a
- * shopper's money; silently skipping would lose the evidence.
+ * One transaction per member, opened here rather than by the sweep that
+ * recorded the effect: a team of five that fails is five refunds, and one bad
+ * order — a line that shipped between the sweep and the effect, say — must not
+ * roll back the other four. The ledger's `UNIQUE (scope, scope_id,
+ * event_type)` gives exactly one effect per member's order however many sweeps
+ * run, and `refundSystemInitiated` is idempotent per `(orderId, reason)` on top
+ * of that, so a retried effect finds the refund it already opened and returns
+ * it instead of opening a second.
+ *
+ * A throw here is still the right failure: the dispatcher retries eight times
+ * and then parks the row as `unknown`, where the 待处理任务 console lists it
+ * (it filters `scope in ('payment','refund','order')`, and this effect's scope
+ * is `order`) and an operator settles it by hand. Swallowing the error would
+ * lose a shopper's money quietly.
  */
 async function handleRefundEffect(ctx: Ctx, effect: Effect): Promise<void> {
   const payload = effect.payload as RefundPayload;
   const orderId = Number(payload.orderId);
   const port = autoRefundPort;
-  if (!port) {
-    throw new DomainError('INTERNAL', {
-      message: `拼团失败退款需人工处理：订单 ${payload.orderId}（拼团 ${payload.groupId}）尚无系统退款入口，见 CR-3-d`,
-      details: { orderId: payload.orderId, groupId: payload.groupId, reason: payload.reason },
-    });
-  }
-  await ctx.withTx((tx) =>
+  const result = await ctx.withTx((tx) =>
     port.refund(tx, ctx, {
       orderId,
       reason: 'groupbuy_failed',
       note: `拼团 ${payload.groupId} ${payload.reason === 'seat_lost' ? '名额已满' : '未成团'}`,
     }),
+  );
+  ctx.logger.info(
+    {
+      orderId: payload.orderId,
+      groupId: payload.groupId,
+      refundId: String(result.refundId),
+      created: result.created,
+    },
+    'groupbuy: failed team refunded',
   );
 }
 

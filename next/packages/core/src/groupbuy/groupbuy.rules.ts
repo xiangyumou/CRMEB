@@ -184,27 +184,32 @@ export function expectedGoodsTotal(
 /**
  * The fail-closed half of CR-1-d.
  *
- * B1's `buildDraft` does not pass `kindMeta` into the pricing `selections`, so
- * the `PricingContributor` cannot know which activity is being bought and the
- * draft arrives at the ordinary SKU price. Rather than sell at that price, the
- * kind handler recomputes the activity total and refuses when the draft does
- * not match.
+ * With CR-1-d applied, `buildDraft` passes `kind` and every `kindMeta` key into
+ * the pricing `selections`, so `groupbuyPricingContributor` fires and B1 books
+ * the gap between the catalogue price and the 拼团价 as an adjustment. The
+ * shopper is charged the activity price — but by *another* domain's arithmetic,
+ * through a registry this domain does not own.
  *
- * When CR-1-d lands the contributor fires, the two agree, and this becomes a
- * silent assertion. It stays either way: an activity price that fails to reach
- * the order is a pricing bug whichever layer causes it.
+ * So the kind handler checks the result instead of trusting it, and checks it
+ * where the result exists: after the order lines are written, against what they
+ * actually charge. A contributor dropped from the registry, ordered behind
+ * something that overwrites it, or silently returning `[]` again surfaces here
+ * as a refused order rather than as a shopper paying 88.00 for a 59.00 team.
+ *
+ * Charging *less* is fine — a coupon on top is the shopper's own business — so
+ * only charging more than the activity price is a bug.
  */
 export function assertActivityPriceApplied(args: {
   expected: Money;
-  actual: Money;
+  charged: Money;
   activityId: number;
 }): void {
-  if (args.expected.eq(args.actual)) return;
+  if (!args.charged.gt(args.expected)) return;
   throw new DomainError('GROUPBUY_PRICE_NOT_APPLIED', {
     details: {
       activityId: String(args.activityId),
       expected: args.expected.toString(),
-      actual: args.actual.toString(),
+      charged: args.charged.toString(),
     },
   });
 }
