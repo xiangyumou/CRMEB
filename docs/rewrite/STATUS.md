@@ -44,10 +44,10 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | B3 order/cart/coupon follow-up (CR-1-d2, CR-1-f2, CR-6-f1 fold, CR-5-h2, CR-1-h2, CR-1-f3 §2) | merged 2026-09-23 (`41883680c`; nested staff grant → flat `coupon-grants`, H3 re-points) | `rewrite/ws-b3-order-followup` |
 | J3 deploy follow-up (CR-1..3-j2, CR-4-k, ETL drill harness, cutover runbook) | merged 2026-09-23 (`d88065849`; CR-1-j3 `expectedStatuses` in the binder; `next.yml` never yet run by GitHub Actions) | `rewrite/ws-j3-deploy-followup` |
 | I storefront e2e | dispatched 2026-09-23 (Sonnet 5) into A2's slot; told to merge integration (K1 admin e2e precedent, CR-15-k, A2) first; E4/F4/B3 routes → `test.fixme` | `rewrite/ws-i-storefront-e2e` |
-| CR-2-k invariants ledger edits | dispatched 2026-09-23 (Sonnet 5), worktree `ws-cr2k` | `rewrite/ws-cr2k-invariants-ledger` |
+| CR-2-k invariants ledger edits | merged 2026-09-23 (`d62ea784b`; 229 ported / 32 retired-dropped / 13 owner-marked; `pending(orchestrator)` 0) | `rewrite/ws-cr2k-invariants-ledger` |
 | H3 uni-app third pass (bind 25 landed routes, re-point 8, delete captcha ×2, 3 wrappers, 7 dangling imports) | dispatched 2026-09-23 (Opus), brief `H3-uniapp-third-pass.md` | `rewrite/ws-h3-uniapp-third-pass` |
 | W4T wave-4 tail (CR-2-e4 port registration, 版式 config ETL path) | dispatched 2026-09-23 (Opus), brief `W4T-wave4-tail.md` | `rewrite/ws-w4t-wave4-tail` |
-| K2 hardening second pass (load smoke, final guard run) | after every stream is merged | — |
+| K2 hardening second pass (AUDIT re-read, AUTH-005, SEQ/MUT/STAB-001, load smoke, web unit flake, guard lists) | dispatched 2026-09-23 (Opus), brief `K2-hardening-second-pass.md`; the final all-merged guard flip stays with the orchestrator after H3/I/W4T | `rewrite/ws-k2-hardening` |
 
 ## Decisions log
 
