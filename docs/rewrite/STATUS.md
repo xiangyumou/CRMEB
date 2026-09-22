@@ -26,17 +26,17 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 | B1 / C fix-ups (CR-7-c, CR-3-b2, CR-4/5/6-c) | merged 2026-09-23 (`91a04b3d`, `03c74fe1`) | stream branches |
 | Kit maintenance (CR-1..5-f1, CR-8-c) | merged 2026-09-23 | `rewrite/ws-kit-f1crs` |
 | E1 user and login | merged 2026-09-23 | `rewrite/ws-e1-user` |
-| D group buy | merged 2026-09-23 (`2209d1d8`); follow-up in progress: CR-3-d `refundSystemInitiated` + CR-1-d end-to-end price test | `rewrite/ws-d-marketing` |
-| D2 presale | dispatched 2026-09-23 | `rewrite/ws-d2-presale` |
-| F2 shipping, articles | in progress (stats split off to F3 at `06afd806`) | `rewrite/ws-f2-ops` |
-| F3 statistics | dispatched 2026-09-23 | `rewrite/ws-f3-stats` |
+| D group buy | merged 2026-09-23 (`2209d1d8`); follow-up merged (`5c942549`: CR-3-d `refundSystemInitiated`, CR-1-d guard in `afterCreate`) | `rewrite/ws-d-marketing` |
+| D2 presale | merged 2026-09-23 (`902f6c36`) | `rewrite/ws-d2-presale` |
+| F2 shipping, articles | merged 2026-09-23 (`00845747`) | `rewrite/ws-f2-ops` |
+| F3 statistics | merged 2026-09-23 (`612d0a00`) | `rewrite/ws-f3-stats` |
 | E2 notifications | merged 2026-09-23 (carries the pre-split WeChat OA core `dd40734c` + `f2e35432`) | `rewrite/ws-e2-wechat` |
-| N1 notification wiring (CR-2-e2, CR-1-e2) | dispatched 2026-09-23 | `rewrite/ws-n1-notify-wiring` |
-| E3 WeChat OA | dispatched 2026-09-23 | `rewrite/ws-e3-wechat-oa` |
+| N1 notification wiring (CR-2-e2, CR-1-e2) | merged 2026-09-23 (`fa65145d`) | `rewrite/ws-n1-notify-wiring` |
+| E3 WeChat OA | merged 2026-09-23 (`f2a262b5`) | `rewrite/ws-e3-wechat-oa` |
 | S storefront contract gaps (CR-1..5-h) | merged 2026-09-23 (`3fd7f848`) | `rewrite/ws-s-storefront-gaps` |
-| J ETL runner | merged 2026-09-23 (`427e858d`); follow-up in progress: CR-1..4-j fixes | `rewrite/ws-j-etl-deploy` |
-| J2 images and deployment | dispatched 2026-09-23 | `rewrite/ws-j2-deploy` |
-| H2 uni-app second pass | dispatched 2026-09-23 against the 391-route contract set | `rewrite/ws-h2-uniapp` |
+| J ETL runner | merged 2026-09-23 (`427e858d`); follow-up merged (`4083e6c5`: CR-1..4-j) | `rewrite/ws-j-etl-deploy` |
+| J2 images and deployment | merged 2026-09-23 (`c2182657`) | `rewrite/ws-j2-deploy` |
+| H2 uni-app second pass | merged 2026-09-23 (`ab0f3c54`; 154 live / 37 pending / 0 broken) | `rewrite/ws-h2-uniapp` |
 | K1 hardening first pass | dispatched 2026-09-23 | `rewrite/ws-k-hardening` |
 | I storefront e2e | after H2 + J2 (unit tests for the api layer stay with H2) | — |
 | K2 hardening second pass (load smoke, final guard run) | after every stream is merged | — |
@@ -78,3 +78,6 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
 - 2026-09-23 — D merged (group buy: activities, teams, the six seat/quota/refund races, expiry as a delayed effect + sweep backstop, 19 routes, three admin pages, ETL mapper, RISK-D-001…008). The races found two real holes (quota enforced at reservation only; two refunds deadlocking on team/membership rows), both fixed in-stream. CRs: CR-1-d **applied** at merge (`buildDraft` passes `kind` + `kindMeta` keys to pricing contributors — without it every activity was priced at the SKU price); CR-2-d closed shop-wide (`groupbuy.virtualFillOnExpiry`, no per-activity column); CR-3-d accepted — D's follow-up adds `refundSystemInitiated` to the refund domain in a new file, D2 will register presale's port to it. D2 told to `rebase --onto` from `8cd2936d1`.
 - 2026-09-23 — S merged (every CR-1..5-h row: storefront `:id` takes the order number, cart SKU change / decrement-by-SKU / batch favourite, category version, per-day 统计明细, 售后备注 appended to `refund_logs`, 删除订单 as `hidden_by_user_at`, invoice order summary, upload field `file` + `purpose: 'staff'`; uni-app 185 calls: 88 live, 97 pending, 0 broken). At merge: `cart.gaps.int.test` registers the catalog domain; web unit `testTimeout` 20 s (form renders time out at 5 s under a dozen executors). Owed to H2: clear the stale CONTRACT-PENDING(E1) markers, `addGoods.vue` passes `purpose: 'staff'`, the route guard must see chained `request\n.get(…)`.
 - 2026-09-23 — J merged (ETL runner: eleven groups, `plan|run|verify|assets`, `requiresReference` preflight, identity restart on reload, `--migrated-at`, `rehearse.sh` byte-identical double run + verify 18/18 on the synthetic fixture; MIG-001…017 retired with reasons, ETL-J-001…012). CRs decided: CR-1-j (`wechat` owns the OA credentials, E3 drops them from `wechat-oa`; `trade` goes with CR-6-f1; J drops `configKeyMap`), CR-2-j (`reviewWindowDays` → `system_comment_time`), CR-3-j (identity ids carried, `knownCityIds` nulls unknown cities), CR-4-j (`admins.lastLoginIp` and `roles.deletedAt` not migrated). All four fixes are J's follow-up. J2 was cut from integration, not from J: plain rebase.
+- 2026-09-23 — F2 merged. Two defects fixed at merge, both B1's: (1) `FreightPort.quote` now takes the caller's `db` — F2's port read through `ctx.db` while checkout held its transaction, and twelve buyers against a twelve-connection pool deadlocked (`order.concurrency` hung; production would have too); (2) the B1 freight fallback is deleted — legacy charges `postage × cart_num`, B1's fallback charged once per product and hid the difference behind the unregistered port. Rule from here: **no fallback behind an unregistered port**; tests register the owning domain. F2's express-companies takeover (CR-1-b2) already removed B2's routes/schemas. CR-1-f2 / CR-2-f2 still open.
+- 2026-09-23 — H2, J follow-up, J2, D follow-up, N1, E3, F3, D2 merged in that order (integration `902f6c36`; int core 1015 / web 184 / etl 9 / worker 6 / testing 9; 397 routes). E3's JS-SDK signer: `isTrustedHost` from `site` **plus** the account's own `wechat-oa-runtime.jsApiAllowedHosts`. Known flake: `@shop/web` unit suite under turbo alongside `build` occasionally dies with react-scheduler `window is not defined` (four streams saw it); passes standalone every time — to be pinned by K2.
+- 2026-09-23 — Open CRs routed to the next wave: CR-1..7-h2 (37 pending uni-app calls), CR-1-f3, CR-1-f2, CR-2-f2, CR-1-d2, CR-3-d2, CR-1..3-j2, CR-2-e3, CR-3-e3, CR-6-f1, the `routine_appId` two-claimants sibling of CR-1-j, N1's read-only config descriptor. See the wave-4 briefs.
