@@ -572,10 +572,20 @@ describe('LogisticsPort.track', () => {
     expect(result).toEqual({ state: 'unknown', traces: [] });
   });
 
-  it('treats 快递100 as unconfigured (CR-2-f2)', async () => {
-    await harness.ctx.config.set(logisticsConfig, { provider: 'kuaidi100', appCode: 'x' });
-    const result = await logisticsPort.track(harness.ctx, { companyCode: 'SF', trackingNo: 'SF1' });
-    expect(result.state).toBe('unknown');
+  it('offers 阿里云云市场 as the only provider (CR-2-f2)', async () => {
+    // The setting is gone, not merely unimplemented: a value the driver cannot
+    // serve must not be selectable, or the form promises tracking it will
+    // never deliver. The stored group refuses it too, so an ETL'd or
+    // hand-edited row cannot put the shop back into that state.
+    await expect(
+      harness.ctx.config.set(logisticsConfig, {
+        provider: 'kuaidi100' as never,
+        appCode: 'x',
+      }),
+    ).rejects.toThrow();
+    expect(logisticsConfig.schema.shape.provider.safeParse('kuaidi100').success).toBe(false);
+    expect(logisticsConfig.schema.shape.provider.safeParse('aliyun-market').success).toBe(true);
+    expect(Object.keys(logisticsConfig.schema.shape)).not.toContain('customer');
   });
 
   it('calls the market API once and serves the second look-up from Redis', async () => {

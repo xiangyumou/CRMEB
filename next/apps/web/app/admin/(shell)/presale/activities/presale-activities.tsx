@@ -1,7 +1,6 @@
 'use client';
 
-import { Button, Modal, Skeleton, Typography } from 'antd';
-import { useState } from 'react';
+import { Button, Typography } from 'antd';
 import {
   presaleAdminActivityCreate,
   presaleAdminActivityDelete,
@@ -15,10 +14,11 @@ import {
   type PresaleActivityDetail,
   type PresaleActivityListItem,
 } from '@shop/contracts/presale/schemas';
+import type { z } from 'zod';
 
-import { useRouteMutation, useRouteQuery } from '@/admin/api/hooks';
+import { useRouteMutation } from '@/admin/api/hooks';
 import { ConfirmButton } from '@/admin/kit/confirm-button';
-import { ModalForm } from '@/admin/kit/form/modal-form';
+import { ModalForm, useFormModal } from '@/admin/kit/form/modal-form';
 import { PageContainer } from '@/admin/kit/page-container';
 import { StatusTag } from '@/admin/kit/status-tag';
 import {
@@ -50,18 +50,25 @@ import { PRESALE_ACTIVITY_STATUS, PRESALE_PAYMENT_MODE, presaleFields } from '..
  * wants it gone sooner moves the end time or deletes it.
  */
 export function PresaleActivitiesPage() {
-  const [editing, setEditing] = useState<PresaleActivityListItem | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
+  // `detail` is the kit's (CR-3-d2): the edit dialog loads the whole activity
+  // before it renders a single field. `presaleAdminActivityUpdate` takes a
+  // whole activity, and the list row carries neither `skus` nor
+  // `sliderImages` — a form opened on the row would submit an empty 规格 list
+  // and delete every presale price on the campaign.
+  const modal = useFormModal<PresaleActivityListItem, typeof presaleAdminActivityDetail>({
+    detail: {
+      route: presaleAdminActivityDetail,
+      params: (row) => ({ id: row.id }),
+      select: initialValuesOf,
+    },
+  });
 
   const setStatus = useRouteMutation(presaleAdminActivitySetStatus, {
     invalidate: [presaleAdminActivityList],
     successMessage: '已更新状态',
   });
 
-  const open = (row?: PresaleActivityListItem) => {
-    setEditing(row ?? null);
-    setFormOpen(true);
-  };
+  const open = (row?: PresaleActivityListItem) => modal.show(row);
 
   return (
     <PageContainer subTitle="全款预售：付款后按承诺天数发货；预售库存与商品库存各记各的">
@@ -184,67 +191,21 @@ export function PresaleActivitiesPage() {
         ]}
       />
 
-      <ActivityFormModal
-        open={formOpen}
-        editingId={editing?.id ?? null}
-        heading={editing ? `编辑：${editing.title}` : '新建预售活动'}
-        onClose={() => setFormOpen(false)}
+      <ModalForm
+        {...modal.props}
+        title={modal.record ? `编辑：${modal.record.title}` : '新建预售活动'}
+        width={960}
+        columns={2}
+        schema={presaleActivityForm}
+        fields={presaleFields}
+        route={modal.record ? presaleAdminActivityUpdate : presaleAdminActivityCreate}
+        toInput={(values) =>
+          modal.record ? { params: { id: modal.record.id }, body: values } : { body: values }
+        }
+        invalidate={[presaleAdminActivityList, presaleAdminActivityDetail]}
+        successMessage="已保存"
       />
     </PageContainer>
-  );
-}
-
-/**
- * The create/edit dialog.
- *
- * Editing loads the **detail** route first and waits for it. The list row does
- * not carry `skus` or `sliderImages`, and `presaleAdminActivityUpdate` takes a
- * whole activity: opening the form on a list row would submit an empty 规格
- * list and silently delete every presale price on the campaign. Waiting for one
- * request is the cheap half of that trade.
- */
-function ActivityFormModal({
-  open,
-  editingId,
-  heading,
-  onClose,
-}: {
-  open: boolean;
-  editingId: string | null;
-  heading: string;
-  onClose: () => void;
-}) {
-  const detail = useRouteQuery(
-    presaleAdminActivityDetail,
-    { params: { id: editingId ?? '0' } },
-    { enabled: open && editingId !== null },
-  );
-
-  if (open && editingId !== null && detail.data === undefined) {
-    return (
-      <Modal open title={heading} footer={null} onCancel={onClose} width={960}>
-        <Skeleton active paragraph={{ rows: 8 }} />
-      </Modal>
-    );
-  }
-
-  return (
-    <ModalForm
-      open={open}
-      onClose={onClose}
-      title={heading}
-      width={960}
-      columns={2}
-      schema={presaleActivityForm}
-      fields={presaleFields}
-      initialValues={detail.data && editingId !== null ? initialValuesOf(detail.data) : undefined}
-      route={editingId === null ? presaleAdminActivityCreate : presaleAdminActivityUpdate}
-      toInput={(values) =>
-        editingId === null ? { body: values } : { params: { id: editingId }, body: values }
-      }
-      invalidate={[presaleAdminActivityList, presaleAdminActivityDetail]}
-      successMessage="已保存"
-    />
   );
 }
 
@@ -253,8 +214,13 @@ function ActivityFormModal({
  * it owns (`sales`, `productName`, `createdAt`), with `null` turned into
  * `undefined` — `exactOptionalPropertyTypes` means an optional field is either
  * absent or a real value, never `null`.
+ *
+ * The declared return type is what keeps it honest: `EntityFormLoad['select']`
+ * is a plain record, because the controller that carries it does not know the
+ * body schema, so this annotation is where a field that stops existing on the
+ * form is a compile error rather than a value the form drops on save.
  */
-function initialValuesOf(row: PresaleActivityDetail) {
+function initialValuesOf(row: PresaleActivityDetail): Partial<z.input<typeof presaleActivityForm>> {
   return {
     productId: row.productId,
     title: row.title,

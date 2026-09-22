@@ -46,6 +46,13 @@ const row = {
   createdAt: '2026-06-01T10:00:00+08:00',
 };
 
+/**
+ * What the detail route answers and the list row does not: the scope links.
+ * This page renders no control for either, so they exist only to be carried
+ * back out of the form untouched (CR-3-d2).
+ */
+const detail = { ...row, scope: 'products', productIds: ['31', '42'], categoryIds: [] };
+
 function stubApi(): Call[] {
   const calls: Call[] = [];
   configureApi({
@@ -60,7 +67,9 @@ function stubApi(): Call[] {
       const payload = url.includes('/grants')
         ? { granted: 3, skippedUserIds: [] }
         : method === 'GET'
-          ? { items: [row], total: 1, page: 1, pageSize: 20 }
+          ? /\/admin-api\/coupons\/\d+$/.test(url)
+            ? detail
+            : { items: [row], total: 1, page: 1, pageSize: 20 }
           : { ...row, status: 'disabled' };
       return new Response(JSON.stringify(payload), {
         status: 200,
@@ -122,6 +131,33 @@ describe('优惠券列表', () => {
       const toggle = calls.find((call) => call.method === 'POST');
       expect(toggle?.url).toContain('/admin-api/coupons/7/status');
       expect(toggle?.body).toEqual({ status: 'disabled' });
+    });
+  });
+
+  /**
+   * CR-3-d2. The bug this is pinned against: 编辑 opened a form seeded from the
+   * list row, which has no `productIds`, so saving an unrelated field posted
+   * the schema's `[]` default and unlinked every product the coupon applied to.
+   */
+  it('loads the whole template before editing, and keeps the scope links it does not render', async () => {
+    const calls = stubApi();
+    renderAdmin(<CouponTemplatesPage />, { identity: allPermissions });
+    await screen.findByText('满 100 减 10');
+
+    await userEvent.click(screen.getByRole('button', { name: '编辑' }));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => {
+      expect(calls.some((call) => call.url.endsWith('/admin-api/coupons/7'))).toBe(true);
+    });
+    // The name arrives from the detail, not from the row we clicked.
+    await within(dialog).findByDisplayValue('满 100 减 10');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: '保 存' }));
+
+    await waitFor(() => {
+      const save = calls.find((call) => call.method === 'PUT');
+      expect(save?.url).toContain('/admin-api/coupons/7');
+      expect((save?.body as { productIds: string[] }).productIds).toEqual(['31', '42']);
     });
   });
 

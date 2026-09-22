@@ -38,6 +38,15 @@ export interface ConfigFieldDescriptor {
    * descriptor where no field has one renders exactly as it did before.
    */
   section?: string | undefined;
+  /**
+   * Shown as plain text, with no control and no place in the saved payload.
+   *
+   * The value belongs to the deployment rather than to the operator —
+   * `site.publicOrigin` comes from an environment variable. `help` says which
+   * one. The server refuses the key independently, so a stale tab is refused
+   * rather than obeyed.
+   */
+  readOnly?: boolean | undefined;
   /** `asset` only. */
   multiple?: boolean | undefined;
   max?: number | undefined;
@@ -78,9 +87,11 @@ export function isConfigFieldVisible(field: ConfigFieldDescriptor, values: Confi
 /**
  * Builds the payload to save.
  *
- * Every visible non-secret field is included. A `password` field is included
- * only when `secrets[key]` holds something the operator typed, so saving an
- * unrelated setting can never blank out a stored credential.
+ * Every visible, writable, non-secret field is included. A `password` field is
+ * included only when `secrets[key]` holds something the operator typed, so
+ * saving an unrelated setting can never blank out a stored credential; a
+ * `readOnly` field is never included at all, so saving the site name does not
+ * post back an origin the server would then refuse.
  */
 export function buildConfigPayload(
   descriptor: ConfigGroupDescriptor,
@@ -90,6 +101,7 @@ export function buildConfigPayload(
   const payload: ConfigValues = {};
   for (const field of descriptor.fields) {
     if (!isConfigFieldVisible(field, formValues)) continue;
+    if (field.readOnly === true) continue;
     if (field.kind === 'password') {
       const typed = secrets[field.key];
       if (typed !== undefined && typed !== '') payload[field.key] = typed;

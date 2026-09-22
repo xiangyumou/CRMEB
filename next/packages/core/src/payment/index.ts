@@ -1,4 +1,6 @@
 import { registerPaymentPort } from '../order/ports';
+import { registerSitePaymentMethod } from '../system';
+import { isPaymentEnabled, paymentConfig } from './payment.config';
 import { registerPaymentEffects } from './payment.effects';
 import { closeOrderPayments, ensureNoOpenAttempts } from './payment.service';
 
@@ -77,6 +79,7 @@ export {
 
 export {
   NOTIFY_PATHS,
+  isPaymentEnabled,
   paymentConfig,
   paymentCredentials,
   type PaymentConfig,
@@ -110,4 +113,10 @@ export {
 export function registerPaymentDomain(): void {
   registerPaymentPort({ ensureNoOpenAttempts, closeOrderPayments });
   registerPaymentEffects();
+  // `GET /api/v1/site/config` tells the app which pay buttons to draw (CR-7-h2).
+  // It is announced from here, not read from there: `system` is the domain every
+  // other one imports, so an edge back into `payment` would be a cycle — and the
+  // one that existed briefly broke `notification`'s effect handler registration.
+  // A boolean crosses the seam, never a credential.
+  registerSitePaymentMethod('wechat', { group: paymentConfig.group, isEnabled: isPaymentEnabled });
 }

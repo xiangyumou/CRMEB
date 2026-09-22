@@ -67,6 +67,29 @@ export interface ConfigFieldUi {
   visibleWhen?: ConfigVisibleWhen;
   /** Rendered write-only: the current value is never sent to the browser. */
   secret?: boolean;
+  /**
+   * Shown, but not an operator's to change (N1 / CR-1-e2).
+   *
+   * Some settings are facts about the deployment rather than decisions about
+   * the shop — `site.publicOrigin` is the example that prompted this. The
+   * legacy installer wrote `site_url` into `eb_system_config` and the SSL
+   * screen rewrote it, so a shop that moved domains carried `http://localhost`
+   * in its WeChat links until somebody noticed. The value now comes from the
+   * environment, and a field that shows the *current* one while refusing to
+   * save it is honest: leaving it off the screen entirely just makes an
+   * operator hunt for where the wrong value is coming from.
+   *
+   * The screen renders it as plain text with no control, `configSave` refuses
+   * the key with `CONFIG_FIELD_READ_ONLY`, and the two are independent — the
+   * second is what holds for a stale tab or a hand-made request.
+   */
+  readOnly?: boolean;
+  /**
+   * Where a `readOnly` value comes from, e.g. `env:PUBLIC_ORIGIN`. Shown as
+   * help text, because "you cannot edit this" without "and here is what to
+   * edit instead" is an unanswerable screen.
+   */
+  source?: string;
   /** Display order inside the section; ties fall back to declaration order. */
   order?: number;
 }

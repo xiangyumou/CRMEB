@@ -62,7 +62,13 @@ export {
   type SniffedKind,
   type SniffResult,
 } from './file-type';
-export { classifyAddress, safeFetch, SafeFetchError, type SafeFetchResult } from './safe-fetch';
+export {
+  classifyAddress,
+  safeFetch,
+  SafeFetchError,
+  type SafeFetchOptions,
+  type SafeFetchResult,
+} from './safe-fetch';
 export { createS3Storage, signS3Request, S3Error, type S3Options } from './s3';
 export { createScanTokenStore, type ScanTokenStore } from './scan-token';
 export * as attachmentRepo from './storage.repo';

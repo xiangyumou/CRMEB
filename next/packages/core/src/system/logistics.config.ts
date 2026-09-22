@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { defineConfigGroup, type ConfigVisibleWhen } from '../kernel/config-registry';
 
 /** `none` means no tracking at all, so the credentials have nothing to say. */
-const TRACKING_ON: ConfigVisibleWhen = { key: 'provider', equals: ['aliyun-market', 'kuaidi100'] };
+const TRACKING_ON: ConfigVisibleWhen = { key: 'provider', equals: 'aliyun-market' };
 
 /**
  * `logistics` — express tracking.
@@ -13,6 +13,14 @@ const TRACKING_ON: ConfigVisibleWhen = { key: 'provider', equals: ['aliyun-marke
  * 电子面单 (printed waybills) went through 一号通, which is out of scope, so what
  * is left is the tracking query and the default waybill contact — the latter is
  * still worth storing because it is what a shop prints on a return label.
+ *
+ * **One provider, 阿里云云市场** (CR-2-f2). The group offered 快递100 as well and
+ * nothing implemented it: F2 owns the driver, only the market API is in scope,
+ * and the seeded 1101 carrier codes are the market API's. A setting that looks
+ * supported and silently answers nothing is worse than no setting, so the
+ * option, its `customer` field and F2's warn-and-treat-as-`none` branch are all
+ * gone. No legacy value maps to it either — `logistics_type` carries `1`
+ * (aliyun) — which `packages/etl/src/config.test.ts` pins.
  */
 export const logisticsConfig = defineConfigGroup({
   group: 'logistics',
@@ -20,10 +28,9 @@ export const logisticsConfig = defineConfigGroup({
   permission: 'system:config:read',
   schema: z.object({
     /** `none` disables the 物流跟踪 tab rather than showing an empty one. */
-    provider: z.enum(['none', 'aliyun-market', 'kuaidi100']).default('none'),
-    /** Aliyun 云市场 appcode, or the kuaidi100 key. */
+    provider: z.enum(['none', 'aliyun-market']).default('none'),
+    /** Aliyun 云市场 appcode. */
     appCode: z.string().max(128).default(''),
-    customer: z.string().max(128).default(''),
     /** How long a tracking result may be reused. Carriers rate-limit hard. */
     cacheMinutes: z.number().int().min(1).max(1440).default(30),
 
@@ -38,7 +45,6 @@ export const logisticsConfig = defineConfigGroup({
       options: [
         { label: '不启用', value: 'none' },
         { label: '阿里云云市场', value: 'aliyun-market' },
-        { label: '快递100', value: 'kuaidi100' },
       ],
       order: 1,
     },
@@ -48,13 +54,6 @@ export const logisticsConfig = defineConfigGroup({
       secret: true,
       visibleWhen: TRACKING_ON,
       order: 2,
-    },
-    customer: {
-      label: '客户编号',
-      type: 'text',
-      help: '快递100 需要',
-      visibleWhen: { key: 'provider', equals: 'kuaidi100' },
-      order: 3,
     },
     cacheMinutes: {
       label: '查询结果缓存（分钟）',

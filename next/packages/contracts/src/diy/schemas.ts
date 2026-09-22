@@ -111,6 +111,41 @@ export const diyStorefrontPage = z.object({
 });
 export type DiyStorefrontPage = z.infer<typeof diyStorefrontPage>;
 
+/**
+ * 底部导航 — the decorated tab bar (CR-3-h2 §2).
+ *
+ * `navigation` is the saved `pageFoot` component **verbatim**, not a re-shaped
+ * `{ enabled, items }`. `components/pageFooter/index.vue` reads
+ * `effectConfig.tabVal`, `navStyleConfig.tabVal`, `menuList[].imgList`,
+ * `bgColor2.color[0].item`, `fillet.valList[3].val` and a dozen more off the
+ * object it is handed; a tidier shape would be a rewrite of that renderer, and
+ * the rule of this domain is that the saved envelope crosses the wire untouched.
+ *
+ * `null` when the live home page carries no 底部导航. That is a real and common
+ * state — the shop uses the native tab bar — so it is not a 404.
+ */
+export const diyNavigation = z.object({
+  navigation: diyContent.nullable(),
+  version: diyVersion,
+});
+export type DiyNavigation = z.infer<typeof diyNavigation>;
+
+/**
+ * 版式 — which built-in layout 分类页 / 个人中心 use (CR-3-h2 §3).
+ *
+ * A number, not a boolean: `pages/goods_cate/goods_cate.vue` tests
+ * `status == 2 || status == 3`, and the production fixtures carry
+ * `category: 1` and `member: 2`. The CR's `{ status: boolean }` would have
+ * collapsed two of the three values into one.
+ */
+export const diyLayoutType = z.enum(['category', 'user']);
+export type DiyLayoutType = z.infer<typeof diyLayoutType>;
+
+export const diyLayout = z.object({
+  status: z.number().int().min(1).max(3),
+});
+export type DiyLayout = z.infer<typeof diyLayout>;
+
 export const diyThemeTokens = z.record(z.string(), z.unknown());
 
 export const diyStorefrontTheme = z.object({

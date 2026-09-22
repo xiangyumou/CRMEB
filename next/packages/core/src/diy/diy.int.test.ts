@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { themes } from '@shop/db/schema/diy';
 import { createTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Ctx } from '../kernel/context';
@@ -14,10 +15,14 @@ import {
   createPage,
   deleteLink,
   deletePage,
+  diyConfig,
   getHomePage,
+  getLayout,
+  getNavigation,
   getPage,
   getPageVersion,
   getStorefrontPage,
+  getUserCenterPage,
   listLinks,
   listPages,
   listThemes,
@@ -61,6 +66,8 @@ function pageValueOf(fileName: string): Record<string, unknown> {
 }
 
 const PROD_PAGE = pageValueOf('prod-6.json');
+/** `prod-8` is the one production home page with `status = 1`; it carries a 底部导航. */
+const PROD_LIVE_HOME = pageValueOf('prod-8.json');
 
 const RETIRED = JSON.parse(
   readFileSync(path.join(FIXTURES, 'retired-components.json'), 'utf8'),
@@ -399,6 +406,160 @@ describe('the storefront read', () => {
 
     const served = await getHomePage(withHeaders);
     expect(headers.ETag).toBe(`W/"${served.version}"`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+/**
+ * The three public reads the app makes that the four original storefront
+ * routes did not answer (CR-3-h2): 个人中心, 底部导航 and the 版式 switch.
+ *
+ * All three are read through the production fixtures rather than hand-written
+ * content, because what is being asserted is that a real decorated page
+ * survives the trip. The fixtures are the six `eb_diy` rows G1 kept: `prod-8`
+ * is the one home page with `status = 1` and it carries a 底部导航; `prod-3`
+ * and `prod-4` are the two 版式 settings rows, whose values are `1` and `2`.
+ */
+describe('个人中心 / 底部导航 / 版式 (CR-3-h2)', () => {
+  async function seedUserCenter(content = PROD_PAGE) {
+    const page = await createPage(ctx, { name: '个人中心', kind: 'user_center', title: '我的' });
+    await savePageContent(ctx, { id: page.id, content, publish: true });
+    return page;
+  }
+
+  async function seedLiveHome() {
+    const page = await seedHome();
+    await savePageContent(ctx, { id: page.id, content: PROD_LIVE_HOME, publish: true });
+    await setHomePage(ctx, { id: page.id });
+    return page;
+  }
+
+  it('serves 个人中心 in the same envelope as any other page, content untouched', async () => {
+    const page = await seedUserCenter();
+    const served = await getUserCenterPage(ctx);
+
+    expect(served.id).toBe(page.id);
+    expect(served.kind).toBe('user_center');
+    expect(served.title).toBe('我的');
+    // The whole point: the renderer gets the same shape `pages/:id` answers.
+    expect(Object.keys(served).sort()).toEqual(
+      Object.keys(await getStorefrontPage(ctx, { id: page.id })).sort(),
+    );
+    // A real production page round-trips byte for byte, key order included.
+    expect(served.content).toEqual(PROD_PAGE);
+    expect(Object.keys(served.content)).toEqual(Object.keys(PROD_PAGE));
+  });
+
+  it('serves the newest published 个人中心, and ignores a draft beside it', async () => {
+    const published = await seedUserCenter();
+    const draft = await createPage(ctx, { name: '个人中心改版', kind: 'user_center' });
+    await savePageContent(ctx, { id: draft.id, content: {} });
+
+    expect((await getUserCenterPage(ctx)).id).toBe(published.id);
+
+    harness.clock.advance(5000);
+    await savePageContent(ctx, { id: draft.id, content: {}, publish: true });
+    expect((await getUserCenterPage(ctx)).id).toBe(draft.id);
+  });
+
+  it('says nobody has published a 个人中心 rather than "模板不存在"', async () => {
+    await expect(getUserCenterPage(ctx)).rejects.toMatchObject({
+      code: 'DIY_USER_CENTER_PAGE_MISSING',
+    });
+    // A draft is not published, so it does not count.
+    const draft = await createPage(ctx, { name: '个人中心', kind: 'user_center' });
+    await savePageContent(ctx, { id: draft.id, content: {} });
+    await expect(getUserCenterPage(ctx)).rejects.toMatchObject({
+      code: 'DIY_USER_CENTER_PAGE_MISSING',
+    });
+  });
+
+  it('answers 底部导航 with the fixture’s own tab bar, verbatim', async () => {
+    await seedLiveHome();
+    const { navigation } = await getNavigation(ctx);
+
+    // The legacy reader matched `strtolower(name) === 'pagefoot'`; the fixture
+    // stores the component under the key `undefined`, which is exactly why the
+    // lookup is by `name` and not by key.
+    const expected = PROD_LIVE_HOME['undefined'] as Record<string, unknown>;
+    expect(navigation).toEqual(expected);
+    expect((navigation as { menuList: unknown[] }).menuList).toHaveLength(4);
+    // Every field `components/pageFooter/index.vue` reads off it is present.
+    for (const key of ['effectConfig', 'navStyleConfig', 'bgColor2', 'fillet', 'topConfig']) {
+      expect(navigation).toHaveProperty(key);
+    }
+  });
+
+  it('answers null rather than 404 when the shop uses the native tab bar', async () => {
+    // No home page at all: every tabbar page mounts this component, and a shop
+    // mid-setup must not have every screen erroring.
+    await expect(getNavigation(ctx)).resolves.toEqual({ navigation: null, version: '0' });
+
+    const page = await seedHome();
+    await savePageContent(ctx, { id: page.id, content: PROD_PAGE, publish: true });
+    await setHomePage(ctx, { id: page.id });
+    // `prod-6` has a 底部导航; strip it and the answer is still not an error.
+    const withoutFooter = Object.fromEntries(
+      Object.entries(PROD_PAGE).filter(
+        ([, value]) => (value as { name?: string }).name !== 'pageFoot',
+      ),
+    );
+    await savePageContent(ctx, { id: page.id, content: withoutFooter });
+    expect((await getNavigation(ctx)).navigation).toBeNull();
+  });
+
+  it('defaults both 版式 switches when nothing has been configured', async () => {
+    expect(await getLayout(ctx, { type: 'category' })).toEqual({ status: 1 });
+    expect(await getLayout(ctx, { type: 'user' })).toEqual({ status: 1 });
+  });
+
+  it('serves the values the legacy settings rows carried', async () => {
+    // `prod-3` (template_name 'category') holds 1, `prod-4` ('member') holds 2.
+    await ctx.config.set(diyConfig, { categoryLayout: 1, userCenterLayout: 2 });
+    expect(await getLayout(ctx, { type: 'category' })).toEqual({ status: 1 });
+    expect(await getLayout(ctx, { type: 'user' })).toEqual({ status: 2 });
+  });
+
+  /**
+   * The cache is the reason these three exist as their own service, so it is
+   * worth a test that actually proves both halves: that a second read does not
+   * touch the database, and that a publish drops the entry.
+   */
+  it('caches for 60 s and drops the entry the moment an operator publishes', async () => {
+    const page = await seedLiveHome();
+    const first = await getNavigation(ctx);
+    expect(first.navigation).not.toBeNull();
+
+    // Write straight past the service, so only a cache hit can still answer
+    // the old value.
+    await harness.db.db.execute(
+      sql`update diy_pages set content = '{"value":{}}'::jsonb where id = ${Number(page.id)}`,
+    );
+    expect((await getNavigation(ctx)).navigation).toEqual(first.navigation);
+    expect(await harness.redis.get('diy:navigation:v1')).not.toBeNull();
+
+    // A publish invalidates, and the next read is honest again.
+    await publishPage(ctx, { id: page.id });
+    expect(await harness.redis.get('diy:navigation:v1')).toBeNull();
+    expect((await getNavigation(ctx)).navigation).toBeNull();
+  });
+
+  it('drops the 个人中心 entry on a save, a publish and a delete alike', async () => {
+    const page = await seedUserCenter();
+    await getUserCenterPage(ctx);
+    expect(await harness.redis.get('diy:user-center:v1')).not.toBeNull();
+
+    harness.clock.advance(1000);
+    await savePageContent(ctx, { id: page.id, content: {} });
+    expect(await harness.redis.get('diy:user-center:v1')).toBeNull();
+
+    await getUserCenterPage(ctx);
+    await deletePage(ctx, { id: page.id });
+    expect(await harness.redis.get('diy:user-center:v1')).toBeNull();
+    await expect(getUserCenterPage(ctx)).rejects.toMatchObject({
+      code: 'DIY_USER_CENTER_PAGE_MISSING',
+    });
   });
 });
 

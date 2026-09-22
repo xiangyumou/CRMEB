@@ -23,8 +23,10 @@ import { logisticsConfig } from '../system';
  *    carrier that has never heard of the number all come back as
  *    `state: 'unknown'` with no traces, because the caller is an operator
  *    looking at an order and a 500 tells them nothing.
- *  - **`kuaidi100` has no driver** (CR-2-f2). It is treated as unconfigured,
- *    with one warning naming the setting.
+ *  - **阿里云云市场 is the only provider** (CR-2-f2, applied). `logisticsConfig`
+ *    also offered `kuaidi100`, which nothing implemented; the enum no longer
+ *    has it, so the warn-and-treat-as-`none` branch that stood in for the
+ *    missing driver is gone with it and `none` is the only other value.
  *
  * The client is tested against a fake `fetch`. Nothing here ever reaches a real
  * endpoint in a test or a build.
@@ -49,13 +51,6 @@ export function resetTrackingFetch(): void {
 export const logisticsPort: LogisticsPort = {
   async track(ctx, input): Promise<TrackingResult> {
     const config = await ctx.config.get(logisticsConfig);
-    if (config.provider === 'kuaidi100') {
-      ctx.logger.warn(
-        { provider: config.provider },
-        '快递100 没有实现的驱动（CR-2-f2），物流跟踪按未配置处理',
-      );
-      return empty();
-    }
     if (config.provider !== 'aliyun-market' || config.appCode === '') return empty();
 
     const cacheKey = `shipping:tracking:${input.companyCode}:${input.trackingNo}`;

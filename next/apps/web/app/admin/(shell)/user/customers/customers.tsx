@@ -12,7 +12,11 @@ import {
   userAdminUpdate,
 } from '@shop/contracts/user/user.admin.contract';
 import { userGroupList, userLabelList } from '@shop/contracts/user/user.taxonomy.contract';
-import { adminUserForm, type AdminUserListItem } from '@shop/contracts/user/schemas';
+import {
+  adminUserForm,
+  type AdminUserDetail,
+  type AdminUserListItem,
+} from '@shop/contracts/user/schemas';
 
 import { useRouteMutation, useRouteQuery } from '@/admin/api/hooks';
 import { DescriptionsCard } from '@/admin/kit/descriptions-card';
@@ -48,7 +52,13 @@ import { REGISTER_SOURCE, USER_STATUS } from '../user-enums';
  *    added on the next page is selectable here without a deploy.
  */
 export function CustomersPage() {
-  const edit = useFormModal<AdminUserListItem>();
+  // The edit form loads the whole customer first (CR-3-d2). 真实姓名 / 生日 /
+  // 管理员备注 are on the detail and not on the list row, so a form seeded from
+  // the row opened those three blank — and an empty antd box submits `''`,
+  // which the service happily wrote over whatever was stored.
+  const edit = useFormModal<AdminUserListItem, typeof userAdminDetail>({
+    detail: { route: userAdminDetail, params: (row) => ({ id: row.id }), select: editValuesOf },
+  });
   const [detailId, setDetailId] = useState<string | null>(null);
   const [resetting, setResetting] = useState<AdminUserListItem | null>(null);
 
@@ -245,15 +255,6 @@ export function CustomersPage() {
           },
           { kind: 'textarea', name: 'adminRemark', label: '管理员备注', span: 24, rows: 2 },
         ]}
-        initialValues={
-          edit.record
-            ? {
-                ...(edit.record.nickname === null ? {} : { nickname: edit.record.nickname }),
-                groupIds: edit.record.groups.map((group) => group.id),
-                labelIds: edit.record.labels.map((label) => label.id),
-              }
-            : undefined
-        }
         route={userAdminUpdate}
         toInput={(values) => ({ params: { id: edit.record?.id ?? '' }, body: values })}
         invalidate={[userAdminList]}
@@ -265,6 +266,26 @@ export function CustomersPage() {
       <CustomerDrawer id={detailId} onClose={() => setDetailId(null)} />
     </PageContainer>
   );
+}
+
+/**
+ * The detail as `adminUserForm` wants it.
+ *
+ * `null` becomes absent rather than `''`: `exactOptionalPropertyTypes` means an
+ * optional field is either missing or a real value, and the service skips a key
+ * it was not sent — so a customer who never had a 真实姓名 keeps not having one
+ * instead of gaining an empty string. `birthday` is `nullish`, so `null` is a
+ * value the form may legitimately hold and send back.
+ */
+function editValuesOf(user: AdminUserDetail) {
+  return {
+    ...(user.nickname === null ? {} : { nickname: user.nickname }),
+    ...(user.realName === null ? {} : { realName: user.realName }),
+    ...(user.adminRemark === null ? {} : { adminRemark: user.adminRemark }),
+    birthday: user.birthday,
+    groupIds: user.groups.map((group) => group.id),
+    labelIds: user.labels.map((label) => label.id),
+  };
 }
 
 // ---------------------------------------------------------------------------

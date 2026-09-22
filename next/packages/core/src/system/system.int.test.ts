@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { admins } from '@shop/db/schema/auth';
 import { configValues } from '@shop/db/schema/system';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { createAdminSessionStore } from '../auth/admin-session.store';
 import { hashPassword } from '../auth/password';
-import type { Actor, Ctx } from '../kernel/context';
+import { anonymousActor, type Actor, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import {
   adminCreate,
@@ -29,10 +29,17 @@ import {
   roleUpdate,
 } from './role.service';
 import { auditLogList } from './audit.service';
-import { configGet, configGroupList, configSave } from './config.service';
+import { configGet, configGroupList, configSave, describeGroup } from './config.service';
+import { allConfigGroups } from '../kernel/config-registry';
 import { agreementGet } from './agreement.service';
+import { siteConfigGet, siteConfigSourceGroups } from './site.service';
 import { dashboardHeader } from './dashboard';
 import './index';
+// Side-effect import: the same bootstrap `handle()` performs on every request.
+// Without it no domain has registered anything — and `GET /api/v1/site/config`
+// reports the pay buttons that `registerPaymentDomain()` announced, so a test
+// that skipped this would be testing a process no deployment ever runs.
+import '../domains.gen';
 
 /**
  * `system` against a real PostgreSQL and a real Redis.
@@ -403,6 +410,51 @@ describe('config', () => {
     expect(await harness.ctx.db.select().from(configValues)).toHaveLength(0);
   });
 
+  /**
+   * N1's leftover: `site.publicOrigin` is a deployment fact (CR-1-e2).
+   *
+   * The screen renders it as plain text and never submits it — but that is the
+   * half a stale tab or a `curl` does not honour, so the route refuses the key
+   * itself, and refuses it even when the value sent happens to be the current
+   * one.
+   */
+  it('refuses a read-only field, on presence and not on difference', async () => {
+    const ctx = as(superId);
+    const before = await configGet(ctx, { group: 'site' });
+    const current = before.values['publicOrigin'];
+
+    expect(
+      await code(
+        configSave(ctx, { group: 'site' }, { values: { publicOrigin: 'https://evil.test' } }),
+      ),
+    ).toBe('CONFIG_FIELD_READ_ONLY');
+    // Same value back: still refused, and still nothing written.
+    expect(
+      await code(configSave(ctx, { group: 'site' }, { values: { publicOrigin: current } })),
+    ).toBe('CONFIG_FIELD_READ_ONLY');
+    expect(
+      await code(
+        configSave(
+          ctx,
+          { group: 'site' },
+          { values: { siteName: '带着只读字段一起提交', extraOrigins: 'a.test' } },
+        ),
+      ),
+    ).toBe('CONFIG_FIELD_READ_ONLY');
+
+    expect(await harness.ctx.db.select().from(configValues)).toHaveLength(0);
+    expect((await configGet(ctx, { group: 'site' })).values['publicOrigin']).toBe(current);
+  });
+
+  it('describes a read-only field as such, and says where its value comes from', async () => {
+    const { descriptor } = await configGet(as(superId), { group: 'site' });
+    const field = descriptor.fields.find((f) => f.key === 'publicOrigin');
+    expect(field?.readOnly).toBe(true);
+    expect(field?.help).toContain('env:PUBLIC_ORIGIN');
+    // Everything else stays writable, or this flag would be a foot-gun.
+    expect(descriptor.fields.find((f) => f.key === 'siteName')?.readOnly).toBeUndefined();
+  });
+
   it('404s on a group nobody registered', async () => {
     expect(await code(configGet(as(superId), { group: 'no-such-group' }))).toBe(
       'SYSTEM_CONFIG_GROUP_NOT_FOUND',
@@ -422,6 +474,144 @@ describe('config', () => {
       as(superId, { isSuper: false, permissions: ['system:config:read'] }),
     );
     expect(reader.groups.every((g) => g.writable === false)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe('站点公开配置 (CR-7-h2)', () => {
+  /** The anonymous context a storefront request arrives with. */
+  const anonymous = (): Ctx => harness.ctx.as(anonymousActor);
+
+  it('answers a request with no session at all', async () => {
+    // The six legacy calls it replaces all happen before there is one: on
+    // launch, above the sign-in form and on the splash screen.
+    expect(anonymous().actor.kind).toBe('anonymous');
+    const payload = await siteConfigGet(anonymous());
+    expect(payload.name).toBe('CRMEB 商城');
+    expect(payload.version).toBe('0');
+  });
+
+  it('serves what the operator typed, across three config groups', async () => {
+    const ctx = as(superId);
+    await configSave(
+      ctx,
+      { group: 'site' },
+      {
+        values: {
+          siteName: '示例商城',
+          logo: '/uploads/a.png',
+          loginLogo: '/uploads/b.png',
+          shareTitle: '好货不贵',
+          copyrightText: '© 2026 示例',
+          copyrightLink: 'https://example.test',
+          icpNumber: '京ICP备00000000号',
+          contactPhone: '400-000-0000',
+          contactQrcode: '/uploads/support-qrcode.png',
+          splashEnabled: true,
+          splashImage: '/uploads/adv.png',
+          splashSeconds: 5,
+        },
+      },
+    );
+    await configSave(ctx, { group: 'wechat-mini' }, { values: { enabled: false } });
+
+    const payload = await siteConfigGet(anonymous());
+    expect(payload).toMatchObject({
+      name: '示例商城',
+      logo: { main: '/uploads/a.png', login: '/uploads/b.png', square: null },
+      copyright: { text: '© 2026 示例', link: 'https://example.test', imageUrl: null },
+      share: { title: '好货不贵', synopsis: '', image: null },
+      filing: { icpNumber: '京ICP备00000000号' },
+      // No merchant credentials stored, so the cashier shows no pay button.
+      payments: { wechat: false },
+      support: { kind: 'phone', phone: '400-000-0000', qrcodeUrl: '/uploads/support-qrcode.png' },
+      splashAd: { enabled: true, imageUrl: '/uploads/adv.png', link: null, seconds: 5 },
+    });
+    expect(payload.version).not.toBe('0');
+  });
+
+  it('keeps 开屏广告 off while there is no image to show', async () => {
+    // An operator preparing next week's campaign turns the switch on before
+    // the artwork exists; `pages/guide` must not render an empty splash.
+    await configSave(as(superId), { group: 'site' }, { values: { splashEnabled: true } });
+    expect((await siteConfigGet(anonymous())).splashAd.enabled).toBe(false);
+  });
+
+  it('prefers the mini-program 客服 window when the mini-program is on', async () => {
+    await configSave(
+      as(superId),
+      { group: 'wechat-mini' },
+      { values: { enabled: true, contactType: 'mini-program' } },
+    );
+    expect((await siteConfigGet(anonymous())).support.kind).toBe('mini-program');
+  });
+
+  it('caches for a minute and drops the cache the moment a source group is saved', async () => {
+    const ctx = as(superId);
+    await configSave(ctx, { group: 'site' }, { values: { siteName: '第一版' } });
+    expect((await siteConfigGet(anonymous())).name).toBe('第一版');
+
+    // Writing behind the service's back proves the second read was cached…
+    await harness.ctx.db
+      .update(configValues)
+      .set({ value: '第二版' })
+      .where(and(eq(configValues.group, 'site'), eq(configValues.key, 'siteName')));
+    await harness.ctx.config.invalidate('site');
+    expect((await siteConfigGet(anonymous())).name).toBe('第一版');
+
+    // …and that a save through the real path drops it.
+    await configSave(ctx, { group: 'site' }, { values: { siteName: '第三版' } });
+    expect((await siteConfigGet(anonymous())).name).toBe('第三版');
+  });
+
+  it('is built from exactly the three groups that drop its cache', async () => {
+    expect([...siteConfigSourceGroups()].sort()).toEqual(['payment', 'site', 'wechat-mini']);
+  });
+
+  /**
+   * The property the whole route stands on.
+   *
+   * Rather than "we checked the fields we send", every `secret: true` field of
+   * every registered group is given a value that exists nowhere else, written
+   * straight into `config_values` so no schema can refuse it, and the
+   * serialised payload must contain none of them. A future field added to the
+   * payload from a group that happens to hold a credential fails here.
+   */
+  it('cannot leak any secret in any registered group', async () => {
+    const markers: string[] = [];
+    const rows: { group: string; key: string; value: unknown; updatedAt: Date }[] = [];
+    for (const group of allConfigGroups()) {
+      for (const field of describeGroup(group).fields) {
+        if (field.secret !== true) continue;
+        const marker = `LEAKED-${group.group}-${field.key}-${markers.length}`;
+        markers.push(marker);
+        rows.push({
+          group: group.group,
+          key: field.key,
+          value: marker,
+          updatedAt: harness.ctx.clock.now(),
+        });
+      }
+    }
+    // The test is only worth anything if it is actually checking something.
+    expect(markers.length).toBeGreaterThan(5);
+
+    await harness.ctx.db.insert(configValues).values(rows);
+    for (const group of allConfigGroups()) await harness.ctx.config.invalidate(group.group);
+
+    const serialised = JSON.stringify(await siteConfigGet(anonymous()));
+    for (const marker of markers) expect(serialised).not.toContain(marker);
+  });
+
+  it('says WeChat Pay is available only once the credentials are complete', async () => {
+    const ctx = as(superId);
+    expect((await siteConfigGet(anonymous())).payments.wechat).toBe(false);
+
+    // Half a credential is not a payment method: the button would fail at the
+    // till rather than be absent.
+    await configSave(ctx, { group: 'payment' }, { values: { mchId: '1900000109' } });
+    expect((await siteConfigGet(anonymous())).payments.wechat).toBe(false);
   });
 });
 

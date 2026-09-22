@@ -148,7 +148,7 @@ export const systemConfigSave = defineRoute({
   params: configGroupParams,
   body: configSaveBody,
   response: configGroupValues,
-  errors: ['SYSTEM_CONFIG_GROUP_NOT_FOUND', 'SYSTEM_CONFIG_UNKNOWN_KEY'],
+  errors: ['SYSTEM_CONFIG_GROUP_NOT_FOUND', 'SYSTEM_CONFIG_UNKNOWN_KEY', 'CONFIG_FIELD_READ_ONLY'],
   examples: [
     {
       name: 'rename-the-shop',

@@ -5,12 +5,17 @@ import { useState } from 'react';
 import {
   couponAdminCreate,
   couponAdminDelete,
+  couponAdminDetail,
   couponAdminGrant,
   couponAdminList,
   couponAdminSetStatus,
   couponAdminUpdate,
 } from '@shop/contracts/coupon/coupon.admin.contract';
-import { couponTemplateForm, type CouponTemplateListItem } from '@shop/contracts/coupon/schemas';
+import {
+  couponTemplateForm,
+  type CouponTemplateDetail,
+  type CouponTemplateListItem,
+} from '@shop/contracts/coupon/schemas';
 
 import { useRouteMutation } from '@/admin/api/hooks';
 import { ConfirmButton } from '@/admin/kit/confirm-button';
@@ -43,7 +48,17 @@ import { COUPON_CLAIM_MODE, COUPON_SCOPE, COUPON_STATUS, couponFields } from '..
  *    things — the server re-checks the atom declared on each route.
  */
 export function CouponTemplatesPage() {
-  const modal = useFormModal<CouponTemplateListItem>();
+  // The edit form loads the whole template first (CR-3-d2). The list row has
+  // no `productIds` / `categoryIds`, and this page renders no control for
+  // either, so a form seeded from the row would post the schema's `[]` default
+  // and silently unlink every product a scoped coupon applied to.
+  const modal = useFormModal<CouponTemplateListItem, typeof couponAdminDetail>({
+    detail: {
+      route: couponAdminDetail,
+      params: (row) => ({ id: row.id }),
+      select: initialValuesOf,
+    },
+  });
   const [granting, setGranting] = useState<CouponTemplateListItem | null>(null);
 
   const setStatus = useRouteMutation(couponAdminSetStatus, {
@@ -185,7 +200,6 @@ export function CouponTemplatesPage() {
         columns={2}
         schema={couponTemplateForm}
         fields={couponFields}
-        initialValues={modal.record ? initialValuesOf(modal.record) : undefined}
         route={modal.record ? couponAdminUpdate : couponAdminCreate}
         toInput={(values) =>
           modal.record ? { params: { id: modal.record.id }, body: values } : { body: values }
@@ -200,13 +214,21 @@ export function CouponTemplatesPage() {
 }
 
 /**
- * The list row minus the fields the form does not own (`remainingCount`,
+ * The detail minus the fields the form does not own (`remainingCount`,
  * `issuedCount`, `createdAt`), with `null` turned into `undefined`:
  * `exactOptionalPropertyTypes` means an optional field is either absent or a
  * real value, never `null`.
+ *
+ * `productIds` and `categoryIds` are carried through even though no control
+ * renders them: they are part of the update body, so leaving them out means
+ * sending `[]`. They ride in the form's initial values, which antd keeps in
+ * its store whether or not a field registers for them, and come back out of
+ * `onFinish` unchanged.
  */
-function initialValuesOf(row: CouponTemplateListItem) {
+function initialValuesOf(row: CouponTemplateDetail) {
   return {
+    productIds: row.productIds,
+    categoryIds: row.categoryIds,
     name: row.name,
     scope: row.scope,
     claimMode: row.claimMode,

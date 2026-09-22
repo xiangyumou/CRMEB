@@ -72,15 +72,48 @@ export const siteConfig = defineConfigGroup({
     shareImage: z.string().max(512).default(''),
 
     /**
+     * 版权 — the footer line every storefront page renders (CR-7-h2).
+     *
+     * The legacy `copyright()` endpoint answered `nncnL_crmeb_copyright` and
+     * `nncnL_crmeb_copyright_image`; neither key is in the shipped
+     * `crmeb.sql`, so a stock install has nothing here and the footer is
+     * empty, which is what it was before. `copyrightLink` is new: the old
+     * footer was inert text, and an operator who writes a company name almost
+     * always wants it to go somewhere.
+     */
+    copyrightText: z.string().max(255).default(''),
+    copyrightLink: z.string().max(255).default(''),
+    copyrightImage: z.string().max(512).default(''),
+
+    /**
+     * 开屏广告 — `pages/guide` shows this before the home page, once a day.
+     *
+     * **No `legacyKeys`**, deliberately: the legacy value was not an
+     * `eb_system_config` row at all but a `SystemGroupData` blob read through
+     * `getDbCache('open_adv')`, with an array of images and a video link. One
+     * image with a link and a countdown is what the screen actually renders,
+     * so that is what is stored; a shop re-enters it once.
+     *
+     * `splashEnabled` is the switch on its own, rather than "an image means
+     * on": an operator who is preparing next week's campaign needs somewhere
+     * to put the image that is not live.
+     */
+    splashEnabled: z.boolean().default(false),
+    splashImage: z.string().max(512).default(''),
+    splashLink: z.string().max(255).default(''),
+    /** How long the splash stays up before it falls through to the home page. */
+    splashSeconds: z.number().int().min(1).max(30).default(3),
+
+    /**
      * Absolute public origin, no trailing slash, e.g. `https://shop.example.com`.
      *
      * Environment-derived and **not** an operator setting: it is a deployment
      * fact, which is exactly what the legacy installer kept getting wrong when
      * it rewrote `site_url` on every deploy and left shops with
-     * `http://localhost` in their WeChat links. There is no `ui` entry, so the
-     * generic settings screen neither renders nor submits it, and no
-     * `legacyKeys`, because the old value is precisely the one that must not
-     * come across.
+     * `http://localhost` in their WeChat links. Its `ui` entry is `readOnly`,
+     * so the settings screen shows the current value as plain text and
+     * `configSave` refuses the key; there are no `legacyKeys`, because the old
+     * value is precisely the one that must not come across.
      *
      * Empty is the safe default: with no origin an outbound link is dropped
      * rather than sent as a bare path, and `isTrustedHost` trusts nothing.
@@ -132,6 +165,60 @@ export const siteConfig = defineConfigGroup({
       help: '比例 5:4，建议小于 50KB',
       order: 42,
     },
+
+    copyrightText: { label: '版权文字', type: 'text', section: '版权', order: 50 },
+    copyrightLink: {
+      label: '版权链接',
+      type: 'text',
+      section: '版权',
+      help: '留空则版权文字不可点击',
+      order: 51,
+    },
+    copyrightImage: { label: '版权图片', type: 'image', section: '版权', order: 52 },
+
+    splashEnabled: { label: '启用开屏广告', type: 'switch', section: '开屏广告', order: 60 },
+    splashImage: {
+      label: '开屏图片',
+      type: 'image',
+      section: '开屏广告',
+      visibleWhen: { key: 'splashEnabled', equals: true },
+      order: 61,
+    },
+    splashLink: {
+      label: '点击跳转',
+      type: 'text',
+      section: '开屏广告',
+      visibleWhen: { key: 'splashEnabled', equals: true },
+      order: 62,
+    },
+    splashSeconds: {
+      label: '停留秒数',
+      type: 'number',
+      section: '开屏广告',
+      visibleWhen: { key: 'splashEnabled', equals: true },
+      order: 63,
+    },
+
+    // Shown, but nobody's here to change (N1 / CR-1-e2). Leaving them off the
+    // screen entirely was the first draft and it was worse: an operator whose
+    // WeChat links point at the wrong host needs to see *which* host the shop
+    // thinks it is before they can go and fix the variable that says so.
+    publicOrigin: {
+      label: '站点域名',
+      type: 'text',
+      section: '部署',
+      readOnly: true,
+      source: 'env:PUBLIC_ORIGIN',
+      order: 70,
+    },
+    extraOrigins: {
+      label: '其他域名',
+      type: 'text',
+      section: '部署',
+      readOnly: true,
+      source: 'env:EXTRA_ALLOWED_ORIGINS',
+      order: 71,
+    },
   },
   legacyKeys: {
     siteName: 'site_name',
@@ -152,6 +239,8 @@ export const siteConfig = defineConfigGroup({
     shareTitle: 'wechat_share_title',
     shareSummary: 'wechat_share_synopsis',
     shareImage: 'wechat_share_img',
+    copyrightText: 'nncnL_crmeb_copyright',
+    copyrightImage: 'nncnL_crmeb_copyright_image',
   },
 });
 

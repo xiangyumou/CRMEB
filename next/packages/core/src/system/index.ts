@@ -86,6 +86,30 @@ export { mapConfig } from './map.config';
  * asks here rather than keeping its own copy of the answer.
  */
 export { isTrustedHost, publicOrigin, siteConfig } from './site.config';
+/**
+ * `GET /api/v1/site/config` (CR-7-h2) — the six legacy "what did the operator
+ * type into that box" reads, as one public payload.
+ *
+ * `registerSitePaymentMethod` is how a gateway says it is usable *without*
+ * `system` importing it: this domain is a sink and must import none, or
+ * `notification`'s effect handler registers itself under `undefined/undefined`
+ * (see the comment in `site.service.ts`).
+ */
+export {
+  invalidateSiteConfigCache,
+  registerSitePaymentMethod,
+  resetSitePaymentMethods,
+  siteConfigGet,
+  siteConfigSourceGroups,
+  type SitePaymentMethod,
+  type SitePaymentMethodSource,
+} from './site.service';
+/**
+ * `POST /api/v1/attachments/base64` (CR-7-h2) — an attachment endpoint that
+ * lives here because "is this URL ours?" is answered by `site.config.ts`, and
+ * `system` may import `storage` while `storage` may not import `system`.
+ */
+export { attachmentDataUrl } from './attachment.service';
 export { smsConfig } from './sms.config';
 export { wechatMiniConfig } from './wechat-mini.config';
 export { wechatOaConfig } from './wechat-oa.config';

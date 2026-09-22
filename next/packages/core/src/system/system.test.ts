@@ -72,11 +72,28 @@ function siteCtx(values: Partial<SiteConfig>): Ctx {
 }
 
 describe('the public origin (CR-1-e2)', () => {
-  it('is not an operator setting: neither field is on the settings screen', () => {
+  /**
+   * N1's leftover changed the answer here, deliberately.
+   *
+   * Both fields used to be absent from the descriptor altogether. They are now
+   * present and `readOnly`, because hiding them was the worse half of the
+   * trade: an operator whose WeChat links point at `http://localhost` has to be
+   * able to see which host the shop thinks it is before they can go and fix the
+   * variable that says so. "Not an operator setting" is now carried by the flag
+   * and by `configSave` refusing the key (`CONFIG_FIELD_READ_ONLY`, covered in
+   * `system.int.test.ts`), not by the field being invisible.
+   */
+  it('is shown but not editable, and says where its value comes from', () => {
     const descriptor = describeGroup(getConfigGroup('site')!);
-    const keys = descriptor.fields.map((field) => field.key);
-    expect(keys).not.toContain('publicOrigin');
-    expect(keys).not.toContain('extraOrigins');
+    const byKey = new Map(descriptor.fields.map((field) => [field.key, field]));
+
+    expect(byKey.get('publicOrigin')?.readOnly).toBe(true);
+    expect(byKey.get('publicOrigin')?.help).toContain('env:PUBLIC_ORIGIN');
+    expect(byKey.get('extraOrigins')?.readOnly).toBe(true);
+    expect(byKey.get('extraOrigins')?.help).toContain('env:EXTRA_ALLOWED_ORIGINS');
+    // The rest of the group is still an operator's to change.
+    expect(byKey.get('siteName')?.readOnly).toBeUndefined();
+
     // And nothing carries the legacy value across — that is the one value that
     // must not come, because the installer rewrote it on every deploy.
     expect(getConfigGroup('site')!.legacyKeys).not.toHaveProperty('publicOrigin');
@@ -192,13 +209,20 @@ describe('describeGroup', () => {
   it('gives every group a readable title and a permission that exists', () => {
     // A group whose atom is not declared anywhere is a screen only a super
     // admin can open, and nobody finds out until a 客服 account tries.
-    // `:write` is allowed: a group holding a merchant private key (`payment`)
-    // deliberately gates reading behind the write atom, and
-    // `writePermissionFor` returns that same atom rather than inventing one.
+    // A verb other than `:read` is allowed and means "the same atom guards the
+    // save": a group holding a merchant private key (`payment`) gates reading
+    // behind `:write`, and the 装修版式 switch (`diy`, F4) behind `:publish`
+    // because flipping it changes what every shopper sees. `writePermissionFor`
+    // returns such an atom unchanged rather than inventing one, so the only
+    // derived atom is `:read` → `:write`, and that one must exist too.
     for (const group of allConfigGroups()) {
       const descriptor = describeGroup(group);
       expect(descriptor.title.length, group.group).toBeGreaterThan(0);
-      expect(descriptor.permission, group.group).toMatch(/^[a-z-]+:[a-z-]+:(read|write)$/);
+      expect(descriptor.permission, group.group).toMatch(/^[a-z-]+:[a-z-]+:[a-z]+$/);
+      if (descriptor.permission.endsWith(':read')) {
+        const write = descriptor.permission.replace(/:read$/, ':write');
+        expect(isKnownPermission(write), write).toBe(true);
+      }
       expect(isKnownPermission(descriptor.permission), descriptor.permission).toBe(true);
       expect(descriptor.fields.length, group.group).toBeGreaterThan(0);
     }

@@ -308,3 +308,79 @@ describe('<ConfigGroupForm> rendering', () => {
     expect(screen.queryByTestId('secret-input-apiSecret')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * Read-only fields (N1 / CR-1-e2).
+ *
+ * `site.publicOrigin` comes from the environment. Leaving it off the screen
+ * was the first draft and it was worse: an operator whose WeChat links point
+ * at the wrong host has to be able to see which host the shop thinks it is.
+ * So it is shown, as text, next to the variable that decides it — and it never
+ * reaches the payload.
+ */
+const deployDescriptor: ConfigGroupDescriptor = {
+  group: 'site',
+  title: '站点设置',
+  fields: [
+    { key: 'siteName', label: '站点名称', kind: 'text' },
+    {
+      key: 'publicOrigin',
+      label: '站点域名',
+      kind: 'text',
+      readOnly: true,
+      help: '由部署环境决定：env:PUBLIC_ORIGIN',
+    },
+    { key: 'extraOrigins', label: '其他域名', kind: 'text', readOnly: true },
+  ],
+};
+
+const deployValues = { siteName: '示例商城', publicOrigin: 'https://shop.example.com' };
+
+describe('<ConfigGroupForm> read-only fields', () => {
+  it('renders the value as text, with no control to type into', () => {
+    stubSave();
+    renderAdmin(
+      <ConfigGroupForm descriptor={deployDescriptor} values={deployValues} route={saveRoute} />,
+    );
+
+    expect(screen.getByTestId('readonly-value-publicOrigin')).toHaveTextContent(
+      'https://shop.example.com',
+    );
+    // No control at all — not a disabled one, which reads as "not yet".
+    expect(screen.queryByLabelText('站点域名')).not.toBeInTheDocument();
+    // And the writable field beside it is untouched.
+    expect(screen.getByLabelText('站点名称')).toHaveValue('示例商城');
+  });
+
+  it('says where the value comes from', () => {
+    stubSave();
+    renderAdmin(
+      <ConfigGroupForm descriptor={deployDescriptor} values={deployValues} route={saveRoute} />,
+    );
+    expect(screen.getByText('由部署环境决定：env:PUBLIC_ORIGIN')).toBeInTheDocument();
+  });
+
+  it('shows 未设置 rather than an empty line when the environment said nothing', () => {
+    stubSave();
+    renderAdmin(
+      <ConfigGroupForm descriptor={deployDescriptor} values={deployValues} route={saveRoute} />,
+    );
+    expect(screen.getByTestId('readonly-value-extraOrigins')).toHaveTextContent('未设置');
+  });
+
+  it('never submits a read-only key, so the server has nothing to refuse', async () => {
+    const user = userEvent.setup();
+    const { bodies } = stubSave();
+    renderAdmin(
+      <ConfigGroupForm descriptor={deployDescriptor} values={deployValues} route={saveRoute} />,
+    );
+
+    await user.clear(screen.getByLabelText('站点名称'));
+    await user.type(screen.getByLabelText('站点名称'), '改过的名称');
+    await user.click(screen.getByRole('button', { name: zhName('保存') }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    const sent = (bodies[0] as { values: Record<string, unknown> }).values;
+    expect(sent).toEqual({ siteName: '改过的名称' });
+  });
+});

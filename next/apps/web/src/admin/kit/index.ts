@@ -49,9 +49,12 @@ export type { ZodFormProps } from './form/zod-form';
 export { DrawerForm, ModalForm, useFormModal } from './form/modal-form';
 export type {
   DrawerFormProps,
+  EntityFormLoad,
   EntityFormProps,
   FormModalController,
+  FormModalDetail,
   ModalFormProps,
+  UseFormModalOptions,
 } from './form/modal-form';
 export { MoneyInput } from './form/money-input';
 export type { MoneyInputProps } from './form/money-input';

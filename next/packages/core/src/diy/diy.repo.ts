@@ -82,6 +82,29 @@ export async function findHomePage(db: DbOrTx): Promise<DiyPageRow | null> {
   return rows[0] ?? null;
 }
 
+/**
+ * The newest published page of a kind, for the storefront surfaces that have
+ * no id of their own — 个人中心 is asked for by name, not by number (CR-3-h2).
+ *
+ * Newest by `updated_at`, because nothing marks one `user_center` page as the
+ * live one the way `is_home` does for the home page: the legacy data had a
+ * single 个人中心 settings row and the new editor lets an operator keep drafts
+ * beside it, so "the one most recently worked on and published" is the only
+ * answer that does not need a new column.
+ */
+export async function findLatestPublishedOfKind(
+  db: DbOrTx,
+  kind: DiyPageKindValue,
+): Promise<DiyPageRow | null> {
+  const rows = await db
+    .select()
+    .from(diyPages)
+    .where(and(eq(diyPages.kind, kind), eq(diyPages.status, 'published'), live))
+    .orderBy(desc(diyPages.updatedAt), desc(diyPages.id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export interface NewDiyPageInput {
   name: string;
   kind: DiyPageKindValue;

@@ -355,6 +355,13 @@ export const configFieldDescriptor = z.object({
    * flag, and saving without retyping leaves the stored secret alone.
    */
   secret: z.boolean().optional(),
+  /**
+   * Shown but not editable: an environment-derived deployment fact rather than
+   * an operator's decision (N1 / CR-1-e2). The form renders the value as plain
+   * text, `help` says where it comes from, and the save route refuses the key
+   * with `CONFIG_FIELD_READ_ONLY`.
+   */
+  readOnly: z.boolean().optional(),
 });
 export type ConfigFieldDescriptor = z.infer<typeof configFieldDescriptor>;
 
@@ -462,6 +469,163 @@ export const agreementExample: Agreement = {
 };
 
 export const agreementParams = z.object({ key: agreementKey });
+
+// ---------------------------------------------------------------------------
+// the shop's own public settings
+// ---------------------------------------------------------------------------
+
+/**
+ * What the storefront may read of the operator's own settings (CR-7-h2).
+ *
+ * **One route, not six.** The legacy app asked six endpoints — `basicConfig`,
+ * `getLogo`, `getShare`, `getCrmebCopyRight`, `getCustomerType`, `getOpenAdv` —
+ * for what is one row in the console, on the first screen a cold visitor sees.
+ * They are folded into one payload the app fetches once and caches by
+ * `version`.
+ *
+ * **Nothing secret is in here, by construction.** Every value is a field of the
+ * `site`, `wechat-mini` or `payment` config group whose descriptor is *not*
+ * `secret`, and `payments` carries booleans only: whether WeChat Pay is
+ * configured, never a merchant id and never a key. `system.int.test.ts` states
+ * that as a property over the whole registry rather than as a review habit.
+ */
+const siteText = z.string();
+/** An asset URL, or `null` when the operator never filled that box in. */
+const siteAsset = z.string().nullable();
+
+export const sitePublicConfig = z.object({
+  name: siteText,
+  /**
+   * Four slots, because the app renders four different logos: the header
+   * (`App.vue`), the sign-in form (`pages/users/login`), the square icon a
+   * share card uses, and the browser favicon on H5.
+   */
+  logo: z.object({
+    main: siteAsset,
+    login: siteAsset,
+    square: siteAsset,
+    favicon: siteAsset,
+  }),
+  copyright: z.object({
+    text: siteText,
+    /** Where the 版权 line points, or `null` for inert text. */
+    link: z.string().nullable(),
+    imageUrl: siteAsset,
+  }),
+  /** Defaults for `wx.updateAppMessageShareData`. */
+  share: z.object({ title: siteText, synopsis: siteText, image: siteAsset }),
+  /** 备案 — the footer the 工信部 requires on a Chinese site. */
+  filing: z.object({
+    icpNumber: siteText,
+    icpUrl: siteText,
+    publicSecurityNumber: siteText,
+    publicSecurityUrl: siteText,
+  }),
+  /**
+   * Which payment buttons the cashier may show. Booleans only, derived from
+   * whether the gateway's credentials are complete. WeChat Pay v3 is the only
+   * gateway in scope, so it is the only key; the app's mapper treats every
+   * other legacy flag as `0`.
+   */
+  payments: z.object({ wechat: z.boolean() }),
+  /**
+   * The 客服 entry. `mini-program` means "open the mini-program's own chat",
+   * `phone` means "dial `phone`", `none` means the button is not rendered.
+   * `qrcodeUrl` is the 客服二维码 `components/kefuIcon` shows on H5 and is
+   * independent of `kind` — a shop can have both.
+   */
+  support: z.object({
+    kind: z.enum(['none', 'phone', 'mini-program']),
+    phone: z.string().nullable(),
+    qrcodeUrl: siteAsset,
+  }),
+  /** `pages/guide`'s splash. `enabled: false` means go straight to the home page. */
+  splashAd: z.object({
+    enabled: z.boolean(),
+    imageUrl: siteAsset,
+    link: z.string().nullable(),
+    seconds: z.number().int().min(1),
+  }),
+  /**
+   * Changes whenever any of the source groups is saved. The app keeps the
+   * payload in storage and re-fetches only when this string moves; it is also
+   * the `ETag`.
+   */
+  version: z.string(),
+});
+export type SitePublicConfig = z.infer<typeof sitePublicConfig>;
+
+export const sitePublicConfigExample: SitePublicConfig = {
+  name: 'CRMEB 商城',
+  logo: {
+    main: '/uploads/site/2026/09/2f8c1d.png',
+    login: '/uploads/site/2026/09/7ab319.png',
+    square: null,
+    favicon: null,
+  },
+  copyright: {
+    text: '© 2026 示例科技有限公司',
+    link: 'https://example.test',
+    imageUrl: null,
+  },
+  share: {
+    title: '示例商城',
+    synopsis: '好货不贵',
+    image: '/uploads/site/2026/09/5c0de1.png',
+  },
+  filing: {
+    icpNumber: '京ICP备00000000号',
+    icpUrl: 'https://beian.miit.gov.cn/',
+    publicSecurityNumber: '',
+    publicSecurityUrl: '',
+  },
+  payments: { wechat: true },
+  support: { kind: 'phone', phone: '400-000-0000', qrcodeUrl: null },
+  splashAd: {
+    enabled: true,
+    imageUrl: '/uploads/site/2026/09/a91f22.png',
+    link: '/pages/goods_details/index?id=12',
+    seconds: 3,
+  },
+  version: '1758500000000',
+};
+
+// ---------------------------------------------------------------------------
+// 图片转 base64
+// ---------------------------------------------------------------------------
+
+/**
+ * One image, by URL, that the server is asked to fetch on the caller's behalf.
+ *
+ * A relative path is the normal case and the preferred one: `/uploads/…` is
+ * unambiguously ours, so there is nothing for the server to adjudicate. An
+ * absolute URL is accepted too — the app sometimes holds one — but only when
+ * its host is this deployment's, which is what the service checks.
+ *
+ * 255 characters, the same ceiling every stored asset URL has.
+ */
+export const attachmentDataUrlBody = z.object({
+  url: z.string().min(1).max(255),
+});
+export type AttachmentDataUrlBody = z.infer<typeof attachmentDataUrlBody>;
+
+/**
+ * `data:image/png;base64,…`.
+ *
+ * The whole image, inline, which is the point: the canvas that draws a 海报
+ * cannot read pixels from a cross-origin `<image>`, so the bytes have to arrive
+ * in the document. Capped at 2 MB of source, so the response is about 2.7 MB at
+ * worst.
+ */
+export const attachmentDataUrl = z.object({
+  dataUrl: z.string(),
+});
+export type AttachmentDataUrl = z.infer<typeof attachmentDataUrl>;
+
+export const attachmentDataUrlExample: AttachmentDataUrl = {
+  dataUrl:
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+};
 
 // ---------------------------------------------------------------------------
 // dashboard header

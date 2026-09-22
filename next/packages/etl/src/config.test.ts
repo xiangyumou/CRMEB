@@ -406,3 +406,29 @@ describe('parked claims', () => {
     expect(isDroppedConfigKey('order_activity_time')).toBe(true);
   });
 });
+
+describe('物流查询服务 (CR-2-f2)', () => {
+  it('no legacy logistics_type value can land on 快递100', () => {
+    // The option is gone from `logisticsConfig.provider`, and the reason it
+    // could go without a data decision is that nothing migrates onto it: the
+    // legacy column carries `1` (阿里云云市场). This pins that — every spelling
+    // the old form could have written is checked against the *live* registry,
+    // so re-adding the value to the enum without re-reading this test fails.
+    const logistics = allConfigGroups().find((group) => group.group === 'logistics');
+    expect(logistics?.legacyKeys?.['provider']).toBe('logistics_type');
+
+    for (const raw of ['"1"', '"2"', '"0"', '"kuaidi100"', '"aliyun-market"']) {
+      const { values } = mapConfig([row('logistics_type', raw)], {
+        now: NOW,
+        allowInvalid: true,
+      });
+      const provider = values.filter((v) => v.group === 'logistics' && v.key === 'provider');
+      expect(provider.map((v) => v.value)).not.toContain('kuaidi100');
+    }
+  });
+
+  it('the group no longer carries the 快递100-only 客户编号 field', () => {
+    const logistics = allConfigGroups().find((group) => group.group === 'logistics');
+    expect(Object.keys(logistics?.schema.shape ?? {})).not.toContain('customer');
+  });
+});

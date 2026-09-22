@@ -16,6 +16,7 @@ import {
 } from '../kernel/config-registry';
 import { DomainError } from '../kernel/errors';
 import { hasPermission } from '../auth/rbac';
+import { invalidateSiteConfigCache } from './site.service';
 import * as repo from './system.repo';
 // The gen'd bucket: `defineConfigGroup` registers as a side effect of its
 // module being imported, so this is what makes a group exist. `pnpm gen`
@@ -56,19 +57,35 @@ const FIELD_KIND: Record<ConfigFieldType, ConfigFieldDescriptor['kind']> = {
   json: 'json',
 };
 
+/**
+ * A read-only field's help text always says where the value does come from.
+ *
+ * "You cannot change this here" on its own is an unanswerable screen: the
+ * operator still has `http://localhost` in their WeChat links and now no idea
+ * where it is written. `source` names the environment variable. A group that
+ * also wrote `help` keeps it, with the source appended.
+ */
+function helpFor(ui: ConfigFieldUi): string | undefined {
+  if (ui.readOnly !== true || ui.source === undefined) return ui.help;
+  const source = `由部署环境决定：${ui.source}`;
+  return ui.help === undefined ? source : `${ui.help}（${source}）`;
+}
+
 function fieldDescriptor(key: string, ui: ConfigFieldUi): ConfigFieldDescriptor {
   const secret = ui.secret === true || ui.type === 'password';
+  const help = helpFor(ui);
   return {
     key,
     label: ui.label,
     kind: secret ? 'password' : FIELD_KIND[ui.type],
-    ...(ui.help === undefined ? {} : { help: ui.help }),
+    ...(help === undefined ? {} : { help }),
     ...(ui.placeholder === undefined ? {} : { placeholder: ui.placeholder }),
     ...(ui.options === undefined ? {} : { options: ui.options.map((o) => ({ ...o })) }),
     ...(ui.section === undefined ? {} : { section: ui.section }),
     ...(ui.type === 'images' || ui.type === 'multi-select' ? { multiple: true } : {}),
     ...(ui.visibleWhen === undefined ? {} : { visibleWhen: { ...ui.visibleWhen } }),
     ...(secret ? { secret: true } : {}),
+    ...(ui.readOnly === true ? { readOnly: true } : {}),
   };
 }
 
@@ -99,6 +116,20 @@ function secretKeys(def: ConfigGroupDef): Set<string> {
   const out = new Set<string>();
   for (const [key, ui] of Object.entries(def.ui as Record<string, ConfigFieldUi | undefined>)) {
     if (ui && (ui.secret === true || ui.type === 'password')) out.add(key);
+  }
+  return out;
+}
+
+/**
+ * Which keys of a group the deployment decides rather than an operator.
+ *
+ * The screen renders these as plain text and never submits them; this is the
+ * half that holds for a stale tab or a hand-made request (N1 / CR-1-e2).
+ */
+function readOnlyKeys(def: ConfigGroupDef): Set<string> {
+  const out = new Set<string>();
+  for (const [key, ui] of Object.entries(def.ui as Record<string, ConfigFieldUi | undefined>)) {
+    if (ui?.readOnly === true) out.add(key);
   }
   return out;
 }
@@ -175,6 +206,17 @@ export async function configSave(
     throw new DomainError('SYSTEM_CONFIG_UNKNOWN_KEY', { details: { keys: unknown } });
   }
 
+  // Refused on presence, not on difference. "You may send it as long as it
+  // matches" would mean the value is settable the moment the environment
+  // changes underneath a tab that is still open, and it would hide the bug
+  // this exists to surface: a caller that thinks `site.publicOrigin` is its to
+  // write is wrong even when it happens to send the right string.
+  const frozen = readOnlyKeys(def);
+  const attempted = Object.keys(body.values).filter((key) => frozen.has(key));
+  if (attempted.length > 0) {
+    throw new DomainError('CONFIG_FIELD_READ_ONLY', { details: { keys: attempted } });
+  }
+
   const secrets = secretKeys(def);
   const patch: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body.values)) {
@@ -190,6 +232,10 @@ export async function configSave(
   // `set` validates the *whole* merged group, so a patch that would leave the
   // group invalid is refused rather than half-written.
   await ctx.config.set(def, patch as never, { updatedBy: adminIdOrNull(ctx) });
+  // The storefront's `GET /api/v1/site/config` is a 60-second Redis cache over
+  // three of these groups; saving one of them drops it so the operator sees
+  // their change in the app now rather than within the minute (CR-7-h2).
+  await invalidateSiteConfigCache(ctx, def.group);
   ctx.logger.info(
     { group: def.group, keys: Object.keys(patch).filter((k) => !secrets.has(k)) },
     'config group saved',

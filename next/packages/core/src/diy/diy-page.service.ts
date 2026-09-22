@@ -11,6 +11,7 @@ import type { DiyPageValue } from '@shop/contracts/diy/schema/page';
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { cleanDiyData } from './compatibility';
+import { invalidateDiyStorefrontCache } from './diy.cache';
 import {
   assertProductLimits,
   contentVersionOf,
@@ -101,8 +102,12 @@ function toDetail(row: repo.DiyPageRow): DiyPageDetail {
   };
 }
 
-/** The storefront view: cleaned, and without anything only an operator cares about. */
-function toStorefront(row: repo.DiyPageRow): DiyStorefrontPage {
+/**
+ * The storefront view: cleaned, and without anything only an operator cares
+ * about. Exported for `diy-storefront.service.ts`, which answers 个人中心 and
+ * 底部导航 off the same rows and must produce the identical envelope.
+ */
+export function toStorefront(row: repo.DiyPageRow): DiyStorefrontPage {
   return {
     id: String(row.id),
     name: row.name,
@@ -171,6 +176,7 @@ export async function updatePage(
   }
   const next = await repo.updatePage(ctx.db, row.id, patch, ctx.clock.now());
   if (!next) throw new DomainError('DIY_PAGE_NOT_FOUND');
+  await invalidateDiyStorefrontCache(ctx);
   return toDetail(next);
 }
 
@@ -213,6 +219,9 @@ export async function savePageContent(
     // The guard failed, so somebody else saved between the read and the write.
     throw new DomainError('DIY_VERSION_CONFLICT', { details: { current: null } });
   }
+  // 底部导航 and 个人中心 are cached reads off these rows (CR-3-h2); an operator
+  // who saves must see the change in the app now, not within the minute.
+  await invalidateDiyStorefrontCache(ctx);
   return toDetail(next);
 }
 
@@ -229,6 +238,7 @@ export async function publishPage(ctx: Ctx, input: { id: string }): Promise<DiyP
     now,
   );
   if (!next) throw new DomainError('DIY_PAGE_NOT_FOUND');
+  await invalidateDiyStorefrontCache(ctx);
   return toDetail(next);
 }
 
@@ -245,6 +255,7 @@ export async function setHomePage(ctx: Ctx, input: { id: string }): Promise<DiyP
       await repo.updatePage(tx, row.id, { status: 'published', publishedAt: now }, now);
     }
   });
+  await invalidateDiyStorefrontCache(ctx);
   return toDetail(await loadPage(ctx, input.id));
 }
 
@@ -255,6 +266,7 @@ export async function deletePage(ctx: Ctx, input: { id: string }): Promise<{ ok:
   if (row.isHome) throw new DomainError('DIY_PAGE_UNDELETABLE');
   const ok = await repo.softDeletePage(ctx.db, row.id, ctx.clock.now());
   if (!ok) throw new DomainError('DIY_PAGE_NOT_FOUND');
+  await invalidateDiyStorefrontCache(ctx);
   return { ok: true };
 }
 
@@ -310,6 +322,7 @@ export async function restorePageDefault(ctx: Ctx, input: { id: string }): Promi
     now,
   );
   if (!next) throw new DomainError('DIY_PAGE_NOT_FOUND');
+  await invalidateDiyStorefrontCache(ctx);
   return toDetail(next);
 }
 

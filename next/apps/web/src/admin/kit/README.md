@@ -222,6 +222,37 @@ scrollX / size / expandable / emptyText / title / bordered / onData
 
 替代老后台的 `$modalForm`。props 同 `ZodForm` 的 schema/fields/initialValues，外加 `route` `toInput` `invalidate` `successMessage` `onSuccess` `width` `columns`。提交中禁用、成功后自动关闭并失效列表。配 `useFormModal<T>()` 拿 `{ open, record, show(record?), close, props }`。
 
+#### 编辑表单必须先把整条记录读回来（CR-3-d2）
+
+**列表行不是记录。** 列表路由只回列上看得见的字段，更新路由收的是整条记录：拿列表行当
+`initialValues` 打开表单，列表没带的字段就按 schema 默认值提交回去——预售活动上这意味着
+一份空的 规格 列表，和一次「我只改了标题」的保存删光了活动上所有预售价。
+
+所以给 `useFormModal` 一个 `detail`，编辑对话框就会先读详情再渲染：
+
+```tsx
+const modal = useFormModal<PresaleActivityListItem, typeof presaleAdminActivityDetail>({
+  detail: {
+    route: presaleAdminActivityDetail,
+    params: (row) => ({ id: row.id }),
+    // 详情行 → 表单值；形状本来就一致时可以不写
+    select: initialValuesOf,
+  },
+});
+
+<ModalForm {...modal.props} route={modal.record ? update : create} … />;
+```
+
+`modal.props` 在编辑时带上 `load`，新建时不带——新建对话框照旧立刻打开，一个请求都不发。
+
+三个状态由 kit 负责，页面不用管：详情在途时是骨架屏且**没有保存按钮**；失败时是错误原因
+加一个「重试」；成功后字段才挂载，且挂载时值已经在里面。**永远不会出现填了一半的表单**，
+也没有任何一个往已经渲染的表单里灌值的 `useEffect`——那正是出错的地方。
+
+也可以直接写 `<ModalForm load={{ route, params, select? }}>`；`useFormModal({ detail })` 只是
+替你把它接好。`select` 的返回类型是普通对象（控制器并不知道 body schema），所以页面上的
+`initialValuesOf` 请自己写好返回类型标注——那是字段写错能被编译器抓住的地方。
+
 ### AssetPicker
 
 素材库弹窗：左侧分类树、中间分页图片网格、拖拽/多选上传，返回契约的 `asset` 对象。

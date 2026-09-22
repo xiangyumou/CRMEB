@@ -167,7 +167,9 @@ export function ConfigGroupForm<R extends AnyRouteDef>({
             <Row gutter={16}>
               {fields.map((field) => (
                 <Col key={field.key} xs={24} md={field.span ?? defaultSpan}>
-                  {field.kind === 'password' ? (
+                  {field.readOnly === true ? (
+                    <ReadOnlyField field={field} value={values?.[field.key]} />
+                  ) : field.kind === 'password' ? (
                     <SecretField
                       field={field}
                       isSet={Boolean(values?.[field.key])}
@@ -230,6 +232,42 @@ function groupBySection(
     bucket.push(field);
   }
   return runs;
+}
+
+/**
+ * A deployment fact, shown and not edited (N1 / CR-1-e2).
+ *
+ * No `name`, deliberately: the field never joins the form's values, so it
+ * cannot be submitted even by a `buildConfigPayload` that forgot to skip it,
+ * and `applyApiErrorToForm` has no field to attach an error to. A disabled
+ * `<Input>` would have been fewer lines and the wrong shape — it reads as "you
+ * may not do this *yet*", and antd still carries a disabled field's value in
+ * the payload.
+ *
+ * `help` carries the source (`由部署环境决定：env:PUBLIC_ORIGIN`), which the
+ * server folded in, so the screen answers "then where do I change it".
+ */
+function ReadOnlyField({ field, value }: { field: ConfigFieldDescriptor; value: unknown }) {
+  return (
+    <Form.Item label={field.label} extra={field.help}>
+      <Typography.Text
+        {...(value === undefined || value === null || value === ''
+          ? ({ type: 'secondary' } as const)
+          : {})}
+        data-testid={`readonly-value-${field.key}`}
+        style={{ wordBreak: 'break-all' }}
+      >
+        {readOnlyText(value)}
+      </Typography.Text>
+    </Form.Item>
+  );
+}
+
+function readOnlyText(value: unknown): string {
+  if (value === undefined || value === null || value === '') return '未设置';
+  if (typeof value === 'boolean') return value ? '是' : '否';
+  if (Array.isArray(value)) return value.length === 0 ? '未设置' : value.join('、');
+  return String(value);
 }
 
 function SecretField({

@@ -10,6 +10,9 @@
  * | `getStorefrontPage`   | H      | any other decorated page, by id                            |
  * | `getPageVersion`      | H      | the cheap poll on resume, before re-downloading a page     |
  * | `getActiveTheme`      | H      | the colour tokens the renderer applies globally            |
+ * | `getUserCenterPage`   | H      | 个人中心 — `GET /api/v1/diy/pages/user-center`              |
+ * | `getNavigation`       | H      | 底部导航 — `GET /api/v1/diy/navigation`                      |
+ * | `getLayout`           | H      | the 版式 switch — `GET /api/v1/diy/layouts/:type`           |
  * | `cleanDiyData`        | H      | only if a page is read outside these functions; they clean |
  * | `isRemovedStorefrontPage` | F2 | when deciding whether a link target still exists           |
  *
@@ -57,6 +60,12 @@ export {
 } from './diy-page.service';
 
 export { activateTheme, getActiveTheme, listThemes, updateTheme } from './theme.service';
+
+export { diyConfig } from './diy.config';
+
+export { invalidateDiyStorefrontCache } from './diy.cache';
+
+export { getLayout, getNavigation, getUserCenterPage } from './diy-storefront.service';
 
 export {
   createLink,
