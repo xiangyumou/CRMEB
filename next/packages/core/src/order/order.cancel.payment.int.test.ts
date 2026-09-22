@@ -17,6 +17,7 @@ import {
 } from '@shop/testing';
 import { resetEffectHandlers } from '../effects';
 import { registerCatalogDomain, stockAndSalesOf } from '../catalog';
+import { registerShippingFreightPort } from '../shipping';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import {
@@ -89,6 +90,7 @@ beforeEach(async () => {
 
   resetOrderPorts();
   registerCatalogDomain();
+  registerShippingFreightPort();
   registerOrderStateMachine(orderStateMachine);
   // The real thing, not `fakePaymentPort`. This is the whole point of the file.
   registerPaymentDomain();

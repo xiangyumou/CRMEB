@@ -8,6 +8,7 @@ import { admins } from '@shop/db/schema/auth';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, forkTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
 import { registerCatalogDomain } from '../catalog';
+import { registerShippingFreightPort } from '../shipping';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { Money } from '../kernel/money';
@@ -53,6 +54,7 @@ beforeEach(async () => {
   harness.queue.reset();
   resetOrderPorts();
   registerCatalogDomain();
+  registerShippingFreightPort();
   resetFulfilmentPorts();
   registerOrderStateMachine(orderStateMachine);
   installFulfilmentHooks();

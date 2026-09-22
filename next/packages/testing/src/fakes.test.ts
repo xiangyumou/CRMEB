@@ -56,7 +56,7 @@ describe('flatRateFreight', () => {
       volume: 0,
       amountFen: 100,
     });
-    const quote = await port.quote(ctx, {
+    const quote = await port.quote(ctx, ctx, {
       addressCityId: 1,
       lines: [line(1), line(2), line(3)],
     });
@@ -67,11 +67,11 @@ describe('flatRateFreight', () => {
   });
 
   it('handles an empty cart and a free quote', async () => {
-    expect(await flatRateFreight(500).quote(ctx, { addressCityId: null, lines: [] })).toEqual({
+    expect(await flatRateFreight(500).quote(ctx, ctx, { addressCityId: null, lines: [] })).toEqual({
       totalFen: 0,
       perLine: [],
     });
-    const free = await freeFreight().quote(ctx, {
+    const free = await freeFreight().quote(ctx, ctx, {
       addressCityId: null,
       lines: [
         { skuId: 1, quantity: 1, freightTemplateId: null, weight: 0, volume: 0, amountFen: 1 },

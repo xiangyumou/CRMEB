@@ -5,7 +5,6 @@ import type { SkuForSale } from './catalog.port';
 import {
   couponAdjustment,
   distribute,
-  fallbackFreightQuote,
   freightLineOf,
   goodsTotalOf,
   lineSubtotal,
@@ -243,24 +242,5 @@ describe('freightLineOf', () => {
     const line = freightLineOf({ sku: sku(), quantity: 1, subtotal: yuan('1.00') });
     expect(line.weight).toBe(0);
     expect(line.volume).toBe(0);
-  });
-});
-
-describe('fallbackFreightQuote', () => {
-  it('charges a fixed amount once per product, not per line and not per unit', () => {
-    const one = sku({ skuId: 1, productId: 10, freightMode: 'fixed', fixedFreight: '8.00' });
-    const two = sku({ skuId: 2, productId: 10, freightMode: 'fixed', fixedFreight: '8.00' });
-    const quote = fallbackFreightQuote([{ sku: one }, { sku: two }]);
-
-    expect(quote.perLine).toEqual([800, 0]);
-    expect(quote.totalFen).toBe(800);
-  });
-
-  it('quotes free shipping and an unowned template at zero', () => {
-    const quote = fallbackFreightQuote([
-      { sku: sku({ freightMode: 'free' }) },
-      { sku: sku({ skuId: 2, productId: 11, freightMode: 'template', shippingTemplateId: 3 }) },
-    ]);
-    expect(quote.totalFen).toBe(0);
   });
 });

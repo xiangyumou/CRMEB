@@ -206,33 +206,6 @@ export function freightLineOf(line: {
   };
 }
 
-/**
- * What freight costs while stream F2 has not registered a `FreightPort`.
- *
- * It honours the two modes that need no shipping template — `free` and the
- * per-product `fixed` amount — and quotes `template` at zero, because the
- * template rules (region tables, 满额包邮, first-piece/extra-piece) are F2's
- * work and guessing at them would be worse than quoting nothing. A `fixed`
- * amount is charged **once per product**, not per unit, which is what
- * `products.fixed_freight` has always meant.
- *
- * The moment F2 registers a port this function stops being called; nothing
- * else in checkout changes.
- */
-export function fallbackFreightQuote(lines: readonly { sku: SkuForSale }[]): {
-  totalFen: number;
-  perLine: number[];
-} {
-  const charged = new Set<number>();
-  const perLine = lines.map((line) => {
-    if (line.sku.freightMode !== 'fixed') return 0;
-    if (charged.has(line.sku.productId)) return 0;
-    charged.add(line.sku.productId);
-    return Money.parseOrZero(line.sku.fixedFreight).fen;
-  });
-  return { totalFen: perLine.reduce((a, b) => a + b, 0), perLine };
-}
-
 /** `PricingDraft.lines`, for the contributors. */
 export function pricingLineOf(line: {
   sku: SkuForSale;

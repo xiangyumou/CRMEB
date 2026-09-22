@@ -7,6 +7,7 @@ import { orders } from '@shop/db/schema/order';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, forkTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
 import { registerCatalogDomain, stockAndSalesOf } from '../catalog';
+import { registerShippingFreightPort } from '../shipping';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { withTx } from '../kernel/tx';
@@ -53,6 +54,7 @@ beforeEach(async () => {
   harness.queue.reset();
   resetOrderPorts();
   registerCatalogDomain();
+  registerShippingFreightPort();
   registerOrderStateMachine(orderStateMachine);
 });
 

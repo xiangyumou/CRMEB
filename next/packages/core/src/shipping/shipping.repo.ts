@@ -1,6 +1,7 @@
 import type { DbOrTx } from '@shop/db';
 import { cities, expressCompanies } from '@shop/db/schema/reference';
 import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 /**
  * The only file in the shipping domain that touches Drizzle tables
@@ -58,6 +59,31 @@ export async function cityFingerprint(db: DbOrTx): Promise<{ count: number; maxI
     .where(eq(cities.isVisible, true));
   const row = rows[0];
   return { count: row?.value ?? 0, maxId: Number(row?.maxId ?? 0) };
+}
+
+/**
+ * A division and its ancestors, most specific first.
+ *
+ * A freight rule may name a province, a city or a district, and an address
+ * carries exactly one division id, so pricing has to know the chain. The tree
+ * is exactly three levels deep, so two left self-joins answer it in one round
+ * trip — a recursive CTE would buy nothing but a plan nobody can read.
+ */
+export async function cityAncestry(db: DbOrTx, cityId: number): Promise<number[]> {
+  const parent = alias(cities, 'parent_city');
+  const grandParent = alias(cities, 'grand_parent_city');
+  const rows = await db
+    .select({ id: cities.id, parentId: parent.id, grandParentId: grandParent.id })
+    .from(cities)
+    .leftJoin(parent, eq(parent.id, cities.parentId))
+    .leftJoin(grandParent, eq(grandParent.id, parent.parentId))
+    .where(eq(cities.id, cityId))
+    .limit(1);
+  const row = rows[0];
+  if (row === undefined) return [];
+  return [row.id, row.parentId, row.grandParentId].filter(
+    (value): value is number => value !== null,
+  );
 }
 
 /** Which of these ids exist at all. Used to refuse a template that names a division we do not have. */

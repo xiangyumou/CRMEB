@@ -13,6 +13,7 @@ import {
   type TestCtx,
 } from '@shop/testing';
 import { registerCatalogDomain, stockAndSalesOf } from '../catalog';
+import { registerShippingFreightPort } from '../shipping';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import * as order from './index';
@@ -57,6 +58,7 @@ beforeEach(async () => {
   // the next one's cancellation.
   resetOrderPorts();
   registerCatalogDomain();
+  registerShippingFreightPort();
   registerOrderStateMachine(orderStateMachine);
 });
 
@@ -233,9 +235,10 @@ describe('checkout preview', () => {
     });
 
     expect(preview.itemsAmount).toBe('120.00');
-    expect(preview.freightAmount).toBe('8.00');
+    // Fixed postage is per unit, as legacy's `postage × cart_num` was.
+    expect(preview.freightAmount).toBe('16.00');
     expect(preview.couponDiscount).toBe('10.00');
-    expect(preview.payableAmount).toBe('118.00');
+    expect(preview.payableAmount).toBe('126.00');
     expect(preview.lines[0]?.discountAmount).toBe('10.00');
     expect(preview.lines[0]?.totalAmount).toBe('110.00');
     expect(preview.receiver?.name).toBe('张三');
@@ -443,11 +446,11 @@ describe('order creation', () => {
       userCouponId: String(couponId),
       idempotencyKey: idempotencyKey(),
       buyerRemark: '请在工作日送达',
-      expectedPayableAmount: '118.00',
+      expectedPayableAmount: '126.00',
     });
 
     expect(detail.status).toBe('pending_payment');
-    expect(detail.payableAmount).toBe('118.00');
+    expect(detail.payableAmount).toBe('126.00');
     expect(detail.couponDiscount).toBe('10.00');
     expect(detail.items).toHaveLength(1);
     expect(detail.items[0]?.discountAmount).toBe('10.00');

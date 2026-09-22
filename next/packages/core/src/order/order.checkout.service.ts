@@ -22,7 +22,6 @@ import {
 import { orderConfig } from './order.config';
 import {
   couponAdjustment,
-  fallbackFreightQuote,
   freightLineOf,
   goodsTotalOf,
   lineSubtotal,
@@ -236,6 +235,7 @@ async function gatherAdjustments(
 
 async function quoteFreight(
   ctx: Ctx,
+  db: DbOrTx,
   lines: readonly DraftLine[],
   address: repo.AddressRow | null,
 ): Promise<Money> {
@@ -244,13 +244,10 @@ async function quoteFreight(
   // the create path refuses the order for want of an address anyway.
   if (physical.length === 0 || address === null) return Money.ZERO;
 
-  const port = resolveFreightPort();
-  const quote = port
-    ? await port.quote(ctx, {
-        addressCityId: address.cityId,
-        lines: physical.map(freightLineOf),
-      })
-    : fallbackFreightQuote(physical);
+  const quote = await resolveFreightPort().quote(db, ctx, {
+    addressCityId: address.cityId,
+    lines: physical.map(freightLineOf),
+  });
   return Money.fromFen(quote.totalFen);
 }
 
@@ -313,7 +310,7 @@ async function buildDraft(
   });
   const discount = splitAdjustments(lines, adjustments);
   const itemsAmount = goodsTotalOf(lines);
-  const freightAmount = await quoteFreight(ctx, lines, address);
+  const freightAmount = await quoteFreight(ctx, db, lines, address);
   const { payWindowMinutes } = await ctx.config.get(orderConfig);
 
   return {

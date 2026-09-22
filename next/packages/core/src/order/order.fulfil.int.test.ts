@@ -14,6 +14,7 @@ import { admins } from '@shop/db/schema/auth';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { registerCatalogDomain } from '../catalog';
+import { registerShippingFreightPort } from '../shipping';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { withTx } from '../kernel/tx';
@@ -59,6 +60,7 @@ beforeEach(async () => {
   // go back in or every virtual order below would quietly skip delivery.
   resetOrderPorts();
   registerCatalogDomain();
+  registerShippingFreightPort();
   resetFulfilmentPorts();
   registerOrderStateMachine(orderStateMachine);
   installFulfilmentHooks();

@@ -1,4 +1,5 @@
 import type { Tx } from '@shop/db';
+import type { DbOrTx } from '@shop/db';
 import type { Ctx } from '../kernel/context';
 import type { Money } from '../kernel/money';
 import { DomainError } from '../kernel/errors';
@@ -293,7 +294,13 @@ export interface FreightQuote {
 }
 
 export interface FreightPort {
+  /**
+   * `db` is the caller's handle — checkout quotes inside its creating
+   * transaction, and a port that read through `ctx.db` instead would take a
+   * second pool connection per buyer and deadlock the pool under load.
+   */
   quote(
+    db: DbOrTx,
     ctx: Ctx,
     input: { addressCityId: number | null; lines: readonly FreightLine[] },
   ): Promise<FreightQuote>;

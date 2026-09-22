@@ -5,18 +5,33 @@
  * domain's `index.ts`". Everything not re-exported here is private —
  * `shipping.repo.ts` above all, which no other domain may reach.
  *
- * | Export                 | Caller     | When                                    |
- * | ---------------------- | ---------- | --------------------------------------- |
- * | `expressCompanies.*`   | routes, B2 | the 发货 picker and its management screen |
- * | `cityTree`             | routes     | 省市区 picker, storefront and admin      |
+ * | Export               | Caller     | When                                      |
+ * | -------------------- | ---------- | ----------------------------------------- |
+ * | `expressCompanies.*` | routes, B2 | the 发货 picker and its management screen |
+ * | `cityTree`           | routes     | 省市区 picker, storefront and admin       |
+ * | `templates.*`        | routes     | 运费模板 management                        |
  *
- * Registration is a side effect of importing this file, exactly like the order
- * domain's state machine: importing `@shop/core/shipping` installs the
- * `FreightPort` B1 quotes through and the `LogisticsPort` B2 tracks through, so
- * neither stream imports an implementation.
+ * Registering the `FreightPort` and the `LogisticsPort` is a **side effect of
+ * importing this file**,
+ * exactly like the order domain's state machine: B1 quotes through
+ * `getFreightPort()` and never imports an implementation. Until this import
+ * happens, `fallbackFreightQuote` answers and every 运费模板 line costs zero.
  */
+import { registerShippingFreightPort } from './shipping.freight.port';
+import { registerShippingLogisticsPort } from './shipping.logistics.port';
+
+registerShippingFreightPort();
+registerShippingLogisticsPort();
 
 export { shippingPermissions } from './permissions';
 
 export * as expressCompanies from './shipping.express.service';
+export * as templates from './shipping.template.service';
 export { cityTree, resetCityTreeCache } from './shipping.city.service';
+export { freightPort, registerShippingFreightPort } from './shipping.freight.port';
+export {
+  logisticsPort,
+  registerShippingLogisticsPort,
+  resetTrackingFetch,
+  setTrackingFetch,
+} from './shipping.logistics.port';

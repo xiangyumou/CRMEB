@@ -91,7 +91,7 @@ export function flatRateFreight(fen: number): FakeFreightPort {
   const quotes: FreightQuote[] = [];
   return {
     quotes,
-    async quote(_ctx, input) {
+    async quote(_db, _ctx, input) {
       const count = input.lines.length;
       if (count === 0) {
         const empty = { totalFen: 0, perLine: [] };

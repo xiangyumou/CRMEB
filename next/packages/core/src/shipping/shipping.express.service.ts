@@ -57,7 +57,10 @@ export async function adminCreate(ctx: Ctx, body: ExpressCompanyForm): Promise<E
   try {
     return toRow(await repo.insertExpressCompany(ctx.db, body));
   } catch (error) {
-    if (repo.isDuplicateCode(error)) throw new DomainError('SHIPPING_EXPRESS_COMPANY_CODE_TAKEN');
+    if (repo.isDuplicateCode(error))
+      throw new DomainError('SHIPPING_EXPRESS_COMPANY_CODE_TAKEN', {
+        details: { code: body.code },
+      });
     throw error;
   }
 }
@@ -72,7 +75,10 @@ export async function adminUpdate(
     if (row === null) throw new DomainError('SHIPPING_EXPRESS_COMPANY_NOT_FOUND');
     return toRow(row);
   } catch (error) {
-    if (repo.isDuplicateCode(error)) throw new DomainError('SHIPPING_EXPRESS_COMPANY_CODE_TAKEN');
+    if (repo.isDuplicateCode(error))
+      throw new DomainError('SHIPPING_EXPRESS_COMPANY_CODE_TAKEN', {
+        details: { code: body.code },
+      });
     throw error;
   }
 }

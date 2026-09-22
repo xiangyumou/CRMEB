@@ -128,15 +128,11 @@ export function resolvePaymentPort(): PaymentPort | null {
 }
 
 /**
- * `null` until stream F2 registers a `FreightPort`. The checkout service then
- * quotes freight from `products.freight_mode` alone
- * (`fallbackFreightQuote` in `order.pricing.ts`) instead of inventing template
- * rules it does not own.
+ * The freight seam the shipping domain registers into. Throws when nothing
+ * has registered: checkout has no freight rules of its own (the per-unit
+ * fixed postage, the template tables and 满额包邮 are all the shipping
+ * domain's), so a quote without the port would be a guess.
  */
-export function resolveFreightPort(): FreightPort | null {
-  try {
-    return getFreightPort();
-  } catch {
-    return null;
-  }
+export function resolveFreightPort(): FreightPort {
+  return getFreightPort();
 }

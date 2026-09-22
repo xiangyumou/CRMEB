@@ -7,10 +7,12 @@
  * conflict on one line each.
  */
 export * as catalog from './mappers/catalog';
+export * as cms from './mappers/cms';
 export * as coupon from './mappers/coupon';
 export * as diy from './mappers/diy';
 export * as groupbuy from './mappers/groupbuy';
 export * as notification from './mappers/notification';
+export * as shipping from './mappers/shipping';
 export * as storage from './mappers/storage';
 export * as system from './mappers/system';
 export * as user from './mappers/user';

@@ -174,7 +174,7 @@ describe('port registration', () => {
     expect(await getStockPort().reserve(tx, 1, [])).toEqual([]);
     expect(await getPaymentPort().ensureNoOpenAttempts(tx, 1)).toBe('closed');
     expect(await getPaymentPort().closeOrderPayments(ctx, 1)).toBe('closed');
-    expect(await getFreightPort().quote(ctx, { addressCityId: null, lines: [] })).toEqual({
+    expect(await getFreightPort().quote(tx, ctx, { addressCityId: null, lines: [] })).toEqual({
       totalFen: 500,
       perLine: [500],
     });

@@ -1,0 +1,185 @@
+import type { Ctx } from '../kernel/context';
+import {
+  registerLogisticsPort,
+  type LogisticsPort,
+  type TrackingResult,
+  type TrackingTrace,
+} from '../order';
+import { logisticsConfig } from '../system';
+
+/**
+ * 物流跟踪, over 阿里云云市场's express API.
+ *
+ * Facts that shape this file:
+ *
+ *  - **the host is hardcoded.** It is not a setting, because a setting that
+ *    names an outbound host is a way to exfiltrate the app code. Only the
+ *    credential and the cache window are configurable (F1's `logisticsConfig`;
+ *    F2 adds no second group).
+ *  - **every call is cached in Redis** for `cacheMinutes` (default 30). The
+ *    carriers rate-limit hard and the console polls: the legacy shop's tracking
+ *    tab went blank under load for exactly this reason.
+ *  - **a failure is never an exception.** A refused credential, a timeout or a
+ *    carrier that has never heard of the number all come back as
+ *    `state: 'unknown'` with no traces, because the caller is an operator
+ *    looking at an order and a 500 tells them nothing.
+ *  - **`kuaidi100` has no driver** (CR-2-f2). It is treated as unconfigured,
+ *    with one warning naming the setting.
+ *
+ * The client is tested against a fake `fetch`. Nothing here ever reaches a real
+ * endpoint in a test or a build.
+ */
+
+const ALIYUN_HOST = 'https://wuliu.market.alicloudapi.com/kdi';
+const TIMEOUT_MS = 5_000;
+
+/** Injectable for tests. Never overridden in production code. */
+export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
+
+let fetchImpl: FetchLike = (url, init) => globalThis.fetch(url, init);
+
+export function setTrackingFetch(impl: FetchLike): void {
+  fetchImpl = impl;
+}
+
+export function resetTrackingFetch(): void {
+  fetchImpl = (url, init) => globalThis.fetch(url, init);
+}
+
+export const logisticsPort: LogisticsPort = {
+  async track(ctx, input): Promise<TrackingResult> {
+    const config = await ctx.config.get(logisticsConfig);
+    if (config.provider === 'kuaidi100') {
+      ctx.logger.warn(
+        { provider: config.provider },
+        '快递100 没有实现的驱动（CR-2-f2），物流跟踪按未配置处理',
+      );
+      return empty();
+    }
+    if (config.provider !== 'aliyun-market' || config.appCode === '') return empty();
+
+    const cacheKey = `shipping:tracking:${input.companyCode}:${input.trackingNo}`;
+    const cached = await readCache(ctx, cacheKey);
+    if (cached !== null) return cached;
+
+    const result = await callAliyun(ctx, config.appCode, input);
+    // A result nobody could parse is still worth caching briefly: a carrier
+    // that does not know the number yet will not know it a second later either.
+    await ctx.redis.set(cacheKey, JSON.stringify(result), 'EX', config.cacheMinutes * 60);
+    return result;
+  },
+};
+
+/** Idempotent; called from `index.ts` and safe to call again from a test. */
+export function registerShippingLogisticsPort(): void {
+  registerLogisticsPort(logisticsPort);
+}
+
+// ---------------------------------------------------------------------------
+// the client
+// ---------------------------------------------------------------------------
+
+async function callAliyun(
+  ctx: Ctx,
+  appCode: string,
+  input: { companyCode: string; trackingNo: string; phone?: string },
+): Promise<TrackingResult> {
+  const query = new URLSearchParams({
+    no: input.trackingNo,
+    type: input.companyCode.toLowerCase(),
+  });
+  // 顺丰 refuses a lookup without the last four digits of the receiver's phone.
+  if (input.phone !== undefined && input.phone !== '') {
+    query.set('no', `${input.trackingNo}:${input.phone.slice(-4)}`);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await fetchImpl(`${ALIYUN_HOST}?${query.toString()}`, {
+      method: 'GET',
+      headers: { Authorization: `APPCODE ${appCode}` },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      ctx.logger.warn({ status: response.status }, '物流查询接口返回了非 200');
+      return empty();
+    }
+    return parseAliyun(await response.json());
+  } catch (error) {
+    ctx.logger.warn({ err: error }, '物流查询失败');
+    return empty();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * `{ status: '0', result: { deliverystatus, list: [{ time, status }] } }`.
+ *
+ * Anything that does not look like that is an `unknown` with no traces — the
+ * vendor answers errors with the same 200 and a different body.
+ */
+export function parseAliyun(payload: unknown): TrackingResult {
+  if (typeof payload !== 'object' || payload === null) return empty();
+  const body = payload as { status?: unknown; result?: unknown };
+  if (String(body.status ?? '') !== '0') return empty();
+  if (typeof body.result !== 'object' || body.result === null) return empty();
+  const result = body.result as { deliverystatus?: unknown; list?: unknown };
+
+  const traces: TrackingTrace[] = [];
+  if (Array.isArray(result.list)) {
+    for (const entry of result.list) {
+      if (typeof entry !== 'object' || entry === null) continue;
+      const trace = entry as { time?: unknown; status?: unknown };
+      const at = new Date(String(trace.time ?? ''));
+      if (Number.isNaN(at.getTime())) continue;
+      traces.push({ at, context: String(trace.status ?? '') });
+    }
+  }
+  // Newest first, which is the order the console renders and the opposite of
+  // what the vendor returns.
+  traces.sort((a, b) => b.at.getTime() - a.at.getTime());
+  return { state: stateOf(String(result.deliverystatus ?? '')), traces };
+}
+
+/** 0 揽件, 1 在途, 2 派件中, 3 已签收, 4 派送失败, 5 疑难件, 6 退件签收. */
+function stateOf(code: string): TrackingResult['state'] {
+  switch (code) {
+    case '0':
+    case '1':
+      return 'in_transit';
+    case '2':
+      return 'delivering';
+    case '3':
+      return 'delivered';
+    case '4':
+    case '5':
+    case '6':
+      return 'exception';
+    default:
+      return 'unknown';
+  }
+}
+
+async function readCache(ctx: Ctx, key: string): Promise<TrackingResult | null> {
+  const raw = await ctx.redis.get(key);
+  if (raw === null) return null;
+  try {
+    const parsed = JSON.parse(raw) as { state?: unknown; traces?: unknown };
+    const traces = Array.isArray(parsed.traces) ? parsed.traces : [];
+    return {
+      state: (parsed.state ?? 'unknown') as TrackingResult['state'],
+      traces: traces.map((trace) => {
+        const entry = trace as { at?: unknown; context?: unknown };
+        return { at: new Date(String(entry.at ?? '')), context: String(entry.context ?? '') };
+      }),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function empty(): TrackingResult {
+  return { state: 'unknown', traces: [] };
+}
