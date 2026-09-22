@@ -440,6 +440,38 @@ describe('the activity ledgers', () => {
   });
 
   /**
+   * The same thing at the width of the pool (CR-1-d2).
+   *
+   * The harness opens twelve connections, and `beforeCreate` runs while its
+   * caller already holds one of them. A handler that reaches for a second — the
+   * shape presale's price guard had before the applied adjustments reached the
+   * draft — leaves twelve callers each holding one and wanting one, and this
+   * test hangs instead of failing. Twelve is therefore not an arbitrary crowd:
+   * it is exactly the number that turns that mistake into a red suite.
+   */
+  it('holds under a crowd the width of the pool', async () => {
+    const fixture = await makeActivity({ seatsRequired: 2, stock: 3 });
+    const users = await makeUsers(12);
+
+    const report = await runConcurrently(users.length, async (index) => {
+      const userId = users[index]!;
+      try {
+        await placeOrder(racer(userId), { userId, fixture });
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    expect(report.winners).toBe(3);
+    expect(report.losers).toBe(9);
+    expect(await readLedgers(fixture)).toEqual({
+      activity: { stock: 0, sales: 0 },
+      sku: { stock: 0, sales: 0 },
+    });
+  });
+
+  /**
    * The quota is a ceiling on *sales*, and sales only move when money arrives,
    * so the guard that counts is the one in `commitActivitySales`. Six shoppers
    * hold a reservation each and then pay at the same instant: two sales land,

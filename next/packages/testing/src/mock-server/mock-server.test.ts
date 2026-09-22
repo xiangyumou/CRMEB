@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { allRoutes } from '@shop/contracts/routes';
 import { adminProfileExample } from '@shop/contracts/auth/schemas';
 import {
+  bySpecificity,
   compileRoute,
   matchRoute,
   pickExample,
@@ -71,6 +72,37 @@ describe('serving examples', () => {
     const payload = await response.json();
     expect(payload.code).toBe('NOT_FOUND');
     expect(payload.details.available).toEqual(['super', 'limited']);
+  });
+
+  /**
+   * A literal segment must beat a `:param` one, **whatever order the registry
+   * hands the routes over in**.
+   *
+   * Both orderings are asserted because the bug this replaced was invisible in
+   * one of them. `bySpecificity` used to return `0` for two unrelated paths,
+   * which is not a total order, so `sort` produced whatever the pairs it
+   * happened to compare allowed — and `/api/v1/addresses/default` started
+   * answering `422` the day an unrelated contract was added somewhere else in
+   * the tree, because `/api/v1/addresses/:id` had drifted in front of it.
+   */
+  it('prefers a literal segment over a :param one however the routes are ordered', async () => {
+    const literal = allRoutes.find((route) => route.path === '/api/v1/addresses/default');
+    const wildcard = allRoutes.find((route) => route.path === '/api/v1/addresses/:id');
+    expect(literal).toBeDefined();
+    expect(wildcard).toBeDefined();
+
+    for (const routes of [
+      [literal!, wildcard!],
+      [wildcard!, literal!],
+    ]) {
+      const instance = await startMockServer({ port: 0, routes });
+      try {
+        expect((await fetch(`${instance.url}/api/v1/addresses/default`)).status).toBe(200);
+        expect((await fetch(`${instance.url}/api/v1/addresses/7`)).status).toBe(200);
+      } finally {
+        await instance.close();
+      }
+    }
   });
 
   it('serves every registered route from its first example', async () => {
@@ -143,6 +175,35 @@ describe('routing', () => {
       'super',
       'limited',
     ]);
+  });
+});
+
+describe('bySpecificity', () => {
+  /**
+   * Fixed three times on 2026-09-23 (J3, B3, E4). A comparator that is not a
+   * total order makes `sort` registry-order dependent, so the failure shows up
+   * in a file nobody touched the day an unrelated route is added. This pins the
+   * property itself over the whole table, not one pair that happened to break.
+   */
+  it('is a total order over every registered route', () => {
+    const compiled = allRoutes.map(compileRoute);
+    for (const a of compiled) {
+      expect(bySpecificity(a, a)).toBe(0);
+      for (const b of compiled) {
+        expect(Math.sign(bySpecificity(a, b)) + Math.sign(bySpecificity(b, a))).toBe(0);
+      }
+    }
+    const sorted = [...compiled].sort(bySpecificity);
+    for (let i = 0; i < sorted.length; i += 1) {
+      for (let j = i + 1; j < sorted.length; j += 1) {
+        // Every earlier element compares below every later one — transitivity
+        // made visible, without an n³ walk. Equal only for one path under two
+        // methods, which the matcher tells apart itself.
+        const order = bySpecificity(sorted[i]!, sorted[j]!);
+        if (sorted[i]!.route.path === sorted[j]!.route.path) expect(order).toBe(0);
+        else expect(order).toBeLessThan(0);
+      }
+    }
   });
 });
 

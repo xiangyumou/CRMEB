@@ -213,3 +213,38 @@ export function assertActivityPriceApplied(args: {
     },
   });
 }
+
+/**
+ * The same guard, one step earlier and from the other side (CR-1-d2).
+ *
+ * `PricingDraft.adjustments` now carries what the pricing pass really took off,
+ * by contributor, so `beforeCreate` can compare this domain's own adjustment
+ * with the gap it was supposed to close — before an order row exists, before
+ * stock moves, and without asking the contributor to run a second time inside
+ * the creating transaction (which is what cost presale a second pooled
+ * connection per checkout).
+ *
+ * `afterCreate`'s check stays. The two are not redundant: this one proves the
+ * *contributor* fired, that one proves the *written lines* charge what the
+ * activity says. Both are a lookup and a comparison, so neither is worth
+ * trading away for the other.
+ *
+ * Unlike the `charged` form above this is an equality. Both amounts are
+ * negative — what the campaign owes the shopper off the catalogue price — and
+ * an adjustment that differs either way means this domain's arithmetic and
+ * B1's disagree about the same campaign.
+ */
+export function assertActivityDiscountApplied(args: {
+  expected: Money;
+  actual: Money;
+  activityId: number;
+}): void {
+  if (args.expected.eq(args.actual)) return;
+  throw new DomainError('GROUPBUY_PRICE_NOT_APPLIED', {
+    details: {
+      activityId: String(args.activityId),
+      expected: args.expected.toString(),
+      actual: args.actual.toString(),
+    },
+  });
+}

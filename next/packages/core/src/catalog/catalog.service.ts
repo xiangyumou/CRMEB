@@ -909,6 +909,35 @@ export async function checkPurchaseAllowance(
   void ctx;
 }
 
+/**
+ * 加购 as a product event (CR-1-f3 §2).
+ *
+ * F3's product page reports 加购件数 from `product_events`, next to views,
+ * orders and payments, and until now nothing wrote the `cart` kind — the column
+ * read zero on every product however busy the shop was. The cart calls this
+ * from inside its own transaction, beside the `cart_items` upsert, so the
+ * number and the row it describes commit together or not at all.
+ *
+ * `(tx, ctx, input)` — the caller owns the transaction, matching
+ * `checkPurchaseAllowance` and the platform's other "join the transaction you
+ * are already in" primitives. The cart may not reach `catalog.repo` itself
+ * (CONVENTIONS: a repo is private to its domain), and this is the whole of the
+ * seam: no read, no verdict, one insert.
+ */
+export async function recordCartAdd(
+  tx: Tx,
+  ctx: Ctx,
+  input: { productId: number; skuId: number; userId: number; quantity: number },
+): Promise<void> {
+  await repo.recordCartEvent(tx, {
+    productId: input.productId,
+    skuId: input.skuId,
+    userId: input.userId,
+    quantity: input.quantity,
+    platform: platformOf(ctx),
+  });
+}
+
 function checkLimit(
   product: repo.ProductRow,
   quantity: number,

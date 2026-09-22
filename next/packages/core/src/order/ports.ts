@@ -288,6 +288,18 @@ export interface FreightLine {
   skuId: number;
   quantity: number;
   freightTemplateId: number | null;
+  /**
+   * How this line is charged (CR-1-f2).
+   *
+   * `freightTemplateId` alone cannot say: a line that ships **free** and a line
+   * with a **fixed** postage both carry `null`, and they price differently —
+   * free is 0, fixed is `fixedFreightFen × quantity` (legacy
+   * `OrderFreightCalculator::getOrderPriceGroup`). Without this the port had to
+   * re-read the skus its caller had just read, once per quote.
+   */
+  freightMode: 'free' | 'fixed' | 'template';
+  /** 分 per unit. `0` unless `freightMode === 'fixed'`. */
+  fixedFreightFen: number;
   /** Grams. */
   weight: number;
   /** Cubic centimetres. */
@@ -338,6 +350,12 @@ export interface PricingDraft {
   goodsTotal: Money;
   /** Caller-supplied selections, e.g. `{ couponId: '3' }`. */
   selections: Readonly<Record<string, string | undefined>>;
+  /**
+   * What the pricing pass took off, by contributor. Empty on the pricing pass
+   * itself (a contributor cannot see its peers); populated for `beforeCreate`,
+   * so a kind handler can verify its own adjustment landed.
+   */
+  adjustments?: readonly PriceAdjustment[];
 }
 
 export interface PriceAdjustment {

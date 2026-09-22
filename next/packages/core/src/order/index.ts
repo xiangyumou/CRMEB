@@ -50,11 +50,22 @@ registerOrderDomain();
 export { create, preview, rebuyLines } from './order.checkout.service';
 export { autoCancel, cancel, cancelOrder, sweepExpiredOrders } from './order.cancel.service';
 export type { CancelInput, CancelOutcome, CancelReason } from './order.cancel.service';
-export { counts, detail, detailOf, list } from './order.query.service';
+export { counts, detail, detailOf, giftCoupons, list } from './order.query.service';
 export { hide } from './order.hide.service';
 export { ORDER_NO_LENGTH, isOrderNo, requireOrderRef, resolveOrderRef } from './order.ref';
 export { orderStateMachine } from './order.state-machine';
 export { orderConfig } from './order.config';
+
+/**
+ * The pricing split, exactly as `create` applies it.
+ *
+ * Pure, and exported because a marketing domain's tests have to be able to
+ * build the same `PricingDraft.adjustments` this service hands to
+ * `beforeCreate` (CR-1-d2). A driver that skipped the clamping would be
+ * testing a kind handler's guard against a draft no real checkout produces.
+ */
+export { splitAdjustments } from './order.pricing';
+export type { AppliedAdjustment, DiscountSplit } from './order.pricing';
 
 /** The catalogue seam: the read interface the catalog domain registers into. */
 export {

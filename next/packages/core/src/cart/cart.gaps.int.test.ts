@@ -1,5 +1,6 @@
 import { cartItems } from '@shop/db/schema/cart';
 import { productSkus, products } from '@shop/db/schema/catalog';
+import { productEvents } from '@shop/db/schema/stats';
 import { users } from '@shop/db/schema/user';
 import { createTestCtx, forkTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
 import { eq } from 'drizzle-orm';
@@ -7,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { registerCatalogDomain } from '../catalog';
+import * as stats from '../stats';
 import * as cart from './index';
 
 /**
@@ -35,6 +37,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await harness.db.truncateAll();
+  await harness.redis.flushdb();
   harness.clock.set(NOW);
   harness.queue.reset();
 });
@@ -360,5 +363,93 @@ describe('decrementing by SKU', () => {
     expect(report.winners).toBe(3);
     expect(report.losers).toBe(2);
     expect(await harness.ctx.db.select().from(cartItems)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CR-1-f3 §2 — 加购件数
+// ---------------------------------------------------------------------------
+
+/**
+ * `product_events.created_at` is `defaultNow()`, so a row written by the cart
+ * carries the database's wall clock, not the harness clock. The window is
+ * therefore built around the real instant rather than around `NOW`.
+ *
+ * Wide enough (three days) that a test running across a Shanghai midnight still
+ * brackets the row, and narrow enough to stay inside `MAX_RANGE_DAYS`.
+ */
+function windowAroundNow(): { from: string; to: string } {
+  const day = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  return {
+    from: new Date(now - day).toISOString(),
+    to: new Date(now + day).toISOString(),
+  };
+}
+
+const cartQuantityOf = async (): Promise<number> => {
+  // `productStats` memoises the whole page in Redis, so a test that reads the
+  // tile before and after an add has to drop the cache in between.
+  await harness.redis.flushdb();
+  const page = await stats.productStats(harness.ctx, windowAroundNow());
+  const tile = page.metrics.find((metric) => metric.key === 'cartQuantity');
+  if (tile === undefined) throw new Error('no 加购件数 tile');
+  return tile.value;
+};
+
+describe('加购件数', () => {
+  it('reports the units the shopper just added', async () => {
+    const userId = await makeUser();
+    const { productId, skuIds } = await makeProduct();
+
+    expect(await cartQuantityOf()).toBe(0);
+    await cart.addItem(as(userId), { skuId: String(skuIds[0]!), quantity: 1 });
+    expect(await cartQuantityOf()).toBe(1);
+
+    // Per product, which is the column F3 draws on 商品排行.
+    const ranking = await stats.productRanking(harness.ctx, {
+      ...windowAroundNow(),
+      sortBy: 'cartQuantity',
+      limit: 20,
+    });
+    const row = ranking.rows.find((candidate) => candidate.productId === String(productId));
+    expect(row?.cartQuantity).toBe(1);
+  });
+
+  it('sums units rather than counting taps, and records the variant', async () => {
+    const userId = await makeUser();
+    const { productId, skuIds } = await makeProduct();
+
+    await cart.addItem(as(userId), { skuId: String(skuIds[0]!), quantity: 2 });
+    await cart.addItem(as(userId), { skuId: String(skuIds[0]!), quantity: 3 });
+    await cart.addItem(as(userId), { skuId: String(skuIds[1]!), quantity: 1 });
+
+    // One cart row of five units plus one of one — but six units of interest.
+    expect(await cartQuantityOf()).toBe(6);
+
+    const events = await harness.ctx.db
+      .select()
+      .from(productEvents)
+      .where(eq(productEvents.kind, 'cart'));
+    expect(events).toHaveLength(3);
+    expect(events.map((event) => event.quantity)).toEqual([2, 3, 1]);
+    expect(events.map((event) => event.skuId)).toEqual([skuIds[0], skuIds[0], skuIds[1]]);
+    expect(new Set(events.map((event) => event.productId))).toEqual(new Set([productId]));
+    // The harness ctx is `platform: 'h5'`, mapped from `X-Client-Platform`.
+    expect(events.every((event) => event.platform === 'h5')).toBe(true);
+  });
+
+  it('is not written when the add is refused', async () => {
+    const userId = await makeUser();
+    const { skuIds } = await makeProduct({ stock: 1 });
+
+    await expectDomainError(
+      cart.addItem(as(userId), { skuId: String(skuIds[0]!), quantity: 5 }),
+      'CART_OUT_OF_STOCK',
+    );
+    expect(await cartQuantityOf()).toBe(0);
+    expect(
+      await harness.ctx.db.select().from(productEvents).where(eq(productEvents.kind, 'cart')),
+    ).toHaveLength(0);
   });
 });

@@ -102,6 +102,17 @@ export const DROPPED_CONFIG_KEYS: readonly DroppedConfigKey[] = [
   { key: 'confirm_take_over_switch', reason: '改由 notification_templates 的逐模板开关表达' },
   { key: 'deliver_goods_switch', reason: '改由 notification_templates 的逐模板开关表达' },
   { key: 'unpaid_order_switch', reason: '改由 notification_templates 的逐模板开关表达' },
+  // `trade` 组解散时（CR-6-f1）失去认领人的开关。它与上面的
+  // `admin_lower_order_switch` 是同一个「新订单提醒」，只是后台/客户端两份。
+  { key: 'lower_order_switch', reason: '改由 notification_templates 的逐模板开关表达' },
+
+  // --- 售后文案：新系统写在代码里，不再是自由文本 ----------------------------
+  {
+    key: 'stor_reason',
+    reason:
+      '「退款理由」改由 refund 域的内置 REFUND_REASONS 给出：' +
+      '每条理由都对应一段退款处理与统计口径，可自由编辑的文本框会让两边对不上',
+  },
 
   // --- retired user features -----------------------------------------------
   { key: 'get_avatar', reason: RETIRED_FEATURE('强制授权头像') },

@@ -20,9 +20,11 @@ import type {
   GroupbuyOpenGroup,
   GroupbuyPoster,
   GroupbuyStatisticsQuery,
+  GroupbuySummary,
   MyGroupbuyItem,
   MyGroupbuyListQuery,
 } from '@shop/contracts/groupbuy/schemas';
+import { GROUPBUY_SUMMARY_AVATAR_LIMIT } from '@shop/contracts/groupbuy/schemas';
 import { DomainError } from '../kernel/errors';
 import { toId, toIdOrNull } from '../kernel/ids';
 import type { Ctx } from '../kernel/context';
@@ -338,6 +340,51 @@ export async function list(ctx: Ctx, query: GroupbuyListQuery): Promise<Paged<Gr
     page: query.page,
     pageSize: query.pageSize,
   };
+}
+
+/** How long the 人气条 may be stale. A minute, and the strip says nothing that needs to be exact. */
+const SUMMARY_CACHE_SECONDS = 60;
+const SUMMARY_CACHE_KEY = 'groupbuy:summary';
+
+/**
+ * 人气条 (CR-1-h2) — 「已有 N 人参与拼团」 plus a row of faces.
+ *
+ * Two aggregate scans over `groupbuy_members`, on the public landing tab of a
+ * marketing surface, which is the shape of request that arrives in bursts: a
+ * push notification goes out and every recipient opens the same page. So the
+ * answer is cached in Redis for a minute, on one key — there is no window and
+ * no user in it, so there is nothing to vary by.
+ *
+ * **A cache failure is never a page failure.** A Redis that is down, full or
+ * unreachable means the aggregates run, the error is logged at `warn`, and the
+ * shopper sees the right number. The same rule `stats.cache.ts` follows, for
+ * the same reason: a decorative strip must not be able to 500 the 拼团 tab.
+ *
+ * Nothing invalidates the key on a join. A shopper who joins a team and sees
+ * the count move a minute later is not a bug; a write path that has to know
+ * about a cache key in another domain is.
+ */
+export async function summary(ctx: Ctx): Promise<GroupbuySummary> {
+  try {
+    const hit = await ctx.redis.get(SUMMARY_CACHE_KEY);
+    if (hit !== null) return JSON.parse(hit) as GroupbuySummary;
+  } catch (error) {
+    ctx.logger.warn({ err: error, key: SUMMARY_CACHE_KEY }, 'groupbuy: summary cache read failed');
+  }
+
+  const now = ctx.clock.now();
+  const [participants, avatars] = await Promise.all([
+    repo.countLiveParticipants(ctx.db, now),
+    repo.listLiveParticipantAvatars(ctx.db, { now, limit: GROUPBUY_SUMMARY_AVATAR_LIMIT }),
+  ]);
+  const value: GroupbuySummary = { participants, avatars };
+
+  try {
+    await ctx.redis.set(SUMMARY_CACHE_KEY, JSON.stringify(value), 'EX', SUMMARY_CACHE_SECONDS);
+  } catch (error) {
+    ctx.logger.warn({ err: error, key: SUMMARY_CACHE_KEY }, 'groupbuy: summary cache write failed');
+  }
+  return value;
 }
 
 export async function banners(

@@ -630,6 +630,29 @@ export async function listUserCoupons(
   return { rows, total: counted[0]?.total ?? 0 };
 }
 
+/**
+ * The coupons one order earned, oldest first.
+ *
+ * Filtered on the user as well as the order. The caller has already proved the
+ * order belongs to this shopper, so the extra predicate is not what makes the
+ * route safe — it is what makes a future caller that forgets to check return
+ * nothing instead of somebody else's wallet.
+ *
+ * `sourceKind` is not filtered: `source_order_id` is only ever set by
+ * `gift_order` (`user_coupons_gift_order_present` makes that a CHECK), so
+ * naming the kind here would be a second spelling of the same fact.
+ */
+export async function listOrderGiftCoupons(
+  db: DbOrTx,
+  args: { orderId: number; userId: number },
+): Promise<UserCouponRow[]> {
+  return db
+    .select()
+    .from(userCoupons)
+    .where(and(eq(userCoupons.sourceOrderId, args.orderId), eq(userCoupons.userId, args.userId)))
+    .orderBy(asc(userCoupons.id));
+}
+
 /** Every coupon this user could conceivably spend right now, newest first. Feeds the checkout picker. */
 export async function listSpendableUserCoupons(
   db: DbOrTx,

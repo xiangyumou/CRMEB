@@ -80,7 +80,6 @@ export { systemPermissions } from './permissions';
 export { AGREEMENT_FIELDS, agreementConfig } from './agreement.config';
 export { logisticsConfig } from './logistics.config';
 export { mapConfig } from './map.config';
-export { tradeConfig } from './trade.config';
 /**
  * `publicOrigin` / `isTrustedHost` are the origin's one home (CR-1-e2). Any
  * domain that needs an absolute URL, or has to decide whether a host is ours,

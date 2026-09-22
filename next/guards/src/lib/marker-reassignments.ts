@@ -165,8 +165,8 @@ export const MARKER_REASSIGNMENTS: readonly Reassignment[] = [
     marked: 'B1',
     method: 'POST',
     url: '/api/v1/staff/users/:param/coupons',
-    owedBy: 'B3',
-    why: 'the mobile staff console — CR-1..4-h, collected into S, which merged without it',
+    owedBy: 'H3',
+    why: 'the nested grant path never lands: B3 shipped the flat POST /api/v1/staff/coupon-grants (2026-09-23); H3 re-points the 发券 call at it and deletes the marker',
   },
   {
     marked: 'G1',

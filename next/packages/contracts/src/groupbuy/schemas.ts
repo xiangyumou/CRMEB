@@ -671,3 +671,41 @@ export const groupbuyActivityOrderExample: GroupbuyActivityOrder = {
   paid: true,
   createdAt: '2026-09-22T10:20:00+08:00',
 };
+
+// ---------------------------------------------------------------------------
+// 人气条 (CR-1-h2)
+// ---------------------------------------------------------------------------
+
+/**
+ * The strip at the top of the 拼团 tab: 「已有 N 人参与拼团」 and a row of faces.
+ *
+ * Legacy served this from `getCombinationIndex`, which counted rows in
+ * `store_pink` — refunds, failed teams and repeat joins included — so the
+ * number only ever went up and routinely exceeded the shop's customer count.
+ * Here `participants` is **distinct users currently taking part**: a member who
+ * has not left, in a team that is still forming or has already succeeded, on an
+ * activity that is live right now.
+ */
+export const groupbuySummary = z.object({
+  /** Distinct users in a live team. Never negative, and it can go down. */
+  participants: z.number().int().min(0),
+  /**
+   * Up to `GROUPBUY_SUMMARY_AVATAR_LIMIT` faces, most recent participant first.
+   * Fewer than that — including none — is ordinary: a shop that has just opened
+   * its first activity has no faces yet, and members may have no avatar at all.
+   */
+  avatars: z.array(z.string()).max(8),
+});
+export type GroupbuySummary = z.infer<typeof groupbuySummary>;
+
+/** How many faces the strip shows. One row on a phone. */
+export const GROUPBUY_SUMMARY_AVATAR_LIMIT = 8;
+
+export const groupbuySummaryExample: GroupbuySummary = {
+  participants: 1286,
+  avatars: [
+    'https://cdn.example.com/avatar/1.png',
+    'https://cdn.example.com/avatar/2.png',
+    'https://cdn.example.com/avatar/3.png',
+  ],
+};

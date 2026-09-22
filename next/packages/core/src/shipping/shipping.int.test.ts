@@ -5,7 +5,8 @@ import { cities, expressCompanies } from '@shop/db/schema/reference';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { registerCatalogDomain } from '../catalog';
 import { DomainError } from '../kernel/errors';
-import { logisticsConfig, tradeConfig } from '../system';
+import { orderConfig } from '../order';
+import { logisticsConfig } from '../system';
 import * as express from './shipping.express.service';
 import * as templates from './shipping.template.service';
 import { cityTree, resetCityTreeCache } from './shipping.city.service';
@@ -26,8 +27,10 @@ import { logisticsPort, resetTrackingFetch, setTrackingFetch } from './shipping.
 let harness: TestCtx;
 
 beforeAll(async () => {
-  // The freight port reads SKU freight modes through the CatalogPort, which
-  // only the catalog domain registers.
+  // Kept for the template-in-use checks, which count the products pointing at a
+  // template. The freight port itself no longer needs the catalog registered:
+  // since CR-1-f2 the line carries its own `freightMode`, so the port stopped
+  // re-reading the skus through the `CatalogPort` once per quote.
   registerCatalogDomain();
   harness = await createTestCtx({ now: '2026-06-01T00:00:00.000Z' });
 }, 180_000);
@@ -120,16 +123,35 @@ async function makeSku(options: {
   return sku!.id;
 }
 
+/**
+ * A `FreightLine` as checkout hands one over.
+ *
+ * `freightMode` and `fixedFreightFen` travel **with** the line (CR-1-f2): the
+ * port no longer re-reads the sku to learn how it is charged, so a test that
+ * writes `freightMode: 'fixed'` onto the product has to say so here too —
+ * exactly as `order.pricing.ts` does, from the `SkuForSale` it already holds.
+ */
 function quoteLine(skuId: number, overrides: Record<string, unknown> = {}) {
   return {
     skuId,
     quantity: 1,
+    freightMode: 'template' as const,
+    fixedFreightFen: 0,
     freightTemplateId: null,
     weight: 0,
     volume: 0,
     amountFen: 10000,
     ...overrides,
   };
+}
+
+/** The same, for a product charged a flat postage per unit. */
+function fixedLine(
+  skuId: number,
+  fixedFreightFen: number,
+  overrides: Record<string, unknown> = {},
+) {
+  return quoteLine(skuId, { freightMode: 'fixed', fixedFreightFen, ...overrides });
 }
 
 // ---------------------------------------------------------------------------
@@ -265,7 +287,7 @@ describe('FreightPort.quote', () => {
     const skuId = await makeSku({ freightMode: 'fixed', fixedFreight: '8.00' });
     const quote = await freightPort.quote(harness.ctx.db, harness.ctx, {
       addressCityId: 330106,
-      lines: [quoteLine(skuId, { quantity: 3 })],
+      lines: [fixedLine(skuId, 800, { quantity: 3 })],
     });
     expect(quote.totalFen).toBe(2400);
     expect(quote.perLine).toEqual([2400]);
@@ -380,14 +402,78 @@ describe('FreightPort.quote', () => {
     expect((error as DomainError).code).toBe('SHIPPING_NOT_DELIVERABLE');
   });
 
+  /**
+   * 满额包邮 is settled here and nowhere else (CR-1-f2). Checkout cannot do it:
+   * by the time it knows the goods total it has already been handed a per-line
+   * quote, and a fixed-postage line is the case that proves the difference —
+   * legacy's `getOrderPriceGroup` charged it regardless of the threshold, which
+   * is the bug an operator reports as 「满额包邮不生效」.
+   *
+   * The setting is in 元 and everything else here is 分, so the boundary is
+   * worth pinning from both sides rather than only from above.
+   */
+  // FREIGHT-003 names this test, so the name stays exactly as it is.
   it('zeroes the postage once the shop-wide 满额包邮 threshold is met', async () => {
-    await harness.ctx.config.set(tradeConfig, { freeShippingThreshold: 99 });
+    await harness.ctx.config.set(orderConfig, { freeShippingThreshold: 99 });
     const skuId = await makeSku({ freightMode: 'fixed', fixedFreight: '8.00' });
     const quote = await freightPort.quote(harness.ctx.db, harness.ctx, {
       addressCityId: 330106,
-      lines: [quoteLine(skuId, { quantity: 1, amountFen: 9900 })],
+      lines: [fixedLine(skuId, 800, { quantity: 1, amountFen: 9900 })],
     });
     expect(quote.totalFen).toBe(0);
+    expect(quote.perLine).toEqual([0]);
+  });
+
+  it('still charges a fixed postage one fen below the threshold', async () => {
+    await harness.ctx.config.set(orderConfig, { freeShippingThreshold: 99 });
+    const skuId = await makeSku({ freightMode: 'fixed', fixedFreight: '8.00' });
+    const quote = await freightPort.quote(harness.ctx.db, harness.ctx, {
+      addressCityId: 330106,
+      lines: [fixedLine(skuId, 800, { quantity: 1, amountFen: 9899 })],
+    });
+    expect(quote.totalFen).toBe(800);
+  });
+
+  it('zeroes a template line too, and prorates nothing across the order', async () => {
+    await harness.ctx.config.set(orderConfig, { freeShippingThreshold: 99 });
+    const template = await templates.create(
+      harness.ctx,
+      form({
+        chargeMode: 'quantity',
+        regions: [
+          {
+            isFallback: false,
+            cityIds: ['330000'],
+            firstUnit: 1,
+            firstPrice: '12.00',
+            additionalUnit: 1,
+            additionalPrice: '6.00',
+          },
+        ],
+      }),
+    );
+    const templateSku = await makeSku({ freightMode: 'template', templateId: template.id });
+    const fixedSku = await makeSku({ freightMode: 'fixed', fixedFreight: '8.00' });
+    const quote = await freightPort.quote(harness.ctx.db, harness.ctx, {
+      addressCityId: 330106,
+      lines: [
+        quoteLine(templateSku, { amountFen: 5000, freightTemplateId: Number(template.id) }),
+        fixedLine(fixedSku, 800, { amountFen: 4900 }),
+      ],
+    });
+    // 50.00 + 49.00 = 99.00, exactly the threshold: both lines ship free.
+    expect(quote.totalFen).toBe(0);
+    expect(quote.perLine).toEqual([0, 0]);
+  });
+
+  it('leaves the postage alone when 满额包邮 is switched off', async () => {
+    await harness.ctx.config.set(orderConfig, { freeShippingThreshold: 0 });
+    const skuId = await makeSku({ freightMode: 'fixed', fixedFreight: '8.00' });
+    const quote = await freightPort.quote(harness.ctx.db, harness.ctx, {
+      addressCityId: 330106,
+      lines: [fixedLine(skuId, 800, { quantity: 2, amountFen: 100_000 })],
+    });
+    expect(quote.totalFen).toBe(1600);
   });
 });
 

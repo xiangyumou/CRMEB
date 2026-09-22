@@ -62,35 +62,51 @@ export function compileRoute(route: AnyRouteDef): CompiledRoute {
 }
 
 /**
- * Compares segment by segment; the first position where only one side is static
- * decides. Ties break on the path, which is what makes this a **total order**
- * and is not cosmetic.
+ * A route's shape as a string of `0` (static segment) and `1` (`:param`).
  *
- * Without the tie-break this returns 0 for every pair of unrelated paths, and a
- * comparator that reports 0 for pairs it cannot order is not transitive: `a < b`
- * and `b == c` and `c == a` can all hold at once. `Array.prototype.sort` is
- * allowed to do anything with such a comparator, and TimSort only compares a
- * subset of the pairs — so two routes that *are* ordered relative to each other
- * can still come out the wrong way round, depending on where the sort happens to
- * place them, which depends on the order the routes were registered in.
- *
- * That is how this surfaced: `/api/v1/my-messages/unread-count` and
- * `/api/v1/my-messages/:id` were ordered correctly for 397 routes and
- * incorrectly for 398, so adding one unrelated route (`/api/v1/readyz`) made the
- * static path lose to the dynamic one and the mock server answered a request for
- * the unread count with a 422 about an id that was not a number. Nothing about
- * either route had changed.
+ * `/api/v1/addresses/default` is `0000` and `/api/v1/addresses/:id` is `0001`,
+ * so plain string order puts the literal first — which is the rule the App
+ * Router follows and the only thing the sort has to achieve.
  */
-function bySpecificity(a: CompiledRoute, b: CompiledRoute): number {
-  const left = a.route.path.split('/');
-  const right = b.route.path.split('/');
-  for (let i = 0; i < Math.min(left.length, right.length); i += 1) {
-    const leftParam = left[i]?.startsWith(':') ?? false;
-    const rightParam = right[i]?.startsWith(':') ?? false;
-    if (leftParam !== rightParam) return leftParam ? 1 : -1;
-  }
-  if (a.route.path !== b.route.path) return a.route.path < b.route.path ? -1 : 1;
-  return 0;
+function shapeOf(path: string): string {
+  return path
+    .split('/')
+    .map((segment) => (segment.startsWith(':') ? '1' : '0'))
+    .join('');
+}
+
+/**
+ * Orders the routes so a static segment always beats a `:param` one at the
+ * first position where they differ.
+ *
+ * This compares whole **keys** rather than returning `0` for two unrelated
+ * paths, and that is the entire point. The earlier version walked the segments
+ * and returned `0` when neither side was more specific, which is not a total
+ * order: it is not transitive, so `Array.prototype.sort` was free to produce
+ * any arrangement consistent with the pairs it happened to compare. It did.
+ * Adding an unrelated route elsewhere in the registry moved
+ * `/api/v1/addresses/:id` in front of `/api/v1/addresses/default`, and the
+ * literal route started answering `422` because `default` is not an id — a
+ * failure in a file nobody had touched, caused by a file somewhere else.
+ *
+ * The path is the tie-break so the order is total and the mock server behaves
+ * the same however the aggregation happens to be ordered.
+ *
+ * Three streams fixed this bug on the same day (J3, B3, E4 — CR-3-e4). The
+ * segment-walking variant that broke ties on the path was **still** not
+ * transitive: a shorter all-static path (`/admin-api/attachment-categories`)
+ * compared by path against a longer one with a `:param` (`/admin-api/admins/:id`),
+ * while the longer static path between them was ordered by segment — 2.5 M bad
+ * triples over 412 routes. The key here is a (shape, path) tuple, which is a
+ * total order by construction; `mock-server.test.ts` asserts it over the whole
+ * table.
+ */
+export function bySpecificity(a: CompiledRoute, b: CompiledRoute): number {
+  const left = shapeOf(a.route.path);
+  const right = shapeOf(b.route.path);
+  if (left !== right) return left < right ? -1 : 1;
+  if (a.route.path === b.route.path) return 0;
+  return a.route.path < b.route.path ? -1 : 1;
 }
 
 function escapeRegex(value: string): string {

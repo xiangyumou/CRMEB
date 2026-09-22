@@ -47,7 +47,7 @@ export const STREAM_STATE: Readonly<Record<string, StreamState>> = {
   A2: 'merged', // catalog follow-up: staff 商品管理, template select, SkuPicker
   E4: 'in-flight', // user/wechat follow-up
   F4: 'in-flight', // system/kit/DIY follow-up
-  B3: 'in-flight', // order/cart/coupon follow-up
+  B3: 'merged', // order/cart/coupon follow-up
   J3: 'merged', // deploy follow-up: /readyz, CI jobs, invariants, cutover runbook
   H3: 'in-flight', // uni-app third pass: marker flips for A2/E4/F4/B3, captcha removal
   I: 'in-flight', // storefront e2e

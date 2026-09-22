@@ -13,6 +13,7 @@ import type {
   CartUpdateBody,
 } from '@shop/contracts/cart/schemas';
 import type { DbOrTx, Tx } from '@shop/db';
+import { recordCartAdd } from '../catalog';
 import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId } from '../kernel/ids';
@@ -196,6 +197,15 @@ export async function addItem(ctx: Ctx, body: CartAddBody): Promise<CartMutation
       skuId,
       quantity: body.quantity,
       cap: capFor(sku),
+    });
+    // 加购件数 on F3's product page (CR-1-f3 §2). In the same transaction as the
+    // row it describes, and through the catalog's seam rather than this
+    // domain's repo, because `product_events` is a catalog table.
+    await recordCartAdd(tx, ctx, {
+      productId: sku.productId,
+      skuId,
+      userId,
+      quantity: body.quantity,
     });
     return loadCart(ctx, tx, userId);
   });

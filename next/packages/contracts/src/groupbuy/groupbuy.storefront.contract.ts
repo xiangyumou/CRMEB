@@ -11,6 +11,8 @@ import {
   groupbuyOpenGroupExample,
   groupbuyPoster,
   groupbuyPosterExample,
+  groupbuySummary,
+  groupbuySummaryExample,
   myGroupbuyItemExample,
   myGroupbuyListQuery,
   pagedGroupbuyCards,
@@ -49,6 +51,29 @@ export const groupbuyList = defineRoute({
       query: { page: 1, pageSize: 20 },
       response: { items: [groupbuyCardExample], total: 1, page: 1, pageSize: 20 },
     },
+  ],
+});
+
+/**
+ * 人气条 (CR-1-h2). Public, because it is the first thing on the 拼团 tab and a
+ * signed-out visitor is exactly who the social proof is for.
+ *
+ * Cached for 60 s in Redis. The number is social proof, not an invoice: a
+ * minute of lag is invisible to a shopper and the difference between one
+ * aggregate a minute and one per tab open on a busy sale.
+ */
+export const groupbuySummaryRoute = defineRoute({
+  id: 'groupbuy.summary',
+  method: 'GET',
+  path: '/api/v1/groupbuy/summary',
+  auth: 'public',
+  summary: '拼团人气',
+  tags: ['groupbuy'],
+  response: groupbuySummary,
+  examples: [
+    { name: 'busy-shop', response: groupbuySummaryExample },
+    // A shop whose first activity has just opened. Not an error, not a 404.
+    { name: 'nobody-yet', response: { participants: 0, avatars: [] } },
   ],
 });
 

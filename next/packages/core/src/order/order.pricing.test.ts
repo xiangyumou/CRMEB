@@ -223,7 +223,12 @@ function sku(overrides: Partial<SkuForSale> = {}): SkuForSale {
 describe('freightLineOf', () => {
   it('converts kilograms to grams and cubic metres to cubic centimetres, per line', () => {
     const line = freightLineOf({
-      sku: sku({ weight: '1.500', volume: '0.0025', shippingTemplateId: 7 }),
+      sku: sku({
+        weight: '1.500',
+        volume: '0.0025',
+        freightMode: 'template',
+        shippingTemplateId: 7,
+      }),
       quantity: 2,
       subtotal: yuan('20.00'),
     });
@@ -231,6 +236,8 @@ describe('freightLineOf', () => {
     expect(line).toEqual({
       skuId: 1,
       quantity: 2,
+      freightMode: 'template',
+      fixedFreightFen: 0,
       freightTemplateId: 7,
       weight: 3000,
       volume: 5000,
@@ -242,5 +249,50 @@ describe('freightLineOf', () => {
     const line = freightLineOf({ sku: sku(), quantity: 1, subtotal: yuan('1.00') });
     expect(line.weight).toBe(0);
     expect(line.volume).toBe(0);
+  });
+
+  /**
+   * The point of CR-1-f2. A free line and a fixed-postage line both carry
+   * `shippingTemplateId: null`, so the template id alone cannot tell the port
+   * which one it is looking at — and they price differently. Carrying the mode
+   * on the line is what let the `FreightPort` stop re-reading the skus that
+   * checkout had just read, once per quote.
+   */
+  it('carries the freight mode so the port never has to re-read the sku', () => {
+    expect(freightLineOf({ sku: sku(), quantity: 1, subtotal: yuan('1.00') })).toMatchObject({
+      freightMode: 'free',
+      fixedFreightFen: 0,
+      freightTemplateId: null,
+    });
+
+    expect(
+      freightLineOf({
+        sku: sku({ freightMode: 'fixed', fixedFreight: '8.50' }),
+        quantity: 3,
+        subtotal: yuan('30.00'),
+      }),
+    ).toMatchObject({ freightMode: 'fixed', fixedFreightFen: 850, freightTemplateId: null });
+  });
+
+  it('reads a fixed postage of zero, and a missing one, as no postage', () => {
+    expect(
+      freightLineOf({
+        sku: sku({ freightMode: 'fixed', fixedFreight: null }),
+        quantity: 1,
+        subtotal: yuan('1.00'),
+      }).fixedFreightFen,
+    ).toBe(0);
+  });
+
+  it('ignores a stray fixed postage on a line that is not charged one', () => {
+    // Legacy left `postage` filled in after an operator switched a product to a
+    // template; charging it anyway is the 「改了模板还在收固定运费」 bug.
+    expect(
+      freightLineOf({
+        sku: sku({ freightMode: 'template', fixedFreight: '8.50', shippingTemplateId: 7 }),
+        quantity: 1,
+        subtotal: yuan('1.00'),
+      }).fixedFreightFen,
+    ).toBe(0);
   });
 });

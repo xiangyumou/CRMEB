@@ -5,6 +5,8 @@ import type {
   OrderListItem,
   OrderListQuery,
 } from '@shop/contracts/order/schemas';
+import type { UserCoupon } from '@shop/contracts/coupon/schemas';
+import * as coupon from '../coupon';
 import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { toId, toIdOrNull } from '../kernel/ids';
@@ -120,6 +122,36 @@ export async function detailOf(
   if (!row) throw new DomainError('ORDER_NOT_FOUND');
   const items = await repo.listItems(ctx.db, [row.id]);
   return toDetail(row, items.map(toOrderItem));
+}
+
+/**
+ * 订单赠券 — the coupons this order earned (CR-5-h2).
+ *
+ * Lives here rather than in the coupon domain because the interesting half is
+ * the *ownership* question, and this domain is the only one that may read
+ * `orders`. The coupon domain is handed two integers.
+ *
+ * The order is loaded even though nothing on it is returned. `requireOrderRef`
+ * only *resolves* the reference — an order number is looked up for this user,
+ * but a bare surrogate id is taken at face value, because every caller so far
+ * went on to read the order and find out. Skipping that read here would answer
+ * a stranger `{ items: [] }` with a `200`: harmless-looking, and still the
+ * difference between "no coupons" and "no such order of yours". The 404 says
+ * neither.
+ *
+ * Legacy put these inside the order detail payload, written at create time from
+ * `give_coupon_ids`. Keeping it a separate call means the wallet-shaped part of
+ * the answer can change without widening `OrderDetail`, and the 订单详情 page
+ * still renders while it is in flight.
+ */
+export async function giftCoupons(
+  ctx: Ctx,
+  params: { id: string },
+): Promise<{ items: UserCoupon[] }> {
+  const { orderId, userId } = await requireOrderRef(ctx, params.id);
+  const order = await repo.findOrderForUser(ctx.db, { id: orderId, userId });
+  if (!order) throw new DomainError('ORDER_NOT_FOUND');
+  return coupon.listOrderGifts(ctx, { orderId, userId });
 }
 
 // ---------------------------------------------------------------------------

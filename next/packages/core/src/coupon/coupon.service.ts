@@ -14,6 +14,9 @@ import type {
   CouponTemplateListQuery,
   CouponTemplateStatusBody,
   MyCouponListQuery,
+  StaffCoupon,
+  StaffCouponGrantBody,
+  StaffCouponListQuery,
   UserCoupon,
 } from '@shop/contracts/coupon/schemas';
 import type { PageQuery } from '@shop/contracts/conventions';
@@ -262,8 +265,77 @@ export async function adminListUserCoupons(
 }
 
 // ---------------------------------------------------------------------------
+// 移动端店员发券 (CR-5-h2)
+// ---------------------------------------------------------------------------
+
+/**
+ * The coupons a staff member may hand out: the `active` templates, newest
+ * first, optionally filtered by name.
+ *
+ * `draft` and `disabled` are excluded rather than greyed out. The web console
+ * lists them because an operator edits them there; on the phone the only
+ * action is 发放, and a row that can never be tapped is a support call.
+ *
+ * A sold-out template *is* listed, with `remainingCount: 0`. The staff member
+ * has to be able to see why the coupon they were told to give out is not
+ * working.
+ */
+export async function staffListCoupons(
+  ctx: Ctx,
+  query: StaffCouponListQuery,
+): Promise<{ items: StaffCoupon[]; total: number; page: number; pageSize: number }> {
+  const { rows, total } = await repo.listTemplates(ctx.db, {
+    keyword: query.keyword,
+    status: ['active'],
+    ...pageBounds(query),
+  });
+  return {
+    items: rows.map(toStaffCoupon),
+    total,
+    page: query.page,
+    pageSize: query.pageSize,
+  };
+}
+
+/**
+ * One coupon to one customer, from the phone.
+ *
+ * Delegates to `adminGrant` rather than reimplementing it. Everything that
+ * makes a grant correct under load — the supply decrement that can lose,
+ * `issueOne`'s insert-before-decrement ordering, the per-user limit reported as
+ * a skip rather than an error — lives in exactly one place, so the two consoles
+ * cannot drift apart on the questions that cost money.
+ */
+export async function staffGrant(ctx: Ctx, body: StaffCouponGrantBody): Promise<CouponGrantResult> {
+  return adminGrant(ctx, { id: body.couponId }, { userIds: [body.userId] });
+}
+
+// ---------------------------------------------------------------------------
 // storefront
 // ---------------------------------------------------------------------------
+
+/**
+ * The coupons one order earned.
+ *
+ * The caller (`order.query.service.ts`) has already resolved `:id` and proved
+ * the order is this shopper's, which is why this takes ids rather than the
+ * route's params: the coupon domain has no business reading `orders`.
+ *
+ * Empty is a normal answer, so there is no "not found" here at all — an order
+ * that earned nothing and an order whose gift templates were all sold out look
+ * the same to the buyer, and both are true.
+ */
+export async function listOrderGifts(
+  ctx: Ctx,
+  input: { orderId: number; userId: number },
+): Promise<{ items: UserCoupon[] }> {
+  const rows = await repo.listOrderGiftCoupons(ctx.db, input);
+  const terms = await repo.templateTermsFor(
+    ctx.db,
+    rows.map((row) => row.templateId),
+  );
+  return { items: rows.map((row) => toUserCoupon(row, termsOf(terms, row.templateId))) };
+}
 
 export async function listClaimable(
   ctx: Ctx,
@@ -795,6 +867,24 @@ function toListItem(row: repo.TemplateRow, issuedCount: number): CouponTemplateL
     giftMinOrderAmount: row.giftMinOrderAmount,
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/** The phone's slimmer row. See `staffCoupon` in the contract for what is left out and why. */
+function toStaffCoupon(row: repo.TemplateRow): StaffCoupon {
+  return {
+    id: String(row.id),
+    name: row.name,
+    discountAmount: row.discountAmount,
+    minSpend: row.minSpend,
+    scope: row.scope,
+    validityMode: row.validityMode,
+    validFrom: iso(row.validFrom),
+    validTo: iso(row.validTo),
+    validDays: row.validDays,
+    isUnlimitedSupply: row.isUnlimitedSupply,
+    remainingCount: row.remainingCount,
+    perUserLimit: row.perUserLimit,
   };
 }
 

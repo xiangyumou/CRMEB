@@ -11,9 +11,11 @@
  * `mappers/system.ts` has a `configKeyMap` input for the same job. The runner
  * does not use it, for one concrete reason: several legacy keys are claimed by
  * **more than one** group while the transition runs — `wechat_appid` by both
- * `wechat` (C's) and `wechat-oa` (F1's), `system_delivery_time` by both
- * `order-fulfil` and the not-yet-dissolved `trade` (CR-6-f1), `store_stock` by
- * both `catalog` and `trade`. `ReadonlyMap<string, {group, key}>` can only
+ * `wechat` (C's) and `wechat-oa` (F1's). F1's `trade` group was the largest
+ * source of these until CR-6-f1 dissolved it into `order`; the overlaps it left
+ * behind are now single-claimant fields carrying two *aliases*
+ * (`catalog.autoReviewContent`, `refund.return*`), which this file handles the
+ * same way. `ReadonlyMap<string, {group, key}>` can only
  * express one, so a key would land in one group and silently not in the other,
  * and the shop would come up with half a setting. Here a key fans out to every
  * claimant. The mapper is untouched; see `CR-1-j`.

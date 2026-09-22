@@ -200,6 +200,13 @@ export function freightLineOf(line: {
     skuId: line.sku.skuId,
     quantity: line.quantity,
     freightTemplateId: line.sku.shippingTemplateId,
+    // CR-1-f2. The mode travels with the line because only this side has the
+    // `SkuForSale` in hand; `null` template plus 'free' and `null` template
+    // plus 'fixed' are two different prices and the port cannot tell them
+    // apart from a template id.
+    freightMode: line.sku.freightMode,
+    fixedFreightFen:
+      line.sku.freightMode === 'fixed' ? Money.parseOrZero(line.sku.fixedFreight).fen : 0,
     weight: gramsOf(line.sku.weight) * line.quantity,
     volume: cubicCentimetresOf(line.sku.volume) * line.quantity,
     amountFen: line.subtotal.fen,

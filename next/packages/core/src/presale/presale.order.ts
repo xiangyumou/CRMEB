@@ -4,7 +4,6 @@ import { DomainError, validationFailed } from '../kernel/errors';
 import { Money } from '../kernel/money';
 import { recordEffect } from '../effects/index';
 import {
-  getPricingContributors,
   onOrderCancelled,
   onOrderPaid,
   onOrderRefunded,
@@ -94,12 +93,15 @@ export const presaleKindHandler: OrderKindHandler = {
    * `orders.coupon_discount` (CR-3-b1). So comparing the campaign total against
    * `goodsTotal` would refuse every correctly priced presale order.
    *
-   * What has to be true instead is that the contributor *fired*: ask the one
-   * registered under this domain's name what it takes off this very draft, and
-   * refuse unless it is exactly the difference between the catalogue and the
-   * campaign. An unregistered, replaced or silently-returning-nothing
-   * contributor is the one failure that would bill a shopper the catalogue
-   * price for a presale, and this is what catches it.
+   * What has to be true instead is that the contributor *fired*: `draft.adjustments`
+   * carries what the pricing pass actually took off, by contributor (CR-1-d2),
+   * so the guard is a lookup by source and refuses unless it is exactly the
+   * difference between the catalogue and the campaign. An unregistered,
+   * replaced or silently-returning-nothing contributor is the one failure that
+   * would bill a shopper the catalogue price for a presale, and this is what
+   * catches it. A missing entry reads as `Money.ZERO`, which is the right
+   * answer twice over: nothing was taken off, and a campaign that discounts
+   * nothing passes because the shopper pays the same either way.
    */
   async beforeCreate(ctx: Ctx, tx: Tx, draft: PricingDraft): Promise<Record<string, unknown>> {
     const activityId = readSelection(draft, 'activityId');
@@ -117,10 +119,11 @@ export const presaleKindHandler: OrderKindHandler = {
     const skus = await repo.listActivitySkus(tx, [activityId]);
     const prices = new Map(skus.filter((s) => s.isEnabled).map((s) => [s.skuId, s.price]));
     const campaignTotal = expectedGoodsTotal(lines, prices);
+    const mine = draft.adjustments?.find((adjustment) => adjustment.source === PRICING_SOURCE);
     assertActivityPriceApplied({
       // Negative: what the campaign owes the shopper off the catalogue price.
       expected: campaignTotal.sub(draft.goodsTotal),
-      actual: await contributedAdjustment(ctx, tx, draft, activityId),
+      actual: mine?.amount ?? Money.ZERO,
       activityId,
     });
 
@@ -197,54 +200,6 @@ export const presaleKindHandler: OrderKindHandler = {
     });
   },
 };
-
-/**
- * What the registered presale contributor would take off this draft.
- *
- * `beforeCreate` is handed the pre-discount totals and no view of the
- * adjustments the pricing pass produced, so the only way to know the campaign
- * price reached the order is to ask the contributor again (**CR-1-d2** asks B1
- * to put the applied adjustments on `PricingDraft`, which would make this
- * free). `selections` is rebuilt with `kind` because the kind handler is given
- * `kindMeta` alone while the pricing pass is given `kind` as well.
- *
- * The contributor runs against **this transaction**, not `ctx.db`, and that is
- * not a detail: `beforeCreate` already holds a pooled connection, so a context
- * that reaches for a second one deadlocks the pool as soon as as many orders
- * are placed at once as the pool is wide — twelve simultaneous checkouts
- * against a pool of twelve, which is exactly what the concurrency suite does.
- * It is also the more correct read: the same snapshot the rest of the handler
- * sees.
- *
- * Nothing registered under the name means nothing was taken off, which is
- * exactly the `Money.ZERO` this returns — and a campaign that discounts
- * nothing passes, correctly, because the shopper pays the same either way.
- */
-async function contributedAdjustment(
-  ctx: Ctx,
-  tx: Tx,
-  draft: PricingDraft,
-  activityId: number,
-): Promise<Money> {
-  const contributor = getPricingContributors().find((c) => c.name === PRICING_SOURCE);
-  if (!contributor) return Money.ZERO;
-  const adjustments = await contributor.contribute(inTx(ctx, tx), {
-    ...draft,
-    selections: { ...draft.selections, kind: KIND, activityId: String(activityId) },
-  });
-  return Money.sum(adjustments.map((adjustment) => adjustment.amount));
-}
-
-/**
- * The same context, reading through an open transaction.
- *
- * The cast is the one place this domain admits that `Ctx['db']` and `Tx` are
- * two types for the same thing — every repo function in this folder is declared
- * on `Tx` and called with both.
- */
-function inTx(ctx: Ctx, tx: Tx): Ctx {
-  return { ...ctx, db: tx as unknown as Ctx['db'] };
-}
 
 // ---------------------------------------------------------------------------
 // the pricing contributor

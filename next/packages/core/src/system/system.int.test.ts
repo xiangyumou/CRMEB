@@ -398,7 +398,7 @@ describe('config', () => {
   it('refuses a value the schema rejects, and writes nothing', async () => {
     const ctx = as(superId);
     expect(
-      await code(configSave(ctx, { group: 'trade' }, { values: { autoReceiveDays: -5 } })),
+      await code(configSave(ctx, { group: 'order' }, { values: { payWindowMinutes: -5 } })),
     ).toBe('VALIDATION_FAILED');
     expect(await harness.ctx.db.select().from(configValues)).toHaveLength(0);
   });

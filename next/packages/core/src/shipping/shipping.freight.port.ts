@@ -3,8 +3,7 @@ import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { toId } from '../kernel/ids';
 import { registerFreightPort, type FreightLine, type FreightQuote } from '../order/ports';
-import { resolveCatalogPort } from '../order';
-import { tradeConfig } from '../system';
+import { orderConfig } from '../order';
 import {
   computeFreight,
   type FreightInputLine,
@@ -23,14 +22,18 @@ import * as repo from './shipping.template.repo';
  *
  * Two seams worth naming:
  *
- *  - **the line's freight mode.** `FreightLine` carries a
- *    `freightTemplateId` and nothing else, so a free line and a fixed-postage
- *    line look identical to the port. Until CR-1-f2 lands, the skus are re-read
- *    through the registered `CatalogPort` — one query on a table checkout has
- *    just read — and `freightMode` / `fixedFreight` come from there.
+ *  - **the line's freight mode.** `FreightLine` carries `freightMode` and
+ *    `fixedFreightFen` (CR-1-f2, landed), so a free line and a fixed-postage
+ *    line — both of which carry a `null` template id — are told apart from the
+ *    argument. This port used to re-read the skus through the registered
+ *    `CatalogPort` to find out, one extra query per quote on a table checkout
+ *    had just read; that adapter is gone.
  *  - **the address.** A region rule may name a province, a city or a district,
  *    so the address's division is expanded into its ancestor chain and the
  *    narrowest matching rule wins.
+ *
+ * 满额包邮 is settled here rather than in checkout, because only this side can
+ * see that a fixed-postage line was part of the order it has to zero.
  */
 
 export const freightPort = {
@@ -42,26 +45,22 @@ export const freightPort = {
     const empty = { totalFen: 0, perLine: input.lines.map(() => 0) };
     if (input.lines.length === 0) return empty;
 
-    const [cityPath, modes, config] = await Promise.all([
+    const [cityPath, config] = await Promise.all([
       cityPathOf(db, input.addressCityId),
-      freightModesOf(db, input.lines),
-      ctx.config.get(tradeConfig),
+      ctx.config.get(orderConfig),
     ]);
 
-    const lines: FreightInputLine[] = input.lines.map((line, index) => {
-      const mode = modes.get(line.skuId);
-      return {
-        index,
-        skuId: line.skuId,
-        quantity: line.quantity,
-        weight: line.weight,
-        volume: line.volume,
-        amountFen: line.amountFen,
-        mode: mode?.mode ?? (line.freightTemplateId === null ? 'free' : 'template'),
-        fixedFreightFen: mode?.fixedFreightFen ?? 0,
-        templateId: line.freightTemplateId,
-      };
-    });
+    const lines: FreightInputLine[] = input.lines.map((line, index) => ({
+      index,
+      skuId: line.skuId,
+      quantity: line.quantity,
+      weight: line.weight,
+      volume: line.volume,
+      amountFen: line.amountFen,
+      mode: line.freightMode,
+      fixedFreightFen: line.fixedFreightFen,
+      templateId: line.freightTemplateId,
+    }));
 
     const templateIds = [
       ...new Set(
@@ -108,31 +107,6 @@ export function registerShippingFreightPort(): void {
 async function cityPathOf(db: DbOrTx, addressCityId: number | null): Promise<number[]> {
   if (addressCityId === null) return [];
   return cityRepo.cityAncestry(db, addressCityId);
-}
-
-interface LineMode {
-  mode: 'free' | 'fixed' | 'template';
-  fixedFreightFen: number;
-}
-
-/** CR-1-f2's local adapter. Deleted the day `FreightLine` carries the mode itself. */
-async function freightModesOf(
-  db: DbOrTx,
-  lines: readonly FreightLine[],
-): Promise<Map<number, LineMode>> {
-  const out = new Map<number, LineMode>();
-  const skus = await resolveCatalogPort().getSkusForSale(
-    db,
-    lines.map((line) => line.skuId),
-  );
-  for (const [skuId, sku] of skus) {
-    out.set(skuId, {
-      mode: sku.freightMode,
-      fixedFreightFen:
-        sku.freightMode === 'fixed' ? Math.round(Number(sku.fixedFreight ?? '0') * 100) : 0,
-    });
-  }
-  return out;
 }
 
 async function loadTemplates(

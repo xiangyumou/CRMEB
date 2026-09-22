@@ -423,3 +423,88 @@ export const claimableCouponExample: ClaimableCoupon = {
   claimedCount: 0,
   canClaim: true,
 };
+
+// ---------------------------------------------------------------------------
+// 移动端店员发券 (CR-5-h2)
+// ---------------------------------------------------------------------------
+
+/**
+ * One grantable coupon as the staff console lists it.
+ *
+ * Deliberately smaller than `couponTemplateListItem`: no `issuedCount`, no
+ * `totalCount`, no `sortOrder`, no `giftMinOrderAmount`. A staff member picks a
+ * coupon and a customer; how the campaign is performing is the web console's
+ * business, the same line the rest of 移动端商家管理 draws (`order.staff.contract.ts`).
+ *
+ * `remainingCount` stays, because it is the one number that changes whether the
+ * next tap can succeed.
+ */
+export const staffCoupon = z.object({
+  id,
+  name: z.string(),
+  discountAmount: money,
+  minSpend: money,
+  scope: couponScope,
+  validityMode: couponValidityMode,
+  validFrom: instant.nullable(),
+  validTo: instant.nullable(),
+  validDays: z.number().int().nullable(),
+  isUnlimitedSupply: z.boolean(),
+  /** `null` when the supply is unlimited. */
+  remainingCount: z.number().int().nullable(),
+  perUserLimit: z.number().int().nullable(),
+});
+export type StaffCoupon = z.infer<typeof staffCoupon>;
+
+export const staffCouponListQuery = pageQuery.extend({
+  /** Matches the coupon name, case-insensitively. */
+  keyword: z.string().trim().max(50).optional(),
+});
+export type StaffCouponListQuery = z.infer<typeof staffCouponListQuery>;
+
+export const pagedStaffCoupons = paged(staffCoupon);
+
+/**
+ * One coupon to one customer.
+ *
+ * Singular where `couponGrantBody` is plural, because the phone's flow is 选客户
+ * → 选券 → 发放 and a multi-select of users on a phone is a different screen
+ * nobody asked for. The service behind it is `adminGrant` unchanged, so the
+ * supply race and the per-user limit behave identically on both surfaces.
+ */
+export const staffCouponGrantBody = z.object({
+  userId: id,
+  couponId: id,
+});
+export type StaffCouponGrantBody = z.infer<typeof staffCouponGrantBody>;
+
+// ---------------------------------------------------------------------------
+// 订单赠券 (CR-5-h2)
+// ---------------------------------------------------------------------------
+
+/**
+ * The coupons an order earned, in the order they were issued.
+ *
+ * Always a `200`. An order that earned nothing answers `{ items: [] }`, because
+ * "this order came with no coupons" is a fact about the order, not a failure —
+ * and the 订单详情 page asks for this on every open.
+ */
+export const orderGiftCoupons = z.object({
+  items: z.array(userCoupon),
+});
+export type OrderGiftCoupons = z.infer<typeof orderGiftCoupons>;
+
+export const staffCouponExample: StaffCoupon = {
+  id: '1',
+  name: '满 100 减 10',
+  discountAmount: '10.00',
+  minSpend: '100.00',
+  scope: 'all_products',
+  validityMode: 'fixed_window',
+  validFrom: '2026-01-01T00:00:00+08:00',
+  validTo: '2026-12-31T23:59:59+08:00',
+  validDays: null,
+  isUnlimitedSupply: false,
+  remainingCount: 873,
+  perUserLimit: 1,
+};

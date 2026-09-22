@@ -109,7 +109,11 @@ export const catalogConfig = defineConfigGroup({
   legacyKeys: {
     stockWarningThreshold: 'store_stock',
     autoReviewDays: 'product_replay_days',
-    autoReviewContent: 'product_replay_content',
+    // `comment_content` first, and it is the one that exists: `crmeb.sql` ships
+    // `comment_content`, never `product_replay_content`. F1's deleted `trade`
+    // group held the real key while this field — the one the auto-review job
+    // actually writes — claimed a name nobody had stored (CR-6-f1).
+    autoReviewContent: ['comment_content', 'product_replay_content'],
     browseHistoryDays: 'visit_list_days',
   },
 });

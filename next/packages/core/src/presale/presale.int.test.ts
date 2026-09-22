@@ -6,16 +6,21 @@ import { presaleActivities, presaleActivitySkus, presaleOrders } from '@shop/db/
 import { orderItems, orders } from '@shop/db/schema/order';
 import { refunds } from '@shop/db/schema/refund';
 import { users } from '@shop/db/schema/user';
+import type { Tx } from '@shop/db';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import type { Actor, Ctx } from '../kernel/context';
 import { Money } from '../kernel/money';
 import { withTx } from '../kernel/tx';
+import { splitAdjustments } from '../order';
 import {
+  getPricingContributors,
   onOrderCancelled,
   onOrderPaid,
   onOrderRefunded,
   registerPricingContributor,
   resetOrderPorts,
+  type PriceAdjustment,
+  type PricingDraft,
 } from '../order/ports';
 import { presaleConfig } from './presale.config';
 import { sweepPresaleWindows } from './presale.jobs';
@@ -248,24 +253,48 @@ async function placeOrder(args: {
   const ctx = asUser(args.userId);
   const quantity = args.quantity ?? 1;
   const total = Money.parse(args.amount ?? args.fixture.price).mul(quantity);
+  const lines = [
+    {
+      skuId: args.skuId ?? args.fixture.skuId,
+      productId: args.fixture.productId,
+      quantity,
+      unitPrice: Money.parse(args.amount ?? args.fixture.price),
+      subtotal: total,
+    },
+  ];
   await withTx(harness.ctx.db, async (tx) => {
-    const meta = await presaleKindHandler.beforeCreate(ctx, tx, {
+    const draft: PricingDraft = {
       userId: args.userId,
-      lines: [
-        {
-          skuId: args.skuId ?? args.fixture.skuId,
-          productId: args.fixture.productId,
-          quantity,
-          unitPrice: Money.parse(args.amount ?? args.fixture.price),
-          subtotal: total,
-        },
-      ],
+      lines,
       goodsTotal: total,
       selections: { kind: 'presale', activityId: String(args.fixture.activityId) },
+    };
+    const meta = await presaleKindHandler.beforeCreate(ctx, tx, {
+      ...draft,
+      adjustments: await priceDraft(ctx, tx, draft),
     });
     await presaleKindHandler.afterCreate(ctx, tx, order.orderId, meta);
   });
   return order.orderId;
+}
+
+/**
+ * B1's pricing pass, in miniature (CR-1-d2).
+ *
+ * `beforeCreate` no longer re-runs the contributor to find out whether it
+ * fired: `create` hands it what the pass actually applied. A driver that did
+ * not do the same would be testing a guard against a draft no real checkout
+ * produces, so this runs every registered contributor over the draft and splits
+ * the result exactly as `create` does — on the caller's transaction, which is
+ * also how B1 avoids a second pooled connection per checkout.
+ */
+async function priceDraft(ctx: Ctx, tx: Tx, draft: PricingDraft) {
+  const reading = { ...ctx, db: tx as Ctx['db'] };
+  const raw: PriceAdjustment[] = [];
+  for (const contributor of getPricingContributors()) {
+    raw.push(...(await contributor.contribute(reading, draft)));
+  }
+  return splitAdjustments(draft.lines, raw).applied;
 }
 
 /** Marks the order paid and fires the hook, the way stream C's callback does. */

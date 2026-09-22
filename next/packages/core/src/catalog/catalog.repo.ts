@@ -2205,6 +2205,39 @@ export async function recordFavoriteEvent(
 }
 
 /**
+ * Record units going into a cart (CR-1-f3 §2).
+ *
+ * Unlike a view or a favourite this one carries a `skuId` and a real
+ * `quantity`: F3's product page reports 加购件数 as
+ * `sum(quantity) filter (where kind = 'cart')`, not a row count. The event is
+ * the *delta* the shopper just added, so two taps of 加入购物车 with `1` are two
+ * rows summing to 2 — the same number legacy accumulated in
+ * `eb_store_product_log.cart_num`.
+ *
+ * Append-only and never retracted: emptying the cart afterwards does not
+ * un-add it, because the metric is interest, not inventory.
+ */
+export async function recordCartEvent(
+  tx: Tx,
+  args: {
+    productId: number;
+    skuId: number;
+    userId: number;
+    quantity: number;
+    platform: ProductEventPlatform;
+  },
+): Promise<void> {
+  await tx.insert(productEvents).values({
+    productId: args.productId,
+    skuId: args.skuId,
+    userId: args.userId,
+    kind: 'cart',
+    quantity: args.quantity,
+    platform: args.platform,
+  });
+}
+
+/**
  * 我的足迹: the shopper's most recent view of each product.
  *
  * `max(created_at)` grouped by product, so revisiting a product moves it to the

@@ -12,6 +12,7 @@
  * | ----------------------- | ---------- | ------------------------------------------------- |
  * | `getSkuForSale`         | B1         | pricing the cart, confirming and creating an order |
  * | `checkPurchaseAllowance`| B1         | 起购 / 限购, inside the order transaction           |
+ * | `recordCartAdd`         | B1         | 加购件数, inside the cart's add transaction          |
  * | `getStockPort()`        | B1 / C / D | reserve, commit, release — via `order/ports.ts`    |
  * | `getCatalogPort()`      | B1         | the batch cart read, via `order/catalog.port.ts`   |
  * | `issueVirtualCard`      | B2         | handing a card key to a paid order line            |
@@ -22,7 +23,8 @@
  * | `runAutoReview`         | worker     | the 系统默认好评 sweep                              |
  * | `pruneBrowseHistory`    | worker     | the 足迹 retention sweep                           |
  *
- * `checkPurchaseAllowance` and `issueVirtualCard` take `(tx, …)` — a
+ * `checkPurchaseAllowance`, `issueVirtualCard` and `recordCartAdd` take
+ * `(tx, …)` — a
  * transaction the *caller* owns — matching `recordEffect(tx, ctx, input)`, the
  * platform's other "join the transaction you are already in" primitive.
  *
@@ -91,6 +93,7 @@ export {
   getSkuForSale,
   issueVirtualCard,
   productCardsFor,
+  recordCartAdd,
   // shared mappers, for the other catalog service files and the tests
   toProductCard,
 } from './catalog.service';

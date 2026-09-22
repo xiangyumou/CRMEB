@@ -48,9 +48,13 @@ describe('fakePaymentPort', () => {
 describe('flatRateFreight', () => {
   it('splits the fee so perLine always sums to totalFen', async () => {
     const port = flatRateFreight(1000);
+    // `freightMode` / `fixedFreightFen` are part of a `FreightLine` since
+    // CR-1-f2; the flat-rate fake ignores both, but the shape has to be whole.
     const line = (skuId: number) => ({
       skuId,
       quantity: 1,
+      freightMode: 'free' as const,
+      fixedFreightFen: 0,
       freightTemplateId: null,
       weight: 0,
       volume: 0,
@@ -74,7 +78,16 @@ describe('flatRateFreight', () => {
     const free = await freeFreight().quote(ctx, ctx, {
       addressCityId: null,
       lines: [
-        { skuId: 1, quantity: 1, freightTemplateId: null, weight: 0, volume: 0, amountFen: 1 },
+        {
+          skuId: 1,
+          quantity: 1,
+          freightMode: 'free' as const,
+          fixedFreightFen: 0,
+          freightTemplateId: null,
+          weight: 0,
+          volume: 0,
+          amountFen: 1,
+        },
       ],
     });
     expect(free).toEqual({ totalFen: 0, perLine: [0] });

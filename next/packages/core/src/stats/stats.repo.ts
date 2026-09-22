@@ -322,7 +322,9 @@ export async function visitAggregate(
  * 商品浏览量 / 商品访客数 / 加购件数.
  *
  * `view` rows are written by the catalog domain on every product detail read;
- * `cart` rows are not written by anybody yet (CR-1-f3). Anonymous views count
+ * `cart` rows by the cart's add path, through `catalog.recordCartAdd`, since
+ * CR-1-f3 §2 — 加购件数 sums their `quantity`, so it is units added and not taps
+ * of the button. Anonymous views count
  * towards 浏览量 and never towards 访客数: `product_events` has no session
  * identity, and inventing one would make the conversion rate a fiction.
  */

@@ -64,6 +64,9 @@ beforeEach(async () => {
   // `truncateAll` empties the settings table but not the config cache, and a
   // test that switches 虚拟成团 on would otherwise leak it into the next one.
   await harness.ctx.config.invalidate(groupbuyConfig.group);
+  // The 人气条 is cached in Redis for a minute (CR-1-h2); without this a test
+  // reads the previous test's count.
+  await harness.redis.flushdb();
   harness.clock.set(NOW);
   resetOrderPorts();
   clearAutoRefundPort();
@@ -980,6 +983,144 @@ describe('the storefront surface', () => {
     expect(poster.qrPayload).toContain(String(opened.groupId));
     expect(poster.seatsLeft).toBe(2);
     expect(poster.leaderNickname).toBe('小明');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 人气条 (CR-1-h2)
+// ---------------------------------------------------------------------------
+
+/**
+ * `summary` counts **distinct users currently taking part**, which is the whole
+ * difference from legacy: `getCombinationIndex` counted rows in `store_pink`,
+ * so refunds, dead teams and repeat joins all pushed the number up and it could
+ * only ever grow. Each case below is one of the ways that number used to lie.
+ */
+/** The avatars those users joined with, in the order given. */
+async function avatarsOf(userIds: readonly number[]): Promise<string[]> {
+  const rows = await harness.ctx.db
+    .select({ id: users.id, avatarUrl: users.avatarUrl })
+    .from(users);
+  const byId = new Map(rows.map((row) => [row.id, row.avatarUrl]));
+  return userIds.map((userId) => byId.get(userId) ?? '');
+}
+
+describe('the 人气条 summary', () => {
+  it('counts nobody, and offers no faces, before anybody joins', async () => {
+    await makeActivity({ stock: 10 });
+    expect(await service.summary(harness.ctx)).toEqual({ participants: 0, avatars: [] });
+  });
+
+  it('counts a shopper once however many teams they are in', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const other = await makeActivity({ stock: 10 });
+    const keen = await makeUser('小明');
+    await pay((await placeOrder({ userId: keen, fixture })).orderId);
+    await pay((await placeOrder({ userId: keen, fixture: other })).orderId);
+
+    const summary = await service.summary(harness.ctx);
+    expect(summary.participants).toBe(1);
+    expect(summary.avatars).toHaveLength(1);
+  });
+
+  it('counts a succeeded team, and forgets a failed one', async () => {
+    const fixture = await makeActivity({ seatsRequired: 2, stock: 10 });
+    const first = await makeUser();
+    const second = await makeUser();
+    const opened = await placeOrder({ userId: first, fixture });
+    await pay(opened.orderId);
+    await pay((await placeOrder({ userId: second, fixture, groupId: opened.groupId })).orderId);
+
+    const [group] = await harness.ctx.db
+      .select()
+      .from(groupbuyGroups)
+      .where(eq(groupbuyGroups.id, opened.groupId));
+    expect(group?.status).toBe('succeeded');
+    expect((await service.summary(harness.ctx)).participants).toBe(2);
+
+    // A team that ran out of time is nobody's 参与中.
+    await harness.redis.flushdb();
+    const lonely = await makeActivity({ ttlSeconds: 60, stock: 10 });
+    const straggler = await makeUser();
+    await pay((await placeOrder({ userId: straggler, fixture: lonely })).orderId);
+    harness.clock.advance(120_000);
+    await settleExpiredGroups(harness.ctx);
+
+    await harness.redis.flushdb();
+    expect((await service.summary(harness.ctx)).participants).toBe(2);
+  });
+
+  it('drops a member who left, without touching the rest of the team', async () => {
+    const fixture = await makeActivity({ seatsRequired: 3, stock: 10 });
+    const leader = await makeUser();
+    const joiner = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    const joined = await placeOrder({ userId: joiner, fixture, groupId: opened.groupId });
+    await pay(joined.orderId);
+    expect((await service.summary(harness.ctx)).participants).toBe(2);
+
+    await refund(joined.orderId);
+    await harness.redis.flushdb();
+    expect((await service.summary(harness.ctx)).participants).toBe(1);
+  });
+
+  it('ignores a team on an activity that is no longer live', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const buyer = await makeUser();
+    await pay((await placeOrder({ userId: buyer, fixture })).orderId);
+    expect((await service.summary(harness.ctx)).participants).toBe(1);
+
+    await harness.ctx.db
+      .update(groupbuyActivities)
+      .set({ status: 'paused' })
+      .where(eq(groupbuyActivities.id, fixture.activityId));
+    await harness.redis.flushdb();
+    expect((await service.summary(harness.ctx)).participants).toBe(0);
+  });
+
+  /**
+   * Eight, most recent first, one per person. The bug worth pinning is the
+   * de-duplication *order*: take the latest rows and then dedupe, and one
+   * shopper in three teams costs two faces.
+   */
+  it('shows at most eight faces, newest first, one per shopper', async () => {
+    const fixture = await makeActivity({ seatsRequired: 12, stock: 40 });
+    const opened = await placeOrder({ userId: await makeUser(), fixture });
+    await pay(opened.orderId);
+    const joiners: number[] = [];
+    for (let index = 0; index < 9; index += 1) {
+      const userId = await makeUser();
+      joiners.push(userId);
+      await pay((await placeOrder({ userId, fixture, groupId: opened.groupId })).orderId);
+    }
+
+    const summary = await service.summary(harness.ctx);
+    expect(summary.participants).toBe(10);
+    // Newest first: the last eight joiners. The leader and the first joiner
+    // fall off the end, in that order.
+    const newest = [...joiners].reverse().slice(0, 8);
+    expect(summary.avatars).toEqual(await avatarsOf(newest));
+  });
+
+  /**
+   * The cache is the point of the route, so it is asserted rather than assumed:
+   * a second call must not see a change made in between, and must see it once
+   * the key is gone.
+   */
+  it('serves the same answer for a minute, then recomputes', async () => {
+    const fixture = await makeActivity({ seatsRequired: 3, stock: 10 });
+    const leader = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    expect((await service.summary(harness.ctx)).participants).toBe(1);
+
+    const joiner = await makeUser();
+    await pay((await placeOrder({ userId: joiner, fixture, groupId: opened.groupId })).orderId);
+    expect((await service.summary(harness.ctx)).participants).toBe(1);
+
+    await harness.redis.flushdb();
+    expect((await service.summary(harness.ctx)).participants).toBe(2);
   });
 });
 

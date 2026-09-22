@@ -16,6 +16,7 @@ import {
 } from '../order/ports';
 import * as repo from './groupbuy.repo';
 import {
+  assertActivityDiscountApplied,
   assertActivityOpen,
   assertActivityPriceApplied,
   assertGroupJoinable,
@@ -43,6 +44,9 @@ import {
  */
 
 const KIND = 'groupbuy';
+
+/** The contributor's name, used both to register it and to check it fired. */
+const PRICING_SOURCE = 'groupbuy:activity-price';
 
 interface KindMeta {
   activityId: number;
@@ -80,11 +84,15 @@ export const groupbuyKindHandler: OrderKindHandler = {
   /**
    * Everything that can refuse the order, before a row exists.
    *
-   * The activity's own price is computed here and carried in the meta, but it
-   * is *checked* in `afterCreate` — `draft.goodsTotal` is the sum of the line
-   * subtotals before any adjustment, so at this point it is the catalogue
-   * price even on a correctly priced group-buy order. What the shopper is
-   * actually charged only exists once the lines are written.
+   * The activity's own price is computed here and carried in the meta for
+   * `afterCreate` to check against the written lines. `draft.goodsTotal` is the
+   * sum of the line subtotals before any adjustment, so it is the *catalogue*
+   * price even on a correctly priced group-buy order and comparing the two
+   * directly would refuse every order.
+   *
+   * What can be checked here is the adjustment itself: CR-1-d2 puts the applied
+   * adjustments on the draft, so this asks whether this domain's contributor
+   * took off exactly the gap it owes. Cheap, and it fails before a row exists.
    */
   async beforeCreate(ctx: Ctx, tx: Tx, draft: PricingDraft): Promise<Record<string, unknown>> {
     const activityId = readSelection(draft, 'activityId');
@@ -105,6 +113,14 @@ export const groupbuyKindHandler: OrderKindHandler = {
     // Refuses a line that is not part of the activity at all, here, where there
     // is still nothing to roll back.
     const expected = expectedGoodsTotal(lines, prices);
+
+    const mine = draft.adjustments?.find((adjustment) => adjustment.source === PRICING_SOURCE);
+    assertActivityDiscountApplied({
+      // Negative: what the campaign owes the shopper off the catalogue price.
+      expected: expected.sub(draft.goodsTotal),
+      actual: mine?.amount ?? Money.ZERO,
+      activityId,
+    });
 
     if (groupId !== null) {
       const group = await repo.findGroup(tx, groupId);
@@ -229,7 +245,7 @@ export const groupbuyKindHandler: OrderKindHandler = {
  * `afterCreate` refuses any group-buy order this did not reach.
  */
 export const groupbuyPricingContributor: PricingContributor = {
-  name: 'groupbuy:activity-price',
+  name: PRICING_SOURCE,
   priority: 50,
 
   async contribute(ctx: Ctx, draft: PricingDraft): Promise<PriceAdjustment[]> {
@@ -262,7 +278,7 @@ export const groupbuyPricingContributor: PricingContributor = {
     if (amount.isZero()) return [];
     return [
       {
-        source: 'groupbuy:activity-price',
+        source: PRICING_SOURCE,
         label: `拼团价（${activity.title}）`,
         amount,
         perLine,

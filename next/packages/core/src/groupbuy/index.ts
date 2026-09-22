@@ -33,6 +33,7 @@ export {
   myGroups,
   openGroups,
   poster,
+  summary,
   withdraw,
 } from './groupbuy.service';
 

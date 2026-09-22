@@ -188,6 +188,25 @@ async function resolveAddress(
 }
 
 /**
+ * The same context, reading through the caller's handle.
+ *
+ * `Ctx.db` is the pool, and on the `create` path this whole pricing pass runs
+ * *inside* an open transaction that is already holding one pooled connection.
+ * A contributor — or the coupon quote — handed the plain `ctx` therefore
+ * reaches for a **second** connection per checkout, and as soon as as many
+ * orders are placed at once as the pool is wide, every caller holds one and
+ * wants one: the pool deadlocks rather than queues. CR-1-d2 caught this in
+ * presale's local copy of the problem (`presale.order.ts::inTx`); the cast
+ * belongs here, once, rather than in every marketing domain.
+ *
+ * It is also the more correct read: contributors see the same snapshot the
+ * order they are pricing will be written into.
+ */
+function readingThrough(ctx: Ctx, db: DbOrTx): Ctx {
+  return { ...ctx, db: db as Ctx['db'] };
+}
+
+/**
  * Gathers every adjustment: the registered `PricingContributor`s in `priority`
  * order first, then the coupon. The coupon runs last on purpose — it is the
  * thing the shopper picked, so it should apply to what the automatic rules
@@ -195,6 +214,7 @@ async function resolveAddress(
  */
 async function gatherAdjustments(
   ctx: Ctx,
+  db: DbOrTx,
   userId: number,
   lines: readonly DraftLine[],
   userCouponId: number | null,
@@ -206,14 +226,15 @@ async function gatherAdjustments(
     goodsTotal: goodsTotalOf(lines),
     selections,
   };
+  const reading = readingThrough(ctx, db);
 
   const out: PriceAdjustment[] = [];
   for (const contributor of getPricingContributors()) {
-    out.push(...(await contributor.contribute(ctx, draft)));
+    out.push(...(await contributor.contribute(reading, draft)));
   }
 
   if (userCouponId !== null) {
-    const quoted = await coupon.quote(ctx, {
+    const quoted = await coupon.quote(reading, {
       userCouponId,
       userId,
       lines: lines.map((line) => ({
@@ -304,7 +325,7 @@ async function buildDraft(
   // CR-1-d: a marketing contributor learns which activity the shopper picked
   // from the same `kindMeta` the kind handler gets, plus `kind` so it can
   // refuse to fire on an ordinary order.
-  const adjustments = await gatherAdjustments(ctx, userId, lines, userCouponId, {
+  const adjustments = await gatherAdjustments(ctx, db, userId, lines, userCouponId, {
     couponId: input.userCouponId ?? undefined,
     kind: input.kind,
     ...(input.kindMeta as Record<string, string | undefined> | undefined),
@@ -500,6 +521,13 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
             lines: draft.lines.map(pricingLineOf),
             goodsTotal: draft.itemsAmount,
             selections: { ...(body.kindMeta as Record<string, string | undefined>) },
+            // CR-1-d2. The handler needs to know its own adjustment reached the
+            // order, and `create` is holding the answer at this very moment.
+            // Without it a kind handler has to re-run its own contributor inside
+            // this open transaction — a second pooled connection per checkout,
+            // which deadlocks the pool as soon as as many orders are placed at
+            // once as the pool is wide.
+            adjustments: draft.discount.applied,
           })
         : {};
 

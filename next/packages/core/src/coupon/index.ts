@@ -6,7 +6,7 @@
  * and the rest of the system, and everything not re-exported here is private —
  * `coupon.repo.ts` in particular, which no other domain may reach.
  *
- * The five functions other streams call:
+ * The six functions other streams call:
  *
  * | Function          | Caller | When                                          |
  * | ----------------- | ------ | --------------------------------------------- |
@@ -15,6 +15,7 @@
  * | `release`         | B1 / C | cancel and refund                             |
  * | `grantNewUser`    | E1     | inside the registration transaction           |
  * | `grantOrderGifts` | B1 / C | the order-paid effect handler                 |
+ * | `listOrderGifts`  | B3     | the 订单赠券 panel, after B1 has proved ownership |
  *
  * `redeem`, `release`, `grantNewUser` and `grantOrderGifts` take `(tx, ctx, …)`
  * — a transaction the *caller* owns, plus the context they need a clock and a
@@ -36,9 +37,12 @@ export {
   listClaimable,
   listMine,
   listNewUser,
+  staffGrant,
+  staffListCoupons,
   // the domain API other streams call
   grantNewUser,
   grantOrderGifts,
+  listOrderGifts,
   quote,
   redeem,
   release,

@@ -19,6 +19,7 @@ import {
   eq,
   gt,
   inArray,
+  isNotNull,
   isNull,
   lt,
   lte,
@@ -211,6 +212,84 @@ export async function countFormingGroupsByActivity(
     )
     .groupBy(groupbuyGroups.activityId);
   return new Map(rows.map((row) => [row.activityId, row.value]));
+}
+
+/**
+ * The 人气条 over every live activity (CR-1-h2).
+ *
+ * "In a team" means a member who has not left (`joined`), in a group that is
+ * still `forming` or already `succeeded`. A `failed` or `cancelled` team is not
+ * somebody currently taking part, and a `refunded` member left — counting
+ * either is how a 人气条 ends up larger than the shop's whole customer base,
+ * which is what legacy's `getCombinationIndex` did (it counted rows in
+ * `store_pink`, refunds and all).
+ *
+ * Distinct **users**, not rows: one person who joined three teams is one
+ * participant.
+ */
+function livePinkWhere(now: Date): SQL | undefined {
+  return and(
+    eq(groupbuyMembers.status, 'joined'),
+    inArray(groupbuyGroups.status, ['forming', 'succeeded']),
+    isNull(groupbuyActivities.deletedAt),
+    eq(groupbuyActivities.status, 'active'),
+    lte(groupbuyActivities.startAt, now),
+    gt(groupbuyActivities.endAt, now),
+  );
+}
+
+export async function countLiveParticipants(db: DbOrTx, now: Date): Promise<number> {
+  const [row] = await db
+    .select({ value: sql<number>`count(distinct ${groupbuyMembers.userId})::int` })
+    .from(groupbuyMembers)
+    .innerJoin(groupbuyGroups, eq(groupbuyGroups.id, groupbuyMembers.groupId))
+    .innerJoin(groupbuyActivities, eq(groupbuyActivities.id, groupbuyGroups.activityId))
+    .where(livePinkWhere(now));
+  return row?.value ?? 0;
+}
+
+/**
+ * The faces on the 人气条: the most recent distinct participants who have one.
+ *
+ * `DISTINCT ON (user_id)` picks each user's latest membership, and the outer
+ * query then orders those by recency and takes the first `limit`. Doing it the
+ * other way round — take the latest N rows, then dedupe — would quietly return
+ * fewer than `limit` faces whenever one enthusiastic shopper occupied the top
+ * of the list.
+ *
+ * The avatar is the one frozen on `groupbuy_members` at join time, not the
+ * user's current one, so the strip does not change under a shopper who edited
+ * their profile.
+ */
+export async function listLiveParticipantAvatars(
+  db: DbOrTx,
+  args: { now: Date; limit: number },
+): Promise<string[]> {
+  const latest = db
+    .selectDistinctOn([groupbuyMembers.userId], {
+      userId: groupbuyMembers.userId,
+      memberId: groupbuyMembers.id,
+      avatarUrl: groupbuyMembers.avatarUrl,
+    })
+    .from(groupbuyMembers)
+    .innerJoin(groupbuyGroups, eq(groupbuyGroups.id, groupbuyMembers.groupId))
+    .innerJoin(groupbuyActivities, eq(groupbuyActivities.id, groupbuyGroups.activityId))
+    .where(
+      and(
+        livePinkWhere(args.now),
+        isNotNull(groupbuyMembers.avatarUrl),
+        ne(groupbuyMembers.avatarUrl, ''),
+      ),
+    )
+    .orderBy(asc(groupbuyMembers.userId), desc(groupbuyMembers.id))
+    .as('latest');
+
+  const rows = await db
+    .select({ avatarUrl: latest.avatarUrl })
+    .from(latest)
+    .orderBy(desc(latest.memberId))
+    .limit(args.limit);
+  return rows.map((row) => row.avatarUrl).filter((url): url is string => url !== null);
 }
 
 export async function bumpViews(db: DbOrTx, activityId: number): Promise<void> {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DomainError } from '../kernel/errors';
 import { Money } from '../kernel/money';
 import {
+  assertActivityDiscountApplied,
   assertActivityPriceApplied,
   assertCompletable,
   assertGroupJoinable,
@@ -226,5 +227,62 @@ describe('the CR-1-d price guard', () => {
         charged: '88.00',
       });
     }
+  });
+});
+
+/**
+ * The earlier half of the same guard (CR-1-d2), which reads the applied
+ * adjustments off the draft instead of the written lines.
+ */
+describe('assertActivityDiscountApplied', () => {
+  it('passes when the contributor took off exactly the gap it owes', () => {
+    expect(
+      codeOf(() =>
+        assertActivityDiscountApplied({
+          // 59.00 activity price against an 88.00 catalogue line.
+          expected: Money.parse('-29.00'),
+          actual: Money.parse('-29.00'),
+          activityId: 1,
+        }),
+      ),
+    ).toBe('NO_THROW');
+  });
+
+  it('refuses when nothing was taken off at all', () => {
+    // No entry on the draft reads as `Money.ZERO`: the contributor was dropped,
+    // reordered behind something that overwrote it, or returned `[]`.
+    expect(
+      codeOf(() =>
+        assertActivityDiscountApplied({
+          expected: Money.parse('-29.00'),
+          actual: Money.ZERO,
+          activityId: 1,
+        }),
+      ),
+    ).toBe('GROUPBUY_PRICE_NOT_APPLIED');
+  });
+
+  it('refuses an adjustment larger than the gap, not only a smaller one', () => {
+    expect(
+      codeOf(() =>
+        assertActivityDiscountApplied({
+          expected: Money.parse('-29.00'),
+          actual: Money.parse('-39.00'),
+          activityId: 1,
+        }),
+      ),
+    ).toBe('GROUPBUY_PRICE_NOT_APPLIED');
+  });
+
+  it('passes a campaign that discounts nothing, because the shopper pays the same', () => {
+    expect(
+      codeOf(() =>
+        assertActivityDiscountApplied({
+          expected: Money.ZERO,
+          actual: Money.ZERO,
+          activityId: 1,
+        }),
+      ),
+    ).toBe('NO_THROW');
   });
 });
