@@ -1,6 +1,6 @@
 # CR-3-d — the refund domain has no system-initiated refund entry point
 
-**Stream:** D (group buy and presale) **Status:** open
+**Stream:** D (group buy and presale) **Status:** accepted — implemented by the D follow-up as `refundSystemInitiated(tx, ctx, input)` in a new file under `core/src/refund/` (exported from the refund index), with the groupbuy port forwarding to it; D2 registers presale's port the same way
 **Files:** `next/packages/core/src/refund/index.ts`, `refund.service.ts` (stream C)
 
 ## What

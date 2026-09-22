@@ -1,6 +1,6 @@
 # CR-1-d — the pricing pipeline never sees `kind` or `kindMeta`
 
-**Stream:** D (group buy and presale) **Status:** open
+**Stream:** D (group buy and presale) **Status:** accepted — applied by the orchestrator on integration (`buildDraft` passes `kind` and the `kindMeta` keys to the contributors); the D follow-up adds the end-to-end checkout test and removes the "until then" stub wording
 **Files:** `next/packages/core/src/order/order.checkout.service.ts` (stream B1)
 
 ## What

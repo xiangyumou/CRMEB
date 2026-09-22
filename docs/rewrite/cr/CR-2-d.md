@@ -1,6 +1,6 @@
 # CR-2-d — `groupbuy_activities` has no per-activity 虚拟成团 column
 
-**Stream:** D (group buy and presale) **Status:** open
+**Stream:** D (group buy and presale) **Status:** closed — decision: shop-wide (`groupbuy.virtualFillOnExpiry`), no per-activity column; the recommendation stands as written
 **Files:** `next/packages/db/src/schema/groupbuy.ts` (frozen, orchestrator-owned)
 
 ## What

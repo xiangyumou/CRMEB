@@ -303,8 +303,13 @@ async function buildDraft(
       ? null
       : fromId(input.userCouponId);
 
+  // CR-1-d: a marketing contributor learns which activity the shopper picked
+  // from the same `kindMeta` the kind handler gets, plus `kind` so it can
+  // refuse to fire on an ordinary order.
   const adjustments = await gatherAdjustments(ctx, userId, lines, userCouponId, {
     couponId: input.userCouponId ?? undefined,
+    kind: input.kind,
+    ...(input.kindMeta as Record<string, string | undefined> | undefined),
   });
   const discount = splitAdjustments(lines, adjustments);
   const itemsAmount = goodsTotalOf(lines);
