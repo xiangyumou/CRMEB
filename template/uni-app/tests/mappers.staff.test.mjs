@@ -17,6 +17,12 @@ import {
   toLegacyStaffRefundList,
   fromLegacyStaffRefundQuery,
   fromLegacyRefundReviewInput,
+  fromLegacyRefundRemarkInput,
+  shopDayFromUnix,
+  fromLegacyStatisticsRange,
+  precedingStatisticsRange,
+  toLegacyStatisticsRows,
+  toLegacyStatisticsChart,
 } from '../api/mappers/staff.js';
 
 const ORDERS = example('GET /api/v1/staff/orders');
@@ -60,6 +66,102 @@ describe('toLegacyStaffStatistics', () => {
 
   it('survives a missing dto with zeroes, not blanks', () => {
     expect(toLegacyStaffStatistics(null)).toMatchObject({ todayPrice: '0.00', todayCount: 0 });
+  });
+});
+
+describe('统计明细 (CR-4-h §1)', () => {
+  const SERIES = example('GET /api/v1/staff/statistics/series');
+
+  it('turns the page’s epoch seconds into the shop’s calendar days', () => {
+    // 2026-06-01T16:00:00Z is already 2026-06-02 in Shanghai, wherever the phone is.
+    expect(shopDayFromUnix(Date.parse('2026-06-01T15:59:59Z') / 1000)).toBe('2026-06-01');
+    expect(shopDayFromUnix(Date.parse('2026-06-01T16:00:00Z') / 1000)).toBe('2026-06-02');
+    expect(shopDayFromUnix(Date.parse('2026-06-01T00:00:00Z') / 1000)).toBe('2026-06-01');
+    expect(shopDayFromUnix(0)).toBe('');
+    expect(shopDayFromUnix(undefined)).toBe('');
+  });
+
+  it('leaves an absent end to the server rather than guessing it', () => {
+    expect(fromLegacyStatisticsRange({ page: 1, limit: 15 })).toEqual({ granularity: 'day' });
+    expect(
+      fromLegacyStatisticsRange({
+        start: Date.parse('2026-02-01T00:00:00Z') / 1000,
+        stop: Date.parse('2026-02-03T10:00:00Z') / 1000,
+      }),
+    ).toEqual({ granularity: 'day', from: '2026-02-01', to: '2026-02-03' });
+  });
+
+  it('derives the preceding window of equal length from the answer', () => {
+    // 02-01..02-03 is three days, so the window before it is 01-29..01-31.
+    expect(precedingStatisticsRange(SERIES)).toEqual({
+      granularity: 'day',
+      from: '2026-01-29',
+      to: '2026-01-31',
+    });
+    expect(precedingStatisticsRange(null)).toEqual({ granularity: 'day' });
+  });
+
+  it('lists the 详细数据 table newest first, without the empty days', () => {
+    const rows = toLegacyStatisticsRows(SERIES, { page: 1, limit: 15 });
+    expect(rows).toEqual([
+      { time: '02-03', date: '2026-02-03', count: 51, price: '6180.00' },
+      { time: '02-01', date: '2026-02-01', count: 48, price: '5320.00' },
+    ]);
+    assertRenderable(rows);
+  });
+
+  it('pages the table client-side, and runs out', () => {
+    expect(toLegacyStatisticsRows(SERIES, { page: 1, limit: 1 })).toHaveLength(1);
+    expect(toLegacyStatisticsRows(SERIES, { page: 2, limit: 1 })[0].time).toBe('02-01');
+    expect(toLegacyStatisticsRows(SERIES, { page: 3, limit: 1 })).toEqual([]);
+    expect(toLegacyStatisticsRows(null, {})).toEqual([]);
+  });
+
+  it('charts 营业额 against the previous window', () => {
+    const previous = { items: [{ date: '2026-01-31', orderCount: 10, paidAmount: '5000.00' }] };
+    const chart = toLegacyStatisticsChart(SERIES, previous, 1);
+    expect(chart.chart).toEqual([
+      { time: '2026-02-01', num: '5320.00' },
+      { time: '2026-02-02', num: '0.00' },
+      { time: '2026-02-03', num: '6180.00' },
+    ]);
+    expect(chart.time).toBe('11500.00');
+    expect(chart.increase_time).toBe('6500.00');
+    expect(chart.increase_time_status).toBe(1);
+    expect(chart.growth_rate).toBe(130);
+    assertRenderable(chart);
+  });
+
+  it('charts 订单量 with counts, and marks a fall', () => {
+    const previous = { items: [{ date: '2026-01-31', orderCount: 200, paidAmount: '0.00' }] };
+    const chart = toLegacyStatisticsChart(SERIES, previous, 2);
+    expect(chart.chart[0]).toEqual({ time: '2026-02-01', num: 48 });
+    expect(chart.time).toBe(99);
+    expect(chart.increase_time).toBe(101);
+    expect(chart.increase_time_status).toBe(2);
+    expect(chart.growth_rate).toBe(51);
+  });
+
+  it('has no percentage to quote when the previous window was empty', () => {
+    const chart = toLegacyStatisticsChart(SERIES, { items: [] }, 2);
+    expect(chart.increase_time_status).toBe(1);
+    // Legacy showed the absolute rise scaled by 100 rather than dividing by zero.
+    expect(chart.growth_rate).toBe(9900);
+    expect(toLegacyStatisticsChart(null, null, 1)).toMatchObject({
+      chart: [],
+      time: '0.00',
+      growth_rate: 0,
+      increase_time_status: 1,
+    });
+  });
+});
+
+describe('fromLegacyRefundRemarkInput (CR-4-h §2)', () => {
+  it('sends `remark`, which is not the console’s `adminRemark`', () => {
+    expect(fromLegacyRefundRemarkInput({ id: 601, remark: '已电话联系买家' })).toEqual({
+      remark: '已电话联系买家',
+    });
+    expect(fromLegacyRefundRemarkInput(null)).toEqual({ remark: '' });
   });
 });
 

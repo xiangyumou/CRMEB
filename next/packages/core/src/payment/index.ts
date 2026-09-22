@@ -44,6 +44,7 @@ export {
   recheckException,
   refundException,
   settlePayment,
+  start,
   startPayment,
   type PaymentRuntime,
   type PaymentState,

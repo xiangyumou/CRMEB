@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { id, instant, money, pageQuery, paged, sortQuery } from '../_conventions/common';
+import { orderRef } from '../order/order.ref.schemas';
 
 /**
  * Shapes shared by the refund routes.
@@ -76,7 +77,7 @@ export type RefundableItem = z.infer<typeof refundableItem>;
  * thing this screen cannot be asked without, and a missing path segment is a
  * 404 rather than a 422 the client has to explain.
  */
-export const refundableItemsParams = z.object({ orderId: id });
+export const refundableItemsParams = z.object({ orderId: orderRef });
 export type RefundableItemsParams = z.infer<typeof refundableItemsParams>;
 
 /**

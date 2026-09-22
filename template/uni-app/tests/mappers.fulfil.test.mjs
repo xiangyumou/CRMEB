@@ -201,13 +201,31 @@ describe('toLegacyInvoice', () => {
     assertRenderable(invoice);
   });
 
-  it('gives the 发票记录 row an order stub, because the contract carries no line items', () => {
+  it('draws the 发票记录 row from the order’s line summary (CR-4-h §7)', () => {
     expect(invoice.order).toEqual({
       order_id: '9001',
       order_no: '202602011000000010123456',
       pay_price: '118.00',
-      cartInfo: [],
+      total_num: 2,
+      cartInfo: [
+        {
+          cart_num: 2,
+          productInfo: {
+            store_name: '有机红富士苹果 5 斤装',
+            image: 'https://cdn.example.com/p/1.jpg',
+            attrInfo: { suk: '5斤/箱' },
+          },
+        },
+      ],
     });
+  });
+
+  it('falls back to the order number when there is no summary at all', () => {
+    // `orderSummary` is null only for an order with no lines, which checkout
+    // cannot produce — but the template's fallback has to stay reachable.
+    const bare = toLegacyInvoice({ ...INVOICE, orderSummary: null });
+    expect(bare.order.cartInfo).toEqual([]);
+    expect(bare.order.order_no).toBe('202602011000000010123456');
   });
 
   it('flags an issued invoice and carries its number', () => {

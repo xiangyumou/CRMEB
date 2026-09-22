@@ -21,6 +21,7 @@ import {
   toLegacyCollectList,
   toLegacyVisitList,
   toLegacyFavoriteResult,
+  toLegacyCollectAllResult,
   fromLegacyIdList,
   fromLegacyCommentInput,
 } from '../api/mappers/catalog.js';
@@ -200,7 +201,11 @@ describe('categories', () => {
     expect(toLegacyCategoryTree(null)).toEqual([]);
   });
 
-  it('extracts just the version, which is all getCategoryVersion needs', () => {
+  it('reads the version off the cheap route, and off the tree (CR-3-h)', () => {
+    // `getCategoryVersion` now calls `…/categories/version`; the mapper still
+    // works on the tree, which is what the route used to have to return.
+    expect(toLegacyCategoryVersion(example('GET /api/v1/catalog/categories/version')))
+      .toEqual({ version: '1742534400-17' });
     expect(toLegacyCategoryVersion(CATS)).toEqual({ version: '1742534400-17' });
     expect(toLegacyCategoryVersion(null)).toEqual({ version: '' });
   });
@@ -280,6 +285,31 @@ describe('search, favourites and history', () => {
   it('answers collectAdd with a boolean the page only toasts', () => {
     expect(toLegacyFavoriteResult({ favorited: true })).toEqual({ favorited: true });
     expect(toLegacyFavoriteResult(null)).toEqual({ favorited: false });
+  });
+
+  it('collapses the batch answer to the one flag collectAll used to report (CR-2-h)', () => {
+    const out = toLegacyCollectAllResult(example('POST /api/v1/me/favorites/batch'));
+    expect(out).toEqual({
+      favorited: true,
+      added: 2,
+      list: [
+        { product_id: 1, favorited: true },
+        { product_id: 2, favorited: true },
+      ],
+    });
+  });
+
+  it('is not "收藏成功" when one of the ids could not be favourited', () => {
+    const out = toLegacyCollectAllResult({
+      added: 1,
+      items: [
+        { productId: '1', favorited: true },
+        { productId: '2', favorited: false },
+      ],
+    });
+    expect(out.favorited).toBe(false);
+    expect(out.added).toBe(1);
+    expect(toLegacyCollectAllResult(null)).toEqual({ favorited: false, added: 0, list: [] });
   });
 });
 

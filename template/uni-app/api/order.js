@@ -99,20 +99,21 @@ export function cartDel(ids) {
 }
 
 /**
- * 重选规格：先删掉旧行再按新规格加回。
- * The API has no "change this row's sku" route — see docs/rewrite/cr/CR-2-h.md.
+ * 重选规格 — one PATCH since CR-2-h was accepted.
+ *
+ * This used to be `DELETE` then `POST`, which left the buyer with no row at all
+ * if the second call failed. `PATCH /api/v1/cart/items/:id {skuId}` does both in
+ * one transaction and folds into an existing row of that variant; `cartId` in
+ * the answer is the surviving row, which may not be the one that was PATCHed.
  */
 export function getResetCart(data) {
   const src = data || {};
-  return request
-    .delete(`/api/v1/cart/items/${src.id}`)
-    .then(() =>
-      request.post(
-        '/api/v1/cart/items',
-        { skuId: String(src.unique || ''), quantity: Number(src.num) || 1 },
-        { map: toLegacyCartAddResult, msg: '添加购物车成功' },
-      ),
-    );
+  const body = { skuId: String(src.unique || '') };
+  if (src.num !== undefined && src.num !== '') body.quantity = Number(src.num) || 1;
+  return request.patch(`/api/v1/cart/items/${src.id}`, body, {
+    map: toLegacyCartAddResult,
+    msg: '添加购物车成功',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -260,11 +261,12 @@ export function orderTake(uni) {
   });
 }
 
-// CONTRACT-PENDING(B1) — 删除已完成订单（仅从「我的订单」隐藏）. B2 named the
-// `hidden_by_user` change type but no storefront route writes it; see docs/rewrite/cr/CR-4-h.md.
 /**
- * 删除已完成订单
- * @param string uni 订单 id
+ * 删除已完成订单 — 只是把订单从「我的订单」里隐藏，商家那边一行都不会少（CR-4-h §6）。
+ *
+ * 只有已完成 / 已取消 / 已退款的订单可以删除，重复点击会得到 404：删过之后这张订单
+ * 对买家来说已经不在列表里了。
+ * @param string uni 订单 id 或 24 位订单号
  */
 export function orderDel(uni) {
   return request.delete(`/api/v1/orders/${uni}`, {}, { msg: '删除成功' });

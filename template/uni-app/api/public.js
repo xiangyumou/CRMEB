@@ -12,11 +12,13 @@ import { toLegacyCategoryVersion } from './mappers/catalog.js';
 /**
  * 商品分类版本号
  *
- * The category tree carries its own `version`, so this asks for the tree and keeps only
- * the version. See docs/rewrite/cr/CR-3-h.md for the cheap version route it should get.
+ * Two fields since CR-3-h. This used to fetch the whole tree — tens of kilobytes
+ * on mobile data — and throw it away to learn one string, on every cold start,
+ * from three call sites. The route also sends the version as an `ETag`;
+ * `If-None-Match` on the tree route itself is CR-1-s.
  */
 export function getCategoryVersion() {
-  return request.get('/api/v1/catalog/categories', {}, {
+  return request.get('/api/v1/catalog/categories/version', {}, {
     noAuth: true,
     map: toLegacyCategoryVersion,
   });

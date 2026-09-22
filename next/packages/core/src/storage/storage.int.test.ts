@@ -4,6 +4,7 @@ import { admins } from '@shop/db/schema/auth';
 import { users } from '@shop/db/schema/user';
 import { attachments } from '@shop/db/schema/storage';
 import { createTestCtx, type TestCtx } from '@shop/testing';
+import { registerStaffCheck, resetUserLookup } from '../auth/user-lookup';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { cleanOrphanAttachments } from './storage.jobs';
@@ -92,6 +93,8 @@ beforeEach(async () => {
   await harness.redis.flushdb();
   harness.clock.set(NOW);
   resetStorageDriverCache();
+  // A staff check left behind by one test would decide the next one's upload.
+  resetUserLookup();
   const [row] = await harness.ctx.db
     .insert(admins)
     .values({ account: 'admin', passwordHash: 'x', passwordAlgo: 'bcrypt', name: '管理员' })
@@ -389,6 +392,39 @@ describe('storefront upload', () => {
     await expect(
       userUpload(as(userActor(otherShopperId)), { purpose: 'review' }, png(1, 1, 4)),
     ).resolves.toBeDefined();
+  });
+
+  it('refuses purpose=staff to a shopper, and to nobody at all when no check is registered', async () => {
+    // Nothing registered yet in this file, so the domain fails closed.
+    expect(await code(userUpload(as(userActor(shopperId)), { purpose: 'staff' }, png()))).toBe(
+      'FORBIDDEN',
+    );
+
+    registerStaffCheck({ isStaff: async (_db, userId) => userId === otherShopperId });
+    expect(
+      await code(userUpload(as(userActor(shopperId)), { purpose: 'staff' }, png(1, 1, 5))),
+    ).toBe('FORBIDDEN');
+  });
+
+  it('gives a 店员 its own directory, ceiling and budget (CR-5-h §2)', async () => {
+    registerStaffCheck({ isStaff: async (_db, userId) => userId === shopperId });
+    const ctx = as(userActor(shopperId));
+    await ctx.config.set(storageConfig, {
+      userUploadsPerHour: 1,
+      maxUserUploadBytes: 64 * 1024,
+      staffUploadsPerHour: 3,
+    });
+
+    const result = await userUpload(ctx, { purpose: 'staff' }, png(1600, 1600));
+    expect(result.url).toContain('/uploads/staff/');
+
+    // The shopper budget of one is spent on a shopper upload; the staff budget
+    // is a different counter and is still open.
+    await userUpload(ctx, { purpose: 'review' }, png(1, 1, 6));
+    expect(await code(userUpload(ctx, { purpose: 'review' }, png(1, 1, 7)))).toBe(
+      'STORAGE_UPLOAD_RATE_LIMITED',
+    );
+    await expect(userUpload(ctx, { purpose: 'staff' }, png(1, 1, 8))).resolves.toBeDefined();
   });
 
   it('attributes the row to the shopper and to no admin', async () => {

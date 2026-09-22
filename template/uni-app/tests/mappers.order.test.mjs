@@ -118,10 +118,14 @@ describe('toLegacyReceiver', () => {
 describe('toLegacyOrderListItem', () => {
   const row = toLegacyOrderListItem(LIST.items[0]);
 
-  it('keeps order_id routable and puts the order number in order_no (CR-1-h)', () => {
-    expect(row.order_id).toBe('9001');
+  it('carries the order number in order_id, which is now routable too (CR-1-h)', () => {
+    // CR-1-h was accepted: `/api/v1/orders/:id` takes the surrogate id or the
+    // 24-digit number, so the one field the pages both print and route on can
+    // be the number the buyer recognises.
+    expect(row.order_id).toBe('202602011000000010123456');
     expect(row.order_no).toBe('202602011000000010123456');
     expect(row.trade_no).toBe('202602011000000010123456');
+    expect(row.id).toBe(9001);
   });
 
   it('maps the money and the counts', () => {
@@ -174,7 +178,11 @@ describe('toLegacyOrderDetail', () => {
   const detail = toLegacyOrderDetail(ORDER);
 
   it('folds the receiver into the order row', () => {
-    expect(detail).toMatchObject({ order_id: '9001', real_name: '张三', mark: '请在工作日送达' });
+    expect(detail).toMatchObject({
+      order_id: '202602011000000010123456',
+      real_name: '张三',
+      mark: '请在工作日送达',
+    });
     expect(detail.cartInfo).toHaveLength(1);
     assertRenderable(detail);
   });
@@ -356,7 +364,7 @@ describe('toLegacyCashierOrder / toLegacyOrderProduct', () => {
   it('gives the cashier the handful of fields it reads', () => {
     expect(toLegacyCashierOrder(ORDER)).toMatchObject({
       oid: 9001,
-      order_id: '9001',
+      order_id: '202602011000000010123456',
       pay_price: '118.00',
       pay_weixin_open: 1,
       yue_pay_status: 0,

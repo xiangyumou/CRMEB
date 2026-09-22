@@ -11,7 +11,7 @@ import type {
 import type { Tx } from '@shop/db';
 import { requirePermission } from '../auth/rbac';
 import { recordEffect } from '../effects';
-import { requireAdminId, type Ctx } from '../kernel/context';
+import { requireAdminId, requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { toId, toIdOrNull } from '../kernel/ids';
 import { refundPermissions } from './permissions';
@@ -277,6 +277,39 @@ export async function adminRemark(
   const row = await repo.findRefund(ctx.db, id);
   if (!row) throw new DomainError('REFUND_NOT_FOUND');
   await repo.setAdminRemark(ctx.db, id, input.adminRemark);
+  return detail(ctx, id);
+}
+
+/**
+ * 售后备注 from the 商家管理 phone console (CR-4-h §2).
+ *
+ * Deliberately **not** `adminRemark` with a different caller.
+ *
+ *  - `refunds.admin_remark` is one column the console overwrites. The schema is
+ *    frozen and has no `refunds.staff_remark`, so a staff note lands in
+ *    `refund_logs` — appended, attributed to the `users` row that wrote it, and
+ *    visible to the console in the same `logs` array as everything else.
+ *  - A note is not a transition, but `refund_logs.to_status` is NOT NULL, so
+ *    both ends of the entry are the status the refund is already in. A reader
+ *    of the log sees a row that moved nothing, which is exactly what happened.
+ *  - No `requirePermission`: the actor is a `staff` user, not an admin, and
+ *    `auth: 'staff'` has already decided whether they may be here at all.
+ */
+export async function staffRemark(
+  ctx: Ctx,
+  input: { id: string; remark: string },
+): Promise<AdminRefundDetail> {
+  const userId = requireUserId(ctx);
+  const id = Number(input.id);
+  const row = await repo.findRefund(ctx.db, id);
+  if (!row) throw new DomainError('REFUND_NOT_FOUND');
+  await repo.insertLog(ctx.db, {
+    refundId: id,
+    fromStatus: row.status,
+    toStatus: row.status,
+    message: `店员备注：${input.remark}`,
+    operatorUserId: userId,
+  });
   return detail(ctx, id);
 }
 

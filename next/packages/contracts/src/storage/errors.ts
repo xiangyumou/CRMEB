@@ -12,6 +12,15 @@ import { defineErrors } from '../_conventions/errors';
 export const storageErrors = defineErrors({
   /** No `file` part in the multipart body, or it was empty. */
   STORAGE_NO_FILE: { status: 422, message: '请选择要上传的文件' },
+  /**
+   * There *is* a file in the request, under some other field name (CR-5-h §1).
+   * Separated from `STORAGE_NO_FILE` because it is a client bug with a one-word
+   * fix and no amount of the user retrying will help: `details` carries
+   * `{ expected: 'file', received: [...] }` so the log says which name to
+   * change. Legacy read `image`, the admin kit sends `file`, and a mismatch
+   * used to look to the shopper exactly like picking no photo at all.
+   */
+  STORAGE_UPLOAD_FIELD_MISSING: { status: 422, message: '上传字段名不正确，应为 file' },
   /** Over the configured size limit. `details` carries `{ maxBytes, size }`. */
   STORAGE_FILE_TOO_LARGE: { status: 422, message: '文件过大，请压缩后再上传' },
   /**

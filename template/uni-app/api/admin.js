@@ -19,6 +19,10 @@ import request from '../utils/request.js';
 import {
   toLegacyStaffIdentity,
   toLegacyStaffStatistics,
+  toLegacyStatisticsRows,
+  toLegacyStatisticsChart,
+  fromLegacyStatisticsRange,
+  precedingStatisticsRange,
   toLegacyStaffOrderList,
   toLegacyStaffOrderDetail,
   toLegacyStaffRefund,
@@ -30,6 +34,7 @@ import {
   fromLegacyShipInput,
   fromLegacyPriceInput,
   fromLegacyRemarkInput,
+  fromLegacyRefundRemarkInput,
   fromLegacyRefundReviewInput,
 } from './mappers/staff.js';
 import { toLegacyShipment } from './mappers/fulfil.js';
@@ -58,23 +63,40 @@ export function getStatisticsInfo() {
   return request.get('/api/v1/staff/statistics', {}, { map: toLegacyStaffStatistics });
 }
 
-// ---------------------------------------------------------------------------
-// CONTRACT-PENDING(B2) — 统计明细. `staffStatistics` has no per-day breakdown, so the
-// 统计 detail page (成交额/订单数 按日) has nothing to call. See docs/rewrite/cr/CR-4-h.md.
-// ---------------------------------------------------------------------------
-
 /**
- * 订单月统计
+ * 订单月统计 — the 详细数据 table.
+ *
+ * One request per page, deliberately: the window is at most 92 days, so the mapper
+ * slices what came back rather than making the server paginate days (CR-4-h §1).
  */
 export function getStatisticsMonth(where) {
-  return request.get('/api/v1/staff/statistics/orders', where);
+  return request.get('/api/v1/staff/statistics/series', fromLegacyStatisticsRange(where), {
+    map: (dto) => toLegacyStatisticsRows(dto, where),
+  });
 }
 
 /**
- * 订单统计图
+ * 订单统计图 — the line chart and its 增长率.
+ *
+ * Two requests, because 增长率 compares the window with the one immediately before it
+ * and only the first response says which window that was (the page may have named
+ * neither end). Legacy made the same comparison, inside one call.
  */
 export function getStatisticsTime(data) {
-  return request.get('/api/v1/staff/statistics/timeline', data);
+  // Both calls are written as `request.get(...)` rather than chained off a promise:
+  // `scripts/check-api-routes.mjs` matches that spelling, and a call it cannot see is a
+  // call nothing proves a contract for.
+  const current = request.get('/api/v1/staff/statistics/series', fromLegacyStatisticsRange(data));
+  return current.then((res) => {
+    const previous = request.get(
+      '/api/v1/staff/statistics/series',
+      precedingStatisticsRange(res.data),
+    );
+    return previous.then((before) => ({
+      ...res,
+      data: toLegacyStatisticsChart(res.data, before.data, data && data.type),
+    }));
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -152,31 +174,10 @@ export function getLogistics() {
   return request.get('/api/v1/staff/express-companies', {}, { map: toLegacyExpressCompanies });
 }
 
-// ---------------------------------------------------------------------------
-// CONTRACT-PENDING(F2) — 电子面单与配送员. 面单模板要等物流服务商接入；配送员名单在旧版
-// 是后台配置的「送货人」，新合约只收姓名和电话。见 docs/rewrite/cr/CR-4-h.md。
-// ---------------------------------------------------------------------------
-
-/**
- * 电子面单模板
- */
-export function orderExportTemp(data) {
-  return request.get('/api/v1/staff/shipping/waybill-templates', data);
-}
-
-/**
- * 打印默认配置
- */
-export function orderDeliveryInfo() {
-  return request.get('/api/v1/staff/shipping/defaults', {});
-}
-
-/**
- * 配送员列表
- */
-export function orderOrderDelivery() {
-  return request.get('/api/v1/staff/couriers', {});
-}
+// 电子面单打印（`orderExportTemp` / `orderDeliveryInfo`）和配送员名单
+// （`orderOrderDelivery`）已随 CR-4-h §4/§5 的裁决下线：两者都没有继任路由，送货人
+// 改为在发货页当场填写姓名和手机号，`fromLegacyShipInput` 依旧把它们映射成
+// `merchant_delivery` 的 `courierName` / `courierPhone`。
 
 // ---------------------------------------------------------------------------
 // 售后
@@ -224,17 +225,19 @@ export function agreeExpress(data) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// CONTRACT-PENDING(B2) — 售后备注. Only the web console can remark a refund
-// (`/admin-api/refunds/:id/remark`); the staff surface has no equivalent.
-// ---------------------------------------------------------------------------
-
 /**
- * 退款单备注
+ * 退款单备注 (CR-4-h §2)
+ *
+ * The note is appended to the refund's log rather than written over the web console's
+ * `adminRemark`, so two people remarking on one refund cannot erase each other.
  */
 export function setAdminRefundRemark(data) {
   const src = data || {};
-  return request.post(`/api/v1/staff/refunds/${src.id}/remark`, src, { msg: '备注成功' });
+  return request.post(
+    `/api/v1/staff/refunds/${src.id}/remark`,
+    fromLegacyRefundRemarkInput(src),
+    { msg: '备注成功' },
+  );
 }
 
 // ---------------------------------------------------------------------------

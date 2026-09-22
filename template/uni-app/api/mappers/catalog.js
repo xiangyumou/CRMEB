@@ -330,6 +330,26 @@ export function toLegacyFavoriteResult(dto) {
   return { favorited: !!(dto && dto.favorited) };
 }
 
+/**
+ * `POST /api/v1/me/favorites/batch` → `collectAll` (CR-2-h §3).
+ *
+ * The page only ever read "it worked", so the legacy shape is preserved and the
+ * per-id detail is carried alongside for anything that wants it later.
+ * `favorited` is true when every id the shopper ticked is now a favourite,
+ * which is the claim the 收藏成功 toast makes.
+ */
+export function toLegacyCollectAllResult(dto) {
+  const items = mapList(dto && dto.items, (row) => ({
+    product_id: toId(row && row.productId),
+    favorited: !!(row && row.favorited),
+  }));
+  return {
+    favorited: items.length > 0 && items.every((row) => row.favorited),
+    added: toInt(dto && dto.added, 0),
+    list: items,
+  };
+}
+
 /** Legacy `collect/del` and `collect/all` take ids joined with `,`. */
 export function fromLegacyIdList(ids) {
   if (Array.isArray(ids)) return ids.map((v) => String(v));

@@ -1,6 +1,6 @@
+import { orderRefParams } from '../order/order.ref.schemas';
 import { defineRoute } from '../_conventions/route';
 import {
-  orderIdParams,
   paymentIntent,
   paymentIntentExample,
   paymentOutTradeNoParams,
@@ -24,7 +24,7 @@ export const paymentStart = defineRoute({
   auth: 'user',
   summary: '发起支付',
   tags: ['payment'],
-  params: orderIdParams,
+  params: orderRefParams,
   body: startPaymentBody,
   response: paymentIntent,
   status: 201,

@@ -761,7 +761,6 @@ export default {
       let that = this,
         data = {},
         price = opt.price,
-        refund_price = opt.refund_price,
         refund_status = that.orderInfo.refund_status,
         remark = opt.remark;
       data.order_id = that.orderInfo.order_id;
@@ -791,21 +790,10 @@ export default {
             });
           });
       } else if (that.status == 2) {
-        if (this.isRefund) {
-          if (!isMoney(refund_price)) {
-            return that.$util.Tips({
-              title: "请输入正确的金额",
-            });
-          }
-          data.price = refund_price;
+        // 审核只有同意和拒绝：退款金额是买家申请时定下的（CR-4-h §3）。
+        if (this.isRefund || opt.type == 1) {
           data.type = opt.type;
           this.objOrderRefund(data);
-        } else {
-          if (opt.type == 1) {
-            data.price = refund_price;
-            data.type = opt.type;
-            this.objOrderRefund(data);
-          }
         }
       } else if (that.status == 8) {
         data.type = opt.type;

@@ -1,5 +1,5 @@
 import { registerStaffRefundPort } from '../order';
-import { adminApprove, adminDetail, adminList, adminReject } from './refund.admin';
+import { adminApprove, adminDetail, adminList, adminReject, staffRemark } from './refund.admin';
 import { registerRefundEffects } from './refund.effects';
 
 /**
@@ -87,5 +87,8 @@ export function registerRefundDomain(): void {
     detail: adminDetail,
     approve: (ctx, params, body) => adminApprove(ctx, { ...params, ...body }),
     reject: (ctx, params, body) => adminReject(ctx, { ...params, ...body }),
+    // 售后备注 is the one staff action that is not the console's: it appends to
+    // the refund's log instead of overwriting `refunds.admin_remark` (CR-4-h §2).
+    remark: (ctx, params, body) => staffRemark(ctx, { ...params, ...body }),
   });
 }

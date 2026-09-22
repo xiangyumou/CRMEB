@@ -1,13 +1,13 @@
 import type { OrderCancelBody, OrderDetail } from '@shop/contracts/order/schemas';
 import type { Tx } from '@shop/db';
 import * as coupon from '../coupon';
-import { requireUserId, type Ctx } from '../kernel/context';
+import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
-import { fromId } from '../kernel/ids';
 import { resolvePaymentPort, resolveStockPort } from './catalog.port';
 import { orderConfig } from './order.config';
 import { autoCancelKey } from './order.checkout.service';
 import { detailOf } from './order.query.service';
+import { requireOrderRef } from './order.ref';
 import * as repo from './order.repo';
 import { onOrderCancelled, type OrderStatus, type PaymentState } from './ports';
 import { orderStateMachine } from './order.state-machine';
@@ -208,8 +208,7 @@ export async function cancel(
   params: { id: string },
   body: OrderCancelBody,
 ): Promise<OrderDetail> {
-  const userId = requireUserId(ctx);
-  const orderId = fromId(params.id);
+  const { orderId, userId } = await requireOrderRef(ctx, params.id);
 
   // Ownership first, so a stranger gets 404 rather than a lock and a 409.
   const owned = await repo.findOrderForUser(ctx.db, { id: orderId, userId });

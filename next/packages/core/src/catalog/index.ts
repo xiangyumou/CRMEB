@@ -138,8 +138,10 @@ export type { AutoReviewResult } from './catalog.review.service';
 
 export {
   categoryTree,
+  categoryVersion,
   clearSearchHistory,
   favoriteAdd,
+  favoriteAddBatch,
   favoriteList,
   favoriteRemove,
   favoriteRemoveBatch,

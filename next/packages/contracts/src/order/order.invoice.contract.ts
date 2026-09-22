@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import { id } from '../_conventions/common';
 import { defineRoute } from '../_conventions/route';
+import { orderRefParams } from './order.ref.schemas';
 import {
   adminInvoiceListQuery,
   invoiceIssueBody,
   invoiceRejectBody,
   invoiceRequestBody,
   myInvoiceListQuery,
-  orderIdParams,
   orderInvoice,
   orderInvoiceExample,
   pagedInvoices,
@@ -39,7 +39,7 @@ export const invoiceRequest = defineRoute({
   auth: 'user',
   summary: '申请开票',
   tags: ['order'],
-  params: orderIdParams,
+  params: orderRefParams,
   body: invoiceRequestBody,
   response: orderInvoice,
   status: 201,

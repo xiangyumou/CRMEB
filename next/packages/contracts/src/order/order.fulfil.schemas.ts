@@ -576,6 +576,32 @@ export type InvoiceHeaderType = z.infer<typeof invoiceHeaderType>;
 export const invoiceType = z.enum(['plain', 'special']);
 export type InvoiceType = z.infer<typeof invoiceType>;
 
+/**
+ * What the order was for, on the invoice record (CR-4-h §7).
+ *
+ * The 发票记录 row shows a thumbnail and a product name, and before this it had
+ * only an order number to show instead — a visible downgrade from legacy. The
+ * fix is *not* to copy the lines onto `order_invoices`: legacy's
+ * `store_order_invoice` was a second copy of the order and the two drifted the
+ * moment anything was refunded. This is read from `order_items` on the way out,
+ * so it cannot disagree with the order it describes.
+ *
+ * The first line plus two counts, which is exactly what the row renders: the
+ * thumbnail, the name, and "等 N 件商品".
+ */
+export const invoiceOrderSummary = z.object({
+  productName: z.string(),
+  productImageUrl: z.string(),
+  specText: z.string(),
+  /** Units of that first line. */
+  quantity: z.number().int().min(1),
+  /** Distinct lines on the order, the first one included. */
+  lineCount: z.number().int().min(1),
+  /** Units across every line. */
+  totalQuantity: z.number().int().min(1),
+});
+export type InvoiceOrderSummary = z.infer<typeof invoiceOrderSummary>;
+
 export const orderInvoice = z.object({
   id,
   orderId: id,
@@ -595,6 +621,12 @@ export const orderInvoice = z.object({
   amount: money,
   invoiceNumber: z.string().nullable(),
   remark: z.string().nullable(),
+  /**
+   * `null` only for an order with no lines, which checkout cannot produce — so
+   * the client's fallback to the bare order number is a genuine last resort
+   * rather than the normal case it used to be.
+   */
+  orderSummary: invoiceOrderSummary.nullable(),
   issuedAt: instant.nullable(),
   createdAt: instant,
 });
@@ -619,6 +651,14 @@ export const orderInvoiceExample = {
   amount: '118.00',
   invoiceNumber: null,
   remark: null,
+  orderSummary: {
+    productName: '有机红富士苹果 5 斤装',
+    productImageUrl: 'https://cdn.example.com/p/1.jpg',
+    specText: '5斤/箱',
+    quantity: 2,
+    lineCount: 1,
+    totalQuantity: 2,
+  },
   issuedAt: null,
   createdAt: '2026-02-03T10:00:00+08:00',
 } satisfies OrderInvoice;
@@ -732,6 +772,61 @@ export const staffStatisticsExample = {
   month: { orderCount: 902, paidAmount: '108400.00' },
 } satisfies StaffStatistics;
 
+/**
+ * The per-day breakdown behind 统计明细 (CR-4-h §1).
+ *
+ * A **day** here is a calendar day in Asia/Shanghai, not a UTC day and not the
+ * host's day: the shop is single-tenant and its operators read 今天 as the day
+ * they are living in. Both ends are inclusive, because an operator who picks
+ * 1 日 to 7 日 means seven days, and the window is capped so a client cannot
+ * ask for the shop's whole history in one query.
+ */
+export const shopDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD');
+
+/** The widest window the series answers, in days — a quarter, with a day to spare. */
+export const STAFF_STATISTICS_MAX_DAYS = 92;
+
+export const staffStatisticsDay = z.object({
+  date: shopDay,
+  orderCount: z.number().int().min(0),
+  paidOrderCount: z.number().int().min(0),
+  paidAmount: money,
+});
+export type StaffStatisticsDay = z.infer<typeof staffStatisticsDay>;
+
+export const staffStatisticsSeries = z.object({
+  granularity: z.literal('day'),
+  /** The resolved window, echoed back: the client may have sent neither end. */
+  from: shopDay,
+  to: shopDay,
+  /**
+   * Every day in the window, including the ones nothing happened on. A chart
+   * that silently skips empty days draws a rising line across a dead week and
+   * lies about it, so the gaps are filled here instead of in each client.
+   */
+  items: z.array(staffStatisticsDay),
+});
+export type StaffStatisticsSeries = z.infer<typeof staffStatisticsSeries>;
+
+export const staffStatisticsSeriesQuery = z.object({
+  from: shopDay.optional(),
+  to: shopDay.optional(),
+  /** Days only for now; the key exists so a week rollup needs no second route. */
+  granularity: z.literal('day').default('day'),
+});
+export type StaffStatisticsSeriesQuery = z.infer<typeof staffStatisticsSeriesQuery>;
+
+export const staffStatisticsSeriesExample = {
+  granularity: 'day',
+  from: '2026-02-01',
+  to: '2026-02-03',
+  items: [
+    { date: '2026-02-01', orderCount: 48, paidOrderCount: 41, paidAmount: '5320.00' },
+    { date: '2026-02-02', orderCount: 0, paidOrderCount: 0, paidAmount: '0.00' },
+    { date: '2026-02-03', orderCount: 51, paidOrderCount: 50, paidAmount: '6180.00' },
+  ],
+} satisfies StaffStatisticsSeries;
+
 /** The staff list row is the console row without the soft-delete column. */
 export const staffOrderListItem = adminOrderListItem.omit({ deletedAt: true });
 export type StaffOrderListItem = z.infer<typeof staffOrderListItem>;
@@ -767,6 +862,22 @@ export const staffRefundReviewBody = z.object({
   reason: z.string().max(255).optional(),
 });
 export type StaffRefundReviewBody = z.infer<typeof staffRefundReviewBody>;
+
+/**
+ * 售后备注, from the phone (CR-4-h §2).
+ *
+ * The field is `remark`, not the console's `adminRemark`, and the difference is
+ * not cosmetic: `refunds.admin_remark` is a single column the web console
+ * overwrites, and a staff member is not an admin — there is no
+ * `refunds.staff_remark` to write and the schema is frozen. A staff note is
+ * therefore **appended to the refund's log** instead of replacing anything, so
+ * two people remarking on the same refund cannot silently erase each other and
+ * the note comes back in `logs` on the detail, in order, attributed.
+ */
+export const staffRefundRemarkBody = z.object({
+  remark: z.string().min(1).max(255),
+});
+export type StaffRefundRemarkBody = z.infer<typeof staffRefundRemarkBody>;
 
 /** Item-level export of one order's items, for the 打印/核对 sheet on the phone. */
 export const orderItemsResult = z.object({ items: z.array(orderItem) });

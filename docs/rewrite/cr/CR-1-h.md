@@ -1,7 +1,14 @@
 # CR-1-h — `GET /api/v1/orders/:id` should accept an order number
 
 - **Stream:** H (uni-app storefront), raised against B1 (cart and checkout)
-- **Status:** open
+- **Status:** **resolved** — accepted in full, stream S, `29106ab3`
+
+> **Decision.** The storefront `:id` takes the 24-digit order number as well as
+> the surrogate id, resolved in one place (`order.ref.ts`) with the owner in the
+> WHERE. The **staff** and admin surfaces keep the surrogate id only: a staff
+> member has no owner to scope to, so accepting a number there would turn the
+> lookup into an oracle over the whole order table keyed by a guessable
+> timestamp. See `docs/rewrite/status/s.md`.
 - **Affects:** `next/packages/contracts/src/order/order.checkout.contract.ts`,
   and the same `:id` on the fulfilment sub-resources B2 added
 

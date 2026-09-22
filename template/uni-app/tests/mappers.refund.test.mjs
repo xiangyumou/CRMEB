@@ -12,7 +12,7 @@ import {
 } from '../api/mappers/refund.js';
 
 const REFUND = example('GET /api/v1/refunds/:id');
-const APPLICABLE = example('GET /api/v1/refunds/applicable-items');
+const APPLICABLE = example('GET /api/v1/refunds/applicable-items/:orderId');
 
 describe('legacyRefundType', () => {
   it('maps every status onto the legacy refund_type the pages branch on', () => {

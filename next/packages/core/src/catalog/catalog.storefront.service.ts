@@ -1,5 +1,7 @@
 import type { PageQuery } from '@shop/contracts/conventions';
 import type {
+  FavoriteAddBatchBody,
+  FavoriteAddBatchResult,
   FavoriteItem,
   HistoryItem,
   ProductCard,
@@ -77,6 +79,18 @@ export async function categoryTree(ctx: Ctx): Promise<{
     })),
     version,
   };
+}
+
+/**
+ * The version alone (CR-3-h).
+ *
+ * One aggregate over `product_categories` instead of the whole tree, for the
+ * revalidation the storefront does on every cold start. It is the same string
+ * `categoryTree` returns, from the same repo function, so the two can never
+ * disagree about whether the menu moved.
+ */
+export async function categoryVersion(ctx: Ctx): Promise<{ version: string }> {
+  return { version: await repo.categoryVersion(ctx.db) };
 }
 
 // ---------------------------------------------------------------------------
@@ -381,6 +395,56 @@ export async function favoriteAdd(
   });
 
   return { favorited: true };
+}
+
+/**
+ * 批量收藏 (CR-2-h §3).
+ *
+ * One transaction where the storefront used to fire N requests, so the answer's
+ * `favorited: true` is true of every id at the same instant. Partial-tolerant
+ * on purpose: an id whose product went off shelf between the list and the
+ * button comes back `false` rather than taking the other 49 down with it —
+ * exactly the trade 再次购买 makes.
+ *
+ * Duplicate ids are collapsed first, so `added` counts rows and not requests.
+ */
+export async function favoriteAddBatch(
+  ctx: Ctx,
+  body: FavoriteAddBatchBody,
+): Promise<FavoriteAddBatchResult> {
+  const userId = requireUserId(ctx);
+  const productIds = [...new Set(body.productIds.map(Number))];
+
+  return ctx.withTx(async (tx) => {
+    const sellable = await repo.findSellableProducts(tx, productIds);
+    const platform = platformOf(ctx);
+    const favorited = new Map<number, boolean>();
+    let added = 0;
+
+    for (const productId of productIds) {
+      if (!sellable.has(productId)) {
+        favorited.set(productId, false);
+        continue;
+      }
+      // `ON CONFLICT DO NOTHING` on the composite primary key: a product the
+      // shopper already favourited is `true` with nothing written, which is
+      // what makes the whole call replay-safe.
+      const inserted = await repo.addFavorite(tx, { userId, productId });
+      if (inserted) {
+        added += 1;
+        await repo.recordFavoriteEvent(tx, { productId, userId, platform });
+      }
+      favorited.set(productId, true);
+    }
+
+    return {
+      added,
+      items: body.productIds.map((productId) => ({
+        productId,
+        favorited: favorited.get(Number(productId)) ?? false,
+      })),
+    };
+  });
 }
 
 export async function favoriteRemove(ctx: Ctx, input: { productId: string }): Promise<void> {

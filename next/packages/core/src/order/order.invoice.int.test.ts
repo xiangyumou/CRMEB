@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { cartItems } from '@shop/db/schema/cart';
 import { productSkus, products } from '@shop/db/schema/catalog';
-import { orderInvoices, orderStatusLogs, orders } from '@shop/db/schema/order';
+import { orderInvoices, orderItems, orderStatusLogs, orders } from '@shop/db/schema/order';
 import { admins } from '@shop/db/schema/auth';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, runConcurrently, forkTestCtx, type TestCtx } from '@shop/testing';
@@ -209,6 +209,41 @@ describe('申请开票', () => {
     expect(
       (await logsOf(placed.orderId)).some((log) => log.changeType === 'invoice_requested'),
     ).toBe(true);
+  });
+
+  it('carries the order’s line summary, read from the order rather than copied (CR-4-h §7)', async () => {
+    const placed = await paidOrder();
+    const invoice = await order.orderInvoices.request(
+      as(placed.userId),
+      { id: String(placed.orderId) },
+      header,
+    );
+
+    expect(invoice.orderSummary).toEqual({
+      productName: expect.stringMatching(/^商品\d+$/),
+      productImageUrl: 'https://cdn.example.com/p.jpg',
+      specText: '默认',
+      quantity: 1,
+      lineCount: 1,
+      totalQuantity: 1,
+    });
+
+    // Not a copy: renaming the product changes what the invoice record shows,
+    // because the summary is read from `order_items` on the way out.
+    const items = await harness.ctx.db
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.orderId, placed.orderId));
+    await harness.ctx.db
+      .update(orderItems)
+      .set({ snapshot: { ...items[0]!.snapshot, productName: '改过名的商品' } })
+      .where(eq(orderItems.id, items[0]!.id));
+
+    const again = await order.orderInvoices.myDetail(as(placed.userId), { id: invoice.id });
+    expect(again.orderSummary?.productName).toBe('改过名的商品');
+
+    const listed = await order.orderInvoices.myList(as(placed.userId), invoiceListQuery());
+    expect(listed.items[0]?.orderSummary?.productName).toBe('改过名的商品');
   });
 
   it('refuses an order nobody has paid for', async () => {

@@ -1,6 +1,5 @@
-import { z } from 'zod';
-import { id } from '../_conventions/common';
 import { defineRoute } from '../_conventions/route';
+import { orderRefParams } from './order.ref.schemas';
 import {
   checkoutCreateBody,
   checkoutLineExample,
@@ -12,6 +11,7 @@ import {
   orderCountsExample,
   orderDetail,
   orderDetailExample,
+  orderHidden,
   orderListQuery,
   orderListItemExample,
   pagedOrders,
@@ -196,10 +196,23 @@ export const orderGetDetail = defineRoute({
   auth: 'user',
   summary: '订单详情',
   tags: ['order'],
-  params: z.object({ id }),
+  /**
+   * `:id` is the surrogate id **or** the 24-digit `orderNo` (CR-1-h). The order
+   * number is the only identifier that appears outside the app — on the WeChat
+   * payment record, in the 客服 conversation — so a deep link built from one has
+   * to resolve. `orderRef` explains why the two can never collide.
+   */
+  params: orderRefParams,
   response: orderDetail,
   errors: ['ORDER_NOT_FOUND'],
-  examples: [{ name: 'ok', params: { id: '9001' }, response: orderDetailExample }],
+  examples: [
+    { name: 'by-id', params: { id: '9001' }, response: orderDetailExample },
+    {
+      name: 'by-order-no',
+      params: { id: '202602011000000010123456' },
+      response: orderDetailExample,
+    },
+  ],
 });
 
 /**
@@ -216,7 +229,7 @@ export const orderCancel = defineRoute({
   auth: 'user',
   summary: '取消订单',
   tags: ['order'],
-  params: z.object({ id }),
+  params: orderRefParams,
   body: orderCancelBody,
   response: orderDetail,
   errors: [
@@ -240,4 +253,31 @@ export const orderCancel = defineRoute({
       },
     },
   ],
+});
+
+/**
+ * 删除订单 — which deletes nothing (CR-4-h §6).
+ *
+ * This is legacy's `is_del`: the buyer's own list stops showing a finished
+ * order, and the shop keeps every row of it. That asymmetry is the whole point
+ * — the money, the invoice and the after-sales window all outlive the button —
+ * so the verb is `DELETE` only because that is what the tap means to the person
+ * pressing it, and `hidden_by_user_at` is what it writes.
+ *
+ * Only `completed`, `cancelled` and `refunded` may be hidden: anything else is
+ * still in flight and the buyer would be hiding an order they may need to act
+ * on. Hiding twice answers `ORDER_NOT_FOUND`, because after the first one the
+ * order is no longer in the caller's list to refer to.
+ */
+export const orderHide = defineRoute({
+  id: 'order.hide',
+  method: 'DELETE',
+  path: '/api/v1/orders/:id',
+  auth: 'user',
+  summary: '删除订单（仅从我的订单隐藏）',
+  tags: ['order'],
+  params: orderRefParams,
+  response: orderHidden,
+  errors: ['ORDER_NOT_FOUND', 'ORDER_NOT_DELETABLE'],
+  examples: [{ name: 'ok', params: { id: '9001' }, response: { hidden: true } }],
 });

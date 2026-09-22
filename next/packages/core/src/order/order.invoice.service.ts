@@ -1,6 +1,7 @@
 import type {
   AdminInvoiceListQuery,
   InvoiceIssueBody,
+  InvoiceOrderSummary,
   InvoiceRejectBody,
   InvoiceRequestBody,
   MyInvoiceListQuery,
@@ -10,6 +11,7 @@ import { requireAdminId, requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId } from '../kernel/ids';
 import * as fulfilRepo from './order.fulfil.repo';
+import { requireOrderRef } from './order.ref';
 import * as repo from './order.repo';
 
 /**
@@ -45,7 +47,42 @@ import * as repo from './order.repo';
 
 type InvoiceRow = fulfilRepo.OrderInvoiceRow & { orderNo: string };
 
-function toWire(row: InvoiceRow): OrderInvoice {
+/**
+ * What the order was for, for the 发票记录 row (CR-4-h §7).
+ *
+ * Read from `order_items` every time rather than copied onto the invoice: the
+ * invoice row carries the header and the amount, and nothing that could drift
+ * away from the order it points at. One query covers a whole page of invoices.
+ */
+async function summarise(
+  ctx: Ctx,
+  orderIds: readonly number[],
+): Promise<Map<number, InvoiceOrderSummary>> {
+  const out = new Map<number, InvoiceOrderSummary>();
+  if (orderIds.length === 0) return out;
+
+  // `listItems` orders by id, so the first row of each order is the line the
+  // buyer added first — the same one the order list renders.
+  for (const item of await repo.listItems(ctx.db, orderIds)) {
+    const seen = out.get(item.orderId);
+    if (seen) {
+      seen.lineCount += 1;
+      seen.totalQuantity += item.quantity;
+      continue;
+    }
+    out.set(item.orderId, {
+      productName: item.snapshot.productName,
+      productImageUrl: item.snapshot.skuImageUrl ?? item.snapshot.productImageUrl,
+      specText: item.snapshot.specText,
+      quantity: item.quantity,
+      lineCount: 1,
+      totalQuantity: item.quantity,
+    });
+  }
+  return out;
+}
+
+function toWire(row: InvoiceRow, orderSummary: InvoiceOrderSummary | null): OrderInvoice {
   return {
     id: toId(row.id),
     orderId: toId(row.orderId),
@@ -65,6 +102,7 @@ function toWire(row: InvoiceRow): OrderInvoice {
     amount: row.amount,
     invoiceNumber: row.invoiceNumber,
     remark: row.remark,
+    orderSummary,
     issuedAt: row.issuedAt === null ? null : row.issuedAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
   };
@@ -73,7 +111,17 @@ function toWire(row: InvoiceRow): OrderInvoice {
 async function readInvoice(ctx: Ctx, id: number): Promise<OrderInvoice> {
   const row = await fulfilRepo.findInvoiceWithOrderNo(ctx.db, id);
   if (!row) throw new DomainError('ORDER_INVOICE_NOT_FOUND');
-  return toWire(row);
+  const [wired] = await withSummaries(ctx, [row]);
+  return wired!;
+}
+
+/** One `order_items` read behind a whole page of invoices. */
+async function withSummaries(ctx: Ctx, rows: readonly InvoiceRow[]): Promise<OrderInvoice[]> {
+  const summaries = await summarise(
+    ctx,
+    rows.map((row) => row.orderId),
+  );
+  return rows.map((row) => toWire(row, summaries.get(row.orderId) ?? null));
 }
 
 const asArray = <T>(value: T | readonly T[] | undefined): readonly T[] | undefined =>
@@ -98,8 +146,7 @@ export async function request(
   params: { id: string },
   body: InvoiceRequestBody,
 ): Promise<OrderInvoice> {
-  const userId = requireUserId(ctx);
-  const orderId = fromId(params.id);
+  const { orderId, userId } = await requireOrderRef(ctx, params.id);
 
   const invoiceId = await ctx.withTx(async (tx): Promise<number> => {
     const order = await repo.findOrderForUser(tx, { id: orderId, userId });
@@ -166,7 +213,12 @@ export async function myList(
     offset: (query.page - 1) * query.pageSize,
     limit: query.pageSize,
   });
-  return { items: rows.map(toWire), total, page: query.page, pageSize: query.pageSize };
+  return {
+    items: await withSummaries(ctx, rows),
+    total,
+    page: query.page,
+    pageSize: query.pageSize,
+  };
 }
 
 export async function myDetail(ctx: Ctx, params: { id: string }): Promise<OrderInvoice> {
@@ -174,7 +226,8 @@ export async function myDetail(ctx: Ctx, params: { id: string }): Promise<OrderI
   const row = await fulfilRepo.findInvoiceWithOrderNo(ctx.db, fromId(params.id));
   // A stranger's invoice and a missing one are the same answer (AUTH-005).
   if (!row || row.userId !== userId) throw new DomainError('ORDER_INVOICE_NOT_FOUND');
-  return toWire(row);
+  const [wired] = await withSummaries(ctx, [row]);
+  return wired!;
 }
 
 /** The buyer withdraws a request that has not been issued yet. */
@@ -219,7 +272,12 @@ export async function adminList(
     offset: (query.page - 1) * query.pageSize,
     limit: query.pageSize,
   });
-  return { items: rows.map(toWire), total, page: query.page, pageSize: query.pageSize };
+  return {
+    items: await withSummaries(ctx, rows),
+    total,
+    page: query.page,
+    pageSize: query.pageSize,
+  };
 }
 
 export async function adminDetail(ctx: Ctx, params: { id: string }): Promise<OrderInvoice> {

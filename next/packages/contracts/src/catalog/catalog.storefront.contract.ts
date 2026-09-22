@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { id } from '../_conventions/common';
 import { defineRoute } from '../_conventions/route';
 import {
+  favoriteAddBatchBody,
+  favoriteAddBatchResult,
   favoriteAddBody,
   favoriteRemoveBody,
   favoriteRemoveResult,
@@ -70,6 +72,35 @@ export const catalogCategoryTree = defineRoute({
       },
     },
   ],
+});
+
+/**
+ * "Has the category tree changed?" in two fields (CR-3-h).
+ *
+ * The uni-app caches the whole tree on the device and revalidates it on every
+ * cold start, because the 分类 tab must paint instantly. Without this route it
+ * had to fetch the tree — tens of kilobytes, on mobile data — and throw it away
+ * to learn one string.
+ *
+ * `version` is exactly the one `catalog.categoryTree` carries: `max(updated_at)`
+ * in whole seconds, a dash, and the visible-category count, so any insert, edit,
+ * hide or delete moves it. Both routes also send it as an `ETag`.
+ *
+ * **This is the interim shape.** CR-1-s asks for `If-None-Match` support in
+ * `handle()`, which would let `GET /api/v1/catalog/categories` answer 304 and
+ * cover the "I want the tree if it moved" case in one round trip instead of
+ * two. Until that lands, `handle()` has no way to return a bodyless 304 and
+ * this route is the cheap half.
+ */
+export const catalogCategoryVersion = defineRoute({
+  id: 'catalog.categoryVersion',
+  method: 'GET',
+  path: '/api/v1/catalog/categories/version',
+  auth: 'public',
+  summary: '商品分类版本号',
+  tags: ['catalog'],
+  response: z.object({ version: z.string() }),
+  examples: [{ name: 'ok', response: { version: '1742534400-17' } }],
 });
 
 export const catalogProductList = defineRoute({
@@ -303,6 +334,55 @@ export const catalogFavoriteAdd = defineRoute({
   status: 201,
   errors: ['CATALOG_PRODUCT_NOT_FOUND'],
   examples: [{ name: 'ok', body: { productId: '1' }, response: { favorited: true } }],
+});
+
+/**
+ * 批量收藏 (CR-2-h §3).
+ *
+ * Idempotent like its singular sibling, and partial-tolerant: an id whose
+ * product is gone or off shelf comes back `favorited: false` instead of taking
+ * the other 49 down with it. One transaction, so the storefront's "收藏成功"
+ * is true of every id the answer says `true` for.
+ */
+export const catalogFavoriteAddBatch = defineRoute({
+  id: 'catalog.favoriteAddBatch',
+  method: 'POST',
+  path: '/api/v1/me/favorites/batch',
+  auth: 'user',
+  summary: '批量收藏商品',
+  tags: ['catalog'],
+  body: favoriteAddBatchBody,
+  response: favoriteAddBatchResult,
+  status: 201,
+  examples: [
+    {
+      name: 'ok',
+      body: { productIds: ['1', '2'] },
+      response: {
+        added: 2,
+        items: [
+          { productId: '1', favorited: true },
+          { productId: '2', favorited: true },
+        ],
+      },
+    },
+    {
+      name: 'one-went-off-shelf',
+      body: { productIds: ['1', '2'] },
+      response: {
+        added: 1,
+        items: [
+          { productId: '1', favorited: true },
+          { productId: '2', favorited: false },
+        ],
+      },
+    },
+    {
+      name: 'replay',
+      body: { productIds: ['1'] },
+      response: { added: 0, items: [{ productId: '1', favorited: true }] },
+    },
+  ],
 });
 
 export const catalogFavoriteRemove = defineRoute({

@@ -18,6 +18,7 @@ import { registerOrderFacts, registerOrderStateMachine } from './ports';
  * | `cancelOrder`         | C, B2  | payment failed, admin close-out             |
  * | `autoCancel` / `sweepExpiredOrders` | jobs | the payment window closed     |
  * | `list` / `counts` / `detail` | routes | 我的订单                             |
+ * | `hide`                | routes | 删除订单 (visibility only, CR-4-h §6)       |
  * | `rebuyLines`          | cart   | 再次购买                                    |
  * | `resolveCatalogPort`  | cart   | live price, stock and status of a variant   |
  *
@@ -50,6 +51,8 @@ export { create, preview, rebuyLines } from './order.checkout.service';
 export { autoCancel, cancel, cancelOrder, sweepExpiredOrders } from './order.cancel.service';
 export type { CancelInput, CancelOutcome, CancelReason } from './order.cancel.service';
 export { counts, detail, detailOf, list } from './order.query.service';
+export { hide } from './order.hide.service';
+export { ORDER_NO_LENGTH, isOrderNo, requireOrderRef, resolveOrderRef } from './order.ref';
 export { orderStateMachine } from './order.state-machine';
 export { orderConfig } from './order.config';
 

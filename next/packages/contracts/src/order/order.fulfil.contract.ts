@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { defineRoute } from '../_conventions/route';
+import { orderRefParams } from './order.ref.schemas';
 import { orderDetail, orderDetailExample } from './schemas';
 import {
-  orderIdParams,
   shipment,
   shipmentExample,
   shipmentIdParams,
@@ -32,7 +32,7 @@ export const orderConfirmReceipt = defineRoute({
   auth: 'user',
   summary: '确认收货',
   tags: ['order'],
-  params: orderIdParams,
+  params: orderRefParams,
   body: z.object({}).default({}),
   response: orderDetail,
   errors: ['ORDER_NOT_FOUND', 'ORDER_NOT_RECEIVABLE'],
@@ -63,7 +63,7 @@ export const orderMyShipments = defineRoute({
   auth: 'user',
   summary: '订单包裹',
   tags: ['order'],
-  params: orderIdParams,
+  params: orderRefParams,
   response: z.object({ items: z.array(shipment) }),
   errors: ['ORDER_NOT_FOUND'],
   examples: [

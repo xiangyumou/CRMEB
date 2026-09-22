@@ -313,4 +313,14 @@ describe('system / storage', () => {
     expect(uploadPurposeFor('upload/image')).toBe('review');
     expect(uploadPurposeFor(undefined)).toBe('review');
   });
+
+  it('takes a caller at its word when it names a purpose the contract has (CR-5-h §2)', () => {
+    // 商家管理's 添加商品 has to ask for `staff`: its legacy path is `upload/image`,
+    // the same one 评价 sends, so nothing in the URL could tell them apart.
+    expect(uploadPurposeFor('staff')).toBe('staff');
+    expect(uploadPurposeFor('review')).toBe('review');
+    // A typo is not passed through — the server would answer 422 and the page
+    // has nothing to say about it.
+    expect(uploadPurposeFor('stafff')).toBe('review');
+  });
 });

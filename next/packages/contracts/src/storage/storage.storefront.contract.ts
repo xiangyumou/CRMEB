@@ -22,18 +22,37 @@ import {
  *   so the attachment lands in the right library owned by the right person.
  */
 
+/**
+ * `multipart/form-data` with **exactly one** part named `file` (CR-5-h §1).
+ *
+ * The field name is part of the contract, not a convention: an upload has no
+ * JSON body for `handle()` to validate, so nothing else can catch the client
+ * that sends `image` (legacy's name) or `multipart` (the old uni-app pages').
+ * A file under any other name is `STORAGE_UPLOAD_FIELD_MISSING`, which names
+ * the fix, rather than `STORAGE_NO_FILE`, which told the shopper to pick a
+ * photo they had already picked.
+ *
+ * Further file parts in the same request are **ignored**, not refused: the one
+ * named `file` is the upload, and a form that also carries, say, a thumbnail
+ * the server does not want should not fail outright.
+ *
+ * `purpose=staff` is refused unless the caller is on the 店员 list, and carries
+ * its own size ceiling — see `userUploadPurpose` (CR-5-h §2).
+ */
 export const storageUserUpload = defineRoute({
   id: 'storage.userUpload',
   method: 'POST',
   path: '/api/v1/uploads',
   auth: 'user',
-  summary: '上传图片（头像/评价/退款凭证）',
+  summary: '上传图片（头像/评价/退款凭证/商家素材）',
   tags: ['storage'],
   query: userUploadQuery,
   response: userUploadResult,
   status: 201,
   errors: [
     'STORAGE_NO_FILE',
+    'STORAGE_UPLOAD_FIELD_MISSING',
+    'FORBIDDEN',
     'STORAGE_FILE_TOO_LARGE',
     'STORAGE_FILE_TYPE_REJECTED',
     'STORAGE_MIME_MISMATCH',
@@ -55,6 +74,18 @@ export const storageUserUpload = defineRoute({
         height: 256,
       },
     },
+    {
+      name: 'staff-product-image',
+      query: { purpose: 'staff' },
+      response: {
+        ...userUploadResultExample,
+        url: '/uploads/staff/2026/09/5e6f7a8b9c0d1e2f3a4b5c6d7e8f9012.jpg',
+        name: '5e6f7a8b9c0d1e2f3a4b5c6d7e8f9012.jpg',
+        size: 742318,
+        width: 1600,
+        height: 1600,
+      },
+    },
   ],
 });
 
@@ -71,6 +102,7 @@ export const storageScanUpload = defineRoute({
   errors: [
     'STORAGE_SCAN_TOKEN_INVALID',
     'STORAGE_NO_FILE',
+    'STORAGE_UPLOAD_FIELD_MISSING',
     'STORAGE_FILE_TOO_LARGE',
     'STORAGE_FILE_TYPE_REJECTED',
     'STORAGE_MIME_MISMATCH',

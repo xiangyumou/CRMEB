@@ -5,7 +5,13 @@ import { productSkus, productVirtualCards, products } from '@shop/db/schema/cata
 import { orderStatusLogs, orders } from '@shop/db/schema/order';
 import { couponTemplates, userCoupons } from '@shop/db/schema/coupon';
 import { userAddresses, users } from '@shop/db/schema/user';
-import { createTestCtx, fakePaymentPort, type TestCtx } from '@shop/testing';
+import {
+  createTestCtx,
+  fakePaymentPort,
+  forkTestCtx,
+  runConcurrently,
+  type TestCtx,
+} from '@shop/testing';
 import { registerCatalogDomain, stockAndSalesOf } from '../catalog';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
@@ -987,5 +993,130 @@ describe('my orders', () => {
     const stranger = await makeUser();
     await expectDomainError(order.detail(as(stranger), { id: String(orderId) }), 'ORDER_NOT_FOUND');
     await expectDomainError(order.detail(as(stranger), { id: '999999' }), 'ORDER_NOT_FOUND');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 删除订单 (CR-4-h §6)
+// ---------------------------------------------------------------------------
+
+describe('hiding a finished order', () => {
+  /**
+   * Puts an order into a terminal state without going through the gateway.
+   *
+   * The whole row has to move, not just `status`: `orders_paid_shape`,
+   * `orders_cancelled_shape` and `orders_fulfillment_matches_status` between
+   * them refuse a completed order that was never paid or never shipped. Writing
+   * a shape the database would never hold would make these tests prove nothing.
+   */
+  async function finish(orderId: number, status: 'completed' | 'cancelled' | 'refunded') {
+    const paid = status !== 'cancelled';
+    await harness.ctx.db
+      .update(orders)
+      .set({
+        status,
+        fulfillmentStatus: status === 'completed' ? 'fulfilled' : 'unfulfilled',
+        refundStatus: status === 'refunded' ? 'refunded' : 'none',
+        paidAt: paid ? harness.clock.now() : null,
+        paidAmount: paid ? '120.00' : null,
+        refundedAmount: status === 'refunded' ? '120.00' : '0.00',
+        cancelledAt: status === 'cancelled' ? harness.clock.now() : null,
+        completedAt: status === 'completed' ? harness.clock.now() : null,
+      })
+      .where(eq(orders.id, orderId));
+  }
+
+  it('takes the order out of the buyer’s list and leaves the row for the shop', async () => {
+    const { userId, orderId } = await makeOrder();
+    await finish(orderId, 'completed');
+
+    expect(await order.hide(as(userId), { id: String(orderId) })).toEqual({ hidden: true });
+
+    const listed = await order.list(as(userId), {
+      page: 1,
+      pageSize: 20,
+      tab: 'all',
+      sortOrder: 'desc',
+    });
+    expect(listed.total).toBe(0);
+    expect(await order.counts(as(userId))).toMatchObject({ all: 0, finished: 0 });
+    await expectDomainError(order.detail(as(userId), { id: String(orderId) }), 'ORDER_NOT_FOUND');
+
+    // The shop's copy is untouched apart from the stamp.
+    const [row] = await harness.ctx.db.select().from(orders).where(eq(orders.id, orderId));
+    expect(row!.status).toBe('completed');
+    expect(row!.hiddenByUserAt).toBeInstanceOf(Date);
+    expect(row!.deletedAt).toBeNull();
+
+    const logs = await harness.ctx.db.select().from(orderStatusLogs);
+    const hidden = logs.filter((log) => log.changeType === 'hidden_by_user');
+    expect(hidden).toHaveLength(1);
+    // A visibility change, not a transition: neither status column is claimed.
+    expect(hidden[0]).toMatchObject({ fromStatus: null, toStatus: null, operatorKind: 'user' });
+    expect(hidden[0]!.operatorUserId).toBe(userId);
+  });
+
+  it('accepts the order number as well as the id (CR-1-h)', async () => {
+    const { userId, orderId, detail } = await makeOrder();
+    await finish(orderId, 'cancelled');
+
+    expect(await order.hide(as(userId), { id: detail.orderNo })).toEqual({ hidden: true });
+  });
+
+  it.each(['completed', 'cancelled', 'refunded'] as const)('allows %s', async (status) => {
+    const { userId, orderId } = await makeOrder();
+    await finish(orderId, status);
+    expect(await order.hide(as(userId), { id: String(orderId) })).toEqual({ hidden: true });
+  });
+
+  it('refuses an order that is still in flight, and says which it is', async () => {
+    const { userId, orderId } = await makeOrder();
+
+    await expectDomainError(order.hide(as(userId), { id: String(orderId) }), 'ORDER_NOT_DELETABLE');
+    const [row] = await harness.ctx.db.select().from(orders).where(eq(orders.id, orderId));
+    expect(row!.hiddenByUserAt).toBeNull();
+  });
+
+  it('answers a second tap, a stranger and an unknown id all with the same 404', async () => {
+    const { userId, orderId } = await makeOrder();
+    await finish(orderId, 'completed');
+    const stranger = await makeUser();
+
+    await order.hide(as(userId), { id: String(orderId) });
+    // Already hidden: to this buyer the order no longer exists, so saying
+    // "not deletable" would confirm a row they can no longer see.
+    await expectDomainError(order.hide(as(userId), { id: String(orderId) }), 'ORDER_NOT_FOUND');
+    await expectDomainError(order.hide(as(stranger), { id: String(orderId) }), 'ORDER_NOT_FOUND');
+    await expectDomainError(order.hide(as(stranger), { id: '999999' }), 'ORDER_NOT_FOUND');
+  });
+
+  it('stamps once and logs once when the button is tapped twice at the same moment', async () => {
+    const { userId, orderId } = await makeOrder();
+    await finish(orderId, 'completed');
+
+    const outcomes = await runConcurrently(
+      4,
+      async () => {
+        try {
+          await order.hide(forkTestCtx(harness, { actor: userActor(userId), platform: 'h5' }), {
+            id: String(orderId),
+          });
+          return { won: true, code: null as string | null };
+        } catch (error) {
+          if (!(error instanceof DomainError)) throw error;
+          return { won: false, code: error.code };
+        }
+      },
+      { isWinner: (outcome) => outcome.won },
+    );
+
+    expect(outcomes.winners).toBe(1);
+    expect(outcomes.fulfilled.filter((o) => !o.won).map((o) => o.code)).toEqual([
+      'ORDER_NOT_FOUND',
+      'ORDER_NOT_FOUND',
+      'ORDER_NOT_FOUND',
+    ]);
+    const logs = await harness.ctx.db.select().from(orderStatusLogs);
+    expect(logs.filter((log) => log.changeType === 'hidden_by_user')).toHaveLength(1);
   });
 });

@@ -14,7 +14,7 @@ import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { generateOrderNo, toId, toIdOrNull } from '../kernel/ids';
 import { Money } from '../kernel/money';
-import { resolveStockPort } from '../order';
+import { requireOrderRef, resolveStockPort } from '../order';
 import { onOrderRefunded } from '../order/ports';
 import {
   applyExceptionRefundNotification,
@@ -97,8 +97,7 @@ export async function applicableItems(
   ctx: Ctx,
   input: { orderId: string },
 ): Promise<RefundableItemsResult> {
-  const userId = requireUserId(ctx);
-  const orderId = Number(input.orderId);
+  const { orderId, userId } = await requireOrderRef(ctx, input.orderId, 'REFUND_ORDER_NOT_FOUND');
   const order = await repo.findOrder(ctx.db, orderId);
   if (!order || order.deletedAt !== null || order.userId !== userId) {
     throw new DomainError('REFUND_ORDER_NOT_FOUND');

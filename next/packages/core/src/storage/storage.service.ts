@@ -25,6 +25,7 @@ import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
 import { enforce, fixedWindow } from '../kernel/rate-limit';
 import type { Storage } from '../kernel/storage';
+import { getStaffCheck } from '../auth/user-lookup';
 import { isRejected, mimeAgrees, probeImageDimensions, sniffFileType } from './file-type';
 import { safeFetch, SafeFetchError } from './safe-fetch';
 import { createS3Storage } from './s3';
@@ -653,6 +654,13 @@ function filenameFromUrl(raw: string): string | undefined {
  * Images only, a smaller ceiling, and a per-user hourly budget — the three
  * things that stop a review form from becoming free hosting. The shopper is
  * told the URL and nothing else about the library.
+ *
+ * `purpose=staff` is the exception (CR-5-h §2). 商家管理's 添加商品 screen posts a
+ * *shop* asset over a storefront session, so it arrives here rather than at the
+ * admin route — but it is checked against the 店员 list first, it is stored
+ * under its own directory, and it is allowed the admin ceiling, because a
+ * product photo is not a review snapshot. A shopper who guesses the purpose
+ * gets a 403, not a bigger quota.
  */
 export async function userUpload(
   ctx: Ctx,
@@ -661,11 +669,23 @@ export async function userUpload(
 ): Promise<UserUploadResult> {
   const userId = requireUserId(ctx);
   const settings = await ctx.config.get(storageConfig);
+  const staff = query.purpose === 'staff';
+
+  if (staff) {
+    const check = getStaffCheck();
+    // Fails closed: no staff check registered means nothing can claim to be
+    // staff, exactly as `handle()` treats an `auth: 'staff'` route.
+    if (!check || !(await check.isStaff(ctx.db, userId))) {
+      throw new DomainError('FORBIDDEN', { details: { reason: 'not staff' } });
+    }
+  }
 
   await enforce(
     fixedWindow(ctx.redis, {
-      key: `storage:upload:user:${userId}`,
-      limit: settings.userUploadsPerHour,
+      // Staff uploads are budgeted separately: a 店员 adding a product with
+      // eight photos must not exhaust the allowance they also shop with.
+      key: staff ? `storage:upload:staff:${userId}` : `storage:upload:user:${userId}`,
+      limit: staff ? settings.staffUploadsPerHour : settings.userUploadsPerHour,
       windowMs: 60 * 60 * 1000,
       nowMs: ctx.clock.now().getTime(),
     }),
@@ -674,7 +694,7 @@ export async function userUpload(
 
   const result = await storeFile(ctx, {
     file,
-    maxBytes: settings.maxUserUploadBytes,
+    maxBytes: staff ? settings.maxStaffUploadBytes : settings.maxUserUploadBytes,
     directory: query.purpose,
     // A shopper's picture never lands in an admin's folder tree.
     categoryId: null,

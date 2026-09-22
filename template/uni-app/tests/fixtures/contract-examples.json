@@ -34,6 +34,41 @@
       }
     }
   },
+  "POST /api/v1/cart/items/decrements": {
+    "name": "one-off",
+    "body": {
+      "skuId": "21",
+      "quantity": 1
+    },
+    "response": {
+      "item": {
+        "id": "5001",
+        "productId": "11",
+        "skuId": "21",
+        "quantity": 1,
+        "isSelected": true,
+        "available": true,
+        "state": "ok",
+        "productName": "有机三只松鼠坚果礼盒",
+        "productImageUrl": "https://cdn.example.com/p/11.jpg",
+        "productKind": "physical",
+        "skuImageUrl": "https://cdn.example.com/sku/21.jpg",
+        "specText": "混合装|1000g",
+        "unitName": "盒",
+        "unitPrice": "60.00",
+        "originalUnitPrice": "88.00",
+        "subtotal": "60.00",
+        "stock": 42,
+        "createdAt": "2026-02-01T10:00:00+08:00"
+      },
+      "cart": {
+        "items": 3,
+        "quantity": 4,
+        "availableCount": 2,
+        "unavailableCount": 1
+      }
+    }
+  },
   "GET /api/v1/cart/count": {
     "name": "ok",
     "response": {
@@ -343,6 +378,12 @@
       "version": "1742534400-17"
     }
   },
+  "GET /api/v1/catalog/categories/version": {
+    "name": "ok",
+    "response": {
+      "version": "1742534400-17"
+    }
+  },
   "DELETE /api/v1/me/search-history": {
     "name": "ok"
   },
@@ -353,6 +394,28 @@
     },
     "response": {
       "favorited": true
+    }
+  },
+  "POST /api/v1/me/favorites/batch": {
+    "name": "ok",
+    "body": {
+      "productIds": [
+        "1",
+        "2"
+      ]
+    },
+    "response": {
+      "added": 2,
+      "items": [
+        {
+          "productId": "1",
+          "favorited": true
+        },
+        {
+          "productId": "2",
+          "favorited": true
+        }
+      ]
     }
   },
   "GET /api/v1/me/favorites": {
@@ -1224,7 +1287,7 @@
     }
   },
   "GET /api/v1/orders/:id": {
-    "name": "ok",
+    "name": "by-id",
     "params": {
       "id": "9001"
     },
@@ -1283,6 +1346,15 @@
       "completedAt": null,
       "cancelledAt": null,
       "cancelReason": null
+    }
+  },
+  "DELETE /api/v1/orders/:id": {
+    "name": "ok",
+    "params": {
+      "id": "9001"
+    },
+    "response": {
+      "hidden": true
     }
   },
   "GET /api/v1/orders": {
@@ -1487,6 +1559,14 @@
       "amount": "118.00",
       "invoiceNumber": null,
       "remark": null,
+      "orderSummary": {
+        "productName": "有机红富士苹果 5 斤装",
+        "productImageUrl": "https://cdn.example.com/p/1.jpg",
+        "specText": "5斤/箱",
+        "quantity": 2,
+        "lineCount": 1,
+        "totalQuantity": 2
+      },
       "issuedAt": null,
       "createdAt": "2026-02-03T10:00:00+08:00"
     }
@@ -1515,6 +1595,14 @@
       "amount": "118.00",
       "invoiceNumber": null,
       "remark": null,
+      "orderSummary": {
+        "productName": "有机红富士苹果 5 斤装",
+        "productImageUrl": "https://cdn.example.com/p/1.jpg",
+        "specText": "5斤/箱",
+        "quantity": 2,
+        "lineCount": 1,
+        "totalQuantity": 2
+      },
       "issuedAt": null,
       "createdAt": "2026-02-03T10:00:00+08:00"
     }
@@ -1546,6 +1634,14 @@
           "amount": "118.00",
           "invoiceNumber": null,
           "remark": null,
+          "orderSummary": {
+            "productName": "有机红富士苹果 5 斤装",
+            "productImageUrl": "https://cdn.example.com/p/1.jpg",
+            "specText": "5斤/箱",
+            "quantity": 2,
+            "lineCount": 1,
+            "totalQuantity": 2
+          },
           "issuedAt": null,
           "createdAt": "2026-02-03T10:00:00+08:00"
         }
@@ -1587,6 +1683,14 @@
       "amount": "118.00",
       "invoiceNumber": null,
       "remark": null,
+      "orderSummary": {
+        "productName": "有机红富士苹果 5 斤装",
+        "productImageUrl": "https://cdn.example.com/p/1.jpg",
+        "specText": "5斤/箱",
+        "quantity": 2,
+        "lineCount": 1,
+        "totalQuantity": 2
+      },
       "issuedAt": null,
       "createdAt": "2026-02-03T10:00:00+08:00"
     }
@@ -2087,6 +2191,7 @@
       "returnExpressCompanyName": null,
       "returnTrackingNo": null,
       "returnPhone": null,
+      "returnAddress": null,
       "logs": [
         {
           "toStatus": "applied",
@@ -2151,6 +2256,76 @@
       "pageSize": 20
     }
   },
+  "POST /api/v1/staff/refunds/:id/remark": {
+    "name": "noted",
+    "params": {
+      "id": "601"
+    },
+    "body": {
+      "remark": "已电话联系买家"
+    },
+    "response": {
+      "id": "601",
+      "refundNo": "RF2602261300000601",
+      "orderId": "3001",
+      "orderNo": "SO2602261159001",
+      "kind": "return_and_refund",
+      "status": "applied",
+      "returnStage": "awaiting_shipment",
+      "quantity": 1,
+      "amount": "99.00",
+      "refundedAmount": "0.00",
+      "includesFreight": false,
+      "reason": "商品破损",
+      "rejectReason": null,
+      "items": [
+        {
+          "orderItemId": "7001",
+          "productName": "有机红富士苹果 5 斤装",
+          "productImageUrl": "https://cdn.example/p/apple.jpg",
+          "specText": "5 斤 / 箱",
+          "quantity": 1,
+          "amount": "99.00"
+        }
+      ],
+      "createdAt": "2026-02-26T13:00:00+08:00",
+      "succeededAt": null,
+      "userId": "77",
+      "userNickname": "小明",
+      "outRefundNo": "R2602261300000601C4D2",
+      "gatewayRefundId": null,
+      "paymentAttemptId": "5001",
+      "isAutomatic": false,
+      "adminRemark": null,
+      "lastError": null,
+      "reviewedByAdminId": null,
+      "reviewedAt": null,
+      "failedAt": null,
+      "cancelledAt": null,
+      "updatedAt": "2026-02-26T13:00:00+08:00",
+      "explanation": "收到时箱子被压坏，里面有三个苹果烂了",
+      "images": [
+        "https://cdn.example/u/77/refund-601-1.jpg"
+      ],
+      "returnExpressCompanyId": null,
+      "returnExpressCompanyName": null,
+      "returnTrackingNo": null,
+      "returnPhone": null,
+      "returnAddress": null,
+      "logs": [
+        {
+          "toStatus": "applied",
+          "message": "买家发起退款申请",
+          "createdAt": "2026-02-26T13:00:00+08:00"
+        },
+        {
+          "toStatus": "applied",
+          "message": "店员备注：已电话联系买家",
+          "createdAt": "2026-02-26T14:00:00+08:00"
+        }
+      ]
+    }
+  },
   "POST /api/v1/staff/refunds/:id/review": {
     "name": "approve",
     "params": {
@@ -2206,6 +2381,7 @@
       "returnExpressCompanyName": null,
       "returnTrackingNo": null,
       "returnPhone": null,
+      "returnAddress": null,
       "logs": [
         {
           "toStatus": "applied",
@@ -2336,6 +2512,39 @@
       }
     }
   },
+  "GET /api/v1/staff/statistics/series": {
+    "name": "three-days",
+    "query": {
+      "from": "2026-02-01",
+      "to": "2026-02-03",
+      "granularity": "day"
+    },
+    "response": {
+      "granularity": "day",
+      "from": "2026-02-01",
+      "to": "2026-02-03",
+      "items": [
+        {
+          "date": "2026-02-01",
+          "orderCount": 48,
+          "paidOrderCount": 41,
+          "paidAmount": "5320.00"
+        },
+        {
+          "date": "2026-02-02",
+          "orderCount": 0,
+          "paidOrderCount": 0,
+          "paidAmount": "0.00"
+        },
+        {
+          "date": "2026-02-03",
+          "orderCount": 51,
+          "paidOrderCount": 50,
+          "paidAmount": "6180.00"
+        }
+      ]
+    }
+  },
   "POST /api/v1/orders/:id/payments": {
     "name": "mini-program",
     "params": {
@@ -2391,9 +2600,9 @@
       "message": "成功"
     }
   },
-  "GET /api/v1/refunds/applicable-items": {
+  "GET /api/v1/refunds/applicable-items/:orderId": {
     "name": "one-line",
-    "query": {
+    "params": {
       "orderId": "3001"
     },
     "response": {

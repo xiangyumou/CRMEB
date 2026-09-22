@@ -1,6 +1,7 @@
 import type {
   CartAddBody,
   CartCount,
+  CartDecrementBody,
   CartItem,
   CartList,
   CartListQuery,
@@ -11,7 +12,7 @@ import type {
   CartSelectionBody,
   CartUpdateBody,
 } from '@shop/contracts/cart/schemas';
-import type { DbOrTx } from '@shop/db';
+import type { DbOrTx, Tx } from '@shop/db';
 import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId } from '../kernel/ids';
@@ -203,7 +204,29 @@ export async function addItem(ctx: Ctx, body: CartAddBody): Promise<CartMutation
   return { item: entry ? toCartItem(entry) : null, cart: countOf(entries) };
 }
 
-/** Absolute quantity and/or the tick. `PATCH`, because it is a partial edit. */
+/**
+ * Absolute quantity, the tick, and/or 修改规格. `PATCH`, because it is a partial
+ * edit.
+ *
+ * ## Changing the variant (CR-2-h §1)
+ *
+ * The storefront used to express 修改规格 as `DELETE` then `POST`, which loses
+ * the row outright if the second call fails. Here it is one transaction, and it
+ * is deliberately written as *remove the old row, then add the units under the
+ * new variant* rather than as `UPDATE … SET sku_id = …`:
+ *
+ *  - `addUnits` is a single `INSERT … ON CONFLICT (user_id, sku_id) DO UPDATE`,
+ *    so folding into a row the cart already holds — the merge CR-2-h asked for —
+ *    is the database's decision and cannot race with a concurrent add of the
+ *    same variant. An in-place `UPDATE` would instead hit
+ *    `cart_items_user_sku_uq` and abort the whole transaction;
+ *  - the delete is conditional, so of two requests moving the same row only one
+ *    re-adds the units.
+ *
+ * The cost is that the surviving row's `id` is not the one that was PATCHed
+ * when there was no row to merge into. The contract says so and the answer
+ * carries the survivor, which is what the storefront re-renders anyway.
+ */
 export async function updateItem(
   ctx: Ctx,
   params: { id: string },
@@ -211,25 +234,103 @@ export async function updateItem(
 ): Promise<CartMutationResult> {
   const userId = requireUserId(ctx);
   const id = fromId(params.id);
+  const wantedSkuId = body.skuId === undefined ? null : fromId(body.skuId);
 
-  const entries = await ctx.withTx(async (tx) => {
+  const changed = await ctx.withTx(async (tx) => {
     const row = await repo.findForUser(tx, { id, userId });
     if (!row) throw new DomainError('CART_ITEM_NOT_FOUND');
 
-    if (body.quantity !== undefined) {
+    let survivingId = id;
+
+    if (wantedSkuId !== null && wantedSkuId !== row.skuId) {
+      survivingId = await changeSku(ctx, tx, {
+        row,
+        userId,
+        skuId: wantedSkuId,
+        quantity: body.quantity ?? row.quantity,
+      });
+    } else if (body.quantity !== undefined) {
       const sku = await skuOrRefuse(ctx, tx, row.skuId);
       const refusal = refuseQuantity(sku, body.quantity);
       if (refusal) refuse(refusal);
       const moved = await repo.setQuantity(tx, { id, userId, quantity: body.quantity });
       if (!moved.won) throw new DomainError('CART_ITEM_NOT_FOUND');
     }
+
     if (body.isSelected !== undefined) {
-      await repo.setSelected(tx, { userId, ids: [id], isSelected: body.isSelected });
+      await repo.setSelected(tx, { userId, ids: [survivingId], isSelected: body.isSelected });
+    }
+    return { survivingId, entries: await loadCart(ctx, tx, userId) };
+  });
+
+  const entry = changed.entries.find((candidate) => candidate.row.id === changed.survivingId);
+  return { item: entry ? toCartItem(entry) : null, cart: countOf(changed.entries) };
+}
+
+/**
+ * The variant half of `updateItem`. Answers with the id of the row that now
+ * holds the units — the merge target when the cart already had that variant,
+ * otherwise a fresh row.
+ *
+ * The quantity checked is the **total** the shopper will end up with, because
+ * that is the number the purchase limit and the stock are about: moving 2 units
+ * onto a variant the cart already holds 3 of asks for 5, and 5 is what has to
+ * pass `refuseQuantity`.
+ */
+async function changeSku(
+  ctx: Ctx,
+  tx: Tx,
+  args: { row: repo.CartRow; userId: number; skuId: number; quantity: number },
+): Promise<number> {
+  const sku = await skuOrRefuse(ctx, tx, args.skuId);
+  const existing = await repo.findBySku(tx, { userId: args.userId, skuId: args.skuId });
+
+  const refusal = refuseQuantity(sku, args.quantity + (existing?.quantity ?? 0));
+  if (refusal) refuse(refusal);
+
+  // Conditional: the row we are about to move must still be there. Two devices
+  // re-speccing the same row therefore move it once, and the loser is told the
+  // row is gone rather than silently duplicating its units.
+  const removed = await repo.removeOne(tx, { id: args.row.id, userId: args.userId });
+  if (!removed.won) throw new DomainError('CART_ITEM_NOT_FOUND');
+
+  const survivor = await repo.addUnits(tx, {
+    userId: args.userId,
+    productId: sku.productId,
+    skuId: args.skuId,
+    quantity: args.quantity,
+    cap: capFor(sku),
+  });
+  return survivor.id;
+}
+
+/**
+ * 减少数量 by variant (CR-2-h §2) — the product detail page's minus button,
+ * which knows the SKU it is looking at but not whether a cart row exists for it.
+ *
+ * Two conditional statements, in one transaction, and their order is the point:
+ * the `UPDATE … WHERE quantity > n` takes the units off only if there are more
+ * than `n` of them, and the `DELETE` then catches exactly the case where there
+ * were not. Neither reads the quantity first, so two taps arriving together
+ * take one unit each and the row is removed exactly once.
+ */
+export async function decrementItem(
+  ctx: Ctx,
+  body: CartDecrementBody,
+): Promise<CartMutationResult> {
+  const userId = requireUserId(ctx);
+  const skuId = fromId(body.skuId);
+
+  const entries = await ctx.withTx(async (tx) => {
+    const subtracted = await repo.subtractUnits(tx, { userId, skuId, quantity: body.quantity });
+    if (!subtracted.won) {
+      const removed = await repo.removeBySku(tx, { userId, skuId });
+      if (!removed.won) throw new DomainError('CART_ITEM_NOT_FOUND');
     }
     return loadCart(ctx, tx, userId);
   });
 
-  const entry = entries.find((candidate) => candidate.row.id === id);
+  const entry = entries.find((candidate) => candidate.row.skuId === skuId);
   return { item: entry ? toCartItem(entry) : null, cart: countOf(entries) };
 }
 

@@ -13,9 +13,13 @@ import type {
   StaffOrderDetail,
   StaffOrderListItem,
   StaffOrderListQuery,
+  StaffRefundRemarkBody,
   StaffRefundReviewBody,
   StaffStatistics,
+  StaffStatisticsSeries,
+  StaffStatisticsSeriesQuery,
 } from '@shop/contracts/order/order.fulfil.schemas';
+import { STAFF_STATISTICS_MAX_DAYS } from '@shop/contracts/order/order.fulfil.schemas';
 import type {
   AdminRefundDetail,
   AdminRefundListItem,
@@ -112,6 +116,49 @@ const stripListItem = (item: AdminOrderListItem): StaffOrderListItem => {
   return rest;
 };
 
+// ---------------------------------------------------------------------------
+// statistics
+// ---------------------------------------------------------------------------
+
+/**
+ * The shop keeps one clock, and it is not the host's.
+ *
+ * Every day boundary below is a wall-clock day in Asia/Shanghai. The offset is
+ * written out as a literal because Asia/Shanghai has had no DST since 1991, so
+ * `2026-02-01T00:00:00+08:00` is exact and needs no zone database at run time;
+ * the formatter, which does consult one, is the only place a future rule
+ * change would have to be reflected.
+ */
+const SHOP_TZ_OFFSET = '+08:00';
+const DAY_MS = 86_400_000;
+/** What the 统计明细 page opens on when the operator has picked nothing. */
+const DEFAULT_SERIES_DAYS = 30;
+
+const shopDayFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** `2026-02-01T17:00:00Z` -> `'2026-02-02'`, the day the shop was living in. */
+const shopDayOf = (at: Date): string => shopDayFormatter.format(at);
+const startOfShopDay = (day: string): Date => new Date(`${day}T00:00:00${SHOP_TZ_OFFSET}`);
+const shiftShopDay = (day: string, days: number): string =>
+  shopDayOf(new Date(startOfShopDay(day).getTime() + days * DAY_MS));
+/** Inclusive at both ends: 1 日 to 7 日 is seven days, which is what the picker means. */
+const shopDaysBetween = (from: string, to: string): number =>
+  Math.round((startOfShopDay(to).getTime() - startOfShopDay(from).getTime()) / DAY_MS) + 1;
+
+/**
+ * `sum()` over numeric comes back unpadded (`"0"`, `"5320.5"`); the wire wants
+ * two fraction digits and `Money` is the one thing that guarantees them.
+ */
+const money = (value: string): string => {
+  const [whole = '0', fraction = ''] = value.split('.');
+  return Money.parse(`${whole}.${fraction.padEnd(2, '0').slice(0, 2)}`).toString();
+};
+
 export async function statistics(ctx: Ctx): Promise<StaffStatistics> {
   const now = ctx.clock.now();
   const startOfDay = (offsetDays: number): Date => {
@@ -132,11 +179,6 @@ export async function statistics(ctx: Ctx): Promise<StaffStatistics> {
     fulfilRepo.rangeTotals(ctx.db, { from: monthStart, to: tomorrow }),
   ]);
 
-  const money = (value: string): string => {
-    const [whole = '0', fraction = ''] = value.split('.');
-    return Money.parse(`${whole}.${fraction.padEnd(2, '0').slice(0, 2)}`).toString();
-  };
-
   return {
     pendingShipment: queue.pendingShipment,
     pendingReceipt: queue.pendingReceipt,
@@ -148,6 +190,58 @@ export async function statistics(ctx: Ctx): Promise<StaffStatistics> {
     },
     month: { orderCount: monthTotals.orderCount, paidAmount: money(monthTotals.paidAmount) },
   };
+}
+
+/**
+ * 统计明细 — the same window as the header, one row per day (CR-4-h §1).
+ *
+ * Three things are decided here rather than in the page:
+ *
+ *  - **The window.** Both ends are inclusive Asia/Shanghai days, defaulting to
+ *    the last 30. Pickers that come back the wrong way round are swapped, not
+ *    refused — that is a slip, not a bad request.
+ *  - **The cap.** Wider than `STAFF_STATISTICS_MAX_DAYS` is refused rather than
+ *    silently shortened: a chart that quietly covers less than its axis says is
+ *    worse than an error toast.
+ *  - **The gaps.** Days with no orders come back as explicit zero rows, so the
+ *    chart's x-axis is evenly spaced and the 详细数据 table has no holes.
+ */
+export async function statisticsSeries(
+  ctx: Ctx,
+  query: StaffStatisticsSeriesQuery,
+): Promise<StaffStatisticsSeries> {
+  const today = shopDayOf(ctx.clock.now());
+  const requestedTo = query.to ?? today;
+  const requestedFrom = query.from ?? shiftShopDay(requestedTo, -(DEFAULT_SERIES_DAYS - 1));
+  const [from, to] =
+    requestedFrom <= requestedTo ? [requestedFrom, requestedTo] : [requestedTo, requestedFrom];
+
+  const span = shopDaysBetween(from, to);
+  if (span > STAFF_STATISTICS_MAX_DAYS) {
+    throw new DomainError('ORDER_STATISTICS_RANGE_TOO_WIDE', {
+      details: { maximumDays: STAFF_STATISTICS_MAX_DAYS, requestedDays: span },
+    });
+  }
+
+  // Half-open on the instant axis: `[00:00 of from, 00:00 of the day after to)`.
+  const rows = await fulfilRepo.dailyTotals(ctx.db, {
+    from: startOfShopDay(from),
+    to: startOfShopDay(shiftShopDay(to, 1)),
+  });
+  const byDate = new Map(rows.map((row) => [row.date, row]));
+
+  const items = Array.from({ length: span }, (_unused, offset) => {
+    const date = shiftShopDay(from, offset);
+    const row = byDate.get(date);
+    return {
+      date,
+      orderCount: row?.orderCount ?? 0,
+      paidOrderCount: row?.paidOrderCount ?? 0,
+      paidAmount: money(row?.paidAmount ?? '0'),
+    };
+  });
+
+  return { granularity: 'day', from, to, items };
 }
 
 export async function orderList(
@@ -295,4 +389,19 @@ export async function refundReview(
     });
   }
   return port.reject(ctx, params, { rejectReason: body.reason });
+}
+
+/**
+ * 售后备注 (CR-4-h §2).
+ *
+ * A note, not a decision: the refund's status is untouched and nothing is
+ * overwritten. C appends it to `refund_logs`, which is also where it comes back
+ * from — the detail's `logs` array.
+ */
+export async function refundRemark(
+  ctx: Ctx,
+  params: { id: string },
+  body: StaffRefundRemarkBody,
+): Promise<AdminRefundDetail> {
+  return refundPort().remark(ctx, params, body);
 }

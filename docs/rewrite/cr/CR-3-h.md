@@ -1,7 +1,11 @@
 # CR-3-h — a cheap way to ask "has the category tree changed?"
 
 - **Stream:** H (uni-app storefront), raised against A (catalog)
-- **Status:** open
+- **Status:** **resolved** — accepted, stream S, `0e9e9d6e`
+
+> **Decision.** The category tree answers an `ETag` and a conditional request
+> gets `304`. See `docs/rewrite/status/s.md` for the `handle()` fallback that
+> shipped with it (only `204` may skip a body, so `304` needed its own path).
 - **Affects:** `next/packages/contracts/src/catalog/` (category routes)
 
 ## What the storefront does

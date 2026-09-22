@@ -450,3 +450,18 @@ export const orderCancelBody = z.object({
   reason: z.string().max(255).optional(),
 });
 export type OrderCancelBody = z.infer<typeof orderCancelBody>;
+
+/**
+ * The answer to 删除订单 (CR-4-h §6).
+ *
+ * A single `true`, and not the order: the row the buyer just asked to stop
+ * seeing is the one thing this response has no business handing back. The page
+ * drops it from the list and moves on.
+ */
+export const orderHidden = z.object({
+  hidden: z.literal(true),
+});
+export type OrderHidden = z.infer<typeof orderHidden>;
+
+/** Only these three may be hidden; anything else is still in flight. */
+export const HIDEABLE_ORDER_STATUSES = ['completed', 'cancelled', 'refunded'] as const;

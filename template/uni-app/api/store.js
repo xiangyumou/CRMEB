@@ -13,6 +13,7 @@ import {
   toLegacyCollectList,
   toLegacyVisitList,
   toLegacyFavoriteResult,
+  toLegacyCollectAllResult,
   fromLegacyIdList,
 } from './mappers/catalog.js';
 import { toLegacyCartAddResult, fromLegacyCartAddInput } from './mappers/cart.js';
@@ -183,11 +184,14 @@ export function collectDel(id) {
  * @param object id 产品编号 join(',') 切割成字符串
  */
 export function collectAll(id) {
-  const productIds = fromLegacyIdList(id);
-  // One call per product: the batch route only *removes*. See docs/rewrite/cr/CR-2-h.md.
-  return Promise.all(
-    productIds.map((productId) => request.post('/api/v1/me/favorites', { productId })),
-  ).then(() => ({ data: { favorited: true }, msg: '收藏成功', status: 200 }));
+  // One request since CR-2-h; it used to be one per product, which is N chances
+  // to half-succeed. The route is idempotent and partial-tolerant: an id whose
+  // product went off shelf comes back `favorited: false` instead of failing the
+  // rest, and the page only ever read "it worked".
+  return request.post('/api/v1/me/favorites/batch', { productIds: fromLegacyIdList(id) }, {
+    map: toLegacyCollectAllResult,
+    msg: '收藏成功',
+  });
 }
 
 /**
@@ -294,19 +298,13 @@ export function postCartNum(data) {
       { map: toLegacyCartAddResult, msg: '添加成功' },
     );
   }
-  // Decrement: the quick-add UI has no cart row id, so find the row first.
-  // See docs/rewrite/cr/CR-2-h.md.
-  return request.get('/api/v1/cart', { filter: 'all', pageSize: 100 }).then((res) => {
-    const rows = (res.data && res.data.items) || [];
-    const row = rows.find((r) => String(r.skuId) === String(src.unique));
-    if (!row) return { data: { cartId: 0 }, msg: '', status: 200 };
-    const next = Number(row.quantity) - quantity;
-    if (next <= 0) {
-      return request.delete(`/api/v1/cart/items/${row.id}`, {}, { msg: '删除成功' });
-    }
-    return request.patch(`/api/v1/cart/items/${row.id}`, { quantity: next }, {
-      map: toLegacyCartAddResult,
-      msg: '修改成功',
-    });
-  });
+  // Decrement by variant. Before CR-2-h this had to list the whole cart to find
+  // a row id first — one extra round trip on the hottest screen in the app, and
+  // a read-then-write besides. `/cart/items/decrements` is one conditional
+  // statement and removes the row when it reaches zero.
+  return request.post(
+    '/api/v1/cart/items/decrements',
+    { skuId: String(src.unique || ''), quantity },
+    { map: toLegacyCartAddResult, msg: '修改成功' },
+  );
 }

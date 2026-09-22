@@ -12,6 +12,7 @@
 export {
   addItem,
   count,
+  decrementItem,
   list,
   rebuy,
   removeItem,

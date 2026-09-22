@@ -103,6 +103,15 @@ describe('toLegacyCartAddResult / toLegacyRebuyResult', () => {
     expect(toLegacyCartAddResult(null)).toEqual({ cartId: 0, count: 0 });
   });
 
+  it('reads the same shape off a decrement, including the removed row (CR-2-h)', () => {
+    // `/cart/items/decrements` answers with `cartMutationResult`, so the minus
+    // button on the product page needs no new mapper.
+    expect(toLegacyCartAddResult(example('POST /api/v1/cart/items/decrements')))
+      .toEqual({ cartId: 5001, count: 3 });
+    expect(toLegacyCartAddResult({ item: null, cart: { items: 2 } }))
+      .toEqual({ cartId: 0, count: 2 });
+  });
+
   it('keeps the cateId the 再次购买 page navigates with', () => {
     const out = toLegacyRebuyResult(example('POST /api/v1/cart/rebuys'));
     expect(out).toEqual({ cateId: 0, added: 1, skipped: [22] });

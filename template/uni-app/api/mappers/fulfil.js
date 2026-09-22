@@ -194,13 +194,28 @@ export function toLegacyInvoice(dto) {
     add_time: legacyDateTime(dto.createdAt),
     invoice_time: legacyDateTime(dto.issuedAt),
     is_default: 0,
-    // The 发票记录 row renders the order underneath. Only the total is known here;
-    // the line items are not part of the invoice contract (see docs/rewrite/cr/CR-4-h.md).
+    // The 发票记录 row renders the order underneath. `orderSummary` is the order's
+    // first line, read through the order domain rather than copied onto the invoice
+    // (CR-4-h §7), so it cannot drift away from the order it describes. `cartInfo` is
+    // the one row the template reads; an order with no lines keeps the old fallback.
     order: {
       order_id: text(dto.orderId),
       order_no: text(dto.orderNo),
       pay_price: money(dto.amount),
-      cartInfo: [],
+      total_num: dto.orderSummary ? dto.orderSummary.totalQuantity : 0,
+      cartInfo: dto.orderSummary ? [toLegacyInvoiceLine(dto.orderSummary)] : [],
+    },
+  };
+}
+
+/** `orderSummary` → the single `cartInfo` row 发票记录 draws. */
+function toLegacyInvoiceLine(summary) {
+  return {
+    cart_num: summary.quantity,
+    productInfo: {
+      store_name: text(summary.productName),
+      image: text(summary.productImageUrl),
+      attrInfo: { suk: text(summary.specText) },
     },
   };
 }

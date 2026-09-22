@@ -9,9 +9,11 @@ import { handle } from '../../../../../../src/server';
  * `payment_attempts` row with its own merchant order number. Tapping twice
  * returns the same attempt rather than minting a second one, and an order that
  * is already paid answers `alreadyPaid` instead of a new intent (CLIENT-001).
+ *
+ * `:id` is the order's surrogate id or its 24-digit number (CR-1-h).
  */
 export const POST = handle(paymentStart, (ctx, { params, body }) =>
-  payment.startPayment(ctx, { ...body, orderId: Number(params.id) }),
+  payment.start(ctx, params, body),
 );
 
 export const dynamic = 'force-dynamic';

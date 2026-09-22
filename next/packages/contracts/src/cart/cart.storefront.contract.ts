@@ -4,6 +4,7 @@ import { defineRoute } from '../_conventions/route';
 import {
   cartAddBody,
   cartCount,
+  cartDecrementBody,
   cartCountExample,
   cartItemExample,
   cartList,
@@ -151,6 +152,82 @@ export const cartUpdateItem = defineRoute({
       response: {
         item: { ...cartItemExample, isSelected: false },
         cart: cartCountExample,
+      },
+    },
+    {
+      // 修改规格 with nothing already in the cart for the new variant: same row,
+      // new SKU, quantity carried over.
+      name: 'change-sku',
+      params: { id: '5001' },
+      body: { skuId: '22' },
+      response: {
+        item: {
+          ...cartItemExample,
+          skuId: '22',
+          specText: '原味装|500g',
+          skuImageUrl: 'https://cdn.example.com/sku/22.jpg',
+          unitPrice: '45.00',
+          subtotal: '90.00',
+        },
+        cart: cartCountExample,
+      },
+    },
+    {
+      // 修改规格 onto a variant the cart already holds: the two rows fold and
+      // the answer is the survivor, whose id is not the one that was PATCHed.
+      name: 'change-sku-merging-into-an-existing-row',
+      params: { id: '5001' },
+      body: { skuId: '22' },
+      response: {
+        item: {
+          ...cartItemExample,
+          id: '5002',
+          skuId: '22',
+          specText: '原味装|500g',
+          skuImageUrl: 'https://cdn.example.com/sku/22.jpg',
+          quantity: 3,
+          unitPrice: '45.00',
+          subtotal: '135.00',
+        },
+        cart: { ...cartCountExample, items: 2, quantity: 4 },
+      },
+    },
+  ],
+});
+
+/**
+ * 减少数量 by variant — the minus button on the product detail page.
+ *
+ * A conditional update, so two taps that arrive together take one unit each and
+ * the row disappears exactly once. Decrementing below the row's quantity
+ * removes it; decrementing a variant the cart does not hold is
+ * `CART_ITEM_NOT_FOUND`, the same answer as for a row id that never existed.
+ */
+export const cartDecrementItem = defineRoute({
+  id: 'cart.decrementItem',
+  method: 'POST',
+  path: '/api/v1/cart/items/decrements',
+  auth: 'user',
+  summary: '减少购物车商品数量',
+  tags: ['cart'],
+  body: cartDecrementBody,
+  response: cartMutationResult,
+  errors: ['CART_ITEM_NOT_FOUND'],
+  examples: [
+    {
+      name: 'one-off',
+      body: { skuId: '21', quantity: 1 },
+      response: {
+        item: { ...cartItemExample, quantity: 1, subtotal: '60.00' },
+        cart: { ...cartCountExample, quantity: 4 },
+      },
+    },
+    {
+      name: 'down-to-zero-removes-the-row',
+      body: { skuId: '21', quantity: 2 },
+      response: {
+        item: null,
+        cart: { items: 2, quantity: 3, availableCount: 1, unavailableCount: 1 },
       },
     },
   ],

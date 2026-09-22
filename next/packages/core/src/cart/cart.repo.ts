@@ -1,6 +1,6 @@
 import type { DbOrTx, Tx } from '@shop/db';
 import { cartItems } from '@shop/db/schema/cart';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { conditionalDelete, conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
 
 /**
@@ -125,4 +125,60 @@ export async function remove(
     and(eq(cartItems.userId, args.userId), inArray(cartItems.id, [...new Set(args.ids)])),
   );
   return affected;
+}
+
+/**
+ * Takes `quantity` units off the row holding `skuId`, when the row has more
+ * than that (CR-2-h §2).
+ *
+ * One statement with the arithmetic in SQL, so two taps of the minus button
+ * that arrive together take one unit each rather than both reading 3 and both
+ * writing 2. `won: false` means the row is gone or is down to exactly the units
+ * asked for — `removeBySku` decides which, in the same transaction.
+ */
+export async function subtractUnits(
+  tx: Tx,
+  args: { userId: number; skuId: number; quantity: number },
+): Promise<ConditionalUpdateResult> {
+  return conditionalUpdate(tx, cartItems, {
+    where: and(
+      eq(cartItems.userId, args.userId),
+      eq(cartItems.skuId, args.skuId),
+      gt(cartItems.quantity, args.quantity),
+    ),
+    set: {
+      quantity: sql`${cartItems.quantity} - ${args.quantity}`,
+      updatedAt: sql`now()`,
+    },
+  });
+}
+
+/** The other half of a decrement: the row had no more units to give. */
+export async function removeBySku(
+  tx: Tx,
+  args: { userId: number; skuId: number },
+): Promise<ConditionalUpdateResult> {
+  return conditionalDelete(
+    tx,
+    cartItems,
+    and(eq(cartItems.userId, args.userId), eq(cartItems.skuId, args.skuId)),
+  );
+}
+
+/**
+ * Removes one row by id, reporting whether this call is the one that did it.
+ *
+ * 修改规格 needs the distinction that `remove` above throws away: the row is
+ * deleted and its units are re-added under the new variant, so a caller that
+ * lost the race must not add them a second time.
+ */
+export async function removeOne(
+  tx: Tx,
+  args: { id: number; userId: number },
+): Promise<ConditionalUpdateResult> {
+  return conditionalDelete(
+    tx,
+    cartItems,
+    and(eq(cartItems.id, args.id), eq(cartItems.userId, args.userId)),
+  );
 }

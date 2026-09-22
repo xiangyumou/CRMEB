@@ -1,7 +1,21 @@
 # CR-5-h — `POST /api/v1/uploads` does not say what the multipart field is called, and the staff console has no purpose
 
 - **Stream:** H (uni-app storefront), raised against F1 (system / storage)
-- **Status:** open
+- **Status:** **resolved** — both accepted, stream S, `ea91eb78`
+
+> **Decision.**
+>
+> 1. The multipart field is `file` and only `file`, stated in the contract and
+>    enforced: a file under another name is `STORAGE_UPLOAD_FIELD_MISSING` with
+>    `{expected, received}`, no file at all is `STORAGE_NO_FILE`, and further
+>    file parts are ignored.
+> 2. `purpose: 'staff'` exists, gated on the 店员 check, with its own directory,
+>    size ceiling and hourly budget.
+>
+> One line is left to stream H2: `pages/admin/goods/addGoods.vue` must ask for
+> `{ purpose: 'staff' }` instead of `{ url: 'upload/image' }`. Until it does,
+> those uploads keep landing in `review`, as they did before. See
+> `docs/rewrite/status/s.md`.
 - **Affects:** `next/packages/contracts/src/storage/storage.storefront.contract.ts`,
   `storage/schemas.ts`
 
@@ -40,5 +54,6 @@ route the staff console at the admin upload route with a staff credential. This
 is B2-adjacent (the staff console is B2's surface) but the decision is F1's,
 because it is about where the bytes go.
 
-**Until then:** `uploadPurposeFor()` maps the 添加商品 site to `review` and the
-call is marked in `api/mappers/system.js`.
+**Resolved:** `uploadPurposeFor()` now passes through any purpose the contract
+has, so the page only needs to name `staff`. Until it does, 添加商品 still maps
+to `review`.

@@ -1037,6 +1037,34 @@ export const pagedFavorites = paged(favoriteItem);
 
 export const favoriteAddBody = z.object({ productId: id });
 
+/**
+ * 批量收藏 (CR-2-h §3) — the 我的收藏 screen's bulk button, which used to fire
+ * one request per product and could therefore half-succeed.
+ *
+ * Capped at 50: it is a screenful of tick boxes, not an import.
+ */
+export const favoriteAddBatchBody = z.object({
+  productIds: z.array(id).min(1).max(50),
+});
+export type FavoriteAddBatchBody = z.infer<typeof favoriteAddBatchBody>;
+
+/**
+ * What the batch managed to do.
+ *
+ * Reports rather than refuses, for the same reason 再次购买 does: a product
+ * going off shelf between the list and the button is the normal case, and
+ * failing the other 49 over it would be worse than saying so. `favorited` is
+ * the **resulting state** of each id, so a product that was already favourited
+ * reads `true` — the call is idempotent and the storefront can paint the hearts
+ * straight from the answer.
+ */
+export const favoriteAddBatchResult = z.object({
+  /** Rows this call actually inserted. Zero on a replay. */
+  added: z.number().int().min(0),
+  items: z.array(z.object({ productId: id, favorited: z.boolean() })),
+});
+export type FavoriteAddBatchResult = z.infer<typeof favoriteAddBatchResult>;
+
 export const favoriteRemoveBody = z.object({
   productIds: z.array(id).min(1).max(100),
 });

@@ -340,7 +340,6 @@ import home from '@/components/home';
 				let that = this,
 					data = {},
 					price = opt.price,
-					refund_price = opt.refund_price,
 					refund_status = that.orderInfo.refund_status,
 					remark = opt.remark;
 				data.order_id = that.orderInfo.order_id;
@@ -370,24 +369,8 @@ import home from '@/components/home';
 						}
 					);
 				} else if (that.status == 2) {
+					// 退款金额由买家的申请决定，审核只有同意和拒绝（CR-4-h §3）。
 					if (this.isRefund) {
-						// setOrderRefund(data).then(
-						// 	res => {
-						// 		that.change = false;
-						// 		that.$util.Tips({title: res.msg});
-						// 		that.init();
-						// 	},
-						// 	err => {
-						// 		that.change = false;
-						// 		that.$util.Tips({title: err});
-						// 	}
-						// );
-						if (!isMoney(refund_price)) {
-							return that.$util.Tips({
-								title: '请输入正确的金额'
-							});
-						}
-						data.price = refund_price;
 						data.type = opt.type;
 						this.objOrderRefund(data);
 					} else {

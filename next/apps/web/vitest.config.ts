@@ -38,6 +38,9 @@ export default defineConfig({
           exclude: [...exclude, ...serverTests, ...intTests],
           css: false,
           restoreMocks: true,
+          // A full antd form render is ~1 s idle and 5–6 s when a dozen
+          // executors share the box; a timeout here would only report load.
+          testTimeout: 20_000,
         },
       },
       {

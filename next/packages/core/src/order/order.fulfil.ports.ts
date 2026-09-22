@@ -5,6 +5,7 @@ import type {
   RefundApproveBody,
   RefundRejectBody,
 } from '@shop/contracts/refund/schemas';
+import type { StaffRefundRemarkBody } from '@shop/contracts/order/order.fulfil.schemas';
 import type { Ctx } from '../kernel/context';
 
 type PagedAdminRefunds = {
@@ -82,6 +83,14 @@ export interface StaffRefundPort {
   detail(ctx: Ctx, params: { id: string }): Promise<AdminRefundDetail>;
   approve(ctx: Ctx, params: { id: string }, body: RefundApproveBody): Promise<AdminRefundDetail>;
   reject(ctx: Ctx, params: { id: string }, body: RefundRejectBody): Promise<AdminRefundDetail>;
+  /**
+   * 售后备注 (CR-4-h §2), and deliberately not the console's `adminRemark`.
+   *
+   * That one overwrites `refunds.admin_remark`; this one appends to the
+   * refund's log, because the actor is a `user` with no admin row behind it and
+   * the frozen schema has no `refunds.staff_remark` to write instead.
+   */
+  remark(ctx: Ctx, params: { id: string }, body: StaffRefundRemarkBody): Promise<AdminRefundDetail>;
 }
 
 let staffRefunds: StaffRefundPort | undefined;

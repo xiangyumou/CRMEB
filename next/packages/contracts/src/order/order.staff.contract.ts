@@ -28,9 +28,13 @@ import {
   staffOrderDetailExample,
   staffOrderListItemExample,
   staffOrderListQuery,
+  staffRefundRemarkBody,
   staffRefundReviewBody,
   staffStatistics,
   staffStatisticsExample,
+  staffStatisticsSeries,
+  staffStatisticsSeriesExample,
+  staffStatisticsSeriesQuery,
 } from './order.fulfil.schemas';
 
 /**
@@ -81,6 +85,40 @@ export const staffStatisticsRoute = defineRoute({
   tags: ['order'],
   response: staffStatistics,
   examples: [{ name: 'ok', response: staffStatisticsExample }],
+});
+
+/**
+ * 统计明细 — the same numbers as the header, grouped by day (CR-4-h §1).
+ *
+ * The page above this route draws a line chart and a 详细数据 table from one
+ * window, and legacy served it from two endpoints (`admin/order/time` for the
+ * chart, `admin/order/statistics` for the table) that counted differently:
+ * the chart summed `pay_price` over paid orders, the table paginated a
+ * per-day aggregate built from a different WHERE. They could and did disagree
+ * on the same day. Here both read one series.
+ *
+ * `from` / `to` are Asia/Shanghai calendar days, both inclusive, and default
+ * to the last 30 days. A window wider than 92 days
+ * (`STAFF_STATISTICS_MAX_DAYS`) is refused rather than truncated, so a client
+ * never charts a silently shortened range.
+ */
+export const staffStatisticsSeriesRoute = defineRoute({
+  id: 'order.staffStatisticsSeries',
+  method: 'GET',
+  path: '/api/v1/staff/statistics/series',
+  auth: 'staff',
+  summary: '统计明细（按日）',
+  tags: ['order'],
+  query: staffStatisticsSeriesQuery,
+  response: staffStatisticsSeries,
+  errors: ['ORDER_STATISTICS_RANGE_TOO_WIDE'],
+  examples: [
+    {
+      name: 'three-days',
+      query: { from: '2026-02-01', to: '2026-02-03', granularity: 'day' },
+      response: staffStatisticsSeriesExample,
+    },
+  ],
 });
 
 export const staffOrderList = defineRoute({
@@ -352,6 +390,47 @@ export const staffRefundReview = defineRoute({
         ...adminRefundDetailExample,
         status: 'rejected',
         rejectReason: '商品已签收超过 7 天',
+      },
+    },
+  ],
+});
+
+/**
+ * 售后备注 from the phone (CR-4-h §2).
+ *
+ * The web console has `POST /admin-api/refunds/:id/remark`, which overwrites
+ * `refunds.admin_remark`. This one appends to the refund's log instead: the
+ * schema is frozen, there is no `refunds.staff_remark`, and taking over the
+ * console's single column would let a staff member erase an operator's note
+ * without either of them seeing it happen. The note comes back in `logs`, attributed
+ * and in order, and the refund's status is untouched.
+ */
+export const staffRefundRemark = defineRoute({
+  id: 'order.staffRefundRemark',
+  method: 'POST',
+  path: '/api/v1/staff/refunds/:id/remark',
+  auth: 'staff',
+  summary: '店员售后备注',
+  tags: ['order'],
+  params: z.object({ id }),
+  body: staffRefundRemarkBody,
+  response: adminRefundDetail,
+  errors: ['REFUND_NOT_FOUND'],
+  examples: [
+    {
+      name: 'noted',
+      params: { id: '601' },
+      body: { remark: '已电话联系买家' },
+      response: {
+        ...adminRefundDetailExample,
+        logs: [
+          ...adminRefundDetailExample.logs,
+          {
+            toStatus: 'applied',
+            message: '店员备注：已电话联系买家',
+            createdAt: '2026-02-26T14:00:00+08:00',
+          },
+        ],
       },
     },
   ],

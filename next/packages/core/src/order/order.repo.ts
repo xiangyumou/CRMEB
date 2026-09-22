@@ -387,6 +387,31 @@ export async function transitionStatus(
   });
 }
 
+/**
+ * 删除订单, which has never deleted anything: the buyer's own list stops showing
+ * the order and the shop's copy is untouched (CR-4-h §6).
+ *
+ * Everything that decides the answer is in the WHERE — the owner, the statuses
+ * a finished order may be in, and `hidden_by_user_at IS NULL`. Two taps of the
+ * button therefore have exactly one winner, and a refund landing between a read
+ * and this write cannot leave an in-flight order hidden.
+ */
+export async function hideFromUser(
+  tx: Tx,
+  args: { orderId: number; userId: number; from: readonly OrderStatus[]; at: Date },
+): Promise<ConditionalUpdateResult> {
+  return conditionalUpdate(tx, orders, {
+    where: and(
+      eq(orders.id, args.orderId),
+      eq(orders.userId, args.userId),
+      inArray(orders.status, [...args.from]),
+      isNull(orders.hiddenByUserAt),
+      isNull(orders.deletedAt),
+    ),
+    set: { hiddenByUserAt: args.at, updatedAt: sql`now()` },
+  });
+}
+
 export type StatusLogValues = typeof orderStatusLogs.$inferInsert;
 
 export async function insertStatusLog(tx: Tx, values: StatusLogValues): Promise<void> {

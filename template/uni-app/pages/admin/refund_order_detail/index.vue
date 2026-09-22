@@ -441,7 +441,6 @@
 				let that = this,
 					data = {},
 					price = opt.price,
-					refund_price = opt.refund_price,
 					refund_status = that.orderInfo.refund_status,
 					remark = opt.remark;
 				data.order_id = that.orderInfo.order_id;
@@ -471,13 +470,8 @@
 						}
 					);
 				} else if (that.status == 2) {
+					// 退款金额由买家的申请决定（CR-4-h §3）。
 					if (this.isRefund) {
-						if (!isMoney(refund_price)) {
-							return that.$util.Tips({
-								title: '请输入正确的金额'
-							});
-						}
-						data.price = refund_price;
 						data.type = opt.type;
 						this.objOrderRefund(data);
 					} else {

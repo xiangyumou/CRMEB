@@ -30,11 +30,14 @@
 						{{ orderInfo.pay_price }}<span class="iconfont icon-suozi"></span>
 					</view>
 				</view>
+				<!--
+					退款金额由买家的申请决定，店员只能同意或拒绝（CR-4-h §3 判定：不保留「直接退款」）。
+					原先这里是一个可编辑的输入框，但新合约的审核路由根本不收金额，改成只读展示。
+				-->
 				<view class="item acea-row row-between-wrapper" v-if="(orderInfo.refund_status === 1 || status == 2) && isRefund == 1">
 					<view>{{$t(`退款金额`)}}({{$t(`￥`)}})</view>
 					<view class="money">
-						<input type="text" v-model="refund_price" :class="focus === true ? 'on' : ''"
-							@focus="priceChange" />
+						{{ orderInfo.refund_price }}<span class="iconfont icon-suozi"></span>
 					</view>
 				</view>
 			</view>
@@ -190,14 +193,12 @@
 			return {
 				focus: false,
 				price: 0,
-				refund_price: 0,
 				remark: ""
 			};
 		},
 		watch: {
 			orderInfo: function(nVal) {
 				this.price = this.orderInfo.pay_price;
-				this.refund_price = this.orderInfo.pay_price;
 				this.remark = this.orderInfo.remark;
 			}
 		},
@@ -214,7 +215,6 @@
 				let that = this;
 				that.$emit("savePrice", {
 					price: that.price,
-					refund_price: that.refund_price,
 					type: 1,
 					remark: that.remark
 				});
@@ -223,7 +223,6 @@
 				let that = this;
 				that.$emit("savePrice", {
 					price: that.price,
-					refund_price: that.refund_price,
 					type: 2,
 					remark: that.remark
 				});

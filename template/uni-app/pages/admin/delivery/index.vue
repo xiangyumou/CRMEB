@@ -41,168 +41,65 @@
       </view>
       <block v-if="logistics.length > 0">
         <view class="list" v-show="active === 0">
-          <view
-            class="item acea-row row-middle"
-            v-if="delivery.config_export_open == 1"
-          >
-            <view>发货类型</view>
-            <view class="mode acea-row row-middle row-right">
-              <view
-                class="goods"
-                :class="curExpress === item.key ? 'on' : ''"
-                v-for="(item, index) in expressType"
-                :key="index"
-                @click="changeExpTpe(item, index)"
+          <view class="item acea-row row-middle">
+            <view>快递公司</view>
+            <view class="select-box">
+              <picker
+                class="pickerBox"
+                @change="bindPickerChange"
+                :value="seIndex"
+                :range="logistics"
+                range-key="name"
               >
-                <text
-                  :class="[
-                    'iconfont',
-                    curExpress === item.key
-                      ? 'icon-ic_Selected'
-                      : 'icon-ic_unselect',
-                  ]"
-                ></text>
-                {{ item.title }}
-              </view>
+                <view class="uni-input">{{ logistics[seIndex].name }}</view>
+              </picker>
             </view>
+            <text class="iconfont icon-ic_rightarrow"></text>
           </view>
-          <block v-if="curExpress == 1">
-            <view class="item acea-row row-middle">
-              <view>快递公司</view>
-              <view class="select-box">
-                <picker
-                  class="pickerBox"
-                  @change="bindPickerChange"
-                  :value="seIndex"
-                  :range="logistics"
-                  range-key="name"
-                >
-                  <view class="uni-input">{{ logistics[seIndex].name }}</view>
-                </picker>
-              </view>
-              <text class="iconfont icon-ic_rightarrow"></text>
-            </view>
-            <view class="item acea-row row-middle">
-              <view>快递单号</view>
-              <input
-                type="text"
-                placeholder="请输入"
-                v-model="delivery_id"
-                class="mode"
-              />
-              <!-- #ifdef MP -->
-              <text class="iconfont icon-xiangji" @click="scanCode"></text>
-              <!-- #endif -->
-              <!-- #ifdef H5 -->
-              <text
-                v-if="isWeixin"
-                class="iconfont icon-xiangji"
-                @click="scanCode"
-              ></text>
-              <!-- #endif -->
-            </view>
-            <view class="item">
-              <view class="trip" v-if="curExpress == 1"
-                >顺丰请输入单号 :收件人或寄件人手机号后四位</view
-              >
-              <view class="trip" v-if="curExpress == 1"
-                >例如：SF000000000000:3941</view
-              >
-            </view>
-          </block>
-          <block v-if="curExpress == 2">
-            <view class="item acea-row row-between-wrapper">
-              <view>寄件人姓名</view>
-              <input
-                type="text"
-                placeholder="填写寄件人姓名"
-                v-model="to_name"
-                class="mode"
-              />
-            </view>
-            <view class="item acea-row row-between-wrapper">
-              <view>寄件人电话</view>
-              <input
-                type="text"
-                placeholder="填写寄件人电话"
-                v-model="to_tel"
-                class="mode"
-              />
-            </view>
-            <view class="item acea-row row-between-wrapper">
-              <view>寄件人地址</view>
-              <input
-                type="text"
-                placeholder="填写寄件人地址"
-                v-model="to_addr"
-                class="mode"
-              />
-            </view>
-            <view class="item acea-row row-between-wrapper">
-              <view>快递公司</view>
-              <view class="select-box">
-                <picker
-                  class="pickerBox"
-                  @change="bindPickerChange"
-                  :value="seIndex"
-                  :range="logistics"
-                  range-key="name"
-                >
-                  <!-- <view></view> -->
-                  <view class="uni-input">{{ logistics[seIndex].name }}</view>
-                </picker>
-              </view>
-            </view>
-            <view
-              class="item acea-row row-between-wrapper"
-              v-if="expTemp.length > 0"
-            >
-              <view>电子面单</view>
-              <view class="picker-add">
-                <picker
-                  class="pickerBox"
-                  @change="bindTempChange"
-                  :value="expIndex"
-                  :range="expTemp"
-                  range-key="title"
-                >
-                  <view class="uni-input">{{ expTemp[expIndex].title }}</view>
-                </picker>
-                <view class="look" @click="previewImage">预览</view>
-              </view>
-            </view>
-          </block>
+          <view class="item acea-row row-middle">
+            <view>快递单号</view>
+            <input
+              type="text"
+              placeholder="请输入"
+              v-model="delivery_id"
+              class="mode"
+            />
+            <!-- #ifdef MP -->
+            <text class="iconfont icon-xiangji" @click="scanCode"></text>
+            <!-- #endif -->
+            <!-- #ifdef H5 -->
+            <text
+              v-if="isWeixin"
+              class="iconfont icon-xiangji"
+              @click="scanCode"
+            ></text>
+            <!-- #endif -->
+          </view>
+          <view class="item">
+            <view class="trip">顺丰请输入单号 :收件人或寄件人手机号后四位</view>
+            <view class="trip">例如：SF000000000000:3941</view>
+          </view>
         </view>
       </block>
 
       <view class="list" v-show="active === 1">
         <view class="item acea-row row-between-wrapper">
           <view>送货人</view>
-          <view class="select-box" v-if="postPeople.length > 0">
-            <picker
-              class="pickerBox"
-              @change="bindPostChange"
-              :value="postIndex"
-              :range="postPeople"
-              range-key="wx_name"
-            >
-              <view class="acea-row row-middle">
-                <view class="uni-input">{{
-                  postPeople[postIndex].wx_name
-                }}</view>
-                <text class="iconfont icon-ic_rightarrow"></text>
-              </view>
-            </picker>
-          </view>
+          <input
+            type="text"
+            placeholder="填写送货人姓名"
+            v-model="post_name"
+            class="mode"
+          />
         </view>
-        <view
-          class="item acea-row row-between-wrapper"
-          v-if="postPeople[postIndex]"
-        >
+        <view class="item acea-row row-between-wrapper">
           <view>手机号</view>
-          <view class="select-box acea-row row-middle row-right">{{
-            postPeople[postIndex].phone
-          }}</view>
+          <input
+            type="text"
+            placeholder="填写送货人手机号"
+            v-model="post_phone"
+            class="mode"
+          />
         </view>
       </view>
       <textarea
@@ -238,13 +135,12 @@
   </view>
 </template>
 <script>
+// 电子面单打印与配送员名单都已下线（CR-4-h §4/§5）：面单模板、打印默认配置、平台
+// 配置的「送货人」名单在新合约里没有继任者，送货人改为当场填写姓名和手机号。
 import {
   getAdminOrderDelivery,
   setAdminOrderDelivery,
   getLogistics,
-  orderExportTemp,
-  orderDeliveryInfo,
-  orderOrderDelivery,
 } from "@/api/admin";
 export default {
   name: "GoodsDeliver",
@@ -271,16 +167,6 @@ export default {
           show: true,
         },
       ],
-      expressType: [
-        {
-          title: "手动填写",
-          key: 1,
-        },
-        {
-          title: "电子面单打印",
-          key: 2,
-        },
-      ],
       orderGoods: [
         {
           title: "开启",
@@ -291,7 +177,6 @@ export default {
           key: 0,
         },
       ],
-      curExpress: 1,
       active: 0,
       order_id: "",
       delivery: [],
@@ -300,13 +185,8 @@ export default {
       delivery_name: "",
       delivery_id: "",
       seIndex: 0,
-      expIndex: 0,
-      expTemp: [], // 快递模板
-      to_name: "", // 发货人名称
-      to_tel: "", // 发货人电话
-      to_addr: "", // 发货人地址
-      postPeople: [], //配送人
-      postIndex: 0,
+      post_name: "", // 送货人姓名
+      post_phone: "", // 送货人手机号
       fictitious_content: "",
       listId: 0,
       curGoods: 0,
@@ -349,8 +229,6 @@ export default {
     // 拆单发货已下线（合约里没有对应路由），分单开关永远是关的。
     this.getIndex();
     this.getLogistics();
-    this.orderDeliveryInfo();
-    this.geTorderOrderDelivery();
   },
   methods: {
     getList(val) {
@@ -394,29 +272,6 @@ export default {
       }
       // #endif
     },
-    // 预览图片
-    previewImage() {
-      uni.previewImage({
-        urls: [this.expTemp[this.expIndex].pic],
-        success: function () {},
-        fail: function (error) {},
-      });
-    },
-    // 获取配送员列表
-    geTorderOrderDelivery() {
-      orderOrderDelivery().then((res) => {
-        this.postPeople = res.data;
-      });
-    },
-    // 配送员选择
-    bindPostChange(e) {
-      this.postIndex = e.detail.value;
-    },
-    // 选择发货类型
-    changeExpTpe(item, index) {
-      this.curExpress = item.key;
-      this.getLogistics(index || "");
-    },
     changeType: function (item, index) {
       this.active = index;
       this.delivery_type = item.key;
@@ -441,7 +296,6 @@ export default {
       }).then(
         (res) => {
           that.logistics = res.data;
-          that.getExpTemp(res.data[0].code);
         },
         (error) => {
           that.$util.Tips({
@@ -462,63 +316,32 @@ export default {
       save.delivery_company_id = that.logistics[that.seIndex].id;
       save.delivery_name = that.logistics[that.seIndex].name;
       save.type = that.active + 1;
-      if (delivery_type == 1 && this.curExpress == 1) {
+      if (delivery_type == 1) {
         if (!delivery_id) {
           return this.$util.Tips({
             title: "请填写快递单号",
           });
         }
-        save.express_record_type = that.curExpress;
         save.delivery_id = delivery_id;
         that.setInfo(save);
       }
-
-      if (delivery_type == 1 && this.curExpress == 2) {
-        if (!that.to_name) {
-          return this.$util.Tips({
-            title: "请填写寄件人姓名",
-          });
-        }
-        if (!that.to_tel) {
-          return this.$util.Tips({
-            title: "请填写寄件人手机号码",
-          });
-        }
-        if (!/^1[3456789]\d{9}$/.test(that.to_tel)) {
-          return this.$util.Tips({
-            title: "请填写寄件人手机号码",
-          });
-        }
-        if (!that.to_addr) {
-          return this.$util.Tips({
-            title: "请填写寄件人地址",
-          });
-        }
-        if (that.expTemp.length == 0) {
-          return this.$util.Tips({
-            title: "请选择电子面单",
-          });
-        }
-        save.express_record_type = that.curExpress;
-        save.to_name = that.to_name;
-        save.to_tel = that.to_tel;
-        save.to_addr = that.to_addr;
-        save.express_temp_id = that.expTemp[that.expIndex].temp_id;
-        that.setInfo(save);
-      }
+      // 送货：新合约收的是当场填写的姓名和手机号（CR-4-h §4）。
       if (delivery_type == 2) {
-        if (!that.postPeople.length) {
+        if (!that.post_name) {
           return this.$util.Tips({
-            title: "请在平台后台添加送货人",
+            title: "请填写送货人姓名",
           });
         }
-        let obj = this.postPeople[this.postIndex];
-        let params = {};
-        params.type = that.delivery_type;
-        params.sh_delivery_name = obj.wx_name;
-        params.sh_delivery_id = obj.phone;
-        params.sh_delivery_uid = obj.uid;
-        that.setInfo(params);
+        if (!/^1[3456789]\d{9}$/.test(that.post_phone)) {
+          return this.$util.Tips({
+            title: "请填写送货人手机号",
+          });
+        }
+        that.setInfo({
+          type: that.delivery_type,
+          sh_delivery_name: that.post_name,
+          sh_delivery_id: that.post_phone,
+        });
       }
       if (delivery_type == 3) {
         let params = {};
@@ -557,25 +380,6 @@ export default {
     },
     bindPickerChange(e) {
       this.seIndex = e.detail.value;
-      this.getExpTemp(this.logistics[e.detail.value].code);
-    },
-    bindTempChange(e) {
-      this.expIndex = e.detail.value;
-    },
-    getExpTemp(code) {
-      orderExportTemp({
-        com: code,
-      }).then((res) => {
-        this.expTemp = res.data.data;
-      });
-    },
-    // 获取订单打印默认配置
-    orderDeliveryInfo() {
-      orderDeliveryInfo().then((res) => {
-        this.to_name = res.data.to_name;
-        this.to_tel = res.data.to_tel;
-        this.to_addr = res.data.to_add;
-      });
     },
   },
 };

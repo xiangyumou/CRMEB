@@ -1,7 +1,10 @@
 # CR-2-h — three cart operations the storefront performs and the contract cannot express
 
 - **Stream:** H (uni-app storefront), raised against B1 (cart and checkout)
-- **Status:** open
+- **Status:** **resolved** — all three accepted, stream S, `73e616b0`
+
+> **Decision.** Change a row's SKU, decrement by SKU, and batch favourite all
+> got routes. See `docs/rewrite/status/s.md`.
 - **Affects:** `next/packages/contracts/src/cart/cart.contract.ts`
 
 The cart contract covers the shopping cart as a list of rows. The uni-app does

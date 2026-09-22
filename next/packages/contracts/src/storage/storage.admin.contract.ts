@@ -182,6 +182,7 @@ export const storageAttachmentUpload = defineRoute({
   status: 201,
   errors: [
     'STORAGE_NO_FILE',
+    'STORAGE_UPLOAD_FIELD_MISSING',
     'STORAGE_FILE_TOO_LARGE',
     'STORAGE_FILE_TYPE_REJECTED',
     'STORAGE_MIME_MISMATCH',

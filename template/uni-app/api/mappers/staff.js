@@ -14,7 +14,7 @@
 // Split shipment (`_status` 9/10/11) cannot occur: B2 removed order splitting, so the
 // parent/child cascade those three values described has no successor.
 
-import { toId, toInt, money, text, list, mapList, unixSeconds } from './_shared.js';
+import { toId, toInt, money, moneyNumber, text, list, mapList, unixSeconds } from './_shared.js';
 import {
   toLegacyOrderListItem,
   toLegacyOrderDetail,
@@ -70,6 +70,131 @@ export function toLegacyStaffStatistics(dto) {
     // Retired figures: the phone never showed margin, and 待付款/待评价 are not counted.
     unpaid_count: 0,
     evaluated_count: 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 统计明细 (CR-4-h §1)
+// ---------------------------------------------------------------------------
+//
+// `GET /api/v1/staff/statistics/series` answers one row per Asia/Shanghai day, and the
+// two legacy endpoints that fed 统计明细 (`admin/order/statistics` for the table,
+// `admin/order/time` for the chart) are both derived from it here. They used to count
+// differently and could disagree about the same day; now they cannot.
+//
+// The pages still speak in **epoch seconds**, so the conversion lives here. Every
+// function below is pure: the phone's own clock and timezone never enter, because a
+// Shanghai shop's 今天 is not the day a phone roaming in Berlin thinks it is.
+
+const SHOP_TZ_OFFSET_SECONDS = 8 * 3600;
+const DAY_MS = 86400000;
+
+/** Epoch seconds → the shop's calendar day (`YYYY-MM-DD`). `''` when there is no bound. */
+export function shopDayFromUnix(seconds) {
+  const n = Number(seconds);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return new Date((Math.trunc(n) + SHOP_TZ_OFFSET_SECONDS) * 1000).toISOString().slice(0, 10);
+}
+
+/** `'2026-06-01'` + `-1` → `'2026-05-31'`. Calendar arithmetic, no timezone involved. */
+export function shiftShopDay(day, days) {
+  if (typeof day !== 'string' || day === '') return '';
+  return new Date(Date.parse(`${day}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * `{start, stop}` (epoch seconds) → the series query.
+ *
+ * An absent end is left out rather than guessed, so the *server's* idea of 今天 fills
+ * it in — the only clock that agrees with the numbers in the header.
+ */
+export function fromLegacyStatisticsRange(where) {
+  const src = where || {};
+  const query = { granularity: 'day' };
+  const from = shopDayFromUnix(src.start);
+  const to = shopDayFromUnix(src.stop);
+  if (from) query.from = from;
+  if (to) query.to = to;
+  return query;
+}
+
+/**
+ * The window immediately before the one the series came back with, same length.
+ *
+ * This is legacy's 同比上个时间区间 (`StoreOrderController::time` computed `$front =
+ * $start - ($stop - $start)`), and it is derived from the **response** rather than from
+ * the request because the request may have named neither end.
+ */
+export function precedingStatisticsRange(dto) {
+  const from = dto && typeof dto.from === 'string' ? dto.from : '';
+  const to = dto && typeof dto.to === 'string' ? dto.to : '';
+  if (!from || !to) return { granularity: 'day' };
+  const span =
+    Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS) + 1;
+  return { granularity: 'day', from: shiftShopDay(from, -span), to: shiftShopDay(from, -1) };
+}
+
+/**
+ * The 详细数据 table: `[{time, count, price}]`, newest day first.
+ *
+ * Two deliberate differences from the raw series. Days with no orders are dropped —
+ * legacy's `GROUP BY` never produced them and a table of zeroes is noise — and the page
+ * number is applied here rather than by the server, because the whole window is at most
+ * 92 rows and paging it server-side would mean a request per scroll.
+ */
+export function toLegacyStatisticsRows(dto, where) {
+  const src = where || {};
+  const page = toInt(src.page, 1) || 1;
+  const limit = toInt(src.limit, 15) || 15;
+  const busy = list(dto && dto.items)
+    .filter((item) => toInt(item.orderCount, 0) > 0)
+    .reverse();
+  return busy.slice((page - 1) * limit, page * limit).map((item) => ({
+    // Legacy formatted the label as `%m-%d`; the full date is one field over.
+    time: String(item.date || '').slice(5),
+    date: text(item.date),
+    count: toInt(item.orderCount, 0),
+    price: money(item.paidAmount),
+  }));
+}
+
+/**
+ * The chart above the table: `{chart, time, growth_rate, increase_time,
+ * increase_time_status}`.
+ *
+ * `type` is legacy's 1 = 营业额, 2 = 订单量. The growth figures compare the window with
+ * the one immediately before it, exactly as `StoreOrderController::time` did, including
+ * its rule for a previous window of zero — a rise from nothing has no percentage, so the
+ * absolute increase is shown as one.
+ */
+export function toLegacyStatisticsChart(dto, previous, type) {
+  const isPrice = toInt(type, 1) !== 2;
+  const total = (source) =>
+    list(source && source.items).reduce(
+      (sum, item) => sum + (isPrice ? moneyNumber(item.paidAmount) : toInt(item.orderCount, 0)),
+      0,
+    );
+
+  const current = total(dto);
+  const before = total(previous);
+  const increase = isPrice ? Math.round((current - before) * 100) / 100 : current - before;
+  const magnitude = Math.abs(increase);
+  const growthRate =
+    magnitude === 0
+      ? 0
+      : before === 0
+        ? Math.round(magnitude * 100)
+        : Math.round((magnitude / before) * 100);
+
+  return {
+    chart: list(dto && dto.items).map((item) => ({
+      time: text(item.date),
+      num: isPrice ? money(item.paidAmount) : toInt(item.orderCount, 0),
+    })),
+    time: isPrice ? current.toFixed(2) : current,
+    growth_rate: growthRate,
+    increase_time: isPrice ? magnitude.toFixed(2) : magnitude,
+    increase_time_status: increase >= 0 ? 1 : 2,
   };
 }
 
@@ -147,6 +272,11 @@ export function toLegacyStaffOrderListItem(dto) {
   const items = list(dto.items);
   const user = dto.user || {};
   return Object.assign({}, base, RETIRED_STAFF_FLAGS, {
+    // The staff console routes on `order_id` against `/api/v1/staff/orders/:id`,
+    // which is **not** widened by CR-1-h — a staff member sees every shop order,
+    // so the order-number lookup's "scoped to the owner" rule has nothing to
+    // scope to. The shopper's mapper puts the number here; staff get the id back.
+    order_id: base.id === 0 ? '' : String(base.id),
     _status: legacyStaffStatus(dto),
     status_name: toLegacyStaffStatusName(dto),
     // 商品预览：the row renders `_info[].cart_info`, and `cart_id.length > 1` decides
@@ -189,6 +319,9 @@ export function toLegacyStaffOrderDetail(dto) {
   const parcels = mapList(dto.shipments, toLegacyShipment);
   const latest = parcels.length ? parcels[parcels.length - 1] : null;
   return Object.assign({}, row, detail, {
+    // `detail` is the shopper's mapper, which puts the order *number* in
+    // `order_id`; the staff routes take the id. See the list mapper above.
+    order_id: row.order_id,
     _status: toLegacyStatus(dto),
     _staff_status: legacyStaffStatus(dto),
     status_name: row.status_name,
@@ -333,6 +466,17 @@ export function fromLegacyPriceInput(data) {
 export function fromLegacyRemarkInput(data) {
   const src = data || {};
   return { adminRemark: String(src.remark === undefined ? '' : src.remark) };
+}
+
+/**
+ * The 售后备注 body (CR-4-h §2).
+ *
+ * `remark`, not `adminRemark`: the staff route appends a log entry rather than writing
+ * the console's column, and the two are deliberately not the same field.
+ */
+export function fromLegacyRefundRemarkInput(data) {
+  const src = data || {};
+  return { remark: String(src.remark === undefined ? '' : src.remark) };
 }
 
 // ---------------------------------------------------------------------------

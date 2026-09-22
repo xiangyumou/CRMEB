@@ -10,6 +10,7 @@ import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { generateOrderNo, generateOutTradeNo, toId } from '../kernel/ids';
 import { Money } from '../kernel/money';
+import { requireOrderRef } from '../order';
 import { onOrderPaid } from '../order/ports';
 import {
   createWechatPayClient,
@@ -116,6 +117,23 @@ export { NOTIFY_PATHS };
 
 export interface StartPaymentInput extends StartPaymentBody {
   orderId: number;
+}
+
+/**
+ * `POST /api/v1/orders/:id/payments` — the route-facing entry point.
+ *
+ * `:id` is the surrogate id **or** the 24-digit order number (CR-1-h): the
+ * cashier is reached from a deep link as often as from the order list. The
+ * reference is resolved against the caller's own orders, so an unknown number
+ * and a stranger's number are the same `PAYMENT_ORDER_NOT_FOUND`.
+ */
+export async function start(
+  ctx: Ctx,
+  params: { id: string },
+  body: StartPaymentBody,
+): Promise<PaymentIntent> {
+  const { orderId } = await requireOrderRef(ctx, params.id, 'PAYMENT_ORDER_NOT_FOUND');
+  return startPayment(ctx, { ...body, orderId });
 }
 
 export async function startPayment(ctx: Ctx, input: StartPaymentInput): Promise<PaymentIntent> {

@@ -114,6 +114,14 @@ export const orderFulfilErrors = defineErrors({
   /** Not `shipped` — already received, still unshipped, cancelled or refunded. */
   ORDER_NOT_RECEIVABLE: { status: 409, message: '订单当前状态不可确认收货' },
 
+  // --- statistics ---------------------------------------------------------
+  /**
+   * The 统计明细 window is wider than the cap. Refused rather than silently
+   * shortened, so a chart never claims to cover a range it does not.
+   * `details: { maximumDays }`.
+   */
+  ORDER_STATISTICS_RANGE_TOO_WIDE: { status: 422, message: '统计时间跨度过大，请缩短查询范围' },
+
   // --- console edits ------------------------------------------------------
   /** 改价 is only ever allowed while the order is still `pending_payment`. */
   ORDER_PRICE_NOT_ADJUSTABLE: { status: 409, message: '订单已支付，不能改价' },

@@ -7,7 +7,8 @@ import type {
 } from '@shop/contracts/order/schemas';
 import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
-import { fromId, toId, toIdOrNull } from '../kernel/ids';
+import { toId, toIdOrNull } from '../kernel/ids';
+import { requireOrderRef } from './order.ref';
 import * as repo from './order.repo';
 
 /**
@@ -101,10 +102,13 @@ export async function counts(ctx: Ctx): Promise<OrderCounts> {
   return out;
 }
 
-/** The route-facing detail. A stranger and an unknown id get the same 404. */
+/**
+ * The route-facing detail. A stranger and an unknown reference get the same
+ * 404, and `:id` is the surrogate id or the order number (CR-1-h).
+ */
 export async function detail(ctx: Ctx, params: { id: string }): Promise<OrderDetail> {
-  const userId = requireUserId(ctx);
-  return detailOf(ctx, { orderId: fromId(params.id), userId });
+  const { orderId, userId } = await requireOrderRef(ctx, params.id);
+  return detailOf(ctx, { orderId, userId });
 }
 
 /** Used by `create` and `cancel` to answer with the order they just changed. */

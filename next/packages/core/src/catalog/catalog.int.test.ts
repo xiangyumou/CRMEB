@@ -198,6 +198,28 @@ describe('categories', () => {
     const tree = await storefront.categoryTree(harness.ctx);
     expect(tree.items.map((i) => i.id)).not.toContain(id);
   });
+
+  // CR-3-h: the cheap "has the tree changed?" the storefront asks on every
+  // cold start. It has to be the *same* string the tree carries, or a client
+  // that compares the two decides the menu moved when it did not.
+  it('answers the version alone with exactly what the tree carries', async () => {
+    await makeCategory(asAdmin(), '版本类目');
+    const tree = await storefront.categoryTree(harness.ctx);
+
+    expect(await storefront.categoryVersion(harness.ctx)).toEqual({ version: tree.version });
+  });
+
+  it('moves the standalone version when a category is hidden, not only when one is added', async () => {
+    const id = await makeCategory(asAdmin(), '待隐藏类目');
+    const before = await storefront.categoryVersion(harness.ctx);
+
+    harness.clock.set('2026-06-03T00:00:00.000Z');
+    await service.adminCategorySetVisibility(asAdmin(), { id }, { isVisible: false });
+    const after = await storefront.categoryVersion(harness.ctx);
+
+    expect(after.version).not.toBe(before.version);
+    expect(after).toEqual({ version: (await storefront.categoryTree(harness.ctx)).version });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1349,5 +1371,72 @@ describe('errors', () => {
     ]) {
       expect(new DomainError(code).unregistered, code).toBe(false);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CR-2-h §3 — 批量收藏
+// ---------------------------------------------------------------------------
+
+describe('批量收藏', () => {
+  it('favourites every sellable id in one transaction and reports the state of each', async () => {
+    const first = await makeProduct(asAdmin());
+    const second = await makeProduct(asAdmin());
+    const ctx = asUser(await makeUser(harness));
+
+    const result = await storefront.favoriteAddBatch(ctx, {
+      productIds: [first.id, second.id],
+    });
+
+    expect(result.added).toBe(2);
+    expect(result.items).toEqual([
+      { productId: first.id, favorited: true },
+      { productId: second.id, favorited: true },
+    ]);
+    expect((await storefront.favoriteList(ctx, { page: 1, pageSize: 20 })).total).toBe(2);
+  });
+
+  it('is idempotent: a replay writes nothing and still answers true', async () => {
+    const product = await makeProduct(asAdmin());
+    const ctx = asUser(await makeUser(harness));
+
+    await storefront.favoriteAddBatch(ctx, { productIds: [product.id] });
+    const replay = await storefront.favoriteAddBatch(ctx, { productIds: [product.id] });
+
+    expect(replay).toEqual({ added: 0, items: [{ productId: product.id, favorited: true }] });
+    expect((await storefront.favoriteList(ctx, { page: 1, pageSize: 20 })).total).toBe(1);
+  });
+
+  it('reports an off-shelf id rather than failing the other ids with it', async () => {
+    const live = await makeProduct(asAdmin());
+    const dead = await makeProduct(asAdmin(), { status: 'off_shelf' });
+    const ctx = asUser(await makeUser(harness));
+
+    const result = await storefront.favoriteAddBatch(ctx, { productIds: [live.id, dead.id] });
+
+    expect(result.added).toBe(1);
+    expect(result.items).toEqual([
+      { productId: live.id, favorited: true },
+      { productId: dead.id, favorited: false },
+    ]);
+    // The singular route still refuses outright; the batch is the tolerant one.
+    await expect(storefront.favoriteAdd(ctx, { productId: dead.id })).rejects.toMatchObject({
+      code: 'CATALOG_PRODUCT_NOT_FOUND',
+    });
+  });
+
+  it('counts rows, not requests, when the same id appears twice', async () => {
+    const product = await makeProduct(asAdmin());
+    const ctx = asUser(await makeUser(harness));
+
+    const result = await storefront.favoriteAddBatch(ctx, {
+      productIds: [product.id, product.id],
+    });
+
+    expect(result.added).toBe(1);
+    expect(result.items).toEqual([
+      { productId: product.id, favorited: true },
+      { productId: product.id, favorited: true },
+    ]);
   });
 });

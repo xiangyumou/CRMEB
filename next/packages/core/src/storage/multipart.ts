@@ -14,11 +14,25 @@ import type { IncomingFile } from './storage.service';
  * `Blob` are web standards available in Node, not `next/*` imports — the
  * `boundaries` rule is about framework coupling, and there is none here.
  *
+ * The field is `file` and only `file` (CR-5-h §1). It used to accept `image`
+ * and `multipart` too, which meant the contract could not state a name and a
+ * client sending the wrong one silently worked here and nowhere else. Extra
+ * file parts under other names are ignored; a file under *only* another name
+ * is `STORAGE_UPLOAD_FIELD_MISSING`.
+ *
  * The filename is read but never used as a path: `Storage.put` takes it as a
  * *hint* and honours only a whitelisted extension.
  */
 
-const FIELD_NAMES = ['file', 'multipart', 'image'] as const;
+/**
+ * The one field name the contract names (CR-5-h §1). Anything else is a client
+ * bug, and saying so beats the shopper re-picking the same photo.
+ */
+const FIELD_NAME = 'file';
+
+/** Structural: any part that can hand back bytes is a file part. */
+const isFilePart = (value: unknown): value is { arrayBuffer(): Promise<ArrayBuffer> } =>
+  value !== null && typeof value === 'object' && 'arrayBuffer' in value;
 
 export async function readFilePart(request: {
   formData(): Promise<FormData>;
@@ -31,20 +45,21 @@ export async function readFilePart(request: {
     throw new DomainError('STORAGE_NO_FILE');
   }
 
-  // `file` is the name the admin kit and the uploader both send. `multipart`
-  // and `image` are what the old uni-app pages sent, and the storefront build
-  // of those pages will outlive this rewrite by a release or two.
-  //
   // The part is narrowed structurally rather than with `instanceof File`: this
   // package does not load the DOM lib, and a `Blob` without a filename is still
   // a perfectly good upload.
-  let part: unknown = null;
-  for (const name of FIELD_NAMES) {
-    part = form.get(name);
-    if (part !== null && typeof part !== 'string') break;
-    part = null;
-  }
-  if (part === null || typeof part !== 'object' || !('arrayBuffer' in part)) {
+  const part: unknown = form.get(FIELD_NAME);
+  if (!isFilePart(part)) {
+    // A file under another name is a different failure from no file at all: it
+    // is one word away from working, and the caller is told which word.
+    const misnamed = [...form.keys()].filter(
+      (name) => name !== FIELD_NAME && isFilePart(form.get(name)),
+    );
+    if (misnamed.length > 0) {
+      throw new DomainError('STORAGE_UPLOAD_FIELD_MISSING', {
+        details: { expected: FIELD_NAME, received: misnamed },
+      });
+    }
     throw new DomainError('STORAGE_NO_FILE');
   }
   const blob = part as { arrayBuffer(): Promise<ArrayBuffer>; name?: unknown; type?: unknown };

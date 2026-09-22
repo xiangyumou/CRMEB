@@ -165,9 +165,12 @@ export function toLegacyOrderListItem(dto) {
   return {
     ...RETIRED_ORDER_FLAGS,
     id: toId(dto.id),
-    // See docs/rewrite/cr/CR-1-h.md — pages both display and route on `order_id`,
-    // and only the numeric id is routable today.
-    order_id: text(dto.id),
+    // Pages both *print* `order_id` (订单号：…) and *route* on it. CR-1-h was
+    // accepted, so every storefront order route now takes the surrogate id or
+    // the 24-digit order number, and `order_id` can be the number the buyer
+    // actually recognises — the one on the WeChat payment record and the one a
+    // 客服 agent pastes into a deep link.
+    order_id: text(dto.orderNo),
     order_no: text(dto.orderNo),
     trade_no: text(dto.orderNo),
     uid: 0,
@@ -501,7 +504,8 @@ export function toLegacyCashierOrder(dto) {
   if (!dto) return {};
   return {
     oid: toId(dto.id),
-    order_id: text(dto.id),
+    // Routable either way since CR-1-h; the cashier prints it next to the total.
+    order_id: text(dto.orderNo),
     pay_price: money(dto.payableAmount),
     pay_postage: money(dto.freightAmount),
     offline_postage: 0,

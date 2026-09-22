@@ -16,6 +16,7 @@ import * as rules from './order.fulfil.rules';
 import { resolveLogisticsPort } from './order.fulfil.ports';
 import * as repo from './order.repo';
 import { detailOf } from './order.query.service';
+import { requireOrderRef } from './order.ref';
 import { onOrderCompleted } from './ports';
 import { orderStateMachine } from './order.state-machine';
 
@@ -596,8 +597,7 @@ export const completionKey = (orderId: number): string => `order-complete:${orde
 
 /** `POST /api/v1/orders/:id/receipt`. */
 export async function confirmReceipt(ctx: Ctx, params: { id: string }): Promise<OrderDetail> {
-  const userId = requireUserId(ctx);
-  const orderId = fromId(params.id);
+  const { orderId, userId } = await requireOrderRef(ctx, params.id);
   const owned = await repo.findOrderForUser(ctx.db, { id: orderId, userId });
   if (!owned) throw new DomainError('ORDER_NOT_FOUND');
 
@@ -720,8 +720,7 @@ export async function myShipments(
   ctx: Ctx,
   params: { id: string },
 ): Promise<{ items: Shipment[] }> {
-  const userId = requireUserId(ctx);
-  const orderId = fromId(params.id);
+  const { orderId, userId } = await requireOrderRef(ctx, params.id);
   const owned = await repo.findOrderForUser(ctx.db, { id: orderId, userId });
   if (!owned) throw new DomainError('ORDER_NOT_FOUND');
   return { items: await shipmentsOfOrder(ctx, orderId) };

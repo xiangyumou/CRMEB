@@ -253,7 +253,19 @@ export type ScanTokenStatus = z.infer<typeof scanTokenStatus>;
 // ---------------------------------------------------------------------------
 
 /** Where a shopper's upload is allowed to go. Anything else is refused. */
-export const userUploadPurpose = z.enum(['avatar', 'review', 'refund']);
+/**
+ * What the shopper is uploading, and therefore where it lands and how big it
+ * may be.
+ *
+ * `staff` is the odd one out (CR-5-h §2). 商家管理's 添加商品 screen uploads a
+ * *shop* asset from a storefront session, so it goes through this route with a
+ * storefront token — but it is not a shopper's picture: it is kept in its own
+ * directory, allowed to be larger, and refused outright unless the caller is on
+ * the 店员 list. Before this it was sent as `review`, which was wrong on every
+ * axis: wrong directory, wrong retention, and it ate the shopper's hourly
+ * budget.
+ */
+export const userUploadPurpose = z.enum(['avatar', 'review', 'refund', 'staff']);
 export type UserUploadPurpose = z.infer<typeof userUploadPurpose>;
 
 export const userUploadQuery = z.object({ purpose: userUploadPurpose });
