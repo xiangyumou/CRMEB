@@ -15,8 +15,8 @@ import { DOMAIN_NAMES, registerAllDomains } from './domains.gen';
  * Both exist because registration is a side effect of a module being imported,
  * which fails in the direction nobody checks: forget an import and the config
  * group is simply not on the settings index, or the port is simply not
- * registered, with no error anywhere. B1's `order` group and C's
- * `registerPaymentDomain()` both arrived on `rewrite/integration` that way.
+ * registered, with no error anywhere — a new domain's config group or registrar
+ * would simply be missing.
  *
  * So these tests read `src/` itself rather than trusting the generated lists.
  * A stale bucket is a failing test, not a missing screen.
@@ -126,8 +126,8 @@ describe('domains.gen.ts', () => {
 
   it('installs the ports importing one domain would not', () => {
     // A Next route imports only the domain it serves, so without the bucket the
-    // checkout ran on B1's fallback catalogue adapter and `refund.execute` was
-    // parked as `unknown` by the first dispatcher pass after boot.
+    // checkout would find no catalog port and `refund.execute` would be parked
+    // as `unknown` by the first dispatcher pass after boot.
     expect(peekCatalogPort()).toBeDefined();
     expect(() => getStockPort()).not.toThrow();
     expect(() => getPaymentPort()).not.toThrow();
