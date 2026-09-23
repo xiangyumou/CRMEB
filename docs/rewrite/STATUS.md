@@ -127,3 +127,9 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
     - `cert_crmeb`, the CRMEB 商业授权 key, had no fate; it is now dropped with a reason;
     - no enum or list config field decoded the legacy radio codes (`upload_type`, `sms_type`, `logistics_type`, `routine_encode`, `wechat_encode`, `routine_contact_type`, `order_notice_admin_uids`). These are now `CONFIG_VALUE_TRANSFORMS`, and `config.test.ts` fails if a claimed enum or array field has no decoder.
   - Third run green: 13 groups loaded, verify 43/43, and the migrated shop serves a product, a DIY page and an attachment by sha256. One attachment row is dropped and counted: its file is absent on production too, a 2025 demo row.
+- 2026-09-23 — **CI green on `fd592c026`** (run 35830803645: every job green; soak and mutations run on schedule only). This is the release candidate, cutover step 1 done. Digests:
+  - `ghcr.io/xiangyumou/crmeb-next-web@sha256:c40decfc65bfee68e7b4f800b385018c6d5c36c4cadd461946a22a824617bd33`
+  - `ghcr.io/xiangyumou/crmeb-next-worker@sha256:f8684dc38a37a2a7dc8095c01c57c9b493a7648a131b9a3a0f3f660fba2f377a`
+  - `ghcr.io/xiangyumou/crmeb-next-edge@sha256:1b9859578a6a869c6bf82e64952ec37b107180a187834f500cc13eff9e2473a5`
+
+  The edge image carries the real H5 bundle: `/srv/h5` holds `index.html`, `assets`, `pages` and `static`. What remains is every production-host step (2–6 and 8–17), each needing the user's OK.
