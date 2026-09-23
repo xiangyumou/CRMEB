@@ -411,6 +411,7 @@ export async function listClaimable(
   const { rows, total } = await repo.listClaimable(ctx.db, {
     now,
     ids: query.ids?.map(Number),
+    productId: query.productId === undefined ? undefined : Number(query.productId),
     ...pageBounds(query),
   });
   const items = await withCallerState(ctx, rows);

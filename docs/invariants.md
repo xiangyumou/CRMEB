@@ -655,6 +655,12 @@ Two simultaneous claims by one user leave exactly one success, the loser refused
 
 - `packages/core/src/coupon/coupon.concurrency.int.test.ts::COUPON-008 — one user tapping 领取 twice > holds the per-user limit, and the unique violation surfaces as a 409`
 
+### COUPON-009
+
+A coupon offered on a product page covers that product at checkout: `coupon.claimableList` narrowed by `productId` lists, among the claimable templates, exactly those whose scope the checkout's `eligibleLineIndexes` applies to the product — shop-wide, naming the product, or naming one of the categories it is filed under (its direct `product_categories_map` rows, the same ones the checkout reads).
+
+- `packages/core/src/coupon/coupon.int.test.ts::listClaimable > COUPON-009 — narrowed to a product, lists exactly the coupons the checkout would apply to it`
+
 ### AUTH-005
 
 A stranger gets `订单不存在` (never the after-sale detail) from the storefront refund surface — the refund service answers `REFUND_NOT_FOUND` for another user's row — and the admin refund route refuses an unauthenticated call without completing the after-sale.

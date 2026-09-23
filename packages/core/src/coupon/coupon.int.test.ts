@@ -555,6 +555,67 @@ describe('listClaimable', () => {
     expect(after.items[0]).toMatchObject({ claimedCount: 1, canClaim: false });
   });
 
+  it('COUPON-009 — narrowed to a product, lists exactly the coupons the checkout would apply to it', async () => {
+    const [product, other] = [await makeProduct(), await makeProduct()];
+    const [itsCategory, otherCategory] = [
+      await makeCategory([product]),
+      await makeCategory([other]),
+    ];
+    const create = async (name: string, over: Partial<CouponTemplateForm>) =>
+      (await service.adminCreate(harness.ctx, form({ name, minSpend: '0.00', ...over }))).id;
+    const shopWide = await create('全场券', {});
+    const naming = await create('指定商品券', { scope: 'products', productIds: [String(product)] });
+    const byCategory = await create('品类券', {
+      scope: 'categories',
+      categoryIds: [String(itsCategory)],
+    });
+    const elsewhere = await create('别的商品券', {
+      scope: 'products',
+      productIds: [String(other)],
+    });
+    const otherCategoryOnly = await create('别的品类券', {
+      scope: 'categories',
+      categoryIds: [String(otherCategory)],
+    });
+    // Claimable is still the first filter: a disabled template is offered on no product.
+    await create('已暂停', { status: 'disabled' });
+
+    const listed = await service.listClaimable(harness.ctx, {
+      page: 1,
+      pageSize: 20,
+      productId: String(product),
+    });
+    const listedIds = listed.items.map((item) => item.templateId).sort();
+    expect(listedIds).toEqual([shopWide, naming, byCategory].sort());
+    expect(listed.total).toBe(3);
+
+    // The agreement: claim all five, and the checkout picker covers the product
+    // with exactly the ones the product page offered.
+    const userId = await makeUser();
+    const templateOf = new Map<string, string>();
+    for (const id of [shopWide, naming, byCategory, elsewhere, otherCategoryOnly]) {
+      const claimed = await service.claim(asUser(userId), { id });
+      templateOf.set(claimed.coupon.id, id);
+    }
+    const picker = await service.listApplicable(asUser(userId), {
+      lines: [{ productId: String(product), amount: '100.00' }],
+    });
+    const covering = picker.items
+      .filter((item) => item.eligibleLineIndexes.length > 0)
+      .map((item) => templateOf.get(item.coupon.id))
+      .sort();
+    expect(covering).toEqual(listedIds);
+
+    // A product in no category and named by nothing gets the shop-wide coupon only.
+    const bare = await makeProduct();
+    const forBare = await service.listClaimable(harness.ctx, {
+      page: 1,
+      pageSize: 20,
+      productId: String(bare),
+    });
+    expect(forBare.items.map((item) => item.templateId)).toEqual([shopWide]);
+  });
+
   it('advertises new-user coupons but never marks them claimable', async () => {
     await makeTemplate({ name: '新人礼', claimMode: 'new_user' });
     const userId = await makeUser();
