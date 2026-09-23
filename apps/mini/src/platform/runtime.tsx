@@ -5,6 +5,8 @@ import type {
   AvatarButtonProps,
   ChosenAddress,
   MiniPlatform,
+  OrderConfirmOutcome,
+  OrderConfirmTarget,
   PaymentOutcome,
   PhoneNumberButtonProps,
   SubscribeResult,
@@ -73,6 +75,13 @@ function AvatarButton({ children, className, label, onResult }: AvatarButtonProp
 }
 
 const SUBSCRIBE_ANSWERS = new Set(['accept', 'reject', 'ban', 'filter']);
+
+/** The component wants WeChat's own snake_case keys. */
+function orderConfirmExtraData(target: OrderConfirmTarget): Record<string, string> {
+  return 'transactionId' in target
+    ? { transaction_id: target.transactionId }
+    : { merchant_id: target.merchantId, merchant_trade_no: target.merchantTradeNo };
+}
 
 export const platform: MiniPlatform = {
   kind: 'weapp',
@@ -158,5 +167,23 @@ export const platform: MiniPlatform = {
       header: headers,
     });
     return { status: result.statusCode, body: typeof result.data === 'string' ? result.data : '' };
+  },
+  async openOrderConfirm(target): Promise<OrderConfirmOutcome> {
+    try {
+      // Taro's option type only lists the 支付分 business types; the call is the same.
+      const result = (await Taro.openBusinessView({
+        businessType: 'weappOrderConfirm',
+        extraData: orderConfirmExtraData(target),
+      } as unknown as Parameters<typeof Taro.openBusinessView>[0])) as {
+        extraData?: { status?: string };
+      };
+      const status = result.extraData?.status;
+      if (status === 'success') return { kind: 'confirmed' };
+      if (status === 'cancel') return { kind: 'cancelled' };
+      return { kind: 'failed', message: '微信确认收货未完成' };
+    } catch (error) {
+      if (isCancel(error)) return { kind: 'cancelled' };
+      return { kind: 'failed', message: errMsg(error) };
+    }
   },
 };

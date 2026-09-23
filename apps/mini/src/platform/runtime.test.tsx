@@ -64,4 +64,28 @@ describe('weapp platform', () => {
       message: '已取消授权',
     });
   });
+
+  it("opens WeChat's 确认收货 component with its own keys and maps how it ended", async () => {
+    await expect(platform.openOrderConfirm({ transactionId: '4200' })).resolves.toEqual({
+      kind: 'confirmed',
+    });
+    expect(taroFake.calls).toContainEqual({
+      api: 'openBusinessView',
+      args: { businessType: 'weappOrderConfirm', extraData: { transaction_id: '4200' } },
+    });
+    await platform.openOrderConfirm({ merchantId: 'm1', merchantTradeNo: 'P1' });
+    expect(taroFake.calls.at(-1)?.args).toEqual({
+      businessType: 'weappOrderConfirm',
+      extraData: { merchant_id: 'm1', merchant_trade_no: 'P1' },
+    });
+
+    taroFake.businessViewStatus = 'cancel';
+    await expect(platform.openOrderConfirm({ transactionId: '4200' })).resolves.toEqual({
+      kind: 'cancelled',
+    });
+    taroFake.businessViewStatus = 'fail';
+    await expect(platform.openOrderConfirm({ transactionId: '4200' })).resolves.toMatchObject({
+      kind: 'failed',
+    });
+  });
 });

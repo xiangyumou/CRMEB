@@ -1,4 +1,5 @@
 import { createApiClient } from '@shop/api-client';
+import { serverClockTransport } from '@/lib/server-clock';
 import { platform } from '@/platform';
 import { renewingTransport } from '@/session/renewing-transport';
 
@@ -35,11 +36,12 @@ export function authHooks(): Readonly<AuthHooks> {
  * The one `/api/v1` client. Its transport, origin and `X-Client-Platform` come from the build's
  * platform implementation: `Taro.request` to the shop's origin as `wechat-mini` in the
  * mini-program, same-origin `fetch` on H5 (as `wechat-mini` in the e2e emulation build). The
- * transport renews an expired session and replays the request once (session/renewing-transport).
+ * transport renews an expired session and replays the request once (session/renewing-transport),
+ * and sets the server clock from any `X-Server-Time` header (lib/server-clock).
  */
 export const api = createApiClient({
   baseUrl: platform.api.baseUrl,
-  transport: renewingTransport(platform.api.transport, {
+  transport: renewingTransport(serverClockTransport(platform.api.transport), {
     currentToken: () => auth.getToken(),
     renew: () => auth.renew(),
   }),

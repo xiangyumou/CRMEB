@@ -1,1 +1,5 @@
-export default definePageConfig({ navigationBarTitleText: '售后', enablePageMeta: true });
+export default definePageConfig({
+  navigationBarTitleText: '我的售后',
+  enablePageMeta: true,
+  enablePullDownRefresh: true,
+});
