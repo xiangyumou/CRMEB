@@ -79,13 +79,23 @@ coupons: HeldCoupon[] }`.
   host wrappers for the page streams; §6 the `newcomerCoupons` personal need; §8 editor field and
   canvas-data steps; §9 the video control and canvas data; §10 the 100-campaign item removed.
 
+- **Checklist** (2026-09-24, all pass):
+  - `pnpm turbo run gen typecheck lint test:unit build`: 45/45 tasks. Unit tests: web 872,
+    storefront-blocks 160, contracts 383, core 743, mini 224.
+  - `pnpm turbo run test:int --force --concurrency=2 --filter @shop/core --filter @shop/web`:
+    core 1522, web 328.
+  - `pnpm exec prettier --check .`, `pnpm --filter @shop/contracts check:examples` (461 routes)
+    and `pnpm guards` (15 checks, 0 failures).
+  - `pnpm turbo run build --filter @shop/web && pnpm --filter @shop/e2e-admin e2e`: 50 passed.
+
 ## In progress
 
-- Checklist.
+- Nothing.
 
 ## Next
 
-- Final report.
+- Merge into `storefront/mini` (orchestrator). The page streams add the host wrappers in
+  `docs/mini/decor.md` §2.4.
 
 ## Notes
 
