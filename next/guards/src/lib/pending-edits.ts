@@ -44,12 +44,15 @@ export const PENDING_EDITS: readonly PendingEdit[] = [
   // was left behind, so each was a `map` at tests that exist today. CR-2-k
   // applied all three (AUTH-001 also picked up its **Adapted:** reason) — the
   // rows read `ported` now, so the entries are gone.
-  ...['002', '003', '004', '005', '006', '007', '008', '009', '012'].map((n) => ({
+  // SMOKE-002…005 were mapped at I's merge to the storefront suite's journeys.
+  // The other five had no verified test there; H4 checks the candidates
+  // `status/i.md` names (and writes the missing half) or retires them.
+  ...['006', '007', '008', '009', '012'].map((n) => ({
     id: `SMOKE-${n}`,
     resolution: {
       kind: 'assign' as const,
-      stream: 'I',
-      why: 'storefront smoke over the real routes is stream I’s suite; H owns only the API layer',
+      stream: 'H4',
+      why: 'stream I found no storefront journey for it; H4 verifies the candidate core tests in status/i.md, writes the missing half, or retires it with evidence',
     },
   })),
 

@@ -1,15 +1,21 @@
 # Stream H4 — storefront follow-up: fix what stream I found, lift every `blockedBy`
 
-**Worktree** `../CRMEB-wt/ws-h4` · **Branch** `rewrite/ws-h4-storefront-followup` (cut by the orchestrator from `rewrite/integration` after I and W5T merged) · **Owns** `template/uni-app/{api,utils,tests,scripts,static}/**`, `template/uni-app/App.vue` (§4 only), the uni-app page files CR-4-i names plus the **minimal** page edits the units below need (a changed call, a URL string, a `data-testid` attribute — no page rewrites), `next/e2e/storefront/**`, `next/packages/testing/src/**` fake WeChat gateway (CR-5-i only), `next/apps/web/next.config.ts` (`experimental.cpus` only), the test files it must add under `next/packages/core/src/**` for §6 (`*.int.test.ts` beside the domain; no production code), `docs/rewrite/cr/CR-{4,5}-i.md`, `docs/rewrite/cr/CR-<n>-h4.md`, `docs/rewrite/status/h4.md`. **Read-only**: everything else — `crmeb/**` (copying image files out of it is fine), `template/admin/**`, `next/guards/**`, `invariants.md`, `STATUS.md`, other core/contracts/apps code. A backend defect is a CR to the orchestrator with a failing `test.fails`.
+**Worktree** `../CRMEB-wt/ws-h4` · **Branch** `rewrite/ws-h4-storefront-followup` (cut by the orchestrator from `rewrite/integration` after I and W5T merged) · **Owns** `template/uni-app/{api,utils,tests,scripts,static}/**`, `template/uni-app/App.vue` (§4 only), the uni-app page files CR-4-i names plus the **minimal** page edits the units below need (a changed call, a URL string, a `data-testid` attribute — no page rewrites), `next/e2e/storefront/**`, `next/packages/testing/src/**` fake WeChat gateway (CR-5-i only), `next/apps/web/next.config.ts` (`experimental.cpus` only), the test files it must add under `next/packages/core/src/**` for §6 (`*.int.test.ts` beside the domain; no production code), `docs/rewrite/cr/CR-{4,5,7}-i.md`, W5T's default product page in `next/packages/contracts/src/diy/**` (CR-7-i only), `docs/rewrite/cr/CR-<n>-h4.md`, `docs/rewrite/status/h4.md`. **Read-only**: everything else — `crmeb/**` (copying image files out of it is fine), `template/admin/**`, `next/guards/**`, `invariants.md`, `STATUS.md`, other core/contracts/apps code. A backend defect is a CR to the orchestrator with a failing `test.fails`.
 
 Read first: `docs/rewrite/status/i.md` (the suite, how to run it, the journey matrix, the `data-testid` table, known gaps, the SMOKE mapping table), `docs/rewrite/cr/CR-4-i.md` and `CR-5-i.md` in full, `docs/rewrite/status/w5t.md` (the six `blockedBy`s it unblocks and `SHOP_FAKE_SMS`), `docs/rewrite/status/h.md` / `h3.md` (the uni-app layer's shape).
 
 ## 1. CR-4-i §3–§14 — the uni-app mapper and page layer
 
 Apply each section. The CR's patches were proved by the suite on a copy; they are the evidence, not the required shape — keep mappers pure and tested (`template/uni-app/tests/*.test.mjs`). Decisions the CR leaves open:
+
 - **§4** — drop the `/api/get_script` fetch from `App.vue` (the custom-script feature is not ported).
 - **§5** — ship the referenced legacy images inside the uni-app build: copy exactly the files the pages reference from `crmeb/public/statics/images/` into `template/uni-app/static/images/legacy/` and re-point the references to the local static path (a URL-string edit per call site). Nothing in `next/apps/web/public` or the edge.
+
 Commit per section or per tightly related pair. Remove the matching entries from `next/e2e/storefront/src/known-gaps.ts` as each gap closes (the list may only shrink).
+
+## 1b. CR-7-i — the default product page (found at I's merge)
+
+Read `docs/rewrite/cr/CR-7-i.md`: the built-in `product_detail` default renders no 分享 and prints the product as raw JSON. Fix the default page (or the uni-app mapping of its components), lift the `blockedBy`, add the no-raw-JSON assertion. Do it early: every product-page journey you lift in §3 depends on it.
 
 ## 2. CR-5-i — the fake gateway answers each create endpoint with its real shape
 

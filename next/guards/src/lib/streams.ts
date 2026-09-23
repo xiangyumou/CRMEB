@@ -50,13 +50,14 @@ export const STREAM_STATE: Readonly<Record<string, StreamState>> = {
   B3: 'merged', // order/cart/coupon follow-up
   J3: 'merged', // deploy follow-up: /readyz, CI jobs, invariants, cutover runbook
   H3: 'merged', // uni-app third pass: marker flips for A2/E4/F4/B3, captcha removal
-  I: 'in-flight', // storefront e2e
+  I: 'merged', // storefront e2e
   K: 'merged', // K's own second pass (K2)
   // Wave 6 (2026-09-23): the K2 findings, routed by the orchestrator.
   R1: 'in-flight', // reliability: CR-53/50/51/40/41/23-k2, STAB-001
   R2: 'in-flight', // payment/refund/order: CR-1…6-k2, CR-10-k, CR-14-k
   R3: 'in-flight', // WeChat/config/edge/storage: CR-7/8/9/11/14/31/33-k2, CR-11/12/13-k
   R4: 'in-flight', // auth/audit/admin shell: CR-8/9/16-k, CR-10/12/13/15/32/34/42-k2
+  H4: 'in-flight', // storefront follow-up: CR-4/5-i, every blockedBy lifted, SMOKE-006…012
 };
 
 export const STREAMS: ReadonlySet<string> = new Set(Object.keys(STREAM_STATE));

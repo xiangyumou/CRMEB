@@ -401,6 +401,55 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  e2e/storefront:
+    dependencies:
+      '@shop/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@shop/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@shop/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@shop/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@types/pg@8.23.1)(mysql2@3.24.4(@types/node@24.13.6))(pg@8.23.0)
+      ioredis:
+        specifier: ^6.0.0
+        version: 6.0.0
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.0
+      testcontainers:
+        specifier: ^12.1.0
+        version: 12.1.0
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1.63.0
+        version: 1.63.0
+      '@shop/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.6
+      '@types/pg':
+        specifier: ^8.11.0
+        version: 8.23.1
+      eslint:
+        specifier: ^10.11.0
+        version: 10.11.0
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.15
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   guards:
     dependencies:
       '@shop/contracts':

@@ -15,20 +15,22 @@ name: next
 
 on:
   push:
-    branches: [master, 'rewrite/**']
+    branches: [master, "rewrite/**"]
     paths:
-      - 'next/**'
-      - 'deploy/next/**'
-      - '.github/workflows/next.yml'
+      - "next/**"
+      - "deploy/next/**"
+      - "template/uni-app/**"
+      - ".github/workflows/next.yml"
   pull_request:
     paths:
-      - 'next/**'
-      - 'deploy/next/**'
-      - '.github/workflows/next.yml'
+      - "next/**"
+      - "deploy/next/**"
+      - "template/uni-app/**"
+      - ".github/workflows/next.yml"
   # The concurrency soak below is a flake hunt, not a gate, so it runs on a
   # clock rather than on every push (CR-4-k §2).
   schedule:
-    - cron: '0 18 * * *' # 02:00 CST, after the day's merges
+    - cron: "0 18 * * *" # 02:00 CST, after the day's merges
   workflow_dispatch:
 
 concurrency:
@@ -41,10 +43,10 @@ defaults:
 
 env:
   # Response validation is a merge-gate check, not a production cost.
-  VALIDATE_RESPONSES: '1'
+  VALIDATE_RESPONSES: "1"
   # Keep turbo quiet and deterministic in CI.
-  TURBO_TELEMETRY_DISABLED: '1'
-  DO_NOT_TRACK: '1'
+  TURBO_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
 
 jobs:
   static:
@@ -80,7 +82,6 @@ jobs:
 
       - name: Typecheck
         run: corepack pnpm typecheck
-
 
       - name: Lint
         run: corepack pnpm lint
@@ -205,6 +206,73 @@ jobs:
         with:
           name: playwright-report
           path: next/e2e/admin/playwright-report
+
+  storefront-e2e:
+    name: storefront e2e (playwright, H5)
+    runs-on: ubuntu-latest
+    # Cold: image pulls, `npm ci`, the H5 build, `next build`, then the
+    # journeys (~45-50 s locally, stack ready in ~5 s). Room for the one retry.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: next/pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      # The H5 bundle the edge serves is built from the real uni-app tree by
+      # the suite's own webServer (`src/h5.ts` runs `npm run build:h5`); it
+      # needs that tree's own dependencies, which are npm, not pnpm.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: template/uni-app/package-lock.json
+
+      - name: Install the uni-app dependencies
+        working-directory: template/uni-app
+        run: npm ci
+
+      # Chromium only, mobile emulation: the journeys assert what a shopper on
+      # a phone browser sees, not cross-browser rendering.
+      - name: Install the browser
+        run: corepack pnpm --filter @shop/e2e-storefront exec playwright install --with-deps chromium
+
+      - name: Pre-pull the service images
+        run: |
+          docker pull postgres:17-alpine
+          docker pull redis:7-alpine
+
+      # `CI` is set by Actions, so the config forbids `.only`, retries once,
+      # and never reuses a running server. Journeys blocked on another
+      # stream's open CR are `fixme` (skipped, listed with the CR id), not
+      # failures. See docs/rewrite/status/i.md.
+      - name: Storefront e2e
+        run: corepack pnpm --filter @shop/e2e-storefront test
+
+      # Every journey's console-errors.txt / failed-requests.txt, green or not.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: storefront-playwright-report
+          path: next/e2e/storefront/playwright-report
+          retention-days: 14
+
+      # Traces and screenshots (`retain-on-failure`).
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: storefront-test-results
+          path: next/e2e/storefront/test-results
+          retention-days: 14
 
   # CR-4-k §2 (STAB-001). The races the concurrency suite covers — the last
   # unit of stock, two refund approvals, a callback meeting the reconciliation
