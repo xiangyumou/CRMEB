@@ -146,7 +146,7 @@ Run these on one iPhone and one Android phone, with a real AppID and a test merc
 9. **Returning from 支付结果**
    - Back does not land on the cashier (`redirectTo`).
 10. **Package size**
-    - Upload through DevTools and check the sizes match `size-report` (main 380 KB on this branch).
+    - Upload through DevTools and check the sizes match `size-report` (main 380.7 KB on this branch).
     - Check that 代码质量 reports no ES6+ issues on iOS 12 if it is still supported.
 
 ## How to run it locally
@@ -186,7 +186,7 @@ Measured on this machine (WSL2), on the branch after merging `storefront/mini` (
 | `test:mini` wall clock                                                         | 9.0 s (two consecutive runs); 20.6 s on the first run, which built the H5 bundle                                                |
 | `test` (uni-app, 34 specs) before S4                                           | 2 min 40 s (34 passed)                                                                                                          |
 | `test` (uni-app) after S4, with `SHOP_E2E_BUILD=1`                             | 2 min 02 s (34 passed; stack 51.3 s including a full `next build`)                                                              |
-| weapp main package                                                             | 342.6 KB (S1) → 373.0 KB with S4 (+30 KB: api-client and its route table, session, platform, pages) → 380.0 KB after merging S3 |
+| weapp main package                                                             | 342.6 KB (S1) → 373.0 KB with S4 (+30 KB: api-client and its route table, session, platform, pages) → 380.7 KB after merging S3 |
 | `order` sub-package                                                            | 7.0 KB (three plain pages)                                                                                                      |
 
 ## Recommendations for the I streams
