@@ -229,7 +229,7 @@ export const orderCreate = defineRoute({
         idempotencyKey: 'ck-20260201-gb000001',
         expectedPayableAmount: '49.00',
       },
-      response: { ...orderDetailExample, kind: 'groupbuy' },
+      response: { ...orderDetailExample, kind: 'groupbuy', groupbuyTeamId: '501' },
     },
   ],
 });

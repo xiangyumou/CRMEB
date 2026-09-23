@@ -78,6 +78,7 @@ export function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
     completedAt: null,
     cancelledAt: null,
     cancelReason: null,
+    groupbuyTeamId: null,
     ...overrides,
   };
 }

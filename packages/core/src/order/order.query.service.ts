@@ -12,6 +12,7 @@ import { DomainError } from '../kernel/errors';
 import { toId, toIdOrNull } from '../kernel/ids';
 import { requireOrderRef } from './order.ref';
 import * as repo from './order.repo';
+import { getOrderKindHandler } from './ports';
 
 /**
  * The buyer's own orders: the list, the tab badges and one order's detail.
@@ -121,7 +122,13 @@ export async function detailOf(
   const row = await repo.findOrderForUser(ctx.db, { id: input.orderId, userId: input.userId });
   if (!row) throw new DomainError('ORDER_NOT_FOUND');
   const items = await repo.listItems(ctx.db, [row.id]);
-  return toDetail(row, items.map(toOrderItem));
+  // The kind's own links (the 拼团 team) come from the kind's domain through the port: this
+  // domain never reads a `groupbuy_*` table.
+  const links = (await getOrderKindHandler(row.kind)?.detailLinks?.(ctx.db, row.id)) ?? {};
+  return {
+    ...toDetail(row, items.map(toOrderItem)),
+    groupbuyTeamId: toIdOrNull(links.groupbuyTeamId ?? null),
+  };
 }
 
 /**
@@ -205,7 +212,7 @@ function toListItem(row: repo.OrderRow, items: OrderItem[]): OrderListItem {
   };
 }
 
-function toDetail(row: repo.OrderRow, items: OrderItem[]): OrderDetail {
+function toDetail(row: repo.OrderRow, items: OrderItem[]): Omit<OrderDetail, 'groupbuyTeamId'> {
   return {
     ...toListItem(row, items),
     receiver: {

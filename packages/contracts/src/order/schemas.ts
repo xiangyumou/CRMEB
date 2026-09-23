@@ -447,6 +447,12 @@ export const orderDetail = orderListItem.extend({
   completedAt: instant.nullable(),
   cancelledAt: instant.nullable(),
   cancelReason: z.string().nullable(),
+  /**
+   * 拼团: the team this order sits in, for 查看拼团 (`groupbuyTeam { id }`). Set from the
+   * moment the order exists — 开团 creates the team with the order, 参团 names it — and kept
+   * after a cancel or refund (the team page shows how it ended). `null` for any other kind.
+   */
+  groupbuyTeamId: id.nullable(),
 });
 export type OrderDetail = z.infer<typeof orderDetail>;
 
@@ -462,6 +468,7 @@ export const orderDetailExample = {
   completedAt: null,
   cancelledAt: null,
   cancelReason: null,
+  groupbuyTeamId: null,
 } satisfies OrderDetail;
 
 /**

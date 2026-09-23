@@ -626,6 +626,12 @@ An order whose second stock deduction fails rolls back completely: no order row,
 - `packages/core/src/order/order.concurrency.int.test.ts::two checkouts for the last unit > hands back every line it already took when a later line is short`
 - `packages/core/src/order/order.int.test.ts::the stock port > takes nothing when one line of several is short, and names that line`
 
+### ORDER-011
+
+The shopper's order detail names the 拼团 team a group-buy order opened or joined (`groupbuyTeamId`, for 查看拼团 → `groupbuyTeam { id }`), from the moment the order exists and after it is cancelled; any other order names none. The order domain reads it through `OrderKindHandler.detailLinks`, never from a `groupbuy_*` table.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > ORDER-011 — the order detail names the team an order opened or joined, and nothing for an ordinary order`
+
 ### COUPON-007
 
 The last coupon cannot be claimed twice: one concurrent claim wins, the other is refused, `remain_count` never goes negative and exactly one user holds it.

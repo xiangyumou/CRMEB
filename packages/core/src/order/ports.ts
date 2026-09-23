@@ -416,6 +416,17 @@ export interface OrderKindHandler {
   afterCreate(ctx: Ctx, tx: Tx, orderId: number, meta: Record<string, unknown>): Promise<void>;
   /** May refuse a transition the base machine would allow. */
   canTransition?(from: OrderStatus, to: OrderStatus): boolean;
+  /**
+   * Read-only: what the shopper's 订单详情 links to for this kind (the 拼团 team). Optional —
+   * a kind without it adds nothing. Never writes, never throws for a missing row.
+   */
+  detailLinks?(db: DbOrTx, orderId: number): Promise<OrderKindDetailLinks>;
+}
+
+/** What `OrderKindHandler.detailLinks` answers; every key is optional. */
+export interface OrderKindDetailLinks {
+  /** The `groupbuy_groups.id` the order holds its membership in. */
+  groupbuyTeamId?: number | null;
 }
 
 /**
