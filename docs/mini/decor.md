@@ -129,7 +129,7 @@
 
 商城接口（`auth: user-optional`）：`decor.pageHome`、`decor.pageUserCenter`、`decor.pageResolve`，分别对应 `GET /api/v1/pages/home`、`/user-center`、`/:id?previewToken=`。
 
-pages.md 第 5 节里写的是建议的 id `diy.page*`，实际的 id 是 `decor.page*`。
+pages.md 第 5 节已改为实际的 id `decor.page*`（早期稿子写的是建议的 `diy.page*`）。
 
 ## 6. 页面解析器
 

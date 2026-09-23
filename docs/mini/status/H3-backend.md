@@ -51,9 +51,17 @@ Merged `storefront/mini` at 299956592 (G1 decor blocks) before touching the deco
      `…_OPENID` / `…_PHONE`); never set by the suite. device-check.md (backend B, D04, D05) and
      the e2e README updated.
 
+5. docs/mini cleanup
+   - pages.md: real ids (`system.appConfigGet`, `decor.page*`, `wechat.shareMiniCode`,
+     `payment.wechatReceipt`) in §2 and §5; §5 rows marked done where they are; the unbuilt
+     app/config switches (二级类目, 商品详情 评价/推荐/服务标签) called out as not done.
+   - design.md: `ThemeRoot` / `platform/theme.ts` → the real `theme/store.ts`,
+     `ui/tokens/nutui-bridge.scss`, `platform/tab-bar.ts`; Countdown's 304 header.
+   - decor.md note on ids; wechat-compliance C08 / C12 backend parts marked done.
+
 ## In progress
 
-- Task 5: docs/mini cleanup.
+- Task 6: `diyThemeTokens` typing.
 
 ## Client follow-ups (stream A)
 
