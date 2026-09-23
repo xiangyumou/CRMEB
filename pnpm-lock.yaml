@@ -481,6 +481,64 @@ importers:
         specifier: ^5.0.1
         version: 5.0.1(@types/node@24.13.6)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/api-client:
+    dependencies:
+      '@shop/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@shop/config':
+        specifier: workspace:*
+        version: link:../config
+      '@shop/testing':
+        specifier: workspace:*
+        version: link:../testing
+      '@tanstack/react-query':
+        specifier: ^5.103.2
+        version: 5.103.2(react@19.3.0)
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.6
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      eslint:
+        specifier: ^10.11.0
+        version: 10.11.0
+      happy-dom:
+        specifier: ^20.14.5
+        version: 20.14.5
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-18:
+        specifier: npm:react@18.3.1
+        version: react@18.3.1
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+      react-dom-18:
+        specifier: npm:react-dom@18.3.1
+        version: react-dom@18.3.1(react@19.3.0)
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.15
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.1
+        version: 5.0.1(@types/node@24.13.6)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/config:
     dependencies:
       '@eslint/js':
@@ -4882,6 +4940,11 @@ packages:
   quick-format-unescaped@4.0.4:
     resolution: {integrity: sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg==}
 
+  react-dom@18.3.1:
+    resolution: {integrity: sha512-5m4nQKp+rZRb09LNH59GM4BxTh9251/ylbKIbpe7TpGxfJ+9kv6BLkLBXIjjspbgbnIBNqlI23tRnTWT0snUIw==}
+    peerDependencies:
+      react: ^18.3.1
+
   react-dom@19.3.0:
     resolution: {integrity: sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q==}
     peerDependencies:
@@ -4907,6 +4970,10 @@ packages:
         optional: true
       redux:
         optional: true
+
+  react@18.3.1:
+    resolution: {integrity: sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==}
+    engines: {node: '>=0.10.0'}
 
   react@19.3.0:
     resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
@@ -5036,6 +5103,9 @@ packages:
 
   safer-buffer@2.1.2:
     resolution: {integrity: sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==}
+
+  scheduler@0.23.2:
+    resolution: {integrity: sha512-UOShsPwz7NrMUqhR6t0hWjFduvOzbtv7toDH1/hIrfRNIDBnnBWd0CwJTGvTpngVlmwGCdP9/Zl/tVrDqcuYzQ==}
 
   scheduler@0.28.0:
     resolution: {integrity: sha512-juorfCmIkIw8tT+p5BXSm6PJjQF/ycEYmKyzURCIt/RaZIhL+PulbQ9Yu2z1HdOJDdqDTlxA1+xKBmHXJsczAw==}
@@ -9701,6 +9771,12 @@ snapshots:
 
   quick-format-unescaped@4.0.4: {}
 
+  react-dom@18.3.1(react@19.3.0):
+    dependencies:
+      loose-envify: 1.4.0
+      react: 19.3.0
+      scheduler: 0.23.2
+
   react-dom@19.3.0(react@19.3.0):
     dependencies:
       react: 19.3.0
@@ -9720,6 +9796,10 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.3.0
       redux: 5.0.1
+
+  react@18.3.1:
+    dependencies:
+      loose-envify: 1.4.0
 
   react@19.3.0: {}
 
@@ -9916,6 +9996,10 @@ snapshots:
   safe-stable-stringify@2.5.0: {}
 
   safer-buffer@2.1.2: {}
+
+  scheduler@0.23.2:
+    dependencies:
+      loose-envify: 1.4.0
 
   scheduler@0.28.0: {}
 
