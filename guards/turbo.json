@@ -12,7 +12,15 @@
       "dependsOn": ["gen", "@shop/web#gen"]
     },
     "test:unit": {
-      "dependsOn": ["gen", "^gen", "@shop/web#gen"]
+      "dependsOn": ["gen", "^gen", "@shop/web#gen"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/mini/src/**",
+        "$TURBO_ROOT$/apps/mini/project.config.json",
+        "$TURBO_ROOT$/apps/mini/.env*",
+        "$TURBO_ROOT$/packages/api-client/src/**",
+        "$TURBO_ROOT$/packages/storefront-blocks/src/**"
+      ]
     }
   }
 }

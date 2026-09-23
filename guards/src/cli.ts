@@ -16,6 +16,7 @@ import { domains } from './checks/domains';
 import { fixtures } from './checks/fixtures';
 import { invariants } from './checks/invariants';
 import { migrations } from './checks/migrations';
+import { miniCheck } from './checks/mini';
 import { permissions } from './checks/permissions';
 import { pipeline } from './checks/pipeline';
 import { retiredFeatures } from './checks/retired';
@@ -33,6 +34,7 @@ const CHECKS: readonly Check[] = [
   adminClient,
   fixtures,
   uniappCalls,
+  miniCheck,
   retiredFeatures,
   bannedConstructs,
   secretsNeverLeak,

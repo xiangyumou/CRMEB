@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { citationProblem } from './invariants';
+import { rel } from '../lib/paths';
+import { citationProblem, testModules } from './invariants';
 
 const FILES: Record<string, string> = {
   'packages/x/a.test.ts': "describe('outer', () => { it('keeps the rule', () => {}); });",
@@ -29,5 +30,23 @@ describe('citationProblem', () => {
     expect(citationProblem('just a sentence', read)).toBe(
       '"just a sentence" is not <file>::<test name>',
     );
+  });
+});
+
+describe('the test-title scan', () => {
+  it('reads the mini-program and the packages it is built from', () => {
+    const files = testModules().map((file) => rel(file.file));
+    for (const root of [
+      'apps/mini/src/',
+      'packages/api-client/src/',
+      'packages/storefront-blocks/src/',
+      'e2e/storefront/specs-mini/',
+    ]) {
+      expect(
+        files.some((file) => file.startsWith(root)),
+        root,
+      ).toBe(true);
+    }
+    expect(files.some((file) => file.includes('/node_modules/'))).toBe(false);
   });
 });
