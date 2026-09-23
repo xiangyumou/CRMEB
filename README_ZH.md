@@ -122,7 +122,7 @@ pnpm --filter @shop/e2e-storefront test
 (cd apps/uni-app && npm test && npm run build:h5)
 ```
 
-CI（`.github/workflows/next.yml`）跑同样的内容，另加 shellcheck、部署演练，以及在 push 时构建三个生产镜像。
+CI（`.github/workflows/next.yml`）跑除 uni-app 的 `npm test` 以外的全部内容，另加 shellcheck、部署演练，以及在 push 时构建三个生产镜像。
 
 ## 部署
 

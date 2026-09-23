@@ -39,8 +39,11 @@ build:mp-weixin` if a `#ifdef MP-WEIXIN` block changed).
 - `.github/**`: `actionlint`, and `.github/scripts/publish-release.test.sh` if the publish script
   changed.
 
-CI (`.github/workflows/next.yml`) runs all of the above on every pull request. Commits follow
-[Conventional Commits](https://www.conventionalcommits.org/) (`feat(coupon): …`, `fix(order): …`).
+CI (`.github/workflows/next.yml`) runs the checklist, shellcheck, the publish-script proof and the
+drill on every pull request that touches the code; the uni-app's `npm test` is yours to run.
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat(coupon): …`,
+`fix(order): …`).
 
 ## Adding a route to an existing domain
 

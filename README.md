@@ -140,8 +140,8 @@ pnpm --filter @shop/e2e-storefront test
 (cd apps/uni-app && npm test && npm run build:h5)
 ```
 
-CI (`.github/workflows/next.yml`) runs the same, plus shellcheck, the deploy drill and, on a push,
-the build of the three production images.
+CI (`.github/workflows/next.yml`) runs all of these except the uni-app's `npm test`, plus
+shellcheck, the deploy drill and, on a push, the build of the three production images.
 
 ## Deployment
 
