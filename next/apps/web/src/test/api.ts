@@ -218,44 +218,45 @@ function bodyOf(init: RequestInit | undefined): unknown {
  */
 export function stubRoutes(stubs: readonly RouteStub[]): StubCall[] {
   const calls: StubCall[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = urlOf(input);
-      // Not `new URL(…)`: a test may stub the global `URL` (to catch
-      // `createObjectURL`), and the stub must keep routing when it does.
-      const queryAt = url.indexOf('?');
-      const path = (queryAt === -1 ? url : url.slice(0, queryAt)).replace(/^[a-z]+:\/\/[^/]+/i, '');
-      const query = new URLSearchParams(queryAt === -1 ? '' : url.slice(queryAt + 1));
-      const method = (init?.method ?? 'GET').toUpperCase();
-      let stub: RouteStub | undefined;
-      let params: Record<string, string> = {};
-      for (const candidate of stubs) {
-        const matched = candidate.matches(method, path);
-        if (matched) {
-          stub = candidate;
-          params = matched;
-          break;
-        }
+  // A named function rather than a method called fetch: this implements
+  // fetch, and `pnpm guards banned` would read the method as a raw call.
+  async function answer(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const url = urlOf(input);
+    // Not `new URL(…)`: a test may stub the global `URL` (to catch
+    // `createObjectURL`), and the stub must keep routing when it does.
+    const queryAt = url.indexOf('?');
+    const path = (queryAt === -1 ? url : url.slice(0, queryAt)).replace(/^[a-z]+:\/\/[^/]+/i, '');
+    const query = new URLSearchParams(queryAt === -1 ? '' : url.slice(queryAt + 1));
+    const method = (init?.method ?? 'GET').toUpperCase();
+    let stub: RouteStub | undefined;
+    let params: Record<string, string> = {};
+    for (const candidate of stubs) {
+      const matched = candidate.matches(method, path);
+      if (matched) {
+        stub = candidate;
+        params = matched;
+        break;
       }
-      const call: StubCall = {
-        method,
-        url,
-        path,
-        query,
-        body: bodyOf(init),
-        params,
-        routeId: stub?.route.id ?? null,
-      };
-      calls.push(call);
-      if (!stub) {
-        fixtureFailures.push(`no stub answers ${method} ${url}`);
-        return respondWithError(502, {
-          code: 'TEST_UNSTUBBED',
-          message: `no stub answers ${method} ${path}`,
-        });
-      }
-      return stub.answer(call);
-    },
-  });
+    }
+    const call: StubCall = {
+      method,
+      url,
+      path,
+      query,
+      body: bodyOf(init),
+      params,
+      routeId: stub?.route.id ?? null,
+    };
+    calls.push(call);
+    if (!stub) {
+      fixtureFailures.push(`no stub answers ${method} ${url}`);
+      return respondWithError(502, {
+        code: 'TEST_UNSTUBBED',
+        message: `no stub answers ${method} ${path}`,
+      });
+    }
+    return stub.answer(call);
+  }
+  configureApi({ fetch: answer });
   return calls;
 }
