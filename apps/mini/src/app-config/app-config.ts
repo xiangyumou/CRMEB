@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { isApiError, type ResponseOf } from '@shop/api-client';
 import { api } from '@/data/api';
 import { assetUrl } from '@/lib/asset-url';
+import { setServerTime } from '@/lib/server-clock';
 import { setShareDefaults, setSubscribeTemplates, setWebviewDomains, storage } from '@/platform';
 import { useThemeStore } from '@/theme/store';
 
@@ -73,6 +74,9 @@ async function load(): Promise<void> {
     const fresh = await api.call('system.appConfigGet', undefined, {
       headers: cached ? { 'If-None-Match': `W/"${cached.version}"` } : undefined,
     });
+    // Only a fresh answer's time counts: the stored copy's is as old as the copy. A 304 has no
+    // body; its `X-Server-Time` header is read by the transport (lib/server-clock).
+    setServerTime(Date.parse(fresh.serverTime));
     storage.set(APP_CONFIG_KEY, JSON.stringify(fresh));
     applyAppConfig(fresh, 'network');
   } catch (error) {

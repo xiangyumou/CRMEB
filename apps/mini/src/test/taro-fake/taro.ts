@@ -59,7 +59,13 @@ export type RequestHandler = (option: {
   method: string;
   header: Record<string, string>;
   data?: string | undefined;
-}) => { statusCode: number; data: unknown } | Promise<{ statusCode: number; data: unknown }>;
+}) => RequestAnswer | Promise<RequestAnswer>;
+
+interface RequestAnswer {
+  statusCode: number;
+  data: unknown;
+  header?: Record<string, string>;
+}
 
 const unhandledRequest: RequestHandler = (option) => {
   throw new Error(`taro-fake: no request handler for ${option.method} ${option.url}`);

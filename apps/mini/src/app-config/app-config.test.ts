@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { serverNow } from '@/lib/server-clock';
 import { isWebviewAllowed, subscribe } from '@/platform';
 import { appConfigFixture } from '@/test/app-config-fixture';
 import { serveApi } from '@/test/fake-api';
@@ -78,5 +79,22 @@ describe('app config', () => {
     await loadAppConfig();
     expect(isWebviewAllowed('https://h5.example.com/a')).toBe(true);
     expect(isWebviewAllowed('https://other.example.com/a')).toBe(false);
+  });
+
+  it('sets the server clock from a 200 body, and from the header of a bodyless 304', async () => {
+    serveApi({ 'GET /api/v1/app/config': () => ({ body: config }) });
+    await loadAppConfig();
+    expect(Math.abs(serverNow() - Date.parse(config.serverTime))).toBeLessThan(5_000);
+
+    const later = '2030-01-01T00:00:00.000Z';
+    serveApi({
+      'GET /api/v1/app/config': () => ({
+        status: 304,
+        body: '',
+        headers: { 'X-Server-Time': later },
+      }),
+    });
+    await loadAppConfig();
+    expect(Math.abs(serverNow() - Date.parse(later))).toBeLessThan(5_000);
   });
 });
