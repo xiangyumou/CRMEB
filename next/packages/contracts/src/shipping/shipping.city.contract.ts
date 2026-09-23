@@ -4,16 +4,14 @@ import { cityTree, cityTreeExample } from './schemas';
 /**
  * The administrative-division tree — read-only, on both surfaces.
  *
- * The legacy system had seven city routes: a full list, a children list, add,
- * edit, save, delete and `city/clean_cache`. None of them survive as writes.
- * `cities` is **seed data** (3939 rows, `packages/db/seed-data/cities.json`)
- * that the whole shop's freight rules and address snapshots key on; letting an
- * operator rename or delete a division at runtime is how a freight region
- * quietly stops matching, and the legacy cache-bust route existed precisely
- * because nothing invalidated the cached tree when they did.
+ * There are no writes. `cities` is **seed data** (3939 rows,
+ * `packages/db/seed-data/cities.json`) that the whole shop's freight rules and
+ * address snapshots key on; letting an operator rename or delete a division at
+ * runtime is how a freight region quietly stops matching, and a cached tree
+ * then needs someone to remember to clear it.
  *
  * So: the tree is immutable, the response carries a `version` fingerprint, and
- * there is no cache to bust. Recorded in `docs/rewrite/invariants.md`.
+ * there is no cache to bust (CITY-001).
  */
 
 export const cityTreePublic = defineRoute({

@@ -12,10 +12,9 @@ import { id, instant, money, pageQuery, paged, sortQuery } from '../_conventions
  *   cubic metres — not money, so they travel as numbers with at most two
  *   fraction digits (which is what `numeric(12,2)` stores). Everything with a
  *   ¥ in front of it stays a string, all the way down to `Money`.
- * - **A rule with no cities is the fallback rule.** The legacy tables spelled
- *   that as `city_id = 0`; here `cityIds: []` on the one rule whose
- *   `isFallback` is true. The database has a partial unique index enforcing
- *   at most one such rule per template.
+ * - **A rule with no cities is the fallback rule**: `cityIds: []` on the one
+ *   rule whose `isFallback` is true, not a magic city id. The database has a
+ *   partial unique index enforcing at most one such rule per template.
  */
 
 // ---------------------------------------------------------------------------
@@ -54,7 +53,7 @@ const cityBase = z.object({
  *
  * `z.lazy` is legal zod but produces a `$ref` cycle that `zod-to-openapi`
  * cannot render, and the administrative tree has been exactly three levels
- * since it was seeded. Stream A's category tree is written out for the same
+ * since it was seeded. The catalog's category tree is written out for the same
  * reason.
  */
 const cityDistrict = cityBase;
@@ -67,7 +66,7 @@ export const cityTree = z.object({
   /**
    * Fingerprint of the seeded tree, also served as the `ETag`. The data is
    * immutable, so a client that has seen this value never needs the body again
-   * — which is why the legacy `city/clean_cache` route has no successor.
+   * — which is why there is no route to clear a cache.
    */
   version: z.string(),
 });
@@ -285,10 +284,9 @@ export const shippingTemplateDetailExample: ShippingTemplateDetail = {
 // ---------------------------------------------------------------------------
 
 /**
- * The picker shape, taken over from stream B2 **byte for byte** (CR-1-b2).
- * `GET /admin-api/express-companies` and `GET /api/v1/staff/express-companies`
- * answer with this and nothing else, so B2's 发货 form and the mobile staff
- * console keep working across the move.
+ * The picker shape. `GET /admin-api/express-companies` and
+ * `GET /api/v1/staff/express-companies` answer with this and nothing else, so
+ * the console's 发货 form and the mobile staff console read the same list.
  */
 export const expressCompany = z.object({
   id,
