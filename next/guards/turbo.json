@@ -4,6 +4,15 @@
   "tasks": {
     "guards": {
       "cache": false
+    },
+    "typecheck": {
+      "dependsOn": ["gen", "^gen", "@shop/web#gen"]
+    },
+    "lint": {
+      "dependsOn": ["gen", "@shop/web#gen"]
+    },
+    "test:unit": {
+      "dependsOn": ["gen", "^gen", "@shop/web#gen"]
     }
   }
 }

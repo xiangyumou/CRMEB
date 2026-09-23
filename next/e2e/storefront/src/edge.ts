@@ -54,7 +54,7 @@ const MIME: Record<string, string> = {
 const UPLOAD_DENY = /\.(ph(p[3457]?|t|tml|ar)|jsp?|aspx?|cgi|pl|py|sh|so|exe|html?|xhtml|svgz?)$/i;
 
 /** Everything `web` answers. `^~` in nginx terms: these win over the SPA. */
-const PROXIED = /^\/(admin|admin-api|api|_next)(\/|$)/;
+const PROXIED = /^\/(admin|admin-api|api|scan-upload|_next)(\/|$)/;
 
 export interface EdgeOptions {
   port: number;
