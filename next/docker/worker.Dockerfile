@@ -28,8 +28,8 @@
 # So: **tsup (esbuild) bundles everything we wrote**, `@shop/*` included, and
 # **`pnpm deploy --prod` materialises only the handful of packages the bundle
 # deliberately left external**. The result is ~200 MB against ~1.4 GB for a
-# whole-workspace image, which is what a 2-core / 3.6 GB host running two stacks
-# during cutover can actually afford (PLAN §1, §7).
+# whole-workspace image, which matters on a 2-core / 3.6 GB host that holds
+# the running release and the next one side by side.
 
 ARG NODE_IMAGE=node:24-slim
 
@@ -56,8 +56,8 @@ RUN corepack pnpm gen
 # tsup compiles its config file in place, so the config's own `from 'tsup'`
 # import is resolved from `docker/worker/`. Under pnpm's strict layout that
 # directory sees nothing, and `tsup` only exists in `apps/worker/node_modules`.
-# Borrowing that directory is a build-time symlink; the alternative is putting
-# the config inside `apps/worker`, which stream J2 does not own.
+# Borrowing that directory is a build-time symlink, which keeps the image's
+# bundle config here, next to the Dockerfile, rather than inside `apps/worker`.
 RUN ln -sfn /build/apps/worker/node_modules /build/docker/worker/node_modules \
     && ./apps/worker/node_modules/.bin/tsup --config docker/worker/tsup.config.ts \
     && rm -f /build/docker/worker/node_modules

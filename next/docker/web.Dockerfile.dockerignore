@@ -1,7 +1,7 @@
 # Build context filter for `web.Dockerfile` (context: `next/`).
 #
 # BuildKit prefers `<dockerfile>.dockerignore` over the context's own
-# `.dockerignore`, which keeps this file inside the paths stream J2 owns.
+# `.dockerignore`, so each image's context filter lives next to its Dockerfile.
 
 # Installed inside the image from the lockfile; shipping the host's copy would
 # be both huge and wrong (it is linked into the host's pnpm store).

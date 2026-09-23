@@ -1,5 +1,5 @@
 #!/bin/sh
-# Writes the edge's trusted-proxy list (CR-14-k2). Run by the nginx image's
+# Writes the edge's trusted-proxy list. Run by the nginx image's
 # `/docker-entrypoint.sh` before nginx starts, like the image's own
 # `/docker-entrypoint.d/*.sh` hooks; a non-zero exit stops the container.
 #

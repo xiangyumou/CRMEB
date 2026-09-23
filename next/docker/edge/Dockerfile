@@ -11,11 +11,11 @@
 #
 # The build context is the repository root, because the H5 build output lives
 # under `template/uni-app/`, outside `next/`. The adjacent
-# `Dockerfile.dockerignore` replaces the root `.dockerignore`, which excludes
-# `template/` for the legacy PHP image's benefit.
+# `Dockerfile.dockerignore` replaces the root `.dockerignore`, so the edge
+# build sees exactly its own config and the H5 build output.
 #
 # `H5_DIST` defaults to a placeholder so the image is buildable from a clean
-# checkout: stream H owns `template/uni-app`, and its H5 build is not a
+# checkout: the uni-app is a separate npm project, and its H5 build is not a
 # prerequisite for proving the deployment. A placeholder that says so out loud
 # is better than an image that 404s at `/` with no explanation.
 
@@ -27,7 +27,7 @@ ARG H5_DIST
 
 RUN rm -f /etc/nginx/conf.d/default.conf
 COPY next/docker/edge/nginx.conf /etc/nginx/conf.d/edge.conf
-# The trusted-proxy list for the realip module (CR-14-k2), rendered from
+# The trusted-proxy list for the realip module, rendered from
 # NEXT_EDGE_TRUSTED_PROXIES at every start by the image's own entrypoint hook
 # mechanism. Empty by default: nothing is trusted, and the TCP peer is the
 # client. `compose.traefik.yml` requires it once Traefik fronts the edge.
@@ -42,9 +42,9 @@ COPY ${H5_DIST}/ /srv/h5/
 # seeds a new named volume from *whichever* container mounts it first — read-only
 # mounts included, and the edge usually wins that race. A root-owned
 # `/data/uploads` then makes every upload fail with EACCES in containers that
-# are deliberately not root. The old stack hit exactly this and papered over it
-# with a manual `chown -R 33:33` on the host (deploy/production/README.md); the
-# fix is for every image that declares this path to agree about who owns it.
+# are deliberately not root. A manual `chown` on the host would paper over it
+# until the next fresh volume; the fix is for every image that declares this
+# path to agree about who owns it.
 #
 # The config test runs against the list the entrypoint would write for the
 # default (empty) value and for a representative one, so a directive that the
@@ -58,5 +58,5 @@ RUN mkdir -p /data/uploads /etc/nginx/edge \
 
 # nginx:alpine already drops to the `nginx` user for its workers, and the
 # master needs to bind :80 — inside the container, with no host port mapped
-# below 1024 by compose, so this is not the root the old stack ran.
+# below 1024 by compose, so the root master never faces the network directly.
 EXPOSE 80
