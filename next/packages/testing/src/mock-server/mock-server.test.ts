@@ -186,11 +186,17 @@ describe('bySpecificity', () => {
    * property itself over the whole table, not one pair that happened to break.
    */
   it('is a total order over every registered route', () => {
+    // Violations are collected and asserted once: an `expect` per pair is a
+    // million calls over today's table, too slow for a CI runner's 5 s.
     const compiled = allRoutes.map(compileRoute);
+    const label = (r: (typeof compiled)[number]) => `${r.route.method} ${r.route.path}`;
+    const violations: string[] = [];
     for (const a of compiled) {
-      expect(bySpecificity(a, a)).toBe(0);
+      if (bySpecificity(a, a) !== 0) violations.push(`not reflexive: ${label(a)}`);
       for (const b of compiled) {
-        expect(Math.sign(bySpecificity(a, b)) + Math.sign(bySpecificity(b, a))).toBe(0);
+        if (Math.sign(bySpecificity(a, b)) + Math.sign(bySpecificity(b, a)) !== 0) {
+          violations.push(`not antisymmetric: ${label(a)} / ${label(b)}`);
+        }
       }
     }
     const sorted = [...compiled].sort(bySpecificity);
@@ -200,10 +206,13 @@ describe('bySpecificity', () => {
         // made visible, without an n³ walk. Equal only for one path under two
         // methods, which the matcher tells apart itself.
         const order = bySpecificity(sorted[i]!, sorted[j]!);
-        if (sorted[i]!.route.path === sorted[j]!.route.path) expect(order).toBe(0);
-        else expect(order).toBeLessThan(0);
+        const samePath = sorted[i]!.route.path === sorted[j]!.route.path;
+        if (samePath ? order !== 0 : order >= 0) {
+          violations.push(`out of order: ${label(sorted[i]!)} before ${label(sorted[j]!)}`);
+        }
       }
     }
+    expect(violations).toEqual([]);
   });
 });
 

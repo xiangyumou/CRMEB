@@ -101,6 +101,7 @@ jobs:
         run: corepack pnpm --filter @shop/guards guards --json > guards.json
 
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: failure()
         with:
           name: guards
@@ -125,6 +126,7 @@ jobs:
 
       - name: Upload the OpenAPI document
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: openapi
           path: next/packages/contracts/openapi.json
@@ -187,6 +189,11 @@ jobs:
       - name: Install
         run: corepack pnpm install --frozen-lockfile
 
+      # The routes, error codes and config groups are generated, not committed;
+      # the web server the suite starts imports them.
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
       # Chromium only: these are assertions about the admin's own behaviour —
       # an authorisation boundary, an audit row, a masked secret — not about
       # browser compatibility.
@@ -202,6 +209,7 @@ jobs:
         run: corepack pnpm --filter @shop/e2e-admin e2e
 
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: failure()
         with:
           name: playwright-report
@@ -227,6 +235,11 @@ jobs:
 
       - name: Install
         run: corepack pnpm install --frozen-lockfile
+
+      # The routes, error codes and config groups are generated, not committed;
+      # the web server the suite starts imports them.
+      - name: Generate aggregates
+        run: corepack pnpm gen
 
       # The H5 bundle the edge serves is built from the real uni-app tree by
       # the suite's own webServer (`src/h5.ts` runs `npm run build:h5`); it
@@ -260,6 +273,7 @@ jobs:
 
       # Every journey's console-errors.txt / failed-requests.txt, green or not.
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: storefront-playwright-report
@@ -268,6 +282,7 @@ jobs:
 
       # Traces and screenshots (`retain-on-failure`).
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: failure()
         with:
           name: storefront-test-results
@@ -339,6 +354,7 @@ jobs:
           test "$failed" -eq 0
 
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: soak-logs
@@ -383,6 +399,7 @@ jobs:
         run: corepack pnpm --filter @shop/guards mutations --json mutations.json
 
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: mutation-report
