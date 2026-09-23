@@ -108,6 +108,7 @@ describe('我的订单', () => {
           orderListItem({ id: '2', orderNo: 'A2', status: 'shipped' }),
         ]),
       }),
+      'GET /api/v1/orders/2/wechat-receipt': () => ({ body: { receipt: null } }),
       'POST /api/v1/orders/2/receipt': () => ({
         body: orderListItem({ id: '2', status: 'received' }),
       }),

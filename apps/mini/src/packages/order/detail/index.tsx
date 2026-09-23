@@ -38,7 +38,14 @@ export default function OrderDetailPage() {
   const params = useRouteParams('order');
   return (
     <PageShell title="订单详情" withBar>
-      <LoginCard reason="登录后查看订单" redirect={{ route: 'order', params }}>
+      <LoginCard
+        reason="登录后查看订单"
+        redirect={
+          params.id
+            ? { route: 'order', params: { id: params.id } }
+            : { route: 'order', params: { outTradeNo: params.outTradeNo ?? '' } }
+        }
+      >
         <ResolvedOrder id={params.id} outTradeNo={params.outTradeNo} />
       </LoginCard>
     </PageShell>
@@ -112,6 +119,7 @@ function OrderBody({ id }: { id: string }) {
             canAftersale ? (
               <Pressable
                 label="申请售后"
+                role="link"
                 className="order-detail__link"
                 onClick={() => run('aftersale')}
               >

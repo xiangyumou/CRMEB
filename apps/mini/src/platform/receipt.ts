@@ -20,13 +20,16 @@ export type ReceiptOutcome =
   | { kind: 'failed'; message: string };
 
 /**
- * What WeChat's component needs for this order, or `null` for the plain dialog.
- *
- * TODO(H2): ask `payment.wechatReceipt` (GET /api/v1/orders/:id/wechat-receipt) once
- * storefront/mini-H2-backend is merged; until then every order takes the plain dialog.
+ * What WeChat's component needs for this order, or `null` for the plain dialog. The server
+ * decides (`payment.wechatReceipt`): the order is the shopper's own, was paid in the mini
+ * program, and WeChat has been told it is all out.
  */
-function wechatTarget(_client: ApiClient, _orderId: string): Promise<OrderConfirmTarget | null> {
-  return Promise.resolve(null);
+async function wechatTarget(
+  client: ApiClient,
+  orderId: string,
+): Promise<OrderConfirmTarget | null> {
+  const { receipt } = await client.call('payment.wechatReceipt', { params: { id: orderId } });
+  return receipt;
 }
 
 function messageOf(error: unknown): string {
@@ -43,6 +46,8 @@ export async function confirmReceipt(client: ApiClient, orderId: string): Promis
 
   if (target) {
     const outcome = await platform.openOrderConfirm(target);
+    // `cancel`: the shopper closed WeChat's page; nothing happened. `fail`: say so, the
+    // button stays for another try.
     if (outcome.kind !== 'confirmed') return outcome;
   } else {
     const ok = await showModal({
@@ -56,7 +61,8 @@ export async function confirmReceipt(client: ApiClient, orderId: string): Promis
   try {
     const order = await client.call('order.confirmReceipt', {
       params: { id: orderId },
-      body: {},
+      // The server asks WeChat before it believes the component (C07).
+      body: target ? { via: 'wechat-component' } : {},
     });
     return { kind: 'confirmed', order };
   } catch (error) {

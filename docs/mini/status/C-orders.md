@@ -9,16 +9,21 @@ order/after-sales specs in `e2e/storefront/specs-mini`.
 - `platform.openOrderConfirm` (WeChat's 确认收货 component, C07) in all three builds; the
   emulated one answers by `EmulatedWechatUser.receipt` (default `confirm`).
 - `platform/receipt.ts` `confirmReceipt(client, orderId)`: the one caller of
-  `order.confirmReceipt`. Before H2: the plain confirm dialog for every order.
+  `order.confirmReceipt`. Asks `payment.wechatReceipt` (H2, merged); a receipt opens WeChat's
+  component then posts `{ via: 'wechat-component' }`, `null` gets the plain dialog.
+- e2e harness `mini/confirm-receipt`: the emulated component marks the payment confirmed on
+  the fake `api.weixin.qq.com` (`order_state` 3), which the server reads via `get_order`.
 - `ui/timeline.tsx` (物流轨迹, 售后进度).
+- 我的订单 (tabs + counts, paged list, all card actions) with tests.
+- 订单详情 (by id or outTradeNo; status header + countdown, parcels, address, lines, 金额明细,
+  facts + copy, 发票, ActionBar with 客服) with tests.
+- Merged storefront/mini with H2.
 
 ## In progress
 
-- 订单列表.
+- 物流.
 
 ## Next
 
-- 订单详情, 物流, 评价; 售后 apply / list / detail / return-shipment.
+- 评价 (moderation), 售后 apply / list / detail / return-shipment (express companies).
 - E2E specs and page objects; screenshots; docs/mini/pages.md form changes.
-- H2 (not merged into storefront/mini yet): wire `payment.wechatReceipt`,
-  `shipping.expressCompanyOptions`, review `moderation` once it is.
