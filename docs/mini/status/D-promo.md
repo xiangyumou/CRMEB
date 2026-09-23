@@ -48,7 +48,7 @@ share handlers, 小程序码 + scene decode, canvas-2D poster, e2e journeys.
   (the seats row is now hidden once a team failed or was cancelled).
 
 - Checklist (2026-09-24, after merging storefront/mini with A2, B, C): `pnpm turbo run gen
-  typecheck lint test:unit build` 45/45, `pnpm --filter @shop/e2e-storefront test:mini` 15/15,
+typecheck lint test:unit build` 45/45, `pnpm --filter @shop/e2e-storefront test:mini` 15/15,
   `pnpm exec prettier --check .` clean, `pnpm guards` clean. weapp sizes: main 650.9 KB, promo
   69.6 KB, total 924.7 KB (budgets 1536 / 2048 / 8192 KB).
 
