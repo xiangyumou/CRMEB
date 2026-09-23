@@ -13,7 +13,8 @@
 			<view v-if="coupon.count" class="occupy"></view>
 			<view class='coupon-list' v-if="coupon.list.length">
 				<view class='item acea-row row-center-wrapper' v-for="(item,index) in coupon.list"
-					@click="getCouponUser(index,item.id)" :key='index' :class="{svip: item.receive_type === 4}">
+					@click="getCouponUser(index,item.id)" :key='index' :class="{svip: item.receive_type === 4}"
+					data-testid="coupon-option" :data-coupon-id="item.id">
 					<view class="moneyCon acea-row row-center-wrapper">
 						<view class='money acea-row row-column row-center-wrapper'
 							:class='item.is_use >= item.receive_limit && coupon.count?"moneyGray":""'>
@@ -53,7 +54,7 @@
 			</view>
 			<!-- 无优惠券 -->
 			<view class='pictrue' v-else>
-				<image :src="imgHost + '/statics/images/noCoupon.png'"></image>
+				<image :src="'/static/images/legacy/noCoupon.png'"></image>
 			</view>
 		</view>
 		<view class='mask' catchtouchmove="true" :hidden='coupon.coupon==false' @click='close'></view>

@@ -7,7 +7,7 @@
 					<image :src="orderInfo.status_pic"></image>
 				</view>
 				<view class="data" :class="isGoodsReturn ? 'on' : ''">
-					<view class="state">{{ orderInfo._status._msg }}</view>
+					<view class="state" data-testid="order-status" :data-status-type="orderInfo._status._type" :data-status-title="orderInfo._status._title">{{ orderInfo._status._msg }}</view>
 					<view>
 						{{ orderInfo.add_time_y }}
 						<text class="time">{{ orderInfo.add_time_h }}</text>
@@ -401,12 +401,14 @@
 					<view
 						@click="openSubcribe(`/pages/goods/${cartInfo.length > 1 ? 'goods_return_list' : 'goods_return'}/index?orderId=` + orderInfo.order_id + '&id=' + orderInfo.id)"
 						class="bnt cancel"
+						data-testid="order-refund"
 						v-else-if="orderInfo.is_apply_refund && orderInfo.refund_status == 0 && cartInfo.length > 1 && !orderInfo.virtual_type && orderInfo.is_refund_available"
 					>
 						{{ cartInfo.length > 1 ? $t(`批量退款`) : $t(`申请退款`) }}
 					</view>
 					<navigator
 						class="bnt cancel"
+						data-testid="order-logistics"
 						v-if="orderInfo.delivery_type == 'express' && status.class_status == 3 && status.type == 2 && !split.length"
 						hover-class="none"
 						:url="'/pages/goods/goods_logistics/index?orderId=' + orderInfo.order_id"
@@ -416,7 +418,7 @@
 					<view class="bnt bg-color" v-if="orderInfo.type == 3 && orderInfo.refund_type == 0 && orderInfo.paid" @tap="goJoinPink">
 						{{ $t(`查看拼团`) }}
 					</view>
-					<view class="bnt bg-color" v-if="status.class_status == 3 && !split.length" @click="confirmOrder()">
+					<view class="bnt bg-color" data-testid="order-receive" v-if="status.class_status == 3 && !split.length" @click="confirmOrder()">
 						{{ $t(`确认收货`) }}
 					</view>
 					<view class="bnt bg-color" v-if="orderInfo.paid == 1 && !is_gift && isReturn != 1" @tap="goOrderConfirm">{{ $t(`再次购买`) }}</view>
@@ -467,7 +469,7 @@
 		<view class="mask more-mask" v-if="moreBtn" @click="moreBtn = false"></view>
 		<canvas class="canvas" canvas-id="posterCanvas"></canvas>
 		<view class="share-box" v-if="H5ShareBox">
-			<image :src="imgHost + '/statics/images/share-info.png'" @click="H5ShareBox = false"></image>
+			<image :src="'/static/images/legacy/share-info.png'" @click="H5ShareBox = false"></image>
 		</view>
 		<invoice-picker
 			:inv-show="invShow"
@@ -597,7 +599,7 @@ export default {
 			is_gift: 0, // 0正常商品 || 无人领取   1 购买者   2领取人
 			giftData: null,
 			giftModalData: null,
-			mpGiftImg: HTTP_REQUEST_URL + '/statics/images/gift_share.jpg'
+			mpGiftImg: '/static/images/legacy/gift_share.jpg'
 		};
 	},
 	computed: mapGetters(['isLogin']),

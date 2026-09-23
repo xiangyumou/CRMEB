@@ -60,7 +60,7 @@
 					</block>
 					<view class='noCommodity' v-if="presellList.length == 0">
 						<view class='emptyBox'>
-							<image :src="imgHost + '/statics/images/no-thing.png'"></image>
+							<image :src="'/static/images/legacy/no-thing.png'"></image>
 							<view class="tips">{{$t(`暂无商品，去看点别的吧`)}}</view>
 						</view>
 					</view>
@@ -170,7 +170,7 @@
 						this.picUrl = this.picList[4]
 						break;
 					default:
-						this.picUrl = picList[2]
+						this.picUrl = this.picList[2]
 						break
 				}
 			});

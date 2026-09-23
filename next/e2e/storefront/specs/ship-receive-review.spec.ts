@@ -1,10 +1,9 @@
 import { shipOrder } from '@shop/core/order';
 
-import { blockedBy } from '../src/blocked';
 import { test, expect } from '../src/fixtures';
 import { arrangePaidOrder } from '../src/product-flows';
 import type { Stack } from '../src/stack';
-import { uniTextarea } from '../src/uni';
+import { uniField } from '../src/uni';
 
 /**
  * Journey 3 — Ship → receive → review.
@@ -17,14 +16,13 @@ import { uniTextarea } from '../src/uni';
  * the storefront: does a shopper's own screen show the shipment, can they
  * confirm receipt, and can they then write a review.
  *
- * Today the order-detail page does not render at all (CR-4-i §7), and it is
- * where 确认收货 and 评价 live, so the journey is split: the logistics page
- * and the review page are reached by the links the order-detail page would
- * have followed — receipt confirmed through the real receipt route in
- * between — and the whole motion through the order-detail page is kept as a
- * `blockedBy` test. The review is written against the multi-spec product's
- * line: a zero-spec line crashes the review page (CR-4-i §8), which the
- * blocked test covers.
+ * The first two tests reach the logistics page and the review page by the
+ * links the order-detail page follows — receipt confirmed through the real
+ * receipt route in between — and write the review against the multi-spec
+ * product's line. The third makes the whole motion through the order-detail
+ * page (确认收货, then 评价) on a zero-spec line: the two defects that once
+ * stopped it (CR-4-i §7, the page throwing on `help_info`; §8, a zero-spec
+ * line crashing the review page) are closed.
  */
 
 const TRACKING_NO = 'SF9988776655';
@@ -61,8 +59,8 @@ test('a shopper sees a shipped order with its courier and tracking number', asyn
   // The order-detail page's 查看物流 link.
   await shopperPage.goto(`/pages/goods/goods_logistics/index?orderId=${order.orderNo}`);
   await expect(shopperPage.getByText('E2E 运费商品').first()).toBeVisible({ timeout: 15_000 });
-  await expect(shopperPage.getByText('顺丰速运').first()).toBeVisible();
-  await expect(shopperPage.getByText(TRACKING_NO).first()).toBeVisible();
+  await expect(shopperPage.getByTestId('logistics-company')).toContainText('顺丰速运');
+  await expect(shopperPage.getByTestId('logistics-no')).toContainText(TRACKING_NO);
 });
 
 test('a shopper reviews a received order line', async ({ shopperPage, shopperApi, shop }) => {
@@ -81,8 +79,8 @@ test('a shopper reviews a received order line', async ({ shopperPage, shopperApi
     `/pages/goods/goods_comment_con/index?unique=${detail.items[0]!.id}&uni=${order.orderNo}`,
   );
   await expect(shopperPage.getByText('E2E 多规格商品').first()).toBeVisible({ timeout: 15_000 });
-  await uniTextarea(shopperPage).first().fill('E2E 评价：颜色很正，尺码合适。');
-  await shopperPage.getByText('立即评价', { exact: true }).click();
+  await uniField(shopperPage, 'review-text').fill('E2E 评价：颜色很正，尺码合适。');
+  await shopperPage.getByTestId('review-submit').click();
   await expect(shopperPage.getByText('感谢您的评价', { exact: false })).toBeVisible({
     timeout: 15_000,
   });
@@ -101,19 +99,21 @@ test('a shopper confirms receipt from the order page and reviews it from there',
   shopperApi,
   shop,
 }) => {
-  blockedBy(
-    'CR-4-i §7: the order-detail page throws on help_info (null) and renders nothing; §8: a zero-spec line crashes the review page',
-  );
   const order = await arrangeShippedOrder(shopperApi, shop, shop.fixtures.postageSkuId);
 
   await shopperPage.goto(`/pages/goods/order_details/index?order_id=${order.id}`);
-  await shopperPage.getByText('查看物流', { exact: true }).click({ timeout: 15_000 });
+  await expect(shopperPage.getByTestId('order-status')).toHaveAttribute(
+    'data-status-title',
+    '待收货',
+    { timeout: 15_000 },
+  );
+  await shopperPage.getByTestId('order-logistics').click();
   await shopperPage.waitForURL(/goods_logistics/);
-  await expect(shopperPage.getByText(TRACKING_NO).first()).toBeVisible();
+  await expect(shopperPage.getByTestId('logistics-no')).toContainText(TRACKING_NO);
   await shopperPage.goBack();
 
-  const confirmReceipt = shopperPage.getByText('确认收货', { exact: true });
-  await expect(confirmReceipt).toBeVisible();
+  const confirmReceipt = shopperPage.getByTestId('order-receive');
+  await expect(confirmReceipt).toContainText('确认收货');
   await confirmReceipt.click();
   await expect(shopperPage.getByText('为保障权益', { exact: false })).toBeVisible();
   await shopperPage.getByText('确定', { exact: true }).click();
@@ -126,13 +126,13 @@ test('a shopper confirms receipt from the order page and reviews it from there',
     expect(['received', 'completed']).toContain(detail.status);
   }).toPass({ timeout: 15_000 });
 
-  const reviewButton = shopperPage.getByText('评价', { exact: true }).first();
+  const reviewButton = shopperPage.getByTestId('order-review').first();
   await expect(reviewButton).toBeVisible({ timeout: 15_000 });
   await reviewButton.click();
   await shopperPage.waitForURL(/goods_comment_con/);
 
-  await uniTextarea(shopperPage).first().fill('E2E 评价：料子很舒服，物流也很快。');
-  await shopperPage.getByText('立即评价', { exact: true }).click();
+  await uniField(shopperPage, 'review-text').fill('E2E 评价：料子很舒服，物流也很快。');
+  await shopperPage.getByTestId('review-submit').click();
   await expect(shopperPage.getByText('感谢您的评价', { exact: false })).toBeVisible({
     timeout: 15_000,
   });

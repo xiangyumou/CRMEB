@@ -20,8 +20,8 @@
 					<view class='picTxt acea-row row-between-wrapper'>
 						<view class='iconfont icon-wuliu'></view>
 						<view class='text'>
-							<view><text class='name line1'>{{$t(`快递公司`)}}：</text> {{orderInfo.delivery_name}}</view>
-							<view class='express line1'><text class='name'>{{$t(`快递单号`)}}：</text>
+							<view data-testid="logistics-company"><text class='name line1'>{{$t(`快递公司`)}}：</text> {{orderInfo.delivery_name}}</view>
+							<view class='express line1' data-testid="logistics-no"><text class='name'>{{$t(`快递单号`)}}：</text>
 								{{orderInfo.delivery_id}}
 							</view>
 						</view>

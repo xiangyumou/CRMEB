@@ -62,7 +62,6 @@
         <view class="empty-box" v-else>
           <emptyPage
             title="暂无标签～"
-            src="/statics/images/empty-box.png"
           ></emptyPage>
         </view>
         <view class="footer acea-row row-between-wrapper">

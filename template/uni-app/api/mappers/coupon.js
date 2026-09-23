@@ -59,9 +59,36 @@ export function toLegacyCouponList(dto) {
   };
 }
 
-/** `GET /api/v1/coupons/new-user` → the bare array the 新人券弹窗 renders. */
+/** A `couponTemplate` page → the bare array a list component renders (DIY 优惠券). */
 export function toLegacyCouponArray(dto) {
   return mapList(dto && dto.items, toLegacyCouponTemplate);
+}
+
+/**
+ * `GET /api/v1/coupons` → the 首页 / 微页面 coupon popup (`couponWindow`), which
+ * legacy fed from `/v2/get_today_coupon` as `{list, image}`; the pages read
+ * `data.list.length` (CR-4-i §3). Only templates this shopper can still claim:
+ * the popup's one button is 立即领取, and a coupon already taken is not an
+ * offer. `image` was legacy `coupon_img`, which the site config does not carry;
+ * `couponWindow` does not render it.
+ */
+export function toLegacyCouponPopup(dto) {
+  const claimable = list(dto && dto.items).filter((item) => item && item.canClaim === true);
+  return { list: claimable.map(toLegacyCouponTemplate), image: '' };
+}
+
+/**
+ * `GET /api/v1/coupons/new-user` → the 新人券 popup's `{list, image, show}`.
+ *
+ * Legacy `show` was 1 only on the member's first visit (`add_time ===
+ * last_time`), and the popup announced the coupons registration had just
+ * issued. The route answers the new-user templates, not whether this visit is
+ * the first, so `show` is 0: the page then marks the device `oldUser` and never
+ * shows a returning member a "welcome" popup. The coupons themselves are in
+ * 我的优惠券.
+ */
+export function toLegacyNewUserCouponPopup(dto) {
+  return { list: toLegacyCouponArray(dto), image: '', show: 0 };
 }
 
 const USER_COUPON_TYPE = { unused: 0, used: 1, expired: 2 };
@@ -126,6 +153,20 @@ export function fromLegacyApplicableInput(price, data) {
   const src = data || {};
   const lines = Array.isArray(src.lines) ? src.lines : null;
   if (lines) return { lines };
+  // The 确认订单 picker passes its `cartInfo` (`toLegacyCheckoutLine` rows):
+  // one line per product, at the line's total (CR-4-i §11). The checkout
+  // line carries no category ids, so a category-scoped coupon cannot be
+  // matched from here — CR-1-h4.
+  const cartInfo = Array.isArray(src.cartInfo) ? src.cartInfo.filter(Boolean) : [];
+  if (cartInfo.length) {
+    return {
+      lines: cartInfo.map((line) => ({
+        productId: String(line.product_id),
+        categoryIds: [],
+        amount: money(line.sum_price),
+      })),
+    };
+  }
   return {
     lines: [
       {

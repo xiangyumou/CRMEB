@@ -9,7 +9,7 @@
       <view class="header acea-row row-between row-middle">
         <view class="title-box acea-row row-middle">
           <image
-            :src="`${imgHost}/statics/images/newVip1.png`"
+            :src="`/static/images/legacy/newVip1.png`"
             class="image"
           ></image>
           <view class="info">{{ $t(`超值优惠 限时专享`) }}</view>

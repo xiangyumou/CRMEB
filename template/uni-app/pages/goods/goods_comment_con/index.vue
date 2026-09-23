@@ -25,7 +25,7 @@
 						<text class='evaluate'>{{item.index === -1 ? "" : item.index + 1 + $t(`星`)}}</text>
 					</view>
 					<view class='textarea'>
-						<textarea :placeholder='$t(`商品满足你的期待么？说说你的想法，分享给想买的他们吧`)' name="comment"
+						<textarea data-testid="review-text" :placeholder='$t(`商品满足你的期待么？说说你的想法，分享给想买的他们吧`)' name="comment"
 							placeholder-class='placeholder'></textarea>
 						<view class='list acea-row row-middle'>
 							<view class='pictrue' v-for="(item,index) in pics" :key="index">
@@ -39,7 +39,7 @@
 							</view>
 						</view>
 					</view>
-					<button class='evaluateBnt bg-color' formType="submit">{{$t(`立即评价`)}}</button>
+					<button class='evaluateBnt bg-color' data-testid="review-submit" formType="submit">{{$t(`立即评价`)}}</button>
 				</view>
 			</view>
 		</form>

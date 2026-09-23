@@ -55,7 +55,7 @@
 		</view>
 		<view class='noCommodity' v-else-if="!visitList.length && page == 2">
 			<view class='pictrue'>
-				<image :src="imgHost + '/statics/images/no-thing.png'"></image>
+				<image :src="'/static/images/legacy/no-thing.png'"></image>
 			</view>
 			<view class="acea-row row-center-wrapper tip">{{$t(`暂无数据`)}}</view>
 			<recommend :hostProduct="hostProduct"></recommend>

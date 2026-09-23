@@ -33,7 +33,7 @@
       @changeBarg="changeBarg"
       @goDetail="goDetail"
     ></PageDesign>
-    <image :src="copyRightPic" alt="" class="support"></image>
+    <image :src="copyRightPic" alt="" class="support" data-testid="site-copyright"></image>
     <editUserModal
       :isShow="editModal"
       @closeEdit="closeEdit"

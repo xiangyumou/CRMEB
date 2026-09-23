@@ -38,12 +38,32 @@ export function toLegacyDiyVersion(dto) {
  * `GET /api/v1/diy/theme` → the token bag `mixins/color.js` feeds into CSS variables.
  * The legacy payload nested them under `status`; the renderer only reads the map.
  */
+/**
+ * Legacy 一键换色's five palettes, keyed by their main colour. `status` is what
+ * `colorChange('color_change')` answered and the one caller (`presell/index`)
+ * switches on to pick its banner: 1 蓝 · 2 绿 · 3 红 (the default) · 4 粉 · 5 橙.
+ */
+const LEGACY_COLOR_STATUS = {
+  '#1db0fc': 1,
+  '#42ca4d': 2,
+  '#e93323': 3,
+  '#ff448f': 4,
+  '#fe5c2d': 5,
+};
+
+export function legacyColorStatus(tokens) {
+  const main = text(tokens && tokens.theme).trim().toLowerCase();
+  return LEGACY_COLOR_STATUS[main] || 3;
+}
+
 export function toLegacyTheme(dto) {
   const tokens = (dto && dto.tokens) || {};
   return {
     id: toId(dto && dto.id),
     name: text(dto && dto.name),
-    status: tokens,
+    // A number, as legacy answered: the object that stood here sent the
+    // presell list to its `default:` branch, which threw (H4).
+    status: legacyColorStatus(tokens),
     tokens,
     version: text(dto && dto.version),
   };

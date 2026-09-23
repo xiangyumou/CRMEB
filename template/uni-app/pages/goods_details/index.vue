@@ -204,7 +204,7 @@
       <!-- 发送给朋友图片 -->
       <view class="share-box" v-if="H5ShareBox">
         <image
-          :src="imgHost + '/statics/images/share-info.png'"
+          :src="'/static/images/legacy/share-info.png'"
           @click="H5ShareBox = false"
         ></image>
       </view>
@@ -927,7 +927,9 @@ export default {
       }
       //sort();排序函数:数字-英文-汉字；
       let productSelect = this.productValue[value.join(",")];
-      if (productSelect && productAttr.length) {
+      // A single-SKU product has no spec columns and one SKU keyed '' — select
+      // it too, or 加入购物车 posts no skuId (H4, as CR-4-i §8 for 拼团).
+      if (productSelect) {
         this.$set(
           this.attr.productSelect,
           "store_name",

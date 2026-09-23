@@ -2,7 +2,7 @@
 
 - **Stream:** I (storefront e2e), raised against the owner of `@shop/testing`'s WeChat fakes
   (`next/packages/testing/src/wechat/fake-gateway.ts`). The orchestrator routes it.
-- **Status:** **open** (worked around in stream I's harness; see "Until then")
+- **Status:** **done** (H4) — see "Resolution"
 - **Affects:** `next/packages/testing/src/wechat/fake-gateway.ts` (`createTransaction`),
   `next/packages/testing/src/wechat/fake-gateway.test.ts`
 
@@ -56,3 +56,24 @@ fake's own platform key, so the app's response-signature check still runs for re
 3. drop the `/h5-cashier` handler from `gateway-control.ts`, if the fake serves its own.
 
 The cashier journey in `specs/cart-checkout-pay.spec.ts` should pass unchanged.
+
+## Resolution (H4)
+
+`next/packages/testing/src/wechat/fake-gateway.ts`: `createTransaction` takes the trade type from
+the path and answers through `createAnswer()` — `jsapi` / `app` `{ prepay_id }`, `native`
+`{ code_url: 'weixin://wxpay/bizpayurl?pr=…' }`, `h5` `{ h5_url }` — on the fresh create **and** the
+repeat create of an unchanged unpaid order. The `h5_url` is the fake's own
+`GET /h5-cashier?out_trade_no=…` (exposed as `gateway.h5CashierUrl`; overridable with
+`FakeWechatGatewayOptions.h5CashierUrl`), which 302s to an http(s) `redirect_url` and otherwise
+answers a plain 200. It settles nothing, is not recorded in `calls` (a browser visit, not an app
+call) and is not subject to failure injection.
+
+Tests (`fake-gateway.test.ts` › "each create endpoint answers in its own shape"): per trade type, a
+fresh create answers a signed body with exactly its one key, and a repeat create answers it again,
+fresh; the `h5_url` names the order; the cashier redirects without settling or recording; a
+non-http(s) `redirect_url` is not followed; the override.
+
+Harness: `next/e2e/storefront/src/h5-pay-shim.ts` is deleted; `scripts/serve.ts` seeds
+`paymentConfig` with `gatewayApiUrl: gateway.url`; `gateway-control.ts` no longer serves
+`/h5-cashier`. The cashier journeys pass unchanged, and `payAtCashier` now also asserts the
+payment create succeeded.

@@ -51,6 +51,15 @@ describe('PRODUCT_DETAIL_DEFAULT_VALUE', () => {
     }
   });
 
+  it("offers 分享 in the bottom bar, the product page's one way to the share panel (CR-7-i)", () => {
+    const bottom = Object.values(PRODUCT_DETAIL_DEFAULT_VALUE).find(
+      (node) => (node as { name: string }).name === 'bottomMenu',
+    ) as { showContent: { type: number[]; list: Array<{ id: number; name: string }> } };
+    // `productBottom.vue` renders one entry per id in `type`; 4 is 分享.
+    expect(bottom.showContent.type).toEqual([3, 1, 2, 4]);
+    expect(bottom.showContent.list.find((entry) => entry.id === 4)?.name).toBe('分享');
+  });
+
   it('shows nothing that is not ported', () => {
     const names = Object.values(PRODUCT_DETAIL_DEFAULT_VALUE).map(
       (node) => (node as { name: string }).name,

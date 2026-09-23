@@ -12,13 +12,13 @@
 					<view class="item">
 						<view class="acea-row row-middle">
 							<image src="../static/phone_1.png" style="width: 24rpx; height: 34rpx"></image>
-							<input type="text" :placeholder="$t(`输入手机号码`)" v-model="account" maxlength="11" required />
+							<input data-testid="login-phone" type="text" :placeholder="$t(`输入手机号码`)" v-model="account" maxlength="11" required />
 						</view>
 					</view>
 					<view class="item">
 						<view class="acea-row row-middle">
 							<image src="../static/code_1.png" style="width: 28rpx; height: 32rpx"></image>
-							<input type="password" :placeholder="$t(`填写登录密码`)" v-model="password" required />
+							<input data-testid="login-password" type="password" :placeholder="$t(`填写登录密码`)" v-model="password" required />
 						</view>
 					</view>
 				</form>
@@ -30,28 +30,28 @@
 				<view class="item">
 					<view class="acea-row row-middle">
 						<image src="../static/phone_1.png" style="width: 24rpx; height: 34rpx"></image>
-						<input type="text" :placeholder="$t(`输入手机号码`)" v-model="account" :maxlength="11" />
+						<input data-testid="login-phone" type="text" :placeholder="$t(`输入手机号码`)" v-model="account" :maxlength="11" />
 					</view>
 				</view>
 				<view class="item">
 					<view class="acea-row row-middle">
 						<image src="../static/code_2.png" style="width: 28rpx; height: 32rpx"></image>
-						<input type="text" :placeholder="$t(`填写验证码`)" :maxlength="6" class="codeIput" v-model="captcha" />
-						<button class="code" :disabled="disabled" :class="disabled === true ? 'on' : ''" @click="code">
+						<input data-testid="login-code" type="text" :placeholder="$t(`填写验证码`)" :maxlength="6" class="codeIput" v-model="captcha" />
+						<button class="code" data-testid="login-send-code" :disabled="disabled" :class="disabled === true ? 'on' : ''" @click="code">
 							{{ text }}
 						</button>
 					</view>
 				</view>
 			</view>
-			<view class="logon" @click="loginMobile" v-if="current !== 0">{{ $t(`登录`) }}</view>
-			<view class="logon" @click="submit" v-if="current === 0">{{ $t(`登录`) }}</view>
+			<view class="logon" data-testid="login-submit" @click="loginMobile" v-if="current !== 0">{{ $t(`登录`) }}</view>
+			<view class="logon" data-testid="login-submit" @click="submit" v-if="current === 0">{{ $t(`登录`) }}</view>
 			<view class="tips">
 				<view v-if="current == 0" @click="current = 1">{{ $t(`快速登录`) }}</view>
 				<view v-if="current == 1" @click="current = 0">{{ $t(`账号登录`) }}</view>
 			</view>
 			<view class="protocol">
 				<checkbox-group @change="ChangeIsDefault">
-					<checkbox :class="inAnimation ? 'trembling' : ''" @animationend="inAnimation = false" :checked="protocol ? true : false" />
+					<checkbox data-testid="login-terms" :class="inAnimation ? 'trembling' : ''" @animationend="inAnimation = false" :checked="protocol ? true : false" />
 					{{ $t(`已阅读并同意`) }}
 					<text class="main-color" @click="privacy(4)">{{ $t(`《用户协议》`) }}</text>
 					{{ $t(`与`) }}

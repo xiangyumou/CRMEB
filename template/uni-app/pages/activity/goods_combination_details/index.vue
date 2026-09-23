@@ -314,6 +314,7 @@
         <view class="bnt acea-row">
           <view
             class="joinCart bnts"
+            data-testid="groupbuy-solo"
             @tap="goProduct"
             v-if="storeInfo.product_is_show"
             >{{ $t(`单独购买`) }}</view
@@ -321,6 +322,7 @@
           <view
             class="buy bnts"
             :class="!storeInfo.product_is_show ? 'long-btn' : ''"
+            data-testid="groupbuy-open"
             @tap="goCat"
             v-if="
               attribute.productSelect.product_stock > 0 &&
@@ -406,7 +408,7 @@
     <canvas class="canvas" canvas-id="myCanvas" v-if="canvasStatus"></canvas>
     <view class="share-box" v-if="H5ShareBox">
       <image
-        :src="imgHost + '/statics/images/share-info.png'"
+        :src="'/static/images/legacy/share-info.png'"
         @click="H5ShareBox = false"
       ></image>
     </view>
@@ -909,7 +911,7 @@ export default {
       //sort();排序函数:数字-英文-汉字；
       let productSelect = self.productValue[value.join(",")];
 
-      if (productSelect && productAttr.length) {
+      if (productSelect) {
         self.$set(
           self.attribute.productSelect,
           "store_name",

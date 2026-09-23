@@ -62,7 +62,7 @@
 		</view>
 		<view v-else-if="finished && !list.length" class="empty-wrap">
 			<view class="image-wrap">
-				<image class="image" :src="imgHost + '/statics/images/noMessage.png'"></image>
+				<image class="image" :src="'/static/images/legacy/noMessage.png'"></image>
 			</view>
 			<view>{{$t(`亲、暂无消息记录哟！`)}}</view>
 		</view>

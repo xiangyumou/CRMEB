@@ -16,7 +16,7 @@
 			</view>
 			<!-- 无地址 -->
 			<view class='pictrue' v-if="!is_loading && !addressList.length">
-				<image :src="imgHost + '/statics/images/noAddress.png'"></image>
+				<image :src="'/static/images/legacy/noAddress.png'"></image>
 			</view>
 			<view class='addressBnt bg-color' @tap='goAddressPages'>{{$t(`选择其它地址`)}}</view>
 		</view>

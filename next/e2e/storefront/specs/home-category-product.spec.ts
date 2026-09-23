@@ -1,8 +1,9 @@
 import type { Page } from '@playwright/test';
 
-import { blockedBy } from '../src/blocked';
 import { test, expect } from '../src/fixtures';
 import { unexplainedConsoleErrors, unexplainedFailures } from '../src/known-gaps';
+import { expectNoRawJson } from '../src/product-flows';
+import { POSTAGE_PRODUCT_DESCRIPTION } from '../src/site';
 
 /**
  * Journey 1 — Home → category → product.
@@ -15,17 +16,19 @@ import { unexplainedConsoleErrors, unexplainedFailures } from '../src/known-gaps
  * for both a multi-spec product and a fixed-postage one.
  *
  * "Renders every fixture component" is checked by id, not by eye: the DIY
- * renderer (`PageDesign`) gives each component's wrapper the component's own
- * id from the saved page, and `src/seed.ts` records, for every production
+ * renderer (`PageDesign`) gives each component's wrapper
+ * `data-testid="diy-<id>"`, the component's own id from the saved page, and
+ * `src/seed.ts` records, for every production
  * fixture it seeds, which ids a correct render must contain
  * (`renderedComponentIds`). A component that silently fails to render is a
  * missing id, not a slightly different screenshot.
  */
 
-/** The ids of `expected` that are not in the page's DOM. */
+/** The ids of `expected` that have no rendered `diy-<id>` wrapper on the page. */
 async function missingComponents(page: Page, expected: readonly string[]): Promise<string[]> {
   return page.evaluate(
-    (ids) => ids.filter((id) => document.getElementById(id) === null),
+    (ids) =>
+      ids.filter((id) => document.querySelector(`[data-testid="diy-${CSS.escape(id)}"]`) === null),
     [...expected],
   );
 }
@@ -77,9 +80,6 @@ for (const fixture of ['prod-7.json', 'prod-8.json']) {
     shopperPage,
     shop,
   }) => {
-    blockedBy(
-      'CR-4-i §6: getThemeInfo answers the home page for every theme_id, so a micro page renders the home page',
-    );
     const micro = shop.fixtures.diyPages.find((page) => page.fixture === fixture);
     expect(micro, `${fixture} was not seeded as a micro page`).toBeTruthy();
     expect(micro!.kind).toBe('micro');
@@ -96,9 +96,9 @@ test('a multi-spec product shows its price range and both spec groups', async ({
   shopperPage,
   shop,
 }) => {
-  blockedBy('CR-2-h3: the product page is a DIY product_detail page no storefront route serves');
   await shopperPage.goto(`/pages/goods_details/index?id=${shop.fixtures.multiSpecProductId}`);
   await expect(shopperPage.getByText('E2E 多规格商品').first()).toBeVisible();
+  await expectNoRawJson(shopperPage);
 
   // Opens the attribute popup (the first of the two taps `goCat()` needs);
   // this journey only has to prove the picker is reachable and lists both
@@ -116,11 +116,14 @@ test("a fixed-postage product shows its own name and price, not the freight prod
   shopperPage,
   shop,
 }) => {
-  blockedBy('CR-2-h3: the product page is a DIY product_detail page no storefront route serves');
   await shopperPage.goto(`/pages/goods_details/index?id=${shop.fixtures.postageProductId}`);
   await expect(shopperPage.getByText('E2E 运费商品').first()).toBeVisible();
   // ¥39.00 is this SKU's seeded price (`src/seed.ts`); freight itself is
   // only quoted once an address is known, at checkout — journey 2's freight
   // assertion, not this one's.
   await expect(shopperPage.getByText('39.00', { exact: false }).first()).toBeVisible();
+  // The default page's 图文详情 (`productDesc`) renders the product's own
+  // description, and no component prints the product as raw JSON (CR-7-i).
+  await expect(shopperPage.getByText(POSTAGE_PRODUCT_DESCRIPTION).first()).toBeVisible();
+  await expectNoRawJson(shopperPage);
 });

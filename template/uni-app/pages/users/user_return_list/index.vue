@@ -2,20 +2,20 @@
 	<view :style="colorStyle">
 		<view class="top-tabs">
 			<view class="tabs" :class="{btborder:type === index}" v-for="(item,index) in tabsList" :key="index"
-				@tap="changeTabs(index)">
+				:data-testid="'refund-tab-' + ['all', 'open', 'succeeded'][item.key]" @tap="changeTabs(index)">
 				{{item.name}}
 			</view>
 		</view>
 		<view class='return-list' v-if="orderList.length">
 			<view class='goodWrapper' v-for="(item,index) in orderList" :key="index"
-				@click='goOrderDetails(item.order_id)'>
-				<view class='iconfont icon-shenqingzhong powder' v-if="item.refund_type==1 ||item.refund_type==2">
+				data-testid="refund-row" :data-refund-id="item.id" @click='goOrderDetails(item.order_id)'>
+				<view class='iconfont icon-shenqingzhong powder' data-testid="refund-stamp" :data-refund-type="item.refund_type" v-if="item.refund_type==1 ||item.refund_type==2">
 				</view>
-				<view class='iconfont icon-yijujue' v-if="item.refund_type==3"></view>
-				<view class='iconfont icon-daituihuo1 powder' v-if="item.refund_type==4"></view>
-				<view class='iconfont icon-tuikuanzhong powder' v-if="item.refund_type==5"></view>
-				<view class='iconfont icon-yituikuan' v-if="item.refund_type==6"></view>
-				<view class='orderNum'>{{$t(`订单号`)}}：{{item.order_id}}</view>
+				<view class='iconfont icon-yijujue' data-testid="refund-stamp" :data-refund-type="item.refund_type" v-if="item.refund_type==3"></view>
+				<view class='iconfont icon-daituihuo1 powder' data-testid="refund-stamp" :data-refund-type="item.refund_type" v-if="item.refund_type==4"></view>
+				<view class='iconfont icon-tuikuanzhong powder' data-testid="refund-stamp" :data-refund-type="item.refund_type" v-if="item.refund_type==5"></view>
+				<view class='iconfont icon-yituikuan' data-testid="refund-stamp" :data-refund-type="item.refund_type" v-if="item.refund_type==6"></view>
+				<view class='orderNum'>{{$t(`订单号`)}}：{{item.order_no || item.order_id}}</view>
 				<view class='item acea-row row-between-wrapper' v-for="(items,index) in item.cart_info" :key="index">
 					<view class='pictrue'>
 						<image :src='items.productInfo.attrInfo?items.productInfo.attrInfo.image:items.productInfo.image'>

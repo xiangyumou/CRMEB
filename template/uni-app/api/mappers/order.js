@@ -38,7 +38,10 @@ const RETIRED_ORDER_FLAGS = {
   gift_uid: 0,
   pay_uid: 0,
   pid: 0,
-  shipping_type: 0,
+  // 门店自提 is retired, so every order is 快递配送 (`shipping_type` 1) — the
+  // value the list's 待发货 label and the detail's address block branch on;
+  // 0 rendered no status at all on a paid, unshipped row (CR-4-i §14).
+  shipping_type: 1,
   store_id: 0,
   virtual_type: 0,
   vip_true_price: '0.00',
@@ -46,7 +49,6 @@ const RETIRED_ORDER_FLAGS = {
   memberPrice: 0,
   order_shipping_open: 0,
   fictitious_content: '',
-  help_info: null,
   status_pic: '',
 };
 
@@ -103,14 +105,75 @@ export function toLegacyStatus(dto) {
 }
 
 /** `orderItem` → one `cartInfo` row. */
-export function toLegacyOrderItem(dto) {
+// ---------------------------------------------------------------------------
+// 活动价 (预售 / 拼团)
+// ---------------------------------------------------------------------------
+//
+// An activity order keeps the catalogue price on its line: B1 prices the
+// activity as a `PricingContributor` adjustment (`presale:activity-price`,
+// `groupbuy:activity-price`) that folds into `couponDiscount` and the line's
+// `discountAmount`. The legacy pages print the unit price and 商品总价 straight
+// from the payload, so without the helpers below a ¥78 预售 printed as ¥88 with a
+// ¥10 "优惠券" nobody applied. The activity is always a single buy-now line.
+
+const ACTIVITY_PRICE_SOURCE = /:activity-price$/;
+
+function cents(value) {
+  return Math.round(moneyNumber(value) * 100);
+}
+
+function fromCents(value) {
+  return (Math.max(0, value) / 100).toFixed(2);
+}
+
+/** The activity-price discount a preview carries, in cents (0 when none). */
+export function activityDiscountCents(adjustments) {
+  return list(adjustments).reduce(
+    (sum, a) => (a && ACTIVITY_PRICE_SOURCE.test(text(a.source)) ? sum - cents(a.amount) : sum),
+    0,
+  );
+}
+
+/**
+ * The activity discount an order read implies, in cents.
+ *
+ * `orderDetail` carries no adjustments (CR-2-h4). For an activity order with no
+ * coupon, `couponDiscount` *is* the activity discount; with a coupon stacked the
+ * two cannot be told apart, so this answers 0 and the page falls back to the
+ * catalogue price.
+ */
+export function orderActivityDiscountCents(dto) {
+  if (!dto || !dto.kind || dto.kind === 'normal') return 0;
+  if (!('userCouponId' in dto) || dto.userCouponId !== null) return 0;
+  if (list(dto.items).length !== 1) return 0;
+  return cents(dto.couponDiscount);
+}
+
+/** `unitPrice` less a line's activity discount, spread over its quantity. */
+function activityUnitPrice(subtotal, quantity, discount) {
+  const qty = Math.max(1, toInt(quantity, 1));
+  return fromCents(Math.round((cents(subtotal) - discount) / qty));
+}
+
+// The activity discount travels as `{ activityDiscount }` rather than a bare
+// number: `mapList` / `pagedList` pass the row index as the second argument.
+function discountOf(opts) {
+  const value = opts && typeof opts === 'object' ? opts.activityDiscount : 0;
+  return typeof value === 'number' && value > 0 ? value : 0;
+}
+
+export function toLegacyOrderItem(dto, opts) {
   if (!dto) return {};
-  const hasSpec = !!text(dto.specText);
+  const activityDiscount = discountOf(opts);
+  const unitPrice =
+    activityDiscount > 0
+      ? activityUnitPrice(moneyNumber(dto.unitPrice) * toInt(dto.quantity, 1), dto.quantity, activityDiscount)
+      : money(dto.unitPrice);
   const attrInfo = {
     unique: text(dto.skuId),
     suk: text(dto.specText).split('|').join(','),
     image: text(dto.skuImageUrl || dto.productImageUrl),
-    price: money(dto.unitPrice),
+    price: unitPrice,
     ot_price: money(dto.originalUnitPrice, ''),
     product_id: toId(dto.productId),
   };
@@ -121,7 +184,7 @@ export function toLegacyOrderItem(dto) {
     cart_num: toInt(dto.quantity, 1),
     refund_num: toInt(dto.refundedQuantity, 0),
     delivery_num: toInt(dto.shippedQuantity, 0),
-    truePrice: money(dto.unitPrice),
+    truePrice: unitPrice,
     sum_price: money(dto.totalAmount),
     product_id: toId(dto.productId),
     is_reply: 0,
@@ -130,12 +193,15 @@ export function toLegacyOrderItem(dto) {
       id: toId(dto.productId),
       store_name: text(dto.productName),
       image: text(dto.productImageUrl),
-      price: money(dto.unitPrice),
+      price: unitPrice,
       ot_price: money(dto.originalUnitPrice, ''),
       unit_name: text(dto.unitName, '件'),
       is_virtual: dto.productKind && dto.productKind !== 'physical' ? 1 : 0,
       store_mention: 1,
-      ...(hasSpec ? { attrInfo } : {}),
+      // Always present: 评价 (`goods_comment_con`) and 物流 (`goods_logistics`)
+      // read `attrInfo.price` unguarded. A zero-spec line has `suk: ''`
+      // (CR-4-i §8).
+      attrInfo,
     },
   };
 }
@@ -160,8 +226,9 @@ export function toLegacyReceiver(dto) {
 }
 
 /** `orderListItem` → one 订单列表 row. */
-export function toLegacyOrderListItem(dto) {
+export function toLegacyOrderListItem(dto, opts) {
   if (!dto) return {};
+  const act = discountOf(opts);
   return {
     ...RETIRED_ORDER_FLAGS,
     id: toId(dto.id),
@@ -184,21 +251,26 @@ export function toLegacyOrderListItem(dto) {
     is_refund_available: dto.status === 'paid' || dto.status === 'shipped' || dto.status === 'received',
     refund: [],
     total_num: toInt(dto.totalQuantity, 0),
-    total_price: money(dto.itemsAmount),
+    total_price: act ? fromCents(cents(dto.itemsAmount) - act) : money(dto.itemsAmount),
     pay_price: money(dto.payableAmount),
     paid_price: money(dto.paidAmount, ''),
     pay_postage: money(dto.freightAmount),
-    coupon_price: money(dto.couponDiscount),
+    coupon_price: act ? fromCents(cents(dto.couponDiscount) - act) : money(dto.couponDiscount),
     add_time: unixSeconds(dto.createdAt),
     _add_time: legacyMinute(dto.createdAt),
     add_time_y: legacyDate(dto.createdAt),
     add_time_h: legacyTime(dto.createdAt),
     pay_expires_at: unixSeconds(dto.payExpiresAt, 0),
     _status: toLegacyStatus(dto),
-    cartInfo: mapList(dto.items, toLegacyOrderItem),
+    cartInfo: list(dto.items).map((item) => toLegacyOrderItem(item, { activityDiscount: act })),
     nickname: '',
     avatar: '',
     gift_user_info: null,
+    // 好友代付 and 拆单 are retired, but `order_details` reads
+    // `orderInfo.help_info.help_status` and `split.length` unguarded: an
+    // empty object and an empty list, fresh per order (CR-4-i §7).
+    help_info: {},
+    split: [],
   };
 }
 
@@ -223,6 +295,8 @@ function legacyRefundStatus(refundStatus) {
   return 0;
 }
 
+// A list row never carries `userCouponId`, so it never shows an activity
+// discount: the 订单列表 prints the catalogue unit price (CR-2-h4).
 export function toLegacyOrderList(dto) {
   return mapList(dto && dto.items, toLegacyOrderListItem);
 }
@@ -235,7 +309,7 @@ export function toLegacyOrderPage(dto) {
 export function toLegacyOrderDetail(dto) {
   if (!dto) return {};
   return {
-    ...toLegacyOrderListItem(dto),
+    ...toLegacyOrderListItem(dto, { activityDiscount: orderActivityDiscountCents(dto) }),
     ...toLegacyReceiver(dto.receiver),
     mark: text(dto.buyerRemark),
     remark: '',
@@ -286,7 +360,8 @@ const TAB_BY_LEGACY_TYPE = {
   4: 'finished',
   '-1': 'refunding',
   '-2': 'refunding',
-  9: 'unpaid',
+  // 9 is the order list's 全部 tab (`orderStatus: 9`), not 待付款 (CR-4-i §14).
+  9: 'all',
 };
 
 export function fromLegacyOrderListQuery(data) {
@@ -385,18 +460,24 @@ function splitIds(value) {
 export function toLegacyOrderConfirm(dto) {
   if (!dto) return {};
   const receiver = toLegacyReceiver(dto.receiver);
+  const lines = list(dto.lines);
+  const act = lines.length === 1 ? activityDiscountCents(dto.adjustments) : 0;
+  const itemsAmount = act ? fromCents(cents(dto.itemsAmount) - act) : money(dto.itemsAmount);
   return {
-    cartInfo: mapList(dto.lines, toLegacyCheckoutLine),
+    cartInfo: lines.map((line) => toLegacyCheckoutLine(line, { activityDiscount: act })),
     priceGroup: {
-      totalPrice: money(dto.itemsAmount),
+      totalPrice: itemsAmount,
       storePostage: money(dto.freightAmount),
+      // 配送运费 renders `storePostage + storePostageDiscount`; there is no
+      // freight discount in the rewrite, and undefined made it ¥NaN (CR-4-i §9).
+      storePostageDiscount: '0.00',
       storeFreePostage: '0.00',
-      costPrice: money(dto.itemsAmount),
+      costPrice: itemsAmount,
       vipPrice: 0,
       payPrice: money(dto.payableAmount),
     },
     orderKey: text(dto.idempotencyKey || ''),
-    couponPrice: money(dto.couponDiscount),
+    couponPrice: act ? fromCents(cents(dto.couponDiscount) - act) : money(dto.couponDiscount),
     deduction: false,
     discount_id: dto.userCouponId === null || dto.userCouponId === undefined ? 0 : toId(dto.userCouponId),
     usable_coupon_count: 0,
@@ -447,24 +528,27 @@ export function toLegacyOrderConfirm(dto) {
 }
 
 /** `checkoutLine` → a `cartInfo` row on the 确认订单 page. */
-export function toLegacyCheckoutLine(dto) {
+export function toLegacyCheckoutLine(dto, opts) {
   if (!dto) return {};
   const hasSpec = !!text(dto.specText);
+  const act = discountOf(opts);
+  const unitPrice = act ? activityUnitPrice(dto.subtotal, dto.quantity, act) : money(dto.unitPrice);
   return {
     id: dto.cartItemId === null || dto.cartItemId === undefined ? 0 : toId(dto.cartItemId),
     item_key: text(dto.itemKey),
     product_id: toId(dto.productId),
     product_attr_unique: text(dto.skuId),
     cart_num: toInt(dto.quantity, 1),
-    truePrice: money(dto.unitPrice),
-    costPrice: money(dto.originalUnitPrice, ''),
+    truePrice: unitPrice,
+    // With an activity price the catalogue price is the one struck through.
+    costPrice: act ? money(dto.unitPrice) : money(dto.originalUnitPrice, ''),
     sum_price: money(dto.totalAmount),
     is_valid: 1,
     productInfo: {
       id: toId(dto.productId),
       store_name: text(dto.productName),
       image: text(dto.productImageUrl),
-      price: money(dto.unitPrice),
+      price: unitPrice,
       unit_name: text(dto.unitName, '件'),
       is_virtual: dto.productKind && dto.productKind !== 'physical' ? 1 : 0,
       store_mention: 1,
@@ -474,7 +558,7 @@ export function toLegacyCheckoutLine(dto) {
               unique: text(dto.skuId),
               suk: text(dto.specText).split('|').join(','),
               image: text(dto.skuImageUrl || dto.productImageUrl),
-              price: money(dto.unitPrice),
+              price: unitPrice,
             },
           }
         : {}),
@@ -488,9 +572,11 @@ export function toLegacyOrderComputed(dto) {
   return {
     result: {
       pay_price: money(dto && dto.payableAmount),
-      total_price: money(dto && dto.itemsAmount),
+      total_price: legacy.priceGroup ? legacy.priceGroup.totalPrice : '0.00',
       pay_postage: money(dto && dto.freightAmount),
-      coupon_price: money(dto && dto.couponDiscount),
+      // `computedPrice()` copies this onto `priceGroup` (CR-4-i §9).
+      storePostageDiscount: '0.00',
+      coupon_price: legacy.couponPrice === undefined ? '0.00' : legacy.couponPrice,
       deduction_price: '0.00',
       use_integral: 0,
       priceGroup: legacy.priceGroup,
@@ -508,8 +594,33 @@ export function fromLegacyOrderCreateInput(key, data) {
   if (src.payPrice !== undefined && src.payPrice !== null && src.payPrice !== '') {
     body.expectedPayableAmount = money(src.payPrice);
   }
-  if (src.custom_form) body.customForm = src.custom_form;
+  const customForm = fromLegacyCustomForm(src.custom_form);
+  if (customForm) body.customForm = customForm;
   return body;
+}
+
+/**
+ * The confirm page's `custom_form` → the contract's `customForm` record.
+ *
+ * The page sends back the field list `toLegacyOrderConfirm` gave it, each
+ * field carrying the shopper's `value`; the contract takes `{ [key]: answer }`.
+ * An empty list — a product with no custom form — is no `customForm` at all:
+ * `[]` was forwarded as is, and the contract refused the order (CR-4-i §10).
+ */
+function fromLegacyCustomForm(value) {
+  if (Array.isArray(value)) {
+    const out = {};
+    for (const field of value) {
+      if (!field || !field.key) continue;
+      const answer = field.value;
+      if (answer === undefined || answer === null || answer === '') continue;
+      if (Array.isArray(answer) && answer.length === 0) continue;
+      out[String(field.key)] = answer;
+    }
+    return Object.keys(out).length ? out : null;
+  }
+  if (value && typeof value === 'object') return value;
+  return null;
 }
 
 /** `orderCreate` resolves to `{status, result: {orderId, …}}`. */

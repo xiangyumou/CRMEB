@@ -202,65 +202,9 @@ export default {
     // 		});
     // }
     // #endif
-    // #ifdef H5
-    // 添加crmeb chat 统计
-    // var __s = document.createElement('script');
-    // __s.src = `${HTTP_REQUEST_URL}/api/get_script`;
-    // document.head.appendChild(__s);
-
-    fetch(`${HTTP_REQUEST_URL}/api/get_script`)
-      .then((response) => response.text())
-      .then((content) => {
-        // 尝试解析是否为HTML（带<script>标签）
-        const isHTML = content.trim().startsWith("<script");
-
-        let externalScripts = [];
-        let inlineScripts = [];
-
-        if (isHTML) {
-          // 情况1：带<script>标签，用DOMParser解析
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(content, "text/html");
-          const scripts = doc.querySelectorAll("script");
-
-          externalScripts = Array.from(scripts).filter((script) => script.src);
-          inlineScripts = Array.from(scripts).filter((script) => !script.src);
-        } else {
-          // 情况2：不带<script>标签，直接当作内联脚本处理
-          inlineScripts = [
-            {
-              textContent: content,
-            },
-          ];
-        }
-
-        // 1. 先加载所有外部脚本（如果有）
-        const loadExternalScripts = externalScripts.map((script) => {
-          return new Promise((resolve, reject) => {
-            const newScript = document.createElement("script");
-            newScript.src = script.src;
-            newScript.onload = resolve;
-            newScript.onerror = reject;
-            document.body.appendChild(newScript);
-          });
-        });
-
-        // 2. 等外部脚本加载完成后，再执行内联脚本
-        Promise.all(loadExternalScripts)
-          .then(() => {
-            inlineScripts.forEach((script) => {
-              const newScript = document.createElement("script");
-              newScript.textContent = script.textContent;
-              document.body.appendChild(newScript);
-            });
-          })
-          .catch((error) =>
-            console.error("Failed to load external scripts:", error)
-          );
-      })
-      .catch((error) => console.error("Error fetching script:", error));
-
-    // #endif
+    // The legacy H5 build fetched `/api/get_script` here and injected the
+    // body as <script> tags (the shop's custom 统计 / chat snippet). That
+    // feature is not ported, and the rewrite has no such route (CR-4-i §4).
     getCrmebCopyRight().then((res) => {
       uni.setStorageSync("copyRight", res.data);
     });

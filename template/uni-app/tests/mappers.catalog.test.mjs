@@ -65,6 +65,11 @@ describe('toLegacyProductCard', () => {
     expect(card.activity).toEqual([]);
   });
 
+  it('carries canAddToCart as the legacy cart_button the product bar and the category pages read (CR-7-i)', () => {
+    expect(card.cart_button).toBe(1);
+    expect(toLegacyProductCard({ ...LISTED.items[0], canAddToCart: false }).cart_button).toBe(0);
+  });
+
   it('maps a label', () => {
     expect(card.label[0]).toEqual({
       id: 3,
@@ -153,6 +158,13 @@ describe('toLegacyProductDetail', () => {
     expect(Object.keys(detail.productValue)).toHaveLength(2);
     expect(detail.spec_unique).toBe('1001');
     assertRenderable(detail);
+  });
+
+  it('pins the retired 分销 「最高返佣」 priceName to 0, so the red-packet badge never renders (CR-7-i)', () => {
+    // `goods_details` shows `shareRedPackets` when `priceName != 0` and prints
+    // the value as text: an object here was the raw JSON on the product page.
+    expect(detail.priceName).toBe(0);
+    expect(detail.storeInfo.cart_button).toBe(1);
   });
 
   it('treats "no purchase limit" as legacy 0', () => {

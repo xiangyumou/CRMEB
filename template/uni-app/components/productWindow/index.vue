@@ -163,6 +163,7 @@
           attr.productSelect.product_stock > 0 &&
           attr.productSelect.quota > 0
         "
+        data-testid="sku-popup-confirm"
         @click="goCat"
       >
         {{ $t(`我要参团`) }}
@@ -179,6 +180,7 @@
       <view
         class="joinBnt bg-color"
         v-if="iScart && attr.productSelect.stock"
+        data-testid="sku-popup-confirm"
         @click="goCat"
         >{{ $t(`确定`) }}</view
       >

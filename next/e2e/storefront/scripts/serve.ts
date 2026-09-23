@@ -4,10 +4,9 @@
  *   1. PostgreSQL 17 + Redis 7 (Testcontainers), through `@shop/testing`'s own
  *      global setup — the same code the integration suite uses;
  *   2. a database cloned from that template;
- *   3. the fake WeChat Pay gateway, the control-plane bridge to it
- *      (`src/gateway-control.ts`) and the H5 pay shim in front of it
- *      (`src/h5-pay-shim.ts`) — before the seed, because the seed writes
- *      `paymentConfig` pointed at the shim's URL;
+ *   3. the fake WeChat Pay gateway and the control-plane bridge to it
+ *      (`src/gateway-control.ts`) — before the seed, because the seed writes
+ *      `paymentConfig` pointed at the gateway's URL;
  *   4. the seed (`src/seed.ts`);
  *   5. the H5 build, if `dist/dev/h5` is stale (`src/h5.ts`);
  *   6. `next build`, if `web` has not been built yet, then `next start`;
@@ -35,7 +34,6 @@ import pg from 'pg';
 
 import { startEdge } from '../src/edge';
 import { startGatewayControl } from '../src/gateway-control';
-import { startH5PayShim } from '../src/h5-pay-shim';
 import { ensureH5Build, H5_DIST_DIR } from '../src/h5';
 import { seedE2E } from '../src/seed';
 import {
@@ -59,7 +57,6 @@ let stopTemplate: (() => Promise<void>) | undefined;
 let closeEdge: (() => Promise<void>) | undefined;
 let closeGatewayControl: (() => Promise<void>) | undefined;
 let closeGateway: (() => Promise<void>) | undefined;
-let closeShim: (() => Promise<void>) | undefined;
 
 function log(line: string): void {
   console.log(`[e2e] ${line}`);
@@ -146,18 +143,13 @@ async function main(): Promise<void> {
   const control = await startGatewayControl({ gateway, baseUrl: BASE_URL });
   closeGatewayControl = control.close;
 
-  // `web` talks to the gateway through this, never directly — see the file
-  // header for the one field it adds (CR-5-i).
-  const shim = await startH5PayShim({ gateway, cashierUrl: `${control.url}/h5-cashier` });
-  closeShim = shim.close;
-
   log('seeding …');
   const seeded = await seedE2E({
     databaseUrl,
     redisUrl,
     uploadsDir,
     gateway,
-    gatewayApiUrl: shim.url,
+    gatewayApiUrl: gateway.url,
     baseUrl: BASE_URL,
   });
 
@@ -259,7 +251,6 @@ async function waitForHealthy(url: string, timeoutMs = 60_000): Promise<void> {
 async function shutdown(code = 0): Promise<void> {
   for (const child of children.splice(0)) child.kill('SIGTERM');
   await closeEdge?.().catch(() => {});
-  await closeShim?.().catch(() => {});
   await closeGatewayControl?.().catch(() => {});
   await closeGateway?.().catch(() => {});
   await stopTemplate?.().catch(() => {});

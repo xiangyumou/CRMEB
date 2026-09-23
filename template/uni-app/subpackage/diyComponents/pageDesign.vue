@@ -47,7 +47,7 @@
       <view class="index">
         <!-- 自定义样式 -->
         <block v-for="(item, index) in styleConfig" :key="index">
-          <view :id="item.id">
+          <view :id="item.id" :data-testid="'diy-' + item.id">
             <userInfor
               v-if="item.name == 'userInfor'"
               :dataConfig="item"
@@ -226,7 +226,7 @@
 
     <view v-else>
       <view class="error-network">
-        <image :src="imgHost + '/statics/images/error-network.gif'"></image>
+        <image :src="'/static/images/legacy/error-network.png'"></image>
         <view class="title">{{ $t(`网络连接断开`) }}</view>
         <view class="btn" @click="reconnect">{{ $t(`重新连接`) }}</view>
       </view>

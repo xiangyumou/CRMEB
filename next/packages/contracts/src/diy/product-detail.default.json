@@ -1626,7 +1626,7 @@
     "showContent": {
       "title": "显示内容",
       "name": "showContent",
-      "type": [3, 1, 2],
+      "type": [3, 1, 2, 4],
       "list": [
         {
           "id": 3,

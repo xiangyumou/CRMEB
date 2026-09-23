@@ -171,9 +171,33 @@ export function orderAgain(uni) {
  * @param object data {cartId, addressId, couponId}
  */
 export function orderConfirm(data) {
-  return request.post('/api/v1/checkout/preview', fromLegacyCheckoutInput(data), {
-    map: toLegacyOrderConfirm,
-  });
+  return request
+    .post('/api/v1/checkout/preview', fromLegacyCheckoutInput(data), {
+      map: toLegacyOrderConfirm,
+    })
+    .then((res) => {
+      // The preview has no key to hand out; the page keeps `orderKey` from
+      // here and passes it to `orderCreate`, so a double tap on 提交订单 is one
+      // order (CR-4-i §10). Minted here, not in the pure mapper.
+      if (res && res.data && !res.data.orderKey) res.data.orderKey = newOrderKey();
+      return res;
+    });
+}
+
+/**
+ * A fresh `idempotencyKey` for `POST /api/v1/orders`: 8–64 of
+ * `[A-Za-z0-9_-]`, unique per confirm-page load.
+ */
+export function newOrderKey() {
+  let random = '';
+  const cryptoApi = typeof globalThis !== 'undefined' ? globalThis.crypto : undefined;
+  if (cryptoApi && typeof cryptoApi.getRandomValues === 'function') {
+    const bytes = cryptoApi.getRandomValues(new Uint8Array(12));
+    for (const b of bytes) random += b.toString(16).padStart(2, '0');
+  } else {
+    for (let i = 0; i < 3; i += 1) random += Math.random().toString(36).slice(2, 10);
+  }
+  return `ck-${Date.now().toString(36)}-${random}`.slice(0, 64);
 }
 
 /**
@@ -389,11 +413,13 @@ export function orderInvoiceCancel(id) {
 
 /**
  * 退款单列表（旧名：新订单列表 2.1 版本）
- * @param object data {type, page, limit}
+ * @param object data {refund_status, page, limit} — `refund_status` is the tab index
  */
 export function getNewOrderList(data) {
   const src = data || {};
-  const query = { state: fromLegacyRefundState(src.type) };
+  // The page sends its tab as `refund_status`; reading `type` asked every tab
+  // for state=all (CR-4-i §12).
+  const query = { state: fromLegacyRefundState(src.refund_status) };
   if (src.page !== undefined) query.page = Number(src.page) || 1;
   if (src.limit !== undefined) query.pageSize = Number(src.limit) || 20;
   return request.get('/api/v1/refunds', query, { map: toLegacyRefundList });

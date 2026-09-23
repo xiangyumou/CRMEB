@@ -107,7 +107,7 @@
 				</view>
 			</view>
 		</view>
-		<emptyPage v-else title="暂无订单～" src="/statics/images/noOrder.gif"></emptyPage>
+		<emptyPage v-else title="暂无订单～"></emptyPage>
 		<Loading :loaded="loaded" :loading="loading"></Loading>
 		<PriceChange :change="change" :orderInfo="orderInfo" :isRefund="isRefund" v-on:statusChange="statusChange($event)" v-on:closechange="changeclose($event)" v-on:savePrice="savePrice"
 			:status="status"></PriceChange>

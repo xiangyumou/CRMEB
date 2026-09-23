@@ -55,7 +55,7 @@
 					</view>
 					<view class='item textarea acea-row row-between'>
 						<view>{{$t(`备注说明`)}}</view>
-						<textarea :placeholder='$t(`填写备注信息，100字以内`)' class='num' name="refund_reason_wap_explain"
+						<textarea data-testid="refund-reason" :placeholder='$t(`填写备注信息，100字以内`)' class='num' name="refund_reason_wap_explain"
 							:placeholder-class='$t(`填写备注信息，100字以内`)'></textarea>
 					</view>
 					<view class='item acea-row row-between upload'>
@@ -76,7 +76,7 @@
 						</view>
 					</view>
 				</view>
-				<button class='returnBnt bg-color' form-type="submit">{{$t(`申请退款`)}}</button>
+				<button class='returnBnt bg-color' data-testid="refund-submit" form-type="submit">{{$t(`申请退款`)}}</button>
 			</view>
 		</form>
 	</view>

@@ -15,6 +15,7 @@ import {
   toLegacyPresaleCard,
   toLegacyPresaleList,
   toLegacyPresaleDetail,
+  presaleWindowStatus,
   toLegacyGroupbuySummary,
 } from '../api/mappers/activity.js';
 
@@ -118,6 +119,8 @@ describe('groupbuy — 详情（活动 + 正在拼单）', () => {
       ot_price: '88.00',
       stock: 200,
       quota: 200,
+      // 立即开团 / 参团 are gated on it (CR-4-i §8).
+      product_stock: 200,
     });
   });
 
@@ -234,7 +237,6 @@ describe('presale — 预售', () => {
       ot_price: '168.00',
       deliver_time: 15,
       presell_type: 1,
-      pay_status: 1,
       start_time: '2026-09-01',
       stop_time: '2026-11-30',
     });
@@ -243,7 +245,16 @@ describe('presale — 预售', () => {
 
   it('pins 全款预售, because D refuses a 定金 activity outright', () => {
     expect(toLegacyPresaleCard({ presell_type: 2 }).presell_type).toBe(1);
-    expect(toLegacyPresaleDetail(example('GET /api/v1/presale/activities/:id')).pay_status).toBe(1);
+  });
+
+  it('pay_status is the window — 1 未开始 · 2 进行中 · 3 已结束 — which picks presell_details` button', () => {
+    const dto = example('GET /api/v1/presale/activities/:id'); // 2026-09-01 … 2026-11-30
+    const at = (iso) => Date.parse(iso);
+    expect(toLegacyPresaleDetail(dto, at('2026-08-01T00:00:00+08:00')).pay_status).toBe(1);
+    expect(toLegacyPresaleDetail(dto, at('2026-10-01T00:00:00+08:00')).pay_status).toBe(2);
+    expect(toLegacyPresaleDetail(dto, at('2026-12-01T00:00:00+08:00')).pay_status).toBe(3);
+    expect(toLegacyPresaleCard(dto, at('2026-10-01T00:00:00+08:00')).pay_status).toBe(2);
+    expect(presaleWindowStatus({}, 0)).toBe(2);
   });
 
   it('shapes the detail like a product detail so the page needs no edit', () => {

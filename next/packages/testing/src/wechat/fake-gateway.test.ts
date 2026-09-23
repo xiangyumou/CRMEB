@@ -201,6 +201,119 @@ describe('the endpoints', () => {
   });
 });
 
+describe('each create endpoint answers in its own shape (CR-5-i)', () => {
+  const createOn = (tradeType: string, outTradeNo: string, total = 1990) =>
+    fetch(`${gateway.url}/v3/pay/transactions/${tradeType}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        appid: gateway.keys.appId,
+        mchid: gateway.keys.mchId,
+        out_trade_no: outTradeNo,
+        amount: { total, currency: 'CNY' },
+        ...(tradeType === 'jsapi' ? { payer: { openid: 'oTestOpenid' } } : {}),
+      }),
+    });
+
+  /** The body, after checking the platform signature over exactly those bytes. */
+  async function signedBody(response: Response): Promise<Record<string, unknown>> {
+    const raw = await response.text();
+    const ok = verifyWithKey(
+      gateway.keys.platformPublicKeyPem,
+      signatureMessage(
+        response.headers.get('wechatpay-timestamp')!,
+        response.headers.get('wechatpay-nonce')!,
+        raw,
+      ),
+      response.headers.get('wechatpay-signature')!,
+    );
+    expect(ok).toBe(true);
+    return JSON.parse(raw) as Record<string, unknown>;
+  }
+
+  const SHAPES = {
+    jsapi: { key: 'prepay_id', pattern: /^wx[0-9a-f]{32}$/ },
+    app: { key: 'prepay_id', pattern: /^wx[0-9a-f]{32}$/ },
+    native: { key: 'code_url', pattern: /^weixin:\/\/wxpay\/bizpayurl\?pr=[0-9a-f]+$/ },
+    h5: { key: 'h5_url', pattern: /^http:\/\/127\.0\.0\.1:\d+\/h5-cashier\?out_trade_no=/ },
+  } as const;
+
+  for (const [tradeType, { key, pattern }] of Object.entries(SHAPES)) {
+    it(`${tradeType}: a fresh create answers a signed { ${key} } and nothing else`, async () => {
+      const response = await createOn(tradeType, `S-${tradeType}-1`);
+      expect(response.status).toBe(200);
+      const body = await signedBody(response);
+      expect(Object.keys(body)).toEqual([key]);
+      expect(body[key]).toMatch(pattern);
+      expect(gateway.transactions.get(`S-${tradeType}-1`)).toMatchObject({ tradeState: 'NOTPAY' });
+    });
+
+    it(`${tradeType}: a repeat create of the same unpaid order answers { ${key} } again`, async () => {
+      const first = await signedBody(await createOn(tradeType, `S-${tradeType}-2`));
+      const again = await signedBody(await createOn(tradeType, `S-${tradeType}-2`));
+      expect(Object.keys(again)).toEqual([key]);
+      expect(again[key]).toMatch(pattern);
+      expect(again[key]).not.toBe(first[key]);
+    });
+  }
+
+  it('h5: the h5_url names the order and is the fake`s own cashier page', async () => {
+    const body = await signedBody(await createOn('h5', 'S-h5-url'));
+    const url = new URL(String(body.h5_url));
+    expect(`${url.origin}${url.pathname}`).toBe(gateway.h5CashierUrl);
+    expect(url.searchParams.get('out_trade_no')).toBe('S-h5-url');
+  });
+
+  describe('the fake H5 cashier', () => {
+    it('sends the browser back to the redirect_url the app appended, and settles nothing', async () => {
+      const body = await signedBody(await createOn('h5', 'S-h5-back'));
+      const back = 'http://127.0.0.1:3000/pages/goods/order_pay_status/index?order_id=9';
+      const callsBefore = gateway.calls.length;
+      const response = await fetch(`${body.h5_url}&redirect_url=${encodeURIComponent(back)}`, {
+        redirect: 'manual',
+      });
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe(back);
+      // Paying stays the test's job.
+      expect(gateway.transactions.get('S-h5-back')!.tradeState).toBe('NOTPAY');
+      // A browser visit, not an API call from the app.
+      expect(gateway.calls.length).toBe(callsBefore);
+    });
+
+    it('answers a plain 200 without a redirect_url, or with one that is not http(s)', async () => {
+      const plain = await fetch(`${gateway.h5CashierUrl}?out_trade_no=X`, { redirect: 'manual' });
+      expect(plain.status).toBe(200);
+      expect(await plain.text()).toBe('fake cashier');
+      const odd = await fetch(
+        `${gateway.h5CashierUrl}?out_trade_no=X&redirect_url=${encodeURIComponent('javascript:alert(1)')}`,
+        { redirect: 'manual' },
+      );
+      expect(odd.status).toBe(200);
+    });
+
+    it('can point h5_url somewhere else', async () => {
+      const elsewhere = await startFakeWechatGateway({
+        keys: gateway.keys,
+        h5CashierUrl: 'https://cashier.example.test/pay',
+      });
+      try {
+        expect(elsewhere.h5CashierUrl).toBe('https://cashier.example.test/pay');
+        const response = await fetch(`${elsewhere.url}/v3/pay/transactions/h5`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ out_trade_no: 'S-else', amount: { total: 1 } }),
+        });
+        const body = (await response.json()) as { h5_url: string };
+        expect(body.h5_url.startsWith('https://cashier.example.test/pay?out_trade_no=S-else')).toBe(
+          true,
+        );
+      } finally {
+        await elsewhere.close();
+      }
+    });
+  });
+});
+
 describe('postNotify', () => {
   let app: Server;
   let notifyUrl: string;

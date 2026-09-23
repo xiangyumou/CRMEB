@@ -2,7 +2,7 @@
 
 - **Stream:** I (storefront e2e), raised against the uni-app layer (H / H3 ownership:
   `template/uni-app/{api,pages}/**`). The orchestrator routes it.
-- **Status:** **open**
+- **Status:** **done** (H4, `rewrite/ws-h4-storefront-followup`) — see "Resolution" at the end
 - **Found on:** `rewrite/integration` at `fa9c7c2d9` (after the H3 merge), H5 build, real stack
   (`next/e2e/storefront`, `pnpm --filter @shop/e2e-storefront test`).
 - **Affects:** `template/uni-app/api/{api,order}.js`, `template/uni-app/api/mappers/{catalog,order,refund}.js`,
@@ -234,3 +234,47 @@ refund shows 待退货 and an applied one shows none. Blocks `refund.spec.ts` �
 Each blocked journey is `blockedBy('CR-4-i §n: …')`. §3, §4 and §5 are in
 `next/e2e/storefront/src/known-gaps.ts`, so journey 1's "no console error, no failed request"
 assertion still catches anything new. `docs/rewrite/status/i.md` has the journey × CR matrix.
+
+## Resolution (H4)
+
+Every section is closed in the uni-app tree; every `blockedBy('CR-4-i …')` is lifted and the
+journeys pass on the H5 build against the real stack. Where H4's fix differs from the suggested
+patch, the difference is named.
+
+- **§3** `getCouponV2` → `toLegacyCouponPopup` `{ list, image }` (claimable templates only);
+  `getCouponNewUser` had the same bare-array shape → `toLegacyNewUserCouponPopup`.
+- **§4** the `get_script` fetch is gone from `App.vue`.
+- **§5** the 16 referenced images ship in `template/uni-app/static/images/legacy/` (byte-equal
+  copies); every `/statics/images/` reference is re-pointed; dead `<emptyPage src>` attributes
+  removed. `known-gaps.ts` is empty.
+- **§6** `getThemeInfo` checks `theme_id` before the `home` alias.
+- **§7** `help_info: {}` and `split: []` on every order row/detail, fresh objects per order.
+- **§8** `toLegacySku` adds `product_stock`; `toLegacyOrderItem` always carries `attrInfo`
+  (`suk ''` on a zero-spec line); the default SKU is selected whenever one is found. H4 applied
+  that last guard change to **every** page with the same `if (productSelect && productAttr.length)`
+  — `goods_details` (its 加入购物车 posted no `skuId`, a 422, once CR-2-h3 let the page render),
+  `presell_details`, `goods_cate2/3`, `order_addcart` and `mixins/skuSelect.js` — pinned by a
+  tree-wide test.
+- **§9** `storePostageDiscount: '0.00'` in the confirm `priceGroup` and the recomputed `result`.
+- **§10** the page passes `cartId` to `computedPrice` and `SubOrder`; `api/order.js`
+  `orderConfirm` mints the idempotency key (`newOrderKey()`, once per confirm-page load, so a
+  double tap is one order) rather than the pure mapper; `custom_form` becomes a
+  `{ key: answer }` record, and an empty one is omitted.
+- **§11** the page passes `cartInfo`; `fromLegacyApplicableInput` sends one line per checkout
+  line. `checkoutLine` carries no category ids, so a category-scoped coupon still cannot match
+  from the confirm page — filed as **CR-1-h4**.
+- **§12** `getNewOrderList` reads `refund_status`; the tab index maps 0 全部 → `all`,
+  1 申请中 → `open`, 2 已退款 → `succeeded`.
+- **§13** `refund_type` uses the pages' numbering; a pending application is 1 (仅退款) or 2
+  (退货退款) by `kind`, not always 1, because the staff refund pages audit the two differently;
+  an approved refund whose goods were shipped back is 5.
+- **§14** tab 9 → `all`; every order is `shipping_type` 1 (快递配送, as the staff mapper already
+  had it), so a paid, unshipped row reads 待发货; `order_pay_status` and `user_return_list` show
+  the order number.
+- Found on the way: the poster posted `data:` URLs to `POST /api/v1/attachments/base64` (a 422 on
+  every product page, the seed's images are `data:` URLs); `toDataUrls` now resolves those
+  locally.
+
+Tests: `template/uni-app/tests/storefront.pages.test.mjs` (page-level: §4, §5, §8, §10–§12, §14),
+`tests/storefront.calls.test.mjs` (call-level through a fake `uni.request` answering from the
+contract examples: §6, §10, the poster), and the mapper tests beside each mapper.

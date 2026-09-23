@@ -24,7 +24,7 @@ import { presaleActivities, presaleActivitySkus } from '@shop/db/schema/presale'
 import { users } from '@shop/db/schema/user';
 import { eq } from 'drizzle-orm';
 
-import { SITE } from './site';
+import { POSTAGE_PRODUCT_DESCRIPTION, SITE } from './site';
 import { ctxFor } from './stack';
 import type { SeededUser } from './stack-file';
 
@@ -133,7 +133,7 @@ export async function seedE2E(options: {
   uploadsDir: string;
   /** The fake gateway `scripts/serve.ts` already started, and the edge origin its notifications are addressed to. */
   gateway: FakeWechatGateway;
-  /** Where `web` sends gateway API calls — the H5 pay shim in front of `gateway` (`src/h5-pay-shim.ts`). */
+  /** Where `web` sends gateway API calls — the fake gateway itself (`gateway.url`). */
   gatewayApiUrl: string;
   baseUrl: string;
 }): Promise<SeedResult> {
@@ -400,7 +400,7 @@ export async function seedE2E(options: {
       isBenefit: false,
       isRecommended: false,
       sortOrder: 1,
-      descriptionHtml: '',
+      descriptionHtml: `<p>${POSTAGE_PRODUCT_DESCRIPTION}</p>`,
       categoryIds: [category.id],
       labelIds: [],
       protectionIds: [],

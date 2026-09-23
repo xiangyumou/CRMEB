@@ -30,7 +30,7 @@
 					<view class="text">{{shippingType == 0 ? $t('切换地址') : $t('切换门店')}} <text class='iconfont icon-jiantou'></text>
 					</view>
 				</view>
-				<view class='address acea-row row-between-wrapper' @tap='onAddress' v-if='shippingType == 0'>
+				<view class='address acea-row row-between-wrapper' data-testid="confirm-address" @tap='onAddress' v-if='shippingType == 0'>
 					<view class='addressCon' v-if="addressInfo.real_name || ''">
 						<view class='name'>{{addressInfo.real_name || ''}}
 							<text class='phone'>{{addressInfo.phone || ''}}</text>
@@ -103,7 +103,7 @@
 				</view>
 			</view>
 			<view class='wrapper' v-if="!is_gift || is_gift == 1">
-				<view class='item acea-row row-between-wrapper' @tap='couponTap'
+				<view class='item acea-row row-between-wrapper' data-testid="confirm-coupon" @tap='couponTap'
 					v-if="!pinkId && !BargainId && !combinationId && !seckillId&& !noCoupon && !discountId && !advanceId">
 					<view>{{$t(`优惠券`)}}</view>
 					<view class='discount'>
@@ -238,7 +238,7 @@
 						{{$t(`￥`)}}{{parseFloat(priceGroup.giftPrice)}}
 					</view>
 				</view>
-				<view class='item acea-row row-between-wrapper'
+				<view class='item acea-row row-between-wrapper' data-testid="confirm-freight"
 					v-if="priceGroup.storePostage > 0 || priceGroup.storePostageDiscount > 0">
 					<view>{{$t(`配送运费`)}}：</view>
 					<view class='money'>
@@ -259,7 +259,7 @@
 					<view>{{$t(`会员运费优惠`)}}：</view>
 					<view class='money'>-{{$t(`￥`)}}{{parseFloat(priceGroup.storePostageDiscount).toFixed(2)}}</view>
 				</view>
-				<view class='item acea-row row-between-wrapper' v-if="coupon_price > 0">
+				<view class='item acea-row row-between-wrapper' data-testid="confirm-coupon-discount" v-if="coupon_price > 0">
 					<view>{{$t(`优惠券抵扣`)}}：</view>
 					<view class='money'>-{{$t(`￥`)}}{{parseFloat(coupon_price).toFixed(2)}}</view>
 				</view>
@@ -271,9 +271,9 @@
 			<view style='height:120rpx;'></view>
 			<view class='footer acea-row row-between-wrapper' v-if="!is_gift || is_gift == 1">
 				<view>{{$t(`合计`)}}:
-					<text class='font-color'>{{$t(`￥`)}}{{totalPrice || 0}}</text>
+					<text class='font-color' data-testid="confirm-total">{{$t(`￥`)}}{{totalPrice || 0}}</text>
 				</view>
-				<view class='settlement' style='z-index:100' @tap.stop="Debounce(SubOrder())"
+				<view class='settlement' data-testid="confirm-submit" style='z-index:100' @tap.stop="Debounce(SubOrder())"
 					v-if="(valid_count>0&&!discount_id) || (valid_count==cartInfo.length&&discount_id)">{{$t(`提交订单`)}}
 				</view>
 				<view class='settlement bg-color-hui' style='z-index:100' v-else>{{$t(`提交订单`)}}</view>
@@ -721,6 +721,7 @@
 			computedPrice() {
 				let shippingType = this.shippingType;
 				let data = {
+					cartId: this.cartId,
 					addressId: this.addressId,
 					useIntegral: this.useIntegral ? 1 : 0,
 					couponId: this.couponId,
@@ -971,6 +972,7 @@
 				let that = this;
 				let data = {
 					cartId: this.cartId,
+					cartInfo: this.cartInfo,
 					'new': this.news,
 					'shippingType': parseInt(shippingType) + 1
 				}
@@ -1157,6 +1159,7 @@
 					}
 				}
 				data = {
+					cartId: that.cartId,
 					custom_form: that.confirm,
 					gift_mark: that.gift_mark, // 礼物留言
 					real_name: that.contacts,

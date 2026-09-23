@@ -22,8 +22,6 @@ import type { FakeWechatGateway } from '@shop/testing';
  *    but headless Chromium cannot complete a WeChat H5 redirect;
  *  - `complete-refund`: settles a refund's gateway-side state so a spec is
  *    not stuck polling for `reconcileStaleRefunds()`'s sweep interval;
- *  - `GET /h5-cashier`: the page `src/h5-pay-shim.ts`'s `h5_url` points at,
- *    standing in for WeChat's H5 cashier by sending the browser back.
  *
  * Nothing here is a shortcut through domain code: both operations still go
  * through the real webhook route and the real signature the gateway would
@@ -52,19 +50,6 @@ export async function startGatewayControl(options: GatewayControlOptions): Promi
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
-      // The `h5_url` `src/h5-pay-shim.ts` hands out. WeChat's H5 cashier
-      // returns the shopper to the `redirect_url` the app appended; so does
-      // this, at once. Paying is `complete-payment`'s job, not this page's.
-      if (req.method === 'GET' && req.url?.startsWith('/h5-cashier')) {
-        const back = new URL(req.url, 'http://control').searchParams.get('redirect_url');
-        if (back && new URL(back).origin === new URL(baseUrl).origin) {
-          res.writeHead(302, { location: back }).end();
-        } else {
-          res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' }).end('fake cashier');
-        }
-        return;
-      }
-
       const chunks: Buffer[] = [];
       for await (const chunk of req) chunks.push(chunk as Buffer);
       const body =

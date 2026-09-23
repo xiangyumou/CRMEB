@@ -1,7 +1,6 @@
 import { groupbuyGroups } from '@shop/db/schema/groupbuy';
 import { desc, eq } from 'drizzle-orm';
 
-import { blockedBy } from '../src/blocked';
 import { test, expect } from '../src/fixtures';
 import { payAtCashier, submitOrder } from '../src/product-flows';
 
@@ -23,10 +22,9 @@ import { payAtCashier, submitOrder } from '../src/product-flows';
  * back from `groupbuy_groups` directly, the same "arrange/read what the UI
  * cannot show" use of `shop.db` `src/stack.ts` documents itself for.
  *
- * Blocked today at the first tap: the activity page never shows 立即开团
- * for the seeded activity (CR-4-i §8 — the SKU view model has no
- * `product_stock`, and a zero-spec product's SKU is never selected), and
- * past it, 提交订单 is refused for every order (CR-4-i §10).
+ * 立即开团 needs the SKU's `product_stock` and a selected SKU even for a
+ * zero-spec product, and 提交订单 needs the cart, a real idempotency key and
+ * a `customForm` record — CR-4-i §8 and §10, closed by H4.
  */
 
 test('two shoppers complete a group-buy team', async ({
@@ -34,17 +32,14 @@ test('two shoppers complete a group-buy team', async ({
   secondaryShopperPage,
   shop,
 }) => {
-  blockedBy(
-    'CR-4-i §8: 立即开团 never renders (no product_stock; zero-spec SKU never selected); §10: 提交订单 is a 422',
-  );
   // --- primary opens a new team -------------------------------------------------
   await shopperPage.goto(
     `/pages/activity/goods_combination_details/index?id=${shop.fixtures.groupBuyActivityId}`,
   );
   await expect(shopperPage.getByText('E2E 拼团活动').first()).toBeVisible();
 
-  const openTeam = shopperPage.getByText('立即开团', { exact: true });
-  await expect(openTeam).toBeVisible();
+  const openTeam = shopperPage.getByTestId('groupbuy-open');
+  await expect(openTeam).toContainText('立即开团');
   await openTeam.click();
   await shopperPage.waitForTimeout(400);
   await openTeam.click();
@@ -67,11 +62,12 @@ test('two shoppers complete a group-buy team', async ({
     timeout: 15_000,
   });
 
-  const joinTeam = secondaryShopperPage.getByText('我要参团', { exact: true });
-  await expect(joinTeam.first()).toBeVisible();
-  await joinTeam.first().click();
+  // The page's 我要参团 opens the spec popup; the popup's own 我要参团 buys.
+  const joinTeam = secondaryShopperPage.getByTestId('groupbuy-join');
+  await expect(joinTeam).toContainText('我要参团');
+  await joinTeam.click();
   await secondaryShopperPage.waitForTimeout(400);
-  await joinTeam.last().click();
+  await secondaryShopperPage.getByTestId('sku-popup-confirm').click();
 
   await submitOrder(secondaryShopperPage);
   await payAtCashier(secondaryShopperPage, shop);

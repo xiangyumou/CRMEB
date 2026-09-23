@@ -2,19 +2,23 @@
 //
 // Contract: next/packages/contracts/src/refund/refund.storefront.contract.ts
 //
-// Legacy `refund_type`: 0 待审核 · 1 已拒绝 · 2 退货待寄回 · 3 待商家收货 · 4 已完成 · 5 已撤销
+// Legacy `refund_type`, as every page stamps it (user_return_list, order_details,
+// the staff refund pages): 1 仅退款申请中 · 2 退货退款申请中 · 3 已拒绝 · 4 待退货 ·
+// 5 退货待收货 / 退款中 · 6 已退款 · 0 no live application (撤销 / 关闭).
+// The first version numbered 0–5 from 待审核, so a succeeded refund stamped
+// 待退货 and a pending one stamped nothing (CR-4-i §13).
 
 import { toId, toInt, money, text, list, mapList, pagedList, unixSeconds, legacyDateTime } from './_shared.js';
 
 const REFUND_TYPE = {
-  applied: 0,
-  rejected: 1,
-  approved: 2,
-  returned: 3,
-  refunding: 3,
-  succeeded: 4,
-  cancelled: 5,
-  closed: 5,
+  applied: 1,
+  rejected: 3,
+  approved: 4,
+  returned: 5,
+  refunding: 5,
+  succeeded: 6,
+  cancelled: 0,
+  closed: 0,
 };
 
 const REFUND_MSG = {
@@ -28,8 +32,10 @@ const REFUND_MSG = {
   closed: '售后已关闭',
 };
 
-export function legacyRefundType(status, returnStage) {
-  if (status === 'approved' && returnStage === 'shipped_back') return 3;
+export function legacyRefundType(status, returnStage, kind) {
+  // A pending 退货退款 is 2, a pending 仅退款 1 — the staff page audits them differently.
+  if (status === 'applied') return kind === 'return_and_refund' ? 2 : 1;
+  if (status === 'approved' && returnStage === 'shipped_back') return 5;
   const t = REFUND_TYPE[status];
   return t === undefined ? 0 : t;
 }
@@ -65,7 +71,7 @@ export function toLegacyRefundLine(dto) {
 /** `refundSummary` / `refundDetail` → one 退款单. */
 export function toLegacyRefund(dto) {
   if (!dto) return {};
-  const type = legacyRefundType(dto.status, dto.returnStage);
+  const type = legacyRefundType(dto.status, dto.returnStage, dto.kind);
   return {
     id: toId(dto.id),
     order_id: text(dto.id),
@@ -211,10 +217,13 @@ export function fromLegacyReturnShipmentInput(data) {
 }
 
 /** Legacy 我的售后 tab → `state`. */
-export function fromLegacyRefundState(type) {
-  const n = toInt(type, -1);
-  if (n === 0) return 'open';
-  if (n === 1) return 'succeeded';
-  if (n === 2) return 'closed';
+/**
+ * The 售后 list tab → the refunds `state` filter. `user_return_list` sends the
+ * tab index as `refund_status`: 0 全部 · 1 申请中 · 2 已退款 (CR-4-i §12).
+ */
+export function fromLegacyRefundState(tab) {
+  const n = toInt(tab, -1);
+  if (n === 1) return 'open';
+  if (n === 2) return 'succeeded';
   return 'all';
 }

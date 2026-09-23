@@ -48,7 +48,9 @@ export function toLegacyProductCard(dto) {
     activity: [],
     label: mapList(dto.labels, toLegacyLabel),
     is_gift_bag: 0,
-    can_add_cart: dto.canAddToCart !== false,
+    // legacy `cart_button` (1 = 加入购物车 shown): `productBottom.vue`, the
+    // category pages and `skuSelect` all branch on this name (CR-7-i).
+    cart_button: dto.canAddToCart === false ? 0 : 1,
     ...RETIRED,
   };
 }
@@ -120,6 +122,9 @@ export function toLegacySku(sku, fallbackName) {
     price: money(sku.price),
     ot_price: money(sku.originalPrice, ''),
     stock: toInt(sku.stock, 0),
+    // 拼团 / 预售 pages gate their buy button on `product_stock` (the
+    // product's own stock behind the activity quota) (CR-4-i §8).
+    product_stock: toInt(sku.stock, 0),
     quota: toInt(sku.stock, 0),
     quota_show: toInt(sku.stock, 0),
     weight: text(sku.weight, '0'),
@@ -171,13 +176,11 @@ export function toLegacyProductDetail(dto) {
     replyChance: toInt(dto.reviewSummary && dto.reviewSummary.goodRate, 0),
     coupons: mapList(dto.giftCouponIds, (id) => ({ id: toId(id) })),
     good_list: [],
-    priceName: {
-      // 到手价 breakdown; only the plain price survives the rewrite.
-      price: money(dto.price),
-      ot_price: money(dto.originalPrice, ''),
-      vip_price: 0,
-      member_price: 0,
-    },
+    // Legacy `priceName` is the 分销 「最高返佣」 amount the product page's
+    // red-packet badge prints (`shareRedPackets`), shown when it is not 0.
+    // 分销 is retired, so it is pinned to 0: the badge never renders, and an
+    // object here was printed as raw JSON on the product page (CR-7-i).
+    priceName: 0,
     activity: [],
     ...RETIRED,
   };

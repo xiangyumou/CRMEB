@@ -46,9 +46,9 @@
 				<span class="iconfont" :class="iShidden ? 'icon-xiangshang' : 'icon-xiangxia'"></span>
 			</div>
 			<div v-if="userBool === 1 && isOk == 0 && pinkBool === 0">
-				<div class="teamBnt bg-color-red" @click="listenerActionSheet">{{$t(`邀请好友参团`)}}</div>
+				<div class="teamBnt bg-color-red" data-testid="groupbuy-invite" @click="listenerActionSheet">{{$t(`邀请好友参团`)}}</div>
 			</div>
-			<div class="teamBnt bg-color-red" v-else-if="userBool === 0 && pinkBool === 0 && count > 0" @click="pay">
+			<div class="teamBnt bg-color-red" data-testid="groupbuy-join" v-else-if="userBool === 0 && pinkBool === 0 && count > 0" @click="pay">
 				{{$t(`我要参团`)}}
 			</div>
 			<div class="teamBnt bg-color-red" v-if="pinkBool === 1 || pinkBool === -1"
@@ -107,7 +107,7 @@
 		<view class="mask" v-if="posters" @click="listenerActionClose"></view>
 		<!-- 发送给朋友图片 -->
 		<view class="share-box" v-if="H5ShareBox">
-			<image :src="imgHost + '/statics/images/share-info.png'" @click="H5ShareBox = false"></image>
+			<image :src="'/static/images/legacy/share-info.png'" @click="H5ShareBox = false"></image>
 		</view>
 		<!-- #ifdef MP -->
 		<!-- <authorize @onLoadFun="onLoadFun" :isAuto="isAuto" :isShowAuth="isShowAuth" @authColse="authColse"></authorize> -->
@@ -431,7 +431,7 @@
 				}
 				//sort();排序函数:数字-英文-汉字；
 				let productSelect = this.productValue[value.join(',')];
-				if (productSelect && productAttr.length) {
+				if (productSelect) {
 					this.$set(this.attr.productSelect, 'store_name', this.storeCombination.title);
 					this.$set(this.attr.productSelect, 'image', productSelect.image);
 					this.$set(this.attr.productSelect, 'price', productSelect.price);
@@ -562,7 +562,7 @@
 						that.setOpenShare();
 						//#endif
 						that.setProductSelect();
-						if (that.attr.productAttr != 0) that.DefaultSelect();
+						that.DefaultSelect();
 						if (res.data.is_ok == 1 && res.data.userBool == 0) {
 							return this.$util.Tips({
 								title: that.$t(`你不是该团的成员`),

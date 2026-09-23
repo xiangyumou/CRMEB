@@ -113,7 +113,6 @@
     <view class="empty-box" v-if="goodsList.length == 0 && !loading">
       <emptyPage
         title="暂无商品～"
-        src="/statics/images/empty-box.gif"
       ></emptyPage>
     </view>
     <Loading :loaded="loadend" :loading="loading"></Loading>

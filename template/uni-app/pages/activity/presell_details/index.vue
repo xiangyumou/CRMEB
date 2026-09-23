@@ -25,7 +25,7 @@
 					<view class="wrapper">
 						<view class="share acea-row row-between row-bottom">
 							<view class="money font-color">
-								{{$(`￥`)}}
+								{{$t(`￥`)}}
 								<text class="num" v-text="storeInfo.price || 0"></text>
 								<text v-if="storeInfo.spec_type">{{$t(`起`)}}</text>
 								<text class="price_text">{{$t(`预售价`)}}</text>
@@ -227,7 +227,7 @@
 		<canvas class="canvas" canvas-id="myCanvas" v-if="canvasStatus"></canvas>
 		<!-- 发送给朋友图片 -->
 		<view class="share-box" v-if="H5ShareBox">
-			<image :src="imgHost + '/statics/images/share-info.png'" @click="H5ShareBox = false"></image>
+			<image :src="'/static/images/legacy/share-info.png'" @click="H5ShareBox = false"></image>
 		</view>
 		<kefuIcon :ids='parseInt(id)' :routineContact="routineContact"></kefuIcon>
 	</view>
@@ -812,7 +812,7 @@
 				}
 				//sort();排序函数:数字-英文-汉字；
 				let productSelect = this.productValue[value.join(',')];
-				if (productSelect && productAttr.length) {
+				if (productSelect) {
 					this.$set(this.attr.productSelect, 'store_name', this.storeInfo.store_name);
 					this.$set(this.attr.productSelect, 'image', productSelect.image);
 					this.$set(this.attr.productSelect, 'price', productSelect.price);

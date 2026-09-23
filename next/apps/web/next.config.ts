@@ -1,6 +1,17 @@
 import type { NextConfig } from 'next';
 
 /**
+ * How many workers `next build` may start. Next sizes its pool from
+ * `os.cpus()`, which on a many-core box under a memory cap gets the build
+ * OOM-killed (stream I saw it). `NEXT_BUILD_CPUS` overrides; anything that is
+ * not a positive integer means the small default.
+ */
+function buildCpus(value: string | undefined): number {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : 2;
+}
+
+/**
  * The admin UI and both API surfaces ship as one standalone Next server.
  * `@shop/contracts` is published as TypeScript source (see its package.json
  * `exports`), so it has to be transpiled by Next rather than consumed as JS.
@@ -23,6 +34,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ['antd', '@ant-design/icons'],
+    cpus: buildCpus(process.env.NEXT_BUILD_CPUS),
   },
 };
 

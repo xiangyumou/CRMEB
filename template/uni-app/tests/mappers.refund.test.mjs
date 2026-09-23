@@ -14,26 +14,32 @@ import {
 const REFUND = example('GET /api/v1/refunds/:id');
 const APPLICABLE = example('GET /api/v1/refunds/applicable-items/:orderId');
 
-describe('legacyRefundType', () => {
+describe('legacyRefundType — CR-4-i §13: the numbers the pages stamp (1–6)', () => {
   it('maps every status onto the legacy refund_type the pages branch on', () => {
-    expect(legacyRefundType('applied')).toBe(0);
-    expect(legacyRefundType('rejected')).toBe(1);
-    expect(legacyRefundType('approved')).toBe(2);
-    expect(legacyRefundType('returned')).toBe(3);
-    expect(legacyRefundType('refunding')).toBe(3);
-    expect(legacyRefundType('succeeded')).toBe(4);
-    expect(legacyRefundType('cancelled')).toBe(5);
-    expect(legacyRefundType('closed')).toBe(5);
+    expect(legacyRefundType('applied')).toBe(1);
+    expect(legacyRefundType('applied', null, 'refund_only')).toBe(1);
+    expect(legacyRefundType('applied', null, 'return_and_refund')).toBe(2);
+    expect(legacyRefundType('rejected')).toBe(3);
+    expect(legacyRefundType('approved')).toBe(4);
+    expect(legacyRefundType('returned')).toBe(5);
+    expect(legacyRefundType('refunding')).toBe(5);
+    expect(legacyRefundType('succeeded')).toBe(6);
+    expect(legacyRefundType('cancelled')).toBe(0);
+    expect(legacyRefundType('closed')).toBe(0);
   });
 
-  it('moves an approved refund to 待商家收货 once the buyer has shipped it back', () => {
-    expect(legacyRefundType('approved', 'awaiting_shipment')).toBe(2);
-    expect(legacyRefundType('approved', 'shipped_back')).toBe(3);
+  it('moves an approved refund to 退货待收货 once the buyer has shipped it back', () => {
+    expect(legacyRefundType('approved', 'awaiting_shipment')).toBe(4);
+    expect(legacyRefundType('approved', 'shipped_back')).toBe(5);
   });
 
-  it('defaults to 待审核', () => {
+  it('stamps nothing for an unknown status', () => {
     expect(legacyRefundType('who-knows')).toBe(0);
     expect(legacyRefundType(undefined)).toBe(0);
+  });
+
+  it('a succeeded refund gets user_return_list`s 已退款 stamp (refund_type 6)', () => {
+    expect(toLegacyRefund({ ...REFUND, status: 'succeeded' }).refund_type).toBe(6);
   });
 });
 
@@ -47,8 +53,8 @@ describe('toLegacyRefund', () => {
       refund_order_id: 'RF2602261300000601',
       store_order_id: '3001',
       order_no: 'SO2602261159001',
-      refund_type: 0,
-      _type: 0,
+      refund_type: 2,
+      _type: 2,
       _msg: '等待商家处理',
       refund_num: 1,
       refund_price: '99.00',
@@ -61,7 +67,7 @@ describe('toLegacyRefund', () => {
   });
 
   it('mirrors _status so components shared with the order pages keep working', () => {
-    expect(refund._status).toMatchObject({ _type: 0, _title: '等待商家处理' });
+    expect(refund._status).toMatchObject({ _type: 2, _title: '等待商家处理' });
   });
 
   it('carries the evidence and the audit log', () => {
@@ -195,10 +201,10 @@ describe('the fromLegacy direction', () => {
     });
   });
 
-  it('maps the 我的售后 tab onto a state', () => {
-    expect(fromLegacyRefundState(0)).toBe('open');
-    expect(fromLegacyRefundState(1)).toBe('succeeded');
-    expect(fromLegacyRefundState(2)).toBe('closed');
+  it('CR-4-i §12 — maps the 售后 tab index (全部 · 申请中 · 已退款) onto a state', () => {
+    expect(fromLegacyRefundState(0)).toBe('all');
+    expect(fromLegacyRefundState(1)).toBe('open');
+    expect(fromLegacyRefundState(2)).toBe('succeeded');
     expect(fromLegacyRefundState(undefined)).toBe('all');
   });
 });

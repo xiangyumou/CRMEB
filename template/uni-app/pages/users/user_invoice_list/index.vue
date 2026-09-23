@@ -33,7 +33,7 @@
 				</view>
 			</view>
 			<view v-show="page === 2 && !orderList.length" class="nothing">
-				<image :src="imgHost + '/statics/images/noInvoice.png'"></image>
+				<image :src="'/static/images/legacy/noInvoice.png'"></image>
 				<view>{{ $t(`没有发票信息哟~`) }}</view>
 			</view>
 		</view>
@@ -69,7 +69,7 @@
 				</template>
 			</view>
 			<view v-show="page === 2 && !invoiceList.length" class="nothing">
-				<image :src="imgHost + '/statics/images/noInvoice.png'"></image>
+				<image :src="'/static/images/legacy/noInvoice.png'"></image>
 				<view>{{ $t(`没有发票信息哟~`) }}</view>
 			</view>
 			<navigator class="add-link" :url="`/pages/users/user_invoice_form/index?specialInvoice=${specialInvoice}`">

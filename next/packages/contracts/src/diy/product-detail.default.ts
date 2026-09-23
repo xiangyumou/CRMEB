@@ -25,7 +25,15 @@ import type { DiyPageValue } from './schema/page';
  * (服务保障, rendered by `homeProductService.vue`), `reviews` (商品评价,
  * `homeReviews.vue`), `productDesc` (图文详情), and `bottomMenu` (the bar
  * `productBottom.vue` styles). Keys, timestamps and props are the legacy ones
- * verbatim, so the renderer sees exactly what the legacy default gave it.
+ * verbatim, so the renderer sees exactly what the legacy default gave it —
+ * with one deliberate difference:
+ *
+ * - `bottomMenu.showContent.type` is `[3, 1, 2, 4]` (首页, 收藏, 购物车, **分享**),
+ *   not legacy's `[3, 1, 2]` (CR-7-i). A legacy shopper reached the share
+ *   panel (发送给朋友 / 生成海报) through the 分销 「最高返佣 · 立即分享」 badge;
+ *   分销 is retired, so without the bar's own 分享 entry the default page
+ *   would have no way to share a product at all. An operator who publishes a
+ *   page of their own chooses the entries in the editor as before.
  *
  * **Why the payload is a JSON file.** It is data — the legacy payload, not
  * code written here — and the bottom bar's 客服 entry carries the iconfont

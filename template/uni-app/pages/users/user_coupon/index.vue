@@ -43,7 +43,7 @@
 		</view>
 		<view class='noCommodity' v-if="!couponsList.length && page === 2">
 			<view class='pictrue'>
-				<image :src="imgHost + '/statics/images/noCoupon.png'"></image>
+				<image :src="'/static/images/legacy/noCoupon.png'"></image>
 			</view>
 		</view>
 		<!-- #ifdef MP -->

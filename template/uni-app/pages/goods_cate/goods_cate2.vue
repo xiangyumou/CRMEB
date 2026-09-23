@@ -309,7 +309,7 @@ export default {
 			}
 			//sort();排序函数:数字-英文-汉字；
 			let productSelect = this.productValue[value.join(',')];
-			if (productSelect && productAttr.length) {
+			if (productSelect) {
 				this.$set(this.attr.productSelect, 'store_name', this.storeName);
 				this.$set(this.attr.productSelect, 'image', productSelect.image);
 				this.$set(this.attr.productSelect, 'price', productSelect.price);

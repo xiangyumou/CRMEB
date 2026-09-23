@@ -14,3 +14,10 @@ export const SITE = {
   copyrightText: 'E2E 小店 版权所有',
   copyrightImage: 'https://e2e-assets.invalid/copyright.png',
 } as const;
+
+/**
+ * The 图文详情 `src/seed.ts` gives the fixed-postage product, so a product-page
+ * journey can assert the default page's `productDesc` renders the product's
+ * own description (CR-7-i) — the other seeded products have none.
+ */
+export const POSTAGE_PRODUCT_DESCRIPTION = 'E2E 运费商品的图文详情';

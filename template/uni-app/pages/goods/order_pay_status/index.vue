@@ -5,14 +5,14 @@
 			<view class="iconfont icons icon-duihao2 bg-color" v-if="order_pay_info.paid || order_pay_info.pay_type == 'offline'"></view>
 			<view class="iconfont icons icon-iconfontguanbi" v-else></view>
 			<!-- 失败时：订单支付失败 -->
-			<view class="status" v-if="order_pay_info.pay_type != 'offline'">
+			<view class="status" data-testid="pay-status" v-if="order_pay_info.pay_type != 'offline'">
 				{{ order_pay_info.paid ? $t(`订单支付成功`) : $t(payType ? `订单支付中` : `订单支付失败`) }}
 			</view>
 			<view class="status" v-else>{{ $t(`订单创建成功`) }}</view>
 			<view class="wrapper">
 				<view class="item acea-row row-between-wrapper">
 					<view>{{ $t(`订单号`) }}</view>
-					<view class="itemCom">{{ orderId }}</view>
+					<view class="itemCom">{{ order_pay_info.order_id || orderId }}</view>
 				</view>
 				<view class="item acea-row row-between-wrapper">
 					<view>{{ $t(`下单时间`) }}</view>
@@ -24,7 +24,7 @@
 				</view>
 				<view class="item acea-row row-between-wrapper">
 					<view>{{ $t(`支付金额`) }}</view>
-					<view class="itemCom">{{ order_pay_info.pay_price }}</view>
+					<view class="itemCom" data-testid="pay-amount">{{ order_pay_info.pay_price }}</view>
 				</view>
 				<!--失败时加上这个  -->
 				<view class="item acea-row row-between-wrapper" v-if="order_pay_info.paid == 0 && order_pay_info.pay_type != 'offline'">

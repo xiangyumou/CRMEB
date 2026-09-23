@@ -20,6 +20,8 @@ import {
   toLegacyOrderCreateResult,
   toLegacyCashierOrder,
   toLegacyOrderProduct,
+  activityDiscountCents,
+  orderActivityDiscountCents,
 } from '../api/mappers/order.js';
 
 const ORDER = example('GET /api/v1/orders/:id');
@@ -84,10 +86,12 @@ describe('toLegacyOrderItem', () => {
     assertRenderable(item);
   });
 
-  it('carries attrInfo only when there is a spec', () => {
+  it('carries attrInfo on every line — a zero-spec line too, with an empty suk (CR-4-i §8)', () => {
     expect(item.productInfo.attrInfo).toMatchObject({ unique: '21', suk: '混合装,1000g' });
+    // 评价 and 物流 read `attrInfo.price` unguarded; a zero-spec line threw there.
     const plain = toLegacyOrderItem({ ...ORDER.items[0], specText: '' });
-    expect(Object.prototype.hasOwnProperty.call(plain.productInfo, 'attrInfo')).toBe(false);
+    expect(plain.productInfo.attrInfo).toMatchObject({ unique: '21', suk: '', price: item.productInfo.attrInfo.price });
+    assertRenderable(plain);
   });
 
   it('survives a missing dto', () => {
@@ -157,9 +161,15 @@ describe('toLegacyOrderListItem', () => {
       advance_id: 0,
       use_integral: 0,
       is_gift: 0,
-      shipping_type: 0,
       virtual_type: 0,
     });
+  });
+
+  it('CR-4-i §14 — every order is 快递配送, so a paid, unshipped row reads 待发货', () => {
+    // order_list: `_status._type == 1 && shipping_type == 1` → 待发货.
+    const paid = toLegacyOrderListItem(withStatus({ status: 'paid', fulfillmentStatus: 'unfulfilled' }));
+    expect(paid.shipping_type).toBe(1);
+    expect(paid._status._type).toBe(1);
   });
 
   it('tells the page when a refund is still possible', () => {
@@ -185,6 +195,16 @@ describe('toLegacyOrderDetail', () => {
     });
     expect(detail.cartInfo).toHaveLength(1);
     assertRenderable(detail);
+  });
+
+  it('gives order_details the retired 代付 / 拆单 fields it reads unguarded (CR-4-i §7)', () => {
+    // `orderInfo.help_info.help_status` and `split.length`: a null here threw on render.
+    expect(detail.help_info).toEqual({});
+    expect(detail.split).toEqual([]);
+    // Fresh per order, so a page that writes into one cannot leak into another.
+    const other = toLegacyOrderDetail(ORDER);
+    expect(other.help_info).not.toBe(detail.help_info);
+    expect(other.split).not.toBe(detail.split);
   });
 
   it('turns the null timestamps into 0, not NaN', () => {
@@ -222,6 +242,8 @@ describe('fromLegacyOrderListQuery', () => {
     expect(fromLegacyOrderListQuery({ type: 2 }).tab).toBe('unreceived');
     expect(fromLegacyOrderListQuery({ type: 3 }).tab).toBe('finished');
     expect(fromLegacyOrderListQuery({ type: -1 }).tab).toBe('refunding');
+    // CR-4-i §14: the 全部 tab is `orderStatus 9`.
+    expect(fromLegacyOrderListQuery({ type: 9 }).tab).toBe('all');
     expect(fromLegacyOrderListQuery({ type: '' }).tab).toBe('all');
     expect(fromLegacyOrderListQuery({}).tab).toBe('all');
     expect(fromLegacyOrderListQuery({ type: 'nonsense' }).tab).toBe('all');
@@ -390,6 +412,15 @@ describe('toLegacyOrderConfirm', () => {
   it('survives a missing dto', () => {
     expect(toLegacyOrderConfirm(null)).toEqual({});
   });
+
+  it('CR-4-i §9 — 配送运费 has a freight discount to add, so it is never ¥NaN', () => {
+    // The template renders `storePostage + storePostageDiscount`.
+    const confirm = toLegacyOrderConfirm(PREVIEW);
+    expect(confirm.priceGroup.storePostageDiscount).toBe('0.00');
+    expect(Number(confirm.priceGroup.storePostage) + Number(confirm.priceGroup.storePostageDiscount)).toBe(8);
+    // `computedPrice()` copies it from the recomputed result onto priceGroup.
+    expect(toLegacyOrderComputed(PREVIEW).result.storePostageDiscount).toBe('0.00');
+  });
 });
 
 describe('order creation', () => {
@@ -402,6 +433,30 @@ describe('order creation', () => {
       payPrice: '118.00',
     });
     expect(body).toEqual(exampleBody('POST /api/v1/orders'));
+  });
+
+  it('CR-4-i §10 — a product without a custom form sends no customForm (the page passes [])', () => {
+    const body = fromLegacyOrderCreateInput('ck-20260201-7f3a9b21', { cartId: '5001', custom_form: [] });
+    expect(body).not.toHaveProperty('customForm');
+    expect(body.cartItemIds).toEqual(['5001']);
+  });
+
+  it('CR-4-i §10 — the page`s field list becomes the contract`s { key: answer } record', () => {
+    const body = fromLegacyOrderCreateInput('ck-20260201-7f3a9b21', {
+      cartId: '5001',
+      custom_form: [
+        { key: 'name', label: '姓名', type: 'text', value: '张三' },
+        { key: 'size', label: '尺码', type: 'radio', value: 'L' },
+        { key: 'note', label: '备注', type: 'text', value: '' },
+        { key: 'tags', label: '标签', type: 'checkbox', value: [] },
+        { label: '无键', value: 'x' },
+      ],
+    });
+    expect(body.customForm).toEqual({ name: '张三', size: 'L' });
+    // A record the page already built passes as is.
+    expect(fromLegacyOrderCreateInput('ck-20260201-7f3a9b21', { cartId: '1', custom_form: { a: 1 } }).customForm).toEqual({
+      a: 1,
+    });
   });
 
   it('maps the created order into the legacy cashier hand-off', () => {
@@ -433,5 +488,145 @@ describe('toLegacyCashierOrder / toLegacyOrderProduct', () => {
     expect(toLegacyOrderProduct(ORDER, '7001')).toMatchObject({ cart_num: 2, unique: '7001' });
     expect(toLegacyOrderProduct(ORDER, 'nope')).toEqual({ cart_num: 0, productInfo: {} });
     expect(toLegacyOrderProduct(null, '7001')).toEqual({ cart_num: 0, productInfo: {} });
+  });
+});
+
+// 预售 / 拼团: B1 keeps the catalogue price on the line and prices the activity
+// as a `*:activity-price` adjustment folded into `couponDiscount`. These are the
+// shapes the real stack answered for a ¥88 SKU in a ¥78 预售 (H4 §3 probe).
+describe('活动价 — the activity price is what the pages print', () => {
+  const line = {
+    ...PREVIEW.lines[0],
+    quantity: 1,
+    unitPrice: '88.00',
+    originalUnitPrice: null,
+    subtotal: '88.00',
+    discountAmount: '10.00',
+    totalAmount: '78.00',
+    specText: '',
+  };
+  const presalePreview = {
+    ...PREVIEW,
+    lines: [line],
+    itemsAmount: '88.00',
+    freightAmount: '0.00',
+    couponDiscount: '10.00',
+    adjustments: [{ source: 'presale:activity-price', label: '预售价（E2E 预售活动）', amount: '-10.00' }],
+    payableAmount: '78.00',
+    userCouponId: null,
+    totalQuantity: 1,
+  };
+  const orderItem = {
+    ...ORDER.items[0],
+    quantity: 1,
+    unitPrice: '88.00',
+    originalUnitPrice: null,
+    discountAmount: '10.00',
+    totalAmount: '78.00',
+    specText: '',
+  };
+  const presaleOrder = {
+    ...ORDER,
+    kind: 'presale',
+    items: [orderItem],
+    totalQuantity: 1,
+    itemsAmount: '88.00',
+    freightAmount: '0.00',
+    couponDiscount: '10.00',
+    payableAmount: '78.00',
+    paidAmount: '78.00',
+    userCouponId: null,
+  };
+
+  it('sums only activity-price adjustments', () => {
+    expect(activityDiscountCents(presalePreview.adjustments)).toBe(1000);
+    expect(
+      activityDiscountCents([
+        { source: 'groupbuy:activity-price', amount: '-12.50' },
+        { source: 'coupon:full-reduction', amount: '-5.00' },
+      ]),
+    ).toBe(1250);
+    expect(activityDiscountCents(PREVIEW.adjustments)).toBe(0);
+    expect(activityDiscountCents(undefined)).toBe(0);
+  });
+
+  it('confirm page: ¥78 unit price, ¥78 商品总价, no phantom coupon, ¥88 struck through', () => {
+    const legacy = toLegacyOrderConfirm(presalePreview);
+    expect(legacy.cartInfo[0]).toMatchObject({ truePrice: '78.00', costPrice: '88.00', sum_price: '78.00' });
+    expect(legacy.cartInfo[0].productInfo.price).toBe('78.00');
+    expect(legacy.priceGroup).toMatchObject({ totalPrice: '78.00', costPrice: '78.00', payPrice: '78.00' });
+    expect(legacy.couponPrice).toBe('0.00');
+    expect(toLegacyOrderComputed(presalePreview).result).toMatchObject({
+      total_price: '78.00',
+      coupon_price: '0.00',
+      pay_price: '78.00',
+    });
+  });
+
+  it('confirm page: a stacked coupon stays a coupon', () => {
+    const legacy = toLegacyOrderConfirm({
+      ...presalePreview,
+      couponDiscount: '15.00',
+      adjustments: [...presalePreview.adjustments, { source: 'coupon:full-reduction', label: '减 5', amount: '-5.00' }],
+      payableAmount: '73.00',
+      userCouponId: '9001',
+    });
+    expect(legacy.cartInfo[0].truePrice).toBe('78.00');
+    expect(legacy.priceGroup.totalPrice).toBe('78.00');
+    expect(legacy.couponPrice).toBe('5.00');
+  });
+
+  it('confirm page: the activity price spreads over the quantity', () => {
+    const legacy = toLegacyOrderConfirm({
+      ...presalePreview,
+      lines: [{ ...line, quantity: 2, subtotal: '176.00', discountAmount: '20.00', totalAmount: '156.00' }],
+      itemsAmount: '176.00',
+      couponDiscount: '20.00',
+      adjustments: [{ source: 'presale:activity-price', label: '预售价', amount: '-20.00' }],
+    });
+    expect(legacy.cartInfo[0].truePrice).toBe('78.00');
+    expect(legacy.priceGroup.totalPrice).toBe('156.00');
+  });
+
+  it('a normal preview is untouched', () => {
+    const legacy = toLegacyOrderConfirm(PREVIEW);
+    expect(legacy.priceGroup.totalPrice).toBe(PREVIEW.itemsAmount);
+    expect(legacy.couponPrice).toBe(PREVIEW.couponDiscount);
+    expect(legacy.cartInfo[0].truePrice).toBe(PREVIEW.lines[0].unitPrice);
+  });
+
+  it('order detail: an activity order without a coupon prints the activity price', () => {
+    expect(orderActivityDiscountCents(presaleOrder)).toBe(1000);
+    const detail = toLegacyOrderDetail(presaleOrder);
+    expect(detail).toMatchObject({ total_price: '78.00', coupon_price: '0.00', pay_price: '78.00' });
+    expect(detail.cartInfo[0]).toMatchObject({ truePrice: '78.00', sum_price: '78.00' });
+    expect(detail.cartInfo[0].productInfo.price).toBe('78.00');
+    expect(detail.cartInfo[0].productInfo.attrInfo.price).toBe('78.00');
+    expect(JSON.stringify(detail)).not.toContain('88.00');
+  });
+
+  it('order detail: a normal order, or a list row, is untouched', () => {
+    expect(orderActivityDiscountCents(ORDER)).toBe(0);
+    expect(orderActivityDiscountCents({ ...presaleOrder, userCouponId: '9001' })).toBe(0);
+    const { userCouponId, ...row } = presaleOrder;
+    expect(userCouponId).toBeNull();
+    expect(orderActivityDiscountCents(row)).toBe(0);
+    expect(toLegacyOrderListItem(row, 3).cartInfo[0].truePrice).toBe('88.00');
+    expect(toLegacyOrderList({ items: [row, row] })[1].cartInfo[0].truePrice).toBe('88.00');
+  });
+
+  // CR-2-h4: `orderDetail` / `orderListItem` carry no adjustments and no activity
+  // unit price, so once a coupon stacks on a 预售 the page cannot tell the ¥10
+  // activity discount from the ¥5 coupon and falls back to the catalogue price.
+  it.fails('CR-2-h4: a 预售 order with a stacked coupon still prints ¥78', () => {
+    const detail = toLegacyOrderDetail({
+      ...presaleOrder,
+      items: [{ ...orderItem, discountAmount: '15.00', totalAmount: '73.00' }],
+      couponDiscount: '15.00',
+      payableAmount: '73.00',
+      paidAmount: '73.00',
+      userCouponId: '9001',
+    });
+    expect(detail.cartInfo[0].truePrice).toBe('78.00');
   });
 });

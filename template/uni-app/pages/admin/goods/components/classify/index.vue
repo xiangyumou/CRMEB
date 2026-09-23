@@ -74,7 +74,7 @@
                 </view>
             </checkbox-group>
             <view class="empty-box" v-else>
-                <emptyPage title="暂无分类～" src="/statics/images/empty-box.png"></emptyPage>
+                <emptyPage title="暂无分类～"></emptyPage>
             </view>
             <view class="footer acea-row row-between-wrapper">
                 <view class="bnt acea-row row-center-wrapper" @tap="reset">重置</view>

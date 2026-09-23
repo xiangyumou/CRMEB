@@ -13,18 +13,8 @@
  * tracks the same list.
  */
 export const KNOWN_FAILED_REQUESTS: ReadonlyArray<{ pattern: RegExp; owner: string }> = [
-  {
-    // `App.vue` fetches the legacy custom-script route on every launch.
-    pattern: /^GET \/api\/get_script 404$/,
-    owner: 'CR-4-i §4',
-  },
-  {
-    // `${HTTP_REQUEST_URL}/statics/images/…` — the legacy PHP `public/statics`
-    // tree (empty-state pictures, the coupon bag, the 开团 gif), which
-    // nothing in the rewrite serves.
-    pattern: /^GET \/statics\/images\/[\w.-]+ 404$/,
-    owner: 'CR-4-i §5',
-  },
+  // Empty. CR-4-i §4 (`/api/get_script`) and §5 (`/statics/images/*`) were
+  // closed by H4; see `docs/rewrite/status/h4.md`.
 ];
 
 /**
@@ -32,19 +22,8 @@ export const KNOWN_FAILED_REQUESTS: ReadonlyArray<{ pattern: RegExp; owner: stri
  * today, each with its owner — same rules as `KNOWN_FAILED_REQUESTS`.
  */
 export const KNOWN_CONSOLE_ERRORS: ReadonlyArray<{ pattern: RegExp; owner: string }> = [
-  {
-    // `App.vue` appends the body of `/api/get_script` as a `<script>`; the
-    // route is gone, so the body is an HTML 404 page.
-    pattern: /Failed to execute 'appendChild' on 'Node': Unexpected token '<'/,
-    owner: 'CR-4-i §4',
-  },
-  {
-    // `pages/index/index.vue` `getCoupon` reads `res.data.list.length`, but
-    // `api/api.js` `getCouponV2` maps the list to a bare array.
-    pattern:
-      /^unhandledrejection TypeError: Cannot read properties of undefined \(reading 'length'\)$/,
-    owner: 'CR-4-i §3',
-  },
+  // Empty. CR-4-i §4 (the HTML 404 appended as a script) and §3 (the 首页
+  // coupon popup's `data.list.length`) were closed by H4.
 ];
 
 /**

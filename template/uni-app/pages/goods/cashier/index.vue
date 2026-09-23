@@ -16,7 +16,7 @@
 				{{$t(`支付方式`)}}
 			</view>
 			<view class="item acea-row row-between-wrapper" v-for="(item,index) in cartArr" :key="index"
-				v-show='item.payStatus' @click="payType(item.number || 0, item.value, index)">
+				v-show='item.payStatus' :data-testid="'pay-method-' + item.value" @click="payType(item.number || 0, item.value, index)">
 				<view class="left acea-row row-between-wrapper">
 					<view class="iconfont" :class="item.icon"></view>
 					<view class="text">
@@ -28,7 +28,7 @@
 			</view>
 		</view>
 		<view class="btn">
-			<view class="button acea-row row-center-wrapper" @click='goPay(number, paytype)'>{{$t(`确认支付`)}}</view>
+			<view class="button acea-row row-center-wrapper" data-testid="pay-submit" @click='goPay(number, paytype)'>{{$t(`确认支付`)}}</view>
 			<view class="wait-pay" @click="waitPay">{{$t(`暂不支付`)}}</view>
 		</view>
 	</view>

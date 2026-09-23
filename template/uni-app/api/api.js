@@ -7,6 +7,8 @@ import request from '../utils/request.js';
 import {
   toLegacyCouponList,
   toLegacyCouponArray,
+  toLegacyCouponPopup,
+  toLegacyNewUserCouponPopup,
   toLegacyUserCouponList,
   toLegacyClaimResult,
   fromLegacyCouponState,
@@ -62,7 +64,7 @@ export function getCoupons(data) {
 export function getCouponV2() {
   return request.get('/api/v1/coupons', { page: 1, pageSize: 20 }, {
     noAuth: true,
-    map: toLegacyCouponArray,
+    map: toLegacyCouponPopup,
   });
 }
 
@@ -70,7 +72,7 @@ export function getCouponV2() {
  * 新用户优惠券弹窗
  */
 export function getCouponNewUser() {
-  return request.get('/api/v1/coupons/new-user', {}, { noAuth: true, map: toLegacyCouponArray });
+  return request.get('/api/v1/coupons/new-user', {}, { noAuth: true, map: toLegacyNewUserCouponPopup });
 }
 
 /**
@@ -115,14 +117,17 @@ export function diyLayout(type, map) {
  */
 export function getThemeInfo(type, data) {
   const src = data || {};
-  if (type === 'home' || type === undefined) {
-    return request.get('/api/v1/diy/pages/home', {}, { noAuth: true, map: toLegacyDiyPage });
-  }
+  // A `theme_id` names one page and wins over the type: 微页面
+  // (`pages/annex/special?theme_id=`) asks for it as `getThemeInfo('home', {theme_id})`,
+  // and an admin preview of the home page does the same (CR-4-i §6).
   if (src.theme_id) {
     return request.get(`/api/v1/diy/pages/${src.theme_id}`, {}, {
       noAuth: true,
       map: toLegacyDiyPage,
     });
+  }
+  if (type === 'home' || type === undefined) {
+    return request.get('/api/v1/diy/pages/home', {}, { noAuth: true, map: toLegacyDiyPage });
   }
   // 个人中心是一整页装修（`pages/user` 把它交给 PageDesign，读 `.value`），F4 的
   // `GET /api/v1/diy/pages/user-center`（CR-3-h2 §1）。它的「版式」数字在
@@ -167,7 +172,14 @@ export function getDiyVersion(name) {
  * @param string name
  */
 export function colorChange(name) {
-  return request.get('/api/v1/diy/theme', {}, { noAuth: true, map: toLegacyTheme });
+  // No theme published is a 404 (`DIY_THEME_NOT_FOUND`), not an error to the
+  // shopper: legacy's default palette, as before any theme existed.
+  return request
+    .get('/api/v1/diy/theme', {}, { noAuth: true, map: toLegacyTheme })
+    .catch((err) => {
+      if (err && err.status === 404) return { data: toLegacyTheme(null), msg: '', status: 200 };
+      throw err;
+    });
 }
 
 /**
@@ -348,8 +360,12 @@ export function getOpenAdv() {
  * 商品图失败就整体失败；二维码可选，转不了就原样交回。
  */
 export function toDataUrls(image, code) {
+  // An image that already is a `data:` URL — or no image at all — needs no
+  // round trip: the route would refuse either (a 422 on every poster).
   const one = (url) =>
-    request.post('/api/v1/attachments/base64', fromLegacyBase64Input(url), { map: toLegacyBase64 });
+    /^data:image\//i.test(text(url).trim()) || !text(url).trim()
+      ? Promise.resolve({ data: text(url).trim(), msg: '', status: 200 })
+      : request.post('/api/v1/attachments/base64', fromLegacyBase64Input(url), { map: toLegacyBase64 });
   const codeUrl = text(code).trim();
   return Promise.all([
     one(image),

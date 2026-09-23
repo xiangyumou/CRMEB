@@ -203,6 +203,15 @@ export interface SignedNotification {
 export interface FakeWechatGateway {
   url: string;
   port: number;
+  /**
+   * The page an H5 create's `h5_url` sends the phone browser to, standing in
+   * for WeChat's H5 cashier: `GET <url>/h5-cashier?out_trade_no=…`. It 302s
+   * to the `redirect_url` query parameter the app appends (http/https only),
+   * the way WeChat returns the shopper, and otherwise answers a plain 200.
+   * It settles nothing — paying stays the test's job (`markPaid` /
+   * `postNotify`), so a test keeps control of paid-vs-unpaid timing.
+   */
+  h5CashierUrl: string;
   keys: FakeWechatKeys;
   /** Every request the app made, in order. */
   calls: RecordedCall[];
@@ -255,7 +264,15 @@ export interface FakeWechatGatewayOptions {
   port?: number;
   /** Epoch ms source. Injected so expiry is deterministic under a fake clock. */
   now?: () => number;
+  /**
+   * Where an H5 create's `h5_url` points. Defaults to the fake's own
+   * `GET /h5-cashier` (see `FakeWechatGateway.h5CashierUrl`).
+   */
+  h5CashierUrl?: string;
 }
+
+/** The four create endpoints; each answers in its own shape. */
+export type FakeTradeType = 'jsapi' | 'app' | 'native' | 'h5';
 
 export async function startFakeWechatGateway(
   options: FakeWechatGatewayOptions = {},
@@ -366,7 +383,49 @@ export async function startFakeWechatGateway(
     return transaction ? refresh(transaction) : undefined;
   }
 
+  const h5CashierUrl = options.h5CashierUrl ?? `http://127.0.0.1:${port}/h5-cashier`;
+
+  /**
+   * The fake H5 cashier. A browser request, not an API call from the app, so
+   * it is neither recorded in `calls` nor subject to failure injection.
+   */
+  function h5Cashier(req: IncomingMessage, res: ServerResponse): boolean {
+    const url = new URL(req.url ?? '/', 'http://wxpay.local');
+    if ((req.method ?? 'GET').toUpperCase() !== 'GET' || url.pathname !== '/h5-cashier') {
+      return false;
+    }
+    const back = url.searchParams.get('redirect_url');
+    const target = back && URL.canParse(back) ? new URL(back) : null;
+    if (target && (target.protocol === 'http:' || target.protocol === 'https:')) {
+      res.writeHead(302, { location: target.toString() }).end();
+    } else {
+      res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' }).end('fake cashier');
+    }
+    return true;
+  }
+
+  /**
+   * A create's answer, by trade type — the shapes WeChat Pay v3 answers:
+   * `jsapi` / `app` a `prepay_id`, `native` a `code_url`, `h5` an `h5_url`.
+   * Fresh on every call, including a repeat create of the same unpaid order.
+   */
+  function createAnswer(tradeType: FakeTradeType, outTradeNo: string): Record<string, string> {
+    switch (tradeType) {
+      case 'h5': {
+        const cashier = new URL(h5CashierUrl);
+        cashier.searchParams.set('out_trade_no', outTradeNo);
+        cashier.searchParams.set('prepay_id', `wx${randomBytes(16).toString('hex')}`);
+        return { h5_url: cashier.toString() };
+      }
+      case 'native':
+        return { code_url: `weixin://wxpay/bizpayurl?pr=${randomBytes(6).toString('hex')}` };
+      default:
+        return { prepay_id: `wx${randomBytes(16).toString('hex')}` };
+    }
+  }
+
   async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (h5Cashier(req, res)) return;
     const { raw, parsed } = await readJson(req);
     const url = new URL(req.url ?? '/', 'http://wxpay.local');
     calls.push({
@@ -400,12 +459,10 @@ export async function startFakeWechatGateway(
     const method = (req.method ?? 'GET').toUpperCase();
     const body = (parsed ?? {}) as Record<string, unknown>;
 
-    // --- create transaction (JSAPI / H5 / native share this shape) ----------
-    if (
-      method === 'POST' &&
-      /^\/v3\/pay\/transactions\/(jsapi|h5|native|app)$/.test(url.pathname)
-    ) {
-      createTransaction(res, body);
+    // --- create transaction (one body shape, four answer shapes) -----------
+    const createMatch = /^\/v3\/pay\/transactions\/(jsapi|h5|native|app)$/.exec(url.pathname);
+    if (method === 'POST' && createMatch) {
+      createTransaction(res, body, createMatch[1] as FakeTradeType);
       return;
     }
 
@@ -454,7 +511,11 @@ export async function startFakeWechatGateway(
     fail(res, 404, 'RESOURCE_NOT_EXISTS', `fake gateway: ${url.pathname} 未实现`);
   }
 
-  function createTransaction(res: ServerResponse, body: Record<string, unknown>): void {
+  function createTransaction(
+    res: ServerResponse,
+    body: Record<string, unknown>,
+    tradeType: FakeTradeType,
+  ): void {
     const outTradeNo = String(body.out_trade_no ?? '');
     const amount = (body.amount ?? {}) as { total?: number };
     const totalFen = amount.total ?? 0;
@@ -490,9 +551,9 @@ export async function startFakeWechatGateway(
         fail(res, 400, 'INVALID_REQUEST', '订单号重复，且金额与原单不一致');
         return;
       }
-      // Still unpaid and unchanged: a fresh prepay_id for the same order, which
+      // Still unpaid and unchanged: a fresh answer for the same order, which
       // is what makes "tap pay twice" survivable.
-      reply(res, 200, { prepay_id: `wx${randomBytes(16).toString('hex')}` });
+      reply(res, 200, createAnswer(tradeType, outTradeNo));
       return;
     }
 
@@ -507,7 +568,7 @@ export async function startFakeWechatGateway(
       expiresAtMs: Number.isNaN(expire) ? null : expire,
       successTime: null,
     });
-    reply(res, 200, { prepay_id: `wx${randomBytes(16).toString('hex')}` });
+    reply(res, 200, createAnswer(tradeType, outTradeNo));
   }
 
   function closeTransaction(res: ServerResponse, outTradeNo: string): void {
@@ -702,6 +763,7 @@ export async function startFakeWechatGateway(
 
   return {
     url: `http://127.0.0.1:${port}`,
+    h5CashierUrl,
     port,
     keys,
     calls,

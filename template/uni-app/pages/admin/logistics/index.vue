@@ -45,7 +45,7 @@
 						<text class="iconfont fs-24 pl-8" :class="showMore ? 'icon-ic_uparrow' : 'icon-ic_downarrow'"></text>
 					</view>
 				</view>
-				<emptyPage title="暂无物流信息" src="/statics/images/noExpress.gif" v-else></emptyPage>
+				<emptyPage title="暂无物流信息" v-else></emptyPage>
 			</view>
 			<view class="safe-area-inset-bottom"></view>
 		</view>

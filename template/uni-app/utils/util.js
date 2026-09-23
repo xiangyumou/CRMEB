@@ -104,6 +104,10 @@ export default {
       icon = opt.icon || "none",
       endtime = opt.endtime || 2000,
       success = opt.success;
+    // Pages toast a rejected request as `Tips({ title: err })`, written when
+    // rejections were strings; `utils/request.js` rejects with an object that
+    // carries `msg`, which showToast rendered as nothing (H4).
+    if (title && typeof title === "object") title = title.msg || title.message || "";
     if (title)
       uni.showToast({
         title: title,

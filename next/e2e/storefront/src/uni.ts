@@ -1,22 +1,16 @@
 import type { Locator, Page } from '@playwright/test';
 
 /**
- * Locators for the uni-app H5 runtime's own DOM, which is not the DOM the
- * `.vue` source suggests.
+ * The real form control inside a uni-app H5 input or textarea, found by the
+ * `data-testid` the page puts on it.
  *
- * `<input placeholder="…">` in a page renders as `<uni-input>` holding a
- * sibling `<div class="uni-input-placeholder">` and an `<input>` with *no*
- * `placeholder` attribute — so `getByPlaceholder` finds nothing, and the text
- * a shopper sees as the placeholder is the only stable handle there is.
+ * `<input>` / `<textarea>` in a page render as `<uni-input>` /
+ * `<uni-textarea>`: a host element holding a placeholder `<div>` and the real
+ * control, which has *no* `placeholder` attribute — so `getByPlaceholder`
+ * finds nothing. A `data-testid` on the page's tag lands on that host (Vue
+ * passes non-prop attributes to a component's root), so the control is the
+ * host's `input` / `textarea`.
  */
-export function uniInput(page: Page, placeholder: string): Locator {
-  return page.locator('uni-input', { has: page.getByText(placeholder) }).locator('input');
-}
-
-/** Same for `<textarea>`: `<uni-textarea>` with a placeholder `<div>` beside the real textarea. */
-export function uniTextarea(page: Page, placeholder?: string): Locator {
-  const host = placeholder
-    ? page.locator('uni-textarea', { has: page.getByText(placeholder) })
-    : page.locator('uni-textarea');
-  return host.locator('textarea');
+export function uniField(page: Page, testId: string): Locator {
+  return page.getByTestId(testId).locator('input, textarea');
 }

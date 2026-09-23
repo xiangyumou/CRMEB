@@ -36,7 +36,7 @@
         <view class="list">
           <checkbox-group @change="checkboxChange">
             <block v-for="(item, index) in cartList.valid" :key="index">
-              <view class="item acea-row row-between-wrapper">
+              <view class="item acea-row row-between-wrapper" data-testid="cart-row" :data-sku-id="item.product_attr_unique">
                 <!-- #ifndef MP -->
                 <checkbox
                   :value="item.id.toString()"
@@ -95,9 +95,9 @@
                     class="carnum acea-row row-center-wrapper"
                     v-if="item.attrStatus"
                   >
-                    <view class="reduce" @click.stop="subCart(index)">-</view>
+                    <view class="reduce" data-testid="cart-qty-minus" @click.stop="subCart(index)">-</view>
                     <!-- <view class='num'>{{item.cart_num}}</view> -->
-                    <view class="num">
+                    <view class="num" data-testid="cart-qty">
                       <input
                         type="number"
                         v-model="item.cart_num"
@@ -108,6 +108,7 @@
                     </view>
                     <view
                       class="plus"
+                      data-testid="cart-qty-plus"
                       :class="item.numAdd && !disabledChangeNumber ? 'on' : ''"
                       @click.stop="addCart(index)"
                       >+</view
@@ -182,7 +183,7 @@
         "
       >
         <view class="emptyBox">
-          <image :src="imgHost + '/statics/images/no-thing.png'"></image>
+          <image :src="'/static/images/legacy/no-thing.png'"></image>
           <view class="tips">{{ $t(`暂无商品`) }}</view>
         </view>
         <recommend
@@ -206,9 +207,9 @@
           </checkbox-group>
         </view>
         <view class="money acea-row row-middle" v-if="footerswitch == true">
-          <text class="font-color">{{ $t(`￥`) }}{{ selectCountPrice }}</text>
+          <text class="font-color" data-testid="cart-total">{{ $t(`￥`) }}{{ selectCountPrice }}</text>
           <form @submit="subOrder">
-            <button class="placeOrder bg-color" formType="submit">
+            <button class="placeOrder bg-color" formType="submit" data-testid="cart-checkout">
               {{ $t(`立即下单`) }}
             </button>
           </form>
@@ -528,7 +529,7 @@ export default {
       }
       //sort();排序函数:数字-英文-汉字；
       let productSelect = this.productValue[value.sort().join(",")];
-      if (productSelect && productAttr.length) {
+      if (productSelect) {
         this.$set(
           this.attr.productSelect,
           "store_name",

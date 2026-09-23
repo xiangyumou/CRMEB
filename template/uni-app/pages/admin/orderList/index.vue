@@ -100,7 +100,7 @@
 				</view>
 			</view>
 			<view v-else class="px-20 mt-20 empty-wrapper">
-				<emptyPage title="暂无订单～" src="/statics/images/noOrder.gif"></emptyPage>
+				<emptyPage title="暂无订单～"></emptyPage>
 			</view>
 		</scroll-view>
 		<Loading :loaded="loaded" :loading="loading"></Loading>

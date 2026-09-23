@@ -311,8 +311,22 @@ export function toLegacyGroupbuyPoster(dto) {
 // 预售
 // ---------------------------------------------------------------------------
 
+/**
+ * The 预售 pages' `pay_status`: 1 未开始 · 2 进行中 · 3 已结束 — the three buttons
+ * `presell_details` switches between. It was pinned to 1 (read as "定金 not
+ * supported"), so 立即购买 never rendered and every activity said 未开始 (H4,
+ * journey 7). The clock is injectable so the mapper stays deterministic.
+ */
+export function presaleWindowStatus(dto, now = Date.now()) {
+  const start = Date.parse(text(dto && dto.startAt));
+  const end = Date.parse(text(dto && dto.endAt));
+  if (!Number.isNaN(start) && now < start) return 1;
+  if (!Number.isNaN(end) && now > end) return 3;
+  return 2;
+}
+
 /** `presaleCard` → one row of 预售列表. */
-export function toLegacyPresaleCard(dto) {
+export function toLegacyPresaleCard(dto, now = Date.now()) {
   if (!dto) return {};
   return {
     id: toId(dto.activityId),
@@ -330,7 +344,7 @@ export function toLegacyPresaleCard(dto) {
     unit_name: '件',
     // 全款预售 only: D refuses a 定金 activity with `PRESALE_DEPOSIT_NOT_SUPPORTED`.
     presell_type: 1,
-    pay_status: 1,
+    pay_status: presaleWindowStatus(dto, now),
     deliver_time: toInt(dto.shipAfterDays, 0),
     presale_start_time: unixSeconds(dto.startAt),
     presale_end_time: unixSeconds(dto.endAt),
@@ -348,11 +362,11 @@ export function toLegacyPresaleList(dto) {
 }
 
 /** `presaleDetail` → the 预售详情 payload, shaped like a product detail. */
-export function toLegacyPresaleDetail(dto) {
+export function toLegacyPresaleDetail(dto, now = Date.now()) {
   if (!dto) return {};
   const skus = list(dto.skus);
   const first = skus[0];
-  const card = toLegacyPresaleCard(dto);
+  const card = toLegacyPresaleCard(dto, now);
   return {
     storeInfo: {
       ...card,
@@ -372,8 +386,8 @@ export function toLegacyPresaleDetail(dto) {
     },
     productAttr: toLegacyProductAttr(specsOf(dto)),
     productValue: toLegacyProductValue(skusAsCatalog(dto), dto.title),
-    // 定金预售 is not supported, so the 尾款 branch never renders.
-    pay_status: 1,
+    // 1 未开始 · 2 进行中 · 3 已结束 (not 定金/尾款 — 定金预售 is refused by D).
+    pay_status: card.pay_status,
     reply: null,
     replyCount: 0,
     replyChance: 0,

@@ -1,9 +1,8 @@
 import { codeKey } from '@shop/core/sms';
 
-import { blockedBy } from '../src/blocked';
 import { test, expect } from '../src/fixtures';
 import type { Stack } from '../src/stack';
-import { uniInput } from '../src/uni';
+import { uniField } from '../src/uni';
 
 /**
  * Journey 5 — Login.
@@ -18,21 +17,19 @@ import { uniInput } from '../src/uni';
  * either (`findByAccountOrPhone`), so this is not a workaround, just the
  * one of the two identifiers the form itself validates.
  *
- * The SMS half is blocked by CR-3-i (`docs/rewrite/cr/CR-3-i.md`): the
- * real, out-of-process `next start` server has no SMS sender a test can
- * stand in for. Decided and assigned to W5T: `SHOP_FAKE_SMS=1` on the web
- * process registers the fake sender in web's own module graph.
- * `scripts/serve.ts` already passes it, and the code is read back from Redis
- * under the key `issueCode()` writes (`codeKey`), so the two SMS tests only
- * need their `blockedBy` removed once W5T merges.
+ * The SMS half runs against the real, out-of-process `next start` server:
+ * `SHOP_FAKE_SMS=1` (passed by `scripts/serve.ts`, CR-3-i, landed with W5T)
+ * registers the fake sender in web's own module graph, and the code is read
+ * back from Redis under the key `issueCode()` writes (`codeKey`). The page's
+ * 获取验证码 refuses until the terms are ticked, so the box is ticked first.
  */
 
 test('the terms checkbox blocks submission until it is checked', async ({ page, shop }) => {
   await page.goto('/pages/users/login/index');
   await page.getByText('账号登录', { exact: true }).click();
-  await uniInput(page, '输入手机号码').fill(shop.users.primary.phone);
-  await uniInput(page, '填写登录密码').fill(shop.users.primary.password);
-  await page.getByText('登录', { exact: true }).click();
+  await uniField(page, 'login-phone').fill(shop.users.primary.phone);
+  await uniField(page, 'login-password').fill(shop.users.primary.password);
+  await page.getByTestId('login-submit').click();
   await expect(page.getByText('请先阅读并同意协议')).toBeVisible();
   // Still on the login page — nothing was submitted.
   await expect(page).toHaveURL(/users\/login/);
@@ -41,15 +38,15 @@ test('the terms checkbox blocks submission until it is checked', async ({ page, 
 test('password login reaches an authenticated screen', async ({ page, shop }) => {
   await page.goto('/pages/users/login/index');
   await page.getByText('账号登录', { exact: true }).click();
-  await uniInput(page, '输入手机号码').fill(shop.users.primary.phone);
-  await uniInput(page, '填写登录密码').fill(shop.users.primary.password);
-  await page.locator('.protocol uni-checkbox').click();
+  await uniField(page, 'login-phone').fill(shop.users.primary.phone);
+  await uniField(page, 'login-password').fill(shop.users.primary.password);
+  await page.getByTestId('login-terms').click();
   const session = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === '/api/v1/auth/sessions/password' &&
       response.request().method() === 'POST',
   );
-  await page.getByText('登录', { exact: true }).click();
+  await page.getByTestId('login-submit').click();
   expect((await session).ok()).toBe(true);
   // `toLogin`'s own back-url bookkeeping sends a fresh login (no prior page)
   // home; either way, the login form itself is gone …
@@ -78,47 +75,43 @@ async function issuedCode(shop: Stack, phone: string): Promise<string> {
 }
 
 test('a phone number receives an SMS code it can log in with', async ({ page, shop }) => {
-  blockedBy(
-    'CR-3-i: SHOP_FAKE_SMS=1 (passed by scripts/serve.ts) registers no sender until W5T §5 lands',
-  );
   const phone = shop.users.primary.phone;
   await shop.redis.del(codeKey('login', phone), `sms:resend:login:${phone}`);
   await page.goto('/pages/users/login/index');
-  await uniInput(page, '输入手机号码').fill(phone);
-  await page.locator('uni-button.code').click();
+  await uniField(page, 'login-phone').fill(phone);
+  // 获取验证码 refuses before the terms are ticked (`code()` checks `protocol` first).
+  await page.getByTestId('login-terms').click();
+  await page.getByTestId('login-send-code').click();
   await expect(page.getByText('发送成功', { exact: false })).toBeVisible();
 
   const code = await issuedCode(shop, phone);
-  await uniInput(page, '填写验证码').fill(code);
-  await page.locator('.protocol uni-checkbox').click();
+  await uniField(page, 'login-code').fill(code);
   const session = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === '/api/v1/auth/sessions/sms' &&
       response.request().method() === 'POST',
   );
-  await page.locator('.logon').click();
+  await page.getByTestId('login-submit').click();
   expect((await session).ok()).toBe(true);
   await expect(page).not.toHaveURL(/users\/login/, { timeout: 15_000 });
 });
 
 test('a wrong SMS code is rejected and the code stays usable', async ({ page, shop }) => {
-  blockedBy(
-    'CR-3-i: SHOP_FAKE_SMS=1 (passed by scripts/serve.ts) registers no sender until W5T §5 lands',
-  );
   const phone = shop.users.secondary.phone;
   await shop.redis.del(codeKey('login', phone), `sms:resend:login:${phone}`);
   await page.goto('/pages/users/login/index');
-  await uniInput(page, '输入手机号码').fill(phone);
-  await page.locator('uni-button.code').click();
+  await uniField(page, 'login-phone').fill(phone);
+  // 获取验证码 refuses before the terms are ticked (`code()` checks `protocol` first).
+  await page.getByTestId('login-terms').click();
+  await page.getByTestId('login-send-code').click();
   const code = await issuedCode(shop, phone);
   const wrong = code === '000000' ? '111111' : '000000';
 
-  await uniInput(page, '填写验证码').fill(wrong);
-  await page.locator('.protocol uni-checkbox').click();
+  await uniField(page, 'login-code').fill(wrong);
   const session = page.waitForResponse(
     (response) => new URL(response.url()).pathname === '/api/v1/auth/sessions/sms',
   );
-  await page.locator('.logon').click();
+  await page.getByTestId('login-submit').click();
   expect((await session).status()).toBe(400);
   await expect(page.getByText('验证码不正确或已过期')).toBeVisible();
   await expect(page).toHaveURL(/users\/login/);

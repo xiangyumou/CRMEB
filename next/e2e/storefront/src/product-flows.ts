@@ -42,7 +42,7 @@ export async function checkoutFromCart(page: Page): Promise<void> {
   const selectAll = page.getByText('全选', { exact: false }).first();
   await expect(selectAll).toBeVisible();
   await selectAll.click();
-  await page.getByText('立即下单', { exact: true }).click();
+  await page.getByTestId('cart-checkout').click();
   await page.waitForURL(/order_confirm/);
 }
 
@@ -52,7 +52,7 @@ export async function checkoutFromCart(page: Page): Promise<void> {
  * to wait for, only the URL changing.
  */
 export async function submitOrder(page: Page): Promise<void> {
-  await page.getByText('提交订单', { exact: true }).first().click();
+  await page.getByTestId('confirm-submit').click();
   await page.waitForURL(/cashier\/index/, { timeout: 30_000 });
 }
 
@@ -60,15 +60,15 @@ export async function submitOrder(page: Page): Promise<void> {
  * `cashier/index.vue`'s `确认支付`, settled through the fake gateway's
  * control-plane bridge rather than followed through the UI's own redirect.
  *
- * The cashier's non-WeChat-browser path (`WECHAT_H5_PAY`) reads
- * `uni.reLaunch`s to `order_pay_status` and *then*, 1.5s later, does
- * `location.href = h5_url` — the fake gateway is an API surface, not a
- * browsable checkout page, so following that redirect in a real Chromium tab
- * would navigate the test off the app for no assertion this suite needs.
- * Capturing `outTradeNo` from the `POST /orders/:id/payments` response and
- * driving `payOrder` directly is the same event a real WeChat notification
- * would produce (`markPaid` + `postNotify` against the real webhook route),
- * without racing that redirect.
+ * The cashier's non-WeChat-browser path (`WECHAT_H5_PAY`) `uni.reLaunch`es
+ * to `order_pay_status` and *then*, 1.5s later, does `location.href = h5_url`
+ * — the fake gateway's own `/h5-cashier` (`@shop/testing`, CR-5-i), which
+ * sends the browser straight back and settles nothing, as WeChat's cashier
+ * does when the shopper gives up. So the payment is settled here: capturing
+ * `outTradeNo` from the `POST /orders/:id/payments` response (which only
+ * succeeds when the real H5 create got its `h5_url`) and driving `payOrder`
+ * is the same event a real WeChat notification would produce (`markPaid` +
+ * `postNotify` against the real webhook route).
  */
 export async function payAtCashier(page: Page, shop: Stack): Promise<string> {
   const paymentResponse = page.waitForResponse(
@@ -76,8 +76,9 @@ export async function payAtCashier(page: Page, shop: Stack): Promise<string> {
       /\/api\/v1\/orders\/[^/]+\/payments$/.test(new URL(response.url()).pathname) &&
       response.request().method() === 'POST',
   );
-  await page.getByText('确认支付', { exact: true }).click();
+  await page.getByTestId('pay-submit').click();
   const response = await paymentResponse;
+  expect(response.ok(), `payment create failed: ${response.status()}`).toBe(true);
   const body = (await response.json()) as { outTradeNo: string };
   await payOrder(shop, body.outTradeNo);
   return body.outTradeNo;
@@ -172,4 +173,20 @@ export async function arrangeCartItem(
   });
   expect(added.ok(), `cart add failed: ${added.status()} ${await added.text()}`).toBe(true);
   return ((await added.json()) as { item: { id: string } }).item.id;
+}
+
+/**
+ * No component on the page prints an object as text (CR-7-i).
+ *
+ * Vue renders `{{ obj }}` as `JSON.stringify(obj, null, 2)`, so a component
+ * bound to an object where it expects a string shows up as `{ "key": …`
+ * among the product copy. Read off `innerText`, which is what a shopper
+ * sees, once the page's own content is on screen.
+ */
+export async function expectNoRawJson(page: Page): Promise<void> {
+  const text = await page.evaluate(() => document.body.innerText);
+  expect(
+    text.match(/\{\s*"[^"\n]+"\s*:[^\n]*/g) ?? [],
+    'a component printed an object as raw JSON',
+  ).toEqual([]);
 }

@@ -16,8 +16,8 @@
 					<view class="pictrue">
 						<image :src="
 						  homeActive === true
-						    ? imgHost + '/statics/images/close.gif'
-						    : imgHost + '/statics/images/open.gif'
+						    ? '/static/images/legacy/close.gif'
+						    : '/static/images/legacy/open.gif'
 						" class="image" />
 					</view>
 				</view>

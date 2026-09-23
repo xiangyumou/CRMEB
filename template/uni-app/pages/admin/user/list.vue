@@ -93,7 +93,6 @@
     <block v-if="userLists.length == 0 && !loading">
       <emptyPage
         title="暂无用户信息～"
-        src="/statics/images/empty-box.gif"
       ></emptyPage>
     </block>
     <Loading :loaded="loadend" :loading="loading"></Loading>

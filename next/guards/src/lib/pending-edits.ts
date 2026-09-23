@@ -45,16 +45,8 @@ export const PENDING_EDITS: readonly PendingEdit[] = [
   // applied all three (AUTH-001 also picked up its **Adapted:** reason) — the
   // rows read `ported` now, so the entries are gone.
   // SMOKE-002…005 were mapped at I's merge to the storefront suite's journeys.
-  // The other five had no verified test there; H4 checks the candidates
-  // `status/i.md` names (and writes the missing half) or retires them.
-  ...['006', '007', '008', '009', '012'].map((n) => ({
-    id: `SMOKE-${n}`,
-    resolution: {
-      kind: 'assign' as const,
-      stream: 'H4',
-      why: 'stream I found no storefront journey for it; H4 verifies the candidate core tests in status/i.md, writes the missing half, or retires it with evidence',
-    },
-  })),
+  // The other five (SMOKE-006…009, 012) were answered by H4 and applied at
+  // its merge: four ported against core tests, SMOKE-007 retired.
 
   // OPS-001 … OPS-011 and REL-001 … REL-007 used to sit here, assigned to J2
   // with `CR-2-j2` as the change request that owed them an answer. J3 applied

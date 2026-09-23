@@ -32,7 +32,7 @@
 				</scroll-view>
 			</view>
 			<view class="empty-box" v-else>
-				<emptyPage title="暂无优惠券～" src="/statics/images/noCoupon.png"></emptyPage>
+				<emptyPage title="暂无优惠券～"></emptyPage>
 			</view>
 		</view>
 	</base-drawer>

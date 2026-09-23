@@ -21,6 +21,8 @@ import {
   toLegacyCouponTemplate,
   toLegacyCouponList,
   toLegacyCouponArray,
+  toLegacyCouponPopup,
+  toLegacyNewUserCouponPopup,
   toLegacyUserCoupon,
   toLegacyUserCouponList,
   toLegacyClaimResult,
@@ -167,6 +169,28 @@ describe('coupon', () => {
     expect(newUser.use_title).toBe('领取后 30 天内可用');
   });
 
+  it('answers the 首页 coupon popup as {list, image}, claimable templates only (CR-4-i §3)', () => {
+    // `pages/index` and `pages/annex/special` read `res.data.list.length`.
+    const popup = toLegacyCouponPopup(TEMPLATES);
+    expect(popup.list).toHaveLength(1);
+    expect(popup.list[0]).toMatchObject({ coupon_id: 1, coupon_price: '10.00', is_use: 0 });
+    expect(popup.image).toBe('');
+    const taken = { ...TEMPLATES, items: [{ ...TEMPLATES.items[0], canClaim: false }] };
+    expect(toLegacyCouponPopup(taken).list).toEqual([]);
+    const anonymous = { ...TEMPLATES, items: [{ ...TEMPLATES.items[0], canClaim: null }] };
+    expect(toLegacyCouponPopup(anonymous).list).toEqual([]);
+    expect(toLegacyCouponPopup(null)).toEqual({ list: [], image: '' });
+    assertRenderable(popup);
+  });
+
+  it('answers the 新人券 popup as {list, image, show: 0} — the route cannot tell a first visit', () => {
+    const popup = toLegacyNewUserCouponPopup(example('GET /api/v1/coupons/new-user'));
+    expect(popup.show).toBe(0);
+    expect(popup.list).toHaveLength(1);
+    expect(popup.list[0].coupon_title).toBe('新人专享 5 元券');
+    expect(toLegacyNewUserCouponPopup(null)).toEqual({ list: [], image: '', show: 0 });
+  });
+
   it('maps the scope onto the legacy type', () => {
     expect(toLegacyCouponTemplate({ scope: 'all_products' }).type).toBe(0);
     expect(toLegacyCouponTemplate({ scope: 'categories' }).type).toBe(1);
@@ -207,6 +231,37 @@ describe('coupon', () => {
     });
     const lines = exampleBody('POST /api/v1/user-coupons/applicable').lines;
     expect(fromLegacyApplicableInput('0', { lines })).toEqual({ lines });
+  });
+
+  it('CR-4-i §11 — the 确认订单 picker sends one line per checkout line, not productId 0', () => {
+    const cartInfo = [
+      { product_id: '11', cart_num: 2, truePrice: '60.00', sum_price: '120.00' },
+      { product_id: '12', cart_num: 1, truePrice: '30.00', sum_price: '30.00' },
+    ];
+    expect(fromLegacyApplicableInput('150.00', { cartId: '5001,5002', cartInfo, new: 0, shippingType: 1 })).toEqual({
+      lines: [
+        { productId: '11', categoryIds: [], amount: '120.00' },
+        { productId: '12', categoryIds: [], amount: '30.00' },
+      ],
+    });
+    // The contract example's shape: every line a productId, categoryIds and amount.
+    const example = exampleBody('POST /api/v1/user-coupons/applicable').lines[0];
+    const ours = fromLegacyApplicableInput('0', { cartInfo }).lines[0];
+    expect(Object.keys(ours).sort()).toEqual(Object.keys(example).sort());
+  });
+
+  // CR-1-h4: the confirm page's lines come from `checkoutPreview`, whose
+  // `checkoutLine` has no category ids, and the applicable route matches a
+  // 品类券 only on the ids the caller sends. Flip to `it` once either side fixes it.
+  it.fails('CR-1-h4 — a checkout line reaches the coupon picker with its categories', () => {
+    const preview = example('POST /api/v1/checkout/preview');
+    const cartInfo = preview.lines.map((line) => ({
+      product_id: line.productId,
+      sum_price: line.totalAmount,
+      categoryIds: line.categoryIds,
+    }));
+    const body = fromLegacyApplicableInput(preview.payableAmount, { cartInfo });
+    for (const line of body.lines) expect(line.categoryIds.length).toBeGreaterThan(0);
   });
 
   it('maps the 我的优惠券 tab onto a state', () => {
@@ -381,9 +436,13 @@ describe('diy', () => {
     expect(toLegacyDiyVersion(example('GET /api/v1/diy/version'))).toEqual({ version: '1716451200000' });
     expect(toLegacyDiyVersion(null)).toEqual({ version: '' });
     const theme = toLegacyTheme(example('GET /api/v1/diy/theme'));
-    expect(theme.status).toEqual({ theme: '#E93323', accent: '#FF7E00' });
-    expect(theme.tokens).toBe(theme.status);
-    expect(toLegacyTheme(null)).toMatchObject({ status: {}, tokens: {} });
+    expect(theme.tokens).toEqual({ theme: '#E93323', accent: '#FF7E00' });
+    // `status` is legacy 一键换色's palette number, which presell/index switches on.
+    expect(theme.status).toBe(3);
+    expect(toLegacyTheme({ tokens: { theme: '#1DB0FC' } }).status).toBe(1);
+    expect(toLegacyTheme({ tokens: { theme: '#FE5C2D' } }).status).toBe(5);
+    expect(toLegacyTheme({ tokens: { theme: '#123456' } }).status).toBe(3);
+    expect(toLegacyTheme(null)).toMatchObject({ status: 3, tokens: {} });
   });
 });
 
@@ -593,6 +652,8 @@ describe('底部导航 and 版式 (F4)', () => {
     const bottom = Object.values(page.value).find((node) => node.name === 'bottomMenu');
     expect(bottom.componentBgConfig.colorConfig.color).toHaveLength(2);
     expect(Array.isArray(bottom.showContent.type)).toBe(true);
+    // 4 is 分享: the default bar's one way to the share panel (CR-7-i).
+    expect(bottom.showContent.type).toContain(4);
     expect(bottom.cartButton).toHaveProperty('tabVal');
   });
 
