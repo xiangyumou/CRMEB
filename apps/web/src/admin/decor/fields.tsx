@@ -29,6 +29,8 @@ import { useState, type ReactElement, type ReactNode } from 'react';
 import { useDiyDataSource, type DiyTreeNode } from '@/admin/diy/data-source';
 import { DiyPickerModal } from '@/admin/diy/fields/picker-fields';
 import { AssetPicker } from '@/admin/kit/asset/asset-picker';
+import { HotspotField } from './hotspot-field';
+import { RichTextField } from './rich-text-field';
 import type { CustomFieldRenderers, DecorFieldMetadata } from './zod-to-puck';
 
 /**
@@ -490,5 +492,7 @@ export const DECOR_CUSTOM_FIELDS: CustomFieldRenderers = {
   color: (props) => <ColorField {...props} />,
   link: (props) => <LinkField {...props} />,
   productSource: (props) => <ProductSourceField {...props} />,
+  richText: (props) => <RichTextField {...props} />,
+  hotspots: (props) => <HotspotField {...props} renderLink={(link) => <LinkField {...link} />} />,
   unsupported: (props) => <UnsupportedField {...props} />,
 };

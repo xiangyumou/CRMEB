@@ -14,9 +14,9 @@
 | 后台接口 | `apps/web/app/admin-api/decor/**`                              | 14 个路由，权限 `decor:page:read / write / publish`                   |
 | 商城接口 | `apps/web/app/api/v1/pages/**`                                 | `home`、`user-center`、`:id`                                          |
 | 渲染     | `packages/storefront-blocks`                                   | 只从契约导入类型和无 zod 的常量；`src/schema/index.ts` 是对契约的转发 |
-| 规则     | `docs/invariants.md` 的 DECOR-001 … DECOR-016                  | 每条规则都列出证明它的测试                                            |
+| 规则     | `docs/invariants.md` 的 DECOR-001 … DECOR-017                  | 每条规则都列出证明它的测试                                            |
 
-**不含 zod 的模块**（小程序可以在运行时导入）：`constants.ts`、`link-route.ts`。其余模块只能 `import type`。`decor.test.ts` 的「zod-free runtime modules」测试会检查这一点。
+**不含 zod 的模块**（小程序可以在运行时导入）：`constants.ts`、`link-route.ts`、`defaults.ts`、`meta.ts`、`rich-text.ts`。其余模块只能 `import type`。`decor.test.ts` 的「zod-free runtime modules」测试会检查这一点。
 
 ## 2. 文档模型
 
@@ -28,11 +28,12 @@
 }
 ```
 
-- **块**用 `defineBlock({ type, v, props, meta, migrate?, data? })` 声明，然后登记到 `all-blocks.ts` 的 `DECOR_BLOCK_DEFINITIONS`。目前有 `carousel`、`imageCube`、`productGrid`、`userCard`、`orderEntry`、`serviceGrid` 六种。
+- **块**用 `defineBlock({ type, v, props, meta, migrate?, data?, personal? })` 声明，然后登记到 `all-blocks.ts` 的 `DECOR_BLOCK_DEFINITIONS`。目前有 14 种，见第 2.3 节。
 - **基础属性**：每个块的 props 都必须用 `blockProps()` 构造，自动带上 `style`（间距、圆角、背景，只能取预设档位）和 `visibility`（`audience`: all / guest / member；`platforms`: 空数组表示所有客户端）。`defineBlock` 会拒绝不带这两项的 props。
 - **版本和迁移**：`v` 是块 props 的版本号。`migrate[n]` 负责把 n 版升级到 n + 1 版，1 … v − 1 每一步都必须有，缺一步 `defineBlock` 在加载时就会报错。存储的数据在保存时迁移到当前版本；解析器在读取时也会迁移一次，所以旧修订不需要重写。
 - **`meta`**：`label`、`pages`（哪些页面类型可以使用）、`maxPerPage`、`minClient`（能渲染该块的最低客户端版本，semver 格式）。
 - **`data`**：由 props 推导出块需要的数据，按槽位命名，例如 `{ products: need.products(props.source) }`。块自己从不请求数据。
+- **`personal`**：由 props 推导出块需要的**当前顾客自己的**数据（`personalNeed.orderCounts()`、`personalNeed.userSummary(stats)`），同样按槽位命名。它只是配置，随公共页一起缓存；数据本身只在个人层按请求计算（DECOR-015）。
 - **编辑器元数据约定**写在 `meta.ts` 的文件注释里：标签必填；`.meta()` 可以加在包装链的任意一层；控件类型由 schema 推断；语义类型（`link`、`image`、`color` 和五种数据源）必须显式标出，因为服务端也靠这些标记在文档里找出链接和数据源。
 
 ### 2.1 `LinkTarget`
@@ -55,6 +56,29 @@
 
 另外 `need.newUserCoupons(limit)` 返回新人券。
 
+### 2.3 块一览
+
+| 类型           | 名称        | v   | 页面                      | 数据 / 个人数据                 | 说明                                                                         |
+| -------------- | ----------- | --- | ------------------------- | ------------------------------- | ---------------------------------------------------------------------------- |
+| `searchBar`    | 搜索框      | 1   | home、custom（每页 1 个） |                                 | 点击打开搜索页，热词带 `keyword`；`sticky` 吸顶                              |
+| `carousel`     | 轮播图      | 1   | 全部                      |                                 |                                                                              |
+| `navGrid`      | 导航宫格    | 1   | 全部                      |                                 | 每行 4 或 5 个；`paging` 时按 `columns × rows` 分页横滑                      |
+| `notice`       | 公告        | 1   | 全部                      |                                 | `scroll` 逐条上滚，间隔 ≥ 4 秒（design.md 动效规则）；`static` 全部列出      |
+| `imageCube`    | 图片魔方    | 1   | 全部                      |                                 |                                                                              |
+| `hotspotImage` | 热区图      | 1   | 全部                      |                                 | 热区按图片百分比存储，不得超出图片；编辑器在图上拖画                         |
+| `titleBar`     | 标题栏      | 1   | 全部                      |                                 | 有 `moreLink` 时才显示「更多」                                               |
+| `productGrid`  | 商品列表    | 2   | 全部                      | `products`                      | v2 加 `layout`（两列 / 三列 / 单列 / 横滑）；v1 迁移为 `grid2`，即原来的样子 |
+| `productTabs`  | 商品选项卡  | 1   | home、custom              | `tab0` … `tab4`                 | 2–5 个选项卡，每个有自己的数据源；**全部随页面一起解析**，见下               |
+| `richText`     | 富文本      | 1   | 全部                      |                                 | 白名单净化（DECOR-017），小程序用 `<rich-text>` 的节点数组渲染               |
+| `spacer`       | 间隔/分割线 | 1   | 全部                      |                                 | 一个块，`line` 选无 / 实线 / 虚线                                            |
+| `userCard`     | 用户卡片    | 1   | user_center               | 个人：`user`（`userSummary`）   | 游客显示「登录 / 注册」，点击发出 `login` 意图                               |
+| `orderEntry`   | 订单入口    | 1   | user_center               | 个人：`counts`（`orderCounts`） | 角标：0 不显示，超过 99 显示 `99+`                                           |
+| `serviceGrid`  | 服务宫格    | 1   | user_center               |                                 | 每项 `action` 为 `link` 或 `contact`（联系客服）；`link` 时必须选链接        |
+
+- **商品选项卡为什么一次解析全部选项卡**：解析器只在整页响应里回答块的 `data`，没有按块取数的接口，所以块为每个选项卡声明一个槽位（`productTabSlot(i)`），切换选项卡是本地状态，无需网络。每个槽位受数据源自身的 `limit`（≤ 20）限制，最多 5 个。以后如果选项卡变重，需要新增一个公开的「解析单个数据源」接口，再改为懒加载。
+- **意图**（`BlockIntent`）：块不直接调用平台能力。`contact` 和 `login` 通过 `onIntent` 交给宿主；联系客服在微信里必须是 `<button open-type="contact">`，宿主可以传 `renderIntent` 把该项包进自己的原生控件，这时块不再挂点击处理。
+- **个人中心的角标**：`orderCounts` 取自订单域的 `order.counts`（`aftersale` = 退款中）。`unreviewed`（待评价）目前没有计数来源，所以不显示角标。
+
 ## 3. 校验：保存从宽，发布从严（DECOR-003）
 
 `checkDocument(input, { kind })` 分两级检查：
@@ -63,6 +87,8 @@
 2. **内容**：root props、每个块的 props、块 id 是否重复、页面类型是否允许该块、`maxPerPage`、需要数据的块数量（≤ 20）。有问题时照样保存（未通过的块按原样存储），问题连同路径写入 `issues` 返回。有 `issues` 的草稿**不能发布**。
 
 - **未知块类型，或版本比当前构建新的块**：原样保存，同时产生一条 warning 和一条 issue（不能发布）。解析器会跳过这类块。
+- **读取草稿**（`GET …/documents/:id`）返回的是校验后的文档：旧版本的块已经迁移、默认值已经补齐，所以块升级前保存的草稿在新编辑器里照样能打开，下次保存时按新版本存储。
+- **富文本**（DECOR-017）：`richText` 的 `html` 由 schema 的 `.overwrite(sanitizeRichText)` 净化，保存时存的是净化后的字符串；解析器解析每个块时再净化一次，所以即使数据库里的行没有净化过，返回的也是干净的。白名单：常见文本标签（段落、标题、列表、引用、强调等）和 `https://` 或站内路径的 `img`；`script`、`style`、`iframe`、表单等连同内容一起丢弃，其他标签（包括 `a`）去掉标签保留文字；属性只保留过滤后的 `style`（颜色、背景色、对齐、粗细、斜体、下划线）和 `img` 的 `src` / `alt`。
 - **未知或不可见的 id**（DECOR-004）：商品下架或删除、券不可领、文章未发布、活动不在时间窗内、微页面不存在，一律只产生 **warning**，不报错，也不阻止发布，解析器静默跳过。原因是记录的状态会在保存之后变化，发布时报错也挡不住下一分钟的下架。warning 由各域 `index.ts` 的公开读取接口判断（`decor.references.ts`）；某个检查本身失败时只记日志，不影响保存。
 
 ## 4. 数据表与修订
@@ -128,11 +154,11 @@ pages.md 第 5 节里写的是建议的 id `diy.page*`，实际的 id 是 `decor
    - `visibility.audience` 对照是否登录；
    - `visibility.platforms` 对照 `X-Client-Platform`，未携带该头时不过滤；
    - 块类型的 `minClient` 对照 `X-Client-Version`，版本号不是 semver 格式时视为未知，不过滤。
-3. **个人层，从不缓存**（DECOR-015）：只有请求带用户会话时才计算，结果放在 `personal[blockId][slot]`。目前只有券的状态（`claimedCount`、`canClaim`）。没有会话时，包括后台管理员身份，返回 `null`。
+3. **个人层，从不缓存**（DECOR-015）：只有请求带用户会话时才计算，结果放在 `personal[blockId][slot]`。内容有券的状态（`claimedCount`、`canClaim`），以及块用 `personal` 声明的数据：`orderCounts`（各状态订单数）和 `userSummary`（昵称、头像，`stats` 为真时加上可用券、收藏、足迹的总数）。同一请求里每种数据只取一次；某项取数失败只记日志，该槽位缺省，不影响整页。没有会话时，包括后台管理员身份，返回 `null`。
 
 其他规则：
 
-- **ETag**：对除 `resolvedAt` 以外的整个响应体做哈希，生成弱 ETag。页面没有变化时返回 304，发布后 ETag 随之变化。`version` 字段的取值：已发布页面为 `rev-<id>`，预览为 `draft-<id>-<n>`，内置个人中心为 `builtin-user-center-v2-1`。
+- **ETag**：对除 `resolvedAt` 以外的整个响应体做哈希，生成弱 ETag。页面没有变化时返回 304，发布后 ETag 随之变化。`version` 字段的取值：已发布页面为 `rev-<id>`，预览为 `draft-<id>-<n>`，内置个人中心为 `builtin-user-center-v2-2`（加入了「联系客服」）。
 - **内置个人中心**（DECOR-005）：没有指定个人中心时，接口返回 `USER_CENTER_DEFAULT_DOCUMENT`，`id` 为 `null`，不会返回 404。新建的个人中心文档也从这份内容开始。
 - **首页未设置**时返回 `DECOR_HOME_NOT_SET`（404）。
 
@@ -151,7 +177,8 @@ pages.md 第 5 节里写的是建议的 id `diy.page*`，实际的 id 是 `decor
 1. 在 `packages/contracts/src/decor/blocks/` 下用 `blockProps({...})` 和 `defineBlock` 声明块，并登记到 `all-blocks.ts`。
 2. 需要数据时声明 `data`。如果是新的数据类型，需要依次加上：`DataNeed` 的一个成员、`ResolvedByKind` 的一个字段、`defaultResolvers` 的一个解析器、`collectReferences` 用到的 `ReferenceKind` 和 `decor.references.ts` 里的对应检查。
 3. 修改已有块的 props 时要把 `v` 加一，并补上 `migrate[v-1]`。旧客户端无法渲染新块时，设置 `minClient`。
-4. 在 G 流的 `packages/storefront-blocks` 里加组件。没有组件的类型，客户端什么都不渲染。
+4. 在 G 流的 `packages/storefront-blocks` 里加组件，并登记到 `BLOCK_COMPONENTS`（它是覆盖全部类型的 `Record`，缺组件时编译不过）。组件只接收 props / data / personal，通过 `onLink`、`onIntent` 报告点击，不调用 Taro API，不请求数据；颜色用 design.md 的 CSS 变量（`shared/_tokens.scss`）。
+5. 需要新的编辑控件时，在 `meta.ts` 的 `EditorFieldKind` 加一种，并在 `apps/web/src/admin/decor/` 的 `SEMANTIC_KINDS` 和 `DECOR_CUSTOM_FIELDS` 里登记。
 
 ## 9. 待定事项
 

@@ -221,8 +221,62 @@ export const couponUserState = z.object({
 });
 export type CouponUserState = z.infer<typeof couponUserState>;
 
+/**
+ * Per-shopper data a block asks for by its props alone — not tied to records
+ * the page shows, as coupon state is. A block declares these with
+ * `defineBlock({ personal })`; the resolver answers them only with a session,
+ * in `personal[blockId][slot]`, and never caches them (DECOR-015).
+ *
+ * - `orderCounts`: the 订单入口 badges, from `order.counts`.
+ * - `userSummary`: the 用户卡片's nickname and avatar, and with `stats` the
+ *   优惠券 / 收藏 / 足迹 totals.
+ */
+export type PersonalNeed = { kind: 'orderCounts' } | { kind: 'userSummary'; stats: boolean };
+
+export type PersonalNeedKind = PersonalNeed['kind'];
+
+export const personalNeed = {
+  orderCounts: (): PersonalNeed => ({ kind: 'orderCounts' }),
+  userSummary: (stats: boolean): PersonalNeed => ({ kind: 'userSummary', stats }),
+};
+
+const count = z.number().int().min(0);
+
+/**
+ * The 订单入口 badges, by `ORDER_ENTRY_KEYS`. `aftersale` is the orders with a
+ * live after-sales. `unreviewed` is absent: nothing counts reviewable lines
+ * yet, and the entry then shows no badge rather than a wrong one.
+ */
+export const orderEntryCounts = z.object({
+  unpaid: count,
+  unshipped: count,
+  unreceived: count,
+  aftersale: count,
+  unreviewed: count.optional(),
+});
+export type OrderEntryCounts = z.infer<typeof orderEntryCounts>;
+
+/** Who the 用户卡片 greets. */
+export const userSummary = z.object({
+  nickname: z.string().nullable(),
+  avatarUrl: z.string().nullable(),
+  /** Only when the block shows them (`showStats`). */
+  stats: z
+    .object({
+      /** Unused coupons in the wallet. */
+      coupons: count,
+      favorites: count,
+      /** Products in the browsing history window. */
+      history: count,
+    })
+    .nullable(),
+});
+export type UserSummary = z.infer<typeof userSummary>;
+
 /** One slot's per-shopper state, discriminated so a later kind can be added without guessing. */
 export const personalSlot = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('coupons'), items: z.array(couponUserState) }),
+  z.object({ kind: z.literal('orderCounts'), counts: orderEntryCounts }),
+  z.object({ kind: z.literal('userSummary'), user: userSummary }),
 ]);
 export type PersonalSlot = z.infer<typeof personalSlot>;

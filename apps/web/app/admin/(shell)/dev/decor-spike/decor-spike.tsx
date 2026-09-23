@@ -16,12 +16,25 @@ import { AssetSourceProvider } from '@/admin/kit/asset/asset-source-context';
 import { PageContainer } from '@/admin/kit/page-container';
 import {
   fixtureCarousel,
+  fixtureHotspotImage,
   fixtureImageCube,
+  fixtureNavGrid,
+  fixtureNotice,
+  fixtureOrderEntry,
   fixtureProductGrid,
+  fixtureProductTabs,
+  fixtureRichText,
+  fixtureSearchBar,
+  fixtureServiceGrid,
+  fixtureSpacer,
+  fixtureTitleBar,
+  fixtureUserCard,
   resolveFixtureProducts,
 } from '@shop/storefront-blocks/fixtures';
 import {
+  BLOCKS,
   pageRootProps,
+  type BlockType,
   validatePageDocument,
   type PageDocument,
 } from '@shop/storefront-blocks/schema';
@@ -36,14 +49,28 @@ import { createDecorDemoDataSource } from './demo-data-source';
  * `validatePageDocument`. Every source is in memory: no route, no upload.
  */
 
+/** One of every block, each from its fixture, at the version this build writes. */
+const FIXTURE_BLOCKS: [BlockType, string, Record<string, unknown>][] = [
+  ['searchBar', 'search-bar-1', fixtureSearchBar],
+  ['carousel', 'carousel-1', fixtureCarousel],
+  ['navGrid', 'nav-grid-1', fixtureNavGrid],
+  ['notice', 'notice-1', fixtureNotice],
+  ['titleBar', 'title-bar-1', fixtureTitleBar],
+  ['productGrid', 'product-grid-1', fixtureProductGrid],
+  ['imageCube', 'image-cube-1', fixtureImageCube],
+  ['hotspotImage', 'hotspot-image-1', fixtureHotspotImage],
+  ['productTabs', 'product-tabs-1', fixtureProductTabs],
+  ['spacer', 'spacer-1', fixtureSpacer],
+  ['richText', 'rich-text-1', fixtureRichText],
+  ['userCard', 'user-card-1', fixtureUserCard],
+  ['orderEntry', 'order-entry-1', fixtureOrderEntry],
+  ['serviceGrid', 'service-grid-1', fixtureServiceGrid],
+];
+
 const FIXTURE_DOCUMENT: PageDocument = {
   schemaVersion: 2,
   root: { props: pageRootProps.parse({ title: '装修试验页' }) },
-  blocks: [
-    { id: 'carousel-1', type: 'carousel', v: 1, props: fixtureCarousel },
-    { id: 'product-grid-1', type: 'productGrid', v: 1, props: fixtureProductGrid },
-    { id: 'image-cube-1', type: 'imageCube', v: 1, props: fixtureImageCube },
-  ],
+  blocks: FIXTURE_BLOCKS.map(([type, id, props]) => ({ id, type, v: BLOCKS[type].v, props })),
 };
 
 const canvasData: DecorCanvasData = { products: resolveFixtureProducts };

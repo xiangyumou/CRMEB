@@ -25,6 +25,8 @@ const custom: CustomFieldRenderers = {
   link: noField,
   color: noField,
   productSource: noField,
+  richText: noField,
+  hotspots: noField,
 };
 
 const config = buildDecorConfig(custom);

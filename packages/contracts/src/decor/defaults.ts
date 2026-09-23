@@ -57,16 +57,57 @@ export const USER_CENTER_DEFAULT_DOCUMENT: PageDocument = {
         title: '我的服务',
         columns: 4,
         items: [
-          { label: '优惠券', link: { kind: 'route', to: { route: 'myCoupons', params: {} } } },
-          { label: '领券中心', link: { kind: 'route', to: { route: 'couponCenter', params: {} } } },
-          { label: '我的拼团', link: { kind: 'route', to: { route: 'myGroupbuys', params: {} } } },
-          { label: '收货地址', link: { kind: 'route', to: { route: 'addresses', params: {} } } },
-          { label: '我的收藏', link: { kind: 'route', to: { route: 'favorites', params: {} } } },
-          { label: '浏览记录', link: { kind: 'route', to: { route: 'history', params: {} } } },
-          { label: '我的评价', link: { kind: 'route', to: { route: 'myReviews', params: {} } } },
-          { label: '发票管理', link: { kind: 'route', to: { route: 'invoices', params: {} } } },
-          { label: '消息中心', link: { kind: 'route', to: { route: 'messages', params: {} } } },
-          { label: '设置', link: { kind: 'route', to: { route: 'settings', params: {} } } },
+          {
+            label: '优惠券',
+            action: 'link',
+            link: { kind: 'route', to: { route: 'myCoupons', params: {} } },
+          },
+          {
+            label: '领券中心',
+            action: 'link',
+            link: { kind: 'route', to: { route: 'couponCenter', params: {} } },
+          },
+          {
+            label: '我的拼团',
+            action: 'link',
+            link: { kind: 'route', to: { route: 'myGroupbuys', params: {} } },
+          },
+          {
+            label: '收货地址',
+            action: 'link',
+            link: { kind: 'route', to: { route: 'addresses', params: {} } },
+          },
+          {
+            label: '我的收藏',
+            action: 'link',
+            link: { kind: 'route', to: { route: 'favorites', params: {} } },
+          },
+          {
+            label: '浏览记录',
+            action: 'link',
+            link: { kind: 'route', to: { route: 'history', params: {} } },
+          },
+          {
+            label: '我的评价',
+            action: 'link',
+            link: { kind: 'route', to: { route: 'myReviews', params: {} } },
+          },
+          {
+            label: '发票管理',
+            action: 'link',
+            link: { kind: 'route', to: { route: 'invoices', params: {} } },
+          },
+          {
+            label: '消息中心',
+            action: 'link',
+            link: { kind: 'route', to: { route: 'messages', params: {} } },
+          },
+          { label: '联系客服', action: 'contact' },
+          {
+            label: '设置',
+            action: 'link',
+            link: { kind: 'route', to: { route: 'settings', params: {} } },
+          },
         ],
         style: { marginY: 'sm', paddingX: 'sm', radius: 'sm' },
         visibility: { audience: 'all', platforms: [] },
@@ -76,4 +117,4 @@ export const USER_CENTER_DEFAULT_DOCUMENT: PageDocument = {
 };
 
 /** The `version` the built-in 个人中心 is served with. Bump when it changes. */
-export const USER_CENTER_DEFAULT_VERSION = 'builtin-user-center-v2-1';
+export const USER_CENTER_DEFAULT_VERSION = 'builtin-user-center-v2-2';

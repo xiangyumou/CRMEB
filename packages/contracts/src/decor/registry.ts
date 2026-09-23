@@ -2,7 +2,7 @@ import type { z } from 'zod';
 
 import { BASE_PROP_KEYS } from './base';
 import type { DocumentKind } from './constants';
-import type { DataNeed } from './sources';
+import type { DataNeed, PersonalNeed } from './sources';
 
 /**
  * The block registry (plan §2.1).
@@ -65,6 +65,12 @@ export interface BlockDefinition<
    * needs nothing but its props.
    */
   data?: ((props: z.infer<P>) => Record<string, DataNeed>) | undefined;
+  /**
+   * The shopper's own data this block shows, by slot, computed from its parsed
+   * props. Answered only with a session, never cached (DECOR-015), in
+   * `personal[blockId][slot]`. Omitted: nothing personal.
+   */
+  personal?: ((props: z.infer<P>) => Record<string, PersonalNeed>) | undefined;
 }
 
 /** A definition with its prop type erased, as the registry stores it. */
@@ -75,6 +81,7 @@ export interface AnyBlockDefinition {
   meta: BlockMeta;
   migrate?: Readonly<Record<number, BlockMigration>> | undefined;
   data?: ((props: never) => Record<string, DataNeed>) | undefined;
+  personal?: ((props: never) => Record<string, PersonalNeed>) | undefined;
 }
 
 const TYPE_PATTERN = /^[a-z][A-Za-z0-9]{1,39}$/;

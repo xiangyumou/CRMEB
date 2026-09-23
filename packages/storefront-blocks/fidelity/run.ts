@@ -1,5 +1,5 @@
 /**
- * Fidelity check for the spike blocks (S3). Not part of CI.
+ * Fidelity check for the DIY v2 blocks (S3, extended to every block in G1). Not part of CI.
  *
  * Screenshots each block, at a 375 px wide phone, from
  *
@@ -29,7 +29,26 @@ import { chromium, type Frame, type Locator, type Page } from '@playwright/test'
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 
-const BLOCKS = ['carousel', 'productGrid', 'imageCube'] as const;
+/** Every block, in the order both pages draw them (the spike page and the mini demo page). */
+const BLOCKS = [
+  'searchBar',
+  'carousel',
+  'navGrid',
+  'notice',
+  'titleBar',
+  'productGrid',
+  'imageCube',
+  'hotspotImage',
+  'productTabs',
+  'spacer',
+  'richText',
+  'userCard',
+  'orderEntry',
+  'serviceGrid',
+] as const;
+const LAST_BLOCK: Block = 'serviceGrid';
+/** Tall enough for the whole fixture page at 375 px, so no block is clipped. */
+const PAGE_HEIGHT = 6000;
 type Block = (typeof BLOCKS)[number];
 
 const { values } = parseArgs({
@@ -38,6 +57,8 @@ const { values } = parseArgs({
     h5: { type: 'string' },
     out: { type: 'string', default: 'fidelity/.out' },
     threshold: { type: 'string', default: '0.1' },
+    /** A block whose mismatch is above this percentage is flagged. */
+    flag: { type: 'string', default: '3' },
   },
 });
 
@@ -112,7 +133,7 @@ async function shootAdmin(): Promise<Record<Block, Buffer>> {
     });
     const frame = await frameElement.contentFrame();
     if (!frame) throw new Error('the editor canvas iframe has no frame');
-    await frame.waitForSelector('[data-block="imageCube"]');
+    await frame.waitForSelector(`[data-block="${LAST_BLOCK}"]`);
     await imagesSettled(frame);
     // Nothing hovered or selected: Puck draws outlines over the canvas otherwise.
     await page.mouse.move(0, 0);
@@ -131,10 +152,10 @@ async function shootAdmin(): Promise<Record<Block, Buffer>> {
     writeFileSync(resolve(out, 'admin-editor.png'), await page.screenshot());
     // A block taller than the canvas would be clipped by the editor's own
     // scroll box: stretch the editor so the whole page fits, then shoot.
-    await page.setViewportSize({ width: 1920, height: 3200 });
-    await page.locator('[data-testid="decor-editor"]').evaluate((element) => {
-      (element as HTMLElement).style.height = '3000px';
-    });
+    await page.setViewportSize({ width: 1920, height: PAGE_HEIGHT + 1200 });
+    await page.locator('[data-testid="decor-editor"]').evaluate((element, height) => {
+      (element as HTMLElement).style.height = `${height}px`;
+    }, PAGE_HEIGHT);
     await page.waitForTimeout(500);
     await page.mouse.move(0, 0);
     // Put the canvas on the device-pixel grid: the editor lays it out at a
@@ -161,13 +182,13 @@ async function shootH5(url: string): Promise<Record<Block, Buffer>> {
   try {
     const page = await browser.newPage({
       // Tall enough that every block is on screen: `shootBlock` clips the viewport.
-      viewport: { width: 375, height: 1600 },
+      viewport: { width: 375, height: PAGE_HEIGHT },
       deviceScaleFactor: 2,
       isMobile: true,
       hasTouch: true,
     });
     await page.goto(url);
-    await page.waitForSelector('[data-block="imageCube"]', { timeout: 60_000 });
+    await page.waitForSelector(`[data-block="${LAST_BLOCK}"]`, { timeout: 60_000 });
     await imagesSettled(page);
     const shots = {} as Record<Block, Buffer>;
     for (const block of BLOCKS) {
@@ -225,6 +246,12 @@ if (values.h5) {
   const results = BLOCKS.map((block) => diff(block, admin[block], h5[block]));
   say(JSON.stringify(results, null, 2));
   writeFileSync(resolve(out, 'fidelity.json'), `${JSON.stringify(results, null, 2)}\n`);
+  const flagged = results.filter((result) => result.percent > Number(values.flag));
+  say(
+    flagged.length === 0
+      ? `every block within ${values.flag} %`
+      : `over ${values.flag} %: ${flagged.map((result) => `${result.block} ${result.percent} %`).join(', ')}`,
+  );
 } else {
   say('no --h5 URL: admin screenshots only, nothing to diff against');
 }

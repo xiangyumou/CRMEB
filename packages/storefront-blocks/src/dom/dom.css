@@ -201,3 +201,9 @@
 .sbd-scroll--hidebar::-webkit-scrollbar {
   display: none;
 }
+
+/* <rich-text>: a block of flowing content. */
+:where(.sbd-rich-text) {
+  display: block;
+  user-select: none;
+}

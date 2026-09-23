@@ -14,15 +14,22 @@ export interface BlockFrameProps {
   type: string;
   frame: BlockStyle;
   className?: string | undefined;
+  /** On the outer element, which spans the page width (a sticky block). */
+  outerClassName?: string | undefined;
   children: ReactNode;
 }
 
 /** The shared spacing, background and corner radius around every block. */
-export function BlockFrame({ type, frame, className, children }: BlockFrameProps) {
+export function BlockFrame({ type, frame, className, outerClassName, children }: BlockFrameProps) {
   return (
     <View
       data-block={type}
-      className={cx(styles.outer, MARGIN_Y[frame.marginY], PADDING_X[frame.paddingX])}
+      className={cx(
+        styles.outer,
+        MARGIN_Y[frame.marginY],
+        PADDING_X[frame.paddingX],
+        outerClassName,
+      )}
     >
       <View
         className={cx(styles.inner, RADIUS[frame.radius], className)}

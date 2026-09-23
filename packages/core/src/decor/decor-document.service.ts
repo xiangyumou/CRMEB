@@ -112,7 +112,10 @@ async function detailOf(ctx: Ctx, row: repo.DocumentWithLive): Promise<DecorDocu
   const checked = checkDocument(draft, { kind: row.document.kind });
   return {
     ...toSummary(row),
-    draft: draft as StoredDocument,
+    // The draft as this build reads it: a block stored at an older version
+    // comes back migrated (DECOR-003), so the editor opens a draft saved
+    // before a block's upgrade. It is stored migrated on the next save.
+    draft: checked.ok ? (checked.document as StoredDocument) : (draft as StoredDocument),
     issues: checked.issues,
     warnings: checked.ok ? await warningsOf(ctx, checked) : [],
   };

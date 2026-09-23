@@ -2041,7 +2041,7 @@ A decorated link stores what it opens (`LinkTarget`), never a path: a catalogue 
 
 ### DECOR-003
 
-A draft save is lenient and a publish is strict. A draft whose envelope fails (schema version, block count, byte size) is refused outright; anything inside it that fails — invalid props, an unknown block type, a block type newer than this build, a block the page kind may not hold — is stored as it came and reported as an issue with its path, so an operator's half-finished work is never thrown away. Known blocks are stored migrated with their defaults filled in.
+A draft save is lenient and a publish is strict. A draft whose envelope fails (schema version, block count, byte size) is refused outright; anything inside it that fails — invalid props, an unknown block type, a block type newer than this build, a block the page kind may not hold — is stored as it came and reported as an issue with its path, so an operator's half-finished work is never thrown away. Known blocks are stored migrated with their defaults filled in, and a draft stored before a block's upgrade is read back migrated.
 
 - `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > keeps an unknown block type as it came, warns, and blocks publishing it`
 - `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > treats a known type stored at a newer version like an unknown one`
@@ -2052,6 +2052,9 @@ A draft save is lenient and a publish is strict. A draft whose envelope fails (s
 - `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: an unknown block type is kept as it came, with a warning`
 - `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: a known block is stored migrated, with its defaults filled in`
 - `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: a new page starts empty and titled after its name; a new 个人中心 starts from the built-in one`
+- `packages/contracts/src/decor/blocks.test.ts::商品列表 (productGrid) v2 > migrates a stored v1 block to the two-column grid it always was`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > DECOR-003: a 商品网格 stored at v1 is served at v2 as the two-column grid it was, with its products`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > DECOR-003: a draft stored before a block’s upgrade opens migrated, so the editor can load it`
 - `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: lists, renames, duplicates and soft-deletes documents`
 
 ### DECOR-004
@@ -2137,6 +2140,7 @@ A page serves only what the shopper could see, by each domain's own rule, throug
 - `packages/core/src/decor/decor.int.test.ts::resolved data — DECOR-013 > DECOR-013: a category or label rule returns on-shelf products with stock only, at most the limit`
 - `packages/core/src/decor/decor.int.test.ts::resolved data — DECOR-013 > DECOR-013: coupons, 新人券 and articles come back only when the shopper could see them`
 - `packages/core/src/decor/decor.int.test.ts::resolved data — DECOR-013 > DECOR-013: a resolver that fails costs its slot, not the page`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > DECOR-013: a 商品选项卡 resolves every tab’s products with the page, each by its own rule`
 
 ### DECOR-014
 
@@ -2149,10 +2153,14 @@ The public part of a page is cached per revision (`decor:page:rev:<id>`, `DECOR_
 
 ### DECOR-015
 
-Per-shopper state (coupons claimed / claimable) is resolved only when a shopper's session comes with the request, is never part of the cached page, and is `null` for a guest or an admin.
+Per-shopper state — coupons claimed / claimable, and what a block declares with `personal` (the 订单入口 counts, the 用户卡片 nickname, avatar and coupon / favourite / history totals) — is resolved only when a shopper's session comes with the request, for that shopper, is never part of the cached page (which keeps only _which_ state to fetch), and is `null` for a guest or an admin. A lookup that fails costs its slot, never the page.
 
 - `packages/core/src/decor/decor.int.test.ts::per-shopper state — DECOR-015 > DECOR-015: with a session the page carries the coupon state of that shopper; without one, none`
 - `packages/core/src/decor/decor.int.test.ts::per-shopper state — DECOR-015 > DECOR-015: the cached public page holds nothing per shopper`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > per-shopper state of the 个人中心 blocks — DECOR-015 > DECOR-015: a shopper gets their own order counts, profile and totals; a guest gets none`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > per-shopper state of the 个人中心 blocks — DECOR-015 > DECOR-015: the totals are read only when the card shows them`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > per-shopper state of the 个人中心 blocks — DECOR-015 > DECOR-015: a live 个人中心 is cached without anyone’s state, and each shopper still gets theirs`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > per-shopper state of the 个人中心 blocks — DECOR-015 > DECOR-015: a personal lookup that fails costs its slot, not the page`
 
 ### DECOR-016
 
@@ -2163,3 +2171,16 @@ Blocks are filtered per request from the one cached page: `visibility.audience` 
 - `packages/core/src/decor/decor.int.test.ts::per-request filtering — DECOR-016 > DECOR-016: unknown, newer-than-this-build and unparseable blocks are skipped, never served broken`
 - `packages/core/src/decor/decor.int.test.ts::per-request filtering — DECOR-016 > DECOR-016: blockVisibleTo ignores a client version it cannot read`
 - `apps/web/app/api/v1/pages/pages.int.test.ts::GET /api/v1/pages/home > filters blocks per request: session, X-Client-Platform, X-Client-Version`
+
+### DECOR-017
+
+富文本 HTML reaches a shopper only through the allow-list in `packages/contracts/src/decor/rich-text.ts`: text-structure tags only; `script`, `style`, `iframe`, embeds, forms and media dropped with their content; links and unknown tags unwrapped; no attribute but a filtered `style` (colour, alignment, weight, italics, underline — strict values, no `url()`) and, on `img`, an `https://` or site-relative `src` with a fixed fit-the-screen style. The block schema overwrites the value with its sanitised form, so the save stores only that, and the resolver, which parses every block it serves, sanitises again whatever the row holds.
+
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > drops scripts, styles, iframes, embeds and forms with everything inside them`
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > strips every attribute but a filtered style, and event handlers above all`
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > keeps only the allowed style properties, with strict values`
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > keeps https and site images only, with a fixed style that fits the screen`
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > never lets markup out of text or attribute values`
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > is idempotent: sanitising clean output changes nothing`
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > is applied by the block schema, so a save stores only the clean form`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > DECOR-017: rich text is stored sanitised, and served sanitised even when the row was not`
