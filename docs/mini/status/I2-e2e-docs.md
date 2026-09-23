@@ -33,9 +33,15 @@ mini citations in `docs/invariants.md`, the mini sections of `architecture.md` /
   CONTENT-001, SYS-019; new CLIENT-002 (the web-view 业务域名 rule, unit + e2e). `pnpm guards`
   green.
 
+- `docs/architecture.md`: "The mobile clients" — the mini-program (structure, platform seam,
+  session, app config, the decor v2 pipeline, route catalogue, compliance hooks) and the uni-app
+  marked legacy; `decor` domain, `api-client` / `storefront-blocks` packages, edge `/` noted as
+  the uni-app until the cutover. `docs/conventions.md`: the mini-program rules, the uni-app
+  marked legacy.
+
 ## In progress
 
-- invariants; docs; CI comments.
+- `docs/mini/README.md`, `docs/mini/cutover.md`; CI comments.
 
 ## Pending
 

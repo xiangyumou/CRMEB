@@ -11,8 +11,8 @@ them. [contributing.md](contributing.md) has the merge checklist.
 ```
 apps/web             Next.js App Router: admin UI, /admin-api/*, /api/v1/*
 apps/worker          BullMQ worker and repeatable jobs
-apps/uni-app         the mobile client (npm, outside the pnpm workspace)
-apps/mini            the WeChat mini-program replacing it (Taro 4, React 18; in progress)
+apps/mini            the WeChat mini-program (Taro 4, React 18)
+apps/uni-app         the legacy mobile client, removed at the cutover (npm, outside the workspace)
 packages/contracts   route contracts (zod) → OpenAPI; the single source of truth
 packages/core        domain logic; kernel/ holds shared primitives
 packages/db          Drizzle schema, migrations, reference seeds
@@ -142,35 +142,48 @@ Every endpoint is a `defineRoute({...})` (see `packages/contracts/src/_conventio
 - In tests, match two-character CJK button labels with `zhName()` from `src/test/render.tsx`
   (antd inserts a space between the characters).
 
-## The mobile client
+## The mini-program
 
-`apps/uni-app` is the shipping mobile client. Its pages read the field names its view models have
-always used; the API layer (`api/*.js`) calls `/api/v1`, and the pure functions in
-`api/mappers/<domain>.js` translate each response into those field names. Change a page only where
-the meaning of a field changed. The `uniapp` guard checks that every call in `api/` resolves to a
-registered route.
-
-### The new mini-program (in progress)
-
-`apps/mini` replaces the uni-app at the cutover; [docs/mini/](mini/) is its design, and the uni-app
-rules above hold until then. What the tools enforce there:
+`apps/mini` is the storefront; [docs/mini/](mini/README.md) is its design, and
+[architecture.md](architecture.md#the-mini-program) describes how it is put together. What the
+tools enforce there:
 
 - Pages and features call WeChat only through `@/platform` (navigation, sign-in, payment,
   clipboard, the tab bar…), and import from `@tarojs/taro` only the lifecycle hooks. NutUI is
   imported only by `src/ui/`. Lint and the `mini` guard both say so; the guard also sees `wx.*`.
 - `@shop/contracts` is imported as types only (a zod-free module is the exception, listed in
-  `apps/mini/eslint.config.mjs`); the mini-program carries no zod.
-- A page is `<name>.tsx` with its `<name>.config.ts`, registered in `app.config.ts`, and named by a
-  key in the storefront route catalogue (`packages/contracts/src/system/storefront-routes.ts`).
-  Stored links hold `{ route, params }`, never a path.
-- A privacy API is declared where WeChat requires it (`requiredPrivateInfos`, only
-  `chooseAddress`), per [wechat-compliance.md](mini/wechat-compliance.md).
+  `apps/mini/eslint.config.mjs`); the mini-program carries no zod. Data goes through
+  `useRouteQuery`, `useInfiniteRouteQuery` and `useRouteMutation` from `@shop/api-client/react`;
+  only the api-client calls `Taro.request`.
+- A page is `<dir>/index.tsx` with its `index.config.ts`, registered in `app.config.ts`, and named
+  by a key in the storefront route catalogue (`packages/contracts/src/system/storefront-routes.ts`).
+  Code navigates with `navigate({ route, params })`; stored links hold `{ route, params }`, never a
+  path. Catalogue keys are append-only: never rename or remove one that has shipped.
+- A page's share menu is `useShare(route, …)`, and what it offers is the catalogue's `share` for
+  that key; the guard compares the two.
+- A privacy API is called only from `src/platform/`, listed in `PRIVACY_APIS`, and declared where
+  WeChat requires it (`requiredPrivateInfos`, only `chooseAddress`), per
+  [wechat-compliance.md](mini/wechat-compliance.md). A subscription request is made only from a
+  tap handler.
+- A decoration block is added once, in the contracts' registry and `@shop/storefront-blocks`
+  ([mini/decor.md](mini/decor.md#8-新增一个块)); a block calls no WeChat API, but raises an intent
+  the host page answers.
 - The only AppIDs a committed file names are the shop's own mini-program, `wx4f4b772125e155ed` (a
   public identifier), and Taro's `touristappid`; a developer's own AppID and any API origin go in
   `apps/mini/.env.*.local` ([device-check.md](mini/device-check.md)). The AppSecret lives only in
   the server's config and miniprogram-ci's upload key outside the repository: the `mini` guard
   fails on a `private.*.key` or a 32-hex-digit token under `apps/mini`, and the size gate on one
   in `dist/weapp`.
+- The weapp package has a size budget (`pnpm --filter @shop/mini size`), and the tab bar points
+  only at the main package.
+
+## The uni-app (legacy, removed at the cutover)
+
+`apps/uni-app` still ships until [the cutover](mini/cutover.md) deletes it; change it only to keep
+it working. Its pages read the field names its view models have always used; the API layer
+(`api/*.js`) calls `/api/v1`, and the pure functions in `api/mappers/<domain>.js` translate each
+response into those field names. Change a page only where the meaning of a field changed. The
+`uniapp` guard checks that every call in `api/` resolves to a registered route.
 
 ## Out of scope
 
