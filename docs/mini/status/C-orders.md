@@ -20,11 +20,13 @@ order/after-sales specs in `e2e/storefront/specs-mini`.
 - 物流 (tab per parcel, trail timeline, copy number, merchant/virtual delivery) with tests.
 - 评价 (a card per reviewable line, 服务评分 once, images; `moderation: 'pending'` → 「评价已提交，审核后展示」; already-written lines count as done) with tests.
 - 售后 apply (lines + quantities, 仅退款/退货退款 only when shipped, reason sheet, estimate incl. freight on a whole unshipped refund, words, 6 pictures, subscribe('refundApply') in the tap) with tests.
+- 我的售后 (one list for every order; 全部/处理中/已退款/已关闭) with tests.
+- 售后详情 (status + note, return address + copy, 退货物流, 售后进度 timeline, facts, 撤销/删除/填写退货物流) with tests.
 - Merged storefront/mini with H2, then again with G1.
 
 ## In progress
 
-- 售后 list / detail / return-shipment.
+- 售后 return-shipment form (express company picker).
 
 ## Next
 
