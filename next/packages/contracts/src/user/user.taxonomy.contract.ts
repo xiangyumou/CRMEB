@@ -23,10 +23,8 @@ import {
  * 用户分组 and 用户标签, `/admin-api/user-groups`, `/admin-api/user-labels`,
  * `/admin-api/user-label-categories`.
  *
- * Groups are a many-to-many join now (`user_groups_map`); the legacy
- * `eb_user.group_id` was a single column, so "this customer is both 高价值 and
- * 待激活" could not be said. The ETL maps the old single id to one membership
- * row.
+ * Groups are a many-to-many join (`user_groups_map`), not a single column on
+ * the user, so "this customer is both 高价值 and 待激活" can be said.
  *
  * All three are small, operator-managed reference lists, so they are plain CRUD
  * and share `user:group:*` / `user:label:*`. A label category is not a separate

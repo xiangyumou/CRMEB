@@ -18,7 +18,7 @@ export const userErrors = defineErrors({
 
   /** Unknown id, somebody else's row, or already deleted. One code for all three. */
   USER_ADDRESS_NOT_FOUND: { status: 404, message: '收货地址不存在' },
-  /** 20 live addresses per customer, matching the legacy cap. */
+  /** 20 live addresses per customer. */
   USER_ADDRESS_LIMIT_REACHED: { status: 409, message: '收货地址数量已达上限' },
 
   /** A cancellation request is already open; the customer withdraws it or waits. */

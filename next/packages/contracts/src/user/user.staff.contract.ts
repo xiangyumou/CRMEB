@@ -14,16 +14,15 @@ import {
 } from './schemas';
 
 /**
- * 商家管理 → 用户, the six calls behind `pages/admin/user/**` (CR-2-h2 §3).
+ * 商家管理 → 用户, the six calls behind `pages/admin/user/**`.
  *
- * B2 built `/api/v1/staff/*` for the order and 售后 tabs of the same screen and
- * left the 用户 tab to this stream. The reason they are separate routes rather
- * than the console's is the session, not the data: a 店员 signs in as an
- * ordinary shopper and gets the console only through
- * `order_notice_admin_uids`, so there is no admin cookie to present at
- * `/admin-api/users` and no permission atom to check. `auth: 'staff'` is the
- * whole check — B2's `StaffCheck` reads that config key — exactly as on
- * `/api/v1/staff/orders`.
+ * The order and 售后 tabs of the same screen are the order domain's
+ * `/api/v1/staff/*` routes. The reason these are separate routes rather than
+ * the console's is the session, not the data: a 店员 signs in as an ordinary
+ * shopper and gets the console only through the staff list, so there is no
+ * admin cookie to present at `/admin-api/users` and no permission atom to
+ * check. `auth: 'staff'` is the whole check — the order domain's `StaffCheck`
+ * reads the `orderStaff` config group — exactly as on `/api/v1/staff/orders`.
  *
  * **These are not the console's routes with a different door.** The response
  * shapes are narrower by design; `staffUserListItem` in `./schemas.ts` carries

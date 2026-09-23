@@ -29,10 +29,10 @@ import {
 /**
  * A mainland mobile number, digits only.
  *
- * The legacy validator accepted `/^1[3-9]\d{9}$/` and so does this one. It is
- * repeated here rather than shared with the auth contracts because the two
- * domains must be able to move independently; the regex is three tokens long
- * and a shared constant would be a dependency for no gain.
+ * `/^1[3-9]\d{9}$/`, the same rule the auth contracts apply. It is repeated
+ * here rather than shared with the auth contracts because the two domains must
+ * be able to move independently; the regex is three tokens long and a shared
+ * constant would be a dependency for no gain.
  */
 export const phoneNumber = z.string().regex(/^1[3-9]\d{9}$/, '手机号格式不正确');
 
@@ -308,7 +308,7 @@ export type AdminUserListItem = z.infer<typeof adminUserListItem>;
  * The detail drawer.
  *
  * The orders / coupons tabs are **not** here: they are the owning domains' own
- * admin list routes filtered by `userId`, so this stream never reads another
+ * admin list routes filtered by `userId`, so this domain never reads another
  * domain's tables and a change to the order list shape cannot break this page.
  */
 export const adminUserDetail = adminUserListItem.extend({
@@ -521,15 +521,15 @@ export const adminUserDetailExample: AdminUserDetail = {
 // ---------------------------------------------------------------------------
 
 /**
- * What a 店员 may see of a customer (CR-2-h2 §3).
+ * What a 店员 may see of a customer.
  *
- * This is the one decision in the staff surface that is not a copy of the
- * admin one. The console's 用户详情 carries the unmasked phone, the address
- * book, the registration IP, the operator remark and the account controls; the
- * legacy 商家管理 screen showed most of that to anyone the shop owner had added
- * to `order_notice_admin_uids`. A phone in a shop assistant's hand is a
- * different threat model from a console behind an office login — the handset is
- * shared, left on a counter and not revoked when somebody stops working there.
+ * This is the one decision in the staff surface that is not a copy of the admin
+ * one. The console's 用户详情 carries the unmasked phone, the address book, the
+ * registration IP, the operator remark and the account controls, and none of
+ * that belongs on the phone of everyone the shop owner has made staff. A phone
+ * in a shop assistant's hand is a different threat model from a console behind
+ * an office login — the handset is shared, left on a counter and not revoked
+ * when somebody stops working there.
  *
  * So the staff shapes are an allow-list, not the admin shape minus a few
  * fields, and everything below was chosen for a reason:
@@ -560,10 +560,9 @@ export const staffUserListItem = z.object({
   /**
    * Paid orders and what they came to, or `null`.
    *
-   * `null` is not zero: it means the order stream has not registered
-   * `UserOrderStatsPort` in this deployment (CR-2-e4), and a client must
-   * render 「--」 rather than 「0 单」. A customer with no orders is `0` /
-   * `"0.00"`.
+   * `null` is not zero: it means the order domain has not registered
+   * `UserOrderStatsPort` in this deployment, and a client must render 「--」
+   * rather than 「0 单」. A customer with no orders is `0` / `"0.00"`.
    */
   orderCount: z.number().int().min(0).nullable(),
   spendTotal: money.nullable(),
@@ -641,10 +640,10 @@ export type StaffUserGroupBody = z.infer<typeof staffUserGroupBody>;
 /**
  * 设置标签 — the customer's labels become exactly this set.
  *
- * Plural where CR-2-h2 wrote `{ labelId }`, because the drawer submits the
- * whole selection on 确定 (`components/userLable/index.vue` builds a
- * `labelIds` array) and a singular field has no way to say "take this one
- * off". An empty array clears them.
+ * Plural, not `{ labelId }`, because the drawer submits the whole selection on
+ * 确定 (`components/userLable/index.vue` builds a `labelIds` array) and a
+ * singular field has no way to say "take this one off". An empty array clears
+ * them.
  */
 export const staffUserLabelBody = z.object({
   labelIds: z.array(id).max(50),
@@ -687,15 +686,14 @@ export const staffUserLabelsExample: StaffUserLabels = {
 // ---------------------------------------------------------------------------
 
 /**
- * One storefront page view (CR-1-f3 §1).
+ * One storefront page view.
  *
  * `path` is the **route**, not the URL: no origin, no query string, and no
- * fragment. Two reasons, and both have bitten this table's ancestors. A query
- * string carries `?code=` from the WeChat OAuth redirect and `?phone=` from a
- * share link, so storing it turns an analytics table into a credential log
- * that nobody remembers to purge. And 访客数 is grouped by path: with the query
- * string attached, one product page becomes one row per referrer and the
- * 热门页面 list is noise.
+ * fragment. Two reasons. A query string carries `?code=` from the WeChat OAuth
+ * redirect and `?phone=` from a share link, so storing it turns an analytics
+ * table into a credential log that nobody remembers to purge. And 访客数 is
+ * grouped by path: with the query string attached, one product page becomes one
+ * row per referrer and the 热门页面 list is noise.
  *
  * The visitor is never named in the body. Who they are is the bearer token, or
  * — for somebody who has not signed in — the address the request came from,
