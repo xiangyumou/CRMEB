@@ -53,11 +53,12 @@ interruption.
   `coupon.spec.ts` failed twice in one full run (antd Select dropdown over 适用范围) and passes
   alone — not touched by F2; watch it in the final full run.
 
+- `docs/mini/decor.md` §9 (后台编辑器); the platforms open item removed.
+
 ## In progress
 
-- `docs/mini/decor.md` notes (editor pages, env, platforms).
+- Templates (after `git merge storefront/mini` if G1 has merged).
 
 ## Next
 
-- Templates last (after `git merge storefront/mini` if G1 has merged).
 - Checks, screenshots (`docs/mini/status/F2-screens/`), report.
