@@ -1,0 +1,14 @@
+// Theme tokens. A DIY theme overrides these on the page root; design width is 750, so px
+// here become rpx.
+page,
+.taro_page {
+  --shop-color-primary: #e93323;
+  --shop-color-text: #333333;
+  --shop-color-muted: #999999;
+  --shop-color-bg: #f5f5f5;
+  --shop-radius: 16px;
+
+  background: var(--shop-color-bg);
+  color: var(--shop-color-text);
+  font-size: 28px;
+}
