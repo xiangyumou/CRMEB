@@ -1,0 +1,277 @@
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { useAppConfigStore } from '@/app-config';
+import { useCheckoutDraft } from '@/features/checkout/draft';
+import { startSession, useSession } from '@/session/session';
+import { appConfigFixture } from '@/test/app-config-fixture';
+import { cardFixture, pageOf, productDetailFixture, reviewFixture } from '@/test/catalog-fixture';
+import { serveApi, type FakeReply } from '@/test/fake-api';
+import { renderPage } from '@/test/render';
+import { taroFake } from '@/test/taro-fake/taro';
+import ProductPage from './index';
+
+const empty = { items: [], total: 0, page: 1, pageSize: 100 };
+const coupon = (templateId: string, scope: string, name: string) => ({
+  templateId,
+  name,
+  discountAmount: '5.00',
+  minSpend: '50.00',
+  scope,
+  validityMode: 'fixed',
+  validFrom: '2026-09-01T00:00:00+08:00',
+  validTo: '2026-12-31T23:59:59+08:00',
+  validDays: null,
+  claimTo: null,
+  isUnlimitedSupply: true,
+  remainingCount: null,
+  perUserLimit: 1,
+  claimedCount: null,
+  canClaim: null,
+});
+
+type Routes = Record<string, (body: unknown) => FakeReply>;
+
+function serve(overrides: Routes = {}) {
+  return serveApi({
+    'GET /api/v1/catalog/products/12': () => ({ body: productDetailFixture() }),
+    'GET /api/v1/catalog/products/12/reviews': () => ({
+      body: { items: [reviewFixture()], total: 2, page: 1, pageSize: 2 },
+    }),
+    'GET /api/v1/catalog/products': () => ({
+      body: pageOf([cardFixture(), cardFixture({ id: '31', name: '温感按摩油' })]),
+    }),
+    'GET /api/v1/groupbuy/activities': () => ({
+      body: {
+        ...empty,
+        items: [
+          {
+            activityId: '7',
+            productId: '12',
+            title: '两人拼',
+            intro: null,
+            imageUrl: null,
+            price: '49.00',
+            originalPrice: '59.00',
+            seatsRequired: 2,
+            stock: 10,
+            sales: 0,
+            startAt: '2026-09-01T00:00:00+08:00',
+            endAt: '2026-12-01T00:00:00+08:00',
+            formingGroups: 0,
+            canBuy: true,
+          },
+        ],
+        total: 1,
+      },
+    }),
+    'GET /api/v1/presale/activities': () => ({ body: empty }),
+    'GET /api/v1/coupons': () => ({
+      body: {
+        ...empty,
+        items: [coupon('1', 'all_products', '全场满减券'), coupon('2', 'products', '指定商品券')],
+        total: 2,
+      },
+    }),
+    'POST /api/v1/visits': () => ({ status: 204, body: null }),
+    'GET /api/v1/cart/count': () => ({
+      body: { items: 2, quantity: 2, availableCount: 2, unavailableCount: 0 },
+    }),
+    ...overrides,
+  });
+}
+
+async function signIn() {
+  taroFake.storage.set('shop.session.token', 't1');
+  await startSession();
+}
+
+describe('商品详情', () => {
+  beforeEach(() => {
+    taroFake.routerParams = { id: '12' };
+    useSession.setState({ session: { status: 'idle' } });
+    useAppConfigStore.setState({ config: appConfigFixture, source: 'network' });
+    useCheckoutDraft.setState({ draft: null });
+  });
+
+  it('shows the product to a guest: price, reviews, description, services and recommendations', async () => {
+    serve();
+    await renderPage(<ProductPage />);
+
+    expect(await screen.findByText('柔雾丝绒礼盒', { selector: '#product-name' })).toBeTruthy();
+    expect(screen.getByText('已售 128')).toBeTruthy();
+    expect(screen.getByText('评价 (2)')).toBeTruthy();
+    expect(await screen.findByText('包装很严实，质感不错。')).toBeTruthy();
+    expect(screen.getByText('礼盒图文详情')).toBeTruthy();
+    expect(screen.getByText('隐私发货')).toBeTruthy();
+    expect(await screen.findByText('温感按摩油')).toBeTruthy();
+    // The product itself is not recommended to itself.
+    expect(
+      within(document.getElementById('product-recommended') as HTMLElement).queryByText(
+        '柔雾丝绒礼盒',
+      ),
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole('link', { name: /好评率 100%/ }));
+    expect(taroFake.calls).toContainEqual({
+      api: 'navigateTo',
+      args: { url: '/packages/goods/reviews/index?productId=12' },
+    });
+  });
+
+  it('shows the group-buy entry and only shop-wide coupons', async () => {
+    serve();
+    await renderPage(<ProductPage />);
+
+    fireEvent.click(await screen.findByRole('link', { name: '拼团 ¥49.00，2 人团' }));
+    expect(taroFake.calls).toContainEqual({
+      api: 'navigateTo',
+      args: { url: '/packages/promo/groupbuy-detail/index?id=7' },
+    });
+
+    fireEvent.click(await screen.findByRole('link', { name: '领取优惠券' }));
+    expect(screen.getByText('全场满减券')).toBeTruthy();
+    expect(screen.queryByText('指定商品券')).toBeNull();
+  });
+
+  it('asks a guest to log in at 加入购物车, coming back to the product', async () => {
+    taroFake.loginCode = 'code-1';
+    serve({
+      'POST /api/v1/auth/sessions/wechat-mini': () => ({
+        body: {
+          status: 'phone-required',
+          session: null,
+          registered: false,
+          bindToken: 'bind-1',
+          bindTokenExpiresInSec: 600,
+        },
+      }),
+    });
+    await renderPage(<ProductPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '加入购物车' }));
+
+    const redirect = JSON.stringify({ route: 'product', params: { id: '12' } });
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'navigateTo',
+        args: { url: `/pages/login/index?redirect=${encodeURIComponent(redirect)}` },
+      }),
+    );
+    expect(document.getElementById('sku-sheet')).toBeNull();
+  });
+
+  it('adds the chosen SKU to the cart', async () => {
+    const seen = serve({
+      'POST /api/v1/cart/items': () => ({ status: 201, body: { id: '9', quantity: 1 } }),
+    });
+    await signIn();
+    await renderPage(<ProductPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '加入购物车' }));
+    const sheet = await waitFor(() => {
+      const found = document.getElementById('sku-sheet');
+      expect(found).not.toBeNull();
+      return found as HTMLElement;
+    });
+    expect(within(sheet).getByRole('radio', { name: 'L' })).toBeTruthy();
+    fireEvent.click(within(sheet).getByRole('radio', { name: '黑' }));
+    fireEvent.click(within(sheet).getByRole('radio', { name: 'M' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '加入购物车' }).at(-1) as HTMLElement);
+
+    await waitFor(() =>
+      expect(seen.filter((r) => r.key === 'POST /api/v1/cart/items').map((r) => r.body)).toEqual([
+        { skuId: '103', quantity: 1 },
+      ]),
+    );
+  });
+
+  it('buys now: the draft carries the SKU and quantity, then checkout opens', async () => {
+    serve();
+    await signIn();
+    await renderPage(<ProductPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '立即购买' }));
+    const sheet = await waitFor(() => {
+      const found = document.getElementById('sku-sheet');
+      expect(found).not.toBeNull();
+      return found as HTMLElement;
+    });
+    fireEvent.click(within(sheet).getByRole('radio', { name: '白' }));
+    fireEvent.click(within(sheet).getByRole('radio', { name: 'M' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '立即购买' }).at(-1) as HTMLElement);
+
+    expect(useCheckoutDraft.getState().draft).toEqual({
+      source: 'buy-now',
+      item: { skuId: '101', quantity: 1 },
+      kind: 'normal',
+    });
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'navigateTo',
+        args: { url: '/packages/order/checkout/index' },
+      }),
+    );
+  });
+
+  it('favourites and un-favourites', async () => {
+    const seen = serve({
+      'POST /api/v1/me/favorites': () => ({ status: 201, body: { favorited: true } }),
+      'DELETE /api/v1/me/favorites/12': () => ({ status: 204, body: null }),
+    });
+    await signIn();
+    await renderPage(<ProductPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '收藏' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '已收藏' })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: '已收藏' }));
+    await waitFor(() =>
+      expect(seen.map((r) => r.key)).toEqual(
+        expect.arrayContaining(['POST /api/v1/me/favorites', 'DELETE /api/v1/me/favorites/12']),
+      ),
+    );
+  });
+
+  it('shows a sold-out product with one disabled button', async () => {
+    serve({
+      'GET /api/v1/catalog/products/12': () => ({
+        body: productDetailFixture({
+          stock: 0,
+          skus: productDetailFixture().skus.map((sku) => ({ ...sku, stock: 0 })),
+        }),
+      }),
+    });
+    await renderPage(<ProductPage />);
+
+    const button = await screen.findByRole('button', { name: '已售罄' });
+    expect(
+      (button as HTMLButtonElement).disabled || button.getAttribute('aria-disabled'),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '加入购物车' })).toBeNull();
+  });
+
+  it('says an off-shelf product is gone', async () => {
+    serve({
+      'GET /api/v1/catalog/products/12': () => ({
+        status: 404,
+        body: { code: 'CATALOG_PRODUCT_NOT_FOUND', message: '商品不存在' },
+      }),
+    });
+    await renderPage(<ProductPage />);
+    expect(await screen.findByText('商品已下架')).toBeTruthy();
+  });
+
+  it('records the visit and shares the product', async () => {
+    const seen = serve();
+    await renderPage(<ProductPage />);
+    await screen.findByText('柔雾丝绒礼盒', { selector: '#product-name' });
+    taroFake.showPage();
+
+    await waitFor(() =>
+      expect(seen.find((r) => r.key === 'POST /api/v1/visits')?.body).toEqual({
+        path: '/pages/product/index',
+      }),
+    );
+    const share = taroFake.shareHandlers.message?.();
+    expect(share).toMatchObject({ title: '柔雾丝绒礼盒', path: '/pages/product/index?id=12' });
+  });
+});

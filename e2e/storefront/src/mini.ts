@@ -44,7 +44,33 @@ export interface EmulatedWechatUser {
     bankName: string;
     bankAccount: string;
   } | null;
+  /** How the subscribe-message dialog is answered, for every template. Default `accept`. */
+  subscribe?: 'accept' | 'reject';
+  /**
+   * What 导入微信地址 (`wx.chooseAddress`) returns; `null` = the shopper cancels. Default: the
+   * app's fixed 广州 address, which the seeded division (深圳 only) cannot price.
+   */
+  address?: {
+    name: string;
+    phone: string;
+    province: string;
+    city: string;
+    district: string;
+    detail: string;
+    postCode: string | null;
+  } | null;
 }
+
+/** A 深圳 address 导入微信地址 can hand over: the seeded division prices its freight. */
+export const SHENZHEN_WECHAT_ADDRESS = {
+  name: '小程序新客',
+  phone: '13900001111',
+  province: '广东省',
+  city: '深圳市',
+  district: '南山区',
+  detail: '科技园路 3 号',
+  postCode: '518000',
+} as const;
 
 /** A WeChat user this run has never seen: a new openid and a number nobody registered. */
 export function newWechatUser(overrides: Partial<EmulatedWechatUser> = {}): EmulatedWechatUser {

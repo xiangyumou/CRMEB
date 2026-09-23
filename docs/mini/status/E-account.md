@@ -55,10 +55,15 @@ Updated at every commit so the work can resume after an interruption.
   now types `invoiceTitle`.
 - `docs/mini/pages.md` form changes for the E pages.
 
+- Merged storefront/mini after B: 我的 now draws with B's `features/decor/DecorPage` under a
+  custom `NavBar` (`decor-lite` removed). B's checkout picks its address in its own sheet, so
+  the address book's select mode and `features/checkout/address-choice` are gone (the route
+  catalogue still declares `addresses { select }`, now unused). The e2e 收藏 now taps the
+  product page's 收藏; the address e2e picks the address in B's checkout sheet.
+
 ## In progress
 
-- Merging storefront/mini (B merged): swap `decor-lite` for B's `DecorPage`, reconcile the
-  checkout address picking with B's checkout, rerun the address e2e (it drove the S4 stub).
+- Rerunning `test:mini` after the merge; retaking the screenshots.
 
 ## Next
 

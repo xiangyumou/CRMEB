@@ -1,6 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { useAddressChoice } from '@/features/checkout/address-choice';
 import { page, signIn } from '@/test/account-fixture';
 import { addressFixture, cityTreeFixture } from '@/test/address-fixture';
 import { serveApi } from '@/test/fake-api';
@@ -15,27 +14,9 @@ describe('收货地址', () => {
   beforeEach(() => {
     signIn();
     taroFake.pageStackDepth = 2;
-    useAddressChoice.setState({ addressId: null });
   });
 
-  it('picks an address for the checkout in select mode, and goes back', async () => {
-    taroFake.routerParams = { select: '1' };
-    serveApi({
-      'GET /api/v1/addresses': () => ({ body: page([addressFixture, second]) }),
-      'GET /api/v1/cities': () => ({ body: cityTreeFixture }),
-    });
-    await renderPage(<AddressesPage />);
-
-    fireEvent.click(await screen.findByRole('button', { name: /王五.*选择此地址/ }));
-
-    expect(useAddressChoice.getState().addressId).toBe('32');
-    await waitFor(() =>
-      expect(taroFake.calls).toContainEqual({ api: 'navigateBack', args: { delta: 1 } }),
-    );
-  });
-
-  it('deletes after a confirmation, and forgets it as the checkout’s choice', async () => {
-    useAddressChoice.setState({ addressId: '32' });
+  it('deletes after a confirmation', async () => {
     const seen = serveApi({
       'GET /api/v1/addresses': () => ({ body: page([addressFixture, second]) }),
       'GET /api/v1/cities': () => ({ body: cityTreeFixture }),
@@ -46,7 +27,6 @@ describe('收货地址', () => {
     fireEvent.click(await screen.findByRole('button', { name: '删除 王五 的地址' }));
 
     await waitFor(() => expect(seen.map((r) => r.key)).toContain('DELETE /api/v1/addresses/32'));
-    await waitFor(() => expect(useAddressChoice.getState().addressId).toBeNull());
   });
 
   it('saves a WeChat address whose region resolves in one tap', async () => {

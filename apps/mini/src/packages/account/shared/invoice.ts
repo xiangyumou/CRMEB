@@ -207,7 +207,6 @@ interface CreatedInvoiceTitle {
 }
 
 /**
- * The title just saved from 申请开票's 「新增抬头」, so that page picks it when it shows again
- * (the address book's select mode does the same with `address-choice`).
+ * The title just saved from 申请开票's 「新增抬头」, so that page picks it when it shows again.
  */
 export const useCreatedInvoiceTitle = create<CreatedInvoiceTitle>()(() => ({ id: null }));

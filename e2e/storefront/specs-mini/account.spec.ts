@@ -13,6 +13,7 @@ import {
   TRACKING_NO,
 } from '../src/mini-pages/order-shopper';
 import { openFresh, shown } from '../src/mini-pages/shown';
+import { CashierPage, CheckoutPage, ProductPage } from '../src/mini-pages/shopping-pages';
 import { arrangePaidOrder } from '../src/product-flows';
 
 /**
@@ -20,8 +21,8 @@ import { arrangePaidOrder } from '../src/product-flows';
  * mode at 确认订单, 我的收藏, 消息, 发票抬头, 我的评价 and 注销账号.
  *
  * Each test signs a new WeChat shopper up the way C's order specs do (`signUpFromOrders`, which
- * also gives the account a default 深圳 address). What another stream's pages would have done
- * — a 收藏 from the product page, a received order to review — is arranged through the API.
+ * also gives the account a default 深圳 address). A received order to review is arranged through
+ * the API; the order pages that lead there are C's.
  */
 
 const PROFILE = 'packages/account/profile/index';
@@ -109,21 +110,24 @@ test('a shopper adds, edits, picks at checkout and deletes an address', async ({
   await shown(page).getByText('保存', { exact: true }).click();
   await expect(row).toContainText('科技园路 9 号');
 
-  // 确认订单 starts from the default address; 更换收货地址 opens the book in select mode.
-  await openFresh(page, miniRoute('pages/product/index', { id: shop.fixtures.postageProductId }));
-  await shown(page).getByText('立即购买', { exact: true }).click();
-  const address = shown(page).locator('#checkout-address');
-  await expect(address).toContainText('小程序买家');
-  await shown(page).getByRole('link', { name: '更换收货地址' }).click();
-  await expect(shown(page).getByText('选择收货地址').first()).toBeAttached();
+  // 确认订单 starts from the default address; its address sheet lists the book.
+  const product = new ProductPage(page);
+  await product.open(shop.fixtures.postageProductId);
+  await product.barButton('立即购买').click();
+  await product.sheetButton('立即购买').click();
+  const checkout = new CheckoutPage(page);
+  await checkout.expectShown();
+  await expect(checkout.address()).toContainText('小程序买家');
+  await checkout.address().click();
   await shown(page)
-    .getByRole('button', { name: /^张三，.*，选择此地址$/ })
+    .locator('#address-sheet')
+    .getByRole('radio', { name: /^张三，/ })
     .click();
-  await expect(address).toContainText('张三');
-  await expect(address).toContainText('科技园路 9 号');
+  await expect(checkout.address()).toContainText('张三');
+  await expect(checkout.address()).toContainText('科技园路 9 号');
 
-  await shown(page).getByText('提交订单', { exact: true }).click();
-  await expect(page).toHaveURL(/packages\/order\/cashier\/index\?orderId=\d+/);
+  await checkout.submit();
+  await new CashierPage(page).expectShown();
   const orderId = new URL(page.url().replace('/#/', '/')).searchParams.get('orderId');
   const order = await shopper.api.get(`/api/v1/orders/${orderId}`);
   expect(JSON.stringify(await order.json())).toContain('科技园路 9 号');
@@ -149,17 +153,20 @@ test('a favourited product is in 我的收藏, and leaves it', async ({
   failedRequests,
 }) => {
   const shopper = await signUpFromOrders(page, wechatUser, shop, playwright);
-  // The 收藏 button is the product page's (stream B); the list is what this spec is about.
-  const added = await shopper.api.post('/api/v1/me/favorites', {
-    data: { productId: String(shop.fixtures.postageProductId) },
-  });
-  expect(added.ok(), await added.text()).toBe(true);
+
+  // 收藏 on the product page's bar.
+  const product = new ProductPage(page);
+  await product.open(shop.fixtures.postageProductId);
+  await shown(page).locator('.shop-action-bar').getByRole('button', { name: '收藏' }).click();
+  await expect(
+    shown(page).locator('.shop-action-bar').getByRole('button', { name: '已收藏' }),
+  ).toBeVisible();
 
   await openFresh(page, miniRoute(FAVORITES));
   await expect(shown(page).getByText('共 1 件')).toBeVisible();
   await shown(page).getByText('E2E 运费商品').first().click();
   await expect(page).toHaveURL(/pages\/product\/index\?id=\d+/);
-  await expect(shown(page).locator('#product-name')).toHaveText('E2E 运费商品');
+  await expect(product.name()).toHaveText('E2E 运费商品');
 
   // 管理 → tick → 取消收藏.
   await openFresh(page, miniRoute(FAVORITES));

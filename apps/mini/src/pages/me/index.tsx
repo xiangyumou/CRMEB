@@ -3,21 +3,22 @@ import { Text, View } from '@tarojs/components';
 import { routeKey, useRouteQuery } from '@shop/api-client/react';
 import { useTabPage } from '@/app-shell/tab-page';
 import { useRefetchOnShow } from '@/data/use-refetch-on-show';
-import { DecorPage } from '@/features/decor-lite/decor-page';
+import { DecorPage } from '@/features/decor/decor-page';
+import { DecorSkeleton } from '@/features/decor/decor-states';
 import { navigate, usePullToRefresh } from '@/platform';
 import { useSignedIn } from '@/session/session';
 import { ErrorBlock } from '@/ui/error-block';
 import { Icon } from '@/ui/icon';
+import { NavBar } from '@/ui/nav-bar';
 import { PageShell } from '@/ui/page-shell';
 import { Pressable } from '@/ui/pressable';
-import { CellSkeleton } from '@/ui/skeleton';
 import './index.scss';
 
 const ROUTE = { route: 'me', params: {} } as const;
 
 /**
- * 我的 (tab `me`, pages.md §2.1): the 个人中心 the operator decorated (`decor.pageUserCenter`,
- * the built-in one when none is), drawn by the decor renderer. A guest sees the same page with
+ * 我的 (tab `me`, custom navigation bar, pages.md §2.1): the 个人中心 the operator decorated
+ * (`decor.pageUserCenter`, the built-in one when none is), drawn by the decor renderer. A guest sees the same page with
  * 「登录/注册」 in the user card. Refetched when the shopper signs in or out, on every show
  * (order counts move) and on pull-down.
  */
@@ -44,9 +45,10 @@ export default function Me() {
 
   return (
     <PageShell title="我的">
+      <NavBar title="我的" />
       <View className="me" {...(background ? { style: { background } } : {})}>
         {page.isPending ? (
-          <CellSkeleton rows={6} />
+          <DecorSkeleton />
         ) : page.isError ? (
           <ErrorBlock error={page.error} onRetry={() => void page.refetch()} />
         ) : (

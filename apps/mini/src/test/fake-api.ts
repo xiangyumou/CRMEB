@@ -8,6 +8,8 @@ export interface FakeReply {
 
 export interface SeenRequest {
   key: string;
+  /** The query string, decoded (a repeated key's values joined by commas). */
+  query: Record<string, string>;
   headers: Record<string, string>;
   body: unknown;
 }
@@ -20,10 +22,13 @@ export interface SeenRequest {
 export function serveApi(routes: Record<string, (body: unknown) => FakeReply>): SeenRequest[] {
   const seen: SeenRequest[] = [];
   taroFake.onRequest = (option) => {
-    const path = option.url.replace(/^https?:\/\/[^/]+/, '').split('?')[0] ?? '';
+    const [path = '', search = ''] = option.url.replace(/^https?:\/\/[^/]+/, '').split('?');
+    const query: Record<string, string> = {};
+    for (const [name, value] of new URLSearchParams(search))
+      query[name] = name in query ? `${query[name]},${value}` : value;
     const key = `${option.method} ${path}`;
     const body: unknown = option.data === undefined ? undefined : JSON.parse(option.data);
-    seen.push({ key, headers: option.header, body });
+    seen.push({ key, query, headers: option.header, body });
     const handler = routes[key];
     const reply = handler
       ? handler(body)
