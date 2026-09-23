@@ -1,8 +1,13 @@
 import type { ReactNode } from 'react';
+import { Button as TaroButton } from '@tarojs/components';
 import { useAppConfig } from '@/app-config';
+import { cx } from '@/lib/cx';
 import { callPhone } from '@/platform';
 import type { ActionBarIcon } from './action-bar';
 import { Button, type ButtonLook } from './button';
+import { toast } from './feedback';
+import { Pressable } from './pressable';
+import './contact-button.scss';
 
 /**
  * The customer-service session source (C15): which page and thing the shopper asked from, so
@@ -65,4 +70,48 @@ export function ContactButton({ sessionFrom, children = '联系客服', ...look 
     );
   }
   return null;
+}
+
+export interface ContactAreaProps {
+  sessionFrom: string;
+  /** What a screen reader announces (the face inside is usually an icon and a word). */
+  label?: string | undefined;
+  className?: string | undefined;
+  children: ReactNode;
+}
+
+/**
+ * Makes any face a 客服 entry (a decor block's 联系客服 cell): WeChat's `open-type="contact"`
+ * button with no look of its own when the shop uses WeChat's customer service, a call when it
+ * has a hotline, and a short note when it has neither, so the tap never does nothing.
+ */
+export function ContactArea({
+  sessionFrom,
+  label = '联系客服',
+  className,
+  children,
+}: ContactAreaProps) {
+  const support = useSupport();
+  if (support.kind === 'mini-program') {
+    return (
+      <TaroButton
+        className={cx('shop-contact-area', className)}
+        openType="contact"
+        sessionFrom={sessionFrom}
+        ariaLabel={label}
+      >
+        {children}
+      </TaroButton>
+    );
+  }
+  const phone = support.kind === 'phone' ? support.phone : null;
+  return (
+    <Pressable
+      className={className}
+      label={phone ? `拨打客服电话 ${phone}` : label}
+      onClick={() => (phone ? callPhone(phone) : toast.text('暂未开通在线客服'))}
+    >
+      {children}
+    </Pressable>
+  );
 }

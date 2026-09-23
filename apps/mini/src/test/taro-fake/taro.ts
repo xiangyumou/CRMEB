@@ -405,6 +405,8 @@ const Taro = {
     }),
   getEnterOptionsSync: () => taroFake.enterOptions,
   makePhoneCall: (args: unknown) => record('makePhoneCall', args, {}),
+  getWindowInfo: () => ({ statusBarHeight: 20, windowWidth: 375, windowHeight: 812 }),
+  getMenuButtonBoundingClientRect: () => ({ top: 24, left: 281, height: 32, width: 87 }),
   previewImage: (args: unknown) => record('previewImage', args, {}),
   stopPullDownRefresh: () => record('stopPullDownRefresh', undefined, {}),
   pageScrollTo: (args: unknown) => record('pageScrollTo', args, {}),

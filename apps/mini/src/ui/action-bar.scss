@@ -60,8 +60,16 @@
     gap: $space-3;
     margin-left: $space-3;
 
+    // Two buttons share what the icons leave: they shrink (no min-content floor) and keep a
+    // narrower padding, so 「加入购物车」「立即购买」 fit a 375 px phone with three icons.
     > * {
       flex: 1;
+      min-width: 0;
+    }
+
+    > .shop-btn {
+      padding-left: $space-3;
+      padding-right: $space-3;
     }
   }
 }
