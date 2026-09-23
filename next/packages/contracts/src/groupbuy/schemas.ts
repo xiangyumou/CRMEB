@@ -9,13 +9,13 @@ import { id, instant, money, pageQuery, paged, sortQuery } from '../_conventions
  * layer. `groupbuy.service.ts` assigns one to the other and stops compiling if
  * they ever drift.
  *
- * Two things the legacy shape does not have and this one does:
+ * Two things worth knowing before the shapes:
  *
  * - a **group** is a real row with a real seat counter, so the storefront is
  *   told `seatsTotal` / `seatsTaken` rather than being handed a list of
  *   participants to count;
- * - a **poster** is data plus a QR payload. The server never draws one
- *   (`getPinkPoster` rendered a PNG with GD); the client composes it.
+ * - a **poster** is data plus a QR payload. The server never draws one; the
+ *   client composes it.
  */
 
 // ---------------------------------------------------------------------------
@@ -103,9 +103,8 @@ export type GroupbuyActivityDetail = z.infer<typeof groupbuyActivityDetail>;
  * a form that cannot reach the database is a 422 with a field error, not a 500
  * from a CHECK violation. `ZodForm` runs the same schema in the browser.
  *
- * There is **no per-activity 虚拟成团 switch**: the frozen schema has no column
- * for it, so it is a shop-wide setting in the `groupbuy` config group. See
- * CR-2-d and `docs/rewrite/status/d.md`.
+ * There is **no per-activity 虚拟成团 switch**: the schema has no column for
+ * it, so it is a shop-wide setting in the `groupbuy` config group.
  */
 export const groupbuyActivityForm = z
   .object({
@@ -128,7 +127,7 @@ export const groupbuyActivityForm = z
       .max(30 * 24 * 3600),
     stock: z.number().int().min(0).max(1_000_000),
     totalQuota: z.number().int().min(0).max(1_000_000).optional(),
-    /** 每单限购份数. Legacy `eb_store_combination.num`. */
+    /** 每单限购份数. */
     perOrderQuantity: z.number().int().min(1).max(999).default(1),
     startAt: instant,
     endAt: instant,
@@ -227,10 +226,8 @@ export type GroupbuyGroupListQuery = z.infer<typeof groupbuyGroupListQuery>;
 export const pagedGroupbuyGroups = paged(groupbuyGroupListItem);
 
 /**
- * 立即成团. The operator's name is the audit trail — legacy's
- * `virtualCombination($pinkId, $operator)` passed a bare string and nobody ever
- * looked at it, so here the audit row is written by `handle()` and this body
- * only carries the reason.
+ * 立即成团. The operator's name is the audit trail, and the audit row is
+ * written by `handle()`, so this body only carries the reason.
  */
 export const groupbuyCompleteBody = z.object({
   reason: z.string().max(255).optional(),
@@ -417,8 +414,8 @@ export const pagedMyGroupbuy = paged(myGroupbuyItem);
 
 /**
  * Poster data. The server returns the pieces and the payload a QR code must
- * encode; the client draws the image. Legacy rendered a PNG server-side with
- * GD, cached it as an attachment and leaked one file per group.
+ * encode; the client draws the image. A server-rendered PNG would be one more
+ * stored file per group that nothing ever cleans up.
  */
 export const groupbuyPoster = z.object({
   groupId: id,
@@ -443,9 +440,9 @@ export type GroupbuyPoster = z.infer<typeof groupbuyPoster>;
 
 /**
  * One coherent fixture reused by every example, so the mock server tells the
- * uni-app and admin streams a single story: activity 1 (三只松鼠坚果礼盒,
- * three seats, 拼团价 59.00 against 88.00), group 501 with two of three seats
- * taken by 小明 (leader) and 小红.
+ * uni-app and the admin a single story: activity 1 (三只松鼠坚果礼盒, three
+ * seats, 拼团价 59.00 against 88.00), group 501 with two of three seats taken
+ * by 小明 (leader) and 小红.
  */
 export const groupbuyActivityExample: GroupbuyActivityListItem = {
   id: '1',
@@ -673,18 +670,17 @@ export const groupbuyActivityOrderExample: GroupbuyActivityOrder = {
 };
 
 // ---------------------------------------------------------------------------
-// 人气条 (CR-1-h2)
+// 人气条
 // ---------------------------------------------------------------------------
 
 /**
  * The strip at the top of the 拼团 tab: 「已有 N 人参与拼团」 and a row of faces.
  *
- * Legacy served this from `getCombinationIndex`, which counted rows in
- * `store_pink` — refunds, failed teams and repeat joins included — so the
- * number only ever went up and routinely exceeded the shop's customer count.
- * Here `participants` is **distinct users currently taking part**: a member who
- * has not left, in a team that is still forming or has already succeeded, on an
- * activity that is live right now.
+ * `participants` is **distinct users currently taking part**, not a count of
+ * join rows: counting rows, with refunds, failed teams and repeat joins
+ * included, only ever goes up and soon exceeds the shop's customer count. A
+ * participant is a member who has not left, in a team that is still forming or
+ * has already succeeded, on an activity that is live right now.
  */
 export const groupbuySummary = z.object({
   /** Distinct users in a live team. Never negative, and it can go down. */

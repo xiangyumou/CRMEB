@@ -24,13 +24,13 @@ import {
  * Storefront group-buy routes, all under `/api/v1/groupbuy/`.
  *
  * There is **no join endpoint**: joining a group is placing an order, so it
- * goes through B1's `POST /api/v1/orders` with `kind: 'groupbuy'` and
- * `kindMeta: { activityId, groupId? }` — `groupId` absent opens a new team.
- * A second checkout path would be a second copy of stock, coupons, freight and
+ * goes through checkout's `POST /api/v1/orders` with `kind: 'groupbuy'` and
+ * `kindMeta: { activityId, groupId? }` — `groupId` absent opens a new team. A
+ * second checkout path would be a second copy of stock, coupons, freight and
  * idempotency; the `OrderKindHandler` seam exists exactly so there is one.
  *
- * `POST /api/v1/groupbuy/groups/:id/withdrawal` is legacy `combination/remove`:
- * the leader abandoning a team nobody has paid into.
+ * `POST /api/v1/groupbuy/groups/:id/withdrawal` is the leader abandoning a team
+ * nobody has paid into.
  */
 
 const groupParams = z.object({ id });
@@ -55,7 +55,7 @@ export const groupbuyList = defineRoute({
 });
 
 /**
- * 人气条 (CR-1-h2). Public, because it is the first thing on the 拼团 tab and a
+ * 人气条. Public, because it is the first thing on the 拼团 tab and a
  * signed-out visitor is exactly who the social proof is for.
  *
  * Cached for 60 s in Redis. The number is social proof, not an invoice: a
