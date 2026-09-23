@@ -47,6 +47,7 @@ describe('block prop schemas', () => {
   it('fill every default, base props included, from a nearly empty input', () => {
     expect(productGridProps.parse({})).toEqual({
       source: { mode: 'manual', ids: [] },
+      layout: 'grid2',
       titleLines: 2,
       showMarketPrice: true,
       showTag: true,
@@ -362,7 +363,7 @@ describe('the built-in 个人中心 — DECOR-005', () => {
 
 describe('zod-free runtime modules', () => {
   // The mini-program imports these at runtime; its bundle must not carry zod.
-  const ZOD_FREE = ['constants.ts', 'link-route.ts', 'defaults.ts', 'meta.ts'];
+  const ZOD_FREE = ['constants.ts', 'link-route.ts', 'defaults.ts', 'meta.ts', 'rich-text.ts'];
   it.each(ZOD_FREE)('%s has no value import that can reach zod', (file) => {
     const source = readFileSync(join(import.meta.dirname, file), 'utf8');
     const valueImports = [...source.matchAll(/^import\s+(?!type\b)[^;]*?from\s+'([^']+)'/gms)].map(

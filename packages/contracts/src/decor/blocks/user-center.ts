@@ -5,17 +5,16 @@ import { ORDER_ENTRY_KEYS, type OrderEntryKey } from '../constants';
 import { linkTarget } from '../link';
 import { ui } from '../meta';
 import { defineBlock } from '../registry';
+import { personalNeed } from '../sources';
 
 /**
  * The 个人中心 blocks (plan §2.2): 用户卡片, 订单入口, 服务宫格.
  *
  * Their props are configuration only. The shopper's own data — nickname,
- * avatar, order counts — is not page data: the 我的 page reads it from
- * `user.getProfile` and `order.counts` and hands it to the blocks, so the
+ * avatar, the coupon / favourite / history totals, order counts — is never
+ * page data: the blocks declare it with `personal`, and the resolver answers
+ * it only with a session, beside the page, never cached (DECOR-015). The
  * cached page stays free of anything personal.
- *
- * Schema only for now: the components are stream G's. They exist here because
- * the built-in 个人中心 (`defaults.ts`) is made of them.
  */
 
 export const userCardProps = blockProps({
@@ -33,6 +32,7 @@ export const userCardBlock = defineBlock({
   v: 1,
   props: userCardProps,
   meta: { label: '用户卡片', pages: ['user_center'], maxPerPage: 1 },
+  personal: (props) => ({ user: personalNeed.userSummary(props.showStats) }),
 });
 
 const orderEntryKey = z.enum(Object.keys(ORDER_ENTRY_KEYS) as [OrderEntryKey, ...OrderEntryKey[]]);
@@ -75,17 +75,40 @@ export const orderEntryBlock = defineBlock({
   v: 1,
   props: orderEntryProps,
   meta: { label: '订单入口', pages: ['user_center'], maxPerPage: 1 },
+  personal: () => ({ counts: personalNeed.orderCounts() }),
 });
 
-export const serviceGridItem = z.object({
-  label: z
-    .string()
-    .min(1)
-    .max(8)
-    .meta(ui({ label: '文字' })),
-  icon: imageUrl.optional().meta(ui({ label: '图标（不选用默认）', field: 'image' })),
-  link: linkTarget.meta(ui({ label: '跳转链接', field: 'link' })),
-});
+/**
+ * What a 服务 entry does: open a link, or start a 客服 conversation. `contact`
+ * cannot be a link — in WeChat it is `<button open-type="contact">`, a native
+ * control. The block only says so (an intent); the mini-program draws the
+ * button, and a client without one (H5) falls back to its own 客服 route.
+ */
+export const SERVICE_ACTIONS = { link: '打开链接', contact: '联系客服' } as const;
+export type ServiceAction = keyof typeof SERVICE_ACTIONS;
+
+/**
+ * Added `action` without a version bump: it is additive with a default, so
+ * every stored v1 item still parses to the same thing (`action: 'link'`).
+ */
+export const serviceGridItem = z
+  .object({
+    label: z
+      .string()
+      .min(1)
+      .max(8)
+      .meta(ui({ label: '文字' })),
+    icon: imageUrl.optional().meta(ui({ label: '图标（不选用默认）', field: 'image' })),
+    action: z
+      .enum(Object.keys(SERVICE_ACTIONS) as [ServiceAction, ...ServiceAction[]])
+      .default('link')
+      .meta(ui({ label: '点击后', field: 'radio', options: SERVICE_ACTIONS })),
+    link: linkTarget.optional().meta(ui({ label: '跳转链接（联系客服时不用填）', field: 'link' })),
+  })
+  .refine((item) => item.action !== 'link' || item.link !== undefined, {
+    message: '请选择跳转链接',
+    path: ['link'],
+  });
 export type ServiceGridItem = z.infer<typeof serviceGridItem>;
 
 export const serviceGridProps = blockProps({
