@@ -87,9 +87,9 @@ async function settled(check: () => Promise<unknown>): Promise<'ok' | 'failed'> 
 /**
  * Deep readiness. Unlike `healthPayload`, this one is allowed to touch things —
  * because nothing restarts a container on its say-so. It gates a *release*
- * (`deploy/upgrade.sh` through `deploy/lib/readiness.sh`) and it
- * answers a monitor; the container healthchecks keep calling `/api/v1/health`,
- * which touches nothing.
+ * (`shop upgrade` and `shop rollback`, through `deploy/lib/readiness.sh`),
+ * `shop status` reports it, and it answers a monitor; the container
+ * healthchecks keep calling `/api/v1/health`, which touches nothing.
  *
  * Four checks, and **no error text, host, connection string or credential** in
  * the body: every failure is the bare word `failed` beside the dependency's

@@ -56,7 +56,7 @@ e2e/            Playwright suites: admin/ and storefront/
 guards/         whole-tree static checks (pnpm guards)
 load/           the load smoke
 docker/         the web, worker and edge images
-deploy/         the production Compose stack and its scripts
+deploy/         the production Compose stack, the host command `shop`, and ship.sh
 docs/           architecture, conventions, contributing, the business-rule catalogue
 ```
 
@@ -145,7 +145,8 @@ CI (`.github/workflows/ci.yml`) runs all of these, plus shellcheck, the deploy d
 ## Deployment
 
 The shop runs as one Docker Compose project on one host: PostgreSQL, Redis, `web`, `worker` and the
-nginx `edge`, behind Traefik. Images are built in CI and deployed by digest. First deploy, upgrade,
+nginx `edge`, behind Traefik. Images are built in CI and deployed by digest. A release is one
+command from a machine with the repository, `deploy/ship.sh <commit>`. First deploy, release,
 rollback, backup and restore are in [deploy/README.md](deploy/README.md).
 
 ## Documentation

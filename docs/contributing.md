@@ -34,8 +34,9 @@ Depending on what the change touches, also run:
 
 - `apps/uni-app/**`: `cd apps/uni-app && npm test && npm run build:h5` (and `npm run
 build:mp-weixin` if a `#ifdef MP-WEIXIN` block changed).
-- `deploy/**` or `docker/**`: `shellcheck deploy/*.sh deploy/lib/*.sh deploy/rehearsal/*.sh` and the
-  drill, `deploy/rehearsal/drill.sh` (it builds the three images; allow about fifteen minutes).
+- `deploy/**` or `docker/**`: shellcheck, as the `shell` job in `ci.yml` runs it, and the drill,
+  `deploy/rehearsal/drill.sh` (it builds the three images; allow about half an hour). Commit first:
+  its `ship/` cases ship `HEAD`.
 - `.github/**`: `actionlint`, and `.github/scripts/publish-release.test.sh` if the publish script
   changed.
 

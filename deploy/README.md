@@ -12,50 +12,146 @@ The production stack is one Compose project, `crmeb-next`, on one host:
 | `migrate`  | a one-shot (profile `migrate`) that applies the migrations and the reference seed           | 384 MiB    |
 
 The images are built in CI and pinned by digest. A host needs Docker with Compose v2, `curl`,
-and nothing else: no Node, no pnpm, no build toolchain.
+and nothing else: no Node, no pnpm, no build toolchain, no checkout of the repository.
+
+Two commands run the shop:
+
+- **`deploy/ship.sh`**, on a machine with the repository, releases a commit in one command and
+  forwards everything else to the host over SSH;
+- **`shop`**, on the host, is everything done to the running stack: `upgrade`, `rollback`,
+  `backup`, `status`, and a few helpers.
 
 ## Files
 
-| File                     | What it is                                                                         |
-| ------------------------ | ---------------------------------------------------------------------------------- |
-| `compose.yml`            | the stack. It publishes only the edge, and only on loopback.                       |
-| `compose.traefik.yml`    | the overlay that puts the edge behind Traefik; `NEXT_COMPOSE_OVERLAYS` applies it. |
-| `deployment.env.example` | the template for `deployment.env`, which is gitignored and holds the passwords.    |
-| `upgrade.sh`             | deploys a release; if it does not come up, it ends on the previous images.         |
-| `rollback.sh`            | returns to a known set of images; `--restore` recovers data, and only when asked.  |
-| `backup.sh`              | dumps the database and proves the dump restorable; `--verify-only` checks one.     |
-| `readyz.sh`              | runs the readiness gate on its own. Read-only.                                     |
-| `lib/`                   | shared shell: the Compose wiring, digest capture, the readiness gate.              |
-| `rehearsal/`             | the drill that deploys, breaks and rolls back a throwaway copy of this stack.      |
+| File                     | What it is                                                                                  | On the host |
+| ------------------------ | ------------------------------------------------------------------------------------------- | ----------- |
+| `ship.sh`                | releases a commit to the host, and forwards `status`, `backup` and `rollback` to it         | no          |
+| `ship.local.env.example` | the template for `ship.local.env`, which is gitignored and names the host and its directory | no          |
+| `shop`                   | the host command. `shop help` lists its subcommands.                                        | yes         |
+| `lib/commands/`          | one file per `shop` subcommand: `upgrade.sh`, `rollback.sh`, `backup.sh`, `status.sh`, …    | yes         |
+| `lib/`                   | shared shell: the Compose wiring, digest capture, the readiness gate                        | yes         |
+| `compose.yml`            | the stack. It publishes only the edge, and only on loopback.                                | yes         |
+| `compose.traefik.yml`    | the overlay that puts the edge behind Traefik; `NEXT_COMPOSE_OVERLAYS` applies it           | yes         |
+| `deployment.env.example` | the template for `deployment.env`, which holds the passwords and is never tracked           | yes         |
+| `rehearsal/`             | the drill that deploys, breaks and rolls back a throwaway copy of this stack                | no          |
 
-## Conventions
+## The host
 
-Run everything from the release directory on the host, the one that contains `deploy/`. On the
-production host that is `/home/ubuntu/apps/CRMEB-next`.
+On the production host the release directory is `/home/ubuntu/apps/CRMEB`. It holds what this
+directory ships, at its root, and three things that belong to the host and that no release
+touches:
 
-`deployment.env` lives **next to the scripts**, in `deploy/`. `lib/common.sh` resolves it from its
-own directory and refuses to run without it, so a copy in the wrong place fails at once.
-
-Every script calls Compose the same way: the project `crmeb-next`, `compose.yml`, then every
-overlay `NEXT_COMPOSE_OVERLAYS` lists, and `deployment.env`. So must you. On the production host,
-which runs behind Traefik:
-
-```sh
-docker compose -p crmeb-next --project-directory deploy \
-  -f deploy/compose.yml -f deploy/compose.traefik.yml --env-file deploy/deployment.env …
+```text
+/home/ubuntu/apps/CRMEB/
+  shop  compose.yml  compose.traefik.yml  deployment.env.example  lib/   ← shipped
+  deployment.env                                                         ← the host's settings, mode 600
+  REVISION                                                               ← the commit that is running
+  data/backups/       dumps, upgrade manifests, settings backups
+  data/releases/      one log per ship
+  data/shipped.list   the files the last ship put here
 ```
 
-Never drop `-p crmeb-next`. Without it Compose names the project after the directory, which is a
-_different_ project with different volumes: you would start a second, empty stack beside the real
-one. Never drop an overlay the deployment runs with either: an `up` without `compose.traefik.yml`
-recreates the edge off the router. Set an alias once per shell, naming the same files as
-`NEXT_COMPOSE_OVERLAYS`:
+`deployment.env` lives **next to `shop`**. `lib/common.sh` resolves it from its own directory and
+refuses to run without it, so a copy in the wrong place fails at once.
+
+Every `shop` command calls Compose the same way: the project `crmeb-next`, `compose.yml`, then
+every overlay `NEXT_COMPOSE_OVERLAYS` lists, and `deployment.env`. For anything else Compose can
+do, go through `shop compose`, which calls it with exactly those:
 
 ```sh
-alias shopc='docker compose -p crmeb-next --project-directory deploy -f deploy/compose.yml -f deploy/compose.traefik.yml --env-file deploy/deployment.env'
+cd /home/ubuntu/apps/CRMEB
+./shop compose ps
+./shop compose logs -f worker web edge
 ```
 
-On a host with no overlay, leave out `-f deploy/compose.traefik.yml`.
+Never call `docker compose` without them. Without `-p crmeb-next` Compose names the project after
+the directory, which is a _different_ project with different volumes: you would start a second,
+empty stack beside the real one. Without the overlay an `up` recreates the edge off the router.
+
+`REVISION` is written by `ship.sh`, and only after an upgrade passed, so it always names a commit
+that came up. `shop status` prints it with the running digests.
+
+## Releasing: `ship.sh`
+
+On a machine with the repository, `gh` signed in, and SSH access to the host:
+
+```sh
+cp deploy/ship.local.env.example deploy/ship.local.env   # once: SHIP_HOST and SHIP_DIR
+
+deploy/ship.sh                  # the tip of origin/master
+deploy/ship.sh <commit>         # an earlier commit of master
+deploy/ship.sh --dry-run        # everything up to the upgrade, and change nothing
+```
+
+`SHIP_HOST` is an SSH destination (`user@host`, or a `Host` alias) and `SHIP_DIR` the release
+directory. Set in the environment, or given as `--host` and `--dir`, they win over the file.
+
+In order, refusing to continue when a step cannot be proven, it:
+
+1. checks the commit is on `origin/master` and that CI's push run for it passed. A commit that
+   changes only `docs/**` or `*.md` has no CI run and no images: ship the newest one CI built;
+2. has the host resolve the three images CI published for it, `sha-<commit>`, to digests
+   (`shop resolve`). Nobody copies a digest, and the upgrade is only ever given digests;
+3. stages the runtime files, `git archive <commit> deploy` without the drill, the docs and
+   `ship.sh`, on the host, prints what would change, and runs that staged `shop upgrade --dry-run`
+   against the host's settings. `--dry-run` stops here;
+4. syncs the files into the release directory. A file the last release shipped and this one does
+   not is removed; `data/shipped.list` is what makes that exact. `deployment.env`, `data/` and
+   `REVISION` are never touched;
+5. runs `shop upgrade` for real, detached from the SSH session, with its output streamed and kept
+   in `data/releases/<stamp>-<commit>.log`. A dropped connection cannot kill it halfway;
+6. writes `REVISION`;
+7. checks from outside: `https://<NEXT_HOST>/` answers 2xx and `http://<NEXT_HOST>/` redirects
+   to https. It reads that one setting with `shop hostname`, which prints it only while the
+   Traefik overlay is applied.
+
+| Exit | Meaning                                                                          |
+| ---- | -------------------------------------------------------------------------------- |
+| 0    | shipped                                                                          |
+| 1    | the upgrade failed, and the previous images are running again                    |
+| 2    | invoked wrongly                                                                  |
+| 3    | the upgrade and its rollback failed, or the connection dropped: a person decides |
+| 4    | refused before anything on the host changed                                      |
+| 5    | deployed, but the site does not answer as it should from outside                 |
+
+After a 1, the release directory holds the new files and the stack runs the previous images;
+`REVISION` still names the previous release. Ship again once the cause is fixed, or ship the
+previous commit to put its files back.
+
+A release that changes only the Compose files, a label or a redirect, goes through the same
+command. Its digests equal what runs, nothing is stopped, and `up -d` recreates only what the
+files changed.
+
+The same script forwards the host's everyday commands, so this machine is the one place anyone
+types a command:
+
+```sh
+deploy/ship.sh status                     # shop status
+deploy/ship.sh backup                     # shop backup
+deploy/ship.sh rollback --last-upgrade    # shop rollback --last-upgrade
+```
+
+A tag is not a release. `shop upgrade` refuses anything that is not `repo@sha256:<64 hex>`: a tag
+can be repointed between the run that passed and the deploy, and then the build that passed can no
+longer be named. A rollback target has to be nameable. CI's `images` job also prints
+`storefront in the edge image: **real**`; if a commit's summary says `placeholder`, its H5 build
+failed and its edge serves a placeholder page at `/`, so do not ship it.
+
+## `shop` on the host
+
+```sh
+./shop help
+./shop status                   # the release, the running digests, the last upgrade, the readiness gate
+./shop upgrade  --web …@sha256:… --worker …@sha256:… --edge …@sha256:… [--app-version <commit>]
+./shop rollback --last-upgrade
+./shop backup
+./shop resolve  <commit>        # the three digests CI published for a commit
+./shop compose  <arguments>     # docker compose, with this deployment's project, files and settings
+./shop hostname                 # NEXT_HOST, while the Traefik overlay is applied
+```
+
+`shop <command> --help` prints that command's contract, exit codes included. `ship.sh` is the
+usual way to run `upgrade`; on the host it is there for a person who has to.
 
 ## Configuration: `deployment.env`
 
@@ -63,14 +159,14 @@ Every key the stack reads. `deployment.env.example` carries the same list with p
 
 | Key                                                      | Meaning                                                                                                                           |
 | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `NEXT_WEB_IMAGE`, `NEXT_WORKER_IMAGE`, `NEXT_EDGE_IMAGE` | the release, as `repo@sha256:<64 hex>`. `upgrade.sh` and `rollback.sh` rewrite these three; you only set them by hand once.       |
+| `NEXT_WEB_IMAGE`, `NEXT_WORKER_IMAGE`, `NEXT_EDGE_IMAGE` | the release, as `repo@sha256:<64 hex>`. `shop upgrade` and `shop rollback` rewrite these three; you only set them by hand once.   |
 | `NEXT_POSTGRES_IMAGE`, `NEXT_REDIS_IMAGE`                | the upstream images, also pinned by digest. Change them only as a deliberate upgrade of their own.                                |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`      | the database role and name. Generate the password: `openssl rand -base64 24 \| tr -d /+=`.                                        |
 | `REDIS_PASSWORD`                                         | generated the same way.                                                                                                           |
 | `DATABASE_URL`, `REDIS_URL`                              | the same credentials spelled as URLs, with hosts `postgres` and `redis`. The application reads only these.                        |
 | `APP_ORIGIN`                                             | the origin the **browser** sees, e.g. `https://x-zoo.vip`. It drives the CSRF `Origin` check.                                     |
 | `EXTRA_ALLOWED_ORIGINS`                                  | further origins allowed to send cookie-authenticated mutations, comma-separated. Usually empty.                                   |
-| `APP_VERSION`                                            | the commit being served, reported by `/api/v1/health`. `upgrade.sh --app-version` sets it.                                        |
+| `APP_VERSION`                                            | the commit being served, reported by `/api/v1/health`. `shop upgrade --app-version` sets it.                                      |
 | `LOG_LEVEL`                                              | pino level for `web` and `worker`; `info` by default.                                                                             |
 | `QUEUE_NAME`                                             | the BullMQ queue name; `shop`.                                                                                                    |
 | `WORKER_CONCURRENCY`                                     | jobs one worker process runs at once; `4`.                                                                                        |
@@ -79,10 +175,10 @@ Every key the stack reads. `deployment.env.example` carries the same list with p
 | `DB_IDLE_IN_TX_TIMEOUT_MS`                               | how long a session may sit idle inside an open transaction before PostgreSQL ends it and releases its locks; `30000`, `0` is off. |
 | `HEARTBEAT_INTERVAL_MS`                                  | how often the worker refreshes `worker:heartbeat`. `web` reads the same value to judge whether the heartbeat is fresh.            |
 | `NEXT_EDGE_BIND`                                         | where the edge publishes; `127.0.0.1:8080`. Keep it on loopback: Traefik reaches the edge over its own network.                   |
-| `NEXT_HOST`                                              | the domain Traefik routes to the edge. Read only by `compose.traefik.yml`.                                                        |
+| `NEXT_HOST`                                              | the domain Traefik routes to the edge. Read by `compose.traefik.yml`, and by `shop hostname` for `ship.sh`.                       |
 | `NEXT_EDGE_TRUSTED_PROXIES`                              | the CIDRs whose `X-Forwarded-For` the edge believes: Traefik's network. Required by `compose.traefik.yml`; see below.             |
-| `NEXT_COMPOSE_OVERLAYS`                                  | the Compose files every script layers over `compose.yml`, relative to `deploy/`. Behind Traefik: `compose.traefik.yml`.           |
-| `NEXT_BACKUP_DIR`                                        | where dumps, upgrade manifests and settings backups go; `./data/backups`, relative to `deploy/`. Created mode 700.                |
+| `NEXT_COMPOSE_OVERLAYS`                                  | the Compose files every script layers over `compose.yml`, relative to `shop`. Behind Traefik: `compose.traefik.yml`.              |
+| `NEXT_BACKUP_DIR`                                        | where dumps, upgrade manifests and settings backups go; `./data/backups`, relative to `shop`. Created mode 700.                   |
 
 `APP_ORIGIN` produces the most confusing failure in this list when it is wrong: every admin read
 works and every admin _mutation_ returns 403.
@@ -91,46 +187,10 @@ Everything else the shop can be configured with (payment, SMS, storage, WeChat, 
 site itself) is not an environment variable. It is typed configuration in the database, edited
 under 设置 › 系统设置 in the admin.
 
-The scripts check the file before they touch anything: it must exist, carry the image and URL
-keys, be mode 600, and contain no `CHANGE-ME` placeholder. `deploy/readyz.sh` is the quickest way
+Every `shop` command checks the file before it touches anything: it must exist, carry the image
+and URL keys, be mode 600, and contain no `CHANGE-ME` placeholder. `shop status` is the quickest way
 to run that check: on a host with nothing running it fails at the first readiness check, which
 proves it got past the settings.
-
-## Putting a release on the host
-
-A release is a commit that CI's `images` job has built. That job publishes
-`crmeb-next-web`, `crmeb-next-worker` and `crmeb-next-edge` under `ghcr.io/xiangyumou/` and prints
-the exact `upgrade.sh` command, with the three digests, in its job summary. It also prints
-`storefront in the edge image: **real**`. If it says `placeholder` instead, the H5 build failed on
-that commit and the image serves a placeholder page at `/`; do not deploy it.
-
-The host needs only the `deploy/` directory of that commit. Copy it as an archive, which leaves
-`deployment.env` and `data/` alone because neither is tracked:
-
-```sh
-# on a machine with the repository
-git archive --format=tar.gz -o release.tar.gz <commit> deploy
-scp release.tar.gz <host>:/tmp/
-
-# on the host
-cd /home/ubuntu/apps/CRMEB-next
-tar -xzf /tmp/release.tar.gz
-echo <commit> > REVISION
-```
-
-Then run `upgrade.sh` from that directory with the digests from the job summary.
-
-A host whose checkout predates the current layout keeps these files in `deploy/next/`. Before the
-first upgrade from this layout, move them up once, then remove the old directory:
-
-```sh
-mv deploy/next/deployment.env deploy/next/data deploy/
-rm -r deploy/next
-```
-
-A tag is not a release. `upgrade.sh` refuses anything that is not `repo@sha256:<64 hex>`: a tag
-can be repointed between the run that passed and the deploy, and then the build that passed can
-no longer be named. A rollback target has to be nameable.
 
 ## First deploy on a new host
 
@@ -140,19 +200,19 @@ no longer be named. A rollback target has to be nameable.
    free -m; df -h /var/lib/docker
    ```
 
-2. **Put the release on the host** as above.
-
-3. **Configure it.**
+2. **Configure it.** From a machine with the repository:
 
    ```sh
-   cp deploy/deployment.env.example deploy/deployment.env
-   chmod 600 deploy/deployment.env
+   ssh <host> mkdir -p /home/ubuntu/apps/CRMEB
+   scp deploy/deployment.env.example <host>:/home/ubuntu/apps/CRMEB/deployment.env
+   ssh <host> chmod 600 /home/ubuntu/apps/CRMEB/deployment.env
    ```
 
-   Fill in the image digests, the two generated passwords (in both places each appears),
-   `APP_ORIGIN` and `NEXT_HOST`.
+   Fill in the image repositories (any digest of the right repository will do; the ship replaces
+   them), the two generated passwords (in both places each appears), `APP_ORIGIN` and `NEXT_HOST`.
+   Leave `NEXT_COMPOSE_OVERLAYS` empty for now.
 
-4. **Find Traefik's network.** The overlay joins the external network `server-internal-net`, which
+3. **Find Traefik's network.** The overlay joins the external network `server-internal-net`, which
    Traefik owns; it does not create it.
 
    ```sh
@@ -162,20 +222,18 @@ no longer be named. A rollback target has to be nameable.
 
    Put exactly that subnet (for example `172.18.0.0/16`) in `NEXT_EDGE_TRUSTED_PROXIES`.
 
-5. **Bring the stack up**, with no route to it yet:
+4. **Bring the stack up**, with no route to it yet:
 
    ```sh
-   deploy/upgrade.sh --first-deploy --app-version <commit> \
-     --web    ghcr.io/xiangyumou/crmeb-next-web@sha256:… \
-     --worker ghcr.io/xiangyumou/crmeb-next-worker@sha256:… \
-     --edge   ghcr.io/xiangyumou/crmeb-next-edge@sha256:…
+   deploy/ship.sh --first-deploy
    ```
 
-   It ends with `readiness gate: passed`, `upgrade complete` and `rollback target: <none>`. That
-   `<none>` is correct here and only here: `--first-deploy` is the one run with nothing to go back
-   to, and a failure leaves the stack down, which is harmless because nothing routes to it.
+   It ends with `readiness gate: passed`, `upgrade complete`, `rollback target: <none>` and
+   `no public host name`. That `<none>` is correct here and only here: `--first-deploy` is the one
+   run with nothing to go back to, and a failure leaves the stack down, which is harmless because
+   nothing routes to it.
 
-6. **Create the first super admin.** Nothing creates one on its own: the seed loads only
+5. **Create the first super admin.** Nothing creates one on its own: the seed loads only
    reference data, and the admin cannot grant `is_super`. Generate a bcrypt hash from a checkout
    of the repository (the password is read from the terminal, not from the command line):
 
@@ -189,7 +247,7 @@ no longer be named. A rollback target has to be nameable.
    Then insert the account on the host:
 
    ```sh
-   shopc exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
+   ./shop compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
    insert into admins (account, password_hash, name, is_super)
    values ('admin', '<the hash>', '超级管理员', true);
    SQL
@@ -198,10 +256,10 @@ no longer be named. A rollback target has to be nameable.
    Sign in at `/admin` and create every other account and role under 设置 › 管理员 and
    设置 › 身份管理.
 
-7. **Smoke-test over loopback**, before anyone can reach it:
+6. **Smoke-test over loopback**, before anyone can reach it:
 
    ```sh
-   deploy/readyz.sh
+   ./shop status
    curl -fsS http://127.0.0.1:8080/healthz
    curl -fsS http://127.0.0.1:8080/readyz; echo
    curl -fsS http://127.0.0.1:8080/api/v1/health; echo
@@ -213,18 +271,13 @@ no longer be named. A rollback target has to be nameable.
    (`ssh -L 8080:127.0.0.1:8080 <host>`), sign in to the admin and open a storefront page with an
    image on it.
 
-8. **Put it behind Traefik**: set `NEXT_COMPOSE_OVERLAYS=compose.traefik.yml` and run an `up`
-   (next section), then check through the domain:
+7. **Put it behind Traefik**: set `NEXT_COMPOSE_OVERLAYS=compose.traefik.yml` and run
+   `./shop compose up -d --wait` (next section). From then on every ship ends by checking the
+   domain from outside.
 
-   ```sh
-   curl -fsS https://<NEXT_HOST>/healthz
-   curl -fsS https://<NEXT_HOST>/readyz; echo
-   curl -fsS -o /dev/null -w '%{http_code}\n' https://<NEXT_HOST>/admin
-   ```
-
-9. **Watch** one full cycle of the repeatable jobs: `shopc logs -f worker web edge` and
+8. **Watch** one full cycle of the repeatable jobs: `./shop compose logs -f worker web edge` and
    `docker stats --no-stream`. Expect no restarts and every container under its cap. An OOM kill
-   shows up as a climbing restart count in `shopc ps`, not as an error in a log.
+   shows up as a climbing restart count in `./shop compose ps`, not as an error in a log.
 
 ## The Traefik overlay
 
@@ -244,27 +297,26 @@ The overlay is a setting of the deployment, not a step someone remembers. Name i
 NEXT_COMPOSE_OVERLAYS=compose.traefik.yml
 ```
 
-From then on `upgrade.sh`, `rollback.sh`, `backup.sh` and `readyz.sh` all call Compose with
-`-f compose.yml -f compose.traefik.yml`, so an upgrade or a rollback recreates the edge with its
-route, not without it. A script refuses to start when the key names a file that does not exist.
-To apply it the first time, or after editing the key, run an `up` with the same files (the `shopc`
-alias above):
+From then on every `shop` command calls Compose with `-f compose.yml -f compose.traefik.yml`, so
+an upgrade or a rollback recreates the edge with its route, not without it. `shop` refuses to start
+when the key names a file that does not exist. To apply it the first time, or after editing the
+key, run an `up` through `shop`:
 
 ```sh
-shopc up -d --wait
+./shop compose up -d --wait
 ```
 
 Then check the edge is on both networks:
 
 ```sh
-docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$(shopc ps -q edge)"
+docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$(./shop compose ps -q edge)"
 ```
 
 Expected: `crmeb-next_default server-internal-net`. Run the same check after every upgrade and
 rollback; the drill proves both keep the overlay, and this proves the host is configured to.
 
-To take the site off the router, empty `NEXT_COMPOSE_OVERLAYS` and run the `up` without the overlay
-(`-f deploy/compose.yml` alone); the stack keeps serving on loopback.
+To take the site off the router, empty `NEXT_COMPOSE_OVERLAYS` and run the same `up`; the stack
+keeps serving on loopback.
 
 ### The client's address
 
@@ -282,7 +334,7 @@ To check it, send a made-up header from outside and read what the edge logged:
 
 ```sh
 curl -fsS -o /dev/null -H 'X-Forwarded-For: 198.51.100.77' 'https://<NEXT_HOST>/?ip-check'
-shopc logs --since 1m edge | grep ip-check | tail -1
+./shop compose logs --since 1m edge | grep ip-check | tail -1
 ```
 
 The line must start with **your** public address, not `198.51.100.77` and not an address inside
@@ -290,8 +342,10 @@ The line must start with **your** public address, not `198.51.100.77` and not an
 
 ## Upgrade
 
+`ship.sh` runs it. By hand, on the host:
+
 ```sh
-deploy/upgrade.sh --app-version <commit> \
+./shop upgrade --app-version <commit> \
   --web    ghcr.io/xiangyumou/crmeb-next-web@sha256:… \
   --worker ghcr.io/xiangyumou/crmeb-next-worker@sha256:… \
   --edge   ghcr.io/xiangyumou/crmeb-next-edge@sha256:…
@@ -303,15 +357,29 @@ worker built against a different contract.
 In order, refusing to continue when a step cannot be proven, it:
 
 1. checks all three candidates are digests and records the running images as the rollback target;
-2. pulls the candidates **before** stopping anything;
-3. stops `web`, `worker` and `edge`, so a migration never runs against live writers;
-4. takes a dump with `backup.sh` and proves it restorable;
-5. runs the migrations and the reference seed as the `migrate` one-shot;
-6. starts the candidates and runs the readiness gate.
+2. pulls the candidates **before** anything is stopped;
+3. asks the candidate worker image, read-only, which migrations the database has not applied
+   (`db/src/pending.mjs`);
+4. takes one of two paths:
+   - **migrations pending**: stops `web`, `worker` and `edge`, so a migration never runs against
+     live writers; takes a dump and proves it restorable; runs the migrations and the reference
+     seed as the `migrate` one-shot; starts the candidates. The site is down from the stop to the
+     readiness gate. A first deploy, or a candidate that cannot answer the question, takes this
+     path too;
+   - **nothing to migrate**: stops nothing. It still takes the dump and proves it; runs the
+     reference seed beside the live stack; and `up -d` recreates only the services whose image or
+     configuration changed. The edge finds a recreated `web` by name through Docker's DNS, so it
+     keeps serving across the switch;
+5. runs the readiness gate.
 
-If anything from step 5 on fails, it puts the previous images back and says whether the schema had
-already moved. The migrations are additive, so the previous images run on the new schema; CI
-refuses a migration that is not. The script never restores data on its own.
+If anything after the candidates are pinned fails, it puts the previous images back and says
+whether the schema had moved. The migrations are additive, so the previous images run on the new
+schema; CI refuses a migration that is not. It never restores data on its own.
+
+**Why the seed may run beside live traffic.** Every statement in it is an upsert on a natural key,
+inside one transaction, and it touches only reference tables (cities, express companies, agreement
+and notification shells). It never deletes or truncates. Readers do not wait on it; a write to one
+of the same rows waits for its commit, a few seconds at most.
 
 | Exit | Meaning                                                 |
 | ---- | ------------------------------------------------------- |
@@ -320,22 +388,24 @@ refuses a migration that is not. The script never restores data on its own.
 | 2    | invoked wrongly                                         |
 | 3    | failed, **and** the rollback failed: a person is needed |
 
-`--dry-run` checks and pulls, then stops before touching anything. `--skip-migration` deploys
-images only. Each run writes `data/backups/upgrade-<stamp>.manifest` with the previous and new
-images, the dump, and the outcome.
-
-It recreates the containers with `compose.yml` and every overlay in `NEXT_COMPOSE_OVERLAYS`, so the
-edge stays behind Traefik. On a Traefik host, check the key is set before the first upgrade.
+`--dry-run` checks, pulls and asks about migrations, prints the path the release would take (`the
+release would stop nothing`, or `would stop web, worker and edge to migrate`), and stops before
+touching anything. `--skip-migration` deploys images only, runs neither the migrations nor the
+seed, and so stops nothing. Each run writes `data/backups/upgrade-<stamp>.manifest` with the
+previous and new images and release, the pending migrations, the path taken, the dump, and the
+outcome; `shop status` prints the last one.
 
 ## Rollback
 
 ```sh
-deploy/rollback.sh --last-upgrade      # the images the last upgrade replaced
-deploy/rollback.sh --web …@sha256:… --worker …@sha256:… --edge …@sha256:…
+deploy/ship.sh rollback --last-upgrade      # from the machine with the repository
+./shop rollback --last-upgrade              # on the host: the images the last upgrade replaced
+./shop rollback --web …@sha256:… --worker …@sha256:… --edge …@sha256:…
 ```
 
 It checks the target images exist (pulling them if needed) before it changes anything, switches,
 and runs the readiness gate. If the target does not come up, it returns to what was running.
+`--last-upgrade` also puts `REVISION` back to the release that upgrade replaced.
 
 | Exit | Meaning                                                            |
 | ---- | ------------------------------------------------------------------ |
@@ -344,30 +414,39 @@ and runs the readiness gate. If the target does not come up, it returns to what 
 | 2    | invoked wrongly                                                    |
 | 3    | a person is needed                                                 |
 
-Replacing containers never changes data. Like `upgrade.sh`, it uses the overlays in
-`NEXT_COMPOSE_OVERLAYS`, so the edge keeps its route.
+Replacing containers never changes data. Like `upgrade`, it uses the overlays in
+`NEXT_COMPOSE_OVERLAYS`, so the edge keeps its route. A rollback returns the images, not the
+Compose files: to return those too, ship the previous commit.
 
 ## Backup and restore
 
-`upgrade.sh` takes a verified dump before every migration. To take one at any other time:
+Every upgrade but the first takes a verified dump. To take one at any other time:
 
 ```sh
-deploy/backup.sh                               # into NEXT_BACKUP_DIR, then verify it
-deploy/backup.sh --out /somewhere/shop.sql.gz
-deploy/backup.sh --verify-only data/backups/pre-upgrade-<stamp>.sql.gz
+./shop backup                               # into NEXT_BACKUP_DIR, then verify it
+./shop backup --out /somewhere/shop.sql.gz
+./shop backup --verify-only data/backups/pre-upgrade-<stamp>.sql.gz
 ```
 
 Verification restores the dump into a throwaway PostgreSQL with no network and its data on tmpfs,
-then compares every table's row count against the live database. It prints
+then checks every table in `public`:
+
+- against the rows the dump itself carries, always: every row it holds must come back;
+- against the live database, when `web` and `worker` are stopped, as during a release that
+  migrates, and for `--verify-only`: the dump must hold every row there is.
+
+While the writers run, live row counts move under the comparison, so the second check becomes
+"the dump has every table the live database has". `pg_dump` reads one consistent snapshot either
+way, which is what makes a dump taken beside live traffic a valid way back. It prints
 `backup verified: <n> table(s) restored with matching row counts`. "The dump exists" and "the dump
-is usable" are different claims; only the second is worth stopping for. `--no-verify` exists for a
-scheduled dump on a host short of memory. Nothing here schedules backups; add a cron entry if you
-want them, and copy dumps off the host.
+is usable" are different claims; only the second is worth a release waiting for. `--no-verify`
+exists for a scheduled dump on a host short of memory. Nothing here schedules backups; add a cron
+entry if you want them, and copy dumps off the host.
 
 To restore a dump over the live database:
 
 ```sh
-deploy/rollback.sh --last-upgrade --restore data/backups/pre-upgrade-<stamp>.sql.gz
+./shop rollback --last-upgrade --restore data/backups/pre-upgrade-<stamp>.sql.gz
 ```
 
 `--restore` is never implied. It stops the writers, takes a safety dump of what it is about to
@@ -414,14 +493,14 @@ at `/admin`.
   detail.
 - `/readyz` is proxied to the app's `/api/v1/readyz`, the deep check: database, Redis, migrations
   and worker heartbeat. It answers 503 naming the check that failed, and nothing else: no error
-  text, no host, no connection string. The detail is in `shopc logs web`.
+  text, no host, no connection string. The detail is in `./shop compose logs web`.
 
 The container healthchecks use only the shallow probes. A container probe that opens a database
 connection restarts the container whenever the database blips, which turns a degradation into an
 outage. Nothing restarts a container on `/readyz`; an uptime monitor reads it, and so does the
-**readiness gate** (`readyz.sh`, `lib/readiness.sh`) that ends every upgrade and rollback: every
-container healthy, both HTTP probes answering through the published port, the migrations applied
-with the tables the release needs, and a fresh `worker:heartbeat`.
+**readiness gate** (`lib/readiness.sh`, which `shop status` runs on its own) that ends every
+upgrade and rollback: every container healthy, both HTTP probes answering through the published
+port, the migrations applied with the tables the release needs, and a fresh `worker:heartbeat`.
 
 The worker has no HTTP surface, so its probe reads `worker:heartbeat` and requires it to be
 **recent**. The key is refreshed from the same event loop that runs the jobs and dropped before
@@ -447,9 +526,12 @@ bucket or CDN hostname, never at this site's own origin, and give that host the 
 ## Memory
 
 The host has 2 cores and 3.6 GB. The five long-running services are capped at 1568 MiB in total.
-`migrate` (384 MiB) runs only while `web` and `worker` are stopped, so it reuses their 832 MiB
-rather than adding to the total. Each JavaScript service also sets `--max-old-space-size`, because
-V8 sizes its heap from the _host's_ memory and would otherwise be OOM-killed with no diagnostic.
+When a release migrates, `migrate` (384 MiB) runs while `web` and `worker` are stopped, reusing
+their 832 MiB. When nothing migrates, it runs the seed beside them, for 1952 MiB in total; the
+drill holds that under 2048 MiB. The dump's restore check adds a PostgreSQL with its data on a
+512 MiB tmpfs for the minute it runs. Each JavaScript service also sets `--max-old-space-size`,
+because V8 sizes its heap from the _host's_ memory and would otherwise be OOM-killed with no
+diagnostic.
 
 ## Behaviour an admin may ask about
 
@@ -468,25 +550,32 @@ V8 sizes its heap from the _host's_ memory and would otherwise be OOM-killed wit
 ## The drill
 
 ```sh
-deploy/rehearsal/drill.sh                    # every case; about 25 minutes
+deploy/rehearsal/drill.sh                    # every case; about DRILL_MINUTES minutes
 deploy/rehearsal/drill.sh --list             # the case ids
-deploy/rehearsal/drill.sh --only rollback --keep
+deploy/rehearsal/drill.sh --only ship --keep
 ```
 
 It builds the three images from the checkout, pushes them to a registry container it starts, and
 then deploys, breaks and rolls back a real stack: a moving tag, a missing candidate, a dry run, a
-tampered and a truncated dump, a failing migration, a worker that starts and does no work, a
-readiness gate that finds a table missing, a rollback to an image that is not there, a successful
-upgrade and rollback, the same upgrade and rollback with an overlay configured (a stand-in for
-`compose.traefik.yml` on a stand-in network, never the real one), and a Next page the edge would
-not proxy. It uses its own Compose project (`crmeb-next-drill`), its own generated passwords under
-`$TMPDIR` and its own free loopback port, so it can run beside the live stack. It needs the whole
+tampered and a truncated dump, a dump taken under live writes, a failing migration, a worker that
+starts and does no work, a readiness gate that finds a table missing, a rollback to an image that
+is not there, a successful upgrade and rollback, the same with an overlay configured (a stand-in
+for `compose.traefik.yml` on a stand-in network, never the real one), a release with nothing to
+migrate (with a probe measuring the longest gap in answers), one that changes only the Compose
+files, one with a new migration, and a Next page the edge would not proxy. Its `ship/` cases run
+`ship.sh` with `SHIP_HOST=local` into a directory of their own, against a stand-in `gh`: a red CI,
+a dry run, a fresh directory, a release that drops a file, and the forwarded commands. They ship
+`HEAD`, so commit first.
+
+It uses its own Compose project (`crmeb-next-drill`), its own generated passwords under `$TMPDIR`
+and its own free loopback port, so it can run beside the live stack. It needs the whole
 repository, not just `deploy/`. CI runs it on every change to the application or to this
 directory.
 
 ## Rules
 
-- Every image is pinned by digest. `upgrade.sh` refuses a moving tag.
+- Every image is pinned by digest. `shop upgrade` refuses a moving tag, and `ship.sh` passes
+  digests only.
 - No credential reaches a command line. Each is expanded by the shell inside the container that
   needs it, from that container's own environment.
 - `docker compose down -v` deletes the volumes. It is never run against `crmeb-next`.
