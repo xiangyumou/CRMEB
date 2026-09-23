@@ -5,8 +5,10 @@ import { createTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
 import { withTx } from '../kernel/tx';
 import type { EffectInput, EffectKey } from './index';
 import {
+  dispatchDueEffects,
   dispatchEffectsOnce,
   drainEffects,
+  effectsBacklogMs,
   findEffect,
   findEffectById,
   listEffects,
@@ -243,6 +245,81 @@ describe('the dispatcher', () => {
     registerEffectHandler('order', 'order.paid', async () => {});
     for (let i = 1; i <= 10; i += 1) await record({ scopeId: String(i) });
     expect((await dispatchEffectsOnce(harness.ctx, { batchSize: 3 })).claimed).toBe(3);
+  });
+});
+
+describe('a dispatcher run drains while there is work (CR-40-k2)', () => {
+  const T0 = '2026-06-01T00:00:00.000Z';
+
+  async function queue(count: number, delayMs?: number) {
+    for (let i = 0; i < count; i += 1) {
+      await record({ scopeId: `run-${i}`, ...(delayMs === undefined ? {} : { delayMs }) });
+    }
+  }
+
+  it('leaves nothing due after one run, however many batches were queued', async () => {
+    harness.clock.set(T0);
+    const handled: string[] = [];
+    registerEffectHandler('order', 'order.paid', async (_ctx, effect) => {
+      handled.push(effect.scopeId);
+    });
+    await queue(17);
+
+    const report = await dispatchDueEffects(harness.ctx, { batchSize: 5 });
+
+    // Three full batches, then a short one that says the queue is empty.
+    expect(report).toMatchObject({ claimed: 17, done: 17, passes: 4, oldestDueAgeMs: null });
+    expect(new Set(handled).size).toBe(17);
+    expect(await listEffectsByStatus(harness.ctx.db, 'pending')).toHaveLength(0);
+  });
+
+  it('stops claiming once the time budget is spent, and reports how late the rest are', async () => {
+    harness.clock.set(T0);
+    registerEffectHandler('order', 'order.paid', async () => {
+      harness.clock.advance(1_000); // a slow handler, on the fake clock
+    });
+    await queue(20);
+
+    const report = await dispatchDueEffects(harness.ctx, { batchSize: 5, budgetMs: 4_000 });
+
+    // The first batch took 5 s of fake time: past the budget, so no second claim.
+    expect(report).toMatchObject({ claimed: 5, done: 5, passes: 1 });
+    expect(await listEffectsByStatus(harness.ctx.db, 'pending')).toHaveLength(15);
+    // The fifteen left have been due since T0, and it is now T0 + 5 s.
+    expect(report.oldestDueAgeMs).toBe(5_000);
+  });
+
+  it('counts neither a future row nor one under a dispatcher’s lease as waiting', async () => {
+    harness.clock.set(T0);
+    await queue(1, 60_000);
+    expect(await effectsBacklogMs(harness.ctx)).toBeNull();
+
+    await record({ scopeId: 'leased' });
+    harness.clock.advance(2_000);
+    expect(await effectsBacklogMs(harness.ctx)).toBe(2_000);
+    // A claim pushes the row past its lease: it is being worked on, not waiting.
+    let release!: () => void;
+    const hold = new Promise<void>((resolve) => (release = resolve));
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => (started = resolve));
+    registerEffectHandler('order', 'order.paid', async () => {
+      started();
+      await hold;
+    });
+    const run = dispatchEffectsOnce(harness.ctx, { batchSize: 1 });
+    await running;
+    expect(await effectsBacklogMs(harness.ctx)).toBeNull();
+    release();
+    await run;
+  });
+
+  it('is bounded by maxPasses even when the clock never moves', async () => {
+    harness.clock.set(T0);
+    registerEffectHandler('order', 'order.paid', async () => {});
+    await queue(12);
+    const report = await dispatchDueEffects(harness.ctx, { batchSize: 2, maxPasses: 3 });
+    expect(report).toMatchObject({ claimed: 6, passes: 3 });
+    expect(report.oldestDueAgeMs).toBe(0);
   });
 });
 

@@ -83,14 +83,17 @@ export const PENDING_EDITS: readonly PendingEdit[] = [
     // (CR-51-k2) and a pool deadlock that hangs a round (CR-53-k2), and the
     // CI soak cannot run as written (CR-52-k2). The row stays unmapped until
     // those land; `status/k2.md` carries the text the orchestrator writes.
-    // Re-assigned to R1 at K2's merge: R1 takes CR-50/51/53-k2 and owns the
-    // clean 10-round run; the orchestrator applied CR-52-k2 to `next.yml`.
+    // R1 landed CR-50/51/53-k2 (CR-52-k2 was applied to next.yml at K2's
+    // merge). Its ten rounds were 8 of 10; both failures are one lock-order
+    // deadlock in groupbuy (join vs the leader's refund), CR-2-r1. With the
+    // one-line fix applied experimentally the same seeds were 10 of 10.
+    // Re-assigned to R5 at R1's merge.
     id: 'STAB-001',
     resolution: {
       kind: 'assign',
-      stream: 'R1',
-      cr: 'CR-50-k2, CR-51-k2, CR-52-k2, CR-53-k2',
-      why: 'the 10-round local run is not clean; the four CRs are what stands between the set and 10/10',
+      stream: 'R5',
+      cr: 'CR-2-r1',
+      why: 'ten shuffled rounds are 8/10; both failures are the groupbuy join/refund deadlock',
     },
   },
 ];

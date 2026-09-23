@@ -60,6 +60,9 @@ function siteCtx(values: Partial<SiteConfig>): Ctx {
       async get() {
         return site as never;
       },
+      async getIn() {
+        return site as never;
+      },
       async getRaw() {
         return { ...site };
       },

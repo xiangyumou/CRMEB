@@ -1,4 +1,5 @@
 import type { HealthPayload, ReadinessPayload } from '@shop/contracts/health/health.contract';
+import { effectsBacklogMs } from '@shop/core/effects';
 import { DomainError, type Ctx } from '@shop/core/kernel';
 
 /**
@@ -140,10 +141,31 @@ export async function readinessPayload(ctx: Ctx): Promise<ReadinessPayload> {
   if (Object.values(checks).some((value) => value !== 'ok')) {
     throw new DomainError('HEALTH_NOT_READY', { details: { checks } });
   }
+  const backlog = await effectsBacklog(ctx);
   return {
     status: 'ok',
     time: ctx.clock.now().toISOString(),
     version: process.env.APP_VERSION ?? 'dev',
     checks,
+    ...(backlog === undefined ? {} : { backlog }),
   };
+}
+
+/**
+ * The effects backlog, as a detail and never as a check (CR-40-k2).
+ *
+ * A late notification is not a reason to hold a release or pull a container
+ * out of rotation, so this cannot fail the probe: if it cannot be measured
+ * within the probe's timeout it is left out. It is a number, not text, so it
+ * says nothing about the stack that an error string would.
+ */
+async function effectsBacklog(
+  ctx: Ctx,
+): Promise<{ effectsOldestDueSeconds: number | null } | undefined> {
+  try {
+    const ms = await within(effectsBacklogMs(ctx));
+    return { effectsOldestDueSeconds: ms === null ? null : Math.floor(ms / 1000) };
+  } catch {
+    return undefined;
+  }
 }

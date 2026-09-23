@@ -66,6 +66,21 @@ export const readinessPayload = z.object({
     /** The worker heartbeat is fresh — a stack whose jobs are not running is not ready. */
     worker: checkResult,
   }),
+  /**
+   * Informational, **never** a failing check (CR-40-k2): what is queued behind
+   * a ready stack. Absent when it could not be measured in time.
+   */
+  backlog: z
+    .object({
+      /**
+       * How late the oldest post-commit effect still waiting for the
+       * dispatcher is, in whole seconds; `null` when nothing is waiting. A
+       * number that keeps growing means buyers' notifications are arriving
+       * late.
+       */
+      effectsOldestDueSeconds: z.number().int().nonnegative().nullable(),
+    })
+    .optional(),
 });
 export type ReadinessPayload = z.infer<typeof readinessPayload>;
 
@@ -95,6 +110,7 @@ export const storefrontReadiness = defineRoute({
         time: '2026-01-01T12:00:00+08:00',
         version: 'dev',
         checks: { database: 'ok', redis: 'ok', migrations: 'ok', worker: 'ok' },
+        backlog: { effectsOldestDueSeconds: null },
       },
     },
   ],

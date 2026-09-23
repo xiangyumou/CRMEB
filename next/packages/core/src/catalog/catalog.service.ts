@@ -758,38 +758,6 @@ export async function adminVirtualCardVoid(
   });
 }
 
-/**
- * Hand one card to a paid order line. Called by B2 after payment.
- *
- * Idempotent on `order_item_id`: `product_virtual_cards_order_item_uq` makes a
- * second card for the same line impossible, and the read before the claim turns
- * a replayed effect into the same card rather than an error.
- */
-export async function issueVirtualCard(
-  tx: Tx,
-  ctx: Ctx,
-  input: { skuId: number; orderItemId: number; userId: number },
-): Promise<{ cardKey: string; cardNo: string; cardSecret: string | null }> {
-  const already = await repo.findCardForOrderItem(tx, input.orderItemId);
-  if (already) {
-    return { cardKey: already.cardKey, cardNo: already.cardNo, cardSecret: already.cardSecret };
-  }
-
-  const claimed = await repo.claimVirtualCard(tx, {
-    skuId: input.skuId,
-    orderItemId: input.orderItemId,
-    userId: input.userId,
-    now: ctx.clock.now(),
-  });
-  if (!claimed) throw new DomainError('CATALOG_CARD_POOL_EMPTY');
-
-  await repo.syncCardStock(tx, input.skuId);
-  const sku = await repo.findSku(tx, input.skuId);
-  if (sku) await repo.rollupProduct(tx, sku.productId);
-
-  return { cardKey: claimed.cardKey, cardNo: claimed.cardNo, cardSecret: claimed.cardSecret };
-}
-
 function dedupeByCardNo(
   cards: readonly { cardNo: string; cardSecret?: string | undefined }[],
 ): { cardNo: string; cardSecret?: string | undefined }[] {

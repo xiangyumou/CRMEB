@@ -65,6 +65,7 @@ The last line names what is still owed, by stream:
 | `retired`       | no retired feature comes back as an identifier or a URL token                                                     |
 | `banned`        | no `eval`, `new Function`, `child_process`, `dangerouslySetInnerHTML`; the core clock lint rule is still an error |
 | `secrets`       | no secret config field can leave through a response schema                                                        |
+| `tx-pool`       | no `ctx.config.get(` / `ctx.db` / `ctx.withTx(` inside a function that takes a `tx`, `Tx` or `DbOrTx` (CR-53-k2)  |
 | `invariants`    | `cases.md` ⇄ `invariants.md` ⇄ `risk-matrix.md`, and every named test exists                                      |
 
 ## The allow-lists
@@ -89,6 +90,11 @@ baseline and a hiding place.
 - `checks/banned.ts` — `FETCH_ALLOW` (one file per entry, with the host it
   builds; `fetch(` and `globalThis.fetch(` both count as a call) and the
   sanitised renderers.
+- `checks/tx-pool.ts` — `TX_POOL_ALLOW` (reads proven harmless; empty) and
+  `TX_POOL_OWED` (known instances, `pending` on the stream that owns the file:
+  the checkout config read, the freight quote and `autoDeliver`, CR-1-r1).
+  Keyed on the trimmed source line, so editing an excused line makes it a
+  finding again.
 - `lib/marker-reassignments.ts` — `CONTRACT-PENDING` markers whose owner moved
   to a stream still in flight (H3).
 - `lib/pending-edits.ts` — the `invariants.md` rows CR-2-k asks the

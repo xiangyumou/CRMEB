@@ -186,15 +186,18 @@ export async function productDetail(ctx: Ctx, input: { id: string }): Promise<St
 
   const favorited = userId === null ? null : await repo.isFavorited(ctx.db, { userId, productId });
 
-  await ctx.withTx(async (tx) => {
-    await repo.recordProductView(tx, { productId, userId, platform: platformOf(ctx) });
-    await repo.bumpProductViews(tx, productId);
-  });
+  // One insert, no row lock (CR-41-k2). `products.views` used to be bumped
+  // here too, in the same transaction: every concurrent view of one product
+  // queued on that product's row lock — the page most likely to be hot is the
+  // one that slowed down — and every bump wrote a new wide `products` tuple.
+  // The worker folds these rows into `products.views` once a minute
+  // (`foldProductViews`, `catalog.foldProductViews`).
+  await repo.recordProductView(ctx.db, { productId, userId, platform: platformOf(ctx) });
 
   return {
     ...toProductCard(row, labels.get(productId) ?? []),
-    // `views` is read before the increment above, so the shopper does not see
-    // his own visit counted. One less thing to explain.
+    // The folded count, up to a minute behind, and never this visit: the
+    // shopper does not see his own view counted. One less thing to explain.
     views: row.views,
     sliderImages: row.sliderImages,
     videoUrl: row.videoUrl,

@@ -49,15 +49,19 @@ function asConfigCache(redis: Redis): ConfigCache {
 }
 
 export function buildWorkerContainer(env: Env = loadEnv()): WorkerContainer {
-  const dbHandle = createDb(env.DATABASE_URL, { max: env.DB_POOL_MAX });
-  const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
-  const queueRedis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
-
   const logger = createLogger({
     level: env.LOG_LEVEL,
     pretty: env.LOG_PRETTY,
     base: { app: 'worker' },
   });
+  // Acquire and idle-in-transaction timeouts come from `createDb`'s defaults
+  // (`DB_POOL_ACQUIRE_TIMEOUT_MS`, `DB_IDLE_IN_TX_TIMEOUT_MS`; CR-53-k2).
+  const dbHandle = createDb(env.DATABASE_URL, {
+    max: env.DB_POOL_MAX,
+    onConnectionError: (err) => logger.warn({ err }, 'database connection ended outside a query'),
+  });
+  const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
+  const queueRedis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
   const clock = systemClock;
 
   const ctx = createCtx({

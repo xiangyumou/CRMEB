@@ -11,11 +11,12 @@ import {
   type SmsSender,
 } from './sms.port';
 import {
+  claimResend,
   consumeCode,
   discardCode,
   generateCode,
   issueCode,
-  resendWaitMs,
+  releaseResend,
   type VerifyOutcome,
 } from './verification-code';
 
@@ -104,10 +105,14 @@ export interface SendCodeResult {
 /**
  * Mint a code, store it, send it.
  *
- * Order matters: every budget is checked before a code is minted, the code is
- * stored before it is sent (so a send that succeeds but whose response is lost
- * still leaves a usable code), and a refusal from the provider deletes it again
- * so the shopper is not told to wait 60 seconds for a code that was never sent.
+ * Order matters. The resend window is **claimed first**, with one `SET NX`
+ * (CR-50-k2): of any number of simultaneous taps, exactly one gets past this
+ * line, and the others are told to wait without touching a budget. Then every
+ * budget is checked before a code is minted, the code is stored before it is
+ * sent (so a send that succeeds but whose response is lost still leaves a
+ * usable code), and any refusal after the claim — a budget, the provider —
+ * hands the window back, so the shopper is not told to wait 60 seconds for a
+ * code that was never sent.
  */
 export async function sendVerificationCode(
   ctx: Ctx,
@@ -116,11 +121,25 @@ export async function sendVerificationCode(
   const { scene, phone } = options;
   const nowMs = ctx.clock.nowMs();
 
-  const wait = await resendWaitMs(ctx.redis, scene, phone);
-  if (wait > 0) {
-    throw new DomainError('AUTH_SMS_TOO_FREQUENT', { details: { retryAfterMs: wait } });
+  const claim = await claimResend(ctx.redis, scene, phone, options.resendMs);
+  if (claim.token === null) {
+    throw new DomainError('AUTH_SMS_TOO_FREQUENT', { details: { retryAfterMs: claim.waitMs } });
   }
 
+  try {
+    return await sendClaimed(ctx, options, nowMs);
+  } catch (error) {
+    await releaseResend(ctx.redis, scene, phone, claim.token);
+    throw error;
+  }
+}
+
+async function sendClaimed(
+  ctx: Ctx,
+  options: SendCodeOptions,
+  nowMs: number,
+): Promise<SendCodeResult> {
+  const { scene, phone } = options;
   const config = await ctx.config.get(smsConfig);
   await enforceSmsBudget(
     await fixedWindow(ctx.redis, {
@@ -150,13 +169,7 @@ export async function sendVerificationCode(
   }
 
   const code = generateCode();
-  await issueCode(ctx.redis, {
-    scene,
-    phone,
-    code,
-    ttlMs: options.ttlMs,
-    resendMs: options.resendMs,
-  });
+  await issueCode(ctx.redis, { scene, phone, code, ttlMs: options.ttlMs });
 
   const sender = await resolveSender(ctx);
   let result: SmsSendResult;

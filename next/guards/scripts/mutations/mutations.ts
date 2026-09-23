@@ -196,9 +196,8 @@ export const MUTATIONS: readonly Mutation[] = [
   {
     id: 'virtual-card-claim',
     protection: 'the virtual-card atomic claim',
-    // B2's claim is the one `autoDeliver` calls on `order.paid`. Catalog has a
-    // second copy (`catalog.repo.ts::claimVirtualCard`, behind
-    // `issueVirtualCard`) that no shipping code path reaches.
+    // B2's claim, the one `autoDeliver` calls on `order.paid` and the only one
+    // there is: catalog's unused copy (`issueVirtualCard`) was deleted (CR-23-k2).
     file: 'packages/core/src/order/order.fulfil.repo.ts',
     summary: 'the card subquery loses `FOR UPDATE SKIP LOCKED`',
     search: '         order by id limit 1 for update skip locked)`,',

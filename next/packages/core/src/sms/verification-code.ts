@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import type Redis from 'ioredis';
 
 /**
@@ -79,9 +79,12 @@ export interface IssueInput {
   phone: string;
   code: string;
   ttlMs: number;
-  resendMs: number;
 }
 
+/**
+ * Stores the code. The resend guard is **not** written here: `claimResend`
+ * wrote it, atomically, before anything else happened (CR-50-k2).
+ */
 export async function issueCode(redis: Redis, input: IssueInput): Promise<void> {
   const key = codeKey(input.scene, input.phone);
   await redis
@@ -89,13 +92,59 @@ export async function issueCode(redis: Redis, input: IssueInput): Promise<void> 
     .del(key)
     .hset(key, 'code', input.code, 'attempts', '0')
     .pexpire(key, input.ttlMs)
-    .set(resendKey(input.scene, input.phone), '1', 'PX', input.resendMs)
     .exec();
 }
 
-/** Undo an issue whose SMS the provider then refused, so the shopper may retry at once. */
+/** Undo an issue whose SMS the provider then refused. */
 export async function discardCode(redis: Redis, scene: string, phone: string): Promise<void> {
-  await redis.del(codeKey(scene, phone), resendKey(scene, phone));
+  await redis.del(codeKey(scene, phone));
+}
+
+/**
+ * The resend guard **is** the write (CR-50-k2): `SET key token NX PX`.
+ *
+ * It used to be a `PTTL` check followed, a few round trips later, by a plain
+ * `SET … PX` inside `issueCode`. Every tap that read before the first write
+ * landed got through, minted a code over the previous one and cost an SMS, up
+ * to the per-phone hourly budget: five messages for one double-tap, and only
+ * the last code valid. Now exactly one caller per window wins the key.
+ *
+ * Returns `{ waitMs: 0, token }` to the caller that claimed the window, or
+ * the milliseconds left to everybody else. The token lets the claimant hand
+ * the window back (`releaseResend`) without deleting a later caller's claim.
+ */
+export async function claimResend(
+  redis: Redis,
+  scene: string,
+  phone: string,
+  resendMs: number,
+): Promise<{ waitMs: 0; token: string } | { waitMs: number; token: null }> {
+  const token = randomBytes(9).toString('base64url');
+  const claimed = await redis.set(resendKey(scene, phone), token, 'PX', resendMs, 'NX');
+  if (claimed === 'OK') return { waitMs: 0, token };
+  const ttl = await redis.pttl(resendKey(scene, phone));
+  // `-1`/`-2` here means the key lost its TTL or vanished between the two
+  // calls; either way this caller did not claim it, so it waits a moment.
+  return { waitMs: ttl > 0 ? ttl : 1, token: null };
+}
+
+const RELEASE_LUA = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end
+return 0
+`;
+
+/**
+ * Hands a claimed window back, so a refusal (a budget, the provider) does not
+ * make the shopper wait out a window in which nothing was sent. Only the
+ * claimant's own token is deleted.
+ */
+export async function releaseResend(
+  redis: Redis,
+  scene: string,
+  phone: string,
+  token: string,
+): Promise<void> {
+  await redis.eval(RELEASE_LUA, 1, resendKey(scene, phone), token);
 }
 
 export async function consumeCode(

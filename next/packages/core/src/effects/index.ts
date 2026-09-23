@@ -10,6 +10,7 @@ import {
   listEffects,
   markDone,
   markUnknown,
+  oldestDue,
   retryEffect,
   scheduleRetry,
   type EffectConsoleRow,
@@ -261,6 +262,83 @@ async function settleFailure(
   const runAt = new Date(args.now.getTime() + backoffMs(effect.attempts, args.options));
   await scheduleRetry(db, effect.id, { runAt, error, now: args.now });
   args.report.retried += 1;
+}
+
+export interface DispatchRunOptions extends DispatcherOptions {
+  /**
+   * Stop claiming new batches after this long (CR-40-k2). The batch in hand is
+   * always finished, so the run can overshoot by one batch's handlers. Keep it
+   * under the repeat interval, so a run is over before the next one is due and
+   * a redeploy never waits on an unbounded drain.
+   */
+  budgetMs?: number;
+  /** A hard stop on batches per run, whatever the clock says. Default 100. */
+  maxPasses?: number;
+}
+
+export interface DispatchRunReport extends DispatchReport {
+  /** Batches claimed in this run. */
+  passes: number;
+  /**
+   * How late the oldest row still waiting is, in ms, measured after the run:
+   * `now - next_run_at` of the oldest pending, due, unleased row. `null` when
+   * nothing is waiting. A number that grows run after run is a backlog.
+   */
+  oldestDueAgeMs: number | null;
+}
+
+const DEFAULT_BUDGET_MS = 4_000;
+
+/**
+ * The production dispatcher run: claim a batch, and while the batch came back
+ * **full**, claim the next one straight away — until a batch comes back short
+ * (nothing more is due) or the time budget is spent (CR-40-k2).
+ *
+ * It used to be exactly one batch per tick: 50 rows every 5 s is a ceiling of
+ * 10 effects/s per worker however long the queue was, and a paid order records
+ * about six. The load smoke queued ~117/s and left 7944 pending after a
+ * minute. The budget keeps the job's promise that a run always returns.
+ *
+ * Time is `ctx.clock`, so a test drives the budget with a fake clock.
+ */
+export async function dispatchDueEffects(
+  ctx: Ctx,
+  options: DispatchRunOptions = {},
+): Promise<DispatchRunReport> {
+  const batchSize = options.batchSize ?? DEFAULTS.batchSize;
+  const budgetMs = options.budgetMs ?? DEFAULT_BUDGET_MS;
+  const startedAt = ctx.clock.nowMs();
+  const total: DispatchRunReport = {
+    claimed: 0,
+    done: 0,
+    retried: 0,
+    parked: 0,
+    passes: 0,
+    oldestDueAgeMs: null,
+  };
+  const maxPasses = options.maxPasses ?? 100;
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const report = await dispatchEffectsOnce(ctx, options);
+    if (report.claimed > 0) total.passes += 1;
+    total.claimed += report.claimed;
+    total.done += report.done;
+    total.retried += report.retried;
+    total.parked += report.parked;
+    if (report.claimed < batchSize) break;
+    if (ctx.clock.nowMs() - startedAt >= budgetMs) break;
+  }
+  total.oldestDueAgeMs = await effectsBacklogMs(ctx);
+  return total;
+}
+
+/**
+ * The age of the oldest effect that is due and still waiting, in ms, or
+ * `null` when none is. For the dispatcher's log line and the `readyz` detail.
+ */
+export async function effectsBacklogMs(ctx: Ctx): Promise<number | null> {
+  const now = ctx.clock.now();
+  const at = await oldestDue(ctx.db, now);
+  return at === null ? null : Math.max(0, now.getTime() - at.getTime());
 }
 
 /**

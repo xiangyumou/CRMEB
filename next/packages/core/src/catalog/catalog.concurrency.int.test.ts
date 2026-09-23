@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
-import { productFavorites, productReviews, productVirtualCards } from '@shop/db/schema/catalog';
+import { productFavorites, productReviews } from '@shop/db/schema/catalog';
+import { productEvents } from '@shop/db/schema/stats';
 import { createTestCtx, forkTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
 
 import type { Ctx } from '../kernel/context';
@@ -166,107 +167,6 @@ describe('a replayed stock effect', () => {
 });
 
 // ---------------------------------------------------------------------------
-// virtual cards
-// ---------------------------------------------------------------------------
-
-describe('claiming a virtual card', () => {
-  it('never hands the same card to two buyers', async () => {
-    const product = await makeProduct(asAdmin(), {
-      kind: 'virtual_card',
-      freightMode: 'free',
-      skus: [
-        {
-          specValues: {},
-          price: '30.00',
-          stock: 0,
-          isDefault: true,
-          isVisible: true,
-          sortOrder: 0,
-        },
-      ],
-    });
-    const skuId = await firstSkuId(harness, product.id);
-    await service.adminVirtualCardImport(
-      asAdmin(),
-      { id: product.id },
-      {
-        skuId: String(skuId),
-        cards: [{ cardNo: 'A1' }, { cardNo: 'A2' }, { cardNo: 'A3' }],
-      },
-    );
-
-    const userId = await makeUser(harness);
-    const lines: number[] = [];
-    for (let i = 0; i < 6; i += 1) {
-      const { orderItemId } = await makeOrderLine(harness, {
-        userId,
-        productId: Number(product.id),
-        skuId,
-      });
-      lines.push(orderItemId);
-    }
-
-    const report = await runConcurrently(6, (index) => {
-      const ctx = ctxFor(index);
-      return ctx.withTx((tx) =>
-        service.issueVirtualCard(tx, ctx, { skuId, orderItemId: lines[index]!, userId }),
-      );
-    });
-
-    expect(report.fulfilled).toHaveLength(3);
-    expect(report.rejected).toHaveLength(3);
-    for (const reason of report.rejected) {
-      expect(reason).toMatchObject({ code: 'CATALOG_CARD_POOL_EMPTY' });
-    }
-
-    const cardNos = report.fulfilled.map((card) => card.cardNo);
-    expect(new Set(cardNos).size).toBe(3);
-    expect(await repo.countUnclaimedCards(harness.ctx.db, skuId)).toBe(0);
-  });
-
-  it('gives one order line one card even when the effect is delivered twice at once', async () => {
-    const product = await makeProduct(asAdmin(), {
-      kind: 'virtual_card',
-      freightMode: 'free',
-      skus: [
-        {
-          specValues: {},
-          price: '30.00',
-          stock: 0,
-          isDefault: true,
-          isVisible: true,
-          sortOrder: 0,
-        },
-      ],
-    });
-    const skuId = await firstSkuId(harness, product.id);
-    await service.adminVirtualCardImport(
-      asAdmin(),
-      { id: product.id },
-      { skuId: String(skuId), cards: [{ cardNo: 'A1' }, { cardNo: 'A2' }] },
-    );
-
-    const userId = await makeUser(harness);
-    const { orderItemId } = await makeOrderLine(harness, {
-      userId,
-      productId: Number(product.id),
-      skuId,
-    });
-
-    await runConcurrently(4, (index) => {
-      const ctx = ctxFor(index);
-      return ctx.withTx((tx) => service.issueVirtualCard(tx, ctx, { skuId, orderItemId, userId }));
-    });
-
-    const claimed = await harness.ctx.db
-      .select({ id: productVirtualCards.id })
-      .from(productVirtualCards)
-      .where(eq(productVirtualCards.orderItemId, orderItemId));
-    expect(claimed).toHaveLength(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // the shelf switch
 // ---------------------------------------------------------------------------
 
@@ -401,6 +301,58 @@ describe('two operators submitting the same moderation batch', () => {
     expect(report.rejected).toEqual([]);
     const totalReported = report.fulfilled.reduce((sum, r) => sum + r.updated, 0);
     expect(totalReported).toBe(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a hot product page (CR-41-k2)
+// ---------------------------------------------------------------------------
+
+describe('a promotion sending everyone to one product page', () => {
+  it('serves every view while the product row is locked, and records each one', async () => {
+    const product = await makeProduct(asAdmin());
+    const shoppers = await Promise.all(
+      Array.from({ length: 4 }, async () =>
+        forkTestCtx(harness, { actor: userActor(await makeUser(harness)) }),
+      ),
+    );
+    const VIEWS = 8;
+
+    // Someone else holds the product row — an operator's edit, a stock
+    // reservation: an `UPDATE`, so the row lock is `FOR NO KEY UPDATE` — for
+    // the whole time the views arrive. A detail request that bumped
+    // `products.views` would queue behind it; one that only inserts an event
+    // does not (the event's foreign key takes `FOR KEY SHARE`, which an
+    // update of non-key columns does not block. Only deleting the product, or
+    // an explicit `FOR UPDATE`, would.)
+    const holder = await harness.db.handle.pool.connect();
+    let outcome: 'served' | 'queued on the row lock';
+    let report: Awaited<ReturnType<typeof runConcurrently<unknown>>> | undefined;
+    try {
+      await holder.query('begin');
+      await holder.query('update products set stock = stock where id = $1', [product.id]);
+      const reads = runConcurrently(VIEWS, (index) =>
+        storefront.productDetail(shoppers[index % shoppers.length]!, { id: product.id }),
+      ).then((r) => {
+        report = r;
+        return 'served' as const;
+      });
+      const waited = new Promise<'queued on the row lock'>((resolve) =>
+        setTimeout(() => resolve('queued on the row lock'), 5_000),
+      );
+      outcome = await Promise.race([reads, waited]);
+    } finally {
+      await holder.query('rollback');
+      holder.release();
+    }
+
+    expect(outcome).toBe('served');
+    expect(report!.rejected).toEqual([]);
+    const views = await harness.ctx.db
+      .select({ id: productEvents.id })
+      .from(productEvents)
+      .where(and(eq(productEvents.productId, Number(product.id)), eq(productEvents.kind, 'view')));
+    expect(views).toHaveLength(VIEWS);
   });
 });
 

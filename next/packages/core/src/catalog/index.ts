@@ -15,16 +15,15 @@
  * | `recordCartAdd`         | B1         | 加购件数, inside the cart's add transaction          |
  * | `getStockPort()`        | B1 / C / D | reserve, commit, release — via `order/ports.ts`    |
  * | `getCatalogPort()`      | B1         | the batch cart read, via `order/catalog.port.ts`   |
- * | `issueVirtualCard`      | B2         | handing a card key to a paid order line            |
  * | `productCardsFor`       | G1 / G2    | rendering products in a DIY page or a campaign     |
  * | `ProductCard`           | everyone   | the one product-card DTO; add fields, do not fork  |
  * | `catalogPermissions`    | E2         | the permission tree                                |
  * | `catalogConfig`         | F1         | the 商品设置 config group                           |
  * | `runAutoReview`         | worker     | the 系统默认好评 sweep                              |
  * | `pruneBrowseHistory`    | worker     | the 足迹 retention sweep                           |
+ * | `foldProductViews`      | worker     | folding view events into `products.views`          |
  *
- * `checkPurchaseAllowance`, `issueVirtualCard` and `recordCartAdd` take
- * `(tx, …)` — a
+ * `checkPurchaseAllowance` and `recordCartAdd` take `(tx, …)` — a
  * transaction the *caller* owns — matching `recordEffect(tx, ctx, input)`, the
  * platform's other "join the transaction you are already in" primitive.
  *
@@ -38,15 +37,14 @@
  * them back with one call. (The `OrderFactsPort` stand-in that used to live
  * here moved into the order domain at merge — CR-2-a closed.)
  *
- * ## Not an effect handler
+ * ## Virtual cards: catalog imports them, the order domain hands them out
  *
- * SCHEMA.md §4.5 reserves `catalog.virtual_card.issue`, but claiming a card is
- * a database operation, not a third-party call, and CONVENTIONS is explicit
- * that the ledger is for "anything that calls a third party". Issuing a card
- * inside B2's paid transaction is both simpler and safer — it either commits
- * with the payment or does not happen — so `issueVirtualCard` is a plain
- * exported function and the key stays free for whoever needs to *notify* the
- * buyer.
+ * The 卡密 pool is catalog's (`adminVirtualCard*`: import, list, void, and the
+ * stock derived from the pool). Handing a card to a paid order line is the
+ * order domain's: `order.fulfil.repo.ts::claimVirtualCard`, called by
+ * `autoDeliver` on `order.paid`, is the one atomic claim and the one MUT-001
+ * mutates. Catalog used to carry a second, unused copy (`issueVirtualCard`);
+ * it was deleted so nobody fixes it and believes delivery changed (CR-23-k2).
  */
 
 import { registerCatalogPort } from '../order';
@@ -91,7 +89,6 @@ export {
   // the domain API other streams call
   checkPurchaseAllowance,
   getSkuForSale,
-  issueVirtualCard,
   productCardsFor,
   recordCartAdd,
   // shared mappers, for the other catalog service files and the tests
@@ -182,6 +179,10 @@ export { catalogStockPort } from './catalog.stock';
 
 /** The batch cart read, also reachable as `resolveCatalogPort()`. */
 export { catalogSalePort } from './catalog.sale';
+
+/** 商品浏览量: the worker folds `product_events` views into `products.views` (CR-41-k2). */
+export { foldProductViews, VIEW_WATERMARK_KEY } from './catalog.views';
+export type { FoldViewsOptions, FoldViewsReport } from './catalog.views';
 
 /** The 商品设置 group. Registered by importing this file. */
 export { catalogConfig } from './catalog.config';

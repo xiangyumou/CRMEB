@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { configValues } from '@shop/db/schema/system';
+import { createDb } from '@shop/db';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import {
   createConfigService,
@@ -243,6 +244,71 @@ describe('the Redis cache', () => {
     await config.set(paymentConfig, { wechatMchId: 'x' });
     expect(await config.getRaw('payment')).toEqual({ wechatMchId: 'x' });
     expect(await config.getRaw('nothing-here')).toEqual({});
+  });
+});
+
+describe('config.getIn — a read inside a transaction (CR-53-k2)', () => {
+  it('sees the transaction’s own uncommitted rows, which a pooled read cannot', async () => {
+    let inside: number | undefined;
+    let pooled: number | undefined;
+    await harness.ctx
+      .withTx(async (tx) => {
+        await tx
+          .insert(configValues)
+          .values({ group: 'payment', key: 'autoCancelMinutes', value: 7 });
+        inside = (await config.getIn(tx, paymentConfig)).autoCancelMinutes;
+        pooled = (await config.get(paymentConfig)).autoCancelMinutes;
+        throw new Error('roll back');
+      })
+      .catch(() => undefined);
+    expect(inside).toBe(7);
+    expect(pooled).toBe(30);
+    // The miss did not fill the cache from a transaction that then rolled back:
+    // the pooled `get` above filled it, from committed rows.
+    expect(await harness.redis.get('config:payment')).toBe('{}');
+  });
+
+  it('serves a hit from the cache, the same as get', async () => {
+    await config.set(paymentConfig, { wechatMchId: 'cached' });
+    await config.get(paymentConfig);
+    await harness.ctx.db.update(configValues).set({ value: 'changed-underneath' as never });
+    const values = await harness.ctx.withTx((tx) => config.getIn(tx, paymentConfig));
+    expect(values.wechatMchId).toBe('cached');
+  });
+
+  it('is exactly get when it is handed the pool rather than a transaction', async () => {
+    await config.set(paymentConfig, { autoCancelMinutes: 9 });
+    expect((await config.getIn(harness.ctx.db, paymentConfig)).autoCancelMinutes).toBe(9);
+    // …and, like get, fills the cache from committed rows.
+    expect(await harness.redis.get('config:payment')).toContain('"autoCancelMinutes":9');
+  });
+
+  it('never asks the pool for a second connection: it finishes on a pool of one', async () => {
+    const single = createDb(harness.db.url, { max: 1 });
+    try {
+      const service = createConfigService({
+        db: single.db,
+        cache: {
+          get: (key) => harness.redis.get(key),
+          set: (key, value, _mode, ttl) => harness.redis.set(key, value, 'PX', ttl),
+          del: (...keys) => harness.redis.del(...keys),
+        },
+        clock: harness.clock,
+      });
+      let timer: NodeJS.Timeout | undefined;
+      const outcome = await Promise.race([
+        single.db
+          .transaction(async (tx) => (await service.getIn(tx, paymentConfig)).autoCancelMinutes)
+          .then((minutes) => ({ minutes })),
+        new Promise<'starved'>((resolve) => {
+          timer = setTimeout(() => resolve('starved'), 5_000);
+        }),
+      ]);
+      clearTimeout(timer);
+      expect(outcome).toEqual({ minutes: 30 });
+    } finally {
+      await single.close();
+    }
   });
 });
 

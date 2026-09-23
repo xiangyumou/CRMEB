@@ -21,6 +21,7 @@ import { permissions } from './checks/permissions';
 import { retiredFeatures } from './checks/retired';
 import { routeHygiene } from './checks/route-hygiene';
 import { secretsNeverLeak } from './checks/secrets';
+import { txPool } from './checks/tx-pool';
 import { uniappCalls } from './checks/uniapp';
 import { count, settle, type Check, type CheckResult } from './framework';
 import { inFlight, isMerged } from './lib/streams';
@@ -35,6 +36,7 @@ const CHECKS: readonly Check[] = [
   retiredFeatures,
   bannedConstructs,
   secretsNeverLeak,
+  txPool,
   invariants,
 ];
 

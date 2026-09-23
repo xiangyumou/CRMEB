@@ -648,11 +648,48 @@ export async function restoreProduct(
   });
 }
 
-export async function bumpProductViews(tx: Tx, id: number): Promise<void> {
-  await tx
-    .update(products)
-    .set({ views: sql`${products.views} + 1` })
-    .where(eq(products.id, id));
+/**
+ * The newest `product_events` id recorded at least `graceMs` ago, by the
+ * database's clock — the one `created_at` defaults from — or `null` when there
+ * is none. The view fold stops here, so an insert whose id was handed out
+ * but whose transaction has not committed yet is never stepped over (CR-41-k2).
+ */
+export async function lastSettledEventId(db: DbOrTx, graceMs: number): Promise<number | null> {
+  const [row] = await db
+    .select({ id: productEvents.id })
+    .from(productEvents)
+    .where(lte(productEvents.createdAt, sql`now() - (${graceMs}::int * interval '1 millisecond')`))
+    .orderBy(desc(productEvents.createdAt), desc(productEvents.id))
+    .limit(1);
+  return row?.id ?? null;
+}
+
+/**
+ * Folds the view events in `(afterId, throughId]` into `products.views`: one
+ * `UPDATE … FROM (SELECT product_id, count(*) …)`, each product row touched
+ * once per batch rather than once per view (CR-41-k2).
+ */
+export async function foldViewEvents(
+  tx: Tx,
+  range: { afterId: number; throughId: number },
+): Promise<{ products: number; views: number }> {
+  const result = await tx.execute<{ products: number; views: number }>(sql`
+    with counted as (
+      select ${productEvents.productId} as product_id, count(*)::int as n
+      from ${productEvents}
+      where ${productEvents.kind} = 'view'
+        and ${productEvents.id} > ${range.afterId}
+        and ${productEvents.id} <= ${range.throughId}
+      group by ${productEvents.productId}
+    ), folded as (
+      update ${products} set views = ${products.views} + counted.n
+      from counted
+      where ${products.id} = counted.product_id
+      returning counted.n
+    )
+    select count(*)::int as products, coalesce(sum(n), 0)::int as views from folded`);
+  const row = result.rows[0];
+  return { products: Number(row?.products ?? 0), views: Number(row?.views ?? 0) };
 }
 
 // ---------------------------------------------------------------------------
@@ -1254,52 +1291,6 @@ export async function existingCardNos(
       ),
     );
   return new Set(rows.map((r) => r.cardNo));
-}
-
-/**
- * Hand one unclaimed card to an order line, as one statement.
- *
- * `FOR UPDATE SKIP LOCKED` on the inner select means two concurrent claims take
- * two different cards instead of queueing on the same one, and
- * `product_virtual_cards_order_item_uq` makes a second card for the same order
- * item impossible even if the effect ledger retries. The SQL is the one
- * SCHEMA.md writes out above the table.
- */
-export async function claimVirtualCard(
-  tx: Tx,
-  args: { skuId: number; orderItemId: number; userId: number; now: Date },
-): Promise<VirtualCardRow | null> {
-  const rows = await tx
-    .update(productVirtualCards)
-    .set({
-      state: 'claimed',
-      orderItemId: args.orderItemId,
-      claimedByUserId: args.userId,
-      claimedAt: args.now,
-      updatedAt: args.now,
-    })
-    .where(
-      sql`${productVirtualCards.id} = (
-        select c.id from ${productVirtualCards} c
-        where c.sku_id = ${args.skuId} and c.state = 'unclaimed'
-        order by c.id limit 1 for update skip locked
-      )`,
-    )
-    .returning();
-  return rows[0] ?? null;
-}
-
-/** The card already handed to this order line, if any. Makes a retried hand-over a quiet no-op. */
-export async function findCardForOrderItem(
-  db: DbOrTx,
-  orderItemId: number,
-): Promise<VirtualCardRow | null> {
-  const rows = await db
-    .select()
-    .from(productVirtualCards)
-    .where(eq(productVirtualCards.orderItemId, orderItemId))
-    .limit(1);
-  return rows[0] ?? null;
 }
 
 export async function listVirtualCards(
@@ -2179,7 +2170,7 @@ export type ProductEventPlatform = (typeof productEvents.$inferSelect)['platform
  * F2 and is a different thing; see `docs/rewrite/status/a.md`.
  */
 export async function recordProductView(
-  tx: Tx,
+  tx: DbOrTx,
   args: { productId: number; userId: number | null; platform: ProductEventPlatform },
 ): Promise<void> {
   await tx.insert(productEvents).values({

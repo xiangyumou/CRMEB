@@ -91,6 +91,21 @@ export async function claimDue(
   }));
 }
 
+/**
+ * `next_run_at` of the oldest row that is due and waiting: pending, due by
+ * `now`, and not under a dispatcher's lease (a claim pushes `next_run_at` past
+ * the lease, so claimed rows are not "due"). `null` when nothing is waiting.
+ * One read of `effects_due_idx`.
+ */
+export async function oldestDue(db: DbOrTx, now: Date): Promise<Date | null> {
+  const [row] = await db
+    .select({ at: sql<Date | string | null>`min(${effects.nextRunAt})` })
+    .from(effects)
+    .where(and(eq(effects.status, 'pending'), lte(effects.nextRunAt, now)));
+  const at = row?.at ?? null;
+  return at === null ? null : new Date(at);
+}
+
 export async function markDone(tx: DbOrTx, id: number, now: Date): Promise<void> {
   await tx
     .update(effects)

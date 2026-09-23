@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { productReviews, productSkus, productVirtualCards } from '@shop/db/schema/catalog';
+import { productEvents } from '@shop/db/schema/stats';
 import { effects as effectsTable } from '@shop/db/schema/system';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 
@@ -12,6 +13,7 @@ import * as repo from './catalog.repo';
 import * as service from './catalog.service';
 import * as reviews from './catalog.review.service';
 import { catalogStockPort } from './catalog.stock';
+import { foldProductViews, VIEW_WATERMARK_KEY } from './catalog.views';
 import * as storefront from './catalog.storefront.service';
 import * as taxonomy from './catalog.taxonomy.service';
 import { catalogPermissions } from './permissions';
@@ -974,6 +976,98 @@ describe('browse history', () => {
   });
 });
 
+describe('product views, folded by the worker (CR-41-k2)', () => {
+  // `created_at` is the database's clock, not the harness's, so the tests fold
+  // with no grace period: every committed view is settled.
+  const fold = (options: Parameters<typeof foldProductViews>[1] = {}) =>
+    foldProductViews(harness.ctx, { graceMs: 0, ...options });
+  const viewsOf = async (id: string | number) =>
+    (await repo.findProduct(harness.ctx.db, Number(id)))?.views;
+
+  beforeEach(async () => {
+    await harness.redis.del(VIEW_WATERMARK_KEY);
+  });
+
+  it('records the view and leaves the product row alone on the request path', async () => {
+    const product = await makeProduct(asAdmin());
+    const ctx = asUser(await makeUser(harness));
+
+    await storefront.productDetail(ctx, { id: product.id });
+    await storefront.productDetail(ctx, { id: product.id });
+
+    expect(await viewsOf(product.id)).toBe(0);
+    const events = await harness.ctx.db
+      .select()
+      .from(productEvents)
+      .where(eq(productEvents.productId, Number(product.id)));
+    expect(events.filter((e) => e.kind === 'view')).toHaveLength(2);
+  });
+
+  it('folds the views recorded since the last run into products.views, once', async () => {
+    const first = await makeProduct(asAdmin());
+    const second = await makeProduct(asAdmin());
+    const ctx = asUser(await makeUser(harness));
+    // The first run after deploy only sets the watermark.
+    expect(await fold()).toMatchObject({ initialised: true, views: 0 });
+
+    for (let i = 0; i < 3; i += 1) await storefront.productDetail(ctx, { id: first.id });
+    await storefront.productDetail(harness.ctx, { id: second.id });
+    // A favourite is a product event too, and is not a view.
+    await storefront.favoriteAdd(ctx, { productId: second.id });
+
+    expect(await fold()).toMatchObject({ initialised: false, batches: 1, products: 2, views: 4 });
+    expect(await viewsOf(first.id)).toBe(3);
+    expect(await viewsOf(second.id)).toBe(1);
+
+    // Nothing new: nothing folded twice.
+    expect(await fold()).toMatchObject({ batches: 0, views: 0 });
+    await storefront.productDetail(ctx, { id: second.id });
+    expect(await fold()).toMatchObject({ views: 1 });
+    expect(await viewsOf(first.id)).toBe(3);
+    expect(await viewsOf(second.id)).toBe(2);
+  });
+
+  it('works through a backlog in batches, and a bounded run leaves the rest to the next', async () => {
+    const product = await makeProduct(asAdmin());
+    await fold();
+    for (let i = 0; i < 7; i += 1) await storefront.productDetail(harness.ctx, { id: product.id });
+
+    expect(await fold({ batchSize: 2, maxBatches: 2 })).toMatchObject({ batches: 2, views: 4 });
+    expect(await viewsOf(product.id)).toBe(4);
+    expect(await fold({ batchSize: 2 })).toMatchObject({ batches: 2, views: 3 });
+    expect(await viewsOf(product.id)).toBe(7);
+  });
+
+  it('leaves views younger than the grace period for the next run', async () => {
+    const product = await makeProduct(asAdmin());
+    await fold();
+    await storefront.productDetail(harness.ctx, { id: product.id });
+
+    expect(await fold({ graceMs: 60_000 })).toMatchObject({ batches: 0, views: 0 });
+    expect(await fold()).toMatchObject({ views: 1 });
+  });
+
+  it('never folds one range twice when two runs overlap', async () => {
+    const product = await makeProduct(asAdmin());
+    await fold();
+    for (let i = 0; i < 6; i += 1) await storefront.productDetail(harness.ctx, { id: product.id });
+
+    const runs = await Promise.all([fold({ batchSize: 1 }), fold({ batchSize: 1 })]);
+    expect(runs[0]!.views + runs[1]!.views).toBe(6);
+    expect(await viewsOf(product.id)).toBe(6);
+  });
+
+  it('starts again from the newest event when the watermark is ahead of every event', async () => {
+    const product = await makeProduct(asAdmin());
+    await storefront.productDetail(harness.ctx, { id: product.id });
+    await harness.redis.set(VIEW_WATERMARK_KEY, '1000000');
+
+    expect(await fold()).toMatchObject({ initialised: true, views: 0 });
+    await storefront.productDetail(harness.ctx, { id: product.id });
+    expect(await fold()).toMatchObject({ views: 1 });
+  });
+});
+
 // ---------------------------------------------------------------------------
 // virtual cards
 // ---------------------------------------------------------------------------
@@ -1028,48 +1122,6 @@ describe('virtual cards', () => {
     ).rejects.toMatchObject({ code: 'CATALOG_NOT_A_CARD_PRODUCT' });
   });
 
-  it('hands one card per order line and gives the same card back on a replay', async () => {
-    const { product, skuId } = await makeCardProduct();
-    await service.adminVirtualCardImport(
-      asAdmin(),
-      { id: product.id },
-      { skuId: String(skuId), cards: [{ cardNo: 'A1' }, { cardNo: 'A2' }] },
-    );
-
-    const userId = await makeUser(harness);
-    const { orderItemId } = await makeOrderLine(harness, {
-      userId,
-      productId: Number(product.id),
-      skuId,
-    });
-
-    const issued = await harness.ctx.withTx((tx) =>
-      service.issueVirtualCard(tx, harness.ctx, { skuId, orderItemId, userId }),
-    );
-    const again = await harness.ctx.withTx((tx) =>
-      service.issueVirtualCard(tx, harness.ctx, { skuId, orderItemId, userId }),
-    );
-
-    expect(again.cardNo).toBe(issued.cardNo);
-    expect(await repo.countUnclaimedCards(harness.ctx.db, skuId)).toBe(1);
-  });
-
-  it('refuses when the pool is empty', async () => {
-    const { product, skuId } = await makeCardProduct();
-    const userId = await makeUser(harness);
-    const { orderItemId } = await makeOrderLine(harness, {
-      userId,
-      productId: Number(product.id),
-      skuId,
-    });
-
-    await expect(
-      harness.ctx.withTx((tx) =>
-        service.issueVirtualCard(tx, harness.ctx, { skuId, orderItemId, userId }),
-      ),
-    ).rejects.toMatchObject({ code: 'CATALOG_CARD_POOL_EMPTY' });
-  });
-
   it('voids only unclaimed cards', async () => {
     const { product, skuId } = await makeCardProduct();
     await service.adminVirtualCardImport(
@@ -1084,9 +1136,21 @@ describe('virtual cards', () => {
       productId: Number(product.id),
       skuId,
     });
-    await harness.ctx.withTx((tx) =>
-      service.issueVirtualCard(tx, harness.ctx, { skuId, orderItemId, userId }),
-    );
+    // A card already handed out — the claim itself is the order domain's
+    // (`order.fulfil.repo.ts::claimVirtualCard`), so the row is set directly.
+    await harness.ctx.withTx(async (tx) => {
+      const [first] = await tx
+        .select({ id: productVirtualCards.id })
+        .from(productVirtualCards)
+        .where(eq(productVirtualCards.skuId, skuId))
+        .orderBy(productVirtualCards.id)
+        .limit(1);
+      await tx
+        .update(productVirtualCards)
+        .set({ state: 'claimed', orderItemId, claimedByUserId: userId, claimedAt: new Date(NOW) })
+        .where(eq(productVirtualCards.id, first!.id));
+      await repo.syncCardStock(tx, skuId);
+    });
 
     const all = await harness.ctx.db
       .select({ id: productVirtualCards.id })
@@ -1491,7 +1555,6 @@ describe('errors', () => {
       'CATALOG_PURCHASE_LIMIT_REACHED',
       'CATALOG_MIN_PURCHASE_NOT_MET',
       'CATALOG_NOT_A_CARD_PRODUCT',
-      'CATALOG_CARD_POOL_EMPTY',
       'CATALOG_LABEL_NOT_FOUND',
       'CATALOG_LABEL_CATEGORY_NOT_FOUND',
       'CATALOG_PARAM_TEMPLATE_NOT_FOUND',

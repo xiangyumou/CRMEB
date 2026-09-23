@@ -316,11 +316,13 @@ describe('COUPON-008 — one user tapping 领取 twice', () => {
 
   it('never lets simultaneous taps exceed a limit above one', async () => {
     // Worth knowing, and worth copying: `claim_slot` is computed from what is
-    // committed, so N simultaneous taps all aim at the same slot and exactly
-    // one of them lands. A user with a limit of 3 therefore gets ONE coupon
-    // from one burst of taps, not three — the limit is a ceiling, never a
-    // quota the race fills. Refusing is the safe direction; the shopper can
-    // tap again for slot 2.
+    // committed, so taps that read before the first winner commits all aim at
+    // the same slot and one of them lands. A tap that reads after a commit aims
+    // at the next slot and lands too, legitimately. So one burst of taps gets
+    // **at least one and never more than the limit**, in dense slots — the
+    // limit is a ceiling, never a quota the race fills. Refusing is the likely
+    // direction, not a guaranteed one: on a loaded machine a racer can reach
+    // its read after the first commit (CR-51-k2, STAB-001 round 2).
     const userId = await makeUser();
     const templateId = await makeTemplate({
       perUserLimit: 3,
@@ -332,12 +334,22 @@ describe('COUPON-008 — one user tapping 领取 twice', () => {
       service.claim(racer(userId), { id: String(templateId) }),
     );
 
-    expect(report.fulfilled).toHaveLength(1);
-    expect((await walletRows()).map((row) => row.claimSlot)).toEqual([1]);
+    const landed = report.fulfilled.length;
+    expect(landed).toBeGreaterThanOrEqual(1);
+    expect(landed).toBeLessThanOrEqual(3);
+    // Distinct, dense, within the limit.
+    expect((await walletRows()).map((row) => row.claimSlot).sort()).toEqual(
+      [1, 2, 3].slice(0, landed),
+    );
+    expect((await templateRow(templateId)).remainingCount).toBe(100 - landed);
+    for (const error of report.rejected) {
+      expect(error).toMatchObject({ code: 'COUPON_PER_USER_LIMIT_REACHED' });
+    }
 
     // Sequentially, the same user reaches the limit and then stops.
-    await service.claim(racer(userId), { id: String(templateId) });
-    await service.claim(racer(userId), { id: String(templateId) });
+    for (let slot = landed + 1; slot <= 3; slot += 1) {
+      await service.claim(racer(userId), { id: String(templateId) });
+    }
     await expect(service.claim(racer(userId), { id: String(templateId) })).rejects.toMatchObject({
       code: 'COUPON_PER_USER_LIMIT_REACHED',
     });

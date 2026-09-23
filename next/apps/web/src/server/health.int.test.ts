@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminAuthService, UserSessionService } from '@shop/core/auth';
+import { recordEffect } from '@shop/core/effects';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { GET as readyz } from '../../app/api/v1/readyz/route';
 import { setContainer, type Container } from './container';
@@ -113,6 +114,34 @@ describe('GET /api/v1/readyz', () => {
       version: 'dev',
       checks: { database: 'ok', redis: 'ok', migrations: 'ok', worker: 'ok' },
     });
+  });
+
+  it('reports the effects backlog as a detail, never as a failing check (CR-40-k2)', async () => {
+    await harness.db.truncateAll();
+    const empty = await readyzResponse();
+    expect(empty.status).toBe(200);
+    expect(empty.body).toMatchObject({ backlog: { effectsOldestDueSeconds: null } });
+
+    // A row that has been due for 90 s and nobody has picked up: late, and
+    // still ready — a slow notification is not a reason to hold a release.
+    await harness.ctx.withTx((tx) =>
+      recordEffect(tx, harness.ctx, {
+        scope: 'order',
+        scopeId: 'readyz-backlog',
+        eventType: 'order.paid',
+        payload: {},
+      }),
+    );
+    harness.clock.advance(90_000);
+    await beat();
+
+    const late = await readyzResponse();
+    expect(late.status).toBe(200);
+    expect(late.body).toMatchObject({
+      checks: { database: 'ok', redis: 'ok', migrations: 'ok', worker: 'ok' },
+      backlog: { effectsOldestDueSeconds: 90 },
+    });
+    await harness.db.truncateAll();
   });
 
   it('is 503 naming only the worker when the heartbeat stops', async () => {

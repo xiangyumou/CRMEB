@@ -168,8 +168,35 @@ export function resetConfigRegistry(): void {
 // ---------------------------------------------------------------------------
 
 export interface ConfigService {
-  /** Typed read. Pass the group definition the domain exported. */
+  /**
+   * Typed read. Pass the group definition the domain exported.
+   *
+   * On a cache miss this reads from the **pool**. Never call it while a
+   * transaction is open on the same request: use `getIn(tx, group)` there.
+   */
   get<S extends z.ZodObject>(group: ConfigGroupDef<S>): Promise<z.infer<S>>;
+  /**
+   * The same typed read, for code that is inside a transaction (CR-53-k2).
+   *
+   * A cache hit is the same as `get`. On a miss the rows are read through the
+   * caller's `tx`, never through a second pooled connection. A transaction
+   * that holds a row lock and then waits for a pool connection deadlocks the
+   * pool as soon as `max` transactions queue on that lock: every connection is
+   * held by a waiter, and the holder waits for one of them. That is how the
+   * stock reservation wedged the web pool (`catalog.stock.pool.int.test.ts`).
+   *
+   * A miss does **not** fill the cache: the rows were read inside somebody
+   * else's transaction, which may have written them and may still roll back.
+   * The next `get` fills it from committed rows. The cost is one indexed read
+   * per call while the cache is cold.
+   *
+   * Handed the pool rather than a transaction (a `db: DbOrTx` helper called
+   * from both a read path and a write path), it is exactly `get`.
+   *
+   * `pnpm guards tx-pool` flags `ctx.config.get(`, `ctx.db` and `ctx.withTx(`
+   * inside any function that takes a `tx`, a `Tx` or a `DbOrTx`.
+   */
+  getIn<S extends z.ZodObject>(db: DbOrTx, group: ConfigGroupDef<S>): Promise<z.infer<S>>;
   /** Untyped read by name, for the generic admin config screen. */
   getRaw(group: string): Promise<Record<string, unknown>>;
   /**
@@ -203,43 +230,68 @@ export interface ConfigServiceOptions {
 
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
 
+/** `rollback()` exists only on a drizzle transaction (the same test `withTx` uses). */
+function isTransaction(handle: DbOrTx): boolean {
+  return typeof (handle as { rollback?: unknown }).rollback === 'function';
+}
+
 export function createConfigService(options: ConfigServiceOptions): ConfigService {
   const { db, cache, clock, ttlMs = DEFAULT_TTL_MS, keyPrefix = 'config:' } = options;
   const cacheKey = (group: string) => `${keyPrefix}${group}`;
 
-  async function readRaw(group: string): Promise<Record<string, unknown>> {
-    const key = cacheKey(group);
+  async function readCached(key: string): Promise<Record<string, unknown> | null> {
     const cached = await cache.get(key);
-    if (cached !== null) {
-      try {
-        return JSON.parse(cached) as Record<string, unknown>;
-      } catch {
-        // A corrupt cache entry must never take the shop down.
-        await cache.del(key);
-      }
+    if (cached === null) return null;
+    try {
+      return JSON.parse(cached) as Record<string, unknown>;
+    } catch {
+      // A corrupt cache entry must never take the shop down.
+      await cache.del(key);
+      return null;
     }
-    const rows = await loadGroup(db, group);
+  }
+
+  async function loadRaw(source: DbOrTx, group: string): Promise<Record<string, unknown>> {
+    const rows = await loadGroup(source, group);
     const raw: Record<string, unknown> = {};
     for (const row of rows) raw[row.key] = row.value;
+    return raw;
+  }
+
+  async function readRaw(group: string): Promise<Record<string, unknown>> {
+    const key = cacheKey(group);
+    const cached = await readCached(key);
+    if (cached !== null) return cached;
+    const raw = await loadRaw(db, group);
     await cache.set(key, JSON.stringify(raw), 'PX', ttlMs);
     return raw;
   }
 
+  /** Stored data that no longer matches the schema falls back to defaults field by field. */
+  function typed<S extends z.ZodObject>(
+    group: ConfigGroupDef<S>,
+    raw: Record<string, unknown>,
+  ): z.infer<S> {
+    const parsed = group.schema.safeParse(raw);
+    if (parsed.success) return parsed.data as never;
+    // Rather than failing every request in the shop, drop the broken fields.
+    const repaired: Record<string, unknown> = { ...raw };
+    for (const issue of parsed.error.issues) {
+      const head = issue.path[0];
+      if (typeof head === 'string') delete repaired[head];
+    }
+    return group.schema.parse(repaired) as never;
+  }
+
   return {
     async get(group) {
-      const raw = await readRaw(group.group);
-      const parsed = group.schema.safeParse(raw);
-      if (!parsed.success) {
-        // Stored data no longer matches the schema: fall back to defaults for
-        // the broken fields rather than failing every request in the shop.
-        const repaired: Record<string, unknown> = { ...raw };
-        for (const issue of parsed.error.issues) {
-          const head = issue.path[0];
-          if (typeof head === 'string') delete repaired[head];
-        }
-        return group.schema.parse(repaired) as never;
-      }
-      return parsed.data as never;
+      return typed(group, await readRaw(group.group));
+    },
+
+    async getIn(handle, group) {
+      if (!isTransaction(handle)) return typed(group, await readRaw(group.group));
+      const cached = await readCached(cacheKey(group.group));
+      return typed(group, cached ?? (await loadRaw(handle, group.group)));
     },
 
     async getRaw(group) {

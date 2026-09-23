@@ -83,7 +83,10 @@ function assertPositive(lines: readonly StockLine[]): void {
  * worse trade than a warning those callers do not want anyway.
  */
 async function warnOnLowStock(tx: Tx, ctx: Ctx, lines: readonly StockLine[]): Promise<void> {
-  const { stockWarningThreshold: threshold } = await ctx.config.get(catalogConfig);
+  // Through `tx`, never the pool (CR-53-k2): this runs while the SKU row lock
+  // is held, and a second pooled connection taken here wedges the pool once
+  // `max` checkouts queue on one SKU (`catalog.stock.pool.int.test.ts`).
+  const { stockWarningThreshold: threshold } = await ctx.config.getIn(tx, catalogConfig);
   if (threshold <= 0) return;
 
   const skus = await repo.skusByIds(
