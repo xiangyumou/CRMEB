@@ -15,10 +15,9 @@ import { adminCategoryCreate, adminProductCreate } from './catalog.service';
  * the "no tests in suite" rule; it is excluded from the package build the same
  * way the tests are.
  *
- * The order rows here are written directly rather than through B1, which does
- * not exist yet. They are the *only* order rows this stream creates, they exist
- * purely so the review and purchase-limit paths have something to read, and
- * they go away when `catalog.order-bridge.repo.ts` does (CR-2-a).
+ * The order rows here are written directly rather than through checkout, so a
+ * catalog test can put an order in exactly the state it needs. They exist
+ * purely so the review and purchase-limit paths have something to read.
  */
 
 let sequence = 0;

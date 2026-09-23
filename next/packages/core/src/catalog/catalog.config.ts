@@ -10,9 +10,9 @@ import { defineConfigGroup } from '../kernel/config-registry';
  *
  * Registration is a side effect of this module being imported, and
  * `core/src/catalog/index.ts` exports it, so `@shop/core/catalog` is enough to
- * make the group visible to the generic admin config screen (CONVENTIONS:
- * "`packages/core/src/<domain>/<group>.config.ts`, registered from the domain's
- * `index.ts`").
+ * make the group visible to the generic admin config screen
+ * (`docs/conventions.md`: "`packages/core/src/<domain>/<group>.config.ts`,
+ * registered from the domain's `index.ts`").
  */
 export const catalogConfig = defineConfigGroup({
   group: 'catalog',
@@ -28,8 +28,6 @@ export const catalogConfig = defineConfigGroup({
     /**
      * Days after an order is completed before the auto-review job writes a
      * five-star review for its lines. Zero turns the job into a no-op.
-     *
-     * Legacy `product_replay_days`, run by the `productReplay` timer.
      */
     autoReviewDays: z.number().int().min(0).max(365).default(7),
     /** What that automatic review says. */

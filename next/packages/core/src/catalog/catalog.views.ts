@@ -2,14 +2,13 @@ import type { Ctx } from '../kernel/context';
 import * as repo from './catalog.repo';
 
 /**
- * 商品浏览量, folded from `product_events` by the worker (CR-41-k2).
+ * 商品浏览量, folded from `product_events` by the worker.
  *
  * A product view is one `product_events` row — the record browse history and
- * the traffic report already read (decision 4, `docs/rewrite/status/a.md`).
- * `products.views`, the number on the admin list and the product card, is a
- * denormalised count of those rows. It used to be bumped with
- * `UPDATE products SET views = views + 1` on every detail request, which put
- * every viewer of one product in a queue on that product's row lock. Now the
+ * the traffic report already read. `products.views`, the number on the admin
+ * list and the product card, is a denormalised count of those rows. Bumping it
+ * with `UPDATE products SET views = views + 1` on every detail request would
+ * put every viewer of one product in a queue on that product's row lock. So the
  * request only inserts, and this folds the new rows in, one statement per
  * batch.
  *

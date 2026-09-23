@@ -25,10 +25,10 @@ import { orNull, pageBounds } from './catalog.service';
  * guard, and a generic would either lose those or grow an options object with
  * four branches in it.
  *
- * Protections get their own permission atoms (`catalog:protection:*`). Legacy
- * filed them under the 商品参数 permission group, so granting a colleague the
- * right to edit parameter templates also let them rewrite the guarantee badges
- * shown on every product page. The brief lists that under "Fix, don't port".
+ * Protections get their own permission atoms (`catalog:protection:*`). Filed
+ * under the 商品参数 permission group, granting a colleague the right to edit
+ * parameter templates would also let them rewrite the guarantee badges shown on
+ * every product page.
  */
 
 // ---------------------------------------------------------------------------
@@ -126,8 +126,8 @@ export async function adminLabelCategoryUpdate(
  * Delete a grouping.
  *
  * Its labels survive and become ungrouped. Deleting a folder must not delete
- * what is in it — legacy cascaded and an operator tidying the label groups
- * silently removed every label from every product card.
+ * what is in it — a cascade would let an operator tidying the label groups
+ * silently remove every label from every product card.
  */
 export async function adminLabelCategoryDelete(ctx: Ctx, input: { id: string }): Promise<void> {
   const id = Number(input.id);

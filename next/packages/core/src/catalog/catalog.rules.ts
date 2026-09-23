@@ -13,7 +13,7 @@ import type { ProductKind, ProductSpecInput } from '@shop/contracts/catalog/sche
 // spec matrix
 // ---------------------------------------------------------------------------
 
-/** The separator legacy used in `eb_store_product_attr_value.suk`. Kept: order data quotes it. */
+/** The separator between spec values in `specText` (`红|XL`). Order data quotes it, so it never changes. */
 export const SPEC_SEPARATOR = '|';
 
 export interface SkuCombination {
@@ -30,9 +30,8 @@ export interface SkuCombination {
  * instead would reorder every existing SKU the first time an operator renamed
  * one.
  *
- * Legacy built this in the browser (`SpecStock.vue`) and again on the server
- * (`StoreProductAttrServices::validate`), and the two disagreed about empty
- * values. One function, called from both.
+ * The editor and the server both need this matrix, and two builds of it would
+ * disagree about empty values. One function, called from both.
  */
 export function skuMatrix(specs: readonly ProductSpecInput[]): SkuCombination[] {
   if (specs.length === 0) return [];
@@ -101,16 +100,14 @@ export function comboKey(specValues: Readonly<Record<string, string>>): string {
 /**
  * Whether a product may go in a cart.
  *
- * Legacy: `$item['cart_button'] = $item['is_virtual'] || $item['virtual_type'] == 3
- * || $item['presale'] || json_decode($item['custom_form'], true) ? 0 : 1`
- * (`StoreProductServices.php:1187`). The `is_virtual || virtual_type == 3` half
- * is just "not a physical product" once `kind` exists. `presale` is D's, and it
- * passes its own flag in.
+ * Only a physical product without a custom form, and not on presale, goes in
+ * the cart; everything else is bought on its own. `presale` belongs to the
+ * presale domain, and it passes its own flag in.
  */
 export function canAddToCart(input: {
   kind: ProductKind;
   hasCustomForm: boolean;
-  /** D sets this for a product with a live presale activity. */
+  /** The presale domain sets this for a product with a live presale activity. */
   isPresale?: boolean;
 }): boolean {
   if (input.kind !== 'physical') return false;
@@ -141,9 +138,9 @@ export interface PurchaseLimitVerdict {
 /**
  * The 限购 / 起购 check.
  *
- * `alreadyBought` only matters for `lifetime`; a `per_order` limit is decided on
- * the one basket. Legacy compared against `>= limit` in one place and `> limit`
- * in another, so a lifetime limit of 1 sometimes allowed two.
+ * `alreadyBought` only matters for `lifetime`; a `per_order` limit is decided
+ * on the one basket. One function for every caller, so `>= limit` in one place
+ * and `> limit` in another cannot let a lifetime limit of 1 allow two.
  */
 export function checkPurchaseLimit(input: {
   mode: PurchaseLimitMode;
@@ -219,7 +216,7 @@ export function wouldCycle(input: {
 
 export type RatingBucket = 'good' | 'medium' | 'bad';
 
-/** 好评 4–5 / 中评 3 / 差评 1–2, the way the legacy console groups them. */
+/** 好评 4–5 / 中评 3 / 差评 1–2, the grouping the console shows. */
 export function ratingBucket(productScore: number): RatingBucket {
   if (productScore >= 4) return 'good';
   if (productScore === 3) return 'medium';
@@ -249,11 +246,10 @@ export interface ReviewSummaryValues {
 /**
  * The header above the review list.
  *
- * An unreviewed product reports `goodRate = 100`, matching legacy
- * (`StoreProductReplyServices::getProductReplyCount`): a new product should not
- * open with "0% positive". `averageScore` is rounded to one decimal because
- * that is all the UI renders, and rounding once here keeps the number the same
- * on every surface.
+ * An unreviewed product reports `goodRate = 100`: a new product should not open
+ * with "0% positive". `averageScore` is rounded to one decimal because that is
+ * all the UI renders, and rounding once here keeps the number the same on every
+ * surface.
  */
 export function summariseReviews(counts: ReviewCounts): ReviewSummaryValues {
   const total = Math.max(0, counts.total);
@@ -297,9 +293,10 @@ const SKU_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
  * A stable, opaque variant key.
  *
  * `product_skus.skuCode` is `varchar(32)` and globally unique; it travels on
- * cart rows and order items, so it must not encode the product id (products get
- * merged and renumbered by the ETL) and must not be guessable in sequence.
- * Takes its randomness as an argument so the unit test is deterministic.
+ * cart rows and order items, so it must not encode the product id (a code has
+ * to survive the product being merged or renumbered) and must not be guessable
+ * in sequence. Takes its randomness as an argument so the unit test is
+ * deterministic.
  */
 export function skuCodeFrom(randomBytes: Uint8Array): string {
   let out = 'SKU';
@@ -332,8 +329,7 @@ export interface SkuRollup {
  *
  * Invisible SKUs are excluded from all three: a hidden variant must not set the
  * "from ¥x" price on a card nobody can buy at that price, and it must not make
- * a sold-out product look in stock. Legacy summed every row including the
- * hidden ones.
+ * a sold-out product look in stock.
  *
  * Comparison is on the decimal string, parsed to integer 分 by the caller's
  * `Money`; here the strings are compared by length-then-lexicographically,

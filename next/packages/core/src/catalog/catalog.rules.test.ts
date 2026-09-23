@@ -104,7 +104,7 @@ describe('canAddToCart', () => {
     expect(canAddToCart({ kind: 'physical', hasCustomForm: true })).toBe(false);
   });
 
-  it('refuses a presale product, which stream D flags', () => {
+  it('refuses a presale product, which the presale domain flags', () => {
     expect(canAddToCart({ kind: 'physical', hasCustomForm: false, isPresale: true })).toBe(false);
   });
 });
@@ -186,7 +186,7 @@ describe('checkPurchaseLimit', () => {
     ).toEqual({ ok: true, reason: null, remaining: 0 });
   });
 
-  it('refuses a second unit at a lifetime limit of one — legacy allowed it', () => {
+  it('refuses a second unit at a lifetime limit of one', () => {
     // `>= limit` in one place and `> limit` in another is how a lifetime limit
     // of 1 sometimes let two through.
     expect(
@@ -356,8 +356,8 @@ describe('rollupSkus', () => {
   });
 
   it('ignores invisible SKUs in all three numbers', () => {
-    // Legacy summed every row, so a hidden 1-cent variant set the card price
-    // and a hidden sold-out row made a live product look in stock.
+    // Summing every row would let a hidden 1-cent variant set the card price
+    // and a hidden sold-out row make a live product look in stock.
     expect(
       rollupSkus([
         sku({ price: '59.00', stock: 10, isVisible: true }),
@@ -435,8 +435,8 @@ describe('the product form', () => {
   }
 
   it('refuses a hand-typed stock on a card product', () => {
-    // The card pool is the stock. Legacy kept the two apart, let them drift,
-    // and sold cards that did not exist.
+    // The card pool is the stock. Kept apart, the two drift, and the shop sells
+    // cards that do not exist.
     expect(messages({ ...base, skus: [{ ...base.skus[0]!, stock: 100 }] })).toContain(
       '卡密商品的库存由导入的卡密数量决定，请勿手动填写',
     );
