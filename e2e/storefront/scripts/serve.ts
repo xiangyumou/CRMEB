@@ -33,6 +33,12 @@
  * "模拟小程序" H5 build instead of the uni-app, and adds the fake
  * `api.weixin.qq.com` (`startFakeOaServer`) that the server's mini sign-in
  * calls, on its own ports, stack file and database.
+ *
+ * `SHOP_E2E_WECHAT_DEVICE=1` (mini only, never in the suite) turns on that
+ * fake's device mode, so a real phone's `wx.login()` code signs in against
+ * the fakes (docs/mini/device-check.md, backend B).
+ * `SHOP_E2E_WECHAT_DEVICE_OPENID` / `SHOP_E2E_WECHAT_DEVICE_PHONE` pin the
+ * shopper, so every cold start is the same account.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -41,7 +47,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { generateFakeWechatKeys, startFakeWechatGateway } from '@shop/testing';
-import { startFakeOaServer, type FakeOaServer } from '@shop/testing/wechat';
+import { startFakeOaServer, type FakeDeviceMode, type FakeOaServer } from '@shop/testing/wechat';
 import pg from 'pg';
 
 import { startEdge } from '../src/edge';
@@ -73,6 +79,14 @@ let closeEdge: (() => Promise<void>) | undefined;
 let closeGatewayControl: (() => Promise<void>) | undefined;
 let closeGateway: (() => Promise<void>) | undefined;
 let closeWechat: (() => Promise<void>) | undefined;
+
+/** `SHOP_E2E_WECHAT_DEVICE=1` → the fake's device mode; anything else leaves it off. */
+function deviceModeFromEnv(): FakeDeviceMode {
+  if (process.env.SHOP_E2E_WECHAT_DEVICE !== '1') return false;
+  const openid = process.env.SHOP_E2E_WECHAT_DEVICE_OPENID?.trim() || undefined;
+  const phone = process.env.SHOP_E2E_WECHAT_DEVICE_PHONE?.trim() || undefined;
+  return openid || phone ? { openid, phone } : true;
+}
 
 function log(line: string): void {
   console.log(`[e2e] ${line}`);
@@ -154,7 +168,10 @@ async function main(): Promise<void> {
   let wechat: FakeOaServer | undefined;
   if (CLIENT === 'mini') {
     log('starting fake api.weixin.qq.com …');
-    wechat = await startFakeOaServer();
+    wechat = await startFakeOaServer({ deviceMode: deviceModeFromEnv() });
+    if (wechat.deviceMode !== false) {
+      log('fake api.weixin.qq.com in DEVICE MODE: any well-formed wx.login() code signs in');
+    }
     closeWechat = wechat.close;
   }
 

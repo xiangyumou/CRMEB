@@ -12,27 +12,32 @@ import {
   fixtureUserCard,
   resolveFixtureProducts,
 } from '@shop/storefront-blocks/fixtures';
+import type { DataNeed } from '@shop/contracts/decor/sources';
 import { BLOCKS, decorBlocks, type BlockType } from '@shop/storefront-blocks/schema';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 
-import { buildDecorConfig, DecorCanvasDataProvider, newBlockProps } from './config';
-import { zodToPuckFields, type CustomFieldRenderers } from './zod-to-puck';
+import { renderAdmin } from '@/test/render';
+
+import { DecorCanvasDataProvider, type DecorCanvasData } from './canvas-data';
+import { buildDecorConfig, newBlockProps } from './config';
+import { SEMANTIC_FIELD_KINDS, zodToPuckFields, type CustomFieldRenderers } from './zod-to-puck';
 
 /** The batch-1 blocks in the editor canvas (React 19, the prebuilt admin bundle). */
 
 const noField = (() => null) as never;
-const custom: CustomFieldRenderers = {
-  image: noField,
-  link: noField,
-  color: noField,
-  productSource: noField,
-  richText: noField,
-  hotspots: noField,
-};
+const custom = {
+  ...Object.fromEntries(SEMANTIC_FIELD_KINDS.map((kind) => [kind, noField])),
+  multiChoice: noField,
+} as unknown as CustomFieldRenderers;
 
-const config = buildDecorConfig(custom);
+const config = buildDecorConfig({ kind: 'custom', custom });
+
+const canvasData: DecorCanvasData = {
+  resolve: async (need: DataNeed) =>
+    need.kind === 'products' ? resolveFixtureProducts(need.source) : null,
+};
 
 function renderBlock(type: string, props: unknown): ReactElement {
   const component = config.components[type];
@@ -43,7 +48,11 @@ function renderBlock(type: string, props: unknown): ReactElement {
 
 describe('the editor palette', () => {
   it('offers every registered block', () => {
-    expect(Object.keys(config.components).sort()).toEqual([...decorBlocks.types].sort());
+    expect(
+      Object.keys(config.components)
+        .filter((type) => decorBlocks.get(type))
+        .sort(),
+    ).toEqual([...decorBlocks.types].sort());
   });
 
   it('gives the rich-text and hotspot props their own controls', () => {
@@ -55,7 +64,7 @@ describe('the editor palette', () => {
 
   it('starts every block with props its schema accepts once the pictures are picked', () => {
     for (const type of Object.keys(BLOCKS) as BlockType[]) {
-      const props = newBlockProps(type);
+      const props = newBlockProps(decorBlocks.get(type)!);
       const result = BLOCKS[type].props.safeParse(props);
       // Only what the operator has to supply — a picture, an entry's text or link —
       // may keep a new block invalid; never a missing array item or a bad default.
@@ -81,24 +90,24 @@ describe('the batch-1 blocks on the canvas', () => {
       ['spacer', fixtureSpacer],
     ];
     for (const [type, props] of blocks) {
-      const { container, unmount } = render(renderBlock(type, props));
+      const { container, unmount } = renderAdmin(renderBlock(type, props));
       expect(container.querySelector(`[data-block="${type}"]`), type).not.toBeNull();
       unmount();
     }
   });
 
-  it('fills each 商品选项卡 tab from the canvas products', () => {
-    render(
-      <DecorCanvasDataProvider value={{ products: resolveFixtureProducts }}>
+  it('fills each 商品选项卡 tab from the canvas products', async () => {
+    renderAdmin(
+      <DecorCanvasDataProvider value={canvasData}>
         {renderBlock('productTabs', fixtureProductTabs)}
       </DecorCanvasDataProvider>,
     );
     expect(screen.getByText('推荐')).toBeInTheDocument();
-    expect(screen.getByText('厨房收纳三件套')).toBeInTheDocument();
+    expect(await screen.findByText('厨房收纳三件套')).toBeInTheDocument();
   });
 
   it('draws the 个人中心 blocks as a guest sees them, with no shopper state', () => {
-    render(
+    renderAdmin(
       <>
         {renderBlock('userCard', fixtureUserCard)}
         {renderBlock('orderEntry', fixtureOrderEntry)}
@@ -111,7 +120,7 @@ describe('the batch-1 blocks on the canvas', () => {
   });
 
   it('never lets rich text out of the allow-list on the canvas either', () => {
-    const { container } = render(
+    const { container } = renderAdmin(
       renderBlock('richText', {
         ...fixtureRichText,
         html: '<p>ok</p><script>window.pwned = 1</script><img src="x" onerror="alert(1)">',

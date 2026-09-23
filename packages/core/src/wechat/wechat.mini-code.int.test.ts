@@ -174,3 +174,42 @@ describe('shareMiniCodeUrl', () => {
     expect(codeCalls()).toBe(0);
   });
 });
+
+describe('SHARE-003 — the version a code opens comes from config', () => {
+  const sentEnv = () =>
+    oa
+      .callsTo('/wxa/getwxacodeunlimit')
+      .map((call) => (call.body as { env_version?: string }).env_version);
+
+  it('asks for release by default', async () => {
+    await shareMiniCodeUrl(ctx(), { route: 'product', id: '7' });
+    expect(sentEnv()).toEqual(['release']);
+  });
+
+  it('asks for the configured version, and caches per version', async () => {
+    const release = await shareMiniCodeUrl(ctx(), { route: 'product', id: '7' });
+
+    await harness.ctx.config.set(wechatMiniConfig, { enabled: true, codeEnvVersion: 'trial' });
+    const trial = await shareMiniCodeUrl(ctx(), { route: 'product', id: '7' });
+    const trialAgain = await shareMiniCodeUrl(ctx(), { route: 'product', id: '7' });
+    expect(trial.url).not.toBe(release.url);
+    expect(trialAgain.url).toBe(trial.url);
+
+    // Back to release: the release code, never the trial one, and no new call.
+    await harness.ctx.config.set(wechatMiniConfig, { enabled: true, codeEnvVersion: 'release' });
+    expect((await shareMiniCodeUrl(ctx(), { route: 'product', id: '7' })).url).toBe(release.url);
+
+    expect(sentEnv()).toEqual(['release', 'trial']);
+    const rows = await harness.ctx.db.select().from(wechatMiniCodes);
+    expect(rows.map((row) => row.page).sort()).toEqual([
+      'pages/product/index',
+      'trial:pages/product/index',
+    ]);
+  });
+
+  it('keeps the legacy endpoint on the same rule', async () => {
+    await harness.ctx.config.set(wechatMiniConfig, { enabled: true, codeEnvVersion: 'develop' });
+    await miniCodeUrl(ctx(), { page: PAGE, scene: SCENE });
+    expect(sentEnv()).toEqual(['develop']);
+  });
+});

@@ -48,6 +48,8 @@ export const storefrontAppearanceConfig = defineConfigGroup({
   schema: z.object({
     primaryColor: hexColor.default(theme.primaryColor),
     primaryContrastColor: hexColor.default(theme.primaryContrastColor),
+    /** Blank = no accent: the client uses the primary colour (one-colour scheme). */
+    accentColor: z.union([hexColor, z.literal('')]).default(theme.accentColor ?? ''),
     priceColor: hexColor.default(theme.priceColor),
     radius: radiusScale.default(theme.radius),
 
@@ -85,13 +87,21 @@ export const storefrontAppearanceConfig = defineConfigGroup({
       section: '主题',
       order: 2,
     },
+    accentColor: {
+      label: '辅助色',
+      type: 'text',
+      placeholder: '留空则与主题色相同',
+      help: '#RRGGBB，渐变按钮起点、「加入购物车」按钮；不用于小字',
+      section: '主题',
+      order: 3,
+    },
     priceColor: {
       label: '价格颜色',
       type: 'text',
       placeholder: theme.priceColor,
       help: '#RRGGBB',
       section: '主题',
-      order: 3,
+      order: 4,
     },
     radius: {
       label: '圆角',
@@ -103,7 +113,7 @@ export const storefrontAppearanceConfig = defineConfigGroup({
         { label: '大圆角', value: 'large' },
       ],
       section: '主题',
-      order: 4,
+      order: 5,
     },
 
     tabBarColor: {

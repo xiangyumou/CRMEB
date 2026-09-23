@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
@@ -41,6 +41,19 @@ import type { AddressInfo } from 'node:net';
  * Both kinds are **single-use**, as WeChat's are: the second redemption of a
  * code is `40163 code been used`, so a client that replays a `wx.login()` code
  * (or a server that redeems one twice) fails here as it would on a phone.
+ *
+ * ## Device mode (opt-in, off by default)
+ *
+ * A real phone's `wx.login()` code was issued by the real WeChat, so no test
+ * can seed it. `startFakeOaServer({ deviceMode: true })` lets the device check
+ * (docs/mini/device-check.md, backend B) sign in anyway: an **unseeded,
+ * well-formed** code (`DEVICE_CODE`, WeChat's own alphabet and length range)
+ * redeems to `openid = odev_<hash of the code>` and a phone code to a
+ * `139…` number from the same kind of hash — deterministic, so a log line can
+ * be traced back. `deviceMode: { openid, phone }` pins them instead, so one
+ * tester stays one shopper across cold starts (each launch has a new code).
+ * Seeded codes still win, a malformed one is still `40029`, and every code is
+ * still single-use. Never on in a test that proves a refusal.
  *
  * ## Shipping (小程序发货信息管理)
  *
@@ -172,6 +185,8 @@ export interface FakeOaServer {
   /** The last live menu tree `menu/create` accepted, or `null`. */
   publishedMenu: unknown;
   addMaterial(material: Omit<FakeOaMaterial, 'updateTime'> & { updateTime?: number }): void;
+  /** Whether device mode is on (`startFakeOaServer({ deviceMode })`); off by default. */
+  readonly deviceMode: FakeDeviceMode;
   /** Teach `sns/jscode2session` one code, good once. Anything else is `40029`; a spent one `40163`. */
   setMiniCode(code: string, session: FakeMiniSession): void;
   /** Teach `wxa/business/getuserphonenumber` one code, good once; the same rules. */
@@ -201,6 +216,29 @@ export interface FakeOaServer {
   server: Server;
 }
 
+/**
+ * Device mode (see the file comment). `true` maps each code to its own fake
+ * identity; the fields pin one.
+ */
+export type FakeDeviceMode = boolean | { openid?: string | undefined; phone?: string | undefined };
+
+/** What a real `wx.login()` / `getPhoneNumber` code looks like: WeChat's alphabet, 16–128 long. */
+export const DEVICE_CODE = /^[0-9A-Za-z_-]{16,128}$/;
+
+/** The identity device mode gives an unseeded code, or `null` when the code is not accepted. */
+export function deviceIdentity(
+  mode: FakeDeviceMode,
+  kind: 'login' | 'phone',
+  code: string,
+): string | null {
+  if (mode === false || !DEVICE_CODE.test(code)) return null;
+  const pinned = mode === true ? undefined : kind === 'login' ? mode.openid : mode.phone;
+  if (pinned) return pinned;
+  const digest = createHash('sha256').update(`${kind}:${code}`).digest();
+  if (kind === 'login') return `odev_${digest.toString('base64url').slice(0, 23)}`;
+  return `139${String(digest.readUInt32BE(0) % 100_000_000).padStart(8, '0')}`;
+}
+
 const APP_ID = 'wxfakeoa0000000001';
 const APP_SECRET = 'fake-oa-app-secret-0000000000001';
 const MINI_APP_ID = 'wxfakemini000000001';
@@ -221,7 +259,10 @@ const DEFAULT_REVIEW_WORDS = ['待定测试'] as const;
 /** WeChat's own cap on the `scene` string. */
 const SCENE_MAX_BYTES = 32;
 
-export async function startFakeOaServer(options: { port?: number } = {}): Promise<FakeOaServer> {
+export async function startFakeOaServer(
+  options: { port?: number; deviceMode?: FakeDeviceMode } = {},
+): Promise<FakeOaServer> {
+  const deviceMode: FakeDeviceMode = options.deviceMode ?? false;
   const calls: FakeOaCall[] = [];
   const material = new Map<string, FakeOaMaterial>();
   const scenes: string[] = [];
@@ -420,7 +461,11 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
         return;
       }
       const jsCode = query['js_code'] ?? '';
-      const session = miniSessions.get(jsCode);
+      let session = miniSessions.get(jsCode);
+      if (!session && !spentCodes.has(`login:${jsCode}`)) {
+        const openid = deviceIdentity(deviceMode, 'login', jsCode);
+        if (openid !== null) session = { openid };
+      }
       if (!session) {
         json(
           res,
@@ -467,7 +512,11 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
       switch (url.pathname) {
         case '/wxa/business/getuserphonenumber': {
           const phoneCode = String(body['code'] ?? '');
-          const found = phoneCodes.get(phoneCode);
+          let found = phoneCodes.get(phoneCode);
+          if (!found && !spentCodes.has(`phone:${phoneCode}`)) {
+            const phone = deviceIdentity(deviceMode, 'phone', phoneCode);
+            if (phone !== null) found = { phone };
+          }
           if (!found) {
             json(
               res,
@@ -498,6 +547,11 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
           const scene = String(body['scene'] ?? '');
           if (scene === '' || Buffer.byteLength(scene, 'utf8') > SCENE_MAX_BYTES) {
             json(res, { errcode: 40097, errmsg: 'invalid args' });
+            return;
+          }
+          const envVersion = body['env_version'] ?? 'release';
+          if (envVersion !== 'release' && envVersion !== 'trial' && envVersion !== 'develop') {
+            json(res, { errcode: 40097, errmsg: 'invalid args: env_version' });
             return;
           }
           miniCodes.push({ page: String(body['page'] ?? ''), scene });
@@ -706,6 +760,7 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
     appSecret: APP_SECRET,
     miniAppId: MINI_APP_ID,
     miniAppSecret: MINI_APP_SECRET,
+    deviceMode,
     calls,
     material,
     scenes,

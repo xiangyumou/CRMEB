@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { subscribeScene } from '../wechat-oa/schemas';
-import { appAppearanceDefaults, appPublicConfig, appTabKey, hexColor } from './app.schemas';
+import {
+  appAppearanceDefaults,
+  appPublicConfig,
+  appSubscribeScene,
+  appTabKey,
+  hexColor,
+  webviewDomain,
+} from './app.schemas';
 
 /**
  * The shapes behind `GET /api/v1/app/config` (SYS-015). The config group
@@ -50,6 +57,47 @@ describe('subscribeTemplates', () => {
     const camel = (scene: string) => scene.replace(/-(\w)/g, (_m, c: string) => c.toUpperCase());
     expect(Object.keys(appPublicConfig.shape.subscribeTemplates.shape).sort()).toEqual(
       subscribeScene.options.map(camel).sort(),
+    );
+  });
+});
+
+describe('SYS-018 — subscribe scenes', () => {
+  it('has one key per scene the mini-program asks from, and caps each at three ids', () => {
+    const shape = appPublicConfig.shape.subscribeScenes;
+    expect(Object.keys(shape.shape).sort()).toEqual([...appSubscribeScene.options].sort());
+    const four = ['a', 'b', 'c', 'd'];
+    expect(shape.shape.checkout.safeParse(four).success).toBe(false);
+    expect(shape.shape.checkout.safeParse(four.slice(0, 3)).success).toBe(true);
+    expect(shape.shape.checkout.safeParse(['']).success).toBe(false);
+  });
+});
+
+describe('SYS-019 — webview domains', () => {
+  it.each(['shop.example.com', 'a.b.cn', 'xn--fiqs8s.com'])('accepts %s', (value) => {
+    expect(webviewDomain.safeParse(value).success).toBe(true);
+  });
+
+  it.each([
+    ['a scheme', 'https://shop.example.com'],
+    ['a path', 'shop.example.com/x'],
+    ['a port', 'shop.example.com:8443'],
+    ['upper case', 'Shop.Example.com'],
+    ['a bare label', 'localhost'],
+    ['an IP address', '192.168.1.20'],
+    ['empty', ''],
+  ])('refuses %s', (_label, value) => {
+    expect(webviewDomain.safeParse(value).success).toBe(false);
+  });
+});
+
+describe('splash ad', () => {
+  it('takes a LinkTarget, not a path', () => {
+    const splash = appPublicConfig.shape.splashAd;
+    const base = { enabled: true, imageUrl: null, seconds: 3 };
+    expect(splash.safeParse({ ...base, link: { kind: 'product', id: '12' } }).success).toBe(true);
+    expect(splash.safeParse({ ...base, link: null }).success).toBe(true);
+    expect(splash.safeParse({ ...base, link: '/pages/goods_details/index?id=12' }).success).toBe(
+      false,
     );
   });
 });

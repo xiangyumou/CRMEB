@@ -159,6 +159,10 @@ async function main(): Promise<void> {
         VALIDATE_RESPONSES: '1',
         LOG_LEVEL: process.env.SHOP_E2E_LOG_LEVEL ?? 'warn',
         APP_VERSION: 'e2e',
+        // The decor editor's preview frames this URL. There is no H5 build of
+        // the storefront in this stack, so it frames the storefront's own read
+        // of the draft — what the H5 page would receive (decor.spec.ts).
+        DECOR_PREVIEW_URL: '/api/v1/pages/{id}?previewToken={previewToken}',
       },
     },
   );

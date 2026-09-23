@@ -46,10 +46,10 @@ WeUI 是微信官方的基础样式库：https://github.com/Tencent/weui 。我�
 
 token 分两类：
 
-| 类别     | 包含                         | 实现                                                                                | 运营能否修改          |
-| -------- | ---------------------------- | ----------------------------------------------------------------------------------- | --------------------- |
-| **颜色** | 第 2.1 节全部                | CSS 变量。`app.scss` 的 `page { … }` 写默认值，运行时由 `ThemeRoot` 覆盖（第 3 节） | 仅第 3.2 节列出的几个 |
-| **尺寸** | 字号、间距、圆角、阴影、层级 | Sass 变量（`apps/mini/src/ui/tokens/_size.scss`），编译时确定                       | 否                    |
+| 类别     | 包含                         | 实现                                                                                     | 运营能否修改          |
+| -------- | ---------------------------- | ---------------------------------------------------------------------------------------- | --------------------- |
+| **颜色** | 第 2.1 节全部                | CSS 变量。`app.scss` 的 `page { … }` 写默认值，运行时由 `theme/store.ts` 覆盖（第 3 节） | 仅第 3.2 节列出的几个 |
+| **尺寸** | 字号、间距、圆角、阴影、层级 | Sass 变量（`apps/mini/src/ui/tokens/_size.scss`），编译时确定                            | 否                    |
 
 尺寸不使用 CSS 变量，有两个原因：
 
@@ -201,11 +201,11 @@ DIY 块的圆角由装修属性控制（例如商品块的「圆角 / 直角」�
 ### 3.1 注入方式
 
 - **默认值：** `apps/mini/src/app.scss` 在 `page { … }` 中写第 2.1 节的全部颜色变量。在小程序里，`page` 选择器就是根节点。
-- **运行时覆盖：** 每个页面最外层是 `ui/PageShell`，第一个节点是 `<PageMeta pageStyle={themeStyle} pageFontSize="system" rootFontSize="system" />`。`themeStyle` 是 `ThemeRoot` 从 `app/config.theme` 算出的一串 `--color-*: …;`。
+- **运行时覆盖：** 每个页面最外层是 `ui/PageShell`，第一个节点是 `<PageMeta pageStyle={themeStyle} pageFontSize="system" rootFontSize="system" />`。`themeStyle` 是 `theme/store.ts`（`useThemeStore`）从 `app/config.appearance.theme` 算出的一串 `--color-*: …;`。
 - 用 `page-meta` 而不是在某个 `View` 上写 style，是因为 `page-style` 作用于页面根节点，**底部弹层、Toast 等挂在根下的节点也能继承**，不会出现「弹层还是默认红色」的问题。
 - `app/config` 带 ETag，本地缓存。冷启动先用缓存的主题渲染，再在后台刷新，避免主色从默认值闪变为店铺的颜色。
-- **NutUI：** `ThemeRoot` 同时输出 NutUI 的 CSS 变量，指向我们的 token，例如 `--nutui-color-primary: var(--color-primary)`，`--nutui-color-primary-stop-1` 和 `-stop-2` 都指向主色，不使用它的渐变。完整的对应表放在 `ui/tokens/nutui-bridge.scss`。页面代码**不直接使用** `--nutui-*` 变量。NutUI 变量的具体名称以 S1 锁定的 NutUI-React-Taro 版本为准。
-- **原生区域**不受 CSS 影响，由 `platform/theme.ts` 在启动时和主题变化后调用 API：
+- **NutUI：** `ui/tokens/nutui-bridge.scss` 输出 NutUI 的 CSS 变量，指向我们的 token，例如 `--nutui-color-primary: var(--color-primary)`，`--nutui-color-primary-stop-1` 和 `-stop-2` 都指向主色，不使用它的渐变。完整的对应表放在 `ui/tokens/nutui-bridge.scss`。页面代码**不直接使用** `--nutui-*` 变量。NutUI 变量的具体名称以 S1 锁定的 NutUI-React-Taro 版本为准。
+- **原生区域**不受 CSS 影响，由 `platform/tab-bar.ts` 在启动时和主题变化后调用 API：
   - `setTabBarStyle({ color, selectedColor, backgroundColor, borderStyle })`：选中色等于 `--color-primary-text`，未选中色 `#666666`，背景 `#FFFFFF`，`borderStyle: 'white'`；
   - `setTabBarItem`：只改文字；图标用打包在主包里的 4 组 PNG（81 × 81，每个 ≤ 40 KB），不从网络加载；
   - `setNavigationBarColor`：原生导航栏统一为白底黑字，不跟随主题（微信限制 `frontColor` 只能是 `#000000` 或 `#ffffff`，白底黑字最稳妥）；
@@ -213,14 +213,21 @@ DIY 块的圆角由装修属性控制（例如商品块的「圆角 / 直角」�
 
 ### 3.2 运营可以修改的 token
 
-对应后台「装修 → 主题」和 `app/config.theme`。`diyThemeTokens` 目前是 `Record<string, unknown>`，F1 流要把它改为有类型的 schema：
+对应后台「系统设置 → 小程序外观」（配置分组 `storefront-appearance`）和 `app/config.appearance`。这组字段本身就有类型（契约 `appAppearance`，颜色一律 `#RRGGBB`，保存时校验），就是这里说的「v2 token」：
 
-| 字段（`diyThemeTokens` v2） | 对应 token                                 | 说明                                                         |
-| --------------------------- | ------------------------------------------ | ------------------------------------------------------------ |
-| `primary`                   | `--color-primary`（再派生 on、soft、text） | 品牌主色；旧数据的 `theme` 键在迁移时改名                    |
-| `accent`                    | `--color-accent`（再派生 on）              | 辅助色；为空时等于主色（单色方案）                           |
-| `price`                     | `--color-price`                            | 价格色；为空时等于 `primary` 派生出的 `--color-primary-text` |
-| `tabBar.selectedColor`      | tabBar 选中色                              | 为空时等于 `--color-primary-text`                            |
+| 字段（`app/config.appearance`） | 配置字段                 | 对应 token                                 | 说明                                          |
+| ------------------------------- | ------------------------ | ------------------------------------------ | --------------------------------------------- |
+| `theme.primaryColor`            | `primaryColor`           | `--color-primary`（再派生 on、soft、text） | 品牌主色                                      |
+| `theme.accentColor`             | `accentColor`            | `--color-accent`（再派生 on）              | 辅助色；为空时是 `null`，等于主色（单色方案） |
+| `theme.priceColor`              | `priceColor`             | `--color-price`                            | 价格色；不过线时按第 3.3 节加深               |
+| `theme.radius`                  | `radius`                 | `--radius-factor`                          | 圆角档位                                      |
+| `tabBar.selectedColor` 等       | `tabBarSelectedColor` 等 | tabBar 颜色                                | 另有 4 个 tab 的文字和图标                    |
+
+**旧的 `diyThemeTokens` 不改类型**（原计划由 F1 改成有类型的 schema，H3 评估后决定不做）：
+
+1. 它是旧 `diy` 域「一键换色」的数据，线上的 uni-app 读 `tokens.theme`（`apps/uni-app/api/mappers/diy.js` 的 `pageColorStatus`），后台 DIY 编辑器读 `theme` 和 `accent`。原计划把 `theme` 改名为 `primary`，会让线上 uni-app 的换色失效，违反「旧前端照常工作」。
+2. 只改 TypeScript 类型、不改运行时校验做不到诚实：线上库里的 token 包是运营随意保存过的，把 `Record<string, unknown>` 声明成 `{ theme?: string; … }` 等于对类型撒谎；而加上 zod 校验，又会改变旧接口 `PATCH /admin-api/diy/themes/:id` 接受什么，这是旧行为的改变。
+3. 小程序根本不读它：小程序的主题来自上表，已经有类型。切换完成、旧 uni-app 下线后，`diy` 主题整个退役，不需要再迁移。
 
 其余 token（文字灰阶、背景、边框、语义色、全部尺寸）**不开放**。理由：
 
@@ -230,7 +237,7 @@ DIY 块的圆角由装修属性控制（例如商品块的「圆角 / 直角」�
 
 ### 3.3 可读性的自动派生（写入 `packages/contracts`，前后端共用）
 
-`deriveTheme(tokens)` 是一个纯函数，放在 `packages/contracts/src/diy/theme.ts`。后台预览和小程序调用同一份实现，由 `pnpm gen` 生成无 zod 的版本给小程序：
+`deriveTheme(tokens)` 是一个纯函数，放在 `packages/contracts/src/system/theme.ts`（本身不依赖 zod，小程序可以直接在运行时 import；输入用 `themeInputOf(app/config.appearance.theme)` 得到）。后台预览和小程序调用同一份实现（不变量 SYS-021）：
 
 1. `on-primary`：白色和 `#1A1A1A` 中与主色对比度较高的那个。
 2. `primary-text`：如果主色在白底上 ≥ 4.5，就等于主色；否则在 HSL 中逐步降低亮度，直到 ≥ 4.5。例如蓝 `#1DB0FC` 会被加深为约 `#0077B3`。
@@ -308,23 +315,23 @@ DIY 块的圆角由装修属性控制（例如商品块的「圆角 / 直角」�
 
 ### 4.4 商品与交易
 
-| 组件                | 用途与要点                                                                                                                                                         | 状态                                                                                                            |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `ProductCard`       | `layout: grid \| list \| mini`（横滑）；图片、标题（2 行）、价格、划线价、标签、销量；可选加购按钮                                                                 | default、售罄（图片蒙层「已售罄」，加购按钮隐藏）、下架（整卡置灰，不可点）、活动（左上角「拼团」「预售」标签） |
-| `ProductGrid`       | 双列网格 + 分页加载（TanStack Query `useInfiniteQuery`）+ 骨架 + 空状态                                                                                            | loading、loaded、loadingMore、end（「没有更多了」）、empty、error                                               |
-| `SkuSheet`          | 规格选择：规格图、价格、库存、规格值（不可选的置灰）、数量、确认按钮（「加入购物车」「立即购买」「确定」由调用方决定）                                             | 未选全（按钮禁用并提示「请选择 颜色」）、已选、库存不足、限购                                                   |
-| `CouponCard`        | 金额或折扣、门槛、适用范围、有效期、操作                                                                                                                           | 可领、已领（「去使用」）、已抢光、可用（结算页的选择模式）、不可用（附原因）、已使用、已过期                    |
-| `CouponSheet`       | 结算页和商品详情的领券 / 选券弹层                                                                                                                                  | loading、列表、empty                                                                                            |
-| `AddressCard`       | 结算页顶部：姓名、电话（中间 4 位打码）、地址；无地址时显示「添加收货地址」和「导入微信地址」                                                                      | 有地址、无地址、地址不可配送（红字）                                                                            |
-| `OrderCard`         | 订单列表项：状态、商品行（最多 3 行，超出显示「共 N 件」）、实付、操作按钮组（按状态由 `orderActions(order)` 纯函数决定，页面不自己写判断）                        | 按 `orderListTab` 的每个状态各一种                                                                              |
-| `OrderItemRow`      | 商品图、名称、规格、单价、数量；可附带售后状态标签                                                                                                                 | —                                                                                                               |
-| `PriceSummary`      | 结算页和订单详情的金额明细：商品金额、运费、优惠、实付                                                                                                             | —                                                                                                               |
-| `ActionBar`         | 固定底栏：左侧图标入口（带角标）+ 右侧按钮；安全区                                                                                                                 | default、disabled（例如「已售罄」「活动未开始」替换主按钮）                                                     |
-| `Countdown`         | 基于服务端时间：`app/config` 响应带 `serverTime`，客户端算出与本机时钟的偏移后再倒计时，不信任本机时间；`format: 'hms' \| 'dhms'`；到点回调                        | running、ended                                                                                                  |
-| `Steps`、`Timeline` | 物流轨迹、售后进度                                                                                                                                                 | 当前节点高亮                                                                                                    |
-| `ContactButton`     | 客服（C15）：`support.kind` 决定渲染 `open-type="contact"`，或跳转客服小程序，或不渲染                                                                             | contact、mini-program、hidden                                                                                   |
-| `ShareSheet`        | 「分享给好友」（`open-type="share"`）+「生成海报」（打开 `PosterSheet`）；位于 `promo` 分包和主包各自的 `components/` 中                                           | —                                                                                                               |
-| `PosterSheet`       | canvas 2D 海报：绘制 → 预览 → 保存到相册（需要隐私授权，失败时引导用户去设置页）；只在 `promo` 分包，商品详情通过分包异步化加载（`componentPlaceholder`，S1 验证） | drawing、ready、saving、saved、authDenied                                                                       |
+| 组件                | 用途与要点                                                                                                                                                                     | 状态                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `ProductCard`       | `layout: grid \| list \| mini`（横滑）；图片、标题（2 行）、价格、划线价、标签、销量；可选加购按钮                                                                             | default、售罄（图片蒙层「已售罄」，加购按钮隐藏）、下架（整卡置灰，不可点）、活动（左上角「拼团」「预售」标签） |
+| `ProductGrid`       | 双列网格 + 分页加载（TanStack Query `useInfiniteQuery`）+ 骨架 + 空状态                                                                                                        | loading、loaded、loadingMore、end（「没有更多了」）、empty、error                                               |
+| `SkuSheet`          | 规格选择：规格图、价格、库存、规格值（不可选的置灰）、数量、确认按钮（「加入购物车」「立即购买」「确定」由调用方决定）                                                         | 未选全（按钮禁用并提示「请选择 颜色」）、已选、库存不足、限购                                                   |
+| `CouponCard`        | 金额或折扣、门槛、适用范围、有效期、操作                                                                                                                                       | 可领、已领（「去使用」）、已抢光、可用（结算页的选择模式）、不可用（附原因）、已使用、已过期                    |
+| `CouponSheet`       | 结算页和商品详情的领券 / 选券弹层                                                                                                                                              | loading、列表、empty                                                                                            |
+| `AddressCard`       | 结算页顶部：姓名、电话（中间 4 位打码）、地址；无地址时显示「添加收货地址」和「导入微信地址」                                                                                  | 有地址、无地址、地址不可配送（红字）                                                                            |
+| `OrderCard`         | 订单列表项：状态、商品行（最多 3 行，超出显示「共 N 件」）、实付、操作按钮组（按状态由 `orderActions(order)` 纯函数决定，页面不自己写判断）                                    | 按 `orderListTab` 的每个状态各一种                                                                              |
+| `OrderItemRow`      | 商品图、名称、规格、单价、数量；可附带售后状态标签                                                                                                                             | —                                                                                                               |
+| `PriceSummary`      | 结算页和订单详情的金额明细：商品金额、运费、优惠、实付                                                                                                                         | —                                                                                                               |
+| `ActionBar`         | 固定底栏：左侧图标入口（带角标）+ 右侧按钮；安全区                                                                                                                             | default、disabled（例如「已售罄」「活动未开始」替换主按钮）                                                     |
+| `Countdown`         | 基于服务端时间：`app/config` 响应带 `serverTime`（304 时读 `X-Server-Time` 响应头），客户端算出与本机时钟的偏移后再倒计时，不信任本机时间；`format: 'hms' \| 'dhms'`；到点回调 | running、ended                                                                                                  |
+| `Steps`、`Timeline` | 物流轨迹、售后进度                                                                                                                                                             | 当前节点高亮                                                                                                    |
+| `ContactButton`     | 客服（C15）：`support.kind` 决定渲染 `open-type="contact"`，或跳转客服小程序，或不渲染                                                                                         | contact、mini-program、hidden                                                                                   |
+| `ShareSheet`        | 「分享给好友」（`open-type="share"`）+「生成海报」（打开 `PosterSheet`）；位于 `promo` 分包和主包各自的 `components/` 中                                                       | —                                                                                                               |
+| `PosterSheet`       | canvas 2D 海报：绘制 → 预览 → 保存到相册（需要隐私授权，失败时引导用户去设置页）；只在 `promo` 分包，商品详情通过分包异步化加载（`componentPlaceholder`，S1 验证）             | drawing、ready、saving、saved、authDenied                                                                       |
 
 ### 4.5 导航与布局
 
@@ -414,7 +421,7 @@ DIY 块（`apps/mini/src/blocks/`）不在 `ui/` 里。块由 S3 共享的 `pack
 **为以后开启保留的条件：**
 
 - 所有颜色都经过语义 token（第 2.1 节），页面中不出现十六进制颜色（stylelint 的 `color-no-hex` 只在 `ui/tokens/` 中允许），所以以后只需在 `@media (prefers-color-scheme: dark)` 下再定义一份 `page { … }` 变量；
-- 原生区域（导航栏、tabBar、背景）的颜色都已集中在 `platform/theme.ts`，以后可以改为 `theme.json` 的 `@变量`；
+- 原生区域（导航栏、tabBar、背景）的颜色都已集中在 `platform/tab-bar.ts`，以后可以改为 `theme.json` 的 `@变量`；
 - 真正的前置工作是 DIY 块的深色属性。这是产品决定，列入待确认事项。
 
 ---
