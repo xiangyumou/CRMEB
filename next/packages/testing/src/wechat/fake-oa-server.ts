@@ -8,6 +8,7 @@ import type { AddressInfo } from 'node:net';
  * `fake-gateway.ts` next door speaks WeChat **Pay** v3: a different host, a
  * different auth scheme and a different body format. This one speaks the
  * `cgi-bin` / `sns` / `wxa` endpoints the shop calls — the access token,
+ * `message/template/send`, `message/subscribe/send`,
  * `menu/create`, `menu/delete`, `qrcode/create`, `ticket/getticket`,
  * `media/upload`, the material store, `sns/jscode2session`,
  * `wxa/business/getuserphonenumber` and `wxa/getwxacodeunlimit`. Nothing in the
@@ -15,10 +16,10 @@ import type { AddressInfo } from 'node:net';
  * (`40001 → drop the token and try once more`) only mean anything against a
  * server that can actually refuse.
  *
- * It lives in `@shop/testing` rather than in a domain because three surfaces
- * need it (OA management, storefront sign-in, mini-program codes), and a test
- * helper imported across a domain boundary is exactly what the conventions
- * forbid.
+ * It lives in `@shop/testing` rather than in a domain because several surfaces
+ * need it (OA management, storefront sign-in, mini-program codes, the
+ * notification channels), and a test helper imported across a domain boundary
+ * is exactly what the conventions forbid.
  *
  * ## Two credential pairs, one process
  *
@@ -149,6 +150,7 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
   };
   let publishedMenu: unknown = null;
   let issued = 0;
+  let messageSeq = 0;
   let mediaSequence = 0;
 
   const server = createServer((req, res) => {
@@ -308,6 +310,26 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
     }
 
     switch (url.pathname) {
+      // The two message endpoints the notification channels call. Each app may
+      // only send its own kind: a template message goes out under the OA's
+      // token, a subscribe message under the mini-program's.
+      case '/cgi-bin/message/template/send': {
+        if (app !== 'oa') {
+          json(res, { errcode: 40013, errmsg: 'invalid appid' });
+          return;
+        }
+        messageSeq += 1;
+        json(res, { errcode: 0, errmsg: 'ok', msgid: messageSeq });
+        return;
+      }
+      case '/cgi-bin/message/subscribe/send': {
+        if (app !== 'mini') {
+          json(res, { errcode: 40013, errmsg: 'invalid appid' });
+          return;
+        }
+        json(res, { errcode: 0, errmsg: 'ok' });
+        return;
+      }
       case '/cgi-bin/menu/create': {
         if (behaviour.failMenu) {
           json(res, behaviour.failMenu);
