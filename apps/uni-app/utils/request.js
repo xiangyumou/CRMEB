@@ -117,6 +117,9 @@ const BODYLESS = { GET: true, DELETE: true };
  * @param {object} data    query params for GET/DELETE, JSON body otherwise
  * @param {object} [opt]
  * @param {boolean} [opt.noAuth]  send without a session, and do not redirect to login
+ * @param {boolean} [opt.optionalAuth]  send the session if there is one, never ask for one:
+ *   for a `user-optional` route that counts a signed-in shopper as themselves and
+ *   everybody else anonymously, and must never send a visitor to the login page
  * @param {function} [opt.map]    payload → the page's view model; applied before resolving
  * @param {string|function} [opt.msg]  envelope `msg` for a page that toasts `res.msg`
  * @param {object} [opt.query]    extra query params for a request that also has a body
@@ -128,7 +131,7 @@ function baseRequest(path, method, data, opt) {
   const verb = String(method || 'GET').toUpperCase();
   const token = store.state.app.token;
 
-  if (!options.noAuth && !token && !checkLogin()) {
+  if (!options.noAuth && !options.optionalAuth && !token && !checkLogin()) {
     promptLogin();
     return Promise.reject(failure(401, UNAUTHENTICATED, t('未登录')));
   }
@@ -168,7 +171,7 @@ function baseRequest(path, method, data, opt) {
 
         if (status === 401) {
           store.commit('LOGOUT');
-          if (!options.noAuth) promptLogin();
+          if (!options.noAuth && !options.optionalAuth) promptLogin();
           reject(failure(401, body.code || 'UNAUTHORIZED', message, body.details));
           return;
         }

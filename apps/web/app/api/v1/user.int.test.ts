@@ -517,4 +517,27 @@ describe('POST /api/v1/visits', () => {
     expect(response.status).toBe(422);
     expect(await harness.ctx.db.select().from(userVisits)).toHaveLength(0);
   });
+  it('takes the hide report on the same route and credits the view, not a new one', async () => {
+    const { POST } = await import('./visits/route');
+    const beacon = (body: Record<string, unknown>) =>
+      POST(json('POST', '/api/v1/visits', body, { 'x-real-ip': '198.51.100.4' }));
+
+    expect((await beacon({ path: '/pages/index/index' })).status).toBe(204);
+    harness.clock.advance(12_000);
+    expect((await beacon({ path: '/pages/index/index', stayMs: 12_000 })).status).toBe(204);
+
+    const rows = await harness.ctx.db.select().from(userVisits);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.stayMs).toBe(12_000);
+  });
+
+  it('422s a stay that is negative, fractional or longer than a day', async () => {
+    const { POST } = await import('./visits/route');
+    for (const stayMs of [-1, 1.5, 86_400_001]) {
+      const response = await POST(
+        json('POST', '/api/v1/visits', { path: '/pages/index/index', stayMs }),
+      );
+      expect(response.status, String(stayMs)).toBe(422);
+    }
+  });
 });

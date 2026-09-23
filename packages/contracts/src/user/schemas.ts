@@ -698,7 +698,14 @@ export const staffUserLabelsExample: StaffUserLabels = {
  * The visitor is never named in the body. Who they are is the bearer token, or
  * — for somebody who has not signed in — the address the request came from,
  * both read off the request by the server. A `userId` a client could put in a
- * beacon body would let anybody write page views onto anybody's account.
+ * beacon body would let anybody write page views onto anybody's account. The
+ * province a visit is counted under is likewise the server's to decide (the
+ * signed-in visitor's default address), never the body's.
+ *
+ * A page view is reported twice: once when the page is shown (no `stayMs`) —
+ * that is the view — and once when it is hidden or closed, with `stayMs`, the
+ * time it was on screen. The second report never adds a view; it attaches the
+ * time to the view the first one recorded.
  */
 export const visitBody = z.object({
   path: z
@@ -708,5 +715,11 @@ export const visitBody = z.object({
     .regex(/^\/[^?#\s]*$/, '页面路径格式不正确'),
   /** Omitted means "whatever `X-Client-Platform` said", which is the usual case. */
   platform: clientPlatform.optional(),
+  /**
+   * Milliseconds the page was on screen, sent when it is hidden. At most a day
+   * on the wire; the server caps what one view can be credited with far lower,
+   * and never beyond the time since the view was recorded.
+   */
+  stayMs: z.number().int().min(0).max(86_400_000).optional(),
 });
 export type VisitBody = z.infer<typeof visitBody>;

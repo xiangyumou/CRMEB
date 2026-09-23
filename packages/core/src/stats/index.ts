@@ -16,10 +16,10 @@
  *
  * **No job.** This domain writes no row, so it has no row to sweep: the
  * retention of `product_events` is the catalog domain's `catalog.pruneHistory`,
- * and `user_visits` is written by the user domain's page-view beacon. A
- * retention sweep for visits belongs with its writer, or in a separate
- * `stats.retention.repo.ts` — never in `stats.repo.ts`, which stays
- * `select`-only so that claim stays checkable by reading one file.
+ * and `user_visits` is swept by its writer, the user domain's
+ * `user.pruneVisits`, over the window this domain's `visitRetentionDays`
+ * config sets. `stats.repo.ts` stays `select`-only, so that claim stays
+ * checkable by reading one file.
  *
  * **Other domains do not call this one.** Nothing here is a dependency of any
  * business flow: a statistics page is downstream of everything and upstream of

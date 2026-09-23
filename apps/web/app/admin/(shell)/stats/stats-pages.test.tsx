@@ -139,6 +139,13 @@ describe('用户统计', () => {
     });
     expect(await screen.findByText('广东')).toBeInTheDocument();
   });
+  it('writes 平均停留时长 as a duration, not a count of milliseconds', async () => {
+    stubApi();
+    renderAdmin(<UserStatsPage />, { identity: identityWith(['stats:user:read']) });
+
+    expect(await screen.findByText('平均停留时长')).toBeInTheDocument();
+    expect(screen.getByText('1分05秒')).toBeInTheDocument();
+  });
 });
 
 describe('商品统计', () => {

@@ -42,6 +42,7 @@ import * as stats from './stats.service';
  * | 累计用户 (U1..U4; U5 is cancelled)                                 | 4       |
  * | 成交用户数 (U1 twice, U2, U3)                                      | 3       |
  * | 浏览量 / 访客数 (4 page views, 2 identities)                       | 4 / 2   |
+ * | 平均停留时长 (30 s and 90 s reported, two views without a report)  | 60 s    |
  * | 商品浏览量 / 商品访客数                                             | 6 / 4   |
  *
  * O6 is paid on 2026-01-31 and O5 is never paid: both exist so that "inside
@@ -264,11 +265,11 @@ async function seed(): Promise<void> {
   await db
     .insert(userVisits)
     .values([
-      visit('u1', '1.1.1.1', '浙江', '2026-02-01T10:00:00+08:00'),
-      visit(null, '2.2.2.2', '广东', '2026-02-01T11:00:00+08:00'),
+      visit('u1', '1.1.1.1', '浙江', '2026-02-01T10:00:00+08:00', 30_000),
+      visit(null, '2.2.2.2', '广东', '2026-02-01T11:00:00+08:00', 90_000),
       visit('u1', '1.1.1.1', '浙江', '2026-02-02T10:00:00+08:00'),
       visit(null, '2.2.2.2', '广东', '2026-02-02T11:00:00+08:00'),
-      visit('u1', '1.1.1.1', '浙江', '2026-01-20T11:00:00+08:00'),
+      visit('u1', '1.1.1.1', '浙江', '2026-01-20T11:00:00+08:00', 600_000),
     ]);
 }
 
@@ -294,13 +295,20 @@ function event(product: string, user: string | null, kind: 'view' | 'cart', when
   };
 }
 
-function visit(user: string | null, ip: string, province: string, when: string) {
+function visit(
+  user: string | null,
+  ip: string,
+  province: string,
+  when: string,
+  stayMs: number | null = null,
+) {
   return {
     userId: user === null ? null : userIds[user]!,
     path: '/pages/index',
     platform: 'h5' as const,
     ip,
     province,
+    stayMs,
     createdAt: at(when),
   };
 }
@@ -525,6 +533,16 @@ describe('users', () => {
     // the daily buckets say 2 and 2. Summing them would say four visitors.
     expect(tile(page, 'visitors').value).toBe(2);
     expect(line(page, '访客数')).toEqual([2, 2, 0]);
+  });
+
+  it('averages 停留时长 over the views that reported one, in seconds', async () => {
+    const page = await stats.userStats(harness.ctx, WINDOW);
+
+    // 30 s and 90 s; the two views with no report are absent from the
+    // average, not zeros in it — otherwise it would read 30 s.
+    expect(tile(page, 'avgStay')).toMatchObject({ value: 60, format: 'duration' });
+    // Nothing was reported in the window before, which is a 0 and not a gap.
+    expect(tile(page, 'avgStay').previous).toBe(0);
   });
 
   it('breaks the provinces out per column, and sorts 未知 last', async () => {

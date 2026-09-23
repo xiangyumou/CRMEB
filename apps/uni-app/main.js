@@ -38,6 +38,9 @@ import {
 	Debounce
 } from '@/utils/validate.js'
 Vue.prototype.$Debounce = Debounce
+import visitBeacon from './utils/visitBeacon.js'
+// Every page reports its view and its time on screen (访客数 / 浏览量 / 平均停留时长).
+Vue.mixin(visitBeacon)
 // #ifdef H5
 import {
 	parseQuery

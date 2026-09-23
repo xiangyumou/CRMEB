@@ -20,6 +20,7 @@ import './storefront-auth.config';
  * | `POST/PUT /api/v1/auth/phone` | `bindPhone` / `changePhone` |
  * | `GET /api/v1/auth/wechat-oa/authorize-url` | `oaAuthorizeUrl` |
  * | `POST /api/v1/visits` | `recordVisit` |
+ * | worker `user.pruneVisits` | `pruneVisits` — the page-view retention sweep |
  * | `/admin-api/users…` | `adminList` / `adminDetail` / `adminUpdate` / `adminSetStatus` / `adminResetPassword` / `adminAddressList` / `adminBatchSetGroups` / `adminBatchSetLabels` |
  * | `/admin-api/user-groups…`, `/admin-api/user-labels…`, `/admin-api/user-label-categories…` | the taxonomy CRUD below |
  * | `/api/v1/staff/users…`, `/api/v1/staff/user-groups` | `staffList` / `staffDetail` / `staffGroupList` / `staffSetGroup` / `staffLabelList` / `staffSetLabels` |
@@ -101,7 +102,7 @@ export {
   type RequestMeta,
 } from './storefront-auth.service';
 
-export { recordVisit } from './user.visit.service';
+export { pruneVisits, recordVisit } from './user.visit.service';
 
 // ---------------------------------------------------------------------------
 // admin

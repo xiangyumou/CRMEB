@@ -16,6 +16,13 @@ describe('formatFigure', () => {
   it('writes a percent with two decimals', () => {
     expect(formatFigure(17.5, 'percent')).toBe('17.50%');
   });
+
+  it('writes a duration in seconds as 秒, 分 and 小时', () => {
+    expect(formatFigure(0, 'duration')).toBe('0秒');
+    expect(formatFigure(45.4, 'duration')).toBe('45秒');
+    expect(formatFigure(65, 'duration')).toBe('1分05秒');
+    expect(formatFigure(7380, 'duration')).toBe('2小时03分');
+  });
 });
 
 describe('formatAxis', () => {

@@ -270,8 +270,9 @@ export const userWithdrawCancellation = defineRoute({
 /**
  * The page-view beacon.
  *
- * 访客数 / 浏览量 and the 地域分布 column are computed from the rows this route
- * writes.
+ * 访客数 / 浏览量, 平均停留时长 and the 地域分布 column are computed from the
+ * rows this route writes. A body without `stayMs` records a view; one with it
+ * reports how long the visitor's latest view of that path stayed on screen.
  *
  * `user-optional` and **204**, because of what a beacon is. It is fired from
  * `navigator.sendBeacon` or an `onShow` hook while the page is busy doing the
@@ -301,6 +302,11 @@ export const userRecordVisit = defineRoute({
     {
       name: 'anonymous-mini',
       body: { path: '/pages/index/index', platform: 'wechat-mini' },
+      response: undefined,
+    },
+    {
+      name: 'page-hidden',
+      body: { path: '/pages/goods_details/index', stayMs: 42_000 },
       response: undefined,
     },
   ],

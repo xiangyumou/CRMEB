@@ -1,6 +1,6 @@
 import type { DbOrTx, Tx } from '@shop/db';
 import { effects, type EffectStatus } from '@shop/db/schema/system';
-import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, like, lte, sql } from 'drizzle-orm';
 import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
 
 /** The only file that touches the `effects` table. */
@@ -211,10 +211,24 @@ export interface EffectListFilter {
    */
   scopes?: readonly string[];
   eventType?: string;
+  /**
+   * Narrows to the rows whose `scope_id` starts with this text, matched
+   * literally (`%` and `_` in it are not wildcards). A domain that encodes a
+   * sub-kind in its scope ids — notifications use `<code>:<subject>` — filters
+   * on `<code>:` with it.
+   */
+  scopeIdPrefix?: string;
   /** 1-based. */
   page: number;
   pageSize: number;
 }
+
+/**
+ * A console row plus its payload. Only for a console whose own screen is built
+ * from the payload (the notification log reads the recipient out of it); the
+ * payload itself is never sent to the browser.
+ */
+export type EffectDetailRow = EffectConsoleRow & { payload: unknown };
 
 const consoleColumns = {
   id: effects.id,
@@ -238,24 +252,43 @@ function scopeFilter(filter: EffectListFilter) {
   return filter.scopes ? inArray(effects.scope, [...filter.scopes]) : undefined;
 }
 
+/** `LIKE` treats `%`, `_` and backslash specially; a prefix is matched as text. */
+function likePrefix(prefix: string): string {
+  return `${prefix.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
 /**
  * The filtered, paginated read the console needs.
  *
  * Ordered by `updated_at desc`, so whatever just failed is at the top, with the
  * id as a tiebreaker because a batch settles inside the same millisecond.
+ *
+ * Rows come without their payload unless the caller asks for it with
+ * `withPayload: true`.
  */
 export async function listEffects(
   db: DbOrTx,
-  filter: EffectListFilter,
-): Promise<{ rows: EffectConsoleRow[]; total: number }> {
+  filter: EffectListFilter & { withPayload: true },
+): Promise<{ rows: EffectDetailRow[]; total: number }>;
+export async function listEffects(
+  db: DbOrTx,
+  filter: EffectListFilter & { withPayload?: false },
+): Promise<{ rows: EffectConsoleRow[]; total: number }>;
+export async function listEffects(
+  db: DbOrTx,
+  filter: EffectListFilter & { withPayload?: boolean },
+): Promise<{ rows: EffectConsoleRow[] | EffectDetailRow[]; total: number }> {
   const where = allOf(
     scopeFilter(filter),
     eq(effects.status, filter.status),
     filter.eventType === undefined ? undefined : eq(effects.eventType, filter.eventType),
+    filter.scopeIdPrefix === undefined
+      ? undefined
+      : like(effects.scopeId, likePrefix(filter.scopeIdPrefix)),
   );
 
   const rows = await db
-    .select(consoleColumns)
+    .select(filter.withPayload ? { ...consoleColumns, payload: effects.payload } : consoleColumns)
     .from(effects)
     .where(where)
     .orderBy(desc(effects.updatedAt), asc(effects.id))
@@ -267,20 +300,20 @@ export async function listEffects(
     .from(effects)
     .where(where);
 
-  return { rows: rows as EffectConsoleRow[], total: count?.total ?? 0 };
+  return { rows: rows as EffectDetailRow[], total: count?.total ?? 0 };
 }
 
 export async function findById(
   db: DbOrTx,
   id: number,
   scopes?: readonly string[],
-): Promise<(EffectConsoleRow & { payload: unknown }) | null> {
+): Promise<EffectDetailRow | null> {
   const rows = await db
     .select({ ...consoleColumns, payload: effects.payload })
     .from(effects)
     .where(allOf(eq(effects.id, id), scopes ? inArray(effects.scope, [...scopes]) : undefined))
     .limit(1);
-  return (rows[0] as (EffectConsoleRow & { payload: unknown }) | undefined) ?? null;
+  return (rows[0] as EffectDetailRow | undefined) ?? null;
 }
 
 /**
@@ -308,14 +341,22 @@ export const RETRYABLE_EFFECT_STATUSES = ['unknown'] as const satisfies readonly
  * run this statement, PostgreSQL serialises them, and only one sees
  * `affected > 0` — so the effect runs once. Decide on `won`, never on a prior
  * read.
+ *
+ * `scopes`, when given, is part of the guard: a console that may only see its
+ * own scopes cannot re-queue anybody else's row, even with an id it guessed.
  */
 export async function retryEffect(
   db: DbOrTx,
   id: number,
   now: Date,
+  scopes?: readonly string[],
 ): Promise<ConditionalUpdateResult> {
   return conditionalUpdate(db, effects, {
-    where: and(eq(effects.id, id), inArray(effects.status, [...RETRYABLE_EFFECT_STATUSES])),
+    where: allOf(
+      eq(effects.id, id),
+      inArray(effects.status, [...RETRYABLE_EFFECT_STATUSES]),
+      scopes ? inArray(effects.scope, [...scopes]) : undefined,
+    ),
     set: { status: 'pending' satisfies EffectStatus, attempts: 0, nextRunAt: now, updatedAt: now },
   });
 }

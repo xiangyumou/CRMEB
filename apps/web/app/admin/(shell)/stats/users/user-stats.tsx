@@ -23,9 +23,10 @@ const SORTS: { value: RegionSort; label: string }[] = [
 /**
  * 用户统计 — registrations, buyers, traffic, and the province table.
  *
- * The three user columns of 地域分布 come from three different places:
- * 累计用户 / 新增用户 from the user's default address, 访客数 from the visit's
- * own geo, 支付金额 from the order's receiver province. Each column uses the
+ * The columns of 地域分布 come from three different places: 累计用户 /
+ * 新增用户 from the user's default address, 访客数 from the province recorded
+ * on the visit (the visitor's default address at the time; anonymous visits
+ * have none), 支付金额 from the order's receiver province. Each column uses the
  * province that column actually knows, because one join cannot serve all three
  * without silently dropping every buyer who never saved an address.
  */
@@ -41,11 +42,11 @@ export function UserStatsPage() {
 
   return (
     <StatsPageFrame
-      subTitle="新增用户按注册时间，成交用户按支付时间，累计用户是区间结束时的总数"
+      subTitle="新增用户按注册时间，成交用户按支付时间，累计用户是区间结束时的总数；停留时长只计已上报的访问"
       range={range}
       data={data}
       loading={isPending}
-      metricColumns={5}
+      metricColumns={6}
       chartTitle="用户趋势"
     >
       <Card
@@ -82,7 +83,7 @@ export function UserStatsPage() {
               key: 'province',
               render: (province: string) =>
                 province === '未知' ? (
-                  <Tooltip title="用户没有默认收货地址，或访问未记录省份">未知</Tooltip>
+                  <Tooltip title="用户没有默认收货地址；未登录的访问也计入这里">未知</Tooltip>
                 ) : (
                   province
                 ),

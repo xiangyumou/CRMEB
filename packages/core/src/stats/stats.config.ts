@@ -2,9 +2,9 @@ import { z } from 'zod';
 import { defineConfigGroup } from '../kernel/config-registry';
 
 /**
- * `stats` — the two knobs the statistics screens have.
+ * `stats` — the knobs the statistics screens have.
  *
- * Both exist because a statistics page is the easiest place in an admin to ask
+ * The first two exist because a statistics page is the easiest place in an admin to ask
  * the database for something enormous by accident:
  *
  * - `exportMaxRows` caps a CSV export. The route answers with the file inside a
@@ -17,6 +17,12 @@ import { defineConfigGroup } from '../kernel/config-registry';
  *   aggregate on every poll, short enough that an operator refreshing after a
  *   fix sees the new number within a minute. `0` turns caching off, which is
  *   what a shop debugging a figure wants.
+ *
+ * `visitRetentionDays` is how long page views (`user_visits`) are kept; the
+ * nightly `user.pruneVisits` job deletes what is older. 400 by default, so a
+ * month can still be compared with the same month a year earlier. Past the
+ * window 访客数 / 浏览量 read 0, which is why the floor is a quarter rather than
+ * a week.
  */
 export const statsConfig = defineConfigGroup({
   group: 'stats',
@@ -28,6 +34,7 @@ export const statsConfig = defineConfigGroup({
     // daily buckets would make the 交易统计 refusal unreachable.
     exportMaxRows: z.number().int().min(10).max(50_000).default(2000),
     cacheSeconds: z.number().int().min(0).max(3600).default(60),
+    visitRetentionDays: z.number().int().min(92).max(3660).default(400),
   }),
   ui: {
     exportMaxRows: {
@@ -41,6 +48,12 @@ export const statsConfig = defineConfigGroup({
       type: 'number',
       help: '0 表示不缓存；统计页面的每个区块按时间范围缓存这么久',
       order: 2,
+    },
+    visitRetentionDays: {
+      label: '访问记录保留天数',
+      type: 'number',
+      help: '每天凌晨删除更早的页面访问记录；超出范围的访客数、浏览量显示为 0。同比需要至少 366 天',
+      order: 3,
     },
   },
 });

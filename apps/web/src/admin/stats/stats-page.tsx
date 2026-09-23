@@ -50,7 +50,7 @@ export function StatsPageFrame({
   range: StatsRange;
   data: StatsPageData | undefined;
   loading: boolean;
-  metricColumns?: 3 | 4 | 5;
+  metricColumns?: 3 | 4 | 5 | 6;
   actions?: ReactNode;
   children?: ReactNode;
   chartTitle?: string;
