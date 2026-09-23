@@ -785,7 +785,7 @@ describe('every registered panel', () => {
 /**
  * Open every node of a real page, change nothing, and the page is the page.
  *
- * This is the guarantee the whole stream rests on: the saved JSON is a wire
+ * This is the guarantee the whole editor rests on: the saved JSON is a wire
  * contract with the uni-app renderer, so a panel that
  * normalises a value on the way in silently rewrites a customer's storefront.
  * The store is not involved — a panel only ever changes a page through
