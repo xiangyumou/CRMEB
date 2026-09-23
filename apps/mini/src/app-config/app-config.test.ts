@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { subscribe } from '@/platform';
+import { isWebviewAllowed, subscribe } from '@/platform';
 import { appConfigFixture } from '@/test/app-config-fixture';
 import { serveApi } from '@/test/fake-api';
 import { taroFake } from '@/test/taro-fake/taro';
@@ -67,5 +67,16 @@ describe('app config', () => {
     expect(taroFake.calls.find((call) => call.api === 'requestSubscribeMessage')).toMatchObject({
       args: { tmplIds: config.subscribeScenes.refundApply },
     });
+  });
+
+  it('opens only the configured web-view domains', async () => {
+    serveApi({
+      'GET /api/v1/app/config': () => ({
+        body: { ...config, webviewDomains: ['h5.example.com'] },
+      }),
+    });
+    await loadAppConfig();
+    expect(isWebviewAllowed('https://h5.example.com/a')).toBe(true);
+    expect(isWebviewAllowed('https://other.example.com/a')).toBe(false);
   });
 });

@@ -2,12 +2,12 @@ import { create } from 'zustand';
 import { isApiError, type ResponseOf } from '@shop/api-client';
 import { api } from '@/data/api';
 import { assetUrl } from '@/lib/asset-url';
-import { setShareDefaults, setSubscribeTemplates, storage } from '@/platform';
+import { setShareDefaults, setSubscribeTemplates, setWebviewDomains, storage } from '@/platform';
 import { useThemeStore } from '@/theme/store';
 
 /**
  * `GET /api/v1/app/config`: the launch payload (theme, tab bar, sign-in options, share card,
- * subscribe templates, 客服, splash).
+ * subscribe templates, web-view domains, 客服, splash).
  *
  * Cold start paints from the copy kept in storage, then asks the server with
  * `If-None-Match: W/"<version>"`: a 304 keeps the copy, a 200 replaces it. Offline, the copy
@@ -35,6 +35,7 @@ export function applyAppConfig(config: AppConfig, source: 'cache' | 'network'): 
   useAppConfigStore.setState({ config, source });
   useThemeStore.getState().applyAppearance(config.appearance);
   setSubscribeTemplates(config.subscribeScenes);
+  setWebviewDomains(config.webviewDomains);
   const title = config.share.title || config.name;
   const imageUrl = assetUrl(config.share.image);
   setShareDefaults({ ...(title ? { title } : {}), ...(imageUrl ? { imageUrl } : {}) });

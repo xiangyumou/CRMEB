@@ -11,7 +11,10 @@ link, and `apps/web` unit-test timeouts under load.
    `config.subscribeScenes` to `setSubscribeTemplates`. `SubscribeScene` is the contract's
    `AppSubscribeScene` (type import). A stored copy without `subscribeScenes` (older build) is
    ignored, as before for missing fields.
+2. Web-view domains: `applyAppConfig` calls `setWebviewDomains(config.webviewDomains)`, so
+   `openExternalLink` opens the shop's 业务域名 in the web-view (it only allowed
+   `mp.weixin.qq.com` before).
 
 ## In progress
 
-- Items 2–6.
+- Items 3–6.
