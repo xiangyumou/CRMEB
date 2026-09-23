@@ -11,7 +11,7 @@ import { ProductCoupons } from '@/features/product/product-coupons';
 import { ReviewItem } from '@/features/product/review-item';
 import { SkuSheet, type SkuAction } from '@/features/product/sku-sheet';
 import { initialSelection, selectionText, specsOf } from '@/features/product/sku-select';
-import { openPoster, posterAvailable } from '@/features/share/poster';
+import { PosterHost, openPoster, posterAvailable } from '@/features/share/poster';
 import { assetUrl } from '@/lib/asset-url';
 import { navigate, previewImages, useRouteParams, useShare } from '@/platform';
 import { requireLogin } from '@/session/session';
@@ -376,6 +376,17 @@ function Detail({ product }: { product: Product }) {
           ) : null}
         </View>
       </Sheet>
+      {posterAvailable ? (
+        <PosterHost
+          subject={{ kind: 'product', id: product.id }}
+          content={{
+            title: product.name,
+            price: product.price,
+            originalPrice: product.originalPrice,
+            imageUrl: product.imageUrl,
+          }}
+        />
+      ) : null}
     </PageShell>
   );
 }
