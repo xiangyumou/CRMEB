@@ -21,6 +21,11 @@ export const userErrors = defineErrors({
   /** 20 live addresses per customer. */
   USER_ADDRESS_LIMIT_REACHED: { status: 409, message: '收货地址数量已达上限' },
 
+  /** Unknown id, somebody else's title, or already deleted. One code for all three. */
+  USER_INVOICE_TITLE_NOT_FOUND: { status: 404, message: '发票抬头不存在' },
+  /** `INVOICE_TITLE_LIMIT` (20) live titles per customer. `details` carries `{ limit }`. */
+  USER_INVOICE_TITLE_LIMIT_REACHED: { status: 409, message: '发票抬头数量已达上限' },
+
   /** A cancellation request is already open; the customer withdraws it or waits. */
   USER_CANCELLATION_PENDING: { status: 409, message: '您已提交过注销申请，请等待审核' },
   USER_CANCELLATION_NOT_FOUND: { status: 404, message: '注销申请不存在' },

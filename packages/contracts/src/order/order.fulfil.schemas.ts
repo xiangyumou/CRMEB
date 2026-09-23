@@ -656,13 +656,14 @@ export const orderInvoiceExample = {
 } satisfies OrderInvoice;
 
 /**
- * 申请开票.
+ * The 发票抬头 fields, shared by the request below and by the saved titles of
+ * `/api/v1/invoice-titles` (`user/schemas.ts` `invoiceTitleForm`).
  *
- * A 增值税专用发票 needs a duty number and the four bank/registration fields;
- * a personal 普通发票 needs none of them. The rule is written here so the form
- * can enforce it, and again in the service.
+ * One definition on purpose: a saved title is copied field by field into
+ * `POST /orders/:id/invoice`, so any title the book accepted has to be a body
+ * the request accepts too (USER-017).
  */
-const invoiceRequestInput = z.object({
+export const invoiceHeaderInput = z.object({
   headerType: invoiceHeaderType,
   invoiceType: invoiceType.default('plain'),
   name: z.string().min(1).max(100),
@@ -673,23 +674,48 @@ const invoiceRequestInput = z.object({
   registeredAddress: z.string().max(255).optional(),
   bankName: z.string().max(100).optional(),
   bankAccount: z.string().max(50).optional(),
+});
+export type InvoiceHeaderInput = z.infer<typeof invoiceHeaderInput>;
+
+type InvoiceHeaderRuleInput = Pick<
+  InvoiceHeaderInput,
+  | 'headerType'
+  | 'invoiceType'
+  | 'dutyNumber'
+  | 'registeredAddress'
+  | 'registeredTel'
+  | 'bankName'
+  | 'bankAccount'
+>;
+
+/**
+ * A 增值税专用发票 needs a duty number and the four bank/registration fields;
+ * a personal 普通发票 needs none of them. The rule is written here so the form
+ * can enforce it, and again in the service.
+ */
+export function withInvoiceHeaderRules<T extends z.ZodType<InvoiceHeaderRuleInput>>(schema: T) {
+  return schema
+    .refine((b) => b.headerType !== 'company' || (b.dutyNumber ?? '').length > 0, {
+      message: '企业抬头需要填写税号',
+      path: ['dutyNumber'],
+    })
+    .refine(
+      (b) =>
+        b.invoiceType !== 'special' ||
+        ((b.registeredAddress ?? '').length > 0 &&
+          (b.registeredTel ?? '').length > 0 &&
+          (b.bankName ?? '').length > 0 &&
+          (b.bankAccount ?? '').length > 0),
+      { message: '专用发票需要填写注册地址、电话、开户行和账号', path: ['registeredAddress'] },
+    );
+}
+
+/** 申请开票. The header fields plus a remark for the operator. */
+const invoiceRequestInput = invoiceHeaderInput.extend({
   remark: z.string().max(255).optional(),
 });
 
-export const invoiceRequestBody = invoiceRequestInput
-  .refine((b) => b.headerType !== 'company' || (b.dutyNumber ?? '').length > 0, {
-    message: '企业抬头需要填写税号',
-    path: ['dutyNumber'],
-  })
-  .refine(
-    (b) =>
-      b.invoiceType !== 'special' ||
-      ((b.registeredAddress ?? '').length > 0 &&
-        (b.registeredTel ?? '').length > 0 &&
-        (b.bankName ?? '').length > 0 &&
-        (b.bankAccount ?? '').length > 0),
-    { message: '专用发票需要填写注册地址、电话、开户行和账号', path: ['registeredAddress'] },
-  );
+export const invoiceRequestBody = withInvoiceHeaderRules(invoiceRequestInput);
 export type InvoiceRequestBody = z.infer<typeof invoiceRequestBody>;
 
 export const invoiceIssueBody = z.object({

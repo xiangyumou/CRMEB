@@ -143,12 +143,10 @@ const buyNowNeedsAnItem = {
   path: ['item'] as const,
 };
 
-export const checkoutPreviewBody = checkoutInput
-  .and(checkoutKind)
-  .refine(buyNowNeedsAnItem.check, {
-    message: buyNowNeedsAnItem.message,
-    path: [...buyNowNeedsAnItem.path],
-  });
+export const checkoutPreviewBody = checkoutInput.and(checkoutKind).refine(buyNowNeedsAnItem.check, {
+  message: buyNowNeedsAnItem.message,
+  path: [...buyNowNeedsAnItem.path],
+});
 export type CheckoutPreviewBody = z.infer<typeof checkoutPreviewBody>;
 
 /** The receiver snapshot as the preview and the order both show it. */

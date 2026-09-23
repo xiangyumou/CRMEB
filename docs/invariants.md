@@ -1013,6 +1013,29 @@ One phone number is one account and one openid is one account, however many regi
 - `packages/core/src/user/user.concurrency.int.test.ts::registration > six concurrent creations of one phone number leave one account`
 - `packages/core/src/user/user.concurrency.int.test.ts::registration > six taps on 微信登录 create one account and sign every caller into it`
 
+### USER-016
+
+A customer keeps at most 20 live 发票抬头 and at most one default, including when their own writes race: every write to one customer's book queues on a per-user advisory lock, so six simultaneous promotions all succeed and leave one default, six simultaneous first titles leave one default, and creates racing the cap let exactly the free slots through.
+
+- `packages/core/src/user/invoice-title.int.test.ts::invoice titles > USER-016 — refuses a title past the cap of 20`
+- `packages/core/src/user/invoice-title.int.test.ts::USER-016 — one customer’s title writes, raced > leaves exactly one default when six titles are promoted at once, and every caller succeeds`
+- `packages/core/src/user/invoice-title.int.test.ts::USER-016 — one customer’s title writes, raced > makes exactly one of six simultaneous first titles the default`
+- `packages/core/src/user/invoice-title.int.test.ts::USER-016 — one customer’s title writes, raced > lets exactly the free slots through when six creates race the cap`
+
+### USER-017
+
+A saved 发票抬头 always prefills a `POST /orders/:id/invoice` body the route accepts: the title form and the request share one header schema and its rules, the service re-checks them after trimming, and `invoiceRequestFromTitle` copies only the non-empty header fields.
+
+- `packages/contracts/src/user/invoice-title.test.ts::USER-017 — a saved title prefills the invoice request > copies <label> into a body the request schema accepts`
+- `packages/core/src/user/invoice-title.int.test.ts::invoice titles > USER-017 — every saved title prefills a request body the invoice route accepts`
+
+### USER-018
+
+A 发票抬头 belongs to the customer who saved it: reading, editing, deleting or promoting somebody else's title answers exactly like one that does not exist, and changes nothing.
+
+- `packages/core/src/user/invoice-title.int.test.ts::invoice titles > USER-018 — never reads, edits, deletes or promotes another customer’s title`
+- `apps/web/app/api/v1/user.int.test.ts::/api/v1/invoice-titles > USER-018 — keeps every title route to its owner: a stranger gets 404 on all four`
+
 ## Coupons
 
 ### COUPON-001

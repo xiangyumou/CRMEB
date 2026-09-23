@@ -12,6 +12,7 @@ import './storefront-auth.config';
  * | --- | --- |
  * | `GET/PUT /api/v1/profile` | `getProfile` / `updateProfile` |
  * | `/api/v1/addresses…` | `addressList` / `defaultAddress` / `addressDetail` / `addressCreate` / `addressUpdate` / `addressDelete` / `addressSetDefault` |
+ * | `/api/v1/invoice-titles…` | `invoiceTitleList` / `invoiceTitleDefault` / `invoiceTitleDetail` / `invoiceTitleCreate` / `invoiceTitleUpdate` / `invoiceTitleDelete` / `invoiceTitleSetDefault` |
  * | `/api/v1/account-cancellations…` | `requestCancellation` / `currentCancellation` / `withdrawCancellation` |
  * | `POST /api/v1/auth/sms-codes` | `sendSmsCode` |
  * | `POST /api/v1/auth/sessions/*` | `passwordLogin` / `smsLogin` / `miniLogin` / `miniPhoneLogin` / `oaLogin` / `oaPhoneLogin` |
@@ -101,6 +102,16 @@ export {
   smsLogin,
   type RequestMeta,
 } from './storefront-auth.service';
+
+export {
+  invoiceTitleCreate,
+  invoiceTitleDefault,
+  invoiceTitleDelete,
+  invoiceTitleDetail,
+  invoiceTitleList,
+  invoiceTitleSetDefault,
+  invoiceTitleUpdate,
+} from './invoice-title.service';
 
 export { pruneVisits, recordVisit } from './user.visit.service';
 

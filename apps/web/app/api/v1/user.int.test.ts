@@ -107,17 +107,18 @@ const get = (path: string, headers: Record<string, string> = {}) =>
 /** Sign in through the real routes and keep the bearer token. */
 async function shopper(
   ip = '203.0.113.7',
+  phone = PHONE,
 ): Promise<{ token: string; headers: Record<string, string> }> {
   const { POST: sendCode } = await import('./auth/sms-codes/route');
   await sendCode(
-    json('POST', '/api/v1/auth/sms-codes', { phone: PHONE, scene: 'login' }, { 'x-real-ip': ip }),
+    json('POST', '/api/v1/auth/sms-codes', { phone, scene: 'login' }, { 'x-real-ip': ip }),
   );
   const { POST: smsLogin } = await import('./auth/sessions/sms/route');
   const response = await smsLogin(
     json(
       'POST',
       '/api/v1/auth/sessions/sms',
-      { phone: PHONE, code: sms.lastCodeFor(PHONE) },
+      { phone, code: sms.lastCodeFor(phone) },
       { 'x-real-ip': ip },
     ),
   );
@@ -263,6 +264,66 @@ describe('/api/v1/profile', () => {
 
     const bad = await PUT(json('PUT', '/api/v1/profile', { nickname: '' }, headers));
     expect(bad.status).toBe(422);
+  });
+});
+
+describe('/api/v1/invoice-titles', () => {
+  const company = {
+    headerType: 'company',
+    name: '杭州某某科技有限公司',
+    dutyNumber: '91330100MA2XXXXX0A',
+  };
+
+  it('401s without a token and 422s a company title with no 税号, writing nothing', async () => {
+    const { GET, POST } = await import('./invoice-titles/route');
+    expect((await GET(get('/api/v1/invoice-titles'))).status).toBe(401);
+    expect((await POST(json('POST', '/api/v1/invoice-titles', company))).status).toBe(401);
+
+    const { headers } = await shopper();
+    const bad = await POST(
+      json('POST', '/api/v1/invoice-titles', { headerType: 'company', name: '某某公司' }, headers),
+    );
+    expect(bad.status).toBe(422);
+    const list = await GET(get('/api/v1/invoice-titles', headers));
+    expect(await list.json()).toMatchObject({ total: 0, items: [] });
+  });
+
+  it('USER-018 — keeps every title route to its owner: a stranger gets 404 on all four', async () => {
+    const { POST } = await import('./invoice-titles/route');
+    const byId = await import('./invoice-titles/[id]/route');
+    const { POST: setDefault } = await import('./invoice-titles/[id]/default/route');
+    const { GET: getDefault } = await import('./invoice-titles/default/route');
+
+    const owner = await shopper('203.0.113.7', PHONE);
+    const created = await POST(json('POST', '/api/v1/invoice-titles', company, owner.headers));
+    expect(created.status).toBe(201);
+    const title = await created.json();
+    expect(title).toMatchObject({ ...company, invoiceType: 'plain', isDefault: true });
+
+    const stranger = await shopper('203.0.113.8', '13900139000');
+    const path = `/api/v1/invoice-titles/${title.id}`;
+    const params = { params: { id: String(title.id) } };
+    const responses = [
+      await byId.GET(get(path, stranger.headers), params),
+      await byId.PUT(json('PUT', path, { ...company, name: '改掉' }, stranger.headers), params),
+      await byId.DELETE(json('DELETE', path, undefined, stranger.headers), params),
+      await setDefault(json('POST', `${path}/default`, {}, stranger.headers), params),
+    ];
+    for (const response of responses) {
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ code: 'USER_INVOICE_TITLE_NOT_FOUND' });
+    }
+    expect(
+      await (await getDefault(get('/api/v1/invoice-titles/default', stranger.headers))).json(),
+    ).toEqual({
+      title: null,
+    });
+
+    // The owner still has it, unchanged, as the default.
+    const mine = await getDefault(get('/api/v1/invoice-titles/default', owner.headers));
+    expect(await mine.json()).toEqual({ title });
+    const gone = await byId.DELETE(json('DELETE', path, undefined, owner.headers), params);
+    expect(gone.status).toBe(204);
   });
 });
 
