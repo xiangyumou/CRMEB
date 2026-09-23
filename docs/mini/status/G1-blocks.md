@@ -50,14 +50,21 @@ demo 81.0 KB, total 469.0 KB; react ×1; no zod.
   Taro's `<rich-text>` template in `base.wxml`), order 7.0 KB, demo 118.9 KB (+37.9 KB),
   total 507.3 KB; react ×1; no zod.
 
+- **Fidelity** (`docs/mini/status/G1-fidelity/README.md`): all 14 blocks, same size on both
+  sides; 13 within 3 %, `richText` flagged at 3.28 % (1 CSS px glyph offset from vw-vs-rem
+  font-size rounding, boxes identical). The run found and fixed: `widthFix` height in Taro H5
+  (hotspotImage, imageCube rows) and hairlines (`$hairline: 1PX`, Prettier-ignored) plus
+  `border-box` on fixed-height rows with a hairline.
+- `docs/mini/decor.md`: block table (2.3), personal needs, rich-text allow-list, migrated
+  draft read, adding a block / an editor field.
+
 ## In progress
 
-- Fidelity run (admin canvas vs Taro H5 at 375 px).
+- Full checklist.
 
 ## Next
 
-1. Fidelity run → `docs/mini/status/G1-fidelity/` (flag > 3 %); `docs/mini/decor.md`.
-2. Full checklist.
+1. Full checklist; final report.
 
 ## Notes
 

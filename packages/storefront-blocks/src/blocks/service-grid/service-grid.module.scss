@@ -7,11 +7,12 @@
 .title {
   height: $hit;
   padding: 0 $gutter;
-  border-bottom: 1px solid $border;
+  border-bottom: $hairline solid $border;
   color: $text;
   font-size: $font-body;
   font-weight: 600;
   line-height: $hit;
+  box-sizing: border-box;
 }
 
 .cells {

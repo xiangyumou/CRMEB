@@ -14,6 +14,8 @@
 .rowImage {
   display: block;
   width: 100%;
+  // As in 热区图: widthFix sizes the height on WeChat, not in Taro H5.
+  height: auto;
 }
 
 .box {

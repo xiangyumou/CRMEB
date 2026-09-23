@@ -38,6 +38,13 @@ $radius-md: 16px;
 $radius-lg: 24px;
 $radius-pill: 999px;
 
+// A hairline: upper-case `PX` is left alone by every px transform (Taro's
+// escape hatch, and the admin's px → vw), so it is one CSS pixel on any
+// screen. Prettier would lower-case it into a scaled design px, hence the
+// ignore.
+// prettier-ignore
+$hairline: 1PX;
+
 /** The smallest tap target (design.md §touch). */
 $hit: 88px;
 $z-sticky: 100;

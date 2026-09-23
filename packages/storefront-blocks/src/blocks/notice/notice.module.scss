@@ -54,10 +54,11 @@ $line: 80px;
   display: flex;
   align-items: center;
   height: $line;
+  box-sizing: border-box;
 }
 
 .divided {
-  border-top: 1px solid $border;
+  border-top: $hairline solid $border;
 }
 
 .text {
