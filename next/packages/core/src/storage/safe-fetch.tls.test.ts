@@ -13,12 +13,12 @@ import {
 } from './safe-fetch';
 
 /**
- * `safeFetch` over a real socket and a real TLS handshake (CR-11-k).
+ * `safeFetch` over a real socket and a real TLS handshake.
  *
  * Every other `safeFetch` test injects its transport, so none of them ever
- * opened a connection — which is how "every https import fails certificate
- * validation" shipped: the old code dialled `https://93.184.216.34/…`, and a
- * certificate names hosts, not addresses.
+ * opens a connection — and so none of them would notice "every https import
+ * fails certificate validation": dialling `https://93.184.216.34/…` fails,
+ * because a certificate names hosts, not addresses.
  *
  * Here the servers present certificates that name **DNS names only** (no IP
  * SAN, like a real CDN's), for names that do not exist in any DNS
@@ -116,7 +116,7 @@ async function refusal(promise: Promise<unknown>): Promise<SafeFetchError> {
   throw new Error('expected a SafeFetchError');
 }
 
-describe('safeFetch over real TLS (CR-11-k)', () => {
+describe('safeFetch over real TLS', () => {
   it('imports an https source: judged address, real name for SNI and the certificate', async () => {
     const before = cdn.servernames.length;
     const result = await safeFetch(`https://cdn.shop.test:${cdn.port}/banner.png`, options());

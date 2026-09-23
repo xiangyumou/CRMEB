@@ -4,8 +4,8 @@ import { isRejected, mimeAgrees, probeImageDimensions, sniffFileType } from './f
 /**
  * The upload defence, tested from the attacker's side.
  *
- * Every case in the first block is a file the old uploader accepted, because it
- * trusted the extension and the client's `Content-Type`.
+ * Every case in the first block is a file an uploader that trusted the
+ * extension and the client's `Content-Type` would accept.
  */
 
 function bytes(...values: number[]): Uint8Array {

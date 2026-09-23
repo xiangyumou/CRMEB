@@ -3,13 +3,13 @@ import { DomainError } from '../kernel/errors';
 import { readFilePart } from './multipart';
 
 /**
- * The multipart field name is part of the contract (CR-5-h §1).
+ * The multipart field name is part of the contract.
  *
- * It used to be three names — `file`, `multipart`, `image` — which meant the
+ * Accepting three names — `file`, `multipart`, `image` — would mean the
  * contract could not state one, `openapi.json` could not describe the request,
- * and a client sending a fourth failed with "请选择要上传的文件" no matter how
- * many times the shopper picked the photo. One name, and a distinct error for
- * the client that used another.
+ * and a client sending a fourth would fail with "请选择要上传的文件" no matter
+ * how many times the shopper picked the photo. One name, and a distinct error
+ * for the client that used another.
  */
 
 const asRequest = (form: FormData) => ({ formData: async () => form });

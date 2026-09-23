@@ -90,7 +90,7 @@ describe('safeFetch — refusals', () => {
     }
   });
 
-  // CR-11-k: a plaintext import is a man-in-the-middle's choice of file.
+  // A plaintext import is a man-in-the-middle's choice of file.
   it('refuses plain http unless the caller allows it', async () => {
     const { impl, calls } = fetchReturning(new Uint8Array([1]));
     const error = await refusal(
@@ -232,8 +232,8 @@ describe('safeFetch — the happy path', () => {
   it('connects to the address it judged, presenting the original Host', async () => {
     // This is what closes the DNS-rebinding window: there is no second lookup
     // between the check and the connection for anybody to win. And the URL
-    // keeps the name, so SNI and the certificate check see the name too
-    // (CR-11-k: an IP-literal URL failed every https certificate).
+    // keeps the name, so SNI and the certificate check see the name too (an
+    // IP-literal URL would fail every https certificate).
     const seen: PinnedRequest[] = [];
     const impl: Transport = async (request) => {
       seen.push(request);

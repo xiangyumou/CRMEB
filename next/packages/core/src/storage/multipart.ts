@@ -14,19 +14,19 @@ import type { IncomingFile } from './storage.service';
  * `Blob` are web standards available in Node, not `next/*` imports — the
  * `boundaries` rule is about framework coupling, and there is none here.
  *
- * The field is `file` and only `file` (CR-5-h §1). It used to accept `image`
- * and `multipart` too, which meant the contract could not state a name and a
- * client sending the wrong one silently worked here and nowhere else. Extra
- * file parts under other names are ignored; a file under *only* another name
- * is `STORAGE_UPLOAD_FIELD_MISSING`.
+ * The field is `file` and only `file`. Accepting `image` and `multipart` too
+ * would mean the contract could not state a name, and a client sending the
+ * wrong one would silently work here and nowhere else. Extra file parts under
+ * other names are ignored; a file under *only* another name is
+ * `STORAGE_UPLOAD_FIELD_MISSING`.
  *
  * The filename is read but never used as a path: `Storage.put` takes it as a
  * *hint* and honours only a whitelisted extension.
  */
 
 /**
- * The one field name the contract names (CR-5-h §1). Anything else is a client
- * bug, and saying so beats the shopper re-picking the same photo.
+ * The one field name the contract names. Anything else is a client bug, and
+ * saying so beats the shopper re-picking the same photo.
  */
 const FIELD_NAME = 'file';
 

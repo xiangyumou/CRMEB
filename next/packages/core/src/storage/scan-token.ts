@@ -4,10 +4,9 @@ import { randomToken } from '../kernel/ids';
 /**
  * Scan-to-upload tokens.
  *
- * The old system (`crmeb/app/adminapi/controller/v1/file/SystemAttachment.php`,
- * `scan_upload`) kept **one** token in a cache entry under a fixed key. Whoever
- * opened the dialog last owned it; a phone that scanned an older QR code
- * uploaded into the newest admin's session, and the token stayed valid until it
+ * **One** token in a cache entry under a fixed key would belong to whoever
+ * opened the dialog last: a phone that scanned an older QR code would upload
+ * into the newest admin's session, and the token would stay valid until it
  * expired no matter how many files went through it.
  *
  * Here a token is:
@@ -72,9 +71,9 @@ return redis.call('HMGET', KEYS[1], 'adminId', 'categoryId', 'directory')
 `;
 
 /**
- * Marks a claimed token used and keeps the record readable for a short while.
- * A compare-and-set on `state`, like its two siblings (CR-12-k): an existence
- * check would stamp `used` over a `pending` record.
+ * Marks a claimed token used and keeps the record readable for a short while. A
+ * compare-and-set on `state`, like its two siblings: an existence check would
+ * stamp `used` over a `pending` record.
  */
 const COMPLETE_LUA = `
 if redis.call('HGET', KEYS[1], 'state') ~= 'claimed' then return 0 end
