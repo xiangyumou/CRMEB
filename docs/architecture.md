@@ -272,5 +272,5 @@ call in `api/` resolves to a route.
 | Storefront e2e    | `e2e/storefront`             | The H5 build in mobile Chromium, through the edge, against the built app and worker.                                                                 |
 | Deploy drill      | `deploy/rehearsal/drill.sh`  | The production Compose stack, built locally: first deploy, upgrades that must roll back, rollback, backup and restore.                               |
 
-CI (`.github/workflows/next.yml`) runs all of them, and a nightly soak repeats the concurrency
+CI (`.github/workflows/ci.yml`) runs all of them, and a nightly soak repeats the concurrency
 suites 50 times with shuffled order.

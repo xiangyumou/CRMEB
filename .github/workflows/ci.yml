@@ -1,0 +1,628 @@
+name: ci
+
+# The merge gate: typecheck, lint with the import boundaries, the guards, unit
+# tests, integration tests on a real PostgreSQL 17 and Redis 7, the contract
+# example check, formatting, both Playwright suites and the build.
+#
+# It also builds and publishes the three container images and rehearses a
+# deploy against them. The deploy directory is in the paths filter for that
+# reason: the compose file and the upgrade scripts are part of what this
+# workflow gates.
+#
+# Nothing here touches the production host. A release is deployed by a person,
+# with the command the images job prints (deploy/README.md).
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  # The concurrency soak below is a flake hunt, not a gate, so it runs on a
+  # clock rather than on every push.
+  schedule:
+    - cron: '0 18 * * *' # 02:00 CST, after the day's merges
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Response validation is a merge-gate check, not a production cost.
+  VALIDATE_RESPONSES: '1'
+  # Keep turbo quiet and deterministic in CI.
+  TURBO_TELEMETRY_DISABLED: '1'
+  DO_NOT_TRACK: '1'
+
+jobs:
+  static:
+    name: gen / typecheck / lint / unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Cache turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
+
+      # `*.gen.ts` and `openapi.json` are gitignored, so everything downstream
+      # depends on this step having run.
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
+      - name: Typecheck
+        run: corepack pnpm typecheck
+
+      - name: Lint
+        run: corepack pnpm lint
+
+      # The whole-tree checks no single package's tests can make: a client call
+      # with no route behind it, a secret that reached a response, a menu entry
+      # pointing at nothing, a migration that is not additive, a business rule
+      # with no test. Exits non-zero on any failure.
+      - name: Guards
+        run: corepack pnpm guards
+
+      # The JSON is only worth uploading when something failed; on a green run
+      # it is noise in the artifact list.
+      - name: Guards (JSON for annotations)
+        if: failure()
+        run: corepack pnpm --filter @shop/guards guards --json > guards.json
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        if: failure()
+        with:
+          name: guards
+          path: guards.json
+
+      - name: Unit tests
+        run: corepack pnpm test:unit
+
+      - name: Contract examples
+        run: corepack pnpm --filter @shop/contracts check:examples
+
+      - name: Prettier
+        run: corepack pnpm format:check
+
+      - name: Upload the OpenAPI document
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: openapi
+          path: packages/contracts/openapi.json
+          if-no-files-found: error
+
+  integration:
+    name: integration (testcontainers)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
+      # Docker is preinstalled on the ubuntu runners, which is what
+      # Testcontainers needs. Pulling the images up front keeps the first
+      # container start from eating the per-test timeout.
+      - name: Pre-pull the service images
+        run: |
+          docker pull postgres:17-alpine
+          docker pull redis:7-alpine
+
+      - name: Integration tests
+        run: corepack pnpm test:int
+
+  # No `pnpm build` step here on purpose: the suite's `webServer` is
+  # `e2e/admin/scripts/serve.ts`, which starts the containers, seeds and builds
+  # before it serves. Playwright starts `webServer` before `globalSetup`, so a
+  # globalSetup that created the database would create it after the server had
+  # already failed to connect.
+  e2e-admin:
+    name: admin e2e (playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      # The routes, error codes and config groups are generated, not committed;
+      # the web server the suite starts imports them.
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
+      # Chromium only: these are assertions about the admin's own behaviour —
+      # an authorisation boundary, an audit row, a masked secret — not about
+      # browser compatibility.
+      - name: Install the browser
+        run: corepack pnpm --filter @shop/e2e-admin exec playwright install --with-deps chromium
+
+      - name: Pre-pull the service images
+        run: |
+          docker pull postgres:17-alpine
+          docker pull redis:7-alpine
+
+      - name: Admin e2e
+        run: corepack pnpm --filter @shop/e2e-admin e2e
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/admin/playwright-report
+
+  storefront-e2e:
+    name: storefront e2e (playwright, H5)
+    runs-on: ubuntu-latest
+    # Cold: image pulls, `npm ci`, the H5 build, `next build`, then the
+    # journeys (~45-50 s locally, stack ready in ~5 s). Room for the one retry.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      # The routes, error codes and config groups are generated, not committed;
+      # the web server the suite starts imports them.
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
+      # The H5 bundle the edge serves is built from the real uni-app tree by
+      # the suite's own webServer (`src/h5.ts` runs `npm run build:h5`); it
+      # needs that tree's own dependencies, which are npm, not pnpm.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/uni-app/package-lock.json
+
+      - name: Install the uni-app dependencies
+        working-directory: apps/uni-app
+        run: npm ci
+
+      # Chromium only, mobile emulation: the journeys assert what a shopper on
+      # a phone browser sees, not cross-browser rendering.
+      - name: Install the browser
+        run: corepack pnpm --filter @shop/e2e-storefront exec playwright install --with-deps chromium
+
+      - name: Pre-pull the service images
+        run: |
+          docker pull postgres:17-alpine
+          docker pull redis:7-alpine
+
+      # `CI` is set by Actions, so the config forbids `.only`, retries once,
+      # and never reuses a running server.
+      - name: Storefront e2e
+        run: corepack pnpm --filter @shop/e2e-storefront test
+
+      # Every journey's console-errors.txt / failed-requests.txt, green or not.
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        if: always()
+        with:
+          name: storefront-playwright-report
+          path: e2e/storefront/playwright-report
+          retention-days: 14
+
+      # Traces and screenshots (`retain-on-failure`).
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        if: failure()
+        with:
+          name: storefront-test-results
+          path: e2e/storefront/test-results
+          retention-days: 14
+
+  # STAB-001. The races the concurrency suite covers — the last
+  # unit of stock, two refund approvals, a callback meeting the reconciliation
+  # sweep — are decided by the database, so one green run proves the statement
+  # is right and fifty prove the *test* is right, catching the one that passes
+  # because two transactions happened not to overlap.
+  #
+  # It never talks to a real WeChat, SMS or Aliyun endpoint and never runs
+  # against anything but a Testcontainers database.
+  concurrency-soak:
+    name: concurrency soak (50 rounds)
+    # Nightly and on demand — never on a pull request: this is a flake hunt,
+    # not a gate, and a gate that takes 40 minutes stops being read.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
+      - name: Pre-pull the service images
+        run: |
+          docker pull postgres:17-alpine
+          docker pull redis:7-alpine
+
+      # One container set, fifty rounds, a different ordering seed each time.
+      # Every round that fails is recorded and the loop continues: "round 37
+      # failed" is a fact about the schedule, and stopping at the first failure
+      # throws away the distribution, which is the thing worth knowing.
+      - name: 50 rounds
+        run: |
+          set -uo pipefail
+          mkdir -p soak
+          failed=0
+          for round in $(seq 1 50); do
+            echo "::group::round $round"
+            # vitest lives in @shop/core, and its file filters are substrings,
+            # not globs: these two match the STAB-001 set.
+            if ! corepack pnpm --filter @shop/core exec vitest run --project int \
+                 --sequence.seed="$round" --sequence.shuffle \
+                 concurrency.int.test.ts order.sequence.int.test.ts \
+                 > "soak/round-$round.log" 2>&1; then
+              failed=$((failed + 1))
+              echo "round $round FAILED" | tee -a soak/failures.txt
+              tail -80 "soak/round-$round.log"
+            fi
+            echo "::endgroup::"
+          done
+          echo "$failed of 50 rounds failed"
+          test "$failed" -eq 0
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        if: always()
+        with:
+          name: soak-logs
+          path: soak
+
+  mutations:
+    name: mutation run (MUT-001, ten protections)
+    # Nightly and on demand, like the soak: it asks whether the guarding tests
+    # still guard, which is a question about the tree, not about the change.
+    # Each of the ten protections is removed in a scratch copy of HEAD and its
+    # named tests must fail; a survivor or a mutation string that no longer
+    # matches exits non-zero.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      # The live tree's generated files are not what the copy uses (the runner
+      # regenerates inside the copy), but guards imports @shop/contracts.
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
+      - name: Pre-pull the service images
+        run: |
+          docker pull postgres:17-alpine
+          docker pull redis:7-alpine
+
+      - name: Ten mutants
+        run: corepack pnpm --filter @shop/guards mutations --json mutations.json
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        if: always()
+        with:
+          name: mutation-report
+          path: guards/mutations.json
+          if-no-files-found: ignore
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: static
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
+      - name: Build
+        run: corepack pnpm build
+
+  shell:
+    name: shellcheck (deploy, CI scripts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      # `-x` follows `. lib/common.sh`, and --source-path=SCRIPTDIR resolves it
+      # relative to each script rather than to the working directory — without
+      # it the library is invisible and every variable it sets reads as unset.
+      - name: shellcheck
+        run: |
+          shellcheck --source-path=SCRIPTDIR -x \
+            deploy/*.sh deploy/lib/*.sh deploy/rehearsal/*.sh \
+            .github/scripts/*.sh
+
+  # The publish rules the images job relies on — a conflicting candidate never
+  # overwrites a tag, an unanswerable registry is never read as "absent" —
+  # proved against a throwaway registry rather than trusted from reading bash.
+  publish-rules:
+    name: publish rules (local registry)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Prove the publish rules
+        run: .github/scripts/publish-release.test.sh
+
+  images:
+    name: images (web, worker, edge)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: [static, build, publish-rules]
+    # Publishing happens for the branches that can become a release. A pull
+    # request builds in `rehearsal` below and pushes nothing.
+    if: github.event_name == 'push'
+    # A release is never cancelled mid-publish. The workflow-level group cancels
+    # in progress, which is right for the merge-gate jobs and would kill a
+    # publish halfway, so this job carries its own repository-wide group
+    # (REL-007).
+    concurrency:
+      group: next-images-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    env:
+      WEB_IMAGE: ghcr.io/xiangyumou/crmeb-next-web
+      WORKER_IMAGE: ghcr.io/xiangyumou/crmeb-next-worker
+      EDGE_IMAGE: ghcr.io/xiangyumou/crmeb-next-edge
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The storefront. The edge image defaults to a placeholder page, which is
+      # right for a stack that only serves /admin and the APIs and **wrong for a
+      # release** — so a release builds the real H5 bundle, and a checkout where
+      # that build fails says so loudly instead of shipping the placeholder
+      # quietly.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/uni-app/package-lock.json
+
+      - name: Build the H5 storefront
+        id: h5
+        continue-on-error: true
+        working-directory: apps/uni-app
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build:h5
+
+      # `dist/<NODE_ENV>/h5` — the uni-app CLI names the directory after the
+      # mode it built in, so the job finds the bundle rather than assuming one
+      # of the two names and silently falling back to the placeholder.
+      - name: Resolve the H5 bundle
+        id: bundle
+        run: |
+          set -euo pipefail
+          dist=''
+          for candidate in apps/uni-app/dist/build/h5 apps/uni-app/dist/dev/h5; do
+            if [ -f "$candidate/index.html" ]; then
+              dist="$candidate"
+              break
+            fi
+          done
+          if [ -n "$dist" ]; then
+            storefront=real
+          else
+            storefront=placeholder
+            dist=docker/edge/h5-placeholder
+            echo "::warning title=Edge image has no storefront::The H5 build produced no bundle; the edge image falls back to the placeholder page and this release must not be deployed to a site that serves shoppers."
+          fi
+          printf 'dist=%s\n' "$dist" >> "$GITHUB_OUTPUT"
+          printf 'storefront=%s\n' "$storefront" >> "$GITHUB_OUTPUT"
+
+      # One architecture. The production host is a single amd64 box, so a
+      # second one would double the build for an image nothing will run.
+      #
+      # `docker/build-push-action` rather than a bare `docker buildx build`:
+      # `type=gha` needs the Actions cache token, which the action puts in the
+      # environment and a plain `run:` step does not have.
+      - name: web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web.Dockerfile
+          push: true
+          tags: ${{ env.WEB_IMAGE }}:ci-${{ github.sha }}-amd64
+          cache-from: type=gha,scope=next-web
+          cache-to: type=gha,scope=next-web,mode=max
+
+      - name: worker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/worker.Dockerfile
+          push: true
+          tags: ${{ env.WORKER_IMAGE }}:ci-${{ github.sha }}-amd64
+          cache-from: type=gha,scope=next-worker
+          cache-to: type=gha,scope=next-worker,mode=max
+
+      # Context is the repository root: the edge image copies the nginx config
+      # from `docker/edge/` and the storefront from `apps/uni-app/`.
+      - name: edge
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/edge/Dockerfile
+          push: true
+          build-args: H5_DIST=${{ steps.bundle.outputs.dist }}
+          tags: ${{ env.EDGE_IMAGE }}:ci-${{ github.sha }}-amd64
+          cache-from: type=gha,scope=next-edge
+          cache-to: type=gha,scope=next-edge,mode=max
+
+      # The publish rules live in .github/scripts/publish-release.sh (proved
+      # against a real registry by the publish-rules job), not inline here, so
+      # they are exercised rather than read. REL-006 is the guard that keeps it
+      # that way.
+      - name: Publish the commit-scoped tags
+        id: publish
+        run: |
+          set -euo pipefail
+          for role in web worker edge; do
+            case "$role" in
+              web) image="$WEB_IMAGE" ;;
+              worker) image="$WORKER_IMAGE" ;;
+              edge) image="$EDGE_IMAGE" ;;
+            esac
+            digest="$(bash .github/scripts/publish-release.sh tags "$image" "$GITHUB_SHA" \
+              "$image:ci-$GITHUB_SHA-amd64" | tail -1)"
+            test -n "$digest"
+            printf '%s=%s@%s\n' "$role" "$image" "$digest" >> "$GITHUB_OUTPUT"
+          done
+
+      # The three lines an operator pastes into `deployment.env`, and the three
+      # arguments `upgrade.sh` wants. A release whose digests have to be dug out
+      # of a log is a release that gets deployed by tag.
+      - name: Release summary
+        run: |
+          {
+            printf '## crmeb-next images\n\n'
+            printf 'storefront in the edge image: **%s**\n\n' '${{ steps.bundle.outputs.storefront }}'
+            printf '```sh\ndeploy/upgrade.sh --app-version %s \\\n' "$GITHUB_SHA"
+            printf '  --web    %s \\\n'   '${{ steps.publish.outputs.web }}'
+            printf '  --worker %s \\\n'   '${{ steps.publish.outputs.worker }}'
+            printf '  --edge   %s\n```\n' '${{ steps.publish.outputs.edge }}'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  rehearsal:
+    name: deploy rehearsal
+    runs-on: ubuntu-latest
+    # The drill brings a full stack up several times over; it is the slowest
+    # job here and still the cheapest place to find out that a release cannot
+    # be rolled back.
+    timeout-minutes: 45
+    needs: [shell]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Failing a release for an unrelated registry hiccup mid-drill teaches
+      # people to rerun rather than to read, so the fixed dependencies are
+      # pulled up front.
+      - name: Pre-pull
+        run: |
+          set -euo pipefail
+          docker pull registry:2
+          grep -E '^NEXT_(POSTGRES|REDIS)_IMAGE=' deploy/deployment.env.example |
+            cut -d= -f2- | xargs -rn1 docker pull
+
+      # It builds the three images itself, publishes them to a registry
+      # container it starts, and deploys, fails, and rolls back a stack several
+      # times. Nothing leaves the runner.
+      - name: Drill
+        run: deploy/rehearsal/drill.sh
+
+      - name: What it covers
+        if: always()
+        run: deploy/rehearsal/drill.sh --list >> "$GITHUB_STEP_SUMMARY"

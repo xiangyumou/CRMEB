@@ -5,7 +5,7 @@
 #
 # Publishes each <arch-image> under its own tag in <image>, then joins them
 # under `<image>:sha-<sha>`, and prints that manifest's digest on the last line.
-# The images job in `next.yml` calls it once per role.
+# The images job in `ci.yml` calls it once per role.
 #
 # The rules live here, not inline in the workflow, so they can be exercised
 # against a real registry (`publish-release.test.sh`, next to this file)

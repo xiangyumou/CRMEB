@@ -3,8 +3,7 @@
 The rules the shop keeps, each with the tests that prove it. A rule is a
 `###` heading carrying its ID, a short statement of the rule, and a list of
 citations: `` `<file>::<describe> > <test name>` ``, with the file relative to
-`next/` (or to the repository root, for `deploy/`). A rule with no test is not
-in this file.
+the repository root. A rule with no test is not in this file.
 
 A test names the rule it proves by putting the ID in its title —
 `it('refuses a second redemption — COUPON-004', …)` — or in the title of its
@@ -1257,7 +1256,7 @@ A successful group updates leader and members once, without repeated notificatio
 
 The shop has no 砍价, 秒杀, 抽奖, 直播, 分销, 积分, 签到, 付费会员, 充值, 余额支付, 支付宝, 线下支付, 核销, 门店自提, 自建客服 or the other features `pnpm guards`' `retired` check lists: no identifier or URL token for any of them exists in the application source or the uni-app API layer, and every route file is described by a contract, so there is no unlisted surface for one to come back through.
 
-- `guards/src/checks/retired.test.ts::the retired blacklist > finds no retired identifier in next/ or the uni-app API layer`
+- `guards/src/checks/retired.test.ts::the retired blacklist > finds no retired identifier in the workspace or the uni-app API layer`
 - `guards/src/checks/contracts.test.ts::contracts and route files > leaves no route file that no contract describes`
 
 ## Test strength and stability
@@ -1278,7 +1277,7 @@ Removing any of ten protections (the payment/cancel order lock, attempt immutabi
 
 ### STAB-001
 
-The concurrency set (payment creation vs cancellation, refund agreement in two processes, coupon races, the virtual-card race, multi-item rollback, group-buy joins and refunds, the fixed-seed sequence) runs clean round after round in a shuffled order: the `concurrency-soak` job in `next.yml` runs every test of the set 50 times nightly, with a new ordering seed each round, and fails on the count of failed rounds. The tests below are one per race this names; the soak runs all of them.
+The concurrency set (payment creation vs cancellation, refund agreement in two processes, coupon races, the virtual-card race, multi-item rollback, group-buy joins and refunds, the fixed-seed sequence) runs clean round after round in a shuffled order: the `concurrency-soak` job in `ci.yml` runs every test of the set 50 times nightly, with a new ordering seed each round, and fails on the count of failed rounds. The tests below are one per race this names; the soak runs all of them.
 
 - `packages/core/src/payment/payment.concurrency.int.test.ts::QUEUE-003 — a callback racing an order cancel > never cancels an order whose money arrived, whichever side gets there first`
 - `packages/core/src/order/order.concurrency.int.test.ts::cancel racing the paid transition > lets exactly one of them through`
@@ -1297,22 +1296,22 @@ The concurrency set (payment creation vs cancellation, refund agreement in two p
 
 `upgrade.sh` refuses a moving tag, records the running digests as the rollback target, and refuses a release that does not name all three candidates (`web`, `worker`, `edge`); afterwards each service is verified to be running its own image.
 
-- `deploy/next/rehearsal/drill.sh::upgrade/refuses-moving-tag`
-- `deploy/next/rehearsal/drill.sh::upgrade/requires-all-three-candidates`
-- `deploy/next/rehearsal/drill.sh::upgrade/deploys-and-records-rollback-target`
+- `deploy/rehearsal/drill.sh::upgrade/refuses-moving-tag`
+- `deploy/rehearsal/drill.sh::upgrade/requires-all-three-candidates`
+- `deploy/rehearsal/drill.sh::upgrade/deploys-and-records-rollback-target`
 
 ### OPS-006
 
 A dry run reports the plan without stopping writers or taking a backup.
 
-- `deploy/next/rehearsal/drill.sh::upgrade/dry-run-changes-nothing`
+- `deploy/rehearsal/drill.sh::upgrade/dry-run-changes-nothing`
 
 ### OPS-007
 
 A failing migration ends the upgrade on the previous digests, and says so: migrations are additive, so the previous image tolerates the new schema and a stack that serves is a better place to end than a stack that is down. The release reports that the schema had already moved and names the verified dump it will not restore for you. The condition is enforced, not assumed: the `migrations` guard fails the build when a migration drops a table or a column, or retypes one, without a per-statement `-- destructive: approved` marker.
 
-- `deploy/next/rehearsal/drill.sh::upgrade/failed-migration-ends-on-previous`
-- `deploy/next/rehearsal/drill.sh::upgrade/unhealthy-worker-ends-on-previous`
+- `deploy/rehearsal/drill.sh::upgrade/failed-migration-ends-on-previous`
+- `deploy/rehearsal/drill.sh::upgrade/unhealthy-worker-ends-on-previous`
 - `guards/src/checks/migrations.test.ts::unmarkedDestructive > finds an unmarked DROP TABLE, DROP COLUMN and column retype`
 - `guards/src/checks/migrations.test.ts::unmarkedDestructive > does not let a marker on one statement bless the next`
 
@@ -1320,39 +1319,39 @@ A failing migration ends the upgrade on the previous digests, and says so: migra
 
 A truncated backup is diagnosed before any migration, and the upgrade aborts with the previous images still pinned and running.
 
-- `deploy/next/rehearsal/drill.sh::backup/refuses-truncated-dump`
+- `deploy/rehearsal/drill.sh::backup/refuses-truncated-dump`
 
 ### OPS-009
 
 A backup that cannot be restored (contents disagree with the live database) stops the upgrade before any migration.
 
-- `deploy/next/rehearsal/drill.sh::backup/refuses-tampered-dump`
+- `deploy/rehearsal/drill.sh::backup/refuses-tampered-dump`
 
 ### OPS-010
 
 A valid upgrade dumps, verifies the dump by restoring it into an isolated database and comparing row counts, runs the migrations, resumes traffic and reports the rollback target.
 
-- `deploy/next/rehearsal/drill.sh::backup/verifies-restore`
-- `deploy/next/rehearsal/drill.sh::upgrade/deploys-and-records-rollback-target`
+- `deploy/rehearsal/drill.sh::backup/verifies-restore`
+- `deploy/rehearsal/drill.sh::upgrade/deploys-and-records-rollback-target`
 
 ### OPS-011
 
 `rollback.sh` refuses an unavailable target instead of changing the deployment, and never claims a database was restored.
 
-- `deploy/next/rehearsal/drill.sh::rollback/refuses-unavailable-target`
-- `deploy/next/rehearsal/drill.sh::rollback/last-upgrade-returns-previous`
+- `deploy/rehearsal/drill.sh::rollback/refuses-unavailable-target`
+- `deploy/rehearsal/drill.sh::rollback/last-upgrade-returns-previous`
 
 ### OPS-012
 
 Every long-running service declares a memory limit, the limits together stay under the 1.6 GB the host can spare, and every service that runs node carries an explicit `--max-old-space-size` — V8 sizes its heap from the _host's_ memory, not the cgroup's, so a container without one is OOM killed with no diagnostic.
 
-- `deploy/next/rehearsal/drill.sh::static/memory-budget`
+- `deploy/rehearsal/drill.sh::static/memory-budget`
 
 ### OPS-013
 
-No tracked file under `deploy/next/` or `next/docker/` carries a credential, and `deployment.env` — the one file that does — is gitignored.
+No tracked file under `deploy/` or `docker/` carries a credential, and `deployment.env` — the one file that does — is gitignored.
 
-- `deploy/next/rehearsal/drill.sh::static/no-secrets-in-repo`
+- `deploy/rehearsal/drill.sh::static/no-secrets-in-repo`
 
 ## Release publishing
 
@@ -1387,22 +1386,22 @@ Releases are serialized repository-wide and never cancelled mid-publish: the mer
 
 ### OPS-002
 
-The worker's health probe (`next/docker/healthcheck/worker.mjs`) reads `worker:heartbeat` over the container's configured `REDIS_URL` and requires it to be **recent**: the key is refreshed from the same event loop that runs the jobs and is deleted before draining on SIGTERM, so a worker that is up and consuming nothing turns unhealthy. **Known gap:** the probe shares the worker's own `REDIS_URL`, so a worker pointed at the _wrong_ Redis would still find its own heartbeat there, and `/api/v1/readyz` reads it from `web`, which shares that URL too. Closing it means reading the heartbeat from a second vantage point.
+The worker's health probe (`docker/healthcheck/worker.mjs`) reads `worker:heartbeat` over the container's configured `REDIS_URL` and requires it to be **recent**: the key is refreshed from the same event loop that runs the jobs and is deleted before draining on SIGTERM, so a worker that is up and consuming nothing turns unhealthy. **Known gap:** the probe shares the worker's own `REDIS_URL`, so a worker pointed at the _wrong_ Redis would still find its own heartbeat there, and `/api/v1/readyz` reads it from `web`, which shares that URL too. Closing it means reading the heartbeat from a second vantage point.
 
-- `deploy/next/rehearsal/drill.sh::upgrade/unhealthy-worker-ends-on-previous`
+- `deploy/rehearsal/drill.sh::upgrade/unhealthy-worker-ends-on-previous`
 
 ### OPS-003
 
-A release is gated on readiness. `GET /api/v1/readyz`, proxied by the edge at `/readyz`, checks the database, Redis, migrations and the worker heartbeat, and answers 503 `HEALTH_NOT_READY` with `details.checks` and **no error text, host, connection string or credential** — the int test asserts the whole body, not a subset. `deploy/next/lib/readiness.sh` reads that endpoint and additionally requires `drizzle.__drizzle_migrations` to be populated and every table in `NEXT_READINESS_TABLES` to exist, because which tables _this_ release needs is something the app cannot know. An upgrade whose schema is short ends on the previous digests.
+A release is gated on readiness. `GET /api/v1/readyz`, proxied by the edge at `/readyz`, checks the database, Redis, migrations and the worker heartbeat, and answers 503 `HEALTH_NOT_READY` with `details.checks` and **no error text, host, connection string or credential** — the int test asserts the whole body, not a subset. `deploy/lib/readiness.sh` reads that endpoint and additionally requires `drizzle.__drizzle_migrations` to be populated and every table in `NEXT_READINESS_TABLES` to exist, because which tables _this_ release needs is something the app cannot know. An upgrade whose schema is short ends on the previous digests.
 
 - `apps/web/src/server/health.int.test.ts::GET /api/v1/readyz`
-- `deploy/next/rehearsal/drill.sh::upgrade/readiness-gate-ends-on-previous`
+- `deploy/rehearsal/drill.sh::upgrade/readiness-gate-ends-on-previous`
 
 ### OPS-004
 
 Every service the production topology starts — `postgres`, `redis`, `web`, `worker` and `edge` — has a healthcheck. The assertion is static: it parses the rendered Compose configuration (`docker compose config`, so profiles, overrides and variable substitution are applied) and needs no running stack. `migrate` is exempt: it is a one-shot that exits, and a healthcheck on it has nothing to report.
 
-- `deploy/next/rehearsal/drill.sh::static/healthcheck-per-service`
+- `deploy/rehearsal/drill.sh::static/healthcheck-per-service`
 
 ## Route integrity
 
