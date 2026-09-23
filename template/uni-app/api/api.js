@@ -25,7 +25,7 @@ import {
   fromPageBase64Input,
   toPageBase64,
 } from './mappers/system.js';
-import { toPageProductList } from './mappers/catalog.js';
+import { fromPageProductQuery, toPageProductList } from './mappers/catalog.js';
 import {
   toPageArticleList,
   toPageArticleDetail,
@@ -40,7 +40,7 @@ import {
   toPageSmsCodeResult,
 } from './mappers/user.js';
 import { toPageSubscribeTemplates } from './mappers/wechat.js';
-import { fromPagePaging, text } from './mappers/_shared.js';
+import { fromPagePaging, idList, text, withPickedIds } from './mappers/_shared.js';
 
 // ---------------------------------------------------------------------------
 // 优惠券
@@ -182,20 +182,32 @@ export function colorChange(name) {
 }
 
 /**
- * DIY 组件：商品列表
+ * 超级组件：商品。指定数据传 `ids`，指定分类传 `cate_ids`；
+ * 商品排序 `order`（0 销量 / 1 价格）与排序规则 `sort`（0 降序 / 1 升序）只在指定分类下生效，
+ * 指定数据按选择的顺序展示。
  */
 export function getThemeProduct(data) {
-  const query = fromPagePaging(data);
   const src = data || {};
-  if (src.cid) query.categoryId = String(src.cid);
+  const sorted = idList(src.ids).length === 0;
+  const direction = String(src.sort) === '1' ? 'asc' : 'desc';
+  const query = fromPageProductQuery({
+    ids: src.ids,
+    cate_ids: src.cate_ids,
+    limit: src.limit,
+    salesOrder: sorted && String(src.order) === '0' ? direction : '',
+    priceOrder: sorted && String(src.order) === '1' ? direction : '',
+  });
   return request.get('/api/v1/catalog/products', query, { noAuth: true, map: toPageProductList });
 }
 
 /**
- * DIY 组件：优惠券列表
+ * 超级组件：优惠券。指定数据传 `ids`（券模板 id），按选择的顺序展示，已不可领取的券不展示。
+ * 筛选数据下的券类型、门槛、时间等条件没有对应的查询参数，展示的是可领取的券。
  */
 export function getThemeCoupon(data) {
-  return request.get('/api/v1/coupons', fromPagePaging(data), {
+  const query = fromPagePaging(data);
+  withPickedIds(query, (data || {}).ids);
+  return request.get('/api/v1/coupons', query, {
     noAuth: true,
     map: toPageCouponArray,
   });
@@ -287,10 +299,17 @@ export function getCity() {
 }
 
 /**
- * DIY 文章组件
+ * 超级组件：文章。指定数据传 `ids`，按选择的顺序展示，未发布的文章不展示；
+ * 筛选数据传分类 `cid`（一个或以 `,` 连接的多个）。
  */
 export function getThemeArticle(data) {
-  return request.get('/api/v1/articles', fromPagePaging(data), {
+  const src = data || {};
+  const query = fromPagePaging(src);
+  if (!withPickedIds(query, src.ids)) {
+    const categories = idList(src.cid);
+    if (categories.length) query.categoryIds = categories.join(',');
+  }
+  return request.get('/api/v1/articles', query, {
     noAuth: true,
     map: toPageArticleList,
   });

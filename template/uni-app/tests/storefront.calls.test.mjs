@@ -161,3 +161,107 @@ describe('一键换色 — the presell list never fails on a shop with no theme'
     expect(calls.map((c) => c.route)).toEqual(['GET /api/v1/diy/theme']);
   });
 });
+
+describe('DIY components ask for what the operator picked', () => {
+  // Each call below is made with exactly the params the component builds
+  // (`subpackage/diyComponents/customComponent.vue` → `fetch*Data`,
+  // `goodList.vue` → `productslist`, which also draws 优品推荐 and 商品选项卡).
+  //
+  // What was sent is also parsed by the route's own query schema, the way the
+  // server reads it, so a list the contract would refuse fails here.
+  let store;
+  let routes;
+
+  beforeAll(async () => {
+    store = await import('../api/store.js');
+    routes = (await import('../../../next/packages/contracts/src/routes.gen.ts')).allRoutes;
+  });
+
+  function sent(call) {
+    const [method, path] = call.route.split(' ');
+    const route = routes.find((r) => r.method === method && r.path === path);
+    const params = new URL(call.url).searchParams;
+    const query = {};
+    for (const key of new Set(params.keys())) {
+      const values = params.getAll(key);
+      query[key] = values.length > 1 ? values : values[0];
+    }
+    const parsed = route.query.safeParse(query);
+    expect(parsed.success, JSON.stringify(parsed.error && parsed.error.issues)).toBe(true);
+    return query;
+  }
+
+  it('超级组件 · 文章 · 指定数据 sends the picked ids and asks for all of them', async () => {
+    await api.getThemeArticle({ limit: 1, order: 0, sort: 0, ids: '12,7,31' });
+    expect(calls[0].route).toBe('GET /api/v1/articles');
+    expect(sent(calls[0])).toEqual({ ids: '12,7,31', page: '1', pageSize: '3' });
+  });
+
+  it('超级组件 · 文章 · 筛选数据 sends the category and the count', async () => {
+    await api.getThemeArticle({ limit: 4, order: 0, sort: 0, cid: '3' });
+    expect(sent(calls[0])).toEqual({ categoryIds: '3', pageSize: '4' });
+    calls = [];
+    await api.getThemeArticle({ limit: 4, order: 0, sort: 0, cid: '3,4' });
+    expect(sent(calls[0])).toEqual({ categoryIds: '3,4', pageSize: '4' });
+  });
+
+  it('超级组件 · 优惠券 · 指定数据 sends the picked template ids', async () => {
+    await api.getThemeCoupon({ limit: 1, order: 0, sort: 0, ids: '5,2' });
+    expect(calls[0].route).toBe('GET /api/v1/coupons');
+    expect(sent(calls[0])).toEqual({ ids: '5,2', page: '1', pageSize: '2' });
+  });
+
+  it('超级组件 · 商品 · 指定数据 sends the picked ids, in their order, unsorted', async () => {
+    await api.getThemeProduct({ limit: 6, order: 1, sort: 1, ids: '9,4' });
+    expect(calls[0].route).toBe('GET /api/v1/catalog/products');
+    expect(sent(calls[0])).toEqual({ ids: '9,4', page: '1', pageSize: '2' });
+  });
+
+  it('超级组件 · 商品 · 指定分类 sends the categories, the count and the sort', async () => {
+    await api.getThemeProduct({ limit: 6, order: 1, sort: 1, cate_ids: '17,18' });
+    expect(sent(calls[0])).toEqual({
+      categoryIds: '17,18',
+      pageSize: '6',
+      sortBy: 'price',
+      sortOrder: 'asc',
+    });
+    calls = [];
+    await api.getThemeProduct({ limit: 6, order: 0, sort: 0, cate_ids: '17' });
+    expect(sent(calls[0])).toEqual({
+      categoryIds: '17',
+      pageSize: '6',
+      sortBy: 'sales',
+      sortOrder: 'desc',
+    });
+  });
+
+  it('商品列表 · 指定商品 sends the picked ids and asks for all of them', async () => {
+    await store.getProductslist({ ids: '3,1,8' });
+    expect(sent(calls[0])).toEqual({ ids: '3,1,8', page: '1', pageSize: '3' });
+  });
+
+  it('商品列表 · 指定分类 sends every picked category', async () => {
+    await store.getProductslist({ priceOrder: '', salesOrder: 'desc', cate_id: '17,18', limit: 8 });
+    expect(sent(calls[0])).toEqual({
+      categoryIds: '17,18',
+      pageSize: '8',
+      sortBy: 'sales',
+      sortOrder: 'desc',
+    });
+  });
+
+  it('商品列表 · 商品标签 sends every picked label', async () => {
+    await store.getProductslist({ priceOrder: 'desc', salesOrder: '', store_label_id: '5,6', limit: 8 });
+    expect(sent(calls[0])).toEqual({
+      labelIds: '5,6',
+      pageSize: '8',
+      sortBy: 'price',
+      sortOrder: 'desc',
+    });
+  });
+
+  it('drops a blank or malformed id rather than failing the whole list', async () => {
+    await api.getThemeArticle({ limit: 1, ids: '12,,abc,0,12,7' });
+    expect(sent(calls[0])).toEqual({ ids: '12,7', page: '1', pageSize: '2' });
+  });
+});
