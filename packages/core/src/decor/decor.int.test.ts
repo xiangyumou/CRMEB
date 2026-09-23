@@ -17,11 +17,14 @@ import {
 import { articles } from '@shop/db/schema/cms';
 import { couponTemplates } from '@shop/db/schema/coupon';
 import { decorDocuments, decorRevisions } from '@shop/db/schema/decor';
+import { groupbuyActivities } from '@shop/db/schema/groupbuy';
 import { orders } from '@shop/db/schema/order';
+import { presaleActivities } from '@shop/db/schema/presale';
 import { users } from '@shop/db/schema/user';
 import { createTestCtx, forkTestCtx, type TestCtx } from '@shop/testing';
 import * as coupon from '../coupon';
 import { anonymousActor, type Actor, type Ctx } from '../kernel/context';
+import { withTx } from '../kernel/tx';
 import * as decor from './index';
 
 /**
@@ -1190,5 +1193,245 @@ describe('the batch-1 blocks (G1)', () => {
       expect(page.personal?.card).toBeUndefined();
       expect(page.personal?.orders?.counts).toMatchObject({ kind: 'orderCounts' });
     });
+  });
+});
+
+describe('the batch-2 blocks (G2)', () => {
+  async function groupbuyCampaign(sortOrder = 0, status: 'active' | 'paused' = 'active') {
+    const productId = Number(await product());
+    const [row] = await ctx.db
+      .insert(groupbuyActivities)
+      .values({
+        productId,
+        title: `拼团${sequence}`,
+        status,
+        price: '39.00',
+        originalPrice: '60.00',
+        seatsRequired: 2,
+        groupTtlSeconds: 86_400,
+        stock: 10,
+        perOrderQuantity: 1,
+        sortOrder,
+        startAt: new Date('2026-05-01T00:00:00.000Z'),
+        endAt: new Date('2026-07-01T00:00:00.000Z'),
+      })
+      .returning({ id: groupbuyActivities.id });
+    return String(row!.id);
+  }
+
+  async function presaleCampaign(sortOrder = 0, status: 'active' | 'draft' = 'active') {
+    const productId = Number(await product());
+    const [row] = await ctx.db
+      .insert(presaleActivities)
+      .values({
+        productId,
+        title: `预售${sequence}`,
+        status,
+        paymentMode: 'full',
+        price: '49.00',
+        originalPrice: '60.00',
+        stock: 10,
+        perOrderQuantity: 1,
+        sortOrder,
+        shipAfterDays: 7,
+        startAt: new Date('2026-05-01T00:00:00.000Z'),
+        endAt: new Date('2026-07-01T00:00:00.000Z'),
+      })
+      .returning({ id: presaleActivities.id });
+    return String(row!.id);
+  }
+
+  const block = (id: string, type: string, props: Record<string, unknown> = {}) => ({
+    id,
+    type,
+    v: 1,
+    props,
+  });
+
+  const grantNewcomer = (uid: number) => withTx(ctx.db, (tx) => coupon.grantNewUser(tx, ctx, uid));
+
+  it('DECOR-013: 优惠券 shows only what can be claimed now, in the operator’s order', async () => {
+    const a = await template({ name: '甲' });
+    const paused = await template({ name: '停', status: 'disabled' });
+    const welcome = await template({ name: '新人', claimMode: 'new_user' });
+    const b = await template({ name: '乙' });
+    const page = await previewOf([
+      block('c', 'couponList', { source: { mode: 'manual', ids: [b, paused, welcome, a] } }),
+      block('all', 'couponList', { source: { mode: 'auto', limit: 10 } }),
+    ]);
+    expect(idsIn(page, 0, 'coupons')).toEqual([b, a]);
+    expect(idsIn(page, 1, 'coupons').sort()).toEqual([a, b].sort());
+    expect(page.personal).toBeNull();
+  });
+
+  it('DECOR-015: 优惠券 claim state is each shopper’s own, and never in the cached page', async () => {
+    const limited = await template({ perUserLimit: 1 });
+    const twice = await template({ perUserLimit: 2 });
+    await live(
+      'home',
+      [block('c', 'couponList', { source: { mode: 'manual', ids: [limited, twice] } })],
+      'home',
+    );
+    const [first, second] = [await user('g2-first'), await user('g2-second')];
+    await coupon.claim(harness.as(shopper(first)), { id: limited });
+    await coupon.claim(harness.as(shopper(first)), { id: twice });
+
+    const one = await decor.resolveHome(harness.as(shopper(first)), NO_CLIENT);
+    const two = await decor.resolveHome(harness.as(shopper(second)), NO_CLIENT);
+    expect(one.version).toBe(two.version);
+    expect(one.personal?.c?.coupons).toEqual({
+      kind: 'coupons',
+      items: [
+        { templateId: limited, claimedCount: 1, canClaim: false },
+        { templateId: twice, claimedCount: 1, canClaim: true },
+      ],
+    });
+    expect(two.personal?.c?.coupons).toEqual({
+      kind: 'coupons',
+      items: [
+        { templateId: limited, claimedCount: 0, canClaim: true },
+        { templateId: twice, claimedCount: 0, canClaim: true },
+      ],
+    });
+    // A claim after the page was cached shows at once: the state is never cached.
+    await coupon.claim(harness.as(shopper(second)), { id: limited });
+    const again = await decor.resolveHome(harness.as(shopper(second)), NO_CLIENT);
+    expect(again.version).toBe(two.version);
+    expect(again.personal?.c?.coupons).toMatchObject({
+      items: [{ templateId: limited, claimedCount: 1, canClaim: false }, { claimedCount: 0 }],
+    });
+
+    const raw = await harness.redis.get(decor.revisionCacheKey(Number(one.version.slice(4))));
+    expect(raw).not.toBeNull();
+    expect(raw).not.toContain('claimedCount');
+    expect(raw).not.toContain('canClaim');
+    expect((await decor.resolveHome(anonymous(), NO_CLIENT)).personal).toBeNull();
+  });
+
+  it('DECOR-015: 新人券 shows a guest the templates, and a shopper only the 新人券 they still hold', async () => {
+    const welcome = await template({ name: '新人礼', claimMode: 'new_user', minSpend: '0.00' });
+    await template({ name: '手领', claimMode: 'manual' });
+    const blocks = [block('n', 'newcomerCoupon', { limit: 2 })];
+
+    const guest = await previewOf(blocks);
+    expect(idsIn(guest, 0, 'coupons')).toEqual([welcome]);
+    expect(guest.personal).toBeNull();
+
+    const granted = await user('g2-new');
+    expect(await grantNewcomer(granted)).toBe(1);
+    const mine = await previewOf(blocks, harness.as(shopper(granted)));
+    expect(mine.personal?.n?.held).toEqual({
+      kind: 'newcomerCoupons',
+      coupons: [
+        expect.objectContaining({ templateId: welcome, title: '新人礼', discountAmount: '10.00' }),
+      ],
+    });
+
+    // Registered before the template existed: nothing held, the block hides itself.
+    const veteran = await user('g2-veteran');
+    const theirs = await previewOf(blocks, harness.as(shopper(veteran)));
+    expect(theirs.personal?.n?.held).toEqual({ kind: 'newcomerCoupons', coupons: [] });
+
+    // Spent: gone from the block on the next resolve.
+    const [held] = await coupon.listHeldNewUser(harness.as(shopper(granted)), 5);
+    await withTx(ctx.db, (tx) =>
+      coupon.redeem(tx, ctx, { userCouponId: Number(held!.id), userId: granted, orderId: 1 }),
+    );
+    const after = await previewOf(blocks, harness.as(shopper(granted)));
+    expect(after.personal?.n?.held).toEqual({ kind: 'newcomerCoupons', coupons: [] });
+  });
+
+  it('DECOR-015: a live 新人券 block is cached without anyone’s wallet', async () => {
+    await template({ name: '新人礼', claimMode: 'new_user' });
+    await live('home', [block('n', 'newcomerCoupon')], 'home');
+    const uid = await user('g2-cached');
+    await grantNewcomer(uid);
+    const page = await decor.resolveHome(harness.as(shopper(uid)), NO_CLIENT);
+    expect(page.personal?.n?.held).toMatchObject({ coupons: [{ title: '新人礼' }] });
+    const raw = await harness.redis.get(decor.revisionCacheKey(Number(page.version.slice(4))));
+    expect(JSON.parse(raw!).blocks[0].personalNeeds).toEqual({
+      held: { kind: 'newcomerCoupons', limit: 3 },
+    });
+    expect(raw).not.toContain('newcomerCoupons","coupons"');
+    expect(raw).not.toContain('gift_new_user');
+  });
+
+  it('DECOR-013: a manual 拼团 / 预售 pick is found by id, however far down the list it sits', async () => {
+    const hidden = await groupbuyCampaign(-1);
+    const paused = await groupbuyCampaign(0, 'paused');
+    const top = await groupbuyCampaign(5);
+    const buried = await presaleCampaign(-1);
+    const draft = await presaleCampaign(0, 'draft');
+    const first = await presaleCampaign(5);
+
+    const page = await previewOf([
+      block('g', 'groupbuyList', { source: { mode: 'manual', ids: [hidden, paused, top] } }),
+      block('ga', 'groupbuyList', { source: { mode: 'auto', limit: 1 } }),
+      block('p', 'presaleList', { source: { mode: 'manual', ids: [draft, buried, first] } }),
+      block('pa', 'presaleList', { source: { mode: 'auto', limit: 1 } }),
+    ]);
+    const campaigns = (index: number) =>
+      (page.blocks[index]!.data.campaigns as { activityId: string }[]).map((c) => c.activityId);
+    expect(campaigns(0)).toEqual([hidden, top]);
+    expect(campaigns(1)).toEqual([top]);
+    expect(campaigns(2)).toEqual([buried, first]);
+    expect(campaigns(3)).toEqual([first]);
+    expect(page.blocks[2]!.data.campaigns).toEqual([
+      expect.objectContaining({ price: '49.00', originalPrice: '60.00', shipAfterDays: 7 }),
+      expect.anything(),
+    ]);
+  });
+
+  it('DECOR-004: a picked campaign that is not running is a warning, checked by id', async () => {
+    const running = await groupbuyCampaign(-1);
+    const paused = await groupbuyCampaign(0, 'paused');
+    const draft = await presaleCampaign(0, 'draft');
+    const { id } = await drafted('custom', [
+      block('g', 'groupbuyList', { source: { mode: 'manual', ids: [running, paused] } }),
+      block('p', 'presaleList', { source: { mode: 'manual', ids: [draft] } }),
+    ]);
+    const reread = await decor.getDocument(ctx, { id });
+    expect(reread.issues).toEqual([]);
+    expect(reread.warnings.map((warning) => warning.message)).toEqual([
+      `拼团活动 ${paused} 未在进行中或不存在，商城中不会显示`,
+      `预售活动 ${draft} 未在进行中或不存在，商城中不会显示`,
+    ]);
+  });
+
+  it('DECOR-013: 资讯 resolves a category’s newest published articles', async () => {
+    const older = await article({ publishedAt: new Date('2026-04-01T00:00:00.000Z') });
+    const newer = await article({ publishedAt: new Date('2026-05-10T00:00:00.000Z') });
+    await article({ status: 'draft' });
+    const page = await previewOf([
+      block('a', 'articleList', { source: { mode: 'category', limit: 5 } }),
+      block('m', 'articleList', { source: { mode: 'manual', ids: [older] } }),
+    ]);
+    expect(idsIn(page, 0, 'articles')).toEqual([newer, older]);
+    expect(idsIn(page, 1, 'articles')).toEqual([older]);
+  });
+
+  it('DECOR-018: a page takes one 悬浮客服 and one 关注公众号, and publishing more is refused', async () => {
+    const one = await drafted('home', [
+      block('f', 'floatingContact'),
+      block('o', 'followOfficialAccount'),
+      block('v', 'video', { src: 'https://cdn.example.com/a.mp4' }),
+    ]);
+    expect((await decor.getDocument(ctx, { id: one.id })).issues).toEqual([]);
+    await decor.publish(ctx, { id: one.id, note: '' });
+
+    const two = await drafted('home', [
+      block('f1', 'floatingContact'),
+      block('f2', 'floatingContact', { side: 'left' }),
+      block('o1', 'followOfficialAccount'),
+      block('o2', 'followOfficialAccount'),
+    ]);
+    const reread = await decor.getDocument(ctx, { id: two.id });
+    expect(reread.issues).toEqual([
+      { path: 'blocks.1.type', message: '「悬浮客服」一个页面最多 1 个' },
+      { path: 'blocks.3.type', message: '「关注公众号」一个页面最多 1 个' },
+    ]);
+    expect(await codeOf(decor.publish(ctx, { id: two.id, note: '' }))).toBe(
+      'DECOR_DOCUMENT_INVALID',
+    );
   });
 });

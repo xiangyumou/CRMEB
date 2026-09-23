@@ -160,3 +160,39 @@ export const ORDER_ENTRY_KEYS = {
   aftersale: '售后/退款',
 } as const;
 export type OrderEntryKey = keyof typeof ORDER_ENTRY_KEYS;
+
+/** 优惠券: how the coupon tickets sit. */
+export const COUPON_LIST_LAYOUTS = {
+  scroll: '横向滑动',
+  stack: '纵向排列',
+} as const;
+export type CouponListLayout = keyof typeof COUPON_LIST_LAYOUTS;
+
+/** 拼团 / 预售: how the campaign cards sit. */
+export const CAMPAIGN_LIST_LAYOUTS = {
+  list: '单列列表',
+  scroll: '横向滑动',
+} as const;
+export type CampaignListLayout = keyof typeof CAMPAIGN_LIST_LAYOUTS;
+
+/** 资讯: a text row with a small cover, or a large cover card. */
+export const ARTICLE_LIST_LAYOUTS = {
+  list: '列表',
+  card: '大图卡片',
+} as const;
+export type ArticleListLayout = keyof typeof ARTICLE_LIST_LAYOUTS;
+
+/** 视频: the frame's aspect ratio, width : height. */
+export const VIDEO_RATIOS = {
+  '16:9': '16:9',
+  '4:3': '4:3',
+  '1:1': '1:1',
+} as const;
+export type VideoRatio = keyof typeof VIDEO_RATIOS;
+
+/** 悬浮客服: which edge of the screen the button sits against. */
+export const FLOATING_SIDES = { right: '右侧', left: '左侧' } as const;
+export type FloatingSide = keyof typeof FLOATING_SIDES;
+
+/** 悬浮客服: the button's distance from the bottom of the screen, in design px (750 wide). */
+export const FLOATING_BOTTOM = { min: 120, max: 600, default: 240 } as const;

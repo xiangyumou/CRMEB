@@ -35,6 +35,7 @@ export {
   claim,
   listApplicable,
   listClaimable,
+  listHeldNewUser,
   listMine,
   listNewUser,
   staffGrant,

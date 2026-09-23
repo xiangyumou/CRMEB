@@ -23,7 +23,7 @@ import type { z } from 'zod';
  *    of literals → select (`radio` when ≤ 4 choices), array of objects → list,
  *    array of an enum → multi-select (the enum's `options` label the choices),
  *    object → group. Set `field` only to override that, or for a *semantic*
- *    kind the inference cannot see: `color`, `image`, `link`, `richText`,
+ *    kind the inference cannot see: `color`, `image`, `video`, `link`, `richText`,
  *    `hotspots` and the data
  *    sources (`productSource`, `couponSource`, `groupbuySource`,
  *    `presaleSource`, `articleSource`). Semantic kinds are rendered by the
@@ -67,6 +67,8 @@ export type EditorFieldKind =
   | 'object'
   | 'color'
   | 'image'
+  /** An uploaded video (mp4), picked from the asset library. */
+  | 'video'
   | 'link'
   /** Sanitised HTML (`rich-text.ts`), edited in a WYSIWYG box. */
   | 'richText'

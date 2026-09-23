@@ -230,14 +230,22 @@ export type CouponUserState = z.infer<typeof couponUserState>;
  * - `orderCounts`: the 订单入口 badges, from `order.counts`.
  * - `userSummary`: the 用户卡片's nickname and avatar, and with `stats` the
  *   优惠券 / 收藏 / 足迹 totals.
+ * - `newcomerCoupons`: the 新人券 the shopper still holds unused (at most
+ *   `limit`), for the 新人券 block. 新人券 are granted at registration and
+ *   never claimed by hand, so this — not the templates' claim state — is what
+ *   decides whether a signed-in shopper sees the block.
  */
-export type PersonalNeed = { kind: 'orderCounts' } | { kind: 'userSummary'; stats: boolean };
+export type PersonalNeed =
+  | { kind: 'orderCounts' }
+  | { kind: 'userSummary'; stats: boolean }
+  | { kind: 'newcomerCoupons'; limit: number };
 
 export type PersonalNeedKind = PersonalNeed['kind'];
 
 export const personalNeed = {
   orderCounts: (): PersonalNeed => ({ kind: 'orderCounts' }),
   userSummary: (stats: boolean): PersonalNeed => ({ kind: 'userSummary', stats }),
+  newcomerCoupons: (limit: number): PersonalNeed => ({ kind: 'newcomerCoupons', limit }),
 };
 
 const count = z.number().int().min(0);
@@ -273,10 +281,22 @@ export const userSummary = z.object({
 });
 export type UserSummary = z.infer<typeof userSummary>;
 
+/** A coupon in the shopper's wallet, as the 新人券 block shows it. */
+export const heldCoupon = z.object({
+  id,
+  templateId: id,
+  title: z.string(),
+  discountAmount: money,
+  minSpend: money,
+  validTo: instant,
+});
+export type HeldCoupon = z.infer<typeof heldCoupon>;
+
 /** One slot's per-shopper state, discriminated so a later kind can be added without guessing. */
 export const personalSlot = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('coupons'), items: z.array(couponUserState) }),
   z.object({ kind: z.literal('orderCounts'), counts: orderEntryCounts }),
   z.object({ kind: z.literal('userSummary'), user: userSummary }),
+  z.object({ kind: z.literal('newcomerCoupons'), coupons: z.array(heldCoupon) }),
 ]);
 export type PersonalSlot = z.infer<typeof personalSlot>;

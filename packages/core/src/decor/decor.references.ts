@@ -29,8 +29,6 @@ import * as repo from './decor.repo';
 
 type Checker = (ctx: Ctx, ids: string[]) => Promise<Set<string>>;
 
-const CAMPAIGN_PAGE = 100;
-
 const CHECKERS: Record<ReferenceKind, { label: string; unavailable: string; visible: Checker }> = {
   product: {
     label: '商品',
@@ -97,22 +95,14 @@ const CHECKERS: Record<ReferenceKind, { label: string; unavailable: string; visi
   groupbuy: {
     label: '拼团活动',
     unavailable: '未在进行中或不存在',
-    visible: async (ctx) =>
-      new Set(
-        (await groupbuy.list(ctx, { page: 1, pageSize: CAMPAIGN_PAGE })).items.map(
-          (item) => item.activityId,
-        ),
-      ),
+    visible: async (ctx, ids) =>
+      new Set((await groupbuy.cardsFor(ctx, ids)).map((item) => item.activityId)),
   },
   presale: {
     label: '预售活动',
     unavailable: '未在进行中或不存在',
-    visible: async (ctx) =>
-      new Set(
-        (await presale.list(ctx, { page: 1, pageSize: CAMPAIGN_PAGE })).items.map(
-          (item) => item.activityId,
-        ),
-      ),
+    visible: async (ctx, ids) =>
+      new Set((await presale.cardsFor(ctx, ids)).map((item) => item.activityId)),
   },
   page: {
     label: '微页面',

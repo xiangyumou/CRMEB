@@ -1081,6 +1081,48 @@ describe('the storefront surface', () => {
     expect(byId.get(String(soldOut.activityId))?.canBuy).toBe(false);
   });
 
+  it('answers a manual pick by id, in the given order, with only what the list would show', async () => {
+    const first = await makeActivity({ stock: 5 });
+    const second = await makeActivity({ stock: 0 });
+    const draft = await makeActivity({ status: 'draft' });
+    const later = await makeActivity({
+      startAt: new Date('2026-06-10T00:00:00.000Z'),
+      endAt: new Date('2026-06-20T00:00:00.000Z'),
+    });
+    const deleted = await makeActivity();
+    await harness.ctx.db
+      .update(presaleActivities)
+      .set({ deletedAt: harness.clock.now() })
+      .where(eq(presaleActivities.id, deleted.activityId));
+
+    const ids = [second, draft, later, deleted, first].map((f) => String(f.activityId));
+    const cards = await service.cardsFor(harness.ctx, [...ids, 'abc', ids[0]!]);
+
+    expect(cards.map((card) => card.activityId)).toEqual([
+      String(second.activityId),
+      String(first.activityId),
+    ]);
+    const listed = await service.list(harness.ctx, { page: 1, pageSize: 20 } as never);
+    for (const card of cards) {
+      expect(card).toEqual(listed.items.find((item) => item.activityId === card.activityId));
+    }
+    expect(await service.cardsFor(harness.ctx, [])).toEqual([]);
+  });
+
+  it('finds a picked campaign however many campaigns come before it in the list', async () => {
+    const picked = await makeActivity();
+    await harness.ctx.db
+      .update(presaleActivities)
+      .set({ sortOrder: -1 })
+      .where(eq(presaleActivities.id, picked.activityId));
+    for (let index = 0; index < 3; index += 1) await makeActivity();
+
+    const firstPage = await service.list(harness.ctx, { page: 1, pageSize: 3 } as never);
+    expect(firstPage.items.map((card) => card.activityId)).not.toContain(String(picked.activityId));
+    const cards = await service.cardsFor(harness.ctx, [String(picked.activityId)]);
+    expect(cards.map((card) => card.activityId)).toEqual([String(picked.activityId)]);
+  });
+
   it('serves the detail with enabled SKUs only and the catalogue price struck through', async () => {
     const fixture = await makeActivity({ stock: 5 });
     const ctx = asUser(await makeUser());

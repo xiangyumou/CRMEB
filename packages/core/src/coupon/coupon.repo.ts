@@ -685,6 +685,34 @@ export async function listUserCoupons(
 }
 
 /**
+ * The unused, unexpired coupons of one source kind a user holds, soonest to
+ * expire first. Read-only; the DIY 新人券 block asks it for `gift_new_user`
+ * to tell a shopper their 新人券 are waiting.
+ */
+export async function listUnusedBySource(
+  db: DbOrTx,
+  args: {
+    userId: number;
+    sourceKind: UserCouponRow['sourceKind'];
+    now: Date;
+    limit: number;
+  },
+): Promise<UserCouponRow[]> {
+  return db
+    .select()
+    .from(userCoupons)
+    .where(
+      and(
+        eq(userCoupons.userId, args.userId),
+        eq(userCoupons.sourceKind, args.sourceKind),
+        walletStateFilter('unused', args.now),
+      ),
+    )
+    .orderBy(asc(userCoupons.validTo), asc(userCoupons.id))
+    .limit(args.limit);
+}
+
+/**
  * One customer's wallet as a 店员 sees it: one tab, or every row with the
  * spendable ones first, newest first within each half. Capped by `limit` — the
  * staff drawer does not page.

@@ -965,6 +965,44 @@ describe('the system refund for a failed team', () => {
 });
 
 describe('the storefront surface', () => {
+  it('answers a manual pick by id, in the given order, with only what the list would show', async () => {
+    const first = await makeActivity({ stock: 10 });
+    const second = await makeActivity({ stock: 10 });
+    const paused = await makeActivity({ stock: 10, status: 'paused' });
+    const over = await makeActivity({ stock: 10, endAt: new Date('2026-05-02T00:00:00.000Z') });
+    const leader = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture: second });
+    await pay(opened.orderId);
+
+    const ids = [second, paused, over, first].map((f) => String(f.activityId));
+    const cards = await service.cardsFor(harness.ctx, [...ids, 'x', '0', ids[0]!]);
+
+    expect(cards.map((card) => card.activityId)).toEqual([
+      String(second.activityId),
+      String(first.activityId),
+    ]);
+    const listed = await service.list(harness.ctx, { page: 1, pageSize: 20 });
+    expect(cards[0]).toEqual(
+      listed.items.find((card) => card.activityId === String(second.activityId)),
+    );
+    expect(cards[0]!.formingGroups).toBe(1);
+    expect(await service.cardsFor(harness.ctx, [])).toEqual([]);
+  });
+
+  it('finds a picked campaign however many campaigns come before it in the list', async () => {
+    const picked = await makeActivity({ stock: 10 });
+    await harness.ctx.db
+      .update(groupbuyActivities)
+      .set({ sortOrder: -1 })
+      .where(eq(groupbuyActivities.id, picked.activityId));
+    for (let index = 0; index < 3; index += 1) await makeActivity({ stock: 10 });
+
+    const firstPage = await service.list(harness.ctx, { page: 1, pageSize: 3 });
+    expect(firstPage.items.map((card) => card.activityId)).not.toContain(String(picked.activityId));
+    const cards = await service.cardsFor(harness.ctx, [String(picked.activityId)]);
+    expect(cards.map((card) => card.activityId)).toEqual([String(picked.activityId)]);
+  });
+
   it('offers a team only once its leader has paid', async () => {
     const fixture = await makeActivity({ stock: 10 });
     const leader = await makeUser();
