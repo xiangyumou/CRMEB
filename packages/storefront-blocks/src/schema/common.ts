@@ -9,7 +9,8 @@ import { ui } from './meta';
 /** An image the storefront can load: an uploaded asset URL (or a data URI in fixtures). */
 export const imageUrl = z
   .string()
-  .min(1, '请选择图片')
+  // `abort`: an empty value is "not picked yet", not also "an invalid address".
+  .min(1, { error: '请选择图片', abort: true })
   .max(2048)
   .refine((value) => /^(https?:\/\/|\/|data:image\/)/.test(value), '图片地址无效')
   .meta(ui({ label: '图片', field: 'image' }));

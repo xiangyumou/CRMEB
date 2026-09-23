@@ -214,6 +214,9 @@ importers:
       '@shop/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@shop/storefront-blocks':
+        specifier: workspace:*
+        version: link:../../packages/storefront-blocks
       '@tanstack/react-query':
         specifier: ^5.103.2
         version: 5.103.2(react@19.3.0)

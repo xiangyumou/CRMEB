@@ -6,7 +6,8 @@
     "allowJs": true,
     "incremental": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@tarojs/components": ["../../packages/storefront-blocks/src/dom/index.tsx"]
     },
     "plugins": [{ "name": "next" }]
   },
