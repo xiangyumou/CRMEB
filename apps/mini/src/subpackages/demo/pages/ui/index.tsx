@@ -79,10 +79,10 @@ const productList = {
 function GoodsTab() {
   return (
     <>
-      <Section title="限时秒杀" note="横滑卡片 · 倒计时">
+      <Section title="限时活动" note="横滑卡片 · 倒计时">
         <View className="gallery-flash">
           <View className="gallery-flash__head">
-            <Text className="gallery-flash__title">今日秒杀</Text>
+            <Text className="gallery-flash__title">限时活动</Text>
             <Text className="gallery-flash__ends">距结束</Text>
             <Countdown endsAt={countdownEnd} variant="boxed" />
           </View>
@@ -95,7 +95,7 @@ function GoodsTab() {
                   layout="mini"
                   onClick={noop}
                   activityPrice={index === 0 ? '59.90' : undefined}
-                  activity={index === 0 ? '秒杀' : undefined}
+                  activity={index === 0 ? '拼团' : undefined}
                 />
               ))}
             </View>

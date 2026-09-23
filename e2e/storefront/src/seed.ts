@@ -8,6 +8,11 @@ import {
   adminCreate as couponAdminCreate,
   adminGrant as couponAdminGrant,
 } from '@shop/core/coupon';
+import {
+  createDocument as createDecorDocument,
+  designate as designateDecor,
+  publish as publishDecor,
+} from '@shop/core/decor';
 import { createPage, diyConfig, savePageContent, setHomePage } from '@shop/core/diy';
 import { paymentConfig } from '@shop/core/payment';
 import { templates as shippingTemplates } from '@shop/core/shipping';
@@ -115,6 +120,8 @@ export interface SeedResult {
     secondaryAddressId: number;
     expressCompanyId: number;
     diyHomePageId: number;
+    /** The mini-program's 首页 (页面装修 v2); the uni-app never reads it. */
+    decorHomeId: number;
     division: { provinceId: string; cityId: string; districtId: string };
     diyPages: SeededDiyPage[];
   };
@@ -579,6 +586,17 @@ export async function seedE2E(options: {
       userCenterLayout: Number(valueOf('prod-4.json')),
     });
 
+    // The mini-program's 首页 is a 页面装修 v2 document, not a legacy DIY page:
+    // a search bar, a 分类 entry into the E2E category, and that category's
+    // products — what the mini journeys start from.
+    const decorHome = await createDecorDocument(ctx, {
+      kind: 'home',
+      name: 'E2E 首页',
+      document: decorHomeDocument(String(category.id)),
+    });
+    await publishDecor(ctx, { id: decorHome.id, note: 'E2E' });
+    await designateDecor(ctx, { designation: 'home', documentId: decorHome.id });
+
     return {
       admin: { account: 'e2e-super', password: PASSWORD, id: admin!.id },
       users: { primary, secondary },
@@ -598,6 +616,7 @@ export async function seedE2E(options: {
         secondaryAddressId: Number(secondaryAddress.id),
         expressCompanyId: Number(courier!.id),
         diyHomePageId: diyPages[0]!.id,
+        decorHomeId: Number(decorHome.id),
         division,
         diyPages,
       },
@@ -605,6 +624,81 @@ export async function seedE2E(options: {
   } finally {
     await parts.close();
   }
+}
+
+/** Titles the mini journeys look for on the v2 首页. */
+export const DECOR_HOME = {
+  search: '搜索 E2E 商品',
+  categoryEntry: 'E2E 分类',
+  gridTitle: 'E2E 精选',
+} as const;
+
+function decorHomeDocument(categoryId: string) {
+  const style = { marginY: 'none', paddingX: 'none', radius: 'none' } as const;
+  const visibility = { audience: 'all', platforms: [] } as const;
+  const category = { kind: 'category', id: categoryId } as const;
+  return {
+    schemaVersion: 2 as const,
+    root: {
+      props: { title: 'E2E 商城', background: '#f5f5f5', shareEnabled: true, shareTitle: '' },
+    },
+    blocks: [
+      {
+        id: 'e2e-search',
+        type: 'searchBar',
+        v: 1,
+        props: {
+          placeholder: DECOR_HOME.search,
+          hotWords: [],
+          shape: 'round',
+          sticky: false,
+          style,
+          visibility,
+        },
+      },
+      {
+        id: 'e2e-nav',
+        type: 'navGrid',
+        v: 1,
+        props: {
+          items: [{ icon: E2E_IMAGE_URL, label: DECOR_HOME.categoryEntry, link: category }],
+          columns: 4,
+          rows: 1,
+          paging: false,
+          iconShape: 'circle',
+          style,
+          visibility,
+        },
+      },
+      {
+        id: 'e2e-title',
+        type: 'titleBar',
+        v: 1,
+        props: {
+          title: DECOR_HOME.gridTitle,
+          subtitle: '',
+          align: 'left',
+          moreText: '更多',
+          style,
+          visibility,
+        },
+      },
+      {
+        id: 'e2e-grid',
+        type: 'productGrid',
+        v: 2,
+        props: {
+          source: { mode: 'category', categoryId, sort: 'default', limit: 6 },
+          layout: 'grid2',
+          titleLines: 2,
+          showMarketPrice: false,
+          showTag: false,
+          style,
+          visibility,
+        },
+      },
+    ],
+  };
 }
 
 async function makeUser(

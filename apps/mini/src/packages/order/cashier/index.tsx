@@ -1,48 +1,76 @@
 import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
+import { isApiError } from '@shop/api-client';
 import { useApiClient, useRouteQuery } from '@shop/api-client/react';
-import { LoginCard } from '@/session/login-card';
-import { useSession } from '@/session/session';
 import { navigate, platform, useRouteParams } from '@/platform';
+import { LoginCard } from '@/session/login-card';
+import { useSignedIn } from '@/session/session';
 import { Button } from '@/ui/button';
 import { Card } from '@/ui/card';
+import { Countdown } from '@/ui/countdown';
+import { Empty } from '@/ui/empty';
+import { ErrorBlock } from '@/ui/error-block';
+import { Icon } from '@/ui/icon';
 import { PageShell } from '@/ui/page-shell';
-import '../s4.scss';
+import { Price } from '@/ui/price';
+import { Pressable } from '@/ui/pressable';
+import { Result } from '@/ui/result';
+import { CellSkeleton } from '@/ui/skeleton';
+import './index.scss';
 
 /**
- * 收银台 (`cashier`, `packages/order/cashier/index?orderId=`). Spike S4's plain version:
- * `payment.start` with `wechat_mini`, `wx.requestPayment`, then 支付结果, which polls (C06).
- * A cancelled sheet stays here; anything else goes on to the result page, because only the
- * server knows whether the money moved. Stream B adds the countdown and the order summary.
+ * 收银台 (`cashier { orderId }`): the amount, the time left to pay (`payExpiresAt`), 微信支付.
+ * `payment.start` with `wechat_mini`, then `wx.requestPayment`. Paid (as WeChat's sheet says)
+ * goes on to 支付结果, which asks the server (C06). A closed sheet stays here; a failed one asks
+ * the server once — the money may have moved after all — and otherwise stays with the reason
+ * and 重新支付.
  */
 export default function CashierPage() {
   const { orderId = '' } = useRouteParams('cashier');
   return (
-    <PageShell title="收银台">
+    <PageShell title="收银台" withBar>
       <LoginCard reason="登录后即可支付">
-        <Cashier orderId={orderId} />
+        {orderId === '' ? <Empty title="没有指定订单" /> : <Cashier orderId={orderId} />}
       </LoginCard>
     </PageShell>
   );
 }
 
-type Phase = { kind: 'idle' } | { kind: 'paying' } | { kind: 'notice'; text: string };
+type Phase =
+  { kind: 'idle' } | { kind: 'paying' } | { kind: 'notice'; text: string; retry: boolean };
 
 function Cashier({ orderId }: { orderId: string }) {
   const api = useApiClient();
-  const signedIn = useSession((state) => state.session.status === 'signed-in');
-  const order = useRouteQuery(
-    'order.detail',
-    { params: { id: orderId } },
-    { enabled: signedIn && orderId !== '' },
-  );
+  const signedIn = useSignedIn();
+  const order = useRouteQuery('order.detail', { params: { id: orderId } }, { enabled: signedIn });
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+  const [expired, setExpired] = useState(false);
+  const toOrder = () =>
+    void navigate({ route: 'order', params: { id: orderId } }, { replace: true });
 
-  if (orderId === '') return <Text className="s4-note">没有指定订单</Text>;
-  if (order.isPending) return <Text className="s4-note">加载中…</Text>;
-  if (order.isError) return <Text className="s4-note">{order.error.message}</Text>;
+  if (order.isPending) return <CellSkeleton rows={3} />;
+  if (order.isError) return <ErrorBlock error={order.error} onRetry={() => void order.refetch()} />;
 
-  const payable = order.data.status === 'pending_payment';
+  const detail = order.data;
+  if (detail.status !== 'pending_payment' || expired) {
+    const cancelled = detail.status === 'cancelled' || expired;
+    return (
+      <Result
+        id="cashier-closed"
+        status={cancelled ? 'fail' : 'success'}
+        title={cancelled ? '订单已关闭' : '订单已支付'}
+        description={cancelled ? '超时未支付的订单会自动取消，可以重新下单' : undefined}
+        actions={
+          <>
+            <Button variant="outline" onClick={toOrder}>
+              查看订单
+            </Button>
+            <Button onClick={() => void navigate({ route: 'home', params: {} })}>继续购物</Button>
+          </>
+        }
+      />
+    );
+  }
 
   async function pay() {
     setPhase({ kind: 'paying' });
@@ -56,45 +84,93 @@ function Cashier({ orderId }: { orderId: string }) {
         params: { orderId, outTradeNo: intent.outTradeNo },
       } as const;
       if (intent.alreadyPaid) return void (await navigate(result, { replace: true }));
-      if (!intent.jsapi) throw new Error('服务端没有返回支付参数');
+      if (!intent.jsapi) throw new Error('暂时无法发起支付，请稍后再试');
       const outcome = await platform.requestPayment({
         outTradeNo: intent.outTradeNo,
         params: intent.jsapi,
       });
       if (outcome.kind === 'cancelled') {
-        setPhase({ kind: 'notice', text: '已取消支付，订单会为你保留一段时间' });
+        setPhase({ kind: 'notice', text: '已取消支付，订单会为你保留一段时间', retry: false });
         return;
+      }
+      if (outcome.kind === 'failed') {
+        // WeChat's sheet is not the answer: the server may have been told it was paid.
+        const status = await api
+          .call('payment.status', { params: { outTradeNo: intent.outTradeNo } })
+          .catch(() => null);
+        if (!status?.paid) {
+          setPhase({ kind: 'notice', text: `支付没有完成：${outcome.message}`, retry: true });
+          return;
+        }
       }
       await navigate(result, { replace: true });
     } catch (error) {
-      setPhase({ kind: 'notice', text: error instanceof Error ? error.message : String(error) });
+      if (isApiError(error) && error.code === 'PAYMENT_ORDER_EXPIRED') {
+        setExpired(true);
+        return;
+      }
+      if (isApiError(error) && error.code === 'PAYMENT_ORDER_ALREADY_PAID') {
+        void order.refetch();
+        setPhase({ kind: 'idle' });
+        return;
+      }
+      setPhase({
+        kind: 'notice',
+        text: error instanceof Error ? error.message : String(error),
+        retry: true,
+      });
     }
   }
 
+  const first = detail.items[0];
+  const retry = phase.kind === 'notice' && phase.retry;
   return (
-    <>
-      <Card className="s4-center">
-        <Text className="s4-muted">订单 {order.data.orderNo}</Text>
-        <Text className="s4-amount" id="cashier-amount">
-          ¥{order.data.payableAmount}
-        </Text>
+    <View className="cashier">
+      <Card className="cashier__amount-card">
+        <Text className="cashier__label">实付金额</Text>
+        <View id="cashier-amount">
+          <Price value={detail.payableAmount} size="lg" tone="text" className="cashier__amount" />
+        </View>
+        {detail.payExpiresAt ? (
+          <View className="cashier__deadline">
+            <Text className="cashier__deadline-label">支付剩余时间</Text>
+            <Countdown
+              endsAt={detail.payExpiresAt}
+              onEnd={() => {
+                setExpired(true);
+                void order.refetch();
+              }}
+            />
+          </View>
+        ) : null}
+      </Card>
+      <Card className="cashier__card" padded={false}>
+        <Pressable label="查看订单详情" role="link" className="cashier__summary" onClick={toOrder}>
+          <Text className="cashier__summary-name">
+            {first ? first.productName : '订单商品'}
+            {detail.items.length > 1 ? ` 等 ${detail.totalQuantity} 件` : ''}
+          </Text>
+          <Text className="cashier__summary-no">订单编号 {detail.orderNo}</Text>
+          <Icon name="chevron-right" className="cashier__summary-arrow" />
+        </Pressable>
+      </Card>
+      <Card className="cashier__card" title="支付方式">
+        <View className="cashier__method" ariaRole="radio" ariaChecked ariaLabel="微信支付">
+          <Icon name="wallet" className="cashier__method-icon" />
+          <Text className="cashier__method-name">微信支付</Text>
+          <Icon name="check" className="cashier__method-check" />
+        </View>
       </Card>
       {phase.kind === 'notice' ? (
-        <Text className="s4-note" id="cashier-notice">
+        <Text className="cashier__notice" id="cashier-notice">
           {phase.text}
         </Text>
       ) : null}
-      <View className="s4-actions">
-        <Button
-          size="lg"
-          block
-          disabled={!payable}
-          loading={phase.kind === 'paying'}
-          onClick={() => void pay()}
-        >
-          {payable ? '微信支付' : '订单无需支付'}
+      <View className="cashier__bar">
+        <Button size="lg" block loading={phase.kind === 'paying'} onClick={() => void pay()}>
+          {retry ? '重新支付' : '微信支付'}
         </Button>
       </View>
-    </>
+    </View>
   );
 }
