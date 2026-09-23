@@ -33,7 +33,7 @@ somewhere is an entry in an allow-list inside the check, with the reason next
 to it (below). The last line is the count:
 
 ```
-13 checks, 0 failure(s)
+14 checks, 0 failure(s)
 ```
 
 ## The checks
@@ -45,6 +45,7 @@ to it (below). The last line is the count:
 | `route-hygiene` | `dynamic = 'force-dynamic'` everywhere; `ctx.audit(target)` on every admin write                                                |
 | `permissions`   | every route and menu atom is declared; every declared atom is used                                                              |
 | `admin-client`  | no hand-built `/admin-api/…` URL and no raw `fetch()` outside the api seam                                                      |
+| `fixtures`      | a web test that stubs the API answers through `respondWith`, so every fixture is parsed by its contract                         |
 | `uniapp`        | every storefront call resolves; every page and local import exists for H5 and MP-WEIXIN; the DIY registry matches the contracts |
 | `retired`       | no feature the shop does not have comes back as an identifier or a URL token (CORE-002)                                         |
 | `banned`        | no `eval`, `new Function`, `child_process`, `dangerouslySetInnerHTML`; the core clock lint rule is still an error               |
@@ -71,6 +72,8 @@ baseline and a hiding place.
   admin session itself.
 - `checks/admin-client.ts` — `HAND_BUILT`: the matching client end, the bell's
   `EventSource`. Fails if the URL ever grows a contract.
+- `checks/fixtures.ts` — `RAW_ALLOWED`: `call-route.test.ts`, which tests the
+  transport itself and so must build raw responses.
 - `checks/uniapp.ts` — `NOT_RENDERED_BY_PAGE`: DIY components the editor saves
   that the page renderer does not draw (`bottomMenu`, drawn by the product
   page's footer).
