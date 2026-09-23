@@ -1,3 +1,4 @@
+import { toMiniPath } from '@shop/contracts/system/storefront-routes';
 import type {
   MiniTradeStatus,
   WechatReceiptResult,
@@ -80,10 +81,23 @@ export const SHIPPING_OVERDUE_EVENT = 'admin_shipping_overdue';
 export const MINI_TRADE_MANAGED_EVENT = 'admin_mini_trade_managed';
 
 /**
- * Where WeChat's 发货 / 结算 messages open: the order page, found by the
- * payment's `out_trade_no`, which WeChat substitutes for `${商品订单号}` (C07).
+ * Where WeChat's 发货 / 结算 messages open: the catalogue's `order` page, found
+ * by the payment's `out_trade_no`, which WeChat substitutes for `${商品订单号}`
+ * (C07).
+ *
+ * The path comes from `toMiniPath`, so it moves with the catalogue. WeChat's
+ * placeholder is not a valid `outTradeNo` (the route would refuse it), so the
+ * route is built with a sentinel that is one, and the placeholder replaces the
+ * sentinel only after the route has been validated and rendered.
  */
-export const MSG_JUMP_PATH = 'packages/order/detail/index?outTradeNo=${商品订单号}';
+const OUT_TRADE_NO_SENTINEL = 'WECHATOUTTRADENOSENTINEL';
+export const MSG_JUMP_PATH = msgJumpPath();
+
+function msgJumpPath(): string {
+  const path = toMiniPath({ route: 'order', params: { outTradeNo: OUT_TRADE_NO_SENTINEL } });
+  if (!path.includes(OUT_TRADE_NO_SENTINEL)) throw new Error('order route lost its outTradeNo');
+  return path.replace(OUT_TRADE_NO_SENTINEL, '${商品订单号}');
+}
 
 interface UploadPayload {
   orderId: number;

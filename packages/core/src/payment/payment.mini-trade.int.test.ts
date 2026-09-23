@@ -848,6 +848,8 @@ describe('同步 (is_trade_managed + set_msg_jump_path)', () => {
     expect(after).toMatchObject({ managed: true, msgJumpPath: MSG_JUMP_PATH });
     expect(after.msgJumpPathSetAt).toBe(NOW);
     expect(oa.msgJumpPath).toBe(MSG_JUMP_PATH);
+    // The catalogue's `order` page, with WeChat's own placeholder for the payment.
+    expect(MSG_JUMP_PATH).toBe('packages/order/detail/index?outTradeNo=${商品订单号}');
   });
 
   it('says so when the mini program is not configured, and when WeChat refuses — WXSHIP-007', async () => {

@@ -1418,6 +1418,7 @@ describe('shopper notifications', () => {
     expect(opened?.content).toContain('3 人成团，请在 2026-06-01 09:00 前邀请好友参团');
     expect(opened?.data).toMatchObject({
       link: `/pages/activity/goods_combination_status/index?id=${leader.groupId}`,
+      route: { route: 'groupbuyTeam', params: { id: String(leader.groupId) } },
     });
 
     const [joined] = await inbox(joinerId);
@@ -1425,7 +1426,7 @@ describe('shopper notifications', () => {
     expect(joined).toMatchObject({ code: 'groupbuy_joined', title: '参团成功' });
   });
 
-  it('tells every paid member 拼团成功 when the team fills, on every channel switched on', async () => {
+  it('tells every paid member 拼团成功 when the team fills, on every channel switched on — NOTIF-006', async () => {
     // The operator configures the event in 通知管理 before the team fills.
     const current = await notificationAdmin.getTemplate(superAdmin(), {
       code: 'groupbuy_succeeded',
@@ -1448,6 +1449,7 @@ describe('shopper notifications', () => {
             templateKey: '1001',
             templateId: 'TPL_MINI_GROUP_OK',
             fields: { character_string1: '{{orderNo}}', thing2: '{{activityTitle}}' },
+            // Deprecated: the event's catalogue route decides the page.
             page: 'pages/activity/goods_combination_status/index?id={{groupId}}',
           },
           sms: { enabled: true, templateCode: 'SMS_GROUP_OK' },
@@ -1493,7 +1495,7 @@ describe('shopper notifications', () => {
         .find((call) => (call.body as { touser: string }).touser === `mini-openid-${index}`);
       expect(miniSend?.body).toMatchObject({
         template_id: 'TPL_MINI_GROUP_OK',
-        page: `pages/activity/goods_combination_status/index?id=${team.groupId}`,
+        page: `packages/promo/groupbuy-team/index?id=${team.groupId}`,
         data: { character_string1: { value: orderNo }, thing2: { value: team.title } },
       });
 
