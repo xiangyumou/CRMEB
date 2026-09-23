@@ -1,7 +1,7 @@
 import { registerNotificationEvents } from '../notification';
 
 /**
- * The refund domain's own admin notification (CR-4-k2, CR-5-k2).
+ * The refund domain's own admin notification.
  *
  * Raised when a well-signed refund notification — or a query answer — does not
  * match the after-sale it names: another merchant, or an amount other than the

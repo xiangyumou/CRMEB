@@ -37,11 +37,10 @@ import * as service from './refund.service';
 /**
  * The after-sales races.
  *
- * Three of the seven scenarios the stream brief makes mandatory live here — two
- * simultaneous refund requests on one order line, an approval racing the buyer's
- * withdrawal, and a duplicate refund callback — plus the reconciliation sweep
- * racing a refund notification and a statement-level race for every conditional
- * update they depend on.
+ * Three mandatory scenarios live here — two simultaneous refund requests on one
+ * order line, an approval racing the buyer's withdrawal, and a duplicate refund
+ * callback — plus the reconciliation sweep racing a refund notification and a
+ * statement-level race for every conditional update they depend on.
  *
  * Everything starts from a *genuinely* paid order: the fixture runs the real
  * payment flow against the fake gateway, so the attempt the refund is frozen
@@ -649,8 +648,8 @@ describe('REFUND-006 — reconciliation racing a refund callback', () => {
 
     expect(report.rejected).toEqual([]);
     // Every row the three dispatchers finished was finished by exactly one of
-    // them. Settling records `order.refunded` (delivered to a logged no-op since
-    // CR-2-k2), so the count is not simply 1: it is the rows now `done`.
+    // them. Settling records `order.refunded` (delivered to a logged no-op), so
+    // the count is not simply 1: it is the rows now `done`.
     const done = await harness.ctx.db
       .select({ eventType: effectsTable.eventType })
       .from(effectsTable)
@@ -713,14 +712,15 @@ describe('REFUND-006 — reconciliation racing a refund callback', () => {
 });
 
 // ---------------------------------------------------------------------------
-// FULFILL-002 (the C half) — the warehouse and the operator, on the same units
+// FULFILL-002 (the refund half) — the warehouse and the operator, on the same
+// units
 // ---------------------------------------------------------------------------
 
 /**
- * B2's dispatch bound is `shipped + q <= quantity - refunded_quantity`; the
- * mirror, on this side, is `refunded <= quantity - shipped_quantity`. Both are
- * `WHERE` clauses, so the database decides and the two services never have to
- * agree on an order of operations.
+ * Fulfilment's dispatch bound is `shipped + q <= quantity - refunded_quantity`;
+ * the mirror, on this side, is `refunded <= quantity - shipped_quantity`. Both
+ * are `WHERE` clauses, so the database decides and the two services never have
+ * to agree on an order of operations.
  *
  * Both services are the real ones here. A test with a hand-written `UPDATE`
  * standing in for one of them proves the SQL, not the system: it cannot catch

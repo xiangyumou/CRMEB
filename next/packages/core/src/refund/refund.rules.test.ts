@@ -14,11 +14,10 @@ import {
  * The refund arithmetic, without a database.
  *
  * Every case here is a way a shop gives back the wrong amount of money, and
- * most of them are one rounding decision apart from the right one. The legacy
- * controllers took the amount from the *request*, so none of this arithmetic
- * existed to be got wrong — and a crafted body could ask for any number it
- * liked (risk matrix §6). Here the service computes it and the request carries
- * lines and quantities only, which makes these functions the whole defence.
+ * most of them are one rounding decision apart from the right one. Taking the
+ * amount from the *request* would let a crafted body ask for any number it
+ * liked, so the service computes it and the request carries lines and
+ * quantities only, which makes these functions the whole defence.
  */
 
 const line = (over: Partial<RefundableLineInput> = {}): RefundableLineInput => ({

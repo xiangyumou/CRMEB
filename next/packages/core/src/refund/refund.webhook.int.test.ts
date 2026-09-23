@@ -39,8 +39,7 @@ import * as repo from './refund.repo';
 import * as service from './refund.service';
 
 /**
- * The two WeChat Pay webhooks, read as an attacker (K2, AUDIT.md K-SEC-P6,
- * K-SEC-P7, K-SEC-R6).
+ * The two WeChat Pay webhooks, read as an attacker.
  *
  * Every notification here carries a *genuine* signature from the fake
  * gateway's platform key and a resource sealed with the shop's own APIv3 key —
@@ -49,11 +48,10 @@ import * as service from './refund.service';
  * other endpoint, naming another merchant, or stating an amount that is not
  * the one we froze.
  *
- * K2 pinned CR-3-k2, CR-4-k2 and CR-5-k2 here as expected failures; R2 fixed
- * them and they are plain `it`s now, beside the cases that pin *how* each is
- * refused: 200, no callback row for a misroute, and an operator notification
- * (never a settlement, never an automatic refund) for a merchant or amount that
- * does not match.
+ * Each wrong body has a case that it is refused and cases that pin *how*: 200,
+ * no callback row for a misroute, and an operator notification (never a
+ * settlement, never an automatic refund) for a merchant or amount that does not
+ * match.
  */
 
 let harness: TestCtx;
@@ -79,8 +77,8 @@ beforeEach(async () => {
   await flushTestRedis(harness.redis);
   harness.clock.set(NOW);
   resetEffectHandlers();
-  // The operator notifications CR-4-k2 / CR-5-k2 raise are asserted below;
-  // `notify` drops an event nobody registered.
+  // The operator notifications a wrong merchant or amount raises are asserted
+  // below; `notify` drops an event nobody registered.
   registerNotificationDomain();
   registerPaymentNotificationEvents();
   registerRefundNotificationEvents();
@@ -344,10 +342,10 @@ const flowRows = (kind: 'order_payment' | 'order_refund') =>
   harness.ctx.db.select().from(capitalFlows).where(eq(capitalFlows.kind, kind));
 
 // ---------------------------------------------------------------------------
-// K-SEC-P6 — an event delivered to the endpoint it was not meant for
+// an event delivered to the endpoint it was not meant for
 // ---------------------------------------------------------------------------
 
-describe('K-SEC-P6 — a signed event delivered to the other webhook', () => {
+describe('a signed event delivered to the other webhook', () => {
   it('books nothing when a refund notification reaches the payment endpoint', async () => {
     const order = await paidOrder();
     const refund = await processingRefund(order);
@@ -378,13 +376,13 @@ describe('K-SEC-P6 — a signed event delivered to the other webhook', () => {
     expect(await flowRows('order_payment')).toEqual([]);
   });
 
-  // CR-3-k2. Both webhooks write into one `payment_callbacks` table keyed by
-  // `(mch_id, provider_notify_id)`, and each inserts its row *before* it knows
-  // whether the event is one it handles. So a misrouted delivery burns the
-  // notification id, and the genuine delivery that follows is taken for a
-  // WeChat retry and acknowledged without booking anything: money taken at
-  // the gateway, an order still `pending_payment`, and the auto-cancel job on
-  // its way.
+  // Both webhooks write into one `payment_callbacks` table keyed by
+  // `(mch_id, provider_notify_id)`. A webhook that inserted its row *before*
+  // checking the event type would let a misrouted delivery burn the
+  // notification id, and the genuine delivery that follows would be taken for a
+  // WeChat retry and acknowledged without booking anything: money taken at the
+  // gateway, an order still `pending_payment`, and the auto-cancel job on its
+  // way.
   it('lets the genuine delivery book the payment after a misrouted copy of it', async () => {
     const started = await paidAtGateway();
     const signed = gateway.signTransactionNotification({ outTradeNo: started.outTradeNo });
@@ -396,7 +394,7 @@ describe('K-SEC-P6 — a signed event delivered to the other webhook', () => {
     expect((await orderRow(started.orderId)).status).toBe('paid');
   });
 
-  it('answers a misroute 200 and records no callback row, in either direction (CR-3-k2)', async () => {
+  it('answers a misroute 200 and records no callback row, in either direction', async () => {
     const order = await paidOrder();
     const before = (await callbackRows()).length;
 
@@ -416,15 +414,14 @@ describe('K-SEC-P6 — a signed event delivered to the other webhook', () => {
 });
 
 // ---------------------------------------------------------------------------
-// K-SEC-P7 — a notification that names another merchant
+// a notification that names another merchant
 // ---------------------------------------------------------------------------
 
-describe('K-SEC-P7 — a well-signed notification naming another merchant', () => {
-  // CR-4-k2. `mchid` is read from the resource, compared with the configured
-  // merchant, logged when it differs — and then settled anyway, with the
-  // foreign merchant written onto the capital flow. The AEAD key is the only
-  // thing binding the body to this shop; the merchant number is the second
-  // lock, and it is not turned.
+describe('a well-signed notification naming another merchant', () => {
+  // `mchid` is read from the resource and compared with the configured
+  // merchant. Logging a mismatch and settling anyway would write the foreign
+  // merchant onto the capital flow. The AEAD key is the only other thing
+  // binding the body to this shop; the merchant number is the second lock.
   it('never marks an order paid on a transaction another merchant collected', async () => {
     const started = await paidAtGateway();
     const signed = gateway.signTransactionNotification({
@@ -468,7 +465,7 @@ describe('K-SEC-P7 — a well-signed notification naming another merchant', () =
     expect(row!.mchId).toBe(OTHER_MCH_ID);
   });
 
-  it('tells an operator, and neither books nor refunds the foreign payment (CR-4-k2)', async () => {
+  it('tells an operator, and neither books nor refunds the foreign payment', async () => {
     const started = await paidAtGateway();
     const signed = gateway.signTransactionNotification({
       outTradeNo: started.outTradeNo,
@@ -496,7 +493,7 @@ describe('K-SEC-P7 — a well-signed notification naming another merchant', () =
     );
   });
 
-  it('refuses a payment notification that names no merchant at all (CR-4-k2)', async () => {
+  it('refuses a payment notification that names no merchant at all', async () => {
     const started = await paidAtGateway();
     const resource = transactionResource(started.outTradeNo);
     delete resource['mchid'];
@@ -510,7 +507,7 @@ describe('K-SEC-P7 — a well-signed notification naming another merchant', () =
     expect((await callbackRows())[0]!.result).toMatch(/^exception: merchant_mismatch/);
   });
 
-  it('leaves a refund from another merchant for an operator, on the row and in its log (CR-4-k2)', async () => {
+  it('leaves a refund from another merchant for an operator, on the row and in its log', async () => {
     const order = await paidOrder();
     const refund = await processingRefund(order);
     gateway.markRefunded(refund.outRefundNo, 'SUCCESS');
@@ -534,16 +531,16 @@ describe('K-SEC-P7 — a well-signed notification naming another merchant', () =
 });
 
 // ---------------------------------------------------------------------------
-// K-SEC-R6 — the amount a refund notification states
+// the amount a refund notification states
 // ---------------------------------------------------------------------------
 
-describe('K-SEC-R6 — the amount inside a refund notification', () => {
+describe('the amount inside a refund notification', () => {
   it('can never change the amount booked: settlement uses the frozen amount', async () => {
     const order = await paidOrder();
     const refund = await processingRefund(order);
     gateway.markRefunded(refund.outRefundNo, 'SUCCESS');
     // A signed body that claims WeChat gave back all 100.00, not the 50.00 we
-    // sent. Since CR-5-k2 it is not booked at all — least of all as 100.00.
+    // sent. It is not booked at all — least of all as 100.00.
     const signed = gateway.signRefundNotification({
       outRefundNo: refund.outRefundNo,
       resource: refundResource(refund.outRefundNo, {
@@ -565,11 +562,11 @@ describe('K-SEC-R6 — the amount inside a refund notification', () => {
     expect((await orderRow(order.orderId)).refundedAmount).toBe('50.00');
   });
 
-  // CR-5-k2. The notified `amount.refund` is never read, so a gateway that
-  // gave back one fen against the 50.00 we asked for is booked as a 50.00
-  // refund — the shopper is owed 49.99 and every ledger says they were paid.
-  // The payment webhook refuses a disagreeing amount into an exception
-  // (GATEWAY-001); the refund webhook should not be the softer of the two.
+  // If the notified `amount.refund` were not read, a gateway that gave back one
+  // fen against the 50.00 we asked for would be booked as a 50.00 refund — the
+  // shopper owed 49.99 and every ledger saying they were paid. The payment
+  // webhook refuses a disagreeing amount into an exception (GATEWAY-001); the
+  // refund webhook should not be the softer of the two.
   it('does not book a refund whose notified amount disagrees with the frozen one', async () => {
     const order = await paidOrder();
     const refund = await processingRefund(order);
@@ -589,7 +586,7 @@ describe('K-SEC-R6 — the amount inside a refund notification', () => {
     expect(await flowRows('order_refund')).toEqual([]);
   });
 
-  it('raises a disagreeing or missing amount to an operator (CR-5-k2)', async () => {
+  it('raises a disagreeing or missing amount to an operator', async () => {
     const order = await paidOrder();
     const refund = await processingRefund(order);
     gateway.markRefunded(refund.outRefundNo, 'SUCCESS');
@@ -610,7 +607,7 @@ describe('K-SEC-R6 — the amount inside a refund notification', () => {
     expect(await notificationRows(REFUND_EXCEPTION_EVENT)).toHaveLength(1);
   });
 
-  it('reads the amount on the query path too, and says so once however often the sweep asks (CR-5-k2)', async () => {
+  it('reads the amount on the query path too, and says so once however often the sweep asks', async () => {
     const order = await paidOrder();
     const refund = await processingRefund(order);
     gateway.markRefunded(refund.outRefundNo, 'SUCCESS');

@@ -32,7 +32,7 @@ import * as service from './refund.service';
  * same code, the same message, the same status and the same details* as a
  * refund id that never existed. An assertion that only checked "it throws"
  * would pass a change to a 403, which is the information leak AUTH-005 exists
- * to prevent (CR-3-k).
+ * to prevent.
  *
  * The second half of the ledger row is the admin side: the admin refund route
  * refuses an unauthenticated caller **without completing the after-sale** —

@@ -17,25 +17,23 @@ import { findSucceededRefund, listAutomaticRefunds } from './refund.system.repo'
 /**
  * Money the shop owes without anybody having asked for it.
  *
- * CR-3-d. `refund.service.ts` is the buyer's road: apply, wait for a review,
- * and only then does the gateway hear about it. A failed group buy is none of
- * those things — nobody applied, nobody should have to approve, and the goods
- * never left the warehouse — but it is still a refund, and the one thing that
- * must not happen is a second way to insert a `refunds` row. So this file goes
- * through the same repo, the same ceiling arithmetic, the same
- * `refund.execute` effect and the same settlement (`settleRefundSucceeded` →
- * `onOrderRefunded`) that an operator's 同意 does. What it skips is only the
- * human.
+ * `refund.service.ts` is the buyer's road: apply, wait for a review, and only
+ * then does the gateway hear about it. A failed group buy is none of those
+ * things — nobody applied, nobody should have to approve, and the goods never
+ * left the warehouse — but it is still a refund, and the one thing that must
+ * not happen is a second way to insert a `refunds` row. So this file goes
+ * through the same repo, the same ceiling arithmetic, the same `refund.execute`
+ * effect and the same settlement (`settleRefundSucceeded` → `onOrderRefunded`)
+ * that an operator's 同意 does. What it skips is only the human.
  *
  * ## Why this is a separate file
  *
- * `refund.service.ts` is 1,000 lines and is being edited by another stream for
- * notifications. A new entry point in a new file merges cleanly; the same
- * function added to the middle of that one does not. Nothing here is duplicated
- * logic that could drift into a *different answer*: the two places that would
- * have been shared — the freight rule and the "take the units out of
- * fulfilment" step — are each three lines over the same pure helpers in
- * `refund.rules.ts`, and both call sites are asserted by tests.
+ * `refund.service.ts` is the buyer's road and already 1,000 lines; the shop's
+ * road reads better on its own. Nothing here is duplicated logic that could
+ * drift into a *different answer*: the two places that would have been shared —
+ * the freight rule and the "take the units out of fulfilment" step — are each
+ * three lines over the same pure helpers in `refund.rules.ts`, and both call
+ * sites are asserted by tests.
  *
  * ## Idempotency
  *
@@ -61,10 +59,10 @@ export type SystemRefundReason = 'groupbuy_failed' | 'presale_expired';
 /**
  * The customer-facing reason, and the idempotency key.
  *
- * The frozen schema has no column for "which automatic process opened this", so
- * the reason string carries it. It is written once and never edited, and the
- * lookup matches on it exactly — which is why these strings are constants here
- * rather than something a caller passes in.
+ * There is no column for "which automatic process opened this", so the reason
+ * string carries it. It is written once and never edited, and the lookup
+ * matches on it exactly — which is why these strings are constants here rather
+ * than something a caller passes in.
  */
 const SYSTEM_REASONS: Record<SystemRefundReason, string> = {
   groupbuy_failed: '拼团未成团，系统自动退款',
@@ -88,7 +86,7 @@ export interface SystemRefundResult {
  * Opens — and queues — a refund the shop owes by itself.
  *
  * Full amount of every unshipped line, plus the freight when nothing shipped at
- * all, capped by C's cumulative ceiling so an order that was already partly
+ * all, capped by the cumulative ceiling so an order that was already partly
  * refunded by hand cannot be refunded past what it paid.
  *
  * Runs inside the caller's transaction, like every other cross-domain entry

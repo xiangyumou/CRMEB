@@ -56,12 +56,12 @@ export function registerRefundEffects(): void {
  * The 站内信 already goes out from the in-transaction `onOrderRefunded` hook,
  * and nothing else consumes the row yet.
  *
- * So it is delivered to a logged no-op rather than left without a handler
- * (CR-2-k2): an unhandled effect retries eight times and parks as `unknown`,
- * one row per refund in 待处理任务 that no operator action clears. The row stays
- * as the ledger's record of the settlement; a real consumer replaces this
- * registration. (It is keyed per order, so it records the order's first
- * settled refund; the `refunds` row and its log are the record of each one.)
+ * So it is delivered to a logged no-op rather than left without a handler: an
+ * unhandled effect retries eight times and parks as `unknown`, one row per
+ * refund in 待处理任务 that no operator action clears. The row stays as the
+ * ledger's record of the settlement; a real consumer replaces this
+ * registration. (It is keyed per order, so it records the order's first settled
+ * refund; the `refunds` row and its log are the record of each one.)
  */
 async function logOrderRefunded(ctx: Ctx, effect: Effect): Promise<void> {
   ctx.logger.info(

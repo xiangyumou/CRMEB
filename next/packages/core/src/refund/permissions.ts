@@ -9,12 +9,12 @@ import { definePermissions } from '../auth/permissions';
  * that boundary is the control; in a small shop one role holds both, which is a
  * grant, not a code change.
  *
- * `config:read` / `config:write` gate the 售后设置 group (CR-10-k). The group
- * used to declare `request:write` — the remark atom — and the config service
- * derives a distinct write atom only from a `:read` one, so "add a remark"
- * also meant "change the address buyers post their returns to". Redirecting
- * goods is not a reviewer's decision; `config:write` belongs to whoever runs
- * after-sales, and holding it grants nothing on the requests themselves.
+ * `config:read` / `config:write` gate the 售后设置 group, rather than the
+ * remark atom: the config service derives a distinct write atom only from a
+ * `:read` one, so borrowing `request:write` would make "add a remark" also mean
+ * "change the address buyers post their returns to". Redirecting goods is not a
+ * reviewer's decision; `config:write` belongs to whoever runs after-sales, and
+ * holding it grants nothing on the requests themselves.
  */
 export const refundPermissions = definePermissions(
   'refund',

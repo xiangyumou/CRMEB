@@ -15,21 +15,19 @@ import type { Ctx } from '../kernel/context';
  * `refund:config:read`. Writing it takes `refund:config:write` (derived by the
  * config service from the `:read` atom), because the return address decides
  * where buyers send goods: it is not something the remark atom
- * (`refund:request:write`), which the group used to declare, or an approval
- * atom may change (CR-10-k).
+ * (`refund:request:write`) or an approval atom may change.
  */
 
 /**
  * A stored text setting.
  *
- * `config_values.value` is `jsonb`, and for a while a string written to it came
- * back as a *number* whenever it was all digits — a 商户号, a phone number —
- * because the value was parsed twice on the way out. `CR-6-c` is fixed in
- * `@shop/db` (json and jsonb reach drizzle as text and are parsed once), so this
- * is now a plain string again. The round trip is still covered by a test in
- * every group this stream owns, because the failure mode was silent: the field
- * fell back to its default and the shop reported 支付尚未配置 with a filled-in
- * form.
+ * `config_values.value` is `jsonb`. Parsed twice on the way out, a string that
+ * is all digits — a 商户号, a phone number — would come back as a *number*;
+ * `@shop/db` has json and jsonb reach drizzle as text and parses them once, so
+ * this is a plain string. The round trip is covered by a test in every group
+ * the payment and refund domains own, because the failure mode is silent: the
+ * field falls back to its default and the shop reports 支付尚未配置 with a
+ * filled-in form.
  */
 const configText = (max: number) => z.string().max(max).default('');
 
@@ -43,8 +41,8 @@ export const refundConfig = defineConfigGroup({
     returnPhone: configText(20),
     returnAddress: configText(255),
     /**
-     * How long a buyer may still open after-sales on a completed order, in days.
-     * `0` disables the window entirely (the legacy default was effectively this).
+     * How long a buyer may still open after-sales on a completed order, in
+     * days. `0` disables the window entirely.
      */
     afterSaleDays: z.number().int().min(0).max(365).default(0),
   }),

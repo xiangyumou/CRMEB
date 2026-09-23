@@ -358,9 +358,9 @@ export async function shipmentTracking(
  * file contains no code that touches a gateway, a `refunds` row or
  * `orders.refunded_amount`.
  *
- * If the refund domain has not registered the port, the routes answer 501
- * rather than pretending: a phone that silently shows an empty after-sales list
- * is worse than one that says the feature is not wired up.
+ * If the refund domain has not registered the port, the routes answer
+ * `INTERNAL` rather than pretending: a phone that silently shows an empty
+ * after-sales list is worse than one that says the feature is not wired up.
  */
 function refundPort(): NonNullable<ReturnType<typeof resolveStaffRefundPort>> {
   const port = resolveStaffRefundPort();

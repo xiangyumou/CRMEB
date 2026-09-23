@@ -99,11 +99,11 @@ export async function adminDetail(ctx: Ctx, input: { id: string }): Promise<Admi
  * approval racing the buyer's withdrawal ends with exactly one winner.
  *
  * This is also the moment the return address stops being a setting and becomes
- * a fact (CR-5-c). The operator's own address wins, the configured one is the
- * fallback, and whichever it is gets written to `refunds.return_address` — so
- * editing 售后设置 next month cannot re-address a parcel that is already in the
- * post. The config is read *before* the transaction opens, because it can touch
- * Redis and a row lock is being held inside.
+ * a fact. The operator's own address wins, the configured one is the fallback,
+ * and whichever it is gets written to `refunds.return_address` — so editing
+ * 售后设置 next month cannot re-address a parcel that is already in the post.
+ * The config is read *before* the transaction opens, because it can touch Redis
+ * and a row lock is being held inside.
  */
 export async function adminApprove(
   ctx: Ctx,
@@ -116,10 +116,11 @@ export async function adminApprove(
 /**
  * Who made a review decision.
  *
- * An operator is an `admins` row and is stamped on `refunds.reviewed_by_admin_id`;
- * a staff member (CR-14-k) is a `users` row, which that column cannot hold, so
- * their decision is attributed on the log entry (`operator_user_id`) alone and
- * the refund keeps `reviewed_by_admin_id` null. `reviewed_at` is set either way.
+ * An operator is an `admins` row and is stamped on
+ * `refunds.reviewed_by_admin_id`; a staff member is a `users` row, which that
+ * column cannot hold, so their decision is attributed on the log entry
+ * (`operator_user_id`) alone and the refund keeps `reviewed_by_admin_id` null.
+ * `reviewed_at` is set either way.
  */
 type Reviewer = { kind: 'admin'; id: number } | { kind: 'staff'; id: number };
 
@@ -170,9 +171,9 @@ async function approveAs(
       await queueExecution(tx, ctx, id);
     }
 
-    // CR-2-e2. Last, so that an approval `reserveUnits` rolls back — the units
-    // went out of the door first and the request is now a return — never tells
-    // the buyer their refund was agreed.
+    // Last, so that an approval `reserveUnits` rolls back — the units went out
+    // of the door first and the request is now a return — never tells the buyer
+    // their refund was agreed.
     await notifyReview(tx, ctx, row, 'refund_approved', { amount: row.amount });
   });
 
@@ -213,9 +214,9 @@ async function notifyReview(
  * Approving a 仅退款 takes its units out of fulfilment there and then.
  *
  * The warehouse must not ship goods an operator has just agreed to refund, and
- * B2's dispatch guard reads `quantity - refunded_quantity`, so the only way to
- * stop it is to raise that column now rather than when the money lands. The
- * statement carries the mirror of B2's own bound
+ * fulfilment's dispatch guard reads `quantity - refunded_quantity`, so the only
+ * way to stop it is to raise that column now rather than when the money lands.
+ * The statement carries the mirror of fulfilment's own bound
  * (`refunded + q <= quantity - shipped_quantity`) for a line that has not
  * shipped, so an approval racing a dispatch of the same units has exactly one
  * winner whichever commits first. A line that already shipped is a money-only
@@ -299,9 +300,9 @@ async function rejectAs(
     });
     await refreshOrderRefundStatus(tx, row.orderId);
 
-    // CR-2-e2. The reason travels with it: a rejection the buyer cannot
-    // explain later is the complaint that reaches the shop owner, and the
-    // database makes the reason mandatory for the same reason.
+    // The reason travels with it: a rejection the buyer cannot explain later is
+    // the complaint that reaches the shop owner, and the database makes the
+    // reason mandatory for the same reason.
     await notifyReview(tx, ctx, row, 'refund_rejected', { reason: input.rejectReason });
   });
 
@@ -362,19 +363,19 @@ export async function adminRemark(
 }
 
 // ---------------------------------------------------------------------------
-// the 商家管理 phone console (CR-14-k)
+// the 商家管理 phone console
 // ---------------------------------------------------------------------------
 
 /**
- * The staff console's own entry points — design (b) of CR-14-k.
+ * The staff console's own entry points.
  *
- * `/api/v1/staff/refunds*` used to forward into the admin services above,
- * which demand an admin atom that a staff actor can never hold, so every staff
- * request answered 403. Mapping staff onto admin identities (design (a)) would
- * need an `admins` row per store assistant and a role editor for them; the
- * 商家管理 console already has its own gate, the `order-staff.staffUserIds`
- * allow-list `handle()` checks for `auth: 'staff'`, and the order console's
- * staff functions all rely on it. So these do too, and they:
+ * `/api/v1/staff/refunds*` cannot forward into the admin services above: they
+ * demand an admin atom that a staff actor can never hold, so every staff
+ * request would answer 403. Mapping staff onto admin identities would need an
+ * `admins` row per store assistant and a role editor for them; the 商家管理
+ * console already has its own gate, the `order-staff.staffUserIds` allow-list
+ * `handle()` checks for `auth: 'staff'`, and the order console's staff
+ * functions all rely on it. So these do too, and they:
  *
  *  - accept **only** a `staff` actor. An admin, a shopper or the system gets
  *    `FORBIDDEN` here, and the admin services keep refusing a staff actor, so
@@ -431,20 +432,20 @@ export async function staffReject(
 }
 
 /**
- * 售后备注 from the 商家管理 phone console (CR-4-h §2).
+ * 售后备注 from the 商家管理 phone console.
  *
  * Deliberately **not** `adminRemark` with a different caller.
  *
- *  - `refunds.admin_remark` is one column the console overwrites. The schema is
- *    frozen and has no `refunds.staff_remark`, so a staff note lands in
- *    `refund_logs` — appended, attributed to the `users` row that wrote it, and
- *    visible to the console in the same `logs` array as everything else.
+ *  - `refunds.admin_remark` is one column the console overwrites. There is no
+ *    staff remark column, so a staff note lands in `refund_logs` — appended,
+ *    attributed to the `users` row that wrote it, and visible to the console in
+ *    the same `logs` array as everything else.
  *  - A note is not a transition, but `refund_logs.to_status` is NOT NULL, so
  *    both ends of the entry are the status the refund is already in. A reader
  *    of the log sees a row that moved nothing, which is exactly what happened.
  *  - No `requirePermission`: the actor is a `staff` user, not an admin, and
- *    `auth: 'staff'` has already decided whether they may be here at all.
- *    Only a `staff` actor, though (CR-14-k): a shopper is refused.
+ *    `auth: 'staff'` has already decided whether they may be here at all. Only
+ *    a `staff` actor, though: a shopper is refused.
  */
 export async function staffRemark(
   ctx: Ctx,
