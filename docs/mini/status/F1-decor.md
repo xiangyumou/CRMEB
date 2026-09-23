@@ -30,16 +30,18 @@ interruption.
   `decor.concurrency.int.test.ts` (6: saves, publishes, publish-vs-save, rollbacks, designations,
   delete-vs-designate). All green.
 
+- Web int tests: `apps/web/app/admin-api/decor/decor.int.test.ts` (8: permissions split, full
+  lifecycle with audit targets, 422/404/409) and `apps/web/app/api/v1/pages/pages.int.test.ts`
+  (7: 404 home, ETag/304, per-request filter, user-center default, preview token).
+- `docs/invariants.md` DECOR-001…016 with citations; `docs/mini/decor.md` design doc.
+
 ## In progress
 
-- Web int tests (`apps/web/app/admin-api/decor/decor.int.test.ts`,
-  `apps/web/app/api/v1/pages/pages.int.test.ts`).
+- Merge checklist.
 
 ## Next
 
-1. `docs/invariants.md` DECOR rows (IDs already cited in code comments: DECOR-001…016),
-   `docs/mini/decor.md`.
-2. Merge checklist.
+1. Final report.
 
 ## Decisions / deviations so far
 

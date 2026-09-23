@@ -705,7 +705,7 @@ describe('resolved data — DECOR-013', () => {
     expect(items[2]).not.toHaveProperty('soldOut');
   });
 
-  it('DECOR-013: a category or label rule returns on-shelf products with stock only, at most `limit`', async () => {
+  it('DECOR-013: a category or label rule returns on-shelf products with stock only, at most the limit', async () => {
     const category = await productCategory('女装');
     const label = await productLabel('新品');
     const inCategory = [
@@ -837,7 +837,7 @@ describe('page cache — DECOR-014', () => {
 });
 
 describe('per-shopper state — DECOR-015', () => {
-  it('DECOR-015: with a session the page carries the shopper’s coupon state; without one, none', async () => {
+  it('DECOR-015: with a session the page carries the coupon state of that shopper; without one, none', async () => {
     const uid = await user('shopper-1');
     const claimable = await template({ perUserLimit: 2 });
     const blocks = [
