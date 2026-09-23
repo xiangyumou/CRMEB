@@ -96,6 +96,21 @@ export interface ChosenAddress {
   postCode: string | null;
 }
 
+/**
+ * The payment's identity for WeChat's 确认收货 component (C07): the WeChat Pay transaction id,
+ * or the merchant id with our out-trade-no. The server hands it out (H2's
+ * `payment.wechatReceipt`); the client passes it on untouched.
+ */
+export type OrderConfirmTarget =
+  { transactionId: string } | { merchantId: string; merchantTradeNo: string };
+
+/**
+ * How the 确认收货 component ended. `confirmed` only means WeChat's page said so: the server
+ * checks with WeChat (`get_order`) before the order moves (C07).
+ */
+export type OrderConfirmOutcome =
+  { kind: 'confirmed' } | { kind: 'cancelled' } | { kind: 'failed'; message: string };
+
 export interface MiniPlatform {
   /** Which implementation this build carries; shown nowhere, useful in a bug report. */
   readonly kind: 'weapp' | 'h5-preview' | 'h5-mp-emulation';
@@ -132,6 +147,11 @@ export interface MiniPlatform {
   chooseImages(count: number): Promise<string[]>;
   /** `wx.uploadFile()`: one multipart part. Resolves for every HTTP status. */
   uploadFile(request: UploadRequest): Promise<UploadResponse>;
+  /**
+   * `wx.openBusinessView({ businessType: 'weappOrderConfirm' })`: WeChat's 确认收货 component
+   * (C07). Only `platform/receipt.ts` calls it, from a tap.
+   */
+  openOrderConfirm(target: OrderConfirmTarget): Promise<OrderConfirmOutcome>;
 }
 
 /** Thrown by a capability this build does not have (H5 preview) or does not have yet (TODO). */
