@@ -72,7 +72,7 @@ describe('SKU selection', () => {
   it('names the SKU once every spec is picked, and unpicks on a second tap', () => {
     const picked = toggleValue(toggleValue({}, '颜色', '黑'), '尺码', 'L');
     expect(selectedSku(matrix, picked)?.id).toBe('4');
-    expect(selectionText(matrix, picked)).toBe('已选 黑|L');
+    expect(selectionText(matrix, picked)).toBe('已选 黑 / L');
     expect(toggleValue(picked, '尺码', 'L')).toEqual({ 颜色: '黑' });
   });
 

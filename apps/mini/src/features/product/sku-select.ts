@@ -107,5 +107,5 @@ export function selectionText(matrix: SkuMatrix, selection: SkuSelection): strin
   const missing = missingSpecs(matrix, selection);
   if (missing.length > 0) return `请选择 ${missing.join(' ')}`;
   const sku = selectedSku(matrix, selection);
-  return sku && sku.specText ? `已选 ${sku.specText}` : '';
+  return sku && sku.specText ? `已选 ${sku.specText.replace(/\|/g, ' / ')}` : '';
 }
