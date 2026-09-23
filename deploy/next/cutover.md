@@ -711,6 +711,24 @@ own safety dump first, and requires `--yes` to proceed unattended.
   `server-internal-net`, so nothing needs the published port once the domain is
   switched.
 
+### What the operator will notice
+
+Behaviour that differs from the PHP shop on purpose, worth telling the one admin
+before acceptance rather than after a surprised message:
+
+- **售后设置** (the return address) needs the `refund:config:write` permission.
+  A super admin holds every permission; a narrower role must be granted it.
+- **店员 approving or rejecting a refund** is off until 允许店员审核售后 is turned
+  on (店员与订单提醒 › 店员). List, detail and 备注 work without it.
+- **网址导入** accepts `https://` sources only, unless 允许 http 地址导入 is turned
+  on (存储设置 › 网址导入). Private, loopback and cloud-metadata addresses are
+  always refused.
+- **操作日志** lists every admin sign-in (success or failure) and every 店员
+  write, not only admin writes.
+- **Product views** are folded into `products.views` once a minute by the
+  worker. Its first run only sets the starting point, so the views of the first
+  minute after the switch are not counted.
+
 ### The retirement PR
 
 A separate PR, deliberately out of scope here (PLAN §6), raised after acceptance:
