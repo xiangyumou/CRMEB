@@ -158,6 +158,8 @@ export async function publicList(
     status: 'published',
     keyword: query.keyword,
     categoryId: query.categoryId === undefined ? undefined : fromId(query.categoryId),
+    categoryIds: query.categoryIds?.map(fromId),
+    ids: query.ids?.map(fromId),
     ...(query.feature === 'hot' ? { isHot: true } : {}),
     ...(query.feature === 'banner' ? { isBanner: true } : {}),
     offset: (query.page - 1) * query.pageSize,

@@ -455,6 +455,12 @@ export interface StorefrontProductFilter {
   keyword?: string | undefined;
   categoryId?: number | undefined;
   labelId?: number | undefined;
+  /** Only these products; the list then comes back in this order. */
+  ids?: readonly number[] | undefined;
+  /** In any of these categories. */
+  categoryIds?: readonly number[] | undefined;
+  /** Carrying any of these labels. */
+  labelIds?: readonly number[] | undefined;
   priceFrom?: string | undefined;
   priceTo?: string | undefined;
   feature?: 'hot' | 'new' | 'best' | 'benefit' | 'recommended' | undefined;
@@ -508,6 +514,13 @@ export async function listSellableProducts(
     args.labelId !== undefined
       ? sql`exists (select 1 from ${productLabelsMap} l where l.product_id = ${products.id} and l.label_id = ${args.labelId})`
       : undefined,
+    args.ids !== undefined ? inArray(products.id, [...args.ids]) : undefined,
+    args.categoryIds !== undefined
+      ? sql`exists (select 1 from ${productCategoriesMap} m where m.product_id = ${products.id} and m.category_id = any(${sql.param([...args.categoryIds])}::bigint[]))`
+      : undefined,
+    args.labelIds !== undefined
+      ? sql`exists (select 1 from ${productLabelsMap} l where l.product_id = ${products.id} and l.label_id = any(${sql.param([...args.labelIds])}::bigint[]))`
+      : undefined,
   );
 
   const column =
@@ -519,13 +532,18 @@ export async function listSellableProducts(
           ? products.createdAt
           : products.sortOrder;
   const direction = args.sortOrder === 'asc' ? asc : desc;
+  // An id list is its own order: the caller picked these, in this sequence.
+  const order =
+    args.ids !== undefined
+      ? [sql`array_position(${sql.param([...args.ids])}::bigint[], ${products.id})`]
+      : [direction(column), desc(products.id)];
 
   const [rows, counted] = await Promise.all([
     db
       .select()
       .from(products)
       .where(where)
-      .orderBy(direction(column), desc(products.id))
+      .orderBy(...order)
       .offset(args.offset)
       .limit(args.limit),
     db.select({ total: count }).from(products).where(where),

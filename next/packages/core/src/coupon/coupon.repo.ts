@@ -252,13 +252,17 @@ export async function productCategoryIds(
   return out;
 }
 
-/** Templates a shopper may claim by hand right now, ignoring their own limit. */
+/**
+ * Templates a shopper may claim by hand right now, ignoring their own limit.
+ * With `ids`, only those templates, in that order.
+ */
 export async function listClaimable(
   db: DbOrTx,
-  args: { now: Date; offset: number; limit: number },
+  args: { now: Date; ids?: readonly number[] | undefined; offset: number; limit: number },
 ): Promise<{ rows: TemplateRow[]; total: number }> {
   const where = and(
     liveTemplate(),
+    args.ids === undefined ? undefined : inArray(couponTemplates.id, [...args.ids]),
     eq(couponTemplates.status, 'active'),
     eq(couponTemplates.claimMode, 'manual'),
     or(isNull(couponTemplates.claimFrom), lte(couponTemplates.claimFrom, args.now)),
@@ -272,7 +276,11 @@ export async function listClaimable(
       .select()
       .from(couponTemplates)
       .where(where)
-      .orderBy(desc(couponTemplates.sortOrder), desc(couponTemplates.id))
+      .orderBy(
+        ...(args.ids === undefined
+          ? [desc(couponTemplates.sortOrder), desc(couponTemplates.id)]
+          : [sql`array_position(${sql.param([...args.ids])}::bigint[], ${couponTemplates.id})`]),
+      )
       .offset(args.offset)
       .limit(args.limit),
     db

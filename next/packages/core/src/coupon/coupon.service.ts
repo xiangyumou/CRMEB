@@ -6,6 +6,7 @@ import type {
   ApplicableCouponsResult,
   ClaimResult,
   ClaimableCoupon,
+  ClaimableCouponListQuery,
   CouponGrantBody,
   CouponGrantResult,
   CouponTemplateDetail,
@@ -397,12 +398,21 @@ export async function listOrderGifts(
   return { items: rows.map((row) => toUserCoupon(row, termsOf(terms, row.templateId))) };
 }
 
+/**
+ * The 领券中心, and a DIY component's picked coupons when `ids` is given. Either
+ * way it is the same claimable filter, so a picked template that has stopped
+ * being claimable drops out rather than showing a button that would refuse.
+ */
 export async function listClaimable(
   ctx: Ctx,
-  query: PageQuery,
+  query: ClaimableCouponListQuery,
 ): Promise<{ items: ClaimableCoupon[]; total: number; page: number; pageSize: number }> {
   const now = ctx.clock.now();
-  const { rows, total } = await repo.listClaimable(ctx.db, { now, ...pageBounds(query) });
+  const { rows, total } = await repo.listClaimable(ctx.db, {
+    now,
+    ids: query.ids?.map(Number),
+    ...pageBounds(query),
+  });
   const items = await withCallerState(ctx, rows);
   return { items, total, page: query.page, pageSize: query.pageSize };
 }

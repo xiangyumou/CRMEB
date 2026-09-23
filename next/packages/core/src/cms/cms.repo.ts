@@ -152,6 +152,10 @@ const ARTICLE_SORT = {
 export interface ArticleFilter {
   keyword?: string | undefined;
   categoryId?: number | undefined;
+  /** Any of these categories. */
+  categoryIds?: readonly number[] | undefined;
+  /** Only these articles; the list then comes back in this order. */
+  ids?: readonly number[] | undefined;
   /** `published` alone is what the storefront asks for. */
   status?: 'draft' | 'published' | 'hidden' | undefined;
   isHot?: boolean | undefined;
@@ -173,6 +177,10 @@ function articleWhere(filter: ArticleFilter): SQL[] {
     if (match !== undefined) where.push(match);
   }
   if (filter.categoryId !== undefined) where.push(eq(articles.categoryId, filter.categoryId));
+  if (filter.categoryIds !== undefined) {
+    where.push(inArray(articles.categoryId, [...filter.categoryIds]));
+  }
+  if (filter.ids !== undefined) where.push(inArray(articles.id, [...filter.ids]));
   if (filter.status !== undefined) where.push(eq(articles.status, filter.status));
   if (filter.isHot !== undefined) where.push(eq(articles.isHot, filter.isHot));
   if (filter.isBanner !== undefined) where.push(eq(articles.isBanner, filter.isBanner));
@@ -187,11 +195,14 @@ export async function listArticles(
   const column = ARTICLE_SORT[query.sortBy ?? 'id'];
   // `sortOrder DESC, id DESC` is the admin list order and the storefront's; an
   // explicit `sortBy` replaces the first key only, never the tiebreak.
+  // An id list is its own order: the caller picked these, in this sequence.
   const direction = query.sortOrder === 'asc' ? asc : desc;
   const order =
-    query.sortBy === undefined
-      ? [desc(articles.sortOrder), desc(articles.id)]
-      : [direction(column), desc(articles.id)];
+    query.ids !== undefined
+      ? [sql`array_position(${sql.param([...query.ids])}::bigint[], ${articles.id})`]
+      : query.sortBy === undefined
+        ? [desc(articles.sortOrder), desc(articles.id)]
+        : [direction(column), desc(articles.id)];
 
   const rows = await db
     .select({ row: articles, categoryTitle: articleCategories.title })

@@ -127,6 +127,23 @@ export const catalogProductList = defineRoute({
       query: { page: 1, pageSize: 20, feature: 'hot', sortBy: 'sales', sortOrder: 'desc' },
       response: { items: [productCardExample], total: 1, page: 1, pageSize: 20 },
     },
+    {
+      // A DIY component's 指定商品: 9 went off the shelf after the page was
+      // saved, so it is skipped; the rest come back in the order asked for.
+      name: 'picked',
+      query: { page: 1, pageSize: 3, ids: '1,9,4' },
+      response: {
+        items: [productCardExample, { ...productCardExample, id: '4', name: '纯棉圆领卫衣' }],
+        total: 2,
+        page: 1,
+        pageSize: 3,
+      },
+    },
+    {
+      name: 'by-categories',
+      query: { page: 1, pageSize: 6, categoryIds: '17,18', sortBy: 'sales', sortOrder: 'desc' },
+      response: { items: [productCardExample], total: 1, page: 1, pageSize: 6 },
+    },
   ],
 });
 

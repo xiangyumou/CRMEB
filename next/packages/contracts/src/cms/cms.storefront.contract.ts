@@ -14,9 +14,9 @@ import {
  * The storefront's reading surface, `/api/v1/articles` and
  * `/api/v1/article-categories`.
  *
- * Two lists and a detail. By category, 热门 and banner are the same query with
- * one `where` swapped, so they are one `GET /api/v1/articles` with `categoryId`
- * and `feature`.
+ * Two lists and a detail. By category, 热门, banner and a DIY component's
+ * picked articles are the same query with one `where` swapped, so they are one
+ * `GET /api/v1/articles` with `categoryId`, `feature` and `ids`.
  *
  * Everything here is `public`: an article is marketing copy, and requiring a
  * session to read one would break the share links the whole feature exists for.
@@ -71,6 +71,18 @@ export const articleListPublic = defineRoute({
       name: 'banner',
       query: { page: 1, pageSize: 5, feature: 'banner' },
       response: { items: [], total: 0, page: 1, pageSize: 5 },
+    },
+    {
+      // A DIY component's 指定数据: 104 is a draft now, so it is skipped; the
+      // rest come back in the order asked for.
+      name: 'picked',
+      query: { page: 1, pageSize: 3, ids: '102,104,101' },
+      response: {
+        items: [{ ...articleListItemExample, id: '102' }, articleListItemExample],
+        total: 2,
+        page: 1,
+        pageSize: 3,
+      },
     },
   ],
 });
