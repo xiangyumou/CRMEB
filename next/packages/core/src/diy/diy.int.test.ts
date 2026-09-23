@@ -409,6 +409,68 @@ describe('the storefront read', () => {
     const served = await getHomePage(withHeaders);
     expect(headers.ETag).toBe(`W/"${served.version}"`);
   });
+
+  /**
+   * CR-42-k2: the home page is the first read of every launch and was the
+   * largest slice of database time in the load smoke. Mirrors the 个人中心
+   * and 底部导航 cache cases below.
+   */
+  it('caches the home page for 60 s and drops the entry the moment an operator publishes', async () => {
+    const page = await seedHome();
+    await savePageContent(ctx, { id: page.id, content: PROD_PAGE, publish: true });
+    await setHomePage(ctx, { id: page.id });
+
+    const first = await getHomePage(ctx);
+    expect(Object.keys(first.content).length).toBeGreaterThan(0);
+    expect(await harness.redis.ttl('diy:home:v1')).toBeGreaterThan(0);
+    expect(await harness.redis.ttl('diy:home:v1')).toBeLessThanOrEqual(60);
+
+    // Write straight past the service, so only a cache hit can still answer
+    // the old value — for the page and for the version poll alike.
+    await harness.db.db.execute(
+      sql`update diy_pages set content = '{"value":{}}'::jsonb, updated_at = now() + interval '1 hour' where id = ${Number(page.id)}`,
+    );
+    expect(await getHomePage(ctx)).toEqual(first);
+    expect(await getPageVersion(ctx, {})).toEqual({ version: first.version });
+
+    // A publish invalidates, and the next read is honest again.
+    harness.clock.advance(1000);
+    await publishPage(ctx, { id: page.id });
+    expect(await harness.redis.get('diy:home:v1')).toBeNull();
+    const fresh = await getHomePage(ctx);
+    expect(fresh.content).toEqual({});
+    expect(fresh.version).not.toBe(first.version);
+    expect(await getPageVersion(ctx, {})).toEqual({ version: fresh.version });
+  });
+
+  it('drops the home entry on a save, a switch of home page and an edit alike', async () => {
+    const page = await seedHome();
+    await savePageContent(ctx, { id: page.id, content: {}, publish: true });
+    await setHomePage(ctx, { id: page.id });
+    await getHomePage(ctx);
+    expect(await harness.redis.get('diy:home:v1')).not.toBeNull();
+
+    harness.clock.advance(1000);
+    await savePageContent(ctx, { id: page.id, content: PROD_PAGE });
+    expect(await harness.redis.get('diy:home:v1')).toBeNull();
+
+    await getHomePage(ctx);
+    const other = await seedHome('活动首页');
+    await savePageContent(ctx, { id: other.id, content: {}, publish: true });
+    await getHomePage(ctx);
+    await setHomePage(ctx, { id: other.id });
+    expect(await harness.redis.get('diy:home:v1')).toBeNull();
+    expect((await getHomePage(ctx)).id).toBe(other.id);
+
+    await updatePage(ctx, { id: other.id, title: '新标题' });
+    expect(await harness.redis.get('diy:home:v1')).toBeNull();
+    expect((await getHomePage(ctx)).title).toBe('新标题');
+  });
+
+  it('does not cache a missing home page', async () => {
+    await expect(getHomePage(ctx)).rejects.toMatchObject({ code: 'DIY_HOME_PAGE_MISSING' });
+    expect(await harness.redis.get('diy:home:v1')).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

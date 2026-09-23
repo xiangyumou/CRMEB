@@ -247,7 +247,12 @@ describe('/admin-api/stats', () => {
       const { GET } = await route.load();
       expect((await GET(get(route.path, headers))).status).toBe(200);
     }
-    expect(await harness.ctx.db.select().from(auditLogs)).toEqual([]);
+    expect(
+      (await harness.ctx.db.select().from(auditLogs)).filter(
+        // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+        (row) => row.routeId !== 'auth.adminLogin',
+      ),
+    ).toEqual([]);
   });
 });
 

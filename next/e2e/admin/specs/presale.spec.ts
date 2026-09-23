@@ -168,11 +168,9 @@ test('暂停 takes the campaign off sale at once', async ({ adminPage, adminApi,
 });
 
 test('a draft is not on the storefront, not even by id', async ({ adminApi, request, shop }) => {
-  // CR-34-k2: the list filters on status and window, but `detail` reads the row
-  // with no status filter, so a draft's title, prices and 规格 are public to
-  // anyone who guesses its id — against the form's own 「草稿不会出现在前台」
-  // and the error's own 「不存在或已下架」.
-  test.fail(true, 'CR-34-k2 — GET /api/v1/presale/activities/:id serves drafts');
+  // CR-34-k2 (fixed): the list filters on status and window, and `detail` now
+  // answers 404 for a draft too — ids are sequential, and the form promises
+  // 「草稿不会出现在前台」 and the error 「不存在或已下架」.
 
   // Arranged through the API: making an activity on the screen is the first
   // case's subject.

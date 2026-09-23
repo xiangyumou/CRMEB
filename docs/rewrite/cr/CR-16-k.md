@@ -1,6 +1,6 @@
 # CR-16-k — two holes in the admin shell's own navigation: a 404 in the user menu, and a route guard nobody uses
 
-**Stream:** K (hardening) **Status:** OPEN — for the orchestrator / P0-B (admin shell)
+**Stream:** K (hardening) **Status:** **RESOLVED** by R4 (wave 6; commit in `docs/rewrite/status/r4.md`) — 个人资料 pushes `/admin/system/profile`; the shell guards every page from `menuRegistry` (see Resolution)
 **Files:** `next/apps/web/src/admin/shell/admin-shell.tsx`,
 `next/apps/web/src/admin/session/can.tsx`, every `app/admin/(shell)/**/page.tsx`
 
@@ -69,3 +69,31 @@ The boundary is the server, and it holds: a role with one atom gets 403 on
 roles, admins, refunds, attachments, config and audit-logs, and cannot create an
 admin (`specs/restricted-role.spec.ts:90-112`). This CR is about the admin being
 told the truth by the screen as well.
+
+## Resolution (R4, wave 6)
+
+1. `admin-shell.tsx` exports `PROFILE_PATH = '/admin/system/profile'` and the
+   avatar menu pushes it. The shell test asserts the pushed path; the e2e
+   `restricted-role.spec.ts` clicks it as the narrow role and lands on the page.
+2. Instead of wrapping 60-odd `page.tsx` bodies one by one, the shell does it
+   once: `RouteGuard` (in `admin-shell.tsx`, around `Layout.Content`'s
+   children) reads `requiredPermissions(menuRegistry, usePathname())` from the
+   new `src/admin/shell/route-permission.ts` and renders `ForbiddenResult`
+   inside the chrome when any atom along the matched menu trail is missing.
+   The pairing is the generated fact the CR names — the menu — so the page
+   added next is guarded the moment it has a menu entry, with nothing to
+   forget. Matching: deepest menu path wins, `:id` / `[id]` match one segment
+   and lose a tie to a literal, a shorter path matches as a prefix (detail
+   pages inherit their list's atom), the bare `/admin` matches only itself.
+3. The guard the CR asks for is an in-app unit test rather than a `pnpm guards`
+   check (`guards/**` is R1's this wave): `route-permission.test.tsx` walks
+   every `page.tsx` under `app/admin/(shell)/` and fails if one resolves to no
+   menu node (allow-list: `/admin/403`). An unmatched page would be unguarded,
+   so that is the invariant worth holding. If the orchestrator wants it in
+   `pnpm guards` as well, it is a port of that test's walk.
+
+Tests: new `src/admin/shell/route-permission.test.tsx` (matching incl. the
+literal-over-parameter tie, the coverage walk, `RouteGuard` renders 403 / the
+page, the avatar menu pushes the real path); e2e `restricted-role.spec.ts`
+now asserts the narrow role sees the 403 on `/admin/system/admins`, not on
+`/admin/orders`, and that 个人资料 opens `/admin/system/profile`.

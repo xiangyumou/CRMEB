@@ -10,17 +10,37 @@ import {
 } from '@ant-design/icons';
 import { Avatar, Button, Dropdown, Grid, Layout, Menu, Tooltip, Typography } from 'antd';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 
+import { menuRegistry } from '../menu/menu.gen';
 import { renderMenuIcon } from '../menu/icons';
 import type { MenuNode } from '../menu/types';
 import { useAdminMenu } from '../menu/use-admin-menu';
 import { NotificationBell } from '../notifications/notification-bell';
-import { useSession } from '../session/session-provider';
+import { ForbiddenResult } from '../session/can';
+import { useCan, useSession } from '../session/session-provider';
 import { useThemeMode } from '../theme/theme-provider';
+import { requiredPermissions } from './route-permission';
 
 const SIDER_WIDTH = 216;
+
+/** The avatar menu's 个人资料 (CR-16-k: it pushed `/admin/profile`, which is a 404). */
+export const PROFILE_PATH = '/admin/system/profile';
+
+/**
+ * The route-level guard every page gets from the shell (CR-16-k): a URL whose
+ * menu entry needs an atom the admin lacks renders the 403 inside the chrome
+ * instead of an empty screen and a toast per failed fetch. The atoms come from
+ * the menu registry — see `route-permission.ts`.
+ */
+export function RouteGuard({ children }: { children: ReactNode }) {
+  const pathname = usePathname() ?? '/admin';
+  const can = useCan();
+  const required = useMemo(() => requiredPermissions(menuRegistry, pathname), [pathname]);
+  if (!required.every((permission) => can(permission))) return <ForbiddenResult />;
+  return <>{children}</>;
+}
 const SIDER_COLLAPSED = 56;
 
 function toMenuItems(nodes: readonly MenuNode[]): NonNullable<Parameters<typeof Menu>[0]['items']> {
@@ -182,7 +202,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 ],
                 onClick: ({ key }) => {
                   if (key === 'logout') logout();
-                  if (key === 'profile') router.push('/admin/profile');
+                  if (key === 'profile') router.push(PROFILE_PATH);
                 },
               }}
             >
@@ -207,7 +227,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             minHeight: 0,
           }}
         >
-          {children}
+          <RouteGuard>{children}</RouteGuard>
         </Layout.Content>
       </Layout>
     </Layout>

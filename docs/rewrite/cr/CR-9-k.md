@@ -1,6 +1,6 @@
 # CR-9-k — the audit log redacts only the top level, and every secret is one level down
 
-**Stream:** K (hardening) **Status:** OPEN — for the orchestrator / P0-A (`handle()` + audit repo)
+**Stream:** K (hardening) **Status:** **RESOLVED** by R4 (wave 6; commit in `docs/rewrite/status/r4.md`) — (1) recursive redaction over objects and arrays with a depth cap; (2) every field the config registry marks `secret` / `type: 'password'` is stripped by name, with the key list (case-insensitive) and a credential-name pattern as backstops; (3) both tests
 **Files:** `next/packages/core/src/auth/audit.repo.ts`, `next/packages/contracts/src/system/schemas.ts`
 
 ## What

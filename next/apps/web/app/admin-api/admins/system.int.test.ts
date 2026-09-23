@@ -158,7 +158,10 @@ describe('/admin-api/admins', () => {
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({ admin: { account: 'editor' } });
 
-    const audit = await harness.ctx.db.select().from(auditLogs);
+    const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
+      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      (row) => row.routeId !== 'auth.adminLogin',
+    );
     expect(audit).toHaveLength(1);
     expect(audit[0]).toMatchObject({ routeId: 'system.adminCreate', method: 'POST' });
     // `handle()` redacts before storing; the log must never hand a password to
@@ -415,8 +418,13 @@ describe('/admin-api/audit-logs', () => {
 
     const { GET } = await import('../audit-logs/route');
     const page = await (await GET(get('/admin-api/audit-logs?page=1&pageSize=20', headers))).json();
-    expect(page.total).toBe(2);
-    expect(page.items[0].routeId).toBe('system.adminCreate');
+    // The sign-in that opened the session is listed too (CR-12-k2).
+    expect(page.total).toBe(3);
+    expect(page.items.map((item: { routeId: string }) => item.routeId)).toEqual([
+      'system.adminCreate',
+      'system.adminCreate',
+      'auth.adminLogin',
+    ]);
   });
 
   it('does not record a read', async () => {
@@ -424,6 +432,11 @@ describe('/admin-api/audit-logs', () => {
     const headers = await adminCookie();
     const { GET } = await import('./route');
     await GET(get('/admin-api/admins?page=1&pageSize=20', headers));
-    expect(await harness.ctx.db.select().from(auditLogs)).toHaveLength(0);
+    expect(
+      (await harness.ctx.db.select().from(auditLogs)).filter(
+        // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+        (row) => row.routeId !== 'auth.adminLogin',
+      ),
+    ).toHaveLength(0);
   });
 });

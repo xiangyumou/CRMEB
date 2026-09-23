@@ -319,7 +319,10 @@ describe('POST /admin-api/orders/:id/shipments', () => {
 
     expect((await orderById(placed.orderId)).status).toBe('shipped');
 
-    const audit = await harness.ctx.db.select().from(auditLogs);
+    const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
+      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      (row) => row.routeId !== 'auth.adminLogin',
+    );
     expect(audit).toHaveLength(1);
     expect(audit[0]!.target).toBe(`order:${placed.orderId}`);
   });
@@ -345,7 +348,12 @@ describe('POST /admin-api/orders/:id/shipments', () => {
       { params: Promise.resolve({ id: String(placed.orderId) }) },
     );
     expect(response.status).toBe(403);
-    expect(await harness.ctx.db.select().from(auditLogs)).toHaveLength(0);
+    expect(
+      (await harness.ctx.db.select().from(auditLogs)).filter(
+        // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+        (row) => row.routeId !== 'auth.adminLogin',
+      ),
+    ).toHaveLength(0);
   });
 
   it('refuses a malformed body before it writes anything', async () => {

@@ -16,8 +16,9 @@ import { hashPassword } from './password';
  * row to read, and neither does the successful login that follows a run of
  * failures.
  *
- * The `it.fails` is CR-12-k2: record the *outcome* of each attempt — account,
- * result, address, never the body — somewhere an operator can read.
+ * CR-12-k2: `login` now records the *outcome* of each attempt — account,
+ * result, address, user agent, never the body — in `audit_logs` under
+ * `auth.adminLogin`.
  */
 
 let harness: TestCtx;
@@ -58,7 +59,7 @@ describe('K-SEC-A4 — what a password-guessing run leaves behind', () => {
     ).rejects.toMatchObject({ code: 'AUTH_TOO_MANY_ATTEMPTS' });
   });
 
-  it.fails('leaves a readable trail of the failed attempts, without the password', async () => {
+  it('leaves a readable trail of the failed attempts, without the password', async () => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await auth.login(harness.ctx, { account: 'admin', password: GUESS }).catch(() => undefined);
     }
@@ -67,5 +68,69 @@ describe('K-SEC-A4 — what a password-guessing run leaves behind', () => {
     expect(rows.length).toBeGreaterThanOrEqual(5);
     expect(JSON.stringify(rows)).toContain('admin');
     expect(JSON.stringify(rows)).not.toContain(GUESS);
+  });
+
+  it('writes one row per outcome, naming the account, the result and the address', async () => {
+    const meta = { ip: '203.0.113.9', userAgent: 'Mozilla/5.0 probe' };
+    await auth
+      .login(harness.ctx, { account: 'nobody', password: GUESS }, meta)
+      .catch(() => undefined);
+    await auth
+      .login(harness.ctx, { account: 'admin', password: GUESS }, meta)
+      .catch(() => undefined);
+    await auth.login(harness.ctx, { account: 'admin', password: PASSWORD }, meta);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await auth
+        .login(harness.ctx, { account: 'admin', password: GUESS }, meta)
+        .catch(() => undefined);
+    }
+
+    const rows = (await harness.ctx.db.select().from(auditLogs)).sort((a, b) => a.id - b.id);
+    expect(rows.every((row) => row.routeId === 'auth.adminLogin')).toBe(true);
+    expect(rows.every((row) => row.ip === '203.0.113.9')).toBe(true);
+    const results = rows.map((row) => JSON.parse(row.payload ?? '{}').result);
+    expect(results).toEqual([
+      'invalid_credentials',
+      'invalid_credentials',
+      'success',
+      'invalid_credentials',
+      'invalid_credentials',
+      'invalid_credentials',
+      'invalid_credentials',
+      'invalid_credentials',
+    ]);
+    // The unknown account has no admin id; the real one does.
+    expect(rows[0]).toMatchObject({ adminId: null, adminAccount: 'nobody', status: 401 });
+    expect(rows[1]!.adminId).not.toBeNull();
+    expect(rows[2]).toMatchObject({ status: 200, target: `admin:${rows[1]!.adminId}` });
+    expect(JSON.parse(rows[2]!.payload!)).toEqual({
+      account: 'admin',
+      result: 'success',
+      userAgent: 'Mozilla/5.0 probe',
+    });
+
+    // The next attempt is parked, and that is recorded too.
+    await auth
+      .login(harness.ctx, { account: 'admin', password: PASSWORD }, meta)
+      .catch(() => undefined);
+    const [locked] = (await harness.ctx.db.select().from(auditLogs)).sort((a, b) => b.id - a.id);
+    expect(locked).toMatchObject({ status: 429 });
+    expect(JSON.parse(locked!.payload!)).toMatchObject({
+      result: 'locked',
+      code: 'AUTH_TOO_MANY_ATTEMPTS',
+    });
+
+    expect(JSON.stringify(await harness.ctx.db.select().from(auditLogs))).not.toContain(GUESS);
+    expect(JSON.stringify(await harness.ctx.db.select().from(auditLogs))).not.toContain(PASSWORD);
+  });
+
+  it('records a disabled account after the right password, as disabled', async () => {
+    await harness.ctx.db.update(admins).set({ status: 0 });
+    await expect(
+      auth.login(harness.ctx, { account: 'admin', password: PASSWORD }),
+    ).rejects.toMatchObject({ code: 'AUTH_ACCOUNT_DISABLED' });
+    const [row] = await harness.ctx.db.select().from(auditLogs);
+    expect(row).toMatchObject({ status: 403, ip: null });
+    expect(JSON.parse(row!.payload!)).toMatchObject({ result: 'disabled', userAgent: null });
   });
 });

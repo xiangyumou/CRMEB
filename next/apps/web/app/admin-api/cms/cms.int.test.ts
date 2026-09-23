@@ -157,7 +157,10 @@ describe('/admin-api/cms/articles', () => {
     const headers = await adminCookie(['cms:article:write', 'cms:article:read']);
     const created = await createArticle(headers);
 
-    const audit = await harness.ctx.db.select().from(auditLogs);
+    const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
+      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      (row) => row.routeId !== 'auth.adminLogin',
+    );
     expect(audit).toHaveLength(1);
     expect(audit[0]).toMatchObject({
       routeId: 'cms.adminArticleCreate',

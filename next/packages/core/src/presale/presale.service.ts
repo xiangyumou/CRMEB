@@ -216,11 +216,23 @@ export async function list(ctx: Ctx, query: PageQuery): Promise<Paged<PresaleCar
   };
 }
 
+/** The statuses whose page a shopper may open. Everything else is a 404. */
+const STOREFRONT_READABLE: ReadonlySet<repo.ActivityRow['status']> = new Set([
+  'active',
+  'paused',
+  'ended',
+]);
+
 export async function detail(ctx: Ctx, input: { id: string }): Promise<PresaleDetail> {
   const id = Number(input.id);
   const now = ctx.clock.now();
   const activity = await repo.findActivity(ctx.db, id);
-  if (!activity) throw new DomainError('PRESALE_ACTIVITY_NOT_FOUND');
+  // A draft is not on the storefront, not even by id (CR-34-k2): ids are
+  // sequential, and the form promises 「草稿不会出现在前台」. `paused` and
+  // `ended` stay readable — orders link to the page — and `canBuy` says no.
+  if (!activity || !STOREFRONT_READABLE.has(activity.status)) {
+    throw new DomainError('PRESALE_ACTIVITY_NOT_FOUND');
+  }
 
   const [skus, description] = await Promise.all([
     repo.listActivitySkus(ctx.db, [id]),

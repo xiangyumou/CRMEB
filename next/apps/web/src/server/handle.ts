@@ -14,6 +14,7 @@ import '@shop/contracts/locale';
 import '@shop/core/domains';
 import { anonymousActor, createCtx, DomainError, type Actor, type Ctx } from '@shop/core/kernel';
 import { getStaffCheck, hasPermission, insertAudit, readBearer } from '@shop/core/auth';
+import { clientIp } from '../../app/api/v1/auth/_request';
 import { getContainer, type Container } from './container';
 import { isProduction } from './env';
 
@@ -53,7 +54,7 @@ export interface RequestCtx extends Ctx {
   setCookie(name: string, value: string, options?: CookieOptions): void;
   clearCookie(name: string): void;
   setHeader(name: string, value: string): void;
-  /** Names the thing this admin operation acted on, for the audit log. */
+  /** Names the thing this admin or staff operation acted on, for the audit log. */
   audit(target: string): void;
 }
 
@@ -411,7 +412,10 @@ export function handle<
       }
 
       // -- 7. audit ----------------------------------------------------------
-      if (surface === 'admin' && actor.kind === 'admin' && MUTATING.has(request.method)) {
+      // Every successful write by a console admin, and every successful write
+      // by a 店员 on the staff surface (CR-13-k2: `ctx.audit` on a staff route
+      // used to record nothing).
+      if (MUTATING.has(request.method) && audited(surface, anyRoute.auth, actor)) {
         await writeAudit(container, {
           actor,
           routeId: anyRoute.id,
@@ -421,7 +425,7 @@ export function handle<
           status,
           payload: parsedBody,
           requestId,
-          ip: request.headers.get('x-forwarded-for'),
+          ip: clientIp(request),
         });
       }
 
@@ -462,6 +466,12 @@ function baseCtx(
   });
 }
 
+/** Which successful writes land in `audit_logs`. */
+function audited(surface: string, auth: string, actor: Actor): boolean {
+  if (surface === 'admin') return actor.kind === 'admin';
+  return auth === 'staff' && actor.kind === 'staff';
+}
+
 async function writeAudit(
   container: Container,
   entry: {
@@ -477,9 +487,12 @@ async function writeAudit(
   },
 ): Promise<void> {
   try {
+    const staff = entry.actor.kind === 'staff';
     await insertAudit(container.db, {
-      adminId: entry.actor.id,
-      adminAccount: entry.actor.display ?? '',
+      actorKind: staff ? 'staff' : 'admin',
+      adminId: staff ? null : entry.actor.id,
+      userId: staff ? entry.actor.id : null,
+      adminAccount: staff ? `staff:${entry.actor.id}` : (entry.actor.display ?? ''),
       routeId: entry.routeId,
       method: entry.method,
       path: entry.path,

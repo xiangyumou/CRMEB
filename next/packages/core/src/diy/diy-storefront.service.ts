@@ -14,7 +14,7 @@ import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { cleanDiyData } from './compatibility';
 import { versionOf } from './content';
-import { DIY_CACHE } from './diy.cache';
+import { DIY_CACHE, readDiyCache, writeDiyCache } from './diy.cache';
 import { diyConfig } from './diy.config';
 import { toStorefront, type ReadCtx } from './diy-page.service';
 import * as repo from './diy.repo';
@@ -23,15 +23,14 @@ import * as repo from './diy.repo';
  * The public 装修 reads the app makes that G1's four routes did not answer:
  * 个人中心, 底部导航 and the 版式 switch (CR-3-h2), and 商品详情 (CR-2-h3).
  *
- * ## Why these are cached and `pages/home` is not
+ * ## Why these are cached
  *
- * The home page already has a cheap poll of its own — `GET /api/v1/diy/version`
- * plus the `ETag`, which the app checks on resume and which lets a 200 KB page
- * body be skipped entirely. These three do not: 底部导航 is mounted on *every*
- * tabbar page and refetched on each `onShow`, and 版式 is two integers behind a
- * round trip. Sixty seconds in Redis turns that traffic into one database read
- * a minute per surface, and every mutation that could change them drops the
- * keys, so an operator who publishes still sees the change at once.
+ * 底部导航 is mounted on *every* tabbar page and refetched on each `onShow`, 版式
+ * is two integers behind a round trip, and 商品详情 is read on every product
+ * view. Sixty seconds in Redis turns that traffic into one database read a
+ * minute per surface, and every mutation that could change them drops the
+ * keys, so an operator who publishes still sees the change at once. The home
+ * page is cached the same way, in `diy-page.service.ts` (CR-42-k2).
  *
  * A cache that is merely unwell is never fatal: a Redis error is logged at
  * `warn` and the value is rebuilt from the database, the same discipline as
@@ -39,7 +38,6 @@ import * as repo from './diy.repo';
  */
 
 const {
-  seconds: CACHE_SECONDS,
   userCenter: USER_CENTER_KEY,
   navigation: NAVIGATION_KEY,
   productDetail: PRODUCT_DETAIL_KEY,
@@ -66,14 +64,14 @@ const NAVIGATION_COMPONENT = 'pagefoot';
  * enum column.
  */
 export async function getUserCenterPage(ctx: ReadCtx): Promise<DiyStorefrontPage> {
-  const cached = await readCache<DiyStorefrontPage>(ctx, USER_CENTER_KEY);
+  const cached = await readDiyCache<DiyStorefrontPage>(ctx, USER_CENTER_KEY);
   if (cached !== null) return tagged(ctx, cached);
 
   const row = await repo.findLatestPublishedOfKind(ctx.db, 'user_center');
   if (!row) throw new DomainError('DIY_USER_CENTER_PAGE_MISSING');
 
   const payload = toStorefront(row);
-  await writeCache(ctx, USER_CENTER_KEY, payload);
+  await writeDiyCache(ctx, USER_CENTER_KEY, payload);
   return tagged(ctx, payload);
 }
 
@@ -98,13 +96,13 @@ export async function getUserCenterPage(ctx: ReadCtx): Promise<DiyStorefrontPage
  * than any other 装修 surface, and every 装修 write drops the key.
  */
 export async function getProductDetailPage(ctx: ReadCtx): Promise<DiyProductDetailPage> {
-  const cached = await readCache<DiyProductDetailPage>(ctx, PRODUCT_DETAIL_KEY);
+  const cached = await readDiyCache<DiyProductDetailPage>(ctx, PRODUCT_DETAIL_KEY);
   if (cached !== null) return tagged(ctx, cached);
 
   const row = await repo.findLatestPublishedOfKind(ctx.db, 'product_detail');
   const payload: DiyProductDetailPage = row ? toStorefront(row) : builtInProductDetailPage();
 
-  await writeCache(ctx, PRODUCT_DETAIL_KEY, payload);
+  await writeDiyCache(ctx, PRODUCT_DETAIL_KEY, payload);
   return tagged(ctx, payload);
 }
 
@@ -139,7 +137,7 @@ function builtInProductDetailPage(): DiyProductDetailPage {
  * page yet.
  */
 export async function getNavigation(ctx: ReadCtx): Promise<DiyNavigation> {
-  const cached = await readCache<DiyNavigation>(ctx, NAVIGATION_KEY);
+  const cached = await readDiyCache<DiyNavigation>(ctx, NAVIGATION_KEY);
   if (cached !== null) return tagged(ctx, cached);
 
   const row = await repo.findHomePage(ctx.db);
@@ -147,7 +145,7 @@ export async function getNavigation(ctx: ReadCtx): Promise<DiyNavigation> {
     ? { navigation: navigationOf(toStorefront(row).content), version: versionOf(row) }
     : { navigation: null, version: '0' };
 
-  await writeCache(ctx, NAVIGATION_KEY, payload);
+  await writeDiyCache(ctx, NAVIGATION_KEY, payload);
   return tagged(ctx, payload);
 }
 
@@ -181,24 +179,6 @@ export async function getLayout(ctx: Ctx, input: { type: DiyLayoutType }): Promi
 // ---------------------------------------------------------------------------
 // cache plumbing
 // ---------------------------------------------------------------------------
-
-async function readCache<T>(ctx: Ctx, key: string): Promise<T | null> {
-  try {
-    const raw = await ctx.redis.get(key);
-    return raw === null ? null : (JSON.parse(raw) as T);
-  } catch (error) {
-    ctx.logger.warn({ err: error, key }, 'diy: storefront cache read failed');
-    return null;
-  }
-}
-
-async function writeCache(ctx: Ctx, key: string, payload: unknown): Promise<void> {
-  try {
-    await ctx.redis.set(key, JSON.stringify(payload), 'EX', CACHE_SECONDS);
-  } catch (error) {
-    ctx.logger.warn({ err: error, key }, 'diy: storefront cache write failed');
-  }
-}
 
 /** The same weak validator the other storefront reads set. */
 function tagged<T extends { version: string }>(ctx: ReadCtx, payload: T): T {

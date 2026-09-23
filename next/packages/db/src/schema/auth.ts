@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
   integer,
   pgTable,
@@ -153,10 +154,20 @@ export const auditLogs = pgTable(
     requestId: varchar({ length: 64 }).notNull(),
     /** Forwarded client address. Everything is behind one proxy, so this is advisory. */
     ip: varchar({ length: 64 }),
+    /**
+     * Who acted (CR-13-k2): `admin` — a console account, `admin_id` — or
+     * `staff` — a 店员 on the storefront's staff surface, `user_id`. Rows
+     * written before the column existed are all console rows, hence the default.
+     */
+    actorKind: varchar({ length: 16 }).notNull().default('admin'),
+    /** The 店员's storefront user when `actor_kind = 'staff'`. */
+    userId: fk().references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
   },
   (t) => [
     index('audit_logs_admin_idx').on(t.adminId, t.createdAt),
     index('audit_logs_route_idx').on(t.routeId, t.createdAt),
+    index('audit_logs_user_idx').on(t.userId, t.createdAt),
+    check('audit_logs_actor_kind_known', sql`${t.actorKind} in ('admin', 'staff')`),
   ],
 );

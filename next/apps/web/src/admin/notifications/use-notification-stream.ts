@@ -1,7 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  notificationAdminInboxList,
+  notificationAdminMarkAllRead,
+  notificationAdminMarkRead,
+  notificationAdminUnreadCount,
+} from '@shop/contracts/notification/notification.admin.contract';
+import type { NotificationMessage } from '@shop/contracts/notification/schemas';
 
+import { callRoute } from '../api';
 import { adminNotification, type AdminNotification, type StreamStatus } from './types';
 
 export interface NotificationStreamOptions {
@@ -18,6 +26,11 @@ export interface NotificationStreamOptions {
    * endpoint does not exist during Phase 0, so stop hammering it.
    */
   coldFailureLimit?: number | undefined;
+  /**
+   * Read the durable inbox on mount and after every reconnect, and send
+   * mark-read to the server. Default `true`; the kit demo turns it off.
+   */
+  syncInbox?: boolean | undefined;
 }
 
 export interface NotificationStream {
@@ -31,13 +44,24 @@ export interface NotificationStream {
 }
 
 /**
- * Subscribes to the admin notification SSE stream, with jittered exponential
- * backoff and an unread counter.
+ * The header bell's state: the durable inbox, plus live pushes over SSE.
+ *
+ * - **Seeded from the inbox** (CR-32-k2). On mount, and again whenever the
+ *   stream re-opens after a drop, the hook reads the unread rows
+ *   (`GET /admin-api/notifications?unreadOnly=true`) and the unread count. A
+ *   notification written while the operator was on another tab, or before they
+ *   signed in, is therefore on the bell when they arrive.
+ * - **Pushes are named events.** The server writes `event: notification`,
+ *   which reaches `addEventListener('notification')` and never `onmessage`
+ *   (the listener the hook used to set, so the bell dropped every push). The
+ *   push carries the inbox row's id, so a row that is both seeded and pushed
+ *   shows once.
+ * - **Reading is a server write.** `markRead` / `markAllRead` update the badge
+ *   at once and call the inbox routes; the next load agrees.
  *
  * The connection is a raw `EventSource` rather than `callRoute` because SSE is
  * a long-lived stream, not a request/response: it carries no contract body and
- * cannot be modelled by a `RouteDef`. Everything else still goes through
- * `callRoute`.
+ * cannot be modelled by a `RouteDef`. Everything else goes through `callRoute`.
  */
 export function useNotificationStream(
   url: string,
@@ -49,10 +73,13 @@ export function useNotificationStream(
     baseDelay = 1000,
     maxDelay = 30_000,
     coldFailureLimit = 5,
+    syncInbox = true,
   } = options;
 
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [readIds, setReadIds] = useState<ReadonlySet<string>>(() => new Set());
+  /** Unread rows the server has that the list does not hold (beyond `limit`). */
+  const [unlisted, setUnlisted] = useState(0);
   const [status, setStatus] = useState<StreamStatus>('connecting');
   const [generation, setGeneration] = useState(0);
 
@@ -75,6 +102,37 @@ export function useNotificationStream(
       }
     };
 
+    const seed = async (): Promise<void> => {
+      if (!syncInbox) return;
+      try {
+        const [page, count] = await Promise.all([
+          callRoute(notificationAdminInboxList, {
+            query: { page: 1, pageSize: Math.min(limit, 100), unreadOnly: 'true' },
+          }),
+          callRoute(notificationAdminUnreadCount),
+        ]);
+        if (disposed) return;
+        const seeded = page.items.map(fromInbox);
+        setNotifications((current) => {
+          const known = new Set(seeded.map((item) => item.id));
+          const merged = [...current.filter((item) => !known.has(item.id)), ...seeded];
+          merged.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+          return merged.slice(0, limit);
+        });
+        // Anything seeded is unread on the server right now.
+        setReadIds((current) => {
+          if (!seeded.some((item) => current.has(item.id))) return current;
+          const next = new Set(current);
+          for (const item of seeded) next.delete(item.id);
+          return next;
+        });
+        setUnlisted(Math.max(0, count.unread - seeded.length));
+      } catch {
+        // The bell is a convenience: a failed read leaves whatever it shows,
+        // and the next reconnect tries again. A 401 is handled by `callRoute`.
+      }
+    };
+
     const connect = (): void => {
       if (disposed) return;
       setStatus('connecting');
@@ -84,19 +142,21 @@ export function useNotificationStream(
 
       source.onopen = () => {
         if (disposed) return;
+        // A re-open after a drop may have missed pushes: read the inbox again.
+        if (attempt > 0) void seed();
         everOpened = true;
         attempt = 0;
         setStatus('open');
       };
 
-      source.onmessage = (event: MessageEvent<string>) => {
+      source.addEventListener('notification', (event: MessageEvent<string>) => {
         const parsed = parseEvent(event.data);
         if (!parsed) return;
         setNotifications((prev) => {
           if (prev.some((item) => item.id === parsed.id)) return prev;
           return [parsed, ...prev].slice(0, limit);
         });
-      };
+      });
 
       source.onerror = () => {
         source.close();
@@ -118,6 +178,7 @@ export function useNotificationStream(
       };
     };
 
+    void seed();
     connect();
 
     return () => {
@@ -126,24 +187,36 @@ export function useNotificationStream(
       sourceRef.current?.close();
       sourceRef.current = null;
     };
-  }, [url, enabled, limit, baseDelay, maxDelay, coldFailureLimit, generation]);
+  }, [url, enabled, limit, baseDelay, maxDelay, coldFailureLimit, syncInbox, generation]);
 
-  const markRead = useCallback((id: string) => {
-    setReadIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
-  }, []);
+  const markRead = useCallback(
+    (id: string) => {
+      setReadIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+      if (syncInbox) {
+        callRoute(notificationAdminMarkRead, { params: { id }, body: {} }).catch(() => undefined);
+      }
+    },
+    [syncInbox],
+  );
 
   const markAllRead = useCallback(() => {
     setNotifications((current) => {
       setReadIds(new Set(current.map((item) => item.id)));
       return current;
     });
-  }, []);
+    setUnlisted(0);
+    if (syncInbox) {
+      callRoute(notificationAdminMarkAllRead, { body: {} }).catch(() => undefined);
+    }
+  }, [syncInbox]);
 
   const reconnect = useCallback(() => setGeneration((n) => n + 1), []);
 
   const unreadCount = useMemo(
-    () => notifications.reduce((count, item) => (readIds.has(item.id) ? count : count + 1), 0),
-    [notifications, readIds],
+    () =>
+      unlisted +
+      notifications.reduce((count, item) => (readIds.has(item.id) ? count : count + 1), 0),
+    [notifications, readIds, unlisted],
   );
 
   return { notifications, unreadCount, status, markRead, markAllRead, reconnect };
@@ -156,4 +229,17 @@ function parseEvent(raw: string): AdminNotification | null {
   } catch {
     return null;
   }
+}
+
+/** An inbox row in the shape the bell renders; the same shape the push carries. */
+function fromInbox(message: NotificationMessage): AdminNotification {
+  const link = message.data?.['link'];
+  return {
+    id: message.id,
+    type: message.code ?? 'broadcast',
+    title: message.title,
+    body: message.content,
+    ...(typeof link === 'string' && link !== '' ? { link } : {}),
+    createdAt: message.createdAt,
+  };
 }

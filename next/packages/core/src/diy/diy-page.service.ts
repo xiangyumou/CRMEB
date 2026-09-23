@@ -11,7 +11,7 @@ import type { DiyPageValue } from '@shop/contracts/diy/schema/page';
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { cleanDiyData } from './compatibility';
-import { invalidateDiyStorefrontCache } from './diy.cache';
+import { DIY_CACHE, invalidateDiyStorefrontCache, readDiyCache, writeDiyCache } from './diy.cache';
 import {
   assertProductLimits,
   contentVersionOf,
@@ -355,10 +355,29 @@ function tagged<T extends { version: string }>(ctx: ReadCtx, payload: T): T {
   return payload;
 }
 
+/**
+ * `GET /api/v1/diy/pages/home` — the first request of every app launch.
+ *
+ * Cached under `DIY_CACHE.home` for 60 s (CR-42-k2): reading the row means
+ * reading its whole `content` (≈90 KB for the production home page) and
+ * cleaning it, and it was the storefront's largest slice of database time in
+ * the load smoke. Every 装修 write drops the key (`invalidateDiyStorefrontCache`),
+ * so a publish is visible on the next read. A missing home page is not cached:
+ * the operator who fixes it should not wait a minute.
+ */
 export async function getHomePage(ctx: ReadCtx): Promise<DiyStorefrontPage> {
+  return tagged(ctx, await homePayload(ctx));
+}
+
+async function homePayload(ctx: Ctx): Promise<DiyStorefrontPage> {
+  const cached = await readDiyCache<DiyStorefrontPage>(ctx, DIY_CACHE.home);
+  if (cached !== null) return cached;
+
   const row = await repo.findHomePage(ctx.db);
   if (!row) throw new DomainError('DIY_HOME_PAGE_MISSING');
-  return tagged(ctx, toStorefront(row));
+  const payload = toStorefront(row);
+  await writeDiyCache(ctx, DIY_CACHE.home, payload);
+  return payload;
 }
 
 export async function getStorefrontPage(
@@ -385,7 +404,7 @@ export async function getPageVersion(
     if (!row || row.status !== 'published') throw new DomainError('DIY_PAGE_NOT_FOUND');
     return { version: versionOf(row) };
   }
-  const home = await repo.findHomePage(ctx.db);
-  if (!home) throw new DomainError('DIY_HOME_PAGE_MISSING');
-  return { version: versionOf(home) };
+  // The home page's version is the cached payload's (CR-42-k2): the poll and
+  // the page it guards agree, and neither reads the row while the entry lives.
+  return { version: (await homePayload(ctx)).version };
 }

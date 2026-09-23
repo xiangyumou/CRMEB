@@ -332,7 +332,10 @@ describe('/admin-api/users', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ status: 'disabled' });
 
-    const audit = await harness.ctx.db.select().from(auditLogs);
+    const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
+      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      (row) => row.routeId !== 'auth.adminLogin',
+    );
     expect(audit).toHaveLength(1);
     expect(audit[0]).toMatchObject({ routeId: 'user.adminSetStatus', target: `user:${row!.id}` });
 

@@ -452,7 +452,9 @@ export async function adminIdsWithRole(db: DbOrTx, roleId: number): Promise<numb
 
 export interface AuditRow {
   id: number;
+  actorKind: string;
   adminId: number | null;
+  userId: number | null;
   adminAccount: string;
   routeId: string;
   method: string;
@@ -466,7 +468,9 @@ export interface AuditRow {
 }
 
 export interface AuditListArgs {
+  actorKind?: 'admin' | 'staff' | undefined;
   adminId?: number | undefined;
+  userId?: number | undefined;
   keyword?: string | undefined;
   routeId?: string | undefined;
   method?: string | undefined;
@@ -482,7 +486,9 @@ export async function listAuditLogs(
   args: AuditListArgs,
 ): Promise<{ rows: AuditRow[]; total: number }> {
   const where = allOf(
+    args.actorKind ? eq(auditLogs.actorKind, args.actorKind) : undefined,
     args.adminId === undefined ? undefined : eq(auditLogs.adminId, args.adminId),
+    args.userId === undefined ? undefined : eq(auditLogs.userId, args.userId),
     args.routeId ? eq(auditLogs.routeId, args.routeId) : undefined,
     args.method ? eq(auditLogs.method, args.method) : undefined,
     args.from ? gte(auditLogs.createdAt, args.from) : undefined,

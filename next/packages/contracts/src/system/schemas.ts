@@ -264,9 +264,18 @@ export type PermissionTree = z.infer<typeof permissionTree>;
 // audit log
 // ---------------------------------------------------------------------------
 
+/** Who wrote an audit row: a console admin, or a 店员 on the staff surface (CR-13-k2). */
+export const auditActorKind = z.enum(['admin', 'staff']);
+export type AuditActorKind = z.infer<typeof auditActorKind>;
+
 export const auditLogItem = z.object({
   id,
+  actorKind: auditActorKind,
+  /** The console account, when `actorKind` is `admin` (null once it is deleted, or for a sign-in to an unknown account). */
   adminId: id.nullable(),
+  /** The 店员's storefront user, when `actorKind` is `staff`. */
+  userId: id.nullable(),
+  /** The console account name, or `staff:<userId>` for a 店员. */
   adminAccount: z.string(),
   routeId: z.string(),
   method: z.string(),
@@ -283,7 +292,9 @@ export type AuditLogItem = z.infer<typeof auditLogItem>;
 
 export const auditLogItemExample: AuditLogItem = {
   id: '9001',
+  actorKind: 'admin',
   adminId: '1',
+  userId: null,
   adminAccount: 'admin',
   routeId: 'coupon.adminSetStatus',
   method: 'POST',
@@ -298,7 +309,10 @@ export const auditLogItemExample: AuditLogItem = {
 
 export const auditLogListQuery = pageQuery
   .extend({
+    actorKind: auditActorKind.optional(),
     adminId: id.optional(),
+    /** A 店员's storefront user id. */
+    userId: id.optional(),
     /** Matches `route_id`, `path` or `target`. */
     keyword: z.string().trim().max(128).optional(),
     routeId: z.string().trim().max(128).optional(),

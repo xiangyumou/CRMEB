@@ -20,12 +20,19 @@ const CACHE_SECONDS = 60;
 
 export const DIY_CACHE = {
   seconds: CACHE_SECONDS,
+  /** The cleaned storefront home page, `pages/home` and `version` (CR-42-k2). */
+  home: 'diy:home:v1',
   userCenter: 'diy:user-center:v1',
   navigation: 'diy:navigation:v1',
   productDetail: 'diy:product-detail:v1',
 } as const;
 
-const KEYS = [DIY_CACHE.userCenter, DIY_CACHE.navigation, DIY_CACHE.productDetail] as const;
+const KEYS = [
+  DIY_CACHE.home,
+  DIY_CACHE.userCenter,
+  DIY_CACHE.navigation,
+  DIY_CACHE.productDetail,
+] as const;
 
 /**
  * Drops every cached storefront read.
@@ -44,5 +51,30 @@ export async function invalidateDiyStorefrontCache(ctx: Ctx): Promise<void> {
     await ctx.redis.del(...KEYS);
   } catch (error) {
     ctx.logger.warn({ err: error }, 'diy: storefront cache invalidation failed');
+  }
+}
+
+/**
+ * Reads one cached storefront payload. A Redis error is logged at `warn` and
+ * answers `null`, so the caller rebuilds from the database: a cache that is
+ * merely unwell is never fatal. Here rather than beside the reads so that
+ * `diy-page.service.ts` (the home page) can use it without an import cycle.
+ */
+export async function readDiyCache<T>(ctx: Ctx, key: string): Promise<T | null> {
+  try {
+    const raw = await ctx.redis.get(key);
+    return raw === null ? null : (JSON.parse(raw) as T);
+  } catch (error) {
+    ctx.logger.warn({ err: error, key }, 'diy: storefront cache read failed');
+    return null;
+  }
+}
+
+/** Writes one cached storefront payload for `DIY_CACHE.seconds`. Never throws. */
+export async function writeDiyCache(ctx: Ctx, key: string, payload: unknown): Promise<void> {
+  try {
+    await ctx.redis.set(key, JSON.stringify(payload), 'EX', CACHE_SECONDS);
+  } catch (error) {
+    ctx.logger.warn({ err: error, key }, 'diy: storefront cache write failed');
   }
 }

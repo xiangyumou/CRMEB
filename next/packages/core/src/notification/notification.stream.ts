@@ -69,34 +69,124 @@ export async function publishToAdmin(
 }
 
 /**
- * Subscribes to one admin's channel on a **dedicated** connection.
+ * How many bell streams one admin may hold open **in one web process**
+ * (CR-15-k2). A tab holds one; eight is more tabs than anybody works in, and
+ * a loop opening streams with a stolen or valid cookie stops there instead of
+ * at the process's file-descriptor limit.
+ */
+export const MAX_STREAMS_PER_ADMIN = 8;
+
+/** Thrown by `subscribeToAdmin` when the admin already holds the maximum. */
+export class AdminStreamLimitError extends Error {
+  constructor(readonly adminId: number) {
+    super(`admin ${adminId} already holds ${MAX_STREAMS_PER_ADMIN} notification streams`);
+    this.name = 'AdminStreamLimitError';
+  }
+}
+
+interface ChannelEntry {
+  listeners: Set<(raw: string) => void>;
+  /** Resolves once Redis has confirmed the SUBSCRIBE. */
+  ready: Promise<unknown>;
+}
+
+interface Hub {
+  subscriber: Redis;
+  channels: Map<string, ChannelEntry>;
+}
+
+/**
+ * One subscriber connection per process (per base client), shared by every
+ * open stream (CR-15-k2).
  *
- * ioredis puts a connection into subscriber mode, where ordinary commands are
- * refused, so this duplicates the shared client rather than borrowing it — the
- * one mistake that turns a notification bell into an outage of everything else
- * that uses Redis.
+ * It used to be a `redis.duplicate()` per stream, so any admin session could
+ * open connections in a loop until Redis `maxclients` ran out — taking the
+ * sessions, rate limits and the queue down with it. Now N tabs cost one
+ * connection, the channels are reference-counted, and the connection is
+ * dropped when the last stream closes.
+ */
+const hubs = new WeakMap<Redis, Hub>();
+
+function hubFor(redis: Redis): Hub {
+  const existing = hubs.get(redis);
+  if (existing) return existing;
+  // ioredis puts a connection into subscriber mode, where ordinary commands
+  // are refused, so the hub duplicates the shared client rather than
+  // borrowing it — the one mistake that turns a notification bell into an
+  // outage of everything else that uses Redis.
+  const subscriber = redis.duplicate();
+  const hub: Hub = { subscriber, channels: new Map() };
+  subscriber.on('message', (channel: string, payload: string) => {
+    const entry = hub.channels.get(channel);
+    if (!entry) return;
+    for (const listener of entry.listeners) {
+      try {
+        listener(payload);
+      } catch {
+        // One broken stream must not starve the others on the same channel.
+      }
+    }
+  });
+  hubs.set(redis, hub);
+  return hub;
+}
+
+/**
+ * Subscribes to one admin's channel through the process's shared subscriber.
  *
- * Returns an unsubscribe function; the route handler calls it when the response
- * stream is cancelled, which Next signals through `request.signal`.
+ * Throws `AdminStreamLimitError` when the admin already holds
+ * `MAX_STREAMS_PER_ADMIN` streams here. Returns an unsubscribe function; the
+ * route handler calls it when the response stream is cancelled, which Next
+ * signals through `request.signal`, or when the session stops resolving.
  */
 export async function subscribeToAdmin(
   redis: Redis,
   adminId: number,
   onEvent: (raw: string) => void,
+  options: { maxPerAdmin?: number } = {},
 ): Promise<() => Promise<void>> {
-  const subscriber = redis.duplicate();
+  const hub = hubFor(redis);
   const channel = adminChannel(adminId);
+  const max = options.maxPerAdmin ?? MAX_STREAMS_PER_ADMIN;
 
-  subscriber.on('message', (incoming: string, payload: string) => {
-    if (incoming === channel) onEvent(payload);
-  });
-  await subscriber.subscribe(channel);
+  let entry = hub.channels.get(channel);
+  if (entry && entry.listeners.size >= max) throw new AdminStreamLimitError(adminId);
+  if (!entry) {
+    entry = { listeners: new Set(), ready: hub.subscriber.subscribe(channel) };
+    hub.channels.set(channel, entry);
+  }
+  // A private wrapper, so the same callback subscribed twice is two streams.
+  const listener = (raw: string): void => onEvent(raw);
+  entry.listeners.add(listener);
+  const mine = entry;
 
-  return async () => {
-    try {
-      await subscriber.unsubscribe(channel);
-    } finally {
-      subscriber.disconnect();
+  let released = false;
+  async function release(): Promise<void> {
+    if (released) return;
+    released = true;
+    mine.listeners.delete(listener);
+    if (mine.listeners.size > 0 || hub.channels.get(channel) !== mine) return;
+    hub.channels.delete(channel);
+    if (hub.channels.size === 0 && hubs.get(redis) === hub) {
+      // The last stream in this process closed: drop the connection. The next
+      // stream opens a fresh hub.
+      hubs.delete(redis);
+      hub.subscriber.disconnect();
+      return;
     }
-  };
+    await hub.subscriber.unsubscribe(channel).catch(() => undefined);
+  }
+
+  try {
+    await mine.ready;
+  } catch (error) {
+    await release();
+    throw error;
+  }
+  return release;
+}
+
+/** How many streams this process holds for one admin. For tests and `/readyz`-style probes. */
+export function openAdminStreams(redis: Redis, adminId: number): number {
+  return hubs.get(redis)?.channels.get(adminChannel(adminId))?.listeners.size ?? 0;
 }

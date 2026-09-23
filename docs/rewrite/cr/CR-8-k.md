@@ -1,6 +1,6 @@
 # CR-8-k — an admin session older than 32 hours survives a password change
 
-**Stream:** K (hardening) **Status:** OPEN — for the orchestrator / P0-A (auth kernel)
+**Stream:** K (hardening) **Status:** **RESOLVED** by R4 (wave 6; commit in `docs/rewrite/status/r4.md`) — fix (1) plus (3): `resolve()` slides the index with the session in one Lua call and re-lists the session in it (which also heals sessions whose index lapsed before the fix); the "second belt" comment is replaced by one that says the index is the only belt. Fix (2), an absolute lifetime, is not built: it is a product change (a daily re-login) and not needed once the index slides — recorded as a question in the R4 status
 **Files:** `next/packages/core/src/auth/admin-session.store.ts`, `next/packages/core/src/auth/admin-auth.service.ts`
 
 ## What

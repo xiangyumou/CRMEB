@@ -30,9 +30,10 @@ import type { Stack } from '../src/stack';
  * it: the inbox API behind the bell, the send log, the template screen, and
  * the SSE stream.
  *
- * Two things this spec found are `test.fail`, both CR-32-k2: the bell never
- * shows a pushed notification (the stream names its events, the hook listens
- * for unnamed ones only), and nothing in the admin UI reads the durable inbox.
+ * Two things this spec found were `test.fail`, both CR-32-k2 (now fixed): the
+ * bell never showed a pushed notification (the stream names its events, the
+ * hook listened for unnamed ones only), and nothing in the admin UI read the
+ * durable inbox.
  */
 
 const EVENT = 'admin_refund_applied';
@@ -281,11 +282,13 @@ test('the stream refuses a caller with no session, and pushes to one with a sess
   expect(seen.unnamed).toEqual([]);
 });
 
-test('the bell shows a pushed notification', async ({ adminPage, shop }) => {
-  // CR-32-k2: the route sends `event: notification`; `useNotificationStream`
-  // only sets `onmessage`, which never fires for a named event. The push above
-  // reaches the browser and the bell drops it.
-  test.fail(true, 'CR-32-k2 — the bell listens for unnamed events; the stream sends named ones');
+/** What antd's badge renders for a count. */
+const badge = (count: number): string => (count > 99 ? '99+' : String(count));
+
+test('the bell shows a pushed notification', async ({ adminPage, adminApi, shop }) => {
+  // CR-32-k2 (fixed): the route sends `event: notification`, and the hook now
+  // listens for that named event instead of `onmessage` only.
+  const before = await unread(adminApi);
 
   // Reload so the bell's own EventSource is opened while we are watching for it.
   await Promise.all([
@@ -296,19 +299,30 @@ test('the bell shows a pushed notification', async ({ adminPage, shop }) => {
   ]);
   const bell = adminPage.getByTestId('notification-bell');
   await expect(bell).toBeVisible();
+  // The bell starts from the inbox; wait for it so the push is what moves it.
+  if (before > 0) await expect(bell.locator('.ant-badge-count')).toHaveText(badge(before));
   await notifyAndDispatch(shop, refundApplied());
-  await expect(bell.locator('.ant-badge-count')).toHaveText('1', { timeout: 5_000 });
+  await expect(bell.locator('.ant-badge-count')).toHaveText(badge(before + 1), { timeout: 5_000 });
 });
 
 test('the bell shows the unread inbox on load', async ({ adminPage, adminApi, shop }) => {
-  // CR-32-k2, second half: no admin screen calls `/admin-api/notifications`
-  // or `/unread-count`, so the bell starts empty on every page load and an
-  // operator who was not looking at the moment of the push never sees it.
-  test.fail(true, 'CR-32-k2 — nothing in the admin UI reads the durable inbox');
-
+  // CR-32-k2 (fixed): the bell reads `/admin-api/notifications?unreadOnly` and
+  // `/unread-count` on load, so a notification written while nobody was
+  // looking is on the badge when the operator arrives.
   await notifyAndDispatch(shop, refundApplied());
-  expect(await unread(adminApi)).toBeGreaterThan(0);
+  const count = await unread(adminApi);
+  expect(count).toBeGreaterThan(0);
   await adminPage.reload();
   const bell = adminPage.getByTestId('notification-bell');
-  await expect(bell.locator('.ant-badge-count')).toBeVisible({ timeout: 5_000 });
+  await expect(bell.locator('.ant-badge-count')).toHaveText(badge(count), { timeout: 5_000 });
+
+  // And 全部已读 is a server write: the next load starts at zero.
+  await bell.click();
+  await adminPage.getByRole('button', { name: cjk('全部已读') }).click();
+  await expect.poll(() => unread(adminApi)).toBe(0);
+  await adminPage.reload();
+  await expect(adminPage.getByTestId('notification-bell')).toBeVisible();
+  await expect(adminPage.getByTestId('notification-bell').locator('.ant-badge-count')).toHaveCount(
+    0,
+  );
 });

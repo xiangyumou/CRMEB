@@ -198,7 +198,10 @@ describe('/admin-api/coupons', () => {
     const created = await response.json();
     expect(created).toMatchObject({ name: '满 100 减 10', remainingCount: 100 });
 
-    const audit = await harness.ctx.db.select().from(auditLogs);
+    const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
+      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      (row) => row.routeId !== 'auth.adminLogin',
+    );
     expect(audit).toHaveLength(1);
     expect(audit[0]).toMatchObject({
       routeId: 'coupon.adminCreate',

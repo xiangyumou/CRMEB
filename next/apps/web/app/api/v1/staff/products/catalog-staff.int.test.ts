@@ -296,12 +296,18 @@ describe('POST /api/v1/staff/products', () => {
     expect(detail.status).toBe(200);
     expect(await detail.json()).toMatchObject({ name: '手冲挂耳咖啡' });
 
-    // `audit_logs.admin_id` is an admin FK, so a staff write is not an audit
-    // row — the `ctx.audit` call in the route file is the same no-op B2's
-    // staff routes make, and the trail for the phone is the order/product
-    // history, not the console's log. Pinned so nobody reads the empty table
-    // as the guard having been skipped.
-    expect(await harness.ctx.db.select().from(auditLogs)).toHaveLength(0);
+    // A staff write is an audit row since CR-13-k2 (`actor_kind = 'staff'`,
+    // the 店员's user id); it used to be a no-op.
+    const audit = await harness.ctx.db.select().from(auditLogs);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({
+      actorKind: 'staff',
+      adminId: null,
+      routeId: 'catalog.staffProductCreate',
+      target: `product:${body.id}`,
+      status: 201,
+    });
+    expect(audit[0]!.userId).not.toBeNull();
   });
 
   it('refuses a malformed body before it writes anything', async () => {
@@ -590,6 +596,40 @@ describe('/api/v1/staff/products/:id/skus', () => {
 
     const [row] = await harness.ctx.db.select().from(productSkus);
     expect(row!.stock).toBe(50);
+  });
+
+  it('records the reprice in the operation log, naming the 店员 and the product (CR-13-k2)', async () => {
+    const seeded = await seedProduct();
+    const { userId, headers } = await shopper();
+    await promote(userId);
+
+    const { PUT } = await import('./[id]/skus/route');
+    const updated = await PUT(
+      json(
+        'PUT',
+        `/api/v1/staff/products/${seeded.productId}/skus`,
+        { items: [{ id: String(seeded.skuId), price: '0.01' }] },
+        headers,
+      ),
+      route(String(seeded.productId)),
+    );
+    expect(updated.status).toBe(200);
+
+    const audit = await harness.ctx.db.select().from(auditLogs);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({
+      actorKind: 'staff',
+      adminId: null,
+      userId,
+      adminAccount: `staff:${userId}`,
+      method: 'PUT',
+      path: `/api/v1/staff/products/${seeded.productId}/skus`,
+      target: `product:${seeded.productId}`,
+      status: 200,
+    });
+    expect(JSON.parse(audit[0]!.payload!)).toEqual({
+      items: [{ id: String(seeded.skuId), price: '0.01' }],
+    });
   });
 
   it('refuses an empty patch before it opens a transaction', async () => {

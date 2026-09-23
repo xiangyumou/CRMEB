@@ -168,7 +168,10 @@ describe('/admin-api/diy/pages', () => {
     const headers = await adminCookie(['diy:page:create']);
     const created = await createPage(headers);
 
-    const audit = await harness.ctx.db.select().from(auditLogs);
+    const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
+      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      (row) => row.routeId !== 'auth.adminLogin',
+    );
     expect(audit).toHaveLength(1);
     expect(audit[0]).toMatchObject({
       routeId: 'diy.adminPageCreate',
@@ -227,7 +230,10 @@ describe('/admin-api/diy/pages/:id/content', () => {
     expect(body.content).toEqual(CONTENT);
     expect(body.version).not.toBe(created.version);
 
-    const audit = await harness.ctx.db.select().from(auditLogs);
+    const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
+      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      (row) => row.routeId !== 'auth.adminLogin',
+    );
     expect(audit.at(-1)).toMatchObject({
       routeId: 'diy.adminPageSaveContent',
       target: `diy:page:${created.id}`,

@@ -16,5 +16,5 @@ export * from './rbac';
 export * from './user-lookup';
 export * from './user-session.service';
 export * as adminRepo from './admin.repo';
-export { insertAudit, redactPayload, type AuditEntry } from './audit.repo';
+export { insertAudit, redactPayload, type AuditActorKind, type AuditEntry } from './audit.repo';
 export * as userSessionRepo from './user-session.repo';

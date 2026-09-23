@@ -1,5 +1,5 @@
-import { subscribeToAdmin } from '@shop/core/notification';
 import { ADMIN_COOKIE, getContainer, readCookie } from '../../../../src/server';
+import { serveAdminNotificationStream } from './_stream';
 
 /**
  * `/admin-api/notifications/stream` — the header bell's SSE feed.
@@ -30,91 +30,20 @@ import { ADMIN_COOKIE, getContainer, readCookie } from '../../../../src/server';
 
 const KEEPALIVE_MS = 25_000;
 
+/**
+ * The session is re-checked on every keep-alive tick and the stream closes
+ * when it no longer resolves; every stream in the process shares one Redis
+ * subscriber, and an admin may hold at most `MAX_STREAMS_PER_ADMIN` (CR-15-k2).
+ * The stream lives in `_stream.ts` so a test can shorten the tick.
+ */
 export async function GET(request: Request): Promise<Response> {
-  const container = getContainer();
-
   const token = readCookie(request, ADMIN_COOKIE);
-  if (!token) return unauthorised();
-  const session = await container.adminAuth.resolve(token);
-  if (!session) return unauthorised();
-
-  const adminId = session.adminId;
-  const encoder = new TextEncoder();
-
-  let unsubscribe: (() => Promise<void>) | null = null;
-  let keepalive: ReturnType<typeof setInterval> | null = null;
-  let closed = false;
-
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const send = (chunk: string): void => {
-        if (closed) return;
-        try {
-          controller.enqueue(encoder.encode(chunk));
-        } catch {
-          // The client went away between the check and the enqueue.
-          closed = true;
-        }
-      };
-
-      // Tells the browser to wait 5 s before reconnecting, and gives the proxy
-      // something to flush so the connection is established immediately.
-      send(`retry: 5000\n\n`);
-
-      try {
-        unsubscribe = await subscribeToAdmin(container.redis, adminId, (payload) => {
-          // The payload is already the JSON the bell parses; forwarding it
-          // verbatim is what keeps the bell and the inbox showing one thing.
-          send(`event: notification\ndata: ${payload}\n\n`);
-        });
-      } catch (error) {
-        container.logger.error({ err: error, adminId }, 'notification stream subscribe failed');
-        controller.close();
-        return;
-      }
-
-      keepalive = setInterval(() => send(': keepalive\n\n'), KEEPALIVE_MS);
-
-      request.signal.addEventListener('abort', () => {
-        void cleanup(controller);
-      });
-    },
-
-    async cancel() {
-      await cleanup(null);
-    },
-  });
-
-  async function cleanup(controller: ReadableStreamDefaultController<Uint8Array> | null) {
-    if (closed) return;
-    closed = true;
-    if (keepalive) clearInterval(keepalive);
-    if (unsubscribe) await unsubscribe().catch(() => undefined);
-    try {
-      controller?.close();
-    } catch {
-      // Already closed by the runtime; nothing to do.
-    }
-  }
-
-  return new Response(stream, {
-    status: 200,
-    headers: {
-      'content-type': 'text/event-stream; charset=utf-8',
-      'cache-control': 'no-cache, no-transform',
-      connection: 'keep-alive',
-      // nginx buffers `text/event-stream` by default, which holds every event
-      // until the buffer fills — i.e. forever, for a bell that sends 200 bytes.
-      'x-accel-buffering': 'no',
-    },
-  });
-}
-
-function unauthorised(): Response {
-  return new Response(JSON.stringify({ code: 'UNAUTHENTICATED', message: '请先登录' }), {
-    status: 401,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
+  const session = token ? await getContainer().adminAuth.resolve(token) : null;
+  return serveAdminNotificationStream(
+    request,
+    token && session ? { token, adminId: session.adminId } : null,
+    { keepaliveMs: KEEPALIVE_MS },
+  );
 }
 
 export const dynamic = 'force-dynamic';

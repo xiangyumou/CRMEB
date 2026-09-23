@@ -7,7 +7,9 @@ import * as repo from './system.repo';
  * The operation log viewer.
  *
  * Read-only, and there is no route that writes one: `handle()` writes a row for
- * every successful mutating admin request, with the body already redacted by
+ * every successful mutating admin request and every successful staff-surface
+ * write (CR-13-k2, `actorKind: 'staff'`), the admin sign-in writes one per
+ * outcome (CR-12-k2), with the body already redacted by
  * `redactPayload`. A service that wants to name what it touched calls
  * `ctx.audit('coupon:42')` and the same writer picks it up.
  *
@@ -19,7 +21,9 @@ export async function auditLogList(
   query: AuditLogListQuery,
 ): Promise<{ items: AuditLogItem[]; total: number; page: number; pageSize: number }> {
   const { rows, total } = await repo.listAuditLogs(ctx.db, {
+    actorKind: query.actorKind,
     adminId: query.adminId === undefined ? undefined : fromId(query.adminId),
+    userId: query.userId === undefined ? undefined : fromId(query.userId),
     keyword: query.keyword,
     routeId: query.routeId,
     method: query.method,
@@ -33,7 +37,9 @@ export async function auditLogList(
   return {
     items: rows.map((row) => ({
       id: toId(row.id),
+      actorKind: row.actorKind === 'staff' ? 'staff' : 'admin',
       adminId: toIdOrNull(row.adminId),
+      userId: toIdOrNull(row.userId),
       adminAccount: row.adminAccount,
       routeId: row.routeId,
       method: row.method,

@@ -207,12 +207,27 @@ export async function adminGrant(
   input: { id: string },
   body: CouponGrantBody,
 ): Promise<CouponGrantResult> {
-  const templateId = Number(input.id);
-  const userIds = body.userIds.map(Number);
+  return grant(ctx, Number(input.id), body.userIds.map(Number), { activeOnly: false });
+}
 
+/**
+ * The one grant path behind both consoles. `activeOnly` is the staff
+ * console's: the web console may hand a draft to a test account, a 店员 may
+ * only hand out what marketing has released (CR-10-k2). The status is read
+ * inside the grant's transaction, so the answer is the one the grant used.
+ */
+async function grant(
+  ctx: Ctx,
+  templateId: number,
+  userIds: number[],
+  options: { activeOnly: boolean },
+): Promise<CouponGrantResult> {
   return ctx.withTx(async (tx) => {
     const template = await repo.findTemplate(tx, templateId);
     if (!template) throw new DomainError('COUPON_TEMPLATE_NOT_FOUND');
+    if (options.activeOnly && template.status !== 'active') {
+      throw new DomainError('COUPON_TEMPLATE_NOT_FOUND');
+    }
 
     const known = await repo.existingUserIds(tx, userIds);
     const unknown = userIds.filter((userId) => !known.has(userId));
@@ -310,7 +325,14 @@ export async function staffListCoupons(
  * cannot drift apart on the questions that cost money.
  */
 export async function staffGrant(ctx: Ctx, body: StaffCouponGrantBody): Promise<CouponGrantResult> {
-  return adminGrant(ctx, { id: body.couponId }, { userIds: [body.userId] });
+  // `handle()` has checked the roster; a route wired without it fails closed.
+  if (ctx.actor.kind !== 'staff') throw new DomainError('FORBIDDEN');
+  const userId = Number(body.userId);
+  // A 店员 is a storefront account too: granting to it is granting to oneself.
+  if (userId === Number(ctx.actor.id)) throw new DomainError('COUPON_GRANT_SELF');
+  // Only what marketing has released — the same set the staff coupon list
+  // offers. A draft or withdrawn template answers as if it did not exist.
+  return grant(ctx, Number(body.couponId), [userId], { activeOnly: true });
 }
 
 /**

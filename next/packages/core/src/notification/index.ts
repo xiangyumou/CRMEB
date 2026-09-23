@@ -45,7 +45,14 @@ export { notificationConfig, type NotificationConfig } from './notification.conf
 export { notificationPermissions } from './permissions';
 
 /** The SSE endpoint's half; `apps/web` owns the route, this owns the subscription. */
-export { subscribeToAdmin, adminChannel, type AdminStreamEvent } from './notification.stream';
+export {
+  subscribeToAdmin,
+  adminChannel,
+  openAdminStreams,
+  AdminStreamLimitError,
+  MAX_STREAMS_PER_ADMIN,
+  type AdminStreamEvent,
+} from './notification.stream';
 
 // The two read surfaces the route files call.
 export * as notificationAdmin from './notification.admin.service';

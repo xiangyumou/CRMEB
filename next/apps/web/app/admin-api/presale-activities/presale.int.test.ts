@@ -228,7 +228,10 @@ describe('/admin-api/presale-activities', () => {
     expect(created.id).toEqual(expect.any(String));
     expect(created.skus[0]).toMatchObject({ skuId, price: '59.00' });
 
-    const audit = await harness.ctx.db.select().from(auditLogs);
+    const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
+      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      (row) => row.routeId !== 'auth.adminLogin',
+    );
     expect(audit).toHaveLength(1);
     expect(audit[0]).toMatchObject({
       routeId: 'presale.adminActivityCreate',

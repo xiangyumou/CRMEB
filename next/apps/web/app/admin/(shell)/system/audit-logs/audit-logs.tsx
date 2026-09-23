@@ -26,7 +26,9 @@ const METHOD_COLOUR: Record<string, string> = {
  * a mistake.
  *
  * Only writes are recorded (`handle()` skips GET), and the stored payload has
- * already been redacted — a password field never reaches this table.
+ * already been redacted — a password field never reaches this table. Two kinds
+ * of actor write here: console admins, and 店员 on the storefront's staff
+ * surface (CR-13-k2); every admin sign-in attempt is a row too (CR-12-k2).
  */
 export function AuditLogsPage() {
   const [viewing, setViewing] = useState<AuditLogItem | null>(null);
@@ -38,7 +40,17 @@ export function AuditLogsPage() {
         scrollX={1200}
         filters={[
           { kind: 'text', name: 'keyword', label: '接口/路径/对象' },
+          {
+            kind: 'select',
+            name: 'actorKind',
+            label: '操作人类型',
+            options: [
+              { value: 'admin', label: '后台管理员' },
+              { value: 'staff', label: '店员' },
+            ],
+          },
           { kind: 'text', name: 'adminId', label: '管理员 ID' },
+          { kind: 'text', name: 'userId', label: '店员用户 ID' },
           {
             kind: 'select',
             name: 'method',
@@ -58,15 +70,8 @@ export function AuditLogsPage() {
           {
             title: '操作人',
             key: 'adminAccount',
-            width: 140,
-            render: (_value: unknown, row: AuditLogItem) => (
-              <>
-                {row.adminAccount}
-                {row.adminId === null && (
-                  <Typography.Text type="secondary"> （已删除）</Typography.Text>
-                )}
-              </>
-            ),
+            width: 180,
+            render: (_value: unknown, row: AuditLogItem) => <ActorText row={row} />,
           },
           {
             title: '方法',
@@ -110,7 +115,7 @@ export function AuditLogsPage() {
               <InstantText value={viewing.createdAt} />
             </Descriptions.Item>
             <Descriptions.Item label="操作人">
-              {viewing.adminAccount}
+              <ActorText row={viewing} />
               {viewing.adminId !== null && `（#${viewing.adminId}）`}
             </Descriptions.Item>
             <Descriptions.Item label="路径">{viewing.path}</Descriptions.Item>
@@ -131,6 +136,32 @@ export function AuditLogsPage() {
         )}
       </Drawer>
     </PageContainer>
+  );
+}
+
+/** Who acted: a console account, a 店员 (by storefront user id), or a sign-in to an unknown account. */
+function ActorText({ row }: { row: AuditLogItem }) {
+  if (row.actorKind === 'staff') {
+    return (
+      <>
+        <Tag color="purple">店员</Tag>
+        {row.userId === null ? (
+          <Typography.Text type="secondary">（用户已删除）</Typography.Text>
+        ) : (
+          `用户 #${row.userId}`
+        )}
+      </>
+    );
+  }
+  return (
+    <>
+      {row.adminAccount}
+      {row.adminId === null && (
+        <Typography.Text type="secondary">
+          {row.routeId === 'auth.adminLogin' ? ' （未知账号）' : ' （已删除）'}
+        </Typography.Text>
+      )}
+    </>
   );
 }
 

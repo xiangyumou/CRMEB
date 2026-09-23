@@ -13,8 +13,12 @@ import { sha256Hex } from './password';
  * What is stored is `{ adminId, passwordVersion, permissions, isSuper }`, so a
  * request costs one Redis GET and no database round-trip. Changing a password
  * bumps `password_version` *and* calls `revokeAllForAdmin`, which deletes every
- * token in the per-admin index — the version is kept as a second belt in case
- * a revoke ever misses.
+ * token in the per-admin index. **The index is the only belt**: nothing on the
+ * request path compares `passwordVersion` with the admin row (that would be a
+ * database read per request). So the index must list every live session for as
+ * long as it lives — `resolve()` slides the index together with the session and
+ * re-adds the session to it (CR-8-k: a session kept alive past the index's own
+ * TTL used to fall out of it and survive a password change).
  *
  * The token is stored hashed, exactly as on the storefront: a Redis dump must
  * not be replayable.
@@ -44,11 +48,31 @@ export interface AdminSessionStore {
   create(session: Omit<AdminSession, 'createdAt'>, nowMs: number): Promise<string>;
   /** Returns the session and slides its TTL forward, or `null`. */
   resolve(token: string): Promise<(AdminSession & { sessionId: string }) | null>;
+  /**
+   * Reads the session **without** sliding it. For a long-lived connection
+   * that re-checks its session (the bell's SSE stream, CR-15-k2): an open tab
+   * must not keep an idle admin signed in for ever.
+   */
+  peek(token: string): Promise<AdminSession | null>;
   destroy(token: string): Promise<void>;
   /** Password change, account disable, "log out everywhere". */
   revokeAllForAdmin(adminId: number): Promise<number>;
   countFor(adminId: number): Promise<number>;
 }
+
+/**
+ * Slides the session key and, only if it still exists (a concurrent revoke may
+ * just have deleted it), re-lists it in the per-admin index and slides that
+ * too. Re-adding heals a session whose index expired before this was fixed.
+ */
+const SLIDE_LUA = `
+if redis.call('PEXPIRE', KEYS[1], ARGV[2]) == 1 then
+  redis.call('SADD', KEYS[2], ARGV[1])
+  redis.call('PEXPIRE', KEYS[2], ARGV[3])
+  return 1
+end
+return 0
+`;
 
 export function createAdminSessionStore(options: AdminSessionStoreOptions): AdminSessionStore {
   const { redis, ttlMs = DEFAULT_ADMIN_SESSION_TTL_MS, keyPrefix = 'admin:sess:' } = options;
@@ -82,9 +106,29 @@ export function createAdminSessionStore(options: AdminSessionStoreOptions): Admi
         await redis.del(key);
         return null;
       }
-      // Sliding expiry: an admin who keeps working never gets logged out.
-      await redis.pexpire(key, ttlMs);
+      // Sliding expiry: an admin who keeps working never gets logged out — and
+      // the index slides with the session, so a revoke always reaches it.
+      await redis.eval(
+        SLIDE_LUA,
+        2,
+        key,
+        indexKey(session.adminId),
+        sha256Hex(token),
+        String(ttlMs),
+        String(ttlMs * 4),
+      );
       return { ...session, sessionId: sha256Hex(token).slice(0, 16) };
+    },
+
+    async peek(token) {
+      if (typeof token !== 'string' || token.length < 16 || token.length > 256) return null;
+      const raw = await redis.get(sessionKey(token));
+      if (raw === null) return null;
+      try {
+        return JSON.parse(raw) as AdminSession;
+      } catch {
+        return null;
+      }
     },
 
     async destroy(token) {

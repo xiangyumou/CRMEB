@@ -9,17 +9,16 @@ import * as service from './coupon.service';
  * `POST /api/v1/staff/coupon-grants`, read as a 店员 who wants the coupons for
  * themselves (K2, AUDIT.md K-SEC-B3).
  *
- * `staffGrant` is `adminGrant` with one user id: the per-user limit and the
- * supply hold, and the route's roster check (403 for a non-staff shopper) is
- * covered in `apps/web/app/api/v1/coupons.staff.int.test.ts`. What it does not
- * carry over is the judgement a console role implies. A 店员 is a storefront
- * account with a roster row; the staff coupon list offers only `active`
- * templates, but the grant takes any template id — a `draft` the marketing
- * team has not released, or one they `disabled` — and any user id, the 店员's
- * own included. The route's `ctx.audit(...)` is a no-op on the staff surface
- * (CR-13-k2), so none of it leaves a row.
+ * The per-user limit and the supply hold are shared with `adminGrant`, and
+ * the route's roster check (403 for a non-staff shopper) is covered in
+ * `apps/web/app/api/v1/coupons.staff.int.test.ts`. What a console role
+ * implies and a roster row does not is checked here: a 店员 may grant only an
+ * `active` template — a `draft` marketing has not released, or one they
+ * `disabled`, answers `COUPON_TEMPLATE_NOT_FOUND` — and never to their own
+ * account (`COUPON_GRANT_SELF`). The grant is audited on the staff surface
+ * (CR-13-k2).
  *
- * Both `it.fails` are CR-10-k2.
+ * Both refusals were `it.fails` pins until CR-10-k2 was fixed.
  */
 
 let harness: TestCtx;
@@ -91,7 +90,7 @@ describe('K-SEC-B3 — what a 店员 can grant', () => {
     expect(result).toEqual({ granted: 1, skippedUserIds: [] });
   });
 
-  it.fails('refuses a template marketing has not released, or has withdrawn', async () => {
+  it('refuses a template marketing has not released, or has withdrawn', async () => {
     const clerk = await makeUser();
     const customer = await makeUser();
     for (const status of ['draft', 'disabled'] as const) {
@@ -103,7 +102,7 @@ describe('K-SEC-B3 — what a 店员 can grant', () => {
     expect(await harness.ctx.db.select().from(userCoupons)).toHaveLength(0);
   });
 
-  it.fails('refuses to grant to the 店员’s own account', async () => {
+  it('refuses to grant to the 店员’s own account', async () => {
     const clerk = await makeUser();
     const id = await makeTemplate('active');
 
@@ -112,5 +111,28 @@ describe('K-SEC-B3 — what a 店员 can grant', () => {
       .catch(() => undefined);
 
     expect(await harness.ctx.db.select().from(userCoupons)).toHaveLength(0);
+  });
+
+  it('answers with the code, and leaves the web console free to grant a draft', async () => {
+    const clerk = await makeUser();
+    const customer = await makeUser();
+    const draft = await makeTemplate('draft');
+
+    await expect(
+      service.staffGrant(asStaff(clerk), { couponId: String(draft), userId: String(customer) }),
+    ).rejects.toMatchObject({ code: 'COUPON_TEMPLATE_NOT_FOUND' });
+    const active = await makeTemplate('active');
+    await expect(
+      service.staffGrant(asStaff(clerk), { couponId: String(active), userId: String(clerk) }),
+    ).rejects.toMatchObject({ code: 'COUPON_GRANT_SELF' });
+
+    // A console admin may still hand a draft to a test account.
+    const admin: Actor = { kind: 'admin', id: 1, permissions: [], isSuper: true };
+    const result = await service.adminGrant(
+      harness.as(admin),
+      { id: String(draft) },
+      { userIds: [String(customer)] },
+    );
+    expect(result).toEqual({ granted: 1, skippedUserIds: [] });
   });
 });

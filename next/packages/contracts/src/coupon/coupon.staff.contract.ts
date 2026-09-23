@@ -114,7 +114,10 @@ export const staffCouponList = defineRoute({
  * simply already has it.
  *
  * A sold-out campaign *is* a refusal (`COUPON_SOLD_OUT`), because the staff
- * member has to pick a different coupon.
+ * member has to pick a different coupon. So is a template that is not
+ * `active` (`COUPON_TEMPLATE_NOT_FOUND`, the answer the staff list implies)
+ * and the 店员's own account as the recipient (`COUPON_GRANT_SELF`) —
+ * CR-10-k2.
  */
 export const staffCouponGrant = defineRoute({
   id: 'coupon.staffGrant',
@@ -125,7 +128,12 @@ export const staffCouponGrant = defineRoute({
   tags: ['coupon'],
   body: staffCouponGrantBody,
   response: couponGrantResult,
-  errors: ['COUPON_TEMPLATE_NOT_FOUND', 'COUPON_GRANT_USER_UNKNOWN', 'COUPON_SOLD_OUT'],
+  errors: [
+    'COUPON_TEMPLATE_NOT_FOUND',
+    'COUPON_GRANT_USER_UNKNOWN',
+    'COUPON_GRANT_SELF',
+    'COUPON_SOLD_OUT',
+  ],
   examples: [
     {
       name: 'granted',

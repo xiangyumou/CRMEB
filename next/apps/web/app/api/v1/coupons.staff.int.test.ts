@@ -357,6 +357,41 @@ describe('POST /api/v1/staff/coupon-grants', () => {
     expect(response.status).toBe(422);
     expect(await remaining(templateId)).toBe(100);
   });
+
+  /** CR-10-k2: a 店员 hands out only what marketing released, and never to themselves. */
+  it('404s a draft template and 422s a grant to the 店员’s own account, touching nothing', async () => {
+    const member = await staff();
+    const customer = await shopper();
+    const draft = await makeTemplate('新人礼', { status: 'draft' });
+    const active = await makeTemplate('满 100 减 10');
+    const { POST } = await import('./staff/coupon-grants/route');
+
+    const unreleased = await POST(
+      json(
+        'POST',
+        '/api/v1/staff/coupon-grants',
+        { userId: String(customer.userId), couponId: String(draft) },
+        member.headers,
+      ),
+    );
+    expect(unreleased.status).toBe(404);
+    expect(((await unreleased.json()) as { code: string }).code).toBe('COUPON_TEMPLATE_NOT_FOUND');
+
+    const self = await POST(
+      json(
+        'POST',
+        '/api/v1/staff/coupon-grants',
+        { userId: String(member.userId), couponId: String(active) },
+        member.headers,
+      ),
+    );
+    expect(self.status).toBe(422);
+    expect(((await self.json()) as { code: string }).code).toBe('COUPON_GRANT_SELF');
+
+    expect(await harness.ctx.db.select().from(userCoupons)).toHaveLength(0);
+    expect(await remaining(draft)).toBe(100);
+    expect(await remaining(active)).toBe(100);
+  });
 });
 
 // ---------------------------------------------------------------------------

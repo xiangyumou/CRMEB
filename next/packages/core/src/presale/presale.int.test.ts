@@ -1096,6 +1096,20 @@ describe('the storefront surface', () => {
     expect((await service.detail(ctx, { id: String(fixture.activityId) })).skus).toHaveLength(0);
   });
 
+  it('404s a draft by id, and keeps a paused or ended campaign readable but not buyable (CR-34-k2)', async () => {
+    const ctx = asUser(await makeUser());
+    const draft = await makeActivity({ status: 'draft' });
+    await expect(service.detail(ctx, { id: String(draft.activityId) })).rejects.toMatchObject({
+      code: 'PRESALE_ACTIVITY_NOT_FOUND',
+    });
+
+    for (const status of ['paused', 'ended'] as const) {
+      const fixture = await makeActivity({ status, stock: 5 });
+      const detail = await service.detail(ctx, { id: String(fixture.activityId) });
+      expect(detail.canBuy, status).toBe(false);
+    }
+  });
+
   it('hides a deleted campaign from the detail route', async () => {
     const fixture = await makeActivity();
     await harness.ctx.db

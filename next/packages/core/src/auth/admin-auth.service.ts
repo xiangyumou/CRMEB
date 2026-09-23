@@ -11,6 +11,7 @@ import {
   type AdminSessionStore,
 } from './admin-session.store';
 import { captchaRequired, getCaptchaVerifier } from './captcha';
+import { insertAudit } from './audit.repo';
 import { hashPassword, verifyPassword, type PasswordAlgo } from './password';
 import { effectivePermissions } from './rbac';
 
@@ -43,6 +44,26 @@ const DEFAULTS = {
 /** Exactly the contract's request body — one source of truth, no drift. */
 export type LoginInput = AdminLoginBody;
 
+/** What the route knows about the caller. Never the body. */
+export interface LoginMeta {
+  ip?: string | null;
+  userAgent?: string | null;
+}
+
+/** The `routeId` every sign-in outcome is written under (CR-12-k2). */
+export const ADMIN_LOGIN_AUDIT_ROUTE = 'auth.adminLogin';
+
+export type AdminLoginOutcome =
+  'success' | 'invalid_credentials' | 'locked' | 'disabled' | 'captcha_failed' | 'error';
+
+const OUTCOME_BY_CODE: Record<string, AdminLoginOutcome> = {
+  AUTH_INVALID_CREDENTIALS: 'invalid_credentials',
+  AUTH_TOO_MANY_ATTEMPTS: 'locked',
+  AUTH_ACCOUNT_DISABLED: 'disabled',
+  AUTH_CAPTCHA_REQUIRED: 'captcha_failed',
+  AUTH_CAPTCHA_INVALID: 'captcha_failed',
+};
+
 export interface LoginResult {
   /** Opaque token for the `admin_session` cookie. Never logged, never returned in a body. */
   token: string;
@@ -71,7 +92,69 @@ export class AdminAuthService {
     return `admin:login:fail:${account.trim().toLowerCase()}`;
   }
 
-  async login(ctx: Ctx, input: LoginInput): Promise<LoginResult> {
+  /**
+   * Signs in, and writes the outcome — success or the reason for refusal — to
+   * `audit_logs` under `auth.adminLogin` (CR-12-k2). The route is public, so
+   * `handle()` writes nothing for it; without this a password-guessing run
+   * left no record. The row carries the account, the outcome, the address and
+   * the user agent, and **never** the body.
+   */
+  async login(ctx: Ctx, input: LoginInput, meta?: LoginMeta): Promise<LoginResult> {
+    const seen: { adminId: number | null } = { adminId: null };
+    try {
+      const result = await this.attempt(ctx, input, seen);
+      await this.recordOutcome(ctx, input.account, seen.adminId, 'success', 200, null, meta);
+      return result;
+    } catch (error) {
+      const code = DomainError.is(error) ? error.code : null;
+      const status = DomainError.is(error) ? error.status : 500;
+      const outcome: AdminLoginOutcome = (code ? OUTCOME_BY_CODE[code] : undefined) ?? 'error';
+      await this.recordOutcome(ctx, input.account, seen.adminId, outcome, status, code, meta);
+      throw error;
+    }
+  }
+
+  private async recordOutcome(
+    ctx: Ctx,
+    rawAccount: string,
+    adminId: number | null,
+    result: AdminLoginOutcome,
+    status: number,
+    code: string | null,
+    meta: LoginMeta | undefined,
+  ): Promise<void> {
+    const account = rawAccount.trim().slice(0, 64);
+    try {
+      await insertAudit(ctx.db, {
+        adminId,
+        adminAccount: account,
+        routeId: ADMIN_LOGIN_AUDIT_ROUTE,
+        method: 'POST',
+        path: '/admin-api/auth/login',
+        target: adminId === null ? null : `admin:${adminId}`,
+        status,
+        payload: {
+          account,
+          result,
+          ...(code ? { code } : {}),
+          userAgent: meta?.userAgent?.slice(0, 512) ?? null,
+        },
+        requestId: ctx.requestId.slice(0, 64),
+        ip: meta?.ip?.slice(0, 64) ?? null,
+        now: ctx.clock.now(),
+      });
+    } catch (error) {
+      // A failed audit write must never turn a sign-in into a 500, or a refusal
+      // into something other than the refusal.
+      ctx.logger.error({ err: error, account, result }, 'failed to write the admin login audit');
+    }
+  }
+
+  private async attempt(
+    ctx: Ctx,
+    input: LoginInput,
+    seen: { adminId: number | null },
+  ): Promise<LoginResult> {
     const account = input.account.trim();
     const key = this.throttleKey(account);
 
@@ -100,6 +183,7 @@ export class AdminAuthService {
       // Same error, same shape as a wrong password: no account enumeration.
       throw new DomainError('AUTH_INVALID_CREDENTIALS');
     }
+    seen.adminId = admin.id;
 
     const verified = await verifyPassword(
       input.password,
@@ -162,6 +246,11 @@ export class AdminAuthService {
   /** Resolves a cookie value to a session, sliding its TTL. `null` when invalid. */
   async resolve(token: string): Promise<(AdminSession & { sessionId: string }) | null> {
     return this.store.resolve(token);
+  }
+
+  /** Reads a session without sliding its TTL. `null` when it no longer resolves. */
+  async peek(token: string): Promise<AdminSession | null> {
+    return this.store.peek(token);
   }
 
   async logout(token: string): Promise<void> {
