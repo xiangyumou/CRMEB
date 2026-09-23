@@ -15,10 +15,10 @@ import { afterAll } from 'vitest';
  * `window.event` and throws `ReferenceError: window is not defined`. If that
  * happens before the worker reports `stopped`, the run fails on whichever file
  * it was. On an idle machine the stop path finishes before a timer gets a turn.
- * Under turbo, with `next build` competing for the CPU, it sometimes does not.
- * Four streams saw the failure, each time on a different file with leftover
- * timers. K2 could not reproduce it in 28 local turbo runs, but did show that
- * such a callback throws exactly that error (docs/rewrite/status/k2.md §5).
+ * Under turbo, with `next build` competing for the CPU, it sometimes does not:
+ * the failure was seen on several different files, each with leftover timers,
+ * and it would not reproduce in 28 local turbo runs — but such a callback does
+ * throw exactly that error.
  *
  * So this file hands out tracked timers. It is listed first in `setupFiles`,
  * so it runs before anything imports React and the scheduler captures
