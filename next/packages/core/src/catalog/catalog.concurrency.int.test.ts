@@ -304,8 +304,8 @@ describe('two operators submitting the same moderation batch', () => {
   });
 });
 
-// --------------------------------------------------------------------------- a
-// hot product page
+// ---------------------------------------------------------------------------
+// a hot product page
 // ---------------------------------------------------------------------------
 
 describe('a promotion sending everyone to one product page', () => {
