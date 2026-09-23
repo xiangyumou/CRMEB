@@ -147,6 +147,23 @@ describe('the 预售 pages render', () => {
   });
 });
 
+describe('我的 is never blank', () => {
+  const page = read('pages/user/index.vue');
+  const getDiyData = page.slice(page.indexOf('    getDiyData() {'), page.indexOf('    getWechatuserinfo()'));
+
+  it('catches a failed 个人中心 read and falls back to the last copy it had', () => {
+    expect(getDiyData).toMatch(/\.catch\(/);
+    expect(getDiyData).toMatch(/uni\.setStorageSync\(USER_CENTER_DIY_CACHE/);
+    expect(getDiyData).toMatch(/uni\.getStorageSync\(USER_CENTER_DIY_CACHE\)/);
+  });
+
+  it('offers 重新连接 when it has no copy at all', () => {
+    expect(getDiyData).toMatch(/this\.errorNetwork = true/);
+    expect(page).toMatch(/:errorNetwork="errorNetwork"/);
+    expect(page).toMatch(/@reconnect="reconnect"/);
+  });
+});
+
 // The `data-testid`s the storefront suite (`e2e/storefront`) locates
 // elements by, each on its element. A static id is `data-testid="x"`; a bound one names the expression.
 describe('the storefront suite’s data-testids are on their elements', () => {

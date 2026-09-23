@@ -26,6 +26,8 @@
       :isScrolled="isScrolled"
       :isFixed="isFixed"
       :belongIndex="belongIndex"
+      :errorNetwork="errorNetwork"
+      @reconnect="reconnect"
       @bindSortId="bindSortId"
       @bindHeight="bindHeighta"
       @storeTap="storeTap"
@@ -53,6 +55,8 @@ import { mapState, mapGetters } from "vuex";
 import Auth from "@/libs/wechat";
 // #endif
 const app = getApp();
+// 上次拿到的个人中心装修，读失败时顶上（见 getDiyData）。
+const USER_CENTER_DIY_CACHE = "userCenterDiyData";
 import dayjs from "@/plugin/dayjs/dayjs.min.js";
 import Routine from "@/libs/routine";
 import colors from "@/mixins/color";
@@ -104,6 +108,7 @@ export default {
   data() {
     return {
       currentDiyData: {},
+      errorNetwork: false, // 个人中心装修读失败、手里也没有上次的
       editModal: false, // 编辑头像信息
       storeMenu: [], // 商家管理
       orderMenu: [
@@ -333,9 +338,23 @@ export default {
       let previewThemeId = uni.getStorageSync("previewThemeId");
       let data = {};
       if (previewThemeId) data.theme_id = previewThemeId;
-      getThemeInfo("user", data).then((res) => {
-        this.currentDiyData = res.data;
-      });
+      getThemeInfo("user", data)
+        .then((res) => {
+          this.errorNetwork = false;
+          this.currentDiyData = res.data;
+          if (!previewThemeId) uni.setStorageSync(USER_CENTER_DIY_CACHE, res.data);
+        })
+        .catch(() => {
+          // 我的整页都是这份装修，读不到就只剩版权图和底栏。
+          // 屏上已有的留着；没有就用上次拿到的；都没有才显示「重新连接」。
+          if (this.currentDiyData && this.currentDiyData.value) return;
+          let cached = uni.getStorageSync(USER_CENTER_DIY_CACHE);
+          if (cached && cached.value) {
+            this.currentDiyData = cached;
+          } else {
+            this.errorNetwork = true;
+          }
+        });
     },
     getWechatuserinfo() {
       //#ifdef H5
@@ -352,6 +371,12 @@ export default {
     // 打开授权
     openAuto() {
       toLogin();
+    },
+    // 「重新连接」：和 onShow 读同样的东西
+    reconnect() {
+      if (this.isLogin) this.getUserInfo();
+      this.getMyMenus();
+      this.getDiyData();
     },
     // 授权回调
     onLoadFun() {
