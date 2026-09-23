@@ -36,13 +36,18 @@ Updated at every commit so the work can resume after an interruption.
   logout → result; pending shows 审核中 + 撤回; a rejected one says why). The Taro fake gained
   `RichText` and `WebView`. Password rule gained the server's two-kinds check. Tests.
 
+- content: 资讯 (全部 + top-level category tabs, a category includes its children via
+  `categoryIds`; share 好友), 资讯详情 (rich text, linked product, 「相关链接」 lists the
+  `<a href>`s that `rich-text` cannot tap plus 阅读原文, all through `openExternalLink`; share
+  好友 + 朋友圈), 网页 (业务域名 → `<WebView>`; else a sheet 「该链接需在浏览器中打开」 with
+  复制链接). Tests.
+
 ## In progress
 
-- content: 资讯列表 / 详情, web-view (C12).
+- 我的 tab: user-centre decor through a local renderer until B's `DecorPage` lands.
 
 ## Next
 
-5. 我的 tab: user-centre decor through a local renderer until B's `DecorPage` lands.
 6. e2e specs in `e2e/storefront/specs-mini`; `docs/mini/pages.md`; screenshots in
    `docs/mini/status/E-screens/`; checklist; sizes.
 
