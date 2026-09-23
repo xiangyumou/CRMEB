@@ -47,7 +47,7 @@ describe('editor data ⇄ page document', () => {
     expect(document.schemaVersion).toBe(2);
     expect(document.blocks.map(({ id, type, v }) => ({ id, type, v }))).toEqual([
       { id: 'carousel-0b8c6a3e-3f0d-4a47-9d0e-5b1d2b7c9f10', type: 'carousel', v: 1 },
-      { id: 'productGrid-6a1f', type: 'productGrid', v: 1 },
+      { id: 'productGrid-6a1f', type: 'productGrid', v: 2 },
       { id: 'imageCube-77e2', type: 'imageCube', v: 1 },
     ]);
     expect(document.blocks[0]?.props).not.toHaveProperty('id');

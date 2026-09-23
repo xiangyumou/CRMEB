@@ -19,6 +19,8 @@ const custom: CustomFieldRenderers = {
   link: stub('link'),
   color: stub('color'),
   productSource: stub('productSource'),
+  richText: stub('richText'),
+  hotspots: stub('hotspots'),
 };
 
 type AnyField = Field & Record<string, any>;
@@ -154,6 +156,7 @@ describe('defaultsOf', () => {
   it('fills schema defaults, including the inner defaults of a prefault object', () => {
     expect(defaultsOf(productGridProps)).toEqual({
       source: { mode: 'manual', ids: [] },
+      layout: 'grid2',
       titleLines: 2,
       showMarketPrice: true,
       showTag: true,

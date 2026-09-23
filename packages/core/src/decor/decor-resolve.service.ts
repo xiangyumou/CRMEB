@@ -16,14 +16,27 @@ import {
 } from '@shop/contracts/decor/registry';
 import type { ResolvedPage } from '@shop/contracts/decor/schemas';
 import type { BlockVisibility } from '@shop/contracts/decor/base';
-import type { DataNeed, DataNeedKind, PersonalSlot } from '@shop/contracts/decor/sources';
+import type {
+  DataNeed,
+  DataNeedKind,
+  OrderEntryCounts,
+  PersonalNeed,
+  PersonalSlot,
+  UserSummary,
+} from '@shop/contracts/decor/sources';
 import { DECOR_LIMITS } from '@shop/contracts/decor/constants';
 
 import { anonymousActor, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { readCachedPage, writeCachedPage } from './decor.cache';
 import { assertPreviewToken } from './decor.preview';
-import { couponStatesFor, defaultResolvers, type DataResolvers } from './decor.resolvers';
+import {
+  couponStatesFor,
+  defaultResolvers,
+  orderEntryCountsFor,
+  userSummaryFor,
+  type DataResolvers,
+} from './decor.resolvers';
 import * as repo from './decor.repo';
 
 /**
@@ -41,8 +54,9 @@ import * as repo from './decor.repo';
  *    against `X-Client-Platform`, and each type's `minClient` against
  *    `X-Client-Version`.
  * 3. **Per shopper, never cached** (DECOR-015). With a session, the shopper's
- *    own state for what the page shows (coupons claimed / claimable), in
- *    `personal`.
+ *    own state for what the page shows (coupons claimed / claimable), and
+ *    what the blocks declare with `personal` (订单入口 counts, 用户卡片
+ *    profile and totals), in `personal`.
  *
  * A resolver that fails costs its slot (`null`), never the page.
  */
@@ -56,6 +70,13 @@ interface PublicBlock {
   data: Record<string, unknown[] | null>;
   /** slot → need kind, for the personal layer. Stripped from the response. */
   kinds: Record<string, DataNeedKind>;
+  /**
+   * slot → per-shopper need, from the block's `personal` (config only: what
+   * to fetch, never the answer). Stripped from the response. Absent in an
+   * entry an older build cached (for at most `DECOR_CACHE_SECONDS` across a
+   * deploy): that page then simply has no declared personal state.
+   */
+  personalNeeds?: Record<string, PersonalNeed> | undefined;
 }
 
 interface PublicPage {
@@ -131,6 +152,9 @@ async function buildPublicPage(
       if (dataBlocks > DECOR_LIMITS.dataBlocks) continue;
       needs = (definition.data as (props: unknown) => Record<string, DataNeed>)(props);
     }
+    const personalNeeds = definition.personal
+      ? (definition.personal as (props: unknown) => Record<string, PersonalNeed>)(props)
+      : {};
     pending.push(
       (async () => {
         const entries = await Promise.all(
@@ -145,6 +169,7 @@ async function buildPublicPage(
           props,
           data: Object.fromEntries(entries),
           kinds: Object.fromEntries(Object.entries(needs).map(([slot, need]) => [slot, need.kind])),
+          personalNeeds,
         };
       })(),
     );
@@ -187,10 +212,10 @@ export function blockVisibleTo(
   return true;
 }
 
-async function personalLayer(
-  ctx: Ctx,
-  blocks: readonly PublicBlock[],
-): Promise<Record<string, Record<string, PersonalSlot>>> {
+type PersonalByBlock = Record<string, Record<string, PersonalSlot>>;
+
+/** Coupon state for the coupons the page shows. */
+async function couponLayer(ctx: Ctx, blocks: readonly PublicBlock[]): Promise<PersonalByBlock> {
   const claimable: string[] = [];
   const newUser: string[] = [];
   for (const block of blocks) {
@@ -210,7 +235,7 @@ async function personalLayer(
     ctx.logger.warn({ err: error }, 'decor: personal coupon state could not be resolved');
     return {};
   }
-  const out: Record<string, Record<string, PersonalSlot>> = {};
+  const out: PersonalByBlock = {};
   for (const block of blocks) {
     for (const [slot, kind] of Object.entries(block.kinds)) {
       if (kind !== 'coupons' && kind !== 'newUserCoupons') continue;
@@ -220,6 +245,63 @@ async function personalLayer(
       (out[block.id] ??= {})[slot] = { kind: 'coupons', items };
     }
   }
+  return out;
+}
+
+/**
+ * What the blocks declared with `personal`. Each kind is fetched at most once
+ * per request, however many blocks ask; a kind that fails costs its slots
+ * (left out), never the page.
+ */
+async function declaredLayer(ctx: Ctx, blocks: readonly PublicBlock[]): Promise<PersonalByBlock> {
+  const wanted = blocks.flatMap((block) =>
+    Object.entries(block.personalNeeds ?? {}).map(([slot, need]) => ({
+      block: block.id,
+      slot,
+      need,
+    })),
+  );
+  if (wanted.length === 0) return {};
+  const guarded = async <T>(kind: string, load: () => Promise<T>): Promise<T | null> => {
+    try {
+      return await load();
+    } catch (error) {
+      ctx.logger.warn({ err: error, need: kind }, 'decor: personal state could not be resolved');
+      return null;
+    }
+  };
+  const needsStats = wanted.some(({ need }) => need.kind === 'userSummary' && need.stats);
+  const [counts, user] = await Promise.all([
+    wanted.some(({ need }) => need.kind === 'orderCounts')
+      ? guarded<OrderEntryCounts>('orderCounts', () => orderEntryCountsFor(ctx))
+      : null,
+    wanted.some(({ need }) => need.kind === 'userSummary')
+      ? guarded<UserSummary>('userSummary', () => userSummaryFor(ctx, needsStats))
+      : null,
+  ]);
+  const out: PersonalByBlock = {};
+  for (const { block, slot, need } of wanted) {
+    if (need.kind === 'orderCounts' && counts) {
+      (out[block] ??= {})[slot] = { kind: 'orderCounts', counts };
+    }
+    if (need.kind === 'userSummary' && user) {
+      (out[block] ??= {})[slot] = {
+        kind: 'userSummary',
+        user: need.stats ? user : { ...user, stats: null },
+      };
+    }
+  }
+  return out;
+}
+
+/** Layer 3: everything personal, only ever called with a session. */
+async function personalLayer(ctx: Ctx, blocks: readonly PublicBlock[]): Promise<PersonalByBlock> {
+  const [coupons, declared] = await Promise.all([
+    couponLayer(ctx, blocks),
+    declaredLayer(ctx, blocks),
+  ]);
+  const out: PersonalByBlock = { ...coupons };
+  for (const [block, slots] of Object.entries(declared)) out[block] = { ...out[block], ...slots };
   return out;
 }
 
@@ -241,7 +323,9 @@ async function finish(
     revision: page.revision,
     preview: page.preview,
     root: page.root,
-    blocks: visible.map(({ kinds: _kinds, ...block }) => block) as ResolvedPage['blocks'],
+    blocks: visible.map(
+      ({ kinds: _kinds, personalNeeds: _personal, ...block }) => block,
+    ) as ResolvedPage['blocks'],
     personal: signedIn ? await personalLayer(ctx, visible) : null,
     version: page.version,
     resolvedAt: page.resolvedAt,

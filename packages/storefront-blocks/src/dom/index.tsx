@@ -1,5 +1,6 @@
 import {
   Children,
+  createElement,
   isValidElement,
   useEffect,
   useRef,
@@ -470,6 +471,93 @@ export function ScrollView(props: ScrollViewProps) {
       }
     >
       {children}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RichText
+
+/** A `<rich-text>` node, as WeChat takes it. */
+export type RichTextShimNode =
+  | { type: 'text'; text: string }
+  | {
+      type?: 'node' | undefined;
+      name: string;
+      attrs?: Record<string, string> | undefined;
+      children?: RichTextShimNode[] | undefined;
+    };
+
+export interface RichTextProps extends StandardProps {
+  /** Node list. A string is shown as text here — the blocks always pass nodes. */
+  nodes?: RichTextShimNode[] | string | undefined;
+  userSelect?: boolean | undefined;
+  selectable?: boolean | undefined;
+  space?: 'ensp' | 'emsp' | 'nbsp' | undefined;
+}
+
+/** Tags `<rich-text>` itself refuses; never created here whatever the nodes say. */
+const RICH_TEXT_DENIED =
+  /^(script|style|iframe|frame|object|embed|link|meta|base|form|input|textarea|button|select|svg|math|template|video|audio|canvas)$/;
+
+/** `"color:red;text-align:center"` → `{ color: 'red', textAlign: 'center' }`. */
+function styleObject(style: string): CSSProperties {
+  const out: Record<string, string> = {};
+  for (const declaration of style.split(';')) {
+    const colon = declaration.indexOf(':');
+    if (colon < 0) continue;
+    const property = declaration.slice(0, colon).trim().toLowerCase();
+    const value = declaration.slice(colon + 1).trim();
+    if (!/^[a-z-]+$/.test(property) || value === '' || /url\(|expression\(/i.test(value)) continue;
+    out[property.replace(/-([a-z])/g, (_m, letter: string) => letter.toUpperCase())] = value;
+  }
+  return out as CSSProperties;
+}
+
+function richTextNodes(nodes: readonly RichTextShimNode[], path: string): ReactNode[] {
+  return nodes.map((node, index) => {
+    const key = `${path}.${index}`;
+    if (node.type === 'text') return node.text;
+    const name = node.name.toLowerCase();
+    if (!/^[a-z][a-z0-9]*$/.test(name) || RICH_TEXT_DENIED.test(name)) return null;
+    const attrs = node.attrs ?? {};
+    const props: Record<string, unknown> = { key };
+    if (attrs.style) props.style = styleObject(attrs.style);
+    if (attrs.class) props.className = attrs.class;
+    if (name === 'img') {
+      if (!/^(https?:\/\/|\/|data:image\/)/.test(attrs.src ?? '')) return null;
+      props.src = attrs.src;
+      props.alt = attrs.alt ?? '';
+      return createElement('img', props);
+    }
+    if (name === 'br' || name === 'hr') return createElement(name, props);
+    return createElement(name, props, ...richTextNodes(node.children ?? [], key));
+  });
+}
+
+/**
+ * `<rich-text>`: renders a node list as DOM, text as text. What WeChat draws
+ * is the same elements with the same inline styles; the blocks pass nodes
+ * that were sanitised already (`@shop/contracts/decor/rich-text`), and this
+ * refuses the dangerous tags again anyway.
+ */
+export function RichText(props: RichTextProps) {
+  const { id, className, style, hidden, ariaLabel, onClick, nodes, userSelect, selectable } = props;
+  return (
+    <div
+      {...dataAttributes(props)}
+      id={id}
+      className={cx(
+        'sbd-rich-text',
+        (selectable || userSelect) && 'sbd-text--selectable',
+        className,
+      )}
+      style={style}
+      hidden={hidden}
+      aria-label={ariaLabel}
+      onClick={tapHandler(onClick)}
+    >
+      {typeof nodes === 'string' ? nodes : richTextNodes(nodes ?? [], 'n')}
     </div>
   );
 }
