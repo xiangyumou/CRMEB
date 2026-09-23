@@ -492,7 +492,7 @@
         v-if="goname != 'looks'"
       >
         <view class="more"></view>
-        <view class="bnt cancel" @click="modify('0')" v-if="types == 0">
+        <view class="bnt cancel" @click="modify('0')" v-if="canAdjustPrice && types == 0">
           一键改价
         </view>
         <!-- types == -1 -->
@@ -575,6 +575,7 @@ import {
   setAdminOrderRemark,
   setOrderRefund,
   getUserInfo,
+  getStaffIdentity,
 } from "@/api/admin";
 // import {
 // 	erpConfig
@@ -619,6 +620,8 @@ export default {
       getHeight: this.$util.getWXStatusHeight(),
       confirmShow: false,
       userInfo: {},
+      // 一键改价 follows order-staff.allowStaffRepricing, which is off by default
+      canAdjustPrice: false,
     };
   },
   watch: {
@@ -640,6 +643,13 @@ export default {
     this.order_id = option.id;
     this.goname = option.goname;
     this.statusType = option.types;
+    getStaffIdentity()
+      .then((res) => {
+        this.canAdjustPrice = res.data.adjust_price === 1;
+      })
+      .catch(() => {
+        this.canAdjustPrice = false;
+      });
   },
   onShow() {
     this.getIndex();

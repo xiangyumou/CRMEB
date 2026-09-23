@@ -85,7 +85,7 @@
 					</view>
 					<view class="acea-row row-middle">
 						<view class="bnt" @click="modify(item, 1)">订单备注</view>
-						<view class="bnt" :class="openErp?'on':''" @click="modify(item, 0)" v-if="item._status == 1 && item.is_cancel == 0">
+						<view class="bnt" :class="openErp?'on':''" @click="modify(item, 0)" v-if="canAdjustPrice && item._status == 1 && item.is_cancel == 0">
 							一键改价
 						</view>
 						<view class="bnt primary" :class="openErp?'on':''"
@@ -150,7 +150,8 @@
 		setAdminOrderRemark,
 		setAdminRefundRemark,
 		setOrderRefund,
-		adminRefundList
+		adminRefundList,
+		getStaffIdentity,
 	} from "@/api/admin";
 	// import {
 	// 	erpConfig
@@ -210,6 +211,8 @@
 				status: "",
 				state: -1,
 				isRefund: 0, //1是仅退款;0是退货退款
+				// 一键改价 follows order-staff.allowStaffRepricing, which is off by default
+				canAdjustPrice: false,
 				imgHost: HTTP_REQUEST_URL,
 				dateSelected: '',
 				dateList: [{
@@ -262,6 +265,11 @@
 			let type = option.types;
 			this.where.status = type || '';
 			this.state = type || -1;
+			getStaffIdentity().then(res => {
+				this.canAdjustPrice = res.data.adjust_price === 1;
+			}).catch(() => {
+				this.canAdjustPrice = false;
+			});
 			// this.getErpConfig();
 		},
 		onShow() {

@@ -42,24 +42,28 @@ import { toLegacyShipment } from './fulfil.js';
 // ---------------------------------------------------------------------------
 
 /**
- * `GET /api/v1/staff/me` → the 商家管理 entry's visibility flag, and whether
- * the 售后 screens show 退款审核 / 确认收货.
+ * `GET /api/v1/staff/me` → the 商家管理 entry's visibility flag, and the two
+ * order actions a shop may withhold from its staff.
  *
- * `refund_review` follows `order-staff.allowStaffRefundReview` (R2, CR-14-k):
- * with it off the review route answers 403 `店员审核售后未开启`, so the buttons
- * are hidden rather than offered and refused. The switch reaches the phone as
- * `abilities.refundReview` on this identity — the addition asked for in
- * `docs/rewrite/cr/CR-1-r6.md`. Until a server sends it, it reads as off,
- * which is the switch's own default.
+ * - `refund_review` follows `order-staff.allowStaffRefundReview`: the 售后
+ *   screens show 同意 / 拒绝 / 确认收货 only when it is on.
+ * - `adjust_price` follows `order-staff.allowStaffRepricing`: the order list
+ *   and the order detail show 一键改价 only when it is on.
+ *
+ * With either switch off the server answers the action with a 403, so the
+ * button is hidden rather than offered and refused. Both reach the phone as
+ * `abilities` on this identity; an identity that does not say reads as off,
+ * which is each switch's own default.
  */
 export function toLegacyStaffIdentity(dto) {
-  if (!dto) return { is_staff: 0, uid: 0, nickname: '', refund_review: 0 };
+  if (!dto) return { is_staff: 0, uid: 0, nickname: '', refund_review: 0, adjust_price: 0 };
   const abilities = dto.abilities || {};
   return {
     is_staff: dto.isStaff ? 1 : 0,
     uid: dto.userId === null || dto.userId === undefined ? 0 : toId(dto.userId),
     nickname: text(dto.nickname),
     refund_review: dto.isStaff && abilities.refundReview === true ? 1 : 0,
+    adjust_price: dto.isStaff && abilities.adjustPrice === true ? 1 : 0,
   };
 }
 
@@ -511,6 +515,20 @@ export function fromLegacyRefundRemarkInput(data) {
 /** `adminRefundDetail` → the 售后详情 the staff pages read. */
 export function toLegacyStaffRefund(dto) {
   if (!dto) return {};
+  const cartInfo = mapList(dto.items, (item) => ({
+    id: toId(item.orderItemId),
+    cart_num: toInt(item.quantity, 1),
+    truePrice: money(item.amount),
+    sum_price: money(item.amount),
+    productInfo: {
+      store_name: text(item.productName),
+      image: text(item.productImageUrl),
+      price: money(item.amount),
+      ...(text(item.specText)
+        ? { attrInfo: { suk: text(item.specText).split('|').join(','), image: text(item.productImageUrl) } }
+        : {}),
+    },
+  }));
   return Object.assign({}, toLegacyRefund(dto), {
     uid: dto.userId === undefined ? 0 : toId(dto.userId),
     nickname: text(dto.userNickname),
@@ -522,20 +540,9 @@ export function toLegacyStaffRefund(dto) {
     refund_goods_explain: text(dto.explanation),
     refund_goods_img: mapList(dto.images, (u) => text(u)),
     remark: text(dto.adminRemark),
-    cartInfo: mapList(dto.items, (item) => ({
-      id: toId(item.orderItemId),
-      cart_num: toInt(item.quantity, 1),
-      truePrice: money(item.amount),
-      sum_price: money(item.amount),
-      productInfo: {
-        store_name: text(item.productName),
-        image: text(item.productImageUrl),
-        price: money(item.amount),
-        ...(text(item.specText)
-          ? { attrInfo: { suk: text(item.specText).split('|').join(','), image: text(item.productImageUrl) } }
-          : {}),
-      },
-    })),
+    cartInfo,
+    // 售后列表 previews the goods from `_info[].cart_info`, like the order list.
+    _info: cartInfo.map((cart) => ({ cart_info: cart })),
     total_num: toInt(dto.quantity, 0),
     pay_price: money(dto.amount),
     pay_postage: '0.00',
