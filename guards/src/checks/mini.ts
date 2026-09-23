@@ -123,62 +123,13 @@ const SHOP_PRIVATE_INFOS: ReadonlySet<string> = new Set(['chooseAddress']);
  * page is now registered, or that left the catalogue, fails until it is
  * deleted — so the list only shrinks, page by page, as streams A and B land.
  */
-const UNBUILT_ROUTES: readonly string[] = [
-  // `pages/index/index`; the shell still calls it `pages/home/index` (see UNCATALOGUED_PAGES).
-  'home',
-  'login',
-  'agreement',
-  'productList',
-  'search',
-  'featured',
-  'productReviews',
-  'orderList',
-  'order',
-  'logistics',
-  'reviewWrite',
-  'refundApply',
-  'refundList',
-  'refund',
-  'refundReturnShipment',
-  'groupbuyList',
-  'groupbuy',
-  'groupbuyTeam',
-  'presaleList',
-  'presale',
-  'couponCenter',
-  'myCoupons',
-  'profile',
-  'settings',
-  'phone',
-  'password',
-  'passwordReset',
-  'addresses',
-  'addressEdit',
-  'favorites',
-  'history',
-  'messages',
-  'message',
-  'invoices',
-  'invoiceTitleEdit',
-  'invoice',
-  'invoiceApply',
-  'cancellation',
-  'articleList',
-  'article',
-  'webview',
-  'page',
-  'myReviews',
-  'myGroupbuys',
-];
+const UNBUILT_ROUTES: readonly string[] = [];
 
 /**
  * Registered pages (outside the demo sub-package) with no catalogue key, each
  * with the reason. Exactly compared, like UNBUILT_ROUTES.
  */
-const UNCATALOGUED_PAGES: Readonly<Record<string, string>> = {
-  'pages/home/index':
-    "the S1 shell's home tab; the catalogue's `home` is pages/index/index (docs/mini/pages.md §2.1), which stream A renames it to",
-};
+const UNCATALOGUED_PAGES: Readonly<Record<string, string>> = {};
 
 export interface MiniRoots {
   /** `apps/mini`, or a scratch copy of it (the mutation tests). */

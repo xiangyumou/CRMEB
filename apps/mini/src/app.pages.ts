@@ -20,7 +20,7 @@ export interface SubPackage {
   root: string;
   name: string;
   pages: readonly string[];
-  /** Development builds only (never in a production weapp build). */
+  /** Dev and H5 builds only: never in a production weapp build (app.config.ts). */
   devOnly?: true;
 }
 

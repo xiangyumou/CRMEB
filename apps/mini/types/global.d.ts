@@ -28,7 +28,7 @@ declare namespace NodeJS {
     TARO_APP_API_ORIGIN: string;
     /** `mp` in the e2e suite's H5 build only (`build:h5:mp-emulation`), `''` otherwise. */
     TARO_APP_PLATFORM_EMULATION: '' | 'mp';
-    /** `1` in the build that is uploaded to WeChat: leaves out the dev-only demo package. */
-    TARO_APP_RELEASE?: '' | '1';
+    /** `1` keeps the dev-only demo package in a production weapp build (app.config.ts). */
+    TARO_APP_DEMO?: '' | '1';
   }
 }
