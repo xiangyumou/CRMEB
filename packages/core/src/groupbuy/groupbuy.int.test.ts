@@ -834,7 +834,7 @@ describe('the expiry sweep', () => {
     await storeRetiredVirtualFill();
     const sql = readFileSync(
       fileURLToPath(
-        new URL('../../../db/migrations/0004_groupbuy_virtual_fill_off.sql', import.meta.url),
+        new URL('../../../db/migrations/0005_groupbuy_virtual_fill_off.sql', import.meta.url),
       ),
       'utf8',
     );

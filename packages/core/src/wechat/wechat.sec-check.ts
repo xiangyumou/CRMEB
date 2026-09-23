@@ -179,7 +179,6 @@ export function wechatContentSecurityDriver(ctx: Ctx): ContentSecurityPort {
 /** The mini-program openid to check under, or why there is none. */
 async function checkIdentity(
   ctx: Ctx,
-  db: DbOrTx,
   userId: number | null,
 ): Promise<{ openid: string } | { skipped: string }> {
   const { enabled } = await ctx.config.get(contentSecurityConfig);
@@ -189,7 +188,7 @@ async function checkIdentity(
     return { skipped: 'mini-not-configured' };
   }
   if (userId === null) return { skipped: 'no-user' };
-  const openid = await findOpenid(db, userId, 'mini');
+  const openid = await findOpenid(ctx.db, userId, 'mini');
   return openid ? { openid } : { skipped: 'no-mini-openid' };
 }
 
@@ -213,7 +212,7 @@ export async function checkText(
   input: { userId: number | null; content: string; scene: SecCheckScene; what: string },
 ): Promise<TextVerdict> {
   if (input.content.trim() === '') return 'pass';
-  const identity = await checkIdentity(ctx, ctx.db, input.userId);
+  const identity = await checkIdentity(ctx, input.userId);
   if ('skipped' in identity) {
     ctx.logger.info({ what: input.what, reason: identity.skipped }, 'sec check skipped');
     return 'skipped';
@@ -325,7 +324,7 @@ async function submitMediaCheck(ctx: Ctx, effect: Effect): Promise<void> {
   if (!row || row.status !== 'pending') return;
   const now = ctx.clock.now();
 
-  const identity = await checkIdentity(ctx, ctx.db, row.userId);
+  const identity = await checkIdentity(ctx, row.userId);
   if ('skipped' in identity) {
     ctx.logger.info({ checkId, reason: identity.skipped }, 'media check skipped');
     await markSkipped(ctx.db, checkId, now);

@@ -1,7 +1,7 @@
 import { Image, Text, View } from '@tarojs/components';
 
-import type { ProductSummary } from '../../schema/common';
-import type { ProductGridProps } from '../../schema/product-grid';
+import type { ProductSummary } from '@shop/contracts/decor/sources';
+import type { ProductGridProps } from '@shop/contracts/decor/all-blocks';
 import { cx, tapProps } from '../shared/css';
 import { BlockFrame } from '../shared/frame';
 import type { BlockProps } from '../shared/types';

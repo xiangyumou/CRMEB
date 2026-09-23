@@ -1212,7 +1212,7 @@ An expired under-filled team refunds every paid member exactly once, through the
 
 ### RISK-D-006
 
-虚拟成团 never happens (decided 2026-09-23: the mini-program is the only storefront, and a team completed with invented members reads as a fake transaction there). A team that has not filled by its deadline fails and every paid member is refunded, even in a shop that had the retired `virtualFillOnExpiry` switch stored as on; migration `0004_groupbuy_virtual_fill_off` deletes that stored key so a rollback to the previous image cannot revive it. 立即成团 is refused on an under-filled team whatever is stored, records no `groupbuy.settle`, and is refused to an admin who may read teams but not complete them.
+虚拟成团 never happens (decided 2026-09-23: the mini-program is the only storefront, and a team completed with invented members reads as a fake transaction there). A team that has not filled by its deadline fails and every paid member is refunded, even in a shop that had the retired `virtualFillOnExpiry` switch stored as on; migration `0005_groupbuy_virtual_fill_off` deletes that stored key so a rollback to the previous image cannot revive it. 立即成团 is refused on an under-filled team whatever is stored, records no `groupbuy.settle`, and is refused to an admin who may read teams but not complete them.
 
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > RISK-D-006 — fails and refunds an under-filled team even with the retired 虚拟成团 switch stored as on`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > RISK-D-006 — migration 0004 deletes a stored 虚拟成团 switch`
@@ -1387,9 +1387,9 @@ A successful group updates leader and members once, without repeated notificatio
 
 ### CORE-002
 
-The shop has no 砍价, 秒杀, 抽奖, 直播, 分销, 积分, 签到, 付费会员, 充值, 余额支付, 支付宝, 线下支付, 核销, 门店自提, 自建客服 or the other features `pnpm guards`' `retired` check lists: no identifier or URL token for any of them exists in the application source or the uni-app API layer, and every route file is described by a contract, so there is no unlisted surface for one to come back through.
+The shop has no 砍价, 秒杀, 抽奖, 直播, 分销, 积分, 签到, 付费会员, 充值, 余额支付, 支付宝, 线下支付, 核销, 门店自提, 自建客服 or the other features `pnpm guards`' `retired` check lists: no identifier or URL token for any of them exists in the application source, the uni-app API layer or the mini-program (with `@shop/api-client` and `@shop/storefront-blocks`), and every route file is described by a contract, so there is no unlisted surface for one to come back through.
 
-- `guards/src/checks/retired.test.ts::the retired blacklist > finds no retired identifier in the workspace or the uni-app API layer`
+- `guards/src/checks/retired.test.ts::the retired blacklist > finds no retired identifier in the workspace, the uni-app API layer or the mini-program`
 - `guards/src/checks/contracts.test.ts::contracts and route files > leaves no route file that no contract describes`
 
 ## Test strength and stability
@@ -1940,3 +1940,149 @@ An article slug belongs to one article: concurrent publishes of the same slug le
 The storefront serves published, visible articles only — in the list and by id.
 
 - `packages/core/src/cms/cms.int.test.ts::文章 storefront > serves published articles only, by id as well as in the list`
+
+## Page decoration (装修 v2)
+
+### DECOR-001
+
+A block type is declared once, with `defineBlock`, and a declaration that could not be served safely fails at load: its props carry the shared base props (`style`, `visibility`), every stored version below the current one has exactly one migration step, the type name and `minClient` are well-formed, and no type is registered twice. Stored props are migrated step by step to the current version.
+
+- `packages/contracts/src/decor/decor.test.ts::defineBlock — DECOR-001 > refuses a props schema without the base props`
+- `packages/contracts/src/decor/decor.test.ts::defineBlock — DECOR-001 > refuses a version without a migration for every older version`
+- `packages/contracts/src/decor/decor.test.ts::defineBlock — DECOR-001 > refuses a bad type name, a bad minClient and a registry with a type twice`
+- `packages/contracts/src/decor/decor.test.ts::defineBlock — DECOR-001 > migrates stored props step by step up to the current version`
+- `packages/contracts/src/decor/decor.test.ts::defineBlock — DECOR-001 > compares client versions numerically, and a garbled one as unknown`
+
+### DECOR-002
+
+A decorated link stores what it opens (`LinkTarget`), never a path: a catalogue route by key with strict params and only among the `linkable` keys, an https page for a web-view, or a well-formed mini-program AppID. It resolves to a catalogue route without zod, so the mini-program can follow it.
+
+- `packages/contracts/src/decor/decor.test.ts::LinkTarget — DECOR-002 > is a typed target, never a path string`
+- `packages/contracts/src/decor/decor.test.ts::LinkTarget — DECOR-002 > links to catalogue routes by key with strict params, linkable keys only`
+- `packages/contracts/src/decor/decor.test.ts::LinkTarget — DECOR-002 > opens only https pages in a web-view and checks a mini-program AppID`
+- `packages/contracts/src/decor/decor.test.ts::LinkTarget — DECOR-002 > resolves to a catalogue route without zod`
+
+### DECOR-003
+
+A draft save is lenient and a publish is strict. A draft whose envelope fails (schema version, block count, byte size) is refused outright; anything inside it that fails — invalid props, an unknown block type, a block type newer than this build, a block the page kind may not hold — is stored as it came and reported as an issue with its path, so an operator's half-finished work is never thrown away. Known blocks are stored migrated with their defaults filled in.
+
+- `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > keeps an unknown block type as it came, warns, and blocks publishing it`
+- `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > treats a known type stored at a newer version like an unknown one`
+- `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > saves invalid props as they came and reports them with a path`
+- `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > refuses the envelope outright: schema version, block count, byte size`
+- `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > limits the blocks that need server data`
+- `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: a draft with content issues is saved and the issues reported; a broken envelope is refused`
+- `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: an unknown block type is kept as it came, with a warning`
+- `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: a known block is stored migrated, with its defaults filled in`
+- `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: a new page starts empty and titled after its name; a new 个人中心 starts from the built-in one`
+- `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: lists, renames, duplicates and soft-deletes documents`
+
+### DECOR-004
+
+A link or a data source naming a record the shopper cannot see (off the shelf, deleted, unpublished, outside its window, or an id that never existed) is a warning on save and on publish, never an error; the storefront resolver skips it silently. Links and sources are found through the editor metadata, not by block name.
+
+- `packages/contracts/src/decor/decor.test.ts::collectReferences — DECOR-004 > finds links and sources through the editor metadata, not by block name`
+- `packages/core/src/decor/decor.int.test.ts::references — DECOR-004 > DECOR-004: a record the shopper cannot see is a warning on save, never an error`
+
+### DECOR-005
+
+The storefront always has a 个人中心: with none designated, `GET /api/v1/pages/user-center` serves the built-in one (which passes the strict check for its kind), and a new 个人中心 document starts from it.
+
+- `packages/contracts/src/decor/decor.test.ts::the built-in 个人中心 — DECOR-005 > passes the strict check for a user-centre page, unchanged`
+- `packages/core/src/decor/decor.int.test.ts::the built-in 个人中心 — DECOR-005 > DECOR-005: with nothing designated the storefront gets the built-in 个人中心; once designated, that one`
+- `apps/web/app/api/v1/pages/pages.int.test.ts::GET /api/v1/pages/user-center > serves the built-in 个人中心 until one is designated, then that one`
+
+### DECOR-006
+
+Revisions are append-only: the database refuses an `UPDATE` or `DELETE` on `decor_revisions` (trigger), and a revision reads back exactly as published. Concurrent publishes and rollbacks number revisions without gaps or duplicates.
+
+- `packages/core/src/decor/decor.int.test.ts::revisions — DECOR-006 > DECOR-006: the database refuses to update or delete a revision`
+- `packages/core/src/decor/decor.int.test.ts::revisions — DECOR-006 > DECOR-006: a revision is read back exactly as published`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent rollbacks — DECOR-011 > DECOR-011: N rollbacks at once each append a revision, numbered without gaps or duplicates`
+
+### DECOR-007
+
+Publishing is atomic and idempotent: in one transaction under the document's row lock, a draft with no issues becomes a new revision and the live pointer moves to it — or nothing is written. A draft already live is `DECOR_NOTHING_TO_PUBLISH`, so N simultaneous publishes make one revision; a publish naming a version other than the draft's is a conflict.
+
+- `packages/core/src/decor/decor.int.test.ts::publishing — DECOR-007 > DECOR-007: publish writes revision 1 and moves the live pointer; the same draft again is nothing to publish`
+- `packages/core/src/decor/decor.int.test.ts::publishing — DECOR-007 > DECOR-007: a draft with issues is not published, and nothing is written`
+- `packages/core/src/decor/decor.int.test.ts::publishing — DECOR-007 > DECOR-007: a block not allowed on the page kind blocks publishing`
+- `packages/core/src/decor/decor.int.test.ts::publishing — DECOR-007 > DECOR-007: publishing a version other than the draft is a conflict`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent publishes — DECOR-007 > DECOR-007: N publishes of the same draft make one revision; the rest are nothing to publish`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent publishes — DECOR-007 > DECOR-007: publishes racing saves never publish a version the publisher did not name`
+
+### DECOR-008
+
+At most one document is the 首页 and at most one the 个人中心 (partial unique index, and an advisory lock per designation so concurrent switches queue), and only a published document of the matching kind can be designated. Designating another document moves the designation; `null` clears it.
+
+- `packages/core/src/decor/decor.int.test.ts::designations — DECOR-008 > DECOR-008: only a published document of the matching kind can be designated`
+- `packages/core/src/decor/decor.int.test.ts::designations — DECOR-008 > DECOR-008: designating another document moves the designation; null clears it`
+- `packages/core/src/decor/decor.int.test.ts::designations — DECOR-008 > DECOR-008: the database allows one document per designation`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent designations — DECOR-008 > DECOR-008: N documents designated as 首页 at once leave exactly one designated`
+
+### DECOR-009
+
+The designated 首页 or 个人中心 cannot be deleted (`DECOR_DOCUMENT_IN_USE`); a delete racing a designation leaves either a live designated document or a deleted undesignated one, never a deleted designated one. A deleted document's revisions stay.
+
+- `packages/core/src/decor/decor.int.test.ts::deletion — DECOR-009 > DECOR-009: the designated document cannot be deleted; once undesignated it can`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::delete against designate — DECOR-009 > DECOR-009: a delete racing a designation never leaves a deleted document designated`
+
+### DECOR-010
+
+A draft save is optimistically locked on `draftVersion`: a save on a stale version is `DECOR_VERSION_CONFLICT` carrying the current version and changes nothing, so of N saves on the same version exactly one lands, whole.
+
+- `packages/core/src/decor/decor.int.test.ts::draft saves — DECOR-010 > DECOR-010: a save on a stale version is refused with the current version, and changes nothing`
+- `packages/core/src/decor/decor.int.test.ts::draft saves — DECOR-010 > DECOR-010: a save on a deleted document is not found, not a conflict`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent draft saves — DECOR-010 > DECOR-010: of N saves on the same version exactly one lands; the rest are version conflicts`
+
+### DECOR-011
+
+A rollback republishes an old revision's content as a new revision (`restoredFrom` set), checked like any publish; nothing is rewritten and the draft is left as it is.
+
+- `packages/core/src/decor/decor.int.test.ts::rollback — DECOR-011 > DECOR-011: rollback republishes old content as a new revision and leaves the draft alone`
+- `packages/core/src/decor/decor.int.test.ts::rollback — DECOR-011 > DECOR-011: rolling back to a revision that does not exist writes nothing`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent rollbacks — DECOR-011 > DECOR-011: N rollbacks at once each append a revision, numbered without gaps or duplicates`
+
+### DECOR-012
+
+A preview token opens the current draft of the one document it was issued for, and nothing else; it is 256 random bits, kept in Redis only as its SHA-256, and expires after `PREVIEW_TOKEN_SECONDS`. A preview is never cached and is marked `preview: true`. Without a token an unpublished document does not exist for the storefront.
+
+- `packages/core/src/decor/decor.int.test.ts::preview tokens — DECOR-012 > DECOR-012: a token opens the draft of its own document, uncached and marked preview`
+- `packages/core/src/decor/decor.int.test.ts::preview tokens — DECOR-012 > DECOR-012: a token does not open another document, and a made-up token opens nothing`
+- `packages/core/src/decor/decor.int.test.ts::preview tokens — DECOR-012 > DECOR-012: the token expires with Redis and is stored only as a hash`
+- `apps/web/app/api/v1/pages/pages.int.test.ts::GET /api/v1/pages/:id > with a preview token serves the draft of that document only`
+
+### DECOR-013
+
+A page serves only what the shopper could see, by each domain's own rule, through that domain's `index.ts`: products on the shelf (a manual list keeps the operator's order and marks a sold-out pick; a category or label rule leaves sold-out products out), claimable coupons, published articles, campaigns in their window. A resolver that fails costs its slot (`null`), never the page.
+
+- `packages/core/src/decor/decor.int.test.ts::resolved data — DECOR-013 > DECOR-013: a manual product list keeps the operator order, skips what is off the shelf and marks what is sold out`
+- `packages/core/src/decor/decor.int.test.ts::resolved data — DECOR-013 > DECOR-013: a category or label rule returns on-shelf products with stock only, at most the limit`
+- `packages/core/src/decor/decor.int.test.ts::resolved data — DECOR-013 > DECOR-013: coupons, 新人券 and articles come back only when the shopper could see them`
+- `packages/core/src/decor/decor.int.test.ts::resolved data — DECOR-013 > DECOR-013: a resolver that fails costs its slot, not the page`
+
+### DECOR-014
+
+The public part of a page is cached per revision (`decor:page:rev:<id>`, `DECOR_CACHE_SECONDS`); the live revision is read from the database on every request, so a publish or a rollback serves the new revision at once, and the old entry is deleted. The storefront's ETag changes with it.
+
+- `packages/core/src/decor/decor.int.test.ts::page cache — DECOR-014 > DECOR-014: the public page is cached per revision, and a publish serves the new revision at once`
+- `packages/core/src/decor/decor.int.test.ts::page cache — DECOR-014 > DECOR-014: a rollback also moves the page off the cached revision`
+- `packages/core/src/decor/decor.int.test.ts::page cache — DECOR-014 > DECOR-014: no home designated is DECOR_HOME_NOT_SET`
+- `apps/web/app/api/v1/pages/pages.int.test.ts::GET /api/v1/pages/home > answers 304 to a matching If-None-Match, and a publish changes the ETag`
+
+### DECOR-015
+
+Per-shopper state (coupons claimed / claimable) is resolved only when a shopper's session comes with the request, is never part of the cached page, and is `null` for a guest or an admin.
+
+- `packages/core/src/decor/decor.int.test.ts::per-shopper state — DECOR-015 > DECOR-015: with a session the page carries the coupon state of that shopper; without one, none`
+- `packages/core/src/decor/decor.int.test.ts::per-shopper state — DECOR-015 > DECOR-015: the cached public page holds nothing per shopper`
+
+### DECOR-016
+
+Blocks are filtered per request from the one cached page: `visibility.audience` against the session, `visibility.platforms` against `X-Client-Platform`, and each type's `minClient` against `X-Client-Version` (an unreadable version sees everything). Unknown types, types newer than this build and props that do not parse are skipped, never served broken.
+
+- `packages/core/src/decor/decor.int.test.ts::per-request filtering — DECOR-016 > DECOR-016: blocks are filtered by audience and X-Client-Platform, per request, from one cached page`
+- `packages/core/src/decor/decor.int.test.ts::per-request filtering — DECOR-016 > DECOR-016: a block type newer than the client is left out for that client only`
+- `packages/core/src/decor/decor.int.test.ts::per-request filtering — DECOR-016 > DECOR-016: unknown, newer-than-this-build and unparseable blocks are skipped, never served broken`
+- `packages/core/src/decor/decor.int.test.ts::per-request filtering — DECOR-016 > DECOR-016: blockVisibleTo ignores a client version it cannot read`
+- `apps/web/app/api/v1/pages/pages.int.test.ts::GET /api/v1/pages/home > filters blocks per request: session, X-Client-Platform, X-Client-Version`

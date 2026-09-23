@@ -2,7 +2,7 @@ import path from 'node:path';
 import { allRoutes } from '@shop/contracts/routes';
 import { defineCheck, fail, result, type Finding } from '../framework';
 import { isScript, walk } from '../lib/files';
-import { rel, repoRoot, uniApp } from '../lib/paths';
+import { apiClientSrc, miniApp, rel, repoRoot, storefrontBlocksSrc, uniApp } from '../lib/paths';
 
 /**
  * The shop's scope, enforced instead of remembered (CORE-002).
@@ -18,7 +18,7 @@ import { rel, repoRoot, uniApp } from '../lib/paths';
  * feature are matched as identifiers too.
  */
 
-interface RetiredWord {
+export interface RetiredWord {
   /** Matched as a whole word anywhere in source. */
   identifier?: RegExp;
   /** Matched as a whole path segment or hyphen token of a URL. */
@@ -26,7 +26,7 @@ interface RetiredWord {
   feature: string;
 }
 
-const RETIRED: readonly RetiredWord[] = [
+export const RETIRED: readonly RetiredWord[] = [
   { identifier: /\bbargain(s|Id|_id)?\b/i, urlToken: 'bargain', feature: '砍价' },
   { identifier: /\bseckill\b/i, urlToken: 'seckill', feature: '秒杀' },
   { identifier: /\bluckLottery|\blottery\b/i, urlToken: 'lottery', feature: '抽奖' },
@@ -63,6 +63,10 @@ const SOURCE_ROOTS = [
   path.join(repoRoot, 'packages/core/src'),
   path.join(repoRoot, 'packages/contracts/src'),
   path.join(uniApp, 'api'),
+  // The mini-program and the two packages it is built from (docs/mini), tests included.
+  path.join(miniApp, 'src'),
+  apiClientSrc,
+  storefrontBlocksSrc,
 ];
 
 /**
@@ -114,7 +118,7 @@ const DENY_LISTS: readonly DenyListFile[] = [
 ];
 
 /** A retired word only counts in a URL when it is a whole segment or hyphen token. */
-function urlTokens(url: string): Set<string> {
+export function urlTokens(url: string): Set<string> {
   const tokens = new Set<string>();
   for (const segment of url.split('/')) {
     if (!segment) continue;
@@ -124,9 +128,15 @@ function urlTokens(url: string): Set<string> {
   return tokens;
 }
 
+/** The retired feature a URL (or page path) names, or null. The query string is not read. */
+export function retiredInUrl(url: string): RetiredWord | null {
+  const tokens = urlTokens(url.split(/[?#]/)[0] ?? '');
+  return RETIRED.find((word) => word.urlToken !== undefined && tokens.has(word.urlToken)) ?? null;
+}
+
 export const retiredFeatures = defineCheck(
   'retired',
-  'no retired feature reappears in the workspace or the uni-app API layer',
+  'no retired feature reappears in the workspace, the uni-app API layer or the mini-program',
   () => {
     const findings: Finding[] = [];
     const denyListHits = new Set<string>();

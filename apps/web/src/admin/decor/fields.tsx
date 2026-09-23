@@ -5,10 +5,10 @@ import { FieldLabel, type CustomFieldRender } from '@puckeditor/core';
 import {
   LINK_KINDS,
   PRODUCT_SORT,
-  STOREFRONT_ROUTES,
+  ROUTE_LINK_LABELS,
   type LinkKind,
   type LinkTarget,
-  type StorefrontRoute,
+  type RouteLinkKey,
 } from '@shop/storefront-blocks/schema';
 import type { ProductSource } from '@shop/storefront-blocks/schema';
 import { useQuery } from '@tanstack/react-query';
@@ -138,7 +138,7 @@ const NO_LINK = '__none__';
 function emptyLink(kind: LinkKind): LinkTarget {
   switch (kind) {
     case 'route':
-      return { kind, route: 'home' };
+      return { kind, to: { route: 'home', params: {} } };
     case 'webview':
       return { kind, url: 'https://' };
     case 'miniprogram':
@@ -264,15 +264,18 @@ function LinkField({
         break;
       case 'route':
         detail = (
-          <Select<StorefrontRoute>
+          // Stub until the F2 link picker: routes that need no params only.
+          <Select<RouteLinkKey>
             style={{ width: '100%' }}
-            value={value.route}
+            value={value.to.route as RouteLinkKey}
             disabled={readOnly}
-            options={Object.entries(STOREFRONT_ROUTES).map(([route, label]) => ({
-              value: route as StorefrontRoute,
+            options={Object.entries(ROUTE_LINK_LABELS).map(([route, label]) => ({
+              value: route as RouteLinkKey,
               label,
             }))}
-            onChange={(route) => onChange({ kind: 'route', route })}
+            onChange={(route) =>
+              onChange({ kind: 'route', to: { route, params: {} } } as LinkTarget)
+            }
           />
         );
         break;
@@ -432,10 +435,13 @@ function ProductSourceField({
           />
         ) : (
           <>
+            {/* Stub until the F2 picker: the `label` mode is shown as a category pick. */}
             <CategorySelect
-              value={current.categoryId}
+              value={current.mode === 'category' ? current.categoryId : ''}
               disabled={readOnly}
-              onChange={(categoryId) => onChange({ ...current, categoryId })}
+              onChange={(categoryId) =>
+                onChange({ mode: 'category', categoryId, sort: current.sort, limit: current.limit })
+              }
             />
             <Space.Compact block>
               <Select

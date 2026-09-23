@@ -9,7 +9,7 @@ import { defineConfigGroup } from '../kernel/config-registry';
  * members reads as a fake transaction there (WeChat 运营规范 3.2.5), so a team
  * that does not fill by its deadline fails and every paid member is refunded.
  * The old `virtualFillOnExpiry` key is not in the schema, so a stored value is
- * dropped on read; migration `0004_groupbuy_virtual_fill_off` deletes it too,
+ * dropped on read; migration `0005_groupbuy_virtual_fill_off` deletes it too,
  * which keeps it off if an upgrade rolls back to an image that still reads it.
  *
  * The group declares the *read* atom, as every config group does; the settings

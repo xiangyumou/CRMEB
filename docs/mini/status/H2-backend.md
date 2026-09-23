@@ -15,7 +15,7 @@ route-catalogue adoption (after R0 merges) → merge checklist.
 
 2. Group-buy 虚拟成团 off for good
    - `virtualFillOnExpiry` removed from the `groupbuy` config group (so off the settings screen);
-     a stored value is stripped on read; migration `0004_groupbuy_virtual_fill_off` deletes it
+     a stored value is stripped on read; migration `0005_groupbuy_virtual_fill_off` deletes it
      (rollback safety). Expiring under-filled teams fail and refund.
    - 立即成团 refuses every under-filled team (`GROUPBUY_VIRTUAL_FILL_DISABLED`, new message);
      admin alert text updated. RISK-D-006 rewritten; compliance C02 updated.

@@ -41,6 +41,7 @@ describe('zodToPuckFields', () => {
       'indicatorColor',
       'indicatorActiveColor',
       'style',
+      'visibility',
     ]);
     expect(field(fields, 'height')).toMatchObject({
       type: 'number',
@@ -157,6 +158,7 @@ describe('defaultsOf', () => {
       showMarketPrice: true,
       showTag: true,
       style: { marginY: 'none', paddingX: 'none', radius: 'none' },
+      visibility: { audience: 'all', platforms: [] },
     });
   });
 });

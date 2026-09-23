@@ -808,6 +808,9 @@ importers:
 
   packages/storefront-blocks:
     dependencies:
+      '@shop/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       zod:
         specifier: ^4.6.5
         version: 4.6.5
