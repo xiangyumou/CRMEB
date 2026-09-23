@@ -1,15 +1,29 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import { renderWithQuery } from '@/test/render';
+import { screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { startSession, useSession } from '@/session/session';
+import { serveApi } from '@/test/fake-api';
+import { renderPage } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
 import Home from './index';
 
-describe('首页 (placeholder)', () => {
-  it('shows the cart count and puts it on the cart tab', async () => {
-    renderWithQuery(<Home />);
-    expect(screen.getByText('购物车加载中')).toBeTruthy();
+const count = (items: number) => ({
+  items,
+  quantity: items,
+  availableCount: items,
+  unavailableCount: 0,
+});
 
-    await screen.findByText('购物车 3 件');
+describe('首页 (tab shell)', () => {
+  beforeEach(() => useSession.setState({ session: { status: 'idle' } }));
+
+  it('puts a signed-in shopper’s cart count on the cart tab and styles the tab bar', async () => {
+    taroFake.storage.set('shop.session.token', 't1');
+    serveApi({ 'GET /api/v1/cart/count': () => ({ body: count(3) }) });
+    await startSession();
+
+    await renderPage(<Home />);
+
+    expect(screen.getByText('建设中')).toBeTruthy();
     await waitFor(() =>
       expect(taroFake.calls).toContainEqual({
         api: 'setTabBarBadge',
@@ -17,16 +31,17 @@ describe('首页 (placeholder)', () => {
       }),
     );
     expect(taroFake.calls.some((call) => call.api === 'setTabBarStyle')).toBe(true);
+    expect(taroFake.calls.filter((call) => call.api === 'setTabBarItem')).toHaveLength(4);
   });
 
-  it('opens the demo sub-package page', async () => {
-    renderWithQuery(<Home />);
-    fireEvent.click(screen.getByRole('button', { name: '组件示例' }));
+  it('asks for no cart count while signed out, and shows no badge', async () => {
+    const seen = serveApi({});
+
+    await renderPage(<Home />);
+
     await waitFor(() =>
-      expect(taroFake.calls).toContainEqual({
-        api: 'navigateTo',
-        args: { url: '/subpackages/demo/pages/ui/index' },
-      }),
+      expect(taroFake.calls).toContainEqual({ api: 'removeTabBarBadge', args: { index: 2 } }),
     );
+    expect(seen.filter((request) => request.key.includes('/cart/'))).toHaveLength(0);
   });
 });

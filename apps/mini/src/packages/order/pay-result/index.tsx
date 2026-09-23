@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Text, View } from '@tarojs/components';
-import { useRouter } from '@tarojs/taro';
+import { Text } from '@tarojs/components';
 import { useRouteQuery } from '@shop/api-client/react';
 import { LoginCard } from '@/session/login-card';
 import { useSession } from '@/session/session';
-import { placeholderStyles as styles } from '@/shell/placeholder';
+import { useRouteParams } from '@/platform';
+import { Card } from '@/ui/card';
+import { PageShell } from '@/ui/page-shell';
+import '../s4.scss';
 
 /** How often and for how long 支付结果 asks before it gives up and says 确认中. */
 const POLL_INTERVAL_MS = 1000;
@@ -17,17 +19,17 @@ const POLL_LIMIT_MS = 60_000;
  * link, 继续购物 and the recommendation rail.
  */
 export default function PayResultPage() {
-  const { outTradeNo = '' } = useRouter().params;
+  const { outTradeNo = '' } = useRouteParams('payResult');
   return (
-    <View className={styles.page}>
+    <PageShell title="支付结果">
       <LoginCard reason="登录后查看支付结果">
         {outTradeNo === '' ? (
-          <Text className={styles.muted}>没有支付单号</Text>
+          <Text className="s4-note">没有支付单号</Text>
         ) : (
           <PaymentStatus outTradeNo={outTradeNo} />
         )}
       </LoginCard>
-    </View>
+    </PageShell>
   );
 }
 
@@ -46,17 +48,17 @@ function PaymentStatus({ outTradeNo }: { outTradeNo: string }) {
 
   if (status.data?.paid) {
     return (
-      <View className={styles.card} id="pay-result">
-        <Text className={styles.title}>支付成功</Text>
-        <Text className={styles.muted}>支付单号 {outTradeNo}</Text>
-      </View>
+      <Card className="s4-center" id="pay-result">
+        <Text className="s4-amount">支付成功</Text>
+        <Text className="s4-muted">支付单号 {outTradeNo}</Text>
+      </Card>
     );
   }
-  if (status.isError) return <Text className={styles.muted}>{status.error.message}</Text>;
+  if (status.isError) return <Text className="s4-note">{status.error.message}</Text>;
   return (
-    <View className={styles.card} id="pay-result">
-      <Text className={styles.title}>支付确认中</Text>
-      <Text className={styles.muted}>微信支付的结果可能晚几秒到达，请稍候</Text>
-    </View>
+    <Card className="s4-center" id="pay-result">
+      <Text className="s4-amount">支付确认中</Text>
+      <Text className="s4-muted">微信支付的结果可能晚几秒到达，请稍候</Text>
+    </Card>
   );
 }

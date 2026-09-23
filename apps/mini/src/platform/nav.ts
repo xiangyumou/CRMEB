@@ -1,4 +1,5 @@
-import Taro from '@tarojs/taro';
+import { useState } from 'react';
+import Taro, { useRouter } from '@tarojs/taro';
 import { create } from 'zustand';
 import {
   storefrontRoutes,
@@ -150,6 +151,16 @@ export function readRouteParams<K extends StorefrontRouteKey>(
   }
   if (storefrontRoutes[key].tab) Object.assign(out, takeTabParams(key));
   return out as RouteParamsOf<K>;
+}
+
+/**
+ * `readRouteParams` for the current page (`useRouter().params`). Tab pages use
+ * `useTabPage(key)` instead, which also picks up params left by a later `navigate`.
+ */
+export function useRouteParams<K extends StorefrontRouteKey>(key: K): RouteParamsOf<K> {
+  const { params } = useRouter();
+  const [value] = useState(() => readRouteParams(key, params));
+  return value;
 }
 
 /**

@@ -51,6 +51,7 @@ export const ICON_NAMES = [
   'filter',
   'phone',
   'settings',
+  'close-circle',
   'dot',
 ] as const;
 

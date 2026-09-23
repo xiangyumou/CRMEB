@@ -89,6 +89,34 @@ export const taroFake = {
     avatarUrl?: string;
     errMsg: string;
   },
+  /** How many pages `getCurrentPages()` reports (the stack depth; WeChat's limit is 10). */
+  pageStackDepth: 1,
+  /** `showModal` answers confirm (`true`) or cancel. */
+  modalConfirm: true,
+  /** `setClipboardData` fails with this `errMsg`. */
+  clipboardError: null as string | null,
+  /** What `requestSubscribeMessage` answers per template id. */
+  subscribeAnswer: 'accept' as 'accept' | 'reject' | 'ban' | 'filter',
+  /** `chooseAddress` resolves with this, or rejects (`null`: the shopper cancelled). */
+  address: null as Record<string, string> | null,
+  /** `chooseMedia` temp paths, or `null` for a cancel. */
+  media: ['wxfile://tmp/1.jpg'] as string[] | null,
+  /** `uploadFile` answers this. */
+  upload: { statusCode: 201, data: '{"url":"/uploads/a.png"}' } as {
+    statusCode: number;
+    data: string;
+  },
+  /** `getEnterOptionsSync()` / the next `onAppShow` payload. */
+  enterOptions: { path: 'pages/index/index', query: {}, scene: 1001 } as {
+    path: string;
+    query: Record<string, string>;
+    scene: number;
+  },
+  /** The share handlers the page registered (`useShareAppMessage` / `useShareTimeline`). */
+  shareHandlers: { message: null, timeline: null } as {
+    message: (() => unknown) | null;
+    timeline: (() => unknown) | null;
+  },
   storage: storageMap,
   showApp: () => appShow.emit(undefined),
   hideApp: () => appHide.emit(undefined),
@@ -117,6 +145,15 @@ export const taroFake = {
     this.routerParams = {};
     this.phoneNumberDetail = { code: 'fake-phone-code', errMsg: 'getPhoneNumber:ok' };
     this.avatarDetail = { avatarUrl: 'wxfile://tmp/avatar.png', errMsg: 'chooseAvatar:ok' };
+    this.pageStackDepth = 1;
+    this.modalConfirm = true;
+    this.clipboardError = null;
+    this.subscribeAnswer = 'accept';
+    this.address = null;
+    this.media = ['wxfile://tmp/1.jpg'];
+    this.upload = { statusCode: 201, data: '{"url":"/uploads/a.png"}' };
+    this.enterOptions = { path: 'pages/index/index', query: {}, scene: 1001 };
+    this.shareHandlers = { message: null, timeline: null };
     storageMap.clear();
     networkType = 'wifi';
     privacyListener = null;
@@ -161,6 +198,18 @@ export function useLaunch(callback: () => void): void {
   usePageLifecycle(pageLoad, callback, true);
 }
 
+export function useShareAppMessage(handler: () => unknown): void {
+  taroFake.shareHandlers.message = handler;
+}
+
+export function useShareTimeline(handler: () => unknown): void {
+  taroFake.shareHandlers.timeline = handler;
+}
+
+function rejectWith(errMsg: string): Promise<never> {
+  return Promise.reject(Object.assign(new Error(errMsg), { errMsg }));
+}
+
 export function useRouter() {
   return { path: '/pages/test/index', params: taroFake.routerParams };
 }
@@ -199,8 +248,53 @@ const Taro = {
   setTabBarStyle: (args: unknown) => record('setTabBarStyle', args, {}),
   setTabBarBadge: (args: unknown) => record('setTabBarBadge', args, {}),
   removeTabBarBadge: (args: unknown) => record('removeTabBarBadge', args, {}),
+  setTabBarItem: (args: unknown) => record('setTabBarItem', args, {}),
   navigateTo: (args: unknown) => record('navigateTo', args, {}),
   redirectTo: (args: unknown) => record('redirectTo', args, {}),
+  switchTab: (args: unknown) => record('switchTab', args, {}),
+  reLaunch: (args: unknown) => record('reLaunch', args, {}),
+  navigateBack: (args: unknown) => record('navigateBack', args, {}),
+  getCurrentPages: () => Array.from({ length: taroFake.pageStackDepth }, () => ({})),
+  showModal: (args: unknown) =>
+    record('showModal', args, { confirm: taroFake.modalConfirm, cancel: !taroFake.modalConfirm }),
+  showLoading: (args: unknown) => record('showLoading', args, {}),
+  hideLoading: () => record('hideLoading', undefined, {}),
+  setClipboardData(args: unknown) {
+    taroFake.calls.push({ api: 'setClipboardData', args });
+    const errMsg = taroFake.clipboardError;
+    return errMsg === null ? Promise.resolve({}) : rejectWith(errMsg);
+  },
+  requestSubscribeMessage(args: { tmplIds: string[] }) {
+    taroFake.calls.push({ api: 'requestSubscribeMessage', args });
+    const result: Record<string, string> = { errMsg: 'requestSubscribeMessage:ok' };
+    for (const id of args.tmplIds) result[id] = taroFake.subscribeAnswer;
+    return Promise.resolve(result);
+  },
+  chooseAddress() {
+    taroFake.calls.push({ api: 'chooseAddress', args: undefined });
+    const address = taroFake.address;
+    return address ? Promise.resolve(address) : rejectWith('chooseAddress:fail cancel');
+  },
+  chooseMedia(args: unknown) {
+    taroFake.calls.push({ api: 'chooseMedia', args });
+    const media = taroFake.media;
+    return media
+      ? Promise.resolve({ tempFiles: media.map((tempFilePath) => ({ tempFilePath, size: 1 })) })
+      : rejectWith('chooseMedia:fail cancel');
+  },
+  uploadFile: (args: unknown) => record('uploadFile', args, taroFake.upload),
+  downloadFile: (args: { url: string }) =>
+    record('downloadFile', args, {
+      statusCode: 200,
+      tempFilePath: `wxfile://tmp/${args.url.split('/').pop()}`,
+    }),
+  getEnterOptionsSync: () => taroFake.enterOptions,
+  getUpdateManager: () => ({
+    onCheckForUpdate: () => undefined,
+    onUpdateReady: () => undefined,
+    onUpdateFailed: () => undefined,
+    applyUpdate: () => undefined,
+  }),
   login: () => record('login', undefined, { code: taroFake.loginCode, errMsg: 'login:ok' }),
   requestPayment(args: unknown) {
     taroFake.calls.push({ api: 'requestPayment', args });
@@ -231,6 +325,8 @@ const Taro = {
   useLoad,
   useLaunch,
   useRouter,
+  useShareAppMessage,
+  useShareTimeline,
 };
 
 export default Taro;

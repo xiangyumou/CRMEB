@@ -16,7 +16,6 @@ export {
   type LaunchContext,
 } from './launch';
 export { onAppVisibility } from './lifecycle';
-export { openPage, replacePage, toast } from './navigation';
 export {
   goBack,
   navigate,
@@ -26,6 +25,7 @@ export {
   takeTabParams,
   toPath,
   usePendingTabParams,
+  useRouteParams,
   type RouteParamsOf,
 } from './nav';
 export { onNetworkReachability } from './network';
@@ -37,9 +37,11 @@ export {
   openPrivacyContract,
   PRIVACY_AGREE_BUTTON_ID,
   PRIVACY_APIS,
+  PRIVACY_PURPOSES,
   usePrivacyPrompt,
   type PrivacyApi,
 } from './privacy';
+export { PrivacyAgreeButton } from './privacy-button';
 export { platform } from './runtime';
 export {
   setShareDefaults,
@@ -56,7 +58,7 @@ export {
   subscribe,
   type SubscribeScene,
 } from './subscribe';
-export { applyCartBadge, applyTabBarTheme, type TabBarTheme } from './tab-bar';
+export { applyCartBadge, applyTabBarLook, type TabBarLook } from './tab-bar';
 export { TAB_PAGES, tabIndex, type TabKey } from './tab-pages';
 export { px } from './units';
 export { installUpdateManager } from './update';

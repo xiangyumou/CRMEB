@@ -6,7 +6,7 @@
 // stylesheet once, not in every `setData`.
 
 $stroke: "fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'";
-$solid: "fill='black'";
+$solid: "fill='black' fill-rule='evenodd'";
 
 @function svg($d, $attrs) {
   @return url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' #{$attrs}%3E%3Cpath d='#{$d}'/%3E%3C/svg%3E");
@@ -75,6 +75,8 @@ $line: (
 );
 
 $fill: (
+  'close-circle':
+    'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM8.4 7 12 10.6 15.6 7 17 8.4 13.4 12 17 15.6 15.6 17 12 13.4 8.4 17 7 15.6 10.6 12 7 8.4z',
   'heart-fill':
     'M12 20.8s-8-4.8-9.7-10C1.1 7 3.4 3.7 7.1 3.7c2.1 0 3.8 1.2 4.9 2.9 1.1-1.7 2.8-2.9 4.9-2.9 3.7 0 6 3.3 4.8 7.1-1.7 5.2-9.7 10-9.7 10z',
   'star-fill': 'M12 2.8l2.9 5.8 6.4 1-4.6 4.5 1.1 6.4L12 17.5l-5.8 3 1.1-6.4-4.6-4.5 6.4-1z',

@@ -2,21 +2,32 @@ import Taro from '@tarojs/taro';
 import { create } from 'zustand';
 
 /**
- * Privacy authorisation (C04). The single source of truth for which private APIs the shop
- * calls; the privacy guide on the WeChat platform must declare exactly these, and the guard
- * checks that no other file calls them.
+ * Privacy authorisation (C04). The single source of truth for which private-info APIs the shop
+ * calls: the privacy guide on the WeChat platform must declare exactly these, and `pnpm guards`
+ * ([privacy]) checks that every one the platform calls is listed here.
  */
 export const PRIVACY_APIS = [
-  { api: 'chooseAvatar', item: '收集你的昵称、头像', purpose: '设置个人资料' },
-  { api: 'getPhoneNumber', item: '收集你的手机号', purpose: '登录和绑定手机号' },
-  { api: 'chooseAddress', item: '收集你的通讯地址', purpose: '快速填写收货地址' },
-  { api: 'chooseInvoiceTitle', item: '收集你的发票信息', purpose: '快速填写发票抬头' },
-  { api: 'chooseMedia', item: '收集你选中的照片或视频信息', purpose: '上传图片' },
-  { api: 'saveImageToPhotosAlbum', item: '使用你的相册（仅写入）权限', purpose: '保存海报' },
-  { api: 'setClipboardData', item: '使用你的剪切板', purpose: '复制内容' },
+  'chooseAvatar',
+  'getPhoneNumber',
+  'chooseAddress',
+  'chooseInvoiceTitle',
+  'chooseMedia',
+  'saveImageToPhotosAlbum',
+  'setClipboardData',
 ] as const;
 
-export type PrivacyApi = (typeof PRIVACY_APIS)[number]['api'];
+export type PrivacyApi = (typeof PRIVACY_APIS)[number];
+
+/** What each API collects and why, as the privacy guide words it (and the sheet repeats). */
+export const PRIVACY_PURPOSES: Readonly<Record<PrivacyApi, { item: string; purpose: string }>> = {
+  chooseAvatar: { item: '收集你的昵称、头像', purpose: '设置个人资料' },
+  getPhoneNumber: { item: '收集你的手机号', purpose: '登录和绑定手机号' },
+  chooseAddress: { item: '收集你的通讯地址', purpose: '快速填写收货地址' },
+  chooseInvoiceTitle: { item: '收集你的发票信息', purpose: '快速填写发票抬头' },
+  chooseMedia: { item: '收集你选中的照片或视频信息', purpose: '上传图片' },
+  saveImageToPhotosAlbum: { item: '使用你的相册（仅写入）权限', purpose: '保存海报' },
+  setClipboardData: { item: '使用你的剪切板', purpose: '复制内容' },
+};
 
 /** The agree button's id: `resolve({ event: 'agree', buttonId })` must name the tapped button. */
 export const PRIVACY_AGREE_BUTTON_ID = 'privacy-agree';
@@ -40,8 +51,8 @@ let pending: Resolve[] = [];
 let installed = false;
 
 function purposeOf(referrer: string | undefined): string | null {
-  const entry = PRIVACY_APIS.find((p) => referrer?.includes(p.api));
-  return entry ? entry.purpose : null;
+  const api = PRIVACY_APIS.find((name) => referrer?.includes(name));
+  return api ? PRIVACY_PURPOSES[api].purpose : null;
 }
 
 /**

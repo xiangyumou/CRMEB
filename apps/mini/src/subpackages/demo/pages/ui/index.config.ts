@@ -1,1 +1,1 @@
-export default definePageConfig({ navigationBarTitleText: '组件示例' });
+export default definePageConfig({ navigationBarTitleText: '组件示例', enablePageMeta: true });

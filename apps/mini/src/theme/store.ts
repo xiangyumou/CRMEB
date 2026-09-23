@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { AppAppearance } from '@shop/contracts/system/app.schemas';
+import type { TabBarLook } from '@/platform';
 import { DEFAULT_PRIMARY, deriveTheme, themeStyle, type DerivedTheme } from './derive';
 
 /**
@@ -10,17 +11,7 @@ import { DEFAULT_PRIMARY, deriveTheme, themeStyle, type DerivedTheme } from './d
  * design defaults, which equal `app.scss`, so a page rendered before the config arrives looks
  * the same as one without a theme.
  */
-export interface TabBarLook {
-  color: string;
-  selectedColor: string;
-  backgroundColor: string;
-  items: ReadonlyArray<{
-    key: 'home' | 'category' | 'cart' | 'me';
-    label: string;
-    iconUrl: string | null;
-    selectedIconUrl: string | null;
-  }>;
-}
+export type { TabBarLook };
 
 interface ThemeState {
   theme: DerivedTheme;

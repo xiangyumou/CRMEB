@@ -21,8 +21,8 @@ export interface ModalOptions {
   content: string;
   confirmText?: string | undefined;
   cancelText?: string | undefined;
-  /** `#RRGGBB`: WeChat takes nothing else. */
-  confirmColor?: string | undefined;
+  /** A destructive step: the confirm button in the danger colour. */
+  danger?: boolean | undefined;
   showCancel?: boolean | undefined;
 }
 
@@ -36,7 +36,8 @@ export async function showModal(options: ModalOptions): Promise<boolean> {
       cancelText: options.cancelText ?? '取消',
       showCancel: options.showCancel ?? true,
       cancelColor: '#666666',
-      ...(options.confirmColor ? { confirmColor: options.confirmColor } : {}),
+      // `#RRGGBB` only (WeChat): the literal twins of --color-text-secondary / --color-danger.
+      ...(options.danger ? { confirmColor: '#D32F2F' } : {}),
     });
     return result.confirm;
   } catch {

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { isApiError, type ResponseOf } from '@shop/api-client';
 import type { StorefrontRoute } from '@shop/api-client/routes';
 import { api, installAuth } from '@/data/api';
-import { navigate, platform, storage } from '@/platform';
+import { navigate, platform, showToast, storage, useLaunchContext } from '@/platform';
 
 /**
  * The shopper's session (docs/mini/auth.md): silent WeChat sign-in at launch, the phone-number
@@ -221,6 +221,11 @@ async function afterBindFailure(error: unknown, bindToken: string): Promise<void
  * `false`: the caller stops there.
  */
 export async function requireLogin(redirect?: StorefrontRoute): Promise<boolean> {
+  if (useLaunchContext.getState().isTimelineSinglePage) {
+    // 朋友圈单页 (C10): no login there; WeChat's bottom bar offers 「前往小程序」.
+    showToast('请前往小程序使用完整服务');
+    return false;
+  }
   const before = current().status;
   if (before !== 'signed-in' && before !== 'phone-required') await startSession();
   if (current().status === 'signed-in') return true;

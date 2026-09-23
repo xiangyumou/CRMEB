@@ -1,9 +1,8 @@
-import { Button as TaroButton, Text, View } from '@tarojs/components';
+import { Text, View } from '@tarojs/components';
 import {
-  agreePrivacy,
   disagreePrivacy,
   openPrivacyContract,
-  PRIVACY_AGREE_BUTTON_ID,
+  PrivacyAgreeButton,
   usePrivacyPrompt,
 } from '@/platform';
 import { Button, buttonClassName } from './button';
@@ -30,15 +29,9 @@ export function PrivacySheet() {
           <Button variant="outline" size="lg" onClick={disagreePrivacy}>
             拒绝
           </Button>
-          <TaroButton
-            id={PRIVACY_AGREE_BUTTON_ID}
-            className={buttonClassName({ variant: 'primary', size: 'lg' })}
-            hoverClass="shop-btn--pressed"
-            openType="agreePrivacyAuthorization"
-            onAgreePrivacyAuthorization={agreePrivacy}
-          >
+          <PrivacyAgreeButton className={buttonClassName({ variant: 'primary', size: 'lg' })}>
             同意
-          </TaroButton>
+          </PrivacyAgreeButton>
         </View>
       }
     >
