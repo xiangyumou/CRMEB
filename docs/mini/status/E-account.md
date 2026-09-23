@@ -24,13 +24,17 @@ Updated at every commit so the work can resume after an interruption.
 - 消息中心 (a `data.route` opens that page and marks read; else 消息详情; 全部已读; 删除) and
   消息详情 (marks read once shown; 查看详情 when routed; 删除). Tests.
 
+- 发票 (tabs 发票抬头 / 开票记录; 设为默认, 删除, cap of 20), 新增 / 编辑发票抬头 (从微信导入,
+  企业 / 个人, 专票 fields, C09 name error), 发票详情 (撤回, 重新申请, 未通过的原因), 申请开票
+  (default title first, 新增抬头 comes back picked, remark; `invoiceRequestFromTitle` copied
+  locally). Tests.
+
 ## In progress
 
-- 发票: 抬头 list / edit (微信导入), 开票记录 / 详情, 申请开票.
+- 注销账号; 协议 page (`pages/agreement`).
 
 ## Next
 
-3. 注销账号; 协议 page (`pages/agreement`).
 4. content: 资讯列表 / 详情, web-view (C12).
 5. 我的 tab: user-centre decor through a local renderer until B's `DecorPage` lands.
 6. e2e specs in `e2e/storefront/specs-mini`; `docs/mini/pages.md`; screenshots in
