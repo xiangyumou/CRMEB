@@ -42,9 +42,18 @@ Merged `storefront/mini` at 299956592 (G1 decor blocks) before touching the deco
    - Fake OA refuses an unknown `env_version` (40097). SHARE-003; C11 updated.
    - (The config field itself landed in the task-1 commit, alongside `webviewDomains`.)
 
+4. Fake "device mode" (device-check.md option B)
+   - `startFakeOaServer({ deviceMode })`, off by default: an unseeded, well-formed code
+     (`DEVICE_CODE`, 16–128 of WeChat's alphabet) redeems to `odev_<hash>` / a `139…` phone;
+     `{ openid, phone }` pins one shopper. Seeded codes win, malformed → 40029, still
+     single-use. Unit tests in `fake-oa-server.test.ts`.
+   - `e2e/storefront/scripts/serve.ts`: `SHOP_E2E_WECHAT_DEVICE=1` (+ optional
+     `…_OPENID` / `…_PHONE`); never set by the suite. device-check.md (backend B, D04, D05) and
+     the e2e README updated.
+
 ## In progress
 
-- Task 4: fake "device mode".
+- Task 5: docs/mini cleanup.
 
 ## Client follow-ups (stream A)
 

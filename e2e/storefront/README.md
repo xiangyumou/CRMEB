@@ -47,14 +47,15 @@ pnpm --filter @shop/e2e-storefront test
 
 端口和交接文件按检出派生，且默认不复用已在跑的栈，规则和 `@shop/e2e-admin` 一致（见 `src/stack-file.ts`）。否则第二个 worktree 的 Playwright 发现端口上已经有服务就会直接复用，用**别人的 H5 包、构建和数据库**跑自己的 spec，测出来是红是绿都和自己的代码无关。
 
-| 变量                        | 默认                                             | 说明                                                                                                                    |
-| --------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| `SHOP_E2E_PORT`             | `BASE = 25000 + (CHECKOUT_ID % 2000) × 3`        | edge 端口，也就是浏览器打开的端口。`CHECKOUT_ID` 取检出根目录绝对路径 SHA-256 的前 8 位十六进制，每个检出固定且互不相同 |
-| `SHOP_E2E_WEB_PORT`         | `BASE + 1`                                       | `next start` 的端口                                                                                                     |
-| `SHOP_E2E_GATEWAY_PORT`     | `BASE + 2`                                       | 假微信支付网关的端口                                                                                                    |
-| `SHOP_E2E_STOREFRONT_STACK` | `$TMPDIR/shop-e2e-storefront-<CHECKOUT_ID>.json` | 交接文件，同样按检出区分                                                                                                |
-| `SHOP_E2E_CLIENT`           | `uniapp`                                         | `uniapp` 或 `mini`，见上节                                                                                              |
-| `SHOP_E2E_REUSE`            | 不设置时不复用                                   | 只有设为 `=1` 才复用端口上已经在跑的栈。不设置时，端口被占用会直接报错，不会悄悄接管                                    |
+| 变量                        | 默认                                             | 说明                                                                                                                         |
+| --------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `SHOP_E2E_PORT`             | `BASE = 25000 + (CHECKOUT_ID % 2000) × 3`        | edge 端口，也就是浏览器打开的端口。`CHECKOUT_ID` 取检出根目录绝对路径 SHA-256 的前 8 位十六进制，每个检出固定且互不相同      |
+| `SHOP_E2E_WEB_PORT`         | `BASE + 1`                                       | `next start` 的端口                                                                                                          |
+| `SHOP_E2E_GATEWAY_PORT`     | `BASE + 2`                                       | 假微信支付网关的端口                                                                                                         |
+| `SHOP_E2E_STOREFRONT_STACK` | `$TMPDIR/shop-e2e-storefront-<CHECKOUT_ID>.json` | 交接文件，同样按检出区分                                                                                                     |
+| `SHOP_E2E_CLIENT`           | `uniapp`                                         | `uniapp` 或 `mini`，见上节                                                                                                   |
+| `SHOP_E2E_REUSE`            | 不设置时不复用                                   | 只有设为 `=1` 才复用端口上已经在跑的栈。不设置时，端口被占用会直接报错，不会悄悄接管                                         |
+| `SHOP_E2E_WECHAT_DEVICE`    | 不设置时关闭                                     | 只给真机检查用（`docs/mini/device-check.md` 后端 B）：`=1` 时假 `api.weixin.qq.com` 接受真机的 `wx.login` code；套件从不设置 |
 
 端口段是 25000–30999，每个检出占连续三个端口：
 
