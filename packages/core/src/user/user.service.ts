@@ -10,6 +10,7 @@ import type {
 import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
+import { isStoredImageUrl } from '../storage';
 import { storefrontAuthConfig } from './storefront-auth.config';
 import { pageBounds, shouldForceDefault } from './user.rules';
 import * as repo from './user.repo';
@@ -38,11 +39,19 @@ export async function getProfile(ctx: Ctx): Promise<UserProfile> {
 
 export async function updateProfile(ctx: Ctx, body: UserProfileForm): Promise<UserProfile> {
   const userId = requireUserId(ctx);
+  const nickname = body.nickname === undefined ? undefined : body.nickname.trim();
+  if (nickname === '') {
+    throw new DomainError('VALIDATION_FAILED', {
+      details: [{ field: 'body.nickname', message: '昵称不能为空' }],
+    });
+  }
+  const avatarUrl =
+    body.avatarUrl === undefined ? undefined : await acceptedAvatar(ctx, userId, body.avatarUrl);
   await ctx.withTx(async (tx) => {
     const result = await repo.updateProfile(tx, {
       id: userId,
-      ...(body.nickname === undefined ? {} : { nickname: body.nickname }),
-      ...(body.avatarUrl === undefined ? {} : { avatarUrl: body.avatarUrl }),
+      ...(nickname === undefined ? {} : { nickname }),
+      ...(avatarUrl === undefined ? {} : { avatarUrl }),
       ...(body.realName === undefined ? {} : { realName: body.realName }),
       // `nullish` in the form: `null` clears the birthday, absent leaves it.
       ...(body.birthday === undefined
@@ -53,6 +62,33 @@ export async function updateProfile(ctx: Ctx, body: UserProfileForm): Promise<Us
     if (!result.won) throw new DomainError('USER_NOT_FOUND');
   });
   return getProfile(ctx);
+}
+
+/**
+ * The avatar to store, or `USER_AVATAR_NOT_ALLOWED` (USER-019).
+ *
+ * An avatar is shown next to every review and in the admin console, so it has
+ * to be a picture we hold, not a link to somebody else's server — which could
+ * change what it shows after the fact, or log who looked. Three things pass:
+ *
+ * 1. the current value — the legacy client re-sends the avatar on every save,
+ *    and an account that came in through the 公众号 carries WeChat's URL;
+ * 2. the shop's configured default avatar;
+ * 3. a live image in our storage (what `POST /uploads` returned).
+ *
+ * `''` clears the avatar.
+ */
+async function acceptedAvatar(ctx: Ctx, userId: number, url: string): Promise<string | null> {
+  const wanted = url.trim();
+  if (wanted === '') return null;
+  const current = await repo.findById(ctx.db, userId);
+  if (!current || current.deletedAt !== null) throw new DomainError('USER_NOT_FOUND');
+  if (current.avatarUrl !== null && wanted === current.avatarUrl) return wanted;
+  const config = await ctx.config.get(storefrontAuthConfig);
+  const fallback = config.defaultAvatar.trim();
+  if (fallback !== '' && wanted === fallback) return wanted;
+  if (await isStoredImageUrl(ctx, wanted)) return wanted;
+  throw new DomainError('USER_AVATAR_NOT_ALLOWED');
 }
 
 /**

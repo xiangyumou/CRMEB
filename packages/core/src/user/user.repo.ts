@@ -273,7 +273,7 @@ export async function updateProfile(
   args: {
     id: number;
     nickname?: string | undefined;
-    avatarUrl?: string | undefined;
+    avatarUrl?: string | null | undefined;
     realName?: string | undefined;
     birthday?: Date | null | undefined;
     adminRemark?: string | undefined;

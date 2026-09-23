@@ -1,5 +1,6 @@
 import type { AdminUserForm, UserAddressForm } from '@shop/contracts/user/schemas';
 import { admins } from '@shop/db/schema/auth';
+import { attachments } from '@shop/db/schema/storage';
 import { users } from '@shop/db/schema/user';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { eq } from 'drizzle-orm';
@@ -215,6 +216,87 @@ describe('profile', () => {
     await expect(service.getProfile(asUser(user.id))).rejects.toMatchObject({
       code: 'USER_NOT_FOUND',
     });
+  });
+});
+
+describe('USER-019 — the avatar comes from our own storage', () => {
+  const STORED = '/uploads/avatar/2026/06/01/0f1e2d3c.png';
+
+  async function storeAttachment(
+    url: string,
+    overrides: Partial<typeof attachments.$inferInsert> = {},
+  ): Promise<void> {
+    await harness.ctx.db.insert(attachments).values({
+      storageKey: url.replace(/^\/uploads\//, ''),
+      driver: 'local',
+      url,
+      name: 'avatar.png',
+      kind: 'image',
+      mime: 'image/png',
+      size: 26,
+      sha256: 'a'.repeat(64),
+      ...overrides,
+    });
+  }
+
+  it('takes an image our uploads stored, whoever uploaded the bytes first', async () => {
+    const user = await makeUser();
+    await storeAttachment(STORED);
+    const profile = await service.updateProfile(asUser(user.id), { avatarUrl: STORED });
+    expect(profile.avatarUrl).toBe(STORED);
+  });
+
+  it('refuses a URL on somebody else’s server, and changes nothing', async () => {
+    const user = await makeUser();
+    await expect(
+      service.updateProfile(asUser(user.id), {
+        nickname: '新名字',
+        avatarUrl: 'https://evil.example/pixel.png',
+      }),
+    ).rejects.toMatchObject({ code: 'USER_AVATAR_NOT_ALLOWED' });
+    const profile = await service.getProfile(asUser(user.id));
+    expect(profile).toMatchObject({ nickname: user.nickname, avatarUrl: null });
+  });
+
+  it('refuses a deleted attachment and one that is not an image', async () => {
+    const user = await makeUser();
+    await storeAttachment('/uploads/avatar/gone.png', { deletedAt: harness.clock.now() });
+    await storeAttachment('/uploads/file/report.pdf', { kind: 'file', mime: 'application/pdf' });
+    for (const avatarUrl of ['/uploads/avatar/gone.png', '/uploads/file/report.pdf']) {
+      await expect(service.updateProfile(asUser(user.id), { avatarUrl })).rejects.toMatchObject({
+        code: 'USER_AVATAR_NOT_ALLOWED',
+      });
+    }
+  });
+
+  it('takes the current avatar back unchanged, as every legacy save re-sends it', async () => {
+    const wechatAvatar = 'https://thirdwx.qlogo.cn/mmopen/abc/132';
+    const user = await makeUser({ avatarUrl: wechatAvatar });
+    const profile = await service.updateProfile(asUser(user.id), {
+      nickname: '小明',
+      avatarUrl: wechatAvatar,
+    });
+    expect(profile).toMatchObject({ nickname: '小明', avatarUrl: wechatAvatar });
+  });
+
+  it('takes the shop’s default avatar, and clears on an empty string', async () => {
+    const fallback = 'https://cdn.example.com/default-avatar.png';
+    await harness.ctx.config.set(storefrontAuthConfig, { defaultAvatar: fallback });
+    const user = await makeUser();
+    expect((await service.updateProfile(asUser(user.id), { avatarUrl: fallback })).avatarUrl).toBe(
+      fallback,
+    );
+    expect((await service.updateProfile(asUser(user.id), { avatarUrl: '' })).avatarUrl).toBeNull();
+  });
+
+  it('trims the nickname and refuses one that is only whitespace', async () => {
+    const user = await makeUser();
+    expect((await service.updateProfile(asUser(user.id), { nickname: ' 小明 ' })).nickname).toBe(
+      '小明',
+    );
+    await expect(service.updateProfile(asUser(user.id), { nickname: '   ' })).rejects.toMatchObject(
+      { code: 'VALIDATION_FAILED' },
+    );
   });
 });
 

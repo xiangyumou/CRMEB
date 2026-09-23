@@ -395,7 +395,10 @@ describe('the group-buy price through the real checkout', () => {
     return { userId, ctx: asUser(userId) };
   }
 
-  const buyNow = (fixture: ActivityFixture, kindMeta?: { activityId: string; groupId?: string }) => ({
+  const buyNow = (
+    fixture: ActivityFixture,
+    kindMeta?: { activityId: string; groupId?: string },
+  ) => ({
     source: 'buy-now' as const,
     cartItemIds: [],
     item: { skuId: String(fixture.skuId), quantity: 1 },

@@ -92,9 +92,16 @@ export type UserProfile = z.infer<typeof userProfile>;
  * What a shopper may change about themselves.
  *
  * Not the phone (that is `POST /api/v1/auth/phone`, which needs an SMS code)
- * and not the account name (it is the login identity). `avatarUrl` is a URL
- * returned by `POST /api/v1/uploads?purpose=avatar`, so the only way to set an
- * avatar is to have uploaded one through the storage domain.
+ * and not the account name (it is the login identity).
+ *
+ * `avatarUrl` must be one of: the URL `POST /api/v1/uploads?purpose=avatar`
+ * returned (any live image in our storage), the account's current avatar
+ * (clients re-send it on every save), or the shop's configured default avatar.
+ * Anything else is `USER_AVATAR_NOT_ALLOWED` (USER-019). `''` clears it. In
+ * the mini-program, `<button open-type="chooseAvatar">` gives a temporary file:
+ * upload it first, then save the returned URL.
+ *
+ * `nickname` is trimmed; one that is only whitespace is refused.
  */
 export const userProfileForm = z.object({
   nickname: z.string().min(1).max(64).optional(),

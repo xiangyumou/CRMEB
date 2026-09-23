@@ -265,6 +265,45 @@ describe('/api/v1/profile', () => {
     const bad = await PUT(json('PUT', '/api/v1/profile', { nickname: '' }, headers));
     expect(bad.status).toBe(422);
   });
+
+  it('USER-019 — takes the avatar our upload returned and refuses one on another server', async () => {
+    const { PUT } = await import('./profile/route');
+    const { POST: upload } = await import('./uploads/route');
+    const { headers } = await shopper();
+
+    // What the mini-program does with `chooseAvatar`'s temporary file.
+    const form = new FormData();
+    const bytes = new Uint8Array(26);
+    bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+    new DataView(bytes.buffer).setUint32(16, 1, false);
+    new DataView(bytes.buffer).setUint32(20, 1, false);
+    form.append('file', new File([bytes as BlobPart], 'avatar.png', { type: 'image/png' }));
+    const uploaded = await upload(
+      new Request(`${ORIGIN}/api/v1/uploads?purpose=avatar`, {
+        method: 'POST',
+        body: form,
+        headers: { 'sec-fetch-site': 'same-origin', ...headers },
+      }),
+    );
+    expect(uploaded.status).toBe(201);
+    const { url } = await uploaded.json();
+
+    const ok = await PUT(json('PUT', '/api/v1/profile', { avatarUrl: url }, headers));
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toMatchObject({ avatarUrl: url });
+
+    const foreign = await PUT(
+      json('PUT', '/api/v1/profile', { avatarUrl: 'https://evil.example/pixel.png' }, headers),
+    );
+    expect(foreign.status).toBe(422);
+    expect(await foreign.json()).toMatchObject({ code: 'USER_AVATAR_NOT_ALLOWED' });
+
+    // Re-sending the current avatar, as every legacy save does, still passes.
+    const again = await PUT(
+      json('PUT', '/api/v1/profile', { nickname: '小红', avatarUrl: url }, headers),
+    );
+    expect(again.status).toBe(200);
+  });
 });
 
 describe('/api/v1/invoice-titles', () => {

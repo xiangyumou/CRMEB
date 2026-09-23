@@ -15,6 +15,11 @@ export const userErrors = defineErrors({
   USER_NOT_FOUND: { status: 404, message: '用户不存在' },
   /** Account disabled by an operator. Also raised when a live session's user is disabled. */
   USER_DISABLED: { status: 403, message: '账号已被禁用，请联系客服' },
+  /**
+   * `PUT /profile` with an `avatarUrl` that is not the current avatar, not the
+   * shop's default avatar and not an image `POST /uploads` stored (USER-019).
+   */
+  USER_AVATAR_NOT_ALLOWED: { status: 422, message: '请上传头像图片后再保存' },
 
   /** Unknown id, somebody else's row, or already deleted. One code for all three. */
   USER_ADDRESS_NOT_FOUND: { status: 404, message: '收货地址不存在' },

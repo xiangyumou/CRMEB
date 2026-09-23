@@ -1059,6 +1059,16 @@ A 发票抬头 belongs to the customer who saved it: reading, editing, deleting 
 - `packages/core/src/user/invoice-title.int.test.ts::invoice titles > USER-018 — never reads, edits, deletes or promotes another customer’s title`
 - `apps/web/app/api/v1/user.int.test.ts::/api/v1/invoice-titles > USER-018 — keeps every title route to its owner: a stranger gets 404 on all four`
 
+### USER-019
+
+A shopper's avatar is a picture we hold: `PUT /profile` takes an `avatarUrl` only when it is a live image in our storage, the account's current avatar re-sent, or the shop's configured default avatar (`''` clears it); anything else is `USER_AVATAR_NOT_ALLOWED` and nothing in the request is saved.
+
+- `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > takes an image our uploads stored, whoever uploaded the bytes first`
+- `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > refuses a URL on somebody else’s server, and changes nothing`
+- `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > refuses a deleted attachment and one that is not an image`
+- `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > takes the current avatar back unchanged, as every legacy save re-sends it`
+- `apps/web/app/api/v1/user.int.test.ts::/api/v1/profile > USER-019 — takes the avatar our upload returned and refuses one on another server`
+
 ## Coupons
 
 ### COUPON-001
@@ -1692,11 +1702,13 @@ Identical bytes are stored once: the second upload returns the existing row.
 
 ### STOR-010
 
-The storefront upload needs a shopper session, takes images only, enforces a per-user hourly budget and answers with the file rather than the library row.
+The storefront upload needs a shopper session, takes images only (never an SVG, whatever it is named), refuses a file over the shopper size ceiling, enforces a per-user hourly budget and answers with the file rather than the library row.
 
 - `apps/web/app/admin-api/attachments/storage.int.test.ts::/api/v1/uploads > requires a shopper session`
 - `packages/core/src/storage/storage.int.test.ts::storefront upload > enforces the per-user hourly budget`
 - `packages/core/src/storage/storage.int.test.ts::storefront upload > accepts an image and answers with the file, not the library`
+- `packages/core/src/storage/storage.int.test.ts::storefront upload > refuses an SVG from a shopper whatever it is called`
+- `packages/core/src/storage/storage.int.test.ts::storefront upload > refuses an image over the shopper ceiling, and stores nothing`
 
 ### STOR-011
 
