@@ -2099,6 +2099,7 @@ At most one document is the 首页 and at most one the 个人中心 (partial uni
 - `packages/core/src/decor/decor.int.test.ts::designations — DECOR-008 > DECOR-008: designating another document moves the designation; null clears it`
 - `packages/core/src/decor/decor.int.test.ts::designations — DECOR-008 > DECOR-008: the database allows one document per designation`
 - `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent designations — DECOR-008 > DECOR-008: N documents designated as 首页 at once leave exactly one designated`
+- `e2e/admin/specs/decor.spec.ts::DECOR-008: designating a published page as 首页 serves it as the home page`
 
 ### DECOR-009
 
@@ -2122,6 +2123,7 @@ A rollback republishes an old revision's content as a new revision (`restoredFro
 - `packages/core/src/decor/decor.int.test.ts::rollback — DECOR-011 > DECOR-011: rollback republishes old content as a new revision and leaves the draft alone`
 - `packages/core/src/decor/decor.int.test.ts::rollback — DECOR-011 > DECOR-011: rolling back to a revision that does not exist writes nothing`
 - `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent rollbacks — DECOR-011 > DECOR-011: N rollbacks at once each append a revision, numbered without gaps or duplicates`
+- `e2e/admin/specs/decor.spec.ts::DECOR-011 DECOR-014: create, save, publish, publish again and roll back — the storefront follows each step`
 
 ### DECOR-012
 
@@ -2131,6 +2133,7 @@ A preview token opens the current draft of the one document it was issued for, a
 - `packages/core/src/decor/decor.int.test.ts::preview tokens — DECOR-012 > DECOR-012: a token does not open another document, and a made-up token opens nothing`
 - `packages/core/src/decor/decor.int.test.ts::preview tokens — DECOR-012 > DECOR-012: the token expires with Redis and is stored only as a hash`
 - `apps/web/app/api/v1/pages/pages.int.test.ts::GET /api/v1/pages/:id > with a preview token serves the draft of that document only`
+- `e2e/admin/specs/decor.spec.ts::DECOR-012: the preview frames the saved draft through a preview token`
 
 ### DECOR-013
 
@@ -2150,6 +2153,7 @@ The public part of a page is cached per revision (`decor:page:rev:<id>`, `DECOR_
 - `packages/core/src/decor/decor.int.test.ts::page cache — DECOR-014 > DECOR-014: a rollback also moves the page off the cached revision`
 - `packages/core/src/decor/decor.int.test.ts::page cache — DECOR-014 > DECOR-014: no home designated is DECOR_HOME_NOT_SET`
 - `apps/web/app/api/v1/pages/pages.int.test.ts::GET /api/v1/pages/home > answers 304 to a matching If-None-Match, and a publish changes the ETag`
+- `e2e/admin/specs/decor.spec.ts::DECOR-011 DECOR-014: create, save, publish, publish again and roll back — the storefront follows each step`
 
 ### DECOR-015
 

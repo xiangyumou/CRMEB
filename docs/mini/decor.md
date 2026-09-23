@@ -2,19 +2,20 @@
 
 计划第 2.1 节的后端部分，由 F1 流完成。v2 以 strangler 方式替代旧的 `diy` 域：旧域、旧接口、旧后台编辑器和 `apps/uni-app` 都保持不动，继续服务 uni-app；新小程序只读 v2。旧装修数据不迁移（pages.md 第 6 节）。
 
-编辑器 UI（Puck）属于 F2 流，块组件属于 G 流，模板种子数据不在本期范围内。
+编辑器 UI（Puck）属于 F2 流（第 9 节），块组件属于 G 流。
 
 ## 1. 代码位置
 
-| 层       | 位置                                                           | 内容                                                                  |
-| -------- | -------------------------------------------------------------- | --------------------------------------------------------------------- |
-| 契约     | `packages/contracts/src/decor/`                                | 文档模型、块注册表、`LinkTarget`、数据源、校验、错误码、路由契约      |
-| 数据库   | `packages/db/src/schema/decor.ts`、`migrations/0004_decor.sql` | `decor_documents`、`decor_revisions`                                  |
-| 领域     | `packages/core/src/decor/`                                     | 文档服务、发布与回滚、指定页面、预览令牌、页面解析器                  |
-| 后台接口 | `apps/web/app/admin-api/decor/**`                              | 14 个路由，权限 `decor:page:read / write / publish`                   |
-| 商城接口 | `apps/web/app/api/v1/pages/**`                                 | `home`、`user-center`、`:id`                                          |
-| 渲染     | `packages/storefront-blocks`                                   | 只从契约导入类型和无 zod 的常量；`src/schema/index.ts` 是对契约的转发 |
-| 规则     | `docs/invariants.md` 的 DECOR-001 … DECOR-017                  | 每条规则都列出证明它的测试                                            |
+| 层       | 位置                                                               | 内容                                                                  |
+| -------- | ------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| 契约     | `packages/contracts/src/decor/`                                    | 文档模型、块注册表、`LinkTarget`、数据源、校验、错误码、路由契约      |
+| 数据库   | `packages/db/src/schema/decor.ts`、`migrations/0004_decor.sql`     | `decor_documents`、`decor_revisions`                                  |
+| 领域     | `packages/core/src/decor/`                                         | 文档服务、发布与回滚、指定页面、预览令牌、页面解析器                  |
+| 后台接口 | `apps/web/app/admin-api/decor/**`                                  | 14 个路由，权限 `decor:page:read / write / publish`                   |
+| 商城接口 | `apps/web/app/api/v1/pages/**`                                     | `home`、`user-center`、`:id`                                          |
+| 后台页面 | `apps/web/app/admin/(shell)/decor/**`、`apps/web/src/admin/decor/` | 店铺装修（新版）：页面列表、编辑器、发布记录、预览、模板（第 9 节）   |
+| 渲染     | `packages/storefront-blocks`                                       | 只从契约导入类型和无 zod 的常量；`src/schema/index.ts` 是对契约的转发 |
+| 规则     | `docs/invariants.md` 的 DECOR-001 … DECOR-017                      | 每条规则都列出证明它的测试                                            |
 
 **不含 zod 的模块**（小程序可以在运行时导入）：`constants.ts`、`link-route.ts`、`defaults.ts`、`meta.ts`、`rich-text.ts`。其余模块只能 `import type`。`decor.test.ts` 的「zod-free runtime modules」测试会检查这一点。
 
@@ -180,9 +181,27 @@ pages.md 第 5 节里写的是建议的 id `diy.page*`，实际的 id 是 `decor
 4. 在 G 流的 `packages/storefront-blocks` 里加组件，并登记到 `BLOCK_COMPONENTS`（它是覆盖全部类型的 `Record`，缺组件时编译不过）。组件只接收 props / data / personal，通过 `onLink`、`onIntent` 报告点击，不调用 Taro API，不请求数据；颜色用 design.md 的 CSS 变量（`shared/_tokens.scss`）。
 5. 需要新的编辑控件时，在 `meta.ts` 的 `EditorFieldKind` 加一种，并在 `apps/web/src/admin/decor/` 的 `SEMANTIC_KINDS` 和 `DECOR_CUSTOM_FIELDS` 里登记。
 
-## 9. 待定事项
+## 9. 后台编辑器（F2）
+
+菜单「店铺装修（新版）」（`decor.menu.ts`），与旧的 DIY 菜单并存。所有页面和按钮都按 `decor:page:read / write / publish` 控制，只有读权限时编辑器是只读的。
+
+- **页面列表** `/admin/decor`：按类型筛选；「当前首页」「当前个人中心」卡片；每行显示线上版本和是否有未发布的修改；重命名、复制、删除（正在使用的页面不能删）；「设为首页 / 设为个人中心」要先确认，只对已发布且类型匹配的页面开放，确认框里写明会替换掉哪个页面。
+- **新建页面**：选择类型、填写名称，可以从模板开始。模板是 `src/admin/decor/templates/` 里的代码，作为创建请求的 `document` 发出，数据库里不预置任何页面，所以不存在重复种子的问题。
+- **编辑器** `/admin/decor/:id`：占满整个窗口的 Puck 画布，没有自动保存。
+  - 「保存草稿」带上加载时拿到的 `draftVersion`（DECOR-010）。遇到冲突时可以选择「载入对方的版本」或「用我的覆盖」。
+  - 「发布」可以填写发布说明；有未保存的修改时先保存再发布。
+  - 服务端返回的 issues 和 warnings 显示在工具栏下方，点「定位」会选中出问题的块。
+  - 有未保存的修改时，返回列表会要求确认，关闭窗口会触发 `beforeunload`。
+- **发布记录**：查看某个版本（只读画布，可以载入到编辑器），回滚（要先确认，会生成新版本，草稿不变，DECOR-011）。
+- **预览**：先保存草稿，再申请预览令牌（DECOR-012）。
+  - 设置了环境变量 `DECOR_PREVIEW_URL`（可选，支持 `{id}`、`{previewToken}`、`{kind}` 占位符，值会做 URL 编码）时，在 iframe 里打开 Taro H5 的页面。
+  - 没有设置时（生产环境）提示「请在小程序体验版中预览」，并给出可复制的路径 `packages/page/index?id=…&previewToken=…`。
+  - e2e 栈把 `DECOR_PREVIEW_URL` 指向商城接口自己的读取结果。
+- **控件**：由契约的 `.meta()` 推断，包括图片、颜色、间距档位、单选（选项不超过 4 个时用 Segmented，否则用 Select）、多选（`visibility.platforms`）、链接（覆盖所有 `LinkTarget` 类型）、富文本、热区（G1）以及五种数据源。
+- **组件沙盒**：`/admin/dev/decor-spike` 保留为开发用的组件沙盒，只在开发环境可用。
+
+## 10. 待定事项
 
 - `minClient` 目前是按块类型设置的。如果某个 props 版本需要更高的客户端，目前只能改用新的块类型，没有按版本单独设置的办法。
 - 拼团和预售活动的列表接口不支持按 id 过滤，手动模式会从一页 100 条活动里挑选，超出这 100 条的活动会被跳过。
-- `visibility.platforms` 在编辑器里暂时隐藏（`hidden: true`），要等 F2 流提供多选控件后再开放。
 - design.md 第 3.2 节要求把 `diyThemeTokens` 改为有类型的 schema。这项工作要改旧 `diy` 域的配置，不在本期 F1 的范围内，还没有做。

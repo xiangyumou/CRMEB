@@ -1,19 +1,8 @@
 'use client';
 
-import { Alert, Card, Tag, Typography } from 'antd';
-import { useMemo, useState } from 'react';
-
-import {
-  DecorCanvasDataProvider,
-  toPageDocument,
-  toPuckData,
-  type DecorCanvasData,
-  type DecorData,
-} from '@/admin/decor';
-import { DecorEditor } from '@/admin/decor/editor';
-import { DiyDataSourceProvider } from '@/admin/diy/data-source';
-import { AssetSourceProvider } from '@/admin/kit/asset/asset-source-context';
-import { PageContainer } from '@/admin/kit/page-container';
+import { decorBlocks } from '@shop/contracts/decor/all-blocks';
+import { DOCUMENT_KINDS, type DocumentKind } from '@shop/contracts/decor/constants';
+import { checkDocument, pageRootProps, type StoredDocument } from '@shop/contracts/decor/document';
 import {
   fixtureCarousel,
   fixtureHotspotImage,
@@ -31,22 +20,33 @@ import {
   fixtureUserCard,
   resolveFixtureProducts,
 } from '@shop/storefront-blocks/fixtures';
+import { BLOCKS, type BlockType } from '@shop/storefront-blocks/schema';
+import { Alert, Card, Segmented, Tag, Typography } from 'antd';
+import { useMemo, useState } from 'react';
+
 import {
-  BLOCKS,
-  pageRootProps,
-  type BlockType,
-  validatePageDocument,
-  type PageDocument,
-} from '@shop/storefront-blocks/schema';
+  DecorCanvasDataProvider,
+  DecorRecordSourceProvider,
+  toPageDocument,
+  toPuckData,
+  type DecorCanvasData,
+  type DecorData,
+} from '@/admin/decor';
+import { DecorEditor } from '@/admin/decor/editor';
+import { AssetSourceProvider } from '@/admin/kit/asset/asset-source-context';
+import { PageContainer } from '@/admin/kit/page-container';
 import { createDemoAssetSource } from '../kit/demo-asset-source';
-import { createDecorDemoDataSource } from './demo-data-source';
+import { createDecorDemoRecordSource } from './demo-data-source';
 
 /**
- * `/admin/dev/decor-spike` — spike S3: the DIY v2 blocks in Puck.
+ * `/admin/dev/decor-spike` — the decor component sandbox (was spike S3).
  *
- * Opens a fixture page document, lets the operator edit it on a 375 px
- * canvas, and shows beside it the document the editor would save, checked by
- * `validatePageDocument`. Every source is in memory: no route, no upload.
+ * The real editor (`DecorEditor`, every registered block, every inspector
+ * control) over in-memory sources: fixture products for the canvas, fixture
+ * records for the pickers, the demo 素材库. Beside it, the document the editor
+ * would save and what `checkDocument` says of it. No route is called, so a
+ * block or a control can be tried without a shop behind it; the storefront
+ * fidelity script (`packages/storefront-blocks/fidelity`) shoots its canvas.
  */
 
 /** One of every block, each from its fixture, at the version this build writes. */
@@ -67,37 +67,40 @@ const FIXTURE_BLOCKS: [BlockType, string, Record<string, unknown>][] = [
   ['serviceGrid', 'service-grid-1', fixtureServiceGrid],
 ];
 
-const FIXTURE_DOCUMENT: PageDocument = {
+const FIXTURE_DOCUMENT: StoredDocument = {
   schemaVersion: 2,
   root: { props: pageRootProps.parse({ title: '装修试验页' }) },
   blocks: FIXTURE_BLOCKS.map(([type, id, props]) => ({ id, type, v: BLOCKS[type].v, props })),
 };
 
-const canvasData: DecorCanvasData = { products: resolveFixtureProducts };
+const canvasData: DecorCanvasData = {
+  resolve: async (need) => (need.kind === 'products' ? resolveFixtureProducts(need.source) : null),
+};
 const assets = createDemoAssetSource();
-const records = createDecorDemoDataSource();
+const records = createDecorDemoRecordSource();
 
-function DocumentPanel({ data }: { data: DecorData }) {
+function DocumentPanel({ data, kind }: { data: DecorData; kind: DocumentKind }) {
   const result = useMemo(() => {
     try {
       const document = toPageDocument(data);
-      return { document, validation: validatePageDocument(document) };
+      return { document, check: checkDocument(document, { registry: decorBlocks, kind }) };
     } catch (error) {
       return { error: error instanceof Error ? error.message : String(error) };
     }
-  }, [data]);
+  }, [data, kind]);
 
   if ('error' in result) {
     return <Alert type="error" showIcon message="无法转换为页面文档" description={result.error} />;
   }
-  const { document, validation } = result;
+  const { document, check } = result;
+  const issues = check.issues;
   return (
     <>
-      {validation.ok ? (
+      {issues.length === 0 ? (
         <Alert
           type="success"
           showIcon
-          message={`文档有效：${document.blocks.length} 个块`}
+          message={`文档可发布：${document.blocks.length} 个组件`}
           style={{ marginBottom: 12 }}
         />
       ) : (
@@ -105,10 +108,10 @@ function DocumentPanel({ data }: { data: DecorData }) {
           type="error"
           showIcon
           style={{ marginBottom: 12 }}
-          message={`文档无效：${validation.issues.length} 处问题`}
+          message={`文档有 ${issues.length} 处问题`}
           description={
             <ul style={{ margin: 0, paddingLeft: 18 }} data-testid="decor-issues">
-              {validation.issues.map((issue) => (
+              {issues.map((issue) => (
                 <li key={`${issue.path}:${issue.message}`}>
                   <Typography.Text code>{issue.path}</Typography.Text> {issue.message}
                 </li>
@@ -128,23 +131,30 @@ function DocumentPanel({ data }: { data: DecorData }) {
 }
 
 export default function DecorSpike() {
+  const [kind, setKind] = useState<DocumentKind>('custom');
   const [data, setData] = useState<DecorData>(() => toPuckData(FIXTURE_DOCUMENT));
 
   return (
     <AssetSourceProvider source={assets}>
-      <DiyDataSourceProvider source={records}>
+      <DecorRecordSourceProvider source={records}>
         <DecorCanvasDataProvider value={canvasData}>
           <PageContainer
-            title="装修编辑器试验（DIY v2）"
-            subTitle="Puck + 共享块 + 375px 画布；数据全部来自内存"
-            extra={<Tag color="orange">spike S3</Tag>}
+            title="装修组件沙盒"
+            subTitle="真实编辑器 + 共享组件 + 375px 画布；数据全部来自内存"
+            extra={<Tag color="orange">仅开发</Tag>}
           >
             <Alert
-              type="warning"
+              type="info"
               showIcon
               style={{ marginBottom: 16 }}
-              message="仅开发环境可见"
-              description="本页验证 Puck 能否承载 DIY v2：块与小程序同源渲染，右侧是编辑器将要保存的页面文档。"
+              message="用于试组件与属性控件，不读写任何店铺数据"
+              description="下方是店铺装修的同一个编辑器；切换页面类型可查看各类页面可用的组件。正式装修请到「店铺装修（新版）」。"
+            />
+            <Segmented
+              style={{ marginBottom: 12 }}
+              value={kind}
+              options={Object.entries(DOCUMENT_KINDS).map(([value, label]) => ({ value, label }))}
+              onChange={(value) => setKind(value as DocumentKind)}
             />
             {/* The editor gets the full width: Puck's two side panels plus a 375 px
                 canvas need ~1100 px before it has to zoom the canvas out. */}
@@ -152,14 +162,20 @@ export default function DecorSpike() {
               style={{ height: 820, border: '1px solid #f0f0f0', marginBottom: 16 }}
               data-testid="decor-editor"
             >
-              <DecorEditor data={data} onChange={setData} title="微页面" />
+              <DecorEditor
+                key={kind}
+                kind={kind}
+                data={data}
+                onChange={setData}
+                toolbar={<Typography.Text strong>{DOCUMENT_KINDS[kind]}（沙盒）</Typography.Text>}
+              />
             </div>
             <Card size="small" title="页面文档（schemaVersion 2）">
-              <DocumentPanel data={data} />
+              <DocumentPanel data={data} kind={kind} />
             </Card>
           </PageContainer>
         </DecorCanvasDataProvider>
-      </DiyDataSourceProvider>
+      </DecorRecordSourceProvider>
     </AssetSourceProvider>
   );
 }

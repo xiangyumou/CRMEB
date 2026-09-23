@@ -25,6 +25,7 @@
         "APP_ORIGIN",
         "EXTRA_ALLOWED_ORIGINS",
         "APP_VERSION",
+        "DECOR_PREVIEW_URL",
         "VALIDATE_RESPONSES",
         "LOG_LEVEL",
         "LOG_PRETTY",

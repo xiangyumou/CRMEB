@@ -3,6 +3,22 @@ import next from 'eslint-config-next';
 
 const SERVER = ['src/server/**', 'app/admin-api/**', 'app/api/**'];
 
+const NO_CORE_OR_DB = {
+  group: ['@shop/core', '@shop/core/*', '@shop/db', '@shop/db/*'],
+  message: '后台 UI 只能引用 @shop/contracts 与 src/admin 下的客户端，不能引用 core/db。',
+};
+
+/**
+ * The page-decoration editor library is an implementation detail of
+ * `src/admin/decor` (docs/mini/spikes/S3-decor.md): routes use `DecorEditor`,
+ * so the library can be swapped by rewriting one folder.
+ */
+const NO_PUCK = {
+  group: ['@puckeditor/*'],
+  message:
+    '装修编辑器库只能在 src/admin/decor 内使用；页面请用 @/admin/decor 与 @/admin/decor/editor。',
+};
+
 /**
  * Admin UI rules. `SERVER` files (the route binder and route handlers) are the one part of
  * this app allowed to import `@shop/core`; they must stay free of business logic instead.
@@ -38,13 +54,7 @@ export default [
       'no-restricted-imports': [
         'error',
         {
-          patterns: [
-            {
-              group: ['@shop/core', '@shop/core/*', '@shop/db', '@shop/db/*'],
-              message:
-                '后台 UI 只能引用 @shop/contracts 与 src/admin 下的客户端，不能引用 core/db。',
-            },
-          ],
+          patterns: [NO_CORE_OR_DB, NO_PUCK],
         },
       ],
       'no-restricted-globals': [
@@ -89,6 +99,10 @@ export default [
         },
       ],
     },
+  },
+  {
+    files: ['src/admin/decor/**'],
+    rules: { 'no-restricted-imports': ['error', { patterns: [NO_CORE_OR_DB] }] },
   },
   {
     // The client itself is the one place allowed to call fetch.

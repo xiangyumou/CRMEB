@@ -21,7 +21,7 @@ export default defineMenu({
     },
     {
       key: 'dev.decorSpike',
-      label: '装修编辑器试验',
+      label: '装修组件沙盒',
       path: '/admin/dev/decor-spike',
       icon: 'BuildOutlined',
       order: 20,
