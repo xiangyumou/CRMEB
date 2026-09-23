@@ -20,8 +20,9 @@ describe('maskPhone', () => {
   });
 
   it('masks anything that is not 11 digits rather than returning it', () => {
-    // A legacy row can hold a landline, a number with a country code, or junk.
-    // None of those stop being somebody's phone number because the regex missed.
+    // A stored row can hold a landline, a number with a country code, or junk.
+    // None of those stop being somebody's phone number because the regex
+    // missed.
     expect(maskPhone('01012345678')).toBe('010****5678');
     expect(maskPhone('+8613800138000')).toBe('+8**********00');
     expect(maskPhone('1234')).toBe('****');
@@ -65,7 +66,7 @@ describe('synthetic accounts', () => {
 describe('toPasswordAlgo', () => {
   it('adapts the column enum to what password.ts understands', () => {
     // The DB says `md5_legacy`, `auth/password.ts` says `md5`. Getting this
-    // backwards makes every legacy login fail bcrypt verification silently.
+    // backwards makes every MD5-hashed login fail bcrypt verification silently.
     expect(toPasswordAlgo('md5_legacy')).toBe('md5');
     expect(toPasswordAlgo('bcrypt')).toBe('bcrypt');
     expect(toPasswordAlgo(null)).toBe('bcrypt');
@@ -78,9 +79,9 @@ describe('checkPasswordShape', () => {
     expect(checkPasswordShape('correct horse')).toBe('ok');
   });
 
-  it('rejects the ones the legacy validator allowed', () => {
-    // `123456` passed the old 6..16 length check and was the most common
-    // password in the dump this system was modelled on.
+  it('rejects the ones a length check alone would allow', () => {
+    // `123456` passes a 6..16 length check and is the most common password in
+    // every leak corpus.
     expect(checkPasswordShape('123456')).toBe('too-simple');
     expect(checkPasswordShape('abcdef')).toBe('too-simple');
     expect(checkPasswordShape('12345')).toBe('too-short');

@@ -4,14 +4,15 @@ import { DomainError } from '../kernel/errors';
 /**
  * The narrow seam between storefront sign-in and WeChat's HTTP API.
  *
- * Stream C owns the first-party client (`core/src/wechat/`, `WechatCoreClient`);
- * this domain codes against three methods it can describe exactly, with a fake
- * for the tests. The adapter over C's client is `wechat-identity.adapter.ts`,
- * registered by `registerUserDomain()`. Each method takes the request's `Ctx`
- * because C's client is built per request (credentials come from the config
- * registry and a change must take effect on the next call, not the next deploy):
+ * The `wechat` domain owns the first-party client (`core/src/wechat/`,
+ * `WechatCoreClient`); this domain codes against three methods it can describe
+ * exactly, with a fake for the tests. The adapter over that client is
+ * `wechat-identity.adapter.ts`, registered by `registerUserDomain()`. Each
+ * method takes the request's `Ctx` because the client is built per request
+ * (credentials come from the config registry and a change must take effect on
+ * the next call, not the next deploy):
  *
- * | Port method        | C's client                                                                  |
+ * | Port method        | `WechatCoreClient`                                                          |
  * | ------------------ | --------------------------------------------------------------------------- |
  * | `miniCodeToSession`| `miniCode2Session(code)` → `{ openid, unionid?, sessionKey }`                |
  * | `oaCodeToUser`     | `oaCodeExchange(code)` then, for `snsapi_userinfo`, `oaUserInfo({...})`      |
@@ -29,7 +30,7 @@ import { DomainError } from '../kernel/errors';
 export interface WechatMiniSession {
   openid: string;
   unionid?: string | undefined;
-  /** Never leaves the server and is never persisted. Present for parity with C's type. */
+  /** Never leaves the server and is never persisted. Present for parity with the client's type. */
   sessionKey?: string | undefined;
 }
 
@@ -91,10 +92,10 @@ export interface FakeWechatIdentityPort extends WechatIdentityPort {
 /**
  * An in-memory adapter for tests.
  *
- * It lives here rather than in `@shop/testing` because that package belongs to
- * the orchestrator and a stream may not add to it. An unknown code throws the
- * same `AUTH_WECHAT_CODE_INVALID` the real adapter will, so the refusal path is
- * exercised by default rather than by a special mode.
+ * It lives here rather than in `@shop/testing` because only this domain's tests
+ * use it. An unknown code throws the same `AUTH_WECHAT_CODE_INVALID` the real
+ * adapter will, so the refusal path is exercised by default rather than by a
+ * special mode.
  */
 export function fakeWechatIdentityPort(
   options: { throwOn?: (code: string) => Error | undefined } = {},

@@ -119,8 +119,8 @@ async function resolves(token: string): Promise<boolean> {
 
 describe('sendSmsCode', () => {
   it('answers identically for a registered and an unregistered number', async () => {
-    // No account enumeration: the legacy endpoint refused with 手机号已注册 and
-    // turned the login screen into a free customer lookup.
+    // No account enumeration: refusing with 手机号已注册 would turn the login
+    // screen into a free customer lookup.
     const unknown = await auth.sendSmsCode(asAnonymous(), { phone: PHONE, scene: 'register' });
     await registerCustomer();
     await harness.redis.del(`sms:resend:register:${PHONE}`);
@@ -144,8 +144,8 @@ describe('sendSmsCode', () => {
   });
 
   it('keeps a separate resend window per scene', async () => {
-    // The legacy system keyed on the phone number alone; a code sent for one
-    // purpose blocked — and could be replayed against — another.
+    // Keyed on the phone number alone, a code sent for one purpose would block
+    // — and could be replayed against — another.
     await auth.sendSmsCode(asAnonymous(), { phone: PHONE, scene: 'login' });
     await expect(
       auth.sendSmsCode(asAnonymous(), { phone: PHONE, scene: 'register' }),
@@ -168,10 +168,9 @@ describe('sendSmsCode', () => {
   it('enforces the per-IP daily budget across different numbers', async () => {
     // The per-phone budgets stop one number being spammed; this is the one that
     // stops one machine walking a phone book, and it is the only control that
-    // sees the second number at all. Legacy `maxIpCount` at
-    // `LoginController.php:117-140`, now `storefront-auth.codePerIpPerDay`.
-    // Ten, not two: the field's own floor is 10, because an operator who types
-    // a small number here locks out a whole office behind one NAT.
+    // sees the second number at all (`storefront-auth.codePerIpPerDay`). Ten,
+    // not two: the field's own floor is 10, because an operator who types a
+    // small number here locks out a whole office behind one NAT.
     const limit = 10;
     await harness.ctx.config.set(storefrontAuthConfig, { codePerIpPerDay: limit });
     const meta = { ip: '203.0.113.7' };
@@ -308,7 +307,7 @@ describe('register', () => {
     ).rejects.toMatchObject({ code: 'AUTH_PHONE_TAKEN' });
   });
 
-  it('refuses a password the legacy validator would have accepted', async () => {
+  it('refuses a password that passes on length alone', async () => {
     const code = await codeFor('register');
     await expect(
       auth.register(asAnonymous(), { phone: PHONE, code, password: '123456' }),
@@ -504,7 +503,7 @@ describe('login throttling', () => {
     ).resolves.toBeDefined();
   });
 
-  it('uses the configured window, defaulting to the legacy 900 seconds', async () => {
+  it('uses the configured window, defaulting to 900 seconds', async () => {
     await registerCustomer();
     await auth
       .passwordLogin(asAnonymous(), { account: PHONE, password: 'wrong-one-1' })
@@ -840,7 +839,7 @@ describe('WeChat mini-program sign-in', () => {
 
 describe('WeChat Official Account sign-in', () => {
   beforeEach(async () => {
-    // The switch is the OA group's; the app id is the `wechat` group's (CR-1-j).
+    // The switch is the OA group's; the app id is the `wechat` group's.
     await harness.ctx.config.set(wechatOaConfig, { enabled: true });
     await harness.ctx.config.set(wechatConfig, { oaAppId: 'wx-oa' });
     await harness.ctx.config.set(storefrontAuthConfig, { siteUrl: 'https://shop.example.com' });
@@ -880,8 +879,8 @@ describe('WeChat Official Account sign-in', () => {
   });
 
   it('keeps the bind token alive when the SMS code is mistyped', async () => {
-    // Otherwise a typo costs a fresh WeChat authorisation, which is the loop
-    // the legacy flow was famous for.
+    // Otherwise a typo costs a fresh WeChat authorisation, and the shopper is
+    // stuck in a re-authorise loop.
     wechat.setOaUser('oa-code-1', { openid: 'o_oa_1' });
     const started = await auth.oaLogin(asAnonymous(), { code: 'oa-code-1' });
     const code = await codeFor('login');
@@ -900,8 +899,7 @@ describe('WeChat Official Account sign-in', () => {
   });
 
   it('recognises the same person on the other WeChat app through the unionid', async () => {
-    // The legacy system gave this shopper a second, empty account with none of
-    // their orders in it.
+    // Not a second, empty account with none of their orders in it.
     await harness.ctx.config.set(wechatMiniConfig, { enabled: true });
     await harness.ctx.config.set(wechatConfig, { miniAppId: 'wx-mini' });
     wechat.setOaUser('oa-code-1', { openid: 'o_oa_1', unionid: 'u_1' });

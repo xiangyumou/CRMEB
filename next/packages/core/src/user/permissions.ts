@@ -13,10 +13,8 @@ import { definePermissions } from '../auth/permissions';
  * the same screen, and a third pair nobody would ever grant separately is how
  * permission trees become unreadable.
  *
- * The legacy `Route::resource('user', …)` declared seven per-action
- * `real_name` labels that the permission tree was built from; those seven
- * collapse into `customer:read` / `customer:write` here, because six of them
- * named CRUD verbs on one screen.
+ * Customers get `customer:read` / `customer:write` rather than one atom per
+ * action, because per-action atoms would name CRUD verbs on one screen.
  */
 export const userPermissions = definePermissions(
   'user',

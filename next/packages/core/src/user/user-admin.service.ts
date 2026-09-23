@@ -142,8 +142,8 @@ export async function adminUpdate(
  *
  * The version bump inside `setStatus` revokes every live token, so a banned
  * account stops being able to order *now* rather than whenever its session
- * happened to expire — which is the invariant the brief names ("a disabled
- * user's live token is rejected").
+ * happened to expire — the invariant is "a disabled user's live token is
+ * rejected".
  */
 export async function adminSetStatus(
   ctx: Ctx,

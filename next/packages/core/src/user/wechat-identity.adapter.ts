@@ -4,7 +4,8 @@ import { getWechatClient } from '../wechat';
 import type { WechatIdentityPort } from './wechat-identity.port';
 
 /**
- * `WechatIdentityPort` over stream C's `WechatCoreClient` (`core/src/wechat/`).
+ * `WechatIdentityPort` over the `wechat` domain's `WechatCoreClient`
+ * (`core/src/wechat/`).
  *
  * The client reports a failed exchange as `DomainError('INTERNAL')` carrying
  * WeChat's `errcode` in `details`; the sign-in service must never see a number,
@@ -12,7 +13,7 @@ import type { WechatIdentityPort } from './wechat-identity.port';
  * `AUTH_WECHAT_CODE_INVALID` here and everything else stays what it was — a
  * misconfigured secret or a WeChat outage is an incident, not a login refusal.
  *
- * `miniPhoneNumber` has no method on C's client; it goes through the generic
+ * `miniPhoneNumber` has no method on the client; it goes through the generic
  * `call('mini', …)`, which injects the mini-program access token.
  */
 

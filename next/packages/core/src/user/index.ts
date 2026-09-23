@@ -30,14 +30,15 @@ import './storefront-auth.config';
  *
  * 1. the `storefront-auth` config group, so the generic settings screen can
  *    list it (a plain import side effect);
- * 2. `registerUserLookup` — the real implementation of P0-A's seam. Until this
- *    runs, `UserSessionService.resolve` fails closed and *every* storefront
- *    session is rejected — which is the safe direction;
- * 3. the `WechatIdentityPort` over stream C's client
+ * 2. `registerUserLookup` — the real implementation of the auth domain's
+ *    user-lookup seam. Until this runs, `UserSessionService.resolve` fails
+ *    closed and *every* storefront session is rejected — which is the safe
+ *    direction;
+ * 3. the `WechatIdentityPort` over the `wechat` domain's client
  *    (`wechat-identity.adapter.ts`). A test that wants the fake calls
  *    `registerWechatIdentityPort(fakeWechatIdentityPort())` after this.
  *
- * **What other streams need from here.**
+ * **What other domains need from here.**
  *
  * | Need | Reach for |
  * | --- | --- |

@@ -47,11 +47,8 @@ import { toProfile } from './user.service';
 /**
  * Storefront sign-in — one generation of it.
  *
- * The legacy system carried two: v1 (`mp_auth`, `wechat/auth_login`) and v2
- * (`routine/auth_*`, `v2/wechat/auth_*`), each with its own token format, its
- * own notion of "bound" and its own bugs, with the uni-app choosing between
- * them at runtime. Everything below replaces both, and there is no
- * compatibility surface.
+ * One token format, one notion of "bound", and no second generation for the
+ * client to choose between at runtime.
  *
  * Four rules hold throughout:
  *
@@ -147,10 +144,9 @@ async function reload(ctx: Ctx, id: number): Promise<repo.UserRow> {
 /**
  * Send a verification code.
  *
- * The answer is identical for a registered and an unregistered number. The
- * legacy endpoint refused with 手机号已注册 on `scene=register`, which turned
- * the login screen into a free "is this person your customer" oracle for
- * anybody holding a phone book.
+ * The answer is identical for a registered and an unregistered number. Refusing
+ * with 手机号已注册 on `scene=register` would turn the login screen into a free
+ * "is this person your customer" oracle for anybody holding a phone book.
  *
  * The two scenes that act on the *current* account (`bind-phone`,
  * `change-phone`) do require a session — there is nothing to enumerate there
@@ -197,9 +193,6 @@ export async function sendSmsCode(
  * account in parallel at 4 tries each. Counting `account` and `account+ip`
  * separately catches both: a distributed attack trips the account window, a
  * single machine trips its own.
- *
- * The legacy `LoginThrottleGuard` had one 900-second account window, which is
- * where that number comes from.
  */
 function throttleKeys(account: string, ip: string | null | undefined): string[] {
   const subject = account.trim().toLowerCase();
@@ -282,10 +275,9 @@ export async function passwordLogin(
 /**
  * Code login, which registers when the number is new.
  *
- * The legacy funnel sent an unknown number to a registration form asking for
- * the same number and the same code it had just typed, and lost most of them
- * there. Holding a code sent to the number *is* the proof of ownership a
- * registration needs, so there is nothing left to ask.
+ * Holding a code sent to the number *is* the proof of ownership a registration
+ * needs, so there is nothing left to ask; a separate registration form asking
+ * for the same number and code again loses most shoppers.
  */
 export async function smsLogin(
   ctx: Ctx,
@@ -435,8 +427,8 @@ export async function resetPassword(ctx: Ctx, body: ResetPasswordBody): Promise<
  * Change the password of the account you are signed in as.
  *
  * Either proof works. An account created by WeChat or by SMS code has no
- * password to quote, and refusing to let it ever set one is how the legacy
- * system produced accounts reachable only from inside WeChat, forever.
+ * password to quote, and refusing to let it ever set one would leave accounts
+ * reachable only from inside WeChat, forever.
  *
  * Every session dies, including the one making the call. That is the point of
  * the feature — a customer changes their password because they think somebody
@@ -673,11 +665,11 @@ const bindKey = (token: string): string => `wx:bind:${token}`;
 /**
  * Park a resolved openid for a few minutes.
  *
- * WeChat `code`s are single-use and expire in minutes. The legacy flow asked
- * the client to re-authorise between the sign-in call and the phone-number
- * call, which is where its "请重新授权" loop came from. Holding the resolved
- * identity server-side under an opaque token means the second call is one
- * request, and the token is destroyed the instant it is read.
+ * WeChat `code`s are single-use and expire in minutes. Asking the client to
+ * re-authorise between the sign-in call and the phone-number call produces a
+ * "请重新授权" loop. Holding the resolved identity server-side under an opaque
+ * token means the second call is one request, and the token is destroyed the
+ * instant it is read.
  */
 async function parkPending(ctx: Ctx, pending: PendingWechat): Promise<string> {
   const token = randomToken(32);
@@ -719,8 +711,7 @@ function signedIn(session: StorefrontSession, registered: boolean): WechatLoginR
  * Resolution order: this openid → the same person's openid on the other WeChat
  * app (via `unionid`) → nobody. Checking the unionid matters: a shopper who
  * ordered in the Official Account and then opens the mini-program is the same
- * customer with the same orders, and the legacy system gave them a second,
- * empty account.
+ * customer with the same orders, not a second, empty account.
  */
 async function signInWithIdentity(
   ctx: Ctx,
@@ -866,9 +857,8 @@ async function completeWithPhone(
  *
  * The same two-group split as `oaApp`, for the same reason: the `wechat-mini`
  * group holds the operator's 启用 switch, and every WeChat credential lives in
- * the `wechat` group (CR-1-j, extended to the mini program by E4 — both groups
- * used to claim `routine_appId`, so a migrated shop held the app id in one
- * screen and a blank in the other).
+ * the `wechat` group (an app id claimed by both groups would show in one screen
+ * and as a blank in the other).
  */
 async function miniApp(ctx: Ctx): Promise<{ enabled: boolean; appId: string }> {
   const [mini, core] = await Promise.all([
@@ -922,8 +912,8 @@ export async function miniPhoneLogin(
  *
  * Two groups, on purpose: the `wechat-oa` group holds the operator's 启用
  * switch and the callback settings, while the app id lives in the `wechat`
- * group and nowhere else (CR-1-j — both used to map `wechat_appid`, so a
- * migrated shop held it in one screen and a blank in the other).
+ * group and nowhere else (an app id claimed by both groups would show in one
+ * screen and as a blank in the other).
  */
 async function oaApp(ctx: Ctx): Promise<{ enabled: boolean; appId: string }> {
   const [oa, core] = await Promise.all([
@@ -940,7 +930,7 @@ async function oaApp(ctx: Ctx): Promise<{ enabled: boolean; appId: string }> {
  * `redirectUrl` is checked against the configured `siteUrl` before it is handed
  * to WeChat. An unchecked redirect on this endpoint gives the `code` — and with
  * it the sign-in — to whoever asked for it, which is the classic OAuth open
- * redirect and was live in the legacy `wechat/auth` route.
+ * redirect.
  */
 export async function oaAuthorizeUrl(
   ctx: Ctx,

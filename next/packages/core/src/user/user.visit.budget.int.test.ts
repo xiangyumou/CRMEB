@@ -5,19 +5,17 @@ import { anonymousActor } from '../kernel/context';
 import { recordVisit } from './user.visit.service';
 
 /**
- * `POST /api/v1/visits`, read as somebody with a loop (K2, AUDIT.md K-SEC-V1).
+ * `POST /api/v1/visits`, read as somebody with a loop.
  *
  * The beacon is public and its throttle is keyed on `visit:<subject>:<path>`:
  * one row per visitor **per path** per minute. The path is the caller's to
- * choose (any `/…` up to 255 characters), so a caller who varies it is never
- * throttled at all — every request is one `user_visits` insert, and 浏览量 on
- * the dashboard is whatever the caller wants it to be. The per-path window is
- * right for what it was built for (collapsing `onShow` re-fires); what is
- * missing is a ceiling per subject across paths.
- *
- * K2 pinned the missing ceiling as `it.fails` (CR-11-k2); R3 added a
- * per-subject ceiling of 60 rows a minute across paths, above which the beacon
- * is dropped silently, as a per-path repeat is.
+ * choose (any `/…` up to 255 characters), so with that window alone a caller
+ * who varies it is never throttled at all — every request is one `user_visits`
+ * insert, and 浏览量 on the dashboard is whatever the caller wants it to be.
+ * The per-path window is right for what it is for (collapsing `onShow`
+ * re-fires); the per-subject ceiling of 60 rows a minute across paths is what
+ * stops the loop, and above it the beacon is dropped silently, as a per-path
+ * repeat is.
  */
 
 let harness: TestCtx;
@@ -39,7 +37,7 @@ beforeEach(async () => {
   harness.clock.set(NOW);
 });
 
-describe('K-SEC-V1 — what one anonymous address can write', () => {
+describe('what one anonymous address can write', () => {
   it('writes one row per path per minute, as designed', async () => {
     const anonymous = harness.as(anonymousActor);
     for (let i = 0; i < 5; i += 1) {

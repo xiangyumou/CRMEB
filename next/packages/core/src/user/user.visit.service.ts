@@ -6,12 +6,10 @@ import type { RequestMeta } from './storefront-auth.service';
 import * as repo from './user.visit.repo';
 
 /**
- * `POST /api/v1/visits` — the storefront page-view beacon (CR-1-f3 §1).
+ * `POST /api/v1/visits` — the storefront page-view beacon.
  *
- * Legacy had a `setVisit` call on the client and no endpoint behind it, so
- * `user_visits` has been empty for as long as the table has existed and 访客数
- * has read 0 on every live shop. One insert fixes every figure that reads it,
- * with no change in `stats`.
+ * The only thing that fills `user_visits`; without it 访客数 reads 0. One
+ * insert feeds every figure that reads the table, with no change in `stats`.
  *
  * **Nothing here can throw.** A beacon is fired while the visitor is doing
  * something else; a refusal it could see would either be swallowed (making the
@@ -38,13 +36,13 @@ const WINDOW_MS = 60_000;
 const PER_WINDOW = 1;
 
 /**
- * Rows one visitor may write per minute across **all** paths (CR-11-k2).
+ * Rows one visitor may write per minute across **all** paths.
  *
- * The per-path window is keyed on a path the caller chooses, so varying it
- * turned the throttle off: a loop inserted one row per request and set 浏览量
- * to whatever it liked. Sixty distinct pages a minute is more than a person
- * browses; above it the beacon is dropped silently, exactly as a per-path
- * repeat is.
+ * The per-path window is keyed on a path the caller chooses, so on its own
+ * varying the path turns the throttle off: a loop inserts one row per request
+ * and sets 浏览量 to whatever it likes. Sixty distinct pages a minute is more
+ * than a person browses; above it the beacon is dropped silently, exactly as a
+ * per-path repeat is.
  */
 const SUBJECT_PER_WINDOW = 60;
 
@@ -60,11 +58,10 @@ function toColumnPlatform(
  * Who this beacon is throttled against.
  *
  * A signed-in visitor is their user id. Everybody else is their address —
- * `user_visits` has no session column and this stream may not add one (see
- * `docs/rewrite/status/e4.md`), so the identity used for counting is the same
- * one `stats` already uses for 访客数: `coalesce(user_id, 'ip:' || ip)`. That
- * keeps the throttle and the figure talking about the same visitor instead of
- * two different notions of one.
+ * `user_visits` has no session column, so the identity used for counting is the
+ * same one `stats` already uses for 访客数: `coalesce(user_id, 'ip:' || ip)`.
+ * That keeps the throttle and the figure talking about the same visitor instead
+ * of two different notions of one.
  *
  * Behind a shared NAT this is coarser than a session id would be: a shopping
  * centre's wifi is one visitor for both the throttle and the figure. That is

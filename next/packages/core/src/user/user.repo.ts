@@ -93,8 +93,8 @@ export async function findById(db: DbOrTx, id: number): Promise<UserRow | null> 
 
 /**
  * Sign-in lookup. Case-insensitive, and it matches the account column *or* the
- * phone column, because the legacy login accepted `account|phone` and a
- * customer who registered by phone thinks of the number as their account.
+ * phone column, because a customer who registered by phone thinks of the number
+ * as their account.
  *
  * `lower(...)` on both sides so the expression indexes
  * (`users_account_lower_uq`, `users_phone_lower_uq`) are used rather than a
