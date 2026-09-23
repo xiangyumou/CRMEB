@@ -414,6 +414,42 @@ describe('listEffects', () => {
     expect(sneaky.total).toBe(0);
   });
 
+  it('narrows by a scope-id prefix, taken literally', async () => {
+    await record({ scope: 'notification', scopeId: 'order_paid:order:1', eventType: 'send' });
+    await record({ scope: 'notification', scopeId: 'order_paid_admin:order:1', eventType: 'send' });
+    await record({ scope: 'notification', scopeId: 'orderXpaid:order:2', eventType: 'send' });
+
+    const { rows, total } = await listEffects(harness.ctx.db, {
+      status: 'pending',
+      scopeIdPrefix: 'order_paid:',
+      ...page,
+    });
+    // `_` is a LIKE wildcard; unescaped it would also match `orderXpaid:`.
+    expect(rows.map((row) => row.scopeId)).toEqual(['order_paid:order:1']);
+    expect(total).toBe(1);
+
+    const percent = await listEffects(harness.ctx.db, {
+      status: 'pending',
+      scopeIdPrefix: '%',
+      ...page,
+    });
+    expect(percent.total).toBe(0);
+  });
+
+  it('leaves the payload out unless the caller asks for it', async () => {
+    await record({ scopeId: '1' });
+
+    const plain = await listEffects(harness.ctx.db, { status: 'pending', ...page });
+    expect(plain.rows[0]).not.toHaveProperty('payload');
+
+    const detailed = await listEffects(harness.ctx.db, {
+      status: 'pending',
+      withPayload: true,
+      ...page,
+    });
+    expect(detailed.rows[0]?.payload).toEqual({ hello: 'world' });
+  });
+
   it('puts what changed most recently first, and pages', async () => {
     for (const scopeId of ['1', '2', '3']) {
       await record({ scopeId });
@@ -486,6 +522,18 @@ describe('retryEffect', () => {
       false,
     );
     expect((await findEffect(harness.ctx.db, key))?.status).toBe('done');
+  });
+
+  it('refuses a row outside the scopes the caller named', async () => {
+    const id = await parkOne();
+
+    const outside = await retryEffect(harness.ctx.db, id, harness.ctx.clock.now(), ['refund']);
+    expect(outside.won).toBe(false);
+    expect((await findEffectById(harness.ctx.db, id))?.status).toBe('unknown');
+
+    const inside = await retryEffect(harness.ctx.db, id, harness.ctx.clock.now(), ['order']);
+    expect(inside.won).toBe(true);
+    expect((await findEffectById(harness.ctx.db, id))?.status).toBe('pending');
   });
 
   it('runs the effect ONCE when two operators press 重试 together', async () => {

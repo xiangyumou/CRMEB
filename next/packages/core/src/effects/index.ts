@@ -14,6 +14,7 @@ import {
   retryEffect,
   scheduleRetry,
   type EffectConsoleRow,
+  type EffectDetailRow,
   type EffectListFilter,
   type EffectRow,
 } from './effects.repo';
@@ -371,4 +372,4 @@ export {
   retryEffect,
 };
 export { RETRYABLE_EFFECT_STATUSES } from './effects.repo';
-export type { EffectConsoleRow, EffectListFilter, EffectRow };
+export type { EffectConsoleRow, EffectDetailRow, EffectListFilter, EffectRow };

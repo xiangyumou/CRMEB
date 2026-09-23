@@ -8,7 +8,7 @@ import { createTestCtx, type TestCtx } from '@shop/testing';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import * as admin from './notification.admin.service';
-import { NOTIFICATION_SCOPE } from './notification.effects.repo';
+import { NOTIFICATION_SCOPE } from './notification.service';
 import * as inbox from './notification.inbox.service';
 
 /**
@@ -148,14 +148,17 @@ describe('another person’s message', () => {
   });
 });
 
-async function sendRecord(status: 'done' | 'unknown'): Promise<string> {
+async function sendRecord(
+  status: 'done' | 'unknown',
+  overrides: { scope?: string; scopeId?: string; payload?: unknown } = {},
+): Promise<string> {
   const [row] = await harness.ctx.db
     .insert(effects)
     .values({
-      scope: NOTIFICATION_SCOPE,
-      scopeId: `order.shipped:${++sequence}`,
+      scope: overrides.scope ?? NOTIFICATION_SCOPE,
+      scopeId: overrides.scopeId ?? `order.shipped:${++sequence}`,
       eventType: 'notification.send',
-      payload: {},
+      payload: overrides.payload ?? {},
       status,
     })
     .returning({ id: effects.id });
@@ -188,6 +191,12 @@ describe('重试 on a send record', () => {
     expect(await statusOf(id)).toBe('pending');
   });
 
+  it('answers another console’s row as not found, and leaves it parked', async () => {
+    const id = await sendRecord('unknown', { scope: 'refund', scopeId: '42' });
+    expect(await codeOf(admin.retryLog(handler(), { id }))).toBe('NOT_FOUND');
+    expect(await statusOf(id)).toBe('unknown');
+  });
+
   it('needs the handle atom, not the read one', async () => {
     const id = await sendRecord('unknown');
     const reader = harness.as({
@@ -198,5 +207,33 @@ describe('重试 on a send record', () => {
     });
     expect(await codeOf(admin.retryLog(reader, { id }))).toBe('FORBIDDEN');
     expect(await statusOf(id)).toBe('unknown');
+  });
+});
+
+describe('通知发送记录', () => {
+  const reader = (): Ctx =>
+    harness.as({ kind: 'admin', id: 1, permissions: ['notification:log:read'], isSuper: false });
+  const page = { page: 1, pageSize: 20 };
+
+  it('lists only the notification scope', async () => {
+    await sendRecord('unknown', { scope: 'refund', scopeId: '42' });
+    const mine = await sendRecord('unknown');
+
+    const result = await admin.listLogs(reader(), { status: 'unknown', ...page });
+    expect(result.items.map((item) => item.id)).toEqual([mine]);
+    expect(result.total).toBe(1);
+  });
+
+  it('narrows to one event code, and not to codes that merely start the same way', async () => {
+    const shipped = await sendRecord('done', { scopeId: 'order.shipped:order:1' });
+    await sendRecord('done', { scopeId: 'order.shipped_admin:order:1' });
+
+    const result = await admin.listLogs(reader(), {
+      status: 'done',
+      code: 'order.shipped',
+      ...page,
+    });
+    expect(result.items.map((item) => item.id)).toEqual([shipped]);
+    expect(result.items[0]).toMatchObject({ code: 'order.shipped', subject: 'order:1' });
   });
 });

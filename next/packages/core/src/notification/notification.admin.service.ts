@@ -9,10 +9,10 @@ import type {
   NotificationTemplateListQuery,
 } from '@shop/contracts/notification/schemas';
 import { requirePermission } from '../auth/rbac';
+import { findEffectById, listEffects, retryEffect, type EffectDetailRow } from '../effects';
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { toId } from '../kernel/ids';
-import * as effectsRepo from './notification.effects.repo';
 import { notificationPermissions } from './permissions';
 import * as repo from './notification.repo';
 import type { NotificationChannels } from './notification.repo';
@@ -21,7 +21,7 @@ import {
   findNotificationEvent,
   type NotificationEvent,
 } from './notification.registry';
-import { defaultChannels, readClaimedChannels } from './notification.service';
+import { defaultChannels, NOTIFICATION_SCOPE, readClaimedChannels } from './notification.service';
 
 /**
  * The operator's three screens.
@@ -130,16 +130,28 @@ export async function toggleChannel(
 // the send log
 // ---------------------------------------------------------------------------
 
+/**
+ * The send log reads the shared effects ledger, pinned to the notification
+ * scope: one domain's console must not become everybody's, and a notification
+ * operator has no business seeing a parked refund.
+ */
+const LOG_SCOPES = [NOTIFICATION_SCOPE] as const;
+
 export async function listLogs(
   ctx: Ctx,
   query: NotificationLogListQuery,
 ): Promise<Paged<NotificationLog>> {
   requirePermission(ctx, notificationPermissions['log:read']);
-  const { rows, total } = await effectsRepo.listNotificationEffects(ctx.db, {
+  const { rows, total } = await listEffects(ctx.db, {
+    scopes: LOG_SCOPES,
     status: query.status,
-    ...(query.code === undefined ? {} : { code: query.code }),
-    offset: (query.page - 1) * query.pageSize,
-    limit: query.pageSize,
+    // The scope id is `<code>:<subject scope>:<subject id>`, so the prefix
+    // `code:` is exact for the code and cannot match a different event whose
+    // name merely starts the same way.
+    ...(query.code === undefined ? {} : { scopeIdPrefix: `${query.code}:` }),
+    page: query.page,
+    pageSize: query.pageSize,
+    withPayload: true,
   });
   return {
     items: await Promise.all(rows.map((row) => toLog(ctx, row))),
@@ -149,17 +161,23 @@ export async function listLogs(
   };
 }
 
+/**
+ * 重试: hands a parked send back to the dispatcher. Only a row whose outcome is
+ * `unknown` moves, so a delivered notification is never sent a second time;
+ * the channels that already went out are skipped by their claims when the
+ * handler runs again.
+ */
 export async function retryLog(
   ctx: Ctx,
   input: { id: string },
 ): Promise<NotificationLogRetryResult> {
   requirePermission(ctx, notificationPermissions['log:handle']);
   const id = Number(input.id);
-  const row = await effectsRepo.findNotificationEffect(ctx.db, id);
+  const row = await findEffectById(ctx.db, id, LOG_SCOPES);
   if (!row) throw new DomainError('NOT_FOUND');
 
-  const { won } = await effectsRepo.requeueNotificationEffect(ctx.db, id, ctx.clock.now());
-  const fresh = (await effectsRepo.findNotificationEffect(ctx.db, id)) ?? row;
+  const { won } = await retryEffect(ctx.db, id, ctx.clock.now(), LOG_SCOPES);
+  const fresh = (await findEffectById(ctx.db, id, LOG_SCOPES)) ?? row;
   return {
     log: await toLog(ctx, fresh),
     succeeded: won,
@@ -282,7 +300,7 @@ export function splitScopeId(scopeId: string): { code: string; subject: string }
   return { code: scopeId.slice(0, first), subject: scopeId.slice(first + 1) };
 }
 
-async function toLog(ctx: Ctx, row: effectsRepo.NotificationEffectRow): Promise<NotificationLog> {
+async function toLog(ctx: Ctx, row: EffectDetailRow): Promise<NotificationLog> {
   const { code, subject } = splitScopeId(row.scopeId);
   const event = findNotificationEvent(code);
   const payload = row.payload as { userId?: number } | null;
