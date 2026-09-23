@@ -25,7 +25,7 @@ import type { z } from 'zod';
 /** The kinds the admin renders with a control of its own. */
 export type SemanticFieldKind = Extract<
   EditorFieldKind,
-  'image' | 'link' | 'color' | 'productSource'
+  'image' | 'link' | 'color' | 'productSource' | 'richText' | 'hotspots'
 >;
 
 const SEMANTIC_KINDS: ReadonlySet<EditorFieldKind> = new Set<SemanticFieldKind>([
@@ -33,6 +33,8 @@ const SEMANTIC_KINDS: ReadonlySet<EditorFieldKind> = new Set<SemanticFieldKind>(
   'link',
   'color',
   'productSource',
+  'richText',
+  'hotspots',
 ]);
 
 /**
