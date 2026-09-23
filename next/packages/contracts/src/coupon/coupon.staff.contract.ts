@@ -150,8 +150,8 @@ export const staffCouponGrant = defineRoute({
  * What one customer holds — 商家管理 → 用户 → 详情 → 「查看优惠券」.
  *
  * A 店员 may read it: they already see the customer and may grant coupons, and
- * what the customer holds is the same trust level (the orchestrator's decision
- * on the CR). Same door as the rest of this file — `auth: 'staff'`, no atom.
+ * what the customer holds is the same trust level. Same door as the rest of
+ * this file — `auth: 'staff'`, no atom.
  *
  * `items` are the storefront 我的优惠券 item verbatim. Without `?state` every
  * coupon comes back, the spendable ones (`unused` and inside their window)

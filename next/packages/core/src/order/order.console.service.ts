@@ -442,7 +442,7 @@ export async function adminAdjustPrice(
     // buyer actually saw.
     //
     // The subject carries the **resulting amount**, not just the order id, for
-    // the reason the CR gives about two partial refunds of one order. An order
+    // the same reason two partial refunds of one order need two keys. An order
     // is legitimately repriced more than once — `operatorDiscount` is *added*
     // to what is already there — so a per-order key would deduplicate every
     // change after the first into silence. Keyed on the amount, a save that

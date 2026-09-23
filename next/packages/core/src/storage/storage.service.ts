@@ -70,8 +70,8 @@ export interface ResolvedStorage {
  * `ctx.storage` is built from the environment by the container and is always
  * the local driver; the *configured* driver is a runtime setting an operator
  * changes on the settings screen. So: `local` uses `ctx.storage` unchanged, and
- * `s3` is constructed here from the group's values. Nothing in
- * `apps/web/src/server/container.ts` (orchestrator-owned) had to move.
+ * `s3` is constructed here from the group's values, so
+ * `apps/web/src/server/container.ts` never needs to know about the setting.
  *
  * The S3 client is memoised on its own settings, because building one per
  * upload would re-derive nothing expensive but would still be silly.

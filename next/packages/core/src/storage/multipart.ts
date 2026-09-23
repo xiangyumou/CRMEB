@@ -4,11 +4,10 @@ import type { IncomingFile } from './storage.service';
 /**
  * Pulling the one file part out of a `multipart/form-data` request.
  *
- * `handle()` (orchestrator-owned) parses JSON bodies and nothing else, which is
- * why the upload contracts declare no `body` and carry their options in the
- * query string. The route therefore reads the form itself, and this is the
- * shared half so that four routes do not each invent their own field name and
- * their own error.
+ * `handle()` parses JSON bodies and nothing else, which is why the upload
+ * contracts declare no `body` and carry their options in the query string. The
+ * route therefore reads the form itself, and this is the shared half so that
+ * four routes do not each invent their own field name and their own error.
  *
  * It lives in `core` rather than in the route because `FormData`, `File` and
  * `Blob` are web standards available in Node, not `next/*` imports — the

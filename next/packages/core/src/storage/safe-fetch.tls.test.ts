@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 // A test-only fixture shared by the TLS-001 tests of `wechat` and `storage`;
-// its natural home is `@shop/testing` (noted for the orchestrator).
+// its natural home is `@shop/testing`.
 // eslint-disable-next-line boundaries/core-cross-domain
 import { startHttpsServer, type NamedHttpsServer } from '../wechat/__fixtures__/untrusted-https';
 import {
