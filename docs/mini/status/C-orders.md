@@ -17,13 +17,14 @@ order/after-sales specs in `e2e/storefront/specs-mini`.
 - 我的订单 (tabs + counts, paged list, all card actions) with tests.
 - 订单详情 (by id or outTradeNo; status header + countdown, parcels, address, lines, 金额明细,
   facts + copy, 发票, ActionBar with 客服) with tests.
+- 物流 (tab per parcel, trail timeline, copy number, merchant/virtual delivery) with tests.
 - Merged storefront/mini with H2.
 
 ## In progress
 
-- 物流.
+- 评价.
 
 ## Next
 
-- 评价 (moderation), 售后 apply / list / detail / return-shipment (express companies).
+- 售后 apply / list / detail / return-shipment (express companies).
 - E2E specs and page objects; screenshots; docs/mini/pages.md form changes.
