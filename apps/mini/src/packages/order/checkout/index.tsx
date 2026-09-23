@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { useRouteMutation, useRouteQuery } from '@shop/api-client/react';
+import { clearCheckoutAddress, useAddressChoice } from '@/features/checkout/address-choice';
 import { newIdempotencyKey, useCheckoutDraft } from '@/features/checkout/draft';
 import { LoginCard } from '@/session/login-card';
 import { useSession } from '@/session/session';
@@ -8,6 +9,7 @@ import { navigate } from '@/platform';
 import { Button } from '@/ui/button';
 import { Card } from '@/ui/card';
 import { Empty } from '@/ui/empty';
+import { Pressable } from '@/ui/pressable';
 import { PageShell } from '@/ui/page-shell';
 import '../s4.scss';
 
@@ -19,6 +21,8 @@ import '../s4.scss';
  */
 export default function CheckoutPage() {
   const draft = useCheckoutDraft((state) => state.draft);
+  // A new checkout starts from the default address (stream E: the address book's select mode).
+  useState(clearCheckoutAddress);
   if (!draft) {
     return (
       <PageShell title="确认订单">
@@ -37,7 +41,12 @@ export default function CheckoutPage() {
 
 function Preview({ skuId, quantity }: { skuId: string; quantity: number }) {
   const signedIn = useSession((state) => state.session.status === 'signed-in');
-  const body = { source: 'buy-now', item: { skuId, quantity } } as const;
+  const addressId = useAddressChoice((state) => state.addressId);
+  const body = {
+    source: 'buy-now',
+    item: { skuId, quantity },
+    ...(addressId ? { addressId } : {}),
+  } as const;
   const preview = useRouteQuery('order.checkoutPreview', { body }, { enabled: signedIn });
   const create = useRouteMutation('order.create');
   const [idempotencyKey] = useState(newIdempotencyKey);
@@ -49,23 +58,29 @@ function Preview({ skuId, quantity }: { skuId: string; quantity: number }) {
   const missingAddress = addressRequired && !receiver;
   return (
     <>
-      <Card id="checkout-address">
-        {receiver ? (
-          <>
-            <Text className="s4-title">
-              {receiver.name} {receiver.phone}
-            </Text>
-            <Text className="s4-muted">
-              {receiver.province}
-              {receiver.city}
-              {receiver.district ?? ''}
-              {receiver.detail}
-            </Text>
-          </>
-        ) : (
-          <Text className="s4-muted">请先添加收货地址</Text>
-        )}
-      </Card>
+      <Pressable
+        label="更换收货地址"
+        role="link"
+        onClick={() => void navigate({ route: 'addresses', params: { select: '1' } })}
+      >
+        <Card id="checkout-address">
+          {receiver ? (
+            <>
+              <Text className="s4-title">
+                {receiver.name} {receiver.phone}
+              </Text>
+              <Text className="s4-muted">
+                {receiver.province}
+                {receiver.city}
+                {receiver.district ?? ''}
+                {receiver.detail}
+              </Text>
+            </>
+          ) : (
+            <Text className="s4-muted">请先添加收货地址</Text>
+          )}
+        </Card>
+      </Pressable>
       <Card>
         {lines.map((line) => (
           <Text key={line.itemKey} className="s4-muted">

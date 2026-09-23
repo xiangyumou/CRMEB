@@ -33,7 +33,7 @@ export function fieldErrorsOf(
 
 /** The first of `order` that has an error, for focusing it. */
 export function firstError<K extends string>(
-  errors: Partial<Record<K, string>>,
+  errors: { [P in K]?: string | undefined },
   order: readonly K[],
 ): K | null {
   return order.find((key) => Boolean(errors[key])) ?? null;

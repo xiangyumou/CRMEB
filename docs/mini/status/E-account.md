@@ -13,10 +13,15 @@ Updated at every commit so the work can resume after an interruption.
 - `packages/account/shared` (SubmitBar, error helpers, SMS, password rules), `src/test/account-fixture.ts`.
 - 个人资料 (chooseAvatar + nickname input, C09 field error), 设置, 手机号 (bind WeChat / SMS,
   change by SMS), 修改密码 (old password or SMS; silent re-sign-in), 找回密码. Tests.
+- 收货地址 (导入微信地址: saved in one tap when the region resolves against the city tree,
+  else handed to the form; select mode writes `address-choice` and goes back; 默认, 编辑,
+  删除) and 新增 / 编辑地址 (RegionPicker, import, 默认). S4's checkout (stream B's page) got a
+  minimal hook: tapping the address opens select mode, the preview/create body sends
+  `addressId`. Tests.
 
 ## In progress
 
-- 地址列表 / 地址编辑.
+- 收藏, 浏览记录, 我的评价.
 
 ## Next
 
