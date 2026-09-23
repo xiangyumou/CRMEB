@@ -1,6 +1,6 @@
 # `@shop/e2e-storefront` — 商城端到端套件
 
-商城（uni-app H5）的浏览器端到端测试。一条命令，在仓库根目录跑：
+商城（uni-app H5，以及小程序的「模拟小程序」H5 包）的浏览器端到端测试。一条命令，在仓库根目录跑：
 
 ```
 pnpm --filter @shop/e2e-storefront test
@@ -28,6 +28,20 @@ pnpm --filter @shop/e2e-storefront test
 | `SHOP_E2E_REUSE=1 pnpm …`                                          | 复用本检出端口上已经在跑的栈。默认**不**复用，见下节             |
 | `SHOP_TEST_PG_URL=… SHOP_TEST_REDIS_URL=… pnpm …`                  | 用现成的 PG/Redis，不起容器                                      |
 | `SHOP_E2E_BUILD=1 pnpm …`                                          | 强制重新 `next build`                                            |
+| `pnpm --filter @shop/e2e-storefront test:mini`                     | 改跑小程序（`SHOP_E2E_CLIENT=mini`），见下节                     |
+
+## 小程序（模拟小程序）
+
+`SHOP_E2E_CLIENT=mini`（`test:mini`）时，同一套栈改为托管 `apps/mini` 的 H5 包，并跑 `specs-mini/`（Playwright 项目 `mini-h5`）：
+
+- H5 包用 `build:h5:mp-emulation` 构建，输出到 `apps/mini/dist/h5-mp-emulation`，源码没变时跳过。这个包对服务端就是小程序：每个请求都带 `X-Client-Platform: wechat-mini`，用 `wx.login` 的 code 登录，用 `requestPayment` 付款
+- 另起一个假的 `api.weixin.qq.com`（`@shop/testing/wechat` 的 `startFakeOaServer`），播种时把 `wechat` 配置的小程序 AppSecret 和 `apiBaseUrl` 指向它，并打开「小程序登录」
+- 假支付网关的 `appId` 用假小程序的 AppID，因为 `wechat_mini` 的支付记在小程序的 AppID 上
+- 手机上本该由微信完成的三件事交给网关控制面，页面通过 edge 上同源的 `/__e2e/mini/*` 调用：`login-code`（相当于 `wx.login`）、`phone-code`（相当于手机号授权按钮）、`request-payment`（相当于用户在支付弹窗里确认）。只有小程序模式的 edge 转发这些路径
+
+「手机上登录的是哪个微信用户」是测试数据：spec 在页面启动前写入 `localStorage['__shop_mp_emulation__']`（`src/mini.ts` 的 `wechatUser` / `holdPhone`）。设计、覆盖范围和真机检查清单见 `docs/mini/spikes/S4-e2e.md`。
+
+两个客户端的端口、交接文件和库名互不相同（`CHECKOUT_ID` 对小程序另外派生，交接文件是 `shop-e2e-storefront-mini-<CHECKOUT_ID>.json`，库名默认 `shop_e2e_storefront_mini`），同一个检出里可以同时起两套栈。
 
 ## 多个检出（worktree）同时跑
 
@@ -39,6 +53,7 @@ pnpm --filter @shop/e2e-storefront test
 | `SHOP_E2E_WEB_PORT`         | `BASE + 1`                                       | `next start` 的端口                                                                                                     |
 | `SHOP_E2E_GATEWAY_PORT`     | `BASE + 2`                                       | 假微信支付网关的端口                                                                                                    |
 | `SHOP_E2E_STOREFRONT_STACK` | `$TMPDIR/shop-e2e-storefront-<CHECKOUT_ID>.json` | 交接文件，同样按检出区分                                                                                                |
+| `SHOP_E2E_CLIENT`           | `uniapp`                                         | `uniapp` 或 `mini`，见上节                                                                                              |
 | `SHOP_E2E_REUSE`            | 不设置时不复用                                   | 只有设为 `=1` 才复用端口上已经在跑的栈。不设置时，端口被占用会直接报错，不会悄悄接管                                    |
 
 端口段是 25000–30999，每个检出占连续三个端口：

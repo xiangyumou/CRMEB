@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 import { DEVICE } from './src/device';
 
-import { BASE_URL, REUSE } from './src/stack-file';
+import { BASE_URL, CLIENT, REUSE } from './src/stack-file';
 
 /**
  * Storefront end-to-end suite: the uni-app H5 build in a mobile browser.
@@ -28,8 +28,15 @@ import { BASE_URL, REUSE } from './src/stack-file';
  * `navigator.userAgent`, so the emulated device's UA is what makes the app
  * behave as H5 rather than assume a manual header would.
  */
+/**
+ * `SHOP_E2E_CLIENT` (`src/stack-file.ts`) picks the storefront, and with it
+ * the one project that runs: `mobile-chromium` over `specs/` for the uni-app
+ * (the default), `mini-h5` over `specs-mini/` for the Taro mini-program's
+ * "模拟小程序" build (`pnpm --filter @shop/e2e-storefront test:mini`). One
+ * stack serves one client, so the two never run in one invocation.
+ */
 export default defineConfig({
-  testDir: './specs',
+  testDir: CLIENT === 'mini' ? './specs-mini' : './specs',
   outputDir: './test-results',
   fullyParallel: false,
   workers: 1,
@@ -51,18 +58,25 @@ export default defineConfig({
     video: 'off',
   },
   projects: [
-    {
-      // Chromium only, mobile viewport: these journeys assert what a shopper
-      // on a phone browser sees, not cross-browser rendering.
-      name: 'mobile-chromium',
-      use: { ...DEVICE },
-    },
+    CLIENT === 'mini'
+      ? {
+          // The same phone. The emulation build does not look at the UA: it
+          // says `wechat-mini` because it was built to.
+          name: 'mini-h5',
+          use: { ...DEVICE },
+        }
+      : {
+          // Chromium only, mobile viewport: these journeys assert what a shopper
+          // on a phone browser sees, not cross-browser rendering.
+          name: 'mobile-chromium',
+          use: { ...DEVICE },
+        },
   ],
   webServer: {
     command: 'pnpm exec tsx scripts/serve.ts',
     url: `${BASE_URL}/api/v1/health`,
     // Containers pull on a cold machine, `next build` runs once, and the H5
-    // bundle builds once too when `dist/dev/h5` is stale.
+    // bundle builds once too when it is stale.
     timeout: 900_000,
     // Opt-in only (`SHOP_E2E_REUSE=1`): reusing by default let one worktree's
     // run silently drive another worktree's stack. See `src/stack-file.ts`.

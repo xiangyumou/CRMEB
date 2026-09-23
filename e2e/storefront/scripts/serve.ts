@@ -28,6 +28,11 @@
  *
  * Nothing here talks to a real WeChat, SMS or Aliyun endpoint. The fake
  * gateway is the only thing `paymentConfig`/`wechatConfig` ever point at.
+ *
+ * `SHOP_E2E_CLIENT=mini` (`src/stack-file.ts`) serves the Taro mini-program's
+ * "模拟小程序" H5 build instead of the uni-app, and adds the fake
+ * `api.weixin.qq.com` (`startFakeOaServer`) that the server's mini sign-in
+ * calls, on its own ports, stack file and database.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -35,7 +40,8 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { startFakeWechatGateway } from '@shop/testing';
+import { generateFakeWechatKeys, startFakeWechatGateway } from '@shop/testing';
+import { startFakeOaServer, type FakeOaServer } from '@shop/testing/wechat';
 import pg from 'pg';
 
 import { startEdge } from '../src/edge';
@@ -44,6 +50,7 @@ import { ensureH5Build, H5_DIST_DIR } from '../src/h5';
 import { seedE2E } from '../src/seed';
 import {
   BASE_URL,
+  CLIENT,
   EDGE_PORT,
   GATEWAY_PORT,
   STACK_FILE,
@@ -56,13 +63,16 @@ const HERE = import.meta.dirname;
 const NEXT_ROOT = path.resolve(HERE, '../../..');
 const WEB_DIR = path.join(NEXT_ROOT, 'apps/web');
 const WORKER_DIR = path.join(NEXT_ROOT, 'apps/worker');
-const E2E_DATABASE = process.env.SHOP_E2E_DATABASE ?? 'shop_e2e_storefront';
+const E2E_DATABASE =
+  process.env.SHOP_E2E_DATABASE ??
+  (CLIENT === 'mini' ? 'shop_e2e_storefront_mini' : 'shop_e2e_storefront');
 
 const children: ChildProcess[] = [];
 let stopTemplate: (() => Promise<void>) | undefined;
 let closeEdge: (() => Promise<void>) | undefined;
 let closeGatewayControl: (() => Promise<void>) | undefined;
 let closeGateway: (() => Promise<void>) | undefined;
+let closeWechat: (() => Promise<void>) | undefined;
 
 function log(line: string): void {
   console.log(`[e2e] ${line}`);
@@ -138,15 +148,28 @@ async function main(): Promise<void> {
 
   const uploadsDir = await mkdtemp(path.join(tmpdir(), 'shop-e2e-storefront-uploads-'));
 
+  // The mini-program suite signs in through the fake `api.weixin.qq.com`, and
+  // pays with the mini-program's app id: WeChat Pay charges a `wechat_mini`
+  // payment to the mini app, and the fake gateway refuses any other appid.
+  let wechat: FakeOaServer | undefined;
+  if (CLIENT === 'mini') {
+    log('starting fake api.weixin.qq.com …');
+    wechat = await startFakeOaServer();
+    closeWechat = wechat.close;
+  }
+
   log('starting fake WeChat Pay gateway …');
-  const gateway = await startFakeWechatGateway({ port: GATEWAY_PORT });
+  const gateway = await startFakeWechatGateway({
+    port: GATEWAY_PORT,
+    ...(wechat && { keys: { ...generateFakeWechatKeys(), appId: wechat.miniAppId } }),
+  });
   closeGateway = gateway.close;
   // The gateway settles a refund synchronously once approved, so the refund
   // journey never has to wait on `reconcileStaleRefunds()`'s sweep interval —
   // a real gateway reports PROCESSING first, but nothing here tests that wait.
   gateway.behaviour.refundStatus = 'SUCCESS';
 
-  const control = await startGatewayControl({ gateway, baseUrl: BASE_URL });
+  const control = await startGatewayControl({ gateway, baseUrl: BASE_URL, wechat });
   closeGatewayControl = control.close;
 
   log('seeding …');
@@ -157,6 +180,9 @@ async function main(): Promise<void> {
     gateway,
     gatewayApiUrl: gateway.url,
     baseUrl: BASE_URL,
+    ...(wechat && {
+      miniProgram: { appSecret: wechat.miniAppSecret, apiBaseUrl: wechat.url },
+    }),
   });
 
   log('h5 build …');
@@ -219,6 +245,8 @@ async function main(): Promise<void> {
     root: H5_DIST_DIR,
     uploadsDir,
     upstream: WEB_URL,
+    // Only the mini-program's emulation build has harness endpoints.
+    controlUpstream: CLIENT === 'mini' ? control.url : undefined,
   });
   closeEdge = edge.close;
 
@@ -226,6 +254,8 @@ async function main(): Promise<void> {
     databaseUrl,
     redisUrl,
     baseUrl: BASE_URL,
+    client: CLIENT,
+    wechatMiniAppId: wechat?.miniAppId ?? null,
     uploadsDir,
     gatewayUrl: gateway.url,
     gatewayControlUrl: control.url,
@@ -258,6 +288,7 @@ async function shutdown(code = 0): Promise<void> {
   await closeEdge?.().catch(() => {});
   await closeGatewayControl?.().catch(() => {});
   await closeGateway?.().catch(() => {});
+  await closeWechat?.().catch(() => {});
   await stopTemplate?.().catch(() => {});
   process.exit(code);
 }
