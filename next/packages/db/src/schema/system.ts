@@ -42,11 +42,12 @@ export type EffectStatus = (typeof EFFECT_STATUSES)[number];
 /**
  * The side-effect ledger.
  *
- * CONVENTIONS: "anything that calls a third party happens *after* commit, via
- * the effects ledger — never inside the transaction". A domain writes a row
- * inside its transaction with `recordEffect(tx, …)` (INSERT … ON CONFLICT DO
- * NOTHING, so recording twice is free), and the dispatcher claims rows with
- * `FOR UPDATE SKIP LOCKED` after the commit and runs the registered handler.
+ * `docs/conventions.md`: "anything that calls a third party happens *after*
+ * commit, via the effects ledger — never inside the transaction". A domain
+ * writes a row inside its transaction with `recordEffect(tx, …)` (INSERT … ON
+ * CONFLICT DO NOTHING, so recording twice is free), and the dispatcher claims
+ * rows with `FOR UPDATE SKIP LOCKED` after the commit and runs the registered
+ * handler.
  *
  * `UNIQUE (scope, scope_id, event_type)` is the whole exactly-once story: the
  * same event for the same aggregate can only ever be enqueued once, and the

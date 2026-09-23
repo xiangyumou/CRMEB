@@ -25,7 +25,8 @@ const DENY = {
   core: [
     {
       source: NEXT_AND_REACT,
-      message: 'packages/core 不得依赖 next / react / UI 库（CONVENTIONS「Import boundaries」）',
+      message:
+        'packages/core 不得依赖 next / react / UI 库（docs/conventions.md「Import boundaries」）',
     },
     { source: '^@shop/web', message: 'packages/core 不得依赖 apps/*' },
     {
@@ -132,8 +133,9 @@ export function shopConfig(options) {
       },
     },
     {
-      // Reading the ambient clock is banned in domain code (CONVENTIONS:
-      // "inject `Clock`; never call `Date.now()` in domain code").
+      // Reading the ambient clock is banned in domain code
+      // (`docs/conventions.md`: "inject `Clock`; never call `Date.now()` in
+      // domain code").
       files: ['packages/core/src/**/*.ts', 'src/**/*.ts'],
       ignores: [
         '**/*.test.ts',
@@ -150,7 +152,7 @@ export function shopConfig(options) {
                 {
                   object: 'Date',
                   property: 'now',
-                  message: '领域代码注入 Clock，不要直接读系统时间（CONVENTIONS「Time」）',
+                  message: '领域代码注入 Clock，不要直接读系统时间（docs/conventions.md「Time」）',
                 },
               ]
             : 'off',
@@ -169,7 +171,7 @@ export function shopConfig(options) {
                 {
                   selector: "NewExpression[callee.name='Date'][arguments.length=0]",
                   message:
-                    '领域代码注入 Clock：用 ctx.clock.now()，不要 new Date()（CONVENTIONS「Time」）',
+                    '领域代码注入 Clock：用 ctx.clock.now()，不要 new Date()（docs/conventions.md「Time」）',
                 },
               ]
             : 'off',

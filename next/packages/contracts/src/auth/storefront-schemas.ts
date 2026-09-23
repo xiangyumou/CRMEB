@@ -207,9 +207,9 @@ export type MiniLoginBody = z.infer<typeof miniLoginBody>;
 /**
  * Finish a mini-program sign-in with the phone number.
  *
- * `phoneCode` is what `getPhoneNumber`'s callback gives in the current API —
- * a code redeemed server-side, not `encryptedData` + `iv`. The old client-side
- * decryption path is not ported: it needed `session_key` to leave the server.
+ * `phoneCode` is what `getPhoneNumber`'s callback gives in the current API — a
+ * code redeemed server-side, not `encryptedData` + `iv`. There is no
+ * client-side decryption path: it would need `session_key` to leave the server.
  */
 export const miniPhoneLoginBody = z.object({
   bindToken: z.string().min(1).max(256),

@@ -60,7 +60,7 @@ describe('PRODUCT_DETAIL_DEFAULT_VALUE', () => {
     expect(bottom.showContent.list.find((entry) => entry.id === 4)?.name).toBe('分享');
   });
 
-  it('shows nothing that is not ported', () => {
+  it('shows nothing the storefront does not implement', () => {
     const names = Object.values(PRODUCT_DETAIL_DEFAULT_VALUE).map(
       (node) => (node as { name: string }).name,
     );

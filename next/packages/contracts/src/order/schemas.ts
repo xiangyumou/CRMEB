@@ -274,8 +274,8 @@ export const checkoutCreateBody = checkoutInput
     /**
      * What the shopper was shown. When present and the server's recomputation
      * disagrees, the order is refused with `ORDER_PRICE_CHANGED` instead of
-     * charging a price nobody agreed to (risk matrix §1, "SKU swap between
-     * confirm and create").
+     * charging a price nobody agreed to (say, an operator edited the SKU
+     * between confirm and create).
      */
     expectedPayableAmount: money.optional(),
   })

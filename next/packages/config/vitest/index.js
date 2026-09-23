@@ -1,7 +1,8 @@
 /**
  * Shared Vitest presets.
  *
- * Every package gets two projects, matching the convention in CONVENTIONS.md:
+ * Every package gets two projects, matching the convention in
+ * `docs/conventions.md`:
  *
  *   unit  `src/**\/*.test.ts`      — no PostgreSQL, no Redis, no Docker
  *   int   `src/**\/*.int.test.ts`  — real PG 17 + Redis 7 via the @shop/testing harness

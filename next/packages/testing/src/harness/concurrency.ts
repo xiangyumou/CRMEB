@@ -1,7 +1,7 @@
 /**
- * `runConcurrently` — the tool CONVENTIONS demands for every conditional state
- * change: "Every conditional state change ships a concurrency test using
- * `runConcurrently` from `@shop/testing`."
+ * `runConcurrently` — the tool `docs/conventions.md` demands for every
+ * conditional state change: "Every conditional state change ships a concurrency
+ * test using `runConcurrently` from `@shop/testing`."
  *
  * The point is the *barrier*. Starting N promises in a loop does not make them
  * race: the first one is usually several event-loop turns ahead by the time the

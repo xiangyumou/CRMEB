@@ -58,7 +58,8 @@ export const orderErrors = defineErrors({
   /**
    * The gateway would not say whether an attempt can still succeed. Nothing is
    * released — not the stock, not the coupon — and the caller retries later.
-   * Never guess (risk matrix §4, QUEUE-004).
+   * Never guess: a cancel that released on `unknown` could free the stock of an
+   * order that then gets paid (QUEUE-004).
    */
   ORDER_PAYMENT_STATE_UNKNOWN: { status: 409, message: '支付状态确认失败，请稍后重试' },
   /**
