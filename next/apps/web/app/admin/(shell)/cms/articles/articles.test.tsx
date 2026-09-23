@@ -26,8 +26,8 @@ import { ArticlesPage } from './articles';
  *
  * The wiring worth asserting: the table asks the contract route, the category
  * filter is fed by the category route rather than a second query of its own,
- * 发布/隐藏 goes through the status sub-resource (the legacy screen wrote the
- * column straight from the list), and 删除 sits on its own atom.
+ * 发布/隐藏 goes through the status sub-resource (not a column written straight
+ * from the list), and 删除 sits on its own atom.
  */
 
 const row: AdminArticleListItem = {

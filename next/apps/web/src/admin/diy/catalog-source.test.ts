@@ -177,7 +177,7 @@ describe('catalogLinkTargets', () => {
     expect(matched.items[0]?.id).toBe('17');
   });
 
-  it('answers empty for a target type no stream has shipped yet', async () => {
+  it('answers empty for a target type with no catalog behind it yet', async () => {
     expect(await catalogLinkTargets('article', { page: 1, pageSize: 20 })).toEqual({
       items: [],
       total: 0,

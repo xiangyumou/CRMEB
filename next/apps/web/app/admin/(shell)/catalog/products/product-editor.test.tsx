@@ -220,7 +220,7 @@ describe('商品编辑器', () => {
     await userEvent.click(screen.getByTitle('大件走重量（按重量）'));
 
     // 固定运费 hides the template select and says the charge is per unit —
-    // legacy multiplied `postage` by `cart_num` and the rewrite kept that.
+    // checkout multiplies `postage` by the quantity.
     // antd's radio button puts `pointer-events: none` on the input itself.
     await userEvent
       .setup({ pointerEventsCheck: 0 })

@@ -173,7 +173,7 @@ describe('用户列表', () => {
   });
 
   /**
-   * CR-3-d2. 真实姓名 / 生日 / 管理员备注 live on the detail, not on the list
+   * 真实姓名 / 生日 / 管理员备注 live on the detail, not on the list
    * row, so 编辑 used to open them blank — and an empty antd box submits `''`,
    * which `user-admin.service.ts` writes, because it skips a field only when it
    * is `undefined`. Editing a nickname erased the operator's own notes.

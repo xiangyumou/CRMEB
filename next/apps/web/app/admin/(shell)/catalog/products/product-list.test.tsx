@@ -106,7 +106,7 @@ describe('商品列表', () => {
     renderAdmin(<ProductListPage />, { identity: allPermissions });
 
     expect(await screen.findByText('简约白 T 恤')).toBeInTheDocument();
-    // `kind` replaces legacy's `is_virtual` + `virtual_type` pair.
+    // One `kind`, not an `is_virtual` flag plus a `virtual_type`.
     expect(screen.getByText('实物商品')).toBeInTheDocument();
     expect(screen.getByText('#男装')).toBeInTheDocument();
     const list = calls.find((call) => call.url.includes('/admin-api/catalog/products'));
@@ -119,7 +119,7 @@ describe('商品列表', () => {
     renderAdmin(<ProductListPage />, { identity: allPermissions });
     await screen.findByText('简约白 T 恤');
 
-    // 120 real, +500 boost — legacy showed one conflated number.
+    // 120 real, +500 boost — two numbers, never one conflated total.
     expect(screen.getByText('120')).toBeInTheDocument();
     expect(screen.getByText('+500')).toBeInTheDocument();
   });
