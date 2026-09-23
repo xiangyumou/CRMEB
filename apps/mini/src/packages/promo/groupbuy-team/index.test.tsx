@@ -170,6 +170,8 @@ describe('拼团进度', () => {
     await renderPage(<GroupbuyTeamPage />);
     expect(await screen.findByText('拼团未成功，已退款')).toBeTruthy();
     expect(screen.getByText('款项已原路退回，请留意到账')).toBeTruthy();
+    // Nobody is left in it: no seats, and no 待加入 to invite a stranger into.
+    expect(screen.queryByText('待加入')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '查看订单' }));
     expect(navigatedTo().at(-1)).toBe('/packages/order/detail/index?id=70');
     fireEvent.click(screen.getByRole('button', { name: '再开一团' }));

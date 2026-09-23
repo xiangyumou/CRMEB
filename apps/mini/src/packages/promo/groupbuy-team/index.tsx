@@ -220,25 +220,28 @@ function Team({ view, onStale }: { view: TeamView; onStale: () => void }) {
             </View>
           ) : null}
 
-          <View
-            className="groupbuy-team__seats"
-            ariaLabel={`${view.seatsTotal} 人团，已有 ${seatsTaken} 人`}
-          >
-            {seatsOf(view).map((member, index) => (
-              <View
-                key={index}
-                className={cx('groupbuy-team__seat', !member && 'groupbuy-team__seat--open')}
-                ariaHidden
-              >
-                <View className="groupbuy-team__seat-circle">
-                  <Icon name={member ? 'user' : 'plus'} />
+          {/* A team that did not fill has nobody left in it: its seats say nothing. */}
+          {phase === 'failed' || phase === 'refunded' || phase === 'cancelled' ? null : (
+            <View
+              className="groupbuy-team__seats"
+              ariaLabel={`${view.seatsTotal} 人团，已有 ${seatsTaken} 人`}
+            >
+              {seatsOf(view).map((member, index) => (
+                <View
+                  key={index}
+                  className={cx('groupbuy-team__seat', !member && 'groupbuy-team__seat--open')}
+                  ariaHidden
+                >
+                  <View className="groupbuy-team__seat-circle">
+                    <Icon name={member ? 'user' : 'plus'} />
+                  </View>
+                  <Text className="groupbuy-team__seat-label">
+                    {member ? (member.role === 'leader' ? '团长' : '已参团') : '待加入'}
+                  </Text>
                 </View>
-                <Text className="groupbuy-team__seat-label">
-                  {member ? (member.role === 'leader' ? '团长' : '已参团') : '待加入'}
-                </Text>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )}
 
           <Text className="groupbuy-team__note">{headline.note}</Text>
 

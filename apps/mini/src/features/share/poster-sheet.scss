@@ -29,9 +29,11 @@
     width: 70%;
   }
 
+  // `height: auto` for H5, whose <image> host keeps a default 240px height under widthFix.
   &__image {
     display: block;
     width: 100%;
+    height: auto;
     box-shadow: $shadow-float;
   }
 

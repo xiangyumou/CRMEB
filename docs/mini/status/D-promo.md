@@ -37,13 +37,19 @@ share handlers, 小程序码 + scene decode, canvas-2D poster, e2e journeys.
   商品详情 for both.
 - Decor pages (首页, 微页面), 分类, 商品列表, 精品推荐 and every promo page share; each page's
   `enableShareAppMessage` matches its `useShare`.
-- e2e: `e2e/storefront/src/mini-pages/promo-pages.ts` page objects; `specs-mini/promo.spec.ts`
-  (four journeys) being run.
+- e2e: `e2e/storefront/src/mini-pages/promo-pages.ts` page objects; `specs-mini/promo.spec.ts`,
+  four journeys, green: a team two phones fill (拼团成功 on both); a team nobody joins, its clock
+  moved to now in the database, failed by the worker and refunded (拼团未成功，已退款, 我的拼团
+  未成团); a presale paid in full (the backend has no deposit / balance); a coupon claimed at
+  领券中心, shown in 我的优惠券, applied at 确认订单 (−¥5) and moved to 已使用.
+- 375px H5 screenshots in `docs/mini/status/D-screens/` (seeded e2e data; product pictures are
+  blank because the stack is offline; the 小程序码 is the fake's). Fixes they found: the poster
+  preview was cut at the H5 `<image>`'s default height; a failed team showed two 待加入 seats
+  (the seats row is now hidden once a team failed or was cancelled).
 
 ## Next
 
-1. Run and settle `specs-mini/promo.spec.ts`.
-2. 375px screenshots, checklist.
+1. Final checklist.
 
 ## Decisions
 
