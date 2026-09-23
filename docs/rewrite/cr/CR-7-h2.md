@@ -1,5 +1,7 @@
 # CR-7-h2 — the app has no way to read the shop's own public settings
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `GET /api/v1/site/config` exists (F4, `31ec0782e`). The status line below is kept as history.
+
 - **Stream:** H (uni-app storefront), raised against F1 (system / storage)
 - **Status:** open
 - **Affects:** `next/packages/contracts/src/system/` — there is no storefront

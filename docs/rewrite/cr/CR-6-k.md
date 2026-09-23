@@ -1,5 +1,7 @@
 # CR-6-k — 25 `CONTRACT-PENDING` markers name a stream that has already merged
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `MARKER_REASSIGNMENTS` is empty (H3, `503fbcf35`). The status line below is kept as history.
+
 **Stream:** K (hardening) **Status:** OPEN — for stream H (uni-app), second pass
 **Files:** `template/uni-app/api/*.js`
 **Machine-readable copy:** `next/guards/src/lib/marker-reassignments.ts`

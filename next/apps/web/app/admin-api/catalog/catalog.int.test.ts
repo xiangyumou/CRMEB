@@ -382,6 +382,33 @@ describe('/api/v1/catalog', () => {
     expect(typeof body.version).toBe('string');
   });
 
+  it('answers a caller holding the current version with a 304, on both routes (CR-1-s)', async () => {
+    const headers = await adminCookie();
+    await makeCategory(headers);
+
+    const { GET: tree } = await import('../../api/v1/catalog/categories/route');
+    const { GET: version } = await import('../../api/v1/catalog/categories/version/route');
+    const tag = (await tree(get('/api/v1/catalog/categories'))).headers.get('etag')!;
+    expect(tag).toMatch(/^"[^"]+"$/);
+
+    for (const [route, path] of [
+      [tree, '/api/v1/catalog/categories'],
+      [version, '/api/v1/catalog/categories/version'],
+    ] as const) {
+      const response = await route(get(path, { 'if-none-match': tag }));
+      expect(response.status, path).toBe(304);
+      expect(await response.text()).toBe('');
+      expect(response.headers.get('etag')).toBe(tag);
+    }
+
+    // The tree moved: the old tag gets the new tree.
+    await makeCategory(headers);
+    const moved = await tree(get('/api/v1/catalog/categories', { 'if-none-match': tag }));
+    expect(moved.status).toBe(200);
+    expect(moved.headers.get('etag')).not.toBe(tag);
+    expect((await moved.json()).items.length).toBeGreaterThan(1);
+  });
+
   it('requires a signed-in shopper for 我的收藏', async () => {
     const admin = await adminCookie();
     const { product } = await makeProduct(admin);

@@ -1,5 +1,7 @@
 # CR-3-e4 — the mock server's route sort was not a total order, so adding any route could break an unrelated one
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — the fix stands in `@shop/testing`'s mock server with the whole-table test "is a total order over every registered route" (B3, `41883680c`). The status line below is kept as history.
+
 - **Stream:** E4 (user & WeChat follow-up)
 - **Status:** fixed in `@shop/testing`, with a regression test; flagged because the package is the orchestrator's
 - **Affects:** `next/packages/testing/src/mock-server/index.ts` (K), every stream that adds a route

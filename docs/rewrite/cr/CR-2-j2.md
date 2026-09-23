@@ -1,5 +1,7 @@
 # CR-2-j2 — the OPS and REL invariant rows, mapped
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — every OPS/REL row in `invariants.md` is mapped (ported or retired); `pnpm guards invariants` passes. The status line below is kept as history.
+
 **Stream** J2 (container images and deployment) · **Against**
 `docs/rewrite/invariants.md` (orchestrator-owned), three sections owned by J:
 "Backup, upgrade and rollback", "Deployment topology", "Release publishing" ·

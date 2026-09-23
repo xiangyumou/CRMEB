@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
+import { createDb } from '@shop/db';
 import { cartItems } from '@shop/db/schema/cart';
 import { productSkus, productVirtualCards, products } from '@shop/db/schema/catalog';
 import { orderStatusLogs, orders } from '@shop/db/schema/order';
@@ -19,6 +20,8 @@ import { registerShippingFreightPort } from '../shipping';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import * as order from './index';
+import { orderConfig } from './order.config';
+import { orderFulfilConfig } from './order.fulfil.config';
 import { autoDeliver } from './order.fulfil.effects';
 import {
   registerOrderStateMachine,
@@ -1251,5 +1254,78 @@ describe('hiding a finished order', () => {
     ]);
     const logs = await harness.ctx.db.select().from(orderStatusLogs);
     expect(logs.filter((log) => log.changeType === 'hidden_by_user')).toHaveLength(1);
+  });
+});
+
+/**
+ * CR-1-r1. Checkout's `create` and B2's `autoDeliver` each read a config group
+ * while their transaction is open. Through `ctx.config.get` a cold cache took
+ * a second pooled connection for that read, the CR-53-k2 shape: `max` checkouts
+ * at once, each holding one connection and waiting for another. On a pool of
+ * one that is not a race but a certainty, so these run on a pool of one with
+ * the cache emptied first. Before the fix both fail at the acquire timeout.
+ */
+describe('CR-1-r1 — config read through the transaction, not a second connection', () => {
+  async function onPoolOfOne<T>(userId: number | null, fn: (ctx: Ctx) => Promise<T>): Promise<T> {
+    const small = createDb(harness.db.url, { max: 1, acquireTimeoutMs: 1_000 });
+    small.pool.on('error', () => {});
+    try {
+      const base = { ...harness, db: { ...harness.db, db: small.db } } as TestCtx;
+      const ctx = forkTestCtx(base, {
+        ...(userId === null ? {} : { actor: userActor(userId) }),
+        platform: 'h5',
+      });
+      await ctx.config.invalidate(orderConfig.group);
+      await ctx.config.invalidate(orderFulfilConfig.group);
+      return await fn(ctx);
+    } finally {
+      await small.close().catch(() => {});
+    }
+  }
+
+  it('places an order, freight quote included, on a pool of one with a cold config cache', async () => {
+    const userId = await makeUser();
+    const item = await makeProduct({ freight: '8.00' });
+    const cartItemId = await addToCart(userId, item, 1);
+    await makeAddress(userId);
+
+    const detail = await onPoolOfOne(userId, (ctx) =>
+      order.create(ctx, {
+        source: 'cart',
+        cartItemIds: [String(cartItemId)],
+        kind: 'normal',
+        idempotencyKey: idempotencyKey(),
+      }),
+    );
+
+    expect(detail.status).toBe('pending_payment');
+    expect(detail.freightAmount).toBe('8.00');
+  });
+
+  it('auto-delivers a virtual order on a pool of one with a cold config cache', async () => {
+    const userId = await makeUser();
+    const item = await makeProduct({ kind: 'virtual_card' });
+    await harness.ctx.db
+      .insert(productVirtualCards)
+      .values([{ productId: item.productId, skuId: item.skuId, cardKey: 'KEY-1', cardNo: 'NO-1' }]);
+    const cartItemId = await addToCart(userId, item, 1);
+    const detail = await order.create(as(userId), {
+      source: 'cart',
+      cartItemIds: [String(cartItemId)],
+      kind: 'normal',
+      idempotencyKey: idempotencyKey(),
+    });
+    const orderId = Number(detail.id);
+    await harness.ctx.db
+      .update(orders)
+      .set({ status: 'paid', paidAt: harness.clock.now(), paidAmount: '60.00' })
+      .where(eq(orders.id, orderId));
+
+    const outcome = await onPoolOfOne(null, (ctx) => autoDeliver(ctx, orderId));
+
+    expect(outcome).toMatchObject({ delivered: true, fulfilled: true });
+    const [row] = await harness.ctx.db.select().from(orders).where(eq(orders.id, orderId));
+    expect(row!.status).toBe('shipped');
+    expect(row!.autoReceiveAt).not.toBeNull();
   });
 });

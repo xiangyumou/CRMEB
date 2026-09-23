@@ -1,5 +1,7 @@
 # CR-1-f2 — `FreightLine` should carry the line's freight mode
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `FreightLine.freightMode` / `fixedFreightFen` and 满额包邮 are in the freight port (B3, `41883680c`). The status line below is kept as history.
+
 **Stream** F2 · **Status** open · **Blocking** no (local adapter in place)
 
 ## What

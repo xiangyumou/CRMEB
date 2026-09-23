@@ -1,5 +1,7 @@
 # CR-1-p0b — `ParamsOf` / `QueryOf` / `BodyOf` collapse to `undefined` under `exactOptionalPropertyTypes`
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — the conventions' `PartOf` uses `NonNullable` (`8a4a88a11`); the local workaround is gone. The status line below is kept as history.
+
 - **Stream:** P0-b (admin shell & kit)
 - **Status:** worked around locally; needs an orchestrator fix in the frozen conventions
 - **Affects:** `next/packages/contracts/src/_conventions/route.ts` (orchestrator-owned, frozen)

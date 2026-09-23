@@ -70,8 +70,8 @@ const BANS: readonly Ban[] = [
 /**
  * A raw `fetch()` of a URL the caller supplied is SSRF. The vetted fetcher is
  * `core/storage/safe-fetch.ts` (STOR-004/005/006), which takes its transport by
- * reference (`options.fetchImpl ?? fetch`) and so never *calls* `fetch(` by
- * name. Everything else may only fetch a URL it built itself from
+ * reference (`options.transport ?? pinnedTransport()`, `node:http`/`https` to
+ * the judged address) and so never *calls* `fetch(` by name. Everything else may only fetch a URL it built itself from
  * configuration or a constant host, and each file that does is named here.
  *
  * A call is `fetch(` or `globalThis.fetch(` / `window.fetch(` / `self.fetch(`:

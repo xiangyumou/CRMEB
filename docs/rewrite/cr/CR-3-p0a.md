@@ -1,5 +1,7 @@
 # CR-3-p0a — `typescript-eslint` cannot load against TypeScript 7.0
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — the workaround is accepted and documented in CONVENTIONS' tooling caveats (`scripts/eslint-ts6.mjs`). The status line below is kept as history.
+
 **Stream:** P0-a platform **Status:** worked around, no action needed unless you disagree
 **File:** `next/packages/config/package.json`
 

@@ -1,5 +1,7 @@
 # CR-6-h2 — the storefront cannot get a mini-program code
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `/api/v1/wechat/mini-qrcodes` exists (E4, `53ba7a17a`). The status line below is kept as history.
+
 - **Stream:** H (uni-app storefront), raised against E2 (WeChat OA / mini-program)
 - **Status:** open
 - **Affects:** `next/packages/contracts/src/wechat-oa/wechat-oa.storefront.contract.ts`

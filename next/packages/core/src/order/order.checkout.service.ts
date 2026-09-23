@@ -333,7 +333,10 @@ async function buildDraft(
   const discount = splitAdjustments(lines, adjustments);
   const itemsAmount = goodsTotalOf(lines);
   const freightAmount = await quoteFreight(ctx, db, lines, address);
-  const { payWindowMinutes } = await ctx.config.get(orderConfig);
+  // Through `db`: on `create` it is the checkout transaction, and a cold cache
+  // must not take a second pooled connection while it is open (CR-1-r1). On
+  // the preview it is the pool, where `getIn` is exactly `get`.
+  const { payWindowMinutes } = await ctx.config.getIn(db, orderConfig);
 
   return {
     userId,

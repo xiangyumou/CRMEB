@@ -97,9 +97,10 @@ describe('against the real ledgers', () => {
     expect(rows.length).toBeGreaterThanOrEqual(220);
     // `dropped` is the state CR-2-k gave the sections whose owner already read
     // "dropped: …" while their rows still sat `unmapped` (HIST-001, MAINT-001,
-    // MIG-018…022, CORE-001, SQL-001).
+    // MIG-018…022, CORE-001, SQL-001). `unmapped` is gone since STAB-001 was
+    // ported at R5's merge: every row is answered, and a new one must be too.
     const states = new Set(rows.map((r) => r.state));
-    expect([...states].sort()).toEqual(['dropped', 'ported', 'retired', 'unmapped']);
+    expect([...states].sort()).toEqual(['dropped', 'ported', 'retired']);
   });
 
   it('reads every risk-matrix entry', () => {

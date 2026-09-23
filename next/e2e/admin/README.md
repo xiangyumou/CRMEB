@@ -10,14 +10,27 @@ pnpm --filter @shop/e2e-admin e2e
 
 其他入口：
 
-| 命令                                                      | 作用                                                           |
-| --------------------------------------------------------- | -------------------------------------------------------------- |
-| `pnpm --filter @shop/e2e-admin e2e -- specs/auth.spec.ts` | 只跑一个文件                                                   |
-| `pnpm --filter @shop/e2e-admin e2e:ui`                    | Playwright UI 模式                                             |
-| `pnpm --filter @shop/e2e-admin exec tsx scripts/serve.ts` | 只起栈，保持常驻；随后的 `e2e` 会复用（`reuseExistingServer`） |
-| `SHOP_TEST_PG_URL=… SHOP_TEST_REDIS_URL=… pnpm …`         | 用已有的 PG/Redis，跳过容器                                    |
-| `SHOP_E2E_BUILD=1 pnpm …`                                 | 强制重新 `next build`                                          |
-| `SHOP_E2E_PORT=3300 pnpm …`                               | 换端口                                                         |
+| 命令                                                      | 作用                                                        |
+| --------------------------------------------------------- | ----------------------------------------------------------- |
+| `pnpm --filter @shop/e2e-admin e2e -- specs/auth.spec.ts` | 只跑一个文件                                                |
+| `pnpm --filter @shop/e2e-admin e2e:ui`                    | Playwright UI 模式                                          |
+| `pnpm --filter @shop/e2e-admin exec tsx scripts/serve.ts` | 只起栈，保持常驻；随后带 `SHOP_E2E_REUSE=1` 的 `e2e` 复用它 |
+| `SHOP_E2E_REUSE=1 pnpm …`                                 | 复用本检出端口上已在跑的服务（默认**不**复用，见下节）      |
+| `SHOP_TEST_PG_URL=… SHOP_TEST_REDIS_URL=… pnpm …`         | 用已有的 PG/Redis，跳过容器                                 |
+| `SHOP_E2E_BUILD=1 pnpm …`                                 | 强制重新 `next build`                                       |
+| `SHOP_E2E_PORT=3510 SHOP_E2E_STACK=/tmp/x.json pnpm …`    | 显式指定端口与交接文件（覆盖按检出派生的默认值）            |
+
+## 多个检出（worktree）同时跑
+
+以前端口固定 3210、交接文件固定 `$TMPDIR/shop-e2e-admin.json`，且非 CI 下默认 `reuseExistingServer`：第二个 worktree 的 Playwright 看见端口上已有服务就直接复用，于是拿**别人的构建和数据库**跑自己的 spec，红绿都与自己的代码无关。现在（`src/stack-file.ts`）：
+
+| 变量             | 默认                                        | 说明                                                                                 |
+| ---------------- | ------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `SHOP_E2E_PORT`  | `20000 + (CHECKOUT_ID % 5000)`              | `CHECKOUT_ID` = 检出根目录绝对路径 SHA-256 的前 8 位十六进制；每个检出固定、彼此不同 |
+| `SHOP_E2E_STACK` | `$TMPDIR/shop-e2e-admin-<CHECKOUT_ID>.json` | 交接文件，同样按检出区分                                                             |
+| `SHOP_E2E_REUSE` | 未设 = 不复用                               | `=1` 才复用端口上已在跑的服务；不设时端口被占用会直接报错，而不是悄悄接管            |
+
+同一个检出要并行跑两遍时，显式给第二遍 `SHOP_E2E_PORT` 和 `SHOP_E2E_STACK`。端口段 20000–24999 在 Linux 临时端口段（32768 起）之下；撞号的结果是「端口已占用」报错，不会是静默复用。
 
 **首次运行前**：`pnpm --filter @shop/e2e-admin exec playwright install chromium`（约 150 MB，不进仓库）。
 

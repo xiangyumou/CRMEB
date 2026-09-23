@@ -1,5 +1,7 @@
 # CR-7-k — component-test fixtures are never checked against the contract they pretend to be
 
+**Decided (orchestrator, 2026-09-23): deferred to the post-cutover backlog.** Test-quality, not behaviour: build the `respondWith` helper, migrate the 27 files, then add the guard. Not a cutover blocker.
+
 **Stream:** K (hardening) **Status:** OPEN — proposal; the helper is stream P0-B's seam, the guard is K's second pass
 **Files:** `next/apps/web/src/admin/api/config.ts` (`configureApi`), `next/apps/web/src/test/render.tsx`, every `apps/web/**/*.test.tsx` that stubs `fetch`, `next/guards/src/checks/` (the proposed check)
 

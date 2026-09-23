@@ -1,5 +1,7 @@
 # CR-6-f1 — two streams claimed `group: 'order'`; the settings index now shows two order screens
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — option 1: `trade.config.ts` is deleted and its keys folded into `order.config` / `order.fulfil.config` (B3, `41883680c`). The status line below is kept as history.
+
 - **Stream:** F1 (system & storage)
 - **Status:** resolved locally in F1's favour-of-B1; a product decision is wanted
 - **Affects:** `next/packages/core/src/order/order.config.ts` (B1),

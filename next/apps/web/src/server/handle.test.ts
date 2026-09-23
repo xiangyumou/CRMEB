@@ -801,6 +801,104 @@ describe('audit log', () => {
   });
 });
 
+describe('conditional GET — ctx.etag / ctx.notModified (CR-1-s)', () => {
+  const versioned = (version: string) =>
+    handle(
+      okRoute,
+      async (ctx, { query }) => {
+        ctx.setHeader('cache-control', 'no-cache');
+        if (ctx.etag(version)) ctx.notModified();
+        return { page: query.page };
+      },
+      { container: container() },
+    );
+  const get = (headers: Record<string, string> = {}) =>
+    new Request('https://shop.example/api/v1/things', { headers });
+
+  it('sends the tag with the body when the caller offers none', async () => {
+    const response = await versioned('v1')(get());
+    expect(response.status).toBe(200);
+    expect(response.headers.get('etag')).toBe('"v1"');
+    expect(await body(response)).toEqual({ page: 1 });
+  });
+
+  it('answers 304 with no body, keeping the tag and the headers already set', async () => {
+    const response = await versioned('v1')(get({ 'if-none-match': '"v1"' }));
+    expect(response.status).toBe(304);
+    expect(await response.text()).toBe('');
+    expect(response.headers.get('etag')).toBe('"v1"');
+    expect(response.headers.get('cache-control')).toBe('no-cache');
+    expect(response.headers.get('content-type')).toBeNull();
+  });
+
+  it('compares weakly, reads a list, and treats * as a match', async () => {
+    for (const offered of ['W/"v1"', '"v0", "v1"', ' "v0" ,W/"v1" ', '*']) {
+      expect((await versioned('v1')(get({ 'if-none-match': offered }))).status, offered).toBe(304);
+    }
+  });
+
+  it('sends the new version when the caller holds an old one', async () => {
+    for (const offered of ['"v0"', 'v1', '"v1-old"', '']) {
+      const response = await versioned('v1')(get({ 'if-none-match': offered }));
+      expect(response.status, offered).toBe(200);
+      expect(await body(response)).toEqual({ page: 1 });
+    }
+  });
+
+  it('sends a weak tag when asked, and still matches either form of it', async () => {
+    const GET = handle(
+      okRoute,
+      async (ctx) => {
+        if (ctx.etag('v1', { weak: true })) ctx.notModified();
+        return { page: 1 };
+      },
+      { container: container() },
+    );
+    const fresh = await GET(get());
+    expect(fresh.status).toBe(200);
+    expect(fresh.headers.get('etag')).toBe('W/"v1"');
+    for (const offered of ['W/"v1"', '"v1"']) {
+      const response = await GET(get({ 'if-none-match': offered }));
+      expect(response.status, offered).toBe(304);
+      expect(response.headers.get('etag')).toBe('W/"v1"');
+    }
+  });
+
+  it('does not validate a 304 against the response contract', async () => {
+    // The handler never produces a value, so there is nothing to validate;
+    // validation would otherwise turn `undefined` into a 500.
+    const GET = handle(
+      okRoute,
+      async (ctx) => {
+        ctx.etag('v1');
+        return ctx.notModified();
+      },
+      { container: container() },
+    );
+    expect((await GET(get({ 'if-none-match': '"v1"' }))).status).toBe(304);
+  });
+
+  it('writes no audit row', async () => {
+    const POST = handle(
+      adminMutation,
+      async (ctx) => {
+        ctx.audit('thing:1');
+        return ctx.notModified();
+      },
+      { container: container() },
+    );
+    const response = await POST(
+      new Request('https://shop.example/admin-api/things', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'a' }),
+        headers: { cookie: `${ADMIN_COOKIE}=good-super`, 'sec-fetch-site': 'same-origin' },
+      }),
+    );
+    expect(response.status).toBe(304);
+    expect(audits).toHaveLength(0);
+  });
+});
+
 describe('searchParamsToObject', () => {
   it('keeps a single value scalar and a repeated key an array', () => {
     expect(searchParamsToObject(new URLSearchParams('a=1&b=2&b=3'))).toEqual({

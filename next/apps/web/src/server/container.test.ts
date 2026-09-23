@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getSmsSenderOverride, resetSmsSender } from '@shop/core/sms';
-import { applyProcessOverrides, resetProcessOverrides } from './container';
+import { createDb } from '@shop/db';
+import { applyProcessOverrides, resetProcessOverrides, webDbOptions } from './container';
 import type { Env } from './env';
 
 /**
@@ -53,5 +54,24 @@ describe('applyProcessOverrides', () => {
     applyProcessOverrides({ ...env, SHOP_FAKE_SMS: '0' }, logger);
     expect(getSmsSenderOverride()).toBeUndefined();
     expect(logger.warn).not.toHaveBeenCalled();
+  });
+});
+
+describe('webDbOptions', () => {
+  it('logs a connection the server ends outside a query, as the worker does', () => {
+    const logger = { warn: vi.fn() };
+    // `pg.Pool` connects lazily, so a pool on an unreachable URL is fine here.
+    const handle = createDb('postgres://unused@127.0.0.1:9/none', webDbOptions(env, logger));
+    try {
+      expect(webDbOptions(env, logger).max).toBe(env.DB_POOL_MAX);
+      const error = new Error('terminating connection due to idle-in-transaction timeout');
+      handle.pool.emit('error', error);
+      expect(logger.warn).toHaveBeenCalledWith(
+        { err: error },
+        'database connection ended outside a query',
+      );
+    } finally {
+      void handle.close();
+    }
   });
 });

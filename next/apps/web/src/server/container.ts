@@ -1,4 +1,4 @@
-import { createDb, type Db, type DbHandle } from '@shop/db';
+import { createDb, type Db, type DbOptions, type DbHandle } from '@shop/db';
 import {
   createConfigService,
   createLocalStorage,
@@ -81,15 +81,28 @@ export function resetProcessOverrides(): void {
   fakeSmsAnnounced = false;
 }
 
+/**
+ * The web process's pool options. Acquire and idle-in-transaction timeouts
+ * come from `createDb`'s defaults (`DB_POOL_ACQUIRE_TIMEOUT_MS`,
+ * `DB_IDLE_IN_TX_TIMEOUT_MS`; CR-53-k2). A connection the server ends while it
+ * sits in the pool is logged, as the worker does, instead of vanishing.
+ */
+export function webDbOptions(env: Env, logger: Pick<Logger, 'warn'>): DbOptions {
+  return {
+    max: env.DB_POOL_MAX,
+    onConnectionError: (err) => logger.warn({ err }, 'database connection ended outside a query'),
+  };
+}
+
 export function buildContainer(env: Env = loadEnv()): Container {
-  const dbHandle = createDb(env.DATABASE_URL, { max: env.DB_POOL_MAX });
+  const logger = createLogger({ level: env.LOG_LEVEL, pretty: env.LOG_PRETTY });
+  const dbHandle = createDb(env.DATABASE_URL, webDbOptions(env, logger));
   const redis = new Redis(env.REDIS_URL, {
     // BullMQ requires this, and a request that is waiting on Redis should fail
     // fast rather than retry behind the user's back.
     maxRetriesPerRequest: null,
     enableReadyCheck: true,
   });
-  const logger = createLogger({ level: env.LOG_LEVEL, pretty: env.LOG_PRETTY });
   const clock = systemClock;
   const queue = createBullQueue({ connection: redis, queueName: env.QUEUE_NAME });
   const storage = createLocalStorage({

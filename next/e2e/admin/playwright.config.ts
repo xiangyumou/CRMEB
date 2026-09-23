@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-import { BASE_URL } from './src/stack-file';
+import { BASE_URL, REUSE } from './src/stack-file';
 
 /**
  * Admin end-to-end suite (`K-hardening.md` §3).
@@ -64,7 +64,9 @@ export default defineConfig({
     url: `${BASE_URL}/api/v1/health`,
     // Containers pull on a cold machine and `next build` runs once.
     timeout: 900_000,
-    reuseExistingServer: !process.env.CI,
+    // Opt-in only (`SHOP_E2E_REUSE=1`): reusing by default let one worktree's
+    // run silently test another worktree's server. See `src/stack-file.ts`.
+    reuseExistingServer: REUSE,
     stdout: 'pipe',
     stderr: 'pipe',
   },

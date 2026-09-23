@@ -1,6 +1,6 @@
 # CR-1-r2 — `onOrderPaid` has no ordering, so "commit before the campaigns" holds only by import order
 
-**Stream:** R2 (payment, refund, order) **Status:** OPEN — for the orchestrator (`order/ports.ts` is read-only to R2; `core/scripts/gen-config-groups.ts` is not R2's)
+**Stream:** R2 (payment, refund, order) **Status:** RESOLVED (R5, option 2)
 **Files:** `next/packages/core/src/order/ports.ts` (`HookRegistry.register`), `next/packages/core/scripts/gen-config-groups.ts` (`registerAllDomains`)
 
 ## What
@@ -31,3 +31,17 @@ the one transaction. It is intent, and nothing enforces it.
    (the one domain whose hooks others build on), with a comment saying why.
 
 R2 would then add a `resetOrderPorts()` case to `order.stock.hooks.test.ts`.
+
+## Resolution (R5)
+
+Option 2. `core/scripts/gen-config-groups.ts` emits `registerOrderDomain()`
+first in `registerAllDomains()` (`REGISTERS_FIRST = 'order'`, the rest stay
+alphabetical), with the reason in both the generator and the generated doc
+comment, and fails `pnpm gen` if the order domain ever stops exporting a
+registrar. `HookRegistry` is unchanged; the import order of the generated file
+is unchanged, so the production module graph is as before.
+
+`order/order.stock.hooks.test.ts::CR-1-r2 — after resetOrderPorts() + registerAllDomains() > still runs the sale commit first`
+resets the ports, calls the generated registrar and asserts `order:commit-sale`
+is first, with `groupbuy:take-seat` and `presale:commit-sale` present. On the
+old generator it fails: `expected 'groupbuy:take-seat' to be 'order:commit-sale'`.

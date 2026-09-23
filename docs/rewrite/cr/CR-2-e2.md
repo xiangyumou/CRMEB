@@ -1,5 +1,7 @@
 # CR-2-e2 — six notifications have no hook to fire from
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — N1 (`fa65145d8`) wired `notify` at the missing call sites; every registered event now has a caller (`refund_rejected` from `refund.admin.ts`). The status line below is kept as history.
+
 - **Stream:** E2 (notification)
 - **Status:** the templates ship and are configurable; six of them can never fire
   until the owning stream calls `notify`

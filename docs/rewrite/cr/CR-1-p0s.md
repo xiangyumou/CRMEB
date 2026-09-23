@@ -1,5 +1,7 @@
 # CR-1-p0s — three changes the business schema needs outside its owned paths
 
+**Decided (orchestrator, 2026-09-23): closed.** §1 (`pg_trgm`) and §2 (the FKs) landed; §3 (shared schema helpers) is cosmetic and is dropped, per R5's sweep.
+
 Stream: P0-S (business schema). Branch `rewrite/ws-p0s-schema`.
 Status: open. None of these blocks P0-S; the schema is complete and verified
 without them.

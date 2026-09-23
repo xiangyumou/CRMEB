@@ -1,5 +1,7 @@
 # CR-5-b1 — `pnpm test:unit` is red on `rewrite/integration`: the mock server cannot serve a route with a required query parameter
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `mock-server.test.ts` sends the example's query (`8514dc832`); the merge gate is green. The status line below is kept as history.
+
 - **Stream:** reported by B1; the failure belongs to the platform test or to C's contract
 - **Status:** **unfixed, and it fails the merge gate for every stream**
 - **Affects:** `next/packages/testing/src/mock-server/mock-server.test.ts`, `next/packages/contracts/src/refund/refund.storefront.contract.ts`

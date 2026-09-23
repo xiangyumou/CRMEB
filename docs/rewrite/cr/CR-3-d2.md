@@ -1,5 +1,7 @@
 # CR-3-d2 — the admin kit has no "edit form that loads its own record", and every domain whose list row is thinner than its update body needs one
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — the admin kit's `ModalForm` takes a `load` (F4, `31ec0782e`); presale's local workaround is gone. The status line below is kept as history.
+
 **Stream:** D2 (presale) **Status:** open — worked around locally
 **Files:** `next/apps/web/src/admin/kit/form/modal-form.tsx` (stream F1's kit),
 worked around in

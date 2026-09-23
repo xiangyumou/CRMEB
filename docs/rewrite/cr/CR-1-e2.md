@@ -1,5 +1,7 @@
 # CR-1-e2 — the shop's public origin has no owner, and two streams need it
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `site.publicOrigin` / `site.extraOrigins` are config atoms (N1, `fa65145d8`) and `notification.send` reads `publicOrigin`. The status line below is kept as history.
+
 - **Stream:** E2 (notification)
 - **Status:** worked around with a local adapter; needs a home before F1's config UI is final
 - **Affects:** `next/packages/core/src/system/site.config.ts` (F1), and the local

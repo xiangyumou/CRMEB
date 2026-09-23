@@ -1,7 +1,7 @@
 # CR-2-r1 — a join and a leader's refund on one team deadlock: the two take the group row and the activity SKU row in opposite orders
 
 - **Stream:** R1 (reliability), found by the STAB-001 soak (round 1, seed 1). For the orchestrator: `core/src/groupbuy/**` is owned by no wave-6 stream.
-- **Status:** OPEN
+- **Status:** RESOLVED (R5, see the resolution at the end)
 - **Severity:** medium. PostgreSQL detects the cycle within `deadlock_timeout` (1 s) and kills one side. That side is either the shopper's checkout, which gets a 500, or the refund's completion. The `order.refunded` hooks run inside the transaction that completes the refund (`refund/refund.service.ts`, `onOrderRefunded.dispatch`), so the completion rolls back and waits for whatever drove it (the gateway's redelivery, reconciliation) to run it again. Nothing is corrupted and nothing wedges. It is a 500 on a real checkout, and it happens on the busiest shape a team-buy has: people joining a team while its leader backs out.
 - **Pinned by:** `groupbuy/groupbuy.concurrency.int.test.ts::leadership > passes to exactly one heir while a join is in flight`. This is the "groupbuy leadership" failure K2 saw once in its hung round 3 and left unfiled. It is timing-dependent. It passed 15/15 alone for K2, and failed here on the first STAB-001 round once CR-53-k2 no longer wedged the pool.
 
@@ -62,3 +62,25 @@ before the `reserveActivityStock` loop.
 Alone, the test passes (15/15 here, as K2 also found). It needs the rest of
 the set's load to lose the race. The re-check of `forming` under the lock is
 not part of the experiment.
+
+## Resolution (R5)
+
+**RESOLVED** on `rewrite/ws-r5-wave6-tail`. `groupbuyOrderHooks.afterCreate`
+(`groupbuy/groupbuy.order.ts`), when joining a team, takes `repo.lockGroup(tx,
+groupId)` before the activity-stock loop and re-checks the locked row with the
+existing rule: a missing team or one of another activity is
+`GROUPBUY_GROUP_NOT_FOUND`, a team that is no longer `forming`, has expired or
+is full is `GROUPBUY_GROUP_NOT_JOINABLE`. Both paths now take the group row
+first and the activity SKU row second.
+
+Tests added, `groupbuy/groupbuy.concurrency.int.test.ts::a join into a team that fails a moment before (CR-2-r1)`:
+
+- `> is refused under the group lock, and reserves nothing` (the team is settled
+  as failed between `beforeCreate` and `afterCreate`);
+- `> queues behind a transaction holding the team, then sees what it decided`
+  (another transaction holds the row `FOR UPDATE` and fails the team; the join
+  waits on the lock and refuses).
+
+Both fail on the old code (the join lands in the failed team). The file ran
+shuffled for seeds 1–20, 13/13 each; STAB-001's ten rounds are in
+`docs/rewrite/status/r5.md`.

@@ -1,5 +1,7 @@
 # CR-2-c — config group files cannot live in `core/src/system/config/`
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — CONVENTIONS places config groups in the domain (`<domain>/<domain>.config.ts`) and `core/scripts/gen-config-groups.ts` aggregates them into `config-groups.gen.ts` (CR-3-f1, `b916be269`). The status line below is kept as history.
+
 **Stream** C · **Target** `docs/rewrite/CONVENTIONS.md`, "Where a domain's files go" · **Severity** low, documentation
 
 CONVENTIONS says:

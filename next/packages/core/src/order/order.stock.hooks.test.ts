@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import '../domains.gen';
+import { registerAllDomains } from '../domains.gen';
 import { COMMIT_SALE_HOOK } from './order.stock.hooks';
-import { onOrderPaid } from './ports';
+import { onOrderPaid, resetOrderPorts } from './ports';
 
 /**
  * CR-1-k2. The campaign hooks say the SKU-level sale "just" happened, so the
@@ -12,6 +12,25 @@ import { onOrderPaid } from './ports';
  */
 describe('CR-1-k2 — the paid hook that commits the sale', () => {
   it('runs first, ahead of the group-buy seat and the presale sale', () => {
+    const names = onOrderPaid.names();
+    expect(names[0]).toBe(COMMIT_SALE_HOOK);
+    expect(names).toContain('groupbuy:take-seat');
+    expect(names).toContain('presale:commit-sale');
+    expect(names.filter((name) => name === COMMIT_SALE_HOOK)).toHaveLength(1);
+  });
+});
+
+/**
+ * CR-1-r2. The module graph above decides the order once; tests (and anything
+ * else) that call `resetOrderPorts()` and then `registerAllDomains()` get the
+ * order the generated registrar's calls give, so that has to put the order
+ * domain first too.
+ */
+describe('CR-1-r2 — after resetOrderPorts() + registerAllDomains()', () => {
+  it('still runs the sale commit first', () => {
+    resetOrderPorts();
+    expect(onOrderPaid.names()).toEqual([]);
+    registerAllDomains();
     const names = onOrderPaid.names();
     expect(names[0]).toBe(COMMIT_SALE_HOOK);
     expect(names).toContain('groupbuy:take-seat');

@@ -1,5 +1,7 @@
 # CR-2-golden — `@shop/core/<domain>` does not resolve; every import says `/index`
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `@shop/core`'s `"./*": "./src/*/index.ts"` export map (`6fd2f32b3`); no `/index` imports remain in the app. The status line below is kept as history.
+
 **Stream:** Golden slice (coupon) **Status:** worked around, one-line fix available
 **Files:** `next/packages/core/package.json` (P0-A owned)
 

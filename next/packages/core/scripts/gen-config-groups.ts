@@ -89,6 +89,30 @@ for await (const entry of glob('*/index.ts', { cwd: srcDir })) {
 }
 domains.sort((a, b) => a.name.localeCompare(b.name));
 
+/**
+ * The one domain whose registrar `registerAllDomains()` calls first (CR-1-r2).
+ * `HookRegistry` runs hooks in registration order, and the order domain's
+ * `order:commit-sale` paid hook must run ahead of the campaign hooks that
+ * build on the sale (`groupbuy:take-seat`, `presale:commit-sale`, …). A fresh
+ * module graph already gets that from import order; this keeps it true after
+ * `resetOrderPorts()` + `registerAllDomains()`, where the calls alone decide.
+ */
+const REGISTERS_FIRST = 'order';
+const registrarOrder = [
+  ...domains.filter(({ name }) => name === REGISTERS_FIRST),
+  ...domains.filter(({ name }) => name !== REGISTERS_FIRST),
+];
+if (
+  !registrarOrder[0] ||
+  registrarOrder[0].name !== REGISTERS_FIRST ||
+  registrarOrder[0].registrars.length === 0
+) {
+  // Loud rather than silently alphabetical: the ordering above is the point.
+  throw new Error(
+    `gen-config-groups: the ${REGISTERS_FIRST} domain has no register…Domain() to call first (CR-1-r2)`,
+  );
+}
+
 const registrarCount = domains.reduce((n, d) => n + d.registrars.length, 0);
 
 await writeFile(
@@ -108,13 +132,19 @@ await writeFile(
     '/**',
     ' * Installs every domain: the import registers what a domain registers as a',
     ' * module side effect, and the calls below cover the domains that publish an',
-    ' * explicit `register<Name>Domain()` instead. Order does not matter — every',
-    ' * registration is a map write or a slot assignment, and no domain reads',
-    " * another's port while registering — and every registrar is idempotent, so",
-    ' * calling this twice is harmless.',
+    ' * explicit `register<Name>Domain()` instead. Every registration is a map',
+    " * write or a slot assignment, no domain reads another's port while",
+    ' * registering, and every registrar is idempotent, so calling this twice is',
+    ' * harmless.',
+    ' *',
+    ` * One order matters: \`register${REGISTERS_FIRST[0]!.toUpperCase()}${REGISTERS_FIRST.slice(1)}Domain()\` comes first, because hooks run in`,
+    ' * registration order and its `order:commit-sale` paid hook must run ahead of',
+    ' * the campaign hooks built on the sale — which matters after',
+    ' * `resetOrderPorts()`, when these calls alone decide the order (CR-1-r2).',
+    ' * The rest are alphabetical.',
     ' */',
     'export function registerAllDomains(): void {',
-    ...domains.flatMap(({ registrars }) => registrars.map((fn) => `  ${fn}();`)),
+    ...registrarOrder.flatMap(({ registrars }) => registrars.map((fn) => `  ${fn}();`)),
     '}',
     '',
     'registerAllDomains();',

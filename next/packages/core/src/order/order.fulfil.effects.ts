@@ -223,7 +223,8 @@ export async function autoDeliver(ctx: Ctx, orderId: number): Promise<AutoDelive
       to: rollUp,
     });
     if (rollUp === 'fulfilled') {
-      const { autoReceiveDays } = await ctx.config.get(orderFulfilConfig);
+      // On `tx`: the card rows and the order row are held here (CR-1-r1).
+      const { autoReceiveDays } = await ctx.config.getIn(tx, orderFulfilConfig);
       await orderStateMachine.transition(tx, orderId, ['paid'], 'shipped', {
         at: now,
         autoReceiveAt: new Date(now.getTime() + autoReceiveDays * 86_400_000),

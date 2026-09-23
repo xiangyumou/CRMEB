@@ -1,5 +1,7 @@
 # CR-3-h2 — the storefront decorates four surfaces, the contract decorates one
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `/api/v1/diy/pages/user-center`, `/api/v1/diy/navigation` and `/api/v1/diy/layouts/:type` exist (F4, `31ec0782e`). The status line below is kept as history.
+
 - **Stream:** H (uni-app storefront), raised against G1 (DIY / 装修)
 - **Status:** open
 - **Affects:** `next/packages/contracts/src/diy/storefront.contract.ts`

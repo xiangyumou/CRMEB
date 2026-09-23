@@ -704,6 +704,108 @@ describe('leadership', () => {
   });
 });
 
+describe('a join into a team that fails a moment before (CR-2-r1)', () => {
+  /** `beforeCreate` passes on a forming team; the team's fate moves; then `afterCreate`. */
+  async function joinAcross(
+    ctx: Ctx,
+    args: { userId: number; fixture: ActivityFixture; groupId: number },
+    between: () => Promise<void>,
+  ): Promise<number> {
+    const orderId = await makeOrder(ctx, args.userId, args.fixture);
+    await withTx(ctx.db, async (tx) => {
+      const meta = await groupbuyKindHandler.beforeCreate(ctx, tx, {
+        userId: args.userId,
+        lines: [
+          {
+            skuId: args.fixture.skuId,
+            productId: args.fixture.productId,
+            quantity: 1,
+            unitPrice: Money.parse(PRICE),
+            subtotal: Money.parse(PRICE),
+          },
+        ],
+        goodsTotal: Money.parse(PRICE),
+        selections: {
+          activityId: String(args.fixture.activityId),
+          groupId: String(args.groupId),
+        },
+      } as never);
+      await between();
+      await groupbuyKindHandler.afterCreate(ctx, tx, orderId, meta);
+    });
+    return orderId;
+  }
+
+  it('is refused under the group lock, and reserves nothing', async () => {
+    const fixture = await makeActivity({ seatsRequired: 3, stock: 10, ttlSeconds: 3_600 });
+    const [leader, latecomer] = await makeUsers(2);
+    const opened = await placeOrder(racer(leader!), { userId: leader!, fixture });
+    await pay(racer(leader!), opened.orderId);
+    const before = await readLedgers(fixture);
+
+    // The team expires and is settled as failed after the join's first half.
+    const join = joinAcross(
+      racer(latecomer!),
+      { userId: latecomer!, fixture, groupId: opened.groupId },
+      async () => {
+        harness.clock.set('2026-06-01T02:00:00.000Z');
+        await settleGroup(forkTestCtx(harness), opened.groupId);
+        harness.clock.set(NOW);
+      },
+    );
+
+    await expect(join).rejects.toMatchObject({ code: 'GROUPBUY_GROUP_NOT_JOINABLE' });
+    expect(await readGroup(opened.groupId)).toMatchObject({ status: 'failed' });
+    const rows = await members(opened.groupId);
+    expect(rows.map((row) => row.userId)).toEqual([leader]);
+    expect(await readLedgers(fixture)).toEqual(before);
+  });
+
+  it('queues behind a transaction holding the team, then sees what it decided', async () => {
+    const fixture = await makeActivity({ seatsRequired: 3, stock: 10 });
+    const [leader, latecomer] = await makeUsers(2);
+    const opened = await placeOrder(racer(leader!), { userId: leader!, fixture });
+    const before = await readLedgers(fixture);
+
+    // Another transaction holds the group row, as a settle or a refund does,
+    // and fails the team. The join's second half must queue behind it and
+    // then refuse, not act on the `forming` it read before the lock.
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    let locked!: () => void;
+    const holding = new Promise<void>((resolve) => (locked = resolve));
+    const holder = withTx(forkTestCtx(harness).db, async (tx) => {
+      await tx
+        .select()
+        .from(groupbuyGroups)
+        .where(eq(groupbuyGroups.id, opened.groupId))
+        .for('update');
+      locked();
+      await released;
+      await tx
+        .update(groupbuyGroups)
+        .set({ status: 'failed' })
+        .where(eq(groupbuyGroups.id, opened.groupId));
+    });
+
+    const join = joinAcross(
+      racer(latecomer!),
+      { userId: latecomer!, fixture, groupId: opened.groupId },
+      async () => {
+        await holding;
+        // The join reaches the lock and waits there before the holder decides.
+        setTimeout(release, 200);
+      },
+    );
+
+    await holder;
+    await expect(join).rejects.toMatchObject({ code: 'GROUPBUY_GROUP_NOT_JOINABLE' });
+    const rows = await members(opened.groupId);
+    expect(rows.map((row) => row.userId)).toEqual([leader]);
+    expect(await readLedgers(fixture)).toEqual(before);
+  });
+});
+
 describe('one shopper, two clicks', () => {
   /**
    * Legacy's `isPinkBe()` read the membership and then inserted, so a shopper

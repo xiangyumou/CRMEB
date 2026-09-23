@@ -11,9 +11,15 @@
  *   4. `next start`, against those two connection strings;
  *   5. the handoff file the specs read.
  *
- * Run it directly to keep a stack warm between Playwright runs:
+ * Run it directly to keep a stack warm between Playwright runs, and opt the
+ * runs into attaching to it:
  *
  *     pnpm --filter @shop/e2e-admin exec tsx scripts/serve.ts
+ *     SHOP_E2E_REUSE=1 pnpm --filter @shop/e2e-admin e2e
+ *
+ * The port and handoff file default to values derived from this checkout's
+ * path (`src/stack-file.ts`), so a warm stack in one worktree is invisible to
+ * the suite in another.
  *
  * Nothing here talks to WeChat, an SMS gateway or Aliyun. The payment and
  * notification configuration the seed writes is fixture data pointing at

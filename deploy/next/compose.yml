@@ -174,6 +174,10 @@ services:
       UPLOADS_DIR: /data/uploads
       UPLOADS_PUBLIC_PREFIX: /uploads
       DB_POOL_MAX: ${WEB_DB_POOL_MAX:-10}
+      # Pool acquire wait and PostgreSQL's idle_in_transaction_session_timeout
+      # (packages/db/src/client.ts, CR-53-k2); shared by web and worker.
+      DB_POOL_ACQUIRE_TIMEOUT_MS: ${DB_POOL_ACQUIRE_TIMEOUT_MS:-5000}
+      DB_IDLE_IN_TX_TIMEOUT_MS: ${DB_IDLE_IN_TX_TIMEOUT_MS:-30000}
       # `/api/v1/readyz` decides whether the worker heartbeat is fresh, so it
       # needs the same interval the worker beats at — the two are read from one
       # variable here so they cannot drift into disagreeing about a live worker.
@@ -213,6 +217,8 @@ services:
       UPLOADS_PUBLIC_PREFIX: /uploads
       QUEUE_NAME: ${QUEUE_NAME:-shop}
       DB_POOL_MAX: ${WORKER_DB_POOL_MAX:-5}
+      DB_POOL_ACQUIRE_TIMEOUT_MS: ${DB_POOL_ACQUIRE_TIMEOUT_MS:-5000}
+      DB_IDLE_IN_TX_TIMEOUT_MS: ${DB_IDLE_IN_TX_TIMEOUT_MS:-30000}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
       HEARTBEAT_INTERVAL_MS: ${HEARTBEAT_INTERVAL_MS:-15000}
       LOG_LEVEL: ${LOG_LEVEL:-info}

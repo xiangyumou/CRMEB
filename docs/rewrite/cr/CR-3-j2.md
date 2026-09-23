@@ -1,5 +1,7 @@
 # CR-3-j2 — the image and deploy-rehearsal jobs for `.github/workflows/next.yml`
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `next.yml` has the images and rehearsal jobs and the `deploy/next/**` paths (J3, `d88065849`). The status line below is kept as history.
+
 **Stream** J2 (container images and deployment) · **Against**
 `.github/workflows/next.yml` (orchestrator-owned; the brief says the image and
 rehearsal jobs come as a CR with exact YAML) and

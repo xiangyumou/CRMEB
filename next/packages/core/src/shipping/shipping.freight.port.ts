@@ -45,10 +45,12 @@ export const freightPort = {
     const empty = { totalFen: 0, perLine: input.lines.map(() => 0) };
     if (input.lines.length === 0) return empty;
 
-    const [cityPath, config] = await Promise.all([
-      cityPathOf(db, input.addressCityId),
-      ctx.config.get(orderConfig),
-    ]);
+    // Both reads go through `db`, one after the other: on checkout's `create`
+    // it is a transaction — one connection, which a second pooled read on a
+    // cold config cache must not wait behind (CR-1-r1), and which cannot run
+    // two queries at once anyway.
+    const cityPath = await cityPathOf(db, input.addressCityId);
+    const config = await ctx.config.getIn(db, orderConfig);
 
     const lines: FreightInputLine[] = input.lines.map((line, index) => ({
       index,

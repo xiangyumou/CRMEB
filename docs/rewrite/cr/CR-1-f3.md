@@ -1,5 +1,7 @@
 # CR-1-f3 — two statistics figures have tables, SQL and tests, but no writer
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `user_visits` has a writer, `user/user.visit.repo.ts` (E4, `53ba7a17a`); the cart product event is emitted from catalog (B3, `41883680c`). The status line below is kept as history.
+
 **Stream** F3 · **Status** open · **Blocking** no (the figures read 0 until a
 writer exists; every other figure on every page is complete)
 

@@ -1,5 +1,7 @@
 # CR-3-e3 — `wechat_qrcode_categories_name_uq` counts deleted categories
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — migration `0001_wechat_mini_codes.sql` has the scoped unique index (E4, `53ba7a17a`). The status line below is kept as history.
+
 - **Stream:** E3 (WeChat OA, split from E2)
 - **Status:** open — handled in the service as a 409 with an explanatory message
 - **Affects:** `next/packages/db/src/schema/wechat.ts` (orchestrator-owned) and a migration

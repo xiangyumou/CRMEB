@@ -1,5 +1,7 @@
 # CR-1-d2 — `PricingDraft` hides the adjustments from `beforeCreate`, so a kind handler cannot check its own price without re-running a contributor
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `PricingDraft.adjustments` is in `order/ports.ts` (B3, `41883680c`); presale contributes through it, `inTx`/`contributedAdjustment` are gone. The status line below is kept as history.
+
 **Stream:** D2 (presale) **Status:** open
 **Files:** `next/packages/core/src/order/ports.ts` (`PricingDraft`),
 `next/packages/core/src/order/order.checkout.service.ts` (`create`) — stream B1

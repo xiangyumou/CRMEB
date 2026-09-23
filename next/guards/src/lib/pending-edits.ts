@@ -37,7 +37,6 @@ export const PENDING_EDITS: readonly PendingEdit[] = [
   // --- rows whose section owner is "assign per row" -------------------------
   // ORDER-008 used to sit here (`map`, B1's RISK-B1-005 evidence). CR-2-k
   // applied it — the row reads `ported` now — so the entry is gone.
-
   // --- rows whose section owner names two streams --------------------------
   // E1 has merged, so these three could not be assigned to it any more. They
   // did not need a stream: E1 shipped the behaviour and only the ledger row
@@ -47,47 +46,26 @@ export const PENDING_EDITS: readonly PendingEdit[] = [
   // SMOKE-002…005 were mapped at I's merge to the storefront suite's journeys.
   // The other five (SMOKE-006…009, 012) were answered by H4 and applied at
   // its merge: four ported against core tests, SMOKE-007 retired.
-
   // OPS-001 … OPS-011 and REL-001 … REL-007 used to sit here, assigned to J2
   // with `CR-2-j2` as the change request that owed them an answer. J3 applied
   // CR-2-j2: every one of those rows now reads `ported` (or `retired`, for
   // OPS-001) and names the drill case or the static guard that proves it, so
   // the entries are gone. The list may only shrink.
-
   // --- sections whose heading already says "dropped" ------------------------
   // HIST-001 and MAINT-001 used to sit here (`retire`, "Dropped: …" reasons
   // the section owner already gave). CR-2-k applied both — the rows read
   // `dropped` now, so the entries are gone.
-
   // --- P0-S: a legacy migration tool the rewrite does not have --------------
   // MIG-001 … MIG-022 used to sit here (`retire`, same "no successor to the
   // legacy order-reliability migration" reason for 018…022; 001…017 were
   // applied in an earlier round). CR-2-k applied the rest — every one reads
   // `dropped` now, so the entries are gone.
-
   // --- K's own rows --------------------------------------------------------
   // CORE-001, CORE-002, SQL-001 and ROUTE-001 used to sit here. CR-2-k
   // applied all four — they read `dropped` (CORE-001, SQL-001) or `ported`
   // (CORE-002, ROUTE-001) now, so the entries are gone.
-  {
-    // Not settled, and K2 cannot settle it: ten shuffled rounds of the set
-    // found a product race (CR-50-k2), a schedule-dependent assertion
-    // (CR-51-k2) and a pool deadlock that hangs a round (CR-53-k2), and the
-    // CI soak cannot run as written (CR-52-k2). The row stays unmapped until
-    // those land; `status/k2.md` carries the text the orchestrator writes.
-    // R1 landed CR-50/51/53-k2 (CR-52-k2 was applied to next.yml at K2's
-    // merge). Its ten rounds were 8 of 10; both failures are one lock-order
-    // deadlock in groupbuy (join vs the leader's refund), CR-2-r1. With the
-    // one-line fix applied experimentally the same seeds were 10 of 10.
-    // Re-assigned to R5 at R1's merge.
-    id: 'STAB-001',
-    resolution: {
-      kind: 'assign',
-      stream: 'R5',
-      cr: 'CR-2-r1',
-      why: 'ten shuffled rounds are 8/10; both failures are the groupbuy join/refund deadlock',
-    },
-  },
+  // STAB-001 sat here until R5 fixed CR-2-r1 and ran ten clean shuffled
+  // rounds; the row reads `ported` now.
 ];
 
 /**

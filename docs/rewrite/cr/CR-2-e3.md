@@ -1,5 +1,7 @@
 # CR-2-e3 — the fake WeChat Official Account server belongs in `@shop/testing`
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — the fake official-account server lives in `@shop/testing/wechat` (E4, `53ba7a17a`). The status line below is kept as history.
+
 - **Stream:** E3 (WeChat OA, split from E2)
 - **Status:** open — the fake lives in the domain for now
   (`next/packages/core/src/wechat-oa/wechat-oa.fake-oa.ts`)

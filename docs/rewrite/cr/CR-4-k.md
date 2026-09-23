@@ -1,5 +1,7 @@
 # CR-4-k — three CI jobs: guards, the 50-round concurrency soak, admin e2e
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `next.yml` has the Guards step and the concurrency-soak and e2e-admin jobs (J3, `d88065849`). The status line below is kept as history.
+
 **Stream:** K (hardening) **Status:** OPEN — needs the orchestrator (`.github/**` is not a stream path)
 **Files:** `.github/workflows/next.yml`
 

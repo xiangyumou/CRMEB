@@ -49,11 +49,36 @@ export interface CookieOptions {
 }
 
 /** What a handler receives: the request `Ctx` plus the per-request escape hatches. */
+/**
+ * Thrown by `ctx.notModified()` and caught by `handle()`. A thrown sentinel
+ * rather than a magic return value, so a handler whose return type is the
+ * route's response type still typechecks.
+ */
+const NOT_MODIFIED = Symbol('handle.notModified');
+
 export interface RequestCtx extends Ctx {
   readonly request: Request;
   setCookie(name: string, value: string, options?: CookieOptions): void;
   clearCookie(name: string): void;
   setHeader(name: string, value: string): void;
+  /**
+   * Sets the `ETag` and reports whether the caller already has this version
+   * (CR-1-s):
+   *
+   *     if (ctx.etag(page.version)) ctx.notModified();
+   *
+   * `value` is the bare validator; the quoting is ours, so a caller cannot
+   * emit a malformed tag. `weak: true` sends `W/"…"`, for a body that is the
+   * same resource but not byte-identical per request (the DIY payloads).
+   * `If-None-Match` is compared the weak way (RFC 9110 §8.8.3.2), as a 304
+   * requires: a `W/` prefix on either side is ignored, and `*` matches.
+   */
+  etag(value: string, options?: { weak?: boolean }): boolean;
+  /**
+   * Ends the request with `304 Not Modified`: no body, no response
+   * validation, the headers set so far (the `ETag` included) kept.
+   */
+  notModified(): never;
   /** Names the thing this admin or staff operation acted on, for the audit log. */
   audit(target: string): void;
 }
@@ -239,7 +264,10 @@ export function handle<
         },
         'request',
       );
-      return status === 204 ? new Response(null, { status, headers }) : json(status, body, headers);
+      // 204 and 304 are the two statuses that must not carry a body.
+      return status === 204 || status === 304
+        ? new Response(null, { status, headers })
+        : json(status, body, headers);
     };
 
     const fail = (error: DomainError): Response => finish(error.status, error.toBody());
@@ -389,6 +417,20 @@ export function handle<
           );
         },
         setHeader: (name, value) => headers.set(name, value),
+        etag: (value, etagOptions = {}) => {
+          const tag = `"${value}"`;
+          headers.set('etag', etagOptions.weak ? `W/${tag}` : tag);
+          const offered = request.headers.get('if-none-match');
+          if (offered === null) return false;
+          if (offered.trim() === '*') return true;
+          return offered
+            .split(',')
+            .map((candidate) => candidate.trim().replace(/^W\//, ''))
+            .includes(tag);
+        },
+        notModified: () => {
+          throw NOT_MODIFIED;
+        },
         audit: (target) => {
           auditTarget = target;
         },
@@ -431,6 +473,8 @@ export function handle<
 
       return finish(status, result);
     } catch (error) {
+      // A conditional GET that matched: no body, no validation, no audit.
+      if (error === NOT_MODIFIED) return finish(304, null);
       if (DomainError.is(error)) {
         if (error.unregistered) {
           logger.error({ code: error.code }, 'DomainError with an unregistered code');

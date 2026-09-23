@@ -168,6 +168,25 @@ export const groupbuyKindHandler: OrderKindHandler = {
       activityId: meta.activityId,
     });
 
+    // CR-2-r1 — lock order: the group row first, the activity SKU row second,
+    // as `handleRefunded` and `settleDeparture` take them. Without this the
+    // join took the SKU row here and the group row implicitly later, through
+    // `groupbuy_members.group_id`'s foreign key (`FOR KEY SHARE`), and a
+    // leader's refund on the same team — group first, SKU second — deadlocked
+    // with it.
+    //
+    // Under the lock the team is re-read: `beforeCreate` checked it without
+    // one, and it may have failed, been cancelled or filled since. The lock
+    // makes this check exact — nothing changes the team until this
+    // transaction ends.
+    if (meta.groupId !== null) {
+      const group = await repo.lockGroup(tx, meta.groupId);
+      if (!group || group.activityId !== meta.activityId) {
+        throw new DomainError('GROUPBUY_GROUP_NOT_FOUND');
+      }
+      assertGroupJoinable(group, now);
+    }
+
     for (const line of meta.lines) {
       const reserved = await repo.reserveActivityStock(tx, {
         activityId: meta.activityId,

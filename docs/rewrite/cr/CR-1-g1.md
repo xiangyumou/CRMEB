@@ -1,5 +1,7 @@
 # CR-1-g1 — `jsonb` cannot store the decorated page byte for byte, and `@shop/core/diy` has no export entry
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — §2: `@shop/core`'s `"./*": "./src/*/index.ts"` export (`6fd2f32b3`); no route imports `@shop/core/diy/index` any more. §1: closed as this CR recommends — `diy_pages.content` stays `jsonb`, the key-order limit is documented (G1 status, schema comment, the pinning test); nobody asked for byte-exact storage. The status line below is kept as history.
+
 **Stream:** G1 DIY core **Status:** both worked around, neither blocks G1
 **Files:** `next/packages/db/src/schema/diy.ts` (P0-a owned),
 `next/packages/core/package.json` (P0-a owned)

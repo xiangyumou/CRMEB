@@ -1,5 +1,7 @@
 # CR-4-golden — every admin page test has to stub `next/navigation`
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — a global `next/navigation` mock in `apps/web/src/test/setup.ts` replaces the per-file lines (`6fd2f32b3`). The status line below is kept as history.
+
 **Stream:** Golden slice (coupon) **Status:** worked around in six lines per test file
 **Files:** `next/apps/web/src/admin/kit/table/url-state.ts`,
 `next/apps/web/src/admin/kit/table/crud-table.tsx` (both P0-B owned)

@@ -1,5 +1,7 @@
 # CR-2-p0a — two committed files fail `prettier --check`, and neither is ours
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `.prettierignore` no longer needs the workaround (`67bd50fff`). The status line below is kept as history.
+
 **Stream:** P0-a platform **Status:** worked around, needs an orchestrator fix
 **Files:** `next/packages/contracts/src/_conventions/route.ts` (frozen),
 `next/turbo.json` (orchestrator-owned)

@@ -1,5 +1,7 @@
 # CR-5-h2 — two coupon reads the storefront makes and the coupon domain does not answer
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `/api/v1/orders/:id/gift-coupons` and `/api/v1/staff/coupons` exist (`coupon.staff.contract.ts`, B3, `41883680c`). The status line below is kept as history.
+
 - **Stream:** H (uni-app storefront), raised against B1 (coupon)
 - **Status:** open
 - **Affects:** `next/packages/contracts/src/coupon/coupon.storefront.contract.ts`

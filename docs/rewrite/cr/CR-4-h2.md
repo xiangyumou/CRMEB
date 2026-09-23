@@ -1,5 +1,7 @@
 # CR-4-h2 — 商家管理's 商品管理 has an admin console behind it and no staff surface
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `catalog.staff.contract.ts` has the ten staff routes (A2, `a867050b7`). The status line below is kept as history.
+
 - **Stream:** H (uni-app storefront), raised against A (catalog)
 - **Status:** open
 - **Affects:** a new `next/packages/contracts/src/catalog/catalog.staff.contract.ts`

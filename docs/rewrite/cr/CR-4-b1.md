@@ -1,5 +1,7 @@
 # CR-4-b1 — four invariant rows sit in B1's sections but belong to streams that own the feature
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — decided by the ledger: PRICE-001/002 retired, STOCK-004 and QUEUE-008 ported (`475f59217`). The status line below is kept as history.
+
 - **Stream:** B1 (cart and checkout)
 - **Status:** needs an ownership decision from the orchestrator before gate K
 - **Affects:** `docs/rewrite/invariants.md` (sections "Pricing" and "Stock")

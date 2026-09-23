@@ -1,5 +1,7 @@
 # CR-1-p0a — decide the four undecided build scripts in `pnpm-workspace.yaml`
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — applied and kept: `pnpm-workspace.yaml` `allowBuilds` (`08135d139`). The status line below is kept as history.
+
 **Stream:** P0-a platform **Status:** applied on `rewrite/ws-p0a-platform`, needs the orchestrator's blessing
 **Owner of the file:** orchestrator (`next/pnpm-workspace.yaml` is a root file)
 

@@ -1,5 +1,7 @@
 # CR-1-h2 — the shop-wide 拼团人气条 has no route
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `GET /api/v1/groupbuy/summary` exists (contract + `app/api/v1/groupbuy/summary/route.ts`, B3, `41883680c`). The status line below is kept as history.
+
 - **Stream:** H (uni-app storefront), raised against D (groupbuy)
 - **Status:** open
 - **Affects:** `next/packages/contracts/src/groupbuy/groupbuy.storefront.contract.ts`

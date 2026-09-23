@@ -41,29 +41,7 @@ const TX_POOL_ALLOW: readonly Entry[] = [];
  * Known instances routed to the stream that owns the file. Each is `pending`
  * on that stream while it is in flight and a failure once it has merged.
  */
-const TX_POOL_OWED: ReadonlyArray<Entry & { stream: string; cr: string }> = [
-  {
-    file: 'next/packages/core/src/order/order.checkout.service.ts',
-    text: 'const { payWindowMinutes } = await ctx.config.get(orderConfig);',
-    why: '`buildDraft(ctx, db)` runs inside `create`’s transaction; on a cold `order` cache every checkout wants a second connection',
-    stream: 'R5', // R2 merged before CR-1-r1 reached it; re-assigned at R1's merge
-    cr: 'CR-1-r1',
-  },
-  {
-    file: 'next/packages/core/src/shipping/shipping.freight.port.ts',
-    text: 'ctx.config.get(orderConfig),',
-    why: '`freightPort.quote(db, ctx, …)` is called from `buildDraft` with the checkout transaction',
-    stream: 'R5', // R2 merged before CR-1-r1 reached it; re-assigned at R1's merge
-    cr: 'CR-1-r1',
-  },
-  {
-    file: 'next/packages/core/src/order/order.fulfil.effects.ts',
-    text: 'const { autoReceiveDays } = await ctx.config.get(orderFulfilConfig);',
-    why: '`autoDeliver` reads it inside its `withTx`, after claiming card rows and holding the order row',
-    stream: 'R5', // R2 merged before CR-1-r1 reached it; re-assigned at R1's merge
-    cr: 'CR-1-r1',
-  },
-];
+const TX_POOL_OWED: ReadonlyArray<Entry & { stream: string; cr: string }> = [];
 
 const ROOTS = ['packages/core/src', 'apps/web/src', 'apps/web/app', 'apps/worker/src'];
 

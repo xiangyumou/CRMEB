@@ -1,5 +1,7 @@
 # CR-2-f2 — drop `'kuaidi100'` from `logisticsConfig.provider`
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — the kuaidi100 client was removed (F4, `31ec0782e`). The status line below is kept as history.
+
 **Stream** F2 · **Status** open · **Blocking** no (local adapter in place)
 
 ## What

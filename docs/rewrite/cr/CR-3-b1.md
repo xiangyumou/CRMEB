@@ -1,5 +1,7 @@
 # CR-3-b1 — `orders.coupon_discount` holds every goods-level discount, not only the coupon
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — the schema doc comment says "Every goods-level discount" as asked (`475f59217`). The status line below is kept as history.
+
 - **Stream:** B1 (cart and checkout)
 - **Status:** implemented that way; needs a doc-comment change and an ack from B2 and C
 - **Affects:** `next/packages/db/src/schema/order.ts` (comments only, no DDL)

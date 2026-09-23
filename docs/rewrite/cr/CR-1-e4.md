@@ -1,5 +1,7 @@
 # CR-1-e4 — a stream that lands a contract cannot delete the uni-app marker that waited for it
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `MARKER_REASSIGNMENTS` in `next/guards` is empty (H3, `503fbcf35`): the markers moved to their owners. The status line below is kept as history.
+
 - **Stream:** E4 (user & WeChat follow-up)
 - **Status:** worked around in `next/guards`; the markers themselves are still H2's
 - **Affects:** `next/guards/src/checks/uniapp.ts` (K), `template/uni-app/api/*.js` (H2)

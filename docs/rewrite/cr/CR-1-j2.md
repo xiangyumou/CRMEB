@@ -1,5 +1,7 @@
 # CR-1-j2 — `/readyz` in `apps/web`: the deep check has no HTTP surface
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — `GET /api/v1/readyz` exists (J3, `d88065849`). The status line below is kept as history.
+
 **Stream** J2 (container images and deployment) · **Against** `next/apps/web/**`
 and `next/packages/contracts/src/health/` · **Status** open · **Blocking** no
 (the stack ships and the gate works without it)

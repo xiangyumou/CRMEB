@@ -1,5 +1,7 @@
 # CR-1-b2 — `/admin-api/express-companies` belongs to stream F2
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — the express-company routes live in `contracts/src/shipping/shipping.express.contract.ts` (F2, `1158b892e`) and the route files say so; B2's local adapter is gone. The status line below is kept as history.
+
 **Stream** B2 · **Status** open · **Blocking** no (local adapter in place)
 
 ## What

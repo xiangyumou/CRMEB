@@ -1,7 +1,7 @@
 # CR-1-r1 — three more config reads take a second pooled connection inside a transaction
 
 - **Stream:** R1 (reliability), found by the new `tx-pool` guard (CR-53-k2 part 2); for the orchestrator, **suggested owner R2** (order) — the freight port is in `shipping/`, which no wave-6 stream owns, but it is only reached from R2's checkout
-- **Status:** OPEN
+- **Status:** RESOLVED (R5, see the resolution at the end)
 - **Severity:** medium. The mechanism is CR-53-k2's. Since R1 the pool fails an acquire after 5 s (`DB_POOL_ACQUIRE_TIMEOUT_MS`), so the outcome is a burst of failed checkouts, not a wedged process.
 - **Pinned by:** `pnpm guards tx-pool` — each line is a `pending(R2)` finding (`TX_POOL_OWED` in `next/guards/src/checks/tx-pool.ts`), which becomes a failure once R2 is marked merged.
 
@@ -51,3 +51,27 @@ Then delete the three `TX_POOL_OWED` entries in `next/guards/src/checks/tx-pool.
 They are exactly compared, so a fixed line with its entry still present fails
 as stale. If the orchestrator applies this after R1 and R2 have both merged,
 it is one commit across `order/`, `shipping/` and `guards/`.
+
+## Resolution (R5)
+
+**RESOLVED** on `rewrite/ws-r5-wave6-tail`, as asked:
+
+- `order/order.checkout.service.ts` `buildDraft`: `ctx.config.getIn(db, orderConfig)`.
+- `shipping/shipping.freight.port.ts` `freightPort.quote`: `ctx.config.getIn(db, orderConfig)`,
+  and the two reads (`cityPathOf`, the config) now run one after the other
+  rather than in a `Promise.all`, since on `create` they share one transaction
+  connection.
+- `order/order.fulfil.effects.ts` `autoDeliver`: `ctx.config.getIn(tx, orderFulfilConfig)`
+  inside the `withTx`; the read after commit (`scheduleAutoReceive`) stays on `get`.
+- The three `TX_POOL_OWED` entries are deleted: `pnpm guards tx-pool` → 0
+  allowed, 0 owed, no finding.
+
+Tests added, `order/order.int.test.ts::CR-1-r1 — config read through the transaction, not a second connection`:
+
+- `> places an order, freight quote included, on a pool of one with a cold config cache`
+- `> auto-delivers a virtual order on a pool of one with a cold config cache`
+
+Both run on a pool of `max: 1` with a 1 s acquire timeout and the `order` and
+`order-fulfil` cache entries invalidated. With the old three lines put back,
+both fail with `timeout exceeded when trying to connect` on the
+`config_values` read.

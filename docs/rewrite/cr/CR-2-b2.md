@@ -1,5 +1,7 @@
 # CR-2-b2 — a route cannot answer with a file, so 导出 is CSV in JSON
 
+**Decided (orchestrator, 2026-09-23): closed — option 1, CSV-in-JSON stays.** The admin downloads it fine and the statistics export already handles BOM and formula injection; a file-answering `handle()` is not worth a convention change before cutover.
+
 **Stream** B2 · **Status** open · **Blocking** no (shipped as CSV-in-JSON)
 
 ## What

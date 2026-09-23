@@ -48,8 +48,6 @@ export const catalogErrors = defineErrors({
   // -- virtual cards -------------------------------------------------------
   /** The SKU belongs to a product whose `kind` is not `virtual_card`. */
   CATALOG_NOT_A_CARD_PRODUCT: { status: 422, message: '只有卡密商品可以导入卡密' },
-  /** The pool ran dry between the order and the hand-over. The order stands; an operator tops up. */
-  CATALOG_CARD_POOL_EMPTY: { status: 409, message: '卡密库存不足，请联系客服' },
   /**
    * Somebody typed a stock for a card-key SKU. The pool *is* the stock
    * (`adminProductForm` refuses the same thing with a field error); the staff

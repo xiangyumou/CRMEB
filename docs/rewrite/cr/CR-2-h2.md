@@ -1,5 +1,7 @@
 # CR-2-h2 — three surfaces the uni-app has and E1's contract does not
 
+**Status (R5 sweep, 2026-09-23): RESOLVED** — §1 the captcha was dropped (E4 `53ba7a17a`, H3 `503fbcf35`); §2 `POST /api/v1/auth/phone/wechat-mini` and §3 `/api/v1/staff/users*` (`user.staff.contract.ts`) exist (E4, `53ba7a17a`). The status line below is kept as history.
+
 - **Stream:** H (uni-app storefront), raised against E1 (user, storefront auth)
 - **Status:** open
 - **Affects:** `next/packages/contracts/src/auth/auth.storefront.contract.ts`
