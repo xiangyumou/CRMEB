@@ -28,7 +28,8 @@ export type {
 export { DiyPanelHost, DiyRawPanel } from './panel-host';
 export type { DiyPanelHostProps } from './panel-host';
 export { diyPanelRegistry, diyPanels } from './panels';
-export { createStubDiyDataSource, DiyDataSourceProvider, useDiyDataSource } from './data-source';
+export { DiyDataSourceProvider, useDiyDataSource } from './data-source';
+export { createDiyDataSource } from './record-source';
 export type {
   DiyDataSource,
   DiyPickerItem,
@@ -50,8 +51,7 @@ export { DiyPalette, componentLabel, paletteGroupsFor } from './palette';
 export { DiyPageSettings } from './page-settings';
 export { DiyPageList } from './page-list';
 export { DiyLinkList } from './link-list';
-export { createDiyLinkSource } from './link-source';
-export type { DiyLinkSourceOptions } from './link-source';
+export { createDiyLinkSource, diyLinkTargets } from './link-source';
 export { DiyPreview, diyPreviews } from './preview';
 export type { DiyPreviewComponent, DiyPreviewProps } from './preview';
 

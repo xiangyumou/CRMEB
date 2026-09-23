@@ -21,14 +21,16 @@ import { on, respondWithError, stubRoutes } from '@/test/api';
 import { resetApiConfig } from '../api';
 import {
   catalogLinkTargets,
-  createCatalogDiyDataSource,
+  listLabels,
+  listProducts,
   productCategoryPath,
+  productCategoryTree,
   productDetailPath,
+  resolveProducts,
 } from './catalog-source';
-import { createStubDiyDataSource } from './data-source';
 
 /**
- * The real data source, over the catalog contracts.
+ * The catalog's picker kinds, over the catalog contracts.
  *
  * The pickers are the only place a DIY node can gain a product, a category or a
  * 商品标签 id, so what this layer sends and what it maps back is as load-bearing
@@ -77,14 +79,12 @@ const tree: { items: ProductCategoryNode[] } = {
   ],
 };
 
-describe('createCatalogDiyDataSource', () => {
+describe('the catalog picker kinds', () => {
   it('pages 商品 through the admin list, on-shelf only, and formats the price', async () => {
     const calls = stubRoutes([
       on(catalogAdminProductList, { items: [product], total: 42, page: 2, pageSize: 10 }),
     ]);
-    const source = createCatalogDiyDataSource();
-
-    const result = await source.list('product', { keyword: '外套', page: 2, pageSize: 10 });
+    const result = await listProducts({ keyword: '外套', page: 2, pageSize: 10 });
 
     expect(calls[0]?.url).toContain('/admin-api/catalog/products');
     // 已上架 only: a DIY page must not advertise a product nobody can open.
@@ -101,9 +101,7 @@ describe('createCatalogDiyDataSource', () => {
     const calls = stubRoutes([
       on(catalogAdminLabelList, { items: [label], total: 1, page: 1, pageSize: 10 }),
     ]);
-    const source = createCatalogDiyDataSource();
-
-    const result = await source.list('labels', { page: 1, pageSize: 10 });
+    const result = await listLabels({ page: 1, pageSize: 10 });
 
     expect(calls[0]?.url).toContain('/admin-api/catalog/labels');
     expect(calls[0]?.url).toContain('isEnabled=true');
@@ -119,9 +117,7 @@ describe('createCatalogDiyDataSource', () => {
           : { ...adminProductDetailExample, ...product },
       ),
     ]);
-    const source = createCatalogDiyDataSource();
-
-    const rows = await source.resolve('product', ['7', '9']);
+    const rows = await resolveProducts(['7', '9']);
 
     expect(calls).toHaveLength(2);
     expect(rows[0]).toMatchObject({ id: '7', name: '牛仔外套', subtitle: '¥199.00' });
@@ -131,17 +127,8 @@ describe('createCatalogDiyDataSource', () => {
 
   it('flattens the category tree into the picker tree, keeping the nesting', async () => {
     stubRoutes([on(catalogAdminCategoryTree, tree)]);
-    const nodes = await createCatalogDiyDataSource().categories('product');
+    const nodes = await productCategoryTree();
     expect(nodes).toEqual([{ id: '7', name: '服饰', children: [{ id: '17', name: 'T恤' }] }]);
-  });
-
-  it('delegates the kinds the catalog does not own to the fallback', async () => {
-    // No fetch is configured: reaching the network here would throw.
-    const source = createCatalogDiyDataSource(createStubDiyDataSource());
-    const articles = await source.list('article', { page: 1, pageSize: 5 });
-    expect(articles.items).toHaveLength(5);
-    expect(await source.resolve('coupon', ['1'])).toHaveLength(1);
-    expect(await source.categories('article')).toHaveLength(1);
   });
 });
 
@@ -165,7 +152,7 @@ describe('catalogLinkTargets', () => {
     const all = await catalogLinkTargets('category', { page: 1, pageSize: 20 });
     expect(all.total).toBe(2);
     expect(all.items.map((row) => row.subtitle)).toEqual(['服饰', '服饰 / T恤']);
-    expect(all.items[1]?.url).toBe('/pages/goods_list/index?cid=17');
+    expect(all.items[1]?.url).toBe('/pages/goods/goods_list/index?cid=17');
 
     stubRoutes([on(catalogAdminCategoryTree, tree)]);
     const matched = await catalogLinkTargets('category', {
@@ -176,18 +163,11 @@ describe('catalogLinkTargets', () => {
     expect(matched.total).toBe(1);
     expect(matched.items[0]?.id).toBe('17');
   });
-
-  it('answers empty for a target type with no catalog behind it yet', async () => {
-    expect(await catalogLinkTargets('article', { page: 1, pageSize: 20 })).toEqual({
-      items: [],
-      total: 0,
-    });
-  });
 });
 
 describe('the storefront paths', () => {
   it('encodes the id rather than interpolating it raw', () => {
     expect(productDetailPath('a b')).toBe('/pages/goods_details/index?id=a%20b');
-    expect(productCategoryPath('7')).toBe('/pages/goods_list/index?cid=7');
+    expect(productCategoryPath('7')).toBe('/pages/goods/goods_list/index?cid=7');
   });
 });

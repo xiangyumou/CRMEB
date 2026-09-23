@@ -1,12 +1,24 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import path from 'node:path';
+
+import { cmsArticleList } from '@shop/contracts/cms/cms.admin.contract';
+import { adminArticleExample } from '@shop/contracts/cms/schemas';
+import { couponAdminList } from '@shop/contracts/coupon/coupon.admin.contract';
+import { couponTemplateExample } from '@shop/contracts/coupon/schemas';
+import { diyPageGet, diyThemeList } from '@shop/contracts/diy/diy.contract';
 import { CREATABLE_COMPONENT_KEYS } from '@shop/contracts/diy/schema/registry';
-import { screen } from '@testing-library/react';
+import { renderHook, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useReducer } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import { renderAdmin, zhName } from '@/test/render';
+import { on, stubRoutes } from '@/test/api';
+import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
+import { resetApiConfig } from '../api';
 import { DiyCanvas } from './canvas';
+import { useDiyDataSource } from './data-source';
+import { DiyEditor } from './editor';
 import { DiyEditorProvider } from './editor-context';
 import { DiyInspector } from './inspector';
 import { DiyPalette, componentLabel, paletteGroupsFor } from './palette';
@@ -150,5 +162,98 @@ describe('the editor shell', () => {
     expect(screen.queryByRole('button', { name: '隐藏' })).toBeNull();
     expect(screen.getByRole('button', { name: '删除' })).toHaveProperty('disabled', true);
     expect(screen.getByRole('button', { name: zhName('辅助线') })).toHaveProperty('disabled', true);
+  });
+});
+
+/**
+ * The editor as the admin mounts it, pickers and all.
+ *
+ * Whatever a picker offers is saved into the page and rendered by the
+ * storefront, so these tests pin down that the production editor can only
+ * offer the shop's own records: every picker kind reads its owning route, and
+ * the in-memory test source is unreachable from anything but a test.
+ */
+describe('the production editor', () => {
+  afterEach(() => resetApiConfig());
+
+  const admin = { ...testIdentity, isSuper: true };
+
+  /** A page holding one 超级组件 bound to `type`, picking its rows by hand. */
+  function pageWith(type: 'article' | 'coupon') {
+    const node = createComponentValue('customComponent')!;
+    return {
+      ...detail,
+      content: {
+        '1740450007006001': {
+          ...node,
+          timestamp: 1740450007006001,
+          id: 'id1740450007006001',
+          isHide: false,
+          selectType: { ...(node.selectType as object), activeValue: type },
+          articleDataSource: { ...(node.articleDataSource as object), tabVal: 0 },
+          couponDataSource: { ...(node.couponDataSource as object), tabVal: 0 },
+        },
+      },
+    };
+  }
+
+  it('offers published articles from the CMS in the 文章 picker', async () => {
+    const user = userEvent.setup();
+    const calls = stubRoutes([
+      on(diyPageGet, pageWith('article')),
+      on(diyThemeList, { items: [] }),
+      on(cmsArticleList, { items: [adminArticleExample], total: 1, page: 1, pageSize: 10 }),
+    ]);
+    renderAdmin(<DiyEditor pageId="1" />, { identity: admin });
+
+    await user.click(await screen.findByRole('button', { name: zhName('添加') }));
+    const modal = await screen.findByRole('dialog');
+    expect(await within(modal).findByText('双十一活动说明')).toBeInTheDocument();
+    expect(within(modal).queryByText(/示例文章/)).toBeNull();
+
+    const list = calls.find((call) => call.routeId === cmsArticleList.id);
+    expect(list?.query.get('status')).toBe('published');
+  });
+
+  it('offers claimable coupon templates in the 优惠券 picker', async () => {
+    const user = userEvent.setup();
+    stubRoutes([
+      on(diyPageGet, pageWith('coupon')),
+      on(diyThemeList, { items: [] }),
+      on(couponAdminList, {
+        items: [{ ...couponTemplateExample, claimTo: null, validTo: null }],
+        total: 1,
+        page: 1,
+        pageSize: 100,
+      }),
+    ]);
+    renderAdmin(<DiyEditor pageId="1" />, { identity: admin });
+
+    await user.click(await screen.findByRole('button', { name: zhName('添加') }));
+    const modal = await screen.findByRole('dialog');
+    expect(await within(modal).findByText('满 100 减 10')).toBeInTheDocument();
+    expect(within(modal).queryByText(/示例优惠券/)).toBeNull();
+  });
+
+  it('refuses to hand a picker a data source when none is mounted', () => {
+    expect(() => renderHook(() => useDiyDataSource())).toThrow(/DiyDataSourceProvider/);
+  });
+
+  it('keeps the in-memory test source out of every production module', () => {
+    const root = path.resolve(import.meta.dirname, '../../..');
+    const offenders: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir)) {
+        const full = path.join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          if (entry !== 'node_modules' && entry !== '.next' && entry !== 'test') walk(full);
+        } else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) {
+          if (/from\s+['"]@\/test\//.test(readFileSync(full, 'utf8'))) offenders.push(full);
+        }
+      }
+    };
+    walk(path.join(root, 'src'));
+    walk(path.join(root, 'app'));
+    expect(offenders).toEqual([]);
   });
 });

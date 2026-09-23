@@ -47,8 +47,7 @@ test('the login page renders in a browser, with nothing in the console', async (
   await expect(page.getByLabel('账号')).toBeVisible();
   await expect(page.getByLabel('密码')).toBeVisible();
   await expect(page.getByRole('button', { name: cjk('登录') })).toBeEnabled();
-  // The slider slot is empty until a captcha provider registers one, and an
-  // unregistered captcha must not render a dead field.
+  // The server asks for no captcha, so the form must not render a dead field.
   await expect(page.getByLabel('安全验证')).toHaveCount(0);
 
   expect(errors, errors.join('\n')).toEqual([]);

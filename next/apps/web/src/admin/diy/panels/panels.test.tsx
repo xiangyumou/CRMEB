@@ -10,10 +10,13 @@ import {
 import { serialiseDiyPageValue } from '@shop/contracts/diy/schema/page';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { createStubDiyDataSource } from '@/test/diy-data-source';
 import { renderAdmin } from '@/test/render';
 
+import { DiyDataSourceProvider } from '../data-source';
 import { DiyPanelHost } from '../panel-host';
 import {
   DEFAULT_DIY_THEME,
@@ -23,6 +26,19 @@ import {
   type DiyPanelContext,
 } from '../panel-api';
 import { diyPanelRegistry, diyPanels } from './index';
+
+/**
+ * Renders under the in-memory data source, so a picker field is tested without
+ * the network. `rerender` keeps the provider.
+ */
+function renderPanel(ui: ReactElement) {
+  const source = createStubDiyDataSource();
+  const withSource = (node: ReactElement) => (
+    <DiyDataSourceProvider source={source}>{node}</DiyDataSourceProvider>
+  );
+  const result = renderAdmin(withSource(ui));
+  return { ...result, rerender: (next: ReactElement) => result.rerender(withSource(next)) };
+}
 
 function makeCtx(overrides: Partial<DiyPanelContext> = {}): DiyPanelContext {
   return {
@@ -130,7 +146,7 @@ describe('bindDiyPanel', () => {
 describe('<DiyPanelHost>', () => {
   it('renders the registered panel', () => {
     const panel = diyPanels.find((p) => p.key === 'titles')!;
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={{ ...panel.createDefault(), name: 'titles' }}
@@ -142,7 +158,7 @@ describe('<DiyPanelHost>', () => {
   });
 
   it('falls back to the raw editor for an unregistered key', () => {
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={{ name: 'presale' }}
@@ -156,7 +172,7 @@ describe('<DiyPanelHost>', () => {
   it('the raw editor writes back exactly what was typed', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={{ name: 'presale', untouched: 1 } as DiyComponentValue}
@@ -174,7 +190,7 @@ describe('<DiyPanelHost>', () => {
   it('the raw editor refuses invalid JSON instead of dropping the node', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={{ name: 'presale' }}
@@ -200,7 +216,7 @@ describe('the titles panel', () => {
     const onChange = vi.fn((next: DiyComponentValue) => {
       value = next;
     });
-    const { rerender } = renderAdmin(
+    const { rerender } = renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={value}
@@ -229,7 +245,7 @@ describe('the titles panel', () => {
       name: 'titles',
       buttonConfig: { title: '右侧按钮', tabVal: 1, tabList: [{ name: '显示' }, { name: '隐藏' }] },
     } as DiyComponentValue;
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost registry={diyPanelRegistry} value={value} onChange={vi.fn()} ctx={makeCtx()} />,
     );
     expect(screen.queryByDisplayValue('更多')).not.toBeInTheDocument();
@@ -241,7 +257,7 @@ describe('the goodList panel', () => {
 
   it('shows the product picker for 指定商品 and the filters for 筛选商品', () => {
     const base = { ...panel.createDefault(), name: 'goodList' } as DiyComponentValue;
-    const { unmount } = renderAdmin(
+    const { unmount } = renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={base}
@@ -256,7 +272,7 @@ describe('the goodList panel', () => {
       ...base,
       typeConfig: { ...(base.typeConfig as object), activeValue: 3 },
     } as DiyComponentValue;
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={filtered}
@@ -274,7 +290,7 @@ describe('the goodList panel', () => {
     const onChange = vi.fn((next: DiyComponentValue) => {
       value = next;
     });
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={value}
@@ -299,7 +315,7 @@ describe('the swiperBg panel', () => {
       name: 'swiperBg',
       setUp: { tabVal: 1 },
     } as DiyComponentValue;
-    const { unmount } = renderAdmin(
+    const { unmount } = renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={base}
@@ -310,7 +326,7 @@ describe('the swiperBg panel', () => {
     expect(screen.queryByText('选中样式')).not.toBeInTheDocument();
     unmount();
 
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={
@@ -332,8 +348,9 @@ describe('the swiperBg panel', () => {
  *
  * The rows keep the stored shape — `list` of `{id, label_name}` with
  * `activeValue` the same ids in the same order — because that is what the
- * renderer reads. The data source here is the stub the provider falls back to,
- * which is the point of the port: the field is tested without the network.
+ * renderer reads. The data source here is the in-memory one `renderPanel`
+ * mounts, which is the point of the port: the field is tested without the
+ * network.
  */
 describe('the goodRecommend panel, 商品标签 source', () => {
   const panel = diyPanels.find((p) => p.key === 'goodRecommend')!;
@@ -352,7 +369,7 @@ describe('the goodRecommend panel, 商品标签 source', () => {
     const onChange = vi.fn((next: DiyComponentValue) => {
       value = next;
     });
-    const { rerender } = renderAdmin(
+    const { rerender } = renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={value}
@@ -402,7 +419,7 @@ describe('the goodRecommend panel, 商品标签 source', () => {
     });
     const before = structuredClone(node);
     const onChange = vi.fn();
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={node}
@@ -453,7 +470,7 @@ describe('the pictureCube panel and the unreachable free-draw layout', () => {
     const node = freeDrawNode();
     const before = structuredClone(node);
     const onChange = vi.fn();
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={node}
@@ -474,7 +491,7 @@ describe('the pictureCube panel and the unreachable free-draw layout', () => {
     const onChange = vi.fn((next: DiyComponentValue) => {
       value = next;
     });
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={value}
@@ -519,7 +536,7 @@ describe('the menus panel, for the c_menu_list family', () => {
     const onChange = vi.fn((next: DiyComponentValue) => {
       value = next;
     });
-    renderAdmin(host(value, onChange));
+    renderPanel(host(value, onChange));
 
     const [first] = screen.getAllByDisplayValue('标题');
     await user.type(first!, '页');
@@ -557,7 +574,7 @@ describe('the menus panel, for the c_menu_list family', () => {
         ],
       },
     } as DiyComponentValue;
-    renderAdmin(host(value, vi.fn()));
+    renderPanel(host(value, vi.fn()));
 
     // The link picker sits beside the 链接 entry, not the 描述 one that happens
     // to be second.
@@ -621,7 +638,7 @@ describe('the member panel, for the tabs-and-style family', () => {
     const style2 = storedNode({
       memberStyleConfig: { title: '会员样式', tabVal: 1, tabList: [{ name: '样式一' }] },
     });
-    const { unmount } = renderAdmin(host(style2, vi.fn()));
+    const { unmount } = renderPanel(host(style2, vi.fn()));
     expect(screen.getByDisplayValue('会员中心')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('开通会员，尊享更多权益')).not.toBeInTheDocument();
     unmount();
@@ -629,14 +646,14 @@ describe('the member panel, for the tabs-and-style family', () => {
     const style3 = storedNode({
       memberStyleConfig: { title: '会员样式', tabVal: 2, tabList: [{ name: '样式一' }] },
     });
-    renderAdmin(host(style3, vi.fn()));
+    renderPanel(host(style3, vi.fn()));
     expect(screen.getByDisplayValue('开通会员，尊享更多权益')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('商城购物可享98折')).not.toBeInTheDocument();
   });
 
   it('shows 模块样式 only for 样式四, the layout that has modules', () => {
     const plain = storedNode({ setUp: { tabVal: 1 } });
-    const { unmount } = renderAdmin(host(plain, vi.fn()));
+    const { unmount } = renderPanel(host(plain, vi.fn()));
     expect(screen.queryByText('模块样式')).not.toBeInTheDocument();
     unmount();
 
@@ -644,7 +661,7 @@ describe('the member panel, for the tabs-and-style family', () => {
       setUp: { tabVal: 1 },
       styleConfig: { title: '选择风格', tabVal: 3, tabList: [{ name: '样式一' }] },
     });
-    renderAdmin(host(layout4, vi.fn()));
+    renderPanel(host(layout4, vi.fn()));
     expect(screen.getByText('模块样式')).toBeInTheDocument();
   });
 
@@ -654,7 +671,7 @@ describe('the member panel, for the tabs-and-style family', () => {
     // family existed. The panel must leave it without those rows rather than
     // inventing the keys to have something to render.
     const { ms2TitleType: _a, assetMode: _b, ...older } = panel.createDefault();
-    renderAdmin(host({ ...older, name: 'member' } as DiyComponentValue, vi.fn()));
+    renderPanel(host({ ...older, name: 'member' } as DiyComponentValue, vi.fn()));
     expect(screen.queryByText('标题类型')).not.toBeInTheDocument();
     expect(screen.queryByText('展示模式')).not.toBeInTheDocument();
   });
@@ -668,7 +685,7 @@ describe('the member panel, for the tabs-and-style family', () => {
     const onChange = vi.fn((next: DiyComponentValue) => {
       value = next;
     });
-    renderAdmin(host(value, onChange));
+    renderPanel(host(value, onChange));
 
     await user.type(screen.getByDisplayValue('商城购物可享98折'), '扣');
 
@@ -691,7 +708,7 @@ describe('the member panel, for the tabs-and-style family', () => {
     const onChange = vi.fn((next: DiyComponentValue) => {
       value = next;
     });
-    renderAdmin(host(value, onChange));
+    renderPanel(host(value, onChange));
 
     // The 状态 switches are the per-row ones `c_menu_list` draws. On the factory
     // default (`styleConfig` 样式一, `memberStyleConfig` 样式一, `assetMode`
@@ -727,7 +744,7 @@ describe('every registered panel', () => {
     const value = { ...panel.createDefault(), name: panel.key, setUp: { tabVal: tab } };
     const before = structuredClone(value);
     const onChange = vi.fn();
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={value as DiyComponentValue}
@@ -743,7 +760,7 @@ describe('every registered panel', () => {
     '%s renders read-only without writing',
     (key, panel) => {
       const onChange = vi.fn();
-      renderAdmin(
+      renderPanel(
         <DiyPanelHost
           registry={diyPanelRegistry}
           value={{ ...panel.createDefault(), name: key } as DiyComponentValue}
@@ -798,7 +815,7 @@ describe('the production fixtures', () => {
     expect(isDiyComponentKey(key)).toBe(true);
     const before = structuredClone(node);
     const onChange = vi.fn();
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={node}
@@ -818,7 +835,7 @@ describe('the production fixtures', () => {
     const styled = { ...structuredClone(node), setUp: { ...(node.setUp ?? {}), tabVal: 1 } };
     const before = structuredClone(styled);
     const onChange = vi.fn();
-    renderAdmin(
+    renderPanel(
       <DiyPanelHost
         registry={diyPanelRegistry}
         value={styled}
@@ -835,7 +852,7 @@ describe('the production fixtures', () => {
       const before = JSON.stringify(value, null, 2);
       for (const node of Object.values(value)) {
         const onChange = vi.fn();
-        const { unmount } = renderAdmin(
+        const { unmount } = renderPanel(
           <DiyPanelHost
             registry={diyPanelRegistry}
             value={node}
