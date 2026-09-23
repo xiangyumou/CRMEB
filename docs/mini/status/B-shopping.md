@@ -18,19 +18,25 @@ Updated at every commit so the work can resume after an interruption.
 - 分类 (level-1 rail, banner, level-2 grid, product list with 加购), `features/product/sku-select`
   - `SkuSheet`, `features/cart/quick-add` (`useQuickAdd`).
 
+- 分类 and 加购 tests; `test/catalog-fixture.ts`; the fake API records each request's query.
+- `goods` sub-package: 商品列表 (title from category / keyword, sort, price filter, 1/2 columns
+  remembered, 加购; `features/catalog/list-query.ts`), 搜索 (hot words, server history when
+  signed in, clear; submit `redirectTo` 商品列表), 精品推荐 (tabs best / hot / new / benefit),
+  商品评价 (score, rating tabs with counts, picture preview; `features/product/review-item.tsx`).
+  All with tests.
+
 ## In progress
 
-- Tests for 分类 and `useQuickAdd`.
+- 商品详情.
 
 ## Next
 
-1. 商品列表, 搜索, 精品推荐, 商品评价 (`goods` sub-package).
-2. 商品详情 (fixed design, SkuSheet, coupons, favourite, share, activity entries).
-3. 购物车 (tab; quantity through `cart.updateItemPut`).
-4. 下单 / 收银台 / 支付结果.
-5. Vitest per page, e2e page objects and specs in `e2e/storefront/specs-mini` (seed a decor v2
+1. 商品详情 (fixed design, SkuSheet, coupons, favourite, share, activity entries).
+2. 购物车 (tab; quantity through `cart.updateItemPut`).
+3. 下单 / 收银台 / 支付结果.
+4. Vitest per page, e2e page objects and specs in `e2e/storefront/specs-mini` (seed a decor v2
    home).
-6. `docs/mini/pages.md` for page-form changes; guard allow-lists; sizes; 375px screenshots in
+5. `docs/mini/pages.md` for page-form changes; guard allow-lists; sizes; 375px screenshots in
    `docs/mini/status/B-screens/`.
 
 ## Backend gaps found (not changed; for a later backend task)
@@ -42,6 +48,9 @@ Updated at every commit so the work can resume after an interruption.
 - `groupbuy.list` / `presale.list` take no `productId` filter; `catalog.productDetail` does not
   say which activities a product is in.
 - `coupon.claimableList` takes no `productId` filter.
+- `productList { couponId }` (我的优惠券「去使用」) cannot narrow the list: the storefront API
+  neither filters products by coupon nor exposes a user coupon's scope ids. The list shows
+  everything with a note.
 - `app/config` has no switches for 分类「显示二级类目」 or 商品详情「评价 / 推荐 / 服务标签」;
   `splashAd.link` is a legacy path string, not a `LinkTarget`.
 - `order.create` takes no invoice; invoices are asked for after payment (`order.invoiceRequest`).
