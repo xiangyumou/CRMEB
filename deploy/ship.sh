@@ -157,6 +157,19 @@ on_host() {
   fi
 }
 
+# The same, for a one-line script whose stdin is data (the release files):
+# the script travels as an argument instead, quoted for the host's shell.
+on_host_reading() {
+  local script="$1"
+  shift
+  if [ "$host" = 'local' ]; then
+    bash -c "$script" bash "$@"
+  else
+    # shellcheck disable=SC2029  # expanded here on purpose: quoted arguments.
+    ssh -o BatchMode=yes "$host" "bash -c $(printf '%q' "$script") bash$(quoted_args "$@")"
+  fi
+}
+
 # A `shop` command on the host, interactive: `rollback --restore` asks before
 # it overwrites anything, so it needs a terminal.
 shop_interactive() {
@@ -232,7 +245,7 @@ cleanup() { on_host 'rm -rf -- "$1"' "$stage" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
 git archive --format=tar "$sha" -- "${files[@]}" |
-  on_host 'tar -x -C "$1" --strip-components="$2"' "$stage" "$strip" ||
+  on_host_reading 'tar -x -C "$1" --strip-components="$2"' "$stage" "$strip" ||
   refuse "could not stage the release files on $host"
 
 say ''
