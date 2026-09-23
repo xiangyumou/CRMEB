@@ -14,7 +14,7 @@ import { randomToken } from '../kernel/ids';
  * input by identity or returns a shallow copy whose key order is unchanged.
  */
 
-/** `config('database.page.limitMax', 50)` in the legacy config. */
+/** The most products one product block may show. */
 export const DIY_PRODUCT_LIMIT = 50;
 
 /**
@@ -55,11 +55,9 @@ function idsOf(list: readonly unknown[]): unknown[] {
 /**
  * Drops the rows the editor resolved for preview, keeping only the ids.
  *
- * Port of `Diy::saveDiyData`'s `is_diy` branch
- * (`crmeb/app/adminapi/controller/v1/diy/Diy.php:117`): a decorated page stores
- * *which* products it shows, never a copy of them. Copies go stale the moment a
- * price changes, and a hundred-product home page would be half a megabyte of
- * duplicated catalogue in one jsonb column.
+ * A decorated page stores *which* products it shows, never a copy of them.
+ * Copies go stale the moment a price changes, and a hundred-product home page
+ * would be half a megabyte of duplicated catalogue in one jsonb column.
  *
  * The admin editor re-resolves them through `DiyDataSource` when the page is
  * opened again, and the storefront renderer fetches them itself.
@@ -108,8 +106,8 @@ function dehydrateGoodList(node: Record<string, unknown>): Record<string, unknow
   }
   if (hasGoods) {
     const { list, ...rest } = goodsList;
-    // `ids` is appended where the PHP appended it, and `list` removed after,
-    // so the key order of everything else is untouched.
+    // `ids` is appended last and `list` removed after, so the key order of
+    // everything else is untouched.
     next.goodsList = { ...rest, ids: idsOf(list as unknown[]) };
   }
   return next;
@@ -123,12 +121,11 @@ function withoutListIn(node: Record<string, unknown>, key: string): Record<strin
 }
 
 /**
- * The legacy product-count guard, message and all.
+ * The product-count guard, with the message operators already know.
  *
- * `Diy::saveDiyData:125` checks the *automatic* mode (`tabConfig.tabVal == 0`)
- * against `numConfig.val`. The explicit mode is checked here too, against the
- * length of the chosen list, which the legacy code only did on the theme branch
- * (`Diy::saveData:80`) and forgot on this one.
+ * The *automatic* mode (`tabConfig.tabVal == 0`) is checked against
+ * `numConfig.val`, and the explicit mode against the length of the chosen list,
+ * on every save path.
  */
 export function assertProductLimits(value: DiyPageValue, limit = DIY_PRODUCT_LIMIT): void {
   for (const node of Object.values(value)) {
@@ -162,10 +159,9 @@ export function assertProductLimits(value: DiyPageValue, limit = DIY_PRODUCT_LIM
  * - `updated_at`, which moves on every write, including a rename; the
  *   storefront's `ETag` has to change then too.
  * - the envelope's own `version`, a fresh opaque string written on every
- *   content save. The legacy editor did exactly this
- *   (`$data['version'] = uniqid()` in `Diy::saveData`), and it is what makes
- *   the guard correct at sub-millisecond resolution — two saves inside the same
- *   millisecond share an `updated_at` but never a `version`.
+ *   content save. It is what makes the guard correct at sub-millisecond
+ *   resolution — two saves inside the same millisecond share an `updated_at`
+ *   but never a `version`.
  */
 export function versionOf(row: {
   updatedAt: Date;

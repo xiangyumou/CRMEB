@@ -45,10 +45,10 @@ import * as themeRepo from './theme.repo';
 
 /**
  * `diy_pages.content` holds the envelope `{ value, version?, orderStatus? }`
- * described by `diyPageContent` in the contracts, not the bare component map:
- * the legacy row had `version` and `order_status` beside the components and an
- * ETL'd page must keep them. Everything outside `value` is carried through
- * untouched, which also makes room for whatever a newer editor adds.
+ * described by `diyPageContent` in the contracts, not the bare component map: a
+ * saved page can carry `version` and `order_status` beside the components, and
+ * must keep them. Everything outside `value` is carried through untouched,
+ * which also makes room for whatever a newer editor adds.
  *
  * A row whose content has no `value` key is read as being the component map
  * itself. That is the shape a hand-seeded or half-migrated row has, and
@@ -184,9 +184,9 @@ export async function updatePage(
  * The editor's save.
  *
  * Order matters: validate first (so a broken payload never reaches the row),
- * then the product-count guard (the legacy message the operator knows), then
- * strip the hydrated preview lists, and only then write — guarded on the
- * version the editor loaded.
+ * then the product-count guard (the message the operator knows), then strip the
+ * hydrated preview lists, and only then write — guarded on the version the
+ * editor loaded.
  */
 export async function savePageContent(
   ctx: Ctx,
@@ -219,8 +219,8 @@ export async function savePageContent(
     // The guard failed, so somebody else saved between the read and the write.
     throw new DomainError('DIY_VERSION_CONFLICT', { details: { current: null } });
   }
-  // 底部导航 and 个人中心 are cached reads off these rows (CR-3-h2); an operator
-  // who saves must see the change in the app now, not within the minute.
+  // 底部导航 and 个人中心 are cached reads off these rows; an operator who
+  // saves must see the change in the app now, not within the minute.
   await invalidateDiyStorefrontCache(ctx);
   return toDetail(next);
 }
@@ -242,15 +242,15 @@ export async function publishPage(ctx: Ctx, input: { id: string }): Promise<DiyP
   return toDetail(next);
 }
 
-/** Legacy `set_status`: 使用该模板. */
+/** 使用该模板. */
 export async function setHomePage(ctx: Ctx, input: { id: string }): Promise<DiyPageDetail> {
   const row = await loadPage(ctx, input.id);
   if (row.kind !== 'home') throw new DomainError('DIY_HOME_KIND_MISMATCH');
   const now = ctx.clock.now();
   await ctx.withTx(async (tx) => {
     await repo.setHomePage(tx, row.id, now);
-    // A page nobody can see is not "in use"; the legacy admin published and
-    // switched in one click, so do the same.
+    // A page nobody can see is not "in use", so switching to it publishes it
+    // too, in one click.
     if (row.status !== 'published') {
       await repo.updatePage(tx, row.id, { status: 'published', publishedAt: now }, now);
     }
@@ -297,12 +297,12 @@ function surfaceOf(kind: repo.DiyPageKindValue): themeRepo.ThemeSurface | null {
 }
 
 /**
- * Legacy `recovery`: put the page back to its factory content.
+ * Put the page back to its factory content.
  *
- * `eb_diy.default_value` held a per-row snapshot. The new schema keeps the
- * factory copy on the active theme instead (`themes.default_data`, one blob per
- * surface), so a restore reads from there. 微页面 has no surface of its own and
- * therefore no factory copy — which is correct, since every 微页面 is bespoke.
+ * The factory copy lives on the active theme (`themes.default_data`, one blob
+ * per surface) rather than on each row, so a restore reads from there. 微页面
+ * has no surface of its own and therefore no factory copy — which is correct,
+ * since every 微页面 is bespoke.
  */
 export async function restorePageDefault(ctx: Ctx, input: { id: string }): Promise<DiyPageDetail> {
   const row = await loadPage(ctx, input.id);
@@ -326,7 +326,7 @@ export async function restorePageDefault(ctx: Ctx, input: { id: string }): Promi
   return toDetail(next);
 }
 
-/** Legacy `set_recovery`: 把当前内容存成默认数据. */
+/** 把当前内容存成默认数据. */
 export async function savePageAsDefault(ctx: Ctx, input: { id: string }): Promise<{ ok: true }> {
   const row = await loadPage(ctx, input.id);
   const surface = surfaceOf(row.kind);
@@ -358,12 +358,12 @@ function tagged<T extends { version: string }>(ctx: ReadCtx, payload: T): T {
 /**
  * `GET /api/v1/diy/pages/home` — the first request of every app launch.
  *
- * Cached under `DIY_CACHE.home` for 60 s (CR-42-k2): reading the row means
- * reading its whole `content` (≈90 KB for the production home page) and
- * cleaning it, and it was the storefront's largest slice of database time in
- * the load smoke. Every 装修 write drops the key (`invalidateDiyStorefrontCache`),
- * so a publish is visible on the next read. A missing home page is not cached:
- * the operator who fixes it should not wait a minute.
+ * Cached under `DIY_CACHE.home` for 60 s: reading the row means reading its
+ * whole `content` (≈90 KB for the production home page) and cleaning it, and it
+ * was the storefront's largest slice of database time in the load smoke. Every
+ * 装修 write drops the key (`invalidateDiyStorefrontCache`), so a publish is
+ * visible on the next read. A missing home page is not cached: the operator who
+ * fixes it should not wait a minute.
  */
 export async function getHomePage(ctx: ReadCtx): Promise<DiyStorefrontPage> {
   return tagged(ctx, await homePayload(ctx));
@@ -393,7 +393,7 @@ export async function getStorefrontPage(
 
 /**
  * The cheap poll the app makes on resume, in place of re-downloading a page
- * that rarely changes. Legacy `get_diy_version`.
+ * that rarely changes.
  */
 export async function getPageVersion(
   ctx: Ctx,
@@ -404,7 +404,7 @@ export async function getPageVersion(
     if (!row || row.status !== 'published') throw new DomainError('DIY_PAGE_NOT_FOUND');
     return { version: versionOf(row) };
   }
-  // The home page's version is the cached payload's (CR-42-k2): the poll and
-  // the page it guards agree, and neither reads the row while the entry lives.
+  // The home page's version is the cached payload's: the poll and the page it
+  // guards agree, and neither reads the row while the entry lives.
   return { version: (await homePayload(ctx)).version };
 }

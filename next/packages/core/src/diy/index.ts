@@ -6,16 +6,16 @@
  *
  * | Function              | Caller | When                                                      |
  * | --------------------- | ------ | --------------------------------------------------------- |
- * | `getHomePage`         | H      | the app's first screen — `GET /api/v1/diy/pages/home`      |
- * | `getStorefrontPage`   | H      | any other decorated page, by id                            |
- * | `getPageVersion`      | H      | the cheap poll on resume, before re-downloading a page     |
- * | `getActiveTheme`      | H      | the colour tokens the renderer applies globally            |
- * | `getUserCenterPage`   | H      | 个人中心 — `GET /api/v1/diy/pages/user-center`              |
- * | `getProductDetailPage` | H     | 商品详情 — `GET /api/v1/diy/pages/product-detail` (CR-2-h3) |
- * | `getNavigation`       | H      | 底部导航 — `GET /api/v1/diy/navigation`                      |
- * | `getLayout`           | H      | the 版式 switch — `GET /api/v1/diy/layouts/:type`           |
- * | `cleanDiyData`        | H      | only if a page is read outside these functions; they clean |
- * | `isRemovedStorefrontPage` | F2 | when deciding whether a link target still exists           |
+ * | `getHomePage`         | route  | the app's first screen — `GET /api/v1/diy/pages/home`      |
+ * | `getStorefrontPage`   | route  | any other decorated page, by id                            |
+ * | `getPageVersion`      | route  | the cheap poll on resume, before re-downloading a page     |
+ * | `getActiveTheme`      | route  | the colour tokens the renderer applies globally            |
+ * | `getUserCenterPage`   | route  | 个人中心 — `GET /api/v1/diy/pages/user-center`              |
+ * | `getProductDetailPage` | route | 商品详情 — `GET /api/v1/diy/pages/product-detail`           |
+ * | `getNavigation`       | route  | 底部导航 — `GET /api/v1/diy/navigation`                      |
+ * | `getLayout`           | route  | the 版式 switch — `GET /api/v1/diy/layouts/:type`           |
+ * | `cleanDiyData`        | route  | only if a page is read outside these functions; they clean |
+ * | `isRemovedStorefrontPage` | any    | when deciding whether a link target still exists           |
  *
  * Every function here takes `(ctx, input)`: nothing in this domain participates
  * in another domain's transaction, because a decorated page is never written

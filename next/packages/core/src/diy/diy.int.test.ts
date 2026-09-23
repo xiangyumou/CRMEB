@@ -53,9 +53,9 @@ const FIXTURES = path.join(
 );
 
 /**
- * A real production page, read exactly as it is stored. `eb_diy.value` is a
- * JSON string in some rows and already-decoded JSON in others, which is one of
- * the reasons the legacy schema is what it is.
+ * A real production page, read exactly as it is stored. The fixture's `value`
+ * is a JSON string in some rows and already-decoded JSON in others, so both are
+ * handled.
  */
 function pageValueOf(fileName: string): Record<string, unknown> {
   const row = JSON.parse(readFileSync(path.join(FIXTURES, fileName), 'utf8')) as {
@@ -145,9 +145,9 @@ describe('saving content', () => {
     //
     // Harmless for the renderer, which addresses everything by key and sorts
     // the components by `timestamp` itself — but it does mean a dump of a
-    // migrated row will not diff byte for byte against the MySQL original.
-    // The byte-exact guarantee lives at the wire, where `parseDiyPageValue`
-    // hands back its input; see CR-1-g1.
+    // stored row will not diff byte for byte against what was sent. The
+    // byte-exact guarantee lives at the wire, where `parseDiyPageValue` hands
+    // back its input.
     const page = await seedHome();
     const node = { zzzz: 1, a: 2, name: 'titles', timestamp: 1 };
     const saved = await savePageContent(ctx, { id: page.id, content: { '1': node } });
@@ -159,8 +159,8 @@ describe('saving content', () => {
   it('keeps the unknown keys of the stored envelope', async () => {
     const page = await seedHome();
     await harness.db.db.execute(
-      // A row as the ETL leaves it: the legacy `version` and `order_status`
-      // live beside `value` in the same blob.
+      // A stored envelope can carry `version` and `orderStatus` beside `value`
+      // in the same blob.
       `update diy_pages set content = '{"value":{},"version":"67bd313ce57d7","orderStatus":2}'::jsonb where id = ${Number(page.id)}`,
     );
     const saved = await savePageContent(ctx, {
@@ -177,8 +177,7 @@ describe('saving content', () => {
         rows.map((r) => ({ content: JSON.parse(r.content) as Record<string, unknown> })),
       );
     // `orderStatus` is not ours to touch, so it is still there. `version` is
-    // ours: every content save mints a new one, exactly as the legacy editor
-    // wrote a fresh `uniqid()` into `eb_diy.version`.
+    // ours: every content save mints a new one.
     expect(row?.content.orderStatus).toBe(2);
     expect(row?.content.version).not.toBe('67bd313ce57d7');
     expect(typeof row?.content.version).toBe('string');
@@ -258,7 +257,7 @@ describe('publish, home and copy', () => {
     await setHomePage(ctx, { id: second.id });
     expect((await getPage(ctx, { id: first.id })).isHome).toBe(false);
     expect((await getPage(ctx, { id: second.id })).isHome).toBe(true);
-    // Switching to a template also publishes it, as the legacy one-click did.
+    // Switching to a template also publishes it, in one click.
     expect((await getPage(ctx, { id: second.id })).status).toBe('published');
   });
 
@@ -411,9 +410,9 @@ describe('the storefront read', () => {
   });
 
   /**
-   * CR-42-k2: the home page is the first read of every launch and was the
-   * largest slice of database time in the load smoke. Mirrors the 个人中心
-   * and 底部导航 cache cases below.
+   * The home page is the first read of every launch and the largest slice of
+   * database time under load. Mirrors the 个人中心 and 底部导航 cache cases
+   * below.
    */
   it('caches the home page for 60 s and drops the entry the moment an operator publishes', async () => {
     const page = await seedHome();
@@ -476,16 +475,16 @@ describe('the storefront read', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * The three public reads the app makes that the four original storefront
- * routes did not answer (CR-3-h2): 个人中心, 底部导航 and the 版式 switch.
+ * Three public reads beyond the page routes: 个人中心, 底部导航 and the 版式
+ * switch.
  *
  * All three are read through the production fixtures rather than hand-written
  * content, because what is being asserted is that a real decorated page
- * survives the trip. The fixtures are the six `eb_diy` rows G1 kept: `prod-8`
- * is the one home page with `status = 1` and it carries a 底部导航; `prod-3`
- * and `prod-4` are the two 版式 settings rows, whose values are `1` and `2`.
+ * survives the trip. `prod-8` is the one home page with `status = 1` and it
+ * carries a 底部导航; `prod-3` and `prod-4` are the two 版式 settings rows,
+ * whose values are `1` and `2`.
  */
-describe('个人中心 / 底部导航 / 版式 (CR-3-h2)', () => {
+describe('个人中心 / 底部导航 / 版式', () => {
   async function seedUserCenter(content = PROD_PAGE) {
     const page = await createPage(ctx, { name: '个人中心', kind: 'user_center', title: '我的' });
     await savePageContent(ctx, { id: page.id, content, publish: true });
@@ -543,9 +542,9 @@ describe('个人中心 / 底部导航 / 版式 (CR-3-h2)', () => {
     await seedLiveHome();
     const { navigation } = await getNavigation(ctx);
 
-    // The legacy reader matched `strtolower(name) === 'pagefoot'`; the fixture
-    // stores the component under the key `undefined`, which is exactly why the
-    // lookup is by `name` and not by key.
+    // The lookup matches `name` case-insensitively; the fixture stores the
+    // component under the key `undefined`, which is exactly why the lookup is
+    // by `name` and not by key.
     const expected = PROD_LIVE_HOME['undefined'] as Record<string, unknown>;
     expect(navigation).toEqual(expected);
     expect((navigation as { menuList: unknown[] }).menuList).toHaveLength(4);
@@ -578,7 +577,7 @@ describe('个人中心 / 底部导航 / 版式 (CR-3-h2)', () => {
     expect(await getLayout(ctx, { type: 'user' })).toEqual({ status: 1 });
   });
 
-  it('serves the values the legacy settings rows carried', async () => {
+  it('serves the values the production settings rows carry', async () => {
     // `prod-3` (template_name 'category') holds 1, `prod-4` ('member') holds 2.
     await ctx.config.set(diyConfig, { categoryLayout: 1, userCenterLayout: 2 });
     expect(await getLayout(ctx, { type: 'category' })).toEqual({ status: 1 });
@@ -627,7 +626,7 @@ describe('个人中心 / 底部导航 / 版式 (CR-3-h2)', () => {
   });
 });
 
-describe('商品详情 (CR-2-h3)', () => {
+describe('商品详情', () => {
   async function seedProductDetail(content: Record<string, unknown> = PROD_PAGE) {
     const page = await createPage(ctx, { name: '商品详情', kind: 'product_detail', title: '详情' });
     await savePageContent(ctx, { id: page.id, content, publish: true });

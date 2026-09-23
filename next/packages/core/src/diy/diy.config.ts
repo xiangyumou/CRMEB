@@ -2,24 +2,17 @@ import { z } from 'zod';
 import { defineConfigGroup } from '../kernel/config-registry';
 
 /**
- * `diy` — the two 版式 switches (CR-3-h2 §3).
+ * `diy` — the two 版式 switches.
  *
  * 分类页 and 个人中心 are not decorated component-by-component the way the home
  * page is: the app ships two or three hand-written layouts for each and the
- * operator picks one. The legacy editor stored that pick in `eb_diy` beside the
- * real pages — a row with `template_name = 'category'` or `'member'` whose
- * `value` column held a bare number instead of a component tree, which is why
- * the ETL reports those rows as settings and refuses to make pages of them
- * (`DiyMigrationReport.settings`).
+ * operator picks one. That pick is a setting, not a page, so it lives here
+ * rather than in `diy_pages`.
  *
- * A number, not a boolean. CR-3-h2 §3 describes it as a boolean, and that is
- * wrong about the code it describes: `pages/goods_cate/goods_cate.vue` reads
+ * A number, not a boolean: `pages/goods_cate/goods_cate.vue` reads
  * `status == 2 || status == 3`, and the production fixtures carry `category: 1`
- * and `member: 2`. Two of the three values would have collapsed into one.
- *
- * No `legacyKeys`: those map `eb_system_config` rows, and these two never lived
- * there. A migrated shop re-picks its layout once, or the diy ETL group grows a
- * `config_values` target — see `docs/rewrite/status/f4.md`.
+ * and `member: 2`. As a boolean, two of the three values would collapse into
+ * one.
  */
 export const diyConfig = defineConfigGroup({
   group: 'diy',
