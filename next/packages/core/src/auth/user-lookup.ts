@@ -1,12 +1,13 @@
 import type { DbOrTx } from '@shop/db';
 
 /**
- * The seam between session handling (P0-A) and the `user` domain (stream E1).
+ * The seam between session handling and the `user` domain.
  *
- * P0-A must be able to reject a storefront session whose `passwordVersion` is
- * stale, and to refuse a disabled account, without owning the `users` table.
- * E1 registers the real implementation; `@shop/testing` ships an in-memory
- * fake so everything here is testable today.
+ * Session handling must be able to reject a storefront session whose
+ * `passwordVersion` is stale, and to refuse a disabled account, without owning
+ * the `users` table. The user domain registers the real implementation;
+ * `@shop/testing` ships an in-memory fake so everything here is testable on its
+ * own.
  */
 
 export interface UserAuthState {
@@ -32,9 +33,9 @@ export function getUserLookup(): UserLookup | undefined {
 }
 
 /**
- * `auth: 'staff'` routes (`/api/v1/staff/*`, stream B2) are a storefront
- * session whose user is an order handler. Who counts as staff is B2's
- * business; `handle()` only needs a yes/no.
+ * `auth: 'staff'` routes (`/api/v1/staff/*`) are a storefront session whose
+ * user is an order handler. Who counts as staff is the order domain's business;
+ * `handle()` only needs a yes/no.
  */
 export interface StaffCheck {
   isStaff(db: DbOrTx, userId: number): Promise<boolean>;

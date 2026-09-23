@@ -50,7 +50,7 @@ export interface LoginMeta {
   userAgent?: string | null;
 }
 
-/** The `routeId` every sign-in outcome is written under (CR-12-k2). */
+/** The `routeId` every sign-in outcome is written under. */
 export const ADMIN_LOGIN_AUDIT_ROUTE = 'auth.adminLogin';
 
 export type AdminLoginOutcome =
@@ -94,10 +94,10 @@ export class AdminAuthService {
 
   /**
    * Signs in, and writes the outcome — success or the reason for refusal — to
-   * `audit_logs` under `auth.adminLogin` (CR-12-k2). The route is public, so
-   * `handle()` writes nothing for it; without this a password-guessing run
-   * left no record. The row carries the account, the outcome, the address and
-   * the user agent, and **never** the body.
+   * `audit_logs` under `auth.adminLogin`. The route is public, so `handle()`
+   * writes nothing for it; without this a password-guessing run would leave no
+   * record. The row carries the account, the outcome, the address and the user
+   * agent, and **never** the body.
    */
   async login(ctx: Ctx, input: LoginInput, meta?: LoginMeta): Promise<LoginResult> {
     const seen: { adminId: number | null } = { adminId: null };

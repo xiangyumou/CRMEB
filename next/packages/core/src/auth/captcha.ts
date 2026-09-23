@@ -4,11 +4,11 @@
  * The admin login contract already carries `captchaToken`, and the login
  * service already calls this, so switching the captcha on later is a
  * registration and a config flag rather than a contract change. No
- * implementation ships in Phase 0: the shop has one admin account and a
- * per-account throttle, and a captcha nobody has configured that fails closed
- * would lock the only operator out.
+ * implementation ships: the shop has one admin account and a per-account
+ * throttle, and a captcha nobody has configured that fails closed would lock
+ * the only operator out.
  *
- * TODO(F1): implement against the chosen provider and register it.
+ * TODO: implement against the chosen provider and register it.
  */
 
 export interface CaptchaVerifier {

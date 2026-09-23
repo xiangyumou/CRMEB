@@ -5,20 +5,17 @@ import { AdminAuthService } from './admin-auth.service';
 import { hashPassword } from './password';
 
 /**
- * The console sign-in, read as somebody guessing passwords (K2, AUDIT.md
- * K-SEC-A4).
+ * The console sign-in, read as somebody guessing passwords.
  *
- * The per-account window parks an account after five misses, and that part
- * works. What it leaves behind is nothing: a failure only throws, the route is
- * `auth: 'public'` so `handle()` writes no audit row (by design — the body
- * holds the password), and the lockout itself is a Redis counter that expires.
- * An operator asked "was somebody trying our admin passwords last week" has no
- * row to read, and neither does the successful login that follows a run of
- * failures.
+ * The per-account window parks an account after five misses. That alone leaves
+ * nothing behind: a failure only throws, the route is `auth: 'public'` so
+ * `handle()` writes no audit row (by design — the body holds the password), and
+ * the lockout itself is a Redis counter that expires. An operator asked "was
+ * somebody trying our admin passwords last week" would have no row to read, and
+ * neither would the successful login that follows a run of failures.
  *
- * CR-12-k2: `login` now records the *outcome* of each attempt — account,
- * result, address, user agent, never the body — in `audit_logs` under
- * `auth.adminLogin`.
+ * So `login` records the *outcome* of each attempt — account, result, address,
+ * user agent, never the body — in `audit_logs` under `auth.adminLogin`.
  */
 
 let harness: TestCtx;
@@ -49,7 +46,7 @@ beforeEach(async () => {
   });
 });
 
-describe('K-SEC-A4 — what a password-guessing run leaves behind', () => {
+describe('what a password-guessing run leaves behind', () => {
   it('parks the account after five misses', async () => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await auth.login(harness.ctx, { account: 'admin', password: GUESS }).catch(() => undefined);

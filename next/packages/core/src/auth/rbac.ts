@@ -9,8 +9,8 @@ import { authPermissions } from './permissions';
  *  2. otherwise the atom must be in the actor's granted set.
  *
  * There is no wildcard, no hierarchy and no "implies". A screen that needs two
- * things checks two atoms. Cleverness here is how the old system ended up with
- * permissions nobody could reason about.
+ * things checks two atoms. Cleverness here is how a system ends up with
+ * permissions nobody can reason about.
  */
 
 /**

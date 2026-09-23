@@ -9,10 +9,9 @@ import bcrypt from 'bcryptjs';
  * should not need one. It is pure JS and slower than a native bcrypt, which is
  * why the cost factor is configurable and tests drop it to 4.
  *
- * Legacy rows carry `password_algo = 'md5'` — CRMEB stored `md5(password)`.
- * Those verify once and are rewritten as bcrypt on that first successful
- * login (PLAN §6: "遗留 MD5 标 password_algo='md5' 首次登录升级"). We never
- * *create* an md5 hash.
+ * Imported rows may carry `password_algo = 'md5'` (a bare `md5(password)`).
+ * Those verify once and are rewritten as bcrypt on that first successful login,
+ * so no operator has to reset a password. We never *create* an md5 hash.
  */
 
 export type PasswordAlgo = 'bcrypt' | 'md5';
