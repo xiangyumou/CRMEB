@@ -7,8 +7,8 @@
  *     export default shopConfig({ kind: 'core' });
  *
  * `kind` picks the import-boundary rule set. Everything else is shared.
- * Linting is intentionally NOT type-aware: it has to stay fast enough that ten
- * streams run it on every commit.
+ * Linting is intentionally NOT type-aware: it has to stay fast enough to run
+ * on every commit.
  */
 
 import js from '@eslint/js';

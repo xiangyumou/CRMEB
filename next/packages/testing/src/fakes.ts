@@ -17,10 +17,10 @@ import type { CaptchaVerifier } from '@shop/core/auth';
  * In-memory implementations of the cross-domain ports in
  * `core/src/order/ports.ts`.
  *
- * A wave-1 stream registers the fake for every port it does *not* own, so B1
- * can test order cancellation before payment exists and C can test a refund
- * before freight exists. When the real implementation lands, the stream swaps
- * one `register…` call.
+ * A domain's tests register the fake for every port they do not exercise, so
+ * order cancellation can be tested without payment behind it and a refund
+ * without freight. Swapping a fake for the real implementation is one
+ * `register…` call.
  */
 
 // ---------------------------------------------------------------------------
@@ -39,13 +39,14 @@ export interface FakePaymentPort extends PaymentPort {
 }
 
 /**
- * `fakePaymentPort({ result: 'unknown' })` is how B1 proves the cancel path
- * refuses and keeps every reservation when the gateway will not answer.
+ * `fakePaymentPort({ result: 'unknown' })` is how the order tests prove the
+ * cancel path refuses and keeps every reservation when the gateway will not
+ * answer.
  *
  * Both halves of the two-call protocol answer the same thing by default, which
  * is what a real gateway does when nothing changes underneath. `closeResult`
  * splits them, so a test can have the close succeed and the re-check under the
- * lock find an attempt that opened in between (CR-7-c).
+ * lock find an attempt that opened in between.
  */
 export function fakePaymentPort(
   options: { result?: PaymentState; closeResult?: PaymentState } = {},
@@ -176,7 +177,7 @@ export function fakeStockPort(initial: Record<number, number> = {}): FakeStockPo
 /**
  * An in-memory state machine that still behaves like a conditional update:
  * the transition succeeds only if the current status is in `from`, and a second
- * caller loses. Use it to test hook wiring without B1's tables.
+ * caller loses. Use it to test hook wiring without the order tables.
  */
 export function fakeOrderStateMachine(
   initial: Record<number, string> = {},
@@ -216,7 +217,7 @@ export function fixedPricingContributor(
 }
 
 // ---------------------------------------------------------------------------
-// UserLookup (stream E1's seam)
+// UserLookup
 // ---------------------------------------------------------------------------
 
 export interface FakeUserLookup extends UserLookup {
@@ -227,9 +228,9 @@ export interface FakeUserLookup extends UserLookup {
 }
 
 /**
- * The in-memory `UserLookup` the brief calls for: P0-A's storefront session
- * service needs one to validate `passwordVersion`, and E1's real
- * implementation does not exist yet.
+ * An in-memory `UserLookup`: the storefront session service validates
+ * `passwordVersion` through one, and a test that does not want the user
+ * domain's tables registers this instead.
  */
 export function fakeUserLookup(
   seed: Array<Partial<UserAuthState> & { id: number }> = [],

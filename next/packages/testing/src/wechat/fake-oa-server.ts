@@ -15,10 +15,10 @@ import type { AddressInfo } from 'node:net';
  * (`40001 → drop the token and try once more`) only mean anything against a
  * server that can actually refuse.
  *
- * It moved here from `core/src/wechat-oa/wechat-oa.fake-oa.ts` under
- * **CR-2-e3**: three surfaces need it (OA management, storefront sign-in,
- * mini-program codes), and a test helper imported across a domain boundary is
- * exactly what CONVENTIONS forbids.
+ * It lives in `@shop/testing` rather than in a domain because three surfaces
+ * need it (OA management, storefront sign-in, mini-program codes), and a test
+ * helper imported across a domain boundary is exactly what the conventions
+ * forbid.
  *
  * ## Two credential pairs, one process
  *

@@ -9,11 +9,11 @@ import '@shop/contracts/locale';
 /**
  * The contract mock server.
  *
- * PLAN §3: "每个流的第一个交付物是契约 PR … uni-app 流由此对着 mock server 开工,
- * 不等任何后端实现". This is that server. It knows nothing about the domain: it
- * answers every registered route with an example from the contract, and it
- * validates whatever the client sent against the contract's zod schemas — so a
- * client developed against it cannot drift from the real API.
+ * It lets a client be built against a contract before the handler behind it
+ * exists. It knows nothing about the domain: it answers every registered route
+ * with an example from the contract, and it validates whatever the client sent
+ * against the contract's zod schemas — so a client developed against it cannot
+ * drift from the real API.
  *
  *  - response: the route's **first** example, or the one named by the
  *    `X-Mock-Example` request header;
@@ -92,14 +92,13 @@ function shapeOf(path: string): string {
  * The path is the tie-break so the order is total and the mock server behaves
  * the same however the aggregation happens to be ordered.
  *
- * Three streams fixed this bug on the same day (J3, B3, E4 — CR-3-e4). The
- * segment-walking variant that broke ties on the path was **still** not
- * transitive: a shorter all-static path (`/admin-api/attachment-categories`)
- * compared by path against a longer one with a `:param` (`/admin-api/admins/:id`),
- * while the longer static path between them was ordered by segment — 2.5 M bad
- * triples over 412 routes. The key here is a (shape, path) tuple, which is a
- * total order by construction; `mock-server.test.ts` asserts it over the whole
- * table.
+ * An earlier segment-walking variant that broke ties on the path was **still**
+ * not transitive: a shorter all-static path
+ * (`/admin-api/attachment-categories`) compared by path against a longer one
+ * with a `:param` (`/admin-api/admins/:id`), while the longer static path
+ * between them was ordered by segment — 2.5 M bad triples over 412 routes. The
+ * key here is a (shape, path) tuple, which is a total order by construction;
+ * `mock-server.test.ts` asserts it over the whole table.
  */
 export function bySpecificity(a: CompiledRoute, b: CompiledRoute): number {
   const left = shapeOf(a.route.path);

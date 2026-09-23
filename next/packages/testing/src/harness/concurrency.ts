@@ -90,9 +90,9 @@ export async function runConcurrently<T>(
 }
 
 /**
- * Repeats a concurrency scenario. PLAN §8.3 asks for 50 rounds of each
- * concurrency scenario in CI; this is how a test spells that without a loop
- * that hides which round failed.
+ * Repeats a concurrency scenario. CI's soak runs each concurrency scenario 50
+ * rounds; this is how a test spells that without a loop that hides which
+ * round failed.
  */
 export async function repeatConcurrently<T>(
   rounds: number,

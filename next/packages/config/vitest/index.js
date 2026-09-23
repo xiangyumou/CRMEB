@@ -23,8 +23,8 @@ const ALWAYS_EXCLUDE = ['**/node_modules/**', '**/dist/**', '**/.next/**'];
  * @property {string[]} [unitInclude]
  * @property {string[]} [intInclude]
  * @property {string[]} [setupFiles]
- * @property {unknown[]} [extraProjects] Extra vitest projects (used to pull
- *   `apps/web/src/server` in until P0-b gives that app its own package.json).
+ * @property {unknown[]} [extraProjects] Extra vitest projects appended after
+ *   `unit` and `int`.
  */
 
 /** @param {ShopVitestOptions} options */

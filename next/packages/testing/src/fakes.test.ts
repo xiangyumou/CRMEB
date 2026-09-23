@@ -19,7 +19,7 @@ describe('fakePaymentPort', () => {
     expect(port.calls).toEqual([42]);
   });
 
-  it('can be set to every answer B1 must handle', async () => {
+  it('can be set to every answer the cancel path must handle', async () => {
     const port = fakePaymentPort({ result: 'paid' });
     expect(await port.ensureNoOpenAttempts(tx, 1)).toBe('paid');
     port.setResult('unknown');
@@ -48,8 +48,8 @@ describe('fakePaymentPort', () => {
 describe('flatRateFreight', () => {
   it('splits the fee so perLine always sums to totalFen', async () => {
     const port = flatRateFreight(1000);
-    // `freightMode` / `fixedFreightFen` are part of a `FreightLine` since
-    // CR-1-f2; the flat-rate fake ignores both, but the shape has to be whole.
+    // `freightMode` / `fixedFreightFen` are part of a `FreightLine`; the
+    // flat-rate fake ignores both, but the shape has to be whole.
     const line = (skuId: number) => ({
       skuId,
       quantity: 1,

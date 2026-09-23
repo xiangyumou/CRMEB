@@ -7,7 +7,7 @@ import { runConcurrently } from './concurrency';
 /**
  * The harness testing itself.
  *
- * Every other integration test in the rewrite stands on this, so the promises
+ * Every other integration test in the project stands on this, so the promises
  * it makes — a migrated schema, `pg_trgm`, real isolation between files, a
  * usable `Ctx` — are worth asserting rather than assuming.
  */
@@ -23,7 +23,7 @@ afterAll(async () => {
 });
 
 describe('the cloned database', () => {
-  it('has the schema this stream owns', async () => {
+  it('has the kernel schema', async () => {
     const { rows } = await harness.db.handle.pool.query<{ tablename: string }>(
       `select tablename from pg_tables where schemaname = 'public' order by tablename`,
     );
@@ -63,8 +63,8 @@ describe('the cloned database', () => {
     expect(indexes).toContain('admins_account_lower_key');
   });
 
-  // `group` is a reserved word: Drizzle quotes it, raw SQL must too. Other
-  // streams will hit this the first time they hand-write a config query.
+  // `group` is a reserved word: Drizzle quotes it, raw SQL must too. Anyone
+  // hand-writing a config query hits this the first time.
   it('gives each caller a genuinely separate database', async () => {
     const other = await createTestDatabase();
     try {

@@ -201,7 +201,7 @@ describe('the endpoints', () => {
   });
 });
 
-describe('each create endpoint answers in its own shape (CR-5-i)', () => {
+describe('each create endpoint answers in its own shape', () => {
   const createOn = (tradeType: string, outTradeNo: string, total = 1990) =>
     fetch(`${gateway.url}/v3/pay/transactions/${tradeType}`, {
       method: 'POST',
