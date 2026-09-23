@@ -74,17 +74,15 @@ function siteCtx(values: Partial<SiteConfig>): Ctx {
   });
 }
 
-describe('the public origin (CR-1-e2)', () => {
+describe('the public origin', () => {
   /**
-   * N1's leftover changed the answer here, deliberately.
-   *
-   * Both fields used to be absent from the descriptor altogether. They are now
-   * present and `readOnly`, because hiding them was the worse half of the
-   * trade: an operator whose WeChat links point at `http://localhost` has to be
-   * able to see which host the shop thinks it is before they can go and fix the
-   * variable that says so. "Not an operator setting" is now carried by the flag
-   * and by `configSave` refusing the key (`CONFIG_FIELD_READ_ONLY`, covered in
-   * `system.int.test.ts`), not by the field being invisible.
+   * Both fields are present in the descriptor and `readOnly`, because hiding
+   * them would be the worse half of the trade: an operator whose WeChat links
+   * point at `http://localhost` has to be able to see which host the shop
+   * thinks it is before they can go and fix the variable that says so. "Not an
+   * operator setting" is carried by the flag and by `configSave` refusing the
+   * key (`CONFIG_FIELD_READ_ONLY`, covered in `system.int.test.ts`), not by the
+   * field being invisible.
    */
   it('is shown but not editable, and says where its value comes from', () => {
     const descriptor = describeGroup(getConfigGroup('site')!);
@@ -145,8 +143,8 @@ describe('describeGroup', () => {
     const wechat = getConfigGroup('wechat-oa');
     expect(wechat).toBeDefined();
     const descriptor = describeGroup(wechat!);
-    // The group's secret is the EncodingAESKey; the app credentials moved to
-    // the `wechat` group under CR-1-j.
+    // The group's secret is the EncodingAESKey; the app credentials live in the
+    // `wechat` group.
     const aesKey = descriptor.fields.find((f) => f.key === 'encodingAesKey');
     expect(aesKey).toMatchObject({ secret: true, kind: 'password' });
   });
@@ -159,9 +157,8 @@ describe('describeGroup', () => {
     // `AccessKeyId` and Tencent's `SecretId` are public names shown in every
     // vendor console, and hiding them would leave an operator unable to tell
     // which account is configured. The half that grants access must be secret,
-    // and that is what this pattern matches.
-    // `token` joined the pattern with CR-8-k2: `wechat-oa.token` authenticates
-    // every 明文-mode OA callback and was served in clear.
+    // and that is what this pattern matches. `token` is in the pattern because
+    // `wechat-oa.token` authenticates every 明文-mode OA callback.
     const suspicious = /(secret|password|appcode|serverkey|privatekey|aeskey|apikey|token)$/i;
     const leaks: string[] = [];
     for (const group of allConfigGroups()) {
@@ -209,13 +206,13 @@ describe('describeGroup', () => {
 
   it('gives every group a readable title and a permission that exists', () => {
     // A group whose atom is not declared anywhere is a screen only a super
-    // admin can open, and nobody finds out until a 客服 account tries.
-    // A verb other than `:read` is allowed and means "the same atom guards the
-    // save": a group holding a merchant private key (`payment`) gates reading
-    // behind `:write`, and the 装修版式 switch (`diy`, F4) behind `:publish`
-    // because flipping it changes what every shopper sees. `writePermissionFor`
-    // returns such an atom unchanged rather than inventing one, so the only
-    // derived atom is `:read` → `:write`, and that one must exist too.
+    // admin can open, and nobody finds out until a 客服 account tries. A verb
+    // other than `:read` is allowed and means "the same atom guards the save":
+    // a group holding a merchant private key (`payment`) gates reading behind
+    // `:write`, and the 装修版式 switch (`diy`) behind `:publish` because
+    // flipping it changes what every shopper sees. `writePermissionFor` returns
+    // such an atom unchanged rather than inventing one, so the only derived
+    // atom is `:read` → `:write`, and that one must exist too.
     for (const group of allConfigGroups()) {
       const descriptor = describeGroup(group);
       expect(descriptor.title.length, group.group).toBeGreaterThan(0);
@@ -320,7 +317,7 @@ describe('dashboardHeader', () => {
 
   it('contributes nothing at all for a domain that is not loaded', async () => {
     // No zero, no placeholder: the page shows what exists rather than inventing
-    // a number for a stream that has not landed yet.
+    // a number for a domain that is not loaded.
     const header = await dashboardHeader(pureCtx());
     expect(header.tiles).toEqual([]);
     expect(header.degraded).toEqual([]);

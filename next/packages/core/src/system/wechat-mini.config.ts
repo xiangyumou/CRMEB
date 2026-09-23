@@ -4,20 +4,16 @@ import { defineConfigGroup } from '../kernel/config-registry';
 /**
  * `wechat-mini` — how the 小程序 behaves, **not** what it signs in with.
  *
- * Legacy source: `eb_system_config` tabs 7 / 132 / 133 (小程序配置).
+ * Every WeChat credential lives in the `wechat` group and nowhere else. A
+ * credential claimed by two groups shows on one settings screen and as a blank
+ * on the other, and whichever is saved last wins. So the AppID, the AppSecret,
+ * the callback token, the AES key and the message mode are all `wechat`'s
+ * (`miniAppId`, `miniAppSecret`, `miniToken`, `miniAesKey`, `miniMessageMode`),
+ * and this group keeps the two things that are about the shop rather than the
+ * app: is the mini program switched on, and how does 联系客服 behave.
  *
- * Every WeChat credential lives in the `wechat` group and nowhere else
- * (CR-1-j, extended to the mini program by E4). `routine_appId` used to be
- * claimed here *and* there, so a migrated shop saw the app id on one settings
- * screen and a blank on the other — the exact symptom CR-1-j was filed about,
- * one app along. The AppID, the AppSecret, the callback token, the AES key and
- * the message mode are therefore all `wechat`'s now (`miniAppId`,
- * `miniAppSecret`, `miniToken`, `miniAesKey`, `miniMessageMode`), and this
- * group keeps the two things that are about the shop rather than the app: is
- * the mini program switched on, and how does 联系客服 behave.
- *
- * Readers: E1's sign-in checks `enabled` here and reads the app id from
- * `wechat`; the storefront reads `contactType` / `contactPhone`.
+ * Readers: the mini-program sign-in checks `enabled` here and reads the app id
+ * from `wechat`; the storefront reads `contactType` / `contactPhone`.
  */
 export const wechatMiniConfig = defineConfigGroup({
   group: 'wechat-mini',
@@ -28,7 +24,8 @@ export const wechatMiniConfig = defineConfigGroup({
     name: z.string().max(64).default(''),
     /**
      * How 联系客服 behaves: the mini-program's own chat window, or a phone
-     * number. 自建客服 is not ported (scope guard), so there is no third option.
+     * number. There is no self-hosted 自建客服 (out of scope), so there is no
+     * third option.
      */
     contactType: z.enum(['mini-program', 'phone']).default('mini-program'),
     contactPhone: z.string().max(32).default(''),

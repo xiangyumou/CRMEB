@@ -6,10 +6,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
  * `site` — the shop's own identity: name, logos, filing numbers, contact and
  * the defaults used when a page is shared into WeChat.
  *
- * Legacy source: `eb_system_config` tab 1 (基础配置), 122 (LOGO配置),
- * 125 (备案配置) and 70 (分享配置). `site_url` is **not** here: the old value
- * was rewritten by the installer and by the SSL screen, and the new deployment
- * takes the origin from the environment, where it belongs.
+ * The site URL is **not** here: the deployment takes the origin from the
+ * environment, where it belongs (see `publicOrigin` below).
  *
  * Every field has a `.default()`, without exception — `defineConfigGroup`
  * refuses a group that cannot be read before anybody has saved it, because a
@@ -17,14 +15,13 @@ import { defineConfigGroup } from '../kernel/config-registry';
  */
 
 /**
- * The public origin as the environment states it (CR-1-e2).
+ * The public origin as the environment states it.
  *
- * `PUBLIC_ORIGIN` is the name the CR gave it; `APP_ORIGIN` is the one
+ * `PUBLIC_ORIGIN` is the explicit name; `APP_ORIGIN` is the one
  * `apps/web/src/server/env.ts` already requires of every deployment for the
  * CSRF `Origin` check, and it means exactly the same thing — the origin the
- * storefront is served from. Honouring both means a shop that is already
- * running needs no new variable, and a deployment that wants to be explicit
- * can be.
+ * storefront is served from. Honouring both means a deployment needs no second
+ * variable, and one that wants to be explicit can be.
  *
  * Read on every `config.get`, not captured at import: the worker and the web
  * app both boot from the same environment, and a value read once at module
@@ -72,14 +69,11 @@ export const siteConfig = defineConfigGroup({
     shareImage: z.string().max(512).default(''),
 
     /**
-     * 版权 — the footer line every storefront page renders (CR-7-h2).
+     * 版权 — the footer line every storefront page renders.
      *
-     * The legacy `copyright()` endpoint answered `nncnL_crmeb_copyright` and
-     * `nncnL_crmeb_copyright_image`; neither key is in the shipped
-     * `crmeb.sql`, so a stock install has nothing here and the footer is
-     * empty, which is what it was before. `copyrightLink` is new: the old
-     * footer was inert text, and an operator who writes a company name almost
-     * always wants it to go somewhere.
+     * A fresh install has nothing here and the footer is empty. `copyrightLink`
+     * exists because an operator who writes a company name almost always wants
+     * it to go somewhere.
      */
     copyrightText: z.string().max(255).default(''),
     copyrightLink: z.string().max(255).default(''),
@@ -194,10 +188,10 @@ export const siteConfig = defineConfigGroup({
       order: 63,
     },
 
-    // Shown, but nobody's here to change (N1 / CR-1-e2). Leaving them off the
-    // screen entirely was the first draft and it was worse: an operator whose
-    // WeChat links point at the wrong host needs to see *which* host the shop
-    // thinks it is before they can go and fix the variable that says so.
+    // Shown, but nobody's here to change. Leaving them off the screen entirely
+    // would be worse: an operator whose WeChat links point at the wrong host
+    // needs to see *which* host the shop thinks it is before they can go and
+    // fix the variable that says so.
     publicOrigin: {
       label: '站点域名',
       type: 'text',
@@ -218,7 +212,7 @@ export const siteConfig = defineConfigGroup({
 });
 
 /**
- * The origin the storefront is served from, or `''` (CR-1-e2).
+ * The origin the storefront is served from, or `''`.
  *
  * Three things need it and none can work it out: a notification link
  * (`/orders/1024` has to become something a WeChat web view can open), the

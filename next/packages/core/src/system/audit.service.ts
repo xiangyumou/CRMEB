@@ -8,10 +8,10 @@ import * as repo from './system.repo';
  *
  * Read-only, and there is no route that writes one: `handle()` writes a row for
  * every successful mutating admin request and every successful staff-surface
- * write (CR-13-k2, `actorKind: 'staff'`), the admin sign-in writes one per
- * outcome (CR-12-k2), with the body already redacted by
- * `redactPayload`. A service that wants to name what it touched calls
- * `ctx.audit('coupon:42')` and the same writer picks it up.
+ * write (`actorKind: 'staff'`), the admin sign-in writes one per outcome, with
+ * the body already redacted by `redactPayload`. A service that wants to name
+ * what it touched calls `ctx.audit('coupon:42')` and the same writer picks it
+ * up.
  *
  * There is also no delete route. An operation log an operator can edit is not
  * an operation log; old rows leave through the retention job instead.

@@ -6,7 +6,7 @@ import * as repo from './system.repo';
 import { wechatMiniConfig } from './wechat-mini.config';
 
 /**
- * `GET /api/v1/site/config` — the shop's own public settings (CR-7-h2).
+ * `GET /api/v1/site/config` — the shop's own public settings.
  *
  * Three rules hold this file together.
  *
@@ -32,7 +32,7 @@ import { wechatMiniConfig } from './wechat-mini.config';
  */
 
 /**
- * `v2` since CR-3-h3 added `auth`: a `v1` payload cached by the previous build
+ * `v2` since the payload gained `auth`: a `v1` payload cached by an older build
  * lacks it and would fail response validation for up to a minute after deploy.
  */
 const CACHE_KEY = 'site:config:v2';
@@ -80,8 +80,7 @@ export function resetSitePaymentMethods(): void {
 }
 
 /**
- * A sign-in method the app may offer, and how to tell whether it works
- * (CR-3-h3).
+ * A sign-in method the app may offer, and how to tell whether it works.
  *
  * The same inversion as `registerSitePaymentMethod`, for the same reason: the
  * answer depends on the `wechat` group's credentials and on whether an SMS
@@ -128,7 +127,7 @@ export function siteConfigSourceGroups(): string[] {
   return [...groups];
 }
 
-/** `''` reads as "not filled in" everywhere in the legacy config table. */
+/** `''` reads as "not filled in" everywhere in the config groups. */
 function orNull(value: string): string | null {
   const trimmed = value.trim();
   return trimmed === '' ? null : trimmed;
@@ -258,7 +257,7 @@ async function paymentsOf(ctx: Ctx): Promise<SitePublicConfig['payments']> {
 }
 
 /**
- * Which sign-in methods the app may offer (CR-3-h3).
+ * Which sign-in methods the app may offer.
  *
  * Same discipline as `paymentsOf`: every method starts at `false` and only a
  * registered probe can raise it, and a probe that throws is a `warn` and a
@@ -283,11 +282,11 @@ async function authOf(ctx: Ctx): Promise<SitePublicConfig['auth']> {
 /**
  * The 客服 entry.
  *
- * 自建客服 is not ported (CONVENTIONS 范围约束), so the choice is the
+ * There is no self-hosted 自建客服 (out of scope), so the choice is the
  * mini-program's own chat window or a phone number — exactly what
  * `wechat-mini.contactType` already stores. A shop with no mini-program still
- * has a 联系电话 on the 站点设置 screen, which is what the H5 build dials, so the
- * site group is the fallback rather than a second setting.
+ * has a 联系电话 on the 站点设置 screen, which is what the H5 build dials, so
+ * the site group is the fallback rather than a second setting.
  *
  * `qrcodeUrl` rides alongside `kind` rather than inside it: `kefuIcon` shows
  * the 客服二维码 on H5 whatever the mini-program is configured to do.

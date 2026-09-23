@@ -8,13 +8,11 @@ const TENCENT: ConfigVisibleWhen = { key: 'provider', equals: 'tencent' };
 /**
  * `sms` — the SMS provider.
  *
- * Legacy source: `eb_system_config` tabs 18 / 96 / 97 / 98 / 99. The old system
- * routed SMS through 一号通 (`sms_account` + `sms_token`), which is out of scope
- * — so the provider list here is the two direct ones CRMEB also supported,
- * Aliyun and Tencent Cloud, plus `none`, which is the default and makes the
- * shop work without any SMS account at all.
+ * 一号通 is out of scope, so the provider list is the two direct ones, Aliyun
+ * and Tencent Cloud, plus `none`, which is the default and makes the shop work
+ * without any SMS account at all.
  *
- * E1 reads this group when sending a verification code.
+ * The user domain reads this group when sending a verification code.
  */
 export const smsConfig = defineConfigGroup({
   group: 'sms',

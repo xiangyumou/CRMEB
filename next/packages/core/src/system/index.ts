@@ -16,7 +16,7 @@
  * | `GET /admin-api/dashboard/header` | `dashboardHeader` |
  * | worker `system.pruneAuditLogs` | `pruneAuditLogs` |
  *
- * **Other streams need three things from here.**
+ * **Other domains need three things from here.**
  *
  * 1. **To add a settings screen**, write `core/src/<domain>/<group>.config.ts`
  *    with `defineConfigGroup`, give every field a `.default()`, and add one
@@ -34,7 +34,7 @@
  * contributor there is, as a side effect. That is deliberate: a group nobody
  * imported cannot be edited. The groups arrive through `config.service.ts`,
  * which imports the gen'd `config-groups.gen.ts` bucket; the dashboard
- * contributors this stream owns are below.
+ * contributors `system` owns are below.
  */
 import './dashboard-tiles';
 
@@ -81,20 +81,20 @@ export { AGREEMENT_FIELDS, agreementConfig } from './agreement.config';
 export { logisticsConfig } from './logistics.config';
 export { mapConfig } from './map.config';
 /**
- * `publicOrigin` / `isTrustedHost` are the origin's one home (CR-1-e2). Any
- * domain that needs an absolute URL, or has to decide whether a host is ours,
- * asks here rather than keeping its own copy of the answer.
+ * `publicOrigin` / `isTrustedHost` are the origin's one home. Any domain that
+ * needs an absolute URL, or has to decide whether a host is ours, asks here
+ * rather than keeping its own copy of the answer.
  */
 export { isTrustedHost, publicOrigin, siteConfig } from './site.config';
 /**
- * `GET /api/v1/site/config` (CR-7-h2) — the six legacy "what did the operator
- * type into that box" reads, as one public payload.
+ * `GET /api/v1/site/config` — every "what did the operator type into that box"
+ * read the app needs at start-up, as one public payload.
  *
  * `registerSitePaymentMethod` is how a gateway says it is usable *without*
  * `system` importing it: this domain is a sink and must import none, or
  * `notification`'s effect handler registers itself under `undefined/undefined`
- * (see the comment in `site.service.ts`). `registerSiteAuthMethod` (CR-3-h3)
- * is the same seam for the sign-in methods; `wechat` and `sms` register them.
+ * (see the comment in `site.service.ts`). `registerSiteAuthMethod` is the same
+ * seam for the sign-in methods; `wechat` and `sms` register them.
  */
 export {
   invalidateSiteConfigCache,
@@ -110,9 +110,9 @@ export {
   type SitePaymentMethodSource,
 } from './site.service';
 /**
- * `POST /api/v1/attachments/base64` (CR-7-h2) — an attachment endpoint that
- * lives here because "is this URL ours?" is answered by `site.config.ts`, and
- * `system` may import `storage` while `storage` may not import `system`.
+ * `POST /api/v1/attachments/base64` — an attachment endpoint that lives here
+ * because "is this URL ours?" is answered by `site.config.ts`, and `system` may
+ * import `storage` while `storage` may not import `system`.
  */
 export { attachmentDataUrl } from './attachment.service';
 export { smsConfig } from './sms.config';

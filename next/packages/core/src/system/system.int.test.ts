@@ -412,7 +412,7 @@ describe('config', () => {
   });
 
   /**
-   * N1's leftover: `site.publicOrigin` is a deployment fact (CR-1-e2).
+   * `site.publicOrigin` is a deployment fact.
    *
    * The screen renders it as plain text and never submits it — but that is the
    * half a stale tab or a `curl` does not honour, so the route refuses the key
@@ -480,13 +480,13 @@ describe('config', () => {
 
 // ---------------------------------------------------------------------------
 
-describe('站点公开配置 (CR-7-h2)', () => {
+describe('站点公开配置', () => {
   /** The anonymous context a storefront request arrives with. */
   const anonymous = (): Ctx => harness.ctx.as(anonymousActor);
 
   it('answers a request with no session at all', async () => {
-    // The six legacy calls it replaces all happen before there is one: on
-    // launch, above the sign-in form and on the splash screen.
+    // The app reads it before there is one: on launch, above the sign-in form
+    // and on the splash screen.
     expect(anonymous().actor.kind).toBe('anonymous');
     const payload = await siteConfigGet(anonymous());
     expect(payload.name).toBe('CRMEB 商城');
@@ -568,7 +568,7 @@ describe('站点公开配置 (CR-7-h2)', () => {
 
   it('is built from exactly the groups that drop its cache', async () => {
     // `payment` registers the pay button; `sms`, `wechat` and `wechat-oa`
-    // arrive with the sign-in methods (CR-3-h3).
+    // arrive with the sign-in methods.
     expect([...siteConfigSourceGroups()].sort()).toEqual([
       'payment',
       'site',
@@ -628,12 +628,12 @@ describe('站点公开配置 (CR-7-h2)', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * `auth` on `GET /api/v1/site/config` (CR-3-h3): which sign-in methods the app
- * may offer. Each flag is raised by a probe its owner registers — `wechat` for
- * the two WeChat logins, `sms` for 手机号登录 — so this also proves the
- * registrations are really installed by `domains.gen`.
+ * `auth` on `GET /api/v1/site/config`: which sign-in methods the app may offer.
+ * Each flag is raised by a probe its owner registers — `wechat` for the two
+ * WeChat logins, `sms` for 手机号登录 — so this also proves the registrations
+ * are really installed by `domains.gen`.
  */
-describe('站点公开配置 — 登录方式 (CR-3-h3)', () => {
+describe('站点公开配置 — 登录方式', () => {
   const anonymous = (): Ctx => harness.ctx.as(anonymousActor);
   const auth = async () => (await siteConfigGet(anonymous())).auth;
 
@@ -661,7 +661,8 @@ describe('站点公开配置 — 登录方式 (CR-3-h3)', () => {
     await configSave(ctx, { group: 'wechat' }, { values: { oaAppSecret: OA_SECRET } });
     expect(await auth()).toEqual({ wechatOa: true, wechatMini: false, phone: false });
 
-    // The operator's switch off again: E1 refuses, so the app must not offer it.
+    // The operator's switch off again: the sign-in refuses, so the app must not
+    // offer it.
     await configSave(ctx, { group: 'wechat-oa' }, { values: { enabled: false } });
     expect((await auth()).wechatOa).toBe(false);
   });

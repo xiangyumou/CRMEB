@@ -4,20 +4,17 @@ import { defineConfigGroup } from '../kernel/config-registry';
 /**
  * `wechat-oa` — 公众号 message-callback settings.
  *
- * Legacy source: `eb_system_config` tabs 2 / 130 / 131 (公众号配置).
- * Consumed by stream E3; this stream only owns the screen.
+ * Consumed by the `wechat-oa` domain; `system` only owns the screen.
  *
- * **The app credentials are not here.** `appId` / `appSecret` used to be
- * declared in this group *and* in stream C's `wechat` group, both mapping the
- * legacy keys `wechat_appid` / `wechat_appsecret` — so a migrated shop held the
- * app id in one screen and a blank in the other, and whichever screen was saved
- * last won. CR-1-j settled it: the `wechat` group owns the credentials
- * (`getWechatClient` already reads them), and this group keeps only what an
- * operator types into 公众平台 for the message callback.
+ * **The app credentials are not here.** A credential declared in two groups
+ * shows in one screen and as a blank in the other, and whichever screen is
+ * saved last wins. The `wechat` group owns the credentials (`getWechatClient`
+ * reads them), and this group keeps only what an operator types into 公众平台
+ * for the message callback.
  *
- * `token` and `encodingAesKey` are **secrets**: the descriptor endpoint sends a boolean
- * "is set" flag, the save endpoint ignores the flag coming back, and it is
- * never logged. The old admin rendered it into an input box.
+ * `token` and `encodingAesKey` are **secrets**: the descriptor endpoint sends a
+ * boolean "is set" flag, the save endpoint ignores the flag coming back, and it
+ * is never logged.
  */
 export const wechatOaConfig = defineConfigGroup({
   group: 'wechat-oa',
@@ -28,7 +25,7 @@ export const wechatOaConfig = defineConfigGroup({
     /** Token the WeChat server echoes back when verifying the callback URL. */
     token: z.string().max(64).default(''),
     encodingAesKey: z.string().max(64).default(''),
-    /** 明文 / 兼容 / 安全, spelled as words rather than the legacy 0/1/2. */
+    /** 明文 / 兼容 / 安全, spelled as words rather than 0/1/2. */
     messageMode: z.enum(['plain', 'compatible', 'safe']).default('plain'),
     /** Verification file WeChat asks to be served at the site root. */
     verificationFile: z.string().max(128).default(''),
@@ -40,7 +37,7 @@ export const wechatOaConfig = defineConfigGroup({
       help: 'AppID / AppSecret 在「微信公众号 / 小程序」里填写',
       order: 1,
     },
-    // Secret (CR-8-k2): in 明文模式 this token is the whole of the callback's
+    // Secret: in 明文模式 this token is the whole of the callback's
     // authentication, so a settings *reader* who can see it can forge any
     // follow, scan or message. The form shows "已设置" and a blank save keeps
     // the stored value, as for `encodingAesKey`.

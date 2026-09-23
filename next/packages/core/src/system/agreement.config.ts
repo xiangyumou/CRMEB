@@ -12,10 +12,6 @@ import { defineConfigGroup } from '../kernel/config-registry';
  * The storefront reads them through `GET /api/v1/agreements/:key`, which is
  * public and does not mention config groups; if these ever need versioning or
  * an acceptance record per user, that is when they earn a table.
- *
- * Legacy source: `eb_system_group_data` under groups `user_agreement` /
- * `privacy_agreement` / `cancel_agreement` (setting.php 协议版权 group,
- * `SystemAgreement.php`).
  */
 export const agreementConfig = defineConfigGroup({
   group: 'agreement',
