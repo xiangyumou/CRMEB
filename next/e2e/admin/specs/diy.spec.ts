@@ -83,3 +83,123 @@ test('publishing needs the publish atom, not just the edit one', async ({ adminP
   await expect(adminPage.getByRole('button', { name: cjk('保存') })).toBeVisible();
   await expect(adminPage.getByRole('button', { name: '保存并发布' })).toBeVisible();
 });
+
+test('the pickers offer the shop’s own article and coupon, and the page stores their ids', async ({
+  adminPage,
+  adminApi,
+}) => {
+  // What a picker offers is saved into the page and rendered by the
+  // storefront, so it has to be a record the shop really has: a published
+  // article, and a coupon a shopper can claim right now.
+  const stamp = Date.now();
+  const articleTitle = `E2E 装修文章 ${stamp}`;
+  const couponName = `E2E 装修券 ${stamp}`;
+
+  const article = await adminApi.post('/admin-api/cms/articles', {
+    data: { title: articleTitle, status: 'published' },
+  });
+  expect(article.status(), await article.text()).toBe(201);
+  const articleId = ((await article.json()) as { id: string }).id;
+
+  const coupon = await adminApi.post('/admin-api/coupons', {
+    data: {
+      name: couponName,
+      scope: 'all_products',
+      claimMode: 'manual',
+      status: 'active',
+      discountAmount: '8.00',
+      validityMode: 'days_after_claim',
+      validDays: 7,
+      isUnlimitedSupply: true,
+    },
+  });
+  expect(coupon.status(), await coupon.text()).toBe(201);
+  const couponId = ((await coupon.json()) as { id: string }).id;
+
+  const page = await adminApi.post('/admin-api/diy/pages', {
+    data: { name: `E2E 选择器 ${stamp}`, kind: 'micro' },
+  });
+  expect(page.status(), await page.text()).toBe(201);
+  const pageId = ((await page.json()) as { id: string }).id;
+
+  // 超级组件 is not in the palette (its inner layout needs a designer the
+  // editor does not have), but a stored one stays fully editable. Seed one
+  // bound to 文章, picking its rows by hand (数据选择 = 指定数据).
+  const specific = {
+    title: '数据选择',
+    tabVal: 0,
+    tabList: [{ name: '指定数据' }, { name: '筛选数据' }],
+  };
+  const seeded = await adminApi.put(`/admin-api/diy/pages/${pageId}/content`, {
+    data: {
+      content: {
+        '1740450007006001': {
+          cname: '超级组件',
+          name: 'customComponent',
+          timestamp: 1740450007006001,
+          id: 'id1740450007006001',
+          isHide: false,
+          setUp: { tabVal: 0 },
+          selectType: {
+            title: '选择信息',
+            activeValue: 'article',
+            list: [
+              { activeValue: 'user', title: '用户' },
+              { activeValue: 'article', title: '文章' },
+              { activeValue: 'coupon', title: '优惠券' },
+              { activeValue: 'goods', title: '商品' },
+            ],
+          },
+          articleDataSource: specific,
+          articleList: { list: [] },
+          couponDataSource: specific,
+          couponList: { list: [] },
+        },
+      },
+    },
+  });
+  expect(seeded.status(), await seeded.text()).toBe(200);
+
+  // The only component on the page, so its panel is the one open.
+  await adminPage.goto(`/admin/diy/${pageId}`);
+  await expect(adminPage.getByText('选择信息')).toBeVisible();
+
+  const pickType = async (label: string): Promise<void> => {
+    await adminPage.getByRole('combobox').click();
+    await adminPage.locator(`.ant-select-item-option[title="${label}"]`).click();
+  };
+  const pick = async (kind: string, name: string): Promise<void> => {
+    await adminPage.getByRole('button', { name: cjk('添加') }).click();
+    const modal = adminPage.getByRole('dialog', { name: `选择${kind}` });
+    await modal.getByPlaceholder(`搜索${kind}名称`).fill(name);
+    await modal.getByPlaceholder(`搜索${kind}名称`).press('Enter');
+    const row = modal.getByRole('listitem').filter({ hasText: name });
+    await row.getByRole('button', { name: cjk('选择') }).click();
+    await expect(row.getByRole('button', { name: cjk('已选') })).toBeDisabled();
+    await expect(modal.getByText(/示例/)).toHaveCount(0);
+    await adminPage.keyboard.press('Escape');
+    await expect(modal).toBeHidden();
+  };
+
+  await pick('文章', articleTitle);
+  await pickType('优惠券');
+  await pick('优惠券', couponName);
+
+  await adminPage.getByRole('button', { name: cjk('保存') }).click();
+  await expect(adminPage.getByText('未保存')).toHaveCount(0);
+
+  const saved = await adminApi.get(`/admin-api/diy/pages/${pageId}`);
+  expect(saved.status()).toBe(200);
+  const content = ((await saved.json()) as { content: Record<string, Record<string, unknown>> })
+    .content;
+  const node = Object.values(content).find((entry) => entry.name === 'customComponent');
+  expect(node, JSON.stringify(content)).toBeDefined();
+  // The ids the storefront sends back to its own API: the article id and the
+  // coupon template id.
+  expect(node!.articleList).toEqual({
+    list: [expect.objectContaining({ id: articleId, name: articleTitle })],
+  });
+  expect(node!.couponList).toEqual({
+    list: [expect.objectContaining({ id: couponId, name: couponName })],
+  });
+});
