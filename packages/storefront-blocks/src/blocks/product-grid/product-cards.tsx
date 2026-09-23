@@ -49,6 +49,9 @@ export function ProductCards({
       <View
         key={product.id}
         className={cx(styles.card, product.soldOut && styles.soldOut)}
+        {...(onLink
+          ? { ariaRole: 'link', ariaLabel: `${product.title}${product.soldOut ? '，已售罄' : ''}` }
+          : {})}
         {...tapProps(onLink ? () => onLink({ kind: 'product', id: product.id }) : undefined)}
       >
         <View className={styles.media}>

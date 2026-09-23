@@ -20,10 +20,15 @@ Five small fixes, one commit each. Updated at every commit.
   formatter; used by `ui/order-card.tsx` (订单列表 / 详情 lines), 售后 apply / detail / card,
   确认订单, 购物车, 已选 (sku-select) and 商品评价, replacing four inline `replace`s and four raw
   prints.
+- **Product card role.** `packages/storefront-blocks` `ProductCards` (商品列表 / 商品选项卡 in
+  every layout): a card that opens its product carries `ariaRole="link"` and
+  `ariaLabel="<title>[，已售罄]"`, as the kit's `ProductCard` does. The DOM shim renders
+  `ariaRole` as `role` on `View`, so the admin canvas and the block tests see it
+  (`getByRole('link', { name })`).
 
 ## In progress
 
-- Product card role, login return, client version.
+- Login return, client version.
 
 ## Next
 
