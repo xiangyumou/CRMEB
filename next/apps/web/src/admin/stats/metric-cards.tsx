@@ -22,7 +22,7 @@ export function MetricCards({
 }: {
   metrics: StatsMetric[] | undefined;
   loading?: boolean;
-  columns?: 3 | 4 | 5;
+  columns?: 3 | 4 | 5 | 6;
 }) {
   const span = { xs: 12, sm: 12, md: 8, lg: Math.floor(24 / columns) };
 

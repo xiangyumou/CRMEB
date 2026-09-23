@@ -168,7 +168,7 @@ const ZERO_GOODS = { quantity: 0, goodsAmount: 0 };
 const ZERO_PLACED = { quantity: 0, orderCount: 0 };
 const ZERO_REFUNDS = { refundAmount: 0, refundOrderCount: 0 };
 const ZERO_QUANTITY = { quantity: 0 };
-const ZERO_VISITS = { pageViews: 0, visitors: 0 };
+const ZERO_VISITS = { pageViews: 0, visitors: 0, avgStayMs: 0 };
 const ZERO_EVENTS = { views: 0, viewers: 0, cartQuantity: 0 };
 
 type Window = { from: Date; to: Date };
@@ -352,6 +352,8 @@ export async function orderStats(ctx: Ctx, input: StatsRangeQuery): Promise<Orde
 interface UserFigures {
   visitors: number;
   pageViews: number;
+  /** Whole seconds. */
+  avgStaySeconds: number;
   newUsers: number;
   payingUsers: number;
 }
@@ -365,6 +367,7 @@ async function userFigures(ctx: Ctx, window: Window): Promise<UserFigures> {
   return {
     visitors: only(visits, ZERO_VISITS).visitors,
     pageViews: only(visits, ZERO_VISITS).pageViews,
+    avgStaySeconds: Math.round(Number(only(visits, ZERO_VISITS).avgStayMs) / 1000),
     newUsers: only(registrations, { newUsers: 0 }).newUsers,
     payingUsers: only(paid, ZERO_ORDERS).payingUsers,
   };
@@ -389,6 +392,13 @@ export async function userStats(ctx: Ctx, input: StatsRangeQuery): Promise<UserS
       metrics: [
         metric('visitors', '访客数', 'count', current.visitors, previous.visitors),
         metric('pageViews', '浏览量', 'count', current.pageViews, previous.pageViews),
+        metric(
+          'avgStay',
+          '平均停留时长',
+          'duration',
+          current.avgStaySeconds,
+          previous.avgStaySeconds,
+        ),
         metric('newUsers', '新增用户', 'count', current.newUsers, previous.newUsers),
         metric('payingUsers', '成交用户数', 'count', current.payingUsers, previous.payingUsers),
         // A running total has nothing to compare against: "累计用户 vs the

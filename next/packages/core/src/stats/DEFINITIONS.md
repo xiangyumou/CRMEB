@@ -106,13 +106,14 @@ total, two decimals, and a kind that never occurred is absent rather than 0 %.
 
 ### Users — `GET /admin-api/stats/users`
 
-| Key           | 名称       | Definition                                                                |
-| ------------- | ---------- | ------------------------------------------------------------------------- |
-| `visitors`    | 访客数     | `count(distinct coalesce(user_id::text, 'ip:'                             |     | ip))` over page views |
-| `pageViews`   | 浏览量     | count of page views                                                       |
-| `newUsers`    | 新增用户   | registrations in the bucket                                               |
-| `payingUsers` | 成交用户数 | `count(distinct orders.user_id)` over paid orders                         |
-| `totalUsers`  | 累计用户   | live accounts (`deleted_at is null`) created before the end of the window |
+| Key           | 名称         | Definition                                                                                       |
+| ------------- | ------------ | ------------------------------------------------------------------------------------------------ |
+| `visitors`    | 访客数       | `count(distinct coalesce(user_id::text, 'ip:' \|\| ip))` over page views                         |
+| `pageViews`   | 浏览量       | count of page views                                                                              |
+| `avgStay`     | 平均停留时长 | `avg(stay_ms) ÷ 1000` over the page views that reported a stay, whole seconds, `0` when none did |
+| `newUsers`    | 新增用户     | registrations in the bucket                                                                      |
+| `payingUsers` | 成交用户数   | `count(distinct orders.user_id)` over paid orders                                                |
+| `totalUsers`  | 累计用户     | live accounts (`deleted_at is null`) created before the end of the window                        |
 
 A distinct count is **not** additive: the window's 访客数 is its own query, not
 the sum of its buckets, and the same visitor on two days counts once in the
@@ -126,15 +127,16 @@ Breakdown: **下单来源** counts paid orders by `orders.platform`.
 One row per province, and **each column carries the province that column
 actually knows**, which is stated here rather than fudged into one join:
 
-| Column       | Province comes from                                         |
-| ------------ | ----------------------------------------------------------- |
-| `totalUsers` | the user's default address (`user_addresses.province_name`) |
-| `newUsers`   | the same, for accounts registered inside the window         |
-| `visitors`   | `user_visits.province`, resolved from the IP at write time  |
-| `paidAmount` | `orders.receiver_province` — where the goods actually went  |
+| Column       | Province comes from                                                               |
+| ------------ | --------------------------------------------------------------------------------- |
+| `totalUsers` | the user's default address (`user_addresses.province_name`)                       |
+| `newUsers`   | the same, for accounts registered inside the window                               |
+| `visitors`   | `user_visits.province` — the visitor's default address when the view was recorded |
+| `paidAmount` | `orders.receiver_province` — where the goods actually went                        |
 
-A user with no address, or a visit with no resolved province, is grouped under
-**未知**, which is sorted last whatever the sort key. `totalUsers` ignores the
+A user with no address, or a visit with no province — every anonymous visit,
+and a signed-in visitor with no default address — is grouped under **未知**,
+which is sorted last whatever the sort key. `totalUsers` ignores the
 window (it is a running total); the other three are inside it.
 
 ### Products — `GET /admin-api/stats/products` and `…/ranking`
@@ -166,11 +168,21 @@ one non-zero figure in the window appear.
 
 ## 4. Where the rows come from
 
-- **访客数 / 浏览量** come from `user_visits`, filled by the storefront
-  page-view beacon (`POST /api/v1/visits`, the user domain). **地域访客** reads
-  its `province`, which the beacon does not resolve, so every visitor counts
-  under `未知`; `stay_ms` is not recorded either. The figure is kept rather
-  than dropped because the column exists and the definition is settled.
+- **访客数 / 浏览量 / 平均停留时长** come from `user_visits`, filled by the
+  storefront page-view beacon (`POST /api/v1/visits`, the user domain). The
+  client reports each page twice: when it is shown, which records the view,
+  and when it is hidden, with the time it was on screen, which is added to
+  that view's `stay_ms` — capped at 30 minutes per view and never more than
+  the time since the view was recorded. A view whose hide report never came
+  has a null `stay_ms` and is left out of the average.
+- **地域访客** reads `user_visits.province`, which the beacon fills from the
+  signed-in visitor's default address. There is no IP geolocation: the shop
+  ships no IP-to-region database and calls no third-party service, so an
+  anonymous visit is honestly 未知 rather than confidently wrong.
+- **Retention.** `user_visits` keeps `stats.visitRetentionDays` days (400 by
+  default, so a month can be compared with the same month a year earlier);
+  the nightly `user.pruneVisits` job deletes older rows. A window reaching
+  past it reads 0 for the traffic figures.
 - **加购件数** comes from `product_events` rows of `kind = 'cart'`, written
   inside the cart's add transaction. `cart_items` is not a substitute, because
   a row is deleted when the order is placed, so yesterday's additions would

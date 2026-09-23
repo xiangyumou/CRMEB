@@ -295,22 +295,28 @@ export async function totalUsersAt(db: DbOrTx, at: Date): Promise<number> {
 }
 
 /**
- * 访客数 / 浏览量.
+ * 访客数 / 浏览量 / 平均停留时长.
  *
  * A visitor is a signed-in user or, failing that, an IP — the only identity
  * `user_visits` carries. The table is filled by the user domain's page-view
  * beacon (`POST /api/v1/visits`).
+ *
+ * `avgStayMs` averages only the views whose stay was reported: a view whose
+ * page is still open, or whose hide report never arrived, has no stay rather
+ * than a stay of zero, and counting it as zero would drag the figure down by
+ * however many reports went missing. `0` when no view in the bucket has one.
  */
 export async function visitAggregate(
   db: DbOrTx,
   args: WindowArgs,
-): Promise<Array<Bucketed<{ pageViews: number; visitors: number }>>> {
+): Promise<Array<Bucketed<{ pageViews: number; visitors: number; avgStayMs: number }>>> {
   const bucket = grouping(userVisits.createdAt, args.bucket);
   const query = db
     .select({
       bucket,
       pageViews: sql<number>`count(*)::int`,
       visitors: sql<number>`count(distinct coalesce(${userVisits.userId}::text, 'ip:' || coalesce(${userVisits.ip}, '?')))::int`,
+      avgStayMs: sql<number>`coalesce(avg(${userVisits.stayMs}), 0)::float8`,
     })
     .from(userVisits)
     .where(and(gte(userVisits.createdAt, args.from), lt(userVisits.createdAt, args.to)));
@@ -534,7 +540,8 @@ export type RegionSortKey = keyof typeof REGION_SORTS;
  *
  * Each column brings its own notion of "province", spelled out in
  * `DEFINITIONS.md`: a user's is their default address, a visit's is the
- * province resolved from its IP, and an order's is where the goods were sent.
+ * visitor's default address when the view was recorded (anonymous views have
+ * none), and an order's is where the goods were sent.
  * Pretending one join could serve all three would mean quietly dropping every
  * buyer without a saved address.
  *

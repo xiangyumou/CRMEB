@@ -28,7 +28,8 @@ import { id, instant } from '../_conventions/common';
 // the shared vocabulary
 // ---------------------------------------------------------------------------
 
-export const statsFormat = z.enum(['count', 'money', 'percent']);
+/** `duration` is a number of seconds, written as 分 / 秒 by the page. */
+export const statsFormat = z.enum(['count', 'money', 'percent', 'duration']);
 export type StatsFormat = z.infer<typeof statsFormat>;
 
 /** How the window was cut up. Derived from its length; see `statsRangeQuery`. */
@@ -228,6 +229,7 @@ export const userStatsExample: UserStats = {
   metrics: [
     { key: 'visitors', label: '访客数', value: 1820, format: 'count', previous: 1640 },
     { key: 'pageViews', label: '浏览量', value: 7431, format: 'count', previous: 6900 },
+    { key: 'avgStay', label: '平均停留时长', value: 65, format: 'duration', previous: 58 },
     { key: 'newUsers', label: '新增用户', value: 96, format: 'count', previous: 104 },
     { key: 'payingUsers', label: '成交用户数', value: 212, format: 'count', previous: 198 },
     { key: 'totalUsers', label: '累计用户', value: 18422, format: 'count', previous: null },

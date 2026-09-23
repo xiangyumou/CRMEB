@@ -1,10 +1,11 @@
 import { userVisits } from '@shop/db/schema/stats';
+import { userAddresses } from '@shop/db/schema/user';
 import { createTestCtx, flushTestRedis, type TestCtx } from '@shop/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { anonymousActor, type Ctx } from '../kernel/context';
-import { clearStatsCache, userStats } from '../stats';
+import { clearStatsCache, statsConfig, userRegions, userStats } from '../stats';
 import * as repo from './user.repo';
-import { recordVisit } from './user.visit.service';
+import { pruneVisits, recordVisit } from './user.visit.service';
 
 /**
  * The page-view beacon, and the figure it exists to feed.
@@ -160,8 +161,204 @@ describe('the visits beacon', () => {
     // rather than a guessed `h5` — an unknown platform must not inflate the
     // breakdown's largest bar.
     expect(byPath.get('/pages/cart/index')?.platform).toBeNull();
-    // Province stays null until a geo source exists; `stats` buckets that as
-    // 未知 rather than dropping the visitor.
-    expect(rows.every((row) => row.province === null)).toBe(true);
+  });
+});
+
+async function giveAddress(userId: number, provinceName: string, isDefault = true): Promise<void> {
+  await harness.ctx.withTx((tx) =>
+    repo.insertAddress(tx, {
+      userId,
+      receiverName: '张三',
+      receiverPhone: '13800000000',
+      provinceId: null,
+      cityId: null,
+      districtId: null,
+      provinceName,
+      cityName: '某市',
+      districtName: null,
+      detail: '某路 1 号',
+      postCode: null,
+      lng: null,
+      lat: null,
+      isDefault,
+      now: harness.clock.now(),
+    }),
+  );
+}
+
+async function regionVisitors(): Promise<Record<string, number>> {
+  await clearStatsCache(asAdmin());
+  const { rows } = await userRegions(asAdmin(), { sortBy: 'visitors', limit: 50 });
+  return Object.fromEntries(
+    rows.filter((row) => row.visitors > 0).map((row) => [row.province, row.visitors]),
+  );
+}
+
+describe('地域访客', () => {
+  it('counts a signed-in visitor under their default address, and everybody else as 未知', async () => {
+    const withAddress = await makeUser();
+    await giveAddress(withAddress, '浙江省');
+    const withoutDefault = await makeUser();
+    await giveAddress(withoutDefault, '广东省', false);
+
+    await recordVisit(
+      asVisitor(withAddress),
+      { path: '/pages/index/index' },
+      { ip: '203.0.113.7' },
+    );
+    await recordVisit(
+      asVisitor(withoutDefault),
+      { path: '/pages/index/index' },
+      { ip: '203.0.113.8' },
+    );
+    await recordVisit(asVisitor(null), { path: '/pages/index/index' }, { ip: '198.51.100.4' });
+
+    // A non-default address says nothing about where the shopper is; and no
+    // address is guessed from an IP.
+    expect(await regionVisitors()).toEqual({ 浙江省: 1, 未知: 2 });
+  });
+
+  it('keeps the province a view was recorded with when the address later changes', async () => {
+    const userId = await makeUser();
+    await giveAddress(userId, '浙江省');
+    await recordVisit(asVisitor(userId), { path: '/pages/index/index' }, { ip: '203.0.113.7' });
+
+    await harness.ctx.db.delete(userAddresses);
+    await giveAddress(userId, '上海市');
+    await recordVisit(asVisitor(userId), { path: '/pages/cart/index' }, { ip: '203.0.113.7' });
+
+    const rows = await harness.ctx.db.select().from(userVisits);
+    expect(new Map(rows.map((row) => [row.path, row.province]))).toEqual(
+      new Map([
+        ['/pages/index/index', '浙江省'],
+        ['/pages/cart/index', '上海市'],
+      ]),
+    );
+  });
+});
+
+async function stays(): Promise<Array<number | null>> {
+  const rows = await harness.ctx.db.select().from(userVisits).orderBy(userVisits.id);
+  return rows.map((row) => row.stayMs);
+}
+
+describe('停留时长', () => {
+  const path = '/pages/goods_details/index';
+
+  it('attaches the hide report to the view, without adding one', async () => {
+    const userId = await makeUser();
+    await recordVisit(asVisitor(userId), { path }, { ip: '203.0.113.7' });
+    harness.clock.advance(42_000);
+    await recordVisit(asVisitor(userId), { path, stayMs: 42_000 }, { ip: '203.0.113.7' });
+
+    expect(await stays()).toEqual([42_000]);
+    expect((await figures()).pageViews).toBe(1);
+  });
+
+  it('attaches an anonymous visitor’s report to that address’s view only', async () => {
+    await recordVisit(asVisitor(null), { path }, { ip: '198.51.100.4' });
+    await recordVisit(asVisitor(null), { path }, { ip: '198.51.100.9' });
+    harness.clock.advance(20_000);
+    await recordVisit(asVisitor(null), { path, stayMs: 15_000 }, { ip: '198.51.100.9' });
+
+    expect(await stays()).toEqual([null, 15_000]);
+  });
+
+  it('adds up the spells of a view the throttle kept as one', async () => {
+    const userId = await makeUser();
+    const beacon = (stayMs?: number) =>
+      recordVisit(asVisitor(userId), stayMs === undefined ? { path } : { path, stayMs }, {
+        ip: '203.0.113.7',
+      });
+
+    await beacon();
+    harness.clock.advance(10_000);
+    await beacon(10_000);
+    // Back from a sub-page inside the minute: the show is collapsed into the
+    // same view, and so is its time.
+    await beacon();
+    harness.clock.advance(25_000);
+    await beacon(25_000);
+
+    expect(await stays()).toEqual([35_000]);
+  });
+
+  it('never credits more time than has passed since the view, or more than the cap', async () => {
+    const userId = await makeUser();
+    await recordVisit(asVisitor(userId), { path }, { ip: '203.0.113.7' });
+
+    harness.clock.advance(5_000);
+    // A client that claims an hour five seconds after the view is believed
+    // for five seconds.
+    await recordVisit(asVisitor(userId), { path, stayMs: 3_600_000 }, { ip: '203.0.113.7' });
+    expect(await stays()).toEqual([5_000]);
+
+    harness.clock.advance(3 * 60 * 60_000);
+    await recordVisit(asVisitor(userId), { path, stayMs: 3 * 60 * 60_000 }, { ip: '203.0.113.7' });
+    expect(await stays()).toEqual([30 * 60_000]);
+  });
+
+  it('drops a report with no view to attach it to', async () => {
+    const userId = await makeUser();
+    await recordVisit(asVisitor(userId), { path, stayMs: 8_000 }, { ip: '203.0.113.7' });
+    await recordVisit(asVisitor(userId), { path: '/pages/index/index' }, { ip: '203.0.113.7' });
+    // A different page's view is not this page's.
+    await recordVisit(asVisitor(userId), { path, stayMs: 8_000 }, { ip: '203.0.113.7' });
+
+    expect(await stays()).toEqual([null]);
+  });
+
+  it('feeds 平均停留时长', async () => {
+    const userId = await makeUser();
+    await recordVisit(asVisitor(userId), { path }, { ip: '203.0.113.7' });
+    await recordVisit(asVisitor(null), { path }, { ip: '198.51.100.4' });
+    harness.clock.advance(90_000);
+    await recordVisit(asVisitor(userId), { path, stayMs: 90_000 }, { ip: '203.0.113.7' });
+
+    await clearStatsCache(asAdmin());
+    const page = await userStats(asAdmin(), {});
+    // One view reported 90 s; the other never reported and is not a zero.
+    expect(page.metrics.find((metric) => metric.key === 'avgStay')?.value).toBe(90);
+  });
+});
+
+describe('retention', () => {
+  it('deletes the views older than the configured window, and nothing newer', async () => {
+    await harness.ctx.config.set(statsConfig, { visitRetentionDays: 100 });
+    await harness.ctx.db.insert(userVisits).values([
+      { path: '/old', createdAt: new Date('2026-03-01T00:00:00.000Z') },
+      { path: '/edge', createdAt: new Date('2026-03-07T04:00:01.000Z') },
+      { path: '/new', createdAt: new Date('2026-06-01T00:00:00.000Z') },
+    ]);
+
+    // NOW is 2026-06-15T04:00Z; 100 days earlier is 2026-03-07T04:00Z.
+    expect(await pruneVisits(harness.ctx)).toEqual({ deleted: 1 });
+    const left = await harness.ctx.db.select().from(userVisits);
+    expect(left.map((row) => row.path).sort()).toEqual(['/edge', '/new']);
+  });
+
+  it('drains a backlog in batches', async () => {
+    await harness.ctx.db.insert(userVisits).values(
+      Array.from({ length: 5 }, () => ({
+        path: '/old',
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+      })),
+    );
+
+    expect(await pruneVisits(harness.ctx, { limit: 2 })).toEqual({ deleted: 2 });
+    expect(await pruneVisits(harness.ctx, { limit: 2 })).toEqual({ deleted: 2 });
+    expect(await pruneVisits(harness.ctx, { limit: 2 })).toEqual({ deleted: 1 });
+    expect(await pruneVisits(harness.ctx, { limit: 2 })).toEqual({ deleted: 0 });
+  });
+
+  it('keeps 400 days by default, so a month can be compared with a year ago', async () => {
+    await harness.ctx.db.insert(userVisits).values([
+      { path: '/last-year', createdAt: new Date('2025-06-01T00:00:00.000Z') },
+      { path: '/too-old', createdAt: new Date('2025-05-01T00:00:00.000Z') },
+    ]);
+
+    expect(await pruneVisits(harness.ctx)).toEqual({ deleted: 1 });
+    const left = await harness.ctx.db.select().from(userVisits);
+    expect(left.map((row) => row.path)).toEqual(['/last-year']);
   });
 });
