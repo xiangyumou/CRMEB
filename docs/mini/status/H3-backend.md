@@ -26,9 +26,16 @@ Merged `storefront/mini` at 299956592 (G1 decor blocks) before touching the deco
      unchanged. SYS-020.
    - `apps/mini/src/test/app-config-fixture.ts` gained the new fields (typecheck only).
 
+2. `deriveTheme` into contracts
+   - `packages/contracts/src/system/theme.ts`: colour maths + `deriveTheme` + `themeStyle` +
+     `RADIUS_FACTOR` moved unchanged from `apps/mini/src/theme/{color,derive}.ts`, plus
+     `themeInputOf(appearance.theme)`. Zod-free at runtime (type imports only; a test checks).
+     `system/` rather than design.md's `diy/theme.ts`: it derives `app/config`'s appearance, and
+     `diy` is the legacy domain. SYS-021; design.md §3.3 updated.
+
 ## In progress
 
-- Task 2: `deriveTheme` into contracts.
+- Task 3: 小程序码 `env_version` from config.
 
 ## Client follow-ups (stream A)
 
@@ -37,5 +44,9 @@ Merged `storefront/mini` at 299956592 (G1 decor blocks) before touching the deco
 - `setWebviewDomains(config.webviewDomains)` in `applyAppConfig`.
 - `setServerTime(Date.parse(config.serverTime))` on a 200; on a 304 read the `x-server-time`
   header (the api-client does not surface headers today — read it in the platform transport).
-- Pass `accent: appearance.theme.accentColor` to `deriveTheme`.
+- Theme: `apps/mini/src/theme/derive.ts` and `color.ts` become
+  `export * from '@shop/contracts/system/theme'` (delete `derive.test.ts`, now in contracts), add
+  `'@shop/contracts/system/theme'` to `CONTRACTS_RUNTIME` in `apps/mini/eslint.config.mjs`,
+  and `theme/store.ts` calls `deriveTheme(themeInputOf(appearance.theme))` (picks up the accent).
+  Not done here: it is three files plus the lint allow-list, not a one-line swap.
 - Splash: `splashAd.link` is a `LinkTarget` (`linkTargetRoute` / `openExternalLink` for `webview`).

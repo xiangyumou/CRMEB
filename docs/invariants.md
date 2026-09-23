@@ -1797,6 +1797,15 @@ The mini-program's splash (`app/config.splashAd.link`) is a `LinkTarget`: the st
 - `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > falls back to an https legacy link as a web-view, and to none for a uni-app path`
 - `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > refuses a LinkTarget that does not parse, and writes nothing`
 
+### SYS-021
+
+`deriveTheme` (`packages/contracts/src/system/theme.ts`, shared by the mini-program and the admin preview) keeps the operator's brand colour and makes the text readable: the primary-text and price tokens reach 4.5:1 on white for every input, the text on the primary colour reaches at least 3:1, a missing accent is the primary colour, and the module stays zod-free at runtime.
+
+- `packages/contracts/src/system/theme.test.ts::SYS-021 — deriveTheme keeps text readable > <label>: text on white reaches 4.5:1, text on the colour 3:1`
+- `packages/contracts/src/system/theme.test.ts::SYS-021 — deriveTheme keeps text readable > holds for 200 random colours`
+- `packages/contracts/src/system/theme.test.ts::SYS-021 — deriveTheme keeps text readable > falls back: no accent is the primary colour, no price is the primary text colour`
+- `packages/contracts/src/system/theme.test.ts::zod-free > imports nothing at runtime, so the mini-program may ship it`
+
 ### SYSC-001
 
 Six concurrent disables of one account report exactly one session revocation, and the sessions are gone once.

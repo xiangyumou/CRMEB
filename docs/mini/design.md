@@ -230,7 +230,7 @@ DIY 块的圆角由装修属性控制（例如商品块的「圆角 / 直角」�
 
 ### 3.3 可读性的自动派生（写入 `packages/contracts`，前后端共用）
 
-`deriveTheme(tokens)` 是一个纯函数，放在 `packages/contracts/src/diy/theme.ts`。后台预览和小程序调用同一份实现，由 `pnpm gen` 生成无 zod 的版本给小程序：
+`deriveTheme(tokens)` 是一个纯函数，放在 `packages/contracts/src/system/theme.ts`（本身不依赖 zod，小程序可以直接在运行时 import；输入用 `themeInputOf(app/config.appearance.theme)` 得到）。后台预览和小程序调用同一份实现（不变量 SYS-021）：
 
 1. `on-primary`：白色和 `#1A1A1A` 中与主色对比度较高的那个。
 2. `primary-text`：如果主色在白底上 ≥ 4.5，就等于主色；否则在 HSL 中逐步降低亮度，直到 ≥ 4.5。例如蓝 `#1DB0FC` 会被加深为约 `#0077B3`。
