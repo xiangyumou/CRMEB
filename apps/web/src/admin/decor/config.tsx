@@ -1,18 +1,17 @@
 'use client';
 
 import type { Config, Data } from '@puckeditor/core';
-import { Carousel, ImageCube, ProductGrid } from '@shop/storefront-blocks/admin';
+import { BLOCK_COMPONENTS } from '@shop/storefront-blocks/admin';
 import {
   BLOCKS,
   IMAGE_CUBE_LAYOUTS,
   carouselSlide,
+  decorBlocks,
   imageCubeCell,
   pageRootProps,
   type BlockType,
-  type CarouselProps,
   type ImageCubeProps,
   type PageRootProps,
-  type ProductGridProps,
   type ProductSource,
   type ProductSummary,
 } from '@shop/storefront-blocks/schema';
@@ -24,6 +23,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
+
+import { z } from 'zod';
 
 import { defaultsOf, zodToPuckFields, type CustomFieldRenderers } from './zod-to-puck';
 
@@ -103,10 +104,27 @@ function ownProps<P>(props: Record<string, unknown>): P {
   return own as P;
 }
 
-function ProductGridCanvas({ props }: { props: ProductGridProps }) {
-  const data = useContext(DecorCanvasDataContext);
-  const products = data.products(props.source) ?? [];
-  return <ProductGrid props={props} data={{ products: [...products] }} />;
+/**
+ * What a block's `data` asks the resolver for, answered from the canvas data
+ * instead: products for each `products` need (a 商品列表's `products`, a
+ * 商品选项卡's `tab0`…). Other kinds have no canvas source yet and stay
+ * empty, which the blocks draw as empty.
+ */
+function useCanvasBlockData(type: BlockType, props: unknown): Record<string, unknown> | undefined {
+  const canvas = useContext(DecorCanvasDataContext);
+  const needs = decorBlocks.get(type)?.data?.(props as never);
+  if (!needs) return undefined;
+  const out: Record<string, unknown> = {};
+  for (const [slot, need] of Object.entries(needs)) {
+    if (need.kind === 'products') out[slot] = [...(canvas.products(need.source) ?? [])];
+  }
+  return out;
+}
+
+function CanvasBlock({ type, props }: { type: BlockType; props: unknown }) {
+  const Block = BLOCK_COMPONENTS[type];
+  const data = useCanvasBlockData(type, props);
+  return <Block props={props} data={data} />;
 }
 
 // ─── defaults for a newly inserted block ─────────────────────────────────────
@@ -121,50 +139,54 @@ function cellsFor(layout: keyof typeof IMAGE_CUBE_LAYOUTS): unknown[] {
  * document is invalid until the operator picks them — by design.
  */
 export function newBlockProps(type: BlockType): Record<string, unknown> {
-  const base = defaultsOf(BLOCKS[type].props) as Record<string, unknown>;
+  const schema = BLOCKS[type].props as z.ZodObject;
+  const base = defaultsOf(schema) as Record<string, unknown>;
   switch (type) {
     case 'carousel':
       return { ...base, slides: [defaultsOf(carouselSlide)] };
     case 'imageCube':
       return { ...base, cells: cellsFor((base as ImageCubeProps).layout) };
     default:
-      return base;
+      return { ...base, ...minimumItems(schema, base) };
   }
+}
+
+/** A top-level array with `.min(n)` and nothing in it starts with n default items. */
+function minimumItems(
+  schema: z.ZodObject,
+  base: Record<string, unknown>,
+): Record<string, unknown[]> {
+  const out: Record<string, unknown[]> = {};
+  for (const [key, field] of Object.entries(schema.shape)) {
+    if (!(field instanceof z.ZodArray)) continue;
+    const checks = (field._zod.def.checks ?? []) as unknown as readonly {
+      _zod: { def: { check: string; minimum?: number } };
+    }[];
+    const minimum = Math.max(
+      0,
+      ...checks.map((check) =>
+        check._zod.def.check === 'min_length' ? (check._zod.def.minimum ?? 0) : 0,
+      ),
+    );
+    const current = Array.isArray(base[key]) ? base[key] : [];
+    if (current.length >= minimum) continue;
+    out[key] = Array.from({ length: minimum }, () => defaultsOf(field.element as z.ZodType));
+  }
+  return out;
 }
 
 // ─── the config ──────────────────────────────────────────────────────────────
 
 function blockRender(type: BlockType): (props: Record<string, unknown>) => ReactElement {
   const label = BLOCKS[type].label;
-  switch (type) {
-    case 'carousel':
-      return function CarouselBlock(props) {
-        const own = ownProps<CarouselProps>(props);
-        return (
-          <BlockBoundary label={label} watch={own}>
-            <Carousel props={own} />
-          </BlockBoundary>
-        );
-      };
-    case 'productGrid':
-      return function ProductGridBlock(props) {
-        const own = ownProps<ProductGridProps>(props);
-        return (
-          <BlockBoundary label={label} watch={own}>
-            <ProductGridCanvas props={own} />
-          </BlockBoundary>
-        );
-      };
-    case 'imageCube':
-      return function ImageCubeBlock(props) {
-        const own = ownProps<ImageCubeProps>(props);
-        return (
-          <BlockBoundary label={label} watch={own}>
-            <ImageCube props={own} />
-          </BlockBoundary>
-        );
-      };
-  }
+  return function DecorBlock(props) {
+    const own = ownProps<unknown>(props);
+    return (
+      <BlockBoundary label={label} watch={own}>
+        <CanvasBlock type={type} props={own} />
+      </BlockBoundary>
+    );
+  };
 }
 
 export type DecorData = Data;

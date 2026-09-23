@@ -1,9 +1,21 @@
 import type {
   CarouselProps,
+  HotspotImageProps,
   ImageCubeProps,
+  NavGridProps,
+  NoticeProps,
+  OrderEntryProps,
   ProductGridProps,
+  ProductTabsProps,
+  RichTextProps,
+  SearchBarProps,
+  ServiceGridProps,
+  SpacerProps,
+  TitleBarProps,
+  UserCardProps,
 } from '@shop/contracts/decor/all-blocks';
-import type { ProductSummary } from '@shop/contracts/decor/sources';
+import { productTabSlot } from '@shop/contracts/decor/constants';
+import type { PersonalSlot, ProductSummary } from '@shop/contracts/decor/sources';
 
 /**
  * Fixture data for tests, the admin spike page, the fidelity script and the
@@ -116,6 +128,7 @@ export const fixtureProducts: ProductSummary[] = [
 
 export const fixtureProductGrid: ProductGridProps = {
   source: { mode: 'manual', ids: fixtureProducts.map((product) => product.id) },
+  layout: 'grid2',
   titleLines: 2,
   showMarketPrice: true,
   showTag: true,
@@ -149,6 +162,199 @@ export const fixtureImageCubeRow: ImageCubeProps = {
     { image: tile(230, 300, 100) },
     { image: tile(230, 300, 220) },
   ],
+};
+
+const frame = { marginY: 'none', paddingX: 'none', radius: 'none' } as const;
+const everyone = { audience: 'all', platforms: [] as [] } as const;
+
+/** A round, flat icon: a coloured disc with a white mark, no text. */
+function navIcon(hue: number, mark: string): string {
+  return svg(
+    96,
+    96,
+    `<circle cx="48" cy="48" r="48" fill="hsl(${hue} 55% 58%)"/>` +
+      `<g fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">${mark}</g>`,
+  );
+}
+
+const MARKS = [
+  '<rect x="28" y="30" width="40" height="36" rx="6"/><path d="M28 42h40"/>',
+  '<path d="M48 26l6 13 14 2-10 10 2 14-12-7-12 7 2-14-10-10 14-2z"/>',
+  '<circle cx="48" cy="48" r="18"/><path d="M48 38v10l7 5"/>',
+  '<path d="M30 60V36l18-10 18 10v24H30z"/><path d="M42 60V48h12v12"/>',
+  '<path d="M32 36h32l-4 26H36z"/><path d="M40 36a8 8 0 0 1 16 0"/>',
+];
+
+export const fixtureSearchBar: SearchBarProps = {
+  placeholder: '搜索商品',
+  hotWords: [{ word: '新品' }, { word: '礼盒' }, { word: '包邮' }],
+  shape: 'round',
+  sticky: false,
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixtureNavGrid: NavGridProps = {
+  items: ['新品', '热卖', '限时', '好店', '礼物', '领券', '会员', '积分', '拼团', '全部'].map(
+    (label, index) => ({
+      icon: navIcon((index * 36) % 360, MARKS[index % MARKS.length] as string),
+      label,
+      link: { kind: 'category', id: String(index + 1) },
+    }),
+  ),
+  columns: 5,
+  rows: 2,
+  paging: false,
+  iconShape: 'circle',
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixtureNotice: NoticeProps = {
+  label: '公告',
+  lines: [
+    {
+      text: '全场满 199 元包邮，隐私包装发货',
+      link: { kind: 'route', to: { route: 'couponCenter', params: {} } },
+    },
+    { text: '国庆假期正常发货' },
+  ],
+  // `static` in fixtures: a screenshot must not catch a rolling line mid-way.
+  mode: 'static',
+  interval: 4000,
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixtureHotspotImage: HotspotImageProps = {
+  image: svg(
+    750,
+    360,
+    `<rect width="375" height="360" fill="hsl(200 55% 70%)"/><rect x="375" width="375" height="360" fill="hsl(20 65% 72%)"/>` +
+      `<rect x="60" y="130" width="250" height="100" rx="50" fill="#fff" fill-opacity=".9"/>` +
+      `<rect x="435" y="130" width="250" height="100" rx="50" fill="#fff" fill-opacity=".9"/>`,
+  ),
+  hotspots: [
+    { x: 8, y: 36, w: 33.3, h: 27.8, label: '左侧活动', link: { kind: 'product', id: '12' } },
+    { x: 58, y: 36, w: 33.3, h: 27.8, label: '右侧活动', link: { kind: 'category', id: '3' } },
+  ],
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixtureTitleBar: TitleBarProps = {
+  title: '热卖推荐',
+  subtitle: '大家都在买',
+  align: 'left',
+  moreText: '更多',
+  moreLink: { kind: 'category', id: '3' },
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixtureProductTabs: ProductTabsProps = {
+  tabs: [
+    { title: '推荐', source: { mode: 'manual', ids: ['12', '13', '14', '15'] } },
+    { title: '新品', source: { mode: 'manual', ids: ['16', '17'] } },
+    { title: '热卖', source: { mode: 'manual', ids: ['14', '12'] } },
+  ],
+  layout: 'grid2',
+  titleLines: 2,
+  showMarketPrice: true,
+  showTag: true,
+  style: frame,
+  visibility: everyone,
+};
+
+/** The products each tab resolves to, by slot. */
+export const fixtureProductTabsData: Record<string, ProductSummary[]> = Object.fromEntries(
+  fixtureProductTabs.tabs.map((tab, index) => [
+    productTabSlot(index),
+    resolveFixtureProducts(tab.source),
+  ]),
+);
+
+export const fixtureRichText: RichTextProps = {
+  html:
+    '<h3>购物须知</h3><p>所有商品均为<strong>隐私包装</strong>，外包装不显示商品名称。</p>' +
+    '<ul><li>支持七天无理由退换</li><li>顺丰包邮，48 小时内发货</li></ul>',
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixtureSpacer: SpacerProps = {
+  height: 40,
+  line: 'solid',
+  inset: true,
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixtureUserCard: UserCardProps = {
+  showStats: true,
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixtureOrderEntry: OrderEntryProps = {
+  title: '我的订单',
+  items: [
+    { key: 'unpaid', label: '待付款' },
+    { key: 'unshipped', label: '待发货' },
+    { key: 'unreceived', label: '待收货' },
+    { key: 'unreviewed', label: '待评价' },
+    { key: 'aftersale', label: '售后/退款' },
+  ],
+  style: { ...frame, marginY: 'sm', paddingX: 'sm', radius: 'sm' },
+  visibility: everyone,
+};
+
+export const fixtureServiceGrid: ServiceGridProps = {
+  title: '我的服务',
+  columns: 4,
+  items: [
+    {
+      label: '优惠券',
+      action: 'link',
+      link: { kind: 'route', to: { route: 'myCoupons', params: {} } },
+    },
+    {
+      label: '收货地址',
+      action: 'link',
+      link: { kind: 'route', to: { route: 'addresses', params: {} } },
+    },
+    {
+      label: '我的收藏',
+      action: 'link',
+      link: { kind: 'route', to: { route: 'favorites', params: {} } },
+    },
+    { label: '联系客服', action: 'contact' },
+  ],
+  style: { ...frame, marginY: 'sm', paddingX: 'sm', radius: 'sm' },
+  visibility: everyone,
+};
+
+/** A signed-in shopper's state for the 个人中心 blocks, by slot. */
+export const fixturePersonal: {
+  userCard: Record<string, PersonalSlot>;
+  orderEntry: Record<string, PersonalSlot>;
+} = {
+  userCard: {
+    user: {
+      kind: 'userSummary',
+      user: {
+        nickname: '小林',
+        avatarUrl: navIcon(210, MARKS[2] as string),
+        stats: { coupons: 3, favorites: 12, history: 28 },
+      },
+    },
+  },
+  orderEntry: {
+    counts: {
+      kind: 'orderCounts',
+      counts: { unpaid: 1, unshipped: 2, unreceived: 0, aftersale: 120 },
+    },
+  },
 };
 
 /** Resolves a product grid's source against the fixtures, as the server resolver will. */

@@ -1,0 +1,23 @@
+@use '../shared/tokens' as *;
+
+.space {
+  display: flex;
+  align-items: center;
+  height: calc(var(--sb-height) * 1px);
+}
+
+// A hairline: `PX` is left alone by every px transform, so it stays one CSS
+// pixel on any screen.
+.line {
+  flex: 1;
+  height: 0;
+  border-top: 1px solid $border;
+}
+
+.dashed {
+  border-top-style: dashed;
+}
+
+.inset {
+  margin: 0 $gutter;
+}
