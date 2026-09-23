@@ -95,4 +95,3 @@ describe('h5-mp-emulation platform', () => {
     });
   });
 });
-
