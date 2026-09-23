@@ -2,31 +2,31 @@
 
 The production stack is one Compose project, `crmeb-next`, on one host:
 
-| Service    | What it is                                                                                 | Memory cap |
-| ---------- | ------------------------------------------------------------------------------------------ | ---------- |
-| `postgres` | PostgreSQL 17, the only database                                                           | 512 MiB    |
-| `redis`    | Redis 7 with `noeviction` and AOF: admin sessions, the config cache and the BullMQ queue   | 160 MiB    |
-| `web`      | the Next.js server: the admin at `/admin`, `/admin-api/*` and the storefront API `/api/v1` | 512 MiB    |
-| `worker`   | the BullMQ worker: repeatable jobs, the post-commit effects dispatcher                     | 320 MiB    |
-| `edge`     | nginx: the H5 storefront at `/`, a proxy to `web`, and `/uploads/`                         | 64 MiB     |
-| `migrate`  | a one-shot (profile `migrate`) that applies the migrations and the reference seed          | 384 MiB    |
+| Service    | What it is                                                                                  | Memory cap |
+| ---------- | ------------------------------------------------------------------------------------------- | ---------- |
+| `postgres` | PostgreSQL 17, the only database                                                            | 512 MiB    |
+| `redis`    | Redis 7 with `noeviction` and AOF: admin sessions, the config cache and the BullMQ queue    | 160 MiB    |
+| `web`      | the Next.js server: `/admin`, `/admin-api/*`, the storefront API `/api/v1`, `/scan-upload/` | 512 MiB    |
+| `worker`   | the BullMQ worker: repeatable jobs, the post-commit effects dispatcher                      | 320 MiB    |
+| `edge`     | nginx: the H5 storefront at `/`, a proxy to `web`, and `/uploads/`                          | 64 MiB     |
+| `migrate`  | a one-shot (profile `migrate`) that applies the migrations and the reference seed           | 384 MiB    |
 
 The images are built in CI and pinned by digest. A host needs Docker with Compose v2, `curl`,
 and nothing else: no Node, no pnpm, no build toolchain.
 
 ## Files
 
-| File                     | What it is                                                                              |
-| ------------------------ | --------------------------------------------------------------------------------------- |
-| `compose.yml`            | the stack. It publishes only the edge, and only on loopback.                            |
-| `compose.traefik.yml`    | the overlay that puts the edge behind Traefik. Applied deliberately, never by a script. |
-| `deployment.env.example` | the template for `deployment.env`, which is gitignored and holds the passwords.         |
-| `upgrade.sh`             | deploys a release; if it does not come up, it ends on the previous images.              |
-| `rollback.sh`            | returns to a known set of images; `--restore` recovers data, and only when asked.       |
-| `backup.sh`              | dumps the database and proves the dump restorable; `--verify-only` checks one.          |
-| `readyz.sh`              | runs the readiness gate on its own. Read-only.                                          |
-| `lib/`                   | shared shell: the Compose wiring, digest capture, the readiness gate.                   |
-| `rehearsal/`             | the drill that deploys, breaks and rolls back a throwaway copy of this stack.           |
+| File                     | What it is                                                                         |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| `compose.yml`            | the stack. It publishes only the edge, and only on loopback.                       |
+| `compose.traefik.yml`    | the overlay that puts the edge behind Traefik; `NEXT_COMPOSE_OVERLAYS` applies it. |
+| `deployment.env.example` | the template for `deployment.env`, which is gitignored and holds the passwords.    |
+| `upgrade.sh`             | deploys a release; if it does not come up, it ends on the previous images.         |
+| `rollback.sh`            | returns to a known set of images; `--restore` recovers data, and only when asked.  |
+| `backup.sh`              | dumps the database and proves the dump restorable; `--verify-only` checks one.     |
+| `readyz.sh`              | runs the readiness gate on its own. Read-only.                                     |
+| `lib/`                   | shared shell: the Compose wiring, digest capture, the readiness gate.              |
+| `rehearsal/`             | the drill that deploys, breaks and rolls back a throwaway copy of this stack.      |
 
 ## Conventions
 
@@ -36,20 +36,26 @@ production host that is `/home/ubuntu/apps/CRMEB-next`.
 `deployment.env` lives **next to the scripts**, in `deploy/`. `lib/common.sh` resolves it from its
 own directory and refuses to run without it, so a copy in the wrong place fails at once.
 
-Every script calls Compose the same way, and so must you:
+Every script calls Compose the same way: the project `crmeb-next`, `compose.yml`, then every
+overlay `NEXT_COMPOSE_OVERLAYS` lists, and `deployment.env`. So must you. On the production host,
+which runs behind Traefik:
 
 ```sh
 docker compose -p crmeb-next --project-directory deploy \
-  -f deploy/compose.yml --env-file deploy/deployment.env …
+  -f deploy/compose.yml -f deploy/compose.traefik.yml --env-file deploy/deployment.env …
 ```
 
 Never drop `-p crmeb-next`. Without it Compose names the project after the directory, which is a
 _different_ project with different volumes: you would start a second, empty stack beside the real
-one. Set an alias once per shell:
+one. Never drop an overlay the deployment runs with either: an `up` without `compose.traefik.yml`
+recreates the edge off the router. Set an alias once per shell, naming the same files as
+`NEXT_COMPOSE_OVERLAYS`:
 
 ```sh
-alias shopc='docker compose -p crmeb-next --project-directory deploy -f deploy/compose.yml --env-file deploy/deployment.env'
+alias shopc='docker compose -p crmeb-next --project-directory deploy -f deploy/compose.yml -f deploy/compose.traefik.yml --env-file deploy/deployment.env'
 ```
+
+On a host with no overlay, leave out `-f deploy/compose.traefik.yml`.
 
 ## Configuration: `deployment.env`
 
@@ -75,6 +81,7 @@ Every key the stack reads. `deployment.env.example` carries the same list with p
 | `NEXT_EDGE_BIND`                                         | where the edge publishes; `127.0.0.1:8080`. Keep it on loopback: Traefik reaches the edge over its own network.                   |
 | `NEXT_HOST`                                              | the domain Traefik routes to the edge. Read only by `compose.traefik.yml`.                                                        |
 | `NEXT_EDGE_TRUSTED_PROXIES`                              | the CIDRs whose `X-Forwarded-For` the edge believes: Traefik's network. Required by `compose.traefik.yml`; see below.             |
+| `NEXT_COMPOSE_OVERLAYS`                                  | the Compose files every script layers over `compose.yml`, relative to `deploy/`. Behind Traefik: `compose.traefik.yml`.           |
 | `NEXT_BACKUP_DIR`                                        | where dumps, upgrade manifests and settings backups go; `./data/backups`, relative to `deploy/`. Created mode 700.                |
 
 `APP_ORIGIN` produces the most confusing failure in this list when it is wrong: every admin read
@@ -198,7 +205,8 @@ no longer be named. A rollback target has to be nameable.
    (`ssh -L 8080:127.0.0.1:8080 <host>`), sign in to the admin and open a storefront page with an
    image on it.
 
-8. **Put it behind Traefik** with the overlay (next section), then check through the domain:
+8. **Put it behind Traefik**: set `NEXT_COMPOSE_OVERLAYS=compose.traefik.yml` and run an `up`
+   (next section), then check through the domain:
 
    ```sh
    curl -fsS https://<NEXT_HOST>/healthz
@@ -217,23 +225,34 @@ never take the domain by accident. `compose.traefik.yml` adds both: the labels f
 the `web` and `websecure` entrypoints (certificate resolver `myresolver`), and the edge's second
 network, `server-internal-net`.
 
-Once the overlay is applied, every later `up` has to name it too, or the edge loses its route:
+The overlay is a setting of the deployment, not a step someone remembers. Name it in
+`deployment.env`:
 
 ```sh
-docker compose -p crmeb-next --project-directory deploy \
-  -f deploy/compose.yml -f deploy/compose.traefik.yml \
-  --env-file deploy/deployment.env up -d --wait
+NEXT_COMPOSE_OVERLAYS=compose.traefik.yml
 ```
 
-`upgrade.sh` and `rollback.sh` recreate containers with `compose.yml` alone. After either of them,
-re-apply the overlay with the command above, and check the edge is on both networks:
+From then on `upgrade.sh`, `rollback.sh`, `backup.sh` and `readyz.sh` all call Compose with
+`-f compose.yml -f compose.traefik.yml`, so an upgrade or a rollback recreates the edge with its
+route, not without it. A script refuses to start when the key names a file that does not exist.
+To apply it the first time, or after editing the key, run an `up` with the same files (the `shopc`
+alias above):
+
+```sh
+shopc up -d --wait
+```
+
+Then check the edge is on both networks:
 
 ```sh
 docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$(shopc ps -q edge)"
 ```
 
-Expected: `crmeb-next_default server-internal-net`. To take the site off the router, run the same
-`up` without the overlay; the stack keeps serving on loopback.
+Expected: `crmeb-next_default server-internal-net`. Run the same check after every upgrade and
+rollback; the drill proves both keep the overlay, and this proves the host is configured to.
+
+To take the site off the router, empty `NEXT_COMPOSE_OVERLAYS` and run the `up` without the overlay
+(`-f deploy/compose.yml` alone); the stack keeps serving on loopback.
 
 ### The client's address
 
@@ -293,7 +312,8 @@ refuses a migration that is not. The script never restores data on its own.
 images only. Each run writes `data/backups/upgrade-<stamp>.manifest` with the previous and new
 images, the dump, and the outcome.
 
-Re-apply the Traefik overlay afterwards.
+It recreates the containers with `compose.yml` and every overlay in `NEXT_COMPOSE_OVERLAYS`, so the
+edge stays behind Traefik. On a Traefik host, check the key is set before the first upgrade.
 
 ## Rollback
 
@@ -312,7 +332,8 @@ and runs the readiness gate. If the target does not come up, it returns to what 
 | 2    | invoked wrongly                                                    |
 | 3    | a person is needed                                                 |
 
-Replacing containers never changes data. Re-apply the Traefik overlay afterwards.
+Replacing containers never changes data. Like `upgrade.sh`, it uses the overlays in
+`NEXT_COMPOSE_OVERLAYS`, so the edge keeps its route.
 
 ## Backup and restore
 
@@ -358,6 +379,20 @@ docker run --rm -v crmeb-next_uploads:/data alpine chmod -R a+rX /data
 The edge serves uploads as nginx's unprivileged user. A directory left at `0700` by whatever wrote
 it turns every image under it into a 404, with `(13: Permission denied)` in the edge log. `a+rX`
 sets `+x` on directories only, so no uploaded file becomes executable.
+
+## What the edge sends to `web`
+
+The edge proxies `/admin`, `/admin-api`, `/api`, `/scan-upload` and `/_next/static/` to `web`, and
+`/readyz` to the app's `/api/v1/readyz`. Every other path belongs to the H5 storefront, whose
+history-mode fallback answers any path it does not know with its `index.html`. So a Next page the
+edge does not proxy never 404s: it shows the storefront instead, which is easy to miss.
+
+A new page or route handler under `apps/web/app` outside those prefixes therefore needs a location
+in `docker/edge/nginx.conf`, with the same `X-Real-IP` and `X-Forwarded-For` handling as the
+others. The drill case `edge/proxies-every-page-route` requests every page route, and one route
+handler per top-level path, through the real edge and fails on any that comes back as the
+storefront. `/` is the one route left to the storefront on purpose: the Next page there only points
+at `/admin`.
 
 ## Health and readiness
 
@@ -429,10 +464,12 @@ deploy/rehearsal/drill.sh --only rollback --keep
 It builds the three images from the checkout, pushes them to a registry container it starts, and
 then deploys, breaks and rolls back a real stack: a moving tag, a missing candidate, a dry run, a
 tampered and a truncated dump, a failing migration, a worker that starts and does no work, a
-readiness gate that finds a table missing, a rollback to an image that is not there, and a
-successful upgrade and rollback. It uses its own Compose project (`crmeb-next-drill`), its own
-generated passwords under `$TMPDIR` and its own free loopback port, so it can run beside the live
-stack. It needs the whole repository, not just `deploy/`. CI runs it on every change to this
+readiness gate that finds a table missing, a rollback to an image that is not there, a successful
+upgrade and rollback, the same upgrade and rollback with an overlay configured (a stand-in for
+`compose.traefik.yml` on a stand-in network, never the real one), and a Next page the edge would
+not proxy. It uses its own Compose project (`crmeb-next-drill`), its own generated passwords under
+`$TMPDIR` and its own free loopback port, so it can run beside the live stack. It needs the whole
+repository, not just `deploy/`. CI runs it on every change to the application or to this
 directory.
 
 ## Rules

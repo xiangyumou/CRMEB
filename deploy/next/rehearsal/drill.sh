@@ -15,7 +15,9 @@
 # temporary directory, publishing on a free loopback port, pushing to a
 # throwaway registry container it starts itself. It never reads, writes or
 # touches `deploy/next/deployment.env`, the `crmeb-next` project, or any host
-# but this one.
+# but this one. The overlay case puts the edge on a stand-in network with a
+# stand-in label, never on `server-internal-net` with Traefik's labels: on the
+# production host that would hand the live domain's routers a second backend.
 #
 # Why a local registry rather than `NEXT_ALLOW_LOCAL_IMAGES=1`: the digest path
 # is the part worth drilling. Pinning, pulling, and reading back the digest a
@@ -83,10 +85,13 @@ CASE_IDS=(
   static/healthcheck-per-service
   static/memory-budget
   static/no-secrets-in-repo
+  static/traefik-overlay-resolves
+  overlay/refuses-missing-file
   upgrade/refuses-moving-tag
   upgrade/requires-all-three-candidates
   upgrade/first-deploy
   upgrade/dry-run-changes-nothing
+  edge/proxies-every-page-route
   backup/verifies-restore
   backup/refuses-tampered-dump
   backup/refuses-truncated-dump
@@ -96,15 +101,19 @@ CASE_IDS=(
   upgrade/deploys-and-records-rollback-target
   rollback/refuses-unavailable-target
   rollback/last-upgrade-returns-previous
+  overlay/upgrade-and-rollback-keep-overlay
 )
 CASE_FNS=(
   case_healthcheck_per_service
   case_memory_budget
   case_no_secrets_in_repo
+  case_traefik_overlay_resolves
+  case_overlay_refuses_missing
   case_refuses_moving_tag
   case_requires_all_three
   case_first_deploy
   case_dry_run
+  case_edge_proxies_every_page
   case_backup_verifies_restore
   case_backup_refuses_tampered_dump
   case_backup_refuses_truncated_dump
@@ -114,6 +123,7 @@ CASE_FNS=(
   case_deploys_v2
   case_rollback_refuses_unavailable
   case_rollback_last_upgrade
+  case_overlay_kept
 )
 
 if [ "$list_only" -eq 1 ]; then
@@ -143,6 +153,8 @@ export NEXT_DEPLOYMENT_ENV="$workdir/deployment.env"
 # with it by name.
 export NEXT_CONTAINER_PREFIX='crmeb-next-drill'
 registry_container='crmeb-next-drill-registry'
+# The stand-in for Traefik's external network, created by the overlay case.
+overlay_network='crmeb-next-drill-front'
 
 # A free loopback port, found by asking rather than by hoping. Bash's /dev/tcp
 # needs no python, no ss and no netcat.
@@ -180,6 +192,7 @@ teardown() {
   docker compose -p 'crmeb-next-drill' --project-directory "$deploy_dir" \
     -f "$deploy_dir/compose.yml" --env-file "$NEXT_DEPLOYMENT_ENV" \
     --profile migrate down -v --remove-orphans >/dev/null 2>&1
+  docker network rm "$overlay_network" >/dev/null 2>&1
   docker rm -f "$registry_container" >/dev/null 2>&1
   rm -rf "$workdir" # the generated passwords live in here
   return "$code"
@@ -488,6 +501,78 @@ case_no_secrets_in_repo() {
     git -C "$repo_root" check-ignore -q deploy/next/deployment.env
 }
 
+# The real Traefik overlay, merged the way every script merges it: named by
+# its relative file name in the settings and resolved against the deploy
+# directory. `compose config` neither creates nor joins a network, so this
+# reads the result without the edge going anywhere near `server-internal-net`.
+# With the key empty, as in the drill's own settings, the edge must have
+# neither the network nor a Traefik label.
+case_traefik_overlay_resolves() {
+  have_python || {
+    note 'python3 is not installed'
+    return 77
+  }
+  local traefik_env="$workdir/traefik.env"
+  sed \
+    -e 's|^NEXT_COMPOSE_OVERLAYS=.*|NEXT_COMPOSE_OVERLAYS=compose.traefik.yml|' \
+    -e 's|^NEXT_HOST=.*|NEXT_HOST=drill.invalid|' \
+    -e 's|^NEXT_EDGE_TRUSTED_PROXIES=.*|NEXT_EDGE_TRUSTED_PROXIES=192.0.2.0/24|' \
+    "$NEXT_DEPLOYMENT_ENV" >"$traefik_env"
+  chmod 600 "$traefik_env"
+  if ! (
+    settings="$traefik_env"
+    require_settings
+    compose config --format json
+  ) >"$workdir/traefik.json" 2>"$workdir/traefik.err"; then
+    sed 's/^/      /' "$workdir/traefik.err"
+    return 1
+  fi
+  compose config --format json >"$workdir/plain.json" || return 1
+  python3 - "$workdir/traefik.json" "$workdir/plain.json" <<'PY'
+import json, sys
+overlaid = json.load(open(sys.argv[1]))['services']['edge']
+plain = json.load(open(sys.argv[2]))['services']['edge']
+failures = []
+if 'server-internal-net' not in (overlaid.get('networks') or {}):
+    failures.append('with the overlay the edge is not on server-internal-net')
+if 'default' not in (overlaid.get('networks') or {}):
+    failures.append('with the overlay the edge left the default network')
+labels = overlaid.get('labels') or {}
+if labels.get('traefik.enable') != 'true':
+    failures.append('with the overlay the edge has no traefik.enable=true')
+if labels.get('traefik.http.routers.crmeb-next-https.rule') != 'Host(`drill.invalid`)':
+    failures.append('with the overlay the https router is not Host(NEXT_HOST)')
+if 'server-internal-net' in (plain.get('networks') or {}):
+    failures.append('without the overlay the edge is on server-internal-net')
+if any(key.startswith('traefik.') for key in (plain.get('labels') or {})):
+    failures.append('without the overlay the edge carries a traefik label')
+for failure in failures:
+    print('    NOT ok:', failure)
+if not failures:
+    print('    ok: the overlay adds the network and the routers; without it the edge has neither')
+sys.exit(1 if failures else 0)
+PY
+}
+
+# An overlay the settings name but the directory lacks stops every script
+# before it touches anything, rather than surfacing later as "the edge is not
+# running".
+case_overlay_refuses_missing() {
+  local saved="$workdir/settings.before-missing-overlay"
+  cp -p "$NEXT_DEPLOYMENT_ENV" "$saved"
+  set_setting NEXT_COMPOSE_OVERLAYS 'compose.yml, compose.not-there.yml'
+  if run_expect 1 "$workdir/overlay-missing-readyz.log" "$deploy_dir/readyz.sh"; then
+    check 'readyz.sh names the missing file' \
+      grep -q 'compose.not-there.yml, which does not exist' "$workdir/overlay-missing-readyz.log"
+  fi
+  if run_expect 1 "$workdir/overlay-missing-upgrade.log" \
+    upgrade --dry-run --web "$web_v1" --worker "$worker_v1" --edge "$edge_v1"; then
+    check 'upgrade.sh names the missing file' \
+      grep -q 'compose.not-there.yml, which does not exist' "$workdir/overlay-missing-upgrade.log"
+  fi
+  cp -p "$saved" "$NEXT_DEPLOYMENT_ENV"
+}
+
 # --- upgrade cases ---------------------------------------------------------------
 
 case_refuses_moving_tag() {
@@ -538,6 +623,77 @@ case_dry_run() {
   check 'it says it changed nothing' grep -q 'no migration ran' "$workdir/dry-run.log"
   check 'the settings are untouched' [ "$before" = "$(cat "$NEXT_DEPLOYMENT_ENV")" ]
   check 'the stack is still on v1' on_release web "$web_v1"
+}
+
+# --- the edge -------------------------------------------------------------------------
+
+# `/admin/(shell)/orders/[id]/page.tsx`, relative to the app directory, is
+# `/admin/orders/drill-sample`. Fails for a file under a private folder, which
+# is not a route.
+route_url() {
+  local directory="${1%/*}" segment url=''
+  local -a segments
+  IFS='/' read -r -a segments <<<"${directory#/}"
+  for segment in "${segments[@]}"; do
+    case "$segment" in
+      '') ;;
+      _*) return 1 ;;
+      '('*')' | @*) ;;
+      '[[...'*']]') ;;
+      '['*']') url+='/drill-sample' ;;
+      *) url+="/$segment" ;;
+    esac
+  done
+  printf '%s\n' "${url:-/}"
+}
+
+# The edge serves the storefront's `index.html` for any path it does not
+# proxy, so a Next page left out of `nginx.conf` does not 404: it quietly shows
+# the storefront. Every page route, and one route handler per top-level path,
+# is requested through the real edge, and none may come back as that file.
+#
+# `/` is the storefront's on purpose: the Next page there only points at
+# `/admin`.
+case_edge_proxies_every_page() {
+  ensure_deployed || return 1
+  local app="$repo_root/next/apps/web/app" storefront file url prefix response status
+  local checked=0 handler_prefixes=' '
+  [ -d "$app" ] || {
+    note "no Next app at $app"
+    return 77
+  }
+  # Fetched exactly as the routes are below and split the same way, so the
+  # comparison cannot differ by a trailing newline that `$(…)` strips from one
+  # side only.
+  storefront="$(curl -fsS --max-time 10 -w '\n%{http_code}' "http://127.0.0.1:$edge_port/index.html")" || {
+    note "NOT ok: the edge did not serve the storefront's index.html"
+    return 1
+  }
+  storefront="${storefront%$'\n'*}"
+  while IFS= read -r file; do
+    url="$(route_url "${file#"$app"}")" || continue
+    [ "$url" != '/' ] || continue
+    case "${file##*/}" in
+      route.*)
+        prefix="${url#/}"
+        prefix="${prefix%%/*}"
+        case "$handler_prefixes" in *" $prefix "*) continue ;; esac
+        handler_prefixes+="$prefix "
+        ;;
+    esac
+    checked=$((checked + 1))
+    response="$(curl -sS --max-time 30 -w '\n%{http_code}' "http://127.0.0.1:$edge_port$url" 2>/dev/null || true)"
+    status="${response##*$'\n'}"
+    if [ -z "$status" ] || [ "$status" = '000' ]; then
+      note "NOT ok: $url did not answer (${file#"$repo_root/"})"
+      case_failures=$((case_failures + 1))
+    elif [ "${response%$'\n'*}" = "$storefront" ]; then
+      note "NOT ok: $url is answered by the storefront, not by web (${file#"$repo_root/"})"
+      case_failures=$((case_failures + 1))
+    fi
+  done < <(find "$app" -type f -regextype posix-extended \
+    -regex '.*/(page|route)\.(tsx|ts|jsx|js|mdx)' | sort)
+  check "$checked route(s) reach web through the edge" [ "$checked" -gt 0 ]
 }
 
 # --- backup cases -------------------------------------------------------------------
@@ -693,6 +849,76 @@ case_rollback_last_upgrade() {
   check 'worker is back on v1' on_release worker "$worker_v1"
   check 'edge is back on v1' on_release edge "$edge_v1"
   check 'the readiness gate passes on the rolled-back stack' "$deploy_dir/readyz.sh"
+}
+
+# --- the overlay -------------------------------------------------------------------------
+
+edge_on_network() {
+  local networks
+  networks="$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' \
+    "$(compose ps -q edge)" 2>/dev/null)" || return 1
+  case " $networks " in *" $1 "*) return 0 ;; esac
+  return 1
+}
+edge_off_network() { ! edge_on_network "$1"; }
+edge_labelled() {
+  [ "$(docker inspect -f '{{index .Config.Labels "crmeb-next-drill.overlay"}}' \
+    "$(compose ps -q edge)" 2>/dev/null)" = 'applied' ]
+}
+
+# Production runs `compose.traefik.yml` on top of `compose.yml`, and an upgrade
+# or a rollback that recreated the edge from `compose.yml` alone would take the
+# site off the router. With an overlay named in the settings, both have to
+# leave the edge on the overlay's network and with its labels. The overlay here
+# is a stand-in of the same shape, a second external network and a label, for
+# the reason given at the top of this file.
+case_overlay_kept() {
+  ensure_deployed || return 1
+  on_release web "$web_v1" || {
+    note 'the stack is not on v1 (run without --only, or together with the v1 cases)'
+    return 77
+  }
+  local overlay="$workdir/compose.drill-front.yml"
+  docker network inspect "$overlay_network" >/dev/null 2>&1 ||
+    docker network create "$overlay_network" >/dev/null || return 1
+  cat >"$overlay" <<YAML
+services:
+  edge:
+    networks:
+      - default
+      - drill-front
+    labels:
+      - crmeb-next-drill.overlay=applied
+networks:
+  drill-front:
+    name: $overlay_network
+    external: true
+YAML
+  set_setting NEXT_COMPOSE_OVERLAYS "$overlay"
+
+  run_expect 0 "$workdir/overlay-upgrade.log" \
+    upgrade --app-version drill-overlay \
+    --web "$web_v2" --worker "$worker_v2" --edge "$edge_v2" || return 1
+  check 'the upgrade put the edge on v2' on_release edge "$edge_v2"
+  check 'after the upgrade the edge is on the overlay network' edge_on_network "$overlay_network"
+  check 'after the upgrade the edge is still on the default network' \
+    edge_on_network "${NEXT_PROJECT}_default"
+  check 'after the upgrade the edge carries the overlay label' edge_labelled
+
+  run_expect 0 "$workdir/overlay-rollback.log" rollback --last-upgrade || return 1
+  check 'the rollback put the edge back on v1' on_release edge "$edge_v1"
+  check 'after the rollback the edge is on the overlay network' edge_on_network "$overlay_network"
+  check 'after the rollback the edge carries the overlay label' edge_labelled
+  check 'readyz.sh passes with the overlay' "$deploy_dir/readyz.sh"
+
+  # The other way round: with the key emptied, an `up` takes the edge off the
+  # overlay. That is how the site leaves the router, and it shows the checks
+  # above can fail.
+  set_setting NEXT_COMPOSE_OVERLAYS ''
+  compose up -d --wait --wait-timeout 180 >/dev/null 2>&1 || true
+  check 'with the key emptied, an up takes the edge off the overlay network' \
+    edge_off_network "$overlay_network"
+  check 'and the stack still serves' "$deploy_dir/readyz.sh"
 }
 
 # --- run ---------------------------------------------------------------------------------

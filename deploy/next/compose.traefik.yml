@@ -1,9 +1,13 @@
-# The overlay that puts the edge behind Traefik. **Never** applied by
-# `upgrade.sh`, `rollback.sh` or a routine `up`; applying it is a deliberate
-# step, and so is taking it away (README.md, "The Traefik overlay").
+# The overlay that puts the edge behind Traefik. It is applied by naming it in
+# `deployment.env`:
 #
-#   docker compose -p crmeb-next --env-file deployment.env \
-#     -f compose.yml -f compose.traefik.yml up -d --wait
+#   NEXT_COMPOSE_OVERLAYS=compose.traefik.yml
+#
+# from then on every script (`upgrade.sh`, `rollback.sh`, `backup.sh`,
+# `readyz.sh`) calls Compose with `-f compose.yml -f compose.traefik.yml`, so
+# a release recreates the edge with its route rather than without it. Taking
+# the site off the router is the reverse: remove the name and run an `up`
+# (README.md, "The Traefik overlay").
 #
 # Why a second file rather than `traefik.enable=${NEXT_TRAEFIK:-false}` on the
 # service:

@@ -1,13 +1,16 @@
 # shellcheck shell=bash
-# Shared by backup.sh, upgrade.sh and rollback.sh. Not executable on its own.
+# Shared by backup.sh, upgrade.sh, rollback.sh and readyz.sh. Not executable
+# on its own.
 #
 # No `set` here: the caller sets `-Eeuo pipefail` and owns its own traps.
 #
 # Rules this file exists to keep in one place:
 #   - no secret ever reaches argv; passwords are read inside the container
 #     from the container's own environment;
-#   - `docker compose` is always called with the same project, file and env
-#     file, so a rehearsal against a disposable copy is one variable away;
+#   - `docker compose` is always called with the same project, files and env
+#     file, so a rehearsal against a disposable copy is one variable away, and
+#     no script can recreate a container without the overlays the deployment
+#     runs with;
 #   - an image reference recorded for rollback is immutable — a digest, or for
 #     a locally built image the content id alongside the reference.
 
@@ -47,11 +50,51 @@ require_settings() {
   if grep -q 'CHANGE-ME' "$settings"; then
     die "$settings still contains CHANGE-ME placeholders; configure it first"
   fi
+  # A listed overlay that is not there must stop the script here. Compose would
+  # refuse it too, but only at the first call, and some calls are allowed to
+  # fail (`compose ps` reads as "not running"), which would turn a typo into
+  # "the stack is down".
+  local overlay
+  while IFS= read -r overlay; do
+    [ -f "$overlay" ] || die "NEXT_COMPOSE_OVERLAYS names $overlay, which does not exist"
+  done < <(compose_overlays)
+}
+
+# The overlay files the deployment runs with, one resolved path per line, in
+# the order `NEXT_COMPOSE_OVERLAYS` lists them. The key holds file names
+# separated by spaces or commas; a relative name is resolved against the
+# deploy directory, not the caller's working directory. Unset or empty means
+# `compose.yml` alone.
+#
+# The overlays are a setting of the deployment rather than a flag of each
+# script because an overlay that only some invocations name is an overlay the
+# next `up` silently removes: Compose recreates a container from whichever files
+# it is given, and the one that recreated the edge without
+# `compose.traefik.yml` has taken it off the router.
+compose_overlays() {
+  local raw overlay
+  local -a overlays
+  raw="$(setting NEXT_COMPOSE_OVERLAYS 2>/dev/null || true)"
+  raw="${raw#[\"\']}"
+  raw="${raw%[\"\']}"
+  IFS=$', \t' read -r -a overlays <<<"$raw"
+  for overlay in "${overlays[@]}"; do
+    case "$overlay" in
+      /*) ;;
+      *) overlay="$deploy_root/${overlay#./}" ;;
+    esac
+    printf '%s\n' "$overlay"
+  done
 }
 
 compose() {
+  local overlay
+  local -a files=(-f "$compose_file")
+  while IFS= read -r overlay; do
+    files+=(-f "$overlay")
+  done < <(compose_overlays)
   docker compose -p "$project" --project-directory "$deploy_root" \
-    -f "$compose_file" --env-file "$settings" "$@"
+    "${files[@]}" --env-file "$settings" "$@"
 }
 
 # Reads one key out of the settings file. Never echo the result of a credential
