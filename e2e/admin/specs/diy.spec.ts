@@ -203,3 +203,91 @@ test('the pickers offer the shop’s own article and coupon, and the page stores
     list: [expect.objectContaining({ id: couponId, name: couponName })],
   });
 });
+
+test('a saved 商品列表 shows its picks after a reload, and adding one keeps them', async ({
+  adminPage,
+  adminApi,
+  shop,
+}) => {
+  // The server keeps a 商品列表's picks as `goodsList.ids` and drops the rows,
+  // so the editor opens a saved page without them. What it shows then, and
+  // what the next save writes, is the whole point of this test.
+  const stamp = Date.now();
+  const product = async (name: string): Promise<string> => {
+    const created = await adminApi.post('/admin-api/catalog/products', {
+      data: {
+        name,
+        kind: 'physical',
+        status: 'on_shelf',
+        imageUrl: 'https://cdn.example.com/p/1.png',
+        sliderImages: [],
+        specMode: false,
+        specs: [],
+        skus: [{ specValues: {}, price: '59.00', stock: 12, isDefault: true }],
+        freightMode: 'free',
+        purchaseLimitMode: 'none',
+        descriptionHtml: '',
+        categoryIds: [String(shop.fixtures.categoryId)],
+      },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    return ((await created.json()) as { id: string }).id;
+  };
+  const firstName = `E2E 装修商品甲 ${stamp}`;
+  const secondName = `E2E 装修商品乙 ${stamp}`;
+  const first = await product(firstName);
+  const second = await product(secondName);
+
+  const page = await adminApi.post('/admin-api/diy/pages', {
+    data: { name: `E2E 商品列表 ${stamp}`, kind: 'micro' },
+  });
+  expect(page.status(), await page.text()).toBe(201);
+  const pageId = ((await page.json()) as { id: string }).id;
+
+  const storedGoods = async (): Promise<Record<string, unknown>> => {
+    const read = await adminApi.get(`/admin-api/diy/pages/${pageId}`);
+    expect(read.status()).toBe(200);
+    const content = ((await read.json()) as { content: Record<string, Record<string, unknown>> })
+      .content;
+    const node = Object.values(content).find((entry) => entry.name === 'goodList');
+    expect(node, JSON.stringify(content)).toBeDefined();
+    return node!.goodsList as Record<string, unknown>;
+  };
+  const pick = async (name: string): Promise<void> => {
+    await adminPage.getByRole('button', { name: cjk('添加') }).click();
+    const modal = adminPage.getByRole('dialog', { name: '选择商品' });
+    await modal.getByPlaceholder('搜索商品名称').fill(name);
+    await modal.getByPlaceholder('搜索商品名称').press('Enter');
+    const row = modal.getByRole('listitem').filter({ hasText: name });
+    await row.getByRole('button', { name: cjk('选择') }).click();
+    await expect(row.getByRole('button', { name: cjk('已选') })).toBeDisabled();
+    await adminPage.keyboard.press('Escape');
+    await expect(modal).toBeHidden();
+  };
+  const picked = adminPage.getByTestId('diy-picked');
+
+  // Drop a 商品列表 (指定商品 is its default) and pick one product.
+  await adminPage.goto(`/admin/diy/${pageId}`);
+  await adminPage.getByRole('button', { name: /商品列表$/ }).click();
+  await pick(firstName);
+  await expect(picked).toHaveText([firstName]);
+  await adminPage.getByRole('button', { name: cjk('保存') }).click();
+  await expect(adminPage.getByText('未保存')).toHaveCount(0);
+
+  const saved = await storedGoods();
+  expect(saved.ids).toEqual([first]);
+  expect(saved).not.toHaveProperty('list');
+
+  // Opened again: the pick is back, resolved from its id alone. The only
+  // component on the page, so its panel is the one open.
+  await adminPage.reload();
+  await expect(picked).toHaveText([firstName]);
+
+  await pick(secondName);
+  await expect(picked).toHaveText([firstName, secondName]);
+  await adminPage.getByRole('button', { name: cjk('保存') }).click();
+  await expect(adminPage.getByText('未保存')).toHaveCount(0);
+
+  const resaved = await storedGoods();
+  expect(resaved.ids).toEqual([first, second]);
+});
