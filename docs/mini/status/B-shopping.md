@@ -6,8 +6,9 @@ Updated at every commit so the work can resume after an interruption.
 ## Done
 
 - Copy: 秒杀 removed from the UI gallery demo and the `ProductCard` doc comment (限时活动 / 拼团).
-- `features/decor`: `DecorPage` (shared by 首页 and 微页面), `openLinkTarget`, `SplashOverlay`, `DecorSkeleton`. `ui/nav-bar.tsx` (custom bar) and
-  `platform/chrome.ts` (`navBarMetrics`, `openMiniProgram`). `data/visits.ts` (`useRecordVisit`).
+- `features/decor`: `DecorPage` (shared by 首页 and 微页面), `SplashOverlay`, `DecorSkeleton`.
+  `ui/nav-bar.tsx` (custom bar) and `platform/chrome.ts` (`navBarMetrics`). `data/visits.ts`
+  (`useRecordVisit`). Links go through A2's `openLinkTarget` (`@/platform`).
 - 首页 (custom bar + search entry, 404 `DECOR_HOME_NOT_SET` empty state, pull-to-refresh, share,
   refetch on sign-in change) and 微页面 (`packages/page`), with tests.
 - Merged `storefront/mini` (H2 + G1). `DecorPage` passes `personal` and answers the block
@@ -54,17 +55,29 @@ Updated at every commit so the work can resume after an interruption.
   `features/checkout/checkout-view.ts`, `coupon-sheet.tsx`, `address-sheet.tsx`;
   `test/checkout-fixture.ts`. The old `packages/order/s4.scss` is gone.
 
+- Merged `storefront/mini` (C). 支付结果 invalidates `order.detail` / `order.list` /
+  `order.counts` once paid; C's `payAtMiniCashier` uses B's `CashierPage` / `PayResultPage`.
+- Merged `storefront/mini` (A2). Block `onLink` and the splash overlay use `openLinkTarget` from
+  `@/platform`, deadlines `serverNow()`; B's own `open-link.ts` and `openMiniProgram` are gone.
+- Fixes from the H5 screenshots: 首页 shows one search entry (the nav bar drops its own when the
+  page has a 搜索框 block); action-bar buttons share the width; the cart bar sits above the tab
+  bar (`bottom: taro-tabbar-height`, Taro's H5 constparse word); 已选 shows `白 / L`.
+- e2e (`e2e/storefront`): seed a decor v2 home (`DECOR_HOME`); page objects
+  `src/mini-pages/shopping-pages.ts` and `shopping-shopper.ts` (`returningShopper`,
+  `cartQuantities`, `arrangeCartLine`); specs `specs-mini/shop-journey.spec.ts`,
+  `shopping.spec.ts` (搜索, 规格, 优惠券, 购物车 +, guest login gate) and
+  `new-shopper-buys.spec.ts` (sign-up, 导入微信地址, pay).
+- `docs/mini/pages.md`: 落地调整（B） per page and the §5 gaps; 375px H5 screenshots in
+  `docs/mini/status/B-screens/`.
+
 ## In progress
 
-- e2e page objects and specs in `e2e/storefront/specs-mini`.
+- Final checks (turbo gen/typecheck/lint/test:unit/build, e2e mini, prettier, guards) and the
+  report.
 
 ## Next
 
-1. Merge `storefront/mini` again once A2 lands (subscribe scenes, server clock, theme).
-2. e2e page objects and specs in `e2e/storefront/specs-mini` (seed a decor v2
-   home).
-3. `docs/mini/pages.md` for page-form changes; guard allow-lists; sizes; 375px screenshots in
-   `docs/mini/status/B-screens/`.
+- Nothing planned beyond the report.
 
 ## Backend gaps found (not changed; for a later backend task)
 
