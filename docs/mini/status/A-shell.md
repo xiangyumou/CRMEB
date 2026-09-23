@@ -69,13 +69,18 @@ and `apps/mini/config`.
 - **S4 pages.** Product, checkout, cashier and pay-result are on PageShell and the kit and
   navigate by route.
 
+- **Gallery.** `subpackages/demo/pages/ui` (dev and H5 builds only) puts every kit component
+  on made-up shop data (`fixtures.ts`: SVG art, no network), in four tabs: 商品, 交易, 表单,
+  反馈. Screenshots, 375 px at DPR 2 from the H5 build with the API unreachable, are in
+  [`A-gallery/`](A-gallery/).
+
 ## In progress
 
-- The gallery page (`subpackages/demo/pages/ui`) and its screenshots.
+- Budgets, e2e `test:mini`, final checks.
 
 ## Next
 
-- Budgets, e2e `test:mini`, final checks.
+- Hand-over report.
 
 ## Needs a device check
 
