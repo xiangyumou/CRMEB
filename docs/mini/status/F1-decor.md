@@ -26,11 +26,14 @@ interruption.
   `decor` added to the guards' install list.
 - Route files: `apps/web/app/admin-api/decor/**`, `apps/web/app/api/v1/pages/**` (`_page.ts` reads
   `X-Client-Version`, computes the ETag). `pnpm guards` green.
+- Core int tests: `packages/core/src/decor/decor.int.test.ts` (37) and
+  `decor.concurrency.int.test.ts` (6: saves, publishes, publish-vs-save, rollbacks, designations,
+  delete-vs-designate). All green.
 
 ## In progress
 
-- Tests: core int (`decor.int.test.ts`, `decor.concurrency.int.test.ts`), web int
-  (`apps/web/app/admin-api/decor/decor.int.test.ts`, `apps/web/app/api/v1/pages/pages.int.test.ts`).
+- Web int tests (`apps/web/app/admin-api/decor/decor.int.test.ts`,
+  `apps/web/app/api/v1/pages/pages.int.test.ts`).
 
 ## Next
 
