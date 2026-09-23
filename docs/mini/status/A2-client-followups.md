@@ -33,7 +33,15 @@ link, and `apps/web` unit-test timeouts under load.
    `navigateToMiniProgram` (a cancel is silent, a failure toasts), `null` → nothing.
    `@shop/contracts/decor/link-route` (types-only imports) joins `CONTRACTS_RUNTIME`. The splash
    overlay and every DIY block's `onLink` should call it.
+6. `apps/web` unit timeouts under load: the `unit` project's `testTimeout` 20 s → 120 s, plus
+   `hookTimeout` 120 s (vitest.config.ts). Least invasive: the timeout is a hang detector,
+   and the load comes from outside the suite (turbo's sibling tasks, other executors), so a
+   worker cap would not help — web already runs 4 workers on 32 CPUs, and fewer would only
+   slow an idle run. Idle, the slowest test is 2.4 s (product editor) and the project takes
+   ~43 s. Reproduced by pinning the three named suites (diy panels, product editor, groupbuy
+   activities) to one core beside 24 busy loops: at 20 s, 5 then 4 of 313 tests timed out;
+   at 120 s, 313/313 pass (~6 min wall).
 
 ## In progress
 
-- Item 6.
+- Final checklist.
