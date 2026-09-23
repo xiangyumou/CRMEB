@@ -1,28 +1,44 @@
 import { diyLinkCategoryList, diyLinkList } from '@shop/contracts/diy/diy.contract';
 
 import { callRoute } from '../api';
-import type { LinkPageGroup, LinkSource, LinkTargetResult, LinkTargetType } from '../kit';
+import { articleLinkTargets } from '../cms/link-targets';
+import type {
+  LinkPageGroup,
+  LinkSource,
+  LinkTargetQuery,
+  LinkTargetResult,
+  LinkTargetType,
+} from '../kit';
+import { catalogLinkTargets } from './catalog-source';
 
 /**
- * The real `LinkSource` for `<LinkPicker>` — the 商城页面 half of it.
+ * The real `LinkSource` for `<LinkPicker>`.
  *
  * The link registry (`diy_links` / `diy_link_categories`) is the DIY domain's,
- * so `listPages` is answered here. `listTargets` — products, categories,
- * articles — is not: those belong to the catalog and the CMS, and this
- * implementation composes over whatever `targets` provides rather than
- * duplicating their endpoints. A type `targets` does not answer falls through
- * to the kit's stub.
+ * so `listPages` is answered here. The searchable tabs — products, categories,
+ * articles — belong to the catalog and the CMS, and `diyLinkTargets` hands each
+ * to its owner rather than duplicating their endpoints.
  */
-export interface DiyLinkSourceOptions {
-  targets?:
-    | ((
-        type: Exclude<LinkTargetType, 'page' | 'custom'>,
-        query: { keyword?: string | undefined; page: number; pageSize: number },
-      ) => Promise<LinkTargetResult>)
-    | undefined;
+
+/**
+ * Every searchable tab `<LinkPicker>` offers, each answered by its owner. The
+ * switch is exhaustive, so a tab added to `LinkTargetType` fails to compile
+ * here instead of silently listing nothing.
+ */
+export async function diyLinkTargets(
+  type: Exclude<LinkTargetType, 'page' | 'custom'>,
+  query: LinkTargetQuery,
+): Promise<LinkTargetResult> {
+  switch (type) {
+    case 'product':
+    case 'category':
+      return catalogLinkTargets(type, query);
+    case 'article':
+      return articleLinkTargets(query);
+  }
 }
 
-export function createDiyLinkSource(options: DiyLinkSourceOptions = {}): LinkSource {
+export function createDiyLinkSource(): LinkSource {
   return {
     async listPages(): Promise<LinkPageGroup[]> {
       const [categories, links] = await Promise.all([
@@ -46,9 +62,6 @@ export function createDiyLinkSource(options: DiyLinkSourceOptions = {}): LinkSou
       );
     },
 
-    async listTargets(type, query) {
-      if (options.targets) return options.targets(type, query);
-      return { items: [], total: 0 };
-    },
+    listTargets: diyLinkTargets,
   };
 }

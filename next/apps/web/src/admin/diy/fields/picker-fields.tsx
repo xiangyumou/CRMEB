@@ -18,11 +18,10 @@ import { DiyFieldRow } from './section';
  * Record pickers: 商品 / 文章 / 优惠券 / 拼团 / 商品标签 and the two category trees.
  *
  * They read through `DiyDataSource`, never through a route. The editor installs
- * `createCatalogDiyDataSource`, which answers 商品, 商品分类 and 商品标签 from the
- * catalog contracts and leaves 文章 / 优惠券 / 拼团 on the stub — so every
- * picker renders either way and no panel changes when a real source is wired
- * in. What the page stores is the id list; resolving ids
- * back to names is the picker's job on open, not the payload's.
+ * `createDiyDataSource`, which answers every kind from the owning domain's
+ * admin contracts; tests install an in-memory source instead, and no panel can
+ * tell the difference. What the page stores is the id list; resolving ids back
+ * to names is the picker's job on open, not the payload's.
  */
 
 const KIND_LABEL: Record<DiyPickerKind, string> = {

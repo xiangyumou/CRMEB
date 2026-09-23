@@ -29,13 +29,13 @@ import { ApiError, presentApiError, useRouteMutation, useRouteQuery } from '../a
 import { LinkSourceProvider, PageContainer } from '../kit';
 import { Can, useCan } from '../session';
 import { DiyCanvas } from './canvas';
-import { catalogLinkTargets, createCatalogDiyDataSource } from './catalog-source';
 import { DiyDataSourceProvider } from './data-source';
 import { DiyEditorProvider } from './editor-context';
 import { DiyInspector } from './inspector';
 import { createDiyLinkSource } from './link-source';
 import { DiyPalette } from './palette';
 import { DEFAULT_DIY_THEME, type DiyTheme } from './panel-api';
+import { createDiyDataSource } from './record-source';
 import {
   canRedo,
   canUndo,
@@ -112,10 +112,11 @@ function DiyEditorInner({
   const [conflict, setConflict] = useState(false);
   const can = useCan();
   const canEdit = can('diy:page:update');
-  // The catalog is merged, so the pickers read real products, categories and
-  // 商品标签 rather than the stub; 文章 / 优惠券 / 拼团 still fall through to it.
-  const linkSource = useMemo(() => createDiyLinkSource({ targets: catalogLinkTargets }), []);
-  const dataSource = useMemo(() => createCatalogDiyDataSource(), []);
+  // Both pickers read the shop's own records through the admin contracts:
+  // whatever the operator picks is saved into the page and rendered by the
+  // storefront, so there is no in-memory fallback to pick from.
+  const linkSource = useMemo(() => createDiyLinkSource(), []);
+  const dataSource = useMemo(() => createDiyDataSource(), []);
 
   const saveSettings = useRouteMutation(diyPageUpdate, { presentError: false });
   const saveContent = useRouteMutation(diyPageSaveContent, {
