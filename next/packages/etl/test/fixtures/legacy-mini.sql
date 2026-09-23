@@ -28,7 +28,13 @@
 --  * a config key on the explicit dropped list, which must be reported as
 --    dropped and not as unmapped;
 --  * attachment rows whose files the test writes to a temporary uploads tree,
---    so the sha256 that `run` computes can be compared against known bytes.
+--    so the sha256 that `run` computes can be compared against known bytes;
+--  * for every group after R7 (shipping, cms, wechat-oa, notification,
+--    groupbuy, presale): a few ordinary rows, and at least one row the mapper
+--    must drop and count — a city the dictionary lacks, an orphaned article
+--    body, a QR code with no ticket, a message to a user who does not exist,
+--    a one-person team, a presale for a product that does not exist. The
+--    integration test asserts the per-group counts over `run --require-complete`.
 
 --
 -- 会员相关的表（E1 的 user mapper）。注意 `eb_user_label_cate` 在官方安装脚本里
@@ -697,6 +703,476 @@ CREATE TABLE IF NOT EXISTS `eb_page_link` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=53 DEFAULT CHARSET=utf8mb4 COMMENT='页面链接';
 
+
+-- ---------------------------------------------------------------------------
+-- R7：运费模板、文章、公众号、通知、拼团与预售——同样是官方安装脚本里的原样
+-- 结构。eb_store_order 只为了数"预售订单有几张"：订单不迁移（PLAN §6），
+-- 预售订单和拼团的团（eb_store_pink）都只计数、不搬运。
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `eb_shipping_templates` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `name` varchar(255) NOT NULL DEFAULT '' COMMENT '模板名称',
+  `type` tinyint(1) NOT NULL DEFAULT '1' COMMENT '计费方式',
+  `appoint` tinyint(1) NOT NULL DEFAULT '0' COMMENT '指定包邮',
+  `no_delivery` tinyint(1) NOT NULL DEFAULT '0' COMMENT '指定不送达',
+  `sort` int(11) NOT NULL DEFAULT '0' COMMENT '排序',
+  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '添加时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='运费模板表';
+
+CREATE TABLE IF NOT EXISTS `eb_shipping_templates_region` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `province_id` int(11) NOT NULL DEFAULT '0' COMMENT '省ID',
+  `temp_id` int(11) NOT NULL DEFAULT '0' COMMENT '模板ID',
+  `city_id` int(11) NOT NULL DEFAULT '0' COMMENT '城市ID',
+  `first` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '首件',
+  `first_price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '首件运费',
+  `continue` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '续件',
+  `continue_price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '续件运费',
+  `type` tinyint(1) NOT NULL DEFAULT '1' COMMENT '计费方式',
+  `uniqid` varchar(32) NOT NULL DEFAULT '' COMMENT '分组唯一值',
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='运费模板指定城市运费表';
+
+CREATE TABLE IF NOT EXISTS `eb_shipping_templates_free` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `province_id` int(11) NOT NULL DEFAULT '0' COMMENT '省ID',
+  `temp_id` int(11) NOT NULL DEFAULT '0' COMMENT '模板ID',
+  `city_id` int(11) NOT NULL DEFAULT '0' COMMENT '城市ID',
+  `number` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '包邮件数',
+  `price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '包邮金额',
+  `type` tinyint(1) NOT NULL DEFAULT '1' COMMENT '计费方式',
+  `uniqid` varchar(32) NOT NULL DEFAULT '' COMMENT '分组唯一值',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='运费模板指定包邮关联表';
+
+CREATE TABLE IF NOT EXISTS `eb_shipping_templates_no_delivery` (
+  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `province_id` int(10) NOT NULL DEFAULT '0' COMMENT '省ID',
+  `temp_id` int(10) NOT NULL DEFAULT '0' COMMENT '模板ID',
+  `city_id` int(10) NOT NULL DEFAULT '0' COMMENT '城市ID',
+  `uniqid` varchar(32) NOT NULL DEFAULT '' COMMENT '分组唯一值',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='运费模板指定不送达表';
+
+CREATE TABLE IF NOT EXISTS `eb_express` (
+  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '快递公司id',
+  `code` varchar(50) NOT NULL DEFAULT '' COMMENT '快递公司简称',
+  `name` varchar(50) NOT NULL DEFAULT '' COMMENT '快递公司全称',
+  `partner_id` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否需要月结账号',
+  `partner_key` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否需要月结密码',
+  `net` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否需要取件网店',
+  `check_man` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否填写电子面单承载快递员名',
+  `partner_name` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否填写电子面单客户账户名称',
+  `is_code` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否填写电子面单承载编号',
+  `courier_name` varchar(100) NOT NULL DEFAULT '' COMMENT '承载快递员名',
+  `customer_name` varchar(100) NOT NULL DEFAULT '' COMMENT '客户账户名称',
+  `code_name` varchar(100) NOT NULL DEFAULT '' COMMENT '电子面单承载编号',
+  `account` varchar(100) NOT NULL DEFAULT '' COMMENT '账号',
+  `key` varchar(100) NOT NULL DEFAULT '' COMMENT '密码',
+  `net_name` varchar(100) NOT NULL DEFAULT '' COMMENT '网点名称',
+  `sort` int(11) NOT NULL DEFAULT '0' COMMENT '排序',
+  `is_show` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否显示',
+  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否可用',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `code` (`code`) USING BTREE,
+  KEY `is_show` (`is_show`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='快递公司表';
+
+CREATE TABLE IF NOT EXISTS `eb_article_category` (
+  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '文章分类id',
+  `pid` int(11) NOT NULL DEFAULT '0' COMMENT '父级ID',
+  `title` varchar(255) NOT NULL DEFAULT '' COMMENT '文章分类标题',
+  `intr` varchar(255) NOT NULL DEFAULT '' COMMENT '文章分类简介',
+  `image` varchar(255) NOT NULL DEFAULT '' COMMENT '文章分类图片',
+  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '状态',
+  `sort` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '排序',
+  `is_del` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '1删除0未删除',
+  `add_time` varchar(255) NOT NULL DEFAULT '' COMMENT '添加时间',
+  `hidden` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否隐藏',
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文章分类表';
+
+CREATE TABLE IF NOT EXISTS `eb_article` (
+  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '文章管理ID',
+  `cid` varchar(255) NOT NULL DEFAULT '0' COMMENT '分类id',
+  `title` varchar(255) NOT NULL DEFAULT '' COMMENT '文章标题',
+  `author` varchar(255) NOT NULL DEFAULT '' COMMENT '文章作者',
+  `image_input` varchar(255) NOT NULL DEFAULT '' COMMENT '文章图片',
+  `synopsis` varchar(255) NOT NULL DEFAULT '' COMMENT '文章简介',
+  `share_title` varchar(255) NOT NULL DEFAULT '' COMMENT '文章分享标题',
+  `share_synopsis` varchar(255) NOT NULL DEFAULT '' COMMENT '文章分享简介',
+  `visit` varchar(255) NOT NULL DEFAULT '0' COMMENT '浏览次数',
+  `sort` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '排序',
+  `url` varchar(255) NOT NULL DEFAULT '' COMMENT '原文链接',
+  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '状态',
+  `add_time` varchar(255) NOT NULL DEFAULT '' COMMENT '添加时间',
+  `hide` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否隐藏',
+  `admin_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '管理员id',
+  `mer_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '商户id',
+  `product_id` int(10) NOT NULL DEFAULT '0' COMMENT '商品关联id',
+  `is_hot` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否热门(小程序)',
+  `is_banner` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否轮播图(小程序)',
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文章管理表';
+
+CREATE TABLE IF NOT EXISTS `eb_article_content` (
+  `nid` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '文章id',
+  `content` longtext COMMENT '文章内容',
+  UNIQUE KEY `nid` (`nid`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文章内容表';
+
+CREATE TABLE IF NOT EXISTS `eb_cache` (
+  `key` varchar(32) NOT NULL DEFAULT '' COMMENT '缓存key',
+  `result` text COMMENT '缓存数据',
+  `expire_time` int(11) NOT NULL DEFAULT '0' COMMENT '失效时间0=永久',
+  `add_time` int(10) NOT NULL DEFAULT '0' COMMENT '缓存时间',
+  PRIMARY KEY (`key`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='微信缓存表';
+
+CREATE TABLE IF NOT EXISTS `eb_wechat_reply` (
+  `id` mediumint(8) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '微信关键字回复id',
+  `type` varchar(32) NOT NULL DEFAULT '' COMMENT '回复类型',
+  `data` text COMMENT '回复数据',
+  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '0=不可用  1 =可用',
+  `hide` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否隐藏',
+  PRIMARY KEY (`id`) USING BTREE,
+  KEY `type` (`type`) USING BTREE,
+  KEY `status` (`status`) USING BTREE,
+  KEY `hide` (`hide`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='微信关键字回复表';
+
+CREATE TABLE IF NOT EXISTS `eb_wechat_key` (
+  `id` mediumint(8) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `reply_id` mediumint(8) NOT NULL DEFAULT '0' COMMENT '回复内容id',
+  `keys` varchar(64) NOT NULL DEFAULT '' COMMENT '关键词',
+  `key_type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '回复类型，0公众号自动回复，1客服自动回复',
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COMMENT='微信回复关键词辅助表' ROW_FORMAT=DYNAMIC;
+
+CREATE TABLE IF NOT EXISTS `eb_wechat_qrcode_cate` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '主键id',
+  `cate_name` varchar(255) NOT NULL DEFAULT '' COMMENT '渠道码分类名称',
+  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '添加时间',
+  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='二维码类型表';
+
+CREATE TABLE IF NOT EXISTS `eb_wechat_qrcode` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `uid` int(11) NOT NULL DEFAULT '0' COMMENT '用户id',
+  `name` varchar(255) NOT NULL DEFAULT '' COMMENT '二维码名称',
+  `image` varchar(500) NOT NULL DEFAULT '' COMMENT '二维码图片',
+  `cate_id` int(11) NOT NULL DEFAULT '0' COMMENT '分类id',
+  `label_id` varchar(32) NOT NULL DEFAULT '' COMMENT '标签id',
+  `type` varchar(32) NOT NULL DEFAULT '' COMMENT '回复类型',
+  `content` text COMMENT '回复内容',
+  `data` text COMMENT '发送数据',
+  `follow` int(11) NOT NULL DEFAULT '0' COMMENT '关注人数',
+  `scan` int(11) NOT NULL DEFAULT '0' COMMENT '扫码人数',
+  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '添加时间',
+  `continue_time` int(11) NOT NULL DEFAULT '0' COMMENT '有效期',
+  `end_time` int(11) NOT NULL DEFAULT '0' COMMENT '到期时间',
+  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '状态',
+  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='二维码表';
+
+-- 安装脚本里这张表带 ROW_FORMAT=COMPACT；在 MySQL 8 上，COMPACT 下 utf8mb4 的
+-- varchar(255) 索引超过 767 字节会建表失败，所以这里去掉了它（只影响存储格式）。
+CREATE TABLE IF NOT EXISTS `eb_qrcode` (
+  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '微信二维码ID',
+  `third_type` varchar(32) NOT NULL DEFAULT '' COMMENT '二维码类型',
+  `third_id` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户id',
+  `ticket` varchar(255) NOT NULL DEFAULT '' COMMENT '二维码参数',
+  `expire_seconds` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '二维码有效时间',
+  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '状态',
+  `add_time` varchar(255) NOT NULL DEFAULT '0' COMMENT '添加时间',
+  `url` varchar(255) NOT NULL DEFAULT '' COMMENT '微信访问url',
+  `qrcode_url` varchar(255) NOT NULL DEFAULT '' COMMENT '微信二维码url',
+  `scan` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '被扫的次数',
+  `type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '二维码所属平台1=小程序，2=公众号，3=H5',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `third_type` (`third_type`,`third_id`) USING BTREE,
+  KEY `ticket` (`ticket`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='微信二维码管理表';
+
+CREATE TABLE IF NOT EXISTS `eb_wechat_qrcode_record` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `qid` int(11) NOT NULL DEFAULT '0' COMMENT '渠道码id',
+  `uid` int(11) NOT NULL DEFAULT '0' COMMENT '用户id',
+  `is_follow` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否关注',
+  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '扫码时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='渠道码扫码记录表';
+
+CREATE TABLE IF NOT EXISTS `eb_wechat_media` (
+  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '微信视频音频id',
+  `type` varchar(16) NOT NULL DEFAULT '' COMMENT '回复类型',
+  `path` varchar(128) NOT NULL DEFAULT '' COMMENT '文件路径',
+  `media_id` varchar(64) NOT NULL DEFAULT '' COMMENT '微信服务器返回的id',
+  `url` varchar(256) NOT NULL DEFAULT '' COMMENT '地址',
+  `temporary` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否永久或者临时 0永久1临时',
+  `add_time` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '添加时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `type` (`type`,`media_id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='微信回复表';
+
+CREATE TABLE IF NOT EXISTS `eb_system_notification` (
+  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `mark` varchar(50) NOT NULL DEFAULT '' COMMENT '标识',
+  `name` varchar(50) NOT NULL DEFAULT '' COMMENT '通知类型',
+  `title` varchar(100) NOT NULL DEFAULT '' COMMENT '通知场景说明',
+  `is_system` tinyint(1) NOT NULL DEFAULT '0' COMMENT '站内信（0：不存在，1：开启，2：关闭）',
+  `system_title` varchar(256) NOT NULL DEFAULT '' COMMENT '站内信标题',
+  `system_text` varchar(512) NOT NULL DEFAULT '' COMMENT '系统消息id',
+  `is_wechat` tinyint(1) NOT NULL DEFAULT '0' COMMENT '公众号模板消息（0：不存在，1：开启，2：关闭）',
+  `wechat_tempkey` varchar(255) NOT NULL DEFAULT '' COMMENT '模版消息tempkey',
+  `wechat_content` varchar(255) NOT NULL DEFAULT '' COMMENT '模版消息内容',
+  `wechat_kid` varchar(255) NOT NULL DEFAULT '' COMMENT '模版消息kid',
+  `wechat_tempid` varchar(255) NOT NULL DEFAULT '' COMMENT '模版消息tempid',
+  `wechat_data` varchar(255) NOT NULL DEFAULT '' COMMENT '模版消息参数',
+  `wechat_link` varchar(255) NOT NULL DEFAULT '' COMMENT '模版消息链接',
+  `wechat_to_routine` int(1) NOT NULL DEFAULT '0' COMMENT '模版消息跳转小程序',
+  `is_routine` tinyint(1) NOT NULL DEFAULT '0' COMMENT '小程序订阅消息（0：不存在，1：开启，2：关闭）',
+  `routine_tempkey` varchar(255) NOT NULL DEFAULT '' COMMENT '订阅消息id',
+  `routine_content` varchar(255) NOT NULL DEFAULT '' COMMENT '订阅消息内容',
+  `routine_kid` varchar(255) NOT NULL DEFAULT '' COMMENT '订阅消息kid',
+  `routine_tempid` varchar(255) NOT NULL DEFAULT '' COMMENT '订阅消息tempid',
+  `routine_data` varchar(255) NOT NULL DEFAULT '' COMMENT '订阅消息参数',
+  `routine_link` varchar(255) NOT NULL DEFAULT '' COMMENT '订阅消息链接',
+  `is_sms` tinyint(1) NOT NULL DEFAULT '0' COMMENT '发送短信（0：不存在，1：开启，2：关闭）',
+  `sms_id` varchar(32) NOT NULL DEFAULT '' COMMENT '短信id',
+  `sms_text` varchar(255) NOT NULL DEFAULT '' COMMENT '短信模版内容',
+  `is_ent_wechat` tinyint(1) NOT NULL DEFAULT '0' COMMENT '企业微信群通知（0：不存在，1：开启，2：关闭）',
+  `ent_wechat_text` varchar(512) NOT NULL DEFAULT '' COMMENT '企业微信消息',
+  `url` varchar(512) NOT NULL DEFAULT '' COMMENT '群机器人链接',
+  `is_app` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'APP推送（0：不存在，1：开启，2：关闭）',
+  `app_id` int(11) NOT NULL DEFAULT '0' COMMENT 'app推送id',
+  `variable` varchar(256) NOT NULL DEFAULT '' COMMENT '变量',
+  `type` tinyint(1) NOT NULL DEFAULT '1' COMMENT '类型（1：用户，2：管理员）',
+  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '添加时间',
+  `custom_trigger` varchar(255) NOT NULL DEFAULT '' COMMENT '自定义消息触发位置',
+  `custom_variable` varchar(1000) NOT NULL DEFAULT '' COMMENT '自定义消息变量',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='通知设置';
+
+CREATE TABLE IF NOT EXISTS `eb_message_system` (
+  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `mark` varchar(50) NOT NULL DEFAULT '' COMMENT '标识',
+  `uid` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户ID',
+  `title` varchar(256) NOT NULL DEFAULT '' COMMENT '通知标题',
+  `content` varchar(512) NOT NULL DEFAULT '' COMMENT '通知内容',
+  `data` varchar(5000) NOT NULL DEFAULT '' COMMENT '站内信参数',
+  `look` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否查看',
+  `type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1:普通用户，2：管理员',
+  `add_time` int(11) NOT NULL DEFAULT '0' COMMENT '通知时间',
+  `is_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统通知';
+
+CREATE TABLE IF NOT EXISTS `eb_store_combination` (
+  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `product_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '商品id',
+  `mer_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '商户id',
+  `image` varchar(255) NOT NULL DEFAULT '' COMMENT '推荐图',
+  `images` varchar(2000) NOT NULL DEFAULT '' COMMENT '轮播图',
+  `title` varchar(255) NOT NULL DEFAULT '' COMMENT '活动标题',
+  `attr` varchar(255) NOT NULL DEFAULT '' COMMENT '活动属性',
+  `people` int(2) UNSIGNED NOT NULL DEFAULT '0' COMMENT '参团人数',
+  `info` varchar(255) NOT NULL DEFAULT '' COMMENT '简介',
+  `price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '价格',
+  `sort` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '排序',
+  `sales` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '销量',
+  `stock` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '库存',
+  `add_time` varchar(128) NOT NULL DEFAULT '0' COMMENT '添加时间',
+  `is_host` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '推荐',
+  `is_show` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '商品状态',
+  `is_del` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否删除',
+  `combination` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '拼团',
+  `mer_use` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '商户是否可用1可用0不可用',
+  `is_postage` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否包邮1是0否',
+  `postage` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '邮费',
+  `start_time` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '拼团开始时间',
+  `stop_time` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '拼团结束时间',
+  `effective_time` int(11) NOT NULL DEFAULT '0' COMMENT '拼团订单有效时间',
+  `cost` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '拼图商品成本',
+  `browse` int(11) NOT NULL DEFAULT '0' COMMENT '浏览量',
+  `unit_name` varchar(32) NOT NULL DEFAULT '' COMMENT '单位名',
+  `temp_id` int(11) NOT NULL DEFAULT '0' COMMENT '运费模板ID',
+  `weight` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '重量',
+  `volume` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '体积',
+  `num` int(11) NOT NULL DEFAULT '0' COMMENT '单次购买数量',
+  `once_num` int(11) NOT NULL DEFAULT '0' COMMENT '每个订单可购买数量',
+  `quota` int(10) NOT NULL DEFAULT '0' COMMENT '限购总数',
+  `quota_show` int(10) NOT NULL DEFAULT '0' COMMENT '限量总数显示',
+  `virtual` int(11) NOT NULL DEFAULT '100' COMMENT '虚拟成团百分比',
+  `logistics` varchar(11) NOT NULL DEFAULT '1,2' COMMENT '物流方式',
+  `freight` tinyint(1) NOT NULL DEFAULT '2' COMMENT '运费设置',
+  `custom_form` varchar(2000) NOT NULL DEFAULT '' COMMENT '自定义表单',
+  `virtual_type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '商品类型',
+  `is_commission` tinyint(1) NOT NULL DEFAULT '0' COMMENT '拼团是否返佣',
+  `head_commission` int(11) NOT NULL DEFAULT '0' COMMENT '团长佣金比例',
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='拼团商品表';
+
+CREATE TABLE IF NOT EXISTS `eb_store_pink` (
+  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `uid` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户id',
+  `nickname` varchar(64) NOT NULL DEFAULT '' COMMENT '用户昵称',
+  `avatar` varchar(256) NOT NULL DEFAULT '' COMMENT '用户头像',
+  `order_id` varchar(32) NOT NULL DEFAULT '' COMMENT '订单id 生成',
+  `order_id_key` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '订单id  数据库',
+  `total_num` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '购买商品个数',
+  `total_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '购买总金额',
+  `cid` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '拼团商品id',
+  `pid` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '商品id',
+  `people` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '拼图总人数',
+  `price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '拼团商品单价',
+  `add_time` varchar(24) NOT NULL DEFAULT '0' COMMENT '开始时间',
+  `stop_time` varchar(24) NOT NULL DEFAULT '0' COMMENT '结束时间',
+  `k_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '团长id 0为团长',
+  `is_tpl` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否发送模板消息0未发送1已发送',
+  `is_refund` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否退款 0未退款 1已退款',
+  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '状态1进行中2已完成3未完成',
+  `is_virtual` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否虚拟拼团',
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='拼团表';
+
+CREATE TABLE IF NOT EXISTS `eb_store_advance` (
+  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '预售商品id',
+  `product_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '商品id',
+  `image` varchar(255) NOT NULL DEFAULT '' COMMENT '商品主图',
+  `images` varchar(2000) NOT NULL DEFAULT '' COMMENT '轮播图',
+  `title` varchar(255) NOT NULL DEFAULT '' COMMENT '活动标题',
+  `info` varchar(255) NOT NULL DEFAULT '' COMMENT '简介',
+  `price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '价格',
+  `ot_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '原价',
+  `sort` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '排序',
+  `stock` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '库存',
+  `sales` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '销量',
+  `unit_name` varchar(16) NOT NULL DEFAULT '' COMMENT '单位名',
+  `start_time` varchar(128) NOT NULL DEFAULT '' COMMENT '开始时间',
+  `stop_time` varchar(128) NOT NULL DEFAULT '' COMMENT '结束时间',
+  `add_time` varchar(128) NOT NULL DEFAULT '' COMMENT '添加时间',
+  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '商品状态',
+  `is_del` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '删除 0未删除1已删除',
+  `type` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '类型 0全款1定金',
+  `deposit` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '定金金额',
+  `pay_start_time` varchar(128) NOT NULL DEFAULT '' COMMENT '尾款支付开始时间',
+  `pay_stop_time` varchar(128) NOT NULL DEFAULT '' COMMENT '尾款支付结束时间',
+  `deliver_time` int(10) NOT NULL DEFAULT '0' COMMENT '付款后几天后发货',
+  `num` int(11) UNSIGNED NOT NULL DEFAULT '1' COMMENT '最多购买几个',
+  `temp_id` int(11) NOT NULL DEFAULT '0' COMMENT '运费模板ID',
+  `quota` int(10) NOT NULL DEFAULT '0' COMMENT '限购总数',
+  `quota_show` int(10) NOT NULL DEFAULT '0' COMMENT '限购总数显示',
+  `once_num` int(11) NOT NULL DEFAULT '0' COMMENT '单次购买个数',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='预售商品表';
+
+CREATE TABLE IF NOT EXISTS `eb_store_order` (
+  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '订单ID',
+  `pid` int(10) NOT NULL DEFAULT '0' COMMENT '父类订单id',
+  `order_id` varchar(32) NOT NULL DEFAULT '0' COMMENT '订单号',
+  `trade_no` varchar(100) NOT NULL DEFAULT '' COMMENT '支付订单号',
+  `uid` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户id',
+  `real_name` varchar(32) NOT NULL DEFAULT '' COMMENT '用户姓名',
+  `user_phone` varchar(18) NOT NULL DEFAULT '' COMMENT '用户电话',
+  `user_address` varchar(100) NOT NULL DEFAULT '' COMMENT '详细地址',
+  `cart_id` text COMMENT '购物车id',
+  `freight_price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '运费金额',
+  `total_num` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '订单商品总数',
+  `total_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '订单总价',
+  `total_postage` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '邮费',
+  `pay_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '实际支付金额',
+  `pay_postage` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '支付邮费',
+  `deduction_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '抵扣金额',
+  `coupon_id` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '优惠券id',
+  `coupon_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '优惠券金额',
+  `paid` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '支付状态',
+  `pay_time` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '支付时间',
+  `pay_type` varchar(32) NOT NULL DEFAULT '' COMMENT '支付方式',
+  `add_time` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '创建时间',
+  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '订单状态（-1 : 申请退款 -2 : 退货成功 0：待发货；1：待收货；2：已收货；3：待评价；-1：已退款）',
+  `is_stock_up` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否备货中',
+  `refund_status` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '0 未退款 1 申请中 2 已退款',
+  `refund_type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '退款申请类型',
+  `refund_express` varchar(255) NOT NULL DEFAULT '' COMMENT '退货快递单号',
+  `refund_express_name` varchar(255) NOT NULL DEFAULT '' COMMENT '退货快递名称',
+  `refund_reason_wap_img` varchar(2000) NOT NULL DEFAULT '' COMMENT '退款图片',
+  `refund_reason_wap_explain` varchar(255) NOT NULL DEFAULT '' COMMENT '退款用户说明',
+  `refund_reason_time` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '退款时间',
+  `refund_reason_wap` varchar(255) NOT NULL DEFAULT '' COMMENT '前台退款原因',
+  `refund_reason` varchar(255) NOT NULL DEFAULT '' COMMENT '不退款的理由',
+  `refund_price` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '退款金额',
+  `delivery_name` varchar(64) NOT NULL DEFAULT '' COMMENT '快递名称/送货人姓名',
+  `delivery_code` varchar(50) NOT NULL DEFAULT '' COMMENT '快递公司编码',
+  `delivery_type` varchar(32) NOT NULL DEFAULT '' COMMENT '发货类型',
+  `delivery_id` varchar(64) NOT NULL DEFAULT '' COMMENT '快递单号/手机号',
+  `kuaidi_label` varchar(255) NOT NULL DEFAULT '' COMMENT '快递单号图片',
+  `kuaidi_task_id` varchar(64) NOT NULL DEFAULT '' COMMENT '快递单任务id',
+  `kuaidi_order_id` varchar(64) NOT NULL DEFAULT '' COMMENT '快递单订单号',
+  `fictitious_content` varchar(500) NOT NULL DEFAULT '' COMMENT '虚拟发货内容',
+  `delivery_uid` int(11) NOT NULL DEFAULT '0' COMMENT '配送员id',
+  `gain_integral` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '消费赚取积分',
+  `use_integral` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '使用积分',
+  `back_integral` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '给用户退了多少积分',
+  `spread_uid` int(10) NOT NULL DEFAULT '0' COMMENT '推广人uid',
+  `spread_two_uid` int(10) NOT NULL DEFAULT '0' COMMENT '上上级推广人uid',
+  `one_brokerage` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '一级返佣金额',
+  `two_brokerage` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '二级返佣金额',
+  `mark` varchar(512) NOT NULL DEFAULT '' COMMENT '备注',
+  `is_del` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否删除',
+  `is_cancel` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否取消',
+  `unique` char(32) NOT NULL DEFAULT '' COMMENT '唯一id(md5加密)类似id',
+  `remark` varchar(512) NOT NULL DEFAULT '' COMMENT '管理员备注',
+  `mer_id` int(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '商户ID',
+  `is_mer_check` tinyint(3) UNSIGNED NOT NULL DEFAULT '0' COMMENT '商户上传',
+  `combination_id` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '拼团商品id0一般商品',
+  `pink_id` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '拼团id 0没有拼团',
+  `cost` decimal(12,2) UNSIGNED NOT NULL DEFAULT '0.00' COMMENT '成本价',
+  `seckill_id` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '秒杀商品ID',
+  `bargain_id` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT '砍价id',
+  `advance_id` int(10) NOT NULL DEFAULT '0' COMMENT '预售商品id',
+  `verify_code` varchar(12) NOT NULL DEFAULT '' COMMENT '核销码',
+  `store_id` int(11) NOT NULL DEFAULT '0' COMMENT '门店id',
+  `shipping_type` tinyint(1) NOT NULL DEFAULT '1' COMMENT '配送方式 1=快递 ，2=门店自提',
+  `clerk_id` int(11) NOT NULL DEFAULT '0' COMMENT '店员id',
+  `is_channel` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '支付渠道(0微信公众号1微信小程序)',
+  `is_remind` tinyint(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '消息提醒',
+  `is_system_del` tinyint(1) NOT NULL DEFAULT '0' COMMENT '后台是否删除',
+  `channel_type` varchar(255) NOT NULL DEFAULT '' COMMENT '用户访问端标识',
+  `province` varchar(255) NOT NULL DEFAULT '' COMMENT '用户省份',
+  `express_dump` varchar(502) NOT NULL DEFAULT '' COMMENT '订单面单打印信息',
+  `virtual_type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '虚拟商品类型',
+  `virtual_info` varchar(255) NOT NULL DEFAULT '' COMMENT '虚拟商品信息',
+  `pay_uid` int(11) NOT NULL DEFAULT '0' COMMENT '支付用户uid',
+  `custom_form` text COMMENT '自定义表单',
+  `staff_id` int(11) NOT NULL DEFAULT '0' COMMENT '员工id',
+  `agent_id` int(11) NOT NULL DEFAULT '0' COMMENT '代理id',
+  `division_id` int(11) NOT NULL DEFAULT '0' COMMENT '事业部id',
+  `staff_brokerage` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '员工返佣',
+  `agent_brokerage` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '代理返佣',
+  `division_brokerage` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '事业部返佣',
+  `is_gift` int(1) NOT NULL DEFAULT '0' COMMENT '是否礼品订单',
+  `gift_price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '礼品附加费',
+  `gift_uid` int(11) NOT NULL DEFAULT '0' COMMENT '接受礼品用户uid',
+  `gift_mark` varchar(255) NOT NULL DEFAULT '' COMMENT '礼物留言',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `order_id_2` (`order_id`,`uid`) USING BTREE,
+  UNIQUE KEY `unique` (`unique`) USING BTREE,
+  KEY `uid` (`uid`) USING BTREE,
+  KEY `add_time` (`add_time`) USING BTREE,
+  KEY `pay_price` (`pay_price`) USING BTREE,
+  KEY `paid` (`paid`) USING BTREE,
+  KEY `pay_time` (`pay_time`) USING BTREE,
+  KEY `pay_type` (`pay_type`) USING BTREE,
+  KEY `status` (`status`) USING BTREE,
+  KEY `is_del` (`is_del`) USING BTREE,
+  KEY `coupon_id` (`coupon_id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单表';
+
 -- ---------------------------------------------------------------------------
 -- 后台管理员与角色
 -- ---------------------------------------------------------------------------
@@ -778,7 +1254,7 @@ INSERT INTO `eb_store_product_attr` (`id`,`product_id`,`attr_name`,`attr_values`
 (1,2,'颜色','红,蓝',0),
 (2,2,'尺码','S,M',0);
 
--- type = 0 才是普通 SKU；其它取值属于已经退役的秒杀/砍价/拼团。
+-- type = 0 才是普通 SKU；3 是拼团、6 是预售（活动价行在文件末尾），其它取值属于已经退役的活动。
 INSERT INTO `eb_store_product_attr_value` (`id`,`product_id`,`suk`,`stock`,`sales`,`price`,`image`,`unique`,`cost`,`bar_code`,`ot_price`,`vip_price`,`weight`,`volume`,`type`) VALUES
 (1,1,'默认',88,12,'19.90','/uploads/demo/goods-1.png','demo0001','10.00','DEMO-0001','29.90','18.00','0.50','0.00',0),
 (2,2,'红,S',5,1,'99.00','/uploads/demo/goods-1.png','demo0002','60.00','DEMO-0002-RS','129.00','88.00','1.00','0.01',0),
@@ -915,5 +1391,176 @@ INSERT INTO `eb_user_cancel` (`id`,`uid`,`name`,`phone`,`add_time`,`status`,`up_
 
 INSERT INTO `eb_wechat_user` (`id`,`uid`,`unionid`,`openid`,`nickname`,`headimgurl`,`sex`,`city`,`province`,`country`,`subscribe`,`subscribe_time`,`add_time`,`user_type`,`is_del`) VALUES
 (1,1002,'','oDemoOpenId00000000000001','示例用户乙','/uploads/demo/logo.png',1,'示例市','示例省','中国',1,1600000100,1600000100,'wechat',0);
+
+-- ---------------------------------------------------------------------------
+-- 运费模板与快递公司
+-- ---------------------------------------------------------------------------
+-- #1 按件计费，有兜底规则（province_id = city_id = 0）、一条覆盖两个城市的规则
+-- （同一个 uniqid 下每个城市一行，迁移后并成一条规则两个城市）、一条只指向字典
+-- 里没有的城市的规则（整条丢弃并计数）。#2 没有兜底规则，迁移时补一条零运费的。
+-- temp_id = 99 的那行没有模板，丢弃并计数。
+INSERT INTO `eb_shipping_templates` (`id`,`name`,`type`,`appoint`,`no_delivery`,`sort`,`add_time`) VALUES
+(1,'示例运费模板（按件）',1,1,1,10,1600000000),
+(2,'示例运费模板（按重量）',2,0,0,20,1600000100);
+
+INSERT INTO `eb_shipping_templates_region` (`id`,`province_id`,`temp_id`,`city_id`,`first`,`first_price`,`continue`,`continue_price`,`type`,`uniqid`) VALUES
+(1,0,1,0,'1.00','10.00','1.00','5.00',1,'demo-r-all'),
+(2,1,1,2,'1.00','8.00','1.00','3.00',1,'demo-r-bj'),
+(3,1,1,3,'1.00','8.00','1.00','3.00',1,'demo-r-bj'),
+(4,0,1,888888,'1.00','20.00','1.00','10.00',1,'demo-r-gone'),
+(5,0,99,0,'1.00','1.00','1.00','1.00',1,'demo-r-orphan');
+
+-- #2 既没有件数门槛也没有金额门槛：新 CHECK 不允许，而且它等于"无条件包邮"，丢弃并计数。
+INSERT INTO `eb_shipping_templates_free` (`id`,`province_id`,`temp_id`,`city_id`,`number`,`price`,`type`,`uniqid`) VALUES
+(1,1,1,2,'3.00','99.00',1,'demo-f-bj'),
+(2,0,1,0,'0.00','0.00',1,'demo-f-none');
+
+-- 第二行的城市字典里没有，丢弃并计数。
+INSERT INTO `eb_shipping_templates_no_delivery` (`id`,`province_id`,`temp_id`,`city_id`,`uniqid`) VALUES
+(1,1,1,3,'demo-n'),
+(2,0,1,888888,'demo-n');
+
+-- 商品乙按模板计运费（freight = 3，temp_id = 1）。shipping 排在 catalog 前面，
+-- 所以它的 shipping_template_id 保得住；模板没迁过来的话会降级成固定运费并计数。
+UPDATE `eb_store_product` SET `freight` = 3 WHERE `id` = 2;
+
+-- 快递公司字典由种子写入，id 沿用安装脚本（顺丰 #2、圆通 #3、中通 #4）；旧库
+-- 只带运营改过的排序与显示开关，按 id 覆盖到种子行上。#2000 是运营自己加的一家，
+-- 编码却和种子里的 #4 撞了：新表 code 唯一，它留给种子并计数，而不是让整次迁移失败。
+INSERT INTO `eb_express` (`id`,`code`,`name`,`sort`,`is_show`,`status`) VALUES
+(2,'shunfeng','顺丰速运',10,1,1),
+(3,'yuantong','圆通速递',20,0,1),
+(2000,'zhongtong','中通（运营自建）',30,1,1);
+
+-- ---------------------------------------------------------------------------
+-- 文章
+-- ---------------------------------------------------------------------------
+-- 删除的分类也迁移（带 deleted_at）。文章乙的 product_id 指向不存在的商品：
+-- 文章留下、链接清空并计数。nid = 99 的正文没有文章，丢弃并计数。
+-- 文章甲的正文里有一段 <script>，要被和后台编辑器同一个清洗函数洗掉。
+INSERT INTO `eb_article_category` (`id`,`pid`,`title`,`intr`,`image`,`status`,`sort`,`is_del`,`add_time`,`hidden`) VALUES
+(1,0,'示例资讯','示例栏目简介','',1,10,0,'1600000000',0),
+(2,1,'示例子栏目','','',1,5,0,'1600000100',0),
+(3,0,'已删除的栏目','','',1,0,1,'1600000200',0);
+
+INSERT INTO `eb_article` (`id`,`cid`,`title`,`author`,`image_input`,`synopsis`,`share_title`,`share_synopsis`,`visit`,`sort`,`url`,`status`,`add_time`,`hide`,`admin_id`,`mer_id`,`product_id`,`is_hot`,`is_banner`) VALUES
+(1,'1','示例文章甲','示例作者','/uploads/demo/banner.jpg','示例摘要甲','','','12',10,'',1,'1600001000',0,1,0,1,1,0),
+(2,'2','示例文章乙','示例作者','','示例摘要乙','','','3',5,'',1,'1600001100',0,1,0,99,0,0);
+
+INSERT INTO `eb_article_content` (`nid`,`content`) VALUES
+(1,'<p>示例正文甲。</p><script>alert(1)</script>'),
+(2,'<p>示例正文乙。</p>'),
+(99,'<p>没有文章的正文。</p>');
+
+-- ---------------------------------------------------------------------------
+-- 公众号
+-- ---------------------------------------------------------------------------
+-- 菜单在 eb_cache 里（key = wechat_menus）；另一行缓存与公众号无关，不读。
+INSERT INTO `eb_cache` (`key`,`result`,`expire_time`,`add_time`) VALUES
+('wechat_menus','[{\"name\":\"商城\",\"type\":\"view\",\"url\":\"https://shop.example.invalid/\"}]',0,1600000000),
+('demo_other_cache','{}',0,1600000000);
+
+-- 回复 #3 没有任何关键词，#4 的类型不认识，都丢弃并计数；关键词 #4 是客服消息
+-- （key_type = 1），丢弃并计数；#5 属于那条类型不认识的回复。
+INSERT INTO `eb_wechat_reply` (`id`,`type`,`data`,`status`,`hide`) VALUES
+(1,'text','{\"content\":\"欢迎关注示例商城\"}',1,0),
+(2,'text','{\"content\":\"营业时间 9:00-18:00\"}',1,0),
+(3,'text','{\"content\":\"没有关键词的回复\"}',1,0),
+(4,'demo_unknown_kind','{}',1,0);
+
+INSERT INTO `eb_wechat_key` (`id`,`reply_id`,`keys`,`key_type`) VALUES
+(1,1,'subscribe',0),
+(2,2,'营业时间',0),
+(3,2,'几点开门',0),
+(4,2,'人工客服',1),
+(5,4,'未知类型',0);
+
+-- 两个同名的在线分类：新表每个名字只允许一个在线分类，后一个改名为 线下门店（#2）。
+INSERT INTO `eb_wechat_qrcode_cate` (`id`,`cate_name`,`add_time`,`is_del`) VALUES
+(1,'线下门店',1600000000,0),
+(2,'线下门店',1600000100,0),
+(3,'已删除的分类',1600000200,1);
+
+-- #2 在 eb_qrcode 里没有 ticket：从来没在微信侧生成过，丢弃并计数。
+INSERT INTO `eb_wechat_qrcode` (`id`,`uid`,`name`,`image`,`cate_id`,`label_id`,`type`,`content`,`data`,`follow`,`scan`,`add_time`,`continue_time`,`end_time`,`status`,`is_del`) VALUES
+(1,0,'示例门店海报','',1,'','text','','{\"content\":\"欢迎光临示例门店\"}',3,10,1600000300,0,0,1,0),
+(2,0,'没生成的码','',2,'','text','','{\"content\":\"占位\"}',0,0,1600000400,0,0,1,0);
+
+INSERT INTO `eb_qrcode` (`id`,`third_type`,`third_id`,`ticket`,`expire_seconds`,`status`,`add_time`,`url`,`qrcode_url`,`scan`,`type`) VALUES
+(1,'wechatqrcode',1,'gQDemoTicket0001',0,1,'1600000300','https://mp.weixin.example.invalid/q/demo0001','',10,0),
+(2,'demo_other',1,'',0,1,'1600000300','','',0,0);
+
+-- 扫码记录：#2 的用户不存在，保留记录但清空 user_id；#3 属于被丢弃的码，丢弃并计数。
+INSERT INTO `eb_wechat_qrcode_record` (`id`,`qid`,`uid`,`is_follow`,`add_time`) VALUES
+(1,1,1002,1,1600000500),
+(2,1,4040,0,1600000600),
+(3,2,1001,0,1600000700);
+
+-- #2 是临时素材，早就过了三天有效期；#3 没有 media_id。都丢弃并计数。
+INSERT INTO `eb_wechat_media` (`id`,`type`,`path`,`media_id`,`url`,`temporary`,`add_time`) VALUES
+(1,'image','/uploads/demo/logo.png','DemoMediaId0001','https://mmbiz.example.invalid/demo1',0,1600000000),
+(2,'voice','','DemoMediaId0002','',1,1600000000),
+(3,'image','','','',0,1600000000);
+
+-- ---------------------------------------------------------------------------
+-- 通知模板与站内信
+-- ---------------------------------------------------------------------------
+-- #3 的 mark 属于已经下线的分销功能，注册表里没有对应事件，点名丢弃。
+INSERT INTO `eb_system_notification` (`id`,`mark`,`name`,`title`,`is_system`,`system_title`,`system_text`,`is_wechat`,`wechat_tempkey`,`wechat_tempid`,`is_routine`,`is_sms`,`sms_id`,`sms_text`,`variable`,`type`,`add_time`) VALUES
+(1,'order_pay_success','支付成功','用户下单支付成功后通知',1,'支付成功','您的订单{order_id}已支付{pay_price}元',1,'OPENTM000001','demo-tpl-0001',0,1,'DEMO_SMS_0001','您的订单{order_id}已支付','order_id,pay_price',1,1600000000),
+(2,'order_take','确认收货','用户确认收货后通知',1,'确认收货','订单{order_id}已确认收货',0,'','',0,0,'','','order_id',1,1600000000),
+(3,'revenue_received','收益到账','佣金到账提醒',1,'收益到账','示例',0,'','',0,0,'','','',1,1600000000),
+(4,'admin_pay_success_code','用户支付成功','新订单提醒管理员',1,'新订单','订单{order_id}已支付',0,'','',0,0,'','','order_id',2,1600000000);
+
+-- #3 的收件人不存在，#4 已删除，都丢弃并计数；#5 发给管理员 #1。
+INSERT INTO `eb_message_system` (`id`,`mark`,`uid`,`title`,`content`,`data`,`look`,`type`,`add_time`,`is_del`) VALUES
+(1,'order_pay_success',1002,'支付成功','您的订单已支付','{\"order_id\":\"DEMO0001\"}',0,1,1600009000,0),
+(2,'',1001,'系统公告','示例公告','',1,1,1600009100,0),
+(3,'order_take',5050,'确认收货','示例','',0,1,1600009200,0),
+(4,'order_take',1002,'确认收货','示例','',0,1,1600009300,1),
+(5,'admin_pay_success_code',1,'新订单','订单已支付','',0,2,1600009400,0);
+
+-- ---------------------------------------------------------------------------
+-- 拼团
+-- ---------------------------------------------------------------------------
+-- #2 一人成团（新 CHECK 不允许）、#3 已删除、#4 的商品不存在，都丢弃并计数。
+-- #5 的运费模板 77 不存在：活动留下、模板清空并计数；它的 virtual = 80（虚拟成团
+-- 百分比）新系统没有，计数。
+INSERT INTO `eb_store_combination` (`id`,`product_id`,`image`,`images`,`title`,`info`,`people`,`price`,`sort`,`sales`,`stock`,`add_time`,`is_show`,`is_del`,`start_time`,`stop_time`,`effective_time`,`cost`,`browse`,`temp_id`,`num`,`once_num`,`quota`,`quota_show`,`virtual`) VALUES
+(1,2,'/uploads/demo/goods-1.png','[]','示例拼团乙','三人成团',3,'79.00',10,2,20,'1600010000',1,0,1600010000,1900000000,24,60,5,1,2,2,10,10,100),
+(2,1,'/uploads/demo/goods-1.png','[]','一人成团','',1,'9.90',0,0,5,'1600010100',1,0,1600010000,1900000000,24,10,0,1,1,1,5,5,100),
+(3,1,'/uploads/demo/goods-1.png','[]','已删除的拼团','',2,'9.90',0,0,5,'1600010200',1,1,1600010000,1900000000,24,10,0,1,1,1,5,5,100),
+(4,99,'','[]','商品不存在的拼团','',2,'9.90',0,0,5,'1600010300',1,0,1600010000,1900000000,24,10,0,1,1,1,5,5,100),
+(5,1,'/uploads/demo/goods-1.png','[]','示例拼团甲','两人成团',2,'15.90',5,0,10,'1600010400',1,0,1600010000,1900000000,0,10,0,77,1,1,0,0,80);
+
+-- 团是订单的一部分，不迁移，只计数。
+INSERT INTO `eb_store_pink` (`id`,`uid`,`order_id`,`order_id_key`,`total_num`,`total_price`,`cid`,`pid`,`people`,`price`,`add_time`,`stop_time`,`status`) VALUES
+(1,1001,'DEMO-PINK-0001',1,1,'79.00',1,2,3,'79.00','1600011000','1600097400',1),
+(2,1002,'DEMO-PINK-0002',2,1,'79.00',1,2,3,'79.00','1600011100','1600097500',1);
+
+-- ---------------------------------------------------------------------------
+-- 预售
+-- ---------------------------------------------------------------------------
+-- #2 已删除、#3 的商品不存在，丢弃并计数。
+INSERT INTO `eb_store_advance` (`id`,`product_id`,`image`,`images`,`title`,`info`,`price`,`ot_price`,`sort`,`stock`,`sales`,`unit_name`,`start_time`,`stop_time`,`add_time`,`status`,`is_del`,`type`,`deposit`,`pay_start_time`,`pay_stop_time`,`deliver_time`,`num`,`temp_id`,`quota`,`quota_show`,`once_num`) VALUES
+(1,2,'/uploads/demo/goods-1.png','[]','示例预售乙','定金预售','89.00','129.00',10,20,1,'盒','1600020000','1900000000','1600020000',1,0,1,'20.00','1900000000','1900086400',3,1,1,10,10,1),
+(2,1,'/uploads/demo/goods-1.png','[]','已删除的预售','','9.90','9.90',0,5,0,'件','1600020000','1900000000','1600020100',1,1,0,'0.00','','',3,1,1,5,5,1),
+(3,99,'','[]','商品不存在的预售','','9.90','9.90',0,5,0,'件','1600020000','1900000000','1600020200',1,0,0,'0.00','','',3,1,1,5,5,1);
+
+-- 订单不迁移：这张表只用来数"有几张预售订单被留下"（advance_id > 0 的那张）。
+INSERT INTO `eb_store_order` (`id`,`order_id`,`uid`,`unique`,`advance_id`,`add_time`) VALUES
+(1,'DEMO-ADV-0001',1002,'demo-order-u1',1,1600021000),
+(2,'DEMO-ORD-0002',1001,'demo-order-u2',0,1600021100);
+
+-- 活动价行：和普通 SKU 同一张表，type = 3 是拼团、type = 6 是预售，product_id
+-- 是活动 id。拼团 #1 的「绿,L」和预售 #1 的「黑,XL」商品上没有这个规格，丢弃并计数。
+INSERT INTO `eb_store_product_attr_value` (`id`,`product_id`,`suk`,`stock`,`sales`,`price`,`image`,`unique`,`cost`,`bar_code`,`ot_price`,`vip_price`,`weight`,`volume`,`type`,`quota`,`quota_show`) VALUES
+(101,1,'红,S',5,1,'79.00','','demo0101','60.00','','99.00','0.00','0.00','0.00',3,5,5),
+(102,1,'红,M',5,1,'79.00','','demo0102','60.00','','99.00','0.00','0.00','0.00',3,5,5),
+(103,1,'绿,L',5,0,'79.00','','demo0103','60.00','','99.00','0.00','0.00','0.00',3,5,5),
+(104,5,'默认',10,0,'15.90','','demo0104','10.00','','19.90','0.00','0.00','0.00',3,0,0),
+(111,1,'蓝,S',5,0,'89.00','','demo0111','60.00','','109.00','0.00','0.00','0.00',6,5,5),
+(112,1,'蓝,M',5,1,'89.00','','demo0112','60.00','','109.00','0.00','0.00','0.00',6,5,5),
+(113,1,'黑,XL',5,0,'89.00','','demo0113','60.00','','109.00','0.00','0.00','0.00',6,5,5);
 
 SET FOREIGN_KEY_CHECKS = 1;

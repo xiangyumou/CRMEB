@@ -163,6 +163,8 @@ export interface PresaleMigrationReport {
   activitiesPausedDeposit: number;
   /** 定金预售 whose deposit could not be stored at all; became full-payment. */
   activitiesDepositRepaired: number;
+  /** `temp_id` named a freight template the shipping migration does not have. */
+  activitiesShippingTemplateCleared: number;
   activitySkus: number;
   activitySkusDroppedUnknownSku: number;
   /** 单位名 has no column in the new schema. */
@@ -180,6 +182,12 @@ export interface PresaleMigrationInput {
   productSkus?: readonly MappedProductSku[];
   /** Product ids that survived the catalog migration. */
   keptProductIds?: ReadonlySet<number>;
+  /**
+   * Template ids the shipping migration loaded. A campaign naming one it did
+   * not keeps its row and loses the link — the column is a restricting foreign
+   * key, and the storefront then charges by the product's own freight setting.
+   */
+  keptShippingTemplateIds?: ReadonlySet<number>;
   /** Legacy orders carrying an `advance_id`, reported so the number is logged. */
   legacyPresaleOrderCount?: number;
   /** The timestamp rows without one get. Defaults to the epoch of the dump. */
@@ -280,6 +288,7 @@ export function mapPresale(input: PresaleMigrationInput): PresaleMigrationOutput
     activitiesWindowRepaired: 0,
     activitiesPausedDeposit: 0,
     activitiesDepositRepaired: 0,
+    activitiesShippingTemplateCleared: 0,
     activitySkus: 0,
     activitySkusDroppedUnknownSku: 0,
     unitNamesDropped: 0,
@@ -332,6 +341,16 @@ export function mapPresale(input: PresaleMigrationInput): PresaleMigrationOutput
     }
     if (blankToNull(row.unit_name) !== null) report.unitNamesDropped += 1;
 
+    let shippingTemplateId: number | null = row.temp_id > 0 ? row.temp_id : null;
+    if (
+      shippingTemplateId !== null &&
+      input.keptShippingTemplateIds &&
+      !input.keptShippingTemplateIds.has(shippingTemplateId)
+    ) {
+      report.activitiesShippingTemplateCleared += 1;
+      shippingTemplateId = null;
+    }
+
     activities.push({
       id: row.id,
       productId: row.product_id,
@@ -358,7 +377,7 @@ export function mapPresale(input: PresaleMigrationInput): PresaleMigrationOutput
       finalPaymentStartAt: deposit?.finalPaymentStartAt ?? null,
       finalPaymentEndAt: deposit?.finalPaymentEndAt ?? null,
       shipAfterDays: Math.max(0, row.deliver_time),
-      shippingTemplateId: row.temp_id > 0 ? row.temp_id : null,
+      shippingTemplateId,
       sortOrder: row.sort,
       createdAt,
       updatedAt: createdAt,

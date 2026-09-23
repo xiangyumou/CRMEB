@@ -166,6 +166,8 @@ export interface NotificationMigrationReport {
   messagesDroppedDeleted: number;
   messagesDroppedUnknownRecipient: number;
   messagesUnread: number;
+  /** Titles longer than `notification_messages.title` (legacy 256 → 255), cut to fit. */
+  messagesTitleTruncated: number;
 }
 
 export interface NotificationMigrationInput {
@@ -298,6 +300,7 @@ export function mapNotifications(input: NotificationMigrationInput): Notificatio
   let messagesDroppedDeleted = 0;
   let messagesDroppedUnknownRecipient = 0;
   let messagesUnread = 0;
+  let messagesTitleTruncated = 0;
 
   const registryCodes = input.registryCodes ? new Set(input.registryCodes) : null;
   const seenCodes = new Set<string>();
@@ -410,6 +413,7 @@ export function mapNotifications(input: NotificationMigrationInput): Notificatio
 
     const createdAt = instant(legacy.add_time) ?? new Date(0);
     const read = legacy.look === 1;
+    if (legacy.title.length > 255) messagesTitleTruncated += 1;
     if (!read) messagesUnread += 1;
 
     messages.push({
@@ -420,7 +424,7 @@ export function mapNotifications(input: NotificationMigrationInput): Notificatio
       audience,
       userId: audience === 'user' ? legacy.uid : null,
       adminId: audience === 'admin' ? legacy.uid : null,
-      title: legacy.title,
+      title: legacy.title.length > 255 ? legacy.title.slice(0, 255) : legacy.title,
       content: legacy.content,
       data: parseMessageData(legacy.data),
       // The legacy table records *that* it was read, never when. The creation
@@ -446,6 +450,7 @@ export function mapNotifications(input: NotificationMigrationInput): Notificatio
       messagesDroppedDeleted,
       messagesDroppedUnknownRecipient,
       messagesUnread,
+      messagesTitleTruncated,
     },
   };
 }

@@ -137,6 +137,36 @@ describe('articles', () => {
     expect(out.report.articlesCategoryMissing).toBe(1);
   });
 
+  it('clears a product link the catalog migration did not keep, and counts it', () => {
+    const out = mapCms({
+      articles: [
+        article(),
+        article({ id: 102, product_id: 5 }),
+        article({ id: 103, product_id: 0 }),
+      ],
+      keptProductIds: new Set([5]),
+    });
+    expect(out.articles.map((row) => row.productId)).toEqual([null, 5, null]);
+    expect(out.report.articlesProductCleared).toBe(1);
+  });
+
+  it('cuts a title or an author longer than the new column, and counts it', () => {
+    const out = mapCms({
+      categories: [category({ title: '长'.repeat(120) })],
+      articles: [article({ author: '作'.repeat(70) })],
+    });
+    expect(out.categories[0]?.title).toHaveLength(100);
+    expect(out.articles[0]?.author).toHaveLength(64);
+    expect(out.report.fieldsTruncated).toBe(2);
+  });
+
+  it('emits parent categories before their children', () => {
+    const out = mapCms({
+      categories: [category({ id: 4, pid: 3 }), category()],
+    });
+    expect(out.categories.map((row) => row.id)).toEqual([3, 4]);
+  });
+
   it('parses the varchar hit counter and floors junk at zero', () => {
     const out = mapCms({
       articles: [article({ visit: '' }), article({ id: 102, visit: '-5' })],

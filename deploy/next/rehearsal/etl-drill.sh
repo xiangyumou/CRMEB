@@ -338,8 +338,11 @@ step 'creating the new schema and its reference seed'
 step 'etl plan — what this dump contains'
 (cd "$next_root/packages/etl" && pnpm etl plan) || exit 3
 
-step 'etl run — the migration'
-(cd "$next_root/packages/etl" && pnpm etl run --uploads-root "$uploads_root") || exit 3
+step 'etl run --require-complete — the migration, every group or nothing'
+# `--require-complete` is the cutover gate: it refuses while any group is
+# still pending, so a drill that passes here has exercised every mapper.
+(cd "$next_root/packages/etl" && pnpm etl run --require-complete --uploads-root "$uploads_root") ||
+  exit 3
 
 step 'etl verify — the two databases, item by item'
 (cd "$next_root/packages/etl" && pnpm etl verify --uploads-root "$uploads_root" --full-digest) ||
@@ -491,7 +494,6 @@ step 'result'
 if [ "$failures" -eq 0 ]; then
   printf 'the migrated shop serves a product, a DIY page and an attachment.\n'
   printf 'still to do before a real cutover:\n'
-  printf '  * etl run --require-complete passes (every mapper has landed);\n'
   printf '  * the uploads tree is copied to the real volume and re-verified\n'
   printf '    with etl verify --full-digest against that destination;\n'
   printf '  * this drill was run against a copy of the dump you will cut over\n'

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   chargeModeOf,
   cityIdOf,
+  loadShipping,
   mapShipping,
   type LegacyShippingFree,
   type LegacyShippingRegion,
@@ -184,5 +185,79 @@ describe('helpers', () => {
     expect(cityIdOf({ province_id: 330000, city_id: 330100 })).toBe(330100);
     expect(cityIdOf({ province_id: 330000, city_id: 0 })).toBe(330000);
     expect(cityIdOf({ province_id: 0, city_id: 0 })).toBeNull();
+  });
+});
+
+describe('loadShipping — the rows the runner inserts', () => {
+  const regions = [
+    region({ id: 1 }),
+    region({ id: 2, province_id: 2, city_id: 3, first_price: '8.00', uniqid: 'north' }),
+    region({ id: 3, province_id: 2, city_id: 999999, first_price: '8.00', uniqid: 'north' }),
+    region({ id: 4, province_id: 0, city_id: 888888, first_price: '20.00', uniqid: 'lost' }),
+  ];
+
+  it('gives each rule an id and its cities their own rows', () => {
+    const out = loadShipping({ templates: [TEMPLATE], regions, knownCityIds: new Set([2, 3]) });
+    expect(out.regions.map((row) => [row.id, row.isFallback, row.firstPrice])).toEqual([
+      [1, true, '0.00'],
+      [2, false, '8.00'],
+    ]);
+    expect(out.regionCities).toEqual([{ regionId: 2, cityId: 3 }]);
+    // No `key`, no `cityIds`: every field is a column the runner can insert.
+    for (const row of out.regions) expect(Object.keys(row)).not.toContain('cityIds');
+  });
+
+  it('drops and counts a city the dictionary lacks, and a rule left with none', () => {
+    const out = loadShipping({ templates: [TEMPLATE], regions, knownCityIds: new Set([2, 3]) });
+    // #3 lost its city but its rule kept #2's; #4's rule had only an unknown city.
+    expect(out.report.citiesDroppedUnknown).toBe(2);
+    expect(out.report.rulesDroppedNoKnownCity).toBe(1);
+    expect(out.report.regions).toBe(2);
+  });
+
+  it('assigns the same ids whatever order the dump returned the rows in', () => {
+    const forward = loadShipping({ templates: [TEMPLATE], regions });
+    const backward = loadShipping({ templates: [TEMPLATE], regions: [...regions].reverse() });
+    expect(backward).toEqual(forward);
+  });
+
+  it('splits free rules the same way and filters no-delivery cities', () => {
+    const out = loadShipping({
+      templates: [TEMPLATE],
+      free: [
+        free({ id: 1, province_id: 2, city_id: 3 }),
+        free({ id: 2, city_id: 777777, uniqid: 'x' }),
+      ],
+      noDelivery: [
+        { id: 1, province_id: 0, temp_id: 1, city_id: 3, uniqid: 'n' },
+        { id: 2, province_id: 0, temp_id: 1, city_id: 777777, uniqid: 'n' },
+      ],
+      knownCityIds: new Set([3]),
+    });
+    expect(out.freeRules).toEqual([{ id: 1, templateId: 1, minUnits: null, minAmount: '199.00' }]);
+    expect(out.freeRuleCities).toEqual([{ freeRuleId: 1, cityId: 3 }]);
+    expect(out.noDeliveryCities).toEqual([{ templateId: 1, cityId: 3 }]);
+    expect(out.report.citiesDroppedUnknown).toBe(2);
+    expect(out.report.rulesDroppedNoKnownCity).toBe(1);
+  });
+  it('leaves a courier to the seed when its code belongs to another seeded id', () => {
+    const express = (id: number, code: string) => ({
+      id,
+      code,
+      name: code,
+      sort: 0,
+      is_show: 1,
+      status: 1,
+    });
+    const out = loadShipping({
+      express: [express(1, 'shunfeng'), express(2000, 'yuantong')],
+      seededExpress: [
+        { id: 1, code: 'shunfeng' },
+        { id: 7, code: 'yuantong' },
+      ],
+    });
+    expect(out.expressCompanies.map((row) => row.id)).toEqual([1]);
+    expect(out.report.expressDroppedCodeTaken).toBe(1);
+    expect(out.report.expressCompanies).toBe(1);
   });
 });

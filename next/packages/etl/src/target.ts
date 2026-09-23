@@ -79,6 +79,17 @@ export interface TargetTx {
   clear(tables: readonly string[]): Promise<void>;
   /** Inserts rows, deriving the column list from the first row's keys. */
   insert(table: string, rows: readonly TargetRow[], json?: readonly string[]): Promise<number>;
+  /**
+   * `insert … on conflict (conflict) do update` — for a table the reference
+   * seed already filled (`TargetSpec.upsert`). Every column the rows carry is
+   * overwritten except the conflict key and `created_at`.
+   */
+  upsert(
+    table: string,
+    rows: readonly TargetRow[],
+    conflict: readonly string[],
+    json?: readonly string[],
+  ): Promise<number>;
   /** `setval(pg_get_serial_sequence(table,'id'), max(id))`, so nextval is ahead. */
   resetSequence(table: string): Promise<number | null>;
 }
@@ -110,6 +121,56 @@ function makeTx(client: pg.PoolClient): TargetTx {
     values: readonly unknown[] = [],
   ): Promise<T[]> => (await client.query<T>(text, [...values])).rows;
 
+  /**
+   * One multi-row INSERT per batch, the column list taken from the first row.
+   * With `conflict`, the statement becomes an upsert on that key.
+   */
+  const write = async (
+    table: string,
+    rows: readonly TargetRow[],
+    json: readonly string[],
+    conflict: readonly string[] | null,
+  ): Promise<number> => {
+    if (rows.length === 0) return 0;
+    const first = rows[0] as TargetRow;
+    const keys = Object.keys(first);
+    if (keys.length === 0) throw new Error(`表 ${table} 的待插入行没有任何字段`);
+    const jsonKeys = new Set(json);
+    const columns = keys.map((key) => `"${snakeCase(key)}"`).join(', ');
+
+    let onConflict = '';
+    if (conflict !== null) {
+      const conflictColumns = conflict.map(snakeCase);
+      const updated = keys
+        .map(snakeCase)
+        .filter((column) => !conflictColumns.includes(column) && column !== 'created_at');
+      onConflict =
+        ` on conflict (${conflictColumns.map((column) => `"${column}"`).join(', ')}) ` +
+        (updated.length === 0
+          ? 'do nothing'
+          : `do update set ${updated.map((column) => `"${column}" = excluded."${column}"`).join(', ')}`);
+    }
+
+    let written = 0;
+    for (let offset = 0; offset < rows.length; offset += BATCH_ROWS) {
+      const batch = rows.slice(offset, offset + BATCH_ROWS);
+      const values: unknown[] = [];
+      const tuples = batch.map((row) => {
+        const placeholders = keys.map((key) => {
+          values.push(encode(row[key], jsonKeys.has(key)));
+          return `$${String(values.length)}`;
+        });
+        return `(${placeholders.join(', ')})`;
+      });
+      await query(
+        `insert into "${table}" (${columns}) values ${tuples.join(', ')}${onConflict}`,
+        values,
+      );
+      written += batch.length;
+    }
+    return written;
+  };
+
   return {
     query,
 
@@ -121,30 +182,9 @@ function makeTx(client: pg.PoolClient): TargetTx {
       }
     },
 
-    async insert(table, rows, json = []) {
-      if (rows.length === 0) return 0;
-      const first = rows[0] as TargetRow;
-      const keys = Object.keys(first);
-      if (keys.length === 0) throw new Error(`表 ${table} 的待插入行没有任何字段`);
-      const jsonKeys = new Set(json);
-      const columns = keys.map((key) => `"${snakeCase(key)}"`).join(', ');
+    insert: (table, rows, json = []) => write(table, rows, json, null),
 
-      let written = 0;
-      for (let offset = 0; offset < rows.length; offset += BATCH_ROWS) {
-        const batch = rows.slice(offset, offset + BATCH_ROWS);
-        const values: unknown[] = [];
-        const tuples = batch.map((row) => {
-          const placeholders = keys.map((key) => {
-            values.push(encode(row[key], jsonKeys.has(key)));
-            return `$${String(values.length)}`;
-          });
-          return `(${placeholders.join(', ')})`;
-        });
-        await query(`insert into "${table}" (${columns}) values ${tuples.join(', ')}`, values);
-        written += batch.length;
-      }
-      return written;
-    },
+    upsert: (table, rows, conflict, json = []) => write(table, rows, json, conflict),
 
     async resetSequence(table) {
       // `pg_get_serial_sequence` raises rather than returning null when the

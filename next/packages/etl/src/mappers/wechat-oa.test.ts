@@ -314,6 +314,30 @@ describe('channel QR codes', () => {
     expect(qrcodes[0]!.categoryId).toBe(1);
   });
 
+  it('renames a second live category with the same name, and counts it', () => {
+    const { qrcodeCategories, report } = mapWechatOa({
+      qrcodeCategories: [
+        { id: 1, cate_name: '双十一', add_time: JAN, is_del: 0 },
+        { id: 2, cate_name: '双十一', add_time: JAN, is_del: 1 },
+        { id: 7, cate_name: '双十一', add_time: JAN, is_del: 0 },
+      ],
+    });
+    // A deleted row does not hold its name (the index is scoped to live rows).
+    expect(qrcodeCategories.map((row) => row.name)).toEqual(['双十一', '双十一', '双十一（#7）']);
+    expect(report.categoriesRenamedDuplicate).toBe(1);
+  });
+
+  it('cuts a name longer than the new column, and counts it', () => {
+    const { qrcodeCategories, qrcodes, report } = mapWechatOa({
+      qrcodeCategories: [{ id: 1, cate_name: '类'.repeat(80), add_time: JAN, is_del: 0 }],
+      qrcodes: [qrcode({ name: '码'.repeat(120) })],
+      qrcodeTickets: [ticket],
+    });
+    expect(qrcodeCategories[0]!.name).toHaveLength(64);
+    expect(qrcodes[0]!.name).toHaveLength(100);
+    expect(report.namesTruncated).toBe(2);
+  });
+
   it('carries the code’s own reply across', () => {
     const { qrcodes } = mapWechatOa({
       qrcodes: [qrcode({ type: 'text', data: '{"content":"扫码有礼"}' })],
@@ -404,7 +428,21 @@ describe('the material library', () => {
   });
 
   it('skips a row with no handle at all', () => {
-    expect(mapWechatOa({ media: [medium({ media_id: '' })], now: NOW }).media).toEqual([]);
+    const { media, report } = mapWechatOa({ media: [medium({ media_id: '' })], now: NOW });
+    expect(media).toEqual([]);
+    // Skipped, never silently: the count is in the cutover log.
+    expect(report.mediaDroppedNoHandle).toBe(1);
+  });
+
+  it('keeps one row per (kind, media_id), which is what wechat_media_uq allows', () => {
+    // An unknown legacy type folds into `image`, so two legacy rows the old
+    // unique key told apart can collide here.
+    const { media, report } = mapWechatOa({
+      media: [medium({ id: 1, type: 'image' }), medium({ id: 2, type: 'unknown' })],
+      now: NOW,
+    });
+    expect(media.map((row) => row.id)).toEqual([1]);
+    expect(report.mediaDroppedDuplicate).toBe(1);
   });
 });
 
@@ -452,5 +490,42 @@ describe('mapWechatOa', () => {
     expect(output.autoReplies).toEqual([]);
     expect(output.qrcodes).toEqual([]);
     expect(output.report.replies).toBe(0);
+  });
+  it('maps the same whatever order the dump returned the rows in', () => {
+    const input = {
+      replies: [reply({ id: 1 }), reply({ id: 2, data: '{"content":"再见"}' })],
+      keys: [
+        key({ id: 1, reply_id: 1, keys: '同一个' }),
+        key({ id: 2, reply_id: 2, keys: '同一个' }),
+      ],
+      qrcodeCategories: [
+        { id: 1, cate_name: '门店', add_time: JAN, is_del: 0 },
+        { id: 2, cate_name: '门店', add_time: JAN, is_del: 0 },
+      ],
+      now: NOW,
+    };
+    const forward = mapWechatOa(input);
+    const backward = mapWechatOa({
+      ...input,
+      replies: [...input.replies].reverse(),
+      keys: [...input.keys].reverse(),
+      qrcodeCategories: [...input.qrcodeCategories].reverse(),
+    });
+    expect(backward).toEqual(forward);
+    // The older reply keeps the keyword; the newer category is the renamed one.
+    expect(forward.autoReplies.map((row) => row.payload.text)).toEqual(['你好']);
+    expect(forward.qrcodeCategories.map((row) => row.name)).toEqual(['门店', '门店（#2）']);
+  });
+
+  it('takes the ticket-bearing row when a code has a blank one beside it', () => {
+    const { qrcodes, report } = mapWechatOa({
+      qrcodes: [qrcode()],
+      qrcodeTickets: [
+        { ...ticket, id: 2 },
+        { ...ticket, id: 1, ticket: '' },
+      ],
+    });
+    expect(qrcodes.map((row) => row.ticket)).toEqual(['TICKET_7']);
+    expect(report.qrcodesDroppedNoTicket).toBe(0);
   });
 });

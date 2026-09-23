@@ -383,3 +383,185 @@ export function mapShipping(input: ShippingMigrationInput): ShippingMigrationOut
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// the loadable shape
+// ---------------------------------------------------------------------------
+
+/**
+ * `mapShipping`'s rules, made loadable: ids assigned, cities split out into
+ * their join tables, and every city the dictionary lacks dropped and counted.
+ *
+ * `mapShipping` returns a rule with its cities inline (`cityIds`) and a `key`
+ * that is only stable within one call, because that is the natural shape of
+ * the regrouping. The schema wants the rule as a row with an id and the
+ * cities as rows pointing at it, and the runner inserts rows exactly as they
+ * are — so this function is the bridge, and it is still pure.
+ *
+ * **The ids are assigned here, 1…n in the mapper's order**, and the inputs are
+ * sorted by their legacy id first. `shipping_template_regions` has no legacy id
+ * to carry (one legacy row per city became one rule for many), so the id is a
+ * function of the snapshot: the same dump gives the same ids, twice, which is
+ * what "load twice and compare" needs, and the runner then moves the sequence
+ * past them.
+ *
+ * **A city the seeded dictionary does not have is dropped and counted**
+ * (`citiesDroppedUnknown`), the same rule `mapUsers` follows for an address
+ * (CR-3-j): the join tables' `city_id` is a real foreign key, and one unknown
+ * city would otherwise roll back every template, rule and courier override
+ * with it. A priced rule or free rule that loses **every** city it had is
+ * dropped too (`rulesDroppedNoKnownCity`) — left with no cities it would read
+ * as "applies nowhere" at best and as a second fallback at worst.
+ */
+export interface ShippingLoadInput extends ShippingMigrationInput {
+  /** `cities.id` as seeded. Omitted, every city is taken on trust (unit tests). */
+  knownCityIds?: ReadonlySet<number>;
+  /**
+   * `express_companies` as the target holds it — the seed, on a first run.
+   * The overrides are upserted by id, and the table is unique on `code` too,
+   * so a legacy courier whose code another seeded id already has would fail
+   * the whole run. It is left to the seed and counted instead. Omitted, no
+   * collision is assumed (unit tests).
+   */
+  seededExpress?: readonly { id: number; code: string }[];
+}
+
+export interface ShippingRegionLoadRow {
+  id: number;
+  templateId: number;
+  isFallback: boolean;
+  firstUnit: string;
+  firstPrice: string;
+  additionalUnit: string;
+  additionalPrice: string;
+}
+
+export interface ShippingFreeRuleLoadRow {
+  id: number;
+  templateId: number;
+  minUnits: string | null;
+  minAmount: string | null;
+}
+
+export interface ShippingLoadReport extends ShippingMigrationReport {
+  /** City links (priced, free or no-delivery) naming a city the dictionary lacks. */
+  citiesDroppedUnknown: number;
+  /** Rules whose every city was unknown. */
+  rulesDroppedNoKnownCity: number;
+  /**
+   * Courier overrides whose `code` a different seeded id already holds. Legacy
+   * ids follow the installer, as the seed does, so this is an operator-added
+   * courier colliding with a stock one; the stock row stays as seeded.
+   */
+  expressDroppedCodeTaken: number;
+}
+
+export interface ShippingLoadOutput {
+  templates: ShippingTemplateRow[];
+  regions: ShippingRegionLoadRow[];
+  regionCities: { regionId: number; cityId: number }[];
+  freeRules: ShippingFreeRuleLoadRow[];
+  freeRuleCities: { freeRuleId: number; cityId: number }[];
+  noDeliveryCities: ShippingNoDeliveryRow[];
+  expressCompanies: ExpressCompanyOverrideRow[];
+  report: ShippingLoadReport;
+}
+
+function byId<T extends { id: number }>(rows: readonly T[] | undefined): T[] {
+  return [...(rows ?? [])].sort((a, b) => a.id - b.id);
+}
+
+export function loadShipping(input: ShippingLoadInput): ShippingLoadOutput {
+  const mapped = mapShipping({
+    templates: byId(input.templates),
+    regions: byId(input.regions),
+    free: byId(input.free),
+    noDelivery: byId(input.noDelivery),
+    express: byId(input.express),
+  });
+  const known = input.knownCityIds;
+  const isKnown = (cityId: number): boolean => known === undefined || known.has(cityId);
+
+  let citiesDroppedUnknown = 0;
+  let rulesDroppedNoKnownCity = 0;
+  /** The cities a rule keeps, or `null` when it had some and kept none. */
+  const keptCities = (cityIds: readonly number[]): number[] | null => {
+    const kept = cityIds.filter(isKnown);
+    citiesDroppedUnknown += cityIds.length - kept.length;
+    return cityIds.length > 0 && kept.length === 0 ? null : kept;
+  };
+
+  const regions: ShippingRegionLoadRow[] = [];
+  const regionCities: { regionId: number; cityId: number }[] = [];
+  for (const rule of mapped.regions) {
+    const cities = keptCities(rule.cityIds);
+    if (cities === null) {
+      rulesDroppedNoKnownCity += 1;
+      continue;
+    }
+    const id = regions.length + 1;
+    regions.push({
+      id,
+      templateId: rule.templateId,
+      isFallback: rule.isFallback,
+      firstUnit: rule.firstUnit,
+      firstPrice: rule.firstPrice,
+      additionalUnit: rule.additionalUnit,
+      additionalPrice: rule.additionalPrice,
+    });
+    for (const cityId of cities) regionCities.push({ regionId: id, cityId });
+  }
+
+  const freeRules: ShippingFreeRuleLoadRow[] = [];
+  const freeRuleCities: { freeRuleId: number; cityId: number }[] = [];
+  for (const rule of mapped.freeRules) {
+    const cities = keptCities(rule.cityIds);
+    if (cities === null) {
+      rulesDroppedNoKnownCity += 1;
+      continue;
+    }
+    const id = freeRules.length + 1;
+    freeRules.push({
+      id,
+      templateId: rule.templateId,
+      minUnits: rule.minUnits,
+      minAmount: rule.minAmount,
+    });
+    for (const cityId of cities) freeRuleCities.push({ freeRuleId: id, cityId });
+  }
+
+  const noDeliveryCities = mapped.noDeliveryCities.filter((row) => {
+    if (isKnown(row.cityId)) return true;
+    citiesDroppedUnknown += 1;
+    return false;
+  });
+
+  const seededIdByCode = new Map((input.seededExpress ?? []).map((row) => [row.code, row.id]));
+  let expressDroppedCodeTaken = 0;
+  const expressCompanies = mapped.expressCompanies.filter((row) => {
+    const holder = seededIdByCode.get(row.code);
+    if (holder === undefined || holder === row.id) return true;
+    expressDroppedCodeTaken += 1;
+    return false;
+  });
+
+  return {
+    templates: mapped.templates,
+    regions,
+    regionCities,
+    freeRules,
+    freeRuleCities,
+    noDeliveryCities,
+    expressCompanies,
+    report: {
+      ...mapped.report,
+      expressCompanies: expressCompanies.length,
+      regions: regions.length,
+      freeRules: freeRules.length,
+      noDeliveryCities: noDeliveryCities.length,
+      citiesDroppedUnknown,
+      rulesDroppedNoKnownCity,
+      expressDroppedCodeTaken,
+    },
+  };
+}

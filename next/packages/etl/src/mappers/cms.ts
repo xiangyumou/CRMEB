@@ -148,6 +148,19 @@ export interface CmsMigrationReport {
   articlesMultiCategory: number;
   /** Articles whose `cid` named a category that does not exist. */
   articlesCategoryMissing: number;
+  /**
+   * Articles whose `product_id` names a product the catalog migration does not
+   * have. The article keeps its text and loses the link: `articles.product_id`
+   * is a real foreign key, and one stale id would otherwise roll back every
+   * article with it.
+   */
+  articlesProductCleared: number;
+  /**
+   * Text longer than the new column: a category title (legacy 255 → 100) or an
+   * author (255 → 64), cut to fit. The legacy admin never enforced a length;
+   * one long title would otherwise fail the whole group on `value too long`.
+   */
+  fieldsTruncated: number;
   /** Articles whose `visit` was not a number. Migrated as 0. */
   articlesViewsUnparseable: number;
   /** Articles that were `status = 1` and `hide = 1` at once. Migrated as hidden. */
@@ -170,6 +183,8 @@ export interface CmsMigrationInput {
    * package keeps its single dependency-free shape; the runner has both.
    */
   sanitize?: ((html: string) => string) | undefined;
+  /** Product ids that survived the catalog migration. Omitted, every id is taken on trust. */
+  keptProductIds?: ReadonlySet<number>;
 }
 
 export interface CmsMigrationOutput {
@@ -212,6 +227,14 @@ export function mapCms(input: CmsMigrationInput): CmsMigrationOutput {
   let categoriesDeleted = 0;
   let articlesMultiCategory = 0;
   let articlesCategoryMissing = 0;
+  let articlesProductCleared = 0;
+  let fieldsTruncated = 0;
+  /** `value` cut to `max` characters, counted when it had to be. */
+  const fit = <T extends string | null>(value: T, max: number): T => {
+    if (value === null || value.length <= max) return value;
+    fieldsTruncated += 1;
+    return value.slice(0, max) as T;
+  };
   let articlesViewsUnparseable = 0;
   let articlesStatusConflict = 0;
   let contentsOrphaned = 0;
@@ -252,7 +275,7 @@ export function mapCms(input: CmsMigrationInput): CmsMigrationOutput {
     categories.push({
       id: row.id,
       parentId,
-      title: row.title,
+      title: fit(row.title, 100),
       intro: textOrNull(row.intr),
       imageUrl: textOrNull(row.image),
       status: row.status === 1 && row.hidden === 0 ? 'visible' : 'hidden',
@@ -262,6 +285,10 @@ export function mapCms(input: CmsMigrationInput): CmsMigrationOutput {
       deletedAt: row.is_del === 1 ? createdAt : null,
     });
   }
+  // Roots first. `article_categories.parent_id` is a real foreign key, and the
+  // runner inserts in batches: a child that happened to precede its parent in
+  // the dump would otherwise be checked before the parent existed.
+  categories.sort((a, b) => Number(a.parentId !== null) - Number(b.parentId !== null));
   const liveCategoryIds = new Set(
     categories.filter((row) => row.deletedAt === null).map((row) => row.id),
   );
@@ -285,19 +312,25 @@ export function mapCms(input: CmsMigrationInput): CmsMigrationOutput {
       row.hide === 1 ? 'hidden' : row.status === 1 ? 'published' : 'draft';
     byStatus[status] += 1;
 
+    let productId: number | null = row.product_id > 0 ? row.product_id : null;
+    if (productId !== null && input.keptProductIds && !input.keptProductIds.has(productId)) {
+      articlesProductCleared += 1;
+      productId = null;
+    }
+
     const createdAt = instantOf(row.add_time);
     articles.push({
       id: row.id,
       categoryId,
       title: row.title,
       slug: null,
-      author: textOrNull(row.author),
+      author: fit(textOrNull(row.author), 64),
       coverImageUrl: textOrNull(row.image_input),
       summary: textOrNull(row.synopsis),
       shareTitle: textOrNull(row.share_title),
       shareSummary: textOrNull(row.share_synopsis),
       sourceUrl: textOrNull(row.url),
-      productId: row.product_id > 0 ? row.product_id : null,
+      productId,
       status,
       isHot: row.is_hot === 1,
       isBanner: row.is_banner === 1,
@@ -342,6 +375,8 @@ export function mapCms(input: CmsMigrationInput): CmsMigrationOutput {
       articles: articles.length,
       articlesMultiCategory,
       articlesCategoryMissing,
+      articlesProductCleared,
+      fieldsTruncated,
       articlesViewsUnparseable,
       articlesStatusConflict,
       contentsOrphaned,

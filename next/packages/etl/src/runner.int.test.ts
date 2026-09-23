@@ -22,12 +22,16 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
+import { createDb } from '@shop/db';
+import { seedReference } from '@shop/db/seed';
 import { createTestDatabase, type TestDatabase } from '@shop/testing';
 import mysql from 'mysql2/promise';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { GROUPS } from './groups';
 import { digestText } from './lib/digest';
-import { MissingReferenceDataError, run } from './runner';
+import { defineGroup } from './mapper';
+import { MissingReferenceDataError, run, type RunResult } from './runner';
 import { openSource, type Source } from './source';
 import { openTarget, type Target } from './target';
 import { verify } from './verify';
@@ -44,6 +48,52 @@ const UPLOAD_FILES: Record<string, string> = {
   'demo/banner.jpg': 'synthetic-banner-bytes',
   'demo/goods-1.png': 'synthetic-goods-bytes',
 };
+
+/** Load order, as `groups.ts` declares it: a foreign-key order. */
+const ALL_GROUPS = [
+  'system',
+  'config',
+  'storage',
+  'user',
+  'shipping',
+  'catalog',
+  'groupbuy',
+  'presale',
+  'coupon',
+  'cms',
+  'diy',
+  'wechat-oa',
+  'notification',
+];
+
+/** A group whose mapper has not landed, for the `--require-complete` refusal. */
+const UNFINISHED = defineGroup<{ rows?: readonly unknown[] }, { report: object }>({
+  name: 'unfinished',
+  title: '测试用：还没落地的 group',
+  owner: 'test',
+  mapper: null,
+  sources: [],
+  targets: [],
+});
+
+/** A group that maps fine and then fails inside the transaction, last in the run. */
+const EXPLODING = defineGroup<object, { report: object }>({
+  name: 'exploding',
+  title: '测试用：在事务里失败的 group',
+  owner: 'test',
+  mapper: () => ({ report: {} }),
+  sources: [],
+  targets: [],
+  extras: async (context) => {
+    await context.selectTarget('no_such_table', ['id']);
+    return {};
+  },
+});
+
+function reportOf(result: RunResult, group: string): Record<string, unknown> {
+  const found = result.groups.find((entry) => entry.group === group);
+  return (found?.report ?? {}) as Record<string, unknown>;
+}
 
 describe('etl run + verify', () => {
   let container: StartedMySqlContainer;
@@ -83,6 +133,7 @@ describe('etl run + verify', () => {
     source = await openSource(legacyUrl);
     target = openTarget(database.url);
     await seedCities(target);
+    await seedCouriers(target);
   }, 300_000);
 
   afterAll(async () => {
@@ -94,24 +145,19 @@ describe('etl run + verify', () => {
   }, 120_000);
 
   it('迁移一遍，把该迁的迁过去，把该丢的丢掉并记账', async () => {
-    const result = await run({ source, target, uploadsRoot, migratedAt: new Date('2026-01-01') });
+    // The cutover gate itself: every group has landed, so `--require-complete`
+    // runs rather than refusing (ETL-J-005).
+    const result = await run({
+      source,
+      target,
+      uploadsRoot,
+      requireComplete: true,
+      migratedAt: new Date('2026-01-01'),
+    });
 
     const loaded = result.groups.filter((group) => group.status === 'loaded');
-    expect(loaded.map((group) => group.group)).toEqual([
-      'system',
-      'config',
-      'storage',
-      'user',
-      'catalog',
-      'coupon',
-      'diy',
-    ]);
-    expect(result.pending.map((group) => group.group)).toEqual([
-      'shipping',
-      'cms',
-      'wechat-oa',
-      'notification',
-    ]);
+    expect(loaded.map((group) => group.group)).toEqual(ALL_GROUPS);
+    expect(result.pending).toEqual([]);
 
     // 三个管理员，其中一个 is_del = 1。
     expect(await target.countRows('admins')).toBe(2);
@@ -162,6 +208,115 @@ describe('etl run + verify', () => {
     expect(identityIds.map((row) => row.id)).toEqual(['1']);
     const catalog = loaded.find((group) => group.group === 'catalog');
     expect(JSON.stringify(catalog?.report)).toMatch(/\d/);
+
+    // --- shipping ----------------------------------------------------------
+    // 两个模板；#1 的兜底 + 北京两城一条规则，#2 补出来的零运费兜底 = 3 条规则。
+    // 只指向字典外城市的那条规则整条丢掉，孤儿行、无门槛的包邮行也丢掉，都记账。
+    expect(await target.countRows('shipping_templates')).toBe(2);
+    expect(await target.countRows('shipping_template_regions')).toBe(3);
+    expect(await target.countWhere('shipping_template_regions', 'is_fallback')).toBe(2);
+    expect(await target.countRows('shipping_template_region_cities')).toBe(2);
+    expect(await target.countRows('shipping_template_free_rules')).toBe(1);
+    expect(await target.countRows('shipping_template_free_rule_cities')).toBe(1);
+    expect(await target.countRows('shipping_template_no_delivery_cities')).toBe(1);
+    // 种子里的三家还是三家：两家带上了运营的排序与开关，撞编码的那家留给种子。
+    expect(await target.countRows('express_companies')).toBe(3);
+    const couriers = await target.query<{ id: string; sort_order: number; is_enabled: boolean }>(
+      'select id::text as id, sort_order, is_enabled from express_companies order by id',
+    );
+    expect(couriers).toEqual([
+      { id: '2', sort_order: 10, is_enabled: true },
+      { id: '3', sort_order: 20, is_enabled: false },
+      { id: '4', sort_order: 0, is_enabled: true },
+    ]);
+    expect(reportOf(result, 'shipping')).toMatchObject({
+      templatesFallbackSynthesised: 1,
+      citiesDroppedUnknown: 2,
+      rulesDroppedNoKnownCity: 1,
+      orphanedChildRows: 1,
+      freeRulesWithoutThreshold: 1,
+      expressDroppedCodeTaken: 1,
+    });
+    // 商品乙按模板计运费：shipping 先迁，所以这次链接保得住。
+    expect(await target.countWhere('products', 'shipping_template_id = 1')).toBe(1);
+
+    // --- cms -------------------------------------------------------------------
+    expect(await target.countRows('article_categories')).toBe(3);
+    expect(await target.countWhere('article_categories', 'deleted_at is not null')).toBe(1);
+    expect(await target.countRows('articles')).toBe(2);
+    expect(await target.countWhere('articles', 'product_id = 1')).toBe(1);
+    expect(await target.countRows('article_contents')).toBe(2);
+    expect(await target.countWhere('article_contents', `content_html like '%<script%'`)).toBe(0);
+    expect(reportOf(result, 'cms')).toMatchObject({
+      articlesProductCleared: 1,
+      contentsOrphaned: 1,
+      contentsUnsanitised: 0,
+    });
+
+    // --- wechat-oa -------------------------------------------------------------
+    expect(await target.countRows('wechat_oa_menus')).toBe(1);
+    expect(await target.countRows('wechat_auto_replies')).toBe(3);
+    expect(await target.countRows('wechat_qrcode_categories')).toBe(3);
+    expect(await target.countWhere('wechat_qrcode_categories', `name = '线下门店（#2）'`)).toBe(1);
+    expect(await target.countRows('wechat_qrcodes')).toBe(1);
+    expect(await target.countWhere('wechat_qrcodes', `scene = '1'`)).toBe(1);
+    expect(await target.countRows('wechat_qrcode_scans')).toBe(2);
+    expect(await target.countWhere('wechat_qrcode_scans', 'user_id is null')).toBe(1);
+    expect(await target.countRows('wechat_media')).toBe(1);
+    expect(reportOf(result, 'wechat-oa')).toMatchObject({
+      repliesDroppedKefu: 1,
+      repliesDroppedNoKeyword: 1,
+      repliesDroppedUnknownType: 1,
+      categoriesRenamedDuplicate: 1,
+      qrcodesDroppedNoTicket: 1,
+      scansDroppedUnknownQrcode: 1,
+      mediaDroppedExpired: 1,
+      mediaDroppedNoHandle: 1,
+    });
+
+    // --- notification ----------------------------------------------------------
+    // 三个旧模板落到新 code 上；分销的那个点名丢弃。站内信：收件人不存在的、
+    // 已删除的丢弃，发给管理员的落在 admin_id 上。
+    const codes = await target.query<{ code: string }>(
+      'select code from notification_templates order by code',
+    );
+    expect(codes.map((row) => row.code)).toEqual([
+      'admin_order_paid',
+      'order_paid',
+      'order_received',
+    ]);
+    expect(await target.countRows('notification_messages')).toBe(3);
+    expect(await target.countWhere('notification_messages', 'admin_id = 1')).toBe(1);
+    expect(reportOf(result, 'notification')).toMatchObject({
+      templatesDroppedUnknownMark: ['revenue_received（收益到账）'],
+      messagesDroppedDeleted: 1,
+      messagesDroppedUnknownRecipient: 1,
+    });
+
+    // --- groupbuy / presale ----------------------------------------------------
+    // 活动迁过去，活动价行按 (商品, 规格) 对上新 SKU；团和预售订单是订单的一部分，
+    // 只记数，不搬运。
+    expect(await target.countRows('groupbuy_activities')).toBe(2);
+    expect(await target.countRows('groupbuy_activity_skus')).toBe(3);
+    expect(await target.countWhere('groupbuy_activities', 'shipping_template_id is null')).toBe(1);
+    expect(reportOf(result, 'groupbuy')).toMatchObject({
+      activitiesDroppedDeleted: 1,
+      activitiesDroppedSeats: 1,
+      activitiesDroppedUnknownProduct: 1,
+      activitiesShippingTemplateCleared: 1,
+      activitySkusDroppedUnknownSku: 1,
+      virtualPercentagesDropped: 1,
+      teamsSkipped: 2,
+    });
+    expect(await target.countRows('presale_activities')).toBe(1);
+    expect(await target.countRows('presale_activity_skus')).toBe(2);
+    expect(await target.countWhere('presale_activities', `payment_mode = 'deposit'`)).toBe(1);
+    expect(reportOf(result, 'presale')).toMatchObject({
+      activitiesDroppedDeleted: 1,
+      activitiesDroppedUnknownProduct: 1,
+      activitySkusDroppedUnknownSku: 1,
+      presaleOrdersSkipped: 1,
+    });
 
     // 序列必须走到 max(id) 之后，否则运营新建的第一个商品就撞上 1 号。
     const [next] = await target.query<{ value: string }>(
@@ -275,10 +430,48 @@ describe('etl run + verify', () => {
   }, 300_000);
 
   it('--require-complete 在还有 group 没落地时拒绝跑', async () => {
-    await expect(run({ source, target, requireComplete: true, uploadsRoot })).rejects.toThrow(
-      /mapper 没有落地/,
-    );
+    // Every real group has landed, so the refusal is proved against a registry
+    // with one pending group added — the gate's logic, not today's backlog.
+    const before = await dumpMigratedTables(target);
+    await expect(
+      run({ source, target, requireComplete: true, uploadsRoot, groups: [...GROUPS, UNFINISHED] }),
+    ).rejects.toThrow(/mapper 没有落地/);
+    // It refuses before touching anything.
+    expect(await dumpMigratedTables(target)).toEqual(before);
   });
+
+  it('一个 group 失败，整次迁移回滚，目标库保持原样', async () => {
+    // One run is one transaction: a group that fails after earlier groups
+    // already wrote leaves the database exactly as it was, not half-migrated.
+    const before = await dumpMigratedTables(target);
+    const failing = run({
+      source,
+      target,
+      uploadsRoot,
+      migratedAt: new Date('2026-01-01'),
+      groups: [...GROUPS, EXPLODING],
+    });
+    await expect(failing).rejects.toThrow(/整次迁移的事务已回滚/);
+    expect(await dumpMigratedTables(target)).toEqual(before);
+  }, 300_000);
+
+  it('下一次发版重跑 db:seed，迁过来的快递排序、显示开关和通知模板名称都还在', async () => {
+    // compose 的 migrate 在每次升级时都跑种子数据（CR-1-r7）。
+    const handle = createDb(database.url);
+    try {
+      await handle.db.transaction((tx) => seedReference(tx));
+    } finally {
+      await handle.close();
+    }
+    const result = await verify({ source, target, uploadsRoot });
+    const kept = result.checks.filter((check) =>
+      ['shipping:express', 'notification:templates'].includes(check.name),
+    );
+    expect(kept.map((check) => `${check.name}: ${check.ok ? 'ok' : check.detail}`)).toEqual([
+      'shipping:express: ok',
+      'notification:templates: ok',
+    ]);
+  }, 300_000);
 
   it('没跑过种子数据的库，迁移在动手之前就拒绝开始', async () => {
     // 收货地址的 city_id 指向 cities，而 cities 不由迁移产生。忘了跑种子数据时，
@@ -322,6 +515,23 @@ async function seedCities(target: Target): Promise<void> {
   // by hand collides with 北京市.
   await target.query(
     `select setval(pg_get_serial_sequence('cities', 'id'), (select max(id) from cities))`,
+  );
+}
+
+/**
+ * The slice of the courier dictionary the fixture's overrides land on, with the
+ * ids, codes and defaults `seed-data/express-companies.json` gives them. The
+ * `shipping` group upserts onto these rows rather than creating its own.
+ */
+async function seedCouriers(target: Target): Promise<void> {
+  await target.query(`
+    insert into express_companies (id, code, name, sort_order, is_enabled) values
+      (2, 'shunfeng',  '顺丰速运', 0, true),
+      (3, 'yuantong',  '圆通速递', 0, true),
+      (4, 'zhongtong', '中通快递', 0, true)
+  `);
+  await target.query(
+    `select setval(pg_get_serial_sequence('express_companies', 'id'), (select max(id) from express_companies))`,
   );
 }
 

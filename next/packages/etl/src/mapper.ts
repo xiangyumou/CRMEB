@@ -90,6 +90,25 @@ export interface TargetSpec<Output extends MapperOutput = MapperOutput> {
    * it that ends with either the column existing or the mapper not emitting it.
    */
   readonly dropColumns?: readonly { readonly column: string; readonly reason: string }[];
+  /**
+   * Merge into a table `packages/db`'s seed already filled, instead of
+   * emptying and reloading it.
+   *
+   * Two tables need this, and both for the same reason: the seed writes rows
+   * the application relies on that no legacy table holds. `express_companies`
+   * is the 1101-row carrier catalogue — the legacy `eb_express` only carries
+   * what an operator changed on it (the order and the on/off switch) — and
+   * `notification_templates` holds the registry's shells. Emptying either would
+   * delete seed rows the ETL cannot put back, which is exactly the "two sources
+   * of truth" that decision 9 in `status/j.md` forbids.
+   *
+   * So the rows are written `INSERT … ON CONFLICT (conflict) DO UPDATE`: a row
+   * the seed has is overwritten column by column with what the mapper
+   * produced (never `created_at`, which stays the seed's), a row it lacks is
+   * inserted. Running it twice changes nothing, which is what makes it safe to
+   * leave out of the clear. `reason` is printed with the run report.
+   */
+  readonly upsert?: { readonly conflict: readonly string[]; readonly reason: string };
 }
 
 /**
@@ -194,6 +213,27 @@ export interface GroupContext {
    * not come from here — those are `keptIds`, filled in group order.
    */
   readonly idsOf: (table: string, column?: string) => Promise<ReadonlySet<number>>;
+  /**
+   * Some columns of a table another group has **already loaded in this run**,
+   * read inside the run's transaction, so it sees what that group wrote.
+   *
+   * `groupbuy` and `presale` point their SKU rows at `product_skus.id`, which
+   * the legacy side does not have: the only way to find it is the pair
+   * `(product_id, spec_text)` catalog just wrote. Column names are constants in
+   * `groups.ts`, never input.
+   */
+  readonly selectTarget: <T extends Record<string, unknown>>(
+    table: string,
+    columns: readonly string[],
+  ) => Promise<T[]>;
+  /**
+   * `select count(*)` against the legacy database — for a table a mapper only
+   * needs to *report on*, never to read row by row. `eb_store_pink` is the
+   * case: teams are not migrated (PLAN §6), and the number of rows that were
+   * left behind belongs in the report rather than in a guess. A table the dump
+   * does not have counts as 0.
+   */
+  readonly countSource: (table: string, where?: string) => Promise<number>;
   /** Free-text findings that end up in the run report. Never a value. */
   readonly notes: string[];
 }

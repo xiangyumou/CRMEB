@@ -1,11 +1,25 @@
 /**
  * `plan` and `run`.
  *
- * One group = one PostgreSQL transaction. Inside it: empty exactly this group's
- * target tables, insert the mapper's rows, reset the identity sequences. If
- * anything throws, the transaction rolls back and that group's tables are
- * **exactly as they were** — which is the property that makes a failed
- * migration recoverable instead of a restore-from-backup.
+ * **One run = one PostgreSQL transaction.** Inside it: empty every target
+ * table of every selected group (children first, across groups), then load
+ * the groups in order — insert the mapper's rows, reset the identity
+ * sequences — and finally assert that nothing order-shaped was written. If
+ * anything throws, the transaction rolls back and the target database is
+ * **exactly as it was**, which is the property that makes a failed migration
+ * recoverable instead of a restore-from-backup.
+ *
+ * It used to be one transaction *per group*. That stopped working the moment
+ * a later group held a restricting foreign key into an earlier one:
+ * `products.shipping_template_id` restricts `shipping_templates`, and
+ * `groupbuy_activities` / `presale_activities` restrict `products` and
+ * `product_skus`. On a second run, `shipping` would try to empty its templates
+ * while run #1's products still pointed at them, and fail. Emptying everything
+ * first, in reverse load order, is the only order in which every `DELETE` is
+ * legal — and doing it in the same transaction as the load is what keeps
+ * "a failed run changes nothing" true. `--group` still empties exactly that
+ * group's tables, and a restricting reference from another group's rows then
+ * fails the `DELETE` with the constraint's name, which is the right answer.
  *
  * Idempotency comes from the same place. Running twice empties and reloads the
  * same tables from the same source snapshot, so the second run produces the
@@ -20,7 +34,7 @@
  */
 
 import { GROUPS, groupByName } from './groups';
-import { assertNotMigrated } from './lib/not-migrated';
+import { assertNotMigrated, type RowCounter } from './lib/not-migrated';
 import { rowsByTable, type ErasedGroup, type GroupContext, type TargetRow } from './mapper';
 import type { Source } from './source';
 import { snakeCase, type Target, type TargetTx } from './target';
@@ -30,6 +44,12 @@ export interface RunOptions {
   target: Target;
   /** Only this group (plus nothing else). Absent means every ready group. */
   group?: string;
+  /**
+   * The group registry. Defaults to `GROUPS`; a test passes its own to prove
+   * the `--require-complete` gate against a pending group, now that the real
+   * registry has none.
+   */
+  groups?: readonly ErasedGroup[];
   /** Map and report, but roll back instead of committing. */
   dryRun?: boolean;
   /** Fail if any group is still pending. The cutover gate. */
@@ -58,7 +78,11 @@ export interface GroupResult {
   group: string;
   title: string;
   owner: string;
-  status: 'loaded' | 'pending' | 'skipped' | 'failed';
+  /**
+   * `rolled-back`: the group loaded, then a later group failed and the run's
+   * one transaction took it back out. `skipped`: a dry run.
+   */
+  status: 'loaded' | 'pending' | 'skipped' | 'failed' | 'rolled-back';
   /** The mapper's own report, printed verbatim. Never holds a config value. */
   report?: unknown;
   tables: TableResult[];
@@ -141,11 +165,12 @@ export async function plan(options: { source: Source; group?: string }): Promise
 // run
 // ---------------------------------------------------------------------------
 
-function selectGroups(name?: string): ErasedGroup[] {
-  if (name === undefined) return [...GROUPS];
-  const group = groupByName(name);
+function selectGroups(name?: string, registry: readonly ErasedGroup[] = GROUPS): ErasedGroup[] {
+  if (name === undefined) return [...registry];
+  const group =
+    registry === GROUPS ? groupByName(name) : registry.find((entry) => entry.name === name);
   if (!group) {
-    throw new Error(`没有名为 "${name}" 的 group。可用：${GROUPS.map((g) => g.name).join(', ')}`);
+    throw new Error(`没有名为 "${name}" 的 group。可用：${registry.map((g) => g.name).join(', ')}`);
   }
   return [group];
 }
@@ -154,8 +179,9 @@ export async function run(options: RunOptions): Promise<RunResult> {
   const startedAt = Date.now();
   const log = options.log ?? (() => undefined);
   const migratedAt = options.migratedAt ?? new Date();
-  const groups = selectGroups(options.group);
-  const pending = GROUPS.filter((group) => group.pending);
+  const registry = options.groups ?? GROUPS;
+  const groups = selectGroups(options.group, registry);
+  const pending = registry.filter((group) => group.pending);
 
   if (options.requireComplete === true && pending.length > 0) {
     throw new PendingGroupsError(pending.map((g) => ({ group: g.name, owner: g.owner })));
@@ -171,191 +197,75 @@ export async function run(options: RunOptions): Promise<RunResult> {
   const pendingNames = new Set(pending.map((group) => group.name));
   const results: GroupResult[] = [];
 
-  for (const group of groups) {
-    const groupStartedAt = Date.now();
+  try {
+    await options.target.transaction(async (tx: TargetTx) => {
+      if (options.group === undefined) {
+        // Every group's own tables, children first *across* groups: the only
+        // order in which a restricting reference from a later group (a group
+        // buy's product, a product's freight template) never blocks a DELETE.
+        // Seeded tables that are merged rather than reloaded are left alone.
+        const tables = groups
+          .filter((group) => !group.pending)
+          .flatMap((group) => clearedTargets(group));
+        await tx.clear(tables);
+      }
 
-    if (group.pending) {
-      log(`  ${group.name}: pending —《${group.title}》的 mapper 还没写（owner: ${group.owner}）`);
-      results.push({
-        group: group.name,
-        title: group.title,
-        owner: group.owner,
-        status: 'pending',
-        tables: [],
-        sourceRows: [],
-        notes: [`mapper 未落地，本组一行数据都没有迁移；owner: ${group.owner}`],
-        durationMs: Date.now() - groupStartedAt,
-      });
-      continue;
-    }
-
-    const notes: string[] = [];
-    const context: GroupContext = {
-      migratedAt,
-      keptIds,
-      pending: pendingNames,
-      uploadsRoot: options.uploadsRoot ?? null,
-      allowInvalidConfig: options.allowInvalidConfig === true,
-      idsOf: (table, column) => loadSurvivingIds(options.target, table, column),
-      notes,
-    };
-
-    try {
-      // --- read the source ---------------------------------------------------
-      const input: Record<string, unknown> = {};
-      const sourceRows: { table: string; rows: number }[] = [];
-      for (const source of group.sources) {
-        if (source.optional === true && !(await options.source.tableExists(source.table))) {
-          notes.push(`旧库没有可选表 ${source.table}，按空表处理`);
-          input[source.into] = [];
-          sourceRows.push({ table: source.table, rows: 0 });
+      for (const group of groups) {
+        if (group.pending) {
+          log(
+            `  ${group.name}: pending —《${group.title}》的 mapper 还没写（owner: ${group.owner}）`,
+          );
+          results.push({
+            group: group.name,
+            title: group.title,
+            owner: group.owner,
+            status: 'pending',
+            tables: [],
+            sourceRows: [],
+            notes: [`mapper 未落地，本组一行数据都没有迁移；owner: ${group.owner}`],
+            durationMs: 0,
+          });
           continue;
         }
-        const rows = await options.source.rows(source.table, source.where);
-        input[source.into] = rows;
-        sourceRows.push({ table: source.table, rows: rows.length });
-      }
-
-      // --- soft dependencies -------------------------------------------------
-      for (const dependency of group.softDependencies) {
-        const ids = keptIds.get(`${dependency.group}:${dependency.table}`);
-        input[dependency.into] = ids ?? new Set<number>();
-        if (ids === undefined) {
-          notes.push(
-            `${dependency.group} 还没迁移（pending），所以 ${dependency.into} 是空集合：` +
-              `指向它的行会被丢弃，数量见下面 mapper 自己的报告`,
-          );
-        }
-      }
-
-      Object.assign(input, await group.extras(context));
-
-      // --- map ---------------------------------------------------------------
-      const output = group.map(input);
-      const mapped = rowsByTable(group, output);
-
-      // --- preflight: does every field the mapper emits have a column? -------
-      // Before anything is written, so the failure names the mapper, the table
-      // and the field instead of arriving as `column "x" of relation "y" does
-      // not exist` from four frames deeper.
-      const dropped = await checkColumns(options.target, group, mapped, notes);
-
-      // Which of each table's columns are `json`/`jsonb`, asked of the database
-      // so the encoding cannot drift from the schema.
-      const jsonKeys = new Map<string, string[]>();
-      for (const target of group.targets) {
-        const columns = await options.target.columnsOf(target.table);
-        const jsonColumns = await options.target.jsonColumnsOf(target.table);
-        const rows = mapped.get(target.table) ?? [];
-        const keys = new Set<string>();
-        for (const row of rows) {
-          for (const key of Object.keys(row)) if (jsonColumns.has(snakeCase(key))) keys.add(key);
-        }
-        jsonKeys.set(target.table, [...keys]);
-        pinTimestamps(rows, columns, migratedAt);
-      }
-
-      // --- load, in one transaction ------------------------------------------
-      const tables = await options.target.transaction(async (tx: TargetTx) => {
-        await tx.clear(group.targets.map((target) => target.table));
-        const loaded: TableResult[] = [];
-        for (const target of group.targets) {
-          const rows = mapped.get(target.table) ?? [];
-          const finalised = await group.finalise(target.table, rows, context);
-          const toInsert = stripColumns(finalised, dropped.get(target.table));
-          // A table whose rows carry no id of their own gets them from the
-          // identity sequence — and the sequence does not go back to where it
-          // was when the previous run's rows were deleted a few lines up. Run
-          // the migration twice and the same `wechat_identities` row is id 1,
-          // then id 2: the data is identical, the ids are not, which is enough
-          // to break "load twice and compare" and, worse, enough to make two
-          // rehearsals disagree about a row a support ticket quotes.
-          //
-          // The table is empty at this point, so `resetSequence` restarts it
-          // at 1 (`is_called = false`) and the reload reproduces the first
-          // run's ids exactly. Only when *no* row brings an id: restarting
-          // underneath a batch that carries explicit ids would hand the
-          // sequence a value some other row already occupies.
-          if (toInsert.length > 0 && toInsert.every((row) => row['id'] === undefined)) {
-            await tx.resetSequence(target.table);
-          }
-          const inserted = await tx.insert(
-            target.table,
-            toInsert,
-            jsonKeys.get(target.table) ?? [],
-          );
-          const sequence = await tx.resetSequence(target.table);
-          loaded.push({ table: target.table, mapped: rows.length, inserted, sequence });
-        }
-        if (options.dryRun === true) {
-          // Everything above really ran — the inserts, the constraints, the
-          // sequences — and is then thrown away. A dry run that skips the
-          // inserts proves nothing about whether they would have worked.
-          throw new DryRun(loaded);
-        }
-        return loaded;
-      });
-
-      // Publish the ids a later group's soft dependency will filter on, read
-      // back from the database rather than from the mapper's output: what
-      // matters downstream is what the constraints accepted, not what the
-      // mapper hoped for. Only the tables somebody actually asks about are
-      // read back — catalog has eighteen.
-      for (const wanted of wantedIdSets(group.name)) {
-        keptIds.set(
-          `${group.name}:${wanted.table}`,
-          await loadSurvivingIds(options.target, wanted.table, wanted.column),
+        results.push(
+          await loadGroup(group, tx, {
+            options,
+            registry,
+            migratedAt,
+            keptIds,
+            pendingNames,
+            results,
+            log,
+          }),
         );
       }
-      results.push({
-        group: group.name,
-        title: group.title,
-        owner: group.owner,
-        status: 'loaded',
-        report: output.report,
-        tables,
-        sourceRows,
-        notes,
-        durationMs: Date.now() - groupStartedAt,
-      });
-      log(
-        `  ${group.name}: ${tables.reduce((sum, t) => sum + t.inserted, 0).toString()} 行写入 ` +
-          `${String(tables.length)} 张表（${String(Date.now() - groupStartedAt)}ms）`,
-      );
-    } catch (error) {
-      if (error instanceof DryRun) {
-        results.push({
-          group: group.name,
-          title: group.title,
-          owner: group.owner,
-          status: 'skipped',
-          tables: error.tables,
-          sourceRows: [],
-          notes: [...notes, '试运行：已映射并试插入，事务已回滚'],
-          durationMs: Date.now() - groupStartedAt,
-        });
-        log(`  ${group.name}: 试运行通过（事务已回滚）`);
-        continue;
+
+      if (options.dryRun === true) {
+        // Everything above really ran — the inserts, the constraints, the
+        // sequences — and is then thrown away. A dry run that skips the
+        // inserts proves nothing about whether they would have worked.
+        throw new DryRun();
       }
-      results.push({
-        group: group.name,
-        title: group.title,
-        owner: group.owner,
-        status: 'failed',
-        tables: [],
-        sourceRows: [],
-        notes,
-        durationMs: Date.now() - groupStartedAt,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      // The transaction already rolled back, so this group's tables are exactly
-      // as they were. Stop: a later group would load against half a migration.
-      throw new GroupFailedError(group.name, error, results);
+      // Nothing above may have written an order, a cart, a payment or a
+      // refund. Asserted inside the transaction, so a violation takes the
+      // whole run back out rather than leaving it committed and flagged.
+      await assertNotMigrated(txCounter(tx));
+    });
+  } catch (error) {
+    if (error instanceof DryRun) {
+      for (const result of results) {
+        if (result.status !== 'loaded') continue;
+        result.status = 'skipped';
+        result.notes.push('试运行：已映射并试插入，事务已回滚');
+      }
+      log('  试运行通过（整次迁移的事务已回滚）');
+    } else {
+      for (const result of results) {
+        if (result.status === 'loaded') result.status = 'rolled-back';
+      }
+      throw error;
     }
   }
-
-  // Nothing above may have written an order, a cart, a payment or a refund.
-  if (options.dryRun !== true) await assertNotMigrated(options.target);
 
   return {
     migratedAt,
@@ -367,6 +277,216 @@ export async function run(options: RunOptions): Promise<RunResult> {
       title: group.title,
     })),
     durationMs: Date.now() - startedAt,
+  };
+}
+
+/** A group's targets that `run` empties before loading — all but the merged ones. */
+function clearedTargets(group: ErasedGroup): string[] {
+  return group.targets.filter((target) => target.upsert === undefined).map((t) => t.table);
+}
+
+interface LoadState {
+  options: RunOptions;
+  registry: readonly ErasedGroup[];
+  migratedAt: Date;
+  keptIds: Map<string, ReadonlySet<number>>;
+  pendingNames: ReadonlySet<string>;
+  /** Earlier groups' results, carried by a `GroupFailedError`. */
+  results: GroupResult[];
+  log: (line: string) => void;
+}
+
+/** One group: read, map, preflight, load — inside the run's transaction. */
+async function loadGroup(group: ErasedGroup, tx: TargetTx, state: LoadState): Promise<GroupResult> {
+  const { options, migratedAt, keptIds, log } = state;
+  const groupStartedAt = Date.now();
+  const notes: string[] = [];
+  const context: GroupContext = {
+    migratedAt,
+    keptIds,
+    pending: state.pendingNames,
+    uploadsRoot: options.uploadsRoot ?? null,
+    allowInvalidConfig: options.allowInvalidConfig === true,
+    idsOf: (table, column) => survivingIds(tx, table, column),
+    selectTarget: async <T extends Record<string, unknown>>(
+      table: string,
+      columns: readonly string[],
+    ) =>
+      tx.query<T>(
+        `select ${columns.map((column) => `"${column}"`).join(', ')} from "${table}" order by 1`,
+      ),
+    countSource: async (table, where) =>
+      (await options.source.tableExists(table)) ? options.source.count(table, where) : 0,
+    notes,
+  };
+
+  try {
+    // --- read the source -----------------------------------------------------
+    const input: Record<string, unknown> = {};
+    const sourceRows: { table: string; rows: number }[] = [];
+    for (const source of group.sources) {
+      if (source.optional === true && !(await options.source.tableExists(source.table))) {
+        notes.push(`旧库没有可选表 ${source.table}，按空表处理`);
+        input[source.into] = [];
+        sourceRows.push({ table: source.table, rows: 0 });
+        continue;
+      }
+      const rows = await options.source.rows(source.table, source.where);
+      input[source.into] = rows;
+      sourceRows.push({ table: source.table, rows: rows.length });
+    }
+
+    // --- soft dependencies ---------------------------------------------------
+    for (const dependency of group.softDependencies) {
+      const ids = keptIds.get(`${dependency.group}:${dependency.table}`);
+      input[dependency.into] = ids ?? new Set<number>();
+      if (ids === undefined) {
+        notes.push(
+          `${dependency.group} 还没迁移（pending），所以 ${dependency.into} 是空集合：` +
+            `指向它的行会被丢弃，数量见下面 mapper 自己的报告`,
+        );
+      }
+    }
+
+    Object.assign(input, await group.extras(context));
+
+    // --- map -------------------------------------------------------------------
+    const output = group.map(input);
+    const mapped = rowsByTable(group, output);
+
+    // --- preflight: does every field the mapper emits have a column? ---------
+    // Before anything is written, so the failure names the mapper, the table
+    // and the field instead of arriving as `column "x" of relation "y" does
+    // not exist` from four frames deeper.
+    const dropped = await checkColumns(options.target, group, mapped, notes);
+
+    // Which of each table's columns are `json`/`jsonb`, asked of the database
+    // so the encoding cannot drift from the schema.
+    const jsonKeys = new Map<string, string[]>();
+    for (const target of group.targets) {
+      const columns = await options.target.columnsOf(target.table);
+      const jsonColumns = await options.target.jsonColumnsOf(target.table);
+      const rows = mapped.get(target.table) ?? [];
+      const keys = new Set<string>();
+      for (const row of rows) {
+        for (const key of Object.keys(row)) if (jsonColumns.has(snakeCase(key))) keys.add(key);
+      }
+      jsonKeys.set(target.table, [...keys]);
+      pinTimestamps(rows, columns, migratedAt);
+    }
+
+    // --- load ------------------------------------------------------------------
+    // Empty in a full run already; `--group` empties exactly this group here.
+    await tx.clear(clearedTargets(group));
+    const tables: TableResult[] = [];
+    for (const target of group.targets) {
+      const rows = mapped.get(target.table) ?? [];
+      const finalised = await group.finalise(target.table, rows, context);
+      const toInsert = stripColumns(finalised, dropped.get(target.table));
+      let inserted: number;
+      if (target.upsert !== undefined) {
+        notes.push(
+          `${target.table} 按 (${target.upsert.conflict.join(', ')}) 合并，不清空：${target.upsert.reason}`,
+        );
+        inserted = await tx.upsert(
+          target.table,
+          toInsert,
+          target.upsert.conflict,
+          jsonKeys.get(target.table) ?? [],
+        );
+      } else {
+        // A table whose rows carry no id of their own gets them from the
+        // identity sequence — and the sequence does not go back to where it
+        // was when the previous run's rows were deleted. Run the migration
+        // twice and the same `wechat_identities` row is id 1, then id 2: the
+        // data is identical, the ids are not, which is enough to break "load
+        // twice and compare" and, worse, enough to make two rehearsals
+        // disagree about a row a support ticket quotes.
+        //
+        // The table is empty at this point, so `resetSequence` restarts it at
+        // 1 (`is_called = false`) and the reload reproduces the first run's
+        // ids exactly. Only when *no* row brings an id: restarting underneath
+        // a batch that carries explicit ids would hand the sequence a value
+        // some other row already occupies. Never for a merged table, which is
+        // not empty.
+        if (toInsert.length > 0 && toInsert.every((row) => row['id'] === undefined)) {
+          await tx.resetSequence(target.table);
+        }
+        inserted = await tx.insert(target.table, toInsert, jsonKeys.get(target.table) ?? []);
+      }
+      const sequence = await tx.resetSequence(target.table);
+      tables.push({ table: target.table, mapped: rows.length, inserted, sequence });
+    }
+
+    // Publish the ids a later group's soft dependency will filter on, read
+    // back from the database rather than from the mapper's output: what
+    // matters downstream is what the constraints accepted, not what the mapper
+    // hoped for. Only the tables somebody actually asks about are read back —
+    // catalog has eighteen.
+    for (const wanted of wantedIdSets(group.name, state.registry)) {
+      keptIds.set(
+        `${group.name}:${wanted.table}`,
+        await survivingIds(tx, wanted.table, wanted.column),
+      );
+    }
+    log(
+      `  ${group.name}: ${tables.reduce((sum, t) => sum + t.inserted, 0).toString()} 行写入 ` +
+        `${String(tables.length)} 张表（${String(Date.now() - groupStartedAt)}ms）`,
+    );
+    return {
+      group: group.name,
+      title: group.title,
+      owner: group.owner,
+      status: 'loaded',
+      report: output.report,
+      tables,
+      sourceRows,
+      notes,
+      durationMs: Date.now() - groupStartedAt,
+    };
+  } catch (error) {
+    state.results.push({
+      group: group.name,
+      title: group.title,
+      owner: group.owner,
+      status: 'failed',
+      tables: [],
+      sourceRows: [],
+      notes,
+      durationMs: Date.now() - groupStartedAt,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // The run's one transaction rolls back on the way out, so the target is
+    // exactly as it was. Stop: a later group would load against half a
+    // migration.
+    throw new GroupFailedError(group.name, error, state.results);
+  }
+}
+
+/** `RowCounter` over the run's transaction, for the not-migrated assertion. */
+function txCounter(tx: TargetTx): RowCounter {
+  const exists = async (table: string): Promise<boolean> => {
+    const [row] = await tx.query<{ present: boolean }>(
+      `select to_regclass($1) is not null as present`,
+      [table],
+    );
+    return row?.present === true;
+  };
+  return {
+    async countRows(table) {
+      if (!(await exists(table))) return 0;
+      const [row] = await tx.query<{ count: string }>(
+        `select count(*)::text as count from "${table}"`,
+      );
+      return Number(row?.count ?? '0');
+    },
+    async countWhere(table, predicate) {
+      if (!(await exists(table))) return 0;
+      const [row] = await tx.query<{ count: string }>(
+        `select count(*)::text as count from "${table}" where ${predicate}`,
+      );
+      return Number(row?.count ?? '0');
+    },
   };
 }
 
@@ -540,11 +660,9 @@ function stripColumns(rows: readonly TargetRow[], strip: Set<string> | undefined
 
 /** Thrown inside the transaction to force a rollback after a successful load. */
 class DryRun extends Error {
-  readonly tables: TableResult[];
-  constructor(tables: TableResult[]) {
+  constructor() {
     super('dry run');
     this.name = 'DryRun';
-    this.tables = tables;
   }
 }
 
@@ -553,7 +671,7 @@ export class GroupFailedError extends Error {
   readonly results: readonly GroupResult[];
   constructor(group: string, cause: unknown, results: readonly GroupResult[]) {
     super(
-      `group "${group}" 失败，事务已回滚，它的目标表保持原样：\n  ` +
+      `group "${group}" 失败，整次迁移的事务已回滚，目标库保持原样：\n  ` +
         (cause instanceof Error ? cause.message : String(cause)),
       { cause },
     );
@@ -564,9 +682,12 @@ export class GroupFailedError extends Error {
 }
 
 /** Which of a group's tables some later group's soft dependency asks about. */
-function wantedIdSets(groupName: string): { table: string; column: string }[] {
+function wantedIdSets(
+  groupName: string,
+  registry: readonly ErasedGroup[],
+): { table: string; column: string }[] {
   const wanted = new Map<string, { table: string; column: string }>();
-  for (const other of GROUPS) {
+  for (const other of registry) {
     for (const dependency of other.softDependencies) {
       if (dependency.group !== groupName) continue;
       const column = dependency.column ?? 'id';
@@ -576,14 +697,21 @@ function wantedIdSets(groupName: string): { table: string; column: string }[] {
   return [...wanted.values()];
 }
 
-/** Reads back the ids a group loaded, so the next group can filter on them. */
-export async function loadSurvivingIds(
-  target: Target,
+/**
+ * The ids in a table, read inside the run's transaction — the ids a group just
+ * loaded (so the next group can filter on them), or a seeded dictionary's.
+ */
+async function survivingIds(
+  tx: TargetTx,
   table: string,
   column = 'id',
 ): Promise<ReadonlySet<number>> {
-  if (!(await target.tableExists(table))) return new Set<number>();
-  const rows = await target.query<{ id: string }>(`select "${column}"::text as id from "${table}"`);
+  const [exists] = await tx.query<{ present: boolean }>(
+    `select to_regclass($1) is not null as present`,
+    [table],
+  );
+  if (exists?.present !== true) return new Set<number>();
+  const rows = await tx.query<{ id: string }>(`select "${column}"::text as id from "${table}"`);
   return new Set(rows.map((row) => Number(row.id)));
 }
 

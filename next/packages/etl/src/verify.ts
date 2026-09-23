@@ -6,17 +6,25 @@
  * operator reads before switching traffic. Every check names what it compared
  * so a failure is actionable; nothing here prints a config value.
  *
- * The seven checks:
+ * The seven checks (every group has at least a row count in the first):
  *
  *  1. **row counts** — a declared expectation per group, written as a *source
  *     filter → target table* pair. `exact` where the mapper's filter is simple
  *     and documented (a deleted admin is dropped, a 会员券 is dropped); `atMost`
  *     where it drops rows for reasons only its own report can explain, so that
  *     this file does not quietly become a second copy of the mapper.
- *  2. **money sums** — coupon face values and SKU prices add up to the same
- *     total on both sides, in integer arithmetic (`lib/money.ts`). A mapping
- *     that loses a row usually keeps the count and changes the total, or the
- *     other way round; checking both catches either.
+ *  2. **money sums** — coupon face values, SKU and product prices, group-buy
+ *     and presale activity prices add up to the same total on both sides, in
+ *     integer arithmetic (`lib/money.ts`). A mapping that loses a row usually
+ *     keeps the count and changes the total, or the other way round; checking
+ *     both catches either. Groups with no money (system, config, storage,
+ *     user, cms, diy, wechat-oa, notification) have nothing to sum; shipping
+ *     has prices but regroups them — one legacy row per city became one rule
+ *     per set of cities — so a total is not an invariant there, and
+ *     **per-group structure** checks what is: every template has exactly one
+ *     fallback rule, every courier override landed, every QR code answers to
+ *     its legacy scene, every legacy notification template landed under its
+ *     new code.
  *  3. **DIY pages as parsed JSON** — CR-1-g1: `jsonb` reorders the keys inside
  *     a node, so byte comparison is meaningless and *document* comparison is
  *     the real invariant. The column is read as text (the driver-wide parser in
@@ -36,11 +44,14 @@
 
 import { stat } from 'node:fs/promises';
 
+import { allNotificationEvents } from '@shop/core/notification';
+
 import { GROUPS } from './groups';
 import { digestFile } from './lib/digest';
 import { sumDecimalStrings } from './lib/money';
 import { findNotMigratedOffenders } from './lib/not-migrated';
 import { localFilePath } from './lib/storage-keys';
+import { MARK_TO_CODE } from './mappers/notification';
 import type { Source } from './source';
 import type { Target } from './target';
 
@@ -82,6 +93,22 @@ interface CountExpectation {
   note?: string;
 }
 
+/**
+ * A channel code that was actually generated at WeChat: its ticket lives in
+ * `eb_qrcode`, not on the code's own row. The same predicate the mapper applies.
+ */
+const WECHAT_QRCODE_WITH_TICKET =
+  "id in (select third_id from eb_qrcode where third_type = 'wechatqrcode' and ticket <> '')";
+
+/**
+ * The activities the mappers keep. Catalog migrates every product, soft-deleted
+ * ones included (the `products` count is exact), so "the product survived" is
+ * "the product is in the dump". `people >= 2` is the new CHECK on team size.
+ */
+const GROUPBUY_KEPT =
+  'is_del = 0 and people >= 2 and product_id in (select id from eb_store_product)';
+const PRESALE_KEPT = 'is_del = 0 and product_id in (select id from eb_store_product)';
+
 const COUNTS: readonly CountExpectation[] = [
   {
     group: 'system',
@@ -106,6 +133,40 @@ const COUNTS: readonly CountExpectation[] = [
     note: '没有路径、路径重复、或本地文件缺失（算不出 sha256）的行会被丢弃并计数',
   },
   {
+    group: 'user',
+    sourceTable: 'eb_user',
+    targetTable: 'users',
+    mode: 'exact',
+    note: '注销的会员也迁移（带 deleted_at），否则他们的历史订单会悬空',
+  },
+  {
+    group: 'user',
+    sourceTable: 'eb_user_address',
+    sourceWhere: 'uid in (select uid from eb_user)',
+    targetTable: 'user_addresses',
+    mode: 'exact',
+  },
+  {
+    group: 'user',
+    sourceTable: 'eb_user_label',
+    targetTable: 'user_labels',
+    mode: 'atMost',
+    note: '同名标签只留第一个，其余丢弃并计数（labelsDroppedDuplicateName）',
+  },
+  {
+    group: 'user',
+    sourceTable: 'eb_wechat_user',
+    targetTable: 'wechat_identities',
+    mode: 'atMost',
+    note: '账号已不存在或 openid 重复的行会被丢弃并计数',
+  },
+  {
+    group: 'shipping',
+    sourceTable: 'eb_shipping_templates',
+    targetTable: 'shipping_templates',
+    mode: 'exact',
+  },
+  {
     group: 'catalog',
     sourceTable: 'eb_store_category',
     targetTable: 'product_categories',
@@ -117,6 +178,38 @@ const COUNTS: readonly CountExpectation[] = [
     targetTable: 'products',
     mode: 'exact',
     note: '软删除的商品也要迁移，否则订单明细会悬空',
+  },
+  {
+    group: 'groupbuy',
+    sourceTable: 'eb_store_combination',
+    sourceWhere: GROUPBUY_KEPT,
+    targetTable: 'groupbuy_activities',
+    mode: 'exact',
+    note: '已删除的、一人成团的（新 CHECK 不允许）、商品已不存在的活动丢弃并计数',
+  },
+  {
+    group: 'groupbuy',
+    sourceTable: 'eb_store_product_attr_value',
+    sourceWhere: 'type = 3',
+    targetTable: 'groupbuy_activity_skus',
+    mode: 'atMost',
+    note: '活动已丢弃、或商品已没有这个规格的活动价行会被丢弃并计数',
+  },
+  {
+    group: 'presale',
+    sourceTable: 'eb_store_advance',
+    sourceWhere: PRESALE_KEPT,
+    targetTable: 'presale_activities',
+    mode: 'exact',
+    note: '已删除的、商品已不存在的活动丢弃并计数',
+  },
+  {
+    group: 'presale',
+    sourceTable: 'eb_store_product_attr_value',
+    sourceWhere: 'type = 6',
+    targetTable: 'presale_activity_skus',
+    mode: 'atMost',
+    note: '活动已丢弃、或商品已没有这个规格的活动价行会被丢弃并计数',
   },
   {
     group: 'coupon',
@@ -139,6 +232,68 @@ const COUNTS: readonly CountExpectation[] = [
     targetTable: 'diy_pages',
     mode: 'atMost',
     note: 'template_name 行是设置不是页面，value 不是 JSON 的行也不是页面',
+  },
+  {
+    group: 'cms',
+    sourceTable: 'eb_article_category',
+    targetTable: 'article_categories',
+    mode: 'exact',
+    note: '删除的分类也迁移（带 deleted_at），过深的层级挂到顶级祖先下',
+  },
+  { group: 'cms', sourceTable: 'eb_article', targetTable: 'articles', mode: 'exact' },
+  {
+    group: 'cms',
+    sourceTable: 'eb_article_content',
+    sourceWhere: 'nid in (select id from eb_article)',
+    targetTable: 'article_contents',
+    mode: 'exact',
+  },
+  {
+    group: 'wechat-oa',
+    sourceTable: 'eb_wechat_qrcode_cate',
+    targetTable: 'wechat_qrcode_categories',
+    mode: 'exact',
+    note: '删除的分类也迁移（带 deleted_at），同名的在线分类后一个名字加上 （#旧 id）',
+  },
+  {
+    group: 'wechat-oa',
+    sourceTable: 'eb_wechat_qrcode',
+    sourceWhere: WECHAT_QRCODE_WITH_TICKET,
+    targetTable: 'wechat_qrcodes',
+    mode: 'exact',
+    note: '在 eb_qrcode 里没有 ticket 的码从未在微信侧生成过，丢弃并计数',
+  },
+  {
+    group: 'wechat-oa',
+    sourceTable: 'eb_wechat_qrcode_record',
+    sourceWhere: `qid in (select id from eb_wechat_qrcode where ${WECHAT_QRCODE_WITH_TICKET})`,
+    targetTable: 'wechat_qrcode_scans',
+    mode: 'exact',
+  },
+  {
+    group: 'wechat-oa',
+    // One new row per trigger, not per reply: a legacy reply answering three
+    // keywords becomes three rows, so the keys are what is counted.
+    sourceTable: 'eb_wechat_key',
+    targetTable: 'wechat_auto_replies',
+    mode: 'atMost',
+    note: '客服消息、空关键词、关键词重复、回复类型未知的触发词丢弃并计数',
+  },
+  {
+    group: 'wechat-oa',
+    sourceTable: 'eb_wechat_media',
+    sourceWhere: "media_id <> ''",
+    targetTable: 'wechat_media',
+    mode: 'atMost',
+    note: '已过期的临时素材和 (类型, media_id) 重复的行丢弃并计数',
+  },
+  {
+    group: 'notification',
+    sourceTable: 'eb_message_system',
+    sourceWhere: 'is_del = 0',
+    targetTable: 'notification_messages',
+    mode: 'atMost',
+    note: '收件的会员或管理员已不存在的站内信丢弃并计数',
   },
   {
     // 分类页 / 个人中心 版式：旧库把它们放在 eb_diy 里，新库是 diy 配置组的
@@ -210,8 +365,8 @@ export async function verify(options: VerifyOptions): Promise<VerifyResult> {
       name: 'money:product_skus.price',
       source,
       target,
-      // `type = 0` is the ordinary SKU; the other values belong to the retired
-      // activities (秒杀 / 砍价 / 拼团) and are not migrated.
+      // `type = 0` is the ordinary SKU. 3 (group-buy) and 6 (presale) are
+      // checked under their own groups; the rest belong to retired activities.
       sourceTable: 'eb_store_product_attr_value',
       sourceWhere: 'type = 0',
       sourceColumn: 'price',
@@ -228,6 +383,52 @@ export async function verify(options: VerifyOptions): Promise<VerifyResult> {
       targetTable: 'products',
       targetColumn: 'price',
     });
+  }
+
+  // Activity prices. Only the activity-level price: the per-variant rows can
+  // lose a variant the product no longer has, which the count check allows
+  // for, and a sum over them would then fail for a reason already reported.
+  if (!pendingGroups.has('groupbuy')) {
+    await compareMoney(add, {
+      group: 'groupbuy',
+      name: 'money:groupbuy_activities.price',
+      source,
+      target,
+      sourceTable: 'eb_store_combination',
+      sourceWhere: GROUPBUY_KEPT,
+      sourceColumn: 'price',
+      targetTable: 'groupbuy_activities',
+      targetColumn: 'price',
+    });
+  }
+  if (!pendingGroups.has('presale')) {
+    await compareMoney(add, {
+      group: 'presale',
+      name: 'money:presale_activities.price',
+      source,
+      target,
+      sourceTable: 'eb_store_advance',
+      sourceWhere: PRESALE_KEPT,
+      sourceColumn: 'price',
+      targetTable: 'presale_activities',
+      targetColumn: 'price',
+    });
+  }
+
+  // --- 2b. per-group structure ---------------------------------------------
+  // What a count and a sum cannot see. Shipping has no money sum: one legacy
+  // row per city became one rule per group of cities, so the prices are
+  // regrouped rather than carried and a total means nothing on either side.
+  // What must hold instead is that every template can price every address.
+  if (!pendingGroups.has('shipping')) {
+    add(await verifyShippingFallback(target));
+    add(await verifyExpress(source, target));
+  }
+  if (!pendingGroups.has('wechat-oa')) {
+    add(await verifyQrcodeScenes(target));
+  }
+  if (!pendingGroups.has('notification')) {
+    add(await verifyNotificationTemplates(source, target));
   }
 
   // --- 3. DIY pages, compared as parsed JSON (CR-1-g1) ----------------------
@@ -311,6 +512,156 @@ async function compareMoney(
       `${input.sourceTable}.${input.sourceColumn} 合计 ${expected} → ` +
       `${input.targetTable}.${input.targetColumn} 合计 ${actual}`,
   });
+}
+
+/** Every template has exactly one fallback rule, or some address has no price. */
+async function verifyShippingFallback(target: Target): Promise<Check> {
+  const rows = await target.query<{ id: string; fallbacks: string }>(
+    `select t.id::text as id,
+            (select count(*) from shipping_template_regions r
+              where r.template_id = t.id and r.is_fallback)::text as fallbacks
+       from shipping_templates t
+      order by t.id`,
+  );
+  const wrong = rows.filter((row) => row.fallbacks !== '1');
+  return {
+    group: 'shipping',
+    name: 'shipping:fallback',
+    ok: wrong.length === 0,
+    detail:
+      wrong.length === 0
+        ? `${String(rows.length)} 个运费模板都恰好有一条兜底规则，任何收货地址都算得出运费`
+        : `兜底规则不是恰好一条的模板：${wrong
+            .slice(0, 10)
+            .map((row) => `#${row.id}（${row.fallbacks} 条）`)
+            .join(', ')}`,
+  };
+}
+
+/**
+ * Every legacy courier is in `express_companies` with the operator's code,
+ * sort order and switch — or, when a different seeded id already holds its
+ * code, the seed row is still there (the mapper left it and counted it).
+ */
+async function verifyExpress(source: Source, target: Target): Promise<Check> {
+  interface LegacyExpress {
+    id: number;
+    code: string;
+    sort: number;
+    is_show: number;
+  }
+  const legacy = await source.rows<LegacyExpress>('eb_express');
+  const rows = await target.query<{
+    id: string;
+    code: string;
+    sort_order: number;
+    is_enabled: boolean;
+  }>('select id::text as id, code, sort_order, is_enabled from express_companies');
+  const byId = new Map(rows.map((row) => [Number(row.id), row]));
+  const byCode = new Map(rows.map((row) => [row.code, Number(row.id)]));
+
+  const wrong: string[] = [];
+  let leftToSeed = 0;
+  for (const row of legacy) {
+    const holder = byCode.get(row.code);
+    if (holder !== undefined && holder !== row.id) {
+      leftToSeed += 1;
+      continue;
+    }
+    const stored = byId.get(row.id);
+    if (
+      stored?.code !== row.code ||
+      stored.sort_order !== row.sort ||
+      stored.is_enabled !== (row.is_show === 1)
+    ) {
+      wrong.push(`#${String(row.id)} ${row.code}`);
+    }
+  }
+  return {
+    group: 'shipping',
+    name: 'shipping:express',
+    ok: wrong.length === 0,
+    detail:
+      wrong.length === 0
+        ? `eb_express 的 ${String(legacy.length - leftToSeed)} 家快递公司的排序与显示开关都已覆盖到种子行上` +
+          (leftToSeed === 0
+            ? ''
+            : `；${String(leftToSeed)} 家的编码已被种子里另一个 id 占用，保留种子行`)
+        : `与旧库不一致的快递公司：${wrong.slice(0, 10).join(', ')}`,
+  };
+}
+
+/**
+ * A printed poster encodes the scene string; the new code must answer to the
+ * same one, or every poster already on a shop wall stops attributing.
+ */
+async function verifyQrcodeScenes(target: Target): Promise<Check> {
+  const rows = await target.query<{ id: string; scene: string }>(
+    'select id::text as id, scene from wechat_qrcodes where scene <> id::text order by id',
+  );
+  const [total] = await target.query<{ count: string }>(
+    'select count(*)::text as count from wechat_qrcodes',
+  );
+  return {
+    group: 'wechat-oa',
+    name: 'wechat:scene',
+    ok: rows.length === 0,
+    detail:
+      rows.length === 0
+        ? `${total?.count ?? '0'} 个渠道码的 scene 都等于旧 id，已印出去的海报扫出来仍然记在原渠道上`
+        : `scene 与旧 id 不符：${rows
+            .slice(0, 10)
+            .map((row) => `#${row.id}→${row.scene}`)
+            .join(', ')}`,
+  };
+}
+
+/**
+ * Every legacy template the registry still knows is in the table under its new
+ * code, with the operator's name and audience — i.e. the legacy wording landed
+ * rather than a default. First row per code wins, as in the mapper.
+ */
+async function verifyNotificationTemplates(source: Source, target: Target): Promise<Check> {
+  interface LegacyNotification {
+    id: number;
+    mark: string;
+    name: string;
+    type: number;
+  }
+  const registered = new Set(allNotificationEvents().map((event) => event.code));
+  const legacy = [...(await source.rows<LegacyNotification>('eb_system_notification'))].sort(
+    (a, b) => a.id - b.id,
+  );
+  const rows = await target.query<{ code: string; name: string; audience: string }>(
+    'select code, name, audience::text as audience from notification_templates',
+  );
+  const byCode = new Map(rows.map((row) => [row.code, row]));
+
+  const seen = new Set<string>();
+  const wrong: string[] = [];
+  for (const row of legacy) {
+    const code = MARK_TO_CODE.get(row.mark);
+    if (code === undefined || !registered.has(code) || seen.has(code)) continue;
+    seen.add(code);
+    const stored = byCode.get(code);
+    const audience = row.type === 2 ? 'admin' : 'user';
+    if (stored?.name !== row.name || stored.audience !== audience)
+      wrong.push(`${row.mark}→${code}`);
+  }
+  // A registered event with no row is not a failure: the notification service
+  // seeds a missing row from the registry's defaults on first read. It is
+  // named, so an operator knows which wording is the shipped default.
+  const fromDefaults = [...registered].filter((code) => !byCode.has(code)).length;
+  return {
+    group: 'notification',
+    name: 'notification:templates',
+    ok: wrong.length === 0,
+    detail:
+      wrong.length === 0
+        ? `${String(seen.size)} 个旧通知模板按新 code 落到表里，名称与受众与旧库一致；` +
+          `注册表另有 ${String(fromDefaults)} 个事件没有行，首次读取时按默认值补齐`
+        : `未落地或与旧库不一致的模板：${wrong.join(', ')}`,
+  };
 }
 
 async function verifyDiy(source: Source, target: Target): Promise<Check> {

@@ -74,11 +74,12 @@ export async function seedReference(db: DbOrTx): Promise<SeedCounts> {
       .values(batch)
       .onConflictDoUpdate({
         target: expressCompanies.id,
+        // The carrier's identity is ours (tracking keys on the code); its order
+        // and 显示 switch are the operator's, migrated by the ETL or set in the
+        // admin, and a re-seed on every upgrade must not reset them (CR-1-r7).
         set: {
           code: sql`excluded.code`,
           name: sql`excluded.name`,
-          sortOrder: sql`excluded.sort_order`,
-          isEnabled: sql`excluded.is_enabled`,
           updatedAt: sql`now()`,
         },
       });
@@ -103,9 +104,10 @@ export async function seedReference(db: DbOrTx): Promise<SeedCounts> {
     .values(notificationTemplateShells)
     .onConflictDoUpdate({
       target: notificationTemplates.code,
+      // The name and audience are the operator's, like an agreement's body
+      // (CR-1-r7). The variables are the event's contract — what the code
+      // fills in — so a release that changes them must reach existing rows.
       set: {
-        name: sql`excluded.name`,
-        audience: sql`excluded.audience`,
         variables: sql`excluded.variables`,
         updatedAt: sql`now()`,
       },

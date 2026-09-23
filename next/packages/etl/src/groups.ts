@@ -22,16 +22,25 @@
  * every group, so nothing is.
  */
 
+import { sanitizeHtml } from '@shop/core/cms';
+import { allNotificationEvents } from '@shop/core/notification';
+
 import { configMapper } from './config';
 import { defineGroup, type ErasedGroup, type GroupContext, type TargetRow } from './mapper';
 import { digestFile } from './lib/digest';
 import { localFilePath, localPublicUrl } from './lib/storage-keys';
 import { mapCatalog } from './mappers/catalog';
+import { mapCms } from './mappers/cms';
 import { mapCoupons } from './mappers/coupon';
 import { mapDiy } from './mappers/diy';
+import { mapGroupbuy } from './mappers/groupbuy';
+import { mapNotifications } from './mappers/notification';
+import { mapPresale } from './mappers/presale';
+import { loadShipping } from './mappers/shipping';
 import { mapStorage } from './mappers/storage';
 import { mapSystem } from './mappers/system';
 import { mapUsers } from './mappers/user';
+import { mapWechatOa } from './mappers/wechat-oa';
 
 // ---------------------------------------------------------------------------
 // 1. system — admins and roles. Everything with an "updated by" needs these.
@@ -215,19 +224,59 @@ const user = defineGroup({
 });
 
 // ---------------------------------------------------------------------------
-// 5. shipping — not written yet.
+// 5. shipping — freight templates and the courier overrides. Before catalog,
+//    because `products.shipping_template_id` restricts `shipping_templates`,
+//    and catalog keeps a product's template only if this group loaded it.
 // ---------------------------------------------------------------------------
 
-const shipping = defineGroup<
-  { templates?: readonly unknown[] },
-  { templates: TargetRow[]; report: object }
->({
+const shipping = defineGroup({
   name: 'shipping',
   title: '运费模板',
   owner: 'F2',
-  mapper: null,
-  sources: [],
-  targets: [],
+  mapper: loadShipping,
+  sources: [
+    { table: 'eb_shipping_templates', into: 'templates' },
+    { table: 'eb_shipping_templates_region', into: 'regions' },
+    { table: 'eb_shipping_templates_free', into: 'free' },
+    { table: 'eb_shipping_templates_no_delivery', into: 'noDelivery' },
+    { table: 'eb_express', into: 'express' },
+  ],
+  // FK order: a template before its rules, a rule before its cities.
+  targets: [
+    { table: 'shipping_templates', from: 'templates' },
+    { table: 'shipping_template_regions', from: 'regions' },
+    { table: 'shipping_template_region_cities', from: 'regionCities' },
+    { table: 'shipping_template_free_rules', from: 'freeRules' },
+    { table: 'shipping_template_free_rule_cities', from: 'freeRuleCities' },
+    { table: 'shipping_template_no_delivery_cities', from: 'noDeliveryCities' },
+    {
+      table: 'express_companies',
+      from: 'expressCompanies',
+      upsert: {
+        conflict: ['id'],
+        reason:
+          '快递公司字典由 packages/db 的种子写入（沿用旧库 id）；旧库 eb_express 只带运营改过的' +
+          '排序与显示开关，按 id 覆盖到种子行上，不删种子里的任何一家',
+      },
+    },
+  ],
+  requiresReference: [
+    {
+      table: 'cities',
+      reason:
+        '运费模板的指定城市、包邮城市、不送达城市都指向城市字典，字典由种子数据写入并沿用旧库 id',
+    },
+  ],
+  // The dictionary, so a rule naming a city the seed lacks loses that city and
+  // is counted instead of rolling the whole group back (the CR-3-j rule); and
+  // the seeded couriers, so an override whose code another id holds is left to
+  // the seed and counted rather than failing `express_companies_code_uq`.
+  extras: async (context) => ({
+    knownCityIds: await context.idsOf('cities'),
+    seededExpress: (
+      await context.selectTarget<{ id: number; code: string }>('express_companies', ['id', 'code'])
+    ).map((row) => ({ id: Number(row.id), code: row.code })),
+  }),
 });
 
 // ---------------------------------------------------------------------------
@@ -290,7 +339,82 @@ const catalog = defineGroup({
 });
 
 // ---------------------------------------------------------------------------
-// 7. coupon — templates scope to products and categories, so it follows catalog.
+// 7–8. groupbuy and presale — the campaigns and their per-variant prices.
+//      After catalog, because an activity restricts `products` and an
+//      activity SKU restricts `product_skus`; after shipping, because an
+//      activity may name its own freight template. Orders are not migrated
+//      (PLAN §6), so everything keyed to a legacy order — group-buy teams and
+//      their members, presale orders — is left behind and counted.
+// ---------------------------------------------------------------------------
+
+/** The catalogue SKUs this run loaded, so a legacy variant is matched by `(product, spec)`. */
+async function loadedProductSkus(context: GroupContext) {
+  const rows = await context.selectTarget<{ id: number; product_id: number; spec_text: string }>(
+    'product_skus',
+    ['id', 'product_id', 'spec_text'],
+  );
+  return rows.map((row) => ({
+    id: Number(row.id),
+    productId: Number(row.product_id),
+    specText: row.spec_text,
+  }));
+}
+
+const groupbuy = defineGroup({
+  name: 'groupbuy',
+  title: '拼团活动与活动 SKU',
+  owner: 'F1',
+  mapper: mapGroupbuy,
+  sources: [
+    { table: 'eb_store_combination', into: 'combinations' },
+    // The activity price rows share one table with every other activity kind;
+    // `type = 3` is group-buy, and `product_id` there is the activity id.
+    { table: 'eb_store_product_attr_value', into: 'combinationSkus', where: 'type = 3' },
+  ],
+  targets: [
+    { table: 'groupbuy_activities', from: 'activities' },
+    { table: 'groupbuy_activity_skus', from: 'activitySkus' },
+  ],
+  softDependencies: [
+    { group: 'catalog', into: 'keptProductIds', table: 'products' },
+    { group: 'shipping', into: 'keptShippingTemplateIds', table: 'shipping_templates' },
+  ],
+  extras: async (context) => ({
+    migratedAt: context.migratedAt,
+    productSkus: await loadedProductSkus(context),
+    // Teams (`eb_store_pink`) are rows about orders; counted, not carried.
+    legacyTeamCount: await context.countSource('eb_store_pink'),
+  }),
+});
+
+const presale = defineGroup({
+  name: 'presale',
+  title: '预售活动与活动 SKU',
+  owner: 'F1',
+  mapper: mapPresale,
+  sources: [
+    { table: 'eb_store_advance', into: 'advances' },
+    // `type = 6` is presale; `product_id` there is the activity id.
+    { table: 'eb_store_product_attr_value', into: 'advanceSkus', where: 'type = 6' },
+  ],
+  targets: [
+    { table: 'presale_activities', from: 'activities' },
+    { table: 'presale_activity_skus', from: 'activitySkus' },
+  ],
+  softDependencies: [
+    { group: 'catalog', into: 'keptProductIds', table: 'products' },
+    { group: 'shipping', into: 'keptShippingTemplateIds', table: 'shipping_templates' },
+  ],
+  extras: async (context) => ({
+    migratedAt: context.migratedAt,
+    productSkus: await loadedProductSkus(context),
+    // A presale order is an `eb_store_order` row with `advance_id` set.
+    legacyPresaleOrderCount: await context.countSource('eb_store_order', 'advance_id > 0'),
+  }),
+});
+
+// ---------------------------------------------------------------------------
+// 9. coupon — templates scope to products and categories, so it follows catalog.
 // ---------------------------------------------------------------------------
 
 const coupon = defineGroup({
@@ -315,23 +439,35 @@ const coupon = defineGroup({
 });
 
 // ---------------------------------------------------------------------------
-// 8. cms — not written yet.
+// 10. cms — articles and their categories. After catalog: an article may
+//    promote a product, and keeps that link only if catalog loaded it.
 // ---------------------------------------------------------------------------
 
-const cms = defineGroup<
-  { articles?: readonly unknown[] },
-  { articles: TargetRow[]; report: object }
->({
+const cms = defineGroup({
   name: 'cms',
   title: '文章与文章分类',
   owner: 'F2',
-  mapper: null,
-  sources: [],
-  targets: [],
+  mapper: mapCms,
+  sources: [
+    { table: 'eb_article_category', into: 'categories' },
+    { table: 'eb_article', into: 'articles' },
+    { table: 'eb_article_content', into: 'contents' },
+  ],
+  targets: [
+    { table: 'article_categories', from: 'categories' },
+    { table: 'articles', from: 'articles' },
+    { table: 'article_contents', from: 'contents' },
+  ],
+  softDependencies: [{ group: 'catalog', into: 'keptProductIds', table: 'products' }],
+  // The same sanitiser the admin editor saves through, so a migrated body is
+  // exactly as safe as a newly written one. Without it the mapper would carry
+  // the legacy HTML verbatim and say so (`contentsUnsanitised`); with it, that
+  // count is zero on every real run.
+  extras: () => ({ sanitize: sanitizeHtml }),
 });
 
 // ---------------------------------------------------------------------------
-// 9. diy — pages, themes and the link picker. No cross-group foreign keys.
+// 11. diy — pages, themes and the link picker. No cross-group foreign keys.
 // ---------------------------------------------------------------------------
 
 const diy = defineGroup({
@@ -354,31 +490,79 @@ const diy = defineGroup({
 });
 
 // ---------------------------------------------------------------------------
-// 10–11. WeChat OA and notifications — not written yet.
+// 12. wechat-oa — the official account's menu, auto-replies, parametric QR
+//     codes and uploaded media. After user: a scan keeps its user link only if
+//     that user survived; everything else here is self-contained.
 // ---------------------------------------------------------------------------
 
-const wechatOa = defineGroup<
-  { replies?: readonly unknown[] },
-  { replies: TargetRow[]; report: object }
->({
+const wechatOa = defineGroup({
   name: 'wechat-oa',
-  title: '公众号自动回复、二维码、素材',
+  title: '公众号菜单、自动回复、二维码、素材',
   owner: 'E2',
-  mapper: null,
-  sources: [],
-  targets: [],
+  mapper: mapWechatOa,
+  sources: [
+    // The menu lives in the key/value cache, one row. `key` is a reserved word
+    // in MySQL, hence the backticks.
+    { table: 'eb_cache', into: 'cache', where: "`key` = 'wechat_menus'" },
+    { table: 'eb_wechat_reply', into: 'replies' },
+    { table: 'eb_wechat_key', into: 'keys' },
+    { table: 'eb_wechat_qrcode_cate', into: 'qrcodeCategories' },
+    { table: 'eb_wechat_qrcode', into: 'qrcodes' },
+    // `eb_qrcode` holds every kind of legacy QR code; only the ones that
+    // belong to `eb_wechat_qrcode` carry the WeChat ticket.
+    { table: 'eb_qrcode', into: 'qrcodeTickets', where: "third_type = 'wechatqrcode'" },
+    { table: 'eb_wechat_qrcode_record', into: 'qrcodeRecords' },
+    { table: 'eb_wechat_media', into: 'media' },
+  ],
+  // FK order: a category before its codes, a code before its scans.
+  targets: [
+    { table: 'wechat_oa_menus', from: 'menus' },
+    { table: 'wechat_auto_replies', from: 'autoReplies' },
+    { table: 'wechat_qrcode_categories', from: 'qrcodeCategories' },
+    { table: 'wechat_qrcodes', from: 'qrcodes' },
+    { table: 'wechat_qrcode_scans', from: 'qrcodeScans' },
+    { table: 'wechat_media', from: 'media' },
+  ],
+  softDependencies: [{ group: 'user', into: 'keptUserIds', table: 'users' }],
+  // A temporary medium expires three days after upload; "now" is the pinned
+  // migration instant, so a rerun drops exactly the same rows.
+  extras: (context) => ({ now: context.migratedAt }),
 });
 
-const notification = defineGroup<
-  { templates?: readonly unknown[] },
-  { templates: TargetRow[]; report: object }
->({
+// ---------------------------------------------------------------------------
+// 13. notification — template wording and the in-app inbox. Last: a message
+//     points at a user or an admin, and keeps only the ones that survived.
+// ---------------------------------------------------------------------------
+
+const notification = defineGroup({
   name: 'notification',
   title: '通知模板与站内信',
   owner: 'E2',
-  mapper: null,
-  sources: [],
-  targets: [],
+  mapper: mapNotifications,
+  sources: [
+    { table: 'eb_system_notification', into: 'notifications' },
+    { table: 'eb_message_system', into: 'messages' },
+  ],
+  targets: [
+    {
+      table: 'notification_templates',
+      from: 'templates',
+      upsert: {
+        conflict: ['code'],
+        reason:
+          '通知模板的行由 packages/db 的种子按注册表逐个写入（code 唯一）；旧库只带运营改过的' +
+          '文案与渠道开关，按 code 覆盖到种子行上，注册表里旧库没有的模板保持种子默认值',
+      },
+    },
+    { table: 'notification_messages', from: 'messages' },
+  ],
+  softDependencies: [
+    { group: 'user', into: 'knownUserIds', table: 'users' },
+    { group: 'system', into: 'knownAdminIds', table: 'admins' },
+  ],
+  // The running registry decides which codes exist: a legacy row whose event
+  // this build no longer registers is dropped by name, never written.
+  extras: () => ({ registryCodes: allNotificationEvents().map((event) => event.code) }),
 });
 
 /** Load order. Changing it changes the migration; it is a foreign-key order. */
@@ -389,6 +573,8 @@ export const GROUPS: readonly ErasedGroup[] = [
   user,
   shipping,
   catalog,
+  groupbuy,
+  presale,
   coupon,
   cms,
   diy,

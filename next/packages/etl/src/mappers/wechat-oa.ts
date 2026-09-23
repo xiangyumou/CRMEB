@@ -95,6 +95,8 @@ export interface LegacyQrcode {
 
 /** `eb_qrcode`, filtered to `third_type = 'wechatqrcode'`. This is where the ticket lives. */
 export interface LegacyQrcodeTicket {
+  /** Present in every real dump; optional so a hand-built test row can leave it out. */
+  id?: number;
   third_type: string;
   third_id: number;
   ticket: string;
@@ -227,12 +229,28 @@ export interface WechatOaMigrationReport {
   repliesDroppedDuplicateKeyword: number;
   repliesDroppedUnknownType: number;
   categories: number;
+  /**
+   * Live categories whose name another live category already had.
+   * `wechat_qrcode_categories_name_uq` allows one live row per name, so the
+   * later one gets its legacy id appended — `双十一（#7）` — rather than
+   * failing the group or vanishing with the codes filed under it.
+   */
+  categoriesRenamedDuplicate: number;
   qrcodes: number;
   qrcodesDroppedNoTicket: number;
+  /** Category or code names longer than the new column (64 / 100), cut to fit. */
+  namesTruncated: number;
   scans: number;
   scansDroppedUnknownQrcode: number;
   media: number;
   mediaDroppedExpired: number;
+  /** Rows with an empty `media_id`: nothing WeChat could ever be sent. */
+  mediaDroppedNoHandle: number;
+  /**
+   * A second row for a `(kind, media_id)` already taken — possible because an
+   * unknown legacy `type` folds into `image`. `wechat_media_uq` would refuse it.
+   */
+  mediaDroppedDuplicate: number;
   /** Keywords that lost a duplicate, so a human can check what was overwritten. */
   droppedKeywords: string[];
 }
@@ -390,15 +408,25 @@ function mediaKindOf(legacy: string): MediaKind {
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
+/** A copy in legacy-id order; a row with no id keeps its place relative to the others. */
+function byId<T extends { id?: number }>(rows: readonly T[] | undefined): T[] {
+  return [...(rows ?? [])].sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+}
+
 export function mapWechatOa(input: WechatOaMigrationInput): WechatOaMigrationOutput {
   const now = input.now ?? new Date();
 
+  // Every rule below that keeps "the first" of something — a keyword, a
+  // category name, a media handle, a ticket — and every id assigned in order,
+  // depends on the order of the rows. `select *` promises none, so the rows
+  // are put in legacy-id order here: the same dump maps the same way twice.
   const menus = mapMenu(input.cache ?? []);
-  const replies = mapReplies(input.replies ?? [], input.keys ?? []);
-  const categories = mapCategories(input.qrcodeCategories ?? []);
-  const codes = mapQrcodes(input.qrcodes ?? [], input.qrcodeTickets ?? [], categories.keptIds);
-  const scans = mapScans(input.qrcodeRecords ?? [], codes.keptIds, input.keptUserIds);
-  const media = mapMedia(input.media ?? [], now);
+  const replies = mapReplies(byId(input.replies), byId(input.keys));
+  const categories = mapCategories(byId(input.qrcodeCategories));
+  const codes = mapQrcodes(byId(input.qrcodes), byId(input.qrcodeTickets), categories.keptIds);
+  const namesTruncated = categories.truncated + codes.truncated;
+  const scans = mapScans(byId(input.qrcodeRecords), codes.keptIds, input.keptUserIds);
+  const media = mapMedia(byId(input.media), now);
 
   return {
     menus,
@@ -415,12 +443,16 @@ export function mapWechatOa(input: WechatOaMigrationInput): WechatOaMigrationOut
       repliesDroppedDuplicateKeyword: replies.droppedDuplicate,
       repliesDroppedUnknownType: replies.droppedUnknownType,
       categories: categories.rows.length,
+      categoriesRenamedDuplicate: categories.renamedDuplicate,
       qrcodes: codes.rows.length,
       qrcodesDroppedNoTicket: codes.droppedNoTicket,
+      namesTruncated,
       scans: scans.rows.length,
       scansDroppedUnknownQrcode: scans.droppedUnknownQrcode,
       media: media.rows.length,
       mediaDroppedExpired: media.droppedExpired,
+      mediaDroppedNoHandle: media.droppedNoHandle,
+      mediaDroppedDuplicate: media.droppedDuplicate,
       droppedKeywords: replies.droppedKeywords,
     },
   };
@@ -580,6 +612,13 @@ function mapReplies(
 interface CategoryResult {
   rows: QrcodeCategoryRow[];
   keptIds: Set<number>;
+  truncated: number;
+  renamedDuplicate: number;
+}
+
+/** `value` cut to `max` characters; `cut` says whether it had to be. */
+function fitName(value: string, max: number): { value: string; cut: boolean } {
+  return value.length <= max ? { value, cut: false } : { value: value.slice(0, max), cut: true };
 }
 
 /**
@@ -592,25 +631,40 @@ interface CategoryResult {
 function mapCategories(categories: readonly LegacyQrcodeCategory[]): CategoryResult {
   const rows: QrcodeCategoryRow[] = [];
   const keptIds = new Set<number>();
+  const liveNames = new Set<string>();
+  let truncated = 0;
+  let renamedDuplicate = 0;
 
   for (const [index, category] of categories.entries()) {
     const createdAt = instant(category.add_time) ?? new Date(0);
+    const fitted = fitName(category.cate_name, 64);
+    if (fitted.cut) truncated += 1;
+    let name = fitted.value;
+    if (category.is_del !== 1) {
+      if (liveNames.has(name)) {
+        const suffix = `（#${String(category.id)}）`;
+        name = `${name.slice(0, 64 - suffix.length)}${suffix}`;
+        renamedDuplicate += 1;
+      }
+      liveNames.add(name);
+    }
     rows.push({
       id: category.id,
-      name: category.cate_name,
+      name,
       sortOrder: index,
       createdAt,
       deletedAt: category.is_del === 1 ? createdAt : null,
     });
     keptIds.add(category.id);
   }
-  return { rows, keptIds };
+  return { rows, keptIds, truncated, renamedDuplicate };
 }
 
 interface QrcodeResult {
   rows: QrcodeRow[];
   keptIds: Set<number>;
   droppedNoTicket: number;
+  truncated: number;
 }
 
 /**
@@ -633,10 +687,14 @@ function mapQrcodes(
   const rows: QrcodeRow[] = [];
   const keptIds = new Set<number>();
   let droppedNoTicket = 0;
+  let truncated = 0;
 
   const ticketFor = new Map<number, LegacyQrcodeTicket>();
   for (const ticket of tickets) {
     if (ticket.third_type !== 'wechatqrcode') continue;
+    // The first row that carries a ticket wins, so a stale blank row next to a
+    // real one never hides it — the same predicate `etl verify` counts by.
+    if (ticketFor.get(ticket.third_id)?.ticket) continue;
     ticketFor.set(ticket.third_id, ticket);
   }
 
@@ -648,11 +706,13 @@ function mapQrcodes(
     }
     const createdAt = instant(code.add_time) ?? new Date(0);
     const replyType = replyTypeOf(code.type);
+    const name = fitName(code.name, 100);
+    if (name.cut) truncated += 1;
 
     rows.push({
       id: code.id,
       categoryId: categoryIds.has(code.cate_id) ? code.cate_id : null,
-      name: code.name,
+      name: name.value,
       scene: sceneOf(code.id),
       ticket: ticket.ticket,
       imageUrl: code.image || ticket.url || null,
@@ -668,7 +728,7 @@ function mapQrcodes(
     keptIds.add(code.id);
   }
 
-  return { rows, keptIds, droppedNoTicket };
+  return { rows, keptIds, droppedNoTicket, truncated };
 }
 
 interface ScanResult {
@@ -718,6 +778,8 @@ function mapScans(
 interface MediaResult {
   rows: MediumRow[];
   droppedExpired: number;
+  droppedNoHandle: number;
+  droppedDuplicate: number;
 }
 
 /**
@@ -736,9 +798,15 @@ interface MediaResult {
 function mapMedia(media: readonly LegacyWechatMedium[], now: Date): MediaResult {
   const rows: MediumRow[] = [];
   let droppedExpired = 0;
+  let droppedNoHandle = 0;
+  let droppedDuplicate = 0;
+  const taken = new Set<string>();
 
   for (const medium of media) {
-    if (medium.media_id.trim() === '') continue;
+    if (medium.media_id.trim() === '') {
+      droppedNoHandle += 1;
+      continue;
+    }
     const createdAt = instant(medium.add_time) ?? new Date(0);
     const isPermanent = medium.temporary === 0;
     const expiresAt = isPermanent ? null : new Date(createdAt.getTime() + THREE_DAYS_MS);
@@ -748,9 +816,17 @@ function mapMedia(media: readonly LegacyWechatMedium[], now: Date): MediaResult 
       continue;
     }
 
+    const kind = mediaKindOf(medium.type);
+    const handle = `${kind}:${medium.media_id}`;
+    if (taken.has(handle)) {
+      droppedDuplicate += 1;
+      continue;
+    }
+    taken.add(handle);
+
     rows.push({
       id: medium.id,
-      kind: mediaKindOf(medium.type),
+      kind,
       mediaId: medium.media_id,
       attachmentId: null,
       url: medium.url || null,
@@ -760,5 +836,5 @@ function mapMedia(media: readonly LegacyWechatMedium[], now: Date): MediaResult 
     });
   }
 
-  return { rows, droppedExpired };
+  return { rows, droppedExpired, droppedNoHandle, droppedDuplicate };
 }

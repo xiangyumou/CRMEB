@@ -158,6 +158,8 @@ export interface GroupbuyMigrationReport {
   activitiesDroppedUnknownProduct: number;
   /** `stop_time <= start_time` — `groupbuy_activities_window_ordered`. */
   activitiesWindowRepaired: number;
+  /** `temp_id` named a freight template the shipping migration does not have. */
+  activitiesShippingTemplateCleared: number;
   activitySkus: number;
   activitySkusDroppedUnknownSku: number;
   /** 虚拟成团百分比 became a shop-wide boolean (CR-2-d). */
@@ -177,6 +179,12 @@ export interface GroupbuyMigrationInput {
   productSkus?: readonly MappedProductSku[];
   /** Product ids that survived the catalog migration. */
   keptProductIds?: ReadonlySet<number>;
+  /**
+   * Template ids the shipping migration loaded. A campaign naming one it did
+   * not keeps its row and loses the link — the column is a restricting foreign
+   * key, and the storefront then charges by the product's own freight setting.
+   */
+  keptShippingTemplateIds?: ReadonlySet<number>;
   /** `eb_store_pink` row count, reported so the number is in the log. */
   legacyTeamCount?: number;
   /** The timestamp rows without one get. Defaults to the epoch of the dump. */
@@ -250,6 +258,7 @@ export function mapGroupbuy(input: GroupbuyMigrationInput): GroupbuyMigrationOut
     activitiesDroppedSeats: 0,
     activitiesDroppedUnknownProduct: 0,
     activitiesWindowRepaired: 0,
+    activitiesShippingTemplateCleared: 0,
     activitySkus: 0,
     activitySkusDroppedUnknownSku: 0,
     virtualPercentagesDropped: 0,
@@ -309,6 +318,16 @@ export function mapGroupbuy(input: GroupbuyMigrationInput): GroupbuyMigrationOut
     const ttlHours = row.effective_time > 0 ? row.effective_time : DEFAULT_TTL_HOURS;
     const cost = typeof row.cost === 'number' ? String(row.cost) : blankToNull(row.cost);
 
+    let shippingTemplateId: number | null = row.temp_id && row.temp_id > 0 ? row.temp_id : null;
+    if (
+      shippingTemplateId !== null &&
+      input.keptShippingTemplateIds &&
+      !input.keptShippingTemplateIds.has(shippingTemplateId)
+    ) {
+      report.activitiesShippingTemplateCleared += 1;
+      shippingTemplateId = null;
+    }
+
     activities.push({
       id: row.id,
       productId: row.product_id,
@@ -332,7 +351,7 @@ export function mapGroupbuy(input: GroupbuyMigrationInput): GroupbuyMigrationOut
       perOrderQuantity: row.once_num > 0 ? row.once_num : 1,
       startAt,
       endAt,
-      shippingTemplateId: row.temp_id && row.temp_id > 0 ? row.temp_id : null,
+      shippingTemplateId,
       views: Math.max(0, row.browse ?? 0),
       sortOrder: row.sort,
       createdAt,

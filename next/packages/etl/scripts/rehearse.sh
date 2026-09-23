@@ -155,11 +155,13 @@ step "etl plan — 先看看这份 dump 里有什么"
 # 不是数据在变。真实的重跑同理：把上一次打印出来的时刻传回去。
 migrated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
+# `--require-complete`：还有 group 没落地就直接失败。每个 group 都已经落地，
+# 所以演练和正式切换跑的是同一条命令。
 migrate() {
     if [ -n "$uploads_root" ]; then
-        (cd "$package" && pnpm etl run --migrated-at "$migrated_at" --uploads-root "$uploads_root")
+        (cd "$package" && pnpm etl run --require-complete --migrated-at "$migrated_at" --uploads-root "$uploads_root")
     else
-        (cd "$package" && pnpm etl run --migrated-at "$migrated_at")
+        (cd "$package" && pnpm etl run --require-complete --migrated-at "$migrated_at")
     fi
 }
 
@@ -202,7 +204,6 @@ cat <<'DONE'
 这一轮演练证明了：这份 dump 能完整导入、能迁移、迁两遍结果相同、verify 全部通过。
 
 正式切换前还要确认的事情：
-  * etl run --require-complete 能通过（也就是所有 group 的 mapper 都已经落地）；
   * etl assets 的清单已经生成，uploads 已经复制过去，并且用 --full-digest 校验过；
   * 演练用的容器已经销毁（这个脚本默认会销毁，除非 KEEP=1）。
 DONE
