@@ -37,7 +37,7 @@ export const DECOR_TEMPLATES: readonly DecorTemplate[] = [
     kind: 'home',
     name: '简约首页',
     description:
-      '搜索、轮播、快捷入口、公告、图片魔方、新品横滑和商品选项卡。换上图片、选好商品即可发布。',
+      '搜索、轮播、快捷入口、公告、领券、图片魔方、新品横滑和商品选项卡。换上图片、选好商品即可发布。',
     document: HOME_MODERN,
   },
   {

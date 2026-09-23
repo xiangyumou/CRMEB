@@ -60,13 +60,27 @@ coupons: HeldCoupon[] }`.
     the storefront's public lists (the resolver's filters, as a guest). Tests in `canvas.test.tsx`
     and "the batch-2 blocks on the canvas" in `canvas-blocks.test.tsx`.
 
+  - Templates: 简约首页 gains a 领券中心 row (`couponList`, all claimable, first 3; hides itself
+    when there are none). No other template changed: 新人券 beside it would be a second coupon
+    row, and 拼团 / 预售 / 资讯 / 视频 need this shop's records or media. Still no stock photos.
+  - Sandbox `/admin/dev/decor-spike`: the eight new blocks, canvas data and pickers from the
+    fixtures.
+- **Mini demo page** (`subpackages/demo/pages/blocks`): all 22 blocks; `?canvas=1` draws what the
+  canvas draws, otherwise the live look (fixture shopper, `serverNow`, `renderIntent` wrappers).
+- **Fidelity** (`docs/mini/status/G2-fidelity/README.md`): 22 blocks, the same size on both sides;
+  20 within 3 %, `richText` 3.68 % (G1's known residual) and `followOfficialAccount` 3.86 % (glyph
+  edges only) flagged. `fidelity/run.ts` extended and now waits for canvas records and lazy images.
+- **Mini size**: `build:weapp` main 501.2 KB, total 706.1 KB — unchanged, since no production page
+  renders `BlockList` yet (the demo package is left out of production weapp). No zod in
+  `dist/weapp` or `dist/h5`.
+
 ## In progress
 
-- Templates, spike page.
+- `docs/mini/decor.md`.
 
 ## Next
 
-- Mini demo page; fidelity; decor.md; checklist.
+- Checklist.
 
 ## Notes
 
