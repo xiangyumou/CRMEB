@@ -946,6 +946,50 @@ export async function listMembers(db: DbOrTx, groupId: number): Promise<MemberRo
   }));
 }
 
+/** Everything a notice about one member's order says: the order, the seat and the team. */
+export interface MemberNoticeRow {
+  orderId: number;
+  orderNo: string;
+  paidAmount: string | null;
+  userId: number;
+  role: 'leader' | 'member';
+  memberStatus: MemberStatus;
+  groupId: number;
+  groupStatus: GroupStatus;
+  seatsTotal: number;
+  seatsTaken: number;
+  expiresAt: Date;
+  activityTitle: string;
+}
+
+export async function findMemberNotice(
+  db: DbOrTx,
+  orderId: number,
+): Promise<MemberNoticeRow | null> {
+  const [row] = await db
+    .select({
+      orderId: groupbuyMembers.orderId,
+      orderNo: orders.orderNo,
+      paidAmount: orders.paidAmount,
+      userId: groupbuyMembers.userId,
+      role: groupbuyMembers.role,
+      memberStatus: groupbuyMembers.status,
+      groupId: groupbuyGroups.id,
+      groupStatus: groupbuyGroups.status,
+      seatsTotal: groupbuyGroups.seatsTotal,
+      seatsTaken: groupbuyGroups.seatsTaken,
+      expiresAt: groupbuyGroups.expiresAt,
+      activityTitle: groupbuyActivities.title,
+    })
+    .from(groupbuyMembers)
+    .innerJoin(orders, eq(orders.id, groupbuyMembers.orderId))
+    .innerJoin(groupbuyGroups, eq(groupbuyGroups.id, groupbuyMembers.groupId))
+    .innerJoin(groupbuyActivities, eq(groupbuyActivities.id, groupbuyGroups.activityId))
+    .where(eq(groupbuyMembers.orderId, orderId))
+    .limit(1);
+  return row ?? null;
+}
+
 /** Members who paid and are still in: the people the shop owes goods to. */
 export async function listPaidMembers(db: DbOrTx, groupId: number): Promise<MemberRow[]> {
   const rows = await db

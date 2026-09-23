@@ -40,6 +40,8 @@ export {
   type NotificationAudience,
 } from './notification.registry';
 
+export { formatShopTime } from './notification.render';
+
 export { registerSmsPort, type SmsPort, type SmsSendResult } from './notification.ports';
 
 export { notificationConfig, type NotificationConfig } from './notification.config';

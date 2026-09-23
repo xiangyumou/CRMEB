@@ -1,7 +1,9 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { products, productSkus } from '@shop/db/schema/catalog';
+import { notificationMessages, notificationTemplates } from '@shop/db/schema/notification';
 import { effects } from '@shop/db/schema/system';
+import { wechatIdentities } from '@shop/db/schema/wechat';
 import {
   groupbuyActivities,
   groupbuyActivitySkus,
@@ -12,7 +14,11 @@ import { orderItems, orders } from '@shop/db/schema/order';
 import { refunds } from '@shop/db/schema/refund';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, type TestCtx } from '@shop/testing';
+import { startFakeOaServer, type FakeOaServer } from '@shop/testing/wechat';
 import { registerCatalogDomain } from '../catalog';
+import { getEffectHandler } from '../effects/index';
+import { notificationAdmin, registerSmsPort, type SmsPort } from '../notification';
+import { resetWechatTokenFlight, wechatConfig } from '../wechat';
 import { registerShippingFreightPort } from '../shipping';
 import type { Actor, Ctx } from '../kernel/context';
 import { Money } from '../kernel/money';
@@ -1231,3 +1237,323 @@ async function allMembers(groupId: number) {
 async function setVirtualFill(enabled: boolean): Promise<void> {
   await harness.ctx.config.set(groupbuyConfig, { virtualFillOnExpiry: enabled });
 }
+
+// ---------------------------------------------------------------------------
+// shopper notifications
+// ---------------------------------------------------------------------------
+
+/**
+ * What a shopper is told, end to end: the group-buy effect records the notice,
+ * the notification effect fans it out, and every channel the operator switched
+ * on receives the rendered payload.
+ *
+ * WeChat is the fake `api.weixin.qq.com` from `@shop/testing`; SMS is a
+ * recording port. Nothing here reaches a real provider.
+ */
+describe('shopper notifications', () => {
+  let oa: FakeOaServer;
+  const sms: { calls: Parameters<SmsPort['send']>[1][] } = { calls: [] };
+  const superAdmin = (): Ctx =>
+    harness.as({ kind: 'admin', id: 1, permissions: [], isSuper: true });
+
+  beforeAll(async () => {
+    oa = await startFakeOaServer();
+    process.env['PUBLIC_ORIGIN'] = 'https://shop.example.test';
+  });
+
+  afterAll(async () => {
+    delete process.env['PUBLIC_ORIGIN'];
+    await oa?.close();
+  });
+
+  beforeEach(async () => {
+    oa.reset();
+    resetWechatTokenFlight();
+    sms.calls = [];
+    registerSmsPort({
+      async send(_ctx, input) {
+        sms.calls.push(input);
+        return { ok: true };
+      },
+    });
+    await harness.ctx.config.set(wechatConfig, {
+      oaAppId: oa.appId,
+      oaAppSecret: oa.appSecret,
+      miniAppId: oa.miniAppId,
+      miniAppSecret: oa.miniAppSecret,
+      apiBaseUrl: oa.url,
+    });
+  });
+
+  /**
+   * Runs the pending effects of the named types, and the ones they record, the
+   * way the dispatcher would — but only those: `refund.execute` would call the
+   * payment gateway, and this suite is about what the shopper is told.
+   */
+  async function runEffects(types: readonly string[]): Promise<void> {
+    for (let round = 0; round < 10; round += 1) {
+      const due = await harness.ctx.db
+        .select()
+        .from(effects)
+        .where(and(eq(effects.status, 'pending'), inArray(effects.eventType, [...types])));
+      if (due.length === 0) return;
+      for (const row of due) {
+        await getEffectHandler(row.scope, row.eventType)!(harness.ctx, {
+          id: row.id,
+          scope: row.scope,
+          scopeId: row.scopeId,
+          eventType: row.eventType,
+          payload: row.payload,
+          attempts: 1,
+        });
+        await harness.ctx.db.update(effects).set({ status: 'done' }).where(eq(effects.id, row.id));
+      }
+    }
+    throw new Error('effects kept recording effects');
+  }
+
+  const SEND = 'notification.send';
+
+  const inbox = (userId: number) =>
+    harness.ctx.db
+      .select()
+      .from(notificationMessages)
+      .where(eq(notificationMessages.userId, userId));
+
+  async function fullTeam(seats = 2) {
+    const fixture = await makeActivity({ seatsRequired: seats });
+    const shoppers: { userId: number; orderId: number }[] = [];
+    let groupId = 0;
+    for (let seat = 0; seat < seats; seat += 1) {
+      const userId = await makeUser();
+      const placed = await placeOrder({
+        userId,
+        fixture,
+        ...(groupId ? { groupId } : {}),
+      });
+      groupId = placed.groupId;
+      await pay(placed.orderId);
+      shoppers.push({ userId, orderId: placed.orderId });
+    }
+    const [activity] = await harness.ctx.db
+      .select({ title: groupbuyActivities.title })
+      .from(groupbuyActivities)
+      .where(eq(groupbuyActivities.id, fixture.activityId));
+    return { fixture, groupId, shoppers, title: activity!.title };
+  }
+
+  async function orderNoOf(orderId: number): Promise<string> {
+    const [row] = await harness.ctx.db
+      .select({ orderNo: orders.orderNo })
+      .from(orders)
+      .where(eq(orders.id, orderId));
+    return row!.orderNo;
+  }
+
+  it('tells the leader 开团成功 and a joiner 参团成功, once each however often the effect runs', async () => {
+    const fixture = await makeActivity({ seatsRequired: 3, ttlSeconds: 3_600 });
+    const leaderId = await makeUser();
+    const leader = await placeOrder({ userId: leaderId, fixture });
+    await pay(leader.orderId);
+    const joinerId = await makeUser();
+    const joiner = await placeOrder({ userId: joinerId, fixture, groupId: leader.groupId });
+    await pay(joiner.orderId);
+
+    await runEffects(['groupbuy.join', SEND]);
+    // A retried `groupbuy.join` finds the notice already recorded.
+    await harness.ctx.db
+      .update(effects)
+      .set({ status: 'pending' })
+      .where(eq(effects.eventType, 'groupbuy.join'));
+    await runEffects(['groupbuy.join', SEND]);
+
+    const [opened] = await inbox(leaderId);
+    expect(await inbox(leaderId)).toHaveLength(1);
+    expect(opened).toMatchObject({ code: 'groupbuy_created', title: '开团成功' });
+    expect(opened?.content).toContain('3 人成团，请在 2026-06-01 09:00 前邀请好友参团');
+    expect(opened?.data).toMatchObject({
+      link: `/pages/activity/goods_combination_status/index?id=${leader.groupId}`,
+    });
+
+    const [joined] = await inbox(joinerId);
+    expect(await inbox(joinerId)).toHaveLength(1);
+    expect(joined).toMatchObject({ code: 'groupbuy_joined', title: '参团成功' });
+  });
+
+  it('tells every paid member 拼团成功 when the team fills, on every channel switched on', async () => {
+    // The operator configures the event in 通知管理 before the team fills.
+    const current = await notificationAdmin.getTemplate(superAdmin(), {
+      code: 'groupbuy_succeeded',
+    });
+    await notificationAdmin.saveTemplate(
+      superAdmin(),
+      { code: 'groupbuy_succeeded' },
+      {
+        isEnabled: true,
+        channels: {
+          ...current.channels,
+          wechatOa: {
+            enabled: true,
+            templateKey: 'OPENTM1',
+            templateId: 'TPL_OA_GROUP_OK',
+            fields: { first: '拼团成功', keyword1: '{{orderNo}}', keyword2: '{{activityTitle}}' },
+          },
+          wechatMini: {
+            enabled: true,
+            templateKey: '1001',
+            templateId: 'TPL_MINI_GROUP_OK',
+            fields: { character_string1: '{{orderNo}}', thing2: '{{activityTitle}}' },
+            page: 'pages/activity/goods_combination_status/index?id={{groupId}}',
+          },
+          sms: { enabled: true, templateCode: 'SMS_GROUP_OK' },
+        },
+      },
+    );
+
+    const team = await fullTeam(2);
+    for (const [index, shopper] of team.shoppers.entries()) {
+      await harness.ctx.db.insert(wechatIdentities).values([
+        { userId: shopper.userId, platform: 'oa', openid: `oa-openid-${index}` },
+        { userId: shopper.userId, platform: 'mini', openid: `mini-openid-${index}` },
+      ]);
+    }
+
+    await runEffects(['groupbuy.settle', SEND]);
+
+    for (const [index, shopper] of team.shoppers.entries()) {
+      const orderNo = await orderNoOf(shopper.orderId);
+      const messages = await inbox(shopper.userId);
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toMatchObject({ code: 'groupbuy_succeeded', title: '拼团成功' });
+      expect(messages[0]?.content).toBe(`「${team.title}」拼团成功，订单 ${orderNo} 将尽快为您发货。`);
+
+      const oaSend = oa
+        .callsTo('/cgi-bin/message/template/send')
+        .find((call) => (call.body as { touser: string }).touser === `oa-openid-${index}`);
+      expect(oaSend?.body).toEqual({
+        touser: `oa-openid-${index}`,
+        template_id: 'TPL_OA_GROUP_OK',
+        url: `https://shop.example.test/pages/activity/goods_combination_status/index?id=${team.groupId}`,
+        data: {
+          first: { value: '拼团成功' },
+          keyword1: { value: orderNo },
+          keyword2: { value: team.title },
+        },
+      });
+
+      const miniSend = oa
+        .callsTo('/cgi-bin/message/subscribe/send')
+        .find((call) => (call.body as { touser: string }).touser === `mini-openid-${index}`);
+      expect(miniSend?.body).toMatchObject({
+        template_id: 'TPL_MINI_GROUP_OK',
+        page: `pages/activity/goods_combination_status/index?id=${team.groupId}`,
+        data: { character_string1: { value: orderNo }, thing2: { value: team.title } },
+      });
+
+      const text = sms.calls.find((call) => call.userId === shopper.userId);
+      expect(text).toMatchObject({
+        templateCode: 'SMS_GROUP_OK',
+        notificationCode: 'groupbuy_succeeded',
+        params: { orderNo, activityTitle: team.title, groupId: String(team.groupId) },
+      });
+    }
+    expect(oa.callsTo('/cgi-bin/message/template/send')).toHaveLength(2);
+    expect(oa.callsTo('/cgi-bin/message/subscribe/send')).toHaveLength(2);
+    expect(sms.calls).toHaveLength(2);
+  });
+
+  it('tells each paid member 拼团失败 in the transaction that opened their refund', async () => {
+    const fixture = await makeActivity({ seatsRequired: 3, ttlSeconds: 3_600 });
+    const leaderId = await makeUser();
+    const leader = await placeOrder({ userId: leaderId, fixture });
+    await pay(leader.orderId);
+    const joinerId = await makeUser();
+    const joiner = await placeOrder({ userId: joinerId, fixture, groupId: leader.groupId });
+    await pay(joiner.orderId);
+
+    harness.clock.set('2026-06-01T02:00:00.000Z');
+    await settleExpiredGroups(harness.ctx);
+
+    // The team has failed, but until the refund is open there is nothing to say.
+    await runEffects(['groupbuy.settle', SEND]);
+    const failedNotices = () =>
+      harness.ctx.db
+        .select()
+        .from(effects)
+        .where(and(eq(effects.eventType, SEND), eq(effects.scope, 'notification')))
+        .then((rows) => rows.filter((row) => row.scopeId.startsWith('groupbuy_failed:')));
+    expect(await failedNotices()).toHaveLength(0);
+
+    await runEffects(['groupbuy.refund', SEND]);
+
+    for (const { userId, orderId } of [
+      { userId: leaderId, orderId: leader.orderId },
+      { userId: joinerId, orderId: joiner.orderId },
+    ]) {
+      const [refundRow] = await harness.ctx.db
+        .select()
+        .from(refunds)
+        .where(eq(refunds.orderId, orderId));
+      expect(refundRow).toBeDefined();
+
+      const messages = (await inbox(userId)).filter((row) => row.code === 'groupbuy_failed');
+      expect(messages).toHaveLength(1);
+      expect(messages[0]?.title).toBe('拼团失败');
+      expect(messages[0]?.content).toContain('拼团人数未满，未能成团');
+      expect(messages[0]?.content).toContain(
+        `订单 ${await orderNoOf(orderId)} 的 ¥59.00 将原路退回`,
+      );
+      expect(messages[0]?.data).toMatchObject({ refundId: String(refundRow!.id) });
+    }
+    expect(await failedNotices()).toHaveLength(2);
+  });
+
+  it('sends nothing for an event the operator switched off in 通知管理', async () => {
+    const current = await notificationAdmin.getTemplate(superAdmin(), {
+      code: 'groupbuy_succeeded',
+    });
+    await notificationAdmin.saveTemplate(
+      superAdmin(),
+      { code: 'groupbuy_succeeded' },
+      { isEnabled: false, channels: current.channels },
+    );
+
+    const team = await fullTeam(2);
+    await runEffects(['groupbuy.settle', SEND]);
+
+    for (const shopper of team.shoppers) {
+      expect(await inbox(shopper.userId)).toHaveLength(0);
+    }
+    expect(oa.callsTo('/cgi-bin/message/template/send')).toHaveLength(0);
+    expect(sms.calls).toHaveLength(0);
+  });
+
+  it('lists the four events in 通知管理 with in-app on, over the empty shells the seed writes', async () => {
+    // What `db:seed` leaves in the table on every deploy: no channels at all.
+    await harness.ctx.db.insert(notificationTemplates).values(
+      ['groupbuy_created', 'groupbuy_joined', 'groupbuy_succeeded', 'groupbuy_failed'].map(
+        (code) => ({ code, name: code, audience: 'user' as const, variables: ['orderNo'] }),
+      ),
+    );
+
+    const page = await notificationAdmin.listTemplates(superAdmin(), {
+      page: 1,
+      pageSize: 50,
+      keyword: 'groupbuy_',
+    });
+    expect(page.items.map((row) => row.code)).toEqual([
+      'groupbuy_created',
+      'groupbuy_failed',
+      'groupbuy_joined',
+      'groupbuy_succeeded',
+    ]);
+    for (const row of page.items) {
+      expect(row.channels.inApp?.enabled).toBe(true);
+      expect(row.channels.wechatOa?.enabled).toBe(false);
+      expect(row.variables).toContain('orderNo');
+    }
+    expect(page.items.find((row) => row.code === 'groupbuy_failed')?.channels.inApp?.body).toBe(
+      '「{{activityTitle}}」{{reason}}，订单 {{orderNo}} 的 ¥{{amount}} 将原路退回。',
+    );
+  });
+});
