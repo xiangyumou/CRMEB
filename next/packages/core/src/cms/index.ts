@@ -1,14 +1,14 @@
 /**
  * The CMS domain's public surface: 文章 and 文章分类.
  *
- * ## What other streams call
+ * ## What other domains call
  *
  * | Export             | Caller   | When                                            |
  * | ------------------ | -------- | ----------------------------------------------- |
  * | `articles.*`       | routes   | the admin screens and the storefront reader      |
  * | `categories.*`     | routes   | the same, plus the storefront's tab bar          |
  * | `sanitizeHtml`     | anyone   | storing operator-authored HTML from another form |
- * | `cmsPermissions`   | E1       | the permission tree                              |
+ * | `cmsPermissions`   | registry | declared on import, read by the permission tree  |
  *
  * ## No ports
  *

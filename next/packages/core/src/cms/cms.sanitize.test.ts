@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { isSafeUrl, sanitizeHtml } from './cms.sanitize';
 
 /**
- * The sanitiser's table. Every row is something the legacy shop would have
- * stored and served verbatim, because its `htmlspecialchars` /
- * `htmlspecialchars_decode` pair cancelled out.
+ * The sanitiser's table. Every row is something an escape-on-save,
+ * unescape-on-read pair would store and serve verbatim, because the two cancel
+ * out.
  */
 
 describe('sanitizeHtml', () => {

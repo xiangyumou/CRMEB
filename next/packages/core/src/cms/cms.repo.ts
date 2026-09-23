@@ -3,13 +3,13 @@ import { articleCategories, articleContents, articles } from '@shop/db/schema/cm
 import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 
 /**
- * The only file in the CMS domain that touches Drizzle tables (CONVENTIONS,
- * "Import boundaries").
+ * The only file in the CMS domain that touches Drizzle tables
+ * (`docs/conventions.md`, "Import boundaries").
  *
  * Two tables and a body: `articles` carries everything a list row shows,
- * `article_contents` carries the HTML, and the list never joins it. The legacy
- * `store_article` held the body in the same row and every list query dragged
- * 200 KB of rich text per page across the wire.
+ * `article_contents` carries the HTML, and the list never joins it. With the
+ * body in the same row, every list query would drag 200 KB of rich text per
+ * page across the wire.
  */
 
 export type CategoryRow = typeof articleCategories.$inferSelect;
@@ -185,8 +185,8 @@ export async function listArticles(
 ): Promise<{ rows: ArticleListRow[]; total: number }> {
   const where = and(...articleWhere(query));
   const column = ARTICLE_SORT[query.sortBy ?? 'id'];
-  // `sortOrder DESC, id DESC` is the legacy list order and the storefront's;
-  // an explicit `sortBy` replaces the first key only, never the tiebreak.
+  // `sortOrder DESC, id DESC` is the admin list order and the storefront's; an
+  // explicit `sortBy` replaces the first key only, never the tiebreak.
   const direction = query.sortOrder === 'asc' ? asc : desc;
   const order =
     query.sortBy === undefined
@@ -281,9 +281,9 @@ export async function upsertContent(db: DbOrTx, articleId: number, html: string)
  * One atomic increment, and the number it returns is the one this read
  * produced.
  *
- * Legacy read the `varchar` counter, added one in PHP and wrote it back, which
- * loses every increment that overlaps another — the busiest articles undercounted
- * the most. `UPDATE … SET views = views + 1 RETURNING views` cannot.
+ * Reading the counter, adding one and writing it back loses every increment
+ * that overlaps another — the busiest articles undercount the most.
+ * `UPDATE … SET views = views + 1 RETURNING views` cannot.
  */
 export async function bumpViews(db: DbOrTx, id: number): Promise<number | null> {
   const rows = await db

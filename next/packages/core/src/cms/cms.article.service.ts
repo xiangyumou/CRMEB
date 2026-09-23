@@ -20,18 +20,17 @@ import * as repo from './cms.repo';
 /**
  * 文章.
  *
- * Three legacy defects are fixed here rather than ported, and each one is a
- * line of code:
+ * Three rules, each one a line of code:
  *
- *  1. **Drafts were public.** `article/list` filtered on neither `status` nor
- *     `hide`, so an article was live the moment it was saved and the detail
- *     route served any id that existed. Every storefront read here goes through
- *     `status: 'published'`, and the one refusal the public gets is
- *     `CMS_ARTICLE_NOT_FOUND` — saying "this exists but is a draft" would hand
- *     back what the filter just took away.
- *  2. **HTML was stored raw.** `sanitizeHtml` runs on write, so the column
+ *  1. **Drafts are private.** A list that filtered on neither status nor
+ *     visibility would make an article live the moment it was saved, and a
+ *     detail route that served any id would leak the rest. Every storefront
+ *     read here goes through `status: 'published'`, and the one refusal the
+ *     public gets is `CMS_ARTICLE_NOT_FOUND` — saying "this exists but is a
+ *     draft" would hand back what the filter just took away.
+ *  2. **HTML is never stored raw.** `sanitizeHtml` runs on write, so the column
  *     holds safe markup and no read path can reintroduce the hole.
- *  3. **The view counter was read-modify-write over a `varchar`.** It is now one
+ *  3. **The view counter is one statement**, not a read-modify-write:
  *     `UPDATE … SET views = views + 1 RETURNING views`.
  *
  * The related product is read through the catalog's own `productCardsFor`, so
@@ -172,9 +171,8 @@ export async function publicList(
  *
  * The increment runs before the row is shaped, and the response carries the
  * number it produced — a reader who refreshes sees their own view. It is
- * deliberately not deduplicated by session: the legacy number was not either,
- * and a counter that quietly means something new would make every historical
- * figure a lie.
+ * deliberately not deduplicated by session: it counts reads, and a counter that
+ * quietly changed meaning would make every earlier figure a lie.
  */
 export async function publicDetail(ctx: Ctx, params: { id: string }): Promise<ArticleDetail> {
   const id = fromId(params.id);

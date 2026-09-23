@@ -1,12 +1,11 @@
 /**
  * HTML sanitiser for article bodies.
  *
- * The legacy shop ran `htmlspecialchars()` on save and
- * `htmlspecialchars_decode()` on every read — a round trip that nets exactly
- * zero — so whatever the editor produced, `<script>` included, was stored and
- * served verbatim to every visitor. This file is the replacement, and it runs
- * **on write**: what the database holds is already safe, so a read path that
- * forgets to escape cannot reintroduce the hole.
+ * Escaping on save and unescaping on every read is a round trip that nets
+ * exactly zero: whatever the editor produced, `<script>` included, would be
+ * stored and served verbatim to every visitor. This file runs **on write**
+ * instead: what the database holds is already safe, so a read path that forgets
+ * to escape cannot reintroduce the hole.
  *
  * Hand-written rather than a library on purpose: the input is one WYSIWYG
  * editor's output (Tiptap), the allow-list is 25 tags long, and a dependency
