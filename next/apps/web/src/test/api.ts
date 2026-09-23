@@ -221,12 +221,16 @@ export function stubRoutes(stubs: readonly RouteStub[]): StubCall[] {
   configureApi({
     async fetch(input, init) {
       const url = urlOf(input);
-      const parsed = new URL(url, 'http://test.invalid');
+      // Not `new URL(…)`: a test may stub the global `URL` (to catch
+      // `createObjectURL`), and the stub must keep routing when it does.
+      const queryAt = url.indexOf('?');
+      const path = (queryAt === -1 ? url : url.slice(0, queryAt)).replace(/^[a-z]+:\/\/[^/]+/i, '');
+      const query = new URLSearchParams(queryAt === -1 ? '' : url.slice(queryAt + 1));
       const method = (init?.method ?? 'GET').toUpperCase();
       let stub: RouteStub | undefined;
       let params: Record<string, string> = {};
       for (const candidate of stubs) {
-        const matched = candidate.matches(method, parsed.pathname);
+        const matched = candidate.matches(method, path);
         if (matched) {
           stub = candidate;
           params = matched;
@@ -236,8 +240,8 @@ export function stubRoutes(stubs: readonly RouteStub[]): StubCall[] {
       const call: StubCall = {
         method,
         url,
-        path: parsed.pathname,
-        query: parsed.searchParams,
+        path,
+        query,
         body: bodyOf(init),
         params,
         routeId: stub?.route.id ?? null,
@@ -247,7 +251,7 @@ export function stubRoutes(stubs: readonly RouteStub[]): StubCall[] {
         fixtureFailures.push(`no stub answers ${method} ${url}`);
         return respondWithError(502, {
           code: 'TEST_UNSTUBBED',
-          message: `no stub answers ${method} ${parsed.pathname}`,
+          message: `no stub answers ${method} ${path}`,
         });
       }
       return stub.answer(call);

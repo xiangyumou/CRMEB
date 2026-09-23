@@ -1,8 +1,17 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  couponAdminDetail,
+  couponAdminGrant,
+  couponAdminList,
+  couponAdminSetStatus,
+  couponAdminUpdate,
+} from '@shop/contracts/coupon/coupon.admin.contract';
+import type { CouponTemplateDetail, CouponTemplateListItem } from '@shop/contracts/coupon/schemas';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { CouponTemplatesPage } from './coupon-templates';
@@ -16,13 +25,7 @@ import { CouponTemplatesPage } from './coupon-templates';
  * cover paging, sorting and form rendering, so this does not repeat them.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const row = {
+const row: CouponTemplateListItem = {
   id: '7',
   name: '满 100 减 10',
   scope: 'all_products',
@@ -49,35 +52,23 @@ const row = {
 /**
  * What the detail route answers and the list row does not: the scope links.
  * This page renders no control for either, so they exist only to be carried
- * back out of the form untouched (CR-3-d2).
+ * back out of the form untouched.
  */
-const detail = { ...row, scope: 'products', productIds: ['31', '42'], categoryIds: [] };
+const detail: CouponTemplateDetail = {
+  ...row,
+  scope: 'products',
+  productIds: ['31', '42'],
+  categoryIds: [],
+};
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload = url.includes('/grants')
-        ? { granted: 3, skippedUserIds: [] }
-        : method === 'GET'
-          ? /\/admin-api\/coupons\/\d+$/.test(url)
-            ? detail
-            : { items: [row], total: 1, page: 1, pageSize: 20 }
-          : { ...row, status: 'disabled' };
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(couponAdminGrant, { granted: 3, skippedUserIds: [] }),
+    on(couponAdminList, { items: [row], total: 1, page: 1, pageSize: 20 }),
+    on(couponAdminDetail, detail),
+    on(couponAdminUpdate, detail),
+    on(couponAdminSetStatus, { ...detail, status: 'disabled' }),
+  ]);
 }
 
 afterEach(() => {
@@ -135,7 +126,7 @@ describe('优惠券列表', () => {
   });
 
   /**
-   * CR-3-d2. The bug this is pinned against: 编辑 opened a form seeded from the
+   * The bug this is pinned against: 编辑 opened a form seeded from the
    * list row, which has no `productIds`, so saving an unrelated field posted
    * the schema's `[]` default and unlinked every product the coupon applied to.
    */

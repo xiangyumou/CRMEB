@@ -1,8 +1,19 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import type {
+  ShippingTemplateDetail,
+  ShippingTemplateListItem,
+} from '@shop/contracts/shipping/schemas';
+import { cityTreeAdmin } from '@shop/contracts/shipping/shipping.city.contract';
+import {
+  shippingTemplateDetailRoute,
+  shippingTemplateList,
+  shippingTemplateUpdate,
+} from '@shop/contracts/shipping/shipping.template.admin.contract';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { ShippingTemplatesPage } from './shipping-templates';
@@ -17,13 +28,7 @@ import { ShippingTemplatesPage } from './shipping-templates';
  * list row carries no rules.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const row = {
+const row: ShippingTemplateListItem = {
   id: '1',
   name: '全国包邮（满 5 件）',
   chargeMode: 'quantity',
@@ -35,7 +40,7 @@ const row = {
   updatedAt: '2026-06-01T09:00:00+08:00',
 };
 
-const detail = {
+const detail: ShippingTemplateDetail = {
   ...row,
   regions: [
     {
@@ -51,29 +56,13 @@ const detail = {
   noDeliveryCityIds: [],
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload = url.includes('/admin-api/shipping/cities')
-        ? { items: [], version: 'test' }
-        : url.includes('/admin-api/shipping/templates/')
-          ? detail
-          : { items: [row], total: 1, page: 1, pageSize: 20 };
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(cityTreeAdmin, { items: [], version: 'test' }),
+    on(shippingTemplateList, { items: [row], total: 1, page: 1, pageSize: 20 }),
+    on(shippingTemplateDetailRoute, detail),
+    on(shippingTemplateUpdate, detail),
+  ]);
 }
 
 afterEach(() => {

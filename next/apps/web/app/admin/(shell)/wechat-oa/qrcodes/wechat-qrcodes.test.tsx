@@ -1,8 +1,20 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { WechatQrcode, WechatQrcodeCategory } from '@shop/contracts/wechat-oa/schemas';
+import { wechatOaMediaList } from '@shop/contracts/wechat-oa/wechat-oa.media.contract';
+import {
+  wechatOaQrcodeCategoryList,
+  wechatOaQrcodeCreate,
+  wechatOaQrcodeList,
+  wechatOaQrcodeScans,
+  wechatOaQrcodeSetStatus,
+  wechatOaQrcodeStatistic,
+  wechatOaQrcodeUpdate,
+} from '@shop/contracts/wechat-oa/wechat-oa.qrcode.contract';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { WechatQrcodesPage } from './wechat-qrcodes';
@@ -16,13 +28,7 @@ import { WechatQrcodesPage } from './wechat-qrcodes';
  * re-attribute somebody else's scans.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const qrcode = {
+const qrcode: WechatQrcode = {
   id: '1',
   categoryId: '1',
   categoryName: '线下门店',
@@ -40,7 +46,7 @@ const qrcode = {
   updatedAt: '2026-01-06T09:00:00+08:00',
 };
 
-const category = {
+const category: WechatQrcodeCategory = {
   id: '1',
   name: '线下门店',
   sortOrder: 0,
@@ -48,42 +54,24 @@ const category = {
   createdAt: '2026-01-04T10:00:00+08:00',
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload = url.includes('/statistic')
-        ? {
-            qrcodeId: '1',
-            name: '朝阳门店海报',
-            scanCount: 128,
-            followCount: 47,
-            uniqueScanners: 96,
-            points: [{ date: '2026-01-06', scans: 77, newFollowers: 28 }],
-          }
-        : url.includes('/scans')
-          ? { items: [], total: 0, page: 1, pageSize: 20 }
-          : url.includes('wechat-qrcode-categories')
-            ? { items: [category], total: 1, page: 1, pageSize: 200 }
-            : url.includes('wechat-media')
-              ? { items: [], total: 0, page: 1, pageSize: 100 }
-              : method === 'GET'
-                ? { items: [qrcode], total: 1, page: 1, pageSize: 20 }
-                : { ...qrcode, status: 'disabled' };
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(wechatOaQrcodeStatistic, {
+      qrcodeId: '1',
+      name: '朝阳门店海报',
+      scanCount: 128,
+      followCount: 47,
+      uniqueScanners: 96,
+      points: [{ date: '2026-01-06', scans: 77, newFollowers: 28 }],
+    }),
+    on(wechatOaQrcodeScans, { items: [], total: 0, page: 1, pageSize: 20 }),
+    on(wechatOaQrcodeCategoryList, { items: [category], total: 1, page: 1, pageSize: 200 }),
+    on(wechatOaMediaList, { items: [], total: 0, page: 1, pageSize: 100 }),
+    on(wechatOaQrcodeList, { items: [qrcode], total: 1, page: 1, pageSize: 20 }),
+    on(wechatOaQrcodeSetStatus, { ...qrcode, status: 'disabled' }),
+    on(wechatOaQrcodeCreate, qrcode),
+    on(wechatOaQrcodeUpdate, qrcode),
+  ]);
 }
 
 afterEach(() => {

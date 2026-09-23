@@ -1,6 +1,24 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { configureApi, resetApiConfig } from '../api';
+import { catalogAdminCategoryTree } from '@shop/contracts/catalog/catalog.category.admin.contract';
+import {
+  catalogAdminProductDetail,
+  catalogAdminProductList,
+} from '@shop/contracts/catalog/catalog.product.admin.contract';
+import { catalogAdminLabelList } from '@shop/contracts/catalog/catalog.taxonomy.admin.contract';
+import {
+  adminProductDetailExample,
+  adminProductListItemExample,
+  type AdminProductListItem,
+  productCategoryChildExample,
+  productCategoryExample,
+  type ProductCategoryNode,
+  type ProductLabel,
+} from '@shop/contracts/catalog/schemas';
+
+import { on, respondWithError, stubRoutes } from '@/test/api';
+
+import { resetApiConfig } from '../api';
 import {
   catalogLinkTargets,
   createCatalogDiyDataSource,
@@ -10,7 +28,7 @@ import {
 import { createStubDiyDataSource } from './data-source';
 
 /**
- * The real data source, over the catalog contracts (brief item 4 + CR-3-g2).
+ * The real data source, over the catalog contracts.
  *
  * The pickers are the only place a DIY node can gain a product, a category or a
  * 商品标签 id, so what this layer sends and what it maps back is as load-bearing
@@ -19,33 +37,17 @@ import { createStubDiyDataSource } from './data-source';
  * part of the assertion.
  */
 
-type Handler = (url: string) => unknown;
-
-function stubFetch(handler: Handler): { urls: string[] } {
-  const urls: string[] = [];
-  configureApi({
-    async fetch(input) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      urls.push(url);
-      return new Response(JSON.stringify(handler(url)), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return { urls };
-}
-
 afterEach(() => resetApiConfig());
 
-const product = {
+const product: AdminProductListItem = {
+  ...adminProductListItemExample,
   id: '7',
   name: '牛仔外套',
   imageUrl: '/uploads/7.png',
   price: '199.00',
 };
 
-const label = {
+const label: ProductLabel = {
   id: '3',
   name: '包邮',
   style: 'text',
@@ -62,28 +64,33 @@ const label = {
   createdAt: '2026-01-01T10:00:00+08:00',
 };
 
-const tree = {
+const tree: { items: ProductCategoryNode[] } = {
   items: [
     {
+      ...productCategoryExample,
       id: '7',
       name: '服饰',
-      children: [{ id: '17', name: 'T恤', children: [] }],
+      children: [
+        { ...productCategoryChildExample, id: '17', parentId: '7', name: 'T恤', children: [] },
+      ],
     },
   ],
 };
 
 describe('createCatalogDiyDataSource', () => {
   it('pages 商品 through the admin list, on-shelf only, and formats the price', async () => {
-    const { urls } = stubFetch(() => ({ items: [product], total: 42, page: 2, pageSize: 10 }));
+    const calls = stubRoutes([
+      on(catalogAdminProductList, { items: [product], total: 42, page: 2, pageSize: 10 }),
+    ]);
     const source = createCatalogDiyDataSource();
 
     const result = await source.list('product', { keyword: '外套', page: 2, pageSize: 10 });
 
-    expect(urls[0]).toContain('/admin-api/catalog/products');
+    expect(calls[0]?.url).toContain('/admin-api/catalog/products');
     // 已上架 only: a DIY page must not advertise a product nobody can open.
-    expect(urls[0]).toContain('tab=on_shelf');
-    expect(urls[0]).toContain('page=2');
-    expect(urls[0]).toContain(`keyword=${encodeURIComponent('外套')}`);
+    expect(calls[0]?.url).toContain('tab=on_shelf');
+    expect(calls[0]?.url).toContain('page=2');
+    expect(calls[0]?.url).toContain(`keyword=${encodeURIComponent('外套')}`);
     expect(result).toEqual({
       items: [{ id: '7', name: '牛仔外套', image: '/uploads/7.png', subtitle: '¥199.00' }],
       total: 42,
@@ -91,34 +98,39 @@ describe('createCatalogDiyDataSource', () => {
   });
 
   it('pages 商品标签 through the label list, enabled only', async () => {
-    const { urls } = stubFetch(() => ({ items: [label], total: 1, page: 1, pageSize: 10 }));
+    const calls = stubRoutes([
+      on(catalogAdminLabelList, { items: [label], total: 1, page: 1, pageSize: 10 }),
+    ]);
     const source = createCatalogDiyDataSource();
 
     const result = await source.list('labels', { page: 1, pageSize: 10 });
 
-    expect(urls[0]).toContain('/admin-api/catalog/labels');
-    expect(urls[0]).toContain('isEnabled=true');
+    expect(calls[0]?.url).toContain('/admin-api/catalog/labels');
+    expect(calls[0]?.url).toContain('isEnabled=true');
     // A label with no image contributes no `image` key rather than an empty one.
     expect(result.items).toEqual([{ id: '3', name: '包邮', subtitle: '促销' }]);
   });
 
   it('resolves stored product ids one detail call each, and survives a deleted one', async () => {
-    const { urls } = stubFetch((url) => {
-      if (url.includes('/products/9')) throw new Error('gone');
-      return { ...product, description: '', unitName: '件' };
-    });
+    const calls = stubRoutes([
+      on(catalogAdminProductDetail, (call) =>
+        call.params.id === '9'
+          ? respondWithError(404, { code: 'NOT_FOUND', message: '资源不存在' })
+          : { ...adminProductDetailExample, ...product },
+      ),
+    ]);
     const source = createCatalogDiyDataSource();
 
     const rows = await source.resolve('product', ['7', '9']);
 
-    expect(urls).toHaveLength(2);
+    expect(calls).toHaveLength(2);
     expect(rows[0]).toMatchObject({ id: '7', name: '牛仔外套', subtitle: '¥199.00' });
     // The picker keeps rendering; the missing row shows its bare id.
     expect(rows[1]).toEqual({ id: '9', name: '#9' });
   });
 
   it('flattens the category tree into the picker tree, keeping the nesting', async () => {
-    stubFetch(() => tree);
+    stubRoutes([on(catalogAdminCategoryTree, tree)]);
     const nodes = await createCatalogDiyDataSource().categories('product');
     expect(nodes).toEqual([{ id: '7', name: '服饰', children: [{ id: '17', name: 'T恤' }] }]);
   });
@@ -135,7 +147,9 @@ describe('createCatalogDiyDataSource', () => {
 
 describe('catalogLinkTargets', () => {
   it('turns products into the storefront paths the uni renderer navigates to', async () => {
-    stubFetch(() => ({ items: [product], total: 1, page: 1, pageSize: 20 }));
+    stubRoutes([
+      on(catalogAdminProductList, { items: [product], total: 1, page: 1, pageSize: 20 }),
+    ]);
     const result = await catalogLinkTargets('product', { page: 1, pageSize: 20 });
     expect(result.items[0]).toEqual({
       id: '7',
@@ -147,13 +161,13 @@ describe('catalogLinkTargets', () => {
   });
 
   it('flattens categories, shows the trail and searches it', async () => {
-    stubFetch(() => tree);
+    stubRoutes([on(catalogAdminCategoryTree, tree)]);
     const all = await catalogLinkTargets('category', { page: 1, pageSize: 20 });
     expect(all.total).toBe(2);
     expect(all.items.map((row) => row.subtitle)).toEqual(['服饰', '服饰 / T恤']);
     expect(all.items[1]?.url).toBe('/pages/goods_list/index?cid=17');
 
-    stubFetch(() => tree);
+    stubRoutes([on(catalogAdminCategoryTree, tree)]);
     const matched = await catalogLinkTargets('category', {
       keyword: 'T恤',
       page: 1,

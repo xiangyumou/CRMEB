@@ -1,8 +1,15 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  cmsCategoryList,
+  cmsCategorySetStatus,
+  cmsCategoryUpdate,
+} from '@shop/contracts/cms/cms.admin.contract';
+import type { ArticleCategory } from '@shop/contracts/cms/schemas';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { ArticleCategoriesPage } from './article-categories';
@@ -17,13 +24,7 @@ import { ArticleCategoriesPage } from './article-categories';
  * server enforces.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const parent = {
+const parent: ArticleCategory = {
   id: '3',
   parentId: null,
   title: '新闻资讯',
@@ -36,7 +37,7 @@ const parent = {
   createdAt: '2026-01-01T09:00:00+08:00',
 };
 
-const child = {
+const child: ArticleCategory = {
   ...parent,
   id: '4',
   parentId: '3',
@@ -47,26 +48,12 @@ const child = {
   articleCount: 5,
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload =
-        method === 'GET' ? { items: [parent, child] } : { ...parent, status: 'hidden' };
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(cmsCategoryList, { items: [parent, child] }),
+    on(cmsCategorySetStatus, { ...parent, status: 'hidden' }),
+    on(cmsCategoryUpdate, parent),
+  ]);
 }
 
 afterEach(() => {

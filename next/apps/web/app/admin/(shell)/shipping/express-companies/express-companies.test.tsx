@@ -1,8 +1,15 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { ExpressCompanyRow } from '@shop/contracts/shipping/schemas';
+import {
+  expressCompanyAdminList,
+  expressCompanySetStatus,
+  expressCompanyUpdate,
+} from '@shop/contracts/shipping/shipping.express.contract';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { ExpressCompaniesPage } from './express-companies';
@@ -16,43 +23,22 @@ import { ExpressCompaniesPage } from './express-companies';
  * and form rendering belong to the kit's own tests.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const row = {
+const row: ExpressCompanyRow = {
   id: '12',
   code: 'SF',
   name: '顺丰速运',
   sortOrder: 100,
   isEnabled: true,
   createdAt: '2026-01-01T00:00:00+08:00',
+  updatedAt: '2026-01-01T00:00:00+08:00',
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload =
-        method === 'GET'
-          ? { items: [row], total: 1, page: 1, pageSize: 20 }
-          : { ...row, isEnabled: false };
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(expressCompanyAdminList, { items: [row], total: 1, page: 1, pageSize: 20 }),
+    on(expressCompanyUpdate, row),
+    on(expressCompanySetStatus, { ...row, isEnabled: false }),
+  ]);
 }
 
 afterEach(() => {

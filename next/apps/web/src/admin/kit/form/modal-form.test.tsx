@@ -4,14 +4,15 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, respondWithError, stubRoutes } from '@/test/api';
 import { renderAdmin, zhName } from '@/test/render';
 
 import { ModalForm, useFormModal } from './modal-form';
 import type { FieldSpec } from './types';
 
 /**
- * `ModalForm`'s loader (CR-3-d2).
+ * `ModalForm`'s loader.
  *
  * The rule it exists to enforce is one sentence: **an edit form never renders
  * from a list row.** A list route answers the columns, an update route takes
@@ -77,26 +78,19 @@ function deferredApi() {
   let attempts = 0;
   let failNext = false;
 
-  configureApi({
-    async fetch(input) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      urls.push(url);
+  stubRoutes([
+    on(detailRoute, async (call) => {
+      urls.push(call.url);
       attempts += 1;
       await new Promise<void>((resolve) => {
         release = resolve;
       });
       if (failNext) {
-        return new Response(JSON.stringify({ code: 'INTERNAL', message: '服务器开小差了' }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return respondWithError(500, { code: 'INTERNAL', message: '服务器开小差了' });
       }
-      return new Response(JSON.stringify({ id: '7', name: '已加载的名称', note: '已加载的备注' }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
+      return { id: '7', name: '已加载的名称', note: '已加载的备注' };
+    }),
+  ]);
 
   return {
     urls,

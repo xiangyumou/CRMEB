@@ -1,11 +1,20 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  notificationAdminInboxList,
+  notificationAdminMarkAllRead,
+  notificationAdminMarkRead,
+  notificationAdminUnreadCount,
+} from '@shop/contracts/notification/notification.admin.contract';
+
+import { on, stubRoutes, type StubCall } from '@/test/api';
+
 import { configureApi, resetApiConfig } from '../api';
 import { useNotificationStream } from './use-notification-stream';
 
 /**
- * CR-32-k2: the bell listens for the event the server names, reads the durable
+ * The bell listens for the event the server names, reads the durable
  * inbox on mount, and marks read on the server.
  */
 
@@ -41,21 +50,9 @@ class FakeEventSource {
 
 const original = globalThis.EventSource;
 
-interface Call {
-  method: string;
-  url: string;
-}
-
-let calls: Call[];
+let calls: StubCall[];
 let inbox: { id: string; title: string; content: string; createdAt: string; code: string }[];
 let unread: number;
-
-function json(body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
 
 beforeEach(() => {
   FakeEventSource.instances = [];
@@ -71,29 +68,22 @@ beforeEach(() => {
     },
   ];
   unread = 3;
-  configureApi({
-    validateResponses: true,
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({ method, url });
-      if (url.startsWith('/admin-api/notifications/unread-count')) return json({ unread });
-      if (url.startsWith('/admin-api/notifications?')) {
-        return json({
-          items: inbox.map((item) => ({
-            ...item,
-            data: { link: '/admin/refunds/1' },
-            readAt: null,
-          })),
-          total: inbox.length,
-          page: 1,
-          pageSize: 50,
-        });
-      }
-      if (url.endsWith('/read') || url.endsWith('/read-all')) return json({ marked: 1 });
-      return new Response(null, { status: 404 });
-    },
-  });
+  configureApi({ validateResponses: true });
+  calls = stubRoutes([
+    on(notificationAdminUnreadCount, () => ({ unread })),
+    on(notificationAdminInboxList, () => ({
+      items: inbox.map((item) => ({
+        ...item,
+        data: { link: '/admin/refunds/1' },
+        readAt: null,
+      })),
+      total: inbox.length,
+      page: 1,
+      pageSize: 50,
+    })),
+    on(notificationAdminMarkRead, { marked: 1 }),
+    on(notificationAdminMarkAllRead, { marked: 1 }),
+  ]);
 });
 
 afterEach(() => {
@@ -101,7 +91,7 @@ afterEach(() => {
   resetApiConfig();
 });
 
-describe('useNotificationStream (CR-32-k2)', () => {
+describe('useNotificationStream', () => {
   it('seeds the bell from the unread inbox and the unread count on mount', async () => {
     const { result } = renderHook(() => useNotificationStream('/admin-api/notifications/stream'));
     await waitFor(() => expect(result.current.notifications).toHaveLength(1));
@@ -168,13 +158,17 @@ describe('useNotificationStream (CR-32-k2)', () => {
     act(() => result.current.markRead('11'));
     expect(result.current.unreadCount).toBe(2);
     await waitFor(() =>
-      expect(calls).toContainEqual({ method: 'POST', url: '/admin-api/notifications/11/read' }),
+      expect(calls).toContainEqual(
+        expect.objectContaining({ method: 'POST', url: '/admin-api/notifications/11/read' }),
+      ),
     );
 
     act(() => result.current.markAllRead());
     expect(result.current.unreadCount).toBe(0);
     await waitFor(() =>
-      expect(calls).toContainEqual({ method: 'POST', url: '/admin-api/notifications/read-all' }),
+      expect(calls).toContainEqual(
+        expect.objectContaining({ method: 'POST', url: '/admin-api/notifications/read-all' }),
+      ),
     );
   });
 

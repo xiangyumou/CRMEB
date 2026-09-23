@@ -9,9 +9,21 @@ import {
   tradeStatsExample,
   userRegionStatsExample,
   userStatsExample,
+  type ProductStats,
 } from '@shop/contracts/stats/schemas';
+import {
+  statsOrders,
+  statsProductExport,
+  statsProductRanking,
+  statsProducts,
+  statsTrade,
+  statsTradeExport,
+  statsUserRegions,
+  statsUsers,
+} from '@shop/contracts/stats/stats.admin.contract';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { OrderStatsPage } from './orders/order-stats';
@@ -32,41 +44,22 @@ import { UserStatsPage } from './users/user-stats';
  * What is asserted is wiring: the right route with the range in the query, the
  * labels and figures coming from the server rather than from the page, the
  * export atom really hiding the button, and the export assembling a download
- * from the CSV-in-JSON envelope (CR-2-b2). The chart itself is not asserted —
+ * from the CSV-in-JSON envelope. The chart itself is not asserted —
  * recharts measures its container, and a zero-width container in happy-dom
  * renders nothing; `StatsChart`'s reshaping is covered where it is pure.
  */
 
-interface Call {
-  method: string;
-  url: string;
-}
-
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      calls.push({ method: init?.method ?? 'GET', url });
-      return new Response(JSON.stringify(payloadFor(url)), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
-}
-
-function payloadFor(url: string): unknown {
-  if (url.includes('/stats/users/regions')) return userRegionStatsExample;
-  if (url.includes('/stats/users')) return userStatsExample;
-  if (url.includes('/stats/products/exports')) return statsExportExample;
-  if (url.includes('/stats/products/ranking')) return productRankingExample;
-  if (url.includes('/stats/products')) return productStatsExample;
-  if (url.includes('/stats/trade/exports')) return statsExportExample;
-  if (url.includes('/stats/trade')) return tradeStatsExample;
-  if (url.includes('/stats/orders')) return orderStatsExample;
-  throw new Error(`no stub for ${url}`);
+function stubApi(overrides: { products?: ProductStats } = {}): StubCall[] {
+  return stubRoutes([
+    on(statsUserRegions, userRegionStatsExample),
+    on(statsUsers, userStatsExample),
+    on(statsProductExport, statsExportExample),
+    on(statsProductRanking, productRankingExample),
+    on(statsProducts, overrides.products ?? productStatsExample),
+    on(statsTradeExport, statsExportExample),
+    on(statsTrade, tradeStatsExample),
+    on(statsOrders, orderStatsExample),
+  ]);
 }
 
 const identityWith = (permissions: string[]) => ({ ...testIdentity, permissions });
@@ -162,22 +155,12 @@ describe('商品统计', () => {
   });
 
   it('says 加购件数 has no source rather than letting the 0 pass for a fact', async () => {
-    configureApi({
-      async fetch(input) {
-        const url =
-          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-        const payload = url.includes('/ranking')
-          ? productRankingExample
-          : {
-              ...productStatsExample,
-              metrics: productStatsExample.metrics.map((metric) =>
-                metric.key === 'cartQuantity' ? { ...metric, value: 0, previous: 0 } : metric,
-              ),
-            };
-        return new Response(JSON.stringify(payload), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
+    stubApi({
+      products: {
+        ...productStatsExample,
+        metrics: productStatsExample.metrics.map((metric) =>
+          metric.key === 'cartQuantity' ? { ...metric, value: 0, previous: 0 } : metric,
+        ),
       },
     });
 

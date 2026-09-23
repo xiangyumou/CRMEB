@@ -1,8 +1,23 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { catalogAdminCategoryTree } from '@shop/contracts/catalog/catalog.category.admin.contract';
+import {
+  catalogAdminProductDelete,
+  catalogAdminProductExport,
+  catalogAdminProductList,
+  catalogAdminProductRestore,
+  catalogAdminProductSetStatus,
+} from '@shop/contracts/catalog/catalog.product.admin.contract';
+import {
+  adminProductDetailExample,
+  type AdminProductDetail,
+  type AdminProductListItem,
+  type ProductExportResult,
+} from '@shop/contracts/catalog/schemas';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { ProductListPage } from './product-list';
@@ -17,13 +32,7 @@ import { ProductListPage } from './product-list';
  * kit's own tests cover paging, sorting and filter rendering.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const row = {
+const row: AdminProductListItem = {
   id: '1',
   name: '简约白 T 恤',
   subtitle: '100% 纯棉',
@@ -53,7 +62,7 @@ const row = {
   deletedAt: null,
 };
 
-const exportPayload = {
+const exportPayload: ProductExportResult = {
   filename: '商品列表.csv',
   columns: [
     { key: 'id', title: 'ID' },
@@ -64,31 +73,17 @@ const exportPayload = {
   truncated: false,
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload = url.includes('/category-tree')
-        ? { items: [] }
-        : url.includes('/product-export')
-          ? exportPayload
-          : method === 'GET'
-            ? { items: [row], total: 1, page: 1, pageSize: 20 }
-            : { ...row, status: 'off_shelf' };
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  // The status and restore routes answer with the whole product, not a row.
+  const detail: AdminProductDetail = { ...adminProductDetailExample, ...row };
+  return stubRoutes([
+    on(catalogAdminCategoryTree, { items: [] }),
+    on(catalogAdminProductExport, exportPayload),
+    on(catalogAdminProductList, { items: [row], total: 1, page: 1, pageSize: 20 }),
+    on(catalogAdminProductSetStatus, { ...detail, status: 'off_shelf' }),
+    on(catalogAdminProductRestore, detail),
+    on(catalogAdminProductDelete, undefined),
+  ]);
 }
 
 afterEach(() => {
