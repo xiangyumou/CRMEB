@@ -19,10 +19,10 @@ import {
 /**
  * The audit log, the generic settings screen and the dashboard header.
  *
- * **One settings page, not fifty.** The old admin had a screen per config tab
- * (~50 of them) built by hand. Here a domain declares a group with
- * `defineConfigGroup` and `GET /admin-api/system/config-groups` lists whatever
- * is registered; `/admin-api/system/config/:group` reads and writes it, and one
+ * **One settings page, not fifty.** There is no hand-built screen per config
+ * tab. A domain declares a group with `defineConfigGroup` and
+ * `GET /admin-api/system/config-groups` lists whatever is registered;
+ * `/admin-api/system/config/:group` reads and writes it, and one
  * `<ConfigGroupForm>` renders it.
  *
  * **Secrets never travel.** A field marked `secret` comes back as a boolean

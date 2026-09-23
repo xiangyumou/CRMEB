@@ -2,16 +2,15 @@ import { defineRoute } from '../_conventions/route';
 import { sitePublicConfig, sitePublicConfigExample } from './schemas';
 
 /**
- * `GET /api/v1/site/config` — the shop's own public settings (CR-7-h2).
+ * `GET /api/v1/site/config` — the shop's own public settings.
  *
- * F1 built the settings system end to end for the console and nothing read it
- * back out for the app: the storefront showed its own bundled logo, no
- * copyright line, the generic share card, a 客服 button that went nowhere and a
- * blank splash screen. Six legacy endpoints answered that, all of them "what
- * did the operator type into that box", so this is one route and one response;
- * the app fans it out to the six legacy shapes in a mapper.
+ * Without it the storefront shows its own bundled logo, no copyright line, the
+ * generic share card, a 客服 button that goes nowhere and a blank splash
+ * screen. Six things the app needs, all of them "what did the operator type
+ * into that box", so this is one route and one response; the app's mapper fans
+ * it out to the six shapes its pages read.
  *
- * **Public**, because every one of the six was read before login — `App.vue` on
+ * **Public**, because every one of the six is read before login — `App.vue` on
  * launch, `pages/users/login` above the sign-in form, `pages/guide` before
  * anything else. `GET /api/v1/agreements/:key` is the precedent.
  *
