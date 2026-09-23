@@ -16,7 +16,6 @@ import {
 /**
  * `goodRecommend` — 优品推荐.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_good_recommend.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const goodRecommendSchema = defineDiyComponent('goodRecommend', {

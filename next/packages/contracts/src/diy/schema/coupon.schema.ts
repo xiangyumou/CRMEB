@@ -5,7 +5,6 @@ import { defineDiyComponent, diyColour, diySlider, diyTabs } from './primitives'
 /**
  * `coupon` — 优惠券.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_coupon.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const couponSchema = defineDiyComponent('coupon', {

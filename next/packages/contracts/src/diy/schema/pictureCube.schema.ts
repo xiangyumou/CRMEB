@@ -5,7 +5,6 @@ import { defineDiyComponent, diyFillet, diyGroup, diyListBox, diySlider } from '
 /**
  * `pictureCube` — 图片魔方.
  *
- * Fields derived from `template/admin/src/components/mobilePage/picture_cube.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const pictureCubeSchema = defineDiyComponent('pictureCube', {

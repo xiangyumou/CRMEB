@@ -9,9 +9,9 @@ import { diyComponentSchemas, isDiyComponentKey } from './schema/registry';
 import { diyProductDetailPage, diyVersion } from './schemas';
 
 /**
- * The built-in 商品详情 page (CR-2-h3) is served to every shop that never
- * decorated its product page, so it is held to exactly what a saved page is
- * held to — the same `parseDiyPageValue` the editor's save and the publish run.
+ * The built-in 商品详情 page is served to every shop that never decorated its
+ * product page, so it is held to exactly what a saved page is held to — the
+ * same `parseDiyPageValue` the editor's save and the publish run.
  */
 describe('PRODUCT_DETAIL_DEFAULT_VALUE', () => {
   it('passes the DIY page schema a saved page must pass', () => {
@@ -51,7 +51,7 @@ describe('PRODUCT_DETAIL_DEFAULT_VALUE', () => {
     }
   });
 
-  it("offers 分享 in the bottom bar, the product page's one way to the share panel (CR-7-i)", () => {
+  it("offers 分享 in the bottom bar, the product page's one way to the share panel", () => {
     const bottom = Object.values(PRODUCT_DETAIL_DEFAULT_VALUE).find(
       (node) => (node as { name: string }).name === 'bottomMenu',
     ) as { showContent: { type: number[]; list: Array<{ id: number; name: string }> } };
@@ -65,7 +65,7 @@ describe('PRODUCT_DETAIL_DEFAULT_VALUE', () => {
       (node) => (node as { name: string }).name,
     );
     expect(names).not.toContain('home_paid_vip');
-    // No URL at all: a default must not point at the legacy demo host.
+    // No URL at all: a built-in default must not point at any host.
     expect(JSON.stringify(PRODUCT_DETAIL_DEFAULT_VALUE)).not.toMatch(/https?:/);
   });
 

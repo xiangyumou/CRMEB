@@ -12,7 +12,6 @@ import {
 /**
  * `news` — 新闻公告.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_news_roll.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const newsSchema = defineDiyComponent('news', {

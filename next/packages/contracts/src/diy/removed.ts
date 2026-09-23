@@ -1,19 +1,17 @@
 /**
  * What this build of the storefront no longer ships.
  *
- * Two lists, copied verbatim from the PHP so a diff against the old code is a
- * plain string comparison:
+ * Two lists:
  *
- * - `REMOVED_DIY_COMPONENTS` — `CoreStore::REMOVED_COMPONENTS`
- *   (`crmeb/app/services/CoreStore.php:10`).
- * - `REMOVED_STOREFRONT_PAGES` — `crmeb/config/core_store_removed_pages.json`.
+ * - `REMOVED_DIY_COMPONENTS` — component names of retired features;
+ * - `REMOVED_STOREFRONT_PAGES` — storefront routes of retired features.
  *
- * Both are about *old data*, not about what an operator can create: a page
- * decorated before 拼团/秒杀/积分商城 were dropped still has those components and
- * those links in its saved JSON, and the renderer would either show a dead tile
- * or navigate into a 404. The rows are never rewritten — the storefront read
- * filters them out — so re-enabling a feature is a code change, not a data
- * migration. See `cleanDiyData` in `@shop/core/diy`.
+ * Both are about *saved data*, not about what an operator can create: a page
+ * decorated while 砍价/秒杀/积分商城 still existed has those components and those links
+ * in its saved JSON, and the renderer would either show a dead tile or navigate
+ * into a 404. The rows are never rewritten — the storefront read filters them
+ * out — so re-enabling a feature is a code change, not a data migration. See
+ * `cleanDiyData` in `@shop/core/diy`.
  */
 
 export const REMOVED_DIY_COMPONENTS: readonly string[] = [
@@ -93,8 +91,7 @@ export function isRemovedDiyComponent(name: unknown): boolean {
 }
 
 /**
- * The path part of a navigation target, as the PHP compares it:
- * `ltrim(explode('?', $url)[0], '/')`. Anything after `?` and any number of
+ * The path part of a navigation target: anything after `?` and any number of
  * leading slashes are irrelevant.
  */
 export function normaliseStorefrontPath(url: string): string {
@@ -104,8 +101,7 @@ export function normaliseStorefrontPath(url: string): string {
 /**
  * Whether a navigation target points at a page that is no longer shipped.
  *
- * Mirrors `DiyCompatibilityServices::isRemovedPage`, including the escape
- * hatch: anything starting with `http` is an external link and is left alone.
+ * Anything starting with `http` is an external link and is left alone.
  * (`clean()` omits that check because a URL with a scheme can never equal a
  * bare `pages/...` entry anyway.)
  */

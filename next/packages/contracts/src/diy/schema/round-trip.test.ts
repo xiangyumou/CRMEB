@@ -42,8 +42,7 @@ describe('the fixture set', () => {
     ]);
   });
 
-  // The install SQL and the production export are the same six rows; the brief
-  // lists them as two sources, so this pins that they have not diverged.
+  // Stored pretty-printed, so a byte-for-byte round trip below is meaningful.
   it.each(PROD)('%s is stored exactly as JSON.stringify(x, null, 2)', (file) => {
     const raw = read(file);
     expect(JSON.stringify(JSON.parse(raw), null, 2)).toBe(raw);
@@ -102,7 +101,7 @@ describe('moren.js defaults', () => {
     Record<string, unknown>
   >;
 
-  it('has the 18 legacy component blocks', () => {
+  it('has the 18 component blocks', () => {
     expect(Object.keys(moren)).toHaveLength(18);
   });
 
@@ -130,8 +129,7 @@ describe('component schemas', () => {
     expect(DIY_COMPONENT_KEYS).toHaveLength(33);
   });
 
-  it('matches the legacy admin palette, in order', () => {
-    // template/admin/src/utils/diyRegistry.js:3-37
+  it('matches the admin palette, in order', () => {
     expect(DIY_COMPONENT_KEYS).toEqual([
       'userInfor',
       'member',
@@ -184,7 +182,7 @@ describe('component schemas', () => {
     expect(CREATABLE_COMPONENT_KEYS).not.toContain('bottomMenu');
   });
 
-  it('keeps customComponent renderable but out of the palette (CR-2-g2)', () => {
+  it('keeps customComponent renderable but out of the palette', () => {
     // 超级组件's inner designer is not in this build, so an empty one could
     // never be filled; existing nodes still render, parse and round-trip.
     expect(CREATABLE_COMPONENT_KEYS).not.toContain('customComponent');

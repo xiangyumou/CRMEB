@@ -5,7 +5,6 @@ import { defineDiyComponent, diyColour, diyListBox, diyTabs } from './primitives
 /**
  * `tabNav` — 选项卡.
  *
- * Fields derived from `template/admin/src/components/mobilePage/nav_bar.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const tabNavSchema = defineDiyComponent('tabNav', {

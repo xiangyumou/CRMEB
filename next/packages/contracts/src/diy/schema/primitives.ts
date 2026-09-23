@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
 /**
- * The value shapes the legacy decoration editor persists.
+ * The value shapes the decoration editor persists.
  *
- * A saved DIY page is not a tidy domain object: it is a dump of the Vue editor's
- * own state, panel labels and all. Every shape below is one of the shared field
- * editors in `template/admin/src/components/mobileConfigRight/`, and the
- * uni-app renderer (`template/uni-app/subpackage/diyComponents/`) reads these
- * exact keys. Treat them as a wire contract, not as a design.
+ * A saved DIY page is not a tidy domain object: it is a dump of the Vue
+ * editor's own state, panel labels and all. Every shape below is one of the
+ * shared field editors of the admin's DIY panels, and the uni-app renderer
+ * (`template/uni-app/subpackage/diyComponents/`) reads these exact keys. Treat
+ * them as a wire contract, not as a design.
  *
  * Three rules hold everywhere in this directory:
  *

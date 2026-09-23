@@ -12,7 +12,6 @@ import {
 /**
  * `customComponent` — 超级组件.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_custom_component.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const customComponentSchema = defineDiyComponent('customComponent', {

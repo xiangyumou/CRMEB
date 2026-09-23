@@ -26,11 +26,9 @@ import {
 /**
  * 页面装修 — the admin surface.
  *
- * The legacy API split the same page across `save`, `diy_save`, `set_status`,
- * `recovery` and `set_recovery`, each POSTing the whole row. Here a page is one
- * resource: settings and content have separate routes so renaming a page does
- * not rewrite its components, and the non-CRUD verbs are sub-resource POSTs as
- * CONVENTIONS requires.
+ * A page is one resource: settings and content have separate routes so renaming
+ * a page does not rewrite its components, and the non-CRUD verbs are
+ * sub-resource POSTs as the conventions require.
  */
 
 const pageParams = z.object({ id });
@@ -172,7 +170,7 @@ export const diyPagePublish = defineRoute({
   examples: [{ name: 'ok', params: { id: '1' }, response: diyPageDetailExample }],
 });
 
-/** Legacy `set_status`: make this the page the storefront serves at `/`. */
+/** Make this the page the storefront serves at `/`. */
 export const diyPageSetHome = defineRoute({
   id: 'diy.adminPageSetHome',
   method: 'POST',
@@ -217,10 +215,9 @@ export const diyPageCopy = defineRoute({
 });
 
 /**
- * Legacy `recovery` / `set_recovery`. `eb_diy.default_value` held a per-row
- * snapshot; the new schema keeps the factory copy on the active theme instead
- * (`themes.default_data`, one blob per surface), so "save as default" writes
- * there and "restore" reads from there.
+ * The factory copy lives on the active theme (`themes.default_data`, one blob
+ * per surface) rather than on each page, so "save as default" writes there and
+ * "restore" reads from there.
  */
 export const diyPageRestoreDefault = defineRoute({
   id: 'diy.adminPageRestoreDefault',

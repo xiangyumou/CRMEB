@@ -5,7 +5,6 @@ import { defineDiyComponent, diyGroup, diyListBox, diyTabs } from './primitives'
 /**
  * `productInfo` — 商品信息.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_product_info.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const productInfoSchema = defineDiyComponent('productInfo', {

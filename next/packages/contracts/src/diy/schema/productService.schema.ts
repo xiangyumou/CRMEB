@@ -5,7 +5,6 @@ import { defineDiyComponent, diyColour, diyListBox, diyTabs } from './primitives
 /**
  * `productService` — 商品服务.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_product_service.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const productServiceSchema = defineDiyComponent('productService', {

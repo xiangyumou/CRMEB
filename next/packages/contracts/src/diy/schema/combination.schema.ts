@@ -14,7 +14,6 @@ import {
 /**
  * `combination` — 拼团.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_pink.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const combinationSchema = defineDiyComponent('combination', {

@@ -5,7 +5,6 @@ import { defineDiyComponent, diyColour, diyGroup, diyTabs, diyUnknown } from './
 /**
  * `pageFoot` — 底部导航.
  *
- * Fields derived from `template/admin/src/store/module/mobildConfig.js`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const pageFootSchema = defineDiyComponent('pageFoot', {

@@ -3,12 +3,12 @@ import { defineErrors } from '../_conventions/errors';
 /**
  * Page decoration (页面装修).
  *
- * Most of these are the Chinese strings the legacy `AdminException`s threw,
- * kept word for word where the operator already knows them.
+ * The messages are the wording operators already know from the console, kept
+ * word for word.
  */
 export const diyErrors = defineErrors({
   DIY_PAGE_NOT_FOUND: { status: 404, message: '模板不存在' },
-  /** `DiyServices::del` — 首页模板 is `id = 1` in the legacy data. */
+  /** 首页模板 is the page with `id = 1`. */
   DIY_PAGE_UNDELETABLE: { status: 409, message: '首页模板不能删除' },
   DIY_PAGE_IN_USE: { status: 409, message: '该模板使用中，无法删除' },
   /**
@@ -32,7 +32,7 @@ export const diyErrors = defineErrors({
    * deleted. The answer is that they have not published one yet.
    */
   DIY_USER_CENTER_PAGE_MISSING: { status: 404, message: '尚未发布个人中心模板' },
-  /** `database.page.limitMax`; the legacy message, unchanged. */
+  /** `database.page.limitMax`. */
   DIY_COMPONENT_LIMIT_EXCEEDED: { status: 422, message: '您设置的商品个数超出系统限制' },
   DIY_NO_DEFAULT_CONTENT: { status: 404, message: '当前页面还没有保存过默认数据' },
   DIY_THEME_NOT_FOUND: { status: 404, message: '主题不存在' },

@@ -14,7 +14,6 @@ import {
 /**
  * `homeComb` — 轮播搜索.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_comb.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const homeCombSchema = defineDiyComponent('homeComb', {

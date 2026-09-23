@@ -25,7 +25,7 @@ export { diyPageBackground, diyPageKind, diyPageStatus };
  * changes on every write and needs no column of its own. The editor sends back
  * the one it loaded; a mismatch is `DIY_VERSION_CONFLICT` rather than a silent
  * overwrite. It doubles as the storefront's cache validator (`ETag`), which is
- * what the legacy `get_diy_version` endpoint existed for.
+ * what the storefront's `/version` poll compares.
  */
 export const diyVersion = z.string().min(1).max(64);
 
@@ -78,7 +78,7 @@ export const diyPageContentBody = z.object({
   content: diyContent,
   /**
    * The version the editor loaded. Omitted only by tooling that knowingly
-   * overwrites (the ETL, a seed); the editor always sends it.
+   * overwrites (a seed, a script); the editor always sends it.
    */
   version: diyVersion.optional(),
   /** Publish in the same round trip, so "保存并发布" is one request. */
@@ -112,26 +112,27 @@ export const diyStorefrontPage = z.object({
 export type DiyStorefrontPage = z.infer<typeof diyStorefrontPage>;
 
 /**
- * 商品详情 — `GET /api/v1/diy/pages/product-detail` (CR-2-h3).
+ * 商品详情 — `GET /api/v1/diy/pages/product-detail`.
  *
  * The storefront envelope with one difference: `id` is `null` when the answer
  * is the built-in default (`PRODUCT_DETAIL_DEFAULT_VALUE`) rather than a saved
- * page, because there is no row for it to name and inventing an id would send
- * a caller of `pages/:id` to a page that does not exist. The renderer never
- * reads `id` (`toLegacyDiyPage` maps it to `0`).
+ * page, because there is no row for it to name and inventing an id would send a
+ * caller of `pages/:id` to a page that does not exist. The renderer never reads
+ * `id`.
  */
 export const diyProductDetailPage = diyStorefrontPage.extend({ id: id.nullable() });
 export type DiyProductDetailPage = z.infer<typeof diyProductDetailPage>;
 
 /**
- * 底部导航 — the decorated tab bar (CR-3-h2 §2).
+ * 底部导航 — the decorated tab bar.
  *
  * `navigation` is the saved `pageFoot` component **verbatim**, not a re-shaped
  * `{ enabled, items }`. `components/pageFooter/index.vue` reads
  * `effectConfig.tabVal`, `navStyleConfig.tabVal`, `menuList[].imgList`,
  * `bgColor2.color[0].item`, `fillet.valList[3].val` and a dozen more off the
- * object it is handed; a tidier shape would be a rewrite of that renderer, and
- * the rule of this domain is that the saved envelope crosses the wire untouched.
+ * object it is handed; a tidier shape would mean rewriting that renderer, and
+ * the rule of this domain is that the saved envelope crosses the wire
+ * untouched.
  *
  * `null` when the live home page carries no 底部导航. That is a real and common
  * state — the shop uses the native tab bar — so it is not a 404.
@@ -143,12 +144,11 @@ export const diyNavigation = z.object({
 export type DiyNavigation = z.infer<typeof diyNavigation>;
 
 /**
- * 版式 — which built-in layout 分类页 / 个人中心 use (CR-3-h2 §3).
+ * 版式 — which built-in layout 分类页 / 个人中心 use.
  *
- * A number, not a boolean: `pages/goods_cate/goods_cate.vue` tests
- * `status == 2 || status == 3`, and the production fixtures carry
- * `category: 1` and `member: 2`. The CR's `{ status: boolean }` would have
- * collapsed two of the three values into one.
+ * A number, not a boolean: `pages/goods_cate/goods_cate.vue` tests `status == 2
+ * || status == 3`, and the production fixtures carry `category: 1` and `member:
+ * 2`. A boolean would collapse two of the three values into one.
  */
 export const diyLayoutType = z.enum(['category', 'user']);
 export type DiyLayoutType = z.infer<typeof diyLayoutType>;

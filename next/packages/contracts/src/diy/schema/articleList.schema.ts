@@ -13,7 +13,6 @@ import {
 /**
  * `articleList` — 文章列表.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_new_list.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const articleListSchema = defineDiyComponent('articleList', {

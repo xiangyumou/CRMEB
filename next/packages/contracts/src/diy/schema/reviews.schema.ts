@@ -5,7 +5,6 @@ import { defineDiyComponent, diyColour, diyListBox, diySlider, diyTabs } from '.
 /**
  * `reviews` — 商品评价.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_reviews.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const reviewsSchema = defineDiyComponent('reviews', {
