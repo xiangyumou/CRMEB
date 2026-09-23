@@ -95,14 +95,15 @@
 					<view v-else></view>
 					<view class="acea-row row-middle">
 						<view class="btn" @click="modify(item, 1)">订单备注</view>
-						<view class="btn on" @click="modify(item,'2',1)" v-if="item.refund_type == 1">
+						<!-- 审核与确认收货只在店铺开启「店员审核售后」时出现（R6 §4） -->
+						<view class="btn on" @click="modify(item,'2',1)" v-if="canReview && item.refund_type == 1">
 							退款审核
 						</view>
-						<view class="btn on" @click="modify(item,'2',0)" v-if="item.refund_type == 2">
+						<view class="btn on" @click="modify(item,'2',0)" v-if="canReview && item.refund_type == 2">
 							退款审核
 						</view>
 						<view class="btn" v-if="item.refund_type == 5" @click="goLogistics(item)">查看物流</view>
-						<view class="btn on" v-if="item.refund_type == 5" @click="modify(item, 2, 1)">确认收货</view>
+						<view class="btn on" v-if="canReview && item.refund_type == 5" @click="modify(item, 2, 1)">确认收货</view>
 					</view>
 				</view>
 			</view>
@@ -134,6 +135,7 @@
 		setOrderRefund,
 		agreeExpress,
 		adminRefundList,
+		getStaffIdentity,
 	} from "@/api/admin";
 	import Loading from '@/components/Loading/index'
 	import PriceChange from '../components/PriceChange/index.vue'
@@ -182,6 +184,8 @@ import home from '@/components/home';
 				status: "",
 				state: 1,
 				isRefund: 0, //1是仅退款;0是退货退款
+				// order-staff.allowStaffRefundReview，默认关闭（R6 §4）
+				canReview: false,
 				imgHost: HTTP_REQUEST_URL,
 				dateSelected: '',
 				dateList: [{
@@ -222,6 +226,11 @@ import home from '@/components/home';
 		},
 		onLoad(option) {
 			let type = option.types;
+			getStaffIdentity().then(res => {
+				this.canReview = res.data.refund_review === 1;
+			}).catch(() => {
+				this.canReview = false;
+			});
 			// this.getErpConfig();
 		},
 		onShow() {

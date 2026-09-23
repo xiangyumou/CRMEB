@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 import { DEVICE } from './src/device';
 
-import { BASE_URL } from './src/stack-file';
+import { BASE_URL, REUSE } from './src/stack-file';
 
 /**
  * Storefront end-to-end suite (`docs/rewrite/briefs/I-storefront-e2e.md`).
@@ -64,7 +64,9 @@ export default defineConfig({
     // Containers pull on a cold machine, `next build` runs once, and the H5
     // bundle builds once too when `dist/dev/h5` is stale.
     timeout: 900_000,
-    reuseExistingServer: !process.env.CI,
+    // Opt-in only (`SHOP_E2E_REUSE=1`): reusing by default let one worktree's
+    // run silently drive another worktree's stack. See `src/stack-file.ts`.
+    reuseExistingServer: REUSE,
     stdout: 'pipe',
     stderr: 'pipe',
   },

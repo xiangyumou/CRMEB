@@ -102,10 +102,17 @@ export async function me(ctx: Ctx): Promise<StaffIdentity> {
   const userId = requireActorId(ctx);
   const ids = await staffUserIds(ctx.db);
   const [brief] = await fulfilRepo.listUserBriefs(ctx.db, [userId]);
+  const isStaff = ids.includes(userId);
+  // The phone shows 退款审核 / 改价 only when the route behind them would let it through (CR-1-r6).
+  const { allowStaffRefundReview, allowStaffRepricing } = await ctx.config.get(orderStaffConfig);
   return {
-    isStaff: ids.includes(userId),
+    isStaff,
     userId: toId(userId),
     nickname: brief?.nickname ?? null,
+    abilities: {
+      refundReview: isStaff && allowStaffRefundReview,
+      adjustPrice: isStaff && allowStaffRepricing,
+    },
   };
 }
 

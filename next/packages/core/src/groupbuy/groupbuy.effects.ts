@@ -15,7 +15,8 @@ import { settleGroup } from './groupbuy.jobs';
  * that had genuinely completed. Here there is no flag: every notification is an
  * effect, always.
  *
- * Four event types, all recorded in `groupbuy.order.ts` and `groupbuy.jobs.ts`:
+ * Four event types, recorded in `groupbuy.order.ts` and `groupbuy.jobs.ts` — and
+ * `groupbuy.settle` also by 立即成团 (`groupbuy.service.ts`, CR-3-h4):
  *
  * | scope      | event_type         | when                                        |
  * | ---------- | ------------------ | ------------------------------------------- |

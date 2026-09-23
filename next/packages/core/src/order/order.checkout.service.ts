@@ -467,6 +467,25 @@ function snapshotOf(sku: SkuForSale): OrderItemSnapshot {
 }
 
 /**
+ * What each checkout rule took off one line — the preview's `adjustments`,
+ * split per line — for the order reads (CR-2-h4). Without it an activity
+ * order with a coupon stacked on it cannot tell the activity from the coupon:
+ * both fold into `discountAmount` (CR-3-b1). A rule that left this line alone
+ * is not listed.
+ */
+function lineAdjustmentsOf(
+  discount: DiscountSplit,
+  index: number,
+): NonNullable<OrderItemSnapshot['adjustments']> {
+  return discount.applied.flatMap((applied) => {
+    const share = applied.perLine[index] ?? Money.ZERO;
+    return share.isZero()
+      ? []
+      : [{ source: applied.source, label: applied.label, amount: share.toString() }];
+  });
+}
+
+/**
  * The cost total, for the margin report. A variant with no recorded cost
  * contributes nothing rather than zero-ing the order: `orders.cost_amount` is
  * nullable precisely so "we do not know" is expressible.
@@ -579,7 +598,10 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
             costUnitPrice: line.sku.costUnitPrice,
             discountAmount: share.toString(),
             totalAmount: line.subtotal.sub(share).toString(),
-            snapshot: snapshotOf(line.sku),
+            snapshot: {
+              ...snapshotOf(line.sku),
+              adjustments: lineAdjustmentsOf(draft.discount, index),
+            },
           };
         }),
       );

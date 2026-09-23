@@ -516,6 +516,9 @@ describe('活动价 — the activity price is what the pages print', () => {
     userCouponId: null,
     totalQuantity: 1,
   };
+  // What the server writes for a 预售 line since CR-2-h4: the catalogue price,
+  // and the activity named among the line's adjustments.
+  const ACTIVITY = { source: 'presale:activity-price', label: '预售价（E2E 预售活动）', amount: '-10.00' };
   const orderItem = {
     ...ORDER.items[0],
     quantity: 1,
@@ -524,6 +527,7 @@ describe('活动价 — the activity price is what the pages print', () => {
     discountAmount: '10.00',
     totalAmount: '78.00',
     specText: '',
+    adjustments: [ACTIVITY],
   };
   const presaleOrder = {
     ...ORDER,
@@ -605,28 +609,53 @@ describe('活动价 — the activity price is what the pages print', () => {
     expect(JSON.stringify(detail)).not.toContain('88.00');
   });
 
-  it('order detail: a normal order, or a list row, is untouched', () => {
+  it('order detail: a normal order is untouched', () => {
+    expect(ORDER.items[0].adjustments.map((a) => a.source)).toEqual(['coupon:full-reduction']);
     expect(orderActivityDiscountCents(ORDER)).toBe(0);
-    expect(orderActivityDiscountCents({ ...presaleOrder, userCouponId: '9001' })).toBe(0);
+    expect(toLegacyOrderDetail(ORDER).cartInfo[0].truePrice).toBe(ORDER.items[0].unitPrice);
+    expect(toLegacyOrderDetail(ORDER).coupon_price).toBe(ORDER.couponDiscount);
+  });
+
+  it('CR-2-h4: the 订单列表 prints the activity price too — a list row reads its lines', () => {
     const { userCouponId, ...row } = presaleOrder;
+    expect(userCouponId).toBeNull();
+    expect(orderActivityDiscountCents(row)).toBe(1000);
+    expect(toLegacyOrderListItem(row, 3)).toMatchObject({ total_price: '78.00', coupon_price: '0.00' });
+    expect(toLegacyOrderListItem(row, 3).cartInfo[0].truePrice).toBe('78.00');
+    expect(toLegacyOrderList({ items: [row, row] })[1].cartInfo[0].truePrice).toBe('78.00');
+  });
+
+  it('a line written before CR-2-h4 (no adjustments): only a coupon-free detail can be derived', () => {
+    const older = { ...presaleOrder, items: [{ ...orderItem, adjustments: [] }] };
+    expect(orderActivityDiscountCents(older)).toBe(1000);
+    expect(toLegacyOrderDetail(older).cartInfo[0].truePrice).toBe('78.00');
+    expect(orderActivityDiscountCents({ ...older, userCouponId: '9001' })).toBe(0);
+    const { userCouponId, ...row } = older;
     expect(userCouponId).toBeNull();
     expect(orderActivityDiscountCents(row)).toBe(0);
     expect(toLegacyOrderListItem(row, 3).cartInfo[0].truePrice).toBe('88.00');
-    expect(toLegacyOrderList({ items: [row, row] })[1].cartInfo[0].truePrice).toBe('88.00');
   });
 
-  // CR-2-h4: `orderDetail` / `orderListItem` carry no adjustments and no activity
-  // unit price, so once a coupon stacks on a 预售 the page cannot tell the ¥10
-  // activity discount from the ¥5 coupon and falls back to the catalogue price.
-  it.fails('CR-2-h4: a 预售 order with a stacked coupon still prints ¥78', () => {
+  // CR-2-h4: each order line carries what every checkout rule took off it, so
+  // once a coupon stacks on a 预售 the ¥10 activity and the ¥5 coupon are still
+  // two entries, and the page prints ¥78 and a ¥5 优惠券.
+  it('CR-2-h4: a 预售 order with a stacked coupon still prints ¥78', () => {
     const detail = toLegacyOrderDetail({
       ...presaleOrder,
-      items: [{ ...orderItem, discountAmount: '15.00', totalAmount: '73.00' }],
+      items: [
+        {
+          ...orderItem,
+          discountAmount: '15.00',
+          totalAmount: '73.00',
+          adjustments: [ACTIVITY, { source: 'coupon:discount', label: '优惠券抵扣', amount: '-5.00' }],
+        },
+      ],
       couponDiscount: '15.00',
       payableAmount: '73.00',
       paidAmount: '73.00',
       userCouponId: '9001',
     });
     expect(detail.cartInfo[0].truePrice).toBe('78.00');
+    expect(detail).toMatchObject({ total_price: '78.00', coupon_price: '5.00', pay_price: '73.00' });
   });
 });

@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { products } from '@shop/db/schema/catalog';
+import { productCategories, productCategoriesMap, products } from '@shop/db/schema/catalog';
 import { couponTemplates, productGiftCoupons, userCoupons } from '@shop/db/schema/coupon';
 import { orders } from '@shop/db/schema/order';
 import { users } from '@shop/db/schema/user';
@@ -103,6 +103,21 @@ async function makeOrder(userId: number): Promise<number> {
       receiverDetail: '某路 1 号',
     })
     .returning({ id: orders.id });
+  return row!.id;
+}
+
+/** A root category, with `productIds` filed under it. */
+async function makeCategory(productIds: readonly number[] = []): Promise<number> {
+  sequence += 1;
+  const [row] = await harness.ctx.db
+    .insert(productCategories)
+    .values({ name: `分类${sequence}` })
+    .returning({ id: productCategories.id });
+  if (productIds.length > 0) {
+    await harness.ctx.db
+      .insert(productCategoriesMap)
+      .values(productIds.map((productId) => ({ productId, categoryId: row!.id })));
+  }
   return row!.id;
 }
 
@@ -732,6 +747,65 @@ describe('listApplicable', () => {
       lines: [{ productId: String(productId), categoryIds: [], amount: '100.00' }],
     });
     expect(result.items).toHaveLength(0);
+  });
+
+  describe('CR-1-h4 — a 品类券 is matched against the product, not the body', () => {
+    /** A ¥15-off 品类券 on `categoryId`, claimed by `userId`. */
+    async function categoryCoupon(userId: number, categoryId: number): Promise<string> {
+      const template = await service.adminCreate(
+        harness.ctx,
+        form({
+          scope: 'categories',
+          categoryIds: [String(categoryId)],
+          discountAmount: '15.00',
+          minSpend: '0.00',
+        }),
+      );
+      const claimed = await service.claim(asUser(userId), { id: template.id });
+      return claimed.coupon.id;
+    }
+
+    it('is usable for a cart in its category when the body sends no categories', async () => {
+      const userId = await makeUser();
+      const [inCategory, elsewhere] = [await makeProduct(), await makeProduct()];
+      const category = await makeCategory([inCategory]);
+      const couponId = await categoryCoupon(userId, category);
+
+      const result = await service.listApplicable(asUser(userId), {
+        lines: [
+          { productId: String(elsewhere), amount: '40.00' },
+          { productId: String(inCategory), amount: '100.00' },
+        ],
+      });
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toMatchObject({
+        coupon: { id: couponId },
+        usable: true,
+        discount: '15.00',
+        eligibleLineIndexes: [1],
+        reason: null,
+      });
+    });
+
+    it('is not usable when the client claims a category the product is not in', async () => {
+      const userId = await makeUser();
+      const [inCategory, elsewhere] = [await makeProduct(), await makeProduct()];
+      const category = await makeCategory([inCategory]);
+      await categoryCoupon(userId, category);
+
+      const result = await service.listApplicable(asUser(userId), {
+        lines: [
+          { productId: String(elsewhere), categoryIds: [String(category)], amount: '100.00' },
+        ],
+      });
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toMatchObject({
+        usable: false,
+        discount: '0.00',
+        eligibleLineIndexes: [],
+        reason: 'COUPON_NOT_APPLICABLE',
+      });
+    });
   });
 });
 

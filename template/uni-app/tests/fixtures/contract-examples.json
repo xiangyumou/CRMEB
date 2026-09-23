@@ -1545,16 +1545,10 @@
       "lines": [
         {
           "productId": "11",
-          "categoryIds": [
-            "7"
-          ],
           "amount": "120.00"
         },
         {
           "productId": "12",
-          "categoryIds": [
-            "8"
-          ],
           "amount": "30.00"
         }
       ]
@@ -4206,6 +4200,9 @@
         "redis": "ok",
         "migrations": "ok",
         "worker": "ok"
+      },
+      "backlog": {
+        "effectsOldestDueSeconds": null
       }
     }
   },
@@ -4381,7 +4378,14 @@
           "discountAmount": "10.00",
           "totalAmount": "110.00",
           "refundedQuantity": 0,
-          "shippedQuantity": 0
+          "shippedQuantity": 0,
+          "adjustments": [
+            {
+              "source": "coupon:full-reduction",
+              "label": "满 100 减 10",
+              "amount": "-10.00"
+            }
+          ]
         }
       ],
       "receiver": {
@@ -4464,7 +4468,14 @@
           "discountAmount": "10.00",
           "totalAmount": "110.00",
           "refundedQuantity": 0,
-          "shippedQuantity": 0
+          "shippedQuantity": 0,
+          "adjustments": [
+            {
+              "source": "coupon:full-reduction",
+              "label": "满 100 减 10",
+              "amount": "-10.00"
+            }
+          ]
         }
       ],
       "receiver": {
@@ -4526,7 +4537,14 @@
           "discountAmount": "10.00",
           "totalAmount": "110.00",
           "refundedQuantity": 0,
-          "shippedQuantity": 0
+          "shippedQuantity": 0,
+          "adjustments": [
+            {
+              "source": "coupon:full-reduction",
+              "label": "满 100 减 10",
+              "amount": "-10.00"
+            }
+          ]
         }
       ],
       "receiver": {
@@ -4601,7 +4619,14 @@
               "discountAmount": "10.00",
               "totalAmount": "110.00",
               "refundedQuantity": 0,
-              "shippedQuantity": 0
+              "shippedQuantity": 0,
+              "adjustments": [
+                {
+                  "source": "coupon:full-reduction",
+                  "label": "满 100 减 10",
+                  "amount": "-10.00"
+                }
+              ]
             }
           ]
         }
@@ -4650,7 +4675,14 @@
           "discountAmount": "10.00",
           "totalAmount": "110.00",
           "refundedQuantity": 0,
-          "shippedQuantity": 2
+          "shippedQuantity": 2,
+          "adjustments": [
+            {
+              "source": "coupon:full-reduction",
+              "label": "满 100 减 10",
+              "amount": "-10.00"
+            }
+          ]
         }
       ],
       "receiver": {
@@ -4902,7 +4934,11 @@
     "response": {
       "isStaff": true,
       "userId": "2001",
-      "nickname": "张三"
+      "nickname": "张三",
+      "abilities": {
+        "refundReview": false,
+        "adjustPrice": false
+      }
     }
   },
   "POST /api/v1/staff/orders/:id/address": {
@@ -4951,7 +4987,14 @@
           "discountAmount": "10.00",
           "totalAmount": "110.00",
           "refundedQuantity": 0,
-          "shippedQuantity": 0
+          "shippedQuantity": 0,
+          "adjustments": [
+            {
+              "source": "coupon:full-reduction",
+              "label": "满 100 减 10",
+              "amount": "-10.00"
+            }
+          ]
         }
       ],
       "platform": "wechat-mini",
@@ -5027,7 +5070,14 @@
           "discountAmount": "10.00",
           "totalAmount": "110.00",
           "refundedQuantity": 0,
-          "shippedQuantity": 0
+          "shippedQuantity": 0,
+          "adjustments": [
+            {
+              "source": "coupon:full-reduction",
+              "label": "满 100 减 10",
+              "amount": "-10.00"
+            }
+          ]
         }
       ],
       "platform": "wechat-mini",
@@ -5108,7 +5158,14 @@
               "discountAmount": "10.00",
               "totalAmount": "110.00",
               "refundedQuantity": 0,
-              "shippedQuantity": 0
+              "shippedQuantity": 0,
+              "adjustments": [
+                {
+                  "source": "coupon:full-reduction",
+                  "label": "满 100 减 10",
+                  "amount": "-10.00"
+                }
+              ]
             }
           ],
           "platform": "wechat-mini",
@@ -5185,7 +5242,14 @@
           "discountAmount": "20.00",
           "totalAmount": "100.00",
           "refundedQuantity": 0,
-          "shippedQuantity": 0
+          "shippedQuantity": 0,
+          "adjustments": [
+            {
+              "source": "coupon:full-reduction",
+              "label": "满 100 减 10",
+              "amount": "-10.00"
+            }
+          ]
         }
       ],
       "platform": "wechat-mini",
@@ -5264,7 +5328,14 @@
           "discountAmount": "10.00",
           "totalAmount": "110.00",
           "refundedQuantity": 0,
-          "shippedQuantity": 0
+          "shippedQuantity": 0,
+          "adjustments": [
+            {
+              "source": "coupon:full-reduction",
+              "label": "满 100 减 10",
+              "amount": "-10.00"
+            }
+          ]
         }
       ],
       "platform": "wechat-mini",

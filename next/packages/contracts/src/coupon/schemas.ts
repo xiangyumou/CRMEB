@@ -302,14 +302,18 @@ export const pagedMyCoupons = paged(userCoupon);
 /**
  * One cart line as the checkout picker describes it.
  *
- * The caller supplies `categoryIds` itself, which is what keeps this domain out
- * of the catalog tables: `quote()` never resolves a product, so coupon code has
- * no reason to import `@shop/core/catalog`.
+ * The server resolves each line's categories from `productId` (CR-1-h4): the
+ * catalogue is the server's, and a category list the client sends would be a
+ * client-controlled eligibility input for a 品类券.
  */
 export const couponCartLine = z.object({
   productId: id,
-  /** Every category the product belongs to, including ancestors. Empty is legal. */
-  categoryIds: z.array(id).max(50),
+  /**
+   * **Ignored.** Accepted so an older client that still sends it is not
+   * refused; the server looks the product's categories up itself (CR-1-h4).
+   * New clients omit it.
+   */
+  categoryIds: z.array(id).max(50).optional(),
   /** Line total after item-level discounts: unit price × quantity. */
   amount: money,
 });

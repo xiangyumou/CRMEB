@@ -113,17 +113,29 @@ async function loginCookies(
  * navigated to *after* this script runs boots already logged in, the way a
  * returning shopper's browser would, without paying for the login UI on
  * every spec that is not about login itself (`specs/login.spec.ts` is).
+ *
+ * `UID` too: every login path commits `SETUID` (`pages/users/login`), and
+ * `store/modules/app.js` reads it at init like the token. Pages compare it
+ * with an order's `gift_uid` (0 unless the order is a gift) — without it the
+ * 订单列表 took every order for a gift received and hid its prices.
  */
-export async function seedToken(page: Page, token: string): Promise<void> {
+export async function seedToken(page: Page, token: string, userId: number): Promise<void> {
   await page.addInitScript(
-    ([tokenValue]) => {
+    ([tokenValue, uid]) => {
       window.localStorage.setItem('LOGIN_STATUS_TOKEN', tokenValue);
+      window.localStorage.setItem('UID', JSON.stringify({ type: 'number', data: uid }));
       window.localStorage.setItem(
         'UNI-APP-CRMEB:TAG',
-        JSON.stringify({ type: 'object', data: [{ key: 'LOGIN_STATUS_TOKEN', expire: 0 }] }),
+        JSON.stringify({
+          type: 'object',
+          data: [
+            { key: 'LOGIN_STATUS_TOKEN', expire: 0 },
+            { key: 'UID', expire: 0 },
+          ],
+        }),
       );
     },
-    [token] as const,
+    [token, userId] as const,
   );
 }
 
@@ -244,7 +256,7 @@ export const test = base.extend<Fixtures & { localOnly: undefined }, WorkerFixtu
     const request = await playwright.request.newContext({ baseURL: BASE_URL });
     const token = await passwordLogin(request, shop.users.primary);
     await request.dispose();
-    await seedToken(page, token);
+    await seedToken(page, token, shop.users.primary.id);
     await page.goto('/');
     await use(page);
   },
@@ -275,7 +287,7 @@ export const test = base.extend<Fixtures & { localOnly: undefined }, WorkerFixtu
     const request = await playwright.request.newContext({ baseURL: BASE_URL });
     const token = await passwordLogin(request, shop.users.secondary);
     await request.dispose();
-    await seedToken(page, token);
+    await seedToken(page, token, shop.users.secondary.id);
     await page.goto('/');
     await use(page);
     await context.close();

@@ -495,9 +495,15 @@ export async function listApplicable(
 ): Promise<ApplicableCouponsResult> {
   const userId = requireUserId(ctx);
   const now = ctx.clock.now();
-  const lines: CouponLine[] = body.lines.map((line) => ({
-    productId: Number(line.productId),
-    categoryIds: line.categoryIds.map(Number),
+  // The server owns the catalogue: a line's categories are looked up from its
+  // product, never taken from the body (CR-1-h4). A client-sent list was both
+  // missing (the confirm page has none to send) and a client-controlled
+  // eligibility input. `categoryIds` on the body is accepted and ignored.
+  const productIds = body.lines.map((line) => Number(line.productId));
+  const categories = await repo.productCategoryIds(ctx.db, productIds);
+  const lines: CouponLine[] = body.lines.map((line, index) => ({
+    productId: productIds[index]!,
+    categoryIds: categories.get(productIds[index]!) ?? [],
     amount: Money.parse(line.amount),
   }));
 

@@ -248,6 +248,13 @@ export interface OrderItemSnapshot {
   volume?: string;
   /** Activity context, when `orders.kind <> 'normal'`. */
   activity?: { kind: 'groupbuy' | 'presale'; activityId: string; title: string };
+  /**
+   * What each checkout rule (`PricingContributor`s, then the coupon) took off
+   * this line, in the order applied; `amount` negative, e.g. `-10.00`. Written
+   * at create (CR-2-h4) — absent on a line written before that. Sums to
+   * `-discountAmount` until an operator 改价s the order; the difference is theirs.
+   */
+  adjustments?: Array<{ source: string; label: string; amount: string }>;
 }
 
 export const orderItems = pgTable(

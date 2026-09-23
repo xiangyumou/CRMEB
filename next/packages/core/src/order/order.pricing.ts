@@ -40,6 +40,12 @@ export interface AppliedAdjustment {
   label: string;
   /** What this rule really took off, after clamping. Negative. */
   amount: Money;
+  /**
+   * This rule's share of each line, aligned with the input lines. Negative
+   * (or zero), and sums to `amount` exactly. Persisted per order line so the
+   * order reads can say what each rule took off (CR-2-h4).
+   */
+  perLine: Money[];
 }
 
 /** `unitPrice * quantity`. Integer multiplication only — never a ratio. */
@@ -132,6 +138,7 @@ export function splitAdjustments(
       source: adjustment.source,
       label: adjustment.label,
       amount: moved.negate(),
+      perLine: shares.map((share) => share.negate()),
     });
   }
 

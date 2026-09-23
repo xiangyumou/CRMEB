@@ -3,7 +3,7 @@
 - **Stream:** H4 (storefront follow-up), raised against the order read model (B1 ownership:
   `next/packages/contracts/src/order/**`, `next/packages/core/src/order/**`). The orchestrator
   routes it.
-- **Status:** **open**
+- **Status:** **RESOLVED** by R6 (§2; commit in `docs/rewrite/status/r6.md`) — fix (1) without a migration: each order line carries its own `adjustments` from `order_items.snapshot`
 - **Found on:** `rewrite/ws-h4-storefront-followup`, while writing `presale.spec.ts` (§3).
 - **Severity:** display only, and only for a 预售 / 拼团 order **with a coupon stacked**, and on
   the 订单列表 for every activity order. The amounts charged are right; the unit price the

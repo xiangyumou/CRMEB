@@ -180,6 +180,8 @@ function toOrderItem(row: repo.OrderItemRow): OrderItem {
     totalAmount: row.totalAmount,
     refundedQuantity: row.refundedQuantity,
     shippedQuantity: row.shippedQuantity,
+    // Written at create since CR-2-h4; an older line has none to show.
+    adjustments: snapshot.adjustments ?? [],
   };
 }
 

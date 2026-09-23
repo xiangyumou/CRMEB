@@ -6,6 +6,7 @@ import {
   productGiftCoupons,
   userCoupons,
 } from '@shop/db/schema/coupon';
+import { productCategoriesMap } from '@shop/db/schema/catalog';
 import { users } from '@shop/db/schema/user';
 import {
   and,
@@ -213,6 +214,40 @@ export async function templateTermsFor(
 export async function templateTerms(db: DbOrTx, templateId: number): Promise<TemplateTerms> {
   const terms = await templateTermsFor(db, [templateId]);
   return terms.get(templateId) ?? { scope: 'all_products', productIds: [], categoryIds: [] };
+}
+
+/**
+ * `product_id -> category ids`, batched, for the checkout picker (CR-1-h4).
+ *
+ * The same table, and the same rows, the catalog's `CatalogPort` hands the
+ * checkout (`catalog.sale.ts`): the picker and the order must agree on which
+ * lines a 品类券 covers. Read here rather than through `@shop/core/catalog`
+ * because catalog → order → coupon already import each other in that
+ * direction, and a coupon → catalog import would close the cycle. This is a
+ * read of the link table only, as `groupbuy.repo.ts` and `presale.repo.ts`
+ * read `products`; nothing in this domain writes a catalog table.
+ */
+export async function productCategoryIds(
+  db: DbOrTx,
+  productIds: readonly number[],
+): Promise<Map<number, number[]>> {
+  const out = new Map<number, number[]>();
+  const unique = [...new Set(productIds)];
+  if (unique.length === 0) return out;
+  const rows = await db
+    .select({
+      productId: productCategoriesMap.productId,
+      categoryId: productCategoriesMap.categoryId,
+    })
+    .from(productCategoriesMap)
+    .where(inArray(productCategoriesMap.productId, unique))
+    .orderBy(asc(productCategoriesMap.categoryId));
+  for (const row of rows) {
+    const list = out.get(row.productId) ?? [];
+    list.push(row.categoryId);
+    out.set(row.productId, list);
+  }
+  return out;
 }
 
 /** Templates a shopper may claim by hand right now, ignoring their own limit. */

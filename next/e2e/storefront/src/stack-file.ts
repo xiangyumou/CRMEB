@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -14,13 +15,43 @@ import path from 'node:path';
  *
  * It lives in the system temp directory, never in the repository, so no run
  * leaves behind something `git status` would show or `prettier` would
- * reformat. `SHOP_E2E_STOREFRONT_STACK` overrides it when two suites must not
- * collide — the admin suite already uses a different name, so the two can run
- * side by side.
+ * reformat.
+ *
+ * ## One checkout, one stack
+ *
+ * The same rule as `@shop/e2e-admin` (R5): several checkouts (worktrees) run
+ * this suite on one machine at once. With fixed ports 3220–3222, one fixed
+ * stack file and `reuseExistingServer` on outside CI, the second run's
+ * Playwright found the first run's edge answering, reused it, and drove its
+ * specs against the *other* checkout's H5 bundle, build and database. So:
+ *
+ * - the default ports and stack file are derived from the checkout's path
+ *   (`CHECKOUT_ID` below), so two checkouts never share them by default;
+ * - reusing a server that is already up is opt-in, `SHOP_E2E_REUSE=1`
+ *   (`playwright.config.ts`); without it a busy port is an error, not a
+ *   silent handover;
+ * - `SHOP_E2E_PORT`, `SHOP_E2E_WEB_PORT`, `SHOP_E2E_GATEWAY_PORT` and
+ *   `SHOP_E2E_STOREFRONT_STACK` still override each, e.g. to run the same
+ *   checkout twice.
  */
 
+/** The checkout root (`next/`'s parent), resolved from this file. */
+export const CHECKOUT_ROOT = path.resolve(import.meta.dirname, '../../../..');
+
+/** Eight hex digits of the checkout path's SHA-256: stable per checkout, distinct across them. */
+export const CHECKOUT_ID = createHash('sha256').update(CHECKOUT_ROOT).digest('hex').slice(0, 8);
+
+/**
+ * The first of this checkout's three default ports (edge, web, gateway):
+ * 25000–30999, in steps of three. Clear of the admin suite's 20000–24999 and
+ * below Linux's ephemeral range (32768+). A clash between a handful of
+ * worktrees is unlikely and loud (a port is busy), never a silent reuse.
+ */
+const DEFAULT_BASE_PORT = 25_000 + (Number.parseInt(CHECKOUT_ID, 16) % 2_000) * 3;
+
 export const STACK_FILE =
-  process.env.SHOP_E2E_STOREFRONT_STACK ?? path.join(tmpdir(), 'shop-e2e-storefront.json');
+  process.env.SHOP_E2E_STOREFRONT_STACK ??
+  path.join(tmpdir(), `shop-e2e-storefront-${CHECKOUT_ID}.json`);
 
 /**
  * The port the *browser* talks to: the edge, which serves the H5 bundle and
@@ -28,13 +59,16 @@ export const STACK_FILE =
  * the API origin from `window.location` on H5 — a storefront served from a
  * different origin than its API is not the thing production runs.
  */
-export const EDGE_PORT = Number(process.env.SHOP_E2E_PORT ?? 3220);
+export const EDGE_PORT = Number(process.env.SHOP_E2E_PORT ?? DEFAULT_BASE_PORT);
 
 /** `next start`. Nothing in the browser ever addresses it directly. */
-export const WEB_PORT = Number(process.env.SHOP_E2E_WEB_PORT ?? 3221);
+export const WEB_PORT = Number(process.env.SHOP_E2E_WEB_PORT ?? DEFAULT_BASE_PORT + 1);
 
 /** The fake WeChat Pay gateway. */
-export const GATEWAY_PORT = Number(process.env.SHOP_E2E_GATEWAY_PORT ?? 3222);
+export const GATEWAY_PORT = Number(process.env.SHOP_E2E_GATEWAY_PORT ?? DEFAULT_BASE_PORT + 2);
+
+/** Opt-in: attach to a stack already answering on `EDGE_PORT` instead of starting one. */
+export const REUSE = process.env.SHOP_E2E_REUSE === '1';
 
 export const BASE_URL = process.env.SHOP_E2E_BASE_URL ?? `http://127.0.0.1:${EDGE_PORT}`;
 

@@ -28,6 +28,7 @@ import { GROUPBUY_SUMMARY_AVATAR_LIMIT } from '@shop/contracts/groupbuy/schemas'
 import { DomainError } from '../kernel/errors';
 import { toId, toIdOrNull } from '../kernel/ids';
 import type { Ctx } from '../kernel/context';
+import { recordEffect } from '../effects/index';
 import { groupbuyConfig } from './groupbuy.config';
 import { settleGroup } from './groupbuy.jobs';
 import * as repo from './groupbuy.repo';
@@ -309,6 +310,15 @@ export async function adminGroupComplete(
     }
     const filled = await repo.virtuallyFillAndSucceed(tx, { groupId: id, now: ctx.clock.now() });
     if (!filled.won) throw new DomainError('GROUPBUY_GROUP_NOT_COMPLETABLE');
+    // The same effect the expiry path records for the same update (CR-3-h4),
+    // so 拼团成功 reaches a team an operator completed. `manual` lets the
+    // notification word it differently; nothing reads it yet.
+    await recordEffect(tx, ctx, {
+      scope: 'groupbuy',
+      scopeId: String(id),
+      eventType: 'groupbuy.settle',
+      payload: { groupId: String(id), outcome: 'succeeded', virtual: true, manual: true },
+    });
     ctx.logger.info(
       { groupId: id, adminId: ctx.actor.id, reason: body.reason ?? null },
       'groupbuy: group completed manually',

@@ -243,10 +243,11 @@
 			<view class="footer acea-row row-right row-middle" v-if="goname != 'looks'">
 				<view class="more"></view>
 				<view class="btn cancel" @click="modify('1')">订单备注</view>
-				<view class="btn delivery" v-if="orderInfo.refund_type == 1" @click="modify('2',1)">退款审核</view>
-				<view class="btn delivery" v-if="orderInfo.refund_type == 2" @click="modify('2',0)">退款审核</view>
+				<!-- 审核与确认收货只在店铺开启「店员审核售后」时出现（R6 §4） -->
+				<view class="btn delivery" v-if="canReview && orderInfo.refund_type == 1" @click="modify('2',1)">退款审核</view>
+				<view class="btn delivery" v-if="canReview && orderInfo.refund_type == 2" @click="modify('2',0)">退款审核</view>
 				<view class="btn" v-if="orderInfo.refund_type == 5" @click="goLogistics(orderInfo)">查看物流</view>
-				<view class="btn delivery" v-if="orderInfo.refund_type == 5" @click="modify('2',1)">确认收货</view>
+				<view class="btn delivery" v-if="canReview && orderInfo.refund_type == 5" @click="modify('2',1)">确认收货</view>
 			</view>
 			<PriceChange :change="change" :orderInfo="orderInfo" :isRefund="isRefund" @closechange="changeclose" @savePrice="savePrice" :status="status">
 			</PriceChange>
@@ -268,6 +269,7 @@
 		setOrderRefund,
 		agreeExpress,
 		getUserInfo,
+		getStaffIdentity,
 	} from "@/api/admin";
 	import {
 		isMoney
@@ -312,6 +314,8 @@
 				// #endif
 				getHeight: this.$util.getWXStatusHeight(),
 				userInfo: {},
+				// order-staff.allowStaffRefundReview，默认关闭（R6 §4）
+				canReview: false,
 			};
 		},
 		watch: {
@@ -329,6 +333,7 @@
 			this.goname = option.goname
 			// this.statusType = option.types
 			this.getIndex();
+			this.getReviewSwitch();
 			// this.getErpConfig();
 		},
 		onPageScroll(e) {
@@ -343,6 +348,13 @@
 			// #endif
 		},
 		methods: {
+			getReviewSwitch() {
+				getStaffIdentity().then(res => {
+					this.canReview = res.data.refund_review === 1;
+				}).catch(() => {
+					this.canReview = false;
+				});
+			},
 			goLogistics(orderInfo) {
 				uni.navigateTo({
 					url: '/pages/admin/logistics/index?type=refund&orderId=' + orderInfo.order_id

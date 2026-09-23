@@ -393,7 +393,7 @@ describe('SMOKE-012 — a team succeeds once, and says so once', () => {
  * the leader and the members) never fires for a manually completed team.
  */
 describe('CR-3-h4 — 立即成团 says so', () => {
-  it.fails('records one groupbuy.settle effect when an operator completes a team', async () => {
+  it('records one groupbuy.settle effect when an operator completes a team', async () => {
     const leader = await makeShopper('团长');
     const groupId = await openTeam(leader);
     await harness.ctx.config.set(groupbuyConfig, { virtualFillOnExpiry: true });
@@ -410,5 +410,39 @@ describe('CR-3-h4 — 立即成团 says so', () => {
     const settled = await effectsOf('groupbuy', String(groupId), 'groupbuy.settle');
     expect(settled).toHaveLength(1);
     expect(settled[0]!.payload).toMatchObject({ outcome: 'succeeded', virtual: true });
+  });
+
+  it('says so once: a second press, the expiry timer and the sweep record nothing more', async () => {
+    const leader = await makeShopper('团长');
+    const groupId = await openTeam(leader);
+    await harness.ctx.config.set(groupbuyConfig, { virtualFillOnExpiry: true });
+    const operator = harness.as({
+      kind: 'admin',
+      id: 1,
+      permissions: ['groupbuy:group:complete'],
+      isSuper: true,
+    });
+    await service.adminGroupComplete(operator, { id: String(groupId) }, {});
+    const { succeededAt } = await readTeam(groupId);
+
+    const again = await service.adminGroupComplete(operator, { id: String(groupId) }, {}).then(
+      () => null,
+      (caught: unknown) => caught,
+    );
+    expect((again as DomainError | null)?.code).toBe('GROUPBUY_GROUP_NOT_COMPLETABLE');
+    harness.clock.set(new Date(Date.parse(NOW) + 2 * 86_400_000).toISOString());
+    await drainEffects(harness.ctx, { baseBackoffMs: 0, maxBackoffMs: 0 });
+    expect(await settleGroup(harness.ctx, groupId)).toMatchObject({ outcome: 'unchanged' });
+    await settleExpiredGroups(harness.ctx);
+    await drainEffects(harness.ctx, { baseBackoffMs: 0, maxBackoffMs: 0 });
+
+    expect(await readTeam(groupId)).toMatchObject({ status: 'succeeded', succeededAt });
+    const settled = await effectsOf('groupbuy', String(groupId), 'groupbuy.settle');
+    expect(settled).toHaveLength(1);
+    expect(settled[0]!.payload).toMatchObject({
+      outcome: 'succeeded',
+      virtual: true,
+      manual: true,
+    });
   });
 });

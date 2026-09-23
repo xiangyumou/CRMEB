@@ -41,13 +41,25 @@ import { toLegacyShipment } from './fulfil.js';
 // 店员身份 / 统计
 // ---------------------------------------------------------------------------
 
-/** `GET /api/v1/staff/me` → the 商家管理 entry's visibility flag. */
+/**
+ * `GET /api/v1/staff/me` → the 商家管理 entry's visibility flag, and whether
+ * the 售后 screens show 退款审核 / 确认收货.
+ *
+ * `refund_review` follows `order-staff.allowStaffRefundReview` (R2, CR-14-k):
+ * with it off the review route answers 403 `店员审核售后未开启`, so the buttons
+ * are hidden rather than offered and refused. The switch reaches the phone as
+ * `abilities.refundReview` on this identity — the addition asked for in
+ * `docs/rewrite/cr/CR-1-r6.md`. Until a server sends it, it reads as off,
+ * which is the switch's own default.
+ */
 export function toLegacyStaffIdentity(dto) {
-  if (!dto) return { is_staff: 0, uid: 0, nickname: '' };
+  if (!dto) return { is_staff: 0, uid: 0, nickname: '', refund_review: 0 };
+  const abilities = dto.abilities || {};
   return {
     is_staff: dto.isStaff ? 1 : 0,
     uid: dto.userId === null || dto.userId === undefined ? 0 : toId(dto.userId),
     nickname: text(dto.nickname),
+    refund_review: dto.isStaff && abilities.refundReview === true ? 1 : 0,
   };
 }
 

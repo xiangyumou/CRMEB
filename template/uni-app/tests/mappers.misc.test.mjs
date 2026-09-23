@@ -227,7 +227,7 @@ describe('coupon', () => {
 
   it('builds the applicable body from a price or from explicit lines', () => {
     expect(fromLegacyApplicableInput('150.00', { productId: '11' })).toEqual({
-      lines: [{ productId: '11', categoryIds: [], amount: '150.00' }],
+      lines: [{ productId: '11', amount: '150.00' }],
     });
     const lines = exampleBody('POST /api/v1/user-coupons/applicable').lines;
     expect(fromLegacyApplicableInput('0', { lines })).toEqual({ lines });
@@ -240,28 +240,22 @@ describe('coupon', () => {
     ];
     expect(fromLegacyApplicableInput('150.00', { cartId: '5001,5002', cartInfo, new: 0, shippingType: 1 })).toEqual({
       lines: [
-        { productId: '11', categoryIds: [], amount: '120.00' },
-        { productId: '12', categoryIds: [], amount: '30.00' },
+        { productId: '11', amount: '120.00' },
+        { productId: '12', amount: '30.00' },
       ],
     });
-    // The contract example's shape: every line a productId, categoryIds and amount.
+    // The contract example's shape: every line a productId and an amount (CR-1-h4: no categoryIds).
     const example = exampleBody('POST /api/v1/user-coupons/applicable').lines[0];
     const ours = fromLegacyApplicableInput('0', { cartInfo }).lines[0];
     expect(Object.keys(ours).sort()).toEqual(Object.keys(example).sort());
   });
 
-  // CR-1-h4: the confirm page's lines come from `checkoutPreview`, whose
-  // `checkoutLine` has no category ids, and the applicable route matches a
-  // 品类券 only on the ids the caller sends. Flip to `it` once either side fixes it.
-  it.fails('CR-1-h4 — a checkout line reaches the coupon picker with its categories', () => {
+  it('CR-1-h4 — sends no categoryIds: the server resolves them from the product', () => {
     const preview = example('POST /api/v1/checkout/preview');
-    const cartInfo = preview.lines.map((line) => ({
-      product_id: line.productId,
-      sum_price: line.totalAmount,
-      categoryIds: line.categoryIds,
-    }));
+    const cartInfo = preview.lines.map((line) => ({ product_id: line.productId, sum_price: line.totalAmount }));
     const body = fromLegacyApplicableInput(preview.payableAmount, { cartInfo });
-    for (const line of body.lines) expect(line.categoryIds.length).toBeGreaterThan(0);
+    expect(body.lines).toHaveLength(preview.lines.length);
+    for (const line of body.lines) expect(line).not.toHaveProperty('categoryIds');
   });
 
   it('maps the 我的优惠券 tab onto a state', () => {

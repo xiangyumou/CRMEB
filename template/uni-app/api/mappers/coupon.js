@@ -154,15 +154,14 @@ export function fromLegacyApplicableInput(price, data) {
   const lines = Array.isArray(src.lines) ? src.lines : null;
   if (lines) return { lines };
   // The 确认订单 picker passes its `cartInfo` (`toLegacyCheckoutLine` rows):
-  // one line per product, at the line's total (CR-4-i §11). The checkout
-  // line carries no category ids, so a category-scoped coupon cannot be
-  // matched from here — CR-1-h4.
+  // one line per product, at the line's total (CR-4-i §11). No
+  // `categoryIds`: the server looks a line's categories up from its product
+  // and ignores any the body sends (CR-1-h4).
   const cartInfo = Array.isArray(src.cartInfo) ? src.cartInfo.filter(Boolean) : [];
   if (cartInfo.length) {
     return {
       lines: cartInfo.map((line) => ({
         productId: String(line.product_id),
-        categoryIds: [],
         amount: money(line.sum_price),
       })),
     };
@@ -171,7 +170,6 @@ export function fromLegacyApplicableInput(price, data) {
     lines: [
       {
         productId: String(src.productId || '0'),
-        categoryIds: [],
         amount: money(price),
       },
     ],

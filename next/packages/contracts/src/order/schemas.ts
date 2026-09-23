@@ -302,10 +302,24 @@ export const orderItem = z.object({
   quantity: z.number().int().min(1),
   unitPrice: money,
   originalUnitPrice: money.nullable(),
+  /**
+   * This line's share of `couponDiscount`: every goods-level discount, the
+   * coupon and each activity price alike (CR-3-b1). `adjustments` says which.
+   */
   discountAmount: money,
   totalAmount: money,
   refundedQuantity: z.number().int().min(0),
   shippedQuantity: z.number().int().min(0),
+  /**
+   * What each checkout rule took off this line, in the order applied — the
+   * preview's `adjustments`, split per line and kept with the order (CR-2-h4).
+   * An activity price (`presale:activity-price`, `groupbuy:activity-price`)
+   * and a stacked coupon (`coupon:*`) are separate entries, so the price the
+   * shopper paid per unit is `unitPrice` less the activity entries over
+   * `quantity`. Sums to `-discountAmount`, unless an operator 改价'd the order
+   * (the difference is theirs). Empty for a line written before CR-2-h4.
+   */
+  adjustments: z.array(priceAdjustment),
 });
 export type OrderItem = z.infer<typeof orderItem>;
 
@@ -327,6 +341,7 @@ export const orderItemExample = {
   totalAmount: '110.00',
   refundedQuantity: 0,
   shippedQuantity: 0,
+  adjustments: [{ source: 'coupon:full-reduction', label: '满 100 减 10', amount: '-10.00' }],
 } satisfies OrderItem;
 
 export const orderListItem = z.object({

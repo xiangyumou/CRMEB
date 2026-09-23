@@ -134,16 +134,27 @@ export function activityDiscountCents(adjustments) {
   );
 }
 
+/** Whether any line of an order read carries its checkout adjustments (CR-2-h4). */
+function hasRecordedAdjustments(dto) {
+  return list(dto && dto.items).some((item) => list(item && item.adjustments).length > 0);
+}
+
 /**
  * The activity discount an order read implies, in cents.
  *
- * `orderDetail` carries no adjustments (CR-2-h4). For an activity order with no
- * coupon, `couponDiscount` *is* the activity discount; with a coupon stacked the
- * two cannot be told apart, so this answers 0 and the page falls back to the
- * catalogue price.
+ * Every order line carries what each checkout rule took off it (CR-2-h4), so
+ * the activity entries are summed straight off the lines — on the 订单列表 as on
+ * 订单详情, with or without a coupon stacked. A line written before that
+ * carries none; for such an order with no coupon, `couponDiscount` *is* the
+ * activity discount, and with a coupon the two cannot be told apart (0: the
+ * page falls back to the catalogue price).
  */
 export function orderActivityDiscountCents(dto) {
-  if (!dto || !dto.kind || dto.kind === 'normal') return 0;
+  if (!dto) return 0;
+  if (hasRecordedAdjustments(dto)) {
+    return list(dto.items).reduce((sum, item) => sum + activityDiscountCents(item && item.adjustments), 0);
+  }
+  if (!dto.kind || dto.kind === 'normal') return 0;
   if (!('userCouponId' in dto) || dto.userCouponId !== null) return 0;
   if (list(dto.items).length !== 1) return 0;
   return cents(dto.couponDiscount);
@@ -164,7 +175,10 @@ function discountOf(opts) {
 
 export function toLegacyOrderItem(dto, opts) {
   if (!dto) return {};
-  const activityDiscount = discountOf(opts);
+  // The line's own adjustments when it has them (CR-2-h4); else what the order implies.
+  const activityDiscount = list(dto.adjustments).length
+    ? activityDiscountCents(dto.adjustments)
+    : discountOf(opts);
   const unitPrice =
     activityDiscount > 0
       ? activityUnitPrice(moneyNumber(dto.unitPrice) * toInt(dto.quantity, 1), dto.quantity, activityDiscount)
@@ -226,9 +240,12 @@ export function toLegacyReceiver(dto) {
 }
 
 /** `orderListItem` → one 订单列表 row. */
-export function toLegacyOrderListItem(dto, opts) {
+export function toLegacyOrderListItem(dto) {
   if (!dto) return {};
-  const act = discountOf(opts);
+  const act = orderActivityDiscountCents(dto);
+  // Lines that carry their adjustments price themselves; only an older,
+  // single-line activity order needs the order's figure handed down.
+  const lineFallback = hasRecordedAdjustments(dto) ? 0 : act;
   return {
     ...RETIRED_ORDER_FLAGS,
     id: toId(dto.id),
@@ -262,7 +279,7 @@ export function toLegacyOrderListItem(dto, opts) {
     add_time_h: legacyTime(dto.createdAt),
     pay_expires_at: unixSeconds(dto.payExpiresAt, 0),
     _status: toLegacyStatus(dto),
-    cartInfo: list(dto.items).map((item) => toLegacyOrderItem(item, { activityDiscount: act })),
+    cartInfo: list(dto.items).map((item) => toLegacyOrderItem(item, { activityDiscount: lineFallback })),
     nickname: '',
     avatar: '',
     gift_user_info: null,
@@ -295,8 +312,9 @@ function legacyRefundStatus(refundStatus) {
   return 0;
 }
 
-// A list row never carries `userCouponId`, so it never shows an activity
-// discount: the 订单列表 prints the catalogue unit price (CR-2-h4).
+// A list row's lines carry their adjustments, so the 订单列表 prints the
+// activity price too (CR-2-h4). `mapList` passes the index as the second
+// argument; `toLegacyOrderListItem` takes none.
 export function toLegacyOrderList(dto) {
   return mapList(dto && dto.items, toLegacyOrderListItem);
 }
@@ -309,7 +327,7 @@ export function toLegacyOrderPage(dto) {
 export function toLegacyOrderDetail(dto) {
   if (!dto) return {};
   return {
-    ...toLegacyOrderListItem(dto, { activityDiscount: orderActivityDiscountCents(dto) }),
+    ...toLegacyOrderListItem(dto),
     ...toLegacyReceiver(dto.receiver),
     mark: text(dto.buyerRemark),
     remark: '',

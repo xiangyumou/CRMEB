@@ -49,7 +49,7 @@ const REFUND = example('GET /api/v1/staff/refunds/:id');
 
 describe('toLegacyStaffIdentity', () => {
   it('answers the 商家管理 entry with a 0/1 flag', () => {
-    expect(toLegacyStaffIdentity(example('GET /api/v1/staff/me'))).toEqual({
+    expect(toLegacyStaffIdentity(example('GET /api/v1/staff/me'))).toMatchObject({
       is_staff: 1,
       uid: 2001,
       nickname: '张三',
@@ -58,8 +58,42 @@ describe('toLegacyStaffIdentity', () => {
       is_staff: 0,
       uid: 0,
       nickname: '',
+      refund_review: 0,
     });
-    expect(toLegacyStaffIdentity(null)).toMatchObject({ is_staff: 0 });
+    expect(toLegacyStaffIdentity(null)).toMatchObject({ is_staff: 0, refund_review: 0 });
+  });
+
+  // R6 §4: `order-staff.allowStaffRefundReview` is off by default and the
+  // review route 403s while it is; the 售后 screens hide 退款审核 / 确认收货
+  // on `refund_review`. It reaches the phone as `abilities.refundReview`
+  // (CR-1-r6).
+  describe('refund_review — the 售后 screens follow allowStaffRefundReview', () => {
+    const staff = { isStaff: true, userId: '2001', nickname: '张三' };
+
+    it('is on only when the server says the switch is on', () => {
+      expect(
+        toLegacyStaffIdentity({ ...staff, abilities: { refundReview: true, adjustPrice: false } }),
+      ).toMatchObject({ refund_review: 1 });
+    });
+
+    it('is off when the switch is off', () => {
+      expect(
+        toLegacyStaffIdentity({ ...staff, abilities: { refundReview: false, adjustPrice: true } }),
+      ).toMatchObject({ refund_review: 0 });
+    });
+
+    it('is off when the identity does not say — the switch defaults to off', () => {
+      expect(toLegacyStaffIdentity(staff)).toMatchObject({ refund_review: 0 });
+      expect(toLegacyStaffIdentity(example('GET /api/v1/staff/me'))).toMatchObject({
+        refund_review: 0,
+      });
+    });
+
+    it('is never on for someone who is not staff', () => {
+      expect(
+        toLegacyStaffIdentity({ ...staff, isStaff: false, abilities: { refundReview: true } }),
+      ).toMatchObject({ is_staff: 0, refund_review: 0 });
+    });
   });
 });
 

@@ -162,8 +162,8 @@ export const couponApplicableList = defineRoute({
       name: 'one-usable-one-not',
       body: {
         lines: [
-          { productId: '11', categoryIds: ['7'], amount: '120.00' },
-          { productId: '12', categoryIds: ['8'], amount: '30.00' },
+          { productId: '11', amount: '120.00' },
+          { productId: '12', amount: '30.00' },
         ],
       },
       response: {

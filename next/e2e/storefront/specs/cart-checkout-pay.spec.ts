@@ -1,3 +1,7 @@
+import { userCoupons } from '@shop/db/schema/coupon';
+import { adminCreate, adminDelete, adminGrant } from '@shop/core/coupon';
+import { eq } from 'drizzle-orm';
+
 import { test, expect } from '../src/fixtures';
 import {
   addSingleSkuProduct,
@@ -146,6 +150,70 @@ test('a shopper applies a granted coupon on the confirm page', async ({
   await expect(
     shopperPage.getByTestId('coupon-option').filter({ hasText: 'E2E 满减券' }),
   ).toBeVisible();
+});
+
+/**
+ * CR-1-h4. A 品类券 (`scope: 'categories'`) on the seeded category, which the
+ * postage product is filed under. The confirm page's lines carry no category
+ * ids, so before the fix the picker greyed it out and the ¥5 store-wide
+ * coupon was applied instead; now the server looks the product's categories
+ * up itself. Worth ¥7, it outranks the ¥5 coupon and is the one applied.
+ *
+ * Arranged through the coupon service and removed again afterwards: every
+ * seeded product is in that category, so a 品类券 left in the wallet would
+ * change the totals the other journeys assert.
+ */
+test('a shopper applies a category-scoped coupon on the confirm page', async ({
+  shopperPage,
+  shopperApi,
+  shop,
+}) => {
+  const template = await adminCreate(shop.ctx, {
+    name: 'E2E 品类券',
+    scope: 'categories',
+    claimMode: 'manual',
+    status: 'active',
+    discountAmount: '7.00',
+    minSpend: '0.00',
+    validityMode: 'days_after_claim',
+    validFrom: undefined,
+    validTo: undefined,
+    validDays: 30,
+    claimFrom: undefined,
+    claimTo: undefined,
+    isUnlimitedSupply: false,
+    totalCount: 10,
+    perUserLimit: 1,
+    giftMinOrderAmount: undefined,
+    sortOrder: 0,
+    productIds: [],
+    categoryIds: [String(shop.fixtures.categoryId)],
+  });
+  try {
+    await adminGrant(shop.ctx, { id: template.id }, { userIds: [String(shop.users.primary.id)] });
+
+    await emptyCart(shopperApi);
+    await arrangeCartItem(shopperApi, shop.fixtures.postageSkuId);
+    await checkoutFromCart(shopperPage);
+
+    // ¥39 + ¥6 freight − ¥7.
+    const couponRow = shopperPage.getByTestId('confirm-coupon');
+    await expect(couponRow).toContainText('E2E 品类券');
+    await expect(shopperPage.getByTestId('confirm-coupon-discount')).toContainText('7.00');
+    await expect(shopperPage.getByTestId('confirm-total')).toContainText('38.00');
+
+    // The picker offers both: the 品类券 is usable, not greyed out.
+    await couponRow.click();
+    await expect(
+      shopperPage.getByTestId('coupon-option').filter({ hasText: 'E2E 品类券' }),
+    ).toBeVisible();
+    await expect(
+      shopperPage.getByTestId('coupon-option').filter({ hasText: 'E2E 满减券' }),
+    ).toBeVisible();
+  } finally {
+    await shop.db.delete(userCoupons).where(eq(userCoupons.templateId, Number(template.id)));
+    await adminDelete(shop.ctx, { id: template.id });
+  }
 });
 
 test('a shopper submits the confirm page, pays at the cashier, and sees the order awaiting shipment', async ({

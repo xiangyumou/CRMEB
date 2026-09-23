@@ -2,7 +2,7 @@
 
 - **Stream:** H4 (storefront follow-up), raised against the group-buy domain (D ownership:
   `next/packages/core/src/groupbuy/**`). The orchestrator routes it.
-- **Status:** **open**
+- **Status:** **RESOLVED** by R6 in `6f619b173` — `adminGroupComplete` records the `groupbuy.settle` effect (`manual: true`) in the completing transaction
 - **Found on:** `rewrite/ws-h4-storefront-followup`, while checking SMOKE-012 (§6).
 - **Severity:** the leader and members of a team an operator completes by hand never get the
   拼团成功 notice, once E2 hangs one off `groupbuy.settle`. The team itself is completed correctly.

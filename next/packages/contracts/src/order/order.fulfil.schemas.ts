@@ -749,6 +749,16 @@ export const staffIdentity = z.object({
   isStaff: z.boolean(),
   userId: id.nullable(),
   nickname: z.string().nullable(),
+  /**
+   * What this staff member may do from the phone. It follows the `order-staff`
+   * group. All false for someone who is not staff (CR-1-r6).
+   */
+  abilities: z.object({
+    /** `order-staff.allowStaffRefundReview` — 退款审核 / 确认收货. */
+    refundReview: z.boolean(),
+    /** `order-staff.allowStaffRepricing` — 改价. */
+    adjustPrice: z.boolean(),
+  }),
 });
 export type StaffIdentity = z.infer<typeof staffIdentity>;
 

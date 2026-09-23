@@ -16,9 +16,15 @@
  *   8. the edge (`src/edge.ts`), which is what the browser actually opens;
  *   9. the handoff file the specs read.
  *
- * Run it directly to keep a stack warm between Playwright runs:
+ * Run it directly to keep a stack warm between Playwright runs, and opt the
+ * runs into attaching to it:
  *
  *     pnpm --filter @shop/e2e-storefront exec tsx scripts/serve.ts
+ *     SHOP_E2E_REUSE=1 pnpm --filter @shop/e2e-storefront test
+ *
+ * The three ports and the handoff file default to values derived from this
+ * checkout's path (`src/stack-file.ts`), so a warm stack in one worktree is
+ * invisible to the suite in another.
  *
  * Nothing here talks to a real WeChat, SMS or Aliyun endpoint. The fake
  * gateway is the only thing `paymentConfig`/`wechatConfig` ever point at.

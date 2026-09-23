@@ -176,6 +176,27 @@ const statusOf = async (refundId: number) =>
 
 // ---------------------------------------------------------------------------
 
+describe('GET /api/v1/staff/me — abilities (CR-1-r6)', () => {
+  it('tells the phone whether 退款审核 is on, and a shopper never', async () => {
+    const { GET } = await import('../me/route');
+    const off = await staff();
+    expect(await (await GET(get('/api/v1/staff/me', off.headers))).json()).toMatchObject({
+      isStaff: true,
+      abilities: { refundReview: false, adjustPrice: false },
+    });
+    const on = await staff({ review: true });
+    expect(await (await GET(get('/api/v1/staff/me', on.headers))).json()).toMatchObject({
+      isStaff: true,
+      abilities: { refundReview: true, adjustPrice: false },
+    });
+    const outsider = await shopper();
+    expect(await (await GET(get('/api/v1/staff/me', outsider.headers))).json()).toMatchObject({
+      isStaff: false,
+      abilities: { refundReview: false, adjustPrice: false },
+    });
+  });
+});
+
 describe('GET /api/v1/staff/refunds', () => {
   it('403s a shopper who is not on the staff list', async () => {
     const { headers } = await shopper();

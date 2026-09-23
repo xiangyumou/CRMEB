@@ -71,8 +71,24 @@ export const staffMe = defineRoute({
   tags: ['order'],
   response: staffIdentity,
   examples: [
-    { name: 'is-staff', response: { isStaff: true, userId: '2001', nickname: '张三' } },
-    { name: 'ordinary-shopper', response: { isStaff: false, userId: '2002', nickname: '李四' } },
+    {
+      name: 'is-staff',
+      response: {
+        isStaff: true,
+        userId: '2001',
+        nickname: '张三',
+        abilities: { refundReview: false, adjustPrice: false },
+      },
+    },
+    {
+      name: 'ordinary-shopper',
+      response: {
+        isStaff: false,
+        userId: '2002',
+        nickname: '李四',
+        abilities: { refundReview: false, adjustPrice: false },
+      },
+    },
   ],
 });
 

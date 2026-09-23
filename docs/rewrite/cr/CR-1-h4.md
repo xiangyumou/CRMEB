@@ -3,7 +3,7 @@
 - **Stream:** H4 (storefront follow-up), raised against the checkout / coupon contracts (B1 / B3
   ownership: `next/packages/contracts/src/{order,coupon}/**`, `next/packages/core/src/coupon/**`).
   The orchestrator routes it.
-- **Status:** **open**
+- **Status:** **RESOLVED** by R6 in `16ceae8a1` — `listApplicable` looks each line's categories up from `productId`; the body's `categoryIds` is optional and ignored
 - **Found on:** `rewrite/ws-h4-storefront-followup`, while closing CR-4-i §11.
 - **Severity:** a shopper holding a 品类券 (`scope: 'categories'`) sees it greyed out in the
   确认订单 picker even when the cart is in that category. Store-wide and product-scoped coupons

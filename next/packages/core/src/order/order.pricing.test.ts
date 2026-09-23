@@ -95,6 +95,30 @@ describe('splitAdjustments', () => {
     expect(split.applied.map((a) => a.amount.toString())).toEqual(['-20.00', '-10.00']);
   });
 
+  it("keeps each adjustment's own per-line share, which the order lines persist (CR-2-h4)", () => {
+    const cart = lines('88.00', '12.00');
+    const split = splitAdjustments(cart, [
+      discount('presale:activity-price', '-10.00', ['10.00', '0.00']),
+      discount('coupon:discount', '-5.00'),
+    ]);
+
+    expect(split.applied.map((a) => a.perLine.map(String))).toEqual([
+      ['-10.00', '0.00'],
+      ['-4.33', '-0.67'],
+    ]);
+    for (const applied of split.applied) {
+      expect(Money.sum(applied.perLine).eq(applied.amount)).toBe(true);
+    }
+    // Per line, the adjustments' shares add up to that line's discount.
+    for (const [index, share] of split.perLine.entries()) {
+      expect(
+        Money.sum(split.applied.map((a) => a.perLine[index]!))
+          .negate()
+          .eq(share),
+      ).toBe(true);
+    }
+  });
+
   it('honours a contributor-supplied per-line split and never leaks outside it', () => {
     const cart = lines('100.00', '100.00');
     const split = splitAdjustments(cart, [discount('x:scoped', '-30.00', ['30.00', '0.00'])]);
