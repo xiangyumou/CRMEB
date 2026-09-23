@@ -138,7 +138,7 @@ describe('首页', () => {
       splashAd: {
         enabled: true,
         imageUrl: '/uploads/splash.png',
-        link: '/pages/goods_details/index?id=12',
+        link: { kind: 'product' as const, id: '12' },
         seconds: 3,
       },
     };

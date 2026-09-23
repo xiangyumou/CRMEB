@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { useAppConfig } from '@/app-config';
 import { assetUrl } from '@/lib/asset-url';
-import { navigate, openExternalLink, storage } from '@/platform';
+import { storage } from '@/platform';
 import { Image } from '@/ui/image';
 import { Pressable } from '@/ui/pressable';
-import { SPLASH_DAY_KEY, shopDay, splashAction, splashDue } from './splash';
+import { openLinkTarget } from './open-link';
+import { SPLASH_DAY_KEY, shopDay, splashDue } from './splash';
 import './splash-overlay.scss';
 
 /** A phone screen, portrait: what operators design the picture for (750 × 1334). */
@@ -45,11 +46,11 @@ export function SplashOverlay() {
 
   const open = phase === 'open';
   if (!open || !ad) return null;
-  const action = splashAction(ad.link);
+  const link = ad.link;
   const close = () => setPhase('closed');
   return (
     <View className="splash" id="splash-overlay">
-      {action ? (
+      {link ? (
         <Pressable
           label="查看活动"
           role="link"
@@ -57,8 +58,7 @@ export function SplashOverlay() {
           className="splash__picture"
           onClick={() => {
             close();
-            if (action.kind === 'external') void openExternalLink(action.url);
-            else void navigate(action.route);
+            openLinkTarget(link);
           }}
         >
           <Image src={assetUrl(ad.imageUrl)} label="开屏图片" ratio={SCREEN_RATIO} lazy={false} />

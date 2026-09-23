@@ -6,8 +6,7 @@ Updated at every commit so the work can resume after an interruption.
 ## Done
 
 - Copy: 秒杀 removed from the UI gallery demo and the `ProductCard` doc comment (限时活动 / 拼团).
-- `features/decor`: `DecorPage` (shared by 首页 and 微页面), `openLinkTarget`, `SplashOverlay`
-  (legacy link string parsed), `DecorSkeleton`. `ui/nav-bar.tsx` (custom bar) and
+- `features/decor`: `DecorPage` (shared by 首页 and 微页面), `openLinkTarget`, `SplashOverlay`, `DecorSkeleton`. `ui/nav-bar.tsx` (custom bar) and
   `platform/chrome.ts` (`navBarMetrics`, `openMiniProgram`). `data/visits.ts` (`useRecordVisit`).
 - 首页 (custom bar + search entry, 404 `DECOR_HOME_NOT_SET` empty state, pull-to-refresh, share,
   refetch on sign-in change) and 微页面 (`packages/page`), with tests.
@@ -32,14 +31,19 @@ Updated at every commit so the work can resume after an interruption.
   「商品已下架」, share sheet with the poster entry reserved for stream D
   (`features/share/poster.ts`). `features/checkout/draft.ts` now types cart / buy-now and
   kind / kindMeta.
+- Merged `storefront/mini` (F2 + H3). 微页面 takes `previewToken` (`platform/nav.ts`
+  `usePreviewToken`, validated): the draft, uncached, under a 「草稿预览」 banner, never shared;
+  「预览已过期」 / 「页面不存在」 states. 开屏浮层 opens `splashAd.link` as a `LinkTarget`.
+  Stable paths for streams D / E: `features/decor/decor-page.tsx` (`DecorPage`) and
+  `ui/contact-button.tsx` (`ContactArea`, `useContactIcon`, `sessionFromOf`).
 
 ## In progress
 
-- Merge `storefront/mini` (F2 + H3): 微页面 `previewToken`, `splashAd.link` as `LinkTarget`.
+- 购物车.
 
 ## Next
 
-1. 购物车 (tab; quantity through `cart.updateItemPut`).
+1. Merge `storefront/mini` again once A2 lands (subscribe scenes, server clock, theme).
 2. 下单 / 收银台 / 支付结果.
 3. Vitest per page, e2e page objects and specs in `e2e/storefront/specs-mini` (seed a decor v2
    home).
@@ -59,6 +63,6 @@ Updated at every commit so the work can resume after an interruption.
 - `productList { couponId }` (我的优惠券「去使用」) cannot narrow the list: the storefront API
   neither filters products by coupon nor exposes a user coupon's scope ids. The list shows
   everything with a note.
-- `app/config` has no switches for 分类「显示二级类目」 or 商品详情「评价 / 推荐 / 服务标签」;
-  `splashAd.link` is a legacy path string, not a `LinkTarget`.
+- `app/config` has no switches for 分类「显示二级类目」 or 商品详情「评价 / 推荐 / 服务标签」.
+  (`splashAd.link` as a `LinkTarget`: resolved by H3.)
 - `order.create` takes no invoice; invoices are asked for after payment (`order.invoiceRequest`).

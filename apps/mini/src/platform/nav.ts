@@ -164,6 +164,20 @@ export function useRouteParams<K extends StorefrontRouteKey>(key: K): RouteParam
 }
 
 /**
+ * The decor editor's draft preview token (F2 opens `packages/page/index?id=&previewToken=`).
+ * Deliberately not a catalogue param: a preview link is never shared, saved or linked from DIY.
+ * `null` when absent or not token-shaped.
+ */
+export function usePreviewToken(): string | null {
+  const { params } = useRouter();
+  const [value] = useState(() => {
+    const raw = params.previewToken;
+    return typeof raw === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(raw) ? raw : null;
+  });
+  return value;
+}
+
+/**
  * A `login.redirect` value back to a route (pages.md §3.2): JSON of a catalogue route, never a
  * path (no open redirect), never `login` itself. Anything else is `null`.
  */
