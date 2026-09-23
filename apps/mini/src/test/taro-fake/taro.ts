@@ -106,6 +106,8 @@ export const taroFake = {
   subscribeAnswer: 'accept' as 'accept' | 'reject' | 'ban' | 'filter',
   /** `chooseAddress` resolves with this, or rejects (`null`: the shopper cancelled). */
   address: null as Record<string, string> | null,
+  /** `chooseInvoiceTitle` resolves with this, or rejects (`null`: the shopper cancelled). */
+  invoiceTitle: null as Record<string, string> | null,
   /** `chooseMedia` temp paths, or `null` for a cancel. */
   media: ['wxfile://tmp/1.jpg'] as string[] | null,
   /** `uploadFile` answers this (a function: called per upload, for a sequence). */
@@ -158,6 +160,7 @@ export const taroFake = {
     this.clipboardError = null;
     this.subscribeAnswer = 'accept';
     this.address = null;
+    this.invoiceTitle = null;
     this.media = ['wxfile://tmp/1.jpg'];
     this.upload = { statusCode: 201, data: '{"url":"/uploads/a.png"}' };
     this.enterOptions = { path: 'pages/index/index', query: {}, scene: 1001 };
@@ -300,6 +303,11 @@ const Taro = {
     taroFake.calls.push({ api: 'chooseAddress', args: undefined });
     const address = taroFake.address;
     return address ? Promise.resolve(address) : rejectWith('chooseAddress:fail cancel');
+  },
+  chooseInvoiceTitle() {
+    taroFake.calls.push({ api: 'chooseInvoiceTitle', args: undefined });
+    const title = taroFake.invoiceTitle;
+    return title ? Promise.resolve(title) : rejectWith('chooseInvoiceTitle:fail cancel');
   },
   chooseMedia(args: unknown) {
     taroFake.calls.push({ api: 'chooseMedia', args });

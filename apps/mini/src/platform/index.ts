@@ -15,6 +15,8 @@ export {
   useLaunchContext,
   type LaunchContext,
 } from './launch';
+export { chooseInvoiceTitle } from './invoice-title';
+export { fromWechatInvoiceTitle, type ChosenInvoiceTitle } from './invoice-title-map';
 export { onAppVisibility } from './lifecycle';
 export {
   goBack,
