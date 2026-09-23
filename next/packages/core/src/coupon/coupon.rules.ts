@@ -10,15 +10,12 @@ import { Money } from '../kernel/money';
  * (`coupon.rules.test.ts`, no Docker). The service does the I/O and calls
  * these; the integration tests then only have to prove the I/O.
  *
- * Behaviour comes from `crmeb/app/services/order/OrderCouponCalculator.php`,
- * read and then rewritten rather than ported. Two rules from there that are
- * easy to get wrong and are kept exactly:
+ * Two rules that are easy to get wrong:
  *
  *  - `min_spend` is compared against the **eligible** subtotal, not the whole
- *    cart (`OrderCouponCalculator.php:51`). A 品类券 on a ¥200 cart with ¥30 of
- *    eligible goods does not meet a ¥100 threshold.
- *  - the discount is **capped at the eligible subtotal**
- *    (`:52`, `coupon_price > price ? price : coupon_price`), so a ¥50 coupon on
+ *    cart. A 品类券 on a ¥200 cart with ¥30 of eligible goods does not meet a
+ *    ¥100 threshold.
+ *  - the discount is **capped at the eligible subtotal**, so a ¥50 coupon on
  *    ¥30 of eligible goods takes off ¥30, never ¥50.
  */
 
@@ -80,8 +77,8 @@ export function eligibleLineIndexes(terms: CouponTerms, lines: readonly CouponLi
  *
  * Returns an outcome rather than throwing: the checkout picker lists unusable
  * coupons greyed out with the reason, and a thrown error cannot be put in a
- * list. `quote()` in `index.ts` is the throwing wrapper for the one-coupon
- * case that B1 calls.
+ * list. `quote()` in `index.ts` is the throwing wrapper for the one-coupon case
+ * that checkout calls.
  */
 export function quoteLines(terms: CouponTerms, lines: readonly CouponLine[]): QuoteOutcome {
   const indexes = eligibleLineIndexes(terms, lines);
@@ -147,7 +144,7 @@ export function windowForIssue(terms: ValidityTerms, issuedAt: Date): { from: Da
   return { from: issuedAt, to: new Date(issuedAt.getTime() + terms.validDays * MS_PER_DAY) };
 }
 
-/** `validFrom <= now <= validTo`. Both ends inclusive, as the legacy redemption guard was. */
+/** `validFrom <= now <= validTo`. Both ends inclusive, like the redemption guard. */
 export function isWithinWindow(now: Date, from: Date, to: Date): boolean {
   return now.getTime() >= from.getTime() && now.getTime() <= to.getTime();
 }
@@ -158,8 +155,7 @@ export function isWithinWindow(now: Date, from: Date, to: Date): boolean {
  *
  * A `fixed_window` template whose spending window has already closed is not
  * claimable even if its claim window is still open: issuing a coupon that is
- * dead on arrival is how support tickets are made. The legacy list did the
- * same thing in `canReceiveCoupons`.
+ * dead on arrival is how support tickets are made.
  */
 export function isClaimWindowOpen(
   terms: ValidityTerms & { claimFrom: Date | null; claimTo: Date | null },

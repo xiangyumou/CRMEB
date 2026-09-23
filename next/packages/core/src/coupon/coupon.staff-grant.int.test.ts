@@ -7,18 +7,15 @@ import * as service from './coupon.service';
 
 /**
  * `POST /api/v1/staff/coupon-grants`, read as a 店员 who wants the coupons for
- * themselves (K2, AUDIT.md K-SEC-B3).
+ * themselves.
  *
- * The per-user limit and the supply hold are shared with `adminGrant`, and
- * the route's roster check (403 for a non-staff shopper) is covered in
- * `apps/web/app/api/v1/coupons.staff.int.test.ts`. What a console role
- * implies and a roster row does not is checked here: a 店员 may grant only an
- * `active` template — a `draft` marketing has not released, or one they
- * `disabled`, answers `COUPON_TEMPLATE_NOT_FOUND` — and never to their own
- * account (`COUPON_GRANT_SELF`). The grant is audited on the staff surface
- * (CR-13-k2).
- *
- * Both refusals were `it.fails` pins until CR-10-k2 was fixed.
+ * The per-user limit and the supply hold are shared with `adminGrant`, and the
+ * route's roster check (403 for a non-staff shopper) is covered in
+ * `apps/web/app/api/v1/coupons.staff.int.test.ts`. What a console role implies
+ * and a roster row does not is checked here: a 店员 may grant only an `active`
+ * template — a `draft` marketing has not released, or one they `disabled`,
+ * answers `COUPON_TEMPLATE_NOT_FOUND` — and never to their own account
+ * (`COUPON_GRANT_SELF`). The grant is audited on the staff surface.
  */
 
 let harness: TestCtx;
@@ -76,7 +73,7 @@ function asStaff(userId: number): Ctx {
   return harness.as(actor);
 }
 
-describe('K-SEC-B3 — what a 店员 can grant', () => {
+describe('what a 店员 can grant', () => {
   it('grants an active template to a customer, once', async () => {
     const clerk = await makeUser();
     const customer = await makeUser();
