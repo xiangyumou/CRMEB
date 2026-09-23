@@ -45,6 +45,8 @@ const pageShow = new Channel<void>();
 const pageHide = new Channel<void>();
 /** Never emitted by a test: `useLoad` runs once, on mount. */
 const pageLoad = new Channel<void>();
+const pullDown = new Channel<void>();
+const reachBottom = new Channel<void>();
 const events = new Map<string, Set<(...args: unknown[]) => void>>();
 let networkType = 'wifi';
 type PrivacyResolve = (option: { event: string; buttonId?: string }) => void;
@@ -63,6 +65,11 @@ const unhandledRequest: RequestHandler = (option) => {
   throw new Error(`taro-fake: no request handler for ${option.method} ${option.url}`);
 };
 const DEFAULT_LOGIN_CODE = 'fake-login-code';
+
+interface UploadAnswer {
+  statusCode: number;
+  data: string;
+}
 
 export interface RecordedCall {
   api: string;
@@ -101,11 +108,10 @@ export const taroFake = {
   address: null as Record<string, string> | null,
   /** `chooseMedia` temp paths, or `null` for a cancel. */
   media: ['wxfile://tmp/1.jpg'] as string[] | null,
-  /** `uploadFile` answers this. */
-  upload: { statusCode: 201, data: '{"url":"/uploads/a.png"}' } as {
-    statusCode: number;
-    data: string;
-  },
+  /** `uploadFile` answers this (a function: called per upload, for a sequence). */
+  upload: { statusCode: 201, data: '{"url":"/uploads/a.png"}' } as
+    | UploadAnswer
+    | ((args: { filePath: string; url: string }) => UploadAnswer | Promise<UploadAnswer>),
   /** `getEnterOptionsSync()` / the next `onAppShow` payload. */
   enterOptions: { path: 'pages/index/index', query: {}, scene: 1001 } as {
     path: string;
@@ -126,6 +132,8 @@ export const taroFake = {
   },
   /** Every mounted component's `useDidShow` runs, as when its page comes back. */
   showPage: () => pageShow.emit(undefined),
+  pullDown: () => pullDown.emit(undefined),
+  reachBottom: () => reachBottom.emit(undefined),
   hidePage: () => pageHide.emit(undefined),
   /**
    * WeChat raising `onNeedPrivacyAuthorization` (a private API called before consent). Returns
@@ -157,7 +165,16 @@ export const taroFake = {
     storageMap.clear();
     networkType = 'wifi';
     privacyListener = null;
-    for (const channel of [appShow, appHide, network, pageShow, pageHide, pageLoad])
+    for (const channel of [
+      appShow,
+      appHide,
+      network,
+      pageShow,
+      pageHide,
+      pageLoad,
+      pullDown,
+      reachBottom,
+    ])
       channel.clear();
     events.clear();
   },
@@ -196,6 +213,15 @@ export function useLoad(callback: () => void): void {
 
 export function useLaunch(callback: () => void): void {
   usePageLifecycle(pageLoad, callback, true);
+}
+
+/** `usePullDownRefresh` / `useReachBottom`: tests fire them with `taroFake.pullDown()` / `reachBottom()`. */
+export function usePullDownRefresh(callback: () => void): void {
+  usePageLifecycle(pullDown, callback, false);
+}
+
+export function useReachBottom(callback: () => void): void {
+  usePageLifecycle(reachBottom, callback, false);
 }
 
 export function useShareAppMessage(handler: () => unknown): void {
@@ -282,13 +308,20 @@ const Taro = {
       ? Promise.resolve({ tempFiles: media.map((tempFilePath) => ({ tempFilePath, size: 1 })) })
       : rejectWith('chooseMedia:fail cancel');
   },
-  uploadFile: (args: unknown) => record('uploadFile', args, taroFake.upload),
+  uploadFile: async (args: { filePath: string; url: string }) => {
+    const answer = taroFake.upload;
+    return record('uploadFile', args, typeof answer === 'function' ? await answer(args) : answer);
+  },
   downloadFile: (args: { url: string }) =>
     record('downloadFile', args, {
       statusCode: 200,
       tempFilePath: `wxfile://tmp/${args.url.split('/').pop()}`,
     }),
   getEnterOptionsSync: () => taroFake.enterOptions,
+  makePhoneCall: (args: unknown) => record('makePhoneCall', args, {}),
+  previewImage: (args: unknown) => record('previewImage', args, {}),
+  stopPullDownRefresh: () => record('stopPullDownRefresh', undefined, {}),
+  pageScrollTo: (args: unknown) => record('pageScrollTo', args, {}),
   getUpdateManager: () => ({
     onCheckForUpdate: () => undefined,
     onUpdateReady: () => undefined,
@@ -327,6 +360,8 @@ const Taro = {
   useRouter,
   useShareAppMessage,
   useShareTimeline,
+  usePullDownRefresh,
+  useReachBottom,
 };
 
 export default Taro;

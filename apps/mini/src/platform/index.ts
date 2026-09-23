@@ -41,6 +41,8 @@ export {
   usePrivacyPrompt,
   type PrivacyApi,
 } from './privacy';
+export { scrollPageToTop, usePullToRefresh, useScrolledToBottom } from './page-scroll';
+export { callPhone, previewImages } from './device';
 export { PrivacyAgreeButton } from './privacy-button';
 export { platform } from './runtime';
 export {

@@ -26,6 +26,11 @@ export function installAuth(hooks: AuthHooks): void {
   auth = hooks;
 }
 
+/** The session's hooks, for requests that do not go through the client (`uploadImage`). */
+export function authHooks(): Readonly<AuthHooks> {
+  return auth;
+}
+
 /**
  * The one `/api/v1` client. Its transport, origin and `X-Client-Platform` come from the build's
  * platform implementation: `Taro.request` to the shop's origin as `wechat-mini` in the
