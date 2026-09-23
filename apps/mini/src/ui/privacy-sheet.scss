@@ -1,0 +1,30 @@
+@use './tokens' as *;
+
+.shop-privacy {
+  &__lead {
+    display: block;
+    @include text($font-body);
+    color: var(--color-text-secondary);
+  }
+
+  &__link {
+    color: var(--color-link);
+  }
+
+  &__note {
+    display: block;
+    margin-top: $space-3;
+    @include text($font-caption);
+    color: var(--color-text-tertiary);
+  }
+
+  &__actions {
+    display: flex;
+    gap: $space-3;
+    width: 100%;
+
+    > * {
+      flex: 1;
+    }
+  }
+}

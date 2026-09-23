@@ -1,0 +1,19 @@
+// NutUI's variables pointed at our tokens (docs/mini/design.md §3.1), for the few NutUI pieces
+// the kit wraps. Pages never use `--nutui-*` directly. Names are NutUI-React-Taro 3.0.19's.
+page,
+.taro_page {
+  --nutui-color-primary: var(--color-primary);
+  --nutui-color-primary-stop-1: var(--color-primary);
+  --nutui-color-primary-stop-2: var(--color-primary);
+  --nutui-color-primary-text: var(--color-on-primary);
+  --nutui-color-title: var(--color-text);
+  --nutui-color-text: var(--color-text-secondary);
+  --nutui-color-text-help: var(--color-text-tertiary);
+  --nutui-color-text-disabled: var(--color-text-disabled);
+  --nutui-color-background: var(--color-bg);
+  --nutui-color-background-overlay: var(--color-surface);
+  --nutui-color-mask: var(--color-mask);
+  --nutui-color-border: var(--color-border);
+  --nutui-overlay-bg-color: var(--color-mask);
+  --nutui-popup-border-radius: 12px;
+}

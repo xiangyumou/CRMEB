@@ -1,0 +1,55 @@
+import { Button as TaroButton, Text, View } from '@tarojs/components';
+import {
+  agreePrivacy,
+  disagreePrivacy,
+  openPrivacyContract,
+  PRIVACY_AGREE_BUTTON_ID,
+  usePrivacyPrompt,
+} from '@/platform';
+import { Button, buttonClassName } from './button';
+import { Sheet } from './sheet';
+import './privacy-sheet.scss';
+
+/**
+ * The global privacy sheet (C04), mounted by every `PageShell`. WeChat raises it when a private
+ * API is used before the shopper agreed; 「同意」 is `open-type="agreePrivacyAuthorization"`
+ * with `id="privacy-agree"`, as the base library checks. 「拒绝」 fails only the feature that
+ * asked; browsing continues.
+ */
+export function PrivacySheet() {
+  const { open, purpose } = usePrivacyPrompt();
+  return (
+    <Sheet
+      visible={open}
+      onClose={disagreePrivacy}
+      title="用户隐私保护提示"
+      dismissible={false}
+      closable={false}
+      footer={
+        <View className="shop-privacy__actions">
+          <Button variant="outline" size="lg" onClick={disagreePrivacy}>
+            拒绝
+          </Button>
+          <TaroButton
+            id={PRIVACY_AGREE_BUTTON_ID}
+            className={buttonClassName({ variant: 'primary', size: 'lg' })}
+            hoverClass="shop-btn--pressed"
+            openType="agreePrivacyAuthorization"
+            onAgreePrivacyAuthorization={agreePrivacy}
+          >
+            同意
+          </TaroButton>
+        </View>
+      }
+    >
+      <Text className="shop-privacy__lead">
+        {purpose ? `为了${purpose}，` : ''}我们需要你同意
+        <Text className="shop-privacy__link" ariaRole="link" onClick={openPrivacyContract}>
+          《用户隐私保护指引》
+        </Text>
+        。请阅读后选择是否同意。
+      </Text>
+      <Text className="shop-privacy__note">拒绝后仅这项功能不可用，你仍可继续浏览和购物。</Text>
+    </Sheet>
+  );
+}
