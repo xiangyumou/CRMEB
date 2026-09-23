@@ -3,12 +3,11 @@ import type { SmsMessage, SmsSendResult, SmsSender } from './sms.port';
 /**
  * An in-memory sender for tests and for a staging box with no SMS account.
  *
- * It lives in `core` rather than in `@shop/testing` because
- * `packages/testing/**` belongs to the orchestrator and a stream may not add to
- * it. Registering it is an explicit call, never a config value: the tests
- * call it, and so does `apps/web`'s container when the process env says
- * `SHOP_FAKE_SMS=1` (CR-3-i) — an env var an operator would have to type, not
- * a choice on the 短信设置 screen.
+ * It lives in `core`, next to the port it implements, so `apps/web` can
+ * register it without depending on `@shop/testing`. Registering it is an
+ * explicit call, never a config value: the tests call it, and so does
+ * `apps/web`'s container when the process env says `SHOP_FAKE_SMS=1` — an env
+ * var an operator would have to type, not a choice on the 短信设置 screen.
  */
 
 export interface FakeSmsSender extends SmsSender {

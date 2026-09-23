@@ -9,25 +9,22 @@ import { sendVerificationCode } from './sms.service';
 import { claimResend, releaseResend, resendKey } from './verification-code';
 
 /**
- * CR-50-k2. STAB-001 found this: `user.concurrency.int.test.ts > SMS codes >
- * lets one of six sends through the resend guard` failed once in ten shuffled
- * rounds, with five of the six sends delivered.
+ * The resend guard under a deterministic race (STAB-001).
  *
- * The test's comment says "`SET NX` decides". The code does not use `SET NX`.
- * `sendVerificationCode` checks the resend key with `PTTL` (`resendWaitMs`),
- * then checks the budgets and reads the config, and only then writes the key
- * with a plain `SET … PX` inside `issueCode`'s `MULTI`. That is a check followed
- * by a separate write, so every caller that reads `PTTL` before the first
- * `SET` lands gets through and costs one SMS, up to the per-phone hourly
- * budget (five by default). Whether the original test passes depends on how
- * the six callers interleave on the shared connection.
+ * `user.concurrency.int.test.ts > SMS codes > lets one of six sends through
+ * the resend guard` only catches a broken guard when the six callers happen to
+ * interleave badly on the shared connection. A guard that checked the resend
+ * key with `PTTL`, then checked the budgets and read the config, and only then
+ * wrote the key with a plain `SET … PX` would be a check followed by a
+ * separate write: every caller that read `PTTL` before the first `SET` landed
+ * would get through and cost one SMS, up to the per-phone hourly budget (five
+ * by default).
  *
- * This file makes the interleaving deterministic. Each caller's first touch
- * of the resend key — the `PTTL` of the old check, or the `SET NX` of the fix
- * — waits until all six have arrived, which is the schedule a loaded machine
- * produces by chance. It was pinned as `it.fails` until the check and the
- * write became one atomic step (`claimResend`: `SET NX PX` first, handed back
- * on a budget or provider refusal); R1 flipped it.
+ * This file makes the interleaving deterministic. Each caller's first touch of
+ * the resend key — a `PTTL` check, or the `SET NX` claim — waits until all six
+ * have arrived, which is the schedule a loaded machine produces by chance. Only
+ * a guard where the check and the write are one atomic step (`claimResend`:
+ * `SET NX PX` first, handed back on a budget or provider refusal) passes.
  */
 
 let harness: TestCtx;
@@ -62,7 +59,7 @@ afterEach(() => {
 /**
  * The harness's Redis, except that the first `PTTL` or `SET` on the resend key
  * holds every caller until `parties` of them have reached it. A `PTTL` is
- * answered with what it read before the wait (the old check's schedule); a
+ * answered with what it read before the wait (a check-then-write schedule); a
  * `SET` is sent after it (every claim races at once).
  */
 function redisWithResendBarrier(redis: Redis, parties: number): Redis {
@@ -110,7 +107,7 @@ function send(ctx: Ctx) {
   });
 }
 
-describe('CR-50-k2 — the resend guard is a check, then a separate write', () => {
+describe('the resend guard is one atomic claim, not a check then a write', () => {
   it('passes the guard once, sequentially', async () => {
     // The control: without the interleaving, the guard works.
     await send(forkTestCtx(harness));

@@ -140,8 +140,8 @@ describe('fakeSmsSender', () => {
 
 describe('verification code keys', () => {
   it('puts the scene in the key', () => {
-    // The legacy system keyed on the phone number alone, so a code sent to
-    // confirm a phone change also logged you in.
+    // Keyed on the phone number alone, a code sent to confirm a phone change
+    // would also log you in.
     expect(codeKey('login', '13800138000')).toBe('sms:code:login:13800138000');
     expect(codeKey('bind-phone', '13800138000')).not.toBe(codeKey('login', '13800138000'));
   });
@@ -169,9 +169,9 @@ describe('generateCode', () => {
 });
 
 /**
- * `resolveSender`'s rule, as the predicate `GET /api/v1/site/config` asks
- * (CR-3-h3) — the same function `resolveSender` itself now calls, so the two
- * cannot disagree about whether a code can be sent.
+ * `resolveSender`'s rule, as the predicate `GET /api/v1/site/config` asks — the
+ * same function `resolveSender` itself calls, so the two cannot disagree about
+ * whether a code can be sent.
  */
 describe('smsProviderConfigured', () => {
   const config = (values: Record<string, unknown>) => smsConfig.schema.parse(values);

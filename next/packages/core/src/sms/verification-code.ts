@@ -4,21 +4,20 @@ import type Redis from 'ioredis';
 /**
  * Verification codes in Redis, consumed **atomically**.
  *
- * The legacy implementation stored the code at `code_<phone>` and compared it
- * with `substr($code, 0, 6) != $captcha`. Three things followed from that, all
- * of them exploitable:
+ * A code stored under the phone alone and merely compared invites three
+ * exploits:
  *
- *  1. `register` and `reset` never deleted the key, so one code worked for its
- *     whole TTL — a code overheard once was a login for the next minute;
- *  2. there was no attempt counter, so six digits could be walked through at
- *     whatever rate the network allowed;
- *  3. one key served every purpose, so a code sent to confirm a phone change
- *     also logged you in.
+ *  1. a key that is not deleted on use lets one code work for its whole TTL — a
+ *     code overheard once is a login for the next minute;
+ *  2. without an attempt counter, six digits can be walked through at whatever
+ *     rate the network allows;
+ *  3. one key for every purpose lets a code sent to confirm a phone change also
+ *     log you in.
  *
- * Here the scene is part of the key, the compare-and-delete is one Lua script
- * (the `GETDEL` the brief asks for, with a counter), and a wrong guess is
- * counted inside the same atomic step. Two concurrent verifications of the
- * same correct code therefore produce exactly one `ok`.
+ * So the scene is part of the key, the compare-and-delete is one Lua script (a
+ * `GETDEL` with a counter), and a wrong guess is counted inside the same atomic
+ * step. Two concurrent verifications of the same correct code therefore produce
+ * exactly one `ok`.
  */
 
 export type VerifyOutcome = 'ok' | 'invalid' | 'attempts-exceeded';
@@ -38,9 +37,9 @@ export function resendKey(scene: string, phone: string): string {
 /**
  * Six digits from a CSPRNG, uniform over `000000`–`999999`.
  *
- * `randomInt` rather than `Math.random()`: a predictable code is a login, and
- * the legacy `rand(100000, 999999)` also threw away every code starting with a
- * zero, costing a tenth of the space for nothing.
+ * `randomInt` rather than `Math.random()`: a predictable code is a login. And
+ * the range starts at zero — `100000`–`999999` would throw away every code
+ * starting with a zero, costing a tenth of the space for nothing.
  */
 export function generateCode(): string {
   return String(randomInt(0, 1_000_000)).padStart(CODE_LENGTH, '0');
@@ -83,7 +82,7 @@ export interface IssueInput {
 
 /**
  * Stores the code. The resend guard is **not** written here: `claimResend`
- * wrote it, atomically, before anything else happened (CR-50-k2).
+ * wrote it, atomically, before anything else happened.
  */
 export async function issueCode(redis: Redis, input: IssueInput): Promise<void> {
   const key = codeKey(input.scene, input.phone);
@@ -101,13 +100,13 @@ export async function discardCode(redis: Redis, scene: string, phone: string): P
 }
 
 /**
- * The resend guard **is** the write (CR-50-k2): `SET key token NX PX`.
+ * The resend guard **is** the write: `SET key token NX PX`.
  *
- * It used to be a `PTTL` check followed, a few round trips later, by a plain
- * `SET … PX` inside `issueCode`. Every tap that read before the first write
- * landed got through, minted a code over the previous one and cost an SMS, up
- * to the per-phone hourly budget: five messages for one double-tap, and only
- * the last code valid. Now exactly one caller per window wins the key.
+ * A `PTTL` check followed, a few round trips later, by a plain `SET … PX` would
+ * let every tap that read before the first write landed get through, mint a
+ * code over the previous one and cost an SMS, up to the per-phone hourly
+ * budget: five messages for one double-tap, and only the last code valid. As
+ * one write, exactly one caller per window wins the key.
  *
  * Returns `{ waitMs: 0, token }` to the caller that claimed the window, or
  * the milliseconds left to everybody else. The token lets the claimant hand

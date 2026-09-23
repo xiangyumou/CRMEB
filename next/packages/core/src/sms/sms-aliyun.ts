@@ -56,10 +56,10 @@ export interface AliyunSmsOptions {
   regionId: string;
   signName: string;
   /**
-   * Required, not defaulted to `new Date()`: CONVENTIONS bans an ambient clock
-   * in `packages/core`, and the signature the request is rejected or accepted
-   * on is *of* the timestamp — so a test that cannot pin it cannot assert the
-   * signature at all.
+   * Required, not defaulted to `new Date()`: `docs/conventions.md` bans an
+   * ambient clock in `packages/core`, and the signature the request is rejected
+   * or accepted on is *of* the timestamp — so a test that cannot pin it cannot
+   * assert the signature at all.
    */
   now: () => Date;
   nonce?: () => string;

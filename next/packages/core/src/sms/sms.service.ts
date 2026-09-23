@@ -39,9 +39,9 @@ type SmsConfigValues = z.infer<typeof smsConfig.schema>;
  * Whether the `sms` group names a provider this build can send through.
  *
  * `resolveSender`'s rule, extracted so `GET /api/v1/site/config` can say
- * whether 手机号登录 works (CR-3-h3) without a second copy of it to drift:
- * Aliyun with its key id, key secret and sign name all filled in. `none` and
- * Tencent (declared, not implemented — see below) are not.
+ * whether 手机号登录 works without a second copy of it to drift: Aliyun with
+ * its key id, key secret and sign name all filled in. `none` and Tencent
+ * (declared, not implemented — see below) are not.
  */
 export function smsProviderConfigured(config: SmsConfigValues): boolean {
   return (
@@ -78,11 +78,11 @@ export async function resolveSender(ctx: Ctx): Promise<SmsSender> {
       now: () => ctx.clock.now(),
     });
   }
-  // Tencent Cloud is declared in the config group (F1 ported the fields) but
-  // has no implementation here: nobody on this project has an account to test
-  // one against, and a signing routine that has never talked to the real
-  // endpoint is a liability dressed as a feature. `nullSmsSender` refuses
-  // loudly instead of failing at 3am on a release.
+  // Tencent Cloud is declared in the config group but has no implementation
+  // here: nobody on this project has an account to test one against, and a
+  // signing routine that has never talked to the real endpoint is a liability
+  // dressed as a feature. `nullSmsSender` refuses loudly instead of failing at
+  // 3am on a release.
   return nullSmsSender;
 }
 
@@ -105,14 +105,14 @@ export interface SendCodeResult {
 /**
  * Mint a code, store it, send it.
  *
- * Order matters. The resend window is **claimed first**, with one `SET NX`
- * (CR-50-k2): of any number of simultaneous taps, exactly one gets past this
- * line, and the others are told to wait without touching a budget. Then every
- * budget is checked before a code is minted, the code is stored before it is
- * sent (so a send that succeeds but whose response is lost still leaves a
- * usable code), and any refusal after the claim — a budget, the provider —
- * hands the window back, so the shopper is not told to wait 60 seconds for a
- * code that was never sent.
+ * Order matters. The resend window is **claimed first**, with one `SET NX`: of
+ * any number of simultaneous taps, exactly one gets past this line, and the
+ * others are told to wait without touching a budget. Then every budget is
+ * checked before a code is minted, the code is stored before it is sent (so a
+ * send that succeeds but whose response is lost still leaves a usable code),
+ * and any refusal after the claim — a budget, the provider — hands the window
+ * back, so the shopper is not told to wait 60 seconds for a code that was never
+ * sent.
  */
 export async function sendVerificationCode(
   ctx: Ctx,
