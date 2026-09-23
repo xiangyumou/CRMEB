@@ -65,7 +65,7 @@ async function withTemplate(
   }
 }
 
-test('确认订单 takes a category-scoped coupon for a product in that category', async ({
+test('确认订单 itemises the freight and takes a category-scoped coupon for a product in that category', async ({
   miniPage: page,
   wechatUser,
   shop,
@@ -87,6 +87,10 @@ test('确认订单 takes a category-scoped coupon for a product in that category
       await checkout.expectShown();
       await expect(checkout.couponCell()).toContainText('-¥7.00');
       await expect(checkout.bar()).toContainText('38.00');
+      // The freight it charges is its own line: ¥6.00 to the 深圳 address.
+      await expect(
+        shown(page).locator('.shop-cell__row').filter({ hasText: /^运费/ }),
+      ).toContainText('¥6.00');
 
       // Both are offered and usable.
       await checkout.couponCell().click();

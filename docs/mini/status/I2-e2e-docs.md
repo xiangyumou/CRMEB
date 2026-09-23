@@ -25,9 +25,17 @@ mini citations in `docs/invariants.md`, the mini sections of `architecture.md` /
 - `specs-mini/reviews.spec.ts`: a held review appears only once the merchant publishes it
   (CONTENT-001); a clean one appears at once and leaves when hidden.
 
+- `docs/mini/e2e-coverage.md`: every legacy scenario, SMOKE row and §12 journey → mini spec,
+  with the gaps (password login not built; privacy sheet not emulable on H5; presale order
+  pages known-failing; account pages pending E).
+- `docs/invariants.md`: SMOKE-002…005 cite a mini spec beside the legacy one (statements name
+  both clients); mini citations added to AUTH-007, AUTH-008, DECOR-012, DECOR-013, SHARE-001,
+  CONTENT-001, SYS-019; new CLIENT-002 (the web-view 业务域名 rule, unit + e2e). `pnpm guards`
+  green.
+
 ## In progress
 
-- The coverage matrix; invariants; docs; CI comments.
+- invariants; docs; CI comments.
 
 ## Pending
 
