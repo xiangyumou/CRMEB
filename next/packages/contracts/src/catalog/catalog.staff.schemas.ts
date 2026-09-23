@@ -17,8 +17,9 @@ import { productFreightMode, productKind, volume, weight } from './schemas';
  * scrolls in public), no recycle bin, no export. The per-SKU 成本价 *is* here,
  * because 修改价格/库存 edits it and always has.
  *
- * Every shape is either one of A's admin schemas or a strict subset of one, so
- * the phone and the console can never disagree about what a product is.
+ * Every shape is either one of the catalog's admin schemas or a strict subset
+ * of one, so the phone and the console can never disagree about what a product
+ * is.
  */
 
 // ---------------------------------------------------------------------------
@@ -123,7 +124,7 @@ export const staffBulkResult = z.object({ updated: z.number().int().min(0) });
 
 /**
  * 商品分类 for the picker: id, name, children. Three levels written out, for
- * the reason A's admin tree is (`z.lazy` makes an OpenAPI `$ref` cycle).
+ * the reason the admin tree is (`z.lazy` makes an OpenAPI `$ref` cycle).
  */
 const staffCategoryBase = z.object({ id, name: z.string() });
 const staffCategoryLeaf = staffCategoryBase;

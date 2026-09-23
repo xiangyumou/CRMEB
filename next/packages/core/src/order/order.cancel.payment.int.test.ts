@@ -536,7 +536,8 @@ describe('a payment callback racing the cancel on one order', () => {
 
     if ('cancel' in cancelSide && cancelSide.cancel === 'cancelled') {
       // The cancel got there first. The money that landed afterwards is not the
-      // order's any more — it is C's exception, and the order stays cancelled.
+      // order's any more — it is a payment exception, and the order stays
+      // cancelled.
       expect(row.status).toBe('cancelled');
       expect(row.paidAt).toBeNull();
       expect(await stockOf(shopper.skuId)).toBe(10);
