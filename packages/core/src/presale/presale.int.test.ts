@@ -1,13 +1,19 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { products, productSkus } from '@shop/db/schema/catalog';
+import { notificationMessages } from '@shop/db/schema/notification';
 import { effects } from '@shop/db/schema/system';
+import { wechatIdentities } from '@shop/db/schema/wechat';
 import { presaleActivities, presaleActivitySkus, presaleOrders } from '@shop/db/schema/presale';
 import { orderItems, orders } from '@shop/db/schema/order';
 import { refunds } from '@shop/db/schema/refund';
 import { users } from '@shop/db/schema/user';
 import type { Tx } from '@shop/db';
 import { createTestCtx, type TestCtx } from '@shop/testing';
+import { startFakeOaServer, type FakeOaServer } from '@shop/testing/wechat';
+import { getEffectHandler } from '../effects/index';
+import { notificationAdmin, registerSmsPort, type SmsPort } from '../notification';
+import { resetWechatTokenFlight, wechatConfig } from '../wechat';
 import type { Actor, Ctx } from '../kernel/context';
 import { Money } from '../kernel/money';
 import { withTx } from '../kernel/tx';
@@ -1206,5 +1212,228 @@ describe('the system refund seam', () => {
 
     expect(seen).toEqual([{ orderId, reason: 'presale_expired' }]);
     expect(await refundsFor(orderId)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// shopper notifications
+// ---------------------------------------------------------------------------
+
+/**
+ * What a presale shopper is told, end to end: the presale effect records the
+ * notice, the notification effect fans it out, and the channels the operator
+ * switched on receive the rendered payload. WeChat is the fake
+ * `api.weixin.qq.com` from `@shop/testing`; SMS is a recording port.
+ */
+describe('shopper notifications', () => {
+  let oa: FakeOaServer;
+  const sms: { calls: Parameters<SmsPort['send']>[1][] } = { calls: [] };
+  const superAdmin = (): Ctx =>
+    harness.as({ kind: 'admin', id: 1, permissions: [], isSuper: true });
+  const SEND = 'notification.send';
+
+  beforeAll(async () => {
+    oa = await startFakeOaServer();
+    process.env['PUBLIC_ORIGIN'] = 'https://shop.example.test';
+  });
+
+  afterAll(async () => {
+    delete process.env['PUBLIC_ORIGIN'];
+    await oa?.close();
+  });
+
+  beforeEach(async () => {
+    await harness.redis.flushdb();
+    oa.reset();
+    resetWechatTokenFlight();
+    sms.calls = [];
+    registerSmsPort({
+      async send(_ctx, input) {
+        sms.calls.push(input);
+        return { ok: true };
+      },
+    });
+    await harness.ctx.config.set(wechatConfig, {
+      oaAppId: oa.appId,
+      oaAppSecret: oa.appSecret,
+      apiBaseUrl: oa.url,
+    });
+  });
+
+  /**
+   * Runs the pending effects of the named types, and the ones they record —
+   * only those: `refund.execute` would call the payment gateway, and this suite
+   * is about what the shopper is told.
+   */
+  async function runEffects(types: readonly string[]): Promise<void> {
+    for (let round = 0; round < 10; round += 1) {
+      const due = await harness.ctx.db
+        .select()
+        .from(effects)
+        .where(and(eq(effects.status, 'pending'), inArray(effects.eventType, [...types])));
+      if (due.length === 0) return;
+      for (const row of due) {
+        await getEffectHandler(row.scope, row.eventType)!(harness.ctx, {
+          id: row.id,
+          scope: row.scope,
+          scopeId: row.scopeId,
+          eventType: row.eventType,
+          payload: row.payload,
+          attempts: 1,
+        });
+        await harness.ctx.db.update(effects).set({ status: 'done' }).where(eq(effects.id, row.id));
+      }
+    }
+    throw new Error('effects kept recording effects');
+  }
+
+  const inbox = (userId: number) =>
+    harness.ctx.db
+      .select()
+      .from(notificationMessages)
+      .where(eq(notificationMessages.userId, userId));
+
+  async function orderOf(orderId: number) {
+    const [row] = await harness.ctx.db.select().from(orders).where(eq(orders.id, orderId));
+    return row!;
+  }
+
+  async function titleOf(fixture: ActivityFixture): Promise<string> {
+    const [row] = await harness.ctx.db
+      .select({ title: presaleActivities.title })
+      .from(presaleActivities)
+      .where(eq(presaleActivities.id, fixture.activityId));
+    return row!.title;
+  }
+
+  it('tells the shopper the ship date their payment fixed, once, on every channel switched on', async () => {
+    const current = await notificationAdmin.getTemplate(superAdmin(), { code: 'presale_paid' });
+    await notificationAdmin.saveTemplate(
+      superAdmin(),
+      { code: 'presale_paid' },
+      {
+        isEnabled: true,
+        channels: {
+          ...current.channels,
+          wechatOa: {
+            enabled: true,
+            templateKey: 'OPENTM2',
+            templateId: 'TPL_OA_PRESALE',
+            fields: { keyword1: '{{orderNo}}', keyword2: '{{shipDate}}' },
+          },
+          sms: { enabled: true, templateCode: 'SMS_PRESALE' },
+        },
+      },
+    );
+
+    // Paid at 20:00 UTC on 1 June, which is already 2 June in the shop; 15 days
+    // on from there is 17 June.
+    harness.clock.set('2026-06-01T20:00:00.000Z');
+    const fixture = await makeActivity({ shipAfterDays: 15 });
+    const userId = await makeUser();
+    const orderId = await placeOrder({ userId, fixture });
+    await pay(orderId);
+    await harness.ctx.db
+      .insert(wechatIdentities)
+      .values({ userId, platform: 'oa', openid: 'oa-presale-1' });
+
+    await runEffects(['presale.paid', SEND]);
+    // A replayed payment callback records nothing new, and a re-run effect
+    // finds its notice already there.
+    await pay(orderId);
+    await harness.ctx.db
+      .update(effects)
+      .set({ status: 'pending' })
+      .where(eq(effects.eventType, 'presale.paid'));
+    await runEffects(['presale.paid', SEND]);
+
+    const { orderNo } = await orderOf(orderId);
+    const title = await titleOf(fixture);
+    const messages = await inbox(userId);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({ code: 'presale_paid', title: '预售付款成功' });
+    expect(messages[0]?.content).toBe(
+      `您预订的「${title}」已付款 ¥59.00，将于 2026-06-17 起发货。`,
+    );
+    expect(messages[0]?.data).toMatchObject({
+      link: `/pages/goods/order_details/index?order_id=${orderNo}`,
+    });
+
+    const sends = oa.callsTo('/cgi-bin/message/template/send');
+    expect(sends).toHaveLength(1);
+    expect(sends[0]?.body).toEqual({
+      touser: 'oa-presale-1',
+      template_id: 'TPL_OA_PRESALE',
+      url: `https://shop.example.test/pages/goods/order_details/index?order_id=${orderNo}`,
+      data: { keyword1: { value: orderNo }, keyword2: { value: '2026-06-17' } },
+    });
+    expect(sms.calls).toEqual([
+      expect.objectContaining({
+        userId,
+        templateCode: 'SMS_PRESALE',
+        notificationCode: 'presale_paid',
+        params: expect.objectContaining({ orderNo, shipDate: '2026-06-17', amount: '59.00' }),
+      }),
+    ]);
+  });
+
+  it('tells a shopper whose payment the quota refused, in the transaction that opened the refund', async () => {
+    const fixture = await makeActivity({ stock: 10, totalQuota: 1 });
+    const firstUser = await makeUser();
+    const first = await placeOrder({ userId: firstUser, fixture });
+    const secondUser = await makeUser();
+    const second = await placeOrder({ userId: secondUser, fixture });
+    await pay(first);
+    await pay(second);
+
+    // Nothing is said about the refused payment until its refund is open.
+    await runEffects(['presale.paid', 'presale.released', SEND]);
+    expect(await inbox(secondUser)).toHaveLength(0);
+    expect((await inbox(firstUser)).map((row) => row.code)).toEqual(['presale_paid']);
+
+    await runEffects(['presale.refund', SEND]);
+
+    const [refundRow] = await harness.ctx.db
+      .select()
+      .from(refunds)
+      .where(eq(refunds.orderId, second));
+    expect(refundRow).toBeDefined();
+    const messages = await inbox(secondUser);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({ code: 'presale_sold_out', title: '预售名额已满' });
+    expect(messages[0]?.content).toBe(
+      `「${await titleOf(fixture)}」的预售名额已满，订单 ${(await orderOf(second)).orderNo} 的 ¥59.00 将原路退回。`,
+    );
+    expect(messages[0]?.data).toMatchObject({ refundId: String(refundRow!.id) });
+  });
+
+  it('sends nothing for an event the operator switched off in 通知管理', async () => {
+    const current = await notificationAdmin.getTemplate(superAdmin(), { code: 'presale_paid' });
+    await notificationAdmin.saveTemplate(
+      superAdmin(),
+      { code: 'presale_paid' },
+      { isEnabled: false, channels: current.channels },
+    );
+
+    const fixture = await makeActivity();
+    const userId = await makeUser();
+    await pay(await placeOrder({ userId, fixture }));
+    await runEffects(['presale.paid', SEND]);
+
+    expect(await inbox(userId)).toHaveLength(0);
+    expect(sms.calls).toHaveLength(0);
+  });
+
+  it('lists both events in 通知管理 with in-app on and the registry wording', async () => {
+    const page = await notificationAdmin.listTemplates(superAdmin(), {
+      page: 1,
+      pageSize: 50,
+      keyword: 'presale_',
+    });
+    expect(page.items.map((row) => row.code)).toEqual(['presale_paid', 'presale_sold_out']);
+    for (const row of page.items) {
+      expect(row.channels.inApp?.enabled).toBe(true);
+      expect(row.supportedChannels).toEqual(['inApp', 'wechatOa', 'wechatMini', 'sms']);
+    }
   });
 });

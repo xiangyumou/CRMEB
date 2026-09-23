@@ -563,6 +563,38 @@ export async function insertPresaleOrder(
   return rows[0]!;
 }
 
+/** Everything a notice about one presale order says. */
+export interface OrderNoticeRow {
+  orderId: number;
+  orderNo: string;
+  paidAmount: string | null;
+  userId: number;
+  stage: OrderStage;
+  shipNotBeforeAt: Date | null;
+  activityId: number;
+  activityTitle: string;
+}
+
+export async function findOrderNotice(db: DbOrTx, orderId: number): Promise<OrderNoticeRow | null> {
+  const [row] = await db
+    .select({
+      orderId: presaleOrders.orderId,
+      orderNo: orders.orderNo,
+      paidAmount: orders.paidAmount,
+      userId: orders.userId,
+      stage: presaleOrders.stage,
+      shipNotBeforeAt: presaleOrders.shipNotBeforeAt,
+      activityId: presaleActivities.id,
+      activityTitle: presaleActivities.title,
+    })
+    .from(presaleOrders)
+    .innerJoin(orders, eq(orders.id, presaleOrders.orderId))
+    .innerJoin(presaleActivities, eq(presaleActivities.id, presaleOrders.activityId))
+    .where(eq(presaleOrders.orderId, orderId))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function findPresaleOrder(db: DbOrTx, orderId: number): Promise<PresaleOrder | null> {
   const [row] = await db
     .select()

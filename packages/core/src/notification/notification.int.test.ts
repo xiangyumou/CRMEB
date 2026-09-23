@@ -211,6 +211,28 @@ describe('fan-out', () => {
     expect(message?.readAt).toBeNull();
   });
 
+  it('sends in-app from a template shell the reference-data seed wrote with no channels', async () => {
+    // The row `db:seed` writes on every deploy: code, name, audience and
+    // variables, and `channels` left at its `{}` default.
+    await harness.ctx.db.insert(notificationTemplates).values({
+      code: 'order_paid',
+      name: '支付成功提醒',
+      audience: 'user',
+      variables: ['orderNo', 'amount', 'productName'],
+    });
+    const userId = await makeUser();
+    await record({
+      event: 'order_paid',
+      subject: { scope: 'order', id: 14 },
+      userId,
+      data: { orderNo: 'SO14', amount: '10.00', orderId: 14 },
+    });
+
+    expect(await dispatchEffectsOnce(harness.ctx)).toMatchObject({ claimed: 1, done: 1 });
+    const [message] = await messagesFor('userId', userId);
+    expect(message?.content).toBe('订单 SO14 已支付 ¥10.00，我们会尽快发货。');
+  });
+
   it('does not send at all when the operator turned the event off', async () => {
     const userId = await makeUser();
     await record({ event: 'order_paid', subject: { scope: 'order', id: 12 }, userId });

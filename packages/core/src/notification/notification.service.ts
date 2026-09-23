@@ -374,7 +374,9 @@ export async function ensureTemplate(
   event: NotificationEvent,
 ): Promise<{ channels: NotificationChannels; isEnabled: boolean }> {
   const existing = await repo.findTemplate(ctx.db, event.code);
-  if (existing) return { channels: existing.channels, isEnabled: existing.isEnabled };
+  if (existing) {
+    return { channels: effectiveChannels(event, existing.channels), isEnabled: existing.isEnabled };
+  }
 
   const seeded = defaultChannels(event);
   await ctx.withTx((tx) =>
@@ -410,4 +412,23 @@ export function defaultChannels(event: NotificationEvent): NotificationChannels 
   }
   if (event.channels.includes('sms')) channels.sms = { enabled: false, templateCode: '' };
   return channels;
+}
+
+/**
+ * The row's channels laid over the event's defaults.
+ *
+ * A row can exist without naming every channel its event supports. The
+ * reference-data seed writes template shells — code, name, variables — with
+ * `channels = {}`, so that 通知管理 lists them before anything has been sent;
+ * and an event can gain a channel after its row was written. A channel the row
+ * does not mention takes its default (in-app on with the registry's wording,
+ * the outbound ones off) instead of reading as "switched off", which would
+ * silence the event with no switch in the admin to turn it back on. A channel
+ * the row does name is the operator's, and wins whole.
+ */
+export function effectiveChannels(
+  event: NotificationEvent,
+  stored: NotificationChannels | undefined,
+): NotificationChannels {
+  return { ...defaultChannels(event), ...stored };
 }

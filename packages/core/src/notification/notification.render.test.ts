@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   clampField,
+  formatShopTime,
   placeholdersIn,
   render,
   renderFields,
@@ -111,5 +112,13 @@ describe('toTemplateData', () => {
   it('survives a payload that is not an object', () => {
     expect(toTemplateData(null)).toEqual({});
     expect(toTemplateData('string')).toEqual({});
+  });
+});
+
+describe('formatShopTime', () => {
+  it('reads an instant on the shop calendar, not the UTC one', () => {
+    const lateUtc = new Date('2026-06-01T16:30:00.000Z');
+    expect(formatShopTime(lateUtc, 'day')).toBe('2026-06-02');
+    expect(formatShopTime(lateUtc, 'minute')).toBe('2026-06-02 00:30');
   });
 });

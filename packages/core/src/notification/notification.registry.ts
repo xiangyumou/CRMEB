@@ -14,8 +14,9 @@ import type { NotificationChannel } from '@shop/contracts/notification/schemas';
  *
  * - SMS verification codes: the `sms` domain sends them, and they are not a
  *   business event.
- * - Group-buy events: group buy owns their wording and registers its own
- *   entries with `registerNotificationEvents`.
+ * - Events another domain owns the wording of: group buy, presale, payment
+ *   and refund register their own entries with `registerNotificationEvents`
+ *   from their `index.ts`.
  * - Same-city delivery and distribution/brokerage events: those features are
  *   out of scope.
  */
@@ -61,8 +62,8 @@ const registry = new Map<string, NotificationEvent>();
  * Declares events. Idempotent per code: registering the same code twice with
  * the same name is free (a module reload in dev), with a different name throws.
  *
- * Other domains may call this from their own `index.ts` — group-buy events are
- * the expected case — which is why it is exported rather than the table being a
+ * Other domains call this from their own `index.ts` (group buy, presale,
+ * payment, refund), which is why it is exported rather than the table being a
  * frozen constant.
  */
 export function registerNotificationEvents(events: readonly NotificationEvent[]): void {

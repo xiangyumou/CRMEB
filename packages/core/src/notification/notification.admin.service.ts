@@ -21,7 +21,7 @@ import {
   findNotificationEvent,
   type NotificationEvent,
 } from './notification.registry';
-import { defaultChannels, readClaimedChannels } from './notification.service';
+import { defaultChannels, effectiveChannels, readClaimedChannels } from './notification.service';
 
 /**
  * The operator's three screens.
@@ -109,7 +109,7 @@ export async function toggleChannel(
   await seedMissing(ctx, [event]);
 
   const row = await repo.findTemplate(ctx.db, event.code);
-  const current: NotificationChannels = row?.channels ?? defaultChannels(event);
+  const current = effectiveChannels(event, row?.channels);
   const existing = current[params.channel];
   if (existing === undefined) throw new DomainError('NOTIFICATION_CHANNEL_NOT_APPLICABLE');
 
@@ -267,7 +267,7 @@ function toTemplate(
     name: event.name,
     description: event.description,
     audience: event.audience,
-    channels: (row?.channels ?? defaultChannels(event)) as NotificationTemplate['channels'],
+    channels: effectiveChannels(event, row?.channels) as NotificationTemplate['channels'],
     variables: [...event.variables],
     supportedChannels: [...event.channels],
     isEnabled: row?.isEnabled ?? true,

@@ -94,3 +94,30 @@ export function toTemplateData(payload: unknown): Record<string, string> {
   }
   return out;
 }
+
+const shopDay = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+const shopClock = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Shanghai',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/**
+ * An instant as a shopper reads it: the shop's own calendar, not UTC.
+ *
+ * A template is text, so a domain that puts a time into `data` formats it
+ * first; an ISO string in a customer's inbox (`2026-06-01T16:00:00.000Z`) is
+ * both unreadable and, eight hours out, wrong about which day it is.
+ *
+ * `'day'` → `2026-06-02`; `'minute'` → `2026-06-02 00:00`.
+ */
+export function formatShopTime(at: Date, precision: 'day' | 'minute'): string {
+  const day = shopDay.format(at);
+  return precision === 'day' ? day : `${day} ${shopClock.format(at)}`;
+}

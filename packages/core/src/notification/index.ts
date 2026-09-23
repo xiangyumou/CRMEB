@@ -20,9 +20,9 @@
  * once.
  *
  * `registerNotificationEvents` is exported for the same reason the permission
- * registry is: a domain that owns an event owns its wording. Group-buy
- * notifications belong in the group-buy domain's `index.ts`, not in this file's
- * table.
+ * registry is: a domain that owns an event owns its wording. Group-buy and
+ * presale notices are registered from those domains' `index.ts`, not from this
+ * domain's table.
  */
 
 export {
@@ -39,6 +39,8 @@ export {
   type NotificationEvent,
   type NotificationAudience,
 } from './notification.registry';
+
+export { formatShopTime } from './notification.render';
 
 export { registerSmsPort, type SmsPort, type SmsSendResult } from './notification.ports';
 

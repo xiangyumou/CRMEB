@@ -370,7 +370,13 @@ async function handlePaid(
     scope: 'order',
     scopeId: String(event.orderId),
     eventType: 'groupbuy.join',
-    payload: { orderId: String(event.orderId), groupId: String(member.groupId) },
+    // The role as it was when the seat was taken: a member promoted later, when
+    // the leader left, still joined somebody else's team.
+    payload: {
+      orderId: String(event.orderId),
+      groupId: String(member.groupId),
+      role: member.role,
+    },
   });
 
   // The last seat completes the team in this same transaction. `succeedGroup`

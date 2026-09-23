@@ -9,9 +9,9 @@
  * Almost nothing here is called by another domain. Group buy does not *ask* for
  * anything: it attaches to the order aggregate through the seams in
  * `order/ports.ts` and is invoked, never invoking. The exceptions are the two
- * jobs the worker runs and, in the other direction, the one call this domain
- * makes into another — `refund.refundSystemInitiated`, for the money a failed
- * team owes back.
+ * jobs the worker runs and, in the other direction, the two calls this domain
+ * makes into others — `refund.refundSystemInitiated`, for the money a failed
+ * team owes back, and `notification.notify`, for telling the shopper.
  */
 
 export {
@@ -62,12 +62,14 @@ export {
 export { groupbuyKindHandler, groupbuyPricingContributor } from './groupbuy.order';
 
 import { registerGroupbuyEffects } from './groupbuy.effects';
+import { registerGroupbuyNotificationEvents } from './groupbuy.notifications';
 import { registerGroupbuyOrderSeams } from './groupbuy.order';
 import './groupbuy.config';
 
 /**
  * Wires the domain into the platform: the order kind handler, the pricing
- * contributor, the three lifecycle hooks and the three effect handlers.
+ * contributor, the three lifecycle hooks, the four effect handlers and the four
+ * shopper notifications.
  *
  * Idempotent — every registry replaces by name — so the web bootstrap and a
  * worker job module in the same process may both call it.
@@ -75,6 +77,7 @@ import './groupbuy.config';
 export function registerGroupbuyDomain(): void {
   registerGroupbuyOrderSeams();
   registerGroupbuyEffects();
+  registerGroupbuyNotificationEvents();
 }
 
 // Importing this module registers the domain. Nothing in `core` depends on
