@@ -2,7 +2,7 @@ import { Button, Text, View } from '@tarojs/components';
 import { useRouter } from '@tarojs/taro';
 import { useRouteQuery } from '@shop/api-client/react';
 import { useCheckoutDraft } from '@/features/checkout/draft';
-import { LoginCard } from '@/features/session/login-card';
+import { LoginCard } from '@/session/login-card';
 import { openPage } from '@/platform';
 import { placeholderStyles as styles } from '@/shell/placeholder';
 

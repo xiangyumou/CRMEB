@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { useRouter } from '@tarojs/taro';
 import { useRouteQuery } from '@shop/api-client/react';
-import { LoginCard } from '@/features/session/login-card';
-import { useSession } from '@/features/session/session';
+import { LoginCard } from '@/session/login-card';
+import { useSession } from '@/session/session';
 import { placeholderStyles as styles } from '@/shell/placeholder';
 
 /** How often and for how long 支付结果 asks before it gives up and says 确认中. */

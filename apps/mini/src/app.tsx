@@ -4,7 +4,7 @@ import { useLaunch } from '@tarojs/taro';
 import { ApiClientProvider } from '@shop/api-client/react';
 import { api } from '@/data/api';
 import { createQueryClient, installQueryAdapters } from '@/data/query-client';
-import { startSession } from '@/features/session/session';
+import { startSession } from '@/session/session';
 import './app.scss';
 
 const queryClient = createQueryClient();

@@ -116,11 +116,64 @@ describe('session', () => {
     });
   });
 
-  it('drops a rejected token and signs in again on a 401', async () => {
+  it('renews an expired token once and replays the read that met it', async () => {
+    const { serveApi, startSession, taroFake, useSession } = await load();
+    taroFake.storage.set('shop.session.token', 'expired');
+    const count = { items: 2, quantity: 3, availableCount: 2, unavailableCount: 0 };
+    const seen = serveApi({
+      'GET /api/v1/cart/count': () =>
+        seen.at(-1)?.headers['Authorization'] === 'Bearer fresh'
+          ? { body: count }
+          : { status: 401, body: { code: 'UNAUTHENTICATED', message: '请先登录' } },
+      'POST /api/v1/auth/sessions/wechat-mini': () => ({ body: signedIn('fresh') }),
+    });
+    const { api } = await import('@/data/api');
+
+    await startSession();
+    await expect(api.call('cart.count')).resolves.toEqual(count);
+
+    expect(seen.map((request) => request.key)).toEqual([
+      'GET /api/v1/cart/count',
+      'POST /api/v1/auth/sessions/wechat-mini',
+      'GET /api/v1/cart/count',
+    ]);
+    expect(useSession.getState().session).toEqual({ status: 'signed-in', token: 'fresh' });
+    expect(taroFake.storage.get('shop.session.token')).toBe('fresh');
+  });
+
+  it('replays a write too, and requests that 401 together share one renewal', async () => {
+    const { serveApi, startSession, taroFake } = await load();
+    taroFake.storage.set('shop.session.token', 'expired');
+    const seen = serveApi({
+      'DELETE /api/v1/cart/items/5': () =>
+        seen.at(-1)?.headers['Authorization'] === 'Bearer fresh'
+          ? { status: 204, body: null }
+          : { status: 401, body: { code: 'UNAUTHENTICATED', message: '请先登录' } },
+      'DELETE /api/v1/cart/items/6': () =>
+        seen.at(-1)?.headers['Authorization'] === 'Bearer fresh'
+          ? { status: 204, body: null }
+          : { status: 401, body: { code: 'UNAUTHENTICATED', message: '请先登录' } },
+      'POST /api/v1/auth/sessions/wechat-mini': () => ({ body: signedIn('fresh') }),
+    });
+    const { api } = await import('@/data/api');
+
+    await startSession();
+    await Promise.all([
+      api.call('cart.removeItem', { params: { id: '5' } }),
+      api.call('cart.removeItem', { params: { id: '6' } }),
+    ]);
+
+    const keys = seen.map((request) => request.key);
+    expect(keys.filter((key) => key.startsWith('POST'))).toHaveLength(1);
+    expect(keys.filter((key) => key === 'DELETE /api/v1/cart/items/5')).toHaveLength(2);
+    expect(keys.filter((key) => key === 'DELETE /api/v1/cart/items/6')).toHaveLength(2);
+  });
+
+  it('gives up after one replay: a second 401 stands and the session goes idle', async () => {
     const { serveApi, startSession, taroFake, useSession } = await load();
     taroFake.storage.set('shop.session.token', 'revoked');
-    serveApi({
-      'GET /api/v1/orders/1': () => ({
+    const seen = serveApi({
+      'GET /api/v1/cart/count': () => ({
         status: 401,
         body: { code: 'UNAUTHENTICATED', message: '请先登录' },
       }),
@@ -129,11 +182,36 @@ describe('session', () => {
     const { api } = await import('@/data/api');
 
     await startSession();
-    await expect(api.call('order.detail', { params: { id: '1' } })).rejects.toThrow();
-    await vi.waitFor(() =>
-      expect(useSession.getState().session).toEqual({ status: 'signed-in', token: 'fresh' }),
-    );
-    expect(taroFake.storage.get('shop.session.token')).toBe('fresh');
+    await expect(api.call('cart.count')).rejects.toMatchObject({ status: 401 });
+
+    expect(seen.map((request) => request.key)).toEqual([
+      'GET /api/v1/cart/count',
+      'POST /api/v1/auth/sessions/wechat-mini',
+      'GET /api/v1/cart/count',
+    ]);
+    expect(useSession.getState().session).toEqual({ status: 'idle' });
+  });
+
+  it('does not renew when renewal ends at the phone step', async () => {
+    const { serveApi, startSession, taroFake, useSession } = await load();
+    taroFake.storage.set('shop.session.token', 'expired');
+    const seen = serveApi({
+      'GET /api/v1/cart/count': () => ({
+        status: 401,
+        body: { code: 'UNAUTHENTICATED', message: '请先登录' },
+      }),
+      'POST /api/v1/auth/sessions/wechat-mini': () => ({ body: phoneRequired }),
+    });
+    const { api } = await import('@/data/api');
+
+    await startSession();
+    await expect(api.call('cart.count')).rejects.toMatchObject({ status: 401 });
+
+    expect(seen).toHaveLength(2); // no replay without a token
+    expect(useSession.getState().session).toEqual({
+      status: 'phone-required',
+      bindToken: 'bind-1',
+    });
   });
 
   it('reports a failed wx.login', async () => {
