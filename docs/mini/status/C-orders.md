@@ -18,11 +18,12 @@ order/after-sales specs in `e2e/storefront/specs-mini`.
 - 订单详情 (by id or outTradeNo; status header + countdown, parcels, address, lines, 金额明细,
   facts + copy, 发票, ActionBar with 客服) with tests.
 - 物流 (tab per parcel, trail timeline, copy number, merchant/virtual delivery) with tests.
-- Merged storefront/mini with H2.
+- 评价 (a card per reviewable line, 服务评分 once, images; `moderation: 'pending'` → 「评价已提交，审核后展示」; already-written lines count as done) with tests.
+- Merged storefront/mini with H2, then again with G1.
 
 ## In progress
 
-- 评价.
+- 售后 apply.
 
 ## Next
 
