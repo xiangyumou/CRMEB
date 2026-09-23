@@ -49,9 +49,13 @@ mini citations in `docs/invariants.md`, the mini sections of `architecture.md` /
   OA template-message decision, the `uniapp` guard, CI, edge `/` → landing); what not to drop;
   公众平台 actions by release; rollback.
 
+- CI: both storefront jobs run their whole testDir (`test` → `specs/`, `test:mini` →
+  `specs-mini/`); stale timing comments in `storefront-e2e-mini` fixed. actionlint is not
+  installed here, so the workflow was only YAML-parsed.
+
 ## In progress
 
-- CI comments.
+- Final merge and checklist.
 
 ## Pending
 
