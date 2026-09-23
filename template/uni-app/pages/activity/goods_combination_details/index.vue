@@ -408,7 +408,7 @@
     <canvas class="canvas" canvas-id="myCanvas" v-if="canvasStatus"></canvas>
     <view class="share-box" v-if="H5ShareBox">
       <image
-        :src="'/static/images/legacy/share-info.png'"
+        :src="'/static/images/common/share-info.png'"
         @click="H5ShareBox = false"
       ></image>
     </view>

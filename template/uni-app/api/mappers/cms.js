@@ -1,22 +1,23 @@
-// 文章 DTOs → the legacy 资讯 payload `pages/extension/news_*` and
+// 文章 DTOs → the 资讯 payload `pages/extension/news_*` and
 // `subpackage/diyComponents/articleList.vue` render.
 //
 // Contract: next/packages/contracts/src/cms/cms.storefront.contract.ts
 //
-// Two legacy habits the new shape does not have, and the mapper reinstates:
+// Two things the page expects that the API shape does not have, and the mapper
+// supplies:
 //
 //  * **`image_input` is an array.** The list template branches on
 //    `item.image_input.length` (1 / 2 / >2 thumbnails) and the detail page reads
 //    `image_input[0]` for the share card, so a single `coverImageUrl` becomes a
 //    one-element array and a missing cover becomes `[]` — never `[null]`.
 //  * **`add_time` is a formatted string.** `articleList.vue` runs it through
-//    `dayjs(...)`, so it must stay parseable; `legacyDateTime` keeps the offset the
+//    `dayjs(...)`, so it must stay parseable; `pageDateTime` keeps the offset the
 //    payload carried instead of re-rendering it in the phone's timezone.
 //
-// `likes` has no successor — the legacy column was never written by anything — so it
+// `likes` has no source — nothing records a 点赞 — so it
 // is pinned to 0 and the 点赞 count renders as zero rather than `undefined`.
 
-import { toId, toInt, money, legacyDateTime, mapList, text } from './_shared.js';
+import { toId, toInt, money, pageDateTime, mapList, text } from './_shared.js';
 
 /** `coverImageUrl` → the `image_input` array the templates iterate. */
 function images(url) {
@@ -24,7 +25,7 @@ function images(url) {
 }
 
 /** `articleListItem` → one 资讯 row. */
-export function toLegacyArticle(dto) {
+export function toPageArticle(dto) {
   if (!dto) return {};
   return {
     id: toId(dto.id),
@@ -40,17 +41,17 @@ export function toLegacyArticle(dto) {
     is_hot: dto.isHot ? 1 : 0,
     is_banner: dto.isBanner ? 1 : 0,
     sort: toInt(dto.sortOrder, 0),
-    add_time: legacyDateTime(dto.publishedAt),
+    add_time: pageDateTime(dto.publishedAt),
   };
 }
 
 /** `pagedArticles` → the bare array the pages `concat` onto their list. */
-export function toLegacyArticleList(dto) {
-  return mapList(dto && dto.items, toLegacyArticle);
+export function toPageArticleList(dto) {
+  return mapList(dto && dto.items, toPageArticle);
 }
 
 /** The product an article promotes → the 关联商品 card's `store_info`. */
-export function toLegacyArticleProduct(dto) {
+export function toPageArticleProduct(dto) {
   if (!dto) return {};
   return {
     id: toId(dto.id),
@@ -62,16 +63,16 @@ export function toLegacyArticleProduct(dto) {
 }
 
 /** `articleDetail` → what `news_details` binds, `store_info` included. */
-export function toLegacyArticleDetail(dto) {
+export function toPageArticleDetail(dto) {
   if (!dto) return {};
-  return Object.assign(toLegacyArticle(dto), {
+  return Object.assign(toPageArticle(dto), {
     content: text(dto.contentHtml),
-    store_info: toLegacyArticleProduct(dto.product),
+    store_info: toPageArticleProduct(dto.product),
   });
 }
 
 /** One node of `publicArticleCategoryList`. */
-function toLegacyArticleCategory(dto) {
+function toPageArticleCategory(dto) {
   return {
     id: toId(dto && dto.id),
     title: text(dto && dto.title),
@@ -84,10 +85,10 @@ function toLegacyArticleCategory(dto) {
  * `children` is always an array: the template reads `item.children.length` before
  * it reads anything else.
  */
-export function toLegacyArticleCategories(dto) {
+export function toPageArticleCategories(dto) {
   return mapList(dto && dto.items, (node) =>
-    Object.assign(toLegacyArticleCategory(node), {
-      children: mapList(node && node.children, toLegacyArticleCategory),
+    Object.assign(toPageArticleCategory(node), {
+      children: mapList(node && node.children, toPageArticleCategory),
     }),
   );
 }

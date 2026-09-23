@@ -135,8 +135,7 @@
   </view>
 </template>
 <script>
-// 电子面单打印与配送员名单都已下线（CR-4-h §4/§5）：面单模板、打印默认配置、平台
-// 配置的「送货人」名单在新合约里没有继任者，送货人改为当场填写姓名和手机号。
+// 不支持电子面单打印，也没有平台配置的「送货人」名单：送货人当场填写姓名和手机号。
 import {
   getAdminOrderDelivery,
   setAdminOrderDelivery,
@@ -325,7 +324,7 @@ export default {
         save.delivery_id = delivery_id;
         that.setInfo(save);
       }
-      // 送货：新合约收的是当场填写的姓名和手机号（CR-4-h §4）。
+      // 送货：路由收的是当场填写的姓名和手机号。
       if (delivery_type == 2) {
         if (!that.post_name) {
           return this.$util.Tips({

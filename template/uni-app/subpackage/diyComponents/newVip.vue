@@ -9,7 +9,7 @@
       <view class="header acea-row row-between row-middle">
         <view class="title-box acea-row row-middle">
           <image
-            :src="`/static/images/legacy/newVip1.png`"
+            :src="`/static/images/common/newVip1.png`"
             class="image"
           ></image>
           <view class="info">{{ $t(`超值优惠 限时专享`) }}</view>
@@ -227,7 +227,7 @@ export default {
       newcomer_integral: "",
     };
   },
-  // 新人专享已下线：`newcomerList` 从来没有继任路由，两个列表永远是空的，
+  // 新人专享已下线：`newcomerList` 没有路由，两个列表永远是空的，
   // 外层 `v-if="couponList.length || productList.length"` 因此整块不渲染。
   computed: {
     totalPrice() {

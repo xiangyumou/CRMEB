@@ -1,9 +1,9 @@
 {
   "generatedBy": "scripts/extract-page-fields.mjs",
   "totals": {
-    "exports": 294,
-    "live": 180,
-    "dead": 114
+    "exports": 357,
+    "live": 161,
+    "dead": 196
   },
   "modules": {
     "_shared": {
@@ -18,31 +18,7 @@
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "fromLegacyPage": {
-          "live": false,
-          "callSites": [],
-          "resolvedFields": [],
-          "rejectedFields": []
-        },
-        "legacyDate": {
-          "live": false,
-          "callSites": [],
-          "resolvedFields": [],
-          "rejectedFields": []
-        },
-        "legacyDateTime": {
-          "live": false,
-          "callSites": [],
-          "resolvedFields": [],
-          "rejectedFields": []
-        },
-        "legacyMinute": {
-          "live": false,
-          "callSites": [],
-          "resolvedFields": [],
-          "rejectedFields": []
-        },
-        "legacyTime": {
+        "fromPagePaging": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
@@ -67,6 +43,30 @@
           "rejectedFields": []
         },
         "moneyNumber": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "pageDate": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "pageDateTime": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "pageMinute": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "pageTime": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
@@ -105,150 +105,126 @@
       }
     },
     "activity": {
-      "exports": 9,
-      "live": 9,
-      "dead": 0,
+      "exports": 12,
+      "live": 0,
+      "dead": 12,
       "danglingCallSites": {
-        "getAdvancellList": [
-          "subpackage/diyComponents/presale.vue:485"
+        "getCombinationBannerList": [
+          "pages/activity/goods_combination/index.vue:113"
+        ],
+        "getCombinationDetail": [
+          "pages/activity/goods_combination_details/index.vue:733"
+        ],
+        "getCombinationList": [
+          "pages/activity/goods_combination/index.vue:151",
+          "subpackage/diyComponents/combination.vue:565"
+        ],
+        "getCombinationPink": [
+          "pages/activity/goods_combination_status/index.vue:544"
+        ],
+        "getCombinationPosterData": [
+          "pages/activity/poster-poster/index.vue:220"
+        ],
+        "getPink": [
+          "pages/activity/goods_combination/index.vue:107"
+        ],
+        "getPresellList": [
+          "pages/activity/presell/index.vue:189",
+          "subpackage/diyComponents/presale.vue:486"
+        ],
+        "postCombinationRemove": [
+          "pages/activity/goods_combination_status/index.vue:620"
+        ],
+        "scombinationCode": [
+          "mixins/sharePoster.js:135",
+          "pages/activity/goods_combination_details/index.vue:1218"
         ]
       },
       "functions": {
-        "getCombinationBannerList": {
-          "live": true,
-          "callSites": [
-            "pages/activity/goods_combination/index.vue:113"
-          ],
-          "resolvedFields": [
-            "data"
-          ],
+        "presaleWindowStatus": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
           "rejectedFields": []
         },
-        "getCombinationDetail": {
-          "live": true,
-          "callSites": [
-            "pages/activity/goods_combination_details/index.vue:731"
-          ],
-          "resolvedFields": [
-            "data.pink",
-            "data.pinkAll",
-            "data.pink_ok_list",
-            "data.pink_ok_sum",
-            "data.productAttr",
-            "data.productValue",
-            "data.productValue[]",
-            "data.reply",
-            "data.replyChance",
-            "data.replyCount",
-            "data.routine_contact_type",
-            "data.storeInfo",
-            "data.storeInfo.images",
-            "data.storeInfo.num",
-            "data.storeInfo.title.substring"
-          ],
+        "toPageGroupbuyBanners": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
           "rejectedFields": []
         },
-        "getCombinationList": {
-          "live": true,
-          "callSites": [
-            "pages/activity/goods_combination/index.vue:151",
-            "subpackage/diyComponents/combination.vue:565"
-          ],
-          "resolvedFields": [
-            "data",
-            "data.length"
-          ],
+        "toPageGroupbuyCard": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
           "rejectedFields": []
         },
-        "getCombinationPink": {
-          "live": true,
-          "callSites": [
-            "pages/activity/goods_combination_status/index.vue:542"
-          ],
-          "resolvedFields": [
-            "data.count",
-            "data.current_pink_order",
-            "data.is_ok",
-            "data.order_pid",
-            "data.pinkAll",
-            "data.pinkBool",
-            "data.pinkT",
-            "data.pinkT.stop_time",
-            "data.store_combination",
-            "data.store_combination.num",
-            "data.store_combination.productAttr",
-            "data.store_combination.productValue",
-            "data.store_combination_host",
-            "data.userBool",
-            "data.userInfo"
-          ],
+        "toPageGroupbuyDetail": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
           "rejectedFields": []
         },
-        "getCombinationPosterData": {
-          "live": true,
-          "callSites": [
-            "pages/activity/poster-poster/index.vue:220"
-          ],
-          "resolvedFields": [
-            "data"
-          ],
+        "toPageGroupbuyGroup": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
           "rejectedFields": []
         },
-        "getPink": {
-          "live": true,
-          "callSites": [
-            "pages/activity/goods_combination/index.vue:107"
-          ],
-          "resolvedFields": [
-            "data.avatars",
-            "data.pink_count"
-          ],
+        "toPageGroupbuyList": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
           "rejectedFields": []
         },
-        "getPresellList": {
-          "live": true,
-          "callSites": [
-            "pages/activity/presell/index.vue:189"
-          ],
-          "resolvedFields": [
-            "data.list"
-          ],
+        "toPageGroupbuyPoster": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
           "rejectedFields": []
         },
-        "postCombinationRemove": {
-          "live": true,
-          "callSites": [
-            "pages/activity/goods_combination_status/index.vue:618"
-          ],
-          "resolvedFields": [
-            "msg"
-          ],
+        "toPageGroupbuySummary": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
           "rejectedFields": []
         },
-        "scombinationCode": {
-          "live": true,
-          "callSites": [
-            "mixins/sharePoster.js:135",
-            "pages/activity/goods_combination_details/index.vue:1216"
-          ],
-          "resolvedFields": [
-            "data.code",
-            "tempFilePath"
-          ],
+        "toPageOpenGroup": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPagePresaleCard": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPagePresaleDetail": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPagePresaleList": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
           "rejectedFields": []
         }
       }
     },
     "admin": {
-      "exports": 38,
-      "live": 36,
-      "dead": 2,
+      "exports": 35,
+      "live": 34,
+      "dead": 1,
       "danglingCallSites": {},
       "functions": {
         "adminProductList": {
           "live": true,
           "callSites": [
-            "pages/admin/goods/index.vue:392"
+            "pages/admin/goods/index.vue:391"
           ],
           "resolvedFields": [
             "data.list"
@@ -258,8 +234,8 @@
         "adminRefundList": {
           "live": true,
           "callSites": [
-            "pages/admin/orderList/index.vue:321",
-            "pages/admin/refund_order_list/index.vue:272"
+            "pages/admin/orderList/index.vue:329",
+            "pages/admin/refund_order_list/index.vue:281"
           ],
           "resolvedFields": [
             "then"
@@ -269,8 +245,8 @@
         "agreeExpress": {
           "live": true,
           "callSites": [
-            "pages/admin/refund_order_detail/index.vue:485",
-            "pages/admin/refund_order_list/index.vue:395"
+            "pages/admin/refund_order_detail/index.vue:491",
+            "pages/admin/refund_order_list/index.vue:387"
           ],
           "resolvedFields": [
             "msg"
@@ -280,7 +256,7 @@
         "getAdminOrderDelivery": {
           "live": true,
           "callSites": [
-            "pages/admin/delivery/index.vue:426"
+            "pages/admin/delivery/index.vue:280"
           ],
           "resolvedFields": [
             "data"
@@ -290,8 +266,8 @@
         "getAdminOrderDetail": {
           "live": true,
           "callSites": [
-            "pages/admin/orderDetail/index.vue:710",
-            "pages/admin/refund_order_detail/index.vue:392",
+            "pages/admin/orderDetail/index.vue:720",
+            "pages/admin/refund_order_detail/index.vue:404",
             "pages/goods/admin_order_detail/index.vue:189"
           ],
           "resolvedFields": [
@@ -305,7 +281,7 @@
         "getAdminOrderList": {
           "live": true,
           "callSites": [
-            "pages/admin/orderList/index.vue:323"
+            "pages/admin/orderList/index.vue:331"
           ],
           "resolvedFields": [],
           "rejectedFields": []
@@ -319,8 +295,8 @@
         "getAdminRefundDetail": {
           "live": true,
           "callSites": [
-            "pages/admin/orderDetail/index.vue:708",
-            "pages/admin/refund_order_detail/index.vue:390"
+            "pages/admin/orderDetail/index.vue:718",
+            "pages/admin/refund_order_detail/index.vue:402"
           ],
           "resolvedFields": [],
           "rejectedFields": []
@@ -329,7 +305,7 @@
           "live": true,
           "callSites": [
             "pages/admin/user/index.vue:235",
-            "pages/admin/user/list.vue:268"
+            "pages/admin/user/list.vue:267"
           ],
           "resolvedFields": [
             "data",
@@ -340,12 +316,11 @@
         "getLogistics": {
           "live": true,
           "callSites": [
-            "pages/admin/delivery/index.vue:437",
-            "pages/admin/delivery/index.vue:439"
+            "pages/admin/delivery/index.vue:291",
+            "pages/admin/delivery/index.vue:293"
           ],
           "resolvedFields": [
-            "data",
-            "data[]"
+            "data"
           ],
           "rejectedFields": []
         },
@@ -372,7 +347,7 @@
         "getProductLabel": {
           "live": true,
           "callSites": [
-            "pages/admin/goods/components/label/index.vue:152"
+            "pages/admin/goods/components/label/index.vue:150"
           ],
           "resolvedFields": [
             "data",
@@ -381,9 +356,17 @@
           "rejectedFields": []
         },
         "getStaffIdentity": {
-          "live": false,
-          "callSites": [],
-          "resolvedFields": [],
+          "live": true,
+          "callSites": [
+            "pages/admin/orderDetail/index.vue:646",
+            "pages/admin/orderList/index.vue:268",
+            "pages/admin/refund_order_detail/index.vue:352",
+            "pages/admin/refund_order_list/index.vue:229"
+          ],
+          "resolvedFields": [
+            "data.adjust_price",
+            "data.refund_review"
+          ],
           "rejectedFields": []
         },
         "getStatisticsInfo": {
@@ -446,10 +429,10 @@
         "getUserInfo": {
           "live": true,
           "callSites": [
-            "pages/admin/orderDetail/index.vue:851",
-            "pages/admin/orderDetail/index.vue:852",
-            "pages/admin/refund_order_detail/index.vue:557",
-            "pages/admin/refund_order_detail/index.vue:558",
+            "pages/admin/orderDetail/index.vue:849",
+            "pages/admin/orderDetail/index.vue:850",
+            "pages/admin/refund_order_detail/index.vue:563",
+            "pages/admin/refund_order_detail/index.vue:564",
             "pages/admin/user/index.vue:255"
           ],
           "resolvedFields": [
@@ -461,7 +444,7 @@
           "live": true,
           "callSites": [
             "pages/admin/user/components/filter/index.vue:99",
-            "pages/admin/user/components/userLable/index.vue:106"
+            "pages/admin/user/components/userLable/index.vue:105"
           ],
           "resolvedFields": [
             "data",
@@ -472,50 +455,17 @@
         "getUserList": {
           "live": true,
           "callSites": [
-            "pages/admin/user/list.vue:352"
+            "pages/admin/user/list.vue:351"
           ],
           "resolvedFields": [
             "data.list"
           ],
           "rejectedFields": []
         },
-        "orderDeliveryInfo": {
-          "live": true,
-          "callSites": [
-            "pages/admin/delivery/index.vue:573",
-            "pages/admin/delivery/index.vue:574"
-          ],
-          "resolvedFields": [
-            "data.to_add",
-            "data.to_name",
-            "data.to_tel"
-          ],
-          "rejectedFields": []
-        },
-        "orderExportTemp": {
-          "live": true,
-          "callSites": [
-            "pages/admin/delivery/index.vue:566"
-          ],
-          "resolvedFields": [
-            "data.data"
-          ],
-          "rejectedFields": []
-        },
-        "orderOrderDelivery": {
-          "live": true,
-          "callSites": [
-            "pages/admin/delivery/index.vue:407"
-          ],
-          "resolvedFields": [
-            "data"
-          ],
-          "rejectedFields": []
-        },
         "postBatchProcess": {
           "live": true,
           "callSites": [
-            "pages/admin/goods/components/label/index.vue:120"
+            "pages/admin/goods/components/label/index.vue:118"
           ],
           "resolvedFields": [
             "msg"
@@ -557,7 +507,7 @@
           "live": true,
           "callSites": [
             "pages/admin/user/index.vue:222",
-            "pages/admin/user/list.vue:279"
+            "pages/admin/user/list.vue:278"
           ],
           "resolvedFields": [
             "msg"
@@ -567,7 +517,7 @@
         "postUserSetLabel": {
           "live": true,
           "callSites": [
-            "pages/admin/user/components/userLable/index.vue:79"
+            "pages/admin/user/components/userLable/index.vue:78"
           ],
           "resolvedFields": [
             "msg"
@@ -585,7 +535,7 @@
         "productSetShow": {
           "live": true,
           "callSites": [
-            "pages/admin/goods/index.vue:362"
+            "pages/admin/goods/index.vue:361"
           ],
           "resolvedFields": [
             "msg"
@@ -595,7 +545,7 @@
         "setAdminOrderDelivery": {
           "live": true,
           "callSites": [
-            "pages/admin/delivery/index.vue:532"
+            "pages/admin/delivery/index.vue:354"
           ],
           "resolvedFields": [
             "msg"
@@ -605,10 +555,10 @@
         "setAdminOrderPrice": {
           "live": true,
           "callSites": [
-            "pages/admin/orderDetail/index.vue:776",
-            "pages/admin/orderList/index.vue:406",
-            "pages/admin/refund_order_detail/index.vue:456",
-            "pages/admin/refund_order_list/index.vue:355"
+            "pages/admin/orderDetail/index.vue:785",
+            "pages/admin/orderList/index.vue:413",
+            "pages/admin/refund_order_detail/index.vue:467",
+            "pages/admin/refund_order_list/index.vue:363"
           ],
           "resolvedFields": [
             "data.order_id"
@@ -618,9 +568,9 @@
         "setAdminOrderRemark": {
           "live": true,
           "callSites": [
-            "pages/admin/orderDetail/index.vue:825",
-            "pages/admin/orderList/index.vue:466",
-            "pages/admin/refund_order_detail/index.vue:519"
+            "pages/admin/orderDetail/index.vue:823",
+            "pages/admin/orderList/index.vue:451",
+            "pages/admin/refund_order_detail/index.vue:525"
           ],
           "resolvedFields": [],
           "rejectedFields": []
@@ -628,10 +578,10 @@
         "setAdminRefundRemark": {
           "live": true,
           "callSites": [
-            "pages/admin/orderDetail/index.vue:823",
-            "pages/admin/orderList/index.vue:464",
-            "pages/admin/refund_order_detail/index.vue:517",
-            "pages/admin/refund_order_list/index.vue:430"
+            "pages/admin/orderDetail/index.vue:821",
+            "pages/admin/orderList/index.vue:449",
+            "pages/admin/refund_order_detail/index.vue:523",
+            "pages/admin/refund_order_list/index.vue:422"
           ],
           "resolvedFields": [
             "msg"
@@ -641,12 +591,10 @@
         "setOrderRefund": {
           "live": true,
           "callSites": [
-            "pages/admin/orderDetail/index.vue:744",
-            "pages/admin/orderList/index.vue:374",
-            "pages/admin/orderList/index.vue:433",
-            "pages/admin/refund_order_detail/index.vue:424",
-            "pages/admin/refund_order_list/index.vue:323",
-            "pages/admin/refund_order_list/index.vue:374"
+            "pages/admin/orderDetail/index.vue:754",
+            "pages/admin/orderList/index.vue:382",
+            "pages/admin/refund_order_detail/index.vue:436",
+            "pages/admin/refund_order_list/index.vue:332"
           ],
           "resolvedFields": [
             "msg"
@@ -656,32 +604,19 @@
       }
     },
     "api": {
-      "exports": 34,
-      "live": 34,
-      "dead": 0,
+      "exports": 35,
+      "live": 30,
+      "dead": 5,
       "danglingCallSites": {
-        "newcomerList": [
-          "subpackage/diyComponents/newVip.vue:402"
+        "pink": [
+          "subpackage/diyComponents/combination.vue:577"
         ]
       },
       "functions": {
-        "ajcaptchaCheck": {
-          "live": true,
-          "callSites": [
-            "pages/annex/components/verify/verifySlider/verifySlider.vue:234",
-            "pages/users/components/verify/verifyPoint/verifyPoint.vue:152",
-            "pages/users/components/verify/verifySlider/index.vue:234",
-            "pages/users/components/verify/verifySlider/verifySliderPc.vue:310"
-          ],
-          "resolvedFields": [
-            "data"
-          ],
-          "rejectedFields": []
-        },
         "bindingPhone": {
           "live": true,
           "callSites": [
-            "pages/users/auth/index.vue:137"
+            "pages/users/auth/index.vue:127"
           ],
           "resolvedFields": [
             "data.expires_time",
@@ -692,8 +627,8 @@
         "bindingUserPhone": {
           "live": true,
           "callSites": [
-            "pages/users/user_phone/index.vue:109",
-            "pages/users/user_phone/index.vue:98"
+            "pages/users/user_phone/index.vue:105",
+            "pages/users/user_phone/index.vue:94"
           ],
           "resolvedFields": [
             "cancel",
@@ -724,17 +659,16 @@
           ],
           "rejectedFields": []
         },
-        "getAjcaptcha": {
-          "live": true,
-          "callSites": [
-            "pages/annex/components/verify/verifySlider/verifySlider.vue:314",
-            "pages/users/components/verify/verifyPoint/verifyPoint.vue:219",
-            "pages/users/components/verify/verifySlider/index.vue:314",
-            "pages/users/components/verify/verifySlider/verifySliderPc.vue:382"
-          ],
-          "resolvedFields": [
-            "data"
-          ],
+        "diyLayout": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "fromSiteConfig": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
           "rejectedFields": []
         },
         "getArticleBannerList": {
@@ -832,7 +766,7 @@
           "live": true,
           "callSites": [
             "pages/activity/presell_details/index.vue:863",
-            "pages/goods_details/index.vue:1001",
+            "pages/goods_details/index.vue:1003",
             "pages/users/user_get_coupon/index.vue:183",
             "subpackage/diyComponents/coupon.vue:427"
           ],
@@ -846,10 +780,10 @@
         "getCrmebCopyRight": {
           "live": true,
           "callSites": [
-            "App.vue:267",
+            "App.vue:208",
             "pages/annex/special/index.vue:390",
             "pages/index/index.vue:406",
-            "pages/user/index.vue:551"
+            "pages/user/index.vue:534"
           ],
           "resolvedFields": [
             "data",
@@ -863,8 +797,8 @@
           "live": true,
           "callSites": [
             "components/kefuIcon/index.vue:10",
-            "pages/goods/order_details/index.vue:723",
-            "pages/goods/order_details/index.vue:724",
+            "pages/goods/order_details/index.vue:725",
+            "pages/goods/order_details/index.vue:726",
             "subpackage/diyComponents/customerService.vue:10",
             "subpackage/diyComponents/productBottom.vue:250",
             "utils/index.js:27"
@@ -941,7 +875,7 @@
             "pages/goods_cate/goods_cate.vue:82",
             "pages/goods_details/index.vue:561",
             "pages/index/index.vue:714",
-            "pages/user/index.vue:342",
+            "pages/user/index.vue:336",
             "utils/theme.js:69"
           ],
           "resolvedFields": [
@@ -984,32 +918,28 @@
         "phoneRegisterReset": {
           "live": true,
           "callSites": [
-            "pages/users/user_pwd_edit/index.vue:170"
+            "pages/users/user_pwd_edit/index.vue:152"
           ],
           "resolvedFields": [
             "msg"
-          ],
-          "rejectedFields": []
-        },
-        "pink": {
-          "live": true,
-          "callSites": [
-            "subpackage/diyComponents/combination.vue:577"
-          ],
-          "resolvedFields": [
-            "data"
           ],
           "rejectedFields": []
         },
         "registerVerify": {
           "live": true,
           "callSites": [
-            "pages/users/binding_phone/index.vue:288",
-            "pages/users/user_phone/index.vue:172"
+            "pages/users/binding_phone/index.vue:291",
+            "pages/users/user_phone/index.vue:176"
           ],
           "resolvedFields": [
             "msg"
           ],
+          "rejectedFields": []
+        },
+        "resetSiteConfig": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
           "rejectedFields": []
         },
         "searchList": {
@@ -1026,7 +956,7 @@
         "setCouponReceive": {
           "live": true,
           "callSites": [
-            "components/couponListWindow/index.vue:102",
+            "components/couponListWindow/index.vue:103",
             "pages/users/user_get_coupon/index.vue:157",
             "subpackage/diyComponents/coupon.vue:449",
             "subpackage/diyComponents/customComponent.vue:1018"
@@ -1034,21 +964,22 @@
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "switchH5Login": {
-          "live": true,
-          "callSites": [
-            "pages/users/user_info/index.vue:322"
-          ],
-          "resolvedFields": [
-            "data.expires_time",
-            "data.token"
-          ],
+        "siteConfig": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toDataUrls": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
           "rejectedFields": []
         },
         "updatePhone": {
           "live": true,
           "callSites": [
-            "pages/users/user_phone/index.vue:150"
+            "pages/users/user_phone/index.vue:146"
           ],
           "resolvedFields": [
             "msg"
@@ -1058,15 +989,10 @@
         "verifyCode": {
           "live": true,
           "callSites": [
-            "pages/users/auth/index.vue:180",
-            "pages/users/binding_phone/index.vue:287",
-            "pages/users/user_phone/index.vue:171",
-            "pages/users/user_phone/index.vue:70",
-            "pages/users/user_pwd_edit/index.vue:90"
+            "pages/users/user_phone/index.vue:66"
           ],
           "resolvedFields": [
-            "data.key",
-            "msg"
+            "data.key"
           ],
           "rejectedFields": []
         }
@@ -1078,49 +1004,49 @@
       "dead": 8,
       "danglingCallSites": {},
       "functions": {
-        "fromLegacyCartAddInput": {
+        "fromPageCartAddInput": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "fromLegacyCartQuery": {
+        "fromPageCartQuery": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyCartAddResult": {
+        "toPageCartAddResult": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyCartArray": {
+        "toPageCartArray": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyCartCount": {
+        "toPageCartCount": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyCartItem": {
+        "toPageCartItem": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyCartList": {
+        "toPageCartList": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyRebuyResult": {
+        "toPageRebuyResult": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
@@ -1129,144 +1055,188 @@
       }
     },
     "catalog": {
-      "exports": 23,
+      "exports": 24,
       "live": 0,
-      "dead": 23,
+      "dead": 24,
       "danglingCallSites": {},
       "functions": {
-        "fromLegacyCommentInput": {
+        "fromPageCommentInput": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "fromLegacyIdList": {
+        "fromPageIdList": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyAttr": {
+        "toPageAttr": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyCategoryTree": {
+        "toPageCategoryTree": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyCategoryVersion": {
+        "toPageCategoryVersion": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyCollectList": {
+        "toPageCollectAllResult": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyFavoriteResult": {
+        "toPageCollectList": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyHotKeywords": {
+        "toPageFavoriteResult": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyLabel": {
+        "toPageHotKeywords": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyProductAttr": {
+        "toPageLabel": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyProductCard": {
+        "toPageProductAttr": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyProductDetail": {
+        "toPageProductCard": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyProductList": {
+        "toPageProductDetail": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyProductPage": {
+        "toPageProductList": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyProductValue": {
+        "toPageProductPage": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyRealPrice": {
+        "toPageProductValue": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyReply": {
+        "toPageRealPrice": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyReplyConfig": {
+        "toPageReply": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyReplyList": {
+        "toPageReplyConfig": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyReplyPage": {
+        "toPageReplyList": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacySearchHistory": {
+        "toPageReplyPage": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacySku": {
+        "toPageSearchHistory": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyVisitList": {
+        "toPageSku": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageVisitList": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        }
+      }
+    },
+    "cms": {
+      "exports": 5,
+      "live": 0,
+      "dead": 5,
+      "danglingCallSites": {},
+      "functions": {
+        "toPageArticle": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageArticleCategories": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageArticleDetail": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageArticleList": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageArticleProduct": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
@@ -1275,60 +1245,108 @@
       }
     },
     "coupon": {
-      "exports": 9,
+      "exports": 17,
       "live": 0,
-      "dead": 9,
+      "dead": 17,
       "danglingCallSites": {},
       "functions": {
-        "fromLegacyApplicableInput": {
+        "couponGrantMessage": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "fromLegacyCouponState": {
+        "fromPageApplicableInput": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyApplicableCoupons": {
+        "fromPageCouponGrant": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyClaimResult": {
+        "fromPageCouponState": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyCouponArray": {
+        "fromPageStaffCouponQuery": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyCouponList": {
+        "toPageApplicableCoupons": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyCouponTemplate": {
+        "toPageClaimResult": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyUserCoupon": {
+        "toPageCouponArray": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyUserCouponList": {
+        "toPageCouponList": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageCouponPopup": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageCouponTemplate": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageGiftCoupons": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageNewUserCouponPopup": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffCoupon": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffCoupons": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageUserCoupon": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageUserCouponList": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
@@ -1337,24 +1355,48 @@
       }
     },
     "diy": {
-      "exports": 3,
+      "exports": 7,
       "live": 0,
-      "dead": 3,
+      "dead": 7,
       "danglingCallSites": {},
       "functions": {
-        "toLegacyDiyPage": {
+        "pageColorStatus": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyDiyVersion": {
+        "toPageDiyPage": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyTheme": {
+        "toPageDiyVersion": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageLayout": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageNavigation": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageTheme": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageUserMenus": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
@@ -1368,13 +1410,13 @@
       "dead": 13,
       "danglingCallSites": {},
       "functions": {
-        "fromLegacyInvoiceRequest": {
+        "fromPageInvoiceRequest": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "legacyDeliveryType": {
+        "pageDeliveryType": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
@@ -1386,61 +1428,87 @@
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyExpressOrder": {
+        "toPageExpressOrder": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyExpressView": {
+        "toPageExpressView": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyInvoice": {
+        "toPageInvoice": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyInvoiceList": {
+        "toPageInvoiceList": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyInvoicePage": {
+        "toPageInvoicePage": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyShipment": {
+        "toPageShipment": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyShipmentLine": {
+        "toPageShipmentLine": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyShipmentList": {
+        "toPageShipmentList": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyTrace": {
+        "toPageTrace": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyTracking": {
+        "toPageTracking": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        }
+      }
+    },
+    "notification": {
+      "exports": 3,
+      "live": 0,
+      "dead": 3,
+      "danglingCallSites": {},
+      "functions": {
+        "toPageMarkRead": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageMessage": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageMessageList": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
@@ -1449,9 +1517,9 @@
       }
     },
     "order": {
-      "exports": 37,
+      "exports": 38,
       "live": 33,
-      "dead": 4,
+      "dead": 5,
       "danglingCallSites": {},
       "functions": {
         "adminExpress": {
@@ -1463,8 +1531,8 @@
         "cancelRefundOrder": {
           "live": true,
           "callSites": [
-            "pages/goods/order_details/index.vue:689",
-            "pages/goods/order_details/index.vue:696"
+            "pages/goods/order_details/index.vue:691",
+            "pages/goods/order_details/index.vue:698"
           ],
           "resolvedFields": [],
           "rejectedFields": []
@@ -1478,9 +1546,9 @@
             "pages/goods_cate/goods_cate2.vue:252",
             "pages/goods_cate/goods_cate3.vue:373",
             "pages/goods_cate/goods_cate3.vue:387",
-            "pages/order_addcart/order_addcart.vue:1153",
-            "pages/order_addcart/order_addcart.vue:623",
-            "pages/order_addcart/order_addcart.vue:837"
+            "pages/order_addcart/order_addcart.vue:1154",
+            "pages/order_addcart/order_addcart.vue:624",
+            "pages/order_addcart/order_addcart.vue:838"
           ],
           "resolvedFields": [],
           "rejectedFields": []
@@ -1488,7 +1556,7 @@
         "changeCartNum": {
           "live": true,
           "callSites": [
-            "pages/order_addcart/order_addcart.vue:911"
+            "pages/order_addcart/order_addcart.vue:912"
           ],
           "resolvedFields": [
             "data"
@@ -1515,10 +1583,10 @@
             "pages/annex/special/index.vue:363",
             "pages/goods_cate/goods_cate2.vue:285",
             "pages/goods_cate/goods_cate3.vue:424",
-            "pages/goods_details/index.vue:1236",
+            "pages/goods_details/index.vue:1238",
             "pages/index/index.vue:379",
-            "pages/order_addcart/order_addcart.vue:929",
-            "pages/order_addcart/order_addcart.vue:974",
+            "pages/order_addcart/order_addcart.vue:930",
+            "pages/order_addcart/order_addcart.vue:975",
             "subpackage/diyComponents/goodList.vue:1296"
           ],
           "resolvedFields": [
@@ -1532,9 +1600,9 @@
         "getCartList": {
           "live": true,
           "callSites": [
-            "pages/order_addcart/order_addcart.vue:1068",
-            "pages/order_addcart/order_addcart.vue:950",
-            "pages/order_addcart/order_addcart.vue:963"
+            "pages/order_addcart/order_addcart.vue:1069",
+            "pages/order_addcart/order_addcart.vue:951",
+            "pages/order_addcart/order_addcart.vue:964"
           ],
           "resolvedFields": [
             "data"
@@ -1560,7 +1628,7 @@
         "getCouponsOrderPrice": {
           "live": true,
           "callSites": [
-            "pages/goods/order_confirm/index.vue:977"
+            "pages/goods/order_confirm/index.vue:979"
           ],
           "resolvedFields": [
             "data"
@@ -1580,7 +1648,7 @@
         "getOrderDetail": {
           "live": true,
           "callSites": [
-            "pages/goods/order_details/index.vue:819",
+            "pages/goods/order_details/index.vue:821",
             "pages/goods/order_pay_status/index.vue:192"
           ],
           "resolvedFields": [
@@ -1608,12 +1676,18 @@
         "getResetCart": {
           "live": true,
           "callSites": [
-            "pages/order_addcart/order_addcart.vue:437"
+            "pages/order_addcart/order_addcart.vue:438"
           ],
           "resolvedFields": [],
           "rejectedFields": [
             "msg"
           ]
+        },
+        "newOrderKey": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
         },
         "ordeRefundReason": {
           "live": true,
@@ -1628,7 +1702,7 @@
         "orderAgain": {
           "live": true,
           "callSites": [
-            "pages/goods/order_details/index.vue:1092",
+            "pages/goods/order_details/index.vue:1094",
             "pages/users/user_invoice_order/index.vue:768"
           ],
           "resolvedFields": [
@@ -1639,7 +1713,7 @@
         "orderCancel": {
           "live": true,
           "callSites": [
-            "pages/goods/order_details/index.vue:1220",
+            "pages/goods/order_details/index.vue:1222",
             "pages/goods/order_list/index.vue:247",
             "pages/users/user_invoice_order/index.vue:824"
           ],
@@ -1661,7 +1735,7 @@
         "orderConfirm": {
           "live": true,
           "callSites": [
-            "pages/goods/order_confirm/index.vue:874"
+            "pages/goods/order_confirm/index.vue:875"
           ],
           "resolvedFields": [
             "data.ali_pay_status",
@@ -1709,7 +1783,7 @@
         "orderCreate": {
           "live": true,
           "callSites": [
-            "pages/goods/order_confirm/index.vue:1072"
+            "pages/goods/order_confirm/index.vue:1074"
           ],
           "resolvedFields": [
             "data.result.orderId"
@@ -1797,7 +1871,7 @@
         "orderTake": {
           "live": true,
           "callSites": [
-            "pages/goods/order_details/index.vue:1142",
+            "pages/goods/order_details/index.vue:1144",
             "pages/users/user_invoice_order/index.vue:781"
           ],
           "resolvedFields": [],
@@ -1806,7 +1880,7 @@
         "postOrderComputed": {
           "live": true,
           "callSites": [
-            "pages/goods/order_confirm/index.vue:731"
+            "pages/goods/order_confirm/index.vue:732"
           ],
           "resolvedFields": [
             "data.result"
@@ -1852,7 +1926,7 @@
         "refundOrderDetail": {
           "live": true,
           "callSites": [
-            "pages/goods/order_details/index.vue:817",
+            "pages/goods/order_details/index.vue:819",
             "pages/goods/order_refund_goods/index.vue:176"
           ],
           "resolvedFields": [
@@ -1902,13 +1976,13 @@
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyPayResult": {
+        "toPagePayResult": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyPayStatus": {
+        "toPagePayStatus": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
@@ -1917,15 +1991,15 @@
       }
     },
     "public": {
-      "exports": 18,
-      "live": 17,
+      "exports": 15,
+      "live": 14,
       "dead": 1,
       "danglingCallSites": {},
       "functions": {
         "authLogin": {
           "live": true,
           "callSites": [
-            "pages/users/wechat_login/index.vue:300"
+            "pages/users/wechat_login/index.vue:299"
           ],
           "resolvedFields": [
             "data.bindName",
@@ -1937,7 +2011,7 @@
         "authType": {
           "live": true,
           "callSites": [
-            "pages/users/wechat_login/index.vue:261"
+            "pages/users/wechat_login/index.vue:260"
           ],
           "resolvedFields": [
             "data.bindPhone",
@@ -1972,7 +2046,7 @@
           "live": true,
           "callSites": [
             "components/Authorize.vue:160",
-            "pages/users/login/index.vue:341"
+            "pages/users/login/index.vue:311"
           ],
           "resolvedFields": [
             "data.logo_url"
@@ -2005,16 +2079,6 @@
           ],
           "rejectedFields": []
         },
-        "getSubscribe": {
-          "live": true,
-          "callSites": [
-            "subpackage/diyComponents/follow.vue:177"
-          ],
-          "resolvedFields": [
-            "data.subscribe"
-          ],
-          "rejectedFields": []
-        },
         "getWechatConfig": {
           "live": true,
           "callSites": [
@@ -2040,7 +2104,7 @@
         "phoneLogin": {
           "live": true,
           "callSites": [
-            "pages/users/binding_phone/index.vue:192"
+            "pages/users/binding_phone/index.vue:187"
           ],
           "resolvedFields": [
             "data.bindName",
@@ -2049,23 +2113,12 @@
           ],
           "rejectedFields": []
         },
-        "remoteRegister": {
-          "live": true,
-          "callSites": [
-            "App.vue:278",
-            "App.vue:279"
-          ],
-          "resolvedFields": [
-            "data"
-          ],
-          "rejectedFields": []
-        },
         "routineBindingPhone": {
           "live": true,
           "callSites": [
             "components/Authorize.vue:123",
-            "pages/users/components/login_mobile/routine_phone.vue:71",
-            "pages/users/wechat_login/index.vue:423"
+            "pages/users/components/login_mobile/routine_phone.vue:66",
+            "pages/users/wechat_login/index.vue:417"
           ],
           "resolvedFields": [
             "data.bindName",
@@ -2080,7 +2133,7 @@
         "routineLogin": {
           "live": true,
           "callSites": [
-            "libs/routine.js:236"
+            "libs/routine.js:235"
           ],
           "resolvedFields": [
             "data.key",
@@ -2089,28 +2142,11 @@
           ],
           "rejectedFields": []
         },
-        "silenceAuth": {
-          "live": true,
-          "callSites": [
-            "App.vue:296",
-            "App.vue:299",
-            "components/Authorize.vue:63",
-            "libs/routine.js:43",
-            "libs/routine.js:48",
-            "pages/users/auth/index.vue:86"
-          ],
-          "resolvedFields": [
-            "data.expires_time",
-            "data.key",
-            "data.token"
-          ],
-          "rejectedFields": []
-        },
         "wechatAuthLogin": {
           "live": true,
           "callSites": [
-            "pages/users/wechat_login/index.vue:213",
-            "pages/users/wechat_login/index.vue:217"
+            "pages/users/wechat_login/index.vue:212",
+            "pages/users/wechat_login/index.vue:216"
           ],
           "resolvedFields": [
             "data.bindPhone",
@@ -2142,55 +2178,75 @@
       "dead": 9,
       "danglingCallSites": {},
       "functions": {
-        "fromLegacyRefundApplyInput": {
+        "fromPageRefundApplyInput": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "fromLegacyRefundState": {
+        "fromPageRefundState": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "fromLegacyReturnShipmentInput": {
+        "fromPageReturnShipmentInput": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "legacyRefundType": {
+        "pageRefundType": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyApplicableItems": {
+        "toPageApplicableItems": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyRefund": {
+        "toPageRefund": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyRefundLine": {
+        "toPageRefundLine": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyRefundList": {
+        "toPageRefundList": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyRefundReasons": {
+        "toPageRefundReasons": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        }
+      }
+    },
+    "region": {
+      "exports": 2,
+      "live": 0,
+      "dead": 2,
+      "danglingCallSites": {},
+      "functions": {
+        "cityTreeVersion": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageCityTree": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
@@ -2199,108 +2255,264 @@
       }
     },
     "staff": {
-      "exports": 17,
+      "exports": 43,
       "live": 0,
-      "dead": 17,
+      "dead": 43,
       "danglingCallSites": {},
       "functions": {
-        "fromLegacyPriceInput": {
+        "fromPageCategoryAssignment": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "fromLegacyRefundReviewInput": {
+        "fromPageLabelAssignment": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "fromLegacyRemarkInput": {
+        "fromPagePriceInput": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "fromLegacyShipInput": {
+        "fromPageRefundRemarkInput": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "fromLegacyStaffOrderQuery": {
+        "fromPageRefundReviewInput": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "fromLegacyStaffRefundQuery": {
+        "fromPageRemarkInput": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "legacyStaffStatus": {
+        "fromPageShipInput": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyExpressCompanies": {
+        "fromPageSkuPatch": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyOrderTimeline": {
+        "fromPageStaffOrderQuery": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyStaffIdentity": {
+        "fromPageStaffProductForm": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyStaffOrderDetail": {
+        "fromPageStaffProductQuery": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyStaffOrderList": {
+        "fromPageStaffRefundQuery": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyStaffOrderListItem": {
+        "fromPageStaffUserQuery": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyStaffRefund": {
+        "fromPageStatisticsRange": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyStaffRefundList": {
+        "fromPageUserGroupInput": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyStaffStatistics": {
+        "fromPageUserLabelInput": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyStaffStatusName": {
+        "pageStaffStatus": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "precedingStatisticsRange": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "shiftShopDay": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "shopDayFromUnix": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageExpressCompanies": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageOrderTimeline": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageProductCategories": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageProductLabels": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffIdentity": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffOrderDetail": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffOrderList": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffOrderListItem": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffProduct": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffProductList": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffRefund": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffRefundList": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffSku": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffSkus": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffStatistics": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffStatusName": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffUser": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStaffUserList": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStatisticsChart": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageStatisticsRows": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageTemplateOptions": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageUserGroups": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageUserLabels": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
@@ -2317,9 +2529,9 @@
         "collectAdd": {
           "live": true,
           "callSites": [
-            "pages/activity/goods_combination_details/index.vue:1168",
+            "pages/activity/goods_combination_details/index.vue:1170",
             "pages/activity/presell_details/index.vue:921",
-            "pages/goods_details/index.vue:1063"
+            "pages/goods_details/index.vue:1065"
           ],
           "resolvedFields": [
             "msg"
@@ -2329,7 +2541,7 @@
         "collectAll": {
           "live": true,
           "callSites": [
-            "pages/order_addcart/order_addcart.vue:654",
+            "pages/order_addcart/order_addcart.vue:655",
             "pages/users/visit_list/index.vue:155"
           ],
           "resolvedFields": [
@@ -2340,9 +2552,9 @@
         "collectDel": {
           "live": true,
           "callSites": [
-            "pages/activity/goods_combination_details/index.vue:1164",
+            "pages/activity/goods_combination_details/index.vue:1166",
             "pages/activity/presell_details/index.vue:914",
-            "pages/goods_details/index.vue:1052",
+            "pages/goods_details/index.vue:1054",
             "pages/users/user_goods_collection/index.vue:148"
           ],
           "resolvedFields": [
@@ -2452,7 +2664,7 @@
           "live": true,
           "callSites": [
             "pages/goods_details/index.vue:796",
-            "pages/order_addcart/order_addcart.vue:475"
+            "pages/order_addcart/order_addcart.vue:476"
           ],
           "resolvedFields": [
             "data.activity",
@@ -2486,7 +2698,7 @@
             "pages/goods/goods_list/index.vue:190",
             "pages/goods/goods_logistics/index.vue:165",
             "pages/goods/goods_search/index.vue:189",
-            "pages/order_addcart/order_addcart.vue:1093",
+            "pages/order_addcart/order_addcart.vue:1094",
             "pages/users/user_goods_collection/index.vue:258",
             "pages/users/visit_list/index.vue:325"
           ],
@@ -2563,10 +2775,10 @@
         "postCartAdd": {
           "live": true,
           "callSites": [
-            "pages/activity/goods_combination_details/index.vue:1142",
-            "pages/activity/goods_combination_status/index.vue:496",
+            "pages/activity/goods_combination_details/index.vue:1144",
+            "pages/activity/goods_combination_status/index.vue:498",
             "pages/activity/presell_details/index.vue:993",
-            "pages/goods_details/index.vue:1199"
+            "pages/goods_details/index.vue:1201"
           ],
           "resolvedFields": [
             "data.cartId"
@@ -2601,24 +2813,72 @@
       }
     },
     "system": {
-      "exports": 4,
+      "exports": 12,
       "live": 0,
-      "dead": 4,
+      "dead": 12,
       "danglingCallSites": {},
       "functions": {
-        "fromLegacyAgreementKey": {
+        "fromPageAgreementKey": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyAgreement": {
+        "fromPageBase64Input": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
           "rejectedFields": []
         },
-        "toLegacyUpload": {
+        "toPageAgreement": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageBase64": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageBasicConfig": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageCopyright": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageCustomerService": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageLogo": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageShare": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageSplashAd": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageUpload": {
           "live": false,
           "callSites": [],
           "resolvedFields": [],
@@ -2633,9 +2893,9 @@
       }
     },
     "user": {
-      "exports": 33,
-      "live": 31,
-      "dead": 2,
+      "exports": 36,
+      "live": 30,
+      "dead": 6,
       "danglingCallSites": {},
       "functions": {
         "cancelUser": {
@@ -2647,11 +2907,17 @@
           "resolvedFields": [],
           "rejectedFields": []
         },
+        "changePassword": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
         "delAddress": {
           "live": true,
           "callSites": [
             "pages/users/user_address_list/index.vue:28",
-            "pages/users/user_address_list/index.vue:331"
+            "pages/users/user_address_list/index.vue:330"
           ],
           "resolvedFields": [],
           "rejectedFields": []
@@ -2668,8 +2934,8 @@
             "pages/users/user_address/index.vue:287",
             "pages/users/user_address/index.vue:371",
             "pages/users/user_address/index.vue:459",
-            "pages/users/user_address_list/index.vue:161",
-            "pages/users/user_address_list/index.vue:217",
+            "pages/users/user_address_list/index.vue:160",
+            "pages/users/user_address_list/index.vue:216",
             "pages/users/user_address_list/index.vue:26"
           ],
           "resolvedFields": [
@@ -2704,7 +2970,7 @@
           "live": true,
           "callSites": [
             "components/addressWindow/index.vue:82",
-            "pages/users/user_address_list/index.vue:262"
+            "pages/users/user_address_list/index.vue:261"
           ],
           "resolvedFields": [
             "data"
@@ -2714,23 +2980,17 @@
         "getCodeApi": {
           "live": true,
           "callSites": [
-            "pages/users/components/login_mobile/index.vue:106",
-            "pages/users/components/login_mobile/index.vue:74",
-            "pages/users/login/index.vue:310",
-            "pages/users/retrievePassword/index.vue:86"
+            "pages/users/components/login_mobile/index.vue:87"
           ],
           "resolvedFields": [
-            "data.key",
-            "msg"
+            "data.key"
           ],
-          "rejectedFields": [
-            "msg.msg"
-          ]
+          "rejectedFields": []
         },
         "getLogout": {
           "live": true,
           "callSites": [
-            "pages/users/user_info/index.vue:355"
+            "pages/users/user_info/index.vue:330"
           ],
           "resolvedFields": [],
           "rejectedFields": []
@@ -2738,7 +2998,7 @@
         "getMenuList": {
           "live": true,
           "callSites": [
-            "pages/user/index.vue:481"
+            "pages/user/index.vue:464"
           ],
           "resolvedFields": [
             "data.diy_data.business_status",
@@ -2760,6 +3020,12 @@
           ],
           "rejectedFields": []
         },
+        "getMsgUnreadCount": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
         "getUserAgreement": {
           "live": true,
           "callSites": [
@@ -2773,30 +3039,36 @@
           ],
           "rejectedFields": []
         },
+        "getUserCancellation": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
         "getUserInfo": {
           "live": true,
           "callSites": [
-            "pages/activity/goods_combination_details/index.vue:1297",
+            "pages/activity/goods_combination_details/index.vue:1299",
             "pages/activity/poster-poster/index.vue:213",
             "pages/activity/presell_details/index.vue:1258",
             "pages/activity/presell_details/index.vue:588",
-            "pages/goods/order_details/index.vue:795",
-            "pages/goods_details/index.vue:1361",
+            "pages/goods/order_details/index.vue:797",
+            "pages/goods_details/index.vue:1363",
             "pages/goods_details/index.vue:668",
-            "pages/user/index.vue:423",
-            "pages/users/auth/index.vue:111",
-            "pages/users/binding_phone/index.vue:252",
-            "pages/users/binding_phone/index.vue:254",
-            "pages/users/components/login_mobile/index.vue:219",
-            "pages/users/components/login_mobile/routine_phone.vue:100",
-            "pages/users/login/index.vue:395",
-            "pages/users/login/index.vue:544",
-            "pages/users/user_info/index.vue:374",
+            "pages/user/index.vue:406",
+            "pages/users/auth/index.vue:101",
+            "pages/users/binding_phone/index.vue:247",
+            "pages/users/binding_phone/index.vue:249",
+            "pages/users/components/login_mobile/index.vue:200",
+            "pages/users/components/login_mobile/routine_phone.vue:91",
+            "pages/users/login/index.vue:365",
+            "pages/users/login/index.vue:511",
+            "pages/users/user_info/index.vue:349",
             "pages/users/user_invoice_list/index.vue:147",
             "pages/users/user_invoice_list/index.vue:148",
-            "pages/users/user_pwd_edit/index.vue:113",
-            "pages/users/wechat_login/index.vue:458",
-            "pages/users/wechat_login/index.vue:460",
+            "pages/users/user_pwd_edit/index.vue:104",
+            "pages/users/wechat_login/index.vue:447",
+            "pages/users/wechat_login/index.vue:449",
             "store/modules/app.js:87",
             "subpackage/diyComponents/userInfor.vue:363"
           ],
@@ -2864,7 +3136,7 @@
           "live": true,
           "callSites": [
             "pages/goods/order_confirm/index.vue:635",
-            "pages/goods/order_details/index.vue:970",
+            "pages/goods/order_details/index.vue:972",
             "pages/users/user_invoice_list/index.vue:187"
           ],
           "resolvedFields": [
@@ -2895,7 +3167,7 @@
         "loginH5": {
           "live": true,
           "callSites": [
-            "pages/users/login/index.vue:531"
+            "pages/users/login/index.vue:498"
           ],
           "resolvedFields": [],
           "rejectedFields": []
@@ -2903,8 +3175,8 @@
         "loginMobile": {
           "live": true,
           "callSites": [
-            "pages/users/login/index.vue:345",
-            "pages/users/login/index.vue:381"
+            "pages/users/login/index.vue:315",
+            "pages/users/login/index.vue:351"
           ],
           "resolvedFields": [
             "data",
@@ -2915,7 +3187,7 @@
         "makeUpinvoice": {
           "live": true,
           "callSites": [
-            "pages/goods/order_details/index.vue:933"
+            "pages/goods/order_details/index.vue:935"
           ],
           "resolvedFields": [],
           "rejectedFields": []
@@ -2936,8 +3208,8 @@
         "mpBindingPhone": {
           "live": true,
           "callSites": [
-            "pages/user/index.vue:399",
-            "pages/users/user_info/index.vue:205"
+            "pages/user/index.vue:382",
+            "pages/users/user_info/index.vue:198"
           ],
           "resolvedFields": [
             "msg"
@@ -2959,8 +3231,8 @@
         "phoneSilenceAuth": {
           "live": true,
           "callSites": [
-            "pages/users/components/login_mobile/index.vue:192",
-            "pages/users/components/login_mobile/index.vue:194"
+            "pages/users/components/login_mobile/index.vue:173",
+            "pages/users/components/login_mobile/index.vue:175"
           ],
           "resolvedFields": [
             "data.expires_time",
@@ -2972,7 +3244,7 @@
         "phoneWxSilenceAuth": {
           "live": true,
           "callSites": [
-            "pages/users/components/login_mobile/index.vue:171"
+            "pages/users/components/login_mobile/index.vue:152"
           ],
           "resolvedFields": [
             "data.expires_time",
@@ -2983,8 +3255,8 @@
         "register": {
           "live": true,
           "callSites": [
-            "pages/users/login/index.vue:414",
-            "pages/users/login/index.vue:446"
+            "pages/users/login/index.vue:384",
+            "pages/users/login/index.vue:416"
           ],
           "resolvedFields": [],
           "rejectedFields": []
@@ -2992,8 +3264,8 @@
         "registerReset": {
           "live": true,
           "callSites": [
-            "pages/users/retrievePassword/index.vue:107",
-            "pages/users/retrievePassword/index.vue:96"
+            "pages/users/retrievePassword/index.vue:65",
+            "pages/users/retrievePassword/index.vue:76"
           ],
           "resolvedFields": [
             "msg"
@@ -3003,11 +3275,11 @@
         "registerVerify": {
           "live": true,
           "callSites": [
-            "pages/users/auth/index.vue:181",
-            "pages/users/components/login_mobile/index.vue:75",
-            "pages/users/login/index.vue:482",
-            "pages/users/retrievePassword/index.vue:135",
-            "pages/users/user_pwd_edit/index.vue:135"
+            "pages/users/auth/index.vue:167",
+            "pages/users/components/login_mobile/index.vue:71",
+            "pages/users/login/index.vue:452",
+            "pages/users/retrievePassword/index.vue:103",
+            "pages/users/user_pwd_edit/index.vue:120"
           ],
           "resolvedFields": [
             "msg"
@@ -3032,16 +3304,7 @@
         "setAddressDefault": {
           "live": true,
           "callSites": [
-            "pages/users/user_address_list/index.vue:289"
-          ],
-          "resolvedFields": [],
-          "rejectedFields": []
-        },
-        "setVisit": {
-          "live": true,
-          "callSites": [
-            "pages/user/index.vue:359",
-            "pages/user/index.vue:360"
+            "pages/users/user_address_list/index.vue:288"
           ],
           "resolvedFields": [],
           "rejectedFields": []
@@ -3050,11 +3313,49 @@
           "live": true,
           "callSites": [
             "components/eidtUserModal/index.vue:136",
-            "pages/users/user_info/index.vue:436"
+            "pages/users/user_info/index.vue:411"
           ],
           "resolvedFields": [
             "msg"
           ],
+          "rejectedFields": []
+        },
+        "withdrawUserCancellation": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        }
+      }
+    },
+    "wechat": {
+      "exports": 4,
+      "live": 0,
+      "dead": 4,
+      "danglingCallSites": {},
+      "functions": {
+        "fromPageMiniCodeQuery": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageJssdkConfig": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageMiniCode": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
+          "rejectedFields": []
+        },
+        "toPageSubscribeTemplates": {
+          "live": false,
+          "callSites": [],
+          "resolvedFields": [],
           "rejectedFields": []
         }
       }

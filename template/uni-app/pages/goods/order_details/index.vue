@@ -469,7 +469,7 @@
 		<view class="mask more-mask" v-if="moreBtn" @click="moreBtn = false"></view>
 		<canvas class="canvas" canvas-id="posterCanvas"></canvas>
 		<view class="share-box" v-if="H5ShareBox">
-			<image :src="'/static/images/legacy/share-info.png'" @click="H5ShareBox = false"></image>
+			<image :src="'/static/images/common/share-info.png'" @click="H5ShareBox = false"></image>
 		</view>
 		<invoice-picker
 			:inv-show="invShow"
@@ -599,7 +599,7 @@ export default {
 			is_gift: 0, // 0正常商品 || 无人领取   1 购买者   2领取人
 			giftData: null,
 			giftModalData: null,
-			mpGiftImg: '/static/images/legacy/gift_share.jpg'
+			mpGiftImg: '/static/images/common/gift_share.jpg'
 		};
 	},
 	computed: mapGetters(['isLogin']),

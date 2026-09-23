@@ -1,10 +1,10 @@
-// payment DTOs → the legacy 支付 view models.
+// payment DTOs → the 支付 view models.
 //
 // Contract: next/packages/contracts/src/payment/payment.storefront.contract.ts
 //
 // `pages/goods/cashier` and `components/payment` switch on `res.data.status`
 // (`SUCCESS` | `WECHAT_PAY` | `PAY_ERROR`) and hand `res.data.result.jsConfig`
-// to `utils/wechatPayment.js`. Only WeChat Pay survives the rewrite.
+// to `utils/wechatPayment.js`. WeChat Pay is the only channel.
 
 import { toId, money, text, unixSeconds } from './_shared.js';
 
@@ -19,10 +19,9 @@ export function paymentChannelFor(platform) {
  * `paymentStart` → `{status, result: {jsConfig}}`.
  *
  * `jsConfig` carries both `timestamp` and `timeStamp`: the mini-program helper reads the
- * lower-case one, `jweixin`'s `chooseWXPay` reads the camel-case one, and the old payload
- * happened to satisfy both.
+ * lower-case one, `jweixin`'s `chooseWXPay` reads the camel-case one.
  */
-export function toLegacyPayResult(dto) {
+export function toPagePayResult(dto) {
   if (!dto) return { status: 'PAY_ERROR', result: { jsConfig: {} } };
   const jsapi = dto.jsapi || {};
   const jsConfig = {
@@ -45,7 +44,7 @@ export function toLegacyPayResult(dto) {
       pay_price: money(dto.amount),
       expires_at: unixSeconds(dto.expiresAt, 0),
     },
-    // `pay_type` used to decide the toast; the only channel left is WeChat.
+    // `pay_type` decides the toast; the only channel is WeChat.
     pay_type: 'weixin',
   };
 }
@@ -57,7 +56,7 @@ export function payResultMessage(dto) {
 }
 
 /** `GET /api/v1/payments/:outTradeNo` → the 支付结果 poll. */
-export function toLegacyPayStatus(dto) {
+export function toPagePayStatus(dto) {
   if (!dto) return { status: 0, paid: 0 };
   return {
     out_trade_no: text(dto.outTradeNo),

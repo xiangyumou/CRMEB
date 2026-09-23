@@ -1,11 +1,11 @@
 // 发票抬头 — a local address book.
 //
-// Legacy had ten `UserInvoiceController` routes behind 抬头管理. Stream B2 did not port
-// them (`next/packages/contracts/src/order/order.invoice.contract.ts`): the header is
+// The server keeps no 抬头 address book
+// (`next/packages/contracts/src/order/order.invoice.contract.ts`): the header is
 // frozen onto the invoice request at the moment it is made, which is the only thing that
-// ever mattered, "and the storefront can remember the last one locally".
+// matters, and the storefront can remember the last one locally.
 //
-// So this is that local memory. It keeps the legacy row shape (`header_type` 1 个人 /
+// So this is that local memory. It keeps the page's row shape (`header_type` 1 个人 /
 // 2 企业, `type` 1 普通 / 2 专用) because the 抬头管理 pages and the picker component are
 // written against it, and `api/user.js` wraps it in the usual `{data, msg, status}`
 // envelope so no call site can tell the difference.

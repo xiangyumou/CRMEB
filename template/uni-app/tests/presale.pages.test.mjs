@@ -1,4 +1,4 @@
-// 预售 — the list → detail → confirm path a shopper can actually tap (CR-2-i).
+// 预售 — the list → detail → confirm path a shopper can actually tap.
 //
 // `pages/activity/presell_details/index.vue` had the whole presale purchase flow and
 // no entry in `pages.json`, and the list sent the shopper to the plain product page,
@@ -101,7 +101,7 @@ beforeEach(() => installUni());
 // 1. reachable
 // ---------------------------------------------------------------------------
 
-describe('预售详情 is a page a shopper can reach (CR-2-i)', () => {
+describe('预售详情 is a page a shopper can reach', () => {
   it('is registered in the pages/activity subpackage', () => {
     const pages = JSON.parse(read('pages.json'));
     const activity = pages.subPackages.find((p) => p.root === 'pages/activity');

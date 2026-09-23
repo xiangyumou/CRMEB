@@ -1,9 +1,9 @@
-// 拼团 / 预售 DTOs → the legacy 活动 view models `pages/activity/**` render.
+// 拼团 / 预售 DTOs → the 活动 view models `pages/activity/**` render.
 //
 // Contracts: next/packages/contracts/src/groupbuy/groupbuy.storefront.contract.ts
 //            next/packages/contracts/src/presale/presale.storefront.contract.ts
 //
-// Three things about the new model the mappers have to bridge:
+// Three things about the API the mappers have to bridge:
 //
 //  * **A group is a row with a seat counter**, not a list of participants to count.
 //    `pinkBool` / `count` / `userBool` are all derived from `status`, `seatsLeft` and
@@ -12,8 +12,8 @@
 //    the product, `…/groups` carries the teams still looking for members, so
 //    `getCombinationDetail` composes them into the one payload the page knows.
 //  * **The server never draws a poster.** `groupbuyPoster` hands over the pieces and
-//    the payload a QR code must encode; legacy rendered a PNG with GD and leaked one
-//    attachment per group.
+//    the payload a QR code must encode; a server-drawn PNG would leave one
+//    attachment behind per group.
 //
 // Retired next to a product: 会员价, 积分, 门店自提, 虚拟核销. They are pinned to falsy
 // constants here exactly as `mappers/catalog.js` pins them, so the page branches that
@@ -27,10 +27,10 @@ import {
   list,
   mapList,
   pagedList,
-  legacyDate,
+  pageDate,
   unixSeconds,
 } from './_shared.js';
-import { toLegacyProductAttr, toLegacyProductValue } from './catalog.js';
+import { toPageProductAttr, toPageProductValue } from './catalog.js';
 
 /** Same falsy bag `mappers/catalog.js` uses, so an activity product behaves like any other. */
 const RETIRED = {
@@ -47,7 +47,7 @@ const RETIRED = {
 // ---------------------------------------------------------------------------
 
 /** `groupbuyCard` → one row of 拼团列表 / the DIY 拼团 component. */
-export function toLegacyGroupbuyCard(dto) {
+export function toPageGroupbuyCard(dto) {
   if (!dto) return {};
   return {
     id: toId(dto.activityId),
@@ -62,7 +62,7 @@ export function toLegacyGroupbuyCard(dto) {
     ot_price: money(dto.originalPrice, ''),
     people: toInt(dto.seatsRequired, 2),
     stock: toInt(dto.stock, 0),
-    // Legacy 限量 (`quota`) gates the 去拼团 button; the new model has only stock.
+    // 限量 (`quota`) gates the 去拼团 button; the API has only stock.
     quota: toInt(dto.stock, 0),
     sales: toInt(dto.sales, 0),
     unit_name: '件',
@@ -75,12 +75,12 @@ export function toLegacyGroupbuyCard(dto) {
 }
 
 /** `pagedGroupbuyCards` → the bare array the list pages page through. */
-export function toLegacyGroupbuyList(dto) {
-  return mapList(dto && dto.items, toLegacyGroupbuyCard);
+export function toPageGroupbuyList(dto) {
+  return mapList(dto && dto.items, toPageGroupbuyCard);
 }
 
 /** `GET /api/v1/groupbuy/banners` → `[{img, link}]`, which is all the swiper reads. */
-export function toLegacyGroupbuyBanners(dto) {
+export function toPageGroupbuyBanners(dto) {
   return mapList(dto && dto.items, (b) => ({
     img: text(b && b.imageUrl),
     image: text(b && b.imageUrl),
@@ -92,7 +92,7 @@ export function toLegacyGroupbuyBanners(dto) {
  * `GET /api/v1/groupbuy/summary` → the 人气条 on 拼团列表 and the DIY 拼团 block:
  * `avatars` (a bare array of URLs, ≤ 8) and `pink_count` for 「N 人参与拼团」.
  */
-export function toLegacyGroupbuySummary(dto) {
+export function toPageGroupbuySummary(dto) {
   return {
     avatars: list(dto && dto.avatars)
       .map((url) => text(url))
@@ -102,7 +102,7 @@ export function toLegacyGroupbuySummary(dto) {
 }
 
 /** `groupbuyOpenGroup` → one row of the 正在拼单 strip. */
-export function toLegacyOpenGroup(dto) {
+export function toPageOpenGroup(dto) {
   if (!dto) return {};
   return {
     id: toId(dto.groupId),
@@ -118,16 +118,15 @@ export function toLegacyOpenGroup(dto) {
 /**
  * `groupbuyDetail` (+ the open groups) → the 拼团详情 payload.
  *
- * `pink_ok_list` was a marquee of "某某 拼团成功" strings the legacy detail route
- * assembled from other people's orders. Nothing replaces it — publishing other
- * buyers' names was never something the new API offers — so it is an empty list and
+ * `pink_ok_list` is a marquee of "某某 拼团成功" strings built from other people's
+ * orders. The API does not publish other buyers' names, so it is an empty list and
  * the marquee renders nothing. `pink_ok_sum` keeps working: it is just `sales`.
  */
-export function toLegacyGroupbuyDetail(dto, groups) {
+export function toPageGroupbuyDetail(dto, groups) {
   if (!dto) return {};
   const skus = list(dto.skus);
   const first = skus[0];
-  const card = toLegacyGroupbuyCard(dto);
+  const card = toPageGroupbuyCard(dto);
   return {
     storeInfo: {
       ...card,
@@ -151,10 +150,10 @@ export function toLegacyGroupbuyDetail(dto, groups) {
       // same as "cannot open a team" — the page only needs the id.
       my_pink_id: dto.myOpenGroupId === null || dto.myOpenGroupId === undefined ? 0 : toId(dto.myOpenGroupId),
     },
-    productAttr: toLegacyProductAttr(specsOf(dto)),
-    productValue: toLegacyProductValue(skusAsCatalog(dto), dto.title),
-    pink: mapList(groups && groups.items, toLegacyOpenGroup),
-    pinkAll: mapList(groups && groups.items, toLegacyOpenGroup),
+    productAttr: toPageProductAttr(specsOf(dto)),
+    productValue: toPageProductValue(skusAsCatalog(dto), dto.title),
+    pink: mapList(groups && groups.items, toPageOpenGroup),
+    pinkAll: mapList(groups && groups.items, toPageOpenGroup),
     pink_ok_list: [],
     pink_ok_sum: toInt(dto.sales, 0),
     reply: null,
@@ -191,7 +190,7 @@ function specsOf(dto) {
   }));
 }
 
-/** An activity SKU wearing the field names `toLegacySku` reads. */
+/** An activity SKU wearing the field names `toPageSku` reads. */
 function skusAsCatalog(dto) {
   return mapList(dto && dto.skus, (sku) => ({
     id: sku.skuId,
@@ -219,13 +218,13 @@ function pinkBoolOf(status) {
  * and the group view deliberately never says who the caller is. The nickname is the
  * leader's either way: the H5 share text is an invitation from the team.
  */
-export function toLegacyGroupbuyGroup(view, detail, siblings) {
+export function toPageGroupbuyGroup(view, detail, siblings) {
   if (!view) return {};
   const members = list(view.members);
   const leader = members.find((m) => m.role === 'leader') || members[0] || null;
   const me = view.me || null;
   const isLeader = !!me && me.role === 'leader';
-  const product = detail ? toLegacyGroupbuyDetail(detail) : null;
+  const product = detail ? toPageGroupbuyDetail(detail) : null;
   return {
     store_combination: Object.assign(
       product ? product.storeInfo : {},
@@ -240,7 +239,7 @@ export function toLegacyGroupbuyGroup(view, detail, siblings) {
         ? { productAttr: product.productAttr, productValue: product.productValue }
         : { productAttr: [], productValue: {} },
     ),
-    store_combination_host: mapList(siblings && siblings.items, toLegacyGroupbuyCard).filter(
+    store_combination_host: mapList(siblings && siblings.items, toPageGroupbuyCard).filter(
       (row) => String(row.id) !== String(toId(view.activityId)),
     ),
     pinkT: {
@@ -263,7 +262,7 @@ export function toLegacyGroupbuyGroup(view, detail, siblings) {
     count: toInt(view.seatsLeft, 0),
     userBool: me ? 1 : 0,
     pinkBool: pinkBoolOf(view.status),
-    // Legacy `is_ok` gated the 「你不是该团的成员」 warning; "cannot join" is the
+    // `is_ok` gates the 「你不是该团的成员」 warning; "cannot join" is the
     // same question asked the other way round.
     is_ok: view.canJoin ? 0 : 1,
     current_pink_order: me ? text(me.orderId) : '',
@@ -279,13 +278,11 @@ export function toLegacyGroupbuyGroup(view, detail, siblings) {
 /**
  * `groupbuyPoster` → what `pages/activity/poster-poster` draws.
  *
- * The page's `url` was the **rendered** QR image the legacy poster route returned;
- * the new contract hands over `qrPayload` (what the code encodes) and leaves the
+ * The page's `url` is a **rendered** QR image; the contract hands over `qrPayload` (what the code encodes) and leaves the
  * drawing to the client, so `url` is empty and the page falls back to the
- * mini-program code it fetched separately. `label` and `msg` were server-composed
- * strings; they are composed here from the seat counter instead.
+ * mini-program code it fetched separately. `label` and `msg` are composed here from the seat counter instead.
  */
-export function toLegacyGroupbuyPoster(dto) {
+export function toPageGroupbuyPoster(dto) {
   if (!dto) return {};
   const left = toInt(dto.seatsLeft, 0);
   return {
@@ -313,9 +310,8 @@ export function toLegacyGroupbuyPoster(dto) {
 
 /**
  * The 预售 pages' `pay_status`: 1 未开始 · 2 进行中 · 3 已结束 — the three buttons
- * `presell_details` switches between. It was pinned to 1 (read as "定金 not
- * supported"), so 立即购买 never rendered and every activity said 未开始 (H4,
- * journey 7). The clock is injectable so the mapper stays deterministic.
+ * `presell_details` switches between. Pinning it to 1 would hide 立即购买 and label
+ * every activity 未开始, so it follows the activity window. The clock is injectable so the mapper stays deterministic.
  */
 export function presaleWindowStatus(dto, now = Date.now()) {
   const start = Date.parse(text(dto && dto.startAt));
@@ -326,7 +322,7 @@ export function presaleWindowStatus(dto, now = Date.now()) {
 }
 
 /** `presaleCard` → one row of 预售列表. */
-export function toLegacyPresaleCard(dto, now = Date.now()) {
+export function toPagePresaleCard(dto, now = Date.now()) {
   if (!dto) return {};
   return {
     id: toId(dto.activityId),
@@ -342,14 +338,14 @@ export function toLegacyPresaleCard(dto, now = Date.now()) {
     quota: toInt(dto.stock, 0),
     sales: toInt(dto.sales, 0),
     unit_name: '件',
-    // 全款预售 only: D refuses a 定金 activity with `PRESALE_DEPOSIT_NOT_SUPPORTED`.
+    // 全款预售 only: the server refuses a 定金 activity with `PRESALE_DEPOSIT_NOT_SUPPORTED`.
     presell_type: 1,
     pay_status: presaleWindowStatus(dto, now),
     deliver_time: toInt(dto.shipAfterDays, 0),
     presale_start_time: unixSeconds(dto.startAt),
     presale_end_time: unixSeconds(dto.endAt),
-    start_time: legacyDate(dto.startAt),
-    stop_time: legacyDate(dto.endAt),
+    start_time: pageDate(dto.startAt),
+    stop_time: pageDate(dto.endAt),
     coupon: null,
     can_buy: dto.canBuy !== false,
     ...RETIRED,
@@ -357,16 +353,16 @@ export function toLegacyPresaleCard(dto, now = Date.now()) {
 }
 
 /** `pagedPresaleCards` → `{list, count, page, limit}`; the 预售 page reads `data.list`. */
-export function toLegacyPresaleList(dto) {
-  return pagedList(dto, toLegacyPresaleCard);
+export function toPagePresaleList(dto) {
+  return pagedList(dto, toPagePresaleCard);
 }
 
 /** `presaleDetail` → the 预售详情 payload, shaped like a product detail. */
-export function toLegacyPresaleDetail(dto, now = Date.now()) {
+export function toPagePresaleDetail(dto, now = Date.now()) {
   if (!dto) return {};
   const skus = list(dto.skus);
   const first = skus[0];
-  const card = toLegacyPresaleCard(dto, now);
+  const card = toPagePresaleCard(dto, now);
   return {
     storeInfo: {
       ...card,
@@ -384,9 +380,9 @@ export function toLegacyPresaleDetail(dto, now = Date.now()) {
       wechat_code: '',
       code_base: '',
     },
-    productAttr: toLegacyProductAttr(specsOf(dto)),
-    productValue: toLegacyProductValue(skusAsCatalog(dto), dto.title),
-    // 1 未开始 · 2 进行中 · 3 已结束 (not 定金/尾款 — 定金预售 is refused by D).
+    productAttr: toPageProductAttr(specsOf(dto)),
+    productValue: toPageProductValue(skusAsCatalog(dto), dto.title),
+    // 1 未开始 · 2 进行中 · 3 已结束 (not 定金/尾款 — 定金预售 is refused by the server).
     pay_status: card.pay_status,
     reply: null,
     replyCount: 0,

@@ -23,7 +23,7 @@ export function toInt(value, fallback) {
 
 /**
  * Money stays a **string** all the way to the template: pages concatenate it with `￥`
- * and splitting it into a float would reintroduce the rounding the rewrite removed.
+ * and splitting it into a float would introduce float rounding.
  */
 export function money(value, fallback) {
   if (typeof value === 'string' && value !== '') return value;
@@ -42,7 +42,7 @@ const INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/;
 /**
  * Split an ISO-8601 instant into its wall-clock parts **in the offset it carries**.
  * The server sends `+08:00`; formatting through `Date` would re-render it in whatever
- * timezone the phone happens to be in, which is not what the old payload did.
+ * timezone the phone happens to be in, which is not what the pages expect.
  */
 function parts(instant) {
   if (typeof instant !== 'string') return null;
@@ -52,28 +52,28 @@ function parts(instant) {
 }
 
 /** `'2026-02-01T10:00:00+08:00'` → `'2026-02-01 10:00:00'`. */
-export function legacyDateTime(instant, fallback) {
+export function pageDateTime(instant, fallback) {
   const p = parts(instant);
   if (!p) return fallback === undefined ? '' : fallback;
   return `${p.y}-${p.mo}-${p.d} ${p.h}:${p.mi}:${p.s}`;
 }
 
 /** `'2026-02-01T10:00:00+08:00'` → `'2026-02-01 10:00'` (the 订单列表 format). */
-export function legacyMinute(instant, fallback) {
+export function pageMinute(instant, fallback) {
   const p = parts(instant);
   if (!p) return fallback === undefined ? '' : fallback;
   return `${p.y}-${p.mo}-${p.d} ${p.h}:${p.mi}`;
 }
 
 /** `'2026-02-01T10:00:00+08:00'` → `'2026-02-01'`. */
-export function legacyDate(instant, fallback) {
+export function pageDate(instant, fallback) {
   const p = parts(instant);
   if (!p) return fallback === undefined ? '' : fallback;
   return `${p.y}-${p.mo}-${p.d}`;
 }
 
 /** `'2026-02-01T10:00:00+08:00'` → `'10:00:00'`. */
-export function legacyTime(instant, fallback) {
+export function pageTime(instant, fallback) {
   const p = parts(instant);
   if (!p) return fallback === undefined ? '' : fallback;
   return `${p.h}:${p.mi}:${p.s}`;
@@ -105,13 +105,13 @@ export function text(value, fallback) {
   return String(value);
 }
 
-/** Legacy booleans are `0`/`1` ints, not `true`/`false`. */
+/** Page booleans are `0`/`1` ints, not `true`/`false`. */
 export function flag(value) {
   return value ? 1 : 0;
 }
 
 /**
- * The legacy paginated envelope. Most list pages read `res.data` as a bare array and
+ * The page's paginated envelope. Most list pages read `res.data` as a bare array and
  * stop paging when `data.length < limit`, so the array *is* the payload; the few that
  * want a count read `res.data.list` / `res.data.count` and get `pagedList` instead.
  */
@@ -124,8 +124,8 @@ export function pagedList(dto, mapItem) {
   };
 }
 
-/** Page params: legacy sends `{page, limit}`, the API wants `{page, pageSize}`. */
-export function fromLegacyPage(data) {
+/** Page params: the page sends `{page, limit}`, the API wants `{page, pageSize}`. */
+export function fromPagePaging(data) {
   const src = data || {};
   const out = {};
   if (src.page !== undefined && src.page !== null && src.page !== '') out.page = toInt(src.page, 1);

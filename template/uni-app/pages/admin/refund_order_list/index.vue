@@ -95,7 +95,7 @@
 					<view v-else></view>
 					<view class="acea-row row-middle">
 						<view class="btn" @click="modify(item, 1)">订单备注</view>
-						<!-- 审核与确认收货只在店铺开启「店员审核售后」时出现（R6 §4） -->
+						<!-- 审核与确认收货只在店铺开启「店员审核售后」时出现 -->
 						<view class="btn on" @click="modify(item,'2',1)" v-if="canReview && item.refund_type == 1">
 							退款审核
 						</view>
@@ -184,7 +184,7 @@ import home from '@/components/home';
 				status: "",
 				state: 1,
 				isRefund: 0, //1是仅退款;0是退货退款
-				// order-staff.allowStaffRefundReview，默认关闭（R6 §4）
+				// order-staff.allowStaffRefundReview，默认关闭
 				canReview: false,
 				imgHost: HTTP_REQUEST_URL,
 				dateSelected: '',
@@ -378,7 +378,7 @@ import home from '@/components/home';
 						}
 					);
 				} else if (that.status == 2) {
-					// 退款金额由买家的申请决定，审核只有同意和拒绝（CR-4-h §3）。
+					// 退款金额由买家的申请决定，审核只有同意和拒绝。
 					if (this.isRefund) {
 						data.type = opt.type;
 						this.objOrderRefund(data);

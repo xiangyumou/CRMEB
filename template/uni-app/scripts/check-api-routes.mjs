@@ -8,8 +8,8 @@
 //   1. normalises the template literal — `${id}` becomes `:param`;
 //   2. looks the method+path up in `next/packages/contracts/openapi.json`;
 //   3. reports it as LIVE when it resolves, PENDING when the line above it carries a
-//      `// CONTRACT-PENDING(<stream>)` marker, and FAILS otherwise;
-//   4. fails on any URL that still looks like a retired feature or a legacy endpoint.
+//      `// CONTRACT-PENDING(<owner>)` marker, and FAILS otherwise;
+//   4. fails on any URL that still looks like a retired feature or a pre-`/api/v1` endpoint.
 //
 // Usage:
 //   node scripts/check-api-routes.mjs            # human-readable report, exit 1 on failure
@@ -101,7 +101,7 @@ const DIVIDER = /^\s*\/\/\s*-{10,}\s*$/;
 const COMMENT = /^\s*\/\//;
 
 /**
- * A `// CONTRACT-PENDING(<stream>)` marker covers every call below it until a `// -----`
+ * A `// CONTRACT-PENDING(<owner>)` marker covers every call below it until a `// -----`
  * section divider that does not belong to a marker's own header, or until the next
  * marker. That is exactly how the api modules are laid out.
  *

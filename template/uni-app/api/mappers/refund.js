@@ -1,14 +1,14 @@
-// refund DTOs → the legacy 退款 / 售后 view models.
+// refund DTOs → the 退款 / 售后 view models.
 //
 // Contract: next/packages/contracts/src/refund/refund.storefront.contract.ts
 //
-// Legacy `refund_type`, as every page stamps it (user_return_list, order_details,
+// The page's `refund_type`, as every page stamps it (user_return_list, order_details,
 // the staff refund pages): 1 仅退款申请中 · 2 退货退款申请中 · 3 已拒绝 · 4 待退货 ·
 // 5 退货待收货 / 退款中 · 6 已退款 · 0 no live application (撤销 / 关闭).
 // The first version numbered 0–5 from 待审核, so a succeeded refund stamped
-// 待退货 and a pending one stamped nothing (CR-4-i §13).
+// 待退货 and a pending one stamped nothing.
 
-import { toId, toInt, money, text, list, mapList, pagedList, unixSeconds, legacyDateTime } from './_shared.js';
+import { toId, toInt, money, text, list, mapList, pagedList, unixSeconds, pageDateTime } from './_shared.js';
 
 const REFUND_TYPE = {
   applied: 1,
@@ -32,7 +32,7 @@ const REFUND_MSG = {
   closed: '售后已关闭',
 };
 
-export function legacyRefundType(status, returnStage, kind) {
+export function pageRefundType(status, returnStage, kind) {
   // A pending 退货退款 is 2, a pending 仅退款 1 — the staff page audits them differently.
   if (status === 'applied') return kind === 'return_and_refund' ? 2 : 1;
   if (status === 'approved' && returnStage === 'shipped_back') return 5;
@@ -41,7 +41,7 @@ export function legacyRefundType(status, returnStage, kind) {
 }
 
 /** `refundItem` → one `cart_info` row. */
-export function toLegacyRefundLine(dto) {
+export function toPageRefundLine(dto) {
   if (!dto) return {};
   const hasSpec = !!text(dto.specText);
   return {
@@ -69,9 +69,9 @@ export function toLegacyRefundLine(dto) {
 }
 
 /** `refundSummary` / `refundDetail` → one 退款单. */
-export function toLegacyRefund(dto) {
+export function toPageRefund(dto) {
   if (!dto) return {};
-  const type = legacyRefundType(dto.status, dto.returnStage, dto.kind);
+  const type = pageRefundType(dto.status, dto.returnStage, dto.kind);
   return {
     id: toId(dto.id),
     order_id: text(dto.id),
@@ -91,11 +91,11 @@ export function toLegacyRefund(dto) {
     refund_img: mapList(dto.images, (u) => text(u)),
     refuse_reason: text(dto.rejectReason),
     is_refund_freight: dto.includesFreight ? 1 : 0,
-    // 0 仅退款 / 1 退货退款 — the old flag the list filters on
+    // 0 仅退款 / 1 退货退款 — the flag the list filters on
     refund_kind: dto.kind === 'return_and_refund' ? 1 : 0,
-    cart_info: mapList(dto.items, toLegacyRefundLine),
+    cart_info: mapList(dto.items, toPageRefundLine),
     add_time: unixSeconds(dto.createdAt, 0),
-    _add_time: legacyDateTime(dto.createdAt),
+    _add_time: pageDateTime(dto.createdAt),
     success_time: unixSeconds(dto.succeededAt, 0),
     delivery_id: text(dto.returnTrackingNo),
     delivery_name: text(dto.returnExpressCompanyName),
@@ -121,18 +121,18 @@ export function toLegacyRefund(dto) {
       status: text(l.toStatus),
       msg: text(l.message),
       add_time: unixSeconds(l.createdAt, 0),
-      _add_time: legacyDateTime(l.createdAt),
+      _add_time: pageDateTime(l.createdAt),
     })),
     express_list: [],
   };
 }
 
-export function toLegacyRefundList(dto) {
-  return pagedList(dto, toLegacyRefund);
+export function toPageRefundList(dto) {
+  return pagedList(dto, toPageRefund);
 }
 
 /** `GET /api/v1/refund-reasons` → the picker's bare string array. */
-export function toLegacyRefundReasons(dto) {
+export function toPageRefundReasons(dto) {
   return mapList(dto && dto.items, (r) => text(r));
 }
 
@@ -140,7 +140,7 @@ export function toLegacyRefundReasons(dto) {
  * `GET /api/v1/refunds/applicable-items/:orderId` → the 申请退款 商品列表.
  * `surplus_num` is the quantity still refundable; the page clamps its stepper to it.
  */
-export function toLegacyApplicableItems(dto) {
+export function toPageApplicableItems(dto) {
   if (!dto) return { cartInfo: [], order_id: '', pay_price: '0.00' };
   return {
     order_id: text(dto.orderId),
@@ -183,8 +183,8 @@ export function toLegacyApplicableItems(dto) {
   };
 }
 
-/** Legacy 申请退款 body → `POST /api/v1/refunds`. */
-export function fromLegacyRefundApplyInput(orderId, data) {
+/** The page's 申请退款 body → `POST /api/v1/refunds`. */
+export function fromPageRefundApplyInput(orderId, data) {
   const src = data || {};
   const lines = list(src.cart_ids !== undefined ? src.cart_ids : src.lines).map((line) => {
     if (line && typeof line === 'object') {
@@ -206,8 +206,8 @@ export function fromLegacyRefundApplyInput(orderId, data) {
   };
 }
 
-/** Legacy 退货物流 body → `POST /api/v1/refunds/:id/return-shipment`. */
-export function fromLegacyReturnShipmentInput(data) {
+/** The page's 退货物流 body → `POST /api/v1/refunds/:id/return-shipment`. */
+export function fromPageReturnShipmentInput(data) {
   const src = data || {};
   return {
     expressCompanyId: String(src.delivery_code || src.expressCompanyId || ''),
@@ -216,12 +216,11 @@ export function fromLegacyReturnShipmentInput(data) {
   };
 }
 
-/** Legacy 我的售后 tab → `state`. */
 /**
  * The 售后 list tab → the refunds `state` filter. `user_return_list` sends the
- * tab index as `refund_status`: 0 全部 · 1 申请中 · 2 已退款 (CR-4-i §12).
+ * tab index as `refund_status`: 0 全部 · 1 申请中 · 2 已退款.
  */
-export function fromLegacyRefundState(tab) {
+export function fromPageRefundState(tab) {
   const n = toInt(tab, -1);
   if (n === 1) return 'open';
   if (n === 2) return 'succeeded';

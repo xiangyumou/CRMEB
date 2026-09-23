@@ -3,8 +3,7 @@
 // Contracts: next/packages/contracts/src/groupbuy/groupbuy.storefront.contract.ts
 //            next/packages/contracts/src/presale/presale.storefront.contract.ts
 //
-// 砍价、秒杀、积分商城 are retired features (see the rewrite scope guard); their exports
-// and pages are gone. What is left is stream D's, and the shape changed enough that two
+// 砍价、秒杀、积分商城 are not part of the shop; they have no exports and no pages. Two
 // of these functions compose more than one read — see `api/mappers/activity.js`.
 //
 // There is **no join endpoint**: joining a team is placing an order, so it goes through
@@ -14,26 +13,26 @@
 
 import request from '../utils/request.js';
 import {
-  toLegacyGroupbuyList,
-  toLegacyGroupbuyDetail,
-  toLegacyGroupbuyGroup,
-  toLegacyGroupbuyBanners,
-  toLegacyGroupbuyPoster,
-  toLegacyPresaleList,
-  toLegacyGroupbuySummary,
+  toPageGroupbuyList,
+  toPageGroupbuyDetail,
+  toPageGroupbuyGroup,
+  toPageGroupbuyBanners,
+  toPageGroupbuyPoster,
+  toPagePresaleList,
+  toPageGroupbuySummary,
 } from './mappers/activity.js';
-import { fromLegacyMiniCodeQuery, toLegacyMiniCode } from './mappers/wechat.js';
+import { fromPageMiniCodeQuery, toPageMiniCode } from './mappers/wechat.js';
 import store from '../store';
-import { fromLegacyPage } from './mappers/_shared.js';
+import { fromPagePaging } from './mappers/_shared.js';
 
 /**
  * 拼团产品列表
  * @param object data {page, limit}
  */
 export function getCombinationList(data) {
-  return request.get('/api/v1/groupbuy/activities', fromLegacyPage(data), {
+  return request.get('/api/v1/groupbuy/activities', fromPagePaging(data), {
     noAuth: true,
-    map: toLegacyGroupbuyList,
+    map: toPageGroupbuyList,
   });
 }
 
@@ -53,7 +52,7 @@ export function getCombinationDetail(id) {
       .get(`/api/v1/groupbuy/activities/${id}/groups`, { page: 1, pageSize: 20 }, { noAuth: true })
       .catch(() => ({ data: { items: [] } })),
   ]).then(([detail, groups]) => ({
-    data: toLegacyGroupbuyDetail(detail.data, groups.data),
+    data: toPageGroupbuyDetail(detail.data, groups.data),
     msg: '',
     status: 200,
   }));
@@ -81,7 +80,7 @@ export function getCombinationPink(id) {
         .get('/api/v1/groupbuy/activities', { page: 1, pageSize: 6 }, { noAuth: true })
         .catch(() => ({ data: { items: [] } })),
     ]).then(([detail, siblings]) => ({
-      data: toLegacyGroupbuyGroup(view, detail.data, siblings.data),
+      data: toPageGroupbuyGroup(view, detail.data, siblings.data),
       msg: '',
       status: 200,
     }));
@@ -94,7 +93,7 @@ export function getCombinationPink(id) {
  */
 export function postCombinationRemove(data) {
   return request.post(`/api/v1/groupbuy/groups/${(data || {}).id}/withdrawal`, {}, {
-    map: toLegacyGroupbuyGroup,
+    map: toPageGroupbuyGroup,
     msg: '取消成功',
   });
 }
@@ -105,7 +104,7 @@ export function postCombinationRemove(data) {
 export function getCombinationBannerList() {
   return request.get('/api/v1/groupbuy/banners', {}, {
     noAuth: true,
-    map: toLegacyGroupbuyBanners,
+    map: toPageGroupbuyBanners,
   });
 }
 
@@ -120,7 +119,7 @@ function idOf(value) {
  */
 export function getCombinationPosterData(data) {
   return request.get(`/api/v1/groupbuy/groups/${idOf(data)}/poster`, {}, {
-    map: toLegacyGroupbuyPoster,
+    map: toPageGroupbuyPoster,
   });
 }
 
@@ -129,33 +128,33 @@ export function getCombinationPosterData(data) {
  * @param object data {page, limit}
  */
 export function getPresellList(data) {
-  return request.get('/api/v1/presale/activities', fromLegacyPage(data), {
+  return request.get('/api/v1/presale/activities', fromPagePaging(data), {
     noAuth: true,
-    map: toLegacyPresaleList,
+    map: toPagePresaleList,
   });
 }
 
 // ---------------------------------------------------------------------------
-// 拼团人气条和拼团小程序码（B3 / E4，第三轮绑定）
+// 拼团人气条和拼团小程序码
 // ---------------------------------------------------------------------------
 
 /**
  * 正在进行的拼团（首屏人气条）。`api/api.js` 的 `pink` 就是这一个。
- * B3 的 `GET /api/v1/groupbuy/summary`，`auth: 'public'`（CR-1-h2）。
+ * `GET /api/v1/groupbuy/summary`，`auth: 'public'`。
  */
 export function getPink() {
-  return request.get('/api/v1/groupbuy/summary', {}, { noAuth: true, map: toLegacyGroupbuySummary });
+  return request.get('/api/v1/groupbuy/summary', {}, { noAuth: true, map: toPageGroupbuySummary });
 }
 
 /**
- * 拼团小程序码 — E4 的 `GET /api/v1/wechat/mini-qrcodes`（CR-6-h2），`auth: 'user'`。
+ * 拼团小程序码 — `GET /api/v1/wechat/mini-qrcodes`，`auth: 'user'`。
  * 扫码落到拼团详情，scene 带推广人（当前用户）。
  * @param object|int data 拼团活动 id
  */
 export function scombinationCode(data) {
   return request.get(
     '/api/v1/wechat/mini-qrcodes',
-    fromLegacyMiniCodeQuery('groupbuy', idOf(data), store.state.app.uid),
-    { map: toLegacyMiniCode },
+    fromPageMiniCodeQuery('groupbuy', idOf(data), store.state.app.uid),
+    { map: toPageMiniCode },
   );
 }

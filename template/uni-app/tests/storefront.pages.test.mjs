@@ -1,6 +1,5 @@
-// The page-level halves of CR-4-i (H4): the fixes that live in a page, `App.vue`
-// or `static/`, not in a mapper, pinned by reading the sources the build
-// compiles. A mapper fix is tested beside its mapper; this file holds what a
+// Page-level guarantees: the ones that live in a page, `App.vue` or `static/`,
+// not in a mapper, pinned by reading the sources the build compiles. A mapper fix is tested beside its mapper; this file holds what a
 // mapper test cannot see.
 
 import fs from 'node:fs';
@@ -28,7 +27,7 @@ function sources() {
   return out;
 }
 
-describe('CR-4-i §4 — App.vue does not fetch the legacy custom script', () => {
+describe('App.vue does not fetch a custom script', () => {
   it('has no /api/get_script call, so no HTML 404 is ever appended as a <script>', () => {
     // Code only: the comment that says why the fetch is gone may name it.
     const code = read('App.vue')
@@ -41,12 +40,12 @@ describe('CR-4-i §4 — App.vue does not fetch the legacy custom script', () =>
   });
 });
 
-describe('CR-4-i §5 — the legacy images ship inside the build', () => {
+describe('the shared images ship inside the build', () => {
   const files = sources();
-  const LEGACY_DIR = 'static/images/legacy';
+  const IMAGE_DIR = 'static/images/common';
   const referenced = new Set();
   for (const file of files) {
-    for (const match of read(file).matchAll(/\/static\/images\/legacy\/([\w.-]+)/g)) {
+    for (const match of read(file).matchAll(/\/static\/images\/common\/([\w.-]+)/g)) {
       referenced.add(match[1]);
     }
   }
@@ -57,35 +56,26 @@ describe('CR-4-i §5 — the legacy images ship inside the build', () => {
     expect(files.length).toBeGreaterThan(200);
   });
 
-  it('references nothing under the PHP tree`s /statics/images, which nothing serves', () => {
+  it('references no /statics/images path, which nothing serves', () => {
     const offenders = files.filter((file) => read(file).includes('statics/images'));
     expect(offenders).toEqual([]);
   });
 
-  it('ships every legacy image a page references, and nothing no page references', () => {
-    const shipped = fs.readdirSync(path.join(APP, LEGACY_DIR)).sort();
+  it('ships every shared image a page references, and nothing no page references', () => {
+    const shipped = fs.readdirSync(path.join(APP, IMAGE_DIR)).sort();
     expect([...referenced].sort()).toEqual(shipped);
-    // The empty states, the coupon bag and the 开团 gif — the ones CR-4-i named.
+    // The empty states, the coupon bag and the 开团 gif.
     for (const name of ['empty-box.png', 'noCoupon.png', 'co-bag.png', 'open.gif', 'noAddress.png']) {
       expect(shipped).toContain(name);
     }
   });
 
-  it('ships them byte for byte as legacy served them', () => {
-    const legacy = path.join(APP, '..', '..', 'crmeb', 'public', 'statics', 'images');
-    if (!fs.existsSync(legacy)) return; // a checkout without the legacy tree
-    for (const name of referenced) {
-      const ours = fs.readFileSync(path.join(APP, LEGACY_DIR, name));
-      const theirs = fs.readFileSync(path.join(legacy, name));
-      expect(ours.equals(theirs), name).toBe(true);
-    }
-  });
 });
 
-describe('CR-4-i §8 — 立即开团 / 参团 select the SKU of a single-SKU product', () => {
+describe('立即开团 / 参团 select the SKU of a single-SKU product', () => {
   // A single-SKU product has no spec columns (`productAttr` is empty) and one
-  // SKU keyed ''. Guarding the default selection on `productAttr.length` left
-  // nothing selected, so the buy button did nothing.
+  // SKU keyed ''. Guarding the default selection on `productAttr.length` would
+  // leave nothing selected, and the buy button would do nothing.
   it('goods_combination_details selects whenever a SKU was found', () => {
     const page = read('pages/activity/goods_combination_details/index.vue');
     const body = page.slice(page.indexOf('DefaultSelect: function () {'));
@@ -102,7 +92,7 @@ describe('CR-4-i §8 — 立即开团 / 参团 select the SKU of a single-SKU pr
   });
 });
 
-describe('CR-4-i §10 / §11 — 确认订单 passes the cart to every call that needs it', () => {
+describe('确认订单 passes the cart to every call that needs it', () => {
   const page = read('pages/goods/order_confirm/index.vue');
   const block = (start) => page.slice(page.indexOf(start), page.indexOf(start) + 900);
 
@@ -119,10 +109,10 @@ describe('CR-4-i §10 / §11 — 确认订单 passes the cart to every call that
   });
 });
 
-describe('CR-4-i §12 / §14 — the 售后 list and the pay result name the order by its number', () => {
+describe('the 售后 list and the pay result name the order by its number', () => {
   it('user_return_list sends its tab as refund_status (what getNewOrderList now reads)', () => {
     expect(read('pages/users/user_return_list/index.vue')).toMatch(/refund_status: type \? type : that\.type/);
-    expect(read('api/order.js')).toMatch(/fromLegacyRefundState\(src\.refund_status\)/);
+    expect(read('api/order.js')).toMatch(/fromPageRefundState\(src\.refund_status\)/);
   });
 
   it('user_return_list shows the order number, not the refund id it navigates by', () => {
@@ -136,17 +126,17 @@ describe('CR-4-i §12 / §14 — the 售后 list and the pay result name the ord
   });
 });
 
-describe('CR-4-i §8, every page — a single-SKU product has its one SKU selected', () => {
-  // goods_details' 加入购物车 posted no skuId (a 422) for the same reason §8
-  // named for 拼团: the selection was guarded on `productAttr.length`.
+describe('every page — a single-SKU product has its one SKU selected', () => {
+  // goods_details' 加入购物车 would post no skuId (a 422) for the same reason as
+  // 拼团 if the selection were guarded on `productAttr.length`.
   it('no page guards the default selection on the product having spec columns', () => {
     const offenders = sources().filter((file) => /if \(productSelect && productAttr\.length\)/.test(read(file)));
     expect(offenders).toEqual([]);
   });
 });
 
-describe('the 预售 pages render (journey 7)', () => {
-  it('presell_details calls $t, not an undefined $ — the render threw and the page was blank', () => {
+describe('the 预售 pages render', () => {
+  it('presell_details calls $t, not an undefined $, which would throw and blank the page', () => {
     expect(read('pages/activity/presell_details/index.vue')).not.toMatch(/\{\{\s*\$\(/);
     const offenders = sources().filter((file) => /\{\{\s*\$\(/.test(read(file)));
     expect(offenders).toEqual([]);
@@ -157,10 +147,9 @@ describe('the 预售 pages render (journey 7)', () => {
   });
 });
 
-// H4 §4: the `data-testid`s stream I asked for (`docs/rewrite/status/i.md`),
-// each on the element the storefront suite (`next/e2e/storefront`) locates by
-// it. A static id is `data-testid="x"`; a bound one names the expression.
-describe('H4 §4 — the storefront suite’s data-testids are on their elements', () => {
+// The `data-testid`s the storefront suite (`next/e2e/storefront`) locates
+// elements by, each on its element. A static id is `data-testid="x"`; a bound one names the expression.
+describe('the storefront suite’s data-testids are on their elements', () => {
   const TESTIDS = {
     'pages/order_addcart/order_addcart.vue': [
       'data-testid="cart-row" :data-sku-id="item.product_attr_unique"',

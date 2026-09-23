@@ -1,47 +1,46 @@
 // 优惠券 / 装修 / 站点配置 / 文章 / 注册登录辅助
 //
-// Split by owning stream; every call below is live against a merged contract
-// (docs/rewrite/status/h.md, h3.md).
+// Every call below goes to a route in `packages/contracts/openapi.json`.
 
 import request from '../utils/request.js';
 import {
-  toLegacyCouponList,
-  toLegacyCouponArray,
-  toLegacyCouponPopup,
-  toLegacyNewUserCouponPopup,
-  toLegacyUserCouponList,
-  toLegacyClaimResult,
-  fromLegacyCouponState,
+  toPageCouponList,
+  toPageCouponArray,
+  toPageCouponPopup,
+  toPageNewUserCouponPopup,
+  toPageUserCouponList,
+  toPageClaimResult,
+  fromPageCouponState,
 } from './mappers/coupon.js';
 import {
-  toLegacyDiyPage,
-  toLegacyDiyVersion,
-  toLegacyTheme,
-  toLegacyLayout,
+  toPageDiyPage,
+  toPageDiyVersion,
+  toPageTheme,
+  toPageLayout,
 } from './mappers/diy.js';
 import {
-  toLegacyCopyright,
-  toLegacyCustomerService,
-  toLegacySplashAd,
-  fromLegacyBase64Input,
-  toLegacyBase64,
+  toPageCopyright,
+  toPageCustomerService,
+  toPageSplashAd,
+  fromPageBase64Input,
+  toPageBase64,
 } from './mappers/system.js';
-import { toLegacyProductList } from './mappers/catalog.js';
+import { toPageProductList } from './mappers/catalog.js';
 import {
-  toLegacyArticleList,
-  toLegacyArticleDetail,
-  toLegacyArticleCategories,
+  toPageArticleList,
+  toPageArticleDetail,
+  toPageArticleCategories,
 } from './mappers/cms.js';
-import { toLegacyCityTree } from './mappers/region.js';
+import { toPageCityTree } from './mappers/region.js';
 import {
-  toLegacyProfile,
-  toLegacyWechatLogin,
-  toLegacyOk,
-  fromLegacySmsCodeInput,
-  toLegacySmsCodeResult,
+  toPageProfile,
+  toPageWechatLogin,
+  toPageOk,
+  fromPageSmsCodeInput,
+  toPageSmsCodeResult,
 } from './mappers/user.js';
-import { toLegacySubscribeTemplates } from './mappers/wechat.js';
-import { fromLegacyPage, text } from './mappers/_shared.js';
+import { toPageSubscribeTemplates } from './mappers/wechat.js';
+import { fromPagePaging, text } from './mappers/_shared.js';
 
 // ---------------------------------------------------------------------------
 // 优惠券
@@ -52,9 +51,9 @@ import { fromLegacyPage, text } from './mappers/_shared.js';
  * @param object data {page, limit, type}
  */
 export function getCoupons(data) {
-  return request.get('/api/v1/coupons', fromLegacyPage(data), {
+  return request.get('/api/v1/coupons', fromPagePaging(data), {
     noAuth: true,
-    map: toLegacyCouponList,
+    map: toPageCouponList,
   });
 }
 
@@ -64,7 +63,7 @@ export function getCoupons(data) {
 export function getCouponV2() {
   return request.get('/api/v1/coupons', { page: 1, pageSize: 20 }, {
     noAuth: true,
-    map: toLegacyCouponPopup,
+    map: toPageCouponPopup,
   });
 }
 
@@ -72,7 +71,7 @@ export function getCouponV2() {
  * 新用户优惠券弹窗
  */
 export function getCouponNewUser() {
-  return request.get('/api/v1/coupons/new-user', {}, { noAuth: true, map: toLegacyNewUserCouponPopup });
+  return request.get('/api/v1/coupons/new-user', {}, { noAuth: true, map: toPageNewUserCouponPopup });
 }
 
 /**
@@ -81,7 +80,7 @@ export function getCouponNewUser() {
  */
 export function setCouponReceive(couponId) {
   return request.post(`/api/v1/coupons/${couponId}/claims`, {}, {
-    map: toLegacyClaimResult,
+    map: toPageClaimResult,
     msg: '领取成功',
   });
 }
@@ -92,9 +91,9 @@ export function setCouponReceive(couponId) {
  * @param object data {page, limit}
  */
 export function getUserCoupons(types, data) {
-  const query = fromLegacyPage(data);
-  query.state = fromLegacyCouponState(types);
-  return request.get('/api/v1/user-coupons', query, { map: toLegacyUserCouponList });
+  const query = fromPagePaging(data);
+  query.state = fromPageCouponState(types);
+  return request.get('/api/v1/user-coupons', query, { map: toPageUserCouponList });
 }
 
 // ---------------------------------------------------------------------------
@@ -102,7 +101,7 @@ export function getUserCoupons(types, data) {
 // ---------------------------------------------------------------------------
 
 /**
- * `GET /api/v1/diy/layouts/:type`（`category | user`）→ 版式数字 1 / 2 / 3（F4）。
+ * `GET /api/v1/diy/layouts/:type`（`category | user`）→ 版式数字 1 / 2 / 3。
  * 分类页的版式由 `getThemeInfo('category')` 读，个人中心的由 `api/user.js` 的
  * `getMenuList()` 读。
  */
@@ -119,33 +118,33 @@ export function getThemeInfo(type, data) {
   const src = data || {};
   // A `theme_id` names one page and wins over the type: 微页面
   // (`pages/annex/special?theme_id=`) asks for it as `getThemeInfo('home', {theme_id})`,
-  // and an admin preview of the home page does the same (CR-4-i §6).
+  // and an admin preview of the home page does the same.
   if (src.theme_id) {
     return request.get(`/api/v1/diy/pages/${src.theme_id}`, {}, {
       noAuth: true,
-      map: toLegacyDiyPage,
+      map: toPageDiyPage,
     });
   }
   if (type === 'home' || type === undefined) {
-    return request.get('/api/v1/diy/pages/home', {}, { noAuth: true, map: toLegacyDiyPage });
+    return request.get('/api/v1/diy/pages/home', {}, { noAuth: true, map: toPageDiyPage });
   }
-  // 个人中心是一整页装修（`pages/user` 把它交给 PageDesign，读 `.value`），F4 的
-  // `GET /api/v1/diy/pages/user-center`（CR-3-h2 §1）。它的「版式」数字在
+  // 个人中心是一整页装修（`pages/user` 把它交给 PageDesign，读 `.value`），
+  // `GET /api/v1/diy/pages/user-center`。它的「版式」数字在
   // `getMenuList()` 里（`api/user.js`）。
   if (type === 'user') {
-    return request.get('/api/v1/diy/pages/user-center', {}, { noAuth: true, map: toLegacyDiyPage });
+    return request.get('/api/v1/diy/pages/user-center', {}, { noAuth: true, map: toPageDiyPage });
   }
-  // 分类页的版式开关：`goods_cate` 读 `res.data.status`，1 / 2 / 3（CR-3-h2 §3）。
+  // 分类页的版式开关：`goods_cate` 读 `res.data.status`，1 / 2 / 3。
   if (type === 'category') {
-    return diyLayout('category', toLegacyLayout);
+    return diyLayout('category', toPageLayout);
   }
   // 商品详情整页都是装修（`pages/goods_details` 把它交给 PageDesign，底部栏读其中的
-  // `bottomMenu`）：`GET /api/v1/diy/pages/product-detail`（CR-2-h3）。没发布过
+  // `bottomMenu`）：`GET /api/v1/diy/pages/product-detail`。没发布过
   // 商品详情页的店铺拿到内置默认页（`id` 为 null），所以这条读永远有内容。
   if (type === 'detail') {
     return request.get('/api/v1/diy/pages/product-detail', {}, {
       noAuth: true,
-      map: toLegacyDiyPage,
+      map: toPageDiyPage,
     });
   }
   // 其余类型没有按类型读装修页的路由。不上网，给一页空装修。
@@ -163,7 +162,7 @@ export function getThemeInfo(type, data) {
 export function getDiyVersion(name) {
   return request.get('/api/v1/diy/version', name ? { id: String(name) } : {}, {
     noAuth: true,
-    map: toLegacyDiyVersion,
+    map: toPageDiyVersion,
   });
 }
 
@@ -173,11 +172,11 @@ export function getDiyVersion(name) {
  */
 export function colorChange(name) {
   // No theme published is a 404 (`DIY_THEME_NOT_FOUND`), not an error to the
-  // shopper: legacy's default palette, as before any theme existed.
+  // shopper: the built-in default palette.
   return request
-    .get('/api/v1/diy/theme', {}, { noAuth: true, map: toLegacyTheme })
+    .get('/api/v1/diy/theme', {}, { noAuth: true, map: toPageTheme })
     .catch((err) => {
-      if (err && err.status === 404) return { data: toLegacyTheme(null), msg: '', status: 200 };
+      if (err && err.status === 404) return { data: toPageTheme(null), msg: '', status: 200 };
       throw err;
     });
 }
@@ -186,19 +185,19 @@ export function colorChange(name) {
  * DIY 组件：商品列表
  */
 export function getThemeProduct(data) {
-  const query = fromLegacyPage(data);
+  const query = fromPagePaging(data);
   const src = data || {};
   if (src.cid) query.categoryId = String(src.cid);
-  return request.get('/api/v1/catalog/products', query, { noAuth: true, map: toLegacyProductList });
+  return request.get('/api/v1/catalog/products', query, { noAuth: true, map: toPageProductList });
 }
 
 /**
  * DIY 组件：优惠券列表
  */
 export function getThemeCoupon(data) {
-  return request.get('/api/v1/coupons', fromLegacyPage(data), {
+  return request.get('/api/v1/coupons', fromPagePaging(data), {
     noAuth: true,
-    map: toLegacyCouponArray,
+    map: toPageCouponArray,
   });
 }
 
@@ -223,11 +222,9 @@ export function clearSearch() {
 }
 
 // ---------------------------------------------------------------------------
-// 资讯（F2 / cms）
+// 资讯（cms）
 //
-// Five legacy routes collapsed into two: `article/hot/list` and
-// `article/banner/list` were the same query with one `where` swapped, so they are
-// now `feature=hot` / `feature=banner` on the list.
+// 热门和轮播是同一个列表查询换一个条件：`feature=hot` / `feature=banner`。
 // ---------------------------------------------------------------------------
 
 /**
@@ -236,7 +233,7 @@ export function clearSearch() {
 export function getArticleCategoryList() {
   return request.get('/api/v1/article-categories', {}, {
     noAuth: true,
-    map: toLegacyArticleCategories,
+    map: toPageArticleCategories,
   });
 }
 
@@ -246,9 +243,9 @@ export function getArticleCategoryList() {
  * @param object data {page, limit}
  */
 export function getArticleList(cid, data) {
-  const query = fromLegacyPage(data);
+  const query = fromPagePaging(data);
   if (cid) query.categoryId = String(cid);
-  return request.get('/api/v1/articles', query, { noAuth: true, map: toLegacyArticleList });
+  return request.get('/api/v1/articles', query, { noAuth: true, map: toPageArticleList });
 }
 
 /**
@@ -257,7 +254,7 @@ export function getArticleList(cid, data) {
 export function getArticleHotList() {
   return request.get('/api/v1/articles', { feature: 'hot' }, {
     noAuth: true,
-    map: toLegacyArticleList,
+    map: toPageArticleList,
   });
 }
 
@@ -267,7 +264,7 @@ export function getArticleHotList() {
 export function getArticleBannerList() {
   return request.get('/api/v1/articles', { feature: 'banner' }, {
     noAuth: true,
-    map: toLegacyArticleList,
+    map: toPageArticleList,
   });
 }
 
@@ -278,7 +275,7 @@ export function getArticleBannerList() {
 export function getArticleDetails(id) {
   return request.get(`/api/v1/articles/${id}`, {}, {
     noAuth: true,
-    map: toLegacyArticleDetail,
+    map: toPageArticleDetail,
   });
 }
 
@@ -286,16 +283,16 @@ export function getArticleDetails(id) {
  * 省市区三级地区树
  */
 export function getCity() {
-  return request.get('/api/v1/cities', {}, { noAuth: true, map: toLegacyCityTree });
+  return request.get('/api/v1/cities', {}, { noAuth: true, map: toPageCityTree });
 }
 
 /**
  * DIY 文章组件
  */
 export function getThemeArticle(data) {
-  return request.get('/api/v1/articles', fromLegacyPage(data), {
+  return request.get('/api/v1/articles', fromPagePaging(data), {
     noAuth: true,
-    map: toLegacyArticleList,
+    map: toPageArticleList,
   });
 }
 
@@ -304,15 +301,15 @@ export function getThemeArticle(data) {
  * 和 `getUserInfo` 不同的是它不需要订单角标，一次读取就够。
  */
 export function getThemeUser() {
-  return request.get('/api/v1/profile', {}, { map: (dto) => toLegacyProfile(dto) });
+  return request.get('/api/v1/profile', {}, { map: (dto) => toPageProfile(dto) });
 }
 
 // ---------------------------------------------------------------------------
-// 站点公开配置 — F4 的 `GET /api/v1/site/config`（CR-7-h2 §1）
+// 站点公开配置 — `GET /api/v1/site/config`
 //
-// 一个公开路由，六个旧读者（这里三个，`api/public.js` 三个）。整个会话只读一次：
-// `siteConfig()` 缓存那一次请求的 promise，每个旧函数用 `api/mappers/system.js` 里
-// 各自的 mapper 取自己那一片，页面拿到的还是原来的字段名。失败不缓存，下一次调用
+// 一个公开路由，六个读者（这里三个，`api/public.js` 三个）。整个会话只读一次：
+// `siteConfig()` 缓存那一次请求的 promise，每个函数用 `api/mappers/system.js` 里
+// 各自的 mapper 取自己那一片，页面读的字段名不变。失败不缓存，下一次调用
 // 重试。
 // ---------------------------------------------------------------------------
 
@@ -334,29 +331,29 @@ export function resetSiteConfig() {
   siteConfigRead = null;
 }
 
-/** A legacy reader of one slice of the site config, in the usual envelope. */
+/** A page's reader of one slice of the site config, in the usual envelope. */
 export function fromSiteConfig(select) {
   return siteConfig().then((res) => ({ data: select(res.data), msg: '', status: 200 }));
 }
 
 /** 版权文字 / 版权图片（首页、个人中心、登录页、隐私弹窗） */
 export function getCrmebCopyRight() {
-  return fromSiteConfig(toLegacyCopyright);
+  return fromSiteConfig(toPageCopyright);
 }
 
 /** 客服入口：每个读者只要 `customer_qrcode` */
 export function getCustomerType() {
-  return fromSiteConfig(toLegacyCustomerService);
+  return fromSiteConfig(toPageCustomerService);
 }
 
 /** 开屏广告（`pages/guide`） */
 export function getOpenAdv() {
-  return fromSiteConfig(toLegacySplashAd);
+  return fromSiteConfig(toPageSplashAd);
 }
 
 /**
  * 海报图片转 base64 的两次请求，`api/public.js` 的 `imageBase64` 和 `api/user.js` 的
- * `imgToBase` 共用（F4 的 `POST /api/v1/attachments/base64`，一次一张 `{url}`）。
+ * `imgToBase` 共用（`POST /api/v1/attachments/base64`，一次一张 `{url}`）。
  * 商品图失败就整体失败；二维码可选，转不了就原样交回。
  */
 export function toDataUrls(image, code) {
@@ -365,7 +362,7 @@ export function toDataUrls(image, code) {
   const one = (url) =>
     /^data:image\//i.test(text(url).trim()) || !text(url).trim()
       ? Promise.resolve({ data: text(url).trim(), msg: '', status: 200 })
-      : request.post('/api/v1/attachments/base64', fromLegacyBase64Input(url), { map: toLegacyBase64 });
+      : request.post('/api/v1/attachments/base64', fromPageBase64Input(url), { map: toPageBase64 });
   const codeUrl = text(code).trim();
   return Promise.all([
     one(image),
@@ -381,8 +378,8 @@ export function toDataUrls(image, code) {
  * 小程序订阅消息模板 id.
  *
  * The contract asks per moment in the journey — `order-create`, `order-pay`,
- * `order-ship`, `refund` — where legacy answered with one map of every template it had
- * configured, keyed by an internal name. The page caches the whole thing once and
+ * `order-ship`, `refund`, while the page wants one map of every configured template,
+ * keyed by an internal name. The page caches the whole thing once and
  * `utils/SubscribeMessage.js` keys into it, so the four reads are composed back into
  * one object here. An empty array is a normal answer: a shop with no templates
  * configured simply skips `wx.requestSubscribeMessage`, and a red toast about a
@@ -396,7 +393,7 @@ export function getTempIds() {
     SUBSCRIBE_SCENES.map((scene) =>
       request
         .get('/api/v1/wechat/subscribe-templates', { scene }, { noAuth: true })
-        .then((res) => toLegacySubscribeTemplates(res.data))
+        .then((res) => toPageSubscribeTemplates(res.data))
         .catch(() => []),
     ),
   ).then((lists) => {
@@ -410,15 +407,13 @@ export function getTempIds() {
 
 // 首页拼团人气条。`subpackage/diyComponents/combination.vue` 读的和
 // `pages/activity/goods_combination` 读的是同一份 `{avatars, pink_count}`，所以这里
-// 不再复制一遍实现，直接转出 `api/activity.js` 的那一个（它带着 CR-1-h2 的 marker）。
+// 不再复制一遍实现，直接转出 `api/activity.js` 的那一个（兜底逻辑在那边）。
 export { getPink as pink } from './activity.js';
 
-// 行为验证码（滑块 / 点选）没有继任者，`getAjcaptcha` / `ajcaptchaCheck` 和
-// `pages/users/components/verify/**` 一起删掉了。E4 的裁决（docs/rewrite/status/e4.md
-// §2）：旧滑块是客户端自己出题自己判卷，挡不住任何人，却给每个登录页加了一次往返；
-// 短信开销由「每手机号每小时 / 每天」「每来源地址每天」的预算和一个重发冷却兜住，解不
-// 解谜题都一样。服务端留了 `registerCaptchaVerifier` 这个缝，真要接第三方验证码时
-// 只改那一处。各页的「获取验证码」按钮现在直接发短信，验证码输入框不变。
+// 没有行为验证码（滑块 / 点选）：客户端自己出题自己判卷的滑块挡不住任何人，却给每个
+// 登录页加了一次往返。短信开销由「每手机号每小时 / 每天」「每来源地址每天」的预算和
+// 一个重发冷却兜住。服务端留了 `registerCaptchaVerifier` 这个缝，真要接第三方验证码
+// 时只改那一处。各页的「获取验证码」按钮直接发短信。
 
 // ---------------------------------------------------------------------------
 // 短信验证码 / 手机号
@@ -442,15 +437,15 @@ export function registerVerify(phone, reset) {
 }
 
 /**
- * 已登录用户改密码。旧接口走的是「手机号 + 验证码 + 新密码」的找回路径；新模型里
- * `PUT /api/v1/auth/password` 才是这一个 —— 它认当前登录态，改完把所有设备下线。
+ * 已登录用户改密码：`PUT /api/v1/auth/password` 认当前登录态（外加短信验证码），
+ * 改完把所有设备下线。
  */
 export function phoneRegisterReset(data) {
   const src = data || {};
   return request.put(
     '/api/v1/auth/password',
     { code: String(src.captcha || src.code || ''), password: String(src.password || '') },
-    { map: toLegacyOk, msg: '修改成功' },
+    { map: toPageOk, msg: '修改成功' },
   );
 }
 
@@ -466,28 +461,28 @@ export function bindingPhone(data) {
       phone: String(src.phone || ''),
       code: String(src.captcha || src.code || ''),
     },
-    { noAuth: true, map: toLegacyWechatLogin },
+    { noAuth: true, map: toPageWechatLogin },
   );
 }
 
 /**
  * 绑定手机号（已登录）。
  *
- * 旧接口的两步 `step` 流程（手机号已属于另一个账号时问「是否合并」）没有继任者：
- * 合并两个账号会把订单、退款、发票一起搬家，新模型直接 `AUTH_PHONE_TAKEN`。页面读
- * `res.data.is_bind` 拿不到值，就走它原来的成功分支。
+ * 手机号已属于另一个账号时不问「是否合并」（页面的 `step` 分支）：合并两个账号会把
+ * 订单、退款、发票一起搬家，路由直接 `AUTH_PHONE_TAKEN`。页面读 `res.data.is_bind`
+ * 拿不到值，就走成功分支。
  */
 export function bindingUserPhone(data) {
   const src = data || {};
   return request.post(
     '/api/v1/auth/phone',
     { phone: String(src.phone || ''), code: String(src.captcha || src.code || '') },
-    { map: toLegacyOk, msg: '绑定成功' },
+    { map: toPageOk, msg: '绑定成功' },
   );
 }
 
 /**
- * 更换手机号。只要新号码上的验证码 —— 旧号码上也要一条读着漂亮，却正好锁死了这个
+ * 更换手机号。只要新号码上的验证码 —— 原号码上也要一条读着漂亮，却正好锁死了这个
  * 页面存在的全部人群：换了号的人。
  */
 export function updatePhone(data) {
@@ -495,18 +490,17 @@ export function updatePhone(data) {
   return request.put(
     '/api/v1/auth/phone',
     { phone: String(src.phone || ''), code: String(src.captcha || src.code || '') },
-    { map: toLegacyOk, msg: '修改成功' },
+    { map: toPageOk, msg: '修改成功' },
   );
 }
 
 /** Shared by both spellings of 发送验证码. */
 function sendSmsCode(data) {
-  return request.post('/api/v1/auth/sms-codes', fromLegacySmsCodeInput(data), {
+  return request.post('/api/v1/auth/sms-codes', fromPageSmsCodeInput(data), {
     noAuth: true,
-    map: toLegacySmsCodeResult,
+    map: toPageSmsCodeResult,
     msg: '发送成功',
   });
 }
 
-// 多账号切换 (`switchH5Login`) 没有继任者：v1/v2 两套登录态并存才需要它，新模型里
-// 一个 token 就是一个账号。`pages/users/user_info` 的 h5 切换分支已删除。
+// 没有多账号切换 (`switchH5Login`)：一个 token 就是一个账号。

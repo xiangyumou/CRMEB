@@ -1,38 +1,38 @@
 import { example, exampleBody, assertRenderable } from './helpers.mjs';
 import {
-  legacyDeliveryType,
-  toLegacyShipmentLine,
-  toLegacyShipment,
-  toLegacyShipmentList,
+  pageDeliveryType,
+  toPageShipmentLine,
+  toPageShipment,
+  toPageShipmentList,
   pickShipment,
-  toLegacyTrace,
-  toLegacyTracking,
-  toLegacyExpressView,
-  toLegacyInvoice,
-  toLegacyInvoiceList,
-  toLegacyInvoicePage,
-  fromLegacyInvoiceRequest,
+  toPageTrace,
+  toPageTracking,
+  toPageExpressView,
+  toPageInvoice,
+  toPageInvoiceList,
+  toPageInvoicePage,
+  fromPageInvoiceRequest,
 } from '../api/mappers/fulfil.js';
-import { toLegacyOrderDetail } from '../api/mappers/order.js';
+import { toPageOrderDetail } from '../api/mappers/order.js';
 
 const SHIPMENTS = example('GET /api/v1/orders/:id/shipments');
 const TRACKING = example('GET /api/v1/shipments/:id/tracking');
 const INVOICE = example('GET /api/v1/invoices/:id');
 const ORDER = example('GET /api/v1/orders/:id');
 
-describe('legacyDeliveryType', () => {
+describe('pageDeliveryType', () => {
   it('maps the three delivery modes onto the strings the pages compare with', () => {
-    expect(legacyDeliveryType('express')).toBe('express');
-    expect(legacyDeliveryType('merchant_delivery')).toBe('send');
-    expect(legacyDeliveryType('virtual')).toBe('fictitious');
-    expect(legacyDeliveryType(undefined)).toBe('');
+    expect(pageDeliveryType('express')).toBe('express');
+    expect(pageDeliveryType('merchant_delivery')).toBe('send');
+    expect(pageDeliveryType('virtual')).toBe('fictitious');
+    expect(pageDeliveryType(undefined)).toBe('');
   });
 });
 
-describe('toLegacyShipment', () => {
-  const parcel = toLegacyShipment(SHIPMENTS.items[0]);
+describe('toPageShipment', () => {
+  const parcel = toPageShipment(SHIPMENTS.items[0]);
 
-  it('flattens the parcel onto the old delivery_* trio', () => {
+  it('flattens the parcel onto the page delivery_* trio', () => {
     expect(parcel).toMatchObject({
       id: 4001,
       order_id: '9001',
@@ -49,7 +49,7 @@ describe('toLegacyShipment', () => {
   });
 
   it('renders a 送货 parcel with the courier as the delivery name', () => {
-    const send = toLegacyShipment({
+    const send = toPageShipment({
       deliveryMode: 'merchant_delivery',
       expressCompanyName: null,
       courierName: '王五',
@@ -65,13 +65,13 @@ describe('toLegacyShipment', () => {
   });
 
   it('turns every null into something a template can print', () => {
-    const empty = toLegacyShipment({ id: '1', orderId: '2', deliveryMode: 'virtual', status: 'delivered' });
+    const empty = toPageShipment({ id: '1', orderId: '2', deliveryMode: 'virtual', status: 'delivered' });
     expect(empty).toMatchObject({ delivery_id: '', delivery_name: '', fictitious_content: '', receive_time: 0 });
     assertRenderable(empty);
   });
 
   it('maps the lines onto cart rows', () => {
-    expect(toLegacyShipmentLine(SHIPMENTS.items[0].lines[0])).toMatchObject({
+    expect(toPageShipmentLine(SHIPMENTS.items[0].lines[0])).toMatchObject({
       id: 7001,
       unique: '7001',
       cart_num: 2,
@@ -81,13 +81,13 @@ describe('toLegacyShipment', () => {
         attrInfo: { suk: '混合装,1000g' },
       },
     });
-    expect(toLegacyShipmentLine(null)).toEqual({});
+    expect(toPageShipmentLine(null)).toEqual({});
   });
 
   it('survives a missing dto', () => {
-    expect(toLegacyShipment(null)).toEqual({});
-    expect(toLegacyShipmentList(null)).toEqual([]);
-    expect(toLegacyShipmentList(SHIPMENTS)).toHaveLength(1);
+    expect(toPageShipment(null)).toEqual({});
+    expect(toPageShipmentList(null)).toEqual([]);
+    expect(toPageShipmentList(SHIPMENTS)).toHaveLength(1);
   });
 });
 
@@ -113,8 +113,8 @@ describe('pickShipment', () => {
   });
 });
 
-describe('toLegacyTracking', () => {
-  const express = toLegacyTracking(TRACKING);
+describe('toPageTracking', () => {
+  const express = toPageTracking(TRACKING);
 
   it('rebuilds the `{status, result}` blob the 物流 page destructures', () => {
     expect(express.status).toBe(1);
@@ -132,30 +132,30 @@ describe('toLegacyTracking', () => {
       { time: '2026-02-02 09:30:00', status: '快件已从杭州转运中心发出' },
       { time: '2026-02-02 09:05:00', status: '顺丰速运 已收取快件' },
     ]);
-    expect(toLegacyTrace(null)).toEqual({ time: '', status: '' });
+    expect(toPageTrace(null)).toEqual({ time: '', status: '' });
   });
 
   it('says "no feed" rather than pretending the parcel is missing', () => {
-    const none = toLegacyTracking({ ...TRACKING, available: false, state: 'unknown', traces: [] });
+    const none = toPageTracking({ ...TRACKING, available: false, state: 'unknown', traces: [] });
     expect(none).toMatchObject({ status: 0, msg: '暂无物流信息' });
     expect(none.result.list).toEqual([]);
   });
 
   it('marks a delivered parcel as signed for', () => {
-    const done = toLegacyTracking({ ...TRACKING, state: 'delivered' });
+    const done = toPageTracking({ ...TRACKING, state: 'delivered' });
     expect(done.result).toMatchObject({ deliverystatus: 3, issign: 1 });
   });
 
   it('survives a missing dto', () => {
-    expect(toLegacyTracking(null).result.list).toEqual([]);
+    expect(toPageTracking(null).result.list).toEqual([]);
   });
 });
 
-describe('toLegacyExpressView', () => {
-  const order = toLegacyOrderDetail(ORDER);
+describe('toPageExpressView', () => {
+  const order = toPageOrderDetail(ORDER);
 
   it('flattens the parcel onto the order, which is where the page reads it', () => {
-    const view = toLegacyExpressView(order, SHIPMENTS.items[0], TRACKING);
+    const view = toPageExpressView(order, SHIPMENTS.items[0], TRACKING);
     expect(view.order).toMatchObject({
       delivery_id: 'SF1234567890123',
       delivery_name: '顺丰速运',
@@ -167,7 +167,7 @@ describe('toLegacyExpressView', () => {
   });
 
   it('still answers an order with no parcel, with an empty timeline', () => {
-    const view = toLegacyExpressView(order, null, null);
+    const view = toPageExpressView(order, null, null);
     expect(view.express.result.list).toEqual([]);
     expect(view.shipment).toBe(null);
     // The order's own goods are still there, so the page renders its header.
@@ -175,15 +175,15 @@ describe('toLegacyExpressView', () => {
   });
 
   it('borrows the parcel lines when the order view carries none', () => {
-    const view = toLegacyExpressView({ cartInfo: [] }, SHIPMENTS.items[0], null);
+    const view = toPageExpressView({ cartInfo: [] }, SHIPMENTS.items[0], null);
     expect(view.order.cartInfo).toHaveLength(1);
   });
 });
 
-describe('toLegacyInvoice', () => {
-  const invoice = toLegacyInvoice(INVOICE);
+describe('toPageInvoice', () => {
+  const invoice = toPageInvoice(INVOICE);
 
-  it('maps the header onto the legacy 1/2 enums the pages branch on', () => {
+  it('maps the header onto the 1/2 enums the pages branch on', () => {
     expect(invoice).toMatchObject({
       id: 3001,
       order_id: '9001',
@@ -201,7 +201,7 @@ describe('toLegacyInvoice', () => {
     assertRenderable(invoice);
   });
 
-  it('draws the 发票记录 row from the order’s line summary (CR-4-h §7)', () => {
+  it('draws the 发票记录 row from the order’s line summary', () => {
     expect(invoice.order).toEqual({
       order_id: '9001',
       order_no: '202602011000000010123456',
@@ -223,31 +223,31 @@ describe('toLegacyInvoice', () => {
   it('falls back to the order number when there is no summary at all', () => {
     // `orderSummary` is null only for an order with no lines, which checkout
     // cannot produce — but the template's fallback has to stay reachable.
-    const bare = toLegacyInvoice({ ...INVOICE, orderSummary: null });
+    const bare = toPageInvoice({ ...INVOICE, orderSummary: null });
     expect(bare.order.cartInfo).toEqual([]);
     expect(bare.order.order_no).toBe('202602011000000010123456');
   });
 
   it('flags an issued invoice and carries its number', () => {
-    const issued = toLegacyInvoice({ ...INVOICE, status: 'issued', invoiceNumber: '04400021130' });
+    const issued = toPageInvoice({ ...INVOICE, status: 'issued', invoiceNumber: '04400021130' });
     expect(issued).toMatchObject({ is_invoice: 1, invoice_number: '04400021130', unique_num: '04400021130' });
   });
 
   it('survives a missing dto', () => {
-    expect(toLegacyInvoice(null)).toEqual({});
-    expect(toLegacyInvoiceList(null)).toEqual([]);
+    expect(toPageInvoice(null)).toEqual({});
+    expect(toPageInvoiceList(null)).toEqual([]);
   });
 
   it('offers both the array and the counted page', () => {
     const page = example('GET /api/v1/invoices');
-    expect(toLegacyInvoiceList(page)).toHaveLength(1);
-    expect(toLegacyInvoicePage(page)).toMatchObject({ count: 1, page: 1, limit: 20 });
+    expect(toPageInvoiceList(page)).toHaveLength(1);
+    expect(toPageInvoicePage(page)).toMatchObject({ count: 1, page: 1, limit: 20 });
   });
 });
 
-describe('fromLegacyInvoiceRequest', () => {
+describe('fromPageInvoiceRequest', () => {
   it('builds the company body the contract takes', () => {
-    const body = fromLegacyInvoiceRequest({
+    const body = fromPageInvoiceRequest({
       header_type: 2,
       type: 1,
       name: '杭州某某科技有限公司',
@@ -259,13 +259,13 @@ describe('fromLegacyInvoiceRequest', () => {
   });
 
   it('leaves the optional fields out rather than sending empty strings', () => {
-    const body = fromLegacyInvoiceRequest({ header_type: 1, name: '张三', duty_number: '' });
+    const body = fromPageInvoiceRequest({ header_type: 1, name: '张三', duty_number: '' });
     expect(body).toEqual({ headerType: 'personal', invoiceType: 'plain', name: '张三' });
   });
 
   it('carries the 专用发票 bank block through', () => {
     expect(
-      fromLegacyInvoiceRequest({
+      fromPageInvoiceRequest({
         header_type: 2,
         type: 2,
         name: '某某公司',
@@ -284,7 +284,7 @@ describe('fromLegacyInvoiceRequest', () => {
   });
 
   it('survives a missing payload', () => {
-    expect(fromLegacyInvoiceRequest(null)).toEqual({
+    expect(fromPageInvoiceRequest(null)).toEqual({
       headerType: 'personal',
       invoiceType: 'plain',
       name: '',

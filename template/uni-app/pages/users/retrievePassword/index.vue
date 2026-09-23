@@ -46,9 +46,7 @@
 		registerVerify,
 		registerReset
 	} from "@/api/user";
-	// 图形验证码（`getCodeApi` / `again()` 那套 `VUE_APP_API_URL + "/captcha"` 的图片）
-	// 没有继任者，行为验证码也被 E4 裁掉了；这页的 `isShowCode` 一直是 false，那段输入框
-	// 从来没渲染过。整块连同 `keyCode / codeUrl / codeVal` 一起删掉。
+	// 没有图形验证码，也没有行为验证码：号码校验通过就直接发短信。
 
 	export default {
 		name: "RetrievePassword",

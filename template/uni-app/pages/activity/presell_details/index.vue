@@ -227,7 +227,7 @@
 		<canvas class="canvas" canvas-id="myCanvas" v-if="canvasStatus"></canvas>
 		<!-- 发送给朋友图片 -->
 		<view class="share-box" v-if="H5ShareBox">
-			<image :src="'/static/images/legacy/share-info.png'" @click="H5ShareBox = false"></image>
+			<image :src="'/static/images/common/share-info.png'" @click="H5ShareBox = false"></image>
 		</view>
 		<kefuIcon :ids='parseInt(id)' :routineContact="routineContact"></kefuIcon>
 	</view>

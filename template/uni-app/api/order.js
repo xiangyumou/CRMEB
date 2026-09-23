@@ -6,50 +6,50 @@
 
 import request from '../utils/request.js';
 import {
-  toLegacyCartList,
-  toLegacyCartArray,
-  toLegacyCartCount,
-  toLegacyCartAddResult,
-  toLegacyRebuyResult,
-  fromLegacyCartQuery,
+  toPageCartList,
+  toPageCartArray,
+  toPageCartCount,
+  toPageCartAddResult,
+  toPageRebuyResult,
+  fromPageCartQuery,
 } from './mappers/cart.js';
 import {
-  toLegacyOrderList,
-  toLegacyOrderDetail,
-  toLegacyOrderCounts,
-  toLegacyOrderConfirm,
-  toLegacyOrderComputed,
-  toLegacyOrderCreateResult,
-  toLegacyCashierOrder,
-  toLegacyOrderProduct,
-  fromLegacyOrderListQuery,
-  fromLegacyCheckoutInput,
-  fromLegacyOrderCreateInput,
+  toPageOrderList,
+  toPageOrderDetail,
+  toPageOrderCounts,
+  toPageOrderConfirm,
+  toPageOrderComputed,
+  toPageOrderCreateResult,
+  toPageCashierOrder,
+  toPageOrderProduct,
+  fromPageOrderListQuery,
+  fromPageCheckoutInput,
+  fromPageOrderCreateInput,
 } from './mappers/order.js';
-import { toLegacyPayResult, payResultMessage, paymentChannelFor } from './mappers/payment.js';
+import { toPagePayResult, payResultMessage, paymentChannelFor } from './mappers/payment.js';
 import {
-  toLegacyRefund,
-  toLegacyRefundList,
-  toLegacyRefundReasons,
-  toLegacyApplicableItems,
-  fromLegacyRefundApplyInput,
-  fromLegacyReturnShipmentInput,
-  fromLegacyRefundState,
+  toPageRefund,
+  toPageRefundList,
+  toPageRefundReasons,
+  toPageApplicableItems,
+  fromPageRefundApplyInput,
+  fromPageReturnShipmentInput,
+  fromPageRefundState,
 } from './mappers/refund.js';
 import {
-  toLegacyInvoice,
-  toLegacyInvoiceList,
-  toLegacyExpressView,
+  toPageInvoice,
+  toPageInvoiceList,
+  toPageExpressView,
   pickShipment,
 } from './mappers/fulfil.js';
-import { toLegacyStaffOrderDetail } from './mappers/staff.js';
-import { fromLegacyPage } from './mappers/_shared.js';
+import { toPageStaffOrderDetail } from './mappers/staff.js';
+import { fromPagePaging } from './mappers/_shared.js';
 import {
-  toLegacyApplicableCoupons,
-  fromLegacyApplicableInput,
-  toLegacyGiftCoupons,
+  toPageApplicableCoupons,
+  fromPageApplicableInput,
+  toPageGiftCoupons,
 } from './mappers/coupon.js';
-import { fromLegacyCommentInput } from './mappers/catalog.js';
+import { fromPageCommentInput } from './mappers/catalog.js';
 import { clientPlatform } from '../config/app';
 
 // ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ import { clientPlatform } from '../config/app';
  * @param numType boolean true 数量总和, false/0 条数
  */
 export function getCartCounts(numType) {
-  return request.get('/api/v1/cart/count', {}, { map: (dto) => toLegacyCartCount(dto, numType) });
+  return request.get('/api/v1/cart/count', {}, { map: (dto) => toPageCartCount(dto, numType) });
 }
 
 /**
@@ -69,14 +69,14 @@ export function getCartCounts(numType) {
  * @param object data {page, limit, status} — status 1 有效, 0 失效
  */
 export function getCartList(data) {
-  return request.get('/api/v1/cart', fromLegacyCartQuery(data), { map: toLegacyCartList });
+  return request.get('/api/v1/cart', fromPageCartQuery(data), { map: toPageCartList });
 }
 
 /**
  * 分类购物车列表
  */
 export function vcartList() {
-  return request.get('/api/v1/cart', { filter: 'all', pageSize: 100 }, { map: toLegacyCartArray });
+  return request.get('/api/v1/cart', { filter: 'all', pageSize: 100 }, { map: toPageCartArray });
 }
 
 /**
@@ -86,7 +86,7 @@ export function vcartList() {
  */
 export function changeCartNum(cartId, number) {
   return request.patch(`/api/v1/cart/items/${cartId}`, { quantity: Number(number) || 1 }, {
-    map: toLegacyCartAddResult,
+    map: toPageCartAddResult,
     msg: '修改成功',
   });
 }
@@ -103,10 +103,10 @@ export function cartDel(ids) {
 }
 
 /**
- * 重选规格 — one PATCH since CR-2-h was accepted.
+ * 重选规格 — one PATCH.
  *
- * This used to be `DELETE` then `POST`, which left the buyer with no row at all
- * if the second call failed. `PATCH /api/v1/cart/items/:id {skuId}` does both in
+ * A `DELETE` then `POST` would leave the buyer with no row at all if the second
+ * call failed. `PATCH /api/v1/cart/items/:id {skuId}` does both in
  * one transaction and folds into an existing row of that variant; `cartId` in
  * the answer is the surviving row, which may not be the one that was PATCHed.
  */
@@ -115,7 +115,7 @@ export function getResetCart(data) {
   const body = { skuId: String(src.unique || '') };
   if (src.num !== undefined && src.num !== '') body.quantity = Number(src.num) || 1;
   return request.patch(`/api/v1/cart/items/${src.id}`, body, {
-    map: toLegacyCartAddResult,
+    map: toPageCartAddResult,
     msg: '添加购物车成功',
   });
 }
@@ -129,7 +129,7 @@ export function getResetCart(data) {
  * @param object data {type, page, limit}
  */
 export function getOrderList(data) {
-  return request.get('/api/v1/orders', fromLegacyOrderListQuery(data), { map: toLegacyOrderList });
+  return request.get('/api/v1/orders', fromPageOrderListQuery(data), { map: toPageOrderList });
 }
 
 /**
@@ -137,14 +137,14 @@ export function getOrderList(data) {
  * @param string uni 订单 id
  */
 export function getOrderDetail(uni) {
-  return request.get(`/api/v1/orders/${uni}`, {}, { map: toLegacyOrderDetail });
+  return request.get(`/api/v1/orders/${uni}`, {}, { map: toPageOrderDetail });
 }
 
 /**
  * 订单统计数据
  */
 export function orderData() {
-  return request.get('/api/v1/orders/counts', {}, { map: toLegacyOrderCounts });
+  return request.get('/api/v1/orders/counts', {}, { map: toPageOrderCounts });
 }
 
 /**
@@ -153,7 +153,7 @@ export function orderData() {
  */
 export function orderCancel(id) {
   return request.post(`/api/v1/orders/${id}/cancel`, { reason: '用户取消' }, {
-    map: toLegacyOrderDetail,
+    map: toPageOrderDetail,
     msg: '取消成功',
   });
 }
@@ -163,7 +163,7 @@ export function orderCancel(id) {
  * @param string uni 订单 id
  */
 export function orderAgain(uni) {
-  return request.post('/api/v1/cart/rebuys', { orderId: String(uni) }, { map: toLegacyRebuyResult });
+  return request.post('/api/v1/cart/rebuys', { orderId: String(uni) }, { map: toPageRebuyResult });
 }
 
 /**
@@ -172,13 +172,13 @@ export function orderAgain(uni) {
  */
 export function orderConfirm(data) {
   return request
-    .post('/api/v1/checkout/preview', fromLegacyCheckoutInput(data), {
-      map: toLegacyOrderConfirm,
+    .post('/api/v1/checkout/preview', fromPageCheckoutInput(data), {
+      map: toPageOrderConfirm,
     })
     .then((res) => {
       // The preview has no key to hand out; the page keeps `orderKey` from
       // here and passes it to `orderCreate`, so a double tap on 提交订单 is one
-      // order (CR-4-i §10). Minted here, not in the pure mapper.
+      // order. Minted here, not in the pure mapper.
       if (res && res.data && !res.data.orderKey) res.data.orderKey = newOrderKey();
       return res;
     });
@@ -202,12 +202,12 @@ export function newOrderKey() {
 
 /**
  * 计算订单金额
- * @param key  旧的 orderKey，新接口不需要，保留签名
+ * @param key  页面传的 orderKey，路由不需要，保留签名
  * @param data
  */
 export function postOrderComputed(key, data) {
-  return request.post('/api/v1/checkout/preview', fromLegacyCheckoutInput(data), {
-    map: toLegacyOrderComputed,
+  return request.post('/api/v1/checkout/preview', fromPageCheckoutInput(data), {
+    map: toPageOrderComputed,
   });
 }
 
@@ -217,8 +217,8 @@ export function postOrderComputed(key, data) {
  * @param object data
  */
 export function orderCreate(key, data) {
-  return request.post('/api/v1/orders', fromLegacyOrderCreateInput(key, data), {
-    map: toLegacyOrderCreateResult,
+  return request.post('/api/v1/orders', fromPageOrderCreateInput(key, data), {
+    map: toPageOrderCreateResult,
     msg: '订单创建成功',
   });
 }
@@ -232,17 +232,17 @@ export function orderPay(data) {
   return request.post(
     `/api/v1/orders/${src.uni}/payments`,
     { channel: paymentChannelFor(clientPlatform()) },
-    { map: toLegacyPayResult, msg: payResultMessage },
+    { map: toPagePayResult, msg: payResultMessage },
   );
 }
 
 /**
  * 收银台订单信息
  * @param string orderId
- * @param string type 旧的支付来源，新接口不需要
+ * @param string type 页面传的支付来源，路由不需要
  */
 export function getCashierOrder(orderId, type) {
-  return request.get(`/api/v1/orders/${orderId}`, {}, { map: toLegacyCashierOrder });
+  return request.get(`/api/v1/orders/${orderId}`, {}, { map: toPageCashierOrder });
 }
 
 /**
@@ -252,7 +252,7 @@ export function getCashierOrder(orderId, type) {
  */
 export function orderProduct(unique, orderId) {
   return request.get(`/api/v1/orders/${orderId}`, {}, {
-    map: (dto) => toLegacyOrderProduct(dto, unique),
+    map: (dto) => toPageOrderProduct(dto, unique),
   });
 }
 
@@ -261,7 +261,7 @@ export function orderProduct(unique, orderId) {
  * @param object data
  */
 export function orderComment(data) {
-  return request.post('/api/v1/catalog/reviews', fromLegacyCommentInput(data), {
+  return request.post('/api/v1/catalog/reviews', fromPageCommentInput(data), {
     map: () => ({ to_lottery: 0 }),
     msg: '评价成功',
   });
@@ -273,8 +273,8 @@ export function orderComment(data) {
  * @param object data
  */
 export function getCouponsOrderPrice(price, data) {
-  return request.post('/api/v1/user-coupons/applicable', fromLegacyApplicableInput(price, data), {
-    map: toLegacyApplicableCoupons,
+  return request.post('/api/v1/user-coupons/applicable', fromPageApplicableInput(price, data), {
+    map: toPageApplicableCoupons,
   });
 }
 
@@ -284,13 +284,13 @@ export function getCouponsOrderPrice(price, data) {
  */
 export function orderTake(uni) {
   return request.post(`/api/v1/orders/${uni}/receipt`, {}, {
-    map: toLegacyOrderDetail,
+    map: toPageOrderDetail,
     msg: '确认收货成功',
   });
 }
 
 /**
- * 删除已完成订单 — 只是把订单从「我的订单」里隐藏，商家那边一行都不会少（CR-4-h §6）。
+ * 删除已完成订单 — 只是把订单从「我的订单」里隐藏，商家那边一行都不会少。
  *
  * 只有已完成 / 已取消 / 已退款的订单可以删除，重复点击会得到 404：删过之后这张订单
  * 对买家来说已经不在列表里了。
@@ -303,18 +303,17 @@ export function orderDel(uni) {
 /**
  * 订单查询物流信息.
  *
- * Legacy answered this with one call because the order row carried the single
- * `delivery_id` it had. An order now has a `shipments` collection and the trace feed
+ * The page wants one payload, but an order has a `shipments` collection and the trace feed
  * hangs off a shipment, so this composes three reads — the order, its parcels and the
- * tracking of the parcel the page will show — back into the old
- * `{order, express: {result: {list}}}` payload.
+ * tracking of the parcel the page will show — back into the
+ * `{order, express: {result: {list}}}` payload the page reads.
  *
  * @param string uni 订单 id
- * @param string type 旧的「退货物流」分支：订单详情把 refund_type 钉成 0，这里不再可达
+ * @param string type 「退货物流」分支：订单详情把 refund_type 钉成 0，这里不可达
  */
 export function express(uni, type) {
   return expressView(
-    () => request.get(`/api/v1/orders/${uni}`, {}, { map: toLegacyOrderDetail }),
+    () => request.get(`/api/v1/orders/${uni}`, {}, { map: toPageOrderDetail }),
     () => request.get(`/api/v1/orders/${uni}/shipments`, {}),
     (shipmentId) => request.get(`/api/v1/shipments/${shipmentId}/tracking`, {}),
   );
@@ -323,7 +322,7 @@ export function express(uni, type) {
 /** 商家端物流轨迹 — the same composition against the staff surface. */
 export function adminExpress(uni, type) {
   return expressView(
-    () => request.get(`/api/v1/staff/orders/${uni}`, {}, { map: toLegacyStaffOrderDetail }),
+    () => request.get(`/api/v1/staff/orders/${uni}`, {}, { map: toPageStaffOrderDetail }),
     () => request.get(`/api/v1/staff/orders/${uni}/shipments`, {}),
     (shipmentId) => request.get(`/api/v1/staff/shipments/${shipmentId}/tracking`, {}),
   );
@@ -339,17 +338,17 @@ function expressView(readOrder, readShipments, readTracking) {
   return Promise.all([readOrder(), readShipments()]).then(([orderRes, shipRes]) => {
     const parcel = pickShipment(shipRes.data);
     if (!parcel) {
-      return { data: toLegacyExpressView(orderRes.data, null, null), msg: '', status: 200 };
+      return { data: toPageExpressView(orderRes.data, null, null), msg: '', status: 200 };
     }
     return readTracking(parcel.id)
       .then((trackRes) => ({
-        data: toLegacyExpressView(orderRes.data, parcel, trackRes.data),
+        data: toPageExpressView(orderRes.data, parcel, trackRes.data),
         msg: '',
         status: 200,
       }))
       // A parcel with no trace feed is still a parcel: show it without the timeline.
       .catch(() => ({
-        data: toLegacyExpressView(orderRes.data, parcel, null),
+        data: toPageExpressView(orderRes.data, parcel, null),
         msg: '',
         status: 200,
       }));
@@ -357,12 +356,12 @@ function expressView(readOrder, readShipments, readTracking) {
 }
 
 /**
- * 订单赠送的优惠券 — 支付成功页的「恭喜获得优惠券」弹层（B3，CR-5-h2 §1）。
+ * 订单赠送的优惠券 — 支付成功页的「恭喜获得优惠券」弹层。
  * 没送券的订单是 `{items: []}` + 200，弹层 `v-if="couponList.length"` 不渲染。
  * @param string orderId 订单 id 或订单号
  */
 export function orderCoupon(orderId) {
-  return request.get(`/api/v1/orders/${orderId}/gift-coupons`, {}, { map: toLegacyGiftCoupons });
+  return request.get(`/api/v1/orders/${orderId}/gift-coupons`, {}, { map: toPageGiftCoupons });
 }
 
 // ---------------------------------------------------------------------------
@@ -373,22 +372,22 @@ export function orderCoupon(orderId) {
  * 开票记录
  */
 export function orderInvoiceList(data) {
-  return request.get('/api/v1/invoices', fromLegacyPage(data), { map: toLegacyInvoiceList });
+  return request.get('/api/v1/invoices', fromPagePaging(data), { map: toPageInvoiceList });
 }
 
 /**
  * 开票申请详情。
  *
- * 旧接口返回的是「带发票的订单」，页面整页都按订单渲染，所以这里取回发票后再取它的订单，
+ * 页面要的是「带发票的订单」，整页都按订单渲染，所以这里取回发票后再取它的订单，
  * 拼回 `{...订单, invoice}`。调用处传的是开票申请 id（`user_invoice_list` 已改）。
  *
  * @param string id 开票申请 id
  */
 export function orderInvoiceDetail(id) {
-  return request.get(`/api/v1/invoices/${id}`, {}, { map: toLegacyInvoice }).then((invRes) => {
+  return request.get(`/api/v1/invoices/${id}`, {}, { map: toPageInvoice }).then((invRes) => {
     const invoice = invRes.data;
     return request
-      .get(`/api/v1/orders/${invoice.order_id}`, {}, { map: toLegacyOrderDetail })
+      .get(`/api/v1/orders/${invoice.order_id}`, {}, { map: toPageOrderDetail })
       .then((orderRes) => ({
         data: Object.assign({}, orderRes.data, { invoice }),
         msg: '',
@@ -402,7 +401,7 @@ export function orderInvoiceDetail(id) {
  */
 export function orderInvoiceCancel(id) {
   return request.post(`/api/v1/invoices/${id}/cancel`, {}, {
-    map: toLegacyInvoice,
+    map: toPageInvoice,
     msg: '已取消申请',
   });
 }
@@ -412,17 +411,17 @@ export function orderInvoiceCancel(id) {
 // ---------------------------------------------------------------------------
 
 /**
- * 退款单列表（旧名：新订单列表 2.1 版本）
+ * 退款单列表
  * @param object data {refund_status, page, limit} — `refund_status` is the tab index
  */
 export function getNewOrderList(data) {
   const src = data || {};
   // The page sends its tab as `refund_status`; reading `type` asked every tab
-  // for state=all (CR-4-i §12).
-  const query = { state: fromLegacyRefundState(src.refund_status) };
+  // for state=all.
+  const query = { state: fromPageRefundState(src.refund_status) };
   if (src.page !== undefined) query.page = Number(src.page) || 1;
   if (src.limit !== undefined) query.pageSize = Number(src.limit) || 20;
-  return request.get('/api/v1/refunds', query, { map: toLegacyRefundList });
+  return request.get('/api/v1/refunds', query, { map: toPageRefundList });
 }
 
 /**
@@ -430,14 +429,14 @@ export function getNewOrderList(data) {
  * @param string uni 退款单 id
  */
 export function refundOrderDetail(uni) {
-  return request.get(`/api/v1/refunds/${uni}`, {}, { map: toLegacyRefund });
+  return request.get(`/api/v1/refunds/${uni}`, {}, { map: toPageRefund });
 }
 
 /**
  * 退款订单详情（订单详情页复用）
  */
 export function getRefundOrderDetail(uni) {
-  return request.get(`/api/v1/refunds/${uni}`, {}, { map: toLegacyRefund });
+  return request.get(`/api/v1/refunds/${uni}`, {}, { map: toPageRefund });
 }
 
 /**
@@ -445,7 +444,7 @@ export function getRefundOrderDetail(uni) {
  * @param string uni 退款单 id
  */
 export function cancelRefundOrder(uni) {
-  return request.post(`/api/v1/refunds/${uni}/cancel`, {}, { map: toLegacyRefund, msg: '已撤销申请' });
+  return request.post(`/api/v1/refunds/${uni}/cancel`, {}, { map: toPageRefund, msg: '已撤销申请' });
 }
 
 /**
@@ -460,7 +459,7 @@ export function refundOrderDel(uni) {
  * 获取退款理由
  */
 export function ordeRefundReason() {
-  return request.get('/api/v1/refund-reasons', {}, { map: toLegacyRefundReasons, noAuth: true });
+  return request.get('/api/v1/refund-reasons', {}, { map: toPageRefundReasons, noAuth: true });
 }
 
 /**
@@ -469,7 +468,7 @@ export function ordeRefundReason() {
  */
 export function refundGoodsList(orderId) {
   return request.get(`/api/v1/refunds/applicable-items/${encodeURIComponent(String(orderId))}`, {}, {
-    map: toLegacyApplicableItems,
+    map: toPageApplicableItems,
   });
 }
 
@@ -481,7 +480,7 @@ export function postRefundGoods(data) {
   const src = data || {};
   const orderId = String(src.orderId || src.id);
   return request.get(`/api/v1/refunds/applicable-items/${encodeURIComponent(orderId)}`, {}, {
-    map: toLegacyApplicableItems,
+    map: toPageApplicableItems,
   });
 }
 
@@ -491,8 +490,8 @@ export function postRefundGoods(data) {
  * @param object data
  */
 export function returnGoodsSubmit(id, data) {
-  return request.post('/api/v1/refunds', fromLegacyRefundApplyInput(id, data), {
-    map: toLegacyRefund,
+  return request.post('/api/v1/refunds', fromPageRefundApplyInput(id, data), {
+    map: toPageRefund,
     msg: '申请已提交',
   });
 }
@@ -505,7 +504,7 @@ export function refundExpress(data) {
   const src = data || {};
   return request.post(
     `/api/v1/refunds/${src.id}/return-shipment`,
-    fromLegacyReturnShipmentInput(src),
-    { map: toLegacyRefund, msg: '提交成功' },
+    fromPageReturnShipmentInput(src),
+    { map: toPageRefund, msg: '提交成功' },
   );
 }

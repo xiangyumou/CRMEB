@@ -5,18 +5,18 @@
 
 import { example, assertRenderable } from './helpers.mjs';
 import {
-  toLegacyGroupbuyCard,
-  toLegacyGroupbuyList,
-  toLegacyGroupbuyBanners,
-  toLegacyOpenGroup,
-  toLegacyGroupbuyDetail,
-  toLegacyGroupbuyGroup,
-  toLegacyGroupbuyPoster,
-  toLegacyPresaleCard,
-  toLegacyPresaleList,
-  toLegacyPresaleDetail,
+  toPageGroupbuyCard,
+  toPageGroupbuyList,
+  toPageGroupbuyBanners,
+  toPageOpenGroup,
+  toPageGroupbuyDetail,
+  toPageGroupbuyGroup,
+  toPageGroupbuyPoster,
+  toPagePresaleCard,
+  toPagePresaleList,
+  toPagePresaleDetail,
   presaleWindowStatus,
-  toLegacyGroupbuySummary,
+  toPageGroupbuySummary,
 } from '../api/mappers/activity.js';
 
 const ACTIVITY = 'GET /api/v1/groupbuy/activities/:id';
@@ -25,7 +25,7 @@ const VIEW = 'GET /api/v1/groupbuy/groups/:id';
 
 describe('groupbuy — 列表与 banner', () => {
   it('turns the page into the bare array the list concats onto', () => {
-    const rows = toLegacyGroupbuyList(example('GET /api/v1/groupbuy/activities'));
+    const rows = toPageGroupbuyList(example('GET /api/v1/groupbuy/activities'));
     expect(Array.isArray(rows)).toBe(true);
     expect(rows[0]).toMatchObject({
       id: 1,
@@ -44,13 +44,13 @@ describe('groupbuy — 列表与 banner', () => {
   });
 
   it('keeps the countdown in unix seconds, which is what the timer subtracts from', () => {
-    const row = toLegacyGroupbuyCard({ startAt: '2026-09-01T00:00:00+08:00', endAt: null });
+    const row = toPageGroupbuyCard({ startAt: '2026-09-01T00:00:00+08:00', endAt: null });
     expect(row.start_time).toBe(1788192000);
     expect(row.stop_time).toBe(0);
   });
 
   it('pins the retired 会员价 / 门店自提 / 赠品 flags falsy so those branches stay dead', () => {
-    const row = toLegacyGroupbuyCard(example('GET /api/v1/groupbuy/activities').items[0]);
+    const row = toPageGroupbuyCard(example('GET /api/v1/groupbuy/activities').items[0]);
     expect(row.is_vip).toBe(0);
     expect(row.vip_price).toBe(0);
     expect(row.svip_price_open).toBe(false);
@@ -59,7 +59,7 @@ describe('groupbuy — 列表与 banner', () => {
   });
 
   it('gives the banner swiper both spellings of the image and never a null link', () => {
-    const banners = toLegacyGroupbuyBanners(example('GET /api/v1/groupbuy/banners'));
+    const banners = toPageGroupbuyBanners(example('GET /api/v1/groupbuy/banners'));
     expect(banners).toHaveLength(2);
     expect(banners[0]).toEqual({
       img: 'https://cdn.example.com/banner/groupbuy-1.jpg',
@@ -67,14 +67,14 @@ describe('groupbuy — 列表与 banner', () => {
       link: '',
     });
     expect(banners[1].link).toBe('/pages/activity/groupbuy/index');
-    expect(toLegacyGroupbuyBanners(null)).toEqual([]);
+    expect(toPageGroupbuyBanners(null)).toEqual([]);
     assertRenderable(banners);
   });
 });
 
 describe('groupbuy — 详情（活动 + 正在拼单）', () => {
   it('composes the two reads into the one payload the page knows', () => {
-    const detail = toLegacyGroupbuyDetail(example(ACTIVITY), example(GROUPS));
+    const detail = toPageGroupbuyDetail(example(ACTIVITY), example(GROUPS));
     expect(detail.storeInfo).toMatchObject({
       id: 1,
       product_id: 11,
@@ -101,13 +101,13 @@ describe('groupbuy — 详情（活动 + 正在拼单）', () => {
       },
     ]);
     expect(detail.pink_ok_sum).toBe(46);
-    // 别人拼团成功 marquee has no successor: an empty list renders nothing.
+    // 别人拼团成功 marquee has no source: an empty list renders nothing.
     expect(detail.pink_ok_list).toEqual([]);
     assertRenderable(detail);
   });
 
   it('rebuilds the picker columns out of the SKUs own specValues', () => {
-    const detail = toLegacyGroupbuyDetail(example(ACTIVITY), example(GROUPS));
+    const detail = toPageGroupbuyDetail(example(ACTIVITY), example(GROUPS));
     expect(detail.productAttr).toEqual([
       { attr_name: '口味', attr_values: ['混合装'], attr_value: [{ attr: '混合装', pic: '' }] },
       { attr_name: '规格', attr_values: ['1000g'], attr_value: [{ attr: '1000g', pic: '' }] },
@@ -119,34 +119,34 @@ describe('groupbuy — 详情（活动 + 正在拼单）', () => {
       ot_price: '88.00',
       stock: 200,
       quota: 200,
-      // 立即开团 / 参团 are gated on it (CR-4-i §8).
+      // 立即开团 / 参团 are gated on it.
       product_stock: 200,
     });
   });
 
   it('survives the 正在拼单 strip failing, because it is decoration', () => {
-    const detail = toLegacyGroupbuyDetail(example(ACTIVITY), { items: [] });
+    const detail = toPageGroupbuyDetail(example(ACTIVITY), { items: [] });
     expect(detail.pink).toEqual([]);
     expect(detail.pinkAll).toEqual([]);
     expect(detail.storeInfo.id).toBe(1);
   });
 
   it('turns a null myOpenGroupId into 0, because the page compares it numerically', () => {
-    expect(toLegacyGroupbuyDetail({ myOpenGroupId: null }).storeInfo.my_pink_id).toBe(0);
-    expect(toLegacyGroupbuyDetail({ myOpenGroupId: '77' }).storeInfo.my_pink_id).toBe(77);
+    expect(toPageGroupbuyDetail({ myOpenGroupId: null }).storeInfo.my_pink_id).toBe(0);
+    expect(toPageGroupbuyDetail({ myOpenGroupId: '77' }).storeInfo.my_pink_id).toBe(77);
   });
 
   it('marks 单规格 as spec_type 0 so the picker is skipped', () => {
-    expect(toLegacyGroupbuyDetail(example(ACTIVITY)).storeInfo.spec_type).toBe(0);
+    expect(toPageGroupbuyDetail(example(ACTIVITY)).storeInfo.spec_type).toBe(0);
     const two = { ...example(ACTIVITY) };
     two.skus = [...two.skus, { ...two.skus[0], skuId: '22', specText: '原味|1000g' }];
-    expect(toLegacyGroupbuyDetail(two).storeInfo.spec_type).toBe(1);
+    expect(toPageGroupbuyDetail(two).storeInfo.spec_type).toBe(1);
   });
 });
 
 describe('groupbuy — 团单状态页', () => {
   const build = () =>
-    toLegacyGroupbuyGroup(example(VIEW), example(ACTIVITY), example('GET /api/v1/groupbuy/activities'));
+    toPageGroupbuyGroup(example(VIEW), example(ACTIVITY), example('GET /api/v1/groupbuy/activities'));
 
   it('splits the members into the leader (pinkT) and everybody else (pinkAll)', () => {
     const g = build();
@@ -160,18 +160,18 @@ describe('groupbuy — 团单状态页', () => {
 
   it('derives the tri-state pinkBool from status rather than counting members', () => {
     expect(build().pinkBool).toBe(0);
-    expect(toLegacyGroupbuyGroup({ status: 'succeeded' }).pinkBool).toBe(1);
-    expect(toLegacyGroupbuyGroup({ status: 'failed' }).pinkBool).toBe(-1);
-    expect(toLegacyGroupbuyGroup({ status: 'cancelled' }).pinkBool).toBe(-1);
+    expect(toPageGroupbuyGroup({ status: 'succeeded' }).pinkBool).toBe(1);
+    expect(toPageGroupbuyGroup({ status: 'failed' }).pinkBool).toBe(-1);
+    expect(toPageGroupbuyGroup({ status: 'cancelled' }).pinkBool).toBe(-1);
   });
 
   it('only offers 取消开团 to the leader, via userInfo.uid matching pinkT.uid', () => {
     const view = example(VIEW);
-    const asMember = toLegacyGroupbuyGroup(view, null, null);
+    const asMember = toPageGroupbuyGroup(view, null, null);
     expect(asMember.userInfo.uid).toBe(0);
     expect(asMember.order_pid).toBe(1);
 
-    const asLeader = toLegacyGroupbuyGroup(
+    const asLeader = toPageGroupbuyGroup(
       { ...view, me: { role: 'leader', status: 'joined', orderId: '7001', paid: true } },
       null,
       null,
@@ -182,7 +182,7 @@ describe('groupbuy — 团单状态页', () => {
   });
 
   it('answers userBool 0 for a visitor who is not in the team', () => {
-    const g = toLegacyGroupbuyGroup({ ...example(VIEW), me: null, canJoin: true }, null, null);
+    const g = toPageGroupbuyGroup({ ...example(VIEW), me: null, canJoin: true }, null, null);
     expect(g.userBool).toBe(0);
     expect(g.current_pink_order).toBe('');
     // `is_ok` is "cannot join" — joinable means 0.
@@ -195,7 +195,7 @@ describe('groupbuy — 团单状态页', () => {
   });
 
   it('still renders the product card when the activity read failed', () => {
-    const g = toLegacyGroupbuyGroup(example(VIEW), null, null);
+    const g = toPageGroupbuyGroup(example(VIEW), null, null);
     expect(g.store_combination).toMatchObject({ id: 1, title: '三人成团 · 坚果礼盒', price: '59.00', people: 3 });
     expect(g.store_combination.productAttr).toEqual([]);
     expect(g.store_combination.productValue).toEqual({});
@@ -204,7 +204,7 @@ describe('groupbuy — 团单状态页', () => {
 
 describe('groupbuy — 海报', () => {
   it('composes the label and the 还差 N 人 line the canvas prints', () => {
-    const poster = toLegacyGroupbuyPoster(example('GET /api/v1/groupbuy/groups/:id/poster'));
+    const poster = toPageGroupbuyPoster(example('GET /api/v1/groupbuy/groups/:id/poster'));
     expect(poster).toMatchObject({
       id: 501,
       title: '三人成团 · 坚果礼盒',
@@ -214,20 +214,20 @@ describe('groupbuy — 海报', () => {
       msg: '还差1人成团',
       nickname: '小明',
     });
-    // legacy handed over a rendered QR image; the new contract hands over its payload
+    // the contract hands over the QR payload, not a rendered image
     expect(poster.url).toBe('');
     expect(poster.qr_payload).toContain('groupId=501');
     assertRenderable(poster);
   });
 
   it('says 拼团成功 once the last seat is taken', () => {
-    expect(toLegacyGroupbuyPoster({ seatsLeft: 0 }).msg).toBe('拼团成功');
+    expect(toPageGroupbuyPoster({ seatsLeft: 0 }).msg).toBe('拼团成功');
   });
 });
 
 describe('presale — 预售', () => {
   it('pages the list the way the 预售 page reads it', () => {
-    const paged = toLegacyPresaleList(example('GET /api/v1/presale/activities'));
+    const paged = toPagePresaleList(example('GET /api/v1/presale/activities'));
     expect(paged).toMatchObject({ count: 1, page: 1, limit: 20 });
     expect(paged.list[0]).toMatchObject({
       id: 2,
@@ -244,21 +244,21 @@ describe('presale — 预售', () => {
   });
 
   it('pins 全款预售, because D refuses a 定金 activity outright', () => {
-    expect(toLegacyPresaleCard({ presell_type: 2 }).presell_type).toBe(1);
+    expect(toPagePresaleCard({ presell_type: 2 }).presell_type).toBe(1);
   });
 
   it('pay_status is the window — 1 未开始 · 2 进行中 · 3 已结束 — which picks presell_details` button', () => {
     const dto = example('GET /api/v1/presale/activities/:id'); // 2026-09-01 … 2026-11-30
     const at = (iso) => Date.parse(iso);
-    expect(toLegacyPresaleDetail(dto, at('2026-08-01T00:00:00+08:00')).pay_status).toBe(1);
-    expect(toLegacyPresaleDetail(dto, at('2026-10-01T00:00:00+08:00')).pay_status).toBe(2);
-    expect(toLegacyPresaleDetail(dto, at('2026-12-01T00:00:00+08:00')).pay_status).toBe(3);
-    expect(toLegacyPresaleCard(dto, at('2026-10-01T00:00:00+08:00')).pay_status).toBe(2);
+    expect(toPagePresaleDetail(dto, at('2026-08-01T00:00:00+08:00')).pay_status).toBe(1);
+    expect(toPagePresaleDetail(dto, at('2026-10-01T00:00:00+08:00')).pay_status).toBe(2);
+    expect(toPagePresaleDetail(dto, at('2026-12-01T00:00:00+08:00')).pay_status).toBe(3);
+    expect(toPagePresaleCard(dto, at('2026-10-01T00:00:00+08:00')).pay_status).toBe(2);
     expect(presaleWindowStatus({}, 0)).toBe(2);
   });
 
   it('shapes the detail like a product detail so the page needs no edit', () => {
-    const detail = toLegacyPresaleDetail(example('GET /api/v1/presale/activities/:id'));
+    const detail = toPagePresaleDetail(example('GET /api/v1/presale/activities/:id'));
     expect(detail.storeInfo).toMatchObject({
       id: 2,
       store_name: '春茶预售 · 明前龙井',
@@ -275,18 +275,18 @@ describe('presale — 预售', () => {
   });
 
   it('answers {} rather than throwing on an empty payload', () => {
-    expect(toLegacyPresaleDetail(null)).toEqual({});
-    expect(toLegacyPresaleCard(null)).toEqual({});
-    expect(toLegacyGroupbuyDetail(null)).toEqual({});
-    expect(toLegacyGroupbuyGroup(null)).toEqual({});
-    expect(toLegacyOpenGroup(null)).toEqual({});
-    expect(toLegacyGroupbuyPoster(null)).toEqual({});
+    expect(toPagePresaleDetail(null)).toEqual({});
+    expect(toPagePresaleCard(null)).toEqual({});
+    expect(toPageGroupbuyDetail(null)).toEqual({});
+    expect(toPageGroupbuyGroup(null)).toEqual({});
+    expect(toPageOpenGroup(null)).toEqual({});
+    expect(toPageGroupbuyPoster(null)).toEqual({});
   });
 });
 
-describe('拼团人气条 (B3 — GET /api/v1/groupbuy/summary)', () => {
+describe('拼团人气条 (GET /api/v1/groupbuy/summary)', () => {
   it('gives both 人气条 readers `avatars` and `pink_count`', () => {
-    const summary = toLegacyGroupbuySummary(example('GET /api/v1/groupbuy/summary'));
+    const summary = toPageGroupbuySummary(example('GET /api/v1/groupbuy/summary'));
     expect(summary).toEqual({
       avatars: [
         'https://cdn.example.com/avatar/1.png',
@@ -299,10 +299,10 @@ describe('拼团人气条 (B3 — GET /api/v1/groupbuy/summary)', () => {
   });
 
   it('is a quiet zero for a shop with no live team', () => {
-    expect(toLegacyGroupbuySummary({ participants: 0, avatars: [] })).toEqual({
+    expect(toPageGroupbuySummary({ participants: 0, avatars: [] })).toEqual({
       avatars: [],
       pink_count: 0,
     });
-    expect(toLegacyGroupbuySummary(null)).toEqual({ avatars: [], pink_count: 0 });
+    expect(toPageGroupbuySummary(null)).toEqual({ avatars: [], pink_count: 0 });
   });
 });

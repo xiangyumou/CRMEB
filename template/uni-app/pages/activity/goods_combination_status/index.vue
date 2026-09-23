@@ -107,7 +107,7 @@
 		<view class="mask" v-if="posters" @click="listenerActionClose"></view>
 		<!-- 发送给朋友图片 -->
 		<view class="share-box" v-if="H5ShareBox">
-			<image :src="'/static/images/legacy/share-info.png'" @click="H5ShareBox = false"></image>
+			<image :src="'/static/images/common/share-info.png'" @click="H5ShareBox = false"></image>
 		</view>
 		<!-- #ifdef MP -->
 		<!-- <authorize @onLoadFun="onLoadFun" :isAuto="isAuto" :isShowAuth="isShowAuth" @authColse="authColse"></authorize> -->

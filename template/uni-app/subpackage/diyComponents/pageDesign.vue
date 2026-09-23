@@ -226,7 +226,7 @@
 
     <view v-else>
       <view class="error-network">
-        <image :src="'/static/images/legacy/error-network.png'"></image>
+        <image :src="'/static/images/common/error-network.png'"></image>
         <view class="title">{{ $t(`网络连接断开`) }}</view>
         <view class="btn" @click="reconnect">{{ $t(`重新连接`) }}</view>
       </view>

@@ -21,7 +21,7 @@ export function example(key) {
   return found.response;
 }
 
-/** The example request body, for the `fromLegacy*` direction. */
+/** The example request body, for the `fromPage*` direction. */
 export function exampleBody(key) {
   const found = EXAMPLES[key];
   if (!found) throw new Error(`no contract example for ${key}`);

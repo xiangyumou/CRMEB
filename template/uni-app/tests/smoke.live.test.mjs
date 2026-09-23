@@ -92,7 +92,7 @@ d('the api layer against the contract mock', () => {
     return (first && first[field]) || '1';
   }
 
-  it('GET /api/v1/cart maps to the legacy cart payload', async () => {
+  it('GET /api/v1/cart maps to the page cart payload', async () => {
     const res = await order.getCartList({ page: 1, limit: 20 });
     expect(res.status).toBe(200);
     expect(Array.isArray(res.data.valid)).toBe(true);
@@ -110,7 +110,7 @@ d('the api layer against the contract mock', () => {
     expect(Number.isFinite(Number(res.data.count))).toBe(true);
   });
 
-  it('GET /api/v1/catalog/products maps to the legacy product list', async () => {
+  it('GET /api/v1/catalog/products maps to the page product list', async () => {
     const res = await store.getProductslist({ page: 1, limit: 10 });
     expect(res.status).toBe(200);
     const list = Array.isArray(res.data) ? res.data : res.data.list;
@@ -118,7 +118,7 @@ d('the api layer against the contract mock', () => {
     expect(list[0]).toHaveProperty('store_name');
   });
 
-  it('GET /api/v1/orders maps to the legacy order list', async () => {
+  it('GET /api/v1/orders maps to the page order list', async () => {
     const res = await order.getOrderList({ type: '', page: 1, limit: 10 });
     expect(res.status).toBe(200);
     const list = Array.isArray(res.data) ? res.data : res.data.list;
@@ -127,7 +127,7 @@ d('the api layer against the contract mock', () => {
     expect(list[0]._status).toBeTruthy();
   });
 
-  it('GET /api/v1/orders/:id maps to the legacy detail, _status included', async () => {
+  it('GET /api/v1/orders/:id maps to the page detail, _status included', async () => {
     const id = exampleId('GET /api/v1/orders', 'id');
     const res = await order.getOrderDetail(id);
     expect(res.status).toBe(200);
@@ -149,7 +149,7 @@ d('the api layer against the contract mock', () => {
     expect(res.data).toBeTruthy();
   });
 
-  // The five compositions H2 added. Each one fans a legacy call out across two or
+  // The five compositions. Each one fans a page call out across two or
   // more routes, and a fan-out is exactly what the mocked-`uni.request` suites cannot
   // prove: the URLs have to be right and the pieces have to come back in the shape
   // the page destructures.
@@ -162,7 +162,7 @@ d('the api layer against the contract mock', () => {
     expect(Array.isArray(res.data.pink)).toBe(true);
   });
 
-  it('预售列表 maps to the legacy activity card', async () => {
+  it('预售列表 maps to the page activity card', async () => {
     const res = await activity.getPresellList({ page: 1, limit: 10 });
     expect(res.status).toBe(200);
     const list = Array.isArray(res.data) ? res.data : res.data.list;
@@ -195,7 +195,7 @@ d('the api layer against the contract mock', () => {
     for (const ids of Object.values(res.data)) expect(Array.isArray(ids)).toBe(true);
   });
 
-  // 商品管理 — A2's ten routes, bound in the third pass. Two of them are fan-outs
+  // 商品管理 — ten routes. Two of them are fan-outs
   // (批量下架 and the single-spec 保存) and the rest are a URL plus a mapper, which
   // is exactly what a mocked `uni.request` cannot prove.
 
@@ -272,7 +272,7 @@ d('the api layer against the contract mock', () => {
     expect(created.data).toHaveProperty('store_name');
   });
 
-  // 用户管理 — E4's six routes. `getUserLabel()` with no uid borrows a customer to
+  // 用户管理 — six routes. `getUserLabel()` with no uid borrows a customer to
   // read the catalogue, and the two writes fan out over a batch selection.
 
   it('用户列表 and 用户详情 map to the rows the 用户管理 pages render', async () => {
@@ -308,7 +308,7 @@ d('the api layer against the contract mock', () => {
     expect(saved.data[0]).toHaveProperty('label_id');
   });
 
-  // 赠送优惠券 and 订单赠券 — B3's three routes.
+  // 赠送优惠券 and 订单赠券 — three routes.
 
   it('赠券抽屉 lists grantable coupons and grants through coupon-grants', async () => {
     const coupons = await admin.getUserCoupon({ coupon_title: '', uid: 0 });
@@ -320,7 +320,7 @@ d('the api layer against the contract mock', () => {
     expect(res.msg).toBe('赠送成功');
   });
 
-  it('查看优惠券 reads the customer’s own coupons, spendable first (CR-1-h3)', async () => {
+  it('查看优惠券 reads the customer’s own coupons, spendable first', async () => {
     const seen = [];
     const original = globalThis.uni.request;
     globalThis.uni.request = (options) => {
@@ -344,7 +344,7 @@ d('the api layer against the contract mock', () => {
     expect(res.data[0]).toHaveProperty('coupon_title');
   });
 
-  // 人气条, the three 小程序码 callers and 一键绑定手机号 — B3 / E4.
+  // 人气条, the three 小程序码 callers and 一键绑定手机号.
 
   it('拼团人气条 maps to {avatars, pink_count}', async () => {
     const res = await activity.getPink();
@@ -370,8 +370,8 @@ d('the api layer against the contract mock', () => {
     expect(res.msg).toBe('绑定成功');
   });
 
-  // 站点公开配置 — six legacy readers over one GET /api/v1/site/config (F4), the
-  // DIY reads that replaced CR-3-h2's three gaps, and the poster base64 re-point.
+  // 站点公开配置 — six readers over one GET /api/v1/site/config, the DIY reads, and
+  // the poster base64.
 
   it('reads the site config once for all six readers', async () => {
     api.resetSiteConfig();
@@ -412,7 +412,7 @@ d('the api layer against the contract mock', () => {
     expect(menus.data.routine_my_menus).toEqual([]);
     const center = await api.getThemeInfo('user');
     expect(center.data).toHaveProperty('value');
-    // 商品详情 (CR-2-h3): the mock answers the built-in default page
+    // 商品详情: the mock answers the built-in default page
     const detail = await api.getThemeInfo('detail');
     expect(detail.data.type).toBe('product_detail');
     const names = Object.values(detail.data.value).map((node) => node.name);

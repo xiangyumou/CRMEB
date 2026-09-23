@@ -59,7 +59,7 @@
 			this.getCode();
 		},
 		methods: {
-			// 获取验证码。行为验证码已下线（E4），号码校验通过就直接发短信。
+			// 获取验证码。没有行为验证码，号码校验通过就直接发短信。
 			code() {
 				let that = this;
 				if (!that.account) return that.$util.Tips({

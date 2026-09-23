@@ -44,7 +44,7 @@
 					</template>
 				</radio-group>
 				<view v-else class="empty">
-					<image :src="'/static/images/legacy/noInvoice.png'"></image>
+					<image :src="'/static/images/common/noInvoice.png'"></image>
 					<view>{{$t(`您还没有添加发票信息哟`)}}~</view>
 				</view>
 			</scroll-view>

@@ -16,8 +16,7 @@ import {
  * The cached subscribe-template map, as `api/api.js`'s `getTempIds` writes it.
  *
  * Keyed by the contract's four scenes — `order-create`, `order-pay`, `order-ship`,
- * `refund` — where legacy keyed it by an internal template name per notification
- * (`order_pay_success`, `order_take`, `user_extract`, …). One scene now covers every
+ * `refund` — not by an internal template name per notification. One scene covers every
  * template that moment needs, which is why the helpers below ask for a scene and not
  * for a list of names.
  */

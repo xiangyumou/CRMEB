@@ -117,7 +117,7 @@ const BODYLESS = { GET: true, DELETE: true };
  * @param {object} data    query params for GET/DELETE, JSON body otherwise
  * @param {object} [opt]
  * @param {boolean} [opt.noAuth]  send without a session, and do not redirect to login
- * @param {function} [opt.map]    payload → legacy view model; applied before resolving
+ * @param {function} [opt.map]    payload → the page's view model; applied before resolving
  * @param {string|function} [opt.msg]  envelope `msg` for a page that toasts `res.msg`
  * @param {object} [opt.query]    extra query params for a request that also has a body
  * @param {object} [opt.headers]  extra headers

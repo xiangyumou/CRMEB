@@ -28,7 +28,7 @@
 			</view>
 			<view class='noCommodity' v-if="reply.length==0">
 				<view class='emptyBox'>
-					<image :src="'/static/images/legacy/noMessage.png'"></image>
+					<image :src="'/static/images/common/noMessage.png'"></image>
 				</view>
 				<view class="text">
 					{{$t(`暂无评论`)}}
