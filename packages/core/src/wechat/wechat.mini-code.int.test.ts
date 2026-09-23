@@ -1,12 +1,13 @@
 import { wechatMiniCodes } from '@shop/db/schema/wechat';
 import { createTestCtx, flushTestRedis, type TestCtx } from '@shop/testing';
 import { startFakeOaServer, type FakeOaServer } from '@shop/testing/wechat';
+import { decodeScene } from '@shop/contracts/system/storefront-routes';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Ctx } from '../kernel/context';
 import { wechatMiniConfig } from '../system';
 import { resetWechatTokenFlight } from './wechat.client';
 import { wechatConfig } from './wechat.config';
-import { miniCodeUrl } from './wechat.mini-code.service';
+import { miniCodeUrl, shareMiniCodeUrl } from './wechat.mini-code.service';
 
 /**
  * 小程序码 against a fake `api.weixin.qq.com`.
@@ -128,6 +129,48 @@ describe('miniCodeUrl', () => {
     await expect(miniCodeUrl(ctx(), { page: PAGE, scene: SCENE })).rejects.toMatchObject({
       code: 'AUTH_WECHAT_NOT_CONFIGURED',
     });
+    expect(codeCalls()).toBe(0);
+  });
+});
+
+describe('shareMiniCodeUrl', () => {
+  it('takes the page from the catalogue and the scene from encodeScene — SHARE-001', async () => {
+    const product = await shareMiniCodeUrl(ctx(), { route: 'product', id: '1024' });
+    const team = await shareMiniCodeUrl(ctx(), { route: 'groupbuyTeam', id: '501' });
+    const home = await shareMiniCodeUrl(ctx(), { route: 'home' });
+
+    expect(oa.miniCodes).toEqual([
+      { page: 'pages/product/index', scene: 'id=1024' },
+      { page: 'packages/promo/groupbuy-team/index', scene: 'id=501' },
+      { page: 'pages/index/index', scene: '_' },
+    ]);
+    // The page reads its params back from the scene it is opened with.
+    expect(decodeScene('groupbuyTeam', oa.miniCodes[1]!.scene)).toEqual({ id: '501' });
+    expect(new Set([product.url, team.url, home.url]).size).toBe(3);
+  });
+
+  it('shares the (page, scene) cache with the legacy endpoint — SHARE-001', async () => {
+    const legacy = await miniCodeUrl(ctx(), { page: 'pages/index/index', scene: '_' });
+    const shared = await shareMiniCodeUrl(ctx(), { route: 'home' });
+    expect(shared.url).toBe(legacy.url);
+    expect(codeCalls()).toBe(1);
+  });
+
+  it('refuses params that do not fit the key, without calling WeChat — SHARE-001', async () => {
+    await expect(shareMiniCodeUrl(ctx(), { route: 'home', id: '1' })).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+    });
+    await expect(shareMiniCodeUrl(ctx(), { route: 'product' })).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+    });
+    expect(codeCalls()).toBe(0);
+    expect(await harness.ctx.db.select().from(wechatMiniCodes)).toHaveLength(0);
+  });
+
+  it('refuses a key the catalogue does not mark miniCode — SHARE-001', async () => {
+    await expect(
+      shareMiniCodeUrl(ctx(), { route: 'order' as never, id: '1' }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
     expect(codeCalls()).toBe(0);
   });
 });

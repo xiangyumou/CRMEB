@@ -25,6 +25,7 @@ import type {
   MyGroupbuyListQuery,
 } from '@shop/contracts/groupbuy/schemas';
 import { GROUPBUY_SUMMARY_AVATAR_LIMIT } from '@shop/contracts/groupbuy/schemas';
+import { toMiniPath } from '@shop/contracts/system/storefront-routes';
 import { DomainError } from '../kernel/errors';
 import { toId, toIdOrNull } from '../kernel/ids';
 import type { Ctx } from '../kernel/context';
@@ -542,10 +543,10 @@ export async function myGroups(
 export async function poster(ctx: Ctx, input: { id: string }): Promise<GroupbuyPoster> {
   const id = Number(input.id);
   requireShopper(ctx);
-  const config = await ctx.config.get(groupbuyConfig);
   const row = await repo.findGroupRow(ctx.db, id);
   if (!row) throw new DomainError('GROUPBUY_GROUP_NOT_FOUND');
-  const page = config.posterPage.replaceAll('{groupId}', String(id));
+  const route = { route: 'groupbuyTeam', params: { id: toId(id) } } as const;
+  const page = toMiniPath(route);
   return {
     groupId: toId(id),
     title: row.activityTitle,
@@ -558,6 +559,7 @@ export async function poster(ctx: Ctx, input: { id: string }): Promise<GroupbuyP
     leaderAvatarUrl: row.leaderAvatarUrl,
     qrPayload: page,
     page,
+    route,
   };
 }
 

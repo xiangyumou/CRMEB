@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { id, instant, money, pageQuery, paged, sortQuery } from '../_conventions/common';
+import { storefrontRoute } from '../system/storefront-routes';
 
 /**
  * Shapes shared by the group-buy routes.
@@ -427,10 +428,16 @@ export const groupbuyPoster = z.object({
   expiresAt: instant,
   leaderNickname: z.string().nullable(),
   leaderAvatarUrl: z.string().nullable(),
-  /** What the QR code encodes — a storefront URL, never an image. */
+  /**
+   * What the QR code encodes — the team page's mini-program path, never an
+   * image. The mini program draws its 小程序码 from `GET /share/mini-codes`
+   * with `route` instead.
+   */
   qrPayload: z.string(),
-  /** Deep link for a mini-program `navigateTo`. */
+  /** The team page's mini-program path (`toMiniPath(route)`), no leading `/`. */
   page: z.string(),
+  /** The team page in the storefront route catalogue: `groupbuyTeam { id }`. */
+  route: storefrontRoute,
 });
 export type GroupbuyPoster = z.infer<typeof groupbuyPoster>;
 
@@ -637,8 +644,9 @@ export const groupbuyPosterExample: GroupbuyPoster = {
   expiresAt: '2026-09-23T10:00:00+08:00',
   leaderNickname: '小明',
   leaderAvatarUrl: 'https://cdn.example.com/u/101.jpg',
-  qrPayload: 'https://shop.example.com/pages/activity/groupbuy_status/index?groupId=501',
-  page: 'pages/activity/groupbuy_status/index?groupId=501',
+  qrPayload: 'packages/promo/groupbuy-team/index?id=501',
+  page: 'packages/promo/groupbuy-team/index?id=501',
+  route: { route: 'groupbuyTeam', params: { id: '501' } },
 };
 
 export const groupbuyActivityStatExample: GroupbuyActivityStat = {

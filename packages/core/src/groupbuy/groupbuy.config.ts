@@ -26,16 +26,6 @@ export const groupbuyConfig = defineConfigGroup({
     /** Groups one sweep pass handles. The per-group delayed job does the real work. */
     groupExpirySweepLimit: z.number().int().min(1).max(2_000).default(200),
     /**
-     * The storefront path a poster's QR code points at. `{groupId}` is
-     * substituted. Held as config because the uni-app route is the client's to
-     * decide and changes with its releases.
-     */
-    posterPage: z
-      .string()
-      .min(1)
-      .max(255)
-      .default('/pages/activity/groupbuy/detail?groupId={groupId}'),
-    /**
      * The 拼团频道 head images. Config rather than a table because there are
      * two of them; a DIY page that wants richer banners uses the DIY components
      * instead.
@@ -51,12 +41,6 @@ export const groupbuyConfig = defineConfigGroup({
       type: 'number',
       help: '兜底扫描每次处理的拼团数，正常情况下由单个延时任务先行结算。到期未满员的拼团一律失败并自动退款（不支持虚拟成团）',
       section: '成团',
-    },
-    posterPage: {
-      label: '拼团海报跳转地址',
-      type: 'text',
-      help: '小程序/H5 扫码后跳转的页面路径，{groupId} 会被替换为拼团 ID',
-      section: '分享',
     },
     banners: {
       label: '拼团频道头图',

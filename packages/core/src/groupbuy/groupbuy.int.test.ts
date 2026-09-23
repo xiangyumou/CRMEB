@@ -1017,14 +1017,16 @@ describe('the storefront surface', () => {
     ).rejects.toMatchObject({ code: 'GROUPBUY_GROUP_NOT_WITHDRAWABLE' });
   });
 
-  it('answers the poster with data and a payload, never an image', async () => {
+  it('answers the poster with data and a payload, never an image — SHARE-002', async () => {
     const fixture = await makeActivity({ stock: 10 });
     const leader = await makeUser('小明');
     const opened = await placeOrder({ userId: leader, fixture });
     await pay(opened.orderId);
 
     const poster = await service.poster(asUser(leader), { id: String(opened.groupId) });
-    expect(poster.qrPayload).toContain(String(opened.groupId));
+    expect(poster.route).toEqual({ route: 'groupbuyTeam', params: { id: String(opened.groupId) } });
+    expect(poster.page).toBe(`packages/promo/groupbuy-team/index?id=${opened.groupId}`);
+    expect(poster.qrPayload).toBe(poster.page);
     expect(poster.seatsLeft).toBe(2);
     expect(poster.leaderNickname).toBe('小明');
   });

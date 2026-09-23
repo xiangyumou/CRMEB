@@ -1619,6 +1619,23 @@ Every contract has a route file that exports its method, and every route file is
 - `guards/src/checks/contracts.test.ts::contracts and route files > matches every contract to a route file that exports its method`
 - `guards/src/checks/contracts.test.ts::leaves no route file that no contract describes`
 
+## Storefront share codes (小程序码)
+
+### SHARE-001
+
+`GET /api/v1/share/mini-codes` accepts only route-catalogue keys marked `miniCode`, and the code it answers opens exactly `storefrontRouteDef(key).path` with `encodeScene(route)` as the scene, which `decodeScene` reads back. The params are validated against the key before anything is looked up or minted: params that do not fit (an `id` on `home`, none on `product`) are `VALIDATION_FAILED` with no WeChat call and no row. It shares `/wechat/mini-qrcodes`'s `(page, scene)` cache, so one pair is minted once whichever endpoint asked first.
+
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > takes the page from the catalogue and the scene from encodeScene — SHARE-001`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > shares the (page, scene) cache with the legacy endpoint — SHARE-001`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > refuses params that do not fit the key, without calling WeChat — SHARE-001`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > refuses a key the catalogue does not mark miniCode — SHARE-001`
+
+### SHARE-002
+
+A 拼团 poster points at the team page from the route catalogue, not at a hand-typed path: `route` is `groupbuyTeam { id }`, and `page` and `qrPayload` are `toMiniPath(route)`.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the storefront surface > answers the poster with data and a payload, never an image — SHARE-002`
+
 ## System, storage and uploads
 
 ### SYS-001

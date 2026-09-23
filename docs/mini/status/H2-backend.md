@@ -60,10 +60,23 @@ Merged storefront/mini at 84f28a645+ (F1 decor, I1 guards): our migrations renum
 0005–0007 after `0004_decor`, `EXPECTED_MIGRATIONS = 8`; `/api/v1/pages` routes read
 `ctx.clientVersion`.
 
+4. Route catalogue adoption (pages.md §3–§4.1, C11)
+   - Notifications: customer events carry `route: { route, params }` templates (filled, then
+     validated; `data.route` on in-app messages; subscribe `page` = `toMiniPath`, over the
+     deprecated `wechatMini.page`). `link` kept for 公众号 / the live uni-app H5. NOTIF-006.
+   - `MSG_JUMP_PATH` from `toMiniPath({ route: 'order', params: { outTradeNo: sentinel } })`.
+   - 拼团 poster: `route: groupbuyTeam { id }`, `page` = `qrPayload` = `toMiniPath`; config
+     `posterPage` removed. SHARE-002.
+   - `GET /api/v1/share/mini-codes?route=&id=` (`wechat.shareMiniCode`): `miniCode` keys
+     only, strict params, page from the catalogue, scene from `encodeScene`, shares the
+     legacy `(page, scene)` cache and mint budget. SHARE-001. Legacy `/wechat/mini-qrcodes`
+     kept.
+   - No `/share/scenes` decode endpoint (client decodes locally; documented in C11 + §3.3).
+
 ## In progress
 
-- 4: route catalogue adoption.
+- Final checklist.
 
 ## Next
 
-- Final checklist and report.
+- Report.
