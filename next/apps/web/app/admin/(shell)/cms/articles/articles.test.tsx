@@ -1,8 +1,22 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import { catalogAdminProductList } from '@shop/contracts/catalog/catalog.product.admin.contract';
+import {
+  cmsArticleDetail,
+  cmsArticleList,
+  cmsArticleSetStatus,
+  cmsArticleUpdate,
+  cmsCategoryList,
+} from '@shop/contracts/cms/cms.admin.contract';
+import type {
+  AdminArticleDetail,
+  AdminArticleListItem,
+  ArticleCategory,
+} from '@shop/contracts/cms/schemas';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { ArticlesPage } from './articles';
@@ -16,13 +30,7 @@ import { ArticlesPage } from './articles';
  * from the list), and 删除 sits on its own atom.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const row = {
+const row: AdminArticleListItem = {
   id: '101',
   categoryId: '3',
   categoryTitle: '新闻资讯',
@@ -45,7 +53,7 @@ const row = {
   updatedAt: '2026-06-01T09:00:00+08:00',
 };
 
-const category = {
+const category: ArticleCategory = {
   id: '3',
   parentId: null,
   title: '新闻资讯',
@@ -58,31 +66,17 @@ const category = {
   createdAt: '2026-01-01T09:00:00+08:00',
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload = url.includes('/admin-api/cms/article-categories')
-        ? { items: [category] }
-        : url.includes('/admin-api/catalog/products')
-          ? { items: [], total: 0, page: 1, pageSize: 20 }
-          : method === 'GET'
-            ? { items: [row], total: 1, page: 1, pageSize: 20 }
-            : { ...row, status: 'hidden' };
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  // Every single-article route answers with the detail, body and product included.
+  const detail: AdminArticleDetail = { ...row, contentHtml: '<p>活动说明</p>', product: null };
+  return stubRoutes([
+    on(cmsCategoryList, { items: [category] }),
+    on(catalogAdminProductList, { items: [], total: 0, page: 1, pageSize: 20 }),
+    on(cmsArticleList, { items: [row], total: 1, page: 1, pageSize: 20 }),
+    on(cmsArticleDetail, detail),
+    on(cmsArticleUpdate, detail),
+    on(cmsArticleSetStatus, { ...detail, status: 'hidden' }),
+  ]);
 }
 
 afterEach(() => {

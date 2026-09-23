@@ -1,357 +1,141 @@
-<div align="center" >
-    <img src="https://www.crmeb.com/static/images/dark_logo.png" />
-</div>
+# CRMEB 商城
 
-<div align="center" style="font-size: 15px;">
+简体中文 | [English](./README.md)
 
-CRMEB高品质开源商城系统（PHP版） 
+面向国内市场的单商户网上商城。顾客通过移动端商城购物：H5 可在任何手机浏览器（包括微信内置浏览器）中打开，另有微信小程序。商家在网页管理后台经营店铺。
 
-</div>
+功能：
 
-<div align="center" >
-    <a href='https://gitee.com/ZhongBangKeJi/CRMEB/stargazers'>
-       <img src='https://gitee.com/ZhongBangKeJi/CRMEB/badge/star.svg?theme=gvp' alt='star'></img>
-    </a>
-    <a href="http://www.crmeb.com/?from=giteephp">
-        <img src="https://img.shields.io/badge/Licence-apache2.0-green.svg?style=flat" />
-    </a>
-    <a href="http://www.crmeb.com">
-        <img src="https://img.shields.io/badge/Edition-6.0.0-blue.svg" />
-    </a>
-     <a href="https://gitee.com/ZhongBangKeJi/CRMEB/repository/archive/master.zip">
-        <img src="https://img.shields.io/badge/Download-240m-red.svg" />
-    </a>
+- **商品**：规格与 SKU、分类、标签、参数、评价、关键词搜索。
+- **下单**：购物车；结算时计算运费模板与优惠券分摊；订单；按需开票；自动取消与自动收货。
+- **支付与售后**：微信支付 v3（JSAPI、小程序、H5）、超时支付对账、退款申请与审核。
+- **营销**：优惠券、拼团、预售。
+- **履约**：发货、拆单发货、物流查询，以及移动端的店员页面。
+- **内容**：拖拽式页面装修与主题、文章、协议。
+- **用户**：短信、密码、小程序、公众号登录；地址、标签、分组。
+- **公众号**：菜单、自动回复、二维码、素材。
+- **运营**：由权限原子组成的角色、操作日志、通知（站内信、消息模板、订阅消息）、统计看板、本地或 S3 兼容存储。
 
-</div>
+## 技术栈
 
-<div align="center" style="font-size: 15px;">
-  用心做开源，我们也很需要你的鼓励！右上角Star🌟，等你点亮
-</div>
+| 组成           | 说明                                                                                                                                   |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`     | Next.js 16（App Router，standalone）。管理后台在 `/admin`（React 19、Ant Design 6），其接口在 `/admin-api/*`，商城接口在 `/api/v1/*`。 |
+| `apps/worker`  | BullMQ worker：定时任务、按需任务，以及提交后副作用的派发器。                                                                          |
+| PostgreSQL 17  | 唯一的数据库。schema 与迁移由 Drizzle 管理。                                                                                           |
+| Redis 7        | 后台会话、配置缓存、限流、任务队列、后台实时通知的 pub/sub。                                                                           |
+| `apps/uni-app` | 移动端（uni-app，Vue 2）：H5 商城与微信小程序，同一套代码构建。                                                                        |
+| edge           | 最前面的 nginx：在 `/` 提供 H5 构建产物，把 `/admin`、`/admin-api`、`/api` 转发给 `web`，并提供 `/uploads/`。                          |
 
-####
+除 uni-app 外全部是严格模式的 TypeScript，运行在 Node 24 上，用 pnpm 管理。每个接口只声明一次，即 `packages/contracts` 里的 zod 契约；OpenAPI 文档、类型化的后台客户端、mock server 和守卫都由它派生。详见 [docs/architecture.md](docs/architecture.md)。
 
-<div align="center">
+## 目录结构
 
-简体中文 | [English](./README.md) 
-
-</div>
-
-
-####
-
-<div align="center">
-
-[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/crmeb/CRMEB)
-![star](https://gitcode.com/xazbkj/CRMEB/star/badge.svg)
-![star](https://img.shields.io/github/stars/crmeb/crmeb)
-
-</div>
-
-<div align="center">
-
-[官网](https://www.crmeb.com/?from=giteephp) |
-[在线体验](http://v6.crmeb.net/admin/) |
-[帮助文档](https://doc.crmeb.com/single_open) |
-[应用市场](https://www.crmeb.com/market?from=giteephp) |
-[技术社区](https://www.crmeb.com/ask/thread/list/147) |
-[主题广场](https://www.crmeb.com/theme) |
-[宽屏预览](https://gitee.com/ZhongBangKeJi/CRMEB/blob/master/README.md)
-
-
-</div>
-
-
-
-
-
----
-
-### 当前维护版本
-
-本项目保留 H5、微信小程序、管理后台、微信支付、优惠券、拼团、预售和仅发券的新人礼包。架构与检查见 [维护文档](docs/maintenance/architecture.md)、[检查入口](scripts/check-maintenance.sh)、[配套构建说明](docs/maintenance/build-release.md)。仓库内 `crmeb/public` 为旧发布文件，上线前必须重新构建配套前端。
-
-### 📝 **项目介绍**
-
-**开源自由**
-
-CRMEB开源商城系统代码100%开源，基于 **Apache-2.0协议** 免费商用，无任何隐藏费用或功能限制，真正实现“零成本”部署与二次开发自由！
-
-**技术架构**
-
-采用 **ThinkPHP 6 + ElementUI + UniApp** 技术栈，前后端分离设计，支持模块化开发与高效维护。前端适配微信小程序、H5、APP、PC等多端，后端统一管理全平台数据，保障流畅体验与高并发性能。
-
-**全场景覆盖**
-
-无缝对接公众号、小程序、H5、APP、PC端，数据实时互通，助力商家一站式运营多渠道业务，满足全场景电商需求。
-
-**原生营销引擎**
-
-内置 **20+核心营销模块**（拼团、砍价、秒杀、优惠券、积分体系、直播带货、付费会员、等级会员、用户充值、分销裂变、渠道码、新人礼等），支持零插件自定义活动规则。通过 **首页DIY功能** ，商家可拖拽式设计商城首页，无需技术背景即可快速搭建高转化场景，实现「所见即所得」的运营效率。
-
-**社区共建计划**
-
-我们致力于打造开发者友好生态，开放源码、持续更新功能模块，并新增主题广场，支持商家一键套用精美商城主题快速装修，开发者与设计师可上架原创主题供用户下载使用，实现创意共享与价值变现。同时欢迎开发者提交优化建议或贡献代码，通过共享技术成果，降低行业重复造轮子成本，推动开源电商系统的可持续发展。
-
----
-
-### 📝 **主题广场**
-
-**免费下载**
-
-来CRMEB主题广场畅享海量精选模板，零成本打造个性化商城。无需具备专业设计能力，海量免费模版直接下载使用，多样化主题风格可精准匹配不同行业需求，快速提升店铺形象与用户体验，让您的商城在起步阶段就赢在视觉起跑线上。
-
-**一键导入**
-
-化繁为简，极速焕新商城界面。彻底告别过去繁琐的手动DIY配置流程，一键导入主题包，即可将整套主题（包含页面布局与全局配色）无缝融合至您的系统中。系统自动完成组件匹配与数据挂载，无需编写任何代码，即时预览生效。让商城改版升级像换手机壁纸一样轻松，极大节省了运营与开发的时间成本。
-
-**上架主题广场**
-
-不仅随心用，更能轻松赚。您可以利用系统强大的DIY功能，基于原有模块自由组合配色、布局与组件，打造出独具特色的专属主题，并直接上架至主题广场。当其他用户付费下载您的作品时，您将获得相应的收益分成。这不仅为您的设计能力与技术沉淀提供了直接的变现渠道，更助力共建繁荣的开源商城生态，实现创意与价值的双赢。
-
-主题广场：<a href="https://www.crmeb.com/theme" target="_blank">主题广场</a>
-
-
-![输入图片说明](help/resource/pic/主题广场.png)
-
-
-
-🔗 <a href="https://doc.crmeb.com/single_open/open_v60/39233" target="_blank">功能列表</a> | 📩 <a href="https://gitee.com/ZhongBangKeJi/CRMEB/issues" target="_blank">提交反馈</a> | 📩 <a href="https://gitee.com/ZhongBangKeJi/CRMEB/pulls" target="_blank">提交代码</a> | 🔗 <a href="https://www.crmeb.com/theme" target="_blank">主题广场</a>
-
-
-
----
-
-### Docker 镜像
-```bash
-docker pull ghcr.io/xiangyumou/crmeb:latest
-docker run -d --name crmeb-php -p 9000:9000 ghcr.io/xiangyumou/crmeb:latest
+```
+apps/
+  web/          Next.js：后台页面、/admin-api、/api/v1
+  worker/       BullMQ worker 及其任务
+  uni-app/      移动端（独立的 npm 项目，不在 pnpm workspace 内）
+packages/
+  config/       共享的 ESLint、TypeScript、Vitest 预设
+  contracts/    路由契约（zod）→ OpenAPI；接口的唯一事实来源
+  core/         领域逻辑，每个领域一个目录，另有 kernel/
+  db/           Drizzle schema、迁移、基础数据种子
+  testing/      Testcontainers 测试基座、工厂、假微信与假短信网关、mock server
+e2e/            Playwright 套件：admin/ 与 storefront/
+guards/         全仓静态检查（pnpm guards）
+load/           负载冒烟
+docker/         web、worker、edge 三个镜像
+deploy/         生产 Compose 栈及其脚本
+docs/           架构、约定、贡献指南、业务规则目录
 ```
 
-该镜像提供 PHP-FPM 服务，不包含 Nginx、MySQL 或 Redis。生产环境需要将 Nginx FastCGI 指向容器的 `9000` 端口，并单独配置数据库与 Redis。源码安装依赖请在 `crmeb` 目录执行 `composer install`。
+## 本地开发
 
-`x-zoo.vip` 现有生产环境的更新、验证及人工回滚操作见 [生产部署手册](deploy/production/README.md)。上述 `docker run` 示例不是该环境的更新命令。
+### 前置条件
 
-> 详细说明点击查看 [帮助文档](/help/docker/docker.md)。
----
+- Node 24 与 pnpm 12（`corepack enable` 即可得到锁定的版本）。
+- Docker：用于 PostgreSQL、Redis、集成测试和端到端套件。
 
-![输入图片说明](help/resource/pic/开源banner-PHP.jpg)
+### 启动
 
+```sh
+pnpm install
+pnpm gen          # 生成的聚合文件（*.gen.ts、openapi.json）不入库
 
-### 🫧 技术特点
+docker run -d --name shop-pg -p 127.0.0.1:5432:5432 \
+  -e POSTGRES_USER=shop -e POSTGRES_PASSWORD=shop -e POSTGRES_DB=shop postgres:17
+docker run -d --name shop-redis -p 127.0.0.1:6379:6379 redis:7 \
+  redis-server --maxmemory-policy noeviction
 
-~~~
-关于二开：
-1.代码规范：遵循PSR-2命名规范、Restful标准接口、代码严格分层、注释齐全、统一错误码；
-2.权限管理：内置强大灵活的权限管理，可以控制到每一个菜单；
-3.开发配置：低代码增加配置、系统组合数据模块；
-4.代码生成：快速生成后台菜单、页面，快速实现增删改查；
-5.定时任务：系统内置10中定时任务，还有自定义任务，可以自行设置执行周期，执行代码，完美兼容；
-6.系统事件：埋入30+系统事件锚点，可在后台页面进行事件添加；
-7.在线编辑：可以在后台对系统的代码进行编辑修改操作，不用登录服务器去修改代码文件，方便快捷；
-8.接口管理：后台页面可以看到系统中所有的接口数据，并且可以在线调试接口；
-9.二开效率：应用form-builder PHP可以快速生成表单；
-10.快速上手：后台接口管理、后台数据库字典、系统文件管理备注、代码注释、一键安装；
-~~~
-~~~
-性能与拓展：
-1.系统安全：系统操作日志、系统生产日志、文件校验、数据备份；
-2.高性能：支持Redis缓存、队列、长连接、多种云储存、支持集群部署；
-3.多语言：支持自动识别浏览器多语言展示；
-4.驱动扩展：支持多种支付方式、多种短信、多种云储存等；
-5.云存储：云存储支持图片和视频的远程云存储，支持阿里云，腾讯云，七牛云，京东云，天翼云，华为云
-6.一号通：通用的第三方扩展，支持短信，物流查询，电子面单，电子发票，商品采集，商家寄件
-~~~
+export DATABASE_URL=postgres://shop:shop@127.0.0.1:5432/shop
+export REDIS_URL=redis://127.0.0.1:6379
+export UPLOADS_DIR="$PWD/.uploads"
+export VALIDATE_RESPONSES=1       # 每个响应都按契约校验
 
----
+pnpm --filter @shop/db db:migrate   # 建表
+pnpm --filter @shop/db db:seed      # 基础数据：城市、快递公司、模板
+pnpm dev                            # web 在 http://localhost:3000，同时启动 worker
+```
 
-### 📖 系统功能
+种子只灌基础数据，不创建管理员；产品内也没有任何途径能授予 `is_super`，所以第一个超级管理员要直接写库。密码哈希用 bcrypt，密码从终端读入，不出现在命令行上：
 
-![输入图片说明](help/resource/pic/核心功能.jpg)
+```sh
+(cd packages/core && read -rs PW && PW="$PW" node --input-type=module \
+  -e "import b from 'bcryptjs'; console.log(await b.hash(process.env.PW, 10))")
+docker exec -i shop-pg psql -U shop shop <<'SQL'
+insert into admins (account, password_hash, name, is_super)
+values ('admin', '<上面的哈希>', '超级管理员', true);
+SQL
+```
 
----
+然后在 <http://localhost:3000/admin> 登录。`/admin/dev/kit` 实时展示后台 kit 的全部组件。
 
-### 📖 UI界面展示
+如果想要一个已经带有管理员、商品、优惠券和买家的环境，改用后台端到端套件的服务：`pnpm --filter @shop/e2e-admin exec tsx scripts/serve.ts`。它在 Testcontainers 里自带 PostgreSQL 与 Redis，登录账号 `e2e-super` / `e2e-Passw0rd!`。
 
-![输入图片说明](help/resource/pic/PHP_06.jpg)
+### 移动端
 
+`apps/uni-app` 是独立的 npm 项目：
 
+```sh
+cd apps/uni-app
+npm ci
+npm test                  # 接口层、mappers、store、utils
+npm run build:h5          # 产物在 dist/build/h5，edge 镜像提供的就是它
+npm run build:mp-weixin
+```
 
----
+H5 构建请求它所在的源；小程序构建从 `VUE_APP_CRMEB_API_ORIGIN` 读取接口源。`api/` 下的模块调用 `/api/v1` 路由，`api/mappers/` 把每个响应转换成页面读取的字段名。
 
-### 📖 后台界面展示
+## 检查
 
-![输入图片说明](help/resource/pic/PHP_05.jpg)
+以下全部通过才能合并。完整清单及每一步证明什么，见 [docs/contributing.md](docs/contributing.md)。
 
+```sh
+pnpm turbo run gen typecheck lint test:unit build
+pnpm turbo run test:int --force --concurrency=4     # 需要 Docker
+pnpm --filter @shop/contracts check:examples
+pnpm exec prettier --check .
+pnpm guards                                          # 0 failures
+pnpm --filter @shop/e2e-admin e2e                    # 使用 apps/web 的构建产物
+pnpm --filter @shop/e2e-storefront test
+(cd apps/uni-app && npm test && npm run build:h5)
+```
 
----
+CI（`.github/workflows/next.yml`）跑除 uni-app 的 `npm test` 以外的全部内容，另加 shellcheck、部署演练，以及在 push 时构建三个生产镜像。
 
+## 部署
 
-### 📱 系统演示
-![输入图片说明](help/resource/pic/contact2.jpg)
+商城在一台主机上以一个 Docker Compose 项目运行：PostgreSQL、Redis、`web`、`worker` 与 nginx `edge`，前面是 Traefik。镜像在 CI 中构建，按 digest 部署。首次部署、升级、回滚、备份与恢复见 [deploy/README.md](deploy/README.md)。
 
-管理后台： http://v6.crmeb.net/admin
+## 文档
 
-账号：demo 密码：crmeb.com
+- [docs/architecture.md](docs/architecture.md)：系统如何组成。
+- [docs/conventions.md](docs/conventions.md)：代码遵循的工程约定。
+- [docs/contributing.md](docs/contributing.md)：合并清单；如何新增领域、路由或契约。
+- [docs/invariants.md](docs/invariants.md)：业务规则，每条附证明它的测试。
+- [deploy/README.md](deploy/README.md)：生产栈的运维。
 
-H5端：http://v6.crmeb.net/ （移动端打开）
+## 许可证
 
-PC端：http://v6.crmeb.net/ （电脑端打开）
-
-APP下载：http://app.crmeb.cn/bzv （苹果手机直接在APP Store里搜索CRMEB下载）
-
-主题：https://www.crmeb.com/theme （电脑端打开）
-
-> 听说，大神你想看看CRMEB开源项目的完整框架？<a href="https://doc.crmeb.com/single_open/open_v60/39235" target="_blank">戳这儿，轻松获取！</a>
-
-
-
-
-
----
-
-
-
-
-
-### 🔐 **运行环境**
-
-
-| **运行环境**         | **要求**                                                                 |
-|------------------|------------------------------------------------------------------------|
-| **操作系统**     | Linux / Windows                                                        |
-| **WEB 服务**   | Nginx / Apache / IIS                                                      |
-| **PHP 版本**     | PHP 7.1 ~ 7.4                                                          |
-| **数据库**       | MySQL 5.7 ~ 8.0（引擎：InnoDB）                                         |
-| **缓存**         | Redis（可选，不安装则使用文件缓存）                                      |
-| **管理器**       | Supervisor（用于管理消息队列）                                          |
-| **推荐工具**     | 宝塔面板（简单易用）                                                    |
-| **云服务器**     | 阿里云 ECS / 腾讯云 CVM / 京东云ECS                                                |
-| **开放端口**     | 80, 21, 8888, 888, 443, 3306, 6379（授权对象：`0.0.0.0/0`）              |
-| **PHP 扩展**     | fileinfo（可选）、redis（可选）                               |
-| **禁用函数**     | `proc_open`, `pcntl_signal`, `pcntl_signal_dispatch`, `pcntl_fork`, `pcntl_wait`, `pcntl_alarm` |
-| **消息队列**     | 运行命令：`php think queue:listen --queue`    （使用Supervisor）                          |
-| **长连接**       | 运行命令：`sudo -u www php think workerman start --d`     （命令行执行）              |
-| **定时任务**     | 运行命令：`php think timer start --d`            （命令行执行）                       |
-> 温馨提示：虚拟空间不支持，推荐使用bt宝塔面板，服务器推荐京东云服务器：<a href="https://partner.jdcloud.com/partner/notice/b06c3232b6394fdfa496923b8e00b286" target="_blank">注册即享6.5折专属优惠，点我领取！</a>
-
----
-### 📺 **开发环境及使用技术**
-
-### **开发环境：**
-| 工具          | 版本               | 下载链接                                                                 |
-|--------------|--------------------|-------------------------------------------------------------------------|
-| **PHP**      | 7.1-7.4            | [PHP 官方下载](https://www.php.net/downloads.php)                           |
-| **MySQL**    | 5.7                | [MySQL 官网](https://www.mysql.com/)                                       |
-| **Redis**    | 7.0                | [Redis 官网](https://redis.io/download)                                     |
-| **Nginx**    | 1.22               | [Nginx 官网](http://nginx.org/en/download.html)                             |
-| **Apache**   | 2.4                | [Apache HTTP Server](https://httpd.apache.org/download.cgi)              |
-| **Node.js**  | 14/18              | [Node.js LTS 版本](https://nodejs.org/en/download/releases/)                |
-
-### 后端技术栈
-| **技术**            | **名称**                                                                 | **网址**                                                                 |
-|---------------------|-----------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| php扩展库          | PHP 基础运行环境，JSON 数据处理，高精度数学计算等                                | https://www.php.net/                                                   |
-| topthink          | ThinkPHP 视图模板引擎，验证码生成组件，队列任务支持，数据库迁移工具                 | https://www.thinkphp.cn/                     |
-| overtrue          | 微信生态开发（公众号/小程序/支付）                                               | https://github.com/w7corp/easywechat                                     |
-| php-jwt           | JWT 令牌生成与验证                                                             | https://github.com/firebase/php-jwt                                    |
-| var-dumper        | 调试输出工具（格式化变量）                                                     | https://symfony.com/doc/current/components/var_dumper.html            |
-| phpoffice         | 文件处理                                                                    | https://github.com/PHPOffice/PhpSpreadsheet                           |
-| guzzlehttp｜psr7  | HTTP 客户端库，PSR-7 HTTP 消息接口实现                                        | https://guzzle-cn.readthedocs.io/zh-cn/latest                        |
-| form-builder      | 快速构建表单的 UI 工具                                                      | https://form-create.com                                  |
-| workerman         | 高性能 Socket 服务器框架，定时任务调度                                        | https://www.workerman.net                                   |
-
-### 移动端技术栈
-| **技术** | **名称** | **官网** |
-| --- | --- | --- |
-| uniapp | 跨端框架 | https://uniapp.dcloud.net.cn/ |
-| vuex | 状态管理库 | https://vuex.vuejs.org/ |
-| socket | WebSocket通信 | https://socket.io/ |
-| dayjs | 时间处理库 | https://day.js.org/ |
-| animate | CSS动画库 | https://animate.style/ |
-| easy-loadimage | 图片懒加载 | https://github.com/TSjianjiao/easy-loadimage |
-
-### Admin端技术栈
-| **技术** | **名称** | **官网** |
-| --- | --- | --- |
-| vue2 | Vue框架 | https://v2.vuejs.org/ |
-| vuex | 状态管理库 | https://vuex.vuejs.org/ |
-| element-ui | UI框架 | https://element.eleme.io/ |
-| axios | HTTP客户端 | https://axios-http.com/ |
-| vxe-table | 高级表格组件 | https://vxetable.cn/ |
-| wangeditor | 富文本编辑器 | https://www.wangeditor.com/ |
-| qs | 查询字符串解析 | https://github.com/ljharb/qs |
-| xlsx | Excel处理库 | https://sheetjs.com/ |
-| sass | CSS预处理器 | https://sass-lang.com/ |
-| prettier | 代码格式化 | https://prettier.io/ |
-| v-viewer | 图片查看器 | https://github.com/mirari/v-viewer |
-
-### PC端技术栈
-| **技术** | **名称** | **官网** |
-| --- | --- | --- |
-| nuxt | Vue服务端渲染框架 | https://nuxtjs.org/ |
-| element | UI框架 | https://element.eleme.io/ |
-| axios | HTTP客户端 | https://axios-http.com/ |
-| sass | CSS预处理器 | https://sass-lang.com/ |
-| cookie-universal-nuxt | Nuxt Cookie处理 | https://github.com/microcipcip/cookie-universal |
-| postcss | CSS转换工具 | https://postcss.org/ |
-| qs | 查询字符串解析 | https://github.com/ljharb/qs |
-
-
-
-### 想要快速安装，教程来助攻！
-
-快速一键安装部署：https://doc.crmeb.com/single_open/open_v54/20366
-
-手动配置安装：https://doc.crmeb.com/single_open/open_v54/20389
-
-docker-compose一键部署：https://doc.crmeb.com/single_open/open_v54/20145
-
-宝塔环境一键安装：https://doc.crmeb.com/single_open/open_v54/19892
-
-### 二开支持：
-使用文档：https://doc.crmeb.com/single_open/open_v54/19849
-
-接口文档：https://doc.crmeb.com/single_open/open_v54/21040
-
-数据字典：https://doc.crmeb.com/single_open/open_v54/20136
-
-代码生成：https://doc.crmeb.com/single_open/open_v54/20135
-
-二开文档：https://doc.crmeb.com/single_open/open_v54/19851
-
-视频教程：https://www.bilibili.com/video/BV1kh4y1872K/
-
-技术社区：https://www.crmeb.com/ask/thread/list/147
-
----
-
-###  📞 CRMEB互动
-#### CRMEB开源技术交流群（扫码进群可领取开源版接口文档、产品功能清单、思维脑图！）
-![输入图片说明](help/resource/pic/开源PHP1.jpg)
-#### 技术社区！找方法、提bug、看官方消息、拿活跃大奖！都在 <a href="https://www.crmeb.com/ask/?from=giteephp" target="_blank">CRMEB 技术社区</a> 应有尽有
-
-
-
-
----
-
-❤️ 以商业之名，护航开源之心
-
-### 📕 2小时快速搭建你的小程序商城
-
-[![输入图片说明](help/resource/pic/java-saas.jpg)](https://shop.crmeb.com)
-
-### 📕 专业私域会员电商系统
-
-[![输入图片说明](help/resource/pic/PRO版2.jpg)](https://www.crmeb.com/index/pro?from=giteephp)
-
-
-
-### 📕 做平台推荐高性价比多商户系统
-
-[![输入图片说明](help/resource/pic/duoshanghu2.jpg)](https://www.crmeb.com/index/merchant?from=giteephp)
-
----
-
-
-[返回顶部 :fa-arrow-circle-up: ](https://gitee.com/ZhongBangKeJi/CRMEB#%E9%A1%B9%E7%9B%AE%E4%BB%8B%E7%BB%8D)
+[Apache-2.0](LICENSE)。

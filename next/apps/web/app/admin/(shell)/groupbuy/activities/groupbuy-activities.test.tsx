@@ -6,8 +6,16 @@ import {
   groupbuyActivityExample,
   groupbuyActivityOrderExample,
 } from '@shop/contracts/groupbuy/schemas';
+import {
+  groupbuyAdminActivityDetail,
+  groupbuyAdminActivityList,
+  groupbuyAdminActivityOrders,
+  groupbuyAdminActivitySetStatus,
+  groupbuyAdminActivityUpdate,
+} from '@shop/contracts/groupbuy/groupbuy.admin.contract';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { GroupbuyActivitiesPage } from './groupbuy-activities';
@@ -19,44 +27,28 @@ import { GroupbuyActivitiesPage } from './groupbuy-activities';
  * What is worth asserting on a kit-built page is the wiring — which route the
  * table asks, that permissions really hide the buttons, and what an action puts
  * on the wire. The one thing here that is not generic is the **edit path**: it
- * must read the activity first and send the per-SKU rows back, because the
- * legacy page rebuilt them on every save and that is how 已售 used to reset.
+ * must read the activity first and send the per-SKU rows back, because
+ * rebuilding them on every save is how 已售 would reset.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-
-      const path = url.split('?')[0] ?? '';
-      const payload = path.endsWith('/orders')
-        ? { items: [groupbuyActivityOrderExample], total: 1, page: 1, pageSize: 20 }
-        : method === 'GET' && /groupbuy-activities\/\d+$/.test(path)
-          ? groupbuyActivityDetailExample
-          : method === 'GET'
-            ? { items: [groupbuyActivityExample], total: 1, page: 1, pageSize: 20 }
-            : { ...groupbuyActivityDetailExample, status: 'paused' };
-
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(groupbuyAdminActivityOrders, {
+      items: [groupbuyActivityOrderExample],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    }),
+    on(groupbuyAdminActivityDetail, groupbuyActivityDetailExample),
+    on(groupbuyAdminActivityList, {
+      items: [groupbuyActivityExample],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    }),
+    on(groupbuyAdminActivityUpdate, groupbuyActivityDetailExample),
+    on(groupbuyAdminActivitySetStatus, { ...groupbuyActivityDetailExample, status: 'paused' }),
+  ]);
 }
 
 afterEach(() => {

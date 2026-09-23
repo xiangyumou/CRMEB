@@ -1,13 +1,20 @@
 import { screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { dashboardHeaderExample } from '@shop/contracts/system/schemas';
+import { dashboardHeaderExample, type DashboardHeader } from '@shop/contracts/system/schemas';
+import { systemDashboardHeader } from '@shop/contracts/system/system.settings.contract';
+import {
+  statsOrders,
+  statsProductRanking,
+  statsTrade,
+} from '@shop/contracts/stats/stats.admin.contract';
 import {
   orderStatsExample,
   productRankingExample,
   tradeStatsExample,
 } from '@shop/contracts/stats/schemas';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { DashboardPage } from './dashboard';
@@ -18,34 +25,17 @@ import { DashboardPage } from './dashboard';
  * The thing worth asserting about the home page is that it *contributes*
  * nothing: the tiles come from `/admin-api/dashboard/header`, which is already
  * permission-filtered server-side, and each block below only asks for the
- * route its atom opens. A home page that computed its own figures is how the
- * legacy admin ended up showing three different numbers for one day.
+ * route its atom opens. A home page that computed its own figures would end up
+ * showing three different numbers for one day.
  */
 
-interface Call {
-  url: string;
-}
-
-function stubApi(header: unknown = dashboardHeaderExample): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      calls.push({ url });
-      const payload = url.includes('/dashboard/header')
-        ? header
-        : url.includes('/stats/products/ranking')
-          ? productRankingExample
-          : url.includes('/stats/trade')
-            ? tradeStatsExample
-            : orderStatsExample;
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(header: DashboardHeader = dashboardHeaderExample): StubCall[] {
+  return stubRoutes([
+    on(systemDashboardHeader, header),
+    on(statsProductRanking, productRankingExample),
+    on(statsTrade, tradeStatsExample),
+    on(statsOrders, orderStatsExample),
+  ]);
 }
 
 const identityWith = (permissions: string[]) => ({ ...testIdentity, permissions });

@@ -1,8 +1,18 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { ErrorBody } from '@shop/contracts';
+import type { WechatMenu } from '@shop/contracts/wechat-oa/schemas';
+import {
+  wechatOaMenuCreate,
+  wechatOaMenuCurrent,
+  wechatOaMenuList,
+  wechatOaMenuPublish,
+  wechatOaMenuUpdate,
+} from '@shop/contracts/wechat-oa/wechat-oa.menu.contract';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, respondWithError, stubRoutes, type ErrorStatus, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { WechatMenusPage } from './wechat-menus';
@@ -15,13 +25,7 @@ import { WechatMenusPage } from './wechat-menus';
  * different permission — plus that the tree editor produces WeChat's own shape.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const menu = {
+const menu: WechatMenu = {
   id: '1',
   name: '默认菜单',
   buttons: [
@@ -33,7 +37,7 @@ const menu = {
   ],
   isActive: true,
   publishedAt: '2026-01-04T10:30:00+08:00',
-  publishError: null as string | null,
+  publishError: null,
   createdAt: '2026-01-04T10:00:00+08:00',
   updatedAt: '2026-01-04T10:30:00+08:00',
 };
@@ -42,40 +46,22 @@ function stubApi(
   options: {
     publishError?: string;
     /** Rows listed after the live one. */
-    drafts?: Array<typeof menu>;
+    drafts?: WechatMenu[];
     /** Answer 发布 with this refusal instead of the menu. */
-    refusePublish?: { status: number; body: unknown };
+    refusePublish?: { status: ErrorStatus; body: ErrorBody };
   } = {},
-): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      if (options.refusePublish && url.includes('/publish')) {
-        return new Response(JSON.stringify(options.refusePublish.body), {
-          status: options.refusePublish.status,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      const items = [menu, ...(options.drafts ?? [])];
-      const payload = url.includes('/current')
-        ? { ...menu, publishError: options.publishError ?? null }
-        : method === 'GET'
-          ? { items, total: items.length, page: 1, pageSize: 20 }
-          : menu;
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+): StubCall[] {
+  const items = [menu, ...(options.drafts ?? [])];
+  const { refusePublish } = options;
+  return stubRoutes([
+    on(wechatOaMenuCurrent, { ...menu, publishError: options.publishError ?? null }),
+    on(wechatOaMenuList, { items, total: items.length, page: 1, pageSize: 20 }),
+    on(wechatOaMenuPublish, () =>
+      refusePublish ? respondWithError(refusePublish.status, refusePublish.body) : menu,
+    ),
+    on(wechatOaMenuCreate, menu),
+    on(wechatOaMenuUpdate, menu),
+  ]);
 }
 
 afterEach(() => {
@@ -117,7 +103,7 @@ describe('公众号自定义菜单', () => {
           id: '2',
           name: '清明菜单',
           isActive: false,
-          publishedAt: null as unknown as string,
+          publishedAt: null,
           publishError: '发布菜单失败：invalid button size (40016)',
         },
       ],

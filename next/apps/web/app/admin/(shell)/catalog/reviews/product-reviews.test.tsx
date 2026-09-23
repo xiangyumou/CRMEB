@@ -1,19 +1,22 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  catalogAdminReviewBatchSetStatus,
+  catalogAdminReviewList,
+  catalogAdminReviewReply,
+  catalogAdminReviewReplyUpdate,
+  catalogAdminReviewSetStatus,
+} from '@shop/contracts/catalog/catalog.review.contract';
+import type { AdminProductReview } from '@shop/contracts/catalog/schemas';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { ProductReviewsPage } from './product-reviews';
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const row = {
+const row: AdminProductReview = {
   id: '5001',
   productId: '1',
   productName: '简约白 T 恤',
@@ -35,29 +38,14 @@ const row = {
   createdAt: '2026-06-01T10:00:00+08:00',
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload = url.includes('/statuses')
-        ? { updated: 1 }
-        : method === 'GET'
-          ? { items: [row], total: 1, page: 1, pageSize: 20 }
-          : { ...row, status: 'published' };
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(catalogAdminReviewBatchSetStatus, { updated: 1 }),
+    on(catalogAdminReviewList, { items: [row], total: 1, page: 1, pageSize: 20 }),
+    on(catalogAdminReviewSetStatus, { ...row, status: 'published' }),
+    on(catalogAdminReviewReply, { ...row, status: 'published' }),
+    on(catalogAdminReviewReplyUpdate, { ...row, status: 'published' }),
+  ]);
 }
 
 afterEach(() => {

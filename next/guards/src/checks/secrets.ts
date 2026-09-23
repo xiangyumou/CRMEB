@@ -90,12 +90,12 @@ function walkSchema(
 
 /**
  * Response properties that carry a secret config field's *name* but are not
- * that field (CR-1-r3).
+ * that field.
  *
  * The walk matches on the last property name, because a response has no way
  * to say which config group a value came from. That is exact for names like
  * `encodingAesKey`, and wrong for `wechat-oa.token` (the OA callback token,
- * secret since CR-8-k2): `token` is also what every login answers its session
+ * which is secret): `token` is also what every login answers its session
  * token as and what the 扫码上传 QR carries. Each such place is named here with
  * what it really is. Exactly compared: an entry that matches no response
  * property fails, so the list cannot outlive the routes it names, and a *new*

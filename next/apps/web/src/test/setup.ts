@@ -3,6 +3,8 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
+import { takeFixtureFailures } from './api';
+
 // Page components own a `CrudTable`, which binds its state to the URL through
 // `next/navigation`. There is no app router in a component test, so every test file gets this
 // inert one; a test that cares about navigation declares its own `vi.mock('next/navigation')`.
@@ -51,4 +53,9 @@ console.warn = (...args: unknown[]) => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  // A fixture that disagrees with its contract is thrown inside the stubbed
+  // `fetch`, where the client reports it as a network error; this is where it
+  // fails the test that owns it, whatever the component made of it.
+  const failures = takeFixtureFailures();
+  if (failures.length > 0) throw new Error(failures.join('\n\n'));
 });

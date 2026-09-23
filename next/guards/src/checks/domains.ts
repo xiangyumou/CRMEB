@@ -1,24 +1,26 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DOMAIN_NAMES } from '@shop/core/domains';
-import { defineCheck, fail, pending, result, type Finding } from '../framework';
+import { defineCheck, fail, result, type Finding } from '../framework';
 import { INSTALLED_DOMAINS } from '../lib/install-domains';
 import { nextRoot } from '../lib/paths';
 
 /**
- * CR-8-c said: a domain registers at import, or through one exported
- * `register<Domain>Domain()`, and `domains.gen.ts` is the one place that does
- * it. This check is what keeps that true when a bundler disagrees.
+ * A domain registers itself at import time, and `domains.gen.ts` is the one
+ * place that imports every domain. This check keeps that true when a bundler
+ * disagrees.
  *
- * `domains.gen.ts` reaches the side-effect-only domains with
- * `import * as diy from './diy/index'` and never reads `diy`. esbuild removes an
- * unused namespace import — so `apps/worker`'s tsup bundle contains six of the
- * twelve domain indexes, and `pnpm guards` under tsx saw the same six until this
- * package started importing them by name. Vitest (oxc) and Next (SWC) keep them,
- * which is why every test passes and the bundle is still wrong.
+ * esbuild removes a namespace import whose binding is never read
+ * (`import * as diy from './diy/index'`), so under tsx and in the worker's tsup
+ * bundle such a domain would silently not be installed — while Vitest (oxc) and
+ * Next (SWC) keep it, so every test passes and the bundle is still wrong. The
+ * generator therefore emits a bare side-effect import for every domain, and the
+ * guards import each domain by name as well (`lib/install-domains.ts`), so they
+ * never run on a half-installed system.
  *
- * Until CR-1-k lands, the check reports it as pending and asserts the guards'
- * own explicit list still covers every declared domain.
+ * Two assertions: the guards' own list covers exactly the declared domains, and
+ * no domain in `domains.gen.ts` is reached only through an unused namespace
+ * import.
  */
 
 export const domains = defineCheck(
@@ -56,12 +58,11 @@ export const domains = defineCheck(
       .map((m) => ({ binding: m[1] ?? '', domain: m[2] ?? '' }))
       .filter((entry) => !new RegExp(`\\b${entry.binding}\\.`).test(gen));
 
-    if (namespaceOnly.length > 0) {
+    for (const entry of namespaceOnly) {
       findings.push(
-        pending(
+        fail(
           'packages/core/src/domains.gen.ts',
-          'orchestrator',
-          `${namespaceOnly.length} domains (${namespaceOnly.map((e) => e.domain).join(', ')}) are installed only by an unused namespace import, which esbuild elides — CR-1-k asks gen-config-groups.ts to emit a bare \`import './<d>/index';\` as well`,
+          `installs ${entry.domain} only through the unused namespace import \`${entry.binding}\`, which esbuild elides — the generator must emit a bare \`import './${entry.domain}/index';\` as well`,
         ),
       );
     }

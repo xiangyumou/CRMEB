@@ -5,16 +5,15 @@
  *
  * `@shop/core/system` is imported as well because the config-group bucket is
  * pulled in by `system/config.service.ts`, not by `domains.gen.ts`: a guard that
- * imported only the domains would walk seven config groups instead of sixteen
- * and would cheerfully declare the secrets check green.
+ * imported only the domains would walk a fraction of the config groups and
+ * would cheerfully declare the secrets check green.
  */
 import '@shop/core/domains';
-// Every domain by name, as a bare side-effect import. `domains.gen.ts` reaches
-// them with `import * as x from './x/index'`, and esbuild elides a namespace
-// import whose binding is unused — so under tsx (and in the worker's tsup
-// bundle) `domains.gen.ts` alone installs six of twelve domains. That is
-// CR-1-k; until it is fixed the guards must not inherit the bug they are
-// supposed to report.
+// Every domain by name, as a bare side-effect import. esbuild elides a
+// namespace import whose binding is unused (`import * as x from './x/index'`),
+// so `domains.gen.ts` imports every domain bare and the `domains` check fails
+// if it ever relies on a namespace import alone. Importing each domain here as
+// well means the guards cannot inherit the bug they exist to report.
 import '@shop/core/auth';
 import '@shop/core/cart';
 import '@shop/core/catalog';

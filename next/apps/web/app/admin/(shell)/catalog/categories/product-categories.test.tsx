@@ -1,19 +1,21 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  catalogAdminCategoryList,
+  catalogAdminCategorySetVisibility,
+  catalogAdminCategoryTree,
+  catalogAdminCategoryUpdate,
+} from '@shop/contracts/catalog/catalog.category.admin.contract';
+import type { ProductCategory } from '@shop/contracts/catalog/schemas';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { ProductCategoriesPage } from './product-categories';
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const row = {
+const row: ProductCategory = {
   id: '17',
   parentId: '3',
   name: '男装',
@@ -27,29 +29,13 @@ const row = {
   createdAt: '2026-06-01T10:00:00+08:00',
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload = url.includes('/category-tree')
-        ? { items: [] }
-        : method === 'GET'
-          ? { items: [row], total: 1, page: 1, pageSize: 20 }
-          : { ...row, isVisible: false };
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(catalogAdminCategoryTree, { items: [] }),
+    on(catalogAdminCategoryList, { items: [row], total: 1, page: 1, pageSize: 20 }),
+    on(catalogAdminCategoryUpdate, row),
+    on(catalogAdminCategorySetVisibility, { ...row, isVisible: false }),
+  ]);
 }
 
 afterEach(() => {

@@ -2,8 +2,14 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { groupbuyGroupDetailExample, groupbuyGroupExample } from '@shop/contracts/groupbuy/schemas';
+import {
+  groupbuyAdminGroupComplete,
+  groupbuyAdminGroupDetail,
+  groupbuyAdminGroupList,
+} from '@shop/contracts/groupbuy/groupbuy.admin.contract';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { GroupbuyGroupsPage } from './groupbuy-groups';
@@ -17,39 +23,16 @@ import { GroupbuyGroupsPage } from './groupbuy-groups';
  * name into it — `handle()` writes the audit row.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-
-      const path = url.split('?')[0] ?? '';
-      const payload =
-        method === 'GET' && /groupbuy-groups\/\d+$/.test(path)
-          ? groupbuyGroupDetailExample
-          : method === 'GET'
-            ? { items: [groupbuyGroupExample], total: 1, page: 1, pageSize: 20 }
-            : { ...groupbuyGroupDetailExample, status: 'succeeded', virtuallyFilled: true };
-
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(groupbuyAdminGroupDetail, groupbuyGroupDetailExample),
+    on(groupbuyAdminGroupList, { items: [groupbuyGroupExample], total: 1, page: 1, pageSize: 20 }),
+    on(groupbuyAdminGroupComplete, {
+      ...groupbuyGroupDetailExample,
+      status: 'succeeded',
+      virtuallyFilled: true,
+    }),
+  ]);
 }
 
 afterEach(() => {

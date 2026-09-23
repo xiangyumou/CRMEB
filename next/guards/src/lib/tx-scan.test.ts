@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { findPoolReaches, findTxFunctions, maskSource } from './tx-scan';
 
 /**
- * The `tx-pool` check's scanner (CR-53-k2). What it must see, what it must not
+ * The `tx-pool` check's scanner. What it must see, what it must not
  * invent, and the one real shape it exists for.
  */
 
@@ -10,7 +10,7 @@ const reaches = (source: string) =>
   findPoolReaches(source).map((r) => `${r.within}: ${r.construct}`);
 
 describe('the tx-pool scanner', () => {
-  it('finds the CR-53-k2 shape: a config read inside a function that takes a Tx', () => {
+  it('finds the deadlock shape: a config read inside a function that takes a Tx', () => {
     const source = `
 async function warnOnLowStock(tx: Tx, ctx: Ctx, lines: readonly StockLine[]): Promise<void> {
   const { stockWarningThreshold: threshold } = await ctx.config.get(catalogConfig);

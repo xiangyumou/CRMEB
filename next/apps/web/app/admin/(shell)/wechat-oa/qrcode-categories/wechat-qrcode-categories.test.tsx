@@ -1,26 +1,28 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { WechatQrcodeCategory } from '@shop/contracts/wechat-oa/schemas';
+import {
+  wechatOaQrcodeCategoryCreate,
+  wechatOaQrcodeCategoryDelete,
+  wechatOaQrcodeCategoryList,
+  wechatOaQrcodeCategoryUpdate,
+} from '@shop/contracts/wechat-oa/wechat-oa.qrcode.contract';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { WechatQrcodeCategoriesPage } from './wechat-qrcode-categories';
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const empty = {
+const empty: WechatQrcodeCategory = {
   id: '2',
   name: '线上投放',
   sortOrder: 1,
   qrcodeCount: 0,
   createdAt: '2026-01-04T10:00:00+08:00',
 };
-const occupied = {
+const occupied: WechatQrcodeCategory = {
   id: '1',
   name: '线下门店',
   sortOrder: 0,
@@ -28,26 +30,13 @@ const occupied = {
   createdAt: '2026-01-04T10:00:00+08:00',
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload =
-        method === 'GET' ? { items: [occupied, empty], total: 2, page: 1, pageSize: 20 } : occupied;
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(wechatOaQrcodeCategoryList, { items: [occupied, empty], total: 2, page: 1, pageSize: 20 }),
+    on(wechatOaQrcodeCategoryCreate, occupied),
+    on(wechatOaQrcodeCategoryUpdate, occupied),
+    on(wechatOaQrcodeCategoryDelete, undefined),
+  ]);
 }
 
 afterEach(() => {

@@ -1,8 +1,20 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  catalogAdminProductDetail,
+  catalogAdminProductList,
+} from '@shop/contracts/catalog/catalog.product.admin.contract';
+import {
+  adminProductDetailExample,
+  adminProductListItemExample,
+  productSkuExample,
+  type AdminProductDetail,
+  type AdminProductListItem,
+} from '@shop/contracts/catalog/schemas';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, zhName } from '@/test/render';
 
 import { SkuPicker, type PickedSku } from './sku-picker';
@@ -17,7 +29,8 @@ import { SkuPicker, type PickedSku } from './sku-picker';
  * exists to make impossible.
  */
 
-const product = {
+const product: AdminProductListItem = {
+  ...adminProductListItemExample,
   id: '12',
   name: '手冲挂耳咖啡',
   imageUrl: 'https://cdn.example.com/p/12.png',
@@ -26,34 +39,27 @@ const product = {
   specMode: true,
 };
 
-const detail = {
+const detail: AdminProductDetail = {
+  ...adminProductDetailExample,
   ...product,
   skus: [
-    { id: '1201', specText: '深烘 | 10 片', price: '49.00', stock: 120 },
-    { id: '1202', specText: '浅烘 | 10 片', price: '52.00', stock: 80 },
+    { ...productSkuExample, id: '1201', specText: '深烘 | 10 片', price: '49.00', stock: 120 },
+    {
+      ...productSkuExample,
+      id: '1202',
+      specText: '浅烘 | 10 片',
+      price: '52.00',
+      stock: 80,
+      isDefault: false,
+    },
   ],
 };
 
-interface Call {
-  url: string;
-}
-
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      calls.push({ url });
-      const payload = /\/admin-api\/catalog\/products\/\d+/.test(url)
-        ? detail
-        : { items: [product], total: 1, page: 1, pageSize: 10 };
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(catalogAdminProductDetail, detail),
+    on(catalogAdminProductList, { items: [product], total: 1, page: 1, pageSize: 10 }),
+  ]);
 }
 
 afterEach(() => {

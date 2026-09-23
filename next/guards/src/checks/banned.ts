@@ -29,7 +29,6 @@ const APP_ROOTS = [
   'apps/worker/src',
   'packages/core/src',
   'packages/contracts/src',
-  'packages/etl/src',
 ];
 
 const BANS: readonly Ban[] = [
@@ -50,12 +49,9 @@ const BANS: readonly Ban[] = [
     pattern: /['"]node:child_process['"]|require\(\s*['"]child_process['"]/,
     message: 'child_process outside scripts/ is banned',
     roots: APP_ROOTS,
-    // `packages/etl` is an operator CLI, not a request path: `assets.ts`
-    // spawns the copy command its own plan built (`plan.command`), with
-    // `stdio: 'inherit'`, from a terminal. The ban exists to keep a shell out
-    // of anything that can be reached by an HTTP request, and nothing in
-    // `apps/` imports the ETL package.
-    allow: [/\/scripts\//, /^next\/packages\/etl\/src\/assets\.ts$/],
+    // The ban keeps a shell out of anything an HTTP request can reach; a
+    // package's own build scripts are not on that path.
+    allow: [/\/scripts\//],
   },
   {
     id: 'dangerously-set-inner-html',
@@ -79,12 +75,10 @@ const BANS: readonly Ban[] = [
  * network through `globalThis.fetch` without the rule ever seeing it.
  *
  * Exactly compared: an entry that no scanned file with a fetch call matches
- * fails until it is deleted. The list used to name directories (`wechat/`,
- * `wechat-oa/`, the admin `api/` and `session/` folders) and `safe-fetch.ts`;
- * a directory lets the next file in it call anything, and three of those
- * entries allowed nothing at all. It names files now.
+ * fails until it is deleted. Entries name files, never directories: a
+ * directory would let the next file in it call anything.
  */
-const FETCH_ALLOW: ReadonlyArray<{ path: RegExp; why: string; cr?: string }> = [
+const FETCH_ALLOW: ReadonlyArray<{ path: RegExp; why: string }> = [
   {
     path: /^next\/packages\/core\/src\/wechat\/wechat\.client\.ts$/,
     why: 'api.weixin.qq.com, built from the wechat config group',
@@ -179,7 +173,8 @@ export const bannedConstructs = defineCheck(
 );
 
 /**
- * CONVENTIONS "Time": `Date.now()` and `new Date()` are banned in core. That is
+ * `Date.now()` and `new Date()` are banned in core (`docs/conventions.md`,
+ * "Time"): the clock is `ctx.clock`, so a test can control it. That is
  * a lint rule, so the guard asserts the rule *exists and is an error* rather
  * than re-implementing it — a rule silently downgraded to `warn` is exactly the
  * failure this catches.
@@ -194,7 +189,7 @@ function assertClockRuleIsOn(): Finding[] {
     findings.push(
       fail(
         'next/packages/config/eslint/index.js',
-        'the core preset no longer bans Date.now() as an error (CONVENTIONS "Time")',
+        'the core preset no longer bans Date.now() as an error — core reads the clock through ctx.clock',
       ),
     );
   }
@@ -202,7 +197,7 @@ function assertClockRuleIsOn(): Finding[] {
     findings.push(
       fail(
         'next/packages/config/eslint/index.js',
-        'the core preset no longer bans a zero-argument new Date() (CONVENTIONS "Time")',
+        'the core preset no longer bans a zero-argument new Date() — core reads the clock through ctx.clock',
       ),
     );
   }

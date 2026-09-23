@@ -5,9 +5,9 @@ import { MUTATIONS } from '../scripts/mutations/mutations';
 import { nextRoot } from './lib/paths';
 
 /**
- * MUT-001's ledger row needs a test id that `pnpm guards` can resolve, and the
- * proof itself is a script (`pnpm --filter @shop/guards mutations`), which runs
- * nightly (CR-20-k2) because it takes minutes and a database. This file checks
+ * MUT-001 in `docs/invariants.md` needs a test that `pnpm guards` can resolve,
+ * and the proof itself is a script (`pnpm --filter @shop/guards mutations`),
+ * which runs nightly because it takes minutes and a database. This file checks
  * the catalogue on every PR, statically, so that it cannot rot between runs:
  *
  *  - it still names the ten protections MUT-001 lists, once each;
@@ -41,7 +41,7 @@ function occurrences(haystack: string, needle: string): number {
 }
 
 describe('MUT-001 — the mutation catalogue', () => {
-  it('names the ten protections the ledger lists, once each', () => {
+  it('names the ten protections MUT-001 lists, once each', () => {
     expect(MUTATIONS.map((mutation) => mutation.protection)).toEqual(PROTECTIONS);
     expect(new Set(MUTATIONS.map((mutation) => mutation.id)).size).toBe(MUTATIONS.length);
   });
