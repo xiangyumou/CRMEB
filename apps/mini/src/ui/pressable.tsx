@@ -13,6 +13,8 @@ export interface PressableProps {
   checked?: boolean | undefined;
   /** The pressed tint (5% black). Off for things that show their own pressed state. */
   pressedTint?: boolean | undefined;
+  /** A control inside another tappable thing (加购 on a card): the tap stops here. */
+  stopPropagation?: boolean | undefined;
   className?: string | undefined;
   id?: string | undefined;
   children?: ReactNode;
@@ -31,6 +33,7 @@ export function Pressable({
   selected,
   checked,
   pressedTint = true,
+  stopPropagation = false,
   className,
   id,
   children,
@@ -46,7 +49,14 @@ export function Pressable({
       {...(disabled ? { ariaDisabled: true } : {})}
       {...(selected === undefined ? {} : { ariaSelected: selected })}
       {...(checked === undefined ? {} : { ariaChecked: checked })}
-      {...(disabled || !onClick ? {} : { onClick: () => onClick() })}
+      {...(disabled || !onClick
+        ? {}
+        : {
+            onClick: (event: { stopPropagation: () => void }) => {
+              if (stopPropagation) event.stopPropagation();
+              onClick();
+            },
+          })}
     >
       {children}
     </View>

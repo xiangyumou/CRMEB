@@ -41,20 +41,29 @@ and `apps/mini/config`.
 - **Tab pages** (`useTabPage`): the native tab bar gets its colours, labels and uploaded icons
   from appearance. The cart badge is the real `GET /cart/count`, signed-in only.
 - **Theme.** `deriveTheme` (AA-checked) and `themeStyle` → CSS vars via page-meta on weapp.
-- **UI so far:**
-  - PageShell, Button, Pressable, Icon, Sheet, PrivacySheet, Illustration, Empty, Card,
-    Cell/CellGroup;
-  - toast/confirm/alert;
-  - Field, Textarea, Checkbox, Radio, Switch, AgreementCheck, SmsCodeField, Stepper.
+- **UI kit** (`src/ui`, one Vitest file per component; no barrel, so a sub-package's
+  components and their styles stay out of the main package):
+  - basics: PageShell, Button, Pressable, Icon, Image, Price, Tag, Badge, Divider, Skeleton
+    (ProductCard/Cell presets), Card, Cell/CellGroup;
+  - feedback: toast/confirm/alert, Sheet, PrivacySheet, Empty, ErrorBlock (network, not-found,
+    unauthenticated, server), Result;
+  - forms: Field, Textarea, Checkbox, Radio, Switch, AgreementCheck, SmsCodeField, Stepper,
+    SearchBar (entry / input), RegionPicker (`shipping.cityTree`, stored once),
+    ImageUploader (`chooseMedia` → `POST /uploads`, retry), AvatarPicker (chooseAvatar →
+    upload → `PUT /profile`);
+  - commerce: ProductCard (grid / list / mini; sold out, off shelf, activity), CouponCard (every
+    state, picker mode), OrderCard + `orderActions`, OrderItemRow, AddressCard (masked phone,
+    导入微信地址), ContactButton / `useContactIcon`, Countdown (server clock);
+  - layout: Tabs, ActionBar, InfiniteList (pull-down, reach-bottom, footer states).
+- **Data helpers.** `data/upload.ts` (multipart upload with the client headers and one renewal),
+  `data/cities.ts`, `lib/format.ts`, `lib/server-clock.ts`, `platform/page-scroll.ts`,
+  `platform/device.ts` (call, preview).
 - **S4 pages.** Product, checkout, cashier and pay-result are on PageShell and the kit and
   navigate by route.
 
 ## In progress
 
-- The rest of the UI kit and its tests: Price, Tag, Badge, Skeleton, ActionBar, Tabs,
-  SearchBar, Image, ProductCard, CouponCard, OrderCard, AddressCard, Countdown,
-  InfiniteList, Result, RegionPicker, ImageUploader, AvatarPicker.
-- The gallery page and its screenshots.
+- The gallery page (`subpackages/demo/pages/ui`) and its screenshots.
 
 ## Next
 

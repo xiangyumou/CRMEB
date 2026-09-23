@@ -1,0 +1,53 @@
+import { act, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setServerTime } from '@/lib/server-clock';
+import { Countdown, remainingUntil } from './countdown';
+
+const NOW = Date.parse('2026-09-23T10:00:00+08:00');
+
+describe('Countdown', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    setServerTime(NOW, NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    setServerTime(Date.now(), Date.now());
+  });
+
+  it('splits what is left into days, hours, minutes and seconds', () => {
+    expect(remainingUntil(NOW + 90_061_000, NOW)).toMatchObject({
+      days: 1,
+      hours: 1,
+      minutes: 1,
+      seconds: 1,
+    });
+    expect(remainingUntil(NOW - 5000, NOW).total).toBe(0);
+  });
+
+  it('ticks each second and calls onEnd once at zero', () => {
+    const onEnd = vi.fn();
+    render(<Countdown endsAt="2026-09-23T10:00:03+08:00" onEnd={onEnd} />);
+    expect(screen.getByRole('timer', { name: '剩余0小时0分3秒' }).textContent).toBe('00:00:03');
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.getByRole('timer').textContent).toBe('00:00:02');
+    act(() => vi.advanceTimersByTime(5000));
+    expect(screen.getByText('已结束')).toBeTruthy();
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts on the server clock, not the phone', () => {
+    // The phone is 10 minutes fast.
+    setServerTime(NOW - 600_000, NOW);
+    render(<Countdown endsAt="2026-09-23T09:55:00+08:00" />);
+    expect(screen.getByRole('timer').textContent).toBe('00:05:00');
+  });
+
+  it('shows days in dhms format', () => {
+    render(<Countdown endsAt="2026-09-25T11:00:00+08:00" format="dhms" variant="boxed" />);
+    const timer = screen.getByRole('timer');
+    expect(timer.textContent).toBe('2天01:00:00');
+    expect(timer.className).toContain('shop-countdown--boxed');
+  });
+});

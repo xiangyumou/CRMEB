@@ -24,6 +24,7 @@ export const ICON_NAMES = [
   'star-fill',
   'service',
   'share',
+  'download',
   'location',
   'clock',
   'coupon',
