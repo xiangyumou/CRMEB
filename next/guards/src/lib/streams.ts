@@ -51,7 +51,9 @@ export const STREAM_STATE: Readonly<Record<string, StreamState>> = {
   J3: 'merged', // deploy follow-up: /readyz, CI jobs, invariants, cutover runbook
   H3: 'merged', // uni-app third pass: marker flips for A2/E4/F4/B3, captcha removal
   I: 'in-flight', // storefront e2e
-  K: 'in-flight', // K's own second pass (K2)
+  K: 'merged', // K's own second pass (K2)
+  // Wave 6 (2026-09-23): the K2 findings, routed by the orchestrator.
+  R1: 'in-flight', // reliability: CR-53/50/51/40/41/23-k2, STAB-001
 };
 
 export const STREAMS: ReadonlySet<string> = new Set(Object.keys(STREAM_STATE));

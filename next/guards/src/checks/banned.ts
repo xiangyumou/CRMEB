@@ -69,19 +69,56 @@ const BANS: readonly Ban[] = [
 
 /**
  * A raw `fetch()` of a URL the caller supplied is SSRF. The vetted fetcher is
- * `core/storage/safe-fetch.ts` (STOR-004/005/006). Everything else may only
- * fetch a URL it built itself from configuration, which in practice means the
- * WeChat client and the browser-side API client.
+ * `core/storage/safe-fetch.ts` (STOR-004/005/006), which takes its transport by
+ * reference (`options.fetchImpl ?? fetch`) and so never *calls* `fetch(` by
+ * name. Everything else may only fetch a URL it built itself from
+ * configuration or a constant host, and each file that does is named here.
+ *
+ * A call is `fetch(` or `globalThis.fetch(` / `window.fetch(` / `self.fetch(`:
+ * the qualified forms are the same global, and the logistics port reached the
+ * network through `globalThis.fetch` without the rule ever seeing it.
+ *
+ * Exactly compared: an entry that no scanned file with a fetch call matches
+ * fails until it is deleted. The list used to name directories (`wechat/`,
+ * `wechat-oa/`, the admin `api/` and `session/` folders) and `safe-fetch.ts`;
+ * a directory lets the next file in it call anything, and three of those
+ * entries allowed nothing at all. It names files now.
  */
-const FETCH_ALLOW: readonly RegExp[] = [
-  /^next\/packages\/core\/src\/storage\/safe-fetch\.ts$/,
-  /^next\/packages\/core\/src\/wechat\//, // api.weixin.qq.com / api.mch.weixin.qq.com, built from config
-  /^next\/packages\/core\/src\/wechat-oa\//, // the same, for the official account: `new URL(path, config.apiBaseUrl)`
-  /^next\/apps\/web\/src\/admin\/api\//, // the browser client: same-origin, route-derived URLs
-  /^next\/apps\/web\/src\/admin\/session\//,
-  /\.test\.tsx?$/,
-  /\/dev\/kit\//,
+const FETCH_ALLOW: ReadonlyArray<{ path: RegExp; why: string; cr?: string }> = [
+  {
+    path: /^next\/packages\/core\/src\/wechat\/wechat\.client\.ts$/,
+    why: 'api.weixin.qq.com, built from the wechat config group',
+  },
+  {
+    path: /^next\/packages\/core\/src\/wechat\/wechat\.pay\.ts$/,
+    why: 'api.mch.weixin.qq.com: `new URL(args.urlPath, config.apiBaseUrl)`',
+  },
+  {
+    // E3 merged with this still outside C's client: WeChat's material
+    // endpoints are multipart and `WechatCoreClient.call` speaks JSON only.
+    // The URL is `new URL(path, config.apiBaseUrl)` — not SSRF — but the call
+    // misses the client's `40001 → drop the token and retry once` rule.
+    path: /^next\/packages\/core\/src\/wechat-oa\/wechat-oa\.client\.ts$/,
+    why: "the official account's multipart media upload, with a token C issued; URL from config",
+    cr: 'CR-4-e2 (never filed as a file) → CR-31-k2',
+  },
+  {
+    path: /^next\/packages\/core\/src\/shipping\/shipping\.logistics\.port\.ts$/,
+    why: 'a hardcoded 阿里云云市场 host (`ALIYUN_HOST`); only the credential is configurable',
+  },
+  {
+    path: /^next\/apps\/web\/src\/admin\/api\/config\.ts$/,
+    why: "the browser client's transport: same-origin, route-derived URLs",
+  },
+  { path: /\.test\.tsx?$/, why: 'tests stub the transport' },
+  {
+    path: /^next\/apps\/web\/app\/admin\/\(shell\)\/dev\/kit\/mock-fetch\.ts$/,
+    why: "the kit demo's in-memory router, which implements fetch rather than calling it",
+  },
 ];
+
+/** `fetch(` and its global-object spellings, but not `cfg.fetch(` or `x.refetch(`. */
+const FETCH_CALL = /(^|[^.\w])(?:(?:globalThis|window|self)\s*\.\s*)?fetch\s*\(/g;
 
 export const bannedConstructs = defineCheck(
   'banned',
@@ -106,12 +143,19 @@ export const bannedConstructs = defineCheck(
       }
     }
 
+    const allowHit = new Set<number>();
     for (const root of APP_ROOTS) {
       for (const file of walk(path.join(nextRoot, root), isTypeScript)) {
         const where = rel(file.file);
         scanned += 1;
-        if (FETCH_ALLOW.some((re) => re.test(where))) continue;
-        for (const match of file.text.matchAll(/(^|[^.\w])fetch\s*\(/g)) {
+        const calls = [...file.text.matchAll(FETCH_CALL)];
+        if (calls.length === 0) continue;
+        const allowed = FETCH_ALLOW.findIndex((entry) => entry.path.test(where));
+        if (allowed >= 0) {
+          allowHit.add(allowed);
+          continue;
+        }
+        for (const match of calls) {
           findings.push(
             fail(
               `${where}:${lineOf(file.text, match.index)}`,
@@ -122,12 +166,22 @@ export const bannedConstructs = defineCheck(
       }
     }
 
+    for (const [index, entry] of FETCH_ALLOW.entries()) {
+      if (allowHit.has(index)) continue;
+      findings.push(
+        fail(
+          `FETCH_ALLOW ${entry.path.source}`,
+          `allows a fetch() call no scanned file makes any more — delete the entry (${entry.why})`,
+        ),
+      );
+    }
+
     findings.push(...assertClockRuleIsOn());
 
     return result(
       'banned',
       'banned constructs',
-      `${BANS.length} construct bans plus the fetch rule over ${scanned} files; the core clock lint rule asserted from @shop/config/eslint`,
+      `${BANS.length} construct bans plus the fetch rule over ${scanned} files (${FETCH_ALLOW.length} allowed callers); the core clock lint rule asserted from @shop/config/eslint`,
       findings,
     );
   },

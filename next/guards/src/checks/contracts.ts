@@ -1,8 +1,7 @@
 import path from 'node:path';
 import { allRoutes, routeSources } from '@shop/contracts/routes';
-import { defineCheck, fail, pending, result, type Finding } from '../framework';
-import { walk } from '../lib/files';
-import { PENDING_IMPLEMENTATIONS, pendingImplementation } from '../lib/pending-implementations';
+import { defineCheck, fail, note, result, type Finding } from '../framework';
+import { stripComments, walk } from '../lib/files';
 import { rel, webApp } from '../lib/paths';
 import {
   exportedMethods,
@@ -29,28 +28,33 @@ import {
 /**
  * Route files that deliberately have no contract, named one by one.
  *
- * There is exactly one, and it is a real seam rather than an oversight:
+ * There is exactly one, and it is a decision rather than an oversight:
  * `defineRoute` describes a request and a response body, and an SSE stream has
  * neither — it has a long-lived `text/event-stream` and a sequence of events.
- * The admin client carries the matching exception in `checks/admin-client.ts`
- * (`HAND_BUILT`), so both ends of the one uncontracted URL are written down in
- * the same two places a reader would look.
+ * N1 shipped the endpoint as a bare handler for that reason (the file's own
+ * header says so), and the admin client carries the matching exception in
+ * `checks/admin-client.ts` (`HAND_BUILT`), so both ends of the one
+ * uncontracted URL are written down in the two places a reader would look.
  *
- * Listed as `pending`, not as a decision, because the seam is worth closing:
- * either `defineRoute` grows an `sse` kind that describes the event payloads,
- * or the endpoint stays outside the registry for ever and nothing asserts its
- * shape. N1 owns the notification surface while it is in flight.
+ * What the registry would have given it, the guard asks for instead. A bare
+ * handler does not pass through `handle()`, so nothing resolves the admin
+ * session for it: `authenticates` is the call that has to be in the file, and
+ * a bare handler without it is a failure — an event stream anybody can open
+ * is every admin's notifications on the open internet.
+ *
+ * Exactly compared both ways: an entry whose route file stops exporting the
+ * method, or whose URL grows a contract, fails until it is deleted.
  */
 const UNCONTRACTED: ReadonlyArray<{
   url: string;
   method: Method;
-  stream: string;
+  authenticates: RegExp;
   why: string;
 }> = [
   {
     url: '/admin-api/notifications/stream',
     method: 'GET',
-    stream: 'N1',
+    authenticates: /\.adminAuth\.resolve\s*\(/,
     why: 'the in-app notification SSE stream — defineRoute cannot describe an event stream, so the URL is outside the registry',
   },
 ];
@@ -59,6 +63,7 @@ interface RouteFile {
   relative: string;
   url: string;
   methods: Method[];
+  text: string;
 }
 
 export function collectRouteFiles(): RouteFile[] {
@@ -69,6 +74,7 @@ export function collectRouteFiles(): RouteFile[] {
       relative: rel(f.file),
       url: urlOfRouteFile(f.relative),
       methods: exportedMethods(f.text),
+      text: f.text,
     }));
 }
 
@@ -96,25 +102,10 @@ export const contractsAndRoutes = defineCheck(
     }
 
     const served = new Set<string>();
-    const pendingHit = new Set<string>();
     for (const route of allRoutes) {
       const shape = shapeOf(route.path);
       const file = byShape.get(shape);
       if (!file) {
-        // A contract that merged ahead of its implementation is the owning
-        // stream's work, not a defect — as long as it is named.
-        const owed = pendingImplementation(route.id);
-        if (owed) {
-          pendingHit.add(route.id);
-          findings.push(
-            pending(
-              routeSources[route.id] ?? route.id,
-              owed.stream,
-              `${route.method} ${route.path} (${owed.why}) has no route file yet`,
-            ),
-          );
-          continue;
-        }
         findings.push(
           fail(
             routeSources[route.id] ?? route.id,
@@ -122,14 +113,6 @@ export const contractsAndRoutes = defineCheck(
           ),
         );
         continue;
-      }
-      if (pendingImplementation(route.id)) {
-        findings.push(
-          fail(
-            file.relative,
-            `${route.id} is on the pending-implementation list but its route file exists — delete the entry from lib/pending-implementations.ts`,
-          ),
-        );
       }
       if (!file.methods.includes(route.method as Method)) {
         findings.push(
@@ -162,9 +145,16 @@ export const contractsAndRoutes = defineCheck(
         );
         if (known) {
           uncontractedHit.add(`${known.method} ${known.url}`);
-          findings.push(
-            pending(file.relative, known.stream, `${method} ${file.url} — ${known.why}`),
-          );
+          if (!known.authenticates.test(stripComments(file.text))) {
+            findings.push(
+              fail(
+                file.relative,
+                `${method} ${file.url} is served outside handle() and no longer resolves the admin session itself (${known.authenticates.source})`,
+              ),
+            );
+            continue;
+          }
+          findings.push(note(file.relative, `${method} ${file.url} — ${known.why}`));
           continue;
         }
         findings.push(
@@ -178,18 +168,7 @@ export const contractsAndRoutes = defineCheck(
       findings.push(
         fail(
           entry.url,
-          `is listed as deliberately uncontracted but no route file exports ${entry.method} for it any more — delete the entry`,
-        ),
-      );
-    }
-
-    for (const entry of PENDING_IMPLEMENTATIONS) {
-      if (pendingHit.has(entry.id)) continue;
-      if (allRoutes.some((route) => route.id === entry.id)) continue;
-      findings.push(
-        fail(
-          entry.id,
-          `is on the pending-implementation list but no contract declares it any more — delete the entry from lib/pending-implementations.ts`,
+          `is listed as deliberately uncontracted but no route file serves ${entry.method} for it outside a contract any more — delete the entry`,
         ),
       );
     }

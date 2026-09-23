@@ -1,4 +1,4 @@
-import { shipOrder } from '@shop/core/order';
+import type { Page } from '@playwright/test';
 
 import { test, expect, cjk, dialog, toast } from '../src/fixtures';
 
@@ -12,6 +12,23 @@ import { test, expect, cjk, dialog, toast } from '../src/fixtures';
  * from where the operator is looking, which is exactly the sort of thing that
  * ships broken.
  */
+
+/**
+ * 发货 by 顺丰 with a typed tracking number, on the order page already open.
+ *
+ * The modal closing is the assertion, not the toast: antd's message is torn
+ * down when the page refetches, and a three-second banner is not what the
+ * warehouse depends on.
+ */
+async function shipThroughScreen(page: Page): Promise<void> {
+  await page.getByRole('button', { name: cjk('发货') }).click();
+  const modal = dialog(page);
+  await modal.getByLabel('物流公司').click();
+  await page.getByTitle('顺丰速运', { exact: true }).click();
+  await modal.getByLabel('运单号').fill('SF1234567890');
+  await modal.getByRole('button', { name: cjk('保存') }).click();
+  await expect(modal).toBeHidden();
+}
 
 test('an express shipment needs a courier and a tracking number', async ({ adminPage, shop }) => {
   await adminPage.goto(`/admin/orders/${shop.fixtures.shippableOrderId}`);
@@ -37,16 +54,7 @@ test('ship it, then confirm receipt', async ({ adminPage, adminApi, shop }) => {
   const orderId = shop.fixtures.shippableOrderId;
   await adminPage.goto(`/admin/orders/${orderId}`);
 
-  await adminPage.getByRole('button', { name: cjk('发货') }).click();
-  const modal = dialog(adminPage);
-  await modal.getByLabel('物流公司').click();
-  await adminPage.getByTitle('顺丰速运', { exact: true }).click();
-  await modal.getByLabel('运单号').fill('SF1234567890');
-  await modal.getByRole('button', { name: cjk('保存') }).click();
-  // The modal closing is the assertion, not the toast: antd's message is
-  // torn down when the page refetches, and a three-second banner is not
-  // what the warehouse depends on.
-  await expect(modal).toBeHidden();
+  await shipThroughScreen(adminPage);
 
   // The shipment is on the page, with the number that was typed — twice: the
   // shipment card and the timeline entry.
@@ -82,24 +90,14 @@ test('an order that is already shipped cannot be shipped again', async ({
   shop,
 }) => {
   const orderId = shop.fixtures.shippableOrderId!;
-  // The journey above ships this order through the screen; when this test runs
-  // on its own the arrangement is made through the service instead. `lines: []`
-  // means "everything still outstanding", which is what 一键发货 sends.
-  const before = await (await adminApi.get(`/admin-api/orders/${orderId}`)).json();
-  if (before.status !== 'shipped' && before.fulfillmentStatus !== 'fulfilled') {
-    await shipOrder(shop.ctx, {
-      orderId,
-      body: {
-        deliveryMode: 'express',
-        lines: [],
-        expressCompanyId: String(shop.fixtures.expressCompanyId),
-        trackingNo: 'SF1234567890',
-      },
-      operatorAdminId: shop.accounts.super!.id,
-    });
-  }
-
+  // The journey above ships this order through the screen. When this test runs
+  // on its own it ships it the same way — through the 发货 dialog, never a
+  // service call — so the precondition is itself the screen's doing (CR-15-k).
   await adminPage.goto(`/admin/orders/${orderId}`);
+  const before = await (await adminApi.get(`/admin-api/orders/${orderId}`)).json();
+  if (before.fulfillmentStatus !== 'fulfilled') await shipThroughScreen(adminPage);
+
+  await adminPage.reload();
   // Every line is now on its way; the button is gone, because there is nothing
   // left to send.
   // Twice on the page: the shipment card and the timeline entry.

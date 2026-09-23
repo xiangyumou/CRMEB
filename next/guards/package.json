@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "guards": "tsx src/cli.ts",
+    "mutations": "tsx scripts/mutations/run.ts",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test:unit": "vitest run --project unit",

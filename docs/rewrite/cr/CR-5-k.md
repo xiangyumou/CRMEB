@@ -1,6 +1,6 @@
 # CR-5-k — minting a scan-to-upload token writes an audit row with no target
 
-**Stream:** K (hardening) **Status:** OPEN — for stream F1 (storage)
+**Stream:** K (hardening) **Status:** RESOLVED — by CR-30-k2 at K2's merge
 **Files:** `next/apps/web/app/admin-api/attachments/scan-tokens/route.ts`
 
 ## What

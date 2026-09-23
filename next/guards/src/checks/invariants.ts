@@ -321,6 +321,12 @@ export const invariants = defineCheck(
             const problem = resolveTestId(testId);
             if (problem) findings.push(fail(`${where} (CR-2-k)`, problem));
           }
+          const carrier = edit.resolution.stream;
+          if (carrier !== undefined && !STREAMS.has(carrier)) {
+            findings.push(
+              fail(`${where} (CR-2-k)`, `names stream ${carrier}, which does not exist`),
+            );
+          }
         }
         if (edit.resolution.kind === 'assign') {
           const stream = edit.resolution.stream;
@@ -341,7 +347,9 @@ export const invariants = defineCheck(
         findings.push(
           pending(
             where,
-            edit.resolution.kind === 'assign' ? edit.resolution.stream : 'orchestrator',
+            edit.resolution.kind === 'retire'
+              ? 'orchestrator'
+              : (edit.resolution.stream ?? 'orchestrator'),
             `resolution proposed in CR-2-k (${edit.resolution.kind})`,
           ),
         );

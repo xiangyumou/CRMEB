@@ -1,9 +1,8 @@
 import { allRoutes, routeSources } from '@shop/contracts/routes';
 import { allPermissionAtoms, isKnownPermission } from '@shop/core/auth';
 import { allConfigGroups } from '@shop/core/kernel';
-import { defineCheck, fail, pending, result, type Finding } from '../framework';
+import { defineCheck, fail, result, type Finding } from '../framework';
 import { menuPermissions } from '../lib/menu';
-import { pendingImplementation } from '../lib/pending-implementations';
 import '../lib/install-domains';
 
 /**
@@ -49,21 +48,11 @@ export const permissions = defineCheck(
         continue;
       }
       if (!isKnownPermission(atom)) {
-        // The atom arrives with the domain that serves the route, so a contract
-        // waiting on its implementation is waiting on its atom too
-        // (`lib/pending-implementations.ts`).
-        const owed = pendingImplementation(route.id);
         findings.push(
-          owed
-            ? pending(
-                routeSources[route.id] ?? route.id,
-                owed.stream,
-                `${route.id} requires "${atom}", which arrives with the domain that serves it`,
-              )
-            : fail(
-                routeSources[route.id] ?? route.id,
-                `${route.id} requires "${atom}", which no permissions.ts declares — the route can never be granted`,
-              ),
+          fail(
+            routeSources[route.id] ?? route.id,
+            `${route.id} requires "${atom}", which no permissions.ts declares — the route can never be granted`,
+          ),
         );
         continue;
       }

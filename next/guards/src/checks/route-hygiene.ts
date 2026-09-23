@@ -25,9 +25,10 @@ import {
  * only come from the handler. An audit row that records "PUT /admin-api/…/:id"
  * with a null target is a log entry nobody can answer a question with.
  *
- * The exemptions are named one by one with the reason, exactly-compared: a
- * route that starts naming a target must be deleted from the list, so the list
- * cannot quietly become a baseline.
+ * The exemptions are named one by one with the reason, exactly-compared: an
+ * entry whose URL stops being an admin write, or whose route file starts naming
+ * a target, fails until it is deleted, so the list cannot quietly become a
+ * baseline.
  */
 
 interface Exemption {
@@ -49,13 +50,6 @@ const AUDIT_EXEMPT: readonly Exemption[] = [
     url: '/admin-api/catalog/sku-matrix',
     method: 'POST',
     why: 'a POST-shaped read: the spec axes go in the body and nothing is written',
-  },
-  {
-    url: '/admin-api/attachments/scan-tokens',
-    method: 'POST',
-    why: 'mints a single-use upload token bound to the caller and writes a row, but names no audit target',
-    cr: 'CR-5-k',
-    stream: 'F1',
   },
 
   // The notification inbox: a decision, not a defect.
@@ -124,6 +118,18 @@ export const routeHygiene = defineCheck(
       const needed = writes.filter((m) => !covered.includes(m));
       if (needed.length > 0 && !namesAuditTarget(file.text)) {
         findings.push(fail(where, `${needed.join('/')} writes but never calls ctx.audit(target)`));
+      }
+      // Every write in the file is exempt, and yet the file names a target:
+      // the exemption has stopped being true and must go. (A file whose other
+      // methods audit cannot be judged this way, since the call is per file;
+      // none of the exempt routes shares its file with an audited write.)
+      if (needed.length === 0 && covered.length > 0 && namesAuditTarget(file.text)) {
+        findings.push(
+          fail(
+            where,
+            `${covered.join('/')} is on the audit exemption list but the file now calls ctx.audit(target) — delete the entry`,
+          ),
+        );
       }
     }
 

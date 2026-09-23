@@ -255,9 +255,11 @@ jobs:
           failed=0
           for round in $(seq 1 50); do
             echo "::group::round $round"
-            if ! corepack pnpm exec vitest run --project int \
+            # vitest lives in @shop/core, and its file filters are substrings,
+            # not globs (CR-52-k2): these two match the STAB-001 set.
+            if ! corepack pnpm --filter @shop/core exec vitest run --project int \
                  --sequence.seed="$round" --sequence.shuffle \
-                 'packages/core/src/**/*.concurrency.int.test.ts' \
+                 concurrency.int.test.ts order.sequence.int.test.ts \
                  > "soak/round-$round.log" 2>&1; then
               failed=$((failed + 1))
               echo "round $round FAILED" | tee -a soak/failures.txt
@@ -273,6 +275,51 @@ jobs:
         with:
           name: soak-logs
           path: next/soak
+
+  mutations:
+    name: mutation run (MUT-001, ten protections)
+    # Nightly and on demand, like the soak: it asks whether the guarding tests
+    # still guard, which is a question about the tree, not about the change.
+    # Each of the ten protections is removed in a scratch copy of HEAD and its
+    # named tests must fail; a survivor or a mutation string that no longer
+    # matches exits non-zero (CR-20-k2).
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: next/pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      # The live tree's generated files are not what the copy uses (the runner
+      # regenerates inside the copy), but guards imports @shop/contracts.
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
+      - name: Pre-pull the service images
+        run: |
+          docker pull postgres:17-alpine
+          docker pull redis:7-alpine
+
+      - name: Ten mutants
+        run: corepack pnpm --filter @shop/guards mutations --json mutations.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: next/guards/mutations.json
+          if-no-files-found: ignore
 
   build:
     name: build

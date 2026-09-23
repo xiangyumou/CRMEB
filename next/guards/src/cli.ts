@@ -22,8 +22,8 @@ import { retiredFeatures } from './checks/retired';
 import { routeHygiene } from './checks/route-hygiene';
 import { secretsNeverLeak } from './checks/secrets';
 import { uniappCalls } from './checks/uniapp';
-import { count, type Check, type CheckResult } from './framework';
-import { inFlight } from './lib/streams';
+import { count, settle, type Check, type CheckResult } from './framework';
+import { inFlight, isMerged } from './lib/streams';
 
 const CHECKS: readonly Check[] = [
   domains,
@@ -54,7 +54,7 @@ if (chosen.length === 0) {
 
 const results: CheckResult[] = [];
 for (const check of chosen) {
-  results.push(await check.run());
+  results.push(settle(await check.run(), isMerged));
 }
 
 const failures = results.reduce((n, r) => n + count(r.findings, 'fail'), 0);
@@ -79,8 +79,20 @@ if (json) {
     }
   }
   console.log('');
+  const byStream = new Map<string, number>();
+  for (const check of results) {
+    for (const finding of check.findings) {
+      if (finding.level !== 'pending') continue;
+      const stream = finding.stream ?? '?';
+      byStream.set(stream, (byStream.get(stream) ?? 0) + 1);
+    }
+  }
+  const owed = [...byStream.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([stream, n]) => `${stream}=${n}`)
+    .join(', ');
   console.log(
-    `${results.length} checks, ${failures} failure(s), ${pendings} pending on ${inFlight().join(', ')}`,
+    `${results.length} checks, ${failures} failure(s), ${pendings} pending${owed ? ` (${owed})` : ''}; in flight: ${inFlight().join(', ') || 'none'}`,
   );
 }
 

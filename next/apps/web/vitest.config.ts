@@ -33,7 +33,11 @@ export default defineConfig({
           root: here,
           environment: 'happy-dom',
           globals: true,
-          setupFiles: ['./src/test/setup.ts'],
+          // `timers.ts` first: it wraps the Node timer globals before React's
+          // scheduler captures them, and cancels a file's leftovers so none can
+          // reach React after happy-dom is torn down (the turbo-only
+          // `window is not defined` flake; see that file).
+          setupFiles: ['./src/test/timers.ts', './src/test/setup.ts'],
           include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'app/**/*.test.tsx'],
           exclude: [...exclude, ...serverTests, ...intTests],
           css: false,

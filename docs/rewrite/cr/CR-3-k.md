@@ -1,6 +1,6 @@
 # CR-3-k — AUTH-005: nothing asserts a stranger cannot read another shopper's after-sale
 
-**Stream:** K (hardening) **Status:** OPEN — for stream C (refund)
+**Stream:** K (hardening) **Status:** RESOLVED — K2 wrote the tests (AUTH-005 ported at K2's merge)
 **Files:** `next/packages/core/src/refund/refund.service.ts` (the behaviour), `next/packages/core/src/refund/` (the missing test)
 
 ## What

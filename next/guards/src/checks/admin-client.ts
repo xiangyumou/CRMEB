@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { allRoutes } from '@shop/contracts/routes';
-import { defineCheck, fail, pending, result, type Finding } from '../framework';
+import { defineCheck, fail, result, type Finding } from '../framework';
 import { lineOf, stripComments, walk } from '../lib/files';
 import { nextRoot, rel } from '../lib/paths';
 import { shapeOf } from '../lib/route-files';
@@ -40,18 +40,19 @@ const UI_ROOTS = ['apps/web/src/admin', 'apps/web/app/admin'];
  *
  * A server-sent-event stream has no request body and no response body, so
  * `RouteDef` cannot describe it and `callRoute` cannot call it — P0-B recorded
- * this as the single exception (`status/p0b.md`). It is listed here so that it
- * stays single, and so the guard says who owes it a contract: until E2 lands
- * there is no `/admin-api/notifications/stream` route at all and the bell fails
- * silently by design.
+ * this as the single exception (`status/p0b.md`), and N1 shipped the server
+ * end as a bare handler for the same reason (`checks/contracts.ts`,
+ * `UNCONTRACTED`, which also asserts that handler authenticates by itself).
+ *
+ * A decision, not a debt: it is listed so that it stays single and stays in
+ * the one file that owns it. Exactly compared — if nothing builds the URL any
+ * more, or if the URL grows a contract (and so could go through the seam like
+ * everything else), the entry fails until it is deleted.
  */
-const HAND_BUILT: ReadonlyArray<{ url: string; where: RegExp; stream: string; why: string }> = [
+const HAND_BUILT: ReadonlyArray<{ url: string; where: RegExp; why: string }> = [
   {
     url: '/admin-api/notifications/stream',
     where: /notifications\/notification-bell\.tsx$/,
-    // E2 wrote it and has merged; N1 is the stream still in flight over the
-    // notification surface, so it is the one that can answer for it.
-    stream: 'N1',
     why: 'the SSE stream: EventSource, no contract body to describe',
   },
 ];
@@ -79,9 +80,12 @@ export const adminClient = defineCheck(
           const exception = HAND_BUILT.find((e) => e.url === url && e.where.test(where));
           if (exception) {
             seenExceptions.add(exception.url);
-            if (!known.has(shapeOf(url))) {
+            if (known.has(shapeOf(url))) {
               findings.push(
-                pending(where, exception.stream, `${url} has no contract yet — ${exception.why}`),
+                fail(
+                  `${where}:${lineOf(code, match.index)}`,
+                  `builds "${url}" by hand, but it has a contract now — call it through callRoute and delete the HAND_BUILT entry`,
+                ),
               );
             }
             continue;

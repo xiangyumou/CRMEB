@@ -14,7 +14,12 @@
  */
 
 export type Resolution =
-  | { kind: 'map'; testIds: string[]; why: string }
+  /**
+   * `stream`, when set, is the stream whose merge carries the edit — the one
+   * that wrote the tests and hands the row text to the orchestrator. Without
+   * it the edit is the orchestrator's alone.
+   */
+  | { kind: 'map'; testIds: string[]; why: string; stream?: string }
   | { kind: 'retire'; why: string }
   /**
    * `cr` names the change request that asks for the work. A merged stream can
@@ -32,15 +37,6 @@ export const PENDING_EDITS: readonly PendingEdit[] = [
   // --- rows whose section owner is "assign per row" -------------------------
   // ORDER-008 used to sit here (`map`, B1's RISK-B1-005 evidence). CR-2-k
   // applied it — the row reads `ported` now — so the entry is gone.
-  {
-    id: 'AUTH-005',
-    resolution: {
-      kind: 'assign',
-      stream: 'C',
-      cr: 'CR-3-k',
-      why: 'the refund service already answers REFUND_NOT_FOUND for another user’s row (refund.service.ts), but nothing asserts it — CR-3-k asks C for the cross-user test',
-    },
-  },
 
   // --- rows whose section owner names two streams --------------------------
   // E1 has merged, so these three could not be assigned to it any more. They
@@ -79,27 +75,19 @@ export const PENDING_EDITS: readonly PendingEdit[] = [
   // applied all four — they read `dropped` (CORE-001, SQL-001) or `ported`
   // (CORE-002, ROUTE-001) now, so the entries are gone.
   {
-    id: 'SEQ-001',
-    resolution: {
-      kind: 'assign',
-      stream: 'K',
-      why: 'the fixed-seed interleaving sequence runs in the second hardening pass, once D and E1 can take part in it',
-    },
-  },
-  {
-    id: 'MUT-001',
-    resolution: {
-      kind: 'assign',
-      stream: 'K',
-      why: 'mutation testing of the ten protections runs in the second hardening pass',
-    },
-  },
-  {
+    // Not settled, and K2 cannot settle it: ten shuffled rounds of the set
+    // found a product race (CR-50-k2), a schedule-dependent assertion
+    // (CR-51-k2) and a pool deadlock that hangs a round (CR-53-k2), and the
+    // CI soak cannot run as written (CR-52-k2). The row stays unmapped until
+    // those land; `status/k2.md` carries the text the orchestrator writes.
+    // Re-assigned to R1 at K2's merge: R1 takes CR-50/51/53-k2 and owns the
+    // clean 10-round run; the orchestrator applied CR-52-k2 to `next.yml`.
     id: 'STAB-001',
     resolution: {
       kind: 'assign',
-      stream: 'K',
-      why: 'the 50-round concurrency job is designed in CR-4-k and runs in the second pass',
+      stream: 'R1',
+      cr: 'CR-50-k2, CR-51-k2, CR-52-k2, CR-53-k2',
+      why: 'the 10-round local run is not clean; the four CRs are what stands between the set and 10/10',
     },
   },
 ];

@@ -1,0 +1,77 @@
+import { setTimeout as sleep } from 'node:timers/promises';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createTestCtx, type TestCtx } from '@shop/testing';
+import { createAdminSessionStore } from './admin-session.store';
+
+/**
+ * K-SEC-A1 (CR-8-k), pinned against a real Redis.
+ *
+ * The session key slides on every `resolve`; the per-admin index that
+ * `revokeAllForAdmin` reads is given `ttlMs * 4` once, at `create`, and never
+ * slid. So a session kept alive past four TTLs has fallen out of the index, and
+ * a password change or a disable no longer reaches it. With the production TTL
+ * of 8 h that is anybody who keeps a console tab open for 32 h.
+ *
+ * The TTL is shrunk to 600 ms so the four-TTL horizon is 2.4 s of wall time
+ * (Redis expiry does not follow the harness clock). The `it.fails` flips when
+ * CR-8-k lands.
+ */
+
+let harness: TestCtx;
+
+const TTL_MS = 600;
+
+const SESSION = {
+  adminId: 42,
+  account: 'ops',
+  name: '运营',
+  avatar: null,
+  isSuper: false,
+  permissions: [],
+  passwordVersion: 0,
+};
+
+beforeAll(async () => {
+  harness = await createTestCtx();
+}, 180_000);
+
+afterAll(async () => {
+  await harness?.close();
+});
+
+beforeEach(async () => {
+  await harness.redis.flushdb();
+});
+
+function store() {
+  return createAdminSessionStore({ redis: harness.ctx.redis, ttlMs: TTL_MS });
+}
+
+describe('K-SEC-A1 — revoking every session of an admin', () => {
+  it('reaches a session inside its first four TTLs', async () => {
+    const sessions = store();
+    const token = await sessions.create(SESSION, 0);
+    expect(await sessions.revokeAllForAdmin(SESSION.adminId)).toBe(1);
+    expect(await sessions.resolve(token)).toBeNull();
+  });
+
+  it.fails(
+    'reaches a session that has been kept alive past four TTLs',
+    async () => {
+      const sessions = store();
+      const token = await sessions.create(SESSION, 0);
+
+      // Somebody keeps working: every request slides the session key.
+      for (let elapsed = 0; elapsed < TTL_MS * 5; elapsed += TTL_MS / 4) {
+        await sleep(TTL_MS / 4);
+        expect(await sessions.resolve(token)).not.toBeNull();
+      }
+
+      // The password is changed.
+      await sessions.revokeAllForAdmin(SESSION.adminId);
+
+      expect(await sessions.resolve(token)).toBeNull();
+    },
+    10_000,
+  );
+});

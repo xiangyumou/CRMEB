@@ -76,3 +76,25 @@ export function result(
 export function count(findings: readonly Finding[], level: Level): number {
   return findings.filter((f) => f.level === level).length;
 }
+
+/**
+ * A pending finding is only pending while its stream is in flight. Once
+ * `lib/streams.ts` says the stream has merged, the same finding is a failure —
+ * whichever check produced it, and without that check having to know. This is
+ * what makes the final all-merged run strict by itself: nothing is re-enabled,
+ * the orchestrator flips the last streams and anything still owed fails.
+ */
+export function settle(check: CheckResult, merged: (stream: string) => boolean): CheckResult {
+  return {
+    ...check,
+    findings: check.findings.map((finding) =>
+      finding.level === 'pending' && finding.stream !== undefined && merged(finding.stream)
+        ? {
+            ...finding,
+            level: 'fail',
+            message: `${finding.message} — owed by ${finding.stream}, which has merged`,
+          }
+        : finding,
+    ),
+  };
+}

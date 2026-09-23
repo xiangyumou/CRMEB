@@ -78,6 +78,12 @@ export async function seedE2E(options: {
       .insert(configValues)
       .values({ group: 'payment', key: 'apiBaseUrl', value: 'http://127.0.0.1:9/no-gateway' })
       .onConflictDoNothing();
+    // The same for WeChat (公众号, 小程序, 模板消息). `wechat-oa.spec.ts` points it
+    // at the fake OA server for its own duration and puts this back.
+    await db
+      .insert(configValues)
+      .values({ group: 'wechat', key: 'apiBaseUrl', value: 'http://127.0.0.1:9/no-wechat' })
+      .onConflictDoNothing();
 
     const hash = await hashPassword(PASSWORD, 4);
 
@@ -218,7 +224,7 @@ async function firstSkuId(db: ReturnType<typeof ctxFor>['db'], productId: number
  * INSERT that honours the same CHECK constraints (`orders_fulfillment_matches_status`
  * wants anything at or past 已发货 to be fulfilled; `paid` is not).
  */
-async function makePaidOrder(
+export async function makePaidOrder(
   parts: ReturnType<typeof ctxFor>,
   args: { userId: number; productId: number; skuId: number; no: string },
 ): Promise<{ orderId: number; orderItemId: number }> {
