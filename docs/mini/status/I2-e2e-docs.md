@@ -39,9 +39,19 @@ mini citations in `docs/invariants.md`, the mini sections of `architecture.md` /
   the uni-app until the cutover. `docs/conventions.md`: the mini-program rules, the uni-app
   marked legacy.
 
+- `docs/mini/README.md`: the doc map, the builds, dev H5 (layout only / the e2e stack for
+  data), 微信开发者工具 and device check, unit / guards / e2e (cold and warm stack).
+- `docs/mini/cutover.md` (plan only): preconditions; a proposed three-release order (A: new
+  backend, nothing deleted, 审核; B: deletions + landing page; C: DROP per OPS-007) for the user
+  to decide; the deletion checklist (uni-app, legacy e2e, legacy diy — move
+  `admin/diy/{data-source,record-source}` out first —, the 7 helper routes, staff routes,
+  `MINI_CODE_PAGES` + `/wechat/mini-qrcodes`, notification `link` + `wechatMini.page` with the
+  OA template-message decision, the `uniapp` guard, CI, edge `/` → landing); what not to drop;
+  公众平台 actions by release; rollback.
+
 ## In progress
 
-- `docs/mini/README.md`, `docs/mini/cutover.md`; CI comments.
+- CI comments.
 
 ## Pending
 
