@@ -61,7 +61,7 @@ describe('h5-mp-emulation platform', () => {
       emulationPlatform.requestPayment({ outTradeNo: 'P9', params: jsapi }),
     ).resolves.toEqual({ kind: 'paid' });
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/__e2e/mini/request-payment');
-    expect(bodyOf(fetchMock)).toEqual({ outTradeNo: 'P9', package: 'prepay_id=wx1' });
+    expect(bodyOf(fetchMock)).toEqual({ package: 'prepay_id=wx1' });
 
     window.localStorage.setItem(
       EMULATION_STORAGE_KEY,
