@@ -89,9 +89,15 @@ export default {
           this.dataConfig.fillet.valList[2].val * 2
         }rpx`;
       }
+      // `moduleColor` is optional in the schema: a title saved without it has
+      // no background of its own.
+      const colors = (this.dataConfig.moduleColor || {}).color || [];
       return {
         "border-radius": borderRadius,
-        background: `linear-gradient(90deg, ${this.dataConfig.moduleColor.color[0].item} 0%, ${this.dataConfig.moduleColor.color[1].item} 100%)`,
+        background:
+          colors.length >= 2
+            ? `linear-gradient(90deg, ${colors[0].item} 0%, ${colors[1].item} 100%)`
+            : "transparent",
       };
     },
     titleStyle() {
