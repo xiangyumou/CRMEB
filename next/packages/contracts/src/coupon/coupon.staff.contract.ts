@@ -14,21 +14,20 @@ import {
 } from './schemas';
 
 /**
- * 移动端店员发券, plus the 订单赠券 panel on the shopper's own order page
- * (CR-5-h2), plus 查看客户持有的优惠券 (CR-1-h3).
+ * 移动端店员发券, plus the 订单赠券 panel on the shopper's own order page, plus
+ * 查看客户持有的优惠券.
  *
  * Four routes, two audiences:
  *
- *  - `GET /api/v1/orders/:id/gift-coupons` is the **shopper's**. Legacy showed
- *    the coupons an order had earned inside the order detail payload
- *    (`StoreOrderCreateServices` wrote them from `give_coupon_ids`); here the
- *    order detail stays a single shape owned by B1 and the coupons are their
- *    own call, so a wallet write never has to widen an order response.
+ *  - `GET /api/v1/orders/:id/gift-coupons` is the **shopper's**. The coupons an
+ *    order earned are not inside the order detail: the order detail stays a
+ *    single shape owned by the order domain and the coupons are their own call,
+ *    so a wallet write never has to widen an order response.
  *  - `GET /api/v1/staff/coupons`, `POST /api/v1/staff/coupon-grants` and
- *    `GET /api/v1/staff/users/:uid/coupons` are the **staff console's**. `auth: 'staff'` and no permission atom, exactly like
- *    every other route in `order.staff.contract.ts`: staff is the
- *    `order-staff.staffUserIds` roster, not a role, and a staff member either
- *    has the console or does not.
+ *    `GET /api/v1/staff/users/:uid/coupons` are the **staff console's**.
+ *    `auth: 'staff'` and no permission atom, exactly like every other route in
+ *    `order.staff.contract.ts`: staff is the `order-staff.staffUserIds` roster,
+ *    not a role, and a staff member either has the console or does not.
  *
  * The grant goes through `adminGrant` unchanged. That matters more than the
  * saved code: the supply decrement, the per-user limit and the
@@ -38,8 +37,8 @@ import {
 
 /**
  * `:id` is the surrogate id **or** the order number, the same as every other
- * storefront order route (CR-1-h), and a stranger gets the same `404` as an
- * unknown reference. Answering `403` here would confirm the order exists.
+ * storefront order route, and a stranger gets the same `404` as an unknown
+ * reference. Answering `403` here would confirm the order exists.
  */
 export const orderGiftCouponList = defineRoute({
   id: 'coupon.orderGiftCoupons',
@@ -114,10 +113,9 @@ export const staffCouponList = defineRoute({
  * simply already has it.
  *
  * A sold-out campaign *is* a refusal (`COUPON_SOLD_OUT`), because the staff
- * member has to pick a different coupon. So is a template that is not
- * `active` (`COUPON_TEMPLATE_NOT_FOUND`, the answer the staff list implies)
- * and the 店员's own account as the recipient (`COUPON_GRANT_SELF`) —
- * CR-10-k2.
+ * member has to pick a different coupon. So is a template that is not `active`
+ * (`COUPON_TEMPLATE_NOT_FOUND`, the answer the staff list implies) and the
+ * 店员's own account as the recipient (`COUPON_GRANT_SELF`).
  */
 export const staffCouponGrant = defineRoute({
   id: 'coupon.staffGrant',
@@ -149,7 +147,7 @@ export const staffCouponGrant = defineRoute({
 });
 
 /**
- * What one customer holds — 商家管理 → 用户 → 详情 → 「查看优惠券」 (CR-1-h3).
+ * What one customer holds — 商家管理 → 用户 → 详情 → 「查看优惠券」.
  *
  * A 店员 may read it: they already see the customer and may grant coupons, and
  * what the customer holds is the same trust level (the orchestrator's decision
