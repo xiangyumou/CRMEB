@@ -133,3 +133,31 @@ Maintained by the orchestrator. Per-stream detail lives in `status/<ws>.md`.
   - `ghcr.io/xiangyumou/crmeb-next-edge@sha256:1b9859578a6a869c6bf82e64952ec37b107180a187834f500cc13eff9e2473a5`
 
   The edge image carries the real H5 bundle: `/srv/h5` holds `index.html`, `assets`, `pages` and `static`. What remains is every production-host step (2–6 and 8–17), each needing the user's OK.
+- 2026-09-23 — **Cutover done on production** (`ubuntu@43.142.105.205`, release `bbb05ba1b` on the CI digests above; the user authorized every step). The window ran 15:54–16:10 +08:00, and the switch 16:05:19–16:05:37.
+  - **Steps 1–5, 7 and 8–9.**
+    - Host checkout: `/home/ubuntu/apps/CRMEB-next`. It is a `git archive` of `deploy/next`, `next` and `tests/static` plus a `REVISION` file, not a clone: the host's `git clone` hit TLS resets.
+    - `deployment.env` (600) sets `NEXT_EDGE_TRUSTED_PROXIES=172.18.0.0/16`.
+    - Backups are in `/home/ubuntu/cutover-backups/` (700), dated `20260923T075252Z`:
+      - a verified mysqldump, 160 tables;
+      - an uploads tar, 99 files.
+  - **Step 6** (`drill.sh`) was not run on the host. It builds images, and the checkout has no uni-app. Covered instead by:
+    - the local 16/16 run with `deploy/next` unchanged since;
+    - CI's deploy rehearsal on the release commit.
+  - **Step 10.** `upgrade.sh --first-deploy` passed the readiness gate and applied 3 migrations.
+  - **Step 11.** The ETL ran in a throwaway `node:24` container on `server-internal-net`:
+    - `etl run --require-complete`: 13 groups;
+    - `verify --full-digest`: 43/43.
+  - **Step 12.** 98 referenced files copied into the `crmeb-next_uploads` volume; re-verify 43/43.
+  - **Step 13 smoke.** readyz, health, `/admin` and `/` all green; products, DIY home and an attachment by sha256 served. No real order was placed.
+  - **Step 14.** The ETL container is removed and its env shredded.
+  - **Step 15.**
+    - Old nginx, php, queue, timer and workerman are stopped, not removed. Old mysql and redis stay up for rollback.
+    - The new stack is up with `compose.traefik.yml`.
+  - **Step 16.** Through Traefik on the host with the real SNI:
+    - the cert (CN=x-zoo.vip, until 2026-12-12) is valid;
+    - `/healthz`, `/readyz`, `/admin`, `/` and `/api/v1/health` all return 200 with version `bbb05ba1b`;
+    - a spoofed `X-Forwarded-For` is not believed.
+  - **Step 16, from outside.** Not verifiable: Tencent Cloud's ICP block redirects HTTP to `dnspod.qcloud.com/static/webblock.html` and resets TLS carrying the domain's SNI. The block is the same for any Host and is independent of this stack.
+    - After ICP: recheck that the edge logs the real client IP.
+  - **Step 17.** All five containers are healthy with 0 restarts. There are no errors in web or worker logs. BullMQ: 100 completed, 0 failed, 19 schedulers. Memory: 2.3 GB of 3.6 GB available.
+  - **Rollback** remains available per `cutover.md` "Rollback": the old `crmeb-production` roles are stopped, not removed.
