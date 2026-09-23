@@ -91,6 +91,7 @@ CASE_IDS=(
   upgrade/requires-all-three-candidates
   upgrade/first-deploy
   upgrade/dry-run-changes-nothing
+  edge/proxies-every-page-route
   backup/verifies-restore
   backup/refuses-tampered-dump
   backup/refuses-truncated-dump
@@ -112,6 +113,7 @@ CASE_FNS=(
   case_requires_all_three
   case_first_deploy
   case_dry_run
+  case_edge_proxies_every_page
   case_backup_verifies_restore
   case_backup_refuses_tampered_dump
   case_backup_refuses_truncated_dump
@@ -621,6 +623,77 @@ case_dry_run() {
   check 'it says it changed nothing' grep -q 'no migration ran' "$workdir/dry-run.log"
   check 'the settings are untouched' [ "$before" = "$(cat "$NEXT_DEPLOYMENT_ENV")" ]
   check 'the stack is still on v1' on_release web "$web_v1"
+}
+
+# --- the edge -------------------------------------------------------------------------
+
+# `/admin/(shell)/orders/[id]/page.tsx`, relative to the app directory, is
+# `/admin/orders/drill-sample`. Fails for a file under a private folder, which
+# is not a route.
+route_url() {
+  local directory="${1%/*}" segment url=''
+  local -a segments
+  IFS='/' read -r -a segments <<<"${directory#/}"
+  for segment in "${segments[@]}"; do
+    case "$segment" in
+      '') ;;
+      _*) return 1 ;;
+      '('*')' | @*) ;;
+      '[[...'*']]') ;;
+      '['*']') url+='/drill-sample' ;;
+      *) url+="/$segment" ;;
+    esac
+  done
+  printf '%s\n' "${url:-/}"
+}
+
+# The edge serves the storefront's `index.html` for any path it does not
+# proxy, so a Next page left out of `nginx.conf` does not 404: it quietly shows
+# the storefront. Every page route, and one route handler per top-level path,
+# is requested through the real edge, and none may come back as that file.
+#
+# `/` is the storefront's on purpose: the Next page there only points at
+# `/admin`.
+case_edge_proxies_every_page() {
+  ensure_deployed || return 1
+  local app="$repo_root/next/apps/web/app" storefront file url prefix response status
+  local checked=0 handler_prefixes=' '
+  [ -d "$app" ] || {
+    note "no Next app at $app"
+    return 77
+  }
+  # Fetched exactly as the routes are below and split the same way, so the
+  # comparison cannot differ by a trailing newline that `$(…)` strips from one
+  # side only.
+  storefront="$(curl -fsS --max-time 10 -w '\n%{http_code}' "http://127.0.0.1:$edge_port/index.html")" || {
+    note "NOT ok: the edge did not serve the storefront's index.html"
+    return 1
+  }
+  storefront="${storefront%$'\n'*}"
+  while IFS= read -r file; do
+    url="$(route_url "${file#"$app"}")" || continue
+    [ "$url" != '/' ] || continue
+    case "${file##*/}" in
+      route.*)
+        prefix="${url#/}"
+        prefix="${prefix%%/*}"
+        case "$handler_prefixes" in *" $prefix "*) continue ;; esac
+        handler_prefixes+="$prefix "
+        ;;
+    esac
+    checked=$((checked + 1))
+    response="$(curl -sS --max-time 30 -w '\n%{http_code}' "http://127.0.0.1:$edge_port$url" 2>/dev/null || true)"
+    status="${response##*$'\n'}"
+    if [ -z "$status" ] || [ "$status" = '000' ]; then
+      note "NOT ok: $url did not answer (${file#"$repo_root/"})"
+      case_failures=$((case_failures + 1))
+    elif [ "${response%$'\n'*}" = "$storefront" ]; then
+      note "NOT ok: $url is answered by the storefront, not by web (${file#"$repo_root/"})"
+      case_failures=$((case_failures + 1))
+    fi
+  done < <(find "$app" -type f -regextype posix-extended \
+    -regex '.*/(page|route)\.(tsx|ts|jsx|js|mdx)' | sort)
+  check "$checked route(s) reach web through the edge" [ "$checked" -gt 0 ]
 }
 
 # --- backup cases -------------------------------------------------------------------

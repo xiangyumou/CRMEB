@@ -2,14 +2,14 @@
 
 The production stack is one Compose project, `crmeb-next`, on one host:
 
-| Service    | What it is                                                                                 | Memory cap |
-| ---------- | ------------------------------------------------------------------------------------------ | ---------- |
-| `postgres` | PostgreSQL 17, the only database                                                           | 512 MiB    |
-| `redis`    | Redis 7 with `noeviction` and AOF: admin sessions, the config cache and the BullMQ queue   | 160 MiB    |
-| `web`      | the Next.js server: the admin at `/admin`, `/admin-api/*` and the storefront API `/api/v1` | 512 MiB    |
-| `worker`   | the BullMQ worker: repeatable jobs, the post-commit effects dispatcher                     | 320 MiB    |
-| `edge`     | nginx: the H5 storefront at `/`, a proxy to `web`, and `/uploads/`                         | 64 MiB     |
-| `migrate`  | a one-shot (profile `migrate`) that applies the migrations and the reference seed          | 384 MiB    |
+| Service    | What it is                                                                                  | Memory cap |
+| ---------- | ------------------------------------------------------------------------------------------- | ---------- |
+| `postgres` | PostgreSQL 17, the only database                                                            | 512 MiB    |
+| `redis`    | Redis 7 with `noeviction` and AOF: admin sessions, the config cache and the BullMQ queue    | 160 MiB    |
+| `web`      | the Next.js server: `/admin`, `/admin-api/*`, the storefront API `/api/v1`, `/scan-upload/` | 512 MiB    |
+| `worker`   | the BullMQ worker: repeatable jobs, the post-commit effects dispatcher                      | 320 MiB    |
+| `edge`     | nginx: the H5 storefront at `/`, a proxy to `web`, and `/uploads/`                          | 64 MiB     |
+| `migrate`  | a one-shot (profile `migrate`) that applies the migrations and the reference seed           | 384 MiB    |
 
 The images are built in CI and pinned by digest. A host needs Docker with Compose v2, `curl`,
 and nothing else: no Node, no pnpm, no build toolchain.
@@ -380,6 +380,20 @@ The edge serves uploads as nginx's unprivileged user. A directory left at `0700`
 it turns every image under it into a 404, with `(13: Permission denied)` in the edge log. `a+rX`
 sets `+x` on directories only, so no uploaded file becomes executable.
 
+## What the edge sends to `web`
+
+The edge proxies `/admin`, `/admin-api`, `/api`, `/scan-upload` and `/_next/static/` to `web`, and
+`/readyz` to the app's `/api/v1/readyz`. Every other path belongs to the H5 storefront, whose
+history-mode fallback answers any path it does not know with its `index.html`. So a Next page the
+edge does not proxy never 404s: it shows the storefront instead, which is easy to miss.
+
+A new page or route handler under `apps/web/app` outside those prefixes therefore needs a location
+in `docker/edge/nginx.conf`, with the same `X-Real-IP` and `X-Forwarded-For` handling as the
+others. The drill case `edge/proxies-every-page-route` requests every page route, and one route
+handler per top-level path, through the real edge and fails on any that comes back as the
+storefront. `/` is the one route left to the storefront on purpose: the Next page there only points
+at `/admin`.
+
 ## Health and readiness
 
 - `/healthz` is nginx answering for itself. It never depends on the app, so a slow app cannot
@@ -451,11 +465,12 @@ It builds the three images from the checkout, pushes them to a registry containe
 then deploys, breaks and rolls back a real stack: a moving tag, a missing candidate, a dry run, a
 tampered and a truncated dump, a failing migration, a worker that starts and does no work, a
 readiness gate that finds a table missing, a rollback to an image that is not there, a successful
-upgrade and rollback, and the same upgrade and rollback with an overlay configured (a stand-in
-for `compose.traefik.yml` on a stand-in network, never the real one). It uses its own Compose
-project (`crmeb-next-drill`), its own generated passwords under `$TMPDIR` and its own free loopback
-port, so it can run beside the live stack. It needs the whole repository, not just `deploy/`. CI
-runs it on every change to the application or to this directory.
+upgrade and rollback, the same upgrade and rollback with an overlay configured (a stand-in for
+`compose.traefik.yml` on a stand-in network, never the real one), and a Next page the edge would
+not proxy. It uses its own Compose project (`crmeb-next-drill`), its own generated passwords under
+`$TMPDIR` and its own free loopback port, so it can run beside the live stack. It needs the whole
+repository, not just `deploy/`. CI runs it on every change to the application or to this
+directory.
 
 ## Rules
 
