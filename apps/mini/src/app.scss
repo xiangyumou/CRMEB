@@ -39,3 +39,10 @@ page,
     transform: rotate(360deg);
   }
 }
+
+// H5 only (the tag does not exist in WeChat): Taro wraps each input in a block element whose
+// inner <input> is one line tall, so the text sat at the top of a tall field. WeChat centres it.
+taro-input-core {
+  display: flex;
+  align-items: center;
+}

@@ -21,6 +21,8 @@
     transform $duration-out $ease,
     opacity $duration-out $ease;
 
+  @include native-button-width;
+
   &::after {
     display: none;
     border: none;
@@ -47,6 +49,7 @@
   &--block {
     display: flex;
     width: 100%;
+    @include native-button-width(100%);
   }
 
   // variants

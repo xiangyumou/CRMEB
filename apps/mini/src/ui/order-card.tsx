@@ -27,11 +27,10 @@ export function OrderItemRow({
 }) {
   return (
     <View className="shop-order-row">
-      <Image
-        src={item.skuImageUrl ?? item.productImageUrl}
-        className="shop-order-row__image"
-        radius="sm"
-      />
+      {/* The wrapper sets the width: Image's ratio padding is a share of its parent's width. */}
+      <View className="shop-order-row__image">
+        <Image src={item.skuImageUrl ?? item.productImageUrl} radius="sm" />
+      </View>
       <View className="shop-order-row__info">
         <Text className="shop-order-row__name">{item.productName}</Text>
         {item.specText ? <Text className="shop-order-row__spec">{item.specText}</Text> : null}
@@ -111,7 +110,7 @@ export function OrderCard({ order, onAction, onClick, busy, className }: OrderCa
         <View className="shop-order__actions">
           {order.status === 'pending_payment' && order.payExpiresAt ? (
             <View className="shop-order__expiry">
-              <Text>剩余 </Text>
+              <Text className="shop-order__expiry-label">剩余</Text>
               <Countdown endsAt={order.payExpiresAt} />
             </View>
           ) : null}

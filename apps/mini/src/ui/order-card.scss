@@ -68,8 +68,14 @@
 
   &__expiry {
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     margin-right: auto;
+    white-space: nowrap;
+  }
+
+  &__expiry-label {
+    margin-right: $space-1;
     @include text($font-caption);
     color: var(--color-primary-text);
   }

@@ -33,6 +33,27 @@ describe('Sheet', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('opens after starting hidden, and reopens after closing', () => {
+    const onClose = vi.fn();
+    const sheet = (visible: boolean) => (
+      <Sheet visible={visible} onClose={onClose} title="选择规格">
+        内容
+      </Sheet>
+    );
+    const { rerender } = render(sheet(false));
+    act(() => vi.advanceTimersByTime(500));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    rerender(sheet(true));
+    expect(screen.getByRole('dialog', { name: '选择规格' })).toBeTruthy();
+    act(() => vi.advanceTimersByTime(20));
+    expect(screen.getByRole('dialog').className).toContain('shop-sheet--shown');
+    rerender(sheet(false));
+    act(() => vi.advanceTimersByTime(200));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    rerender(sheet(true));
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
   it('closes from the mask unless the choice must be made', () => {
     const onClose = vi.fn();
     const { container, rerender } = render(

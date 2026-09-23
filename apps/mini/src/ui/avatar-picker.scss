@@ -10,6 +10,7 @@
   border: 0;
   background: none;
   line-height: 1;
+  @include native-button-width;
 
   &::after {
     display: none;

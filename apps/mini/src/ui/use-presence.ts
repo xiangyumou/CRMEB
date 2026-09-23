@@ -8,25 +8,29 @@ export const EXIT_MS = 150;
  * Mount / animate / unmount for an overlay: `mounted` stays true through the exit animation,
  * `shown` flips one frame after mounting so the enter transition runs. While shown, the page
  * behind stops scrolling (overlay-store).
+ *
+ * Both are derived from `visible` plus state the timers set, never set while rendering: the H5
+ * build (react-dom 18, production) dropped one of two render-phase updates here, so a sheet that
+ * started hidden never opened there.
  */
 export function usePresence(visible: boolean): { mounted: boolean; shown: boolean } {
-  const [mounted, setMounted] = useState(visible);
-  const [shown, setShown] = useState(false);
-  const [previous, setPrevious] = useState(visible);
+  // Set by the timers only: whether the overlay is still on screen after `visible` went false
+  // (the exit animation), and whether the enter transition has started.
+  const [present, setPresent] = useState(visible);
+  const [entered, setEntered] = useState(false);
   const push = useOverlayStore((state) => state.push);
   const pop = useOverlayStore((state) => state.pop);
 
-  // Adjust state while rendering (not in an effect) when `visible` flips.
-  if (previous !== visible) {
-    setPrevious(visible);
-    if (visible) setMounted(true);
-    else setShown(false);
-  }
-
   useEffect(() => {
     const timer = visible
-      ? setTimeout(() => setShown(true), 16)
-      : setTimeout(() => setMounted(false), EXIT_MS);
+      ? setTimeout(() => {
+          setPresent(true);
+          setEntered(true);
+        }, 16)
+      : setTimeout(() => {
+          setPresent(false);
+          setEntered(false);
+        }, EXIT_MS);
     return () => clearTimeout(timer);
   }, [visible]);
 
@@ -36,5 +40,5 @@ export function usePresence(visible: boolean): { mounted: boolean; shown: boolea
     return () => pop();
   }, [visible, push, pop]);
 
-  return { mounted, shown };
+  return { mounted: visible || present, shown: visible && entered };
 }

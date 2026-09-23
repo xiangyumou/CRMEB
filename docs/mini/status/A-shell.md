@@ -58,6 +58,14 @@ and `apps/mini/config`.
 - **Data helpers.** `data/upload.ts` (multipart upload with the client headers and one renewal),
   `data/cities.ts`, `lib/format.ts`, `lib/server-clock.ts`, `platform/page-scroll.ts`,
   `platform/device.ts` (call, preview).
+- **Found by the gallery, fixed in the kit.**
+  - `usePresence` no longer sets state while rendering: the H5 build dropped one of the two
+    updates, so a Sheet that started hidden never opened there.
+  - Native buttons (`button` in WeChat, `taro-button-core` on H5) arrive 100% (H5) or 184px
+    (WeChat style v2) wide: `native-button-width` resets them.
+  - H5 inputs are centred vertically, as WeChat already does.
+  - An OrderItemRow picture is sized by a wrapper: Image's ratio padding is a share of its
+    parent's width.
 - **S4 pages.** Product, checkout, cashier and pay-result are on PageShell and the kit and
   navigate by route.
 

@@ -81,6 +81,17 @@
 }
 
 /// A visually small control with a ≥ 88 × 88 hit area.
+// A native button (`button` in WeChat, `taro-button-core` on H5) arrives with the platform's
+// width (100% on H5, 184px under WeChat's style v2) and auto side margins. `[class]` lifts the
+// override over WeChat's `button:not([size=mini])`, which a single class would lose to.
+@mixin native-button-width($width: auto) {
+  &[class] {
+    width: $width;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
 @mixin hit-area {
   position: relative;
   &::before {

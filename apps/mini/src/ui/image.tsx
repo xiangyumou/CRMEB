@@ -23,7 +23,9 @@ export interface ImageProps {
 
 /**
  * A picture in a fixed-ratio box (design.md §4.1): grey while it loads, an icon if it fails.
- * The box is sized by CSS, not by the image, so a list does not jump as pictures arrive.
+ * The box is sized by CSS, not by the image, so a list does not jump as pictures arrive. Its
+ * height is a padding share of the *parent's* width: give a fixed-width picture a wrapper of
+ * that width rather than a width on the Image itself.
  */
 export function Image({
   src,
