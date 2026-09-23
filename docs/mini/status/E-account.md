@@ -64,13 +64,21 @@ Updated at every commit so the work can resume after an interruption.
 - `test:mini` after the merge: 18/18 green. 375px H5 screenshots in `E-screens/` (14 pages,
   taken with a throwaway spec on the e2e stack, `FONTCONFIG_FILE` pointing at a CJK font).
 
+- 个人资料 renders `NicknameField` from `@/platform` (new, `platform/nickname-field.tsx`): the
+  mini guard keeps `type="nickname"` inside `src/platform/`.
+- Merged storefront/mini again (D merged; clean).
+- Final checklist (2026-09-24): `pnpm turbo run gen typecheck lint test:unit build` pass (45/45);
+  `test:mini` 22/22 (a first run lost the first test to a cold stack in C's
+  `signUpFromOrders`; the rerun was green); `prettier --check .` pass; `pnpm guards` pass.
+  Sizes (weapp): main 656.0 KB, account 120.1 KB, content 14.9 KB, total 1034.7 KB.
+
 ## In progress
 
-- Final checklist and sizes.
+- Nothing; final report sent.
 
 ## Next
 
-- Final report.
+- Nothing for E. Open: the route catalogue's `addresses { select }` is now unused.
 
 ## Backend gaps found
 
