@@ -16,9 +16,9 @@ import * as cart from './index';
  * The cart against a real database.
  *
  * Two things are being protected here. The first is that an unsellable row is
- * *described*, never deleted behind the shopper's back — the legacy list
- * silently dropped it. The second is `addUnits`: 加入购物车 from two devices at
- * once must end at the sum, in one row, which is a property of the
+ * *described*, never deleted behind the shopper's back. The second is
+ * `addUnits`: 加入购物车 from two devices at once must end at the sum, in one
+ * row, which is a property of the
  * `INSERT … ON CONFLICT (user_id, sku_id) DO UPDATE` statement and of nothing
  * in TypeScript.
  */
@@ -272,10 +272,10 @@ describe('editing the cart', () => {
   });
 
   /**
-   * CR-3-b2. The add path already refuses a second card; the edit path is the
-   * way round it, because it sets an absolute quantity rather than adding to
-   * one. `product_virtual_cards_order_item_uq` binds one card key to one order
-   * item, so a line of two could only ever be half delivered.
+   * The add path already refuses a second card; the edit path is the way round
+   * it, because it sets an absolute quantity rather than adding to one.
+   * `product_virtual_cards_order_item_uq` binds one card key to one order item,
+   * so a line of two could only ever be half delivered.
    */
   it('refuses to edit a card-key row up to two', async () => {
     const userId = await makeUser();

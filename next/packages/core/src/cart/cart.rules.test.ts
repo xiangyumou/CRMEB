@@ -6,8 +6,8 @@ import { capFor, isAvailable, refuseQuantity, stateOf, MAX_CART_QUANTITY } from 
  * The cart's availability rules, with nothing behind them.
  *
  * The case worth protecting is the first one: a row whose product is gone must
- * still come back, described, so the shopper can remove it. Legacy dropped it
- * from the response and left people staring at a basket that had lost items.
+ * still come back, described, so the shopper can remove it. Dropped from the
+ * response, it would leave people staring at a basket that had lost items.
  */
 
 function sku(overrides: Partial<SkuForSale> = {}): SkuForSale {
@@ -122,7 +122,7 @@ describe('capFor', () => {
   });
 
   it('is one for a card-key product, whatever limit the product carries', () => {
-    // CR-3-b2: the stepper must not offer a quantity `refuseQuantity` refuses.
+    // The stepper must not offer a quantity `refuseQuantity` refuses.
     expect(capFor(sku({ productKind: 'virtual_card' }))).toBe(1);
     expect(
       capFor(

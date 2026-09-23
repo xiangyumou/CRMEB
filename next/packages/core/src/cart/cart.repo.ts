@@ -6,10 +6,9 @@ import { conditionalDelete, conditionalUpdate, type ConditionalUpdateResult } fr
 /**
  * Every `cart_items` statement, and nothing else.
  *
- * The one to read is `addUnits`. Legacy's `StoreCartServices::setCart` read the
- * row, decided, and then inserted or updated — two shoppers tapping 加入购物车
- * on two devices therefore produced two rows for the same variant, and the
- * `(user, sku)` pair had no uniqueness to stop it. Here it is a single
+ * The one to read is `addUnits`. Reading the row, deciding, and then inserting
+ * or updating would let one shopper tapping 加入购物车 on two devices produce
+ * two rows for the same variant. Here it is a single
  * `INSERT … ON CONFLICT (user_id, sku_id) DO UPDATE`, so the database decides
  * and the answer comes back in the same round trip.
  */
@@ -129,7 +128,7 @@ export async function remove(
 
 /**
  * Takes `quantity` units off the row holding `skuId`, when the row has more
- * than that (CR-2-h §2).
+ * than that.
  *
  * One statement with the arithmetic in SQL, so two taps of the minus button
  * that arrive together take one unit each rather than both reading 3 and both

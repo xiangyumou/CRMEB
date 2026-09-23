@@ -35,11 +35,11 @@ import {
  * Two decisions shape every function here.
  *
  * **Nothing about a product is stored on the cart row.** The row is
- * `(user, sku, quantity, isSelected)`; the name, the picture, the price and
- * the stock are read live through the catalogue port every time the cart is
- * listed. Legacy copied `cart_info` onto the row as a JSON blob and then had a
- * scheduled task trying to keep it in step with the product table, which is
- * how a shopper could be shown — and charged — last month's price.
+ * `(user, sku, quantity, isSelected)`; the name, the picture, the price and the
+ * stock are read live through the catalogue port every time the cart is listed.
+ * A copy of the product on the row would need a scheduled task to keep it in
+ * step with the product table, and is how a shopper gets shown — and charged —
+ * last month's price.
  *
  * **An unsellable row is shown, not deleted.** `stateOf` says why it cannot be
  * checked out, the storefront greys it out, and 清空失效商品 removes them when
@@ -198,9 +198,9 @@ export async function addItem(ctx: Ctx, body: CartAddBody): Promise<CartMutation
       quantity: body.quantity,
       cap: capFor(sku),
     });
-    // 加购件数 on F3's product page (CR-1-f3 §2). In the same transaction as the
-    // row it describes, and through the catalog's seam rather than this
-    // domain's repo, because `product_events` is a catalog table.
+    // 加购件数 on the stats product page. In the same transaction as the row it
+    // describes, and through the catalog's seam rather than this domain's repo,
+    // because `product_events` is a catalog table.
     await recordCartAdd(tx, ctx, {
       productId: sku.productId,
       skuId,
@@ -218,18 +218,18 @@ export async function addItem(ctx: Ctx, body: CartAddBody): Promise<CartMutation
  * Absolute quantity, the tick, and/or 修改规格. `PATCH`, because it is a partial
  * edit.
  *
- * ## Changing the variant (CR-2-h §1)
+ * ## Changing the variant
  *
- * The storefront used to express 修改规格 as `DELETE` then `POST`, which loses
- * the row outright if the second call fails. Here it is one transaction, and it
- * is deliberately written as *remove the old row, then add the units under the
- * new variant* rather than as `UPDATE … SET sku_id = …`:
+ * 修改规格 as `DELETE` then `POST` from the storefront would lose the row
+ * outright if the second call failed. Here it is one transaction, and it is
+ * deliberately written as *remove the old row, then add the units under the new
+ * variant* rather than as `UPDATE … SET sku_id = …`:
  *
  *  - `addUnits` is a single `INSERT … ON CONFLICT (user_id, sku_id) DO UPDATE`,
- *    so folding into a row the cart already holds — the merge CR-2-h asked for —
- *    is the database's decision and cannot race with a concurrent add of the
- *    same variant. An in-place `UPDATE` would instead hit
- *    `cart_items_user_sku_uq` and abort the whole transaction;
+ *    so folding into a row the cart already holds is the database's decision
+ *    and cannot race with a concurrent add of the same variant. An in-place
+ *    `UPDATE` would instead hit `cart_items_user_sku_uq` and abort the whole
+ *    transaction;
  *  - the delete is conditional, so of two requests moving the same row only one
  *    re-adds the units.
  *
@@ -315,8 +315,8 @@ async function changeSku(
 }
 
 /**
- * 减少数量 by variant (CR-2-h §2) — the product detail page's minus button,
- * which knows the SKU it is looking at but not whether a cart row exists for it.
+ * 减少数量 by variant — the product detail page's minus button, which knows the
+ * SKU it is looking at but not whether a cart row exists for it.
  *
  * Two conditional statements, in one transaction, and their order is the point:
  * the `UPDATE … WHERE quantity > n` takes the units off only if there are more
