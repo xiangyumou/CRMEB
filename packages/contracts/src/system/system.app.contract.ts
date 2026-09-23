@@ -15,6 +15,12 @@ import { appAppearanceDefaults, appPublicConfig, appPublicConfigExample } from '
  *
  * `site/config` is left as it is for the legacy uni-app; the two share their
  * builders, so the values they both carry always agree.
+ *
+ * **`serverTime` is outside the `ETag`.** It is stamped per request after the
+ * cache, so it never moves `version` and a caller holding the current version
+ * still gets its 304. Every answer, 304 included, also carries the same
+ * instant in the `X-Server-Time` response header (ISO-8601), since a 304 has
+ * no body to read it from.
  */
 export const systemAppConfigGet = defineRoute({
   id: 'system.appConfigGet',
@@ -38,8 +44,17 @@ export const systemAppConfigGet = defineRoute({
         payments: { wechat: false },
         splashAd: { enabled: false, imageUrl: null, link: null, seconds: 3 },
         subscribeTemplates: { orderCreate: [], orderPay: [], orderShip: [], refund: [] },
+        subscribeScenes: {
+          checkout: [],
+          groupbuyCheckout: [],
+          presaleCheckout: [],
+          refundApply: [],
+          returnShipment: [],
+        },
+        webviewDomains: [],
         appearance: appAppearanceDefaults,
         version: '0',
+        serverTime: '2026-09-24T08:00:00.000+08:00',
       },
     },
   ],

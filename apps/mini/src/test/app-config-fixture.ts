@@ -15,10 +15,19 @@ export const appConfigFixture: AppConfig = {
     orderShip: ['tpl-shipped', 'tpl-delivered'],
     refund: ['tpl-refund'],
   },
+  subscribeScenes: {
+    checkout: ['tpl-shipped', 'tpl-delivered', 'tpl-order-paid'],
+    groupbuyCheckout: ['tpl-shipped', 'tpl-delivered', 'tpl-order-paid'],
+    presaleCheckout: ['tpl-shipped', 'tpl-delivered', 'tpl-order-paid'],
+    refundApply: ['tpl-refund'],
+    returnShipment: ['tpl-refund'],
+  },
+  webviewDomains: [],
   appearance: {
     theme: {
       primaryColor: '#1677FF',
       primaryContrastColor: '#FFFFFF',
+      accentColor: null,
       priceColor: '#FF4D4F',
       radius: 'large',
     },
@@ -35,4 +44,5 @@ export const appConfigFixture: AppConfig = {
     },
   },
   version: '1758500000000',
+  serverTime: '2026-09-24T08:00:00.000+08:00',
 };
