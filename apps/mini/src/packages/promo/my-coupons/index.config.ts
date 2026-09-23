@@ -1,1 +1,5 @@
-export default definePageConfig({ navigationBarTitleText: '我的优惠券', enablePageMeta: true });
+export default definePageConfig({
+  navigationBarTitleText: '我的优惠券',
+  enablePageMeta: true,
+  enablePullDownRefresh: true,
+});

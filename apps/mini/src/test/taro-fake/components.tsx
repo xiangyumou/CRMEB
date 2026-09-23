@@ -194,6 +194,11 @@ export const Swiper = View;
 export const SwiperItem = View;
 export const RootPortal = View;
 
+/** `<canvas type="2d">`: an empty node; the fake `createSelectorQuery` hands out its context. */
+export function Canvas(props: BaseProps & { type?: string | undefined }) {
+  return <canvas {...common(props)} data-type={props.type} />;
+}
+
 /** page-meta is not a DOM node; the fake keeps its page-style readable to tests. */
 export function PageMeta(props: {
   pageStyle?: string | undefined;

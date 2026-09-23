@@ -118,6 +118,10 @@ export const taroFake = {
   businessViewStatus: 'success' as 'success' | 'fail' | 'cancel',
   /** `chooseMedia` temp paths, or `null` for a cancel. */
   media: ['wxfile://tmp/1.jpg'] as string[] | null,
+  /** How `saveImageToPhotosAlbum` ends: saved, 相册 refused, privacy refused, or cancelled. */
+  album: 'ok' as 'ok' | 'deny' | 'privacy' | 'cancel',
+  /** Whether 相册 is allowed after `openSetting` (the shopper flipped the switch). */
+  albumSettingGranted: true,
   /** `uploadFile` answers this (a function: called per upload, for a sequence). */
   upload: { statusCode: 201, data: '{"url":"/uploads/a.png"}' } as
     | UploadAnswer
@@ -170,6 +174,8 @@ export const taroFake = {
     this.address = null;
     this.invoiceTitle = null;
     this.media = ['wxfile://tmp/1.jpg'];
+    this.album = 'ok';
+    this.albumSettingGranted = true;
     this.businessViewStatus = 'success';
     this.upload = { statusCode: 201, data: '{"url":"/uploads/a.png"}' };
     this.enterOptions = { path: 'pages/index/index', query: {}, scene: 1001 };
@@ -191,6 +197,40 @@ export const taroFake = {
     events.clear();
   },
 };
+
+/** A canvas 2D context that records nothing and measures every character 10 wide. */
+function fakeContext2d(): unknown {
+  return new Proxy(
+    {},
+    {
+      get: (_target, name) =>
+        name === 'measureText'
+          ? (text: string) => ({ width: [...text].length * 10 })
+          : () => undefined,
+      set: () => true,
+    },
+  );
+}
+
+function fakeCanvasNode() {
+  return {
+    width: 300,
+    height: 150,
+    getContext: () => fakeContext2d(),
+    createImage() {
+      const image = {
+        width: 100,
+        height: 100,
+        onload: null as (() => void) | null,
+        onerror: null as (() => void) | null,
+        set src(_value: string) {
+          void Promise.resolve().then(() => image.onload?.());
+        },
+      };
+      return image;
+    },
+  };
+}
 
 function record<T>(api: string, args: unknown, result: T): Promise<T> {
   taroFake.calls.push({ api, args });
@@ -326,6 +366,37 @@ const Taro = {
       ? Promise.resolve({ tempFiles: media.map((tempFilePath) => ({ tempFilePath, size: 1 })) })
       : rejectWith('chooseMedia:fail cancel');
   },
+  saveImageToPhotosAlbum(args: unknown) {
+    taroFake.calls.push({ api: 'saveImageToPhotosAlbum', args });
+    const errMsg = {
+      ok: null,
+      deny: 'saveImageToPhotosAlbum:fail auth deny',
+      privacy: 'saveImageToPhotosAlbum:fail privacy permission is not authorized',
+      cancel: 'saveImageToPhotosAlbum:fail cancel',
+    }[taroFake.album];
+    return errMsg === null ? Promise.resolve({}) : rejectWith(errMsg);
+  },
+  openSetting: () =>
+    record('openSetting', undefined, {
+      authSetting: { 'scope.writePhotosAlbum': taroFake.albumSettingGranted },
+    }),
+  /** `select('#id').fields({ node }).exec(cb)`: a canvas 2D node whose context draws nothing. */
+  createSelectorQuery() {
+    const query = {
+      select: (selector: string) => ({
+        fields: () => ({
+          exec(callback: (result: unknown[]) => void) {
+            taroFake.calls.push({ api: 'createSelectorQuery', args: selector });
+            callback([{ node: fakeCanvasNode(), width: 300, height: 300 }]);
+            return query;
+          },
+        }),
+      }),
+    };
+    return query;
+  },
+  canvasToTempFilePath: (args: unknown) =>
+    record('canvasToTempFilePath', args, { tempFilePath: 'wxfile://tmp/poster.jpg' }),
   uploadFile: async (args: { filePath: string; url: string }) => {
     const answer = taroFake.upload;
     return record('uploadFile', args, typeof answer === 'function' ? await answer(args) : answer);

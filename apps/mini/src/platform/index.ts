@@ -88,3 +88,10 @@ export {
   type UploadRequest,
   type UploadResponse,
 } from './types';
+export {
+  downloadPosterImage,
+  openAlbumSetting,
+  renderPoster,
+  saveImageToAlbum,
+  type SaveOutcome,
+} from './poster';
