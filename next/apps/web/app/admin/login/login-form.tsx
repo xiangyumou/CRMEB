@@ -4,12 +4,11 @@ import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Card, Checkbox, Form, Input, Typography } from 'antd';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createElement, useState } from 'react';
+import { useState } from 'react';
 
 import { callRoute } from '@/admin/api/call-route';
 import { adminLogin } from '@/admin/api/contracts';
 import { ApiError } from '@/admin/api/errors';
-import { getLoginCaptcha } from '@/admin/session/captcha';
 import { useThemeMode } from '@/admin/theme/theme-provider';
 
 interface LoginValues {
@@ -29,6 +28,12 @@ function safeNext(raw: string | null): string {
  * Deliberately plain antd `Form` rather than `ZodForm`: login is not a CRUD
  * form, it has to keep working if the kit changes, and it is the one screen
  * that must render with no session and no shell.
+ *
+ * There is no captcha field. The server asks for one only when a captcha
+ * verifier is registered in `@shop/core` (`captchaRequired`), and none is; the
+ * per-account login throttle is the defence. Registering a verifier has to ship
+ * together with a challenge widget here, or an admin who mistypes the password
+ * three times meets `AUTH_CAPTCHA_REQUIRED` with nothing to answer it.
  */
 export function LoginForm() {
   const router = useRouter();
@@ -39,9 +44,6 @@ export function LoginForm() {
   const [form] = Form.useForm<LoginValues>();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-
-  const captcha = getLoginCaptcha();
 
   async function onFinish(values: LoginValues): Promise<void> {
     setSubmitting(true);
@@ -50,11 +52,7 @@ export function LoginForm() {
       await callRoute(
         adminLogin,
         {
-          body: {
-            account: values.account,
-            password: values.password,
-            ...(captchaToken ? { captchaToken } : {}),
-          },
+          body: { account: values.account, password: values.password },
         },
         // A 401 here means "wrong password", not "session expired" — showing it
         // inline beats bouncing the browser back to this very page.
@@ -65,7 +63,6 @@ export function LoginForm() {
       router.refresh();
     } catch (cause) {
       setError(ApiError.is(cause) ? cause.message : '登录失败，请稍后重试');
-      setCaptchaToken(null);
     } finally {
       setSubmitting(false);
     }
@@ -131,16 +128,6 @@ export function LoginForm() {
               placeholder="密码"
             />
           </Form.Item>
-
-          {captcha ? (
-            <Form.Item label="安全验证">
-              {createElement(captcha, {
-                onVerified: setCaptchaToken,
-                onReset: () => setCaptchaToken(null),
-                disabled: submitting,
-              })}
-            </Form.Item>
-          ) : null}
 
           <Form.Item name="remember" valuePropName="checked" style={{ marginBottom: 12 }}>
             <Checkbox>记住登录状态</Checkbox>
