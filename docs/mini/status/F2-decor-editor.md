@@ -68,10 +68,18 @@ interruption.
 - G1 follow-up: a new 热区 has no link (was: home); the field says so, and `linkTarget` now reads
   `请选择跳转链接` when a required link is missing (contract message change, reported).
 
+- The issues panel starts closed on load (the toolbar counts them); a save or publish with issues
+  opens it — a page fresh from a template is work to do, not an alarm.
+- Screenshots in `F2-screens/` (list, create-from-template, editor with 简约首页, 发布记录, 预览),
+  taken on the e2e stack with the Windows CJK fonts via a scratch `FONTCONFIG_FILE`.
+- Final checks green (2026-09-24): turbo gen/typecheck/lint/test:unit/build; web test:int
+  (322); prettier; check:examples; guards (15/0); web build + admin e2e (50 passed).
+
 ## In progress
 
-- Final checks, screenshots.
+- Nothing — final report.
 
 ## Next
 
-- Screenshots (`docs/mini/status/F2-screens/`), report.
+- Open questions in the report: `packages/page` in apps/mini (体验版 path), 待评价 count,
+  联系客服 host wrapper (stream B), canvas preview beyond products.

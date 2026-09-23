@@ -219,7 +219,10 @@ function EditorSession({
   const invalidate = useInvalidateRoutes();
   const snapshot = useMemo(() => snapshotOf(data), [data]);
   const dirty = isDirty(snapshot, saved.json);
-  const [showIssues, setShowIssues] = useState(loaded.issues.length > 0);
+  // Closed on load — a page fresh from a template has every picture still to
+  // pick, and that is work to do, not an alarm; the toolbar counts it. A save
+  // or a publish that comes back with issues opens it.
+  const [showIssues, setShowIssues] = useState(false);
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [note, setNote] = useState('');
