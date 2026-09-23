@@ -42,6 +42,21 @@ link, and `apps/web` unit-test timeouts under load.
    activities) to one core beside 24 busy loops: at 20 s, 5 then 4 of 313 tests timed out;
    at 120 s, 313/313 pass (~6 min wall).
 
+Final checklist (2026-09-24): `pnpm turbo run gen typecheck lint test:unit build` (45/45; mini
+168 tests, web 857; weapp main 490.6 KB, total 567.5 KB, size report ok, zod-free),
+`pnpm --filter @shop/e2e-storefront test:mini` (1 passed), `pnpm exec prettier --check .`,
+`pnpm guards` (15 checks, 0 failures) — all pass.
+
+## Notes for streams B–E
+
+- Links: call `openLinkTarget(link)` from `@/platform` for any `LinkTarget | null` (splash
+  overlay, DIY blocks' `onLink`); do not switch on `link.kind` in pages.
+- Deadlines: read `serverNow()` from `@/lib/server-clock`, never `Date.now()`.
+- Subscribe: `subscribe(scene)` with an `AppSubscribeScene`; the ids come from `app/config`.
+- Theme: import from `@/theme/derive` (or `@shop/contracts/system/theme`); the accent colour
+  is `--color-accent` / `theme.accent`.
+- Tests: `serveApi` replies may carry `headers`.
+
 ## In progress
 
-- Final checklist.
+- Nothing. Ready for the coordinator.
