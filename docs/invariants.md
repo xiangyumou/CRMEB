@@ -687,6 +687,29 @@ The staff console (mobile order management) admits exactly the shoppers on the o
 - `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > lets somebody on the list in, and lets them ship`
 - `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > tells an ordinary shopper they are not staff rather than 403ing them`
 
+### AUTH-006
+
+The mini-program sign-in counts only codes WeChat refused against a per-address budget (20 per 10 minutes); past it the address is refused with `RATE_LIMITED` without asking WeChat, a code WeChat accepted never counts, and another address is untouched.
+
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-006 — stops asking WeChat for an address that sent 20 codes WeChat refused`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-006 — never counts a code WeChat accepted`
+
+### AUTH-007
+
+A parked mini-program sign-in survives a phone code WeChat refused, and the same bind token can instead be finished with an SMS code on `POST /auth/sessions/wechat-oa/phone`, which links the mini openid so the next launch is silent.
+
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-007 — keeps the bind token when WeChat refuses the phone code`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-007 — finishes a mini sign-in with an SMS code instead, and links the mini openid`
+
+### AUTH-008
+
+A known mini-program openid renews silently: `signed-in`, `registered: false`, the same account, a fresh token of `sessionTtlDays` recorded as `wechat-mini`, no new account or identity, and the shopper's other sessions stay alive; `registered` is true only on the call that created the account, and a disabled account is not renewed.
+
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — renews an expired session silently: the same account, registered false, a fresh token of sessionTtlDays`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — leaves the shopper’s other sessions alone when renewing`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — refuses to renew a disabled account`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — says registered only on the call that created the account`
+
 ## Fulfilment, the order console and invoices
 
 ### FULFILL-001

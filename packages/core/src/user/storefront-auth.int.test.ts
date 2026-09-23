@@ -1,7 +1,11 @@
-import { admins } from '@shop/db/schema/auth';
+import { admins, userSessions } from '@shop/db/schema/auth';
 import { couponTemplates, userCoupons } from '@shop/db/schema/coupon';
+import { users } from '@shop/db/schema/user';
+import { wechatIdentities } from '@shop/db/schema/wechat';
 import { createTestCtx, type TestCtx } from '@shop/testing';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { sha256Hex } from '../auth/password';
 import { UserSessionService } from '../auth/user-session.service';
 import type { Actor, Ctx } from '../kernel/context';
 import { fakeSmsSender, registerSmsSender, resetSmsSender, type FakeSmsSender } from '../sms';
@@ -834,6 +838,188 @@ describe('WeChat mini-program sign-in', () => {
     await expect(auth.miniLogin(asAnonymous(), { code: 'code-1' })).rejects.toMatchObject({
       code: 'AUTH_WECHAT_NOT_CONFIGURED',
     });
+  });
+});
+
+describe('mini-program session renewal', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  beforeEach(async () => {
+    await harness.ctx.config.set(wechatMiniConfig, { enabled: true });
+    await harness.ctx.config.set(wechatConfig, { miniAppId: 'wx-mini' });
+  });
+
+  /** A mini shopper who finished the first sign-in through getPhoneNumber. */
+  async function miniShopper(): Promise<{ userId: string; token: string }> {
+    wechat.setMiniSession('first-code', { openid: 'o_mini_1' });
+    wechat.setPhone('phone-code-1', { phone: PHONE });
+    const started = await auth.miniLogin(asAnonymous({ platform: 'wechat-mini' }), {
+      code: 'first-code',
+    });
+    const finished = await auth.miniPhoneLogin(asAnonymous({ platform: 'wechat-mini' }), {
+      bindToken: started.bindToken!,
+      phoneCode: 'phone-code-1',
+    });
+    return { userId: finished.session!.user.id, token: finished.session!.token };
+  }
+
+  async function countRows(): Promise<{ users: number; identities: number }> {
+    const [u] = await harness.ctx.db.select({ n: sql<number>`count(*)::int` }).from(users);
+    const [i] = await harness.ctx.db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(wechatIdentities);
+    return { users: u!.n, identities: i!.n };
+  }
+
+  it('AUTH-008 — renews an expired session silently: the same account, registered false, a fresh token of sessionTtlDays', async () => {
+    await harness.ctx.config.set(storefrontAuthConfig, { sessionTtlDays: 7 });
+    const first = await miniShopper();
+    const before = await countRows();
+
+    // A week and a bit later the token has expired; the client got a 401.
+    harness.clock.set(new Date(Date.parse(NOW) + 8 * DAY_MS).toISOString());
+    expect(await resolves(first.token)).toBe(false);
+
+    wechat.setMiniSession('relaunch-code', { openid: 'o_mini_1' });
+    const renewed = await auth.miniLogin(asAnonymous({ platform: 'wechat-mini' }), {
+      code: 'relaunch-code',
+    });
+
+    expect(renewed).toMatchObject({
+      status: 'signed-in',
+      registered: false,
+      bindToken: null,
+      bindTokenExpiresInSec: null,
+    });
+    expect(renewed.session!.user.id).toBe(first.userId);
+    expect(renewed.session!.token).not.toBe(first.token);
+    expect(Date.parse(renewed.session!.expiresAt)).toBe(harness.clock.now().getTime() + 7 * DAY_MS);
+    expect(await resolves(renewed.session!.token)).toBe(true);
+    // Nothing new was created: no second account, no second identity.
+    expect(await countRows()).toEqual(before);
+    const [row] = await harness.ctx.db
+      .select({ platform: userSessions.platform })
+      .from(userSessions)
+      .where(eq(userSessions.tokenHash, sha256Hex(renewed.session!.token)));
+    expect(row!.platform).toBe('wechat-mini');
+  });
+
+  it('AUTH-008 — leaves the shopper’s other sessions alone when renewing', async () => {
+    const first = await miniShopper();
+    wechat.setMiniSession('relaunch-code', { openid: 'o_mini_1' });
+    await auth.miniLogin(asAnonymous({ platform: 'wechat-mini' }), { code: 'relaunch-code' });
+    expect(await resolves(first.token)).toBe(true);
+  });
+
+  it('AUTH-008 — refuses to renew a disabled account', async () => {
+    const first = await miniShopper();
+    const reviewer = await makeAdminRow();
+    await admin.adminSetStatus(
+      harness.as({ kind: 'admin', id: reviewer, permissions: [], isSuper: true }),
+      { id: first.userId },
+      { status: 'disabled' },
+    );
+    wechat.setMiniSession('relaunch-code', { openid: 'o_mini_1' });
+    await expect(
+      auth.miniLogin(asAnonymous({ platform: 'wechat-mini' }), { code: 'relaunch-code' }),
+    ).rejects.toMatchObject({ code: 'USER_DISABLED' });
+  });
+
+  it('AUTH-008 — says registered only on the call that created the account', async () => {
+    // Phone-free mode, where the openid alone becomes an account.
+    await harness.ctx.config.set(storefrontAuthConfig, { requirePhoneForWechat: false });
+    wechat.setMiniSession('code-1', { openid: 'o_mini_9' });
+    wechat.setMiniSession('code-2', { openid: 'o_mini_9' });
+    const created = await auth.miniLogin(asAnonymous(), { code: 'code-1' });
+    const renewed = await auth.miniLogin(asAnonymous(), { code: 'code-2' });
+    expect(created).toMatchObject({ status: 'signed-in', registered: true });
+    expect(renewed).toMatchObject({ status: 'signed-in', registered: false });
+    expect(renewed.session!.user.id).toBe(created.session!.user.id);
+  });
+
+  it('AUTH-006 — stops asking WeChat for an address that sent 20 codes WeChat refused', async () => {
+    let calls = 0;
+    wechat = fakeWechatIdentityPort({
+      throwOn: () => {
+        calls += 1;
+        return undefined;
+      },
+    });
+    registerWechatIdentityPort(wechat);
+    const meta = { ip: '203.0.113.9' };
+
+    for (let i = 0; i < 20; i += 1) {
+      await expect(
+        auth.miniLogin(asAnonymous(), { code: `made-up-${i}` }, meta),
+      ).rejects.toMatchObject({ code: 'AUTH_WECHAT_CODE_INVALID' });
+    }
+    expect(calls).toBe(20);
+
+    // Even a genuine code from that address now waits out the window…
+    wechat.setMiniSession('real-code', { openid: 'o_mini_1' });
+    await expect(auth.miniLogin(asAnonymous(), { code: 'real-code' }, meta)).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+      details: { retryAfterMs: expect.any(Number) },
+    });
+    expect(calls).toBe(20);
+
+    // …while another address is untouched.
+    await expect(
+      auth.miniLogin(asAnonymous(), { code: 'real-code' }, { ip: '203.0.113.10' }),
+    ).resolves.toMatchObject({ status: 'phone-required' });
+  });
+
+  it('AUTH-006 — never counts a code WeChat accepted', async () => {
+    const meta = { ip: '203.0.113.9' };
+    for (let i = 0; i < 25; i += 1) {
+      wechat.setMiniSession(`launch-${i}`, { openid: 'o_mini_1' });
+      await expect(
+        auth.miniLogin(asAnonymous(), { code: `launch-${i}` }, meta),
+      ).resolves.toMatchObject({ status: 'phone-required' });
+    }
+  });
+
+  it('AUTH-007 — keeps the bind token when WeChat refuses the phone code', async () => {
+    wechat.setMiniSession('code-1', { openid: 'o_mini_1' });
+    const started = await auth.miniLogin(asAnonymous(), { code: 'code-1' });
+
+    await expect(
+      auth.miniPhoneLogin(asAnonymous(), {
+        bindToken: started.bindToken!,
+        phoneCode: 'expired-phone-code',
+      }),
+    ).rejects.toMatchObject({ code: 'AUTH_WECHAT_CODE_INVALID' });
+
+    wechat.setPhone('phone-code-2', { phone: PHONE });
+    await expect(
+      auth.miniPhoneLogin(asAnonymous(), {
+        bindToken: started.bindToken!,
+        phoneCode: 'phone-code-2',
+      }),
+    ).resolves.toMatchObject({ status: 'signed-in', registered: true });
+  });
+
+  it('AUTH-007 — finishes a mini sign-in with an SMS code instead, and links the mini openid', async () => {
+    wechat.setMiniSession('code-1', { openid: 'o_mini_1' });
+    const started = await auth.miniLogin(asAnonymous({ platform: 'wechat-mini' }), {
+      code: 'code-1',
+    });
+    // The shopper declined 手机号快捷登录, or WeChat refused the phone code.
+    const finished = await auth.oaPhoneLogin(asAnonymous({ platform: 'wechat-mini' }), {
+      bindToken: started.bindToken!,
+      phone: PHONE,
+      code: await codeFor('login'),
+    });
+    expect(finished).toMatchObject({ status: 'signed-in', registered: true });
+    expect(finished.session!.user.boundWechat).toEqual(['mini']);
+
+    // So the next launch is silent.
+    wechat.setMiniSession('code-2', { openid: 'o_mini_1' });
+    const next = await auth.miniLogin(asAnonymous({ platform: 'wechat-mini' }), {
+      code: 'code-2',
+    });
+    expect(next).toMatchObject({ status: 'signed-in', registered: false });
+    expect(next.session!.user.id).toBe(finished.session!.user.id);
   });
 });
 
