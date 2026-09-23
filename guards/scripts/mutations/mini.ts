@@ -14,9 +14,14 @@
  * rule whose message matches `expect`. The unmutated copy is the baseline and
  * must have no failure at all.
  *
- * Anchors are kept to what is least likely to churn — `app.config.ts`'s
- * top-level keys, committed config — and most mutants add a file instead of
- * editing one, so stream work on the pages does not break the catalogue.
+ * Anchors are kept to what is least likely to churn — the page manifest's
+ * top-level lists (`app.pages.ts`), `app.config.ts`'s top-level keys, committed
+ * config — and most mutants add a file instead of editing one, so stream work
+ * on the pages does not break the catalogue.
+ *
+ * `UNBUILT_ROUTES` and `UNCATALOGUED_PAGES` are empty now that every catalogue
+ * page is registered, so a stale entry cannot be produced from `apps/mini`
+ * alone; the rule stays for the next page that lands in two steps.
  */
 import type { MiniRule } from '../../src/checks/mini';
 
@@ -44,8 +49,9 @@ export interface MiniMutation {
 }
 
 const APP_CONFIG = 'src/app.config.ts';
-const SUBPACKAGES = 'subPackages: [';
-const MAIN_PAGES = 'pages: [...TAB_PAGES';
+/** The page manifest `app.config.ts` builds `pages` and `subPackages` from. */
+const APP_PAGES = 'src/app.pages.ts';
+const SUBPACKAGES = 'export const SUB_PACKAGES: readonly SubPackage[] = [';
 const PRIVATE_INFOS = 'requiredPrivateInfos: [';
 const PAGE_CONFIG = "export default definePageConfig({ navigationBarTitleText: '变异' });\n";
 const PAGE = 'export default function Mutant() {\n  return null;\n}\n';
@@ -58,7 +64,7 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
     summary: 'a sub-package registers a page that has no source file',
     edits: [
       {
-        file: APP_CONFIG,
+        file: APP_PAGES,
         search: SUBPACKAGES,
         replace: `${SUBPACKAGES}{ root: 'packages/mutant', name: 'mutant', pages: ['gone/index'] },`,
       },
@@ -81,7 +87,7 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
     summary: 'a dev-only page registered in a shipping sub-package',
     edits: [
       {
-        file: APP_CONFIG,
+        file: APP_PAGES,
         search: SUBPACKAGES,
         replace: `${SUBPACKAGES}{ root: 'packages/dev', name: 'dev', pages: ['kit/index'] },`,
       },
@@ -121,12 +127,12 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
   {
     id: 'catalogue-page-unregistered',
     rule: 'routes',
-    summary: 'a built catalogue page (product) drops out of app.config.ts',
+    summary: 'a built catalogue page (product) drops out of the page manifest',
     edits: [
       {
-        file: APP_CONFIG,
-        search: "'pages/product/index'",
-        replace: "'pages/product-gone/index'",
+        file: APP_PAGES,
+        search: "  'pages/product/index',\n  'pages/login/index',",
+        replace: "  'pages/product-gone/index',\n  'pages/login/index',",
       },
     ],
     expect: /product → pages\/product\/index, which app\.config\.ts does not register/,
@@ -137,7 +143,7 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
     summary: 'a registered page that no storefront route key names',
     edits: [
       {
-        file: APP_CONFIG,
+        file: APP_PAGES,
         search: SUBPACKAGES,
         replace: `${SUBPACKAGES}{ root: 'packages/mutant', name: 'mutant', pages: ['extra/index'] },`,
       },
@@ -145,21 +151,6 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
       { file: 'src/packages/mutant/extra/index.tsx', create: PAGE },
     ],
     expect: /registers packages\/mutant\/extra\/index, which no storefront route key names/,
-  },
-  {
-    id: 'unbuilt-entry-stale',
-    rule: 'routes',
-    summary: 'the login page is built, and UNBUILT_ROUTES still excuses it',
-    edits: [
-      {
-        file: APP_CONFIG,
-        search: MAIN_PAGES,
-        replace: "pages: ['pages/login/index', ...TAB_PAGES",
-      },
-      { file: 'src/pages/login/index.config.ts', create: PAGE_CONFIG },
-      { file: 'src/pages/login/index.tsx', create: PAGE },
-    ],
-    expect: /login \(pages\/login\/index\) is registered now — delete the entry/,
   },
   {
     id: 'tab-keys-differ',
@@ -256,7 +247,7 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
     summary: "a shell stylesheet pulls in NutUI's variables",
     edits: [
       {
-        file: 'src/shell/mutant.scss',
+        file: 'src/app-shell/mutant.scss',
         create: "@import '~@nutui/nutui-react-taro/dist/styles/variables';\n",
       },
     ],
@@ -296,14 +287,11 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
     rule: 'privacy',
     summary: 'the platform copies to the clipboard, and PRIVACY_APIS does not list it',
     edits: [
+      // platform/clipboard.ts copies; the list forgets it.
       {
         file: 'src/platform/privacy.ts',
-        create: "export const PRIVACY_APIS = ['chooseAddress'] as const;\n",
-      },
-      {
-        file: 'src/platform/mutant.ts',
-        create:
-          "import Taro from '@tarojs/taro';\n\nexport const copy = (data: string) => Taro.setClipboardData({ data });\n",
+        search: "  'setClipboardData',\n] as const;",
+        replace: '] as const;',
       },
     ],
     expect: /uses setClipboardData, which PRIVACY_APIS \(platform\/privacy\.ts\) does not list/,
@@ -316,12 +304,12 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
     summary: 'a 砍价 page comes back as a sub-package page',
     edits: [
       {
-        file: APP_CONFIG,
+        file: APP_PAGES,
         search: SUBPACKAGES,
-        replace: `${SUBPACKAGES}{ root: 'packages/promo', name: 'promo', pages: ['bargain/index'] },`,
+        replace: `${SUBPACKAGES}{ root: 'packages/promo-old', name: 'promo-old', pages: ['bargain/index'] },`,
       },
     ],
-    expect: /packages\/promo\/bargain\/index is a URL for the retired 砍价/,
+    expect: /packages\/promo-old\/bargain\/index is a URL for the retired 砍价/,
   },
   {
     id: 'retired-url-literal',
@@ -353,7 +341,7 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
     edits: [
       {
         file: '.env.production',
-        search: 'TARO_APP_ID="touristappid"',
+        search: 'TARO_APP_ID="wx4f4b772125e155ed"',
         replace: 'TARO_APP_ID="wx0123456789abcdef"',
       },
     ],
@@ -373,7 +361,7 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
     edits: [
       {
         file: 'project.config.json',
-        search: '"appid": "touristappid"',
+        search: '"appid": "wx4f4b772125e155ed"',
         replace: '"appid": "wx0123456789abcdef"',
       },
     ],

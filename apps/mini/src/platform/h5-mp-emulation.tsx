@@ -1,10 +1,13 @@
 import { Button } from '@tarojs/components';
 import { fetchTransport } from '@shop/api-client';
-import {
-  PlatformUnsupportedError,
-  type MiniPlatform,
-  type PaymentOutcome,
-  type PhoneNumberButtonProps,
+import { generatedAvatar, pickImages, uploadWithFetch } from './h5-files';
+import type {
+  AvatarButtonProps,
+  ChosenAddress,
+  MiniPlatform,
+  PaymentOutcome,
+  PhoneNumberButtonProps,
+  SubscribeResult,
 } from './types';
 
 /**
@@ -40,7 +43,21 @@ export interface EmulatedWechatUser {
   phone: string;
   /** What the shopper does with the payment sheet. Default `pay`. */
   payment?: 'pay' | 'cancel' | 'fail' | undefined;
+  /** How the subscribe-message dialog is answered, for every template. Default `accept`. */
+  subscribe?: 'accept' | 'reject' | undefined;
+  /** What 导入微信地址 returns; `null` = the shopper cancels. Default: a fixed address. */
+  address?: ChosenAddress | null | undefined;
 }
+
+const DEFAULT_ADDRESS: ChosenAddress = {
+  name: '张三',
+  phone: '13800138000',
+  province: '广东省',
+  city: '广州市',
+  district: '天河区',
+  detail: '体育西路 100 号',
+  postCode: '510000',
+};
 
 function randomDigits(length: number): string {
   let digits = '';
@@ -100,6 +117,14 @@ function PhoneNumberButton({ children, className, disabled, onResult }: PhoneNum
   );
 }
 
+function AvatarButton({ children, className, onResult }: AvatarButtonProps) {
+  return (
+    <Button className={className ?? ''} onClick={() => void generatedAvatar().then(onResult)}>
+      {children}
+    </Button>
+  );
+}
+
 export const emulationPlatform: MiniPlatform = {
   kind: 'h5-mp-emulation',
   api: { baseUrl: '', transport: fetchTransport(), clientPlatform: 'wechat-mini' },
@@ -119,12 +144,17 @@ export const emulationPlatform: MiniPlatform = {
     await control('request-payment', { outTradeNo, package: params.package });
     return { kind: 'paid' };
   },
-  requestSubscribe() {
-    // TODO(stream A / I2): answer from the emulated user's settings, all `accept` by default.
-    return Promise.reject(new PlatformUnsupportedError('订阅消息', 'h5-mp-emulation'));
+  requestSubscribe(templateIds) {
+    const answer = emulatedUser().subscribe ?? 'accept';
+    const result: SubscribeResult = {};
+    for (const id of templateIds) result[id] = answer;
+    return Promise.resolve(result);
   },
   chooseAddress() {
-    // TODO(stream A / I2): answer from the emulated user's settings.
-    return Promise.reject(new PlatformUnsupportedError('导入微信地址', 'h5-mp-emulation'));
+    const { address } = emulatedUser();
+    return Promise.resolve(address === undefined ? DEFAULT_ADDRESS : address);
   },
+  AvatarButton,
+  chooseImages: pickImages,
+  uploadFile: uploadWithFetch,
 };

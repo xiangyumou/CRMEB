@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiClientProvider } from '@shop/api-client/react';
 import { api } from '@/data/api';
-import { useSession } from '@/features/session/session';
+import { useSession } from '@/session/session';
 import { serveApi, type SeenRequest } from '@/test/fake-api';
 import { renderWithQuery } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';

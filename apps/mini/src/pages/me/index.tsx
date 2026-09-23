@@ -1,7 +1,8 @@
-import { Placeholder } from '@/shell/placeholder';
-import { useTabBarSync } from '@/shell/use-tab-bar-sync';
+import { useTabPage } from '@/app-shell/tab-page';
+import { BuildingPage } from '@/ui/building-page';
 
+/** 我的 (tab `me`). The body is stream B's; the tab bar and pending params are wired. */
 export default function Me() {
-  useTabBarSync();
-  return <Placeholder title="我的" />;
+  useTabPage('me');
+  return <BuildingPage title="我的" home={false} />;
 }

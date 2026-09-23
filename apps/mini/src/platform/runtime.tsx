@@ -1,11 +1,13 @@
 import Taro from '@tarojs/taro';
 import { Button } from '@tarojs/components';
 import { taroTransport } from '@shop/api-client';
-import {
-  PlatformUnsupportedError,
-  type MiniPlatform,
-  type PaymentOutcome,
-  type PhoneNumberButtonProps,
+import type {
+  AvatarButtonProps,
+  ChosenAddress,
+  MiniPlatform,
+  PaymentOutcome,
+  PhoneNumberButtonProps,
+  SubscribeResult,
 } from './types';
 
 /**
@@ -31,8 +33,15 @@ function PhoneNumberButton({ children, className, disabled, onResult }: PhoneNum
       disabled={disabled ?? false}
       openType="getPhoneNumber"
       onGetPhoneNumber={(event) => {
-        const { code, errMsg: message } = event.detail;
+        const { code, errMsg: message } = event.detail as { code?: string; errMsg: string };
+        const errno = (event.detail as { errno?: number }).errno;
         if (code) onResult({ ok: true, code });
+        else if (errno === 1400001 || /1400001/.test(message))
+          onResult({
+            ok: false,
+            reason: 'unavailable',
+            message: '暂时无法获取手机号，请使用短信验证码登录',
+          });
         else if (/deny|cancel/i.test(message))
           onResult({ ok: false, reason: 'denied', message: '已取消授权' });
         else onResult({ ok: false, reason: 'failed', message });
@@ -42,6 +51,28 @@ function PhoneNumberButton({ children, className, disabled, onResult }: PhoneNum
     </Button>
   );
 }
+
+function AvatarButton({ children, className, label, onResult }: AvatarButtonProps) {
+  return (
+    <Button
+      className={className ?? ''}
+      openType="chooseAvatar"
+      {...(label ? { ariaLabel: label } : {})}
+      onChooseAvatar={(event) => {
+        const { avatarUrl, errMsg: message } = event.detail as {
+          avatarUrl?: string;
+          errMsg?: string;
+        };
+        if (avatarUrl) onResult({ ok: true, tempPath: avatarUrl });
+        else onResult({ ok: false, message: message ?? '没有选择头像' });
+      }}
+    >
+      {children}
+    </Button>
+  );
+}
+
+const SUBSCRIBE_ANSWERS = new Set(['accept', 'reject', 'ban', 'filter']);
 
 export const platform: MiniPlatform = {
   kind: 'weapp',
@@ -73,12 +104,59 @@ export const platform: MiniPlatform = {
       return { kind: 'failed', message: errMsg(error) };
     }
   },
-  requestSubscribe() {
-    // TODO(stream A): Taro.requestSubscribeMessage, mapped to SubscribeResult.
-    return Promise.reject(new PlatformUnsupportedError('订阅消息', 'weapp'));
+  async requestSubscribe(templateIds) {
+    // `entityIds` is required by Taro's types for other platforms; WeChat ignores it.
+    const result = (await Taro.requestSubscribeMessage({
+      tmplIds: templateIds,
+      entityIds: [],
+    })) as unknown as Record<string, string>;
+    const answers: SubscribeResult = {};
+    for (const id of templateIds) {
+      const answer = result[id];
+      if (answer && SUBSCRIBE_ANSWERS.has(answer)) answers[id] = answer as SubscribeResult[string];
+    }
+    return answers;
   },
-  chooseAddress() {
-    // TODO(stream A): Taro.chooseAddress behind the privacy sheet (C03).
-    return Promise.reject(new PlatformUnsupportedError('导入微信地址', 'weapp'));
+  async chooseAddress(): Promise<ChosenAddress | null> {
+    try {
+      const address = await Taro.chooseAddress();
+      return {
+        name: address.userName,
+        phone: address.telNumber,
+        province: address.provinceName,
+        city: address.cityName,
+        district: address.countyName,
+        detail: address.detailInfo,
+        postCode: address.postalCode || null,
+      };
+    } catch {
+      // Cancelled, or refused (privacy / 通讯地址 permission): the caller offers manual entry.
+      return null;
+    }
+  },
+  AvatarButton,
+  async chooseImages(count) {
+    try {
+      const result = await Taro.chooseMedia({
+        count,
+        mediaType: ['image'],
+        sourceType: ['album', 'camera'],
+        sizeType: ['compressed'],
+      });
+      return result.tempFiles.map((file) => file.tempFilePath);
+    } catch (error) {
+      if (isCancel(error)) return [];
+      throw new Error(errMsg(error), { cause: error });
+    }
+  },
+  async uploadFile({ url, filePath, name, headers }) {
+    const base = process.env.TARO_APP_API_ORIGIN;
+    const result = await Taro.uploadFile({
+      url: /^https?:/.test(url) ? url : `${base}${url}`,
+      filePath,
+      name,
+      header: headers,
+    });
+    return { status: result.statusCode, body: typeof result.data === 'string' ? result.data : '' };
   },
 };
