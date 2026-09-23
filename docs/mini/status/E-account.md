@@ -29,13 +29,19 @@ Updated at every commit so the work can resume after an interruption.
   (default title first, 新增抬头 comes back picked, remark; `invoiceRequestFromTitle` copied
   locally). Tests.
 
+- Merged storefront/mini (C + A2) at `71c60b452`: kept both sides of the Taro fake.
+- 协议 (`pages/agreement`: key → title, operator HTML through the DIY 富文本 renderer
+  `features/content/rich-content.tsx`, 「内容整理中」 when empty, WeChat's 隐私保护指引 on
+  隐私政策) and 注销账号 (what it does, the 注销协议, reason, tick + danger confirm → request →
+  logout → result; pending shows 审核中 + 撤回; a rejected one says why). The Taro fake gained
+  `RichText` and `WebView`. Password rule gained the server's two-kinds check. Tests.
+
 ## In progress
 
-- 注销账号; 协议 page (`pages/agreement`).
+- content: 资讯列表 / 详情, web-view (C12).
 
 ## Next
 
-4. content: 资讯列表 / 详情, web-view (C12).
 5. 我的 tab: user-centre decor through a local renderer until B's `DecorPage` lands.
 6. e2e specs in `e2e/storefront/specs-mini`; `docs/mini/pages.md`; screenshots in
    `docs/mini/status/E-screens/`; checklist; sizes.

@@ -215,3 +215,33 @@ export function NavigationBar(props: {
 }) {
   return <div data-testid="navigation-bar" data-title={props.title} hidden />;
 }
+
+interface FakeRichTextNode {
+  type?: 'text';
+  text?: string;
+  name?: string;
+  children?: FakeRichTextNode[];
+}
+
+function richTextOf(nodes: readonly FakeRichTextNode[]): ReactNode {
+  return nodes.map((node, index) =>
+    node.type === 'text' ? (
+      node.text
+    ) : (
+      <div key={index} data-tag={node.name}>
+        {richTextOf(node.children ?? [])}
+      </div>
+    ),
+  );
+}
+
+/** `<rich-text nodes>`: the node list drawn as nested divs, so tests can read the text. */
+export function RichText(props: BaseProps & { nodes?: FakeRichTextNode[] | string | undefined }) {
+  const nodes = typeof props.nodes === 'string' ? [] : (props.nodes ?? []);
+  return <div {...common(props)}>{richTextOf(nodes)}</div>;
+}
+
+/** `<web-view src>`: a marker element carrying the address it would open. */
+export function WebView(props: { src: string; onMessage?: unknown; onLoad?: unknown }) {
+  return <div data-testid="web-view" data-src={props.src} />;
+}
