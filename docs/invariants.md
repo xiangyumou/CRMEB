@@ -626,6 +626,13 @@ An order whose second stock deduction fails rolls back completely: no order row,
 - `packages/core/src/order/order.concurrency.int.test.ts::two checkouts for the last unit > hands back every line it already took when a later line is short`
 - `packages/core/src/order/order.int.test.ts::the stock port > takes nothing when one line of several is short, and names that line`
 
+### ORDER-010
+
+A line on the shopper's own order is `reviewable` exactly when `catalog.reviewSubmit` accepts it: the order is `received` or `completed`, the line is not refunded in full, and it has no review yet. `reviewed` is any review row for the line — published, held for moderation or removed by the shop — because each of them makes a second review `CATALOG_REVIEW_ALREADY_WRITTEN`. The list and the detail say the same.
+
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > marks a line reviewable only once received, and reviewed once written — held or not`
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > agrees with what reviewSubmit accepts: a fully refunded line is not reviewable`
+
 ### ORDER-011
 
 The shopper's order detail names the 拼团 team a group-buy order opened or joined (`groupbuyTeamId`, for 查看拼团 → `groupbuyTeam { id }`), from the moment the order exists and after it is cancelled; any other order names none. The order domain reads it through `OrderKindHandler.detailLinks`, never from a `groupbuy_*` table.

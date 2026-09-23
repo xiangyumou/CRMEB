@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { createDb } from '@shop/db';
 import { cartItems } from '@shop/db/schema/cart';
 import { productSkus, productVirtualCards, products } from '@shop/db/schema/catalog';
-import { orderStatusLogs, orders } from '@shop/db/schema/order';
+import { orderItems, orderStatusLogs, orders } from '@shop/db/schema/order';
 import { couponTemplates, userCoupons } from '@shop/db/schema/coupon';
 import { effects as effectsTable } from '@shop/db/schema/system';
 import { userAddresses, users } from '@shop/db/schema/user';
@@ -14,7 +14,7 @@ import {
   runConcurrently,
   type TestCtx,
 } from '@shop/testing';
-import { registerCatalogDomain, stockAndSalesOf } from '../catalog';
+import { registerCatalogDomain, reviewSubmit, stockAndSalesOf } from '../catalog';
 import { registerNotificationDomain } from '../notification';
 import { registerShippingFreightPort } from '../shipping';
 import type { Actor, Ctx } from '../kernel/context';
@@ -23,7 +23,9 @@ import * as order from './index';
 import { orderConfig } from './order.config';
 import { orderFulfilConfig } from './order.fulfil.config';
 import { autoDeliver } from './order.fulfil.effects';
+import { orderFacts } from './order.facts.repo';
 import {
+  registerOrderFacts,
   registerOrderStateMachine,
   registerPaymentPort,
   registerStockPort,
@@ -1130,6 +1132,111 @@ describe('my orders', () => {
     const stranger = await makeUser();
     await expectDomainError(order.detail(as(stranger), { id: String(orderId) }), 'ORDER_NOT_FOUND');
     await expectDomainError(order.detail(as(stranger), { id: '999999' }), 'ORDER_NOT_FOUND');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// review state and 待评价
+// ---------------------------------------------------------------------------
+
+describe('ORDER-010 — review state on the shopper’s lines, and 待评价', () => {
+  beforeEach(() => {
+    // `resetOrderPorts` cleared it; `reviewSubmit` asks it whether a line may be reviewed.
+    registerOrderFacts(orderFacts);
+  });
+
+  /** A two-line order, moved to `status` with the shape the CHECKs demand. */
+  async function twoLineOrder(status: 'paid' | 'shipped' | 'received' | 'completed') {
+    const userId = await makeUser();
+    const first = await makeProduct();
+    const second = await makeProduct();
+    const cartItemIds = [await addToCart(userId, first), await addToCart(userId, second)];
+    await makeAddress(userId);
+    const created = await order.create(as(userId), {
+      source: 'cart',
+      cartItemIds: cartItemIds.map(String),
+      kind: 'normal',
+      idempotencyKey: idempotencyKey(),
+    });
+    harness.queue.reset();
+    const now = harness.clock.now();
+    await harness.ctx.db
+      .update(orders)
+      .set({
+        status,
+        fulfillmentStatus: status === 'paid' ? 'unfulfilled' : 'fulfilled',
+        paidAt: now,
+        paidAmount: created.payableAmount,
+        receivedAt: status === 'received' || status === 'completed' ? now : null,
+        completedAt: status === 'completed' ? now : null,
+      })
+      .where(eq(orders.id, Number(created.id)));
+    const [a, b] = created.items.map((item) => item.id);
+    return { userId, orderId: created.id, lineIds: [a!, b!] as const };
+  }
+
+  const review = (userId: number, orderItemId: string) =>
+    reviewSubmit(as(userId), {
+      orderItemId,
+      productScore: 5,
+      serviceScore: 5,
+      content: '不错',
+      images: [],
+    });
+
+  const stateOf = async (userId: number, orderId: string) =>
+    (await order.detail(as(userId), { id: orderId })).items.map((item) => ({
+      reviewed: item.reviewed,
+      reviewable: item.reviewable,
+    }));
+
+  it('marks a line reviewable only once received, and reviewed once written — held or not', async () => {
+    const paid = await twoLineOrder('paid');
+    expect(await stateOf(paid.userId, paid.orderId)).toEqual([
+      { reviewed: false, reviewable: false },
+      { reviewed: false, reviewable: false },
+    ]);
+
+    const { userId, orderId, lineIds } = await twoLineOrder('received');
+    expect(await stateOf(userId, orderId)).toEqual([
+      { reviewed: false, reviewable: true },
+      { reviewed: false, reviewable: true },
+    ]);
+
+    await review(userId, lineIds[0]);
+    expect(await stateOf(userId, orderId)).toEqual([
+      { reviewed: true, reviewable: false },
+      { reviewed: false, reviewable: true },
+    ]);
+
+    // The list says the same as the detail.
+    const listed = await order.list(as(userId), {
+      page: 1,
+      pageSize: 20,
+      tab: 'all',
+      sortOrder: 'desc',
+    });
+    expect(listed.items[0]?.items.map((item) => item.reviewable)).toEqual([false, true]);
+  });
+
+  it('agrees with what reviewSubmit accepts: a fully refunded line is not reviewable', async () => {
+    const { userId, orderId, lineIds } = await twoLineOrder('completed');
+    await harness.ctx.db
+      .update(orderItems)
+      .set({ refundedQuantity: 1 })
+      .where(eq(orderItems.id, Number(lineIds[1])));
+
+    expect(await stateOf(userId, orderId)).toEqual([
+      { reviewed: false, reviewable: true },
+      { reviewed: false, reviewable: false },
+    ]);
+    await expectDomainError(review(userId, lineIds[1]), 'CATALOG_REVIEW_NOT_ALLOWED');
+    await review(userId, lineIds[0]);
+    await expectDomainError(review(userId, lineIds[0]), 'CATALOG_REVIEW_ALREADY_WRITTEN');
+    expect(await stateOf(userId, orderId)).toEqual([
+      { reviewed: true, reviewable: false },
+      { reviewed: false, reviewable: false },
+    ]);
   });
 });
 

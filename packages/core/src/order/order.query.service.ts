@@ -1,9 +1,10 @@
 import type {
   OrderCounts,
   OrderDetail,
-  OrderItem,
-  OrderListItem,
   OrderListQuery,
+  OrderStatus,
+  StorefrontOrderItem,
+  StorefrontOrderListItem,
 } from '@shop/contracts/order/schemas';
 import type { UserCoupon } from '@shop/contracts/coupon/schemas';
 import * as coupon from '../coupon';
@@ -26,7 +27,7 @@ import { getOrderKindHandler } from './ports';
 export async function list(
   ctx: Ctx,
   query: OrderListQuery,
-): Promise<{ items: OrderListItem[]; total: number; page: number; pageSize: number }> {
+): Promise<{ items: StorefrontOrderListItem[]; total: number; page: number; pageSize: number }> {
   const userId = requireUserId(ctx);
   const { rows, total } = await repo.listOrders(ctx.db, {
     userId,
@@ -42,10 +43,15 @@ export async function list(
     ctx.db,
     rows.map((row) => row.id),
   );
-  const byOrder = new Map<number, OrderItem[]>();
+  const reviewed = await repo.reviewedItemIds(
+    ctx.db,
+    items.map((item) => item.id),
+  );
+  const statusOf = new Map(rows.map((row) => [row.id, row.status]));
+  const byOrder = new Map<number, StorefrontOrderItem[]>();
   for (const item of items) {
     const list = byOrder.get(item.orderId);
-    const mapped = toOrderItem(item);
+    const mapped = toOrderItem(item, statusOf.get(item.orderId), reviewed);
     if (list) list.push(mapped);
     else byOrder.set(item.orderId, [mapped]);
   }
@@ -122,11 +128,18 @@ export async function detailOf(
   const row = await repo.findOrderForUser(ctx.db, { id: input.orderId, userId: input.userId });
   if (!row) throw new DomainError('ORDER_NOT_FOUND');
   const items = await repo.listItems(ctx.db, [row.id]);
+  const reviewed = await repo.reviewedItemIds(
+    ctx.db,
+    items.map((item) => item.id),
+  );
   // The kind's own links (the 拼团 team) come from the kind's domain through the port: this
   // domain never reads a `groupbuy_*` table.
   const links = (await getOrderKindHandler(row.kind)?.detailLinks?.(ctx.db, row.id)) ?? {};
   return {
-    ...toDetail(row, items.map(toOrderItem)),
+    ...toDetail(
+      row,
+      items.map((item) => toOrderItem(item, row.status, reviewed)),
+    ),
     groupbuyTeamId: toIdOrNull(links.groupbuyTeamId ?? null),
   };
 }
@@ -166,8 +179,31 @@ export async function giftCoupons(
 
 const iso = (value: Date | null): string | null => (value === null ? null : value.toISOString());
 
-function toOrderItem(row: repo.OrderItemRow): OrderItem {
+/**
+ * ORDER-010: a line can be reviewed exactly when `catalog.reviewSubmit` would take it — the
+ * order `received` or `completed` (`OrderFactsPort.findReviewableLine`), the line not refunded
+ * in full, and no review yet (the unique index on `product_reviews.order_item_id`). The 待评价
+ * count and tab say the same in SQL (`repo.awaitingReview`).
+ */
+export function isReviewable(
+  status: OrderStatus,
+  line: { quantity: number; refundedQuantity: number },
+  reviewed: boolean,
+): boolean {
+  return (
+    (status === 'received' || status === 'completed') &&
+    line.refundedQuantity < line.quantity &&
+    !reviewed
+  );
+}
+
+function toOrderItem(
+  row: repo.OrderItemRow,
+  status: OrderStatus | undefined,
+  reviewedIds: ReadonlySet<number>,
+): StorefrontOrderItem {
   const snapshot = row.snapshot;
+  const reviewed = reviewedIds.has(row.id);
   return {
     id: toId(row.id),
     itemKey: row.itemKey,
@@ -188,10 +224,12 @@ function toOrderItem(row: repo.OrderItemRow): OrderItem {
     shippedQuantity: row.shippedQuantity,
     // Written at create; a line whose snapshot has no `adjustments` shows none.
     adjustments: snapshot.adjustments ?? [],
+    reviewed,
+    reviewable: status !== undefined && isReviewable(status, row, reviewed),
   };
 }
 
-function toListItem(row: repo.OrderRow, items: OrderItem[]): OrderListItem {
+function toListItem(row: repo.OrderRow, items: StorefrontOrderItem[]): StorefrontOrderListItem {
   return {
     id: toId(row.id),
     orderNo: row.orderNo,
@@ -212,7 +250,10 @@ function toListItem(row: repo.OrderRow, items: OrderItem[]): OrderListItem {
   };
 }
 
-function toDetail(row: repo.OrderRow, items: OrderItem[]): Omit<OrderDetail, 'groupbuyTeamId'> {
+function toDetail(
+  row: repo.OrderRow,
+  items: StorefrontOrderItem[],
+): Omit<OrderDetail, 'groupbuyTeamId'> {
   return {
     ...toListItem(row, items),
     receiver: {

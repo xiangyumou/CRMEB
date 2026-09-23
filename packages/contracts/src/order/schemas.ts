@@ -436,7 +436,45 @@ export const orderListItemExample = {
   items: [orderItemExample],
 } satisfies OrderListItem;
 
-export const orderDetail = orderListItem.extend({
+/**
+ * A line as the shopper's own 我的订单 and 订单详情 show it: `orderItem` plus its review state,
+ * so the 评价 page and the 去评价 button need not learn it from a refusal. The console reads
+ * the plain `orderItem`.
+ *
+ * `reviewable` is exactly what `catalog.reviewSubmit` accepts (ORDER-010): the order is
+ * `received` or `completed`, the line is not refunded in full, and it has no review yet.
+ * There is no deadline: `autoReviewDays` after completion the auto-review job writes the
+ * default review, and from then on the line is `reviewed`.
+ */
+export const storefrontOrderItem = orderItem.extend({
+  /**
+   * The line has a review — published, 待审核 (held for moderation) or removed by the shop.
+   * A second one is refused (`CATALOG_REVIEW_ALREADY_WRITTEN`) in every case.
+   */
+  reviewed: z.boolean(),
+  /** A review can be written for this line now. */
+  reviewable: z.boolean(),
+});
+export type StorefrontOrderItem = z.infer<typeof storefrontOrderItem>;
+
+export const storefrontOrderItemExample = {
+  ...orderItemExample,
+  reviewed: false,
+  reviewable: false,
+} satisfies StorefrontOrderItem;
+
+/** The shopper's list row: `orderListItem` with `storefrontOrderItem` lines. */
+export const storefrontOrderListItem = orderListItem.extend({
+  items: z.array(storefrontOrderItem),
+});
+export type StorefrontOrderListItem = z.infer<typeof storefrontOrderListItem>;
+
+export const storefrontOrderListItemExample = {
+  ...orderListItemExample,
+  items: [storefrontOrderItemExample],
+} satisfies StorefrontOrderListItem;
+
+export const orderDetail = storefrontOrderListItem.extend({
   receiver: orderReceiver,
   buyerRemark: z.string().nullable(),
   customForm: z.record(z.string(), z.unknown()).nullable(),
@@ -457,7 +495,7 @@ export const orderDetail = orderListItem.extend({
 export type OrderDetail = z.infer<typeof orderDetail>;
 
 export const orderDetailExample = {
-  ...orderListItemExample,
+  ...storefrontOrderListItemExample,
   receiver: orderReceiverExample,
   buyerRemark: '请在工作日送达',
   customForm: null,
@@ -497,7 +535,7 @@ export const orderListQuery = pageQuery
   .extend(sortQuery(['createdAt', 'payableAmount']).shape);
 export type OrderListQuery = z.infer<typeof orderListQuery>;
 
-export const pagedOrders = paged(orderListItem);
+export const pagedOrders = paged(storefrontOrderListItem);
 
 /** The badge numbers on the tab bar. One query, not eight. */
 export const orderCounts = z.object({

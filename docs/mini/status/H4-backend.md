@@ -13,11 +13,23 @@ search → the rest of C's gaps → merge checklist.
    (group buy answers from its membership row), so the order domain still never reads a
    `groupbuy_*` table. ORDER-011.
 
+2. Per-line review state on the shopper's own lines: `order.list` and `order.detail` items are
+   now `storefrontOrderItem` = `orderItem` + `reviewed` (any review row: published, 待审核, or
+   removed by the shop — each makes a second one `CATALOG_REVIEW_ALREADY_WRITTEN`) +
+   `reviewable` (exactly what `catalog.reviewSubmit` accepts: order `received`/`completed`,
+   line not refunded in full, not reviewed). The console keeps the plain `orderItem`
+   (`adminOrderListItem` extends the unchanged `orderListItem`). ORDER-010.
+
 ## In progress
 
-- 2: per-line review state.
+- 3: 待评价 count.
 
 ## Client follow-ups
 
 - 订单详情: 查看拼团 → `{ route: 'groupbuyTeam', params: { id: order.groupbuyTeamId } }` when
   `groupbuyTeamId !== null`.
+- 评价 page: `reviewableLines` → `order.items.filter((item) => item.reviewable && …)`; lines with
+  `reviewed` can show as done up front; keep treating `CATALOG_REVIEW_ALREADY_WRITTEN` as done
+  (a race with another device). 我的订单 card: show 评价 only when some line is `reviewable`.
+- Test fixtures: `apps/mini/src/test/order-fixtures.ts` items default to
+  `reviewed: false, reviewable: false`, details to `groupbuyTeamId: null`.

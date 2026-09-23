@@ -1,5 +1,6 @@
 import type { DbOrTx, Tx } from '@shop/db';
 import { cartItems } from '@shop/db/schema/cart';
+import { productReviews } from '@shop/db/schema/catalog';
 import { orderItems, orderStatusLogs, orders } from '@shop/db/schema/order';
 import { userAddresses } from '@shop/db/schema/user';
 import { and, asc, desc, eq, inArray, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm';
@@ -100,6 +101,26 @@ export async function stockLinesOf(
     .from(orderItems)
     .where(eq(orderItems.orderId, orderId))
     .orderBy(asc(orderItems.skuId));
+}
+
+/**
+ * Which of these order lines already have a review: any `product_reviews` row, published,
+ * 待审核 or soft-deleted by the shop, because `product_reviews_order_item_uq` refuses a
+ * second review in every one of those cases.
+ *
+ * A named cross-domain read, like the auto-review sweep's join in `order.facts.repo.ts`: the
+ * alternative is a round trip through the catalog for a set of ids this domain already has.
+ */
+export async function reviewedItemIds(
+  db: DbOrTx,
+  itemIds: readonly number[],
+): Promise<Set<number>> {
+  if (itemIds.length === 0) return new Set();
+  const rows = await db
+    .select({ orderItemId: productReviews.orderItemId })
+    .from(productReviews)
+    .where(inArray(productReviews.orderItemId, [...new Set(itemIds)]));
+  return new Set(rows.flatMap((row) => (row.orderItemId === null ? [] : [row.orderItemId])));
 }
 
 /**

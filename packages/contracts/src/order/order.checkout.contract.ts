@@ -13,8 +13,8 @@ import {
   orderDetailExample,
   orderHidden,
   orderListQuery,
-  orderListItemExample,
   pagedOrders,
+  storefrontOrderListItemExample,
 } from './schemas';
 
 /**
@@ -247,7 +247,7 @@ export const orderList = defineRoute({
     {
       name: 'unpaid-tab',
       query: { page: 1, pageSize: 20, tab: 'unpaid' },
-      response: { items: [orderListItemExample], total: 1, page: 1, pageSize: 20 },
+      response: { items: [storefrontOrderListItemExample], total: 1, page: 1, pageSize: 20 },
     },
     {
       name: 'empty',
