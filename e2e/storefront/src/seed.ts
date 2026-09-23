@@ -191,8 +191,9 @@ export async function seedE2E(options: {
     await db
       .insert(expressCompanies)
       .values([
-        { code: 'shunfeng', name: '顺丰速运', sortOrder: 1 },
-        { code: 'zhongtong', name: '中通快递', sortOrder: 2 },
+        // `wechatDeliveryId`: WeChat's own code, which 发货信息管理's upload needs (mini suite).
+        { code: 'shunfeng', name: '顺丰速运', sortOrder: 1, wechatDeliveryId: 'SF' },
+        { code: 'zhongtong', name: '中通快递', sortOrder: 2, wechatDeliveryId: 'ZTO' },
       ])
       .onConflictDoNothing();
     const [courier] = await db

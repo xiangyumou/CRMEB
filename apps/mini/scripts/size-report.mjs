@@ -18,7 +18,7 @@
  *   does not transpile node_modules for us; `es6: false` in project.config.json);
  * - app.json lists a page or sub-package that is not in the output;
  * - any file carries a 32-hex-digit token (the shape of an AppSecret or a payment key; those live
- *   only in the server's config), or the output holds a miniprogram-ci upload key
+ *   only in the server's config) that is not the name of a chunk in the output, or the output holds a miniprogram-ci upload key
  *   (`private.*.key`);
  * - any file carries the e2e suite's H5 emulation (`src/platform/h5-mp-emulation.tsx`: its
  *   `/__e2e/` endpoints or its storage key) or the H5 preview, or the module list includes
@@ -154,6 +154,15 @@ for (const file of files) {
 // Everything in the package is readable by anyone who opens the mini-program. The `mini` guard
 // checks the source for the same shapes; this checks what the build inlined (env vars included).
 const SECRET_LIKE = /(?<![0-9A-Za-z])[0-9a-f]{32}(?![0-9A-Za-z])/g;
+// Taro names a sub-package's shared chunks by a hash of their modules
+// (`packages/order/sub-common/<32 hex>.js|.wxss`), and every page of the sub-package requires or
+// imports them by that name. A token that is the name of a file in the output is that, not a key.
+const CHUNK_NAMES = new Set(
+  fs
+    .readdirSync(dist, { recursive: true })
+    .map((name) => path.basename(String(name)).replace(/\.(js|wxss)$/, ''))
+    .filter((name) => /^[0-9a-f]{32}$/.test(name)),
+);
 for (const entry of fs.readdirSync(dist, { withFileTypes: true, recursive: true })) {
   if (!entry.isFile()) continue;
   const rel = path
@@ -167,6 +176,7 @@ for (const entry of fs.readdirSync(dist, { withFileTypes: true, recursive: true 
   if (!/\.(js|json|wxml|wxs|wxss)$/.test(rel) || rel.endsWith('.map')) continue;
   const source = fs.readFileSync(path.join(dist, rel), 'utf8');
   for (const match of source.matchAll(SECRET_LIKE)) {
+    if (CHUNK_NAMES.has(match[0])) continue;
     failures.push(
       `${rel}: a 32-hex-digit token (${match[0].slice(0, 4)}…) at offset ${match.index}, the shape of an AppSecret`,
     );

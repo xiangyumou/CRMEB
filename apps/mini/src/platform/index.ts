@@ -46,6 +46,7 @@ export {
 export { scrollPageToTop, usePullToRefresh, useScrolledToBottom } from './page-scroll';
 export { callPhone, previewImages } from './device';
 export { PrivacyAgreeButton } from './privacy-button';
+export { confirmReceipt, type ReceiptOutcome } from './receipt';
 export { platform } from './runtime';
 export {
   setShareDefaults,
@@ -74,6 +75,8 @@ export {
   type ChosenAddress,
   type JsapiPayParams,
   type MiniPlatform,
+  type OrderConfirmOutcome,
+  type OrderConfirmTarget,
   type PaymentOutcome,
   type PaymentRequest,
   type PhoneCodeResult,

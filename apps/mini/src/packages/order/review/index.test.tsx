@@ -1,0 +1,120 @@
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { useSession } from '@/session/session';
+import { serveApi } from '@/test/fake-api';
+import { orderDetail, orderItem } from '@/test/order-fixtures';
+import { renderPage } from '@/test/render';
+import { taroFake } from '@/test/taro-fake/taro';
+import ReviewPage from './index';
+
+const received = orderDetail({
+  status: 'received',
+  items: [
+    orderItem('7001', { productName: '商品甲' }),
+    orderItem('7002', { productName: '商品乙' }),
+    orderItem('7003', { productName: '已退商品', refundedQuantity: 1 }),
+  ],
+});
+
+function answer(moderation: 'published' | 'pending') {
+  return {
+    status: 201,
+    body: {
+      id: '1',
+      skuId: null,
+      specText: null,
+      authorNickname: null,
+      authorAvatarUrl: null,
+      productScore: 5,
+      serviceScore: 5,
+      content: null,
+      images: [],
+      replyContent: null,
+      replyAt: null,
+      createdAt: '2026-02-05T10:00:00+08:00',
+      moderation,
+    },
+  };
+}
+
+describe('评价商品', () => {
+  beforeEach(() => {
+    useSession.setState({ session: { status: 'signed-in', token: 't' } });
+    taroFake.routerParams = { orderId: '9001' };
+  });
+
+  it('offers every line not refunded, and sends each with its stars and words', async () => {
+    const seen = serveApi({
+      'GET /api/v1/orders/9001': () => ({ body: received }),
+      'POST /api/v1/catalog/reviews': () => answer('published'),
+    });
+    await renderPage(<ReviewPage />);
+    await screen.findByText('商品甲');
+    expect(screen.queryByText('已退商品')).toBeNull();
+
+    fireEvent.click(screen.getAllByRole('radio', { name: '商品评分 3 星' })[0]!);
+    fireEvent.click(screen.getByRole('radio', { name: '服务评分 4 星' }));
+    fireEvent.change(screen.getAllByLabelText('评价内容')[0]!, { target: { value: ' 很好 ' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交评价' }));
+
+    await screen.findByText('评价成功');
+    const bodies = seen.filter((r) => r.key === 'POST /api/v1/catalog/reviews').map((r) => r.body);
+    expect(bodies).toEqual([
+      { orderItemId: '7001', productScore: 3, serviceScore: 4, content: '很好', images: [] },
+      { orderItemId: '7002', productScore: 5, serviceScore: 4, images: [] },
+    ]);
+  });
+
+  it('says 审核后展示, never an error, when the shop holds a review', async () => {
+    serveApi({
+      'GET /api/v1/orders/9001': () => ({ body: { ...received, items: [orderItem('7001')] } }),
+      'POST /api/v1/catalog/reviews': () => answer('pending'),
+    });
+    await renderPage(<ReviewPage />);
+    fireEvent.click(await screen.findByRole('button', { name: '提交评价' }));
+    await screen.findByText('评价已提交，审核后展示');
+    expect(taroFake.calls.some((c) => c.api === 'showToast')).toBe(false);
+  });
+
+  it('counts a line reviewed before as done, and stops at a real failure', async () => {
+    let call = 0;
+    serveApi({
+      'GET /api/v1/orders/9001': () => ({ body: received }),
+      'POST /api/v1/catalog/reviews': () => {
+        call += 1;
+        return call === 1
+          ? {
+              status: 409,
+              body: { code: 'CATALOG_REVIEW_ALREADY_WRITTEN', message: '已经评价过了' },
+            }
+          : { status: 503, body: { code: 'INTERNAL', message: '服务暂时不可用' } };
+      },
+    });
+    await renderPage(<ReviewPage />);
+    fireEvent.click(await screen.findByRole('button', { name: '提交评价' }));
+
+    await screen.findByText('已评价');
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'showToast',
+        args: expect.objectContaining({ title: '服务暂时不可用' }),
+      }),
+    );
+    // 商品乙 is still there to try again.
+    expect(screen.getAllByLabelText('评价内容')).toHaveLength(1);
+  });
+
+  it('writes only the line it was sent for', async () => {
+    taroFake.routerParams = { orderId: '9001', orderItemId: '7002' };
+    serveApi({ 'GET /api/v1/orders/9001': () => ({ body: received }) });
+    await renderPage(<ReviewPage />);
+    await screen.findByText('商品乙');
+    expect(screen.queryByText('商品甲')).toBeNull();
+  });
+
+  it('explains when the order cannot be reviewed yet', async () => {
+    serveApi({ 'GET /api/v1/orders/9001': () => ({ body: orderDetail({ status: 'shipped' }) }) });
+    await renderPage(<ReviewPage />);
+    await screen.findByText('暂时不能评价');
+  });
+});
