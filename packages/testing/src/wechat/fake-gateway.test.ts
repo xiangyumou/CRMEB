@@ -257,6 +257,19 @@ describe('each create endpoint answers in its own shape', () => {
     });
   }
 
+  it('maps every prepay_id it answers back to its order, as a bare id or a package', async () => {
+    const first = await signedBody(await createOn('jsapi', 'S-prepay-1'));
+    const again = await signedBody(await createOn('jsapi', 'S-prepay-1'));
+    const other = await signedBody(await createOn('jsapi', 'S-prepay-2'));
+
+    expect(gateway.transactionForPrepay(String(first.prepay_id))?.outTradeNo).toBe('S-prepay-1');
+    expect(gateway.transactionForPrepay(`prepay_id=${String(again.prepay_id)}`)?.outTradeNo).toBe(
+      'S-prepay-1',
+    );
+    expect(gateway.transactionForPrepay(String(other.prepay_id))?.outTradeNo).toBe('S-prepay-2');
+    expect(gateway.transactionForPrepay('prepay_id=wx-never-issued')).toBeUndefined();
+  });
+
   it('h5: the h5_url names the order and is the fake`s own cashier page', async () => {
     const body = await signedBody(await createOn('h5', 'S-h5-url'));
     const url = new URL(String(body.h5_url));

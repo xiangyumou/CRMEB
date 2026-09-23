@@ -33,8 +33,12 @@ import type { AddressInfo } from 'node:net';
  *
  * `setMiniCode()` and `setPhoneCode()` say what a `wx.login()` / `getPhoneNumber`
  * code redeems to. An unseeded code is `40029 invalid code`, which is what a
- * spent or forged one really looks like — so the refusal path is the default
- * rather than a special mode a test has to remember to ask for.
+ * forged one really looks like — so the refusal path is the default rather
+ * than a special mode a test has to remember to ask for.
+ *
+ * Both kinds are **single-use**, as WeChat's are: the second redemption of a
+ * code is `40163 code been used`, so a client that replays a `wx.login()` code
+ * (or a server that redeems one twice) fails here as it would on a phone.
  */
 
 export interface FakeOaCall {
@@ -104,9 +108,9 @@ export interface FakeOaServer {
   /** The last live menu tree `menu/create` accepted, or `null`. */
   publishedMenu: unknown;
   addMaterial(material: Omit<FakeOaMaterial, 'updateTime'> & { updateTime?: number }): void;
-  /** Teach `sns/jscode2session` one code. Anything else is `40029`. */
+  /** Teach `sns/jscode2session` one code, good once. Anything else is `40029`; a spent one `40163`. */
   setMiniCode(code: string, session: FakeMiniSession): void;
-  /** Teach `wxa/business/getuserphonenumber` one code. Anything else is `40029`. */
+  /** Teach `wxa/business/getuserphonenumber` one code, good once; the same rules. */
   setPhoneCode(code: string, phone: FakePhoneNumber): void;
   callsTo(path: string): FakeOaCall[];
   reset(): void;
@@ -141,6 +145,8 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
   const tokenApp = new Map<string, 'oa' | 'mini'>();
   const miniSessions = new Map<string, FakeMiniSession>();
   const phoneCodes = new Map<string, FakePhoneNumber>();
+  /** Codes already redeemed, which WeChat answers `40163` rather than `40029`. */
+  const spentCodes = new Set<string>();
   const behaviour: FakeOaBehaviour = {
     failNext: null,
     failMenu: null,
@@ -234,11 +240,19 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
         json(res, { errcode: 40013, errmsg: 'invalid appid' });
         return;
       }
-      const session = miniSessions.get(query['js_code'] ?? '');
+      const jsCode = query['js_code'] ?? '';
+      const session = miniSessions.get(jsCode);
       if (!session) {
-        json(res, { errcode: 40029, errmsg: 'invalid code' });
+        json(
+          res,
+          spentCodes.has(`login:${jsCode}`)
+            ? { errcode: 40163, errmsg: 'code been used' }
+            : { errcode: 40029, errmsg: 'invalid code' },
+        );
         return;
       }
+      miniSessions.delete(jsCode);
+      spentCodes.add(`login:${jsCode}`);
       json(res, {
         openid: session.openid,
         ...(session.unionid === undefined ? {} : { unionid: session.unionid }),
@@ -273,11 +287,19 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
       }
       switch (url.pathname) {
         case '/wxa/business/getuserphonenumber': {
-          const found = phoneCodes.get(String(body['code'] ?? ''));
+          const phoneCode = String(body['code'] ?? '');
+          const found = phoneCodes.get(phoneCode);
           if (!found) {
-            json(res, { errcode: 40029, errmsg: 'invalid code' });
+            json(
+              res,
+              spentCodes.has(`phone:${phoneCode}`)
+                ? { errcode: 40163, errmsg: 'code been used' }
+                : { errcode: 40029, errmsg: 'invalid code' },
+            );
             return;
           }
+          phoneCodes.delete(phoneCode);
+          spentCodes.add(`phone:${phoneCode}`);
           json(res, {
             errcode: 0,
             errmsg: 'ok',
@@ -444,6 +466,7 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
       miniCodes.length = 0;
       miniSessions.clear();
       phoneCodes.clear();
+      spentCodes.clear();
       publishedMenu = null;
       behaviour.failNext = null;
       behaviour.failMenu = null;

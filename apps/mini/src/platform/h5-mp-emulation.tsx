@@ -112,11 +112,12 @@ export const emulationPlatform: MiniPlatform = {
     return code;
   },
   PhoneNumberButton,
-  async requestPayment({ outTradeNo, params }): Promise<PaymentOutcome> {
+  async requestPayment({ params }): Promise<PaymentOutcome> {
     const behaviour = emulatedUser().payment ?? 'pay';
     if (behaviour === 'cancel') return { kind: 'cancelled' };
     if (behaviour === 'fail') return { kind: 'failed', message: 'requestPayment:fail (模拟)' };
-    await control('request-payment', { outTradeNo, package: params.package });
+    // Only the package, as on a phone: the harness finds the order by prepay_id.
+    await control('request-payment', { package: params.package });
     return { kind: 'paid' };
   },
   requestSubscribe() {

@@ -20,10 +20,17 @@ route-catalogue adoption (after R0 merges) → merge checklist.
    - 立即成团 refuses every under-filled team (`GROUPBUY_VIRTUAL_FILL_DISABLED`, new message);
      admin alert text updated. RISK-D-006 rewritten; compliance C02 updated.
 
+3. Fakes
+   - Fake OA/mini server: login and phone codes are single-use (second use → 40163, never
+     issued → 40029); `reset()` clears spent codes.
+   - Fake WeChat Pay gateway remembers `prepay_id → out_trade_no` (`transactionForPrepay`);
+     the e2e `mini/request-payment` hook takes only `{package}` like `wx.requestPayment`, so
+     the emulated client cannot pay an order it did not prepay. `test:mini` green.
+
 ## In progress
 
-- 3: fakes (single-use mini codes; prepay_id → order in the fake pay gateway).
+- 5: 发货信息管理.
 
 ## Next
 
-- 5 发货信息管理, 6 content security, 4 route catalogue (R0 merged at 6b4f48b96), checklist.
+- 6 content security, 4 route catalogue (R0 merged at 6b4f48b96), checklist.
