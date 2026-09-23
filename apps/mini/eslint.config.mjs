@@ -42,7 +42,7 @@ const REACT_19_ONLY = {
 };
 
 /** `@shop/contracts` modules with no zod import, allowed at runtime. */
-const CONTRACTS_RUNTIME = ['@shop/contracts/diy/removed'];
+const CONTRACTS_RUNTIME = ['@shop/contracts/diy/removed', '@shop/contracts/decor/link-route'];
 
 export default [
   ...shopConfig({

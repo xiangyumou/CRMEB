@@ -6,10 +6,15 @@ Updated at every commit so the work can resume after an interruption.
 ## Done
 
 - Copy: 秒杀 removed from the UI gallery demo and the `ProductCard` doc comment (限时活动 / 拼团).
+- `features/decor`: `DecorPage` (shared by 首页 and 微页面), `openLinkTarget`, `SplashOverlay`
+  (legacy link string parsed), `DecorSkeleton`. `ui/nav-bar.tsx` (custom bar) and
+  `platform/chrome.ts` (`navBarMetrics`, `openMiniProgram`). `data/visits.ts` (`useRecordVisit`).
+- 首页 (custom bar + search entry, 404 `DECOR_HOME_NOT_SET` empty state, pull-to-refresh, share,
+  refetch on sign-in change) and 微页面 (`packages/page`), with tests.
 
 ## In progress
 
-- Shared `DecorPage` renderer, home page, 微页面.
+- Merge `storefront/mini` (H2): cart quantity through `cart.updateItemPut`; `X-Client-Version`.
 
 ## Next
 

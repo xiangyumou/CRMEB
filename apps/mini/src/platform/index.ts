@@ -6,6 +6,7 @@
  * import must stay relative, because Taro's per-platform file resolution (`runtime.h5.tsx` on
  * H5) only applies to relative requests.
  */
+export { navBarMetrics, openMiniProgram, type NavBarMetrics } from './chrome';
 export { copyText } from './clipboard';
 export { hideLoading, showLoading, showModal, showToast, type ModalOptions } from './feedback';
 export {
