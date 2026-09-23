@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Text, View } from '@tarojs/components';
-import { useRouteQuery } from '@shop/api-client/react';
+import { useInvalidateRoutes, useRouteQuery } from '@shop/api-client/react';
 import { navigate, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
@@ -62,6 +62,12 @@ function PaymentStatus({ orderId, outTradeNo }: { orderId: string; outTradeNo: s
 
   const id = orderId || status.data?.orderId || '';
   const paid = status.data?.paid === true;
+  // Every order read cached before the payment (订单详情 under 收银台, 我的订单, the 我的 counts)
+  // still says 待付款: drop them once the server says paid.
+  const invalidate = useInvalidateRoutes();
+  useEffect(() => {
+    if (paid) void invalidate('order.detail', 'order.list', 'order.counts');
+  }, [paid, invalidate]);
   const order = useRouteQuery(
     'order.detail',
     { params: { id } },

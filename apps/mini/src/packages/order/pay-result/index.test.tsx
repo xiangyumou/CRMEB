@@ -6,7 +6,8 @@ import { appConfigFixture } from '@/test/app-config-fixture';
 import { cardFixture, pageOf } from '@/test/catalog-fixture';
 import { orderFixture } from '@/test/checkout-fixture';
 import { serveApi } from '@/test/fake-api';
-import { renderPage } from '@/test/render';
+import { renderPage, testQueryClient } from '@/test/render';
+import { routeQueryKey } from '@shop/api-client/react';
 import { taroFake } from '@/test/taro-fake/taro';
 import PayResultPage, { POLL_LIMIT_MS } from './index';
 
@@ -59,6 +60,17 @@ describe('支付结果', () => {
         args: { url: '/pages/index/index' },
       }),
     );
+  });
+
+  it('drops the order reads cached while the order was unpaid', async () => {
+    serve('paid');
+    const client = testQueryClient();
+    const listKey = routeQueryKey('order.list', { query: {} });
+    client.setQueryData(listKey, { items: [], page: 1, pageSize: 20, total: 0 });
+    await renderPage(<PayResultPage />, client);
+
+    expect(await screen.findByText('支付成功')).toBeTruthy();
+    await waitFor(() => expect(client.getQueryState(listKey)?.isInvalidated).toBe(true));
   });
 
   it('sends a group buyer to invite friends', async () => {
