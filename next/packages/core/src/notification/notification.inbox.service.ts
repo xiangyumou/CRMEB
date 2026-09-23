@@ -14,10 +14,9 @@ import * as repo from './notification.repo';
  * of functions taking an audience.
  *
  * They really are the same feature: a list, an unread count, mark-read,
- * mark-all-read. The legacy system wrote them twice (`MessageSystemServices`
- * for the shopper, `Common::jnotice` for the admin) and they behaved
- * differently in the one way that mattered — `jnotice` marked things seen as a
- * side effect of counting them, so two open tabs lost the badge.
+ * mark-all-read. Written twice, they would drift apart in the one way that
+ * matters — a count that marks things seen as a side effect makes two open tabs
+ * lose the badge.
  *
  * **Reading never mutates.** Only `markRead` and `markAllRead` write, and both
  * answer with how many rows they actually changed, so a double tap is a visible

@@ -3,37 +3,21 @@ import type { NotificationChannel } from '@shop/contracts/notification/schemas';
 /**
  * The registry of business events that produce a notification.
  *
- * **Codes are compiled in; only the wording and the switches are data.** The
- * legacy `eb_system_notification` let an operator edit `mark`, which meant a
- * typo in the admin silently stopped every send of that event with no error
- * anywhere. Here `notification_templates.code` is a foreign key onto this
- * table in spirit: a row whose code is not in the registry is ignored, and a
- * registry entry with no row is seeded on first read.
+ * **Codes are compiled in; only the wording and the switches are data.** An
+ * operator-editable code would let a typo in the admin silently stop every send
+ * of that event with no error anywhere. Here `notification_templates.code` is a
+ * foreign key onto this table in spirit: a row whose code is not in the
+ * registry is ignored, and a registry entry with no row is seeded on first
+ * read.
  *
- * ## Mapping from the legacy 17
+ * ## What is deliberately not here
  *
- * `eb_system_notification` shipped 18 seed rows (`crmeb.sql:48625`). The
- * mapping, and why each one moved:
- *
- * | legacy `mark`                  | here                    | note |
- * | ------------------------------ | ----------------------- | ---- |
- * | `verify_code`                  | —                       | E1 owns the SMS code; it is not a business event |
- * | `order_pay_success`            | `order_paid`            | |
- * | `order_postage_success`        | `order_shipped`         | 发货 |
- * | `order_deliver_success`        | `order_shipped`         | 送货 was same-city delivery, retired by the scope guard |
- * | `order_take`                   | `order_received`        | |
- * | `order_refund`                 | `refund_settled`        | |
- * | `send_order_refund_no_status`  | `refund_rejected`       | |
- * | `price_revision`               | `order_price_changed`   | |
- * | `order_pay_false`              | `order_unpaid_reminder` | |
- * | `open_pink_success`, `can_pink_success`, `order_user_groups_success`, `send_order_pink_fial`, `send_order_pink_clone` | — | group buy is stream D's; D registers its own entries with `registerNotificationEvents` |
- * | `admin_pay_success_code`       | `admin_order_paid`      | |
- * | `send_admin_confirm_take_over` | `admin_order_received`  | |
- * | `send_order_apply_refund`      | `admin_refund_applied`  | |
- * | `revenue_received`             | —                       | distribution/brokerage, retired |
- *
- * Three entries have no legacy ancestor and exist because the brief asks for
- * them: `order_created`, `admin_order_created` and `admin_low_stock`.
+ * - SMS verification codes: the `sms` domain sends them, and they are not a
+ *   business event.
+ * - Group-buy events: group buy owns their wording and registers its own
+ *   entries with `registerNotificationEvents`.
+ * - Same-city delivery and distribution/brokerage events: those features are
+ *   out of scope.
  */
 
 export type NotificationAudience = 'user' | 'admin';
@@ -53,8 +37,7 @@ export interface NotificationEvent {
    * Channels this event may use at all.
    *
    * An admin event has no openid and no phone number we are entitled to text,
-   * so it is in-app only — which is also why the legacy 企业微信机器人 channel
-   * existed, and it left with the feature. A user event can use all four.
+   * so it is in-app only. A user event can use all four.
    */
   channels: readonly NotificationChannel[];
   /**
@@ -78,9 +61,9 @@ const registry = new Map<string, NotificationEvent>();
  * Declares events. Idempotent per code: registering the same code twice with
  * the same name is free (a module reload in dev), with a different name throws.
  *
- * Other domains may call this from their own `index.ts` — stream D's group-buy
- * events are the expected case — which is why it is exported rather than the
- * table being a frozen constant.
+ * Other domains may call this from their own `index.ts` — group-buy events are
+ * the expected case — which is why it is exported rather than the table being a
+ * frozen constant.
  */
 export function registerNotificationEvents(events: readonly NotificationEvent[]): void {
   for (const event of events) {

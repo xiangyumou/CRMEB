@@ -18,16 +18,16 @@ import {
  *   row and the state change commit together, so a rolled-back payment leaves
  *   no "payment received" message behind and a committed one can never lose the
  *   notification.
- * - **`FulfilmentNotifier`** (B2's port) is called *after* commit, from B2's
- *   own effect handler, because shipping's notification is already behind the
- *   ledger. There `notify` opens a short transaction of its own; the effect key
- *   makes the second call free, so B2 retrying its handler does not enqueue a
- *   second notification.
+ * - **`FulfilmentNotifier`** (fulfilment's port) is called *after* commit, from
+ *   fulfilment's own effect handler, because shipping's notification is already
+ *   behind the ledger. There `notify` opens a short transaction of its own; the
+ *   effect key makes the second call free, so fulfilment retrying its handler
+ *   does not enqueue a second notification.
  *
  * Everything here is registered from `installNotificationHooks()` rather than
  * at module scope, because `resetOrderPorts()` in an integration test clears
- * every hook registry — B2 learned this the hard way and left the comment that
- * this one copies.
+ * every hook registry, and a hook registered at module scope would not come
+ * back.
  */
 
 registerEffectHandler(NOTIFICATION_SCOPE, NOTIFICATION_EVENT_TYPE, async (ctx, effect) => {
@@ -138,21 +138,18 @@ const CANCEL_REASONS: Record<string, string> = {
 /**
  * **`installNotificationHooks()` is deliberately not called here.**
  *
- * It used to be, and that was survivable only while nothing in `order`
- * imported this domain back. Since CR-2-e2 the checkout and the order console
- * call `notify`, so `order/index.ts` and `notification/index.ts` are a cycle,
- * and a cycle entered from the order side reaches this module's body while
- * `../order` is still evaluating — at which point `registerFulfilmentNotifier`
- * is not yet a function and the whole app fails to import. (Same family as the
- * bug in cdc04601d: what a bundler or a transform does with a re-exported
- * binding mid-cycle is not something to rely on.)
+ * The checkout and the order console call `notify`, so `order/index.ts` and
+ * `notification/index.ts` are a cycle, and a cycle entered from the order side
+ * reaches this module's body while `../order` is still evaluating — at which
+ * point `registerFulfilmentNotifier` is not yet a function and the whole app
+ * fails to import. What a bundler or a transform does with a re-exported
+ * binding mid-cycle is not something to rely on.
  *
  * `registerNotificationDomain()` in `index.ts` calls it instead, from
- * `@shop/core/domains` at bootstrap, which is where CONVENTIONS says
- * registration belongs and which runs after every module has been evaluated.
- * The `registerEffectHandler` above stays at module scope on purpose: it
- * depends on nothing outside this domain, and the integration tests import
- * this file precisely to get it.
+ * `@shop/core/domains` at bootstrap, which is where registration belongs and
+ * which runs after every module has been evaluated. The `registerEffectHandler`
+ * above stays at module scope on purpose: it depends on nothing outside this
+ * domain, and the integration tests import this file precisely to get it.
  */
 
 /** Imported for its side effects; this keeps a bundler from eliding the module. */

@@ -25,7 +25,7 @@ import './notification.effects';
  *    only them.
  *
  * Everything here runs against the real PostgreSQL and the real Redis. The only
- * fake is the SMS port, which is a seam stream E1 owns — no test in this file
+ * fake is the SMS port, a seam onto the `sms` domain — no test in this file
  * calls a WeChat or SMS endpoint, and the WeChat channels stay unconfigured so
  * they are skipped rather than attempted.
  */
