@@ -33,15 +33,26 @@ coupons: HeldCoupon[] }`.
     (largest limit, capped at 10), never cached.
   - `decor.int.test.ts` "the batch-2 blocks (G2)": 8 tests (DECOR-004/013/015/018).
 - **Docs**: `docs/invariants.md` DECOR-015 text + citations, DECOR-013/004 citations, new DECOR-018.
+- **storefront-blocks**: components `coupon-list`, `newcomer-coupon`, `campaign-list`
+  (`groupbuy-list`, `presale-list`, shared `campaign-cards`), `article-list`, `video`,
+  `floating-contact`, `follow-official-account`; all in `BLOCK_COMPONENTS`.
+  - `BlockIntent` gains `claimCoupon { templateId }`, `claimNewcomerCoupons`, `officialAccount`.
+  - `BlockProps.host` / `BlockListProps.host` (`BlockHost`: `signedIn`, `serverNow`, `canvas`,
+    `overlayOpen`); `BlockList` derives `signedIn` from `personal`.
+  - Shared: `list-head.tsx` (title + 更多), `time.ts` (Beijing-time dates, countdown, phase),
+    `money.ts`, `personal.ts` (`couponStatesIn`, `heldCouponsIn`), tokens `$shadow-float`,
+    `$z-bar`, icon `contact`.
+  - DOM shim: `Video` (300×225, contained, autoplay only muted).
+  - Fixtures for every new block (`FIXTURE_NOW` / `fixtureServerNow` for the countdown,
+    `fixturePersonalG2`). Tests: `marketing-blocks.test.tsx` (27 × React 18 + 19), registry test.
 
 ## In progress
 
-- storefront-blocks components.
+- Admin: video field, canvas flag.
 
 ## Next
 
-- storefront-blocks components + React 18/19 tests; admin video field, canvas flag, canvas data,
-  templates, spike page; mini demo page; fidelity; decor.md; checklist.
+- Admin canvas data, templates, spike page; mini demo page; fidelity; decor.md; checklist.
 
 ## Notes
 

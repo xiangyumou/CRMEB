@@ -45,4 +45,9 @@ export const ICONS = {
     '<circle cx="12" cy="9" r="3.5"/><path d="M5 19.5c1.2-3.3 3.8-5 7-5s5.8 1.7 7 5"/>',
     '#B2B2B2',
   ),
+  /** 客服: a headset. */
+  contact: icon(
+    '<path d="M4.5 13.5v-2a7.5 7.5 0 0 1 15 0v2"/><rect x="3.5" y="13" width="4" height="5.5" rx="1.5"/><rect x="16.5" y="13" width="4" height="5.5" rx="1.5"/><path d="M18.5 18.5c0 1.5-1.5 2.5-4 2.5h-1.5"/>',
+    '#666666',
+  ),
 } as const;

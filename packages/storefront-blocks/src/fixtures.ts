@@ -1,10 +1,17 @@
 import type {
+  ArticleListProps,
   CarouselProps,
+  CouponListProps,
+  FloatingContactProps,
+  FollowOfficialAccountProps,
+  GroupbuyListProps,
   HotspotImageProps,
   ImageCubeProps,
   NavGridProps,
+  NewcomerCouponProps,
   NoticeProps,
   OrderEntryProps,
+  PresaleListProps,
   ProductGridProps,
   ProductTabsProps,
   RichTextProps,
@@ -13,9 +20,17 @@ import type {
   SpacerProps,
   TitleBarProps,
   UserCardProps,
+  VideoProps,
 } from '@shop/contracts/decor/all-blocks';
 import { productTabSlot } from '@shop/contracts/decor/constants';
-import type { PersonalSlot, ProductSummary } from '@shop/contracts/decor/sources';
+import type {
+  ArticleSummary,
+  CouponSummary,
+  GroupbuySummary,
+  PersonalSlot,
+  PresaleSummary,
+  ProductSummary,
+} from '@shop/contracts/decor/sources';
 
 /**
  * Fixture data for tests, the admin spike page, the fidelity script and the
@@ -372,3 +387,246 @@ export function resolveFixtureProducts(source: ProductGridProps['source']): Prod
 function fen(price: string): number {
   return Number.parseInt(price.replace('.', ''), 10);
 }
+
+// ---------------------------------------------------------------------------
+// batch 2 (G2): marketing, content and floating blocks
+// ---------------------------------------------------------------------------
+
+/**
+ * The instant the fixtures are drawn at: what a host passes as
+ * `host.serverNow`, so the 预售 countdown reads the same on every surface.
+ */
+export const FIXTURE_NOW = Date.parse('2026-06-01T04:00:00.000Z');
+export const fixtureServerNow = (): number => FIXTURE_NOW;
+
+const coupon = (
+  templateId: string,
+  name: string,
+  discountAmount: string,
+  minSpend: string,
+  validity: { validDays: number } | { validFrom: string; validTo: string },
+): CouponSummary => ({
+  templateId,
+  name,
+  discountAmount,
+  minSpend,
+  scope: 'all_products',
+  validityMode: 'validDays' in validity ? 'days_after_claim' : 'fixed_window',
+  validFrom: 'validFrom' in validity ? validity.validFrom : null,
+  validTo: 'validTo' in validity ? validity.validTo : null,
+  validDays: 'validDays' in validity ? validity.validDays : null,
+  claimTo: null,
+  isUnlimitedSupply: false,
+  remainingCount: 100,
+  perUserLimit: 1,
+});
+
+export const fixtureCoupons: CouponSummary[] = [
+  coupon('21', '全场通用券', '10.00', '99.00', { validDays: 7 }),
+  coupon('22', '无门槛券', '5.00', '0.00', {
+    validFrom: '2026-05-31T16:00:00.000Z',
+    validTo: '2026-06-30T15:59:59.000Z',
+  }),
+  coupon('23', '满减券', '30.00', '199.00', { validDays: 15 }),
+];
+
+export const fixtureCouponList: CouponListProps = {
+  title: '领券中心',
+  showMore: true,
+  source: { mode: 'auto', limit: 3 },
+  layout: 'scroll',
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixtureNewUserCoupons: CouponSummary[] = [
+  coupon('31', '新人券', '10.00', '0.00', { validDays: 7 }),
+  coupon('32', '新人券', '20.00', '129.00', { validDays: 7 }),
+  coupon('33', '新人券', '50.00', '299.00', { validDays: 7 }),
+];
+
+export const fixtureNewcomerCoupon: NewcomerCouponProps = {
+  title: '新人专享',
+  subtitle: '注册即得，下单立减',
+  limit: 3,
+  style: frame,
+  visibility: everyone,
+};
+
+const campaignStart = '2026-05-20T00:00:00.000Z';
+
+export const fixtureGroupbuys: GroupbuySummary[] = [
+  {
+    activityId: '41',
+    productId: '12',
+    title: '秋季新款宽松针织开衫 女士百搭外套',
+    intro: null,
+    imageUrl: square(12),
+    price: '99.00',
+    originalPrice: '129.90',
+    seatsRequired: 2,
+    stock: 50,
+    sales: 36,
+    startAt: campaignStart,
+    endAt: '2026-06-10T16:00:00.000Z',
+    formingGroups: 3,
+    canBuy: true,
+  },
+  {
+    activityId: '42',
+    productId: '15',
+    title: '厨房收纳三件套',
+    intro: null,
+    imageUrl: square(150),
+    price: '29.90',
+    originalPrice: '39.90',
+    seatsRequired: 3,
+    stock: 80,
+    sales: 0,
+    startAt: campaignStart,
+    endAt: '2026-06-10T16:00:00.000Z',
+    formingGroups: 0,
+    canBuy: true,
+  },
+];
+
+export const fixtureGroupbuyList: GroupbuyListProps = {
+  title: '拼团',
+  showMore: true,
+  source: { mode: 'auto', limit: 3 },
+  layout: 'list',
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixturePresales: PresaleSummary[] = [
+  {
+    activityId: '51',
+    productId: '14',
+    title: '主动降噪真无线蓝牙耳机 长续航',
+    intro: null,
+    imageUrl: square(210),
+    price: '259.00',
+    originalPrice: '299.00',
+    stock: 20,
+    sales: 8,
+    startAt: campaignStart,
+    // 2 days, 3 h 4 min 5 s after FIXTURE_NOW.
+    endAt: '2026-06-03T07:04:05.000Z',
+    shipAfterDays: 15,
+    canBuy: true,
+  },
+  {
+    activityId: '52',
+    productId: '16',
+    title: '儿童绘本套装（全 10 册）精装版 睡前故事',
+    intro: null,
+    imageUrl: square(280),
+    price: '69.00',
+    originalPrice: null,
+    stock: 20,
+    sales: 0,
+    startAt: campaignStart,
+    endAt: '2026-06-01T05:30:00.000Z',
+    shipAfterDays: 0,
+    canBuy: true,
+  },
+];
+
+export const fixturePresaleList: PresaleListProps = {
+  title: '预售',
+  showMore: true,
+  source: { mode: 'auto', limit: 3 },
+  layout: 'list',
+  showCountdown: true,
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixtureArticles: ArticleSummary[] = [
+  {
+    id: '61',
+    title: '换季护理指南：秋冬如何挑选合适的面料',
+    coverImageUrl: tile(400, 280, 200),
+    summary: '从面料成分到洗涤方式，一篇讲清楚。',
+    author: null,
+    categoryTitle: '生活指南',
+    views: 1203,
+    publishedAt: '2026-05-28T02:00:00.000Z',
+  },
+  {
+    id: '62',
+    title: '门店营业时间调整通知',
+    coverImageUrl: null,
+    summary: null,
+    author: null,
+    categoryTitle: '店铺公告',
+    views: 88,
+    publishedAt: '2026-05-20T02:00:00.000Z',
+  },
+];
+
+export const fixtureArticleList: ArticleListProps = {
+  title: '资讯',
+  showMore: true,
+  source: { mode: 'category', limit: 3 },
+  layout: 'list',
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixtureVideo: VideoProps = {
+  src: '/fixtures/intro.mp4',
+  poster: banner('#434343', '#1f1f1f', '#8c8c8c'),
+  ratio: '16:9',
+  autoplay: false,
+  muted: false,
+  loop: false,
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixtureFloatingContact: FloatingContactProps = {
+  label: '客服',
+  side: 'right',
+  bottom: 240,
+  style: frame,
+  visibility: everyone,
+};
+
+export const fixtureFollowOfficialAccount: FollowOfficialAccountProps = {
+  style: frame,
+  visibility: everyone,
+};
+
+/** A signed-in shopper's state for the batch-2 blocks, by slot. */
+export const fixturePersonalG2: {
+  couponList: Record<string, PersonalSlot>;
+  newcomerCoupon: Record<string, PersonalSlot>;
+} = {
+  couponList: {
+    coupons: {
+      kind: 'coupons',
+      items: [
+        { templateId: '21', claimedCount: 1, canClaim: false },
+        { templateId: '22', claimedCount: 1, canClaim: true },
+        { templateId: '23', claimedCount: 0, canClaim: true },
+      ],
+    },
+  },
+  newcomerCoupon: {
+    held: {
+      kind: 'newcomerCoupons',
+      coupons: [
+        {
+          id: '901',
+          templateId: '31',
+          title: '新人券',
+          discountAmount: '10.00',
+          minSpend: '0.00',
+          validTo: '2026-06-07T15:59:59.000Z',
+        },
+      ],
+    },
+  },
+};
