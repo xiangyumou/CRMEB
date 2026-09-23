@@ -105,7 +105,7 @@ const PERSONAL = {
 
 const WEAPP = process.env.TARO_ENV === 'weapp';
 
-/** The host wrappers a real page adds; see `docs/mini/decor.md` § host wrappers. */
+/** The host wrappers a real page adds; see `docs/mini/decor.md` §2.4 (host wrappers). */
 function renderIntent(intent: BlockIntent, children: ReactNode): ReactNode {
   if (intent.kind === 'contact') {
     if (!WEAPP) return children;

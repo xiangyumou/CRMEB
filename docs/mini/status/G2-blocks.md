@@ -74,13 +74,18 @@ coupons: HeldCoupon[] }`.
   renders `BlockList` yet (the demo package is left out of production weapp). No zod in
   `dist/weapp` or `dist/h5`.
 
+- **Docs** `docs/mini/decor.md`: §2.2 by-id campaigns and `ids` on the public lists, §2.3 the eight
+  blocks, intents, `BlockHost`, DECOR-018, the WeChat 关注公众号 scene limits, video; new §2.4
+  host wrappers for the page streams; §6 the `newcomerCoupons` personal need; §8 editor field and
+  canvas-data steps; §9 the video control and canvas data; §10 the 100-campaign item removed.
+
 ## In progress
 
-- `docs/mini/decor.md`.
+- Checklist.
 
 ## Next
 
-- Checklist.
+- Final report.
 
 ## Notes
 
