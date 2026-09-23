@@ -42,14 +42,19 @@ Updated at every commit so the work can resume after an interruption.
   好友 + 朋友圈), 网页 (业务域名 → `<WebView>`; else a sheet 「该链接需在浏览器中打开」 with
   复制链接). Tests.
 
+- 我的 tab (`decor.pageUserCenter` through `features/decor-lite/decor-page.tsx`, a minimal
+  renderer with B's `{ page, route }` interface: links via `openLinkTarget`, `login` →
+  `requireLogin(me)`, 客服 as WeChat's contact button / call / note; refetch on sign-in, on show,
+  on pull-down; 「N 条未读消息」 row). **Swap to B's `features/decor/decor-page.tsx` and delete
+  `features/decor-lite/` once B merges.** Tests.
+
 ## In progress
 
-- 我的 tab: user-centre decor through a local renderer until B's `DecorPage` lands.
+- e2e specs in `e2e/storefront/specs-mini`.
 
 ## Next
 
-6. e2e specs in `e2e/storefront/specs-mini`; `docs/mini/pages.md`; screenshots in
-   `docs/mini/status/E-screens/`; checklist; sizes.
+6. `docs/mini/pages.md`; screenshots in `docs/mini/status/E-screens/`; checklist; sizes.
 
 ## Backend gaps found
 
