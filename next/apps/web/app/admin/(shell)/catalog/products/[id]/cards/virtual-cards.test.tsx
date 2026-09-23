@@ -1,19 +1,26 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  catalogAdminProductDetail,
+  catalogAdminVirtualCardImport,
+  catalogAdminVirtualCardList,
+  catalogAdminVirtualCardVoid,
+} from '@shop/contracts/catalog/catalog.product.admin.contract';
+import {
+  adminProductDetailExample,
+  productSkuExample,
+  type AdminProductDetail,
+  type ProductVirtualCard,
+} from '@shop/contracts/catalog/schemas';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { VirtualCardsPage, parseCards } from './virtual-cards';
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const card = {
+const card: ProductVirtualCard = {
   id: '7001',
   skuId: '1100',
   specText: '面值 50',
@@ -27,41 +34,22 @@ const card = {
   createdAt: '2026-06-01T10:00:00+08:00',
 };
 
-const product = {
+const product: AdminProductDetail = {
+  ...adminProductDetailExample,
   id: '9',
   name: '话费充值卡',
   kind: 'virtual_card',
-  skus: [{ id: '1100', specText: '面值 50' }],
+  specs: [],
+  skus: [{ ...productSkuExample, id: '1100', specText: '面值 50', specValues: {} }],
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload = url.includes('/virtual-cards')
-        ? method === 'GET'
-          ? { items: [card], total: 1, page: 1, pageSize: 20 }
-          : url.includes('/voids')
-            ? { voided: 1, stock: 1 }
-            : { imported: 2, skippedCardNos: [], stock: 2 }
-        : product;
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        // The detail route is validated against the contract in the app, but
-        // this stub only needs to feed the page the fields it reads.
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-    validateResponses: false,
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(catalogAdminVirtualCardList, { items: [card], total: 1, page: 1, pageSize: 20 }),
+    on(catalogAdminVirtualCardVoid, { voided: 1, stock: 1 }),
+    on(catalogAdminVirtualCardImport, { imported: 2, skippedCardNos: [], stock: 2 }),
+    on(catalogAdminProductDetail, product),
+  ]);
 }
 
 afterEach(() => {

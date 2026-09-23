@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes } from '@/test/api';
 import { renderAdmin, zhName } from '@/test/render';
 
 import { ConfigGroupForm } from './config-group-form';
@@ -48,15 +49,12 @@ const values = { siteName: '示例商城', apiSecret: true, smsSecret: false, mo
 
 function stubSave(): { bodies: unknown[] } {
   const bodies: unknown[] = [];
-  configureApi({
-    async fetch(_input, init) {
-      bodies.push(typeof init?.body === 'string' ? JSON.parse(init.body) : undefined);
-      return new Response(JSON.stringify({ ok: true }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
+  stubRoutes([
+    on(saveRoute, (call) => {
+      bodies.push(call.body);
+      return { ok: true };
+    }),
+  ]);
   return { bodies };
 }
 
@@ -161,20 +159,11 @@ describe('<ConfigGroupForm> secrets', () => {
 
   it('sends the group as a path param', async () => {
     const user = userEvent.setup();
-    const urls: string[] = [];
-    configureApi({
-      async fetch(input) {
-        urls.push(typeof input === 'string' ? input : (input as Request).url);
-        return new Response(JSON.stringify({ ok: true }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      },
-    });
+    const calls = stubRoutes([on(saveRoute, { ok: true })]);
     renderAdmin(<ConfigGroupForm descriptor={descriptor} values={values} route={saveRoute} />);
 
     await user.click(screen.getByRole('button', { name: zhName('保存') }));
-    await waitFor(() => expect(urls[0]).toBe('/admin-api/config/demo'));
+    await waitFor(() => expect(calls[0]?.url).toBe('/admin-api/config/demo'));
   });
 });
 
@@ -310,7 +299,7 @@ describe('<ConfigGroupForm> rendering', () => {
 });
 
 /**
- * Read-only fields (N1 / CR-1-e2).
+ * Read-only fields.
  *
  * `site.publicOrigin` comes from the environment. Leaving it off the screen
  * was the first draft and it was worse: an operator whose WeChat links point

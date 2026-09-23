@@ -1,8 +1,17 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  diyPageCopy,
+  diyPageCreate,
+  diyPageList,
+  diyPagePublish,
+  diyPageSetHome,
+} from '@shop/contracts/diy/diy.contract';
+import type { DiyPageDetail, DiyPageSummary } from '@shop/contracts/diy/schemas';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { DiyPageList } from './page-list';
@@ -15,13 +24,7 @@ import { DiyPageList } from './page-list';
  * sends. Paging, sorting and form rendering belong to the kit's own tests.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const home = {
+const home: DiyPageSummary = {
   id: '8',
   name: '首页',
   kind: 'home',
@@ -29,11 +32,13 @@ const home = {
   status: 'published',
   isHome: true,
   componentCount: 12,
+  version: 'v8',
+  publishedAt: '2026-06-01T10:00:00+08:00',
   updatedAt: '2026-06-01T10:00:00+08:00',
   createdAt: '2026-05-01T10:00:00+08:00',
 };
 
-const draft = {
+const draft: DiyPageSummary = {
   ...home,
   id: '9',
   name: '活动专题页',
@@ -41,28 +46,20 @@ const draft = {
   status: 'draft',
   isHome: false,
   componentCount: 3,
+  version: 'v9',
+  publishedAt: null,
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload =
-        method === 'GET' ? { items: [home, draft], total: 2, page: 1, pageSize: 20 } : draft;
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  // Every single-page route answers with the whole page, content included.
+  const detail: DiyPageDetail = { ...draft, content: {}, schemaVersion: 1, background: null };
+  return stubRoutes([
+    on(diyPageList, { items: [home, draft], total: 2, page: 1, pageSize: 20 }),
+    on(diyPageCreate, detail),
+    on(diyPagePublish, { ...detail, status: 'published' }),
+    on(diyPageSetHome, detail),
+    on(diyPageCopy, detail),
+  ]);
 }
 
 afterEach(() => {

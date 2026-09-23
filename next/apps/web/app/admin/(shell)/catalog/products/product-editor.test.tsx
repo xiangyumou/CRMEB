@@ -1,18 +1,24 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import { catalogAdminCategoryTree } from '@shop/contracts/catalog/catalog.category.admin.contract';
+import {
+  catalogAdminProductDetail,
+  catalogAdminProductUpdate,
+} from '@shop/contracts/catalog/catalog.product.admin.contract';
 import type { AdminProductDetail } from '@shop/contracts/catalog/schemas';
+import {
+  catalogAdminLabelList,
+  catalogAdminParamTemplateList,
+  catalogAdminProtectionList,
+} from '@shop/contracts/catalog/catalog.taxonomy.admin.contract';
+import { shippingTemplateOptionList } from '@shop/contracts/shipping/shipping.template.admin.contract';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { ProductEditorPage, formValuesOf } from './product-editor';
-
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
 
 const detail: AdminProductDetail = {
   id: '1',
@@ -112,38 +118,22 @@ const detail: AdminProductDetail = {
   giftCouponIds: [],
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload = url.includes('/category-tree')
-        ? { items: [] }
-        : url.includes('/shipping/template-options')
-          ? {
-              items: [
-                { id: '3', name: '江浙沪包邮', chargeMode: 'quantity' },
-                { id: '4', name: '大件走重量', chargeMode: 'weight' },
-              ],
-            }
-          : url.includes('/labels') ||
-              url.includes('/protections') ||
-              url.includes('/param-templates')
-            ? { items: [], total: 0, page: 1, pageSize: 200 }
-            : detail;
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  const empty = { items: [], total: 0, page: 1, pageSize: 200 };
+  return stubRoutes([
+    on(catalogAdminCategoryTree, { items: [] }),
+    on(shippingTemplateOptionList, {
+      items: [
+        { id: '3', name: '江浙沪包邮', chargeMode: 'quantity' },
+        { id: '4', name: '大件走重量', chargeMode: 'weight' },
+      ],
+    }),
+    on(catalogAdminLabelList, empty),
+    on(catalogAdminProtectionList, empty),
+    on(catalogAdminParamTemplateList, empty),
+    on(catalogAdminProductDetail, detail),
+    on(catalogAdminProductUpdate, detail),
+  ]);
 }
 
 afterEach(() => {
@@ -230,7 +220,7 @@ describe('商品编辑器', () => {
     await userEvent.click(screen.getByTitle('大件走重量（按重量）'));
 
     // 固定运费 hides the template select and says the charge is per unit —
-    // legacy multiplied `postage` by `cart_num` and the rewrite kept that.
+    // checkout multiplies `postage` by the quantity.
     // antd's radio button puts `pointer-events: none` on the input itself.
     await userEvent
       .setup({ pointerEventsCheck: 0 })

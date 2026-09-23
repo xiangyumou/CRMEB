@@ -1,17 +1,18 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AdminAuthService, UserSessionService } from '@shop/core/auth';
-import { createPage, savePageContent, setHomePage } from '@shop/core/diy';
+import { configSave } from '@shop/core/system';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { setContainer, type Container } from '../../../../src/server/container';
 import type { Env } from '../../../../src/server/env';
 
 /**
- * `GET /api/v1/diy/pages/home` answering `If-None-Match`.
+ * `GET /api/v1/site/config` answering `If-None-Match`.
  *
- * The payload is cached for 60 s and dropped by every 装修 write; what is
- * proved here is the HTTP half: a caller holding the current version gets a
- * bodyless 304 with the same weak tag, the answer comes from the cached entry
- * without reading the row, and a publish makes the old tag stale at once.
+ * The first request of every launch, so a caller holding the current version
+ * gets a bodyless 304. The version is the newest save across every group the
+ * payload is built from, and the payload is cached for a minute — so what is
+ * proved here is that a save through the settings screen moves the tag at once,
+ * whichever of those groups it lands in.
  */
 
 let harness: TestCtx;
@@ -63,20 +64,13 @@ beforeEach(async () => {
   await harness.redis.flushdb();
 });
 
-async function seedHome() {
-  const page = await createPage(harness.ctx, { name: '首页', kind: 'home', title: '商城首页' });
-  await setHomePage(harness.ctx, { id: page.id });
-  return page;
-}
-
 async function read(headers: Record<string, string> = {}) {
-  const { GET } = await import('./pages/home/route');
-  return GET(new Request(`${ORIGIN}/api/v1/diy/pages/home`, { headers }));
+  const { GET } = await import('./config/route');
+  return GET(new Request(`${ORIGIN}/api/v1/site/config`, { headers }));
 }
 
-describe('GET /api/v1/diy/pages/home — conditional', () => {
-  it('sends the page and its weak tag to a caller that has nothing', async () => {
-    await seedHome();
+describe('GET /api/v1/site/config — conditional', () => {
+  it('sends the settings and their weak tag to a caller that has nothing', async () => {
     const response = await read();
     expect(response.status).toBe(200);
     const body = (await response.json()) as { version: string };
@@ -85,7 +79,6 @@ describe('GET /api/v1/diy/pages/home — conditional', () => {
   });
 
   it('answers a caller holding the current version with a bodyless 304', async () => {
-    await seedHome();
     const tag = (await read()).headers.get('etag')!;
 
     for (const offered of [tag, tag.replace(/^W\//, '')]) {
@@ -96,28 +89,23 @@ describe('GET /api/v1/diy/pages/home — conditional', () => {
     }
   });
 
-  it('answers the 304 from the cached entry, without reading the row', async () => {
-    await seedHome();
+  it.each([
+    ['site', { siteName: '新店名' }],
+    ['wechat-mini', { contactPhone: '13800000000' }],
+  ] as const)('sends the new settings once the %s group is saved', async (group, values) => {
     const tag = (await read()).headers.get('etag')!;
 
-    // Behind the service's back, so nothing drops the cache: were the row
-    // read, there would be no home page and the answer would be a 404.
-    await harness.db.handle.pool.query('update diy_pages set is_home = false');
-
-    expect((await read({ 'if-none-match': tag })).status).toBe(304);
-  });
-
-  it('sends the new page to a caller holding the version before a publish', async () => {
-    const page = await seedHome();
-    const before = (await read()).headers.get('etag')!;
-
     harness.clock.advance(1_000);
-    await savePageContent(harness.ctx, { id: page.id, content: {}, publish: true });
+    await configSave(harness.ctx, { group }, { values });
 
-    const response = await read({ 'if-none-match': before });
+    const response = await read({ 'if-none-match': tag });
     expect(response.status).toBe(200);
-    const after = response.headers.get('etag');
-    expect(after).not.toBe(before);
-    expect(after).toBe(`W/"${((await response.json()) as { version: string }).version}"`);
+    const fresh = response.headers.get('etag');
+    expect(fresh).not.toBe(tag);
+    const body = (await response.json()) as { version: string; name: string };
+    expect(fresh).toBe(`W/"${body.version}"`);
+    if (group === 'site') expect(body.name).toBe('新店名');
+
+    expect((await read({ 'if-none-match': fresh! })).status).toBe(304);
   });
 });

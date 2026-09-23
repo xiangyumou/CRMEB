@@ -1,8 +1,19 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  presaleAdminActivityDetail,
+  presaleAdminActivityList,
+  presaleAdminActivitySetStatus,
+  presaleAdminActivityUpdate,
+} from '@shop/contracts/presale/presale.admin.contract';
+import type {
+  PresaleActivityDetail,
+  PresaleActivityListItem,
+} from '@shop/contracts/presale/schemas';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { PresaleActivitiesPage } from './presale-activities';
@@ -21,13 +32,7 @@ import { PresaleActivitiesPage } from './presale-activities';
  * silently delete every presale price on the campaign.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const row = {
+const row: PresaleActivityListItem = {
   id: '7',
   productId: '12',
   productName: '明前龙井',
@@ -49,7 +54,7 @@ const row = {
   createdAt: '2026-05-01T08:00:00+08:00',
 };
 
-const detail = {
+const detail: PresaleActivityDetail = {
   ...row,
   sliderImages: [],
   shippingTemplateId: null,
@@ -66,31 +71,13 @@ const detail = {
   ],
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      // The list route carries a query string; the detail route does not.
-      const payload =
-        method === 'GET'
-          ? url.includes('?')
-            ? { items: [row], total: 1, page: 1, pageSize: 20 }
-            : detail
-          : { ...detail, status: 'paused' };
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(presaleAdminActivityList, { items: [row], total: 1, page: 1, pageSize: 20 }),
+    on(presaleAdminActivityDetail, detail),
+    on(presaleAdminActivityUpdate, detail),
+    on(presaleAdminActivitySetStatus, { ...detail, status: 'paused' }),
+  ]);
 }
 
 afterEach(() => {

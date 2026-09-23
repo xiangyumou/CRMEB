@@ -13,6 +13,7 @@ import { adminClient } from './checks/admin-client';
 import { bannedConstructs } from './checks/banned';
 import { contractsAndRoutes } from './checks/contracts';
 import { domains } from './checks/domains';
+import { fixtures } from './checks/fixtures';
 import { invariants } from './checks/invariants';
 import { migrations } from './checks/migrations';
 import { permissions } from './checks/permissions';
@@ -30,6 +31,7 @@ const CHECKS: readonly Check[] = [
   routeHygiene,
   permissions,
   adminClient,
+  fixtures,
   uniappCalls,
   retiredFeatures,
   bannedConstructs,

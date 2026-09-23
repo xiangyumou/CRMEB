@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, respondWithError, stubRoutes } from '@/test/api';
 import { renderAdmin, zhName } from '@/test/render';
 
 import { idColumn, instantColumn, moneyColumn, textColumn } from './columns';
@@ -41,16 +42,12 @@ const rows: Widget[] = Array.from({ length: 3 }, (_, index) => ({
 
 function stubList(): { urls: string[] } {
   const urls: string[] = [];
-  configureApi({
-    async fetch(input) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      urls.push(url);
-      return new Response(JSON.stringify({ items: rows, total: 42, page: 1, pageSize: 20 }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
+  stubRoutes([
+    on(listRoute, (call) => {
+      urls.push(call.url);
+      return { items: rows, total: 42, page: 1, pageSize: 20 };
+    }),
+  ]);
   return { urls };
 }
 
@@ -201,14 +198,9 @@ describe('<CrudTable>', () => {
   });
 
   it('shows the server error message in the empty state', async () => {
-    configureApi({
-      async fetch() {
-        return new Response(JSON.stringify({ code: 'INTERNAL', message: '服务器开小差了' }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      },
-    });
+    stubRoutes([
+      on(listRoute, () => respondWithError(500, { code: 'INTERNAL', message: '服务器开小差了' })),
+    ]);
     renderAdmin(<Harness onState={() => {}} />);
     expect(await screen.findByText('服务器开小差了', {}, { timeout: 4000 })).toBeInTheDocument();
   });

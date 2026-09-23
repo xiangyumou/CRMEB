@@ -1,8 +1,16 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { WechatMedium } from '@shop/contracts/wechat-oa/schemas';
+import {
+  wechatOaMediaDelete,
+  wechatOaMediaList,
+  wechatOaMediaSync,
+  wechatOaMediaUpload,
+} from '@shop/contracts/wechat-oa/wechat-oa.media.contract';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { WechatMediaPage } from './wechat-media';
@@ -15,13 +23,7 @@ import { WechatMediaPage } from './wechat-media';
  * against WeChat, delete removes both sides, and nothing here uploads bytes.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const medium = {
+const medium: WechatMedium = {
   id: '1',
   kind: 'image',
   mediaId: 'MEDIA_ID_0001',
@@ -32,29 +34,13 @@ const medium = {
   createdAt: '2026-01-04T10:00:00+08:00',
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload = url.includes('/sync')
-        ? { removed: 2, added: 5, unchanged: 31 }
-        : method === 'GET'
-          ? { items: [medium], total: 1, page: 1, pageSize: 20 }
-          : medium;
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(wechatOaMediaSync, { removed: 2, added: 5, unchanged: 31 }),
+    on(wechatOaMediaList, { items: [medium], total: 1, page: 1, pageSize: 20 }),
+    on(wechatOaMediaUpload, medium),
+    on(wechatOaMediaDelete, undefined),
+  ]);
 }
 
 afterEach(() => {

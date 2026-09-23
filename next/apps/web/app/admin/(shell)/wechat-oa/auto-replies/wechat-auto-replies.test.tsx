@@ -1,8 +1,17 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { WechatAutoReply } from '@shop/contracts/wechat-oa/schemas';
+import { wechatOaMediaList } from '@shop/contracts/wechat-oa/wechat-oa.media.contract';
+import {
+  wechatOaReplyCreate,
+  wechatOaReplyList,
+  wechatOaReplySetStatus,
+  wechatOaReplyUpdate,
+} from '@shop/contracts/wechat-oa/wechat-oa.reply.contract';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { WechatAutoRepliesPage } from './wechat-auto-replies';
@@ -16,13 +25,7 @@ import { WechatAutoRepliesPage } from './wechat-auto-replies';
  * form to flip a switch is how a concurrent edit gets clobbered.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const reply = {
+const reply: WechatAutoReply = {
   id: '1',
   triggerKind: 'keyword',
   keyword: '优惠券',
@@ -35,29 +38,14 @@ const reply = {
   updatedAt: '2026-01-04T10:00:00+08:00',
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-      const payload = url.includes('/admin-api/wechat-media')
-        ? { items: [], total: 0, page: 1, pageSize: 100 }
-        : method === 'GET'
-          ? { items: [reply], total: 1, page: 1, pageSize: 20 }
-          : { ...reply, isEnabled: false };
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(wechatOaMediaList, { items: [], total: 0, page: 1, pageSize: 100 }),
+    on(wechatOaReplyList, { items: [reply], total: 1, page: 1, pageSize: 20 }),
+    on(wechatOaReplySetStatus, { ...reply, isEnabled: false }),
+    on(wechatOaReplyCreate, reply),
+    on(wechatOaReplyUpdate, reply),
+  ]);
 }
 
 afterEach(() => {
