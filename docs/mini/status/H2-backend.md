@@ -73,10 +73,14 @@ Merged storefront/mini at 84f28a645+ (F1 decor, I1 guards): our migrations renum
      kept.
    - No `/share/scenes` decode endpoint (client decodes locally; documented in C11 + §3.3).
 
+Final checklist (2026-09-24, at dfa008fb3): gen/typecheck/lint/test:unit/build, test:int
+(--force), prettier, check:examples, guards (15/15), admin e2e (47), storefront e2e (34),
+test:mini (1), uni-app `npm test` (477) — all pass.
+
 ## In progress
 
-- Final checklist.
+- Nothing.
 
 ## Next
 
-- Report.
+- Coordinator review / merge into `storefront/mini`.
