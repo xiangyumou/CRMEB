@@ -12,22 +12,22 @@ import * as qrcode from './wechat-oa.qrcode.service';
 import { handleEvent, verifyUrl } from './wechat-oa.webhook.service';
 
 /**
- * The Official Account callback, read as an attacker (K2, AUDIT.md K-SEC-O1).
+ * The Official Account callback, read as an attacker.
  *
  * In 明文 mode WeChat's `signature` is `sha1(sort(token, timestamp, nonce))`:
  * it does **not** cover the body. So the one thing that stops a valid triple
  * from being replayed against a body of the attacker's choosing is what the
- * endpoint does with the triple — and today it does nothing: no freshness
- * window, no single use, and the plain path is taken whenever the request
- * omits `encrypt_type`, whatever 消息加解密方式 the operator chose.
+ * endpoint does with the triple: a freshness window, single use, and the
+ * operator's 消息加解密方式 — not the request's `encrypt_type` — choosing the
+ * path.
  *
  * WeChat puts `signature`, `timestamp` and `nonce` on the query string of every
  * callback, in 安全模式 too (next to `msg_signature`), so every access-log line
  * of the webhook holds a triple that is valid forever.
  *
- * The three refusals below were pinned as `it.fails` by K2 and are CR-7-k2;
- * R3 made them hold (a 300 s window, `(timestamp, nonce)` spent on one body,
- * and the configured mode — not `encrypt_type` — choosing the path).
+ * The three refusals below are those three rules: a 300 s window,
+ * `(timestamp, nonce)` spent on one body, and the configured mode choosing the
+ * path.
  */
 
 let harness: TestCtx;
@@ -110,7 +110,7 @@ async function victimSubscribed(): Promise<boolean | undefined> {
   return row?.subscribed;
 }
 
-describe('K-SEC-O1 — what a valid signature triple is good for', () => {
+describe('what a valid signature triple is good for', () => {
   it('holds in 安全模式 for a genuine encrypted delivery (the baseline)', async () => {
     await configure('safe');
     await followedVictim();

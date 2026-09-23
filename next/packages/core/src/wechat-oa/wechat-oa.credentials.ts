@@ -7,20 +7,17 @@ import { wechatConfig } from '../wechat';
  * One answer to "what are this shop's Official Account credentials", assembled
  * from the two groups that hold parts of it.
  *
- * Stream C's `wechat` group owns the app credentials (`appId`, `appSecret`).
- * That is CR-1-j: both groups used to declare them and both mapped the legacy
- * keys `wechat_appid` / `wechat_appsecret`, so a migrated shop held the app id
- * in one screen and a blank in the other, and whichever screen was saved last
- * won. Stream F1's `wechat-oa` group now owns only what an operator types into
- * 公众平台 for the callback: the token, the EncodingAESKey and 消息加解密方式.
+ * The `wechat` group owns the app credentials (`appId`, `appSecret`): a
+ * credential declared in two groups shows in one screen and as a blank in the
+ * other, and whichever screen is saved last wins. The `wechat-oa` group owns
+ * only what an operator types into 公众平台 for the callback: the token, the
+ * EncodingAESKey and 消息加解密方式.
  *
- * The token and the AES key are still *declared* in both, and keep the "F1
- * first, C as the fallback" rule: F1's is the screen an operator actually fills
- * in, C's is what an install that only ever used C's form carries. What
- * CR-3-e2 asked for has landed on the migration side (E4): C no longer maps
- * `wechat_token` / `wechat_encodingaeskey`, so a migrated shop's values arrive
- * in F1's group alone and there is no second copy to go stale. This function
- * stays the single place that knows the two declarations overlap.
+ * The token and the AES key are *declared* in both, with the `wechat-oa` value
+ * first and the `wechat` one as the fallback: the first is the screen an
+ * operator actually fills in, the second is what an install that only ever used
+ * the `wechat` form carries. This function is the single place that knows the
+ * two declarations overlap.
  */
 export interface OaCredentials {
   enabled: boolean;
@@ -28,8 +25,8 @@ export interface OaCredentials {
   token: string;
   encodingAesKey: string;
   /**
-   * 消息加解密方式 as the operator configured it. The callback reads it to refuse
-   * a plaintext delivery to an account in 安全模式 (CR-7-k2): the request's own
+   * 消息加解密方式 as the operator configured it. The callback reads it to
+   * refuse a plaintext delivery to an account in 安全模式: the request's own
    * `encrypt_type` is the attacker's choice, the setting is not.
    */
   messageMode: 'plain' | 'compatible' | 'safe';
@@ -42,8 +39,9 @@ export async function oaCredentials(ctx: Ctx): Promise<OaCredentials> {
   ]);
   const appId = core.oaAppId.trim();
   return {
-    // F1's switch is the operator's intent; an appId with no secret cannot work
-    // whatever the switch says, and the client refuses that on its own.
+    // The `wechat-oa` switch is the operator's intent; an appId with no secret
+    // cannot work whatever the switch says, and the client refuses that on its
+    // own.
     enabled: oa.enabled && appId !== '',
     appId,
     token: oa.token.trim() || core.oaToken.trim(),

@@ -4,17 +4,18 @@ import { getWechatClient, type WechatCall } from '../wechat';
 import type { WechatMenuButton } from './wechat-oa.repo';
 
 /**
- * The Official Account management endpoints, on top of stream C's client.
+ * The Official Account management endpoints, on top of the `wechat` domain's
+ * client.
  *
- * C owns the transport: the token cache, the cross-process single flight, the
- * `40001 → drop the token and retry once` rule and the TLS defaults. Everything
- * here goes through `client.call('oa', …)` — or `client.upload('oa', …)` for
- * the multipart material endpoints — so none of that is re-implemented and
- * this file never calls `fetch`.
+ * That client owns the transport: the token cache, the cross-process single
+ * flight, the `40001 → drop the token and retry once` rule and the TLS
+ * defaults. Everything here goes through `client.call('oa', …)` — or
+ * `client.upload('oa', …)` for the multipart material endpoints — so none of
+ * that is re-implemented and this file never calls `fetch`.
  *
  * Every function raises `WECHAT_OA_API_FAILED` with WeChat's own `errcode` in
  * `details`. That number is the only thing that makes a failed menu publish
- * diagnosable; the legacy admin showed 操作失败 and dropped it.
+ * diagnosable, so it is never swallowed into a bare 操作失败.
  */
 
 interface Envelope {
@@ -122,10 +123,9 @@ export interface UploadedMedium {
 }
 
 /**
- * Uploads bytes we already hold to WeChat, through C's `upload` — so a stale
- * token here is dropped and retried once like every other WeChat call, instead
- * of surfacing as `WECHAT_OA_API_FAILED 40001` (CR-31-k2, which carried the
- * never-filed CR-4-e2).
+ * Uploads bytes we already hold to WeChat, through the client's `upload` — so a
+ * stale token here is dropped and retried once like every other WeChat call,
+ * instead of surfacing as `WECHAT_OA_API_FAILED 40001`.
  */
 export async function uploadMedium(
   ctx: Ctx,

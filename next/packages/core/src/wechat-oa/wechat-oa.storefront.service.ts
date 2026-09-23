@@ -27,14 +27,13 @@ import { requireOaCredentials } from './wechat-oa.credentials';
 /**
  * Signs one page URL for `wx.config`.
  *
- * ## The check that the legacy endpoint did not have
+ * ## Only our own pages are signed
  *
  * `jsapi_ticket` is the account's, and a signature over an arbitrary URL is a
  * signature for somebody else's page: hand it out freely and any site can call
  * `wx.chooseWXPay` and `wx.getLocation` in our name, with our brand on the
- * permission sheet. The legacy `WechatServices::jsSdk` signed whatever it was
- * given. Here the URL's host must be the site's own or one an operator listed
- * in `wechat-oa-runtime.jsApiAllowedHosts`.
+ * permission sheet. So the URL's host must be the site's own or one an operator
+ * listed in `wechat-oa-runtime.jsApiAllowedHosts`.
  *
  * ## The signature itself
  *
@@ -100,9 +99,9 @@ export async function assertAllowed(ctx: Ctx, url: string): Promise<void> {
     throw new DomainError('WECHAT_OA_URL_NOT_ALLOWED', { message: '待签名的地址不是合法的 URL' });
   }
 
-  // The deployment's own hosts come from `site` (CR-1-e2); the 公众号 JS 安全域名
-  // list is a statement about the WeChat account and stays in this domain's
-  // runtime group. Either is enough.
+  // The deployment's own hosts come from `site`; the 公众号 JS 安全域名 list is
+  // a statement about the WeChat account and stays in this domain's runtime
+  // group. Either is enough.
   if (!(await isTrustedHost(ctx, host)) && !(await isListedJsApiHost(ctx, host))) {
     throw new DomainError('WECHAT_OA_URL_NOT_ALLOWED', { details: { host } });
   }

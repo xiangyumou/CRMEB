@@ -51,9 +51,10 @@ export type {
  *   between. That is not enough by itself: with no menu active yet the first
  *   statement locks nothing, two publishes both reach the second one and one of
  *   them loses on the constraint — which is why `menu.publish` retries once.
- * - **`bumpQrcodeCounters` is `UPDATE … SET n = n + 1`, never read-modify-write.**
- *   Scans arrive concurrently from WeChat's own fan-out; reading 128 in two
- *   requests and writing 129 twice is how the legacy counter drifted low.
+ * - **`bumpQrcodeCounters` is `UPDATE … SET n = n + 1`, never
+ *   read-modify-write.** Scans arrive concurrently from WeChat's own fan-out;
+ *   reading 128 in two requests and writing 129 twice would make the counter
+ *   drift low.
  * - **`findReplyForKeyword` sorts exact before contains and then by
  *   `sort_order`.** The reply engine must be deterministic: the same message
  *   twice has to produce the same answer, or an operator debugging a keyword
@@ -819,7 +820,7 @@ export async function findIdentityByOpenid(
 /**
  * Records a follow / unfollow against an identity we already know.
  *
- * It deliberately does **not** create one. An identity is created by E1's login
+ * It deliberately does **not** create one. An identity is created by the login
  * flow, where the user record and the profile come from; inventing a half-row
  * here would give the shop a customer with no account who cannot be merged with
  * the real one when they eventually log in.

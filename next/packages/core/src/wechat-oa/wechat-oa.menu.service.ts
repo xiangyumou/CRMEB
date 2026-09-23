@@ -15,12 +15,11 @@ import * as repo from './wechat-oa.repo';
 /**
  * The bottom menu, as a draft-and-publish pair.
  *
- * The legacy design kept one menu in `sys_config` and POSTed it to WeChat on
- * save, so "what is live" and "what is in the box" were the same thing and a
- * half-finished edit reached every follower. Here a menu is a row, editing it
- * changes nothing anyone sees, and `publish` is the moment it goes live —
- * recorded on the row as `published_at`, with WeChat's own complaint kept in
- * `publish_error` when it refuses.
+ * A menu POSTed to WeChat on save would make "what is live" and "what is in the
+ * box" the same thing, and a half-finished edit would reach every follower. So
+ * a menu is a row, editing it changes nothing anyone sees, and `publish` is the
+ * moment it goes live — recorded on the row as `published_at`, with WeChat's
+ * own complaint kept in `publish_error` when it refuses.
  */
 
 interface Paged<T> {
@@ -150,12 +149,11 @@ export async function remove(ctx: Ctx, params: { id: string }): Promise<void> {
 /**
  * Sends the tree to WeChat and, only if WeChat accepts it, marks the row live.
  *
- * The order matters and it is the opposite of the legacy flow. Marking first
- * and calling second leaves a row saying 已发布 for a menu the followers never
- * saw whenever the call fails — and it fails often, because WeChat validates
- * URLs against the account's own 业务域名. Calling first means a failure
- * changes nothing except `publish_error`, which is exactly what an operator
- * needs to read.
+ * The order matters. Marking first and calling second leaves a row saying
+ * 已发布 for a menu the followers never saw whenever the call fails — and it
+ * fails often, because WeChat validates URLs against the account's own
+ * 业务域名. Calling first means a failure changes nothing except
+ * `publish_error`, which is exactly what an operator needs to read.
  */
 export async function publish(ctx: Ctx, params: { id: string }): Promise<WechatMenu> {
   requirePermission(ctx, wechatOaPermissions['menu:publish']);

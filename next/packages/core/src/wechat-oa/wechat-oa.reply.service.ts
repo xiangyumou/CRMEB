@@ -32,9 +32,9 @@ interface Paged<T> {
 /**
  * Refuses a reply body that would render as an empty chat bubble.
  *
- * The legacy `WechatReplyServices::setReply` stored whatever it was given and
- * the send path silently did nothing, so an operator who saved a `news` reply
- * with no articles saw success and their customers saw nothing at all.
+ * Stored as given, such a body would make the send path silently do nothing: an
+ * operator who saved a `news` reply with no articles would see success and
+ * their customers would see nothing at all.
  */
 export function validateReplyPayload(
   replyType: WechatReplyType,

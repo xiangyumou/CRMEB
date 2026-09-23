@@ -125,12 +125,9 @@ function insertCategoryOrConflict(
 /**
  * `wechat_qrcode_categories_name_uq` as a 409 instead of a 500.
  *
- * There used to be two ways to get here. The ordinary one is two people naming
- * a category 地推 at once. The other was a name that had been *deleted*: the
- * index covered soft-deleted rows, so a 地推 nothing on the screen showed kept
- * its name for ever and recreating it failed with no visible cause. CR-3-e3
- * (closed by E4) scoped the index to `deleted_at is null`, so only the first
- * one is left and the 409 now means what it says.
+ * The one way to get here is two people naming a category 地推 at once. The
+ * index is scoped to `deleted_at is null`, so a deleted name is free again and
+ * the 409 means what it says.
  */
 async function categoryNameConflictAsDomainError<T>(run: () => Promise<T>): Promise<T> {
   try {

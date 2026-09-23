@@ -28,15 +28,15 @@ import * as repo from './wechat-oa.repo';
  * 0. **Is it on, and is this the mode we run in.** A disabled account answers
  *    nothing. An account configured in 安全模式 refuses a plaintext delivery:
  *    which path is taken is the *setting's* choice, never the request's
- *    `encrypt_type` (CR-7-k2 — dropping `encrypt_type` from a logged query
- *    string used to downgrade the check to one that does not cover the body).
+ *    `encrypt_type` — otherwise dropping `encrypt_type` from a logged query
+ *    string would downgrade the check to one that does not cover the body.
  * 1. **Signature.** `verifySignature` over the three query parameters, or
  *    `verifyMessageSignature` over those plus the still-encrypted payload. This
  *    happens before the body is parsed, before Redis is touched and before
  *    anything is written. The URL is public and unauthenticated in every other
  *    respect: an unsigned "this user just subscribed" would otherwise hand out
  *    the new-follower coupon to anybody who can spell the openid.
- * 1a. **Freshness and single use** (CR-7-k2). In 明文 mode the signature covers
+ * 1a. **Freshness and single use.** In 明文 mode the signature covers
  *    `token`, `timestamp` and `nonce` — not the body — and WeChat puts that
  *    triple on the query string of every callback, so every access-log line
  *    holds one. A triple is therefore good for five minutes either side of our
@@ -54,10 +54,6 @@ import * as repo from './wechat-oa.repo';
  *    background. A customer waiting on a keyword reply would rather see nothing
  *    than see 该公众号暂时无法提供服务 — and WeChat's retry would run the same
  *    work again.
- *
- * The legacy `wechat/serve` did none of steps 1–3 in that order: it handed the
- * body to the SDK, which parsed first and verified inside, and it deduplicated
- * not at all.
  */
 
 export interface OaWebhookResult {
@@ -73,7 +69,7 @@ const FORBIDDEN: OaWebhookResult = { status: 403, body: 'invalid signature' };
 const BUDGET_MS = 4_000;
 /** Longer than WeChat's retry schedule (4 deliveries inside ~15 s) with room to spare. */
 const DEDUPE_TTL_SECONDS = 900;
-/** How far a callback's `timestamp` may be from our clock, either way (CR-7-k2). */
+/** How far a callback's `timestamp` may be from our clock, either way. */
 export const FRESHNESS_SECONDS = 300;
 /** Outlives the freshness window on both sides, so a spent triple cannot come back. */
 const NONCE_TTL_SECONDS = 2 * FRESHNESS_SECONDS;
@@ -237,7 +233,7 @@ async function withBudget(ctx: Ctx, work: Promise<string>): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
-// mode, freshness, single use (CR-7-k2)
+// mode, freshness, single use
 // ---------------------------------------------------------------------------
 
 /**
