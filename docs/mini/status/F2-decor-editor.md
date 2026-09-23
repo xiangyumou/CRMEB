@@ -55,10 +55,20 @@ interruption.
 
 - `docs/mini/decor.md` §9 (后台编辑器); the platforms open item removed.
 
+- Merged `storefront/mini` (G1 batch 1, H2, A): G1's richText / hotspots fields wired into
+  `fields/index.tsx` and `SEMANTIC_FIELD_KINDS`; F2's registry canvas kept (covers product-tab
+  slots); G1's `canvas-blocks.test.tsx` ported to F2's APIs.
+- Templates (`templates/documents.ts`, 14-block set): 简约首页 (search, carousel, nav grid,
+  notice, image cube, title bars, product scroller, product tabs), 简洁个人中心 (user card,
+  orders, two service groups incl. 联系客服), 专题活动 (hero, rich text, divider, cube, title,
+  grid). Image slots empty by design (publish blocked until picked); the canvas draws them with
+  an editor-only placeholder (`canvas-images.ts`). `templates.test.ts` checks each against
+  `checkDocument` for its kind.
+
 ## In progress
 
-- Templates (after `git merge storefront/mini` if G1 has merged).
+- Final checks, screenshots.
 
 ## Next
 
-- Checks, screenshots (`docs/mini/status/F2-screens/`), report.
+- Screenshots (`docs/mini/status/F2-screens/`), report.

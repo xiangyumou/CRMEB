@@ -36,7 +36,8 @@ export const DECOR_TEMPLATES: readonly DecorTemplate[] = [
     key: 'home-modern',
     kind: 'home',
     name: '简约首页',
-    description: '大图轮播、三格入口、商品网格。换上图片、选好商品即可发布。',
+    description:
+      '搜索、轮播、快捷入口、公告、图片魔方、新品横滑和商品选项卡。换上图片、选好商品即可发布。',
     document: HOME_MODERN,
   },
   {
@@ -50,7 +51,7 @@ export const DECOR_TEMPLATES: readonly DecorTemplate[] = [
     key: 'custom-campaign',
     kind: 'custom',
     name: '专题活动',
-    description: '一张专题主图、一大两小的图片魔方和活动商品。',
+    description: '专题主图、活动说明、一大两小的图片魔方和活动商品。',
     document: CUSTOM_CAMPAIGN,
   },
 ];
