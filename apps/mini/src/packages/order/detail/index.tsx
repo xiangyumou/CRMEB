@@ -81,7 +81,12 @@ function mayHaveShipments(order: OrderDetail): boolean {
 
 function OrderBody({ id }: { id: string }) {
   const signedIn = useSignedIn();
-  const detail = useRouteQuery('order.detail', { params: { id } }, { enabled: signedIn });
+  const detail = useRouteQuery(
+    'order.detail',
+    { params: { id } },
+    // An order moves while the app is elsewhere (paid, shipped): never show a cached state first.
+    { enabled: signedIn, refetchOnMount: 'always' },
+  );
   useRefetchOnShow(routeKey('order.detail'));
   const order = detail.data;
   const shipments = useRouteQuery(

@@ -75,7 +75,12 @@ export default function RefundDetailPage() {
 
 function Body({ id }: { id: string }) {
   const signedIn = useSignedIn();
-  const detail = useRouteQuery('refund.myDetail', { params: { id } }, { enabled: signedIn });
+  const detail = useRouteQuery(
+    'refund.myDetail',
+    { params: { id } },
+    // The merchant moves a request while the app is elsewhere: never show a cached state first.
+    { enabled: signedIn, refetchOnMount: 'always' },
+  );
   useRefetchOnShow(routeKey('refund.myDetail'));
   const actions = useRefundActions({ onHidden: () => void goBack() });
   const contact = useContactIcon(sessionFromOf('refund', id));
