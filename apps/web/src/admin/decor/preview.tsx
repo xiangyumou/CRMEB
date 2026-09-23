@@ -55,7 +55,7 @@ export function PreviewDrawer({
       open={open}
       onClose={onClose}
       title="预览草稿"
-      width={FRAME_WIDTH + 48}
+      size={FRAME_WIDTH + 48}
       destroyOnHidden
       extra={
         <Button
@@ -71,7 +71,7 @@ export function PreviewDrawer({
       {token.isPending || (!issued && !token.isError) ? (
         <Spin style={{ display: 'block', margin: '80px auto' }} />
       ) : token.isError || !issued ? (
-        <Alert type="error" showIcon message="无法生成预览，请稍后重试" />
+        <Alert type="error" showIcon title="无法生成预览，请稍后重试" />
       ) : (
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           {frameUrl ? (
@@ -92,7 +92,7 @@ export function PreviewDrawer({
             <Alert
               type="info"
               showIcon
-              message="请在小程序体验版中预览"
+              title="请在小程序体验版中预览"
               description="正式环境不部署 H5 预览。在微信开发者工具或体验版中打开下面的页面路径，即可看到当前已保存的草稿（未发布，顾客看不到）。"
             />
           )}

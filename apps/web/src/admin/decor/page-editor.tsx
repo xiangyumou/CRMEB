@@ -486,7 +486,7 @@ function EditorSession({
 
   const banner = (
     <>
-      {canWrite ? null : <Alert banner type="info" message="你没有编辑权限，当前为只读查看。" />}
+      {canWrite ? null : <Alert banner type="info" title="你没有编辑权限，当前为只读查看。" />}
       {showIssues && issueCount + warningCount > 0 ? (
         <IssuesPanel
           issues={saved.issues}
@@ -568,7 +568,7 @@ function EditorSession({
             <Alert
               type="warning"
               showIcon
-              message={`上次保存时还有 ${issueCount} 处问题，需修改后才能发布`}
+              title={`上次保存时还有 ${issueCount} 处问题，需修改后才能发布`}
             />
           ) : null}
           <Input.TextArea
@@ -668,7 +668,7 @@ function IssuesPanel({
           closable
           onClose={onClose}
           style={{ marginBottom: warnings.length > 0 ? 8 : 0 }}
-          message={`${issues.length} 个问题需修改后才能发布${stale ? '（以上次保存为准）' : ''}`}
+          title={`${issues.length} 个问题需修改后才能发布${stale ? '（以上次保存为准）' : ''}`}
           description={
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {issues.map((issue) => (
@@ -684,7 +684,7 @@ function IssuesPanel({
           showIcon
           closable={issues.length === 0}
           onClose={onClose}
-          message={`${warnings.length} 条提示（不影响发布）`}
+          title={`${warnings.length} 条提示（不影响发布）`}
           description={
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {warnings.map((issue) => (

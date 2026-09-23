@@ -46,7 +46,7 @@ export function RevisionsDrawer({
   const items = revisions.data?.items ?? [];
 
   return (
-    <Drawer open={open} onClose={onClose} title="发布记录" width={420} mask={false}>
+    <Drawer open={open} onClose={onClose} title="发布记录" size={420} mask={false}>
       {revisions.isPending ? (
         <Spin style={{ display: 'block', margin: '48px auto' }} />
       ) : items.length === 0 ? (
