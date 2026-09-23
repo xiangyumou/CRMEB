@@ -5,8 +5,8 @@
 #   deploy/next/rehearsal/drill.sh [--list] [--only <substring>] [--keep]
 #                                  [--no-build --web REF --worker REF --edge REF]
 #
-# Each case has a stable id, so a row in `docs/rewrite/invariants.md` can point
-# at something re-runnable rather than at a paragraph:
+# Each case has a stable id, so a rule in `docs/invariants.md` can point at
+# something re-runnable rather than at a paragraph:
 #
 #   deploy/next/rehearsal/drill.sh::upgrade/failed-migration-ends-on-previous
 #
@@ -424,7 +424,7 @@ case_memory_budget() {
   python3 - "$workdir/compose.json" <<'PY'
 import json, re, sys
 config = json.load(open(sys.argv[1]))
-CAP = 1600 * 1024 * 1024   # the brief's ceiling: every role at once, under 1.6 GB
+CAP = 1600 * 1024 * 1024   # the host's budget for the stack: every role at once, under 1.6 GB
 
 def limit(service):
     value = service.get('deploy', {}).get('resources', {}).get('limits', {}).get('memory')
@@ -500,11 +500,9 @@ case_refuses_moving_tag() {
     grep -q 'pinned by digest' "$workdir/moving-tag.log"
 }
 
-# The old stack ran four roles from one image, so "the roles run different
-# images" was the symptom of a half-finished deploy. Here the three roles are
-# three different images by construction, so the rule with the same purpose is
-# that a release names all three: a `web` that moved while `worker` did not is
-# a web talking to a worker built against a different contract.
+# The three roles are three different images, so a release must name all
+# three: a `web` that moved while `worker` did not is a web talking to a worker
+# built against a different contract.
 case_requires_all_three() {
   local role
   for role in web worker edge; do

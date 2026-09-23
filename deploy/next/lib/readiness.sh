@@ -8,8 +8,8 @@
 # restarts the container when the database blips (apps/web/src/server/health.ts
 # says so in as many words).
 #
-# The deep check now has an HTTP surface: the edge proxies `/readyz` to the
-# app's `/api/v1/readyz` (CR-1-j2), which answers database, Redis, schema and
+# The deep check has an HTTP surface: the edge proxies `/readyz` to the
+# app's `/api/v1/readyz`, which answers database, Redis, schema and
 # worker heartbeat, or 503 with `{code, message, details: {checks}}` and nothing
 # else. Nothing restarts a container on that answer; a *release* is gated on it,
 # here. Five things, in the order they fail usefully:
@@ -31,7 +31,7 @@
 #
 # 3 is also the only one of the five that works before the stack is reachable
 # by any other means, and the only one an uptime monitor or a load balancer can
-# run — which is the whole reason CR-1-j2 exists.
+# run — which is why `/readyz` is exposed over HTTP at all.
 
 # Tables every release needs before it can serve. Deliberately a small,
 # hand-picked list rather than "count the tables": a count passes on a schema

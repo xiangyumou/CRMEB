@@ -1,17 +1,16 @@
-# The rewritten stack. A separate Compose project from `crmeb-production`, so
-# both can run side by side through the cutover (PLAN §6) and the old one is
-# stopped, never deleted.
+# The shop's production stack: PostgreSQL, Redis, the Next.js server, the
+# BullMQ worker and the nginx edge. The scripts next to this file drive it; see
+# README.md.
 #
-#   docker compose --env-file deployment.env -f compose.yml up -d --wait
+#   docker compose -p crmeb-next --env-file deployment.env -f compose.yml up -d --wait
 #
 # Every image is pinned by digest through the env file. A moving tag would make
-# "the stack that passed acceptance" unidentifiable, and `upgrade.sh` refuses
-# one outright.
+# "the stack that passed" unidentifiable, and `upgrade.sh` refuses one outright.
 #
 # ## Memory
 #
-# The host is 2 cores / 3.6 GB and still runs the old stack during cutover
-# (PLAN §7). The five long-running services are capped at **1568 MiB** total:
+# The host has 2 cores and 3.6 GB. The five long-running services are capped at
+# **1568 MiB** total:
 #
 #   postgres 512 · redis 160 · web 512 · worker 320 · edge 64
 #
@@ -25,9 +24,8 @@
 # ## Traffic
 #
 # This file publishes only to `NEXT_EDGE_BIND`, which defaults to loopback, and
-# carries no Traefik labels and no external network. Taking traffic from the
-# old stack is a deliberate second file: `compose.traefik.yml`. See
-# `cutover.md`.
+# carries no Traefik labels and no external network. Putting the edge behind
+# Traefik is a deliberate second file: `compose.traefik.yml`.
 
 name: crmeb-next
 
@@ -95,8 +93,8 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?}
     # `noeviction` is a correctness requirement, not a preference: this Redis
     # holds admin sessions, the config cache and the BullMQ queue. An eviction
-    # policy would silently drop queued jobs — PLAN §1 names it for that
-    # reason. AOF so a restart does not lose the queue.
+    # policy would silently drop queued jobs. AOF so a restart does not lose
+    # the queue.
     #
     # The password never reaches argv: `$$REDIS_PASSWORD` is expanded by the
     # shell *inside* the container, from the container's own environment.
@@ -175,7 +173,7 @@ services:
       UPLOADS_PUBLIC_PREFIX: /uploads
       DB_POOL_MAX: ${WEB_DB_POOL_MAX:-10}
       # Pool acquire wait and PostgreSQL's idle_in_transaction_session_timeout
-      # (packages/db/src/client.ts, CR-53-k2); shared by web and worker.
+      # (packages/db/src/client.ts); shared by web and worker.
       DB_POOL_ACQUIRE_TIMEOUT_MS: ${DB_POOL_ACQUIRE_TIMEOUT_MS:-5000}
       DB_IDLE_IN_TX_TIMEOUT_MS: ${DB_IDLE_IN_TX_TIMEOUT_MS:-30000}
       # `/api/v1/readyz` decides whether the worker heartbeat is fresh, so it
@@ -250,11 +248,12 @@ services:
     container_name: ${NEXT_CONTAINER_PREFIX:-crmeb-next}-edge
     restart: *restart
     ports:
-      # Loopback by default. Publishing on 0.0.0.0 while the old stack still
-      # owns the domain is how a half-finished cutover starts serving.
+      # Loopback by default. Traefik reaches the edge over its own network
+      # (compose.traefik.yml), so nothing needs this port on a public
+      # interface; publishing it there would bypass the router.
       - '${NEXT_EDGE_BIND:-127.0.0.1:8080}:80'
     environment:
-      # Who may tell the edge the client's address (CR-14-k2). Empty here: with
+      # Who may tell the edge the client's address. Empty here: with
       # nothing in front, the TCP peer *is* the client, and a client's own
       # X-Forwarded-For is ignored. `compose.traefik.yml` requires it.
       NEXT_EDGE_TRUSTED_PROXIES: ${NEXT_EDGE_TRUSTED_PROXIES:-}
@@ -267,11 +266,11 @@ services:
       # chain through to the app. An edge that is up but cannot reach `web` is
       # not a healthy edge.
       #
-      # Deliberately **not** `/readyz`. Since CR-1-j2 that path is the deep
-      # check and answers 503 while PostgreSQL or Redis is down — so probing it
+      # Deliberately **not** `/readyz`. That path is the deep check and
+      # answers 503 while PostgreSQL or Redis is down — so probing it
       # here would restart the edge because the database blipped, which is the
       # outage-from-a-degradation that `apps/web/src/server/health.ts` exists to
-      # refuse. Nothing acts on readiness; `deploy/next/lib/readiness.sh` reads
+      # refuse. Nothing acts on readiness; `lib/readiness.sh` reads
       # it to gate a release, and a human or a monitor reads it to know why.
       test:
         [
@@ -291,6 +290,6 @@ volumes:
   pgdata:
   redisdata:
   # Both apps write here and the edge serves it read-only. A *named* volume, so
-  # it inherits the uid-1000 ownership the images create — the old stack needed
-  # a manual `chown -R 33:33` on the host for exactly this (deploy/production/README.md).
+  # it inherits the uid-1000 ownership the images create, with no manual
+  # `chown` on the host.
   uploads:

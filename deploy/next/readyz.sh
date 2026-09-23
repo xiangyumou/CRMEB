@@ -4,7 +4,7 @@
 #   deploy/next/readyz.sh
 #
 # Read-only: it starts nothing, stops nothing and writes nothing. Use it after
-# a manual `up`, during the cutover smoke test, or to find out why a release
+# a manual `up`, during a first-deploy smoke test, or to find out why a release
 # was rolled back. Exit 0 means every check in lib/readiness.sh passed.
 set -Eeuo pipefail
 
