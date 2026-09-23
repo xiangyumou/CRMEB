@@ -64,11 +64,17 @@ Merged `storefront/mini` at 299956592 (G1 decor blocks) before touching the deco
    (now with `accentColor`). The legacy bag stays `Record<string, unknown>`: renaming
    `theme` → `primary` breaks the live uni-app (`pageColorStatus` reads `tokens.theme`), a
    narrower TS type over unvalidated stored data would be a lie, and a zod schema would change
-   what the legacy `PUT /admin-api/diy/themes/:id` accepts.
+   what the legacy `PATCH /admin-api/diy/themes/:id` accepts.
+
+Final checklist (2026-09-24, at dab47f5cc + this status commit): `turbo gen typecheck lint
+test:unit build` (45/45), `test:int --force --concurrency=4` (core 1508, web 324, worker 6,
+testing 9), `prettier --check .`, `check:examples` (461 routes), `pnpm guards` (15/0), uni-app
+`npm ci --ignore-scripts && npm test` (477 passed, 32 skipped), `test:mini` (1) — all pass.
+Not run (outside the brief's list): admin e2e, H5 storefront e2e, a real-device pass.
 
 ## In progress
 
-- Merge checklist.
+- Nothing. Ready for the coordinator.
 
 ## Client follow-ups (stream A)
 

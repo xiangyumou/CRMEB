@@ -226,7 +226,7 @@ DIY 块的圆角由装修属性控制（例如商品块的「圆角 / 直角」�
 **旧的 `diyThemeTokens` 不改类型**（原计划由 F1 改成有类型的 schema，H3 评估后决定不做）：
 
 1. 它是旧 `diy` 域「一键换色」的数据，线上的 uni-app 读 `tokens.theme`（`apps/uni-app/api/mappers/diy.js` 的 `pageColorStatus`），后台 DIY 编辑器读 `theme` 和 `accent`。原计划把 `theme` 改名为 `primary`，会让线上 uni-app 的换色失效，违反「旧前端照常工作」。
-2. 只改 TypeScript 类型、不改运行时校验做不到诚实：线上库里的 token 包是运营随意保存过的，把 `Record<string, unknown>` 声明成 `{ theme?: string; … }` 等于对类型撒谎；而加上 zod 校验，又会改变旧接口 `PUT /admin-api/diy/themes/:id` 接受什么，这是旧行为的改变。
+2. 只改 TypeScript 类型、不改运行时校验做不到诚实：线上库里的 token 包是运营随意保存过的，把 `Record<string, unknown>` 声明成 `{ theme?: string; … }` 等于对类型撒谎；而加上 zod 校验，又会改变旧接口 `PATCH /admin-api/diy/themes/:id` 接受什么，这是旧行为的改变。
 3. 小程序根本不读它：小程序的主题来自上表，已经有类型。切换完成、旧 uni-app 下线后，`diy` 主题整个退役，不需要再迁移。
 
 其余 token（文字灰阶、背景、边框、语义色、全部尺寸）**不开放**。理由：
