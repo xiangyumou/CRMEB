@@ -121,6 +121,20 @@ export const PRODUCT_SORT = {
 } as const;
 export type ProductSort = keyof typeof PRODUCT_SORT;
 
+/** How a product list (商品列表, 商品选项卡) lays its cards out. */
+export const PRODUCT_LAYOUTS = {
+  grid2: '两列网格',
+  grid3: '三列网格',
+  list: '单列列表',
+  scroll: '横向滑动',
+} as const;
+export type ProductLayout = keyof typeof PRODUCT_LAYOUTS;
+
+/** The data slot of 商品选项卡 tab `index` (`block.data.tab0`, …). */
+export function productTabSlot(index: number): string {
+  return `tab${index}`;
+}
+
 /** Image-cube layout → its label and how many cells it shows. */
 export const IMAGE_CUBE_LAYOUTS = {
   row2: { label: '一行两个', cells: 2 },

@@ -7,9 +7,11 @@ import type {
   CouponUserState,
   DataNeed,
   DataNeedKind,
+  OrderEntryCounts,
   ProductSource,
   ProductSummary,
   ResolvedByKind,
+  UserSummary,
 } from '@shop/contracts/decor/sources';
 
 import * as catalog from '../catalog';
@@ -17,7 +19,9 @@ import { articles } from '../cms';
 import * as coupon from '../coupon';
 import * as groupbuy from '../groupbuy';
 import type { Ctx } from '../kernel/context';
+import * as order from '../order';
 import * as presale from '../presale';
+import * as user from '../user';
 
 /**
  * The per-need resolver registry (plan §2.1).
@@ -208,4 +212,46 @@ export async function couponStatesFor(
     items.forEach(record);
   }
   return states;
+}
+
+/**
+ * The 订单入口 badges for the signed-in shopper (DECOR-015), from the same
+ * query as the 我的订单 tab bar. `aftersale` is the orders with a live
+ * after-sales; `unreviewed` is left out — nothing counts reviewable lines yet.
+ */
+export async function orderEntryCountsFor(ctx: Ctx): Promise<OrderEntryCounts> {
+  const counts = await order.counts(ctx);
+  return {
+    unpaid: counts.unpaid,
+    unshipped: counts.unshipped,
+    unreceived: counts.unreceived,
+    aftersale: counts.refunding,
+  };
+}
+
+/**
+ * Who the 用户卡片 greets (DECOR-015): nickname and avatar, and with `stats`
+ * the unused-coupon, favourite and history totals (each a one-row page read
+ * for its `total`).
+ */
+export async function userSummaryFor(ctx: Ctx, stats: boolean): Promise<UserSummary> {
+  const profile = await user.getProfile(ctx);
+  const summary: UserSummary = {
+    nickname: profile.nickname,
+    avatarUrl: profile.avatarUrl,
+    stats: null,
+  };
+  if (!stats) return summary;
+  const one = { page: 1, pageSize: 1 };
+  const [coupons, favorites, history] = await Promise.all([
+    coupon.listMine(ctx, { ...one, state: 'unused' }),
+    catalog.favoriteList(ctx, one),
+    catalog.historyList(ctx, one),
+  ]);
+  summary.stats = {
+    coupons: coupons.total,
+    favorites: favorites.total,
+    history: history.total,
+  };
+  return summary;
 }

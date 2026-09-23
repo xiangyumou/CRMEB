@@ -22,7 +22,8 @@ import type { z } from 'zod';
  *    number (bounds from `.min()` / `.max()`), boolean → switch, enum or union
  *    of literals → select (`radio` when ≤ 3 choices), array of objects → list,
  *    object → group. Set `field` only to override that, or for a *semantic*
- *    kind the inference cannot see: `color`, `image`, `link` and the data
+ *    kind the inference cannot see: `color`, `image`, `link`, `richText`,
+ *    `hotspots` and the data
  *    sources (`productSource`, `couponSource`, `groupbuySource`,
  *    `presaleSource`, `articleSource`). Semantic kinds are rendered by the
  *    admin's own pickers, and the server finds links and data sources in a
@@ -66,6 +67,10 @@ export type EditorFieldKind =
   | 'color'
   | 'image'
   | 'link'
+  /** Sanitised HTML (`rich-text.ts`), edited in a WYSIWYG box. */
+  | 'richText'
+  /** Rectangles in % over the block's `image` (热区图), drawn on the picture. */
+  | 'hotspots'
   | 'productSource'
   | 'couponSource'
   | 'groupbuySource'
