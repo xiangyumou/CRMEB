@@ -7,7 +7,7 @@ The production stack is one Compose project, `crmeb-next`, on one host:
 | `postgres` | PostgreSQL 17, the only database                                                           | 512 MiB    |
 | `redis`    | Redis 7 with `noeviction` and AOF: admin sessions, the config cache and the BullMQ queue   | 160 MiB    |
 | `web`      | the Next.js server: the admin at `/admin`, `/admin-api/*` and the storefront API `/api/v1` | 512 MiB    |
-| `worker`   | the BullMQ worker: repeatable jobs, the post-commit effects dispatcher                      | 320 MiB    |
+| `worker`   | the BullMQ worker: repeatable jobs, the post-commit effects dispatcher                     | 320 MiB    |
 | `edge`     | nginx: the H5 storefront at `/`, a proxy to `web`, and `/uploads/`                         | 64 MiB     |
 | `migrate`  | a one-shot (profile `migrate`) that applies the migrations and the reference seed          | 384 MiB    |
 
@@ -16,17 +16,17 @@ and nothing else: no Node, no pnpm, no build toolchain.
 
 ## Files
 
-| File                     | What it is                                                                         |
-| ------------------------ | ---------------------------------------------------------------------------------- |
-| `compose.yml`            | the stack. It publishes only the edge, and only on loopback.                       |
+| File                     | What it is                                                                              |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| `compose.yml`            | the stack. It publishes only the edge, and only on loopback.                            |
 | `compose.traefik.yml`    | the overlay that puts the edge behind Traefik. Applied deliberately, never by a script. |
-| `deployment.env.example` | the template for `deployment.env`, which is gitignored and holds the passwords.    |
-| `upgrade.sh`             | deploys a release; if it does not come up, it ends on the previous images.         |
-| `rollback.sh`            | returns to a known set of images; `--restore` recovers data, and only when asked.  |
-| `backup.sh`              | dumps the database and proves the dump restorable; `--verify-only` checks one.     |
-| `readyz.sh`              | runs the readiness gate on its own. Read-only.                                     |
-| `lib/`                   | shared shell: the Compose wiring, digest capture, the readiness gate.              |
-| `rehearsal/`             | the drill that deploys, breaks and rolls back a throwaway copy of this stack.      |
+| `deployment.env.example` | the template for `deployment.env`, which is gitignored and holds the passwords.         |
+| `upgrade.sh`             | deploys a release; if it does not come up, it ends on the previous images.              |
+| `rollback.sh`            | returns to a known set of images; `--restore` recovers data, and only when asked.       |
+| `backup.sh`              | dumps the database and proves the dump restorable; `--verify-only` checks one.          |
+| `readyz.sh`              | runs the readiness gate on its own. Read-only.                                          |
+| `lib/`                   | shared shell: the Compose wiring, digest capture, the readiness gate.                   |
+| `rehearsal/`             | the drill that deploys, breaks and rolls back a throwaway copy of this stack.           |
 
 ## Conventions
 
@@ -55,27 +55,27 @@ alias shopc='docker compose -p crmeb-next --project-directory deploy -f deploy/c
 
 Every key the stack reads. `deployment.env.example` carries the same list with placeholders.
 
-| Key                                                      | Meaning                                                                                                                         |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `NEXT_WEB_IMAGE`, `NEXT_WORKER_IMAGE`, `NEXT_EDGE_IMAGE` | the release, as `repo@sha256:<64 hex>`. `upgrade.sh` and `rollback.sh` rewrite these three; you only set them by hand once.     |
-| `NEXT_POSTGRES_IMAGE`, `NEXT_REDIS_IMAGE`                | the upstream images, also pinned by digest. Change them only as a deliberate upgrade of their own.                               |
-| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`      | the database role and name. Generate the password: `openssl rand -base64 24 \| tr -d /+=`.                                       |
-| `REDIS_PASSWORD`                                         | generated the same way.                                                                                                          |
-| `DATABASE_URL`, `REDIS_URL`                              | the same credentials spelled as URLs, with hosts `postgres` and `redis`. The application reads only these.                       |
-| `APP_ORIGIN`                                             | the origin the **browser** sees, e.g. `https://x-zoo.vip`. It drives the CSRF `Origin` check.                                    |
-| `EXTRA_ALLOWED_ORIGINS`                                  | further origins allowed to send cookie-authenticated mutations, comma-separated. Usually empty.                                 |
-| `APP_VERSION`                                            | the commit being served, reported by `/api/v1/health`. `upgrade.sh --app-version` sets it.                                      |
-| `LOG_LEVEL`                                              | pino level for `web` and `worker`; `info` by default.                                                                            |
-| `QUEUE_NAME`                                             | the BullMQ queue name; `shop`.                                                                                                   |
-| `WORKER_CONCURRENCY`                                     | jobs one worker process runs at once; `4`.                                                                                       |
-| `WEB_DB_POOL_MAX`, `WORKER_DB_POOL_MAX`                  | connection pool sizes; `10` and `5`. Together they must stay under PostgreSQL's `max_connections=40`.                           |
-| `DB_POOL_ACQUIRE_TIMEOUT_MS`                             | how long a caller waits for a pooled connection before it errors instead of hanging; `5000`, `0` waits for ever.                 |
+| Key                                                      | Meaning                                                                                                                           |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_WEB_IMAGE`, `NEXT_WORKER_IMAGE`, `NEXT_EDGE_IMAGE` | the release, as `repo@sha256:<64 hex>`. `upgrade.sh` and `rollback.sh` rewrite these three; you only set them by hand once.       |
+| `NEXT_POSTGRES_IMAGE`, `NEXT_REDIS_IMAGE`                | the upstream images, also pinned by digest. Change them only as a deliberate upgrade of their own.                                |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`      | the database role and name. Generate the password: `openssl rand -base64 24 \| tr -d /+=`.                                        |
+| `REDIS_PASSWORD`                                         | generated the same way.                                                                                                           |
+| `DATABASE_URL`, `REDIS_URL`                              | the same credentials spelled as URLs, with hosts `postgres` and `redis`. The application reads only these.                        |
+| `APP_ORIGIN`                                             | the origin the **browser** sees, e.g. `https://x-zoo.vip`. It drives the CSRF `Origin` check.                                     |
+| `EXTRA_ALLOWED_ORIGINS`                                  | further origins allowed to send cookie-authenticated mutations, comma-separated. Usually empty.                                   |
+| `APP_VERSION`                                            | the commit being served, reported by `/api/v1/health`. `upgrade.sh --app-version` sets it.                                        |
+| `LOG_LEVEL`                                              | pino level for `web` and `worker`; `info` by default.                                                                             |
+| `QUEUE_NAME`                                             | the BullMQ queue name; `shop`.                                                                                                    |
+| `WORKER_CONCURRENCY`                                     | jobs one worker process runs at once; `4`.                                                                                        |
+| `WEB_DB_POOL_MAX`, `WORKER_DB_POOL_MAX`                  | connection pool sizes; `10` and `5`. Together they must stay under PostgreSQL's `max_connections=40`.                             |
+| `DB_POOL_ACQUIRE_TIMEOUT_MS`                             | how long a caller waits for a pooled connection before it errors instead of hanging; `5000`, `0` waits for ever.                  |
 | `DB_IDLE_IN_TX_TIMEOUT_MS`                               | how long a session may sit idle inside an open transaction before PostgreSQL ends it and releases its locks; `30000`, `0` is off. |
-| `HEARTBEAT_INTERVAL_MS`                                  | how often the worker refreshes `worker:heartbeat`. `web` reads the same value to judge whether the heartbeat is fresh.           |
-| `NEXT_EDGE_BIND`                                         | where the edge publishes; `127.0.0.1:8080`. Keep it on loopback: Traefik reaches the edge over its own network.                 |
-| `NEXT_HOST`                                              | the domain Traefik routes to the edge. Read only by `compose.traefik.yml`.                                                       |
-| `NEXT_EDGE_TRUSTED_PROXIES`                              | the CIDRs whose `X-Forwarded-For` the edge believes: Traefik's network. Required by `compose.traefik.yml`; see below.            |
-| `NEXT_BACKUP_DIR`                                        | where dumps, upgrade manifests and settings backups go; `./data/backups`, relative to `deploy/`. Created mode 700.               |
+| `HEARTBEAT_INTERVAL_MS`                                  | how often the worker refreshes `worker:heartbeat`. `web` reads the same value to judge whether the heartbeat is fresh.            |
+| `NEXT_EDGE_BIND`                                         | where the edge publishes; `127.0.0.1:8080`. Keep it on loopback: Traefik reaches the edge over its own network.                   |
+| `NEXT_HOST`                                              | the domain Traefik routes to the edge. Read only by `compose.traefik.yml`.                                                        |
+| `NEXT_EDGE_TRUSTED_PROXIES`                              | the CIDRs whose `X-Forwarded-For` the edge believes: Traefik's network. Required by `compose.traefik.yml`; see below.             |
+| `NEXT_BACKUP_DIR`                                        | where dumps, upgrade manifests and settings backups go; `./data/backups`, relative to `deploy/`. Created mode 700.                |
 
 `APP_ORIGIN` produces the most confusing failure in this list when it is wrong: every admin read
 works and every admin _mutation_ returns 403.
@@ -282,12 +282,12 @@ If anything from step 5 on fails, it puts the previous images back and says whet
 already moved. The migrations are additive, so the previous images run on the new schema; CI
 refuses a migration that is not. The script never restores data on its own.
 
-| Exit | Meaning                                                  |
-| ---- | -------------------------------------------------------- |
-| 0    | deployed                                                 |
-| 1    | failed, and the previous images are running again        |
-| 2    | invoked wrongly                                          |
-| 3    | failed, **and** the rollback failed: a person is needed  |
+| Exit | Meaning                                                 |
+| ---- | ------------------------------------------------------- |
+| 0    | deployed                                                |
+| 1    | failed, and the previous images are running again       |
+| 2    | invoked wrongly                                         |
+| 3    | failed, **and** the rollback failed: a person is needed |
 
 `--dry-run` checks and pulls, then stops before touching anything. `--skip-migration` deploys
 images only. Each run writes `data/backups/upgrade-<stamp>.manifest` with the previous and new
@@ -305,12 +305,12 @@ deploy/rollback.sh --web …@sha256:… --worker …@sha256:… --edge …@sha25
 It checks the target images exist (pulling them if needed) before it changes anything, switches,
 and runs the readiness gate. If the target does not come up, it returns to what was running.
 
-| Exit | Meaning                                                           |
-| ---- | ----------------------------------------------------------------- |
-| 0    | rolled back                                                       |
+| Exit | Meaning                                                            |
+| ---- | ------------------------------------------------------------------ |
+| 0    | rolled back                                                        |
 | 1    | the target did not come up; the previously running images are back |
-| 2    | invoked wrongly                                                   |
-| 3    | a person is needed                                                |
+| 2    | invoked wrongly                                                    |
+| 3    | a person is needed                                                 |
 
 Replacing containers never changes data. Re-apply the Traefik overlay afterwards.
 
