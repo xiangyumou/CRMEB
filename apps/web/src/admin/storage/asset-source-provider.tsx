@@ -8,10 +8,9 @@ import { createStorageAssetSource } from './asset-source';
 /**
  * Installs the real material library for everything inside the admin shell.
  *
- * Without this the kit falls back to `createStubAssetSource()`, which is an
- * in-memory library that looks convincing and loses everything on reload — so
- * this provider is the difference between the picker working and the picker
- * appearing to work.
+ * The kit has no fallback source: without this provider every
+ * `<AssetPicker>` throws, which is the point — a picker that quietly offered
+ * files from somewhere else would save them into real records.
  *
  * One instance per browser tab (`useState`), so the source is stable across
  * re-renders and no request is made until a picker actually opens.

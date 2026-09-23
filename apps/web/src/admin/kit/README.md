@@ -268,13 +268,13 @@ interface AssetSource {
 }
 ```
 
-默认是内存桩 `createStubAssetSource()`。真实素材库由 `@/admin/storage` 的 `StorageAssetSourceProvider` 在 shell 布局里包一层 `<AssetSourceProvider source={real}>` 接上，kit 不用改。
+没有默认来源：外面没有 `<AssetSourceProvider>` 时 `useAssetSource()` 直接抛错，免得选到素材库之外的文件存进真实数据。真实素材库由 `@/admin/storage` 的 `StorageAssetSourceProvider` 在 shell 布局里接上；测试用 `@/test/asset-source` 的 `createStubAssetSource()`，kit 演示页挂自己的内存来源。
 
 另有 `useAssetPicker()` 返回 `{ pick(options): Promise<AssetItem[]>, holder }`，给富文本工具栏这类拿不到弹窗状态的地方用。
 
 ### LinkPicker
 
-选商城内部链接：商城页面（按分组）/ 商品 / 分类 / 文章 / 自定义 URL，返回 `{ type, label, url }`。同样对着 `LinkSource` 接口编程，默认是内存桩，用到的页面（如 DIY 编辑器）用 `<LinkSourceProvider>` 换成真实来源。表单里用 `kind: 'link'`。
+选商城内部链接：商城页面（按分组）/ 商品 / 分类 / 文章 / 自定义 URL，返回 `{ type, label, url }`。同样对着 `LinkSource` 接口编程，也没有默认来源：用到的页面（如 DIY 编辑器）用 `<LinkSourceProvider>` 挂上真实来源，测试用 `@/test/link-source` 的 `createStubLinkSource()`。表单里用 `kind: 'link'`。
 
 ### ConfigGroupForm
 

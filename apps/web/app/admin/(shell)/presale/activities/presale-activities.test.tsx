@@ -14,6 +14,7 @@ import type {
 
 import { resetApiConfig } from '@/admin/api/config';
 import { on, stubRoutes, type StubCall } from '@/test/api';
+import { withStubAssets } from '@/test/asset-source';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { PresaleActivitiesPage } from './presale-activities';
@@ -92,7 +93,7 @@ const allPermissions = {
 describe('预售活动', () => {
   it('lists campaigns from the contract route', async () => {
     const calls = stubApi();
-    renderAdmin(<PresaleActivitiesPage />, { identity: allPermissions });
+    renderAdmin(withStubAssets(<PresaleActivitiesPage />), { identity: allPermissions });
 
     expect(await screen.findByText('春茶预售 · 明前龙井')).toBeInTheDocument();
     expect(screen.getByText('进行中')).toBeInTheDocument();
@@ -107,7 +108,7 @@ describe('预售活动', () => {
 
   it('hides every write action from a read-only admin', async () => {
     stubApi();
-    renderAdmin(<PresaleActivitiesPage />, {
+    renderAdmin(withStubAssets(<PresaleActivitiesPage />), {
       identity: { ...testIdentity, permissions: ['presale:activity:read'] },
     });
 
@@ -120,7 +121,7 @@ describe('预售活动', () => {
 
   it('pauses through the sub-resource, not the edit form', async () => {
     const calls = stubApi();
-    renderAdmin(<PresaleActivitiesPage />, { identity: allPermissions });
+    renderAdmin(withStubAssets(<PresaleActivitiesPage />), { identity: allPermissions });
     await screen.findByText('春茶预售 · 明前龙井');
 
     await userEvent.click(screen.getByRole('button', { name: '暂停' }));
@@ -134,7 +135,7 @@ describe('预售活动', () => {
 
   it('loads the detail before the edit form opens, so saving cannot drop the 规格', async () => {
     const calls = stubApi();
-    renderAdmin(<PresaleActivitiesPage />, { identity: allPermissions });
+    renderAdmin(withStubAssets(<PresaleActivitiesPage />), { identity: allPermissions });
     await screen.findByText('春茶预售 · 明前龙井');
 
     await userEvent.click(screen.getByRole('button', { name: '编辑' }));
@@ -153,7 +154,7 @@ describe('预售活动', () => {
 
   it('opens an empty form for a new campaign without asking for a detail', async () => {
     const calls = stubApi();
-    renderAdmin(<PresaleActivitiesPage />, { identity: allPermissions });
+    renderAdmin(withStubAssets(<PresaleActivitiesPage />), { identity: allPermissions });
     await screen.findByText('春茶预售 · 明前龙井');
 
     await userEvent.click(screen.getByRole('button', { name: '新建预售活动' }));

@@ -1,10 +1,13 @@
+import type { ReactElement } from 'react';
+
+import { AssetSourceProvider } from '@/admin/kit/asset/asset-source-context';
 import type {
   AssetCategory,
   AssetItem,
   AssetListQuery,
   AssetListResult,
   AssetSource,
-} from './types';
+} from '@/admin/kit/asset/types';
 
 function placeholder(label: string, hue: number): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><rect width="240" height="240" fill="hsl(${hue} 60% 80%)"/><text x="50%" y="52%" font-family="sans-serif" font-size="22" fill="hsl(${hue} 70% 25%)" text-anchor="middle">${label}</text></svg>`;
@@ -25,11 +28,14 @@ const CATEGORIES: AssetCategory[] = [
 ];
 
 /**
- * In-memory `AssetSource` for Phase 0 and for the kit demo.
+ * An in-memory `AssetSource`, for tests only.
  *
- * It is NOT a mock in the testing sense: it behaves like the real thing
- * (pagination, keyword filter, upload, delete) so the picker can be developed
- * and reviewed without the storage routes.
+ * It behaves like the real library (pagination, category and keyword filters,
+ * upload, delete), so a test drives `<AssetPicker>` without the storage
+ * routes: wrap the subject in `<AssetSourceProvider
+ * source={createStubAssetSource()}>`. The admin shell mounts the real source
+ * (`StorageAssetSourceProvider`), and `useAssetSource()` throws when no
+ * provider is mounted, so these files can never reach a saved record.
  */
 export function createStubAssetSource(seed = 24): AssetSource {
   let nextId = seed + 1;
@@ -86,4 +92,13 @@ export function createStubAssetSource(seed = 24): AssetSource {
       }
     },
   };
+}
+
+/**
+ * `ui` under a fresh stub library: what the admin shell gives every page, for
+ * a test that renders a page or form carrying an asset field without opening
+ * the picker.
+ */
+export function withStubAssets(ui: ReactElement, source = createStubAssetSource()): ReactElement {
+  return <AssetSourceProvider source={source}>{ui}</AssetSourceProvider>;
 }

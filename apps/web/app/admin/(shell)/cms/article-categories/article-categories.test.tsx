@@ -10,6 +10,7 @@ import type { ArticleCategory } from '@shop/contracts/cms/schemas';
 
 import { resetApiConfig } from '@/admin/api/config';
 import { on, stubRoutes, type StubCall } from '@/test/api';
+import { withStubAssets } from '@/test/asset-source';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { ArticleCategoriesPage } from './article-categories';
@@ -68,7 +69,7 @@ const writer = {
 describe('文章分类', () => {
   it('asks one unpaged route for the whole tree', async () => {
     const calls = stubApi();
-    renderAdmin(<ArticleCategoriesPage />, { identity: writer });
+    renderAdmin(withStubAssets(<ArticleCategoriesPage />), { identity: writer });
 
     expect(await screen.findByText('新闻资讯')).toBeInTheDocument();
     expect(screen.getByText('商城公告')).toBeInTheDocument();
@@ -79,7 +80,7 @@ describe('文章分类', () => {
 
   it('hides the write controls from an admin without cms:category:write', async () => {
     stubApi();
-    renderAdmin(<ArticleCategoriesPage />, {
+    renderAdmin(withStubAssets(<ArticleCategoriesPage />), {
       identity: { ...testIdentity, permissions: ['cms:article:read'] },
     });
 
@@ -92,7 +93,7 @@ describe('文章分类', () => {
 
   it('hides a category through the status sub-resource', async () => {
     const calls = stubApi();
-    renderAdmin(<ArticleCategoriesPage />, { identity: writer });
+    renderAdmin(withStubAssets(<ArticleCategoriesPage />), { identity: writer });
     await screen.findByText('新闻资讯');
 
     await userEvent.click(screen.getAllByRole('switch')[0]!);
@@ -106,7 +107,7 @@ describe('文章分类', () => {
 
   it('offers only top-level categories as a parent', async () => {
     stubApi();
-    renderAdmin(<ArticleCategoriesPage />, { identity: writer });
+    renderAdmin(withStubAssets(<ArticleCategoriesPage />), { identity: writer });
     await screen.findByText('新闻资讯');
 
     await userEvent.click(screen.getByRole('button', { name: /新建分类/ }));

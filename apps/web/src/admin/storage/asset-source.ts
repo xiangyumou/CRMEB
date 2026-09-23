@@ -11,8 +11,7 @@ import type { AssetCategory, AssetListResult, AssetSource } from '../kit/asset/t
 import { uploadFile } from './upload';
 
 /**
- * The real material library behind `<AssetPicker>`, replacing
- * `createStubAssetSource()`.
+ * The real material library behind `<AssetPicker>`.
  *
  * The kit programs against `AssetSource`, not against routes, so this is the
  * only file that knows the picker and the storage routes exist in the same

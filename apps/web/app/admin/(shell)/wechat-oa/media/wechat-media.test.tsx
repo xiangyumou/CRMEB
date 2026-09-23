@@ -11,6 +11,7 @@ import {
 
 import { resetApiConfig } from '@/admin/api/config';
 import { on, stubRoutes, type StubCall } from '@/test/api';
+import { withStubAssets } from '@/test/asset-source';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { WechatMediaPage } from './wechat-media';
@@ -55,7 +56,7 @@ const allPermissions = {
 describe('微信素材', () => {
   it('lists material from the contract route', async () => {
     const calls = stubApi();
-    renderAdmin(<WechatMediaPage />, { identity: allPermissions });
+    renderAdmin(withStubAssets(<WechatMediaPage />), { identity: allPermissions });
 
     expect(await screen.findByText('MEDIA_ID_0001')).toBeInTheDocument();
     expect(screen.getByText('永久')).toBeInTheDocument();
@@ -64,7 +65,7 @@ describe('微信素材', () => {
 
   it('reconciles with WeChat and reports both directions', async () => {
     const calls = stubApi();
-    renderAdmin(<WechatMediaPage />, { identity: allPermissions });
+    renderAdmin(withStubAssets(<WechatMediaPage />), { identity: allPermissions });
     await screen.findByText('MEDIA_ID_0001');
 
     await userEvent.click(screen.getByRole('button', { name: zhName('与微信同步') }));
@@ -81,7 +82,7 @@ describe('微信素材', () => {
 
   it('uploads by naming an attachment, never by posting a file', { timeout: 20_000 }, async () => {
     const calls = stubApi();
-    renderAdmin(<WechatMediaPage />, { identity: allPermissions });
+    renderAdmin(withStubAssets(<WechatMediaPage />), { identity: allPermissions });
     await screen.findByText('MEDIA_ID_0001');
 
     await userEvent.click(screen.getByRole('button', { name: zhName('上传到微信') }));
@@ -97,7 +98,7 @@ describe('微信素材', () => {
 
   it('hides every write action from a read-only admin', async () => {
     stubApi();
-    renderAdmin(<WechatMediaPage />, {
+    renderAdmin(withStubAssets(<WechatMediaPage />), {
       identity: { ...testIdentity, permissions: ['wechat-oa:media:read'] },
     });
 
