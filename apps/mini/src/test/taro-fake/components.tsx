@@ -4,6 +4,7 @@
  * Testing Library queries by role and text; layout and styling are not simulated.
  */
 import type { CSSProperties, ReactNode } from 'react';
+import { taroFake } from './taro';
 
 interface BaseProps {
   className?: string | undefined;
@@ -38,14 +39,25 @@ export function Button({
   children,
   onClick,
   disabled,
-}: BaseProps & { disabled?: boolean | undefined }) {
+  openType,
+  onGetPhoneNumber,
+}: BaseProps & {
+  disabled?: boolean | undefined;
+  openType?: string | undefined;
+  /** Called on click when `openType="getPhoneNumber"`, with `taroFake.phoneNumberDetail`. */
+  onGetPhoneNumber?: ((event: { detail: { code?: string; errMsg: string } }) => void) | undefined;
+}) {
   return (
     <button
       type="button"
       className={className}
       style={styleOf(style)}
       id={id}
-      onClick={onClick}
+      onClick={(event) => {
+        onClick?.(event);
+        if (openType === 'getPhoneNumber')
+          onGetPhoneNumber?.({ detail: taroFake.phoneNumberDetail });
+      }}
       disabled={disabled}
     >
       {children}

@@ -10,6 +10,25 @@ import { isRemovedStorefrontPage } from '@shop/contracts/diy/removed';
  */
 export async function openPage(url: string): Promise<boolean> {
   if (isRemovedStorefrontPage(url)) return false;
-  await Taro.navigateTo({ url: url.startsWith('/') ? url : `/${url}` });
+  await Taro.navigateTo({ url: withSlash(url) });
   return true;
+}
+
+/**
+ * Replaces the current page. The checkout, the cashier and the payment result replace each
+ * other, so 返回 from a result never lands on a cashier for an order that is already paid (C06).
+ *
+ * TODO(stream A): both take a `StorefrontRoute` once the route catalogue exists (pages.md §3).
+ */
+export async function replacePage(url: string): Promise<void> {
+  await Taro.redirectTo({ url: withSlash(url) });
+}
+
+/** A short message over the page (`wx.showToast`, no icon). */
+export function toast(title: string): void {
+  void Taro.showToast({ title, icon: 'none' }).catch(() => undefined);
+}
+
+function withSlash(url: string): string {
+  return url.startsWith('/') ? url : `/${url}`;
 }

@@ -12,6 +12,7 @@
     "dev:h5": "taro build --type h5 --watch --no-check",
     "build:weapp": "taro build --type weapp --no-check",
     "build:h5": "taro build --type h5 --no-check",
+    "build:h5:mp-emulation": "TARO_APP_PLATFORM_EMULATION=mp taro build --type h5 --no-check",
     "build": "pnpm run build:weapp && pnpm run build:h5 && pnpm run size",
     "size": "node scripts/size-report.mjs",
     "typecheck": "tsc -p tsconfig.json",
@@ -21,6 +22,7 @@
   "dependencies": {
     "@babel/runtime": "^7.24.4",
     "@nutui/nutui-react-taro": "3.0.19",
+    "@shop/api-client": "workspace:*",
     "@shop/contracts": "workspace:*",
     "@shop/storefront-blocks": "workspace:*",
     "@tanstack/react-query": "^5.103.2",

@@ -13,6 +13,9 @@ module.exports = {
         ts: true,
         compiler: 'webpack5',
         targets: { ios: '12', chrome: '70' },
+        // `catch {` is ES2019. iOS 12 parses it, so preset-env would keep it, but the ES2018
+        // gate would not; transforming it costs nothing (it first came in with @shop/api-client).
+        include: ['transform-optional-catch-binding'],
       },
     ],
   ],

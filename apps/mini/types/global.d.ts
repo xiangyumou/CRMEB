@@ -21,5 +21,12 @@ declare namespace NodeJS {
     TARO_ENV: 'weapp' | 'h5';
     /** The mini-program AppID; `touristappid` in the committed env files. */
     TARO_APP_ID: string;
+    /**
+     * The shop's https origin the mini-program calls (`''` = same origin, H5). Set it in
+     * `.env.production.local`; it must also be a request 合法域名 in the WeChat console.
+     */
+    TARO_APP_API_ORIGIN: string;
+    /** `mp` in the e2e suite's H5 build only (`build:h5:mp-emulation`), `''` otherwise. */
+    TARO_APP_PLATFORM_EMULATION: '' | 'mp';
   }
 }

@@ -16,6 +16,9 @@ export default defineConfig({
       {
         oxc: { jsx: { runtime: 'automatic' } },
         resolve: {
+          // One React and one Query: `@shop/api-client` has its own (React 19) copies as dev
+          // dependencies; config/index.ts aliases the same way for the Taro builds.
+          dedupe: ['react', 'react-dom', '@tanstack/react-query', '@tanstack/query-core'],
           alias: [
             { find: /^@tarojs\/taro$/, replacement: `${src}/test/taro-fake/taro.ts` },
             { find: /^@tarojs\/components$/, replacement: `${src}/test/taro-fake/components.tsx` },
@@ -30,6 +33,8 @@ export default defineConfig({
           include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
           exclude: ['**/node_modules/**', '**/dist/**'],
           setupFiles: ['src/test/setup.ts'],
+          // What config/index.ts defines for every Taro build.
+          env: { TARO_APP_API_ORIGIN: '', TARO_APP_PLATFORM_EMULATION: '' },
         },
       },
     ],

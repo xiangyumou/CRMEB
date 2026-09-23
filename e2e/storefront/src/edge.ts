@@ -64,7 +64,19 @@ export interface EdgeOptions {
   uploadsDir: string;
   /** `next start`'s origin. */
   upstream: string;
+  /**
+   * The mini-program suite only: the gateway control-plane's origin
+   * (`gateway-control.ts`). `/__e2e/mini/*` on the edge goes to its
+   * `/mini/*`, which is how the "模拟小程序" build gets its `wx.login` and
+   * `getPhoneNumber` codes and completes `requestPayment`
+   * (`apps/mini/src/platform/h5-mp-emulation.tsx`). Unset, those paths are
+   * an ordinary 404, as they are in production.
+   */
+  controlUpstream?: string | undefined;
 }
+
+/** The emulated WeChat client's harness endpoints, same-origin for the page. */
+const MINI_CONTROL = /^\/__e2e\/mini\/[a-z-]+$/;
 
 export interface RunningEdge {
   url: string;
@@ -128,6 +140,11 @@ async function handle(
     return;
   }
 
+  if (options.controlUpstream && MINI_CONTROL.test(pathname)) {
+    await proxy(req, res, new URL(options.controlUpstream), pathname.slice('/__e2e'.length));
+    return;
+  }
+
   if (pathname.startsWith('/uploads/')) {
     await serveUpload(res, options.uploadsDir, pathname.slice('/uploads/'.length));
     return;
@@ -136,13 +153,18 @@ async function handle(
   await serveStatic(res, options.root, pathname);
 }
 
-function proxy(req: http.IncomingMessage, res: http.ServerResponse, upstream: URL): Promise<void> {
+function proxy(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  upstream: URL,
+  pathOverride?: string,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const proxied = http.request(
       {
         hostname: upstream.hostname,
         port: upstream.port,
-        path: req.url,
+        path: pathOverride ?? req.url,
         method: req.method,
         headers: {
           ...req.headers,

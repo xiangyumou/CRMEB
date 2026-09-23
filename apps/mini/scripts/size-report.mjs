@@ -17,9 +17,12 @@
  * - any script does not parse as ES2018, the target in babel.config.js (the WeChat runtime
  *   does not transpile node_modules for us; `es6: false` in project.config.json);
  * - app.json lists a page or sub-package that is not in the output;
+ * - any file carries the e2e suite's H5 emulation (`src/platform/h5-mp-emulation.tsx`: its
+ *   `/__e2e/` endpoints or its storage key) or the H5 preview, or the module list includes
+ *   `src/platform/runtime.h5.tsx` or either implementation (docs/mini/spikes/S4-e2e.md);
  * - the build's module list (`.bundle-stats/weapp.json`, written by config/bundle-stats.ts) is
  *   missing or older than the build, or shows more than one copy of react, react-dom,
- *   react-reconciler or @tarojs/runtime, or any zod at all.
+ *   react-reconciler, @tarojs/runtime or TanStack Query, or any zod at all.
  *
  * Package sizes count every file WeChat uploads: everything except source maps and the
  * developer-tool project files.
@@ -130,6 +133,20 @@ for (const page of pageFiles) {
   }
 }
 
+// --- no test-only code ---------------------------------------------------------------------
+// The H5 builds pick their platform in src/platform/runtime.h5.tsx; the WeChat build must not
+// contain it or anything behind it, above all the e2e emulation, which settles payments
+// through a test harness. Markers are strings the emulation cannot work without.
+const TEST_ONLY_MARKERS = ['/__e2e/', '__shop_mp_emulation__', 'h5-mp-emulation', 'h5-preview'];
+const TEST_ONLY_MODULES = /\/src\/platform\/(runtime\.h5|h5-mp-emulation|h5-preview)\.tsx?$/;
+for (const file of files) {
+  if (!/\.(js|json|wxml|wxs)$/.test(file.rel)) continue;
+  const source = fs.readFileSync(path.join(dist, file.rel), 'utf8');
+  for (const marker of TEST_ONLY_MARKERS) {
+    if (source.includes(marker)) failures.push(`${file.rel}: contains test-only "${marker}"`);
+  }
+}
+
 // --- dynamic code and syntax level ----------------------------------------------------------
 const DYNAMIC_CODE = [
   { label: 'new Function(', pattern: /\bnew\s+Function\s*\(/g },
@@ -157,7 +174,14 @@ for (const file of files.filter((candidate) => candidate.rel.endsWith('.js'))) {
 }
 
 // --- one copy of the runtime ---------------------------------------------------------------
-const SINGLE_COPY = ['react', 'react-dom', 'react-reconciler', '@tarojs/runtime'];
+const SINGLE_COPY = [
+  'react',
+  'react-dom',
+  'react-reconciler',
+  '@tarojs/runtime',
+  '@tanstack/react-query',
+  '@tanstack/query-core',
+];
 const statsFile = path.join(appRoot, '.bundle-stats', 'weapp.json');
 let copies;
 /** Raw (pre-minification) module bytes per npm package, to explain where the size goes. */
@@ -173,6 +197,8 @@ if (statsFresh) {
   const bytesByPackage = new Map();
   for (const module of modules) {
     const normalized = module.path.split(path.sep).join('/');
+    if (TEST_ONLY_MODULES.test(normalized))
+      failures.push(`test-only module in the WeChat build: ${path.relative(appRoot, module.path)}`);
     const match = /^(.*\/node_modules\/((?:@[^/]+\/)?[^/]+))\//.exec(normalized);
     const owner = match ? match[2] : normalized.includes('/packages/') ? '(workspace)' : '(app)';
     bytesByPackage.set(owner, (bytesByPackage.get(owner) ?? 0) + module.size);

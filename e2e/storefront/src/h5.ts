@@ -3,8 +3,12 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { CLIENT } from './stack-file';
+
 /**
- * The H5 bundle `edge.ts` serves.
+ * The H5 bundle `edge.ts` serves: the uni-app's (default) or, with
+ * `SHOP_E2E_CLIENT=mini`, the Taro mini-program's "模拟小程序" build (see the
+ * end of this file).
  *
  * The uni-app is its own npm project, but this suite is the one harness that
  * needs an H5 build, so it builds one itself. `pnpm run build:h5` (vue-cli-service
@@ -26,7 +30,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const UNI_APP_DIR = process.env.SHOP_E2E_UNIAPP_DIR
   ? path.resolve(process.env.SHOP_E2E_UNIAPP_DIR)
   : path.join(HERE, '..', '..', '..', 'apps', 'uni-app');
-export const H5_DIST_DIR = path.join(UNI_APP_DIR, 'dist', 'dev', 'h5');
+const UNI_APP_DIST_DIR = path.join(UNI_APP_DIR, 'dist', 'dev', 'h5');
 
 /** Directories `build:h5` actually reads from. Mirrors `pages.json`'s world, not `dist`/`node_modules`/`tests`. */
 const SOURCE_ENTRIES = [
@@ -63,22 +67,57 @@ function newestMtimeMs(entry: string): number {
   return newest;
 }
 
-function isDistFresh(): boolean {
-  const marker = path.join(H5_DIST_DIR, 'index.html');
+function isDistFresh(distDir: string, sources: string[]): boolean {
+  const marker = path.join(distDir, 'index.html');
   if (!existsSync(marker)) return false;
   const distMtime = statSync(marker).mtimeMs;
-  const sourceMtime = Math.max(
-    ...SOURCE_ENTRIES.map((entry) => newestMtimeMs(path.join(UNI_APP_DIR, entry))),
-  );
+  const sourceMtime = Math.max(...sources.map(newestMtimeMs));
   return distMtime >= sourceMtime;
 }
 
 /**
- * Builds the H5 bundle if `dist/dev/h5` is stale, otherwise does nothing.
+ * The mini-program (`apps/mini`) built for H5 as "模拟小程序":
+ * `TARO_APP_PLATFORM_EMULATION=mp`, so it signs in with `wx.login` codes and
+ * pays through `requestPayment` like the WeChat build, answered by the
+ * harness (`gateway-control.ts`) instead of WeChat. Its own output directory:
+ * the plain `build:h5` (the DIY preview) never carries the emulation.
+ */
+const REPO_ROOT = path.join(HERE, '..', '..', '..');
+export const MINI_DIR = path.join(REPO_ROOT, 'apps', 'mini');
+const MINI_DIST_DIR = path.join(MINI_DIR, 'dist', 'h5-mp-emulation');
+/** What the mini build compiles: the app, its config and the workspace sources it includes. */
+const MINI_SOURCES = [
+  path.join(MINI_DIR, 'src'),
+  path.join(MINI_DIR, 'config'),
+  path.join(MINI_DIR, 'babel.config.js'),
+  path.join(MINI_DIR, 'package.json'),
+  path.join(REPO_ROOT, 'packages', 'api-client', 'src'),
+  path.join(REPO_ROOT, 'packages', 'contracts', 'src'),
+  path.join(REPO_ROOT, 'packages', 'storefront-blocks', 'src'),
+];
+
+/** The directory the edge serves for this run's client. */
+export const H5_DIST_DIR = CLIENT === 'mini' ? MINI_DIST_DIR : UNI_APP_DIST_DIR;
+
+/**
+ * Builds this run's H5 bundle if it is stale, otherwise does nothing.
  * Logs go to the parent's stdout/stderr so a CI run's build log shows them.
  */
 export async function ensureH5Build(options: { log: (line: string) => void }): Promise<void> {
-  if (isDistFresh()) {
+  if (CLIENT === 'mini') {
+    if (isDistFresh(MINI_DIST_DIR, MINI_SOURCES)) {
+      options.log('h5: apps/mini/dist/h5-mp-emulation is up to date, skipping build');
+      return;
+    }
+    options.log('h5: building apps/mini (pnpm run build:h5:mp-emulation)');
+    // A production build whatever the caller's NODE_ENV: that is what ships.
+    await run('pnpm', ['run', 'build:h5:mp-emulation'], MINI_DIR, options.log, {
+      NODE_ENV: 'production',
+    });
+    return;
+  }
+  const sources = SOURCE_ENTRIES.map((entry) => path.join(UNI_APP_DIR, entry));
+  if (isDistFresh(UNI_APP_DIST_DIR, sources)) {
     options.log('h5: dist/dev/h5 is up to date, skipping build');
     return;
   }
@@ -91,9 +130,14 @@ function run(
   args: string[],
   cwd: string,
   log: (line: string) => void,
+  env: NodeJS.ProcessEnv = {},
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, ...env },
+    });
     child.stdout?.on('data', (chunk: Buffer) => {
       for (const line of chunk.toString('utf8').split('\n')) if (line.trim()) log(`h5: ${line}`);
     });

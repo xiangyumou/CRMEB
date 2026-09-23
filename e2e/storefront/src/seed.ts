@@ -12,7 +12,7 @@ import { createPage, diyConfig, savePageContent, setHomePage } from '@shop/core/
 import { paymentConfig } from '@shop/core/payment';
 import { templates as shippingTemplates } from '@shop/core/shipping';
 import { addressCreate } from '@shop/core/user';
-import { siteConfig } from '@shop/core/system';
+import { siteConfig, wechatMiniConfig } from '@shop/core/system';
 import { wechatConfig } from '@shop/core/wechat';
 import type { Actor } from '@shop/core/kernel';
 import type { FakeWechatGateway } from '@shop/testing';
@@ -92,7 +92,7 @@ function renderedComponentIds(content: Record<string, unknown>): string[] {
 const E2E_IMAGE_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
-function userActor(id: number): Actor {
+export function userActor(id: number): Actor {
   return { kind: 'user', id, permissions: [], isSuper: false };
 }
 
@@ -115,6 +115,7 @@ export interface SeedResult {
     secondaryAddressId: number;
     expressCompanyId: number;
     diyHomePageId: number;
+    division: { provinceId: string; cityId: string; districtId: string };
     diyPages: SeededDiyPage[];
   };
 }
@@ -136,6 +137,13 @@ export async function seedE2E(options: {
   /** Where `web` sends gateway API calls — the fake gateway itself (`gateway.url`). */
   gatewayApiUrl: string;
   baseUrl: string;
+  /**
+   * The mini-program suite only: sign-in through the fake `api.weixin.qq.com`
+   * (`startFakeOaServer`). The mini app id is the gateway's `appId`, which the
+   * serve script made equal to the fake's mini app id, because WeChat Pay
+   * charges a mini-program payment to the mini-program's own app id.
+   */
+  miniProgram?: { appSecret: string; apiBaseUrl: string };
 }): Promise<SeedResult> {
   const parts = ctxFor(options);
   const { ctx, db } = parts;
@@ -162,7 +170,16 @@ export async function seedE2E(options: {
     await ctx.config.set(wechatConfig, {
       miniAppId: options.gateway.keys.appId,
       oaAppId: options.gateway.keys.appId,
+      ...(options.miniProgram && {
+        miniAppSecret: options.miniProgram.appSecret,
+        apiBaseUrl: options.miniProgram.apiBaseUrl,
+      }),
     });
+    if (options.miniProgram) {
+      // 小程序登录 is off until an operator turns it on; the shop keeps the
+      // default 「微信登录需绑定手机号」, so a new shopper meets phone-required.
+      await ctx.config.set(wechatMiniConfig, { enabled: true, name: 'E2E 小程序' });
+    }
 
     await db
       .insert(expressCompanies)
@@ -580,6 +597,7 @@ export async function seedE2E(options: {
         secondaryAddressId: Number(secondaryAddress.id),
         expressCompanyId: Number(courier!.id),
         diyHomePageId: diyPages[0]!.id,
+        division,
         diyPages,
       },
     };
