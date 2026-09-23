@@ -16,6 +16,7 @@ export {
   type LaunchContext,
 } from './launch';
 export { onAppVisibility } from './lifecycle';
+export { openLinkTarget } from './link';
 export {
   goBack,
   navigate,

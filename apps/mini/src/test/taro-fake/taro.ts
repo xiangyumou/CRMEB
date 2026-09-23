@@ -282,6 +282,7 @@ const Taro = {
   removeTabBarBadge: (args: unknown) => record('removeTabBarBadge', args, {}),
   setTabBarItem: (args: unknown) => record('setTabBarItem', args, {}),
   navigateTo: (args: unknown) => record('navigateTo', args, {}),
+  navigateToMiniProgram: (args: unknown) => record('navigateToMiniProgram', args, {}),
   redirectTo: (args: unknown) => record('redirectTo', args, {}),
   switchTab: (args: unknown) => record('switchTab', args, {}),
   reLaunch: (args: unknown) => record('reLaunch', args, {}),

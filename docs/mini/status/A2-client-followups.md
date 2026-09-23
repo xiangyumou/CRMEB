@@ -26,7 +26,14 @@ link, and `apps/web` unit-test timeouts under load.
    now reaches `--color-accent` (new `theme/store.test.ts`). The weapp bundle stays zod-free
    (size report ok, no `zod` in any main-package file). Main package 490.2 KB before items 1–4
    → 490.5 KB after 1–3 → 490.6 KB after 4 (+0.1 KB for the theme switch, +0.4 KB in all).
+5. Splash link: there is no splash overlay on `storefront/mini` yet (stream B builds it), so
+   nothing to fix. Added `openLinkTarget(link)` in `platform/link.ts` (exported from
+   `@/platform`): catalogue kinds → `navigate(linkTargetRoute(link))`, `webview` →
+   `openExternalLink` (业务域名 check, copy otherwise), `miniprogram` →
+   `navigateToMiniProgram` (a cancel is silent, a failure toasts), `null` → nothing.
+   `@shop/contracts/decor/link-route` (types-only imports) joins `CONTRACTS_RUNTIME`. The splash
+   overlay and every DIY block's `onLink` should call it.
 
 ## In progress
 
-- Items 5–6.
+- Item 6.
