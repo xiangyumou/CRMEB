@@ -34,19 +34,30 @@ demo 81.0 KB, total 469.0 KB; react ×1; no zod.
   slots, per-shopper counts/profile/totals never cached. `docs/invariants.md`: DECOR-003/013/015
   citations, DECOR-015 text, new DECOR-017. `pnpm guards` green.
 
+- **storefront-blocks** (`packages/storefront-blocks/src/blocks/`): a component for every
+  registered type (`BLOCK_COMPONENTS` is complete); `BlockProps.personal` / `onIntent` /
+  `renderIntent`; shared `ProductCards` (4 layouts); `RichText` in the DOM shim; design-token
+  scss (`shared/_tokens.scss`); fixtures for every block; `content-blocks.test.tsx` and
+  `user-center.test.tsx` run on React 18 and 19 (106 tests).
+- **Admin** (`apps/web/src/admin/decor/`): new `hotspot-field.tsx` (drawing on the picture,
+  numeric fine-tune, link per area) and `rich-text-field.tsx` (Puck TipTap, links/code off);
+  `richText` / `hotspots` semantic kinds; `config.tsx` renders any block generically and
+  answers `products` needs from canvas data; `newBlockProps` fills array minimums; spike page
+  shows every block. Tests: `hotspot-field.test.tsx`, `canvas-blocks.test.tsx`.
+- **Core**: the admin detail returns the draft migrated (a v1 productGrid draft opens in the
+  v2 editor). Int test + DECOR-003 citation.
+- **Mini**: demo page renders every block through `BlockList`. Build: main 381.3 KB (+0.3 KB,
+  Taro's `<rich-text>` template in `base.wxml`), order 7.0 KB, demo 118.9 KB (+37.9 KB),
+  total 507.3 KB; react ×1; no zod.
+
 ## In progress
 
-- storefront-blocks components.
+- Fidelity run (admin canvas vs Taro H5 at 375 px).
 
 ## Next
 
-1. storefront-blocks: components + scss for every block; `RichText` in the DOM shim; fixtures;
-   tests on React 18 + 19; `BlockList` personal / intent; registry test.
-2. Admin (`apps/web/src/admin/decor/`): `richText` + `hotspots` fields, generic render wiring,
-   spike-page fixtures.
-3. Mini demo page entries; `CONTRACTS_RUNTIME` += `decor/rich-text`.
-4. Fidelity run → `docs/mini/status/G1-fidelity/`; `docs/mini/decor.md`.
-5. Full checklist; size delta.
+1. Fidelity run → `docs/mini/status/G1-fidelity/` (flag > 3 %); `docs/mini/decor.md`.
+2. Full checklist.
 
 ## Notes
 
