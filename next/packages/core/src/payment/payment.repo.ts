@@ -12,14 +12,14 @@ import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kerne
 
 /**
  * The only file in the payment domain that touches Drizzle tables
- * (CONVENTIONS, "Import boundaries").
+ * (`docs/conventions.md`, "Import boundaries").
  *
  * A repo function is a *statement*, not a decision: it returns rows or the
  * number of rows a conditional update changed. Every branch on that number
  * lives in `payment.service.ts`, which is what makes the race tests readable —
  * they call these directly and assert on `won`.
  *
- * Two statements here carry the weight of the whole stream:
+ * Two statements here carry the weight of the whole domain:
  *
  *  - `insertCallback` relies on `payment_callbacks_notify_uq` and returns
  *    whether *this* call inserted the row. A replayed notification therefore
@@ -839,8 +839,8 @@ export async function lockOrderForPayment(
  * Deliberately *not* routed through `OrderStateMachine.transition`: the paid
  * transition has to write `paid_amount`, `paid_at` and `transaction_no` in the
  * same statement to satisfy `orders_paid_shape`, and it must be callable before
- * B1's implementation is registered. The guard is the same one the state
- * machine would use.
+ * the order domain's implementation is registered. The guard is the same one
+ * the state machine would use.
  */
 export async function markOrderPaid(
   tx: DbOrTx,

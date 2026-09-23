@@ -16,8 +16,8 @@ import {
 } from './wechat.crypto';
 
 /**
- * The transport-security vectors, ported from `tests/regression/cases.md`
- * TLS-002 / TLS-004 / TLS-005 and the v3 driver's own rules.
+ * The transport-security vectors: TLS-002 / TLS-004 / TLS-005 and the v3
+ * driver's own rules.
  *
  * Real RSA-2048, real AES-256-GCM, no network and no clock: this file is the
  * reason the integration suite never has to argue about whether a signature is
@@ -292,7 +292,7 @@ describe('JSAPI pay params', () => {
   });
 
   it('carries exactly the keys the uni-app adapter forwards', () => {
-    // tests/static/wechat-payment-test.mjs asserts this key set on the client.
+    // The uni-app client's WeChat Pay hand-off test asserts this key set too.
     expect(Object.keys(params).sort()).toEqual(
       ['appId', 'nonceStr', 'package', 'paySign', 'signType', 'timeStamp'].sort(),
     );

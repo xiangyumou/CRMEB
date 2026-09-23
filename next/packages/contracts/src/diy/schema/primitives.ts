@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
 /**
- * The value shapes the legacy decoration editor persists.
+ * The value shapes the decoration editor persists.
  *
- * A saved DIY page is not a tidy domain object: it is a dump of the Vue editor's
- * own state, panel labels and all. Every shape below is one of the shared field
- * editors in `template/admin/src/components/mobileConfigRight/`, and the
- * uni-app renderer (`template/uni-app/subpackage/diyComponents/`) reads these
- * exact keys. Treat them as a wire contract, not as a design.
+ * A saved DIY page is not a tidy domain object: it is a dump of the Vue
+ * editor's own state, panel labels and all. Every shape below is one of the
+ * shared field editors of the admin's DIY panels, and the uni-app renderer
+ * (`template/uni-app/subpackage/diyComponents/`) reads these exact keys. Treat
+ * them as a wire contract, not as a design.
  *
  * Three rules hold everywhere in this directory:
  *
@@ -16,8 +16,8 @@ import { z } from 'zod';
  * 2. **Nothing is defaulted or coerced.** No `.default()`, no `z.coerce`. The
  *    parser validates; `parseDiyPageValue` hands back the caller's own object so
  *    key order — which the fixtures are byte-compared on — cannot drift.
- * 3. **Numbers may arrive as strings.** The old editor round-tripped some
- *    sliders through `<input>`, so `diyNumeric` accepts both.
+ * 3. **Numbers may arrive as strings.** Saved pages carry some slider values as
+ *    strings, so `diyNumeric` accepts both.
  */
 
 /** A number that may have been persisted as a string. */

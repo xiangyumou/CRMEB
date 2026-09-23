@@ -27,13 +27,12 @@ import {
  * Admin group-buy routes.
  *
  * Resource segments claimed: `groupbuy-activities/**` and `groupbuy-groups/**`.
- * Not `combination` — the legacy word is a transliteration of nothing, and the
- * URL is what an operator's browser history shows.
+ * Not `combination`: the word says nothing about what the thing is, and the URL
+ * is what an operator's browser history shows.
  *
- * `POST /admin-api/groupbuy-groups/:id/completion` is the successor of
- * `combination/immediately/:id`. It is a POSTed sub-resource, it carries its own
- * permission, and the operator who pressed it is recorded by `ctx.audit`
- * rather than by legacy's bare `$operator = 'admin'` string.
+ * `POST /admin-api/groupbuy-groups/:id/completion` is 立即成团. It is a POSTed
+ * sub-resource, it carries its own permission, and the operator who pressed it
+ * is recorded by `ctx.audit`.
  */
 
 const activityParams = z.object({ id });

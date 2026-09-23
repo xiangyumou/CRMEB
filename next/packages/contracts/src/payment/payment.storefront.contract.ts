@@ -12,9 +12,8 @@ import {
  * Storefront payment routes.
  *
  * Two of them, and that is the whole shopper-facing surface: start a payment,
- * and ask whether the money landed. The legacy `order/cashier/:orderId/:type`
- * screen fetched the order again through a payment controller; here the cashier
- * reads the order from B1's own route and asks this domain only about money.
+ * and ask whether the money landed. The cashier reads the order from the order
+ * domain's own route and asks this domain only about money.
  */
 
 export const paymentStart = defineRoute({

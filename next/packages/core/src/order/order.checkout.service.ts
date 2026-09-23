@@ -45,13 +45,12 @@ import {
  * 确认订单 and 提交订单.
  *
  * The design in one sentence: **preview and create take the same input and
- * price it the same way, from scratch, on the server**. Legacy handed the
- * client a cache key from `order/confirm`, priced it again in
- * `order/computed/:key` and created the order from the key a third time — three
- * chances for the cached draft and the world to disagree, and the source of the
- * "price changed between confirm and submit" class of bug. Here there is one
- * `buildDraft`, called by both, and the only thing the client may assert is
- * `expectedPayableAmount`, which is checked and refused rather than trusted.
+ * price it the same way, from scratch, on the server**. A cached draft handed
+ * from confirm to submit is a chance for the draft and the world to disagree,
+ * and the source of the "price changed between confirm and submit" class of
+ * bug. Here there is one `buildDraft`, called by both, and the only thing the
+ * client may assert is `expectedPayableAmount`, which is checked and refused
+ * rather than trusted.
  *
  * The creating transaction, in order:
  *
@@ -108,9 +107,9 @@ const itemKeyOf = (skuId: number): string => `sku-${skuId}`;
 
 /**
  * `X-Client-Platform` spells the two WeChat surfaces with a hyphen
- * (`wechat-mini`) and the `orders_platform` enum spells them with an
- * underscore (`wechat_mini`). One translation, here, rather than a guess at
- * each call site. Noted for B2 and C, who store the same value.
+ * (`wechat-mini`) and the `orders_platform` enum spells them with an underscore
+ * (`wechat_mini`). One translation, here, rather than a guess at each call
+ * site. Fulfilment and payment store the same value.
  */
 const PLATFORM: Record<string, 'h5' | 'wechat_oa' | 'wechat_mini'> = {
   h5: 'h5',
@@ -191,13 +190,12 @@ async function resolveAddress(
  * The same context, reading through the caller's handle.
  *
  * `Ctx.db` is the pool, and on the `create` path this whole pricing pass runs
- * *inside* an open transaction that is already holding one pooled connection.
- * A contributor — or the coupon quote — handed the plain `ctx` therefore
- * reaches for a **second** connection per checkout, and as soon as as many
- * orders are placed at once as the pool is wide, every caller holds one and
- * wants one: the pool deadlocks rather than queues. CR-1-d2 caught this in
- * presale's local copy of the problem (`presale.order.ts::inTx`); the cast
- * belongs here, once, rather than in every marketing domain.
+ * *inside* an open transaction that is already holding one pooled connection. A
+ * contributor — or the coupon quote — handed the plain `ctx` therefore reaches
+ * for a **second** connection per checkout, and as soon as as many orders are
+ * placed at once as the pool is wide, every caller holds one and wants one: the
+ * pool deadlocks rather than queues. The cast belongs here, once, rather than
+ * in every marketing domain.
  *
  * It is also the more correct read: contributors see the same snapshot the
  * order they are pricing will be written into.
@@ -322,9 +320,9 @@ async function buildDraft(
       ? null
       : fromId(input.userCouponId);
 
-  // CR-1-d: a marketing contributor learns which activity the shopper picked
-  // from the same `kindMeta` the kind handler gets, plus `kind` so it can
-  // refuse to fire on an ordinary order.
+  // A marketing contributor learns which activity the shopper picked from the
+  // same `kindMeta` the kind handler gets, plus `kind` so it can refuse to fire
+  // on an ordinary order.
   const adjustments = await gatherAdjustments(ctx, db, userId, lines, userCouponId, {
     couponId: input.userCouponId ?? undefined,
     kind: input.kind,
@@ -334,8 +332,8 @@ async function buildDraft(
   const itemsAmount = goodsTotalOf(lines);
   const freightAmount = await quoteFreight(ctx, db, lines, address);
   // Through `db`: on `create` it is the checkout transaction, and a cold cache
-  // must not take a second pooled connection while it is open (CR-1-r1). On
-  // the preview it is the pool, where `getIn` is exactly `get`.
+  // must not take a second pooled connection while it is open. On the preview
+  // it is the pool, where `getIn` is exactly `get`.
   const { payWindowMinutes } = await ctx.config.getIn(db, orderConfig);
 
   return {
@@ -468,10 +466,9 @@ function snapshotOf(sku: SkuForSale): OrderItemSnapshot {
 
 /**
  * What each checkout rule took off one line — the preview's `adjustments`,
- * split per line — for the order reads (CR-2-h4). Without it an activity
- * order with a coupon stacked on it cannot tell the activity from the coupon:
- * both fold into `discountAmount` (CR-3-b1). A rule that left this line alone
- * is not listed.
+ * split per line — for the order reads. Without it an activity order with a
+ * coupon stacked on it cannot tell the activity from the coupon: both fold into
+ * `discountAmount`. A rule that left this line alone is not listed.
  */
 function lineAdjustmentsOf(
   discount: DiscountSplit,
@@ -543,12 +540,12 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
             lines: draft.lines.map(pricingLineOf),
             goodsTotal: draft.itemsAmount,
             selections: { ...(body.kindMeta as Record<string, string | undefined>) },
-            // CR-1-d2. The handler needs to know its own adjustment reached the
-            // order, and `create` is holding the answer at this very moment.
-            // Without it a kind handler has to re-run its own contributor inside
-            // this open transaction — a second pooled connection per checkout,
-            // which deadlocks the pool as soon as as many orders are placed at
-            // once as the pool is wide.
+            // The handler needs to know its own adjustment reached the order,
+            // and `create` is holding the answer at this very moment. Without
+            // it a kind handler has to re-run its own contributor inside this
+            // open transaction — a second pooled connection per checkout, which
+            // deadlocks the pool as soon as as many orders are placed at once
+            // as the pool is wide.
             adjustments: draft.discount.applied,
           })
         : {};
@@ -612,8 +609,8 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
         skuId: line.sku.skuId,
         quantity: line.quantity,
       }));
-      // `ctx` lets A record 库存预警 for a SKU this reservation pushed under
-      // its threshold, in this transaction (CR-2-e2).
+      // `ctx` lets the catalog record 库存预警 for a SKU this reservation
+      // pushed under its threshold, in this transaction.
       const short = await resolveStockPort().reserve(tx, order.id, stockLines, ctx);
       if (short.length > 0) {
         throw new DomainError('ORDER_OUT_OF_STOCK', {
@@ -623,9 +620,8 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
         });
       }
 
-      // Spending the coupon belongs in the order's own transaction, exactly
-      // where legacy called `redeemCoupon`: pricing must not write, and a
-      // redemption must not survive a rolled-back order.
+      // Spending the coupon belongs in the order's own transaction: pricing
+      // must not write, and a redemption must not survive a rolled-back order.
       if (draft.userCouponId !== null) {
         await coupon.redeem(tx, ctx, {
           userCouponId: draft.userCouponId,
@@ -646,10 +642,10 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
         message: `提交订单，应付 ${draft.payableAmount.toString()}`,
       });
 
-      // CR-2-e2. Inside this transaction, so a submit that rolls back on stock
-      // or on a coupon leaves no 订单提交成功 behind; `notify` only writes an
-      // effect row and the dispatcher fans out after the commit, so no channel
-      // can fail a checkout. The return value is not an error signal — `false`
+      // Inside this transaction, so a submit that rolls back on stock or on a
+      // coupon leaves no 订单提交成功 behind; `notify` only writes an effect
+      // row and the dispatcher fans out after the commit, so no channel can
+      // fail a checkout. The return value is not an error signal — `false`
       // would mean this order was already announced, which is the outcome
       // either way, and the replay path above never reaches here at all.
       const announcement = {

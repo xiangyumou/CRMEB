@@ -4,12 +4,12 @@
  *
  *  - `src/config-groups.gen.ts` imports every `src/<domain>/*.config.ts`, which
  *    is what fills `defineConfigGroup`'s registry: a group nobody imported is
- *    simply not on the settings index, with no error anywhere (CR-3-f1).
+ *    simply not on the settings index, with no error anywhere.
  *  - `src/domains.gen.ts` imports every `src/<domain>/index.ts` and calls every
  *    exported `register<Name>Domain()` it finds, which is what installs the
  *    ports, the order state machine and the effect handlers. Without it a Next
- *    route only loads the domain it serves, so a checkout ran on B1's fallback
- *    adapter and `refund.execute` was parked as `unknown` (CR-8-c).
+ *    route only loads the domain it serves, so a checkout would find no catalog
+ *    port and `refund.execute` would be parked as `unknown`.
  *
  * Both are gitignored (`*.gen.ts`) and both are pure import order — the
  * generated files carry no logic, so a domain can never be half-registered.
@@ -24,7 +24,7 @@ const srcDir = path.resolve(import.meta.dirname, '..', 'src');
 /** `kernel` is the platform, not a domain: it registers nothing and is imported everywhere. */
 const NOT_A_DOMAIN = new Set(['kernel']);
 
-/** The one shape a registration function may take, per CONVENTIONS. */
+/** The one shape a registration function may take, per `docs/conventions.md`. */
 const REGISTER_FN = /^export function (register[A-Z]\w*Domain)\s*\(/gm;
 
 const posix = (entry: string): string => entry.split(path.sep).join('/');
@@ -90,11 +90,11 @@ for await (const entry of glob('*/index.ts', { cwd: srcDir })) {
 domains.sort((a, b) => a.name.localeCompare(b.name));
 
 /**
- * The one domain whose registrar `registerAllDomains()` calls first (CR-1-r2).
+ * The one domain whose registrar `registerAllDomains()` calls first.
  * `HookRegistry` runs hooks in registration order, and the order domain's
- * `order:commit-sale` paid hook must run ahead of the campaign hooks that
- * build on the sale (`groupbuy:take-seat`, `presale:commit-sale`, …). A fresh
- * module graph already gets that from import order; this keeps it true after
+ * `order:commit-sale` paid hook must run ahead of the campaign hooks that build
+ * on the sale (`groupbuy:take-seat`, `presale:commit-sale`, …). A fresh module
+ * graph already gets that from import order; this keeps it true after
  * `resetOrderPorts()` + `registerAllDomains()`, where the calls alone decide.
  */
 const REGISTERS_FIRST = 'order';
@@ -109,7 +109,7 @@ if (
 ) {
   // Loud rather than silently alphabetical: the ordering above is the point.
   throw new Error(
-    `gen-config-groups: the ${REGISTERS_FIRST} domain has no register…Domain() to call first (CR-1-r2)`,
+    `gen-config-groups: the ${REGISTERS_FIRST} domain has no register…Domain() to call first`,
   );
 }
 
@@ -122,8 +122,8 @@ await writeFile(
     '// Do not edit, do not commit.',
     '/* eslint-disable */',
     // Bare side-effect imports first: a namespace import that is never read is
-    // elided by esbuild / tsx (the ETL CLI found this — J), which would drop
-    // every domain that registers on import and has no explicit registrar.
+    // elided by esbuild / tsx, which would drop every domain that registers on
+    // import and has no explicit registrar.
     ...domains.map(({ name }) => `import './${name}/index';`),
     ...domains
       .filter(({ registrars }) => registrars.length > 0)
@@ -140,7 +140,7 @@ await writeFile(
     ` * One order matters: \`register${REGISTERS_FIRST[0]!.toUpperCase()}${REGISTERS_FIRST.slice(1)}Domain()\` comes first, because hooks run in`,
     ' * registration order and its `order:commit-sale` paid hook must run ahead of',
     ' * the campaign hooks built on the sale — which matters after',
-    ' * `resetOrderPorts()`, when these calls alone decide the order (CR-1-r2).',
+    ' * `resetOrderPorts()`, when these calls alone decide the order.',
     ' * The rest are alphabetical.',
     ' */',
     'export function registerAllDomains(): void {',

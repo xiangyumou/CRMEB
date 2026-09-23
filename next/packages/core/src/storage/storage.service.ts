@@ -36,19 +36,18 @@ import { storageConfig } from './storage.config';
 /**
  * The media library, and every door a file can come in through.
  *
- * Four things here are deliberately not ports of the old behaviour:
+ * Four things here are deliberate:
  *
  *  1. **the bytes decide the type.** `sniffFileType` reads the magic bytes and
  *     an allow-list decides; the client's `Content-Type` is only ever compared
  *     against the answer. HTML, SVG, PHP and executables are refused before the
  *     allow-list is even consulted.
  *  2. **the server picks the key.** `Storage.put` generates it. Nothing in any
- *     request reaches a path — that was `videoDataSave`.
+ *     request reaches a path.
  *  3. **remote imports go through `safeFetch`**, which resolves DNS itself and
  *     judges every resolved address, on the first request and on each redirect.
- *     That was `onlineUpload`.
  *  4. **scan tokens are per-admin and single-use**, claimed by an atomic Redis
- *     script rather than the old single global cache key.
+ *     script rather than kept under one global cache key.
  *
  * Deleting is a *soft* delete. A product description written three years ago
  * may still reference the file, so the row is tombstoned and `cleanOrphans`
@@ -71,8 +70,8 @@ export interface ResolvedStorage {
  * `ctx.storage` is built from the environment by the container and is always
  * the local driver; the *configured* driver is a runtime setting an operator
  * changes on the settings screen. So: `local` uses `ctx.storage` unchanged, and
- * `s3` is constructed here from the group's values. Nothing in
- * `apps/web/src/server/container.ts` (orchestrator-owned) had to move.
+ * `s3` is constructed here from the group's values, so
+ * `apps/web/src/server/container.ts` never needs to know about the setting.
  *
  * The S3 client is memoised on its own settings, because building one per
  * upload would re-derive nothing expensive but would still be silly.
@@ -614,8 +613,8 @@ export async function attachmentImport(
     body.categoryId === undefined || body.categoryId === null ? null : fromId(body.categoryId);
   if (categoryId !== null) await requireCategory(ctx, categoryId);
 
-  // The one endpoint that makes the server fetch an arbitrary URL gets a
-  // bucket of its own (CR-11-k), spent before any DNS lookup.
+  // The one endpoint that makes the server fetch an arbitrary URL gets a bucket
+  // of its own, spent before any DNS lookup.
   await enforce(
     fixedWindow(ctx.redis, {
       key: `storage:import:admin:${adminId}`,
@@ -676,12 +675,12 @@ function filenameFromUrl(raw: string): string | undefined {
  * things that stop a review form from becoming free hosting. The shopper is
  * told the URL and nothing else about the library.
  *
- * `purpose=staff` is the exception (CR-5-h §2). 商家管理's 添加商品 screen posts a
- * *shop* asset over a storefront session, so it arrives here rather than at the
- * admin route — but it is checked against the 店员 list first, it is stored
- * under its own directory, and it is allowed the admin ceiling, because a
- * product photo is not a review snapshot. A shopper who guesses the purpose
- * gets a 403, not a bigger quota.
+ * `purpose=staff` is the exception. 商家管理's 添加商品 screen posts a *shop*
+ * asset over a storefront session, so it arrives here rather than at the admin
+ * route — but it is checked against the 店员 list first, it is stored under its
+ * own directory, and it is allowed the admin ceiling, because a product photo
+ * is not a review snapshot. A shopper who guesses the purpose gets a 403, not a
+ * bigger quota.
  */
 export async function userUpload(
   ctx: Ctx,
@@ -803,9 +802,9 @@ export const SCAN_UPLOADS_PER_TOKEN = 10;
  * sniffer refuses does not burn the QR code.
  *
  * It is also an unauthenticated multipart endpoint, so the work it does for a
- * stranger is bounded **before the body is read** (CR-12-k): `file` may be a
- * reader, called only once the per-address and per-code budgets are spent and
- * the code is seen to be pending. `ip` is `clientIp()` — the edge's address.
+ * stranger is bounded **before the body is read**: `file` may be a reader,
+ * called only once the per-address and per-code budgets are spent and the code
+ * is seen to be pending. `ip` is `clientIp()` — the edge's address.
  */
 export async function scanUpload(
   ctx: Ctx,

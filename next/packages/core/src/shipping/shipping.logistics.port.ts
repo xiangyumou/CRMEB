@@ -14,19 +14,18 @@ import { logisticsConfig } from '../system';
  *
  *  - **the host is hardcoded.** It is not a setting, because a setting that
  *    names an outbound host is a way to exfiltrate the app code. Only the
- *    credential and the cache window are configurable (F1's `logisticsConfig`;
- *    F2 adds no second group).
+ *    credential and the cache window are configurable (the `system` domain's
+ *    `logisticsConfig`; shipping adds no second group).
  *  - **every call is cached in Redis** for `cacheMinutes` (default 30). The
- *    carriers rate-limit hard and the console polls: the legacy shop's tracking
- *    tab went blank under load for exactly this reason.
+ *    carriers rate-limit hard and the console polls: uncached, the tracking tab
+ *    goes blank under load.
  *  - **a failure is never an exception.** A refused credential, a timeout or a
  *    carrier that has never heard of the number all come back as
  *    `state: 'unknown'` with no traces, because the caller is an operator
  *    looking at an order and a 500 tells them nothing.
- *  - **阿里云云市场 is the only provider** (CR-2-f2, applied). `logisticsConfig`
- *    also offered `kuaidi100`, which nothing implemented; the enum no longer
- *    has it, so the warn-and-treat-as-`none` branch that stood in for the
- *    missing driver is gone with it and `none` is the only other value.
+ *  - **阿里云云市场 is the only provider.** The enum offers no provider that
+ *    nothing implements, so `none` is the only other value and there is no
+ *    warn-and-treat-as-`none` branch for a missing driver.
  *
  * The client is tested against a fake `fetch`. Nothing here ever reaches a real
  * endpoint in a test or a build.

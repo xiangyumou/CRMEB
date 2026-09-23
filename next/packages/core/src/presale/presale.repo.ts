@@ -39,7 +39,8 @@ import type { StockDeltas } from './presale.rules';
  * ESLint rule enforces it). It *reads* `products`, `product_skus`, `orders`,
  * `order_items` and `users` for the display joins the admin and storefront
  * lists need, and *writes* nothing outside the four `presale_*` tables: the SKU
- * stock ledger is stream A's `StockPort` and the order row is B1's.
+ * stock ledger is the catalog's `StockPort` and the order row belongs to the
+ * order domain.
  *
  * The statements worth reading are `reserveActivityStock`, `releaseActivityStock`
  * and `claimStockLedger`. Each carries every precondition in its `WHERE` (or, in
@@ -283,10 +284,9 @@ export interface ActivitySkuInput {
  * Upserts the rows the form names and deletes the rest.
  *
  * `sales` is never in the `set`: it is the server's running total and an edit
- * must not reset it — legacy's `saveAdvance` rewrote the row wholesale and the
- * 已售 column went back to zero every time somebody fixed a typo. `stock` is in
- * the `set`, because the operator is restating how many units this campaign may
- * still sell.
+ * must not reset it — rewriting the row wholesale would send 已售 back to zero
+ * every time somebody fixed a typo. `stock` is in the `set`, because the
+ * operator is restating how many units this campaign may still sell.
  *
  * `depositAmount` is written as `null` always: full payment only, and
  * `presale_activity_skus_prices_non_negative` has no opinion, but the activity
@@ -357,12 +357,11 @@ export async function skuIdsOfProduct(db: DbOrTx, productId: number): Promise<nu
  * Takes `quantity` off the activity SKU row and then the activity row, each in
  * one statement carrying `stock >= quantity` and the quota in its `WHERE`.
  *
- * Legacy checked the quota with a separate `SELECT` and then decremented, which
- * oversells under load (risk matrix §5). Here the quota is part of the same
- * `UPDATE`, so the last unit can only be taken once however many checkouts
- * collide on it.
+ * The quota is part of the same `UPDATE` — checking it with a separate `SELECT`
+ * and then decrementing oversells under load — so the last unit can only be
+ * taken once however many checkouts collide on it.
  *
- * `false` means one of the two changed nothing. The caller is inside B1's order
+ * `false` means one of the two changed nothing. The caller is inside the order
  * transaction and throws, which rolls the other one back — a half-applied
  * reservation cannot survive.
  */
@@ -432,10 +431,9 @@ export async function releaseActivityStock(
  * units **sold**, and `sales` only moves on payment, so a check at checkout
  * compares against a number that has not moved yet: with `stock: 100` and
  * `total_quota: 1`, a hundred shoppers each read `sales = 0`, each reserve, and
- * each pay. Legacy had exactly this shape and 预售销量 routinely sailed past the
- * cap. The reservation-time check stays as the cheap early refusal — it is what
- * stops the hundredth shopper once the first one has paid — but this is the one
- * that decides.
+ * each pay, and 预售销量 sails past the cap. The reservation-time check stays
+ * as the cheap early refusal — it is what stops the hundredth shopper once the
+ * first one has paid — but this is the one that decides.
  *
  * `false` means the campaign has sold its last unit to somebody else while this
  * shopper's money was in flight. The caller owes them a refund.
@@ -743,11 +741,11 @@ export async function findClosableActivityIds(
 /**
  * Campaigns that have just come into their window.
  *
- * There is no status transition to make — the frozen schema has no `scheduled`
- * state, and the storefront list already filters on `start_at <= now < end_at`,
- * so an `active` campaign becomes visible on its own. What the open half of the
- * sweep does is *record the event exactly once*, which is what a notification
- * or a channel refresh hangs off. `UNIQUE (scope, scope_id, event_type)` on the
+ * There is no status transition to make — the schema has no `scheduled` state,
+ * and the storefront list already filters on `start_at <= now < end_at`, so an
+ * `active` campaign becomes visible on its own. What the open half of the sweep
+ * does is *record the event exactly once*, which is what a notification or a
+ * channel refresh hangs off. `UNIQUE (scope, scope_id, event_type)` on the
  * effects ledger is the exactly-once, so this query only has to be bounded:
  * hence the lookback rather than "every active campaign, forever".
  */

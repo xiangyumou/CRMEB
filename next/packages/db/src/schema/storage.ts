@@ -20,8 +20,8 @@ import { users } from './user';
  * The media library.
  *
  * The storage key is always generated on the server. Nothing here ever accepts
- * a client-supplied path — that was the `videoDataSave` defect in the old
- * system (`docs/release-readiness.md`).
+ * a client-supplied path: a client that chooses the path can overwrite any
+ * file the server can write.
  */
 
 export const attachmentCategories = pgTable(

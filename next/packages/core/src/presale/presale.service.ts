@@ -19,10 +19,10 @@ import { assertFullPayment, canBuy } from './presale.rules';
 /**
  * Presale services: everything a route file calls.
  *
- * The split CONVENTIONS asks for holds throughout — the service decides, the
- * repo states. Every `if` about an affected row count is here; every SQL
- * statement is in `presale.repo.ts`. What is *not* here is buying a presale
- * item: that is an order, and it lives in `presale.order.ts` behind B1's seams.
+ * The service decides, the repo states: every `if` about an affected row count
+ * is here; every SQL statement is in `presale.repo.ts`. What is *not* here is
+ * buying a presale item: that is an order, and it lives in `presale.order.ts`
+ * behind the order domain's seams.
  *
  * The admin surface is audited for free: `handle()` writes an `audit_logs` row
  * for every mutating admin route, so an operator shortening a 发货承诺 is on the
@@ -81,8 +81,8 @@ export async function adminActivityCreate(
  * `shipAfterDays` is copied onto every order when it is *paid*
  * (`presale_orders.ship_not_before_at`), so shortening or lengthening it
  * mid-campaign cannot move a promise already made to a shopper. That is the
- * whole reason the column is duplicated on the order row, and it is the bug
- * behind legacy's "my 15-day presale suddenly says 30 days".
+ * whole reason the column is duplicated on the order row: without it, a
+ * shopper's 15-day presale suddenly says 30 days.
  */
 export async function adminActivityUpdate(
   ctx: Ctx,
@@ -130,9 +130,8 @@ export async function adminActivitySetStatus(
 /**
  * Soft delete, refused while an order still owes goods.
  *
- * Legacy deleted the `eb_store_advance` row outright (`is_del = 1`) and left
- * every live presale order pointing at nothing, which is why the 预售订单 screen
- * had an "活动已失效" branch showing an empty card. Here the foreign key is
+ * Deleting the campaign outright would leave every live presale order pointing
+ * at nothing, and the 预售订单 screen showing an empty card. The foreign key is
  * `ON DELETE RESTRICT` and this guard gives the operator a sentence instead of
  * a constraint error.
  */
@@ -227,9 +226,9 @@ export async function detail(ctx: Ctx, input: { id: string }): Promise<PresaleDe
   const id = Number(input.id);
   const now = ctx.clock.now();
   const activity = await repo.findActivity(ctx.db, id);
-  // A draft is not on the storefront, not even by id (CR-34-k2): ids are
-  // sequential, and the form promises 「草稿不会出现在前台」. `paused` and
-  // `ended` stay readable — orders link to the page — and `canBuy` says no.
+  // A draft is not on the storefront, not even by id: ids are sequential, and
+  // the form promises 「草稿不会出现在前台」. `paused` and `ended` stay
+  // readable — orders link to the page — and `canBuy` says no.
   if (!activity || !STOREFRONT_READABLE.has(activity.status)) {
     throw new DomainError('PRESALE_ACTIVITY_NOT_FOUND');
   }

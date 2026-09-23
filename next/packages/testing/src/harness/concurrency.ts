@@ -1,7 +1,7 @@
 /**
- * `runConcurrently` — the tool CONVENTIONS demands for every conditional state
- * change: "Every conditional state change ships a concurrency test using
- * `runConcurrently` from `@shop/testing`."
+ * `runConcurrently` — the tool `docs/conventions.md` demands for every
+ * conditional state change: "Every conditional state change ships a concurrency
+ * test using `runConcurrently` from `@shop/testing`."
  *
  * The point is the *barrier*. Starting N promises in a loop does not make them
  * race: the first one is usually several event-loop turns ahead by the time the
@@ -90,9 +90,9 @@ export async function runConcurrently<T>(
 }
 
 /**
- * Repeats a concurrency scenario. PLAN §8.3 asks for 50 rounds of each
- * concurrency scenario in CI; this is how a test spells that without a loop
- * that hides which round failed.
+ * Repeats a concurrency scenario. CI's soak runs each concurrency scenario 50
+ * rounds; this is how a test spells that without a loop that hides which
+ * round failed.
  */
 export async function repeatConcurrently<T>(
   rounds: number,

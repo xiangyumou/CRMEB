@@ -10,15 +10,14 @@ import { users } from './user';
  * Behavioural event logs behind the operator dashboards.
  *
  * Deliberately append-only and deliberately lean: three tables, no rollups, no
- * partitioning. The legacy `eb_store_product_log` carried one column per metric
- * (`visit_num`, `cart_num`, `order_num`, `pay_num`, `collect_num`, `refund_num`)
- * and left five of them zero on every row; here the metric is the `kind` and the
- * magnitude is `quantity` / `amount`.
+ * partitioning. One row is one event: the metric is the `kind` and the
+ * magnitude is `quantity` / `amount`, rather than a column per metric left zero
+ * on most rows.
  *
  * Retention is a scheduled delete by `created_at`, not a schema concern.
  */
 
-/** Legacy `eb_store_product_log.type`. */
+/** Which product event a row records. */
 export const productEventsKind = pgEnum('product_events_kind', [
   'view',
   'cart',

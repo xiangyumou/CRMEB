@@ -87,7 +87,7 @@ beforeEach(async () => {
 // callback fixtures
 // ---------------------------------------------------------------------------
 
-/** Signed at `NOW` with a nonce of its own — the callback spends each triple on one body (CR-7-k2). */
+/** Signed at `NOW` with a nonce of its own — the callback spends each triple on one body. */
 let nonceSeq = 1372623149;
 function plainQuery(timestamp = String(NOW_SECONDS), nonce = String((nonceSeq += 1))) {
   return { timestamp, nonce, signature: signatureOf([TOKEN, timestamp, nonce]) };
@@ -288,8 +288,8 @@ describe('scans arriving together', () => {
 
     // Twelve different phones scanning the same poster in the same second, as
     // happens the moment it goes up at an event. `bumpQrcodeCounters` is
-    // `SET n = n + 1`; a read-modify-write here is how the legacy counter
-    // drifted low and why nobody trusted the channel report.
+    // `SET n = n + 1`; a read-modify-write here would make the counter drift
+    // low, and nobody would trust the channel report.
     const report = await runConcurrently(12, (index) =>
       handleEvent(harness.ctx, {
         query: plainQuery(),

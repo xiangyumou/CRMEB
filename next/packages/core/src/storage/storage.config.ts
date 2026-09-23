@@ -8,12 +8,11 @@ const LOCAL_ONLY: ConfigVisibleWhen = { key: 'driver', equals: 'local' };
 /**
  * `storage` — where uploaded files go, and what is allowed through the door.
  *
- * The old system had **seven** drivers, each with its own config tab, its own
- * PHP class and its own half-tested SDK (`crmeb/crmeb/services/upload/storage/`:
- * Local, Qiniu, Oss, Cos, Jdoss, Obs, Tyoss). Six of the seven are
- * S3-compatible, so there are two here: `local` and `s3`. A shop on Aliyun OSS,
- * Tencent COS, Qiniu or Huawei OBS fills in the S3 fields with that vendor's
- * endpoint; the ETL maps the old per-vendor keys across.
+ * There are two drivers: `local` and `s3`. Aliyun OSS, Tencent COS, Qiniu,
+ * Huawei OBS and the other Chinese object stores are all S3-compatible, so a
+ * shop on any of them fills in the S3 fields with that vendor's endpoint rather
+ * than choosing among per-vendor drivers, each with its own config tab and its
+ * own half-tested SDK.
  *
  * The limits are here rather than in code because they are the thing an
  * operator actually needs to change — "our photographer's JPEGs are 12MB" is a
@@ -39,7 +38,7 @@ export const storageConfig = defineConfigGroup({
     /** Aliyun OSS and Tencent COS want virtual-host addressing; MinIO wants path. */
     s3Addressing: z.enum(['path', 'virtual']).default('virtual'),
 
-    /** Admin uploads. 10MB by default, the old `upload_size` in spirit. */
+    /** Admin uploads. 10MB by default. */
     maxUploadBytes: z
       .number()
       .int()
@@ -56,10 +55,10 @@ export const storageConfig = defineConfigGroup({
     /** Per shopper, per hour. Abuse control, not a quality gate. */
     userUploadsPerHour: z.number().int().min(1).max(500).default(30),
     /**
-     * 商家管理 uploads (`purpose=staff`, CR-5-h §2): a product photo is not a
-     * review snapshot, so it gets the admin ceiling and its own hourly budget —
-     * adding one product with eight images must not spend the allowance the
-     * same person shops with.
+     * 商家管理 uploads (`purpose=staff`): a product photo is not a review
+     * snapshot, so it gets the admin ceiling and its own hourly budget — adding
+     * one product with eight images must not spend the allowance the same
+     * person shops with.
      */
     maxStaffUploadBytes: z
       .number()
@@ -84,7 +83,7 @@ export const storageConfig = defineConfigGroup({
     remoteImportTimeoutMs: z.number().int().min(1000).max(30_000).default(8000),
     /**
      * Plain `http://` sources for 网址导入. Off: a plaintext fetch is whatever
-     * file a man in the middle chose, and nothing would say so (CR-11-k).
+     * file a man in the middle chose, and nothing would say so.
      */
     remoteImportAllowHttp: z.boolean().default(false),
 
@@ -230,27 +229,5 @@ export const storageConfig = defineConfigGroup({
       help: '0 表示不自动清理',
       order: 60,
     },
-  },
-  legacyKeys: {
-    // `upload_type`: 1 local, 2 qiniu, 3 oss, 4 cos, … — the ETL folds every
-    // non-1 value to `s3` and carries that vendor's keys across.
-    driver: 'upload_type',
-    s3AccessKeyId: [
-      'accessKey',
-      'qiniu_accessKey',
-      'tengxun_accessKey',
-      'jd_accessKey',
-      'hw_accessKey',
-      'ty_accessKey',
-    ],
-    s3SecretAccessKey: [
-      'secretKey',
-      'qiniu_secretKey',
-      'tengxun_secretKey',
-      'jd_secretKey',
-      'hw_secretKey',
-      'ty_secretKey',
-    ],
-    s3Region: 'jd_storageRegion',
   },
 });

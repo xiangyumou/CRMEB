@@ -76,7 +76,7 @@ describe('per-order quantity', () => {
     );
   });
 
-  it('refuses zero and fractions, which legacy let through as 1', () => {
+  it('refuses zero and fractions rather than reading them as 1', () => {
     expect(codeOf(() => assertQuantityAllowed({ perOrderQuantity: 5 }, 0))).toBe(
       'GROUPBUY_QUANTITY_NOT_ALLOWED',
     );
@@ -151,7 +151,7 @@ describe('立即成团', () => {
   });
 });
 
-describe('the CR-1-d price guard', () => {
+describe('the activity-price guard', () => {
   const prices = new Map([
     [21, '59.00'],
     [22, '65.50'],
@@ -231,8 +231,8 @@ describe('the CR-1-d price guard', () => {
 });
 
 /**
- * The earlier half of the same guard (CR-1-d2), which reads the applied
- * adjustments off the draft instead of the written lines.
+ * The earlier half of the same guard, which reads the applied adjustments off
+ * the draft instead of the written lines.
  */
 describe('assertActivityDiscountApplied', () => {
   it('passes when the contributor took off exactly the gap it owes', () => {

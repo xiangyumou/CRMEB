@@ -30,7 +30,7 @@ import { defaultChannels, readClaimedChannels } from './notification.service';
  * are what the code can send, and the table only remembers what an operator
  * chose. That is why the list seeds missing rows as it reads and why a row
  * whose code has left the registry simply stops appearing instead of hanging
- * around as an event nobody can trigger — the legacy table had four of those.
+ * around as an event nobody can trigger.
  */
 
 interface Paged<T> {

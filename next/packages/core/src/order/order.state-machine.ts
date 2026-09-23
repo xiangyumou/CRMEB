@@ -13,17 +13,16 @@ import * as repo from './order.repo';
  *
  *     UPDATE orders SET status = $to, ... WHERE id = $id AND status IN ($from)
  *
- * and the decision is the affected row count. Never a read, a branch and then
- * a write: that pattern is the defect this port exists to remove
- * (release-readiness: `takeOrder` / `delivery`), and no amount of surrounding
- * transaction makes it safe, because two callers can both read
- * `pending_payment` before either writes.
+ * and the decision is the affected row count. Never a read, a branch and then a
+ * write: two concurrent 收货 or 发货 requests would both pass the read, and no
+ * amount of surrounding transaction makes it safe, because two callers can both
+ * read `pending_payment` before either writes.
  *
  * `from` is a **list** because several source states may legitimately lead to
- * one target — `paid | shipped | received | completed -> refunded` for stream
- * C's full refund. It goes in the WHERE clause, which is the whole safety
- * property: a caller that read the status first and passed back what it saw
- * would have written a read-then-write with extra steps.
+ * one target — `paid | shipped | received | completed -> refunded` for the
+ * refund domain's full refund. It goes in the WHERE clause, which is the whole
+ * safety property: a caller that read the status first and passed back what it
+ * saw would have written a read-then-write with extra steps.
  *
  * Illegal edges are a programming error, not a runtime refusal: `transition`
  * throws when `from -> to` is absent from `ORDER_TRANSITIONS`, so "cancel a
@@ -93,7 +92,7 @@ export class OrderStateMachineImpl implements OrderStateMachine {
 
 /**
  * The instance every caller shares. `order/index.ts` registers it into
- * `ports.ts`, so C, B2 and D reach it through `getOrderStateMachine()` without
- * importing this file.
+ * `ports.ts`, so payment, refund, fulfilment and the kind handlers reach it
+ * through `getOrderStateMachine()` without importing this file.
  */
 export const orderStateMachine = new OrderStateMachineImpl();

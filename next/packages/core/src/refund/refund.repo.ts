@@ -211,9 +211,10 @@ export async function setOrderRefundStatus(
  * `paid|shipped|received|completed → refunded`, for a full refund.
  *
  * The guard is `ORDER_TRANSITIONS` spelled as SQL. It is written here rather
- * than through `OrderStateMachine.transition` so the refund domain works before
- * B1 registers its implementation, and so the statement can be exercised by a
- * concurrency test that boots nothing but this domain.
+ * than through `OrderStateMachine.transition` so the refund domain does not
+ * depend on the order domain having registered its implementation, and so the
+ * statement can be exercised by a concurrency test that boots nothing but this
+ * domain.
  */
 export async function markOrderRefunded(
   tx: DbOrTx,
@@ -236,7 +237,7 @@ export async function markOrderRefunded(
  *
  *  - a **`refund_only`** takes its units out of fulfilment the moment it is
  *    approved. The warehouse must not ship goods an operator has already agreed
- *    to refund, and B2's dispatch bound reads exactly this column
+ *    to refund, and fulfilment's dispatch bound reads exactly this column
  *    (`shipped + q <= quantity - refunded_quantity`);
  *  - a **`return_and_refund`** counts only once the money is actually back —
  *    those units were shipped, and they are already out of fulfilment.
@@ -259,11 +260,11 @@ const countedUnits = (orderItemId: number) => sql<number>`(
 /**
  * Re-derives `order_items.refunded_quantity` from the refunds themselves.
  *
- * `bound` is the mirror of B2's dispatch guard (FULFILL-002). For units that
- * were never shipped — a `refund_only` on an undispatched line — the ceiling is
- * `quantity - shipped_quantity`, computed *inside* the statement: a shipment
- * that commits first pushes `shipped_quantity` up and this update refuses; if
- * this one commits first the shipment's own `WHERE` sees the raised
+ * `bound` is the mirror of fulfilment's dispatch guard (FULFILL-002). For units
+ * that were never shipped — a `refund_only` on an undispatched line — the
+ * ceiling is `quantity - shipped_quantity`, computed *inside* the statement: a
+ * shipment that commits first pushes `shipped_quantity` up and this update
+ * refuses; if this one commits first the shipment's own `WHERE` sees the raised
  * `refunded_quantity` and refuses. Exactly one wins, in either order, and
  * `shipped + refunded <= quantity` never breaks.
  *
@@ -423,7 +424,7 @@ export interface TransitionPatch {
   rejectReason?: string;
   adminRemark?: string;
   returnStage?: 'not_required' | 'awaiting_shipment' | 'shipped_back' | 'received';
-  /** Frozen once, at the approval that first asks the buyer to ship (CR-5-c). */
+  /** Frozen once, at the approval that first asks the buyer to ship. */
   returnAddress?: { name: string; phone: string; address: string };
   succeededAt?: Date;
   failedAt?: Date;
@@ -482,8 +483,8 @@ export async function setReturnShipment(
 
 /**
  * Writes `last_error` without moving the status: a gateway answer that does not
- * match the refund (CR-4-k2, CR-5-k2) is shown to an operator on the row it
- * concerns, and the row stays where it was.
+ * match the refund is shown to an operator on the row it concerns, and the row
+ * stays where it was.
  */
 export async function setLastError(
   tx: DbOrTx,

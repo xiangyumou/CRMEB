@@ -19,12 +19,13 @@ import { createdAt, deletedAt, emptyJsonObject, fk, instant, pk, updatedAt } fro
  *
  * `content` is the page envelope the uni-app renderer already understands; its
  * shape is owned by `contracts/src/diy/schema/*` and must round-trip
- * byte-identically (see PLAN §7). Nothing in the database interprets it, which
- * is exactly why it is one `jsonb` column with an explicit `schemaVersion`
- * beside it rather than thirty columns.
+ * byte-identically, so a component field this code does not know about survives
+ * a load and save. Nothing in the database interprets it, which is exactly why
+ * it is one `jsonb` column with an explicit `schemaVersion` beside it rather
+ * than thirty columns.
  */
 
-/** Which surface the page decorates. Legacy `eb_diy.type` plus `page_type`. */
+/** Which surface the page decorates. */
 export const diyPagesKind = pgEnum('diy_pages_kind', [
   'home',
   'category',

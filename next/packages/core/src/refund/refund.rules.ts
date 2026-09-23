@@ -4,10 +4,10 @@ import { Money } from '../kernel/money';
  * What a refund is worth, and what may go into one.
  *
  * Pure functions over plain data, so the interesting arithmetic is unit-tested
- * without a database. The rule they encode, which the legacy controllers did
- * not, is that **the service computes the money and the request never carries
- * it**: `refundApplyBody` has lines and quantities and no amount, so a crafted
- * body cannot ask for more than was paid (risk matrix §6).
+ * without a database. The rule they encode is that **the service computes the
+ * money and the request never carries it**: `refundApplyBody` has lines and
+ * quantities and no amount, so a crafted body cannot ask for more than was
+ * paid.
  */
 
 export interface RefundableLineInput {
@@ -83,8 +83,8 @@ export function lineRefundAmount(line: RefundableLineInput, quantity: number): M
  * Freight comes back only while nothing has shipped.
  *
  * Once a parcel is moving the carrier has been paid, so the shop is out of
- * pocket for it; the legacy code refunded freight on any full refund, which is
- * where "why did we pay the shipping twice" reports came from.
+ * pocket for it. Refunding freight on any full refund is where "why did we pay
+ * the shipping twice" reports come from.
  */
 export function freightRefundable(fulfillmentStatus: string): boolean {
   return fulfillmentStatus === 'unfulfilled';

@@ -12,30 +12,27 @@ import { adminActor, firstSkuId, makeAdmin, makeProduct } from './catalog.fixtur
 import { catalogStockPort } from './catalog.stock';
 
 /**
- * CR-53-k2. STAB-001 round 3 hung for good in
- * `order.concurrency.int.test.ts > sells ten units to exactly ten of twelve
- * buyers`. The database showed why. One backend was `idle in transaction`
- * holding the SKU row lock, right after `rollupProduct`. The other eleven were
- * blocked on that lock. Twelve connections is the harness pool's `max`.
+ * A stock reservation never needs a second pooled connection. STAB-001 found
+ * why it matters:
+ * `order.concurrency.int.test.ts > sells ten units to exactly ten of twelve buyers`
+ * hung with one backend `idle in transaction` holding the SKU row lock and the
+ * other eleven blocked on it — twelve connections, the harness pool's `max`.
  *
  * `catalogStockPort.reserve(tx, …, ctx)` takes the SKU row lock, then calls
- * `warnOnLowStock`, which calls `ctx.config.get(catalogConfig)`. That read is
- * **not** on `tx`. On a cache miss it takes a second connection from the pool.
- * The config cache TTL is five minutes, so a miss is routine. With `max`
- * transactions in flight on one SKU, every connection is held by a transaction
- * waiting on the lock. The lock holder waits for a connection that can only
- * come back when it commits, and it never does. `pg.Pool` has no acquire
- * timeout and nothing sets `idle_in_transaction_session_timeout`, so the pool
- * stays wedged.
+ * `warnOnLowStock`, which reads `catalogConfig`. If that read is **not** on
+ * `tx`, a cache miss takes a second connection from the pool, and with a
+ * five-minute config TTL a miss is routine. With `max` transactions in flight
+ * on one SKU, every connection is held by a transaction waiting on the lock;
+ * the lock holder waits for a connection that can only come back when it
+ * commits, and it never does.
  *
  * In production the web pool is `DB_POOL_MAX` 10. Ten checkouts of one SKU
- * landing in the same moment as a cache expiry wedge the web process. That is
- * the flash-sale case the stock guard exists for.
+ * landing in the same moment as a cache expiry would wedge the web process.
+ * That is the flash-sale case the stock guard exists for.
  *
  * This file makes it deterministic with a pool of three and three reservers.
- * The holder's config-cache read is held until the other two are blocked on
- * the row lock. It was pinned `it.fails` until the read moved onto `tx`
- * (`ctx.config.getIn`, R1); it now asserts every reservation finishes.
+ * The holder's config-cache read is held until the other two are blocked on the
+ * row lock, and every reservation must still finish.
  */
 
 let harness: TestCtx;
@@ -98,7 +95,7 @@ function redisHoldingFirstConfigRead(redis: Redis, waiters: number): Redis {
   });
 }
 
-describe('CR-53-k2 — a stock reservation never needs a second pooled connection', () => {
+describe('a stock reservation never needs a second pooled connection', () => {
   it('lets pool-max reservers of one SKU all finish when the config cache is cold', async () => {
     const admin = harness.as(adminActor(await makeAdmin(harness)));
     const product = await makeProduct(admin);
@@ -142,11 +139,11 @@ describe('CR-53-k2 — a stock reservation never needs a second pooled connectio
 });
 
 /**
- * CR-53-k2 part 3, defence in depth. The fix above removes the one known
- * second connection; these two limits make the *next* one an error the caller
- * sees, instead of a process that stops serving.
+ * Defence in depth. Reading config on `tx` removes the one known second
+ * connection; these two limits make the *next* one an error the caller sees,
+ * instead of a process that stops serving.
  */
-describe('CR-53-k2 — a starved pool is an error, not a hang', () => {
+describe('a starved pool is an error, not a hang', () => {
   const lockSku = (tx: Tx, skuId: number) =>
     tx.execute(sql`update product_skus set stock = stock where id = ${skuId}`);
 
@@ -178,7 +175,7 @@ describe('CR-53-k2 — a starved pool is an error, not a hang', () => {
 
     const url = new URL(harness.db.url);
     url.searchParams.set('application_name', APP_NAME);
-    // The CR-53-k2 shape with nothing catalog-specific left: pool of two, one
+    // The same shape with nothing catalog-specific left: pool of two, one
     // transaction holds the row lock, the other waits on it, and the holder
     // asks the pool for another connection.
     const small = createDb(url.toString(), { max: 2, acquireTimeoutMs: 1_000 });

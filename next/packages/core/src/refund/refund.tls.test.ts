@@ -8,7 +8,7 @@ import { Money } from '../kernel/money';
 import { createWechatPayClient, type WechatPayCredentials } from '../wechat';
 
 /**
- * TLS-001 for the refund client — CR-21-k2's neighbouring gap.
+ * TLS-001 for the refund client.
  *
  * `wechat.pay.tls.test.ts` shows the pay client refuses a gateway it cannot
  * authenticate, for the query and the close. The refund domain talks to WeChat
@@ -19,10 +19,9 @@ import { createWechatPayClient, type WechatPayCredentials } from '../wechat';
  * merchant's signed refund request. So the same untrusted gateway is pointed at
  * those two calls.
  *
- * The fixture is a copy of the one in `wechat.pay.tls.test.ts` (that directory
- * is another stream's, and a test file cannot be imported without running its
- * suite): a self-signed `localhost` certificate minted per run, so no key
- * material lives in the repository.
+ * The fixture is a copy of the one in `wechat.pay.tls.test.ts` (a test file
+ * cannot be imported without running its suite): a self-signed `localhost`
+ * certificate minted per run, so no key material lives in the repository.
  *
  * The error must be the transport's `PAYMENT_STATE_UNKNOWN`, never
  * `PAYMENT_GATEWAY_REFUSED`: `executeRefund` reads a refusal as "the gateway did

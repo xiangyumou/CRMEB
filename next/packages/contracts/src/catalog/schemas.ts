@@ -10,32 +10,30 @@ import { id, instant, money, pageQuery, paged, sortQuery } from '../_conventions
  * by `catalog.service.ts`, which assigns one to the other and stops compiling
  * if they drift.
  *
- * Two legacy columns are deliberately gone:
- *  - `is_virtual` + `virtual_type` collapse into one `kind`. Legacy derived
- *    `is_virtual = in_array(virtual_type, [1,2])`, so `virtual_type = 3`
- *    (虚拟商品) was *not* `is_virtual` and half the codebase got it wrong
- *    (`StoreProductServices.php:593`). One enum, one meaning.
- *  - `eb_store_product_rule` (规格模板) is dropped by SCHEMA.md §4.1 — "an admin
- *    convenience list of spec presets, re-enterable" — so there are no
- *    spec-template routes here.
+ * Two things are deliberately absent:
+ *  - a virtual flag beside a virtual type code. What the buyer receives is one
+ *    `kind`, so there is no flag that can disagree with the type. One enum, one
+ *    meaning.
+ *  - spec templates (规格模板). They are a convenience list of spec presets an
+ *    operator can re-enter, so there are no spec-template routes here.
  */
 
 // ---------------------------------------------------------------------------
 // enums
 // ---------------------------------------------------------------------------
 
-/** What the buyer receives. Replaces `is_virtual` + `virtual_type` 0/1/2/3. */
+/** What the buyer receives. */
 export const productKind = z.enum(['physical', 'virtual_card', 'virtual_coupon', 'virtual_manual']);
 export type ProductKind = z.infer<typeof productKind>;
 
 export const productStatus = z.enum(['draft', 'on_shelf', 'off_shelf']);
 export type ProductStatus = z.infer<typeof productStatus>;
 
-/** Legacy `freight` 1/2/3. */
+/** Free shipping, a fixed amount per unit, or a shipping template. */
 export const productFreightMode = z.enum(['free', 'fixed', 'template']);
 export type ProductFreightMode = z.infer<typeof productFreightMode>;
 
-/** Legacy `is_limit` + `limit_type`. */
+/** No limit, a cap per order, or a cap over the buyer's lifetime. */
 export const productPurchaseLimitMode = z.enum(['none', 'per_order', 'lifetime']);
 export type ProductPurchaseLimitMode = z.infer<typeof productPurchaseLimitMode>;
 
@@ -111,10 +109,10 @@ export type ProductCategory = z.infer<typeof productCategory>;
 /**
  * The tree, three levels deep and no deeper.
  *
- * Written out rather than recursed with `z.lazy`: the legacy admin caps the
- * tree at three levels (`StoreCategoryServices::getCategoryList`), OpenAPI
- * generation of a lazy schema is a `$ref` cycle, and a fixed depth is the one
- * shape a `cascader`/`treeSelect` can consume without a runtime guard.
+ * Written out rather than recursed with `z.lazy`: the tree is capped at three
+ * levels (`CATALOG_CATEGORY_TOO_DEEP`), OpenAPI generation of a lazy schema is
+ * a `$ref` cycle, and a fixed depth is the one shape a `cascader`/`treeSelect`
+ * can consume without a runtime guard.
  */
 export const productCategoryLeaf = productCategory;
 export const productCategoryBranch = productCategory.extend({
@@ -196,7 +194,7 @@ export const productLabel = z.object({
   isVisible: z.boolean(),
   isEnabled: z.boolean(),
   sortOrder: z.number().int(),
-  /** How many live products carry it. Legacy `use_list`. */
+  /** How many live products carry it. */
   productCount: z.number().int().min(0),
   createdAt: instant,
 });
@@ -481,7 +479,7 @@ export const adminProductDetail = adminProductListItem.extend({
   protectionIds: z.array(id),
   labelIds: z.array(id),
   recommendedProductIds: z.array(id),
-  /** "Buy this, get that coupon." Legacy `eb_store_product_coupon`. */
+  /** "Buy this, get that coupon." */
   giftCouponIds: z.array(id),
 });
 export type AdminProductDetail = z.infer<typeof adminProductDetail>;
@@ -615,7 +613,8 @@ export const adminProductForm = z
     }
 
     // A card-key product's stock is the card pool, not a number an operator
-    // types: legacy let the two drift and sold cards that did not exist.
+    // types: kept apart, the two drift and the shop sells cards that do not
+    // exist.
     if (value.kind === 'virtual_card' && value.skus.some((sku) => sku.stock > 0)) {
       ctx.addIssue({
         code: 'custom',
@@ -630,7 +629,7 @@ export const adminProductForm = z
 export type AdminProductForm = z.infer<typeof adminProductForm>;
 
 /**
- * The legacy 商品列表 tabs, as one key rather than a `type` integer.
+ * The 商品列表 tabs, as one key rather than a `type` integer.
  *
  * `sold_out` and `stock_warning` are *derived* (stock = 0, stock below the
  * configured threshold) rather than stored, which is why they are here and not
@@ -696,7 +695,7 @@ export const pagedStockWarnings = paged(stockWarningItem);
  * `handle()` serialises every response as JSON, so the rows travel as JSON and
  * the admin page turns them into a CSV/XLSX download in the browser. That keeps
  * one response pipeline (validation, audit, error mapping) instead of a second,
- * unvalidated one for file streams; see `docs/rewrite/status/a.md`.
+ * unvalidated one for file streams.
  */
 export const productExportQuery = z.object({
   tab: adminProductTab.default('all'),
@@ -726,7 +725,7 @@ export const productVirtualCard = z.object({
   id,
   skuId: id,
   specText: z.string(),
-  /** The opaque handle shown to the buyer. Legacy `card_unique`. */
+  /** The opaque handle shown to the buyer. */
   cardKey: z.string(),
   cardNo: z.string(),
   cardSecret: z.string().nullable(),
@@ -820,7 +819,7 @@ export const adminReviewListQuery = pageQuery
     keyword: z.string().max(64).optional(),
     productId: id.optional(),
     status: z.union([productReviewStatus, z.array(productReviewStatus)]).optional(),
-    /** 好评 4–5 / 中评 3 / 差评 1–2, as the legacy console groups them. */
+    /** 好评 4–5 / 中评 3 / 差评 1–2. */
     rating: z.enum(['good', 'medium', 'bad']).optional(),
     hasReply: z.stringbool().optional(),
     hasImages: z.stringbool().optional(),
@@ -877,7 +876,7 @@ export const reviewSubmitBody = z
   .strict();
 export type ReviewSubmitBody = z.infer<typeof reviewSubmitBody>;
 
-/** The 评价 header on a product page. Legacy `reply/config/:id`. */
+/** The 评价 header on a product page. */
 export const reviewSummary = z.object({
   total: z.number().int().min(0),
   goodCount: z.number().int().min(0),
@@ -886,7 +885,7 @@ export const reviewSummary = z.object({
   withImagesCount: z.number().int().min(0),
   /** Mean product score, one decimal. `0` when there are no reviews. */
   averageScore: z.number().min(0).max(5),
-  /** Whole percent of 好评. `100` when there are no reviews, as legacy showed. */
+  /** Whole percent of 好评. `100` when there are no reviews. */
   goodRate: z.number().int().min(0).max(100),
 });
 export type ReviewSummary = z.infer<typeof reviewSummary>;
@@ -906,10 +905,9 @@ export const pagedReviews = paged(productReview);
  * one shape; add a field here rather than inventing a parallel DTO.
  *
  * `salesDisplay` is `sales + displaySalesBoost`, already added up — nothing
- * downstream should have to know the padding exists. `canAddToCart` is the
- * legacy `cart_button` rule (`StoreProductServices.php:1187`) decided on the
- * server: a card/coupon/manual product, or one with a custom form, is bought
- * straight away rather than added to a cart.
+ * downstream should have to know the padding exists. `canAddToCart` is decided
+ * on the server: a card/coupon/manual product, or one with a custom form, is
+ * bought straight away rather than added to a cart.
  */
 export const productCard = z.object({
   id,
@@ -979,7 +977,7 @@ export const storefrontProduct = productCard.extend({
 });
 export type StorefrontProduct = z.infer<typeof storefrontProduct>;
 
-/** The SKU matrix on its own, for the cart popup. Legacy `v2/get_attr/:id/:type`. */
+/** The SKU matrix on its own, for the cart popup. */
 export const productSkuMatrix = z.object({
   productId: id,
   specMode: z.boolean(),
@@ -994,7 +992,7 @@ export const storefrontProductListQuery = pageQuery
     labelId: id.optional(),
     priceFrom: money.optional(),
     priceTo: money.optional(),
-    /** The legacy 精品/热卖/最新/促销 columns, as one key. */
+    /** The 精品/热卖/最新/促销 flags, as one key. */
     feature: z.enum(['hot', 'new', 'best', 'benefit', 'recommended']).optional(),
   })
   .extend(sortQuery(['price', 'sales', 'createdAt']).shape);
@@ -1018,7 +1016,7 @@ export const storefrontCategoryTree = z.object({
   items: z.array(storefrontCategoryNode),
   /**
    * Changes whenever any visible category does. The uni-app caches the tree and
-   * only refetches when this moves — the legacy `category_version` endpoint.
+   * only refetches when this moves.
    */
   version: z.string(),
 });
@@ -1038,8 +1036,8 @@ export const pagedFavorites = paged(favoriteItem);
 export const favoriteAddBody = z.object({ productId: id });
 
 /**
- * 批量收藏 (CR-2-h §3) — the 我的收藏 screen's bulk button, which used to fire
- * one request per product and could therefore half-succeed.
+ * 批量收藏 — the 我的收藏 screen's bulk button, in one request so it cannot
+ * half-succeed the way one request per product could.
  *
  * Capped at 50: it is a screenful of tick boxes, not an import.
  */
@@ -1105,7 +1103,7 @@ export const searchHistoryResult = z.object({
 
 /**
  * One consistent fixture reused by every example, so the mock server tells the
- * uni-app and admin streams a coherent story: product 1 is 「经典白T恤」, it has
+ * uni-app and the admin a coherent story: product 1 is 「经典白T恤」, it has
  * two SKUs, it sits in category 7 and it carries label 3.
  */
 export const productCategoryExample: ProductCategory = {

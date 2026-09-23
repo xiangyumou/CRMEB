@@ -1,15 +1,15 @@
 import type { Ctx } from '../kernel/context';
 
 /**
- * The seam onto stream E1's SMS sender.
+ * The seam onto the `sms` domain's sender.
  *
- * E1 owns `core/src/sms/` and writes `sms_logs`; this domain only decides *that*
- * an SMS should go out and with which template code and parameters. The port
- * follows the shape `order/ports.ts` established — a slot, a registrar and a
- * `resolve*` that returns `undefined` — because a shop with no SMS account is
- * the normal case, not a broken one.
+ * `core/src/sms/` writes `sms_logs`; this domain only decides *that* an SMS
+ * should go out and with which template code and parameters. The port follows
+ * the shape `order/ports.ts` established — a slot, a registrar and a `resolve*`
+ * that returns `undefined` — because a shop with no SMS account is the normal
+ * case, not a broken one.
  *
- * Returning a result object rather than throwing is deliberate and matches C's
+ * Returning a result object rather than throwing is deliberate and matches the
  * WeChat client: these calls run behind the effects ledger, where a thrown
  * error costs a retry of the *whole* fan-out — including the channels that
  * already succeeded.
@@ -47,8 +47,8 @@ export function registerSmsPort(impl: SmsPort): void {
 }
 
 /**
- * `undefined` means no SMS provider is wired — either E1 has not merged yet, or
- * the shop configured `provider: 'none'`. The channel is then skipped and
+ * `undefined` means no SMS provider is wired — the `sms` domain is not loaded,
+ * or the shop configured `provider: 'none'`. The channel is then skipped and
  * recorded as skipped, never as failed: parking an effect for a channel the
  * shop deliberately does not use would fill the operator's queue with rows they
  * cannot act on.

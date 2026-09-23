@@ -10,8 +10,7 @@ import { id, instant, money, pageQuery, paged, sortQuery } from '../_conventions
  * by `coupon.service.ts`, which assigns one to the other and would fail to
  * compile if they drifted.
  *
- * Legacy `receive_type = 4` (会员券) has no member here: paid membership is
- * retired, and the ETL drops those rows (see `etl/src/mappers/coupon.ts`).
+ * There is no 会员券 kind: the shop has no paid membership.
  */
 
 // ---------------------------------------------------------------------------
@@ -302,16 +301,16 @@ export const pagedMyCoupons = paged(userCoupon);
 /**
  * One cart line as the checkout picker describes it.
  *
- * The server resolves each line's categories from `productId` (CR-1-h4): the
- * catalogue is the server's, and a category list the client sends would be a
+ * The server resolves each line's categories from `productId`: the catalogue is
+ * the server's, and a category list the client sends would be a
  * client-controlled eligibility input for a 品类券.
  */
 export const couponCartLine = z.object({
   productId: id,
   /**
    * **Ignored.** Accepted so an older client that still sends it is not
-   * refused; the server looks the product's categories up itself (CR-1-h4).
-   * New clients omit it.
+   * refused; the server looks the product's categories up itself. New clients
+   * omit it.
    */
   categoryIds: z.array(id).max(50).optional(),
   /** Line total after item-level discounts: unit price × quantity. */
@@ -362,8 +361,8 @@ export type ClaimResult = z.infer<typeof claimResult>;
 
 /**
  * One consistent fixture reused by every example below, so the mock server
- * tells the uni-app and admin streams a coherent story instead of five
- * unrelated ones.
+ * tells the uni-app and the admin a coherent story instead of five unrelated
+ * ones.
  */
 export const couponTemplateExample: CouponTemplateListItem = {
   id: '1',
@@ -429,7 +428,7 @@ export const claimableCouponExample: ClaimableCoupon = {
 };
 
 // ---------------------------------------------------------------------------
-// 移动端店员发券 (CR-5-h2)
+// 移动端店员发券
 // ---------------------------------------------------------------------------
 
 /**
@@ -483,7 +482,7 @@ export const staffCouponGrantBody = z.object({
 export type StaffCouponGrantBody = z.infer<typeof staffCouponGrantBody>;
 
 // ---------------------------------------------------------------------------
-// 订单赠券 (CR-5-h2)
+// 订单赠券
 // ---------------------------------------------------------------------------
 
 /**
@@ -499,7 +498,7 @@ export const orderGiftCoupons = z.object({
 export type OrderGiftCoupons = z.infer<typeof orderGiftCoupons>;
 
 // ---------------------------------------------------------------------------
-// 店员查看客户持有的优惠券 (CR-1-h3)
+// 店员查看客户持有的优惠券
 // ---------------------------------------------------------------------------
 
 /**

@@ -12,15 +12,14 @@ import { NOTIFICATION_SCOPE } from './notification.effects.repo';
 import * as inbox from './notification.inbox.service';
 
 /**
- * The two inboxes, read as somebody walking the id space (K2, AUDIT.md
- * K-SEC-N1).
+ * The two inboxes, read as somebody walking the id space.
  *
  * Message ids are sequential, and every per-message call — read, mark-read,
  * delete — takes one from the URL. The property is that another person's row
  * answers exactly like a row that does not exist, and is left untouched.
  *
- * K-SEC-N2 is the one write on 通知发送记录: 重试 must not become a way to send
- * a delivered notification (an SMS, a template message) again.
+ * The one write on 通知发送记录 is 重试, and it must not become a way to send a
+ * delivered notification (an SMS, a template message) again.
  */
 
 let harness: TestCtx;
@@ -106,7 +105,7 @@ async function untouched(id: string): Promise<boolean> {
   return row !== undefined && row.readAt === null && row.deletedAt === null;
 }
 
-describe('K-SEC-N1 — another person’s message', () => {
+describe('another person’s message', () => {
   it('answers a shopper’s id to another shopper as not found, on every call', async () => {
     const owner = await makeUser();
     const stranger = await makeUser();
@@ -171,7 +170,7 @@ async function statusOf(id: string): Promise<string | undefined> {
   return row?.status;
 }
 
-describe('K-SEC-N2 — 重试 on a send record', () => {
+describe('重试 on a send record', () => {
   const handler = (): Ctx =>
     harness.as({ kind: 'admin', id: 1, permissions: ['notification:log:handle'], isSuper: false });
 

@@ -17,11 +17,10 @@ import * as repo from './order.repo';
 /**
  * 发票.
  *
- * Legacy's `store_order_invoice` was a second copy of the order — it carried
- * `order_id`, `pay_price`, the address, the items — and the two drifted the
- * moment anything was refunded. Here the row carries only the *header* (who the
- * invoice is made out to, frozen at request time) plus the amount, and
- * everything else is read from the order.
+ * An invoice row that copied the order — its amount, address and items — would
+ * drift from it the moment anything was refunded. So the row carries only the
+ * *header* (who the invoice is made out to, frozen at request time) plus the
+ * amount, and everything else is read from the order.
  *
  * Three rules, all enforced by the database rather than by a prior SELECT:
  *
@@ -37,8 +36,8 @@ import * as repo from './order.repo';
  *  3. **Every status change is a conditional update.** Two operators pressing
  *     开票 and 驳回 at the same instant cannot both win.
  *
- * The e-invoice provider integration stays out of scope (the brief); an
- * operator types the number from whatever system actually issued it.
+ * There is no e-invoice provider integration; an operator types the number from
+ * whatever system actually issued it.
  */
 
 // ---------------------------------------------------------------------------
@@ -48,7 +47,7 @@ import * as repo from './order.repo';
 type InvoiceRow = fulfilRepo.OrderInvoiceRow & { orderNo: string };
 
 /**
- * What the order was for, for the 发票记录 row (CR-4-h §7).
+ * What the order was for, for the 发票记录 row.
  *
  * Read from `order_items` every time rather than copied onto the invoice: the
  * invoice row carries the header and the amount, and nothing that could drift

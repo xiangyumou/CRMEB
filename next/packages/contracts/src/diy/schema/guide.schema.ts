@@ -5,7 +5,6 @@ import { defineDiyComponent, diyColour, diySlider, diyTabs } from './primitives'
 /**
  * `guide` — 辅助线.
  *
- * Fields derived from `template/admin/src/components/mobilePage/z_auxiliary_line.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const guideSchema = defineDiyComponent('guide', {

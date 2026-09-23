@@ -110,7 +110,7 @@ describe('sha256 dedupe under concurrency', () => {
 
 describe('scan tokens are single-use', () => {
   it('lets exactly one of six phones upload through one QR code', async () => {
-    // The old system kept one global token and would have accepted all six.
+    // One global token would have accepted all six.
     const minted = await scanTokenCreate(harness.ctx.as(adminActor(adminId)), {});
 
     const report = await runConcurrently(WORKERS, (index) =>

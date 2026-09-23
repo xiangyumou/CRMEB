@@ -13,11 +13,10 @@ import type { AddressInfo } from 'node:net';
 /**
  * Fake WeChat Pay v3 gateway.
  *
- * Why it exists: the production credentials are not configured and the site is
- * blocked at the edge (PLAN §Context), so the only way payment and refund can
- * ever be tested is against a gateway we control. PLAN §7 lists
- * "微信支付 v3 无凭据无法实测" as a top risk, mitigated by signature vector
- * tests and this.
+ * Why it exists: no test may spend real money or hold real merchant
+ * credentials, so the only way payment and refund can be tested end to end is
+ * against a gateway we control. Together with the signature vector tests, it
+ * is how the v3 client is proved without a live merchant account.
  *
  * Everything security-shaped here is **real**: a real RSA-2048 key pair per
  * instance, real `Wechatpay-Signature` generation over the documented

@@ -21,10 +21,10 @@ import {
 /**
  * The post-commit side-effect ledger.
  *
- * CONVENTIONS: "Anything that calls a third party happens *after* commit, via
- * the effects ledger — never inside the transaction." A domain writes one row
- * in the same transaction as the state change; the dispatcher runs the
- * registered handler after that transaction commits.
+ * `docs/conventions.md`: "Anything that calls a third party happens *after*
+ * commit, via the effects ledger — never inside the transaction." A domain
+ * writes one row in the same transaction as the state change; the dispatcher
+ * runs the registered handler after that transaction commits.
  *
  * Why not "just enqueue a job"? Because an enqueue inside a transaction is a
  * lie: the job can start before the commit lands, or the commit can succeed
@@ -69,9 +69,9 @@ export type EffectHandler = (ctx: Ctx, effect: Effect) => Promise<void>;
  * only for logging; never branch on it for correctness.
  *
  * It takes `ctx` for one reason: `next_run_at` must come from `ctx.clock`, the
- * same clock the dispatcher compares it against. An earlier version read the
- * ambient `new Date()` here and every fixed-clock test silently claimed
- * nothing — which is exactly why CONVENTIONS says to inject the clock.
+ * same clock the dispatcher compares it against. With the ambient `new Date()`
+ * here, every fixed-clock test would silently claim nothing — which is exactly
+ * why `docs/conventions.md` says to inject the clock.
  */
 export async function recordEffect(tx: Tx, ctx: Ctx, input: EffectInput): Promise<boolean> {
   const now = ctx.clock.now();
@@ -266,10 +266,10 @@ async function settleFailure(
 
 export interface DispatchRunOptions extends DispatcherOptions {
   /**
-   * Stop claiming new batches after this long (CR-40-k2). The batch in hand is
-   * always finished, so the run can overshoot by one batch's handlers. Keep it
-   * under the repeat interval, so a run is over before the next one is due and
-   * a redeploy never waits on an unbounded drain.
+   * Stop claiming new batches after this long. The batch in hand is always
+   * finished, so the run can overshoot by one batch's handlers. Keep it under
+   * the repeat interval, so a run is over before the next one is due and a
+   * redeploy never waits on an unbounded drain.
    */
   budgetMs?: number;
   /** A hard stop on batches per run, whatever the clock says. Default 100. */
@@ -292,12 +292,12 @@ const DEFAULT_BUDGET_MS = 4_000;
 /**
  * The production dispatcher run: claim a batch, and while the batch came back
  * **full**, claim the next one straight away — until a batch comes back short
- * (nothing more is due) or the time budget is spent (CR-40-k2).
+ * (nothing more is due) or the time budget is spent.
  *
- * It used to be exactly one batch per tick: 50 rows every 5 s is a ceiling of
- * 10 effects/s per worker however long the queue was, and a paid order records
- * about six. The load smoke queued ~117/s and left 7944 pending after a
- * minute. The budget keeps the job's promise that a run always returns.
+ * Exactly one batch per tick would be a ceiling: 50 rows every 5 s is 10
+ * effects/s per worker however long the queue is, and a paid order records
+ * about six — under load the queue would only grow. The budget keeps the job's
+ * promise that a run always returns.
  *
  * Time is `ctx.clock`, so a test drives the budget with a fake clock.
  */

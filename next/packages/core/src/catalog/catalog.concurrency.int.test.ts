@@ -26,10 +26,10 @@ import '../order';
 /**
  * One race per conditional state change in the catalog.
  *
- * CONVENTIONS: "Every conditional state change ships a concurrency test using
- * `runConcurrently`." The rule exists because a read-then-write bug passes
- * every sequential test ever written; the only thing that catches it is N
- * callers released on the same tick against a real PostgreSQL.
+ * `docs/conventions.md`: "Every conditional state change ships a concurrency
+ * test using `runConcurrently`." The rule exists because a read-then-write bug
+ * passes every sequential test ever written; the only thing that catches it is
+ * N callers released on the same tick against a real PostgreSQL.
  *
  * `forkTestCtx` gives the contenders their own `Ctx` — their own transactions
  * and their own config service — so they collide on the row rather than
@@ -64,7 +64,7 @@ const asAdmin = (): Ctx => harness.as(adminActor(adminId));
 const ctxFor = (index: number): Ctx => (index % 2 === 0 ? asAdmin() : other);
 
 // ---------------------------------------------------------------------------
-// STOCK-003 — the last unit (risk matrix §1)
+// STOCK-003 — the last unit
 // ---------------------------------------------------------------------------
 
 describe('reserving the last unit', () => {
@@ -305,7 +305,7 @@ describe('two operators submitting the same moderation batch', () => {
 });
 
 // ---------------------------------------------------------------------------
-// a hot product page (CR-41-k2)
+// a hot product page
 // ---------------------------------------------------------------------------
 
 describe('a promotion sending everyone to one product page', () => {
@@ -387,16 +387,15 @@ describe('a double-tapped heart', () => {
 });
 
 // ---------------------------------------------------------------------------
-// the staff 修改价格/库存 editor against live orders (CR-4-h2)
+// the staff 修改价格/库存 editor against live orders
 // ---------------------------------------------------------------------------
 
 describe('the staff SKU editor while orders are being placed', () => {
   /**
    * A price edit must not un-sell anything.
    *
-   * This is the legacy defect written down as a test. `postUpdateAttrs` rewrote
-   * the whole `eb_store_product_attr_value` row, so an operator who opened
-   * 修改价格 and typed a new price also wrote back the stock the screen had
+   * An editor that rewrote the whole SKU row would let an operator who opened
+   * 修改价格 and typed a new price also write back the stock the screen had
    * loaded — silently restoring every unit sold in between. The patch shape
    * makes it impossible: `stock` was not sent, so `stock` is not written, and
    * the eight concurrent reservations all stand.

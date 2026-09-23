@@ -278,9 +278,9 @@ describe('registration', () => {
 describe('the default address', () => {
   it('leaves exactly one default when six rows are promoted at once', async () => {
     // `user_addresses_default_uq` is a partial unique index over the live
-    // default rows. Without it the legacy "clear then set" pair interleaves and
-    // the shopper ends up with two defaults — and the checkout picks whichever
-    // the planner felt like returning first.
+    // default rows. Without it a "clear then set" pair interleaves and the
+    // shopper ends up with two defaults — and the checkout picks whichever the
+    // planner felt like returning first.
     const user = await makeUser();
     const ctx = harness.as({ kind: 'user', id: user.id, permissions: [], isSuper: false });
     const created: Array<{ id: string }> = [];

@@ -6,8 +6,8 @@ import { todayFigures } from './stats.service';
  * What 统计 contributes to the admin home page.
  *
  * Three tiles, each against yesterday, and each a link to the page that
- * explains it — the legacy home page showed the same numbers with nowhere to
- * go and computed them a fourth way on top of that.
+ * explains it and computes it the same way — a tile with nowhere to go, or with
+ * a definition of its own, is a fourth number to argue about.
  *
  * Registered from `stats/index.ts` through `registerDashboardContributor`, so
  * a shop that has not imported this domain simply has no statistics tiles

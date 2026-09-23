@@ -26,8 +26,8 @@ import { hasPermission } from '../auth/rbac';
  *    screen an operator sees during an incident; it must not be the second
  *    casualty.
  * 2. **A contributor that is not loaded contributes nothing** — no zero, no
- *    placeholder. F2 registers the order and user figures later; until then the
- *    page shows what exists rather than inventing numbers.
+ *    placeholder. A deployment without the stats contributor shows what exists
+ *    rather than inventing numbers.
  * 3. **Tiles are permission-filtered.** Somebody who cannot open the orders
  *    screen does not learn today's revenue from the home page.
  */
@@ -70,8 +70,7 @@ export async function dashboardHeader(ctx: Ctx): Promise<DashboardHeader> {
   const tiles: DashboardTile[] = [];
   const degraded: string[] = [];
 
-  // In parallel: six sequential dashboard queries is how the old page took two
-  // seconds to paint.
+  // In parallel: six sequential dashboard queries take seconds to paint.
   const settled = await Promise.all(
     eligible.map(async (contributor) => {
       try {

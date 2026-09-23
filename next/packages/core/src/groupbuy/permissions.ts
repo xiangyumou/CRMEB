@@ -5,9 +5,8 @@ import { definePermissions } from '../auth/permissions';
  *
  * `group:complete` is separate from `group:read` and from `activity:write` on
  * purpose: 立即成团 invents buyers, and inventing buyers is a different kind of
- * act from editing a campaign or looking at one. Legacy had no permission for
- * it at all — `virtualCombination($pinkId, $operator)` took the operator's name
- * as a *string argument* and any admin with the 拼团 menu could press it.
+ * act from editing a campaign or looking at one. Without its own atom, any
+ * admin with the 拼团 menu could fake a team.
  *
  * The atom string is `groupbuy:<resource>:<action>`; `definePermissions` adds
  * the domain prefix, so the keys here omit it.

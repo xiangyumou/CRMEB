@@ -20,8 +20,9 @@
  * once.
  *
  * `registerNotificationEvents` is exported for the same reason the permission
- * registry is: a domain that owns an event owns its wording. Stream D's
- * group-buy notifications belong in D's `index.ts`, not in this file's table.
+ * registry is: a domain that owns an event owns its wording. Group-buy
+ * notifications belong in the group-buy domain's `index.ts`, not in this file's
+ * table.
  */
 
 export {
@@ -65,9 +66,9 @@ import { installNotificationHooks } from './notification.effects';
  * Idempotent, and the only place registration happens.
  *
  * `@shop/core/domains` calls it once per app at bootstrap. Registering from a
- * job or a route file is what left `refund.execute` parked as `unknown`
- * (CR-8-c): the registration then depends on which module a request happened to
- * load first.
+ * job or a route file makes the registration depend on which module a request
+ * happened to load first, and an effect whose handler was not loaded yet parks
+ * as `unknown`.
  */
 export function registerNotificationDomain(): void {
   registerBuiltInNotificationEvents();

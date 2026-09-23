@@ -13,10 +13,9 @@ import {
  *
  * `order/ports.ts` declares the `StockPort` (the *write* side of inventory);
  * this file declares the *read* side — the batch variant read the cart and
- * checkout price against — because it was written by stream B1 before stream
- * A existed, and A then implemented it (`catalog/catalog.sale.ts`). B1's own
- * repo-backed stand-in and the fallback resolution that used it were retired
- * at merge: every `resolve*()` below now fails closed, and the domain bucket
+ * checkout price against — because the order domain is the one asking, and the
+ * catalog implements it (`catalog/catalog.sale.ts`). There is no fallback:
+ * every `resolve*()` below fails closed, and the domain bucket
  * (`@shop/core/domains`) is what registers the real ports.
  */
 
@@ -111,13 +110,13 @@ export function resolveStockPort(): StockPort {
 }
 
 /**
- * `null` until stream C registers a `PaymentPort`.
+ * `null` until the payment domain registers a `PaymentPort`.
  *
  * The cancel path treats `null` as `closed` — with a log line — and that is
  * sound rather than optimistic: if no payment domain is loaded at all, no
- * attempt can be in flight and no money can arrive. The moment C registers a
- * port the real three-way answer (`closed` / `paid` / `unknown`) is used and
- * nothing else changes.
+ * attempt can be in flight and no money can arrive. The moment payment
+ * registers a port the real three-way answer (`closed` / `paid` / `unknown`) is
+ * used and nothing else changes.
  */
 export function resolvePaymentPort(): PaymentPort | null {
   try {

@@ -9,8 +9,8 @@ import * as repo from './shipping.repo';
  * Read-only on both surfaces. `cities` is seed data the whole shop keys on:
  * freight regions point at division ids and every delivery address snapshots
  * one, so a division renamed or deleted at runtime silently re-prices orders.
- * The legacy system had add/edit/delete plus a `city/clean_cache` route — the
- * cache-bust existed *because* the writes existed. Neither has a successor.
+ * There are no writes, and so no cache-bust route either: a cache-bust is only
+ * needed where writes exist.
  *
  * Caching: the flat rows are fetched once per process and re-used while a cheap
  * fingerprint (row count + max id) still matches, so an unlucky container that
@@ -30,7 +30,7 @@ export function resetCityTreeCache(): void {
   cached = null;
 }
 
-/** `setHeader` is present when the call came through `handle()`, absent in jobs and tests (G1's convention). */
+/** `setHeader` is present when the call came through `handle()`, absent in jobs and tests. */
 export type ReadCtx = Ctx & { setHeader?: (name: string, value: string) => void };
 
 export async function cityTree(ctx: ReadCtx): Promise<CityTree> {

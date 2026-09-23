@@ -16,10 +16,10 @@ import { createdAt, fk, instant, pk, updatedAt } from './_shared';
  */
 
 /**
- * Replaces the old 575-key `sys_config` blob. Values are stored per
- * `(group, key)` as JSON so a boolean stays a boolean; the shape is validated
- * against the zod schema of `defineConfigGroup({ group, ... })` on write, and
- * reads go through `config.get('<group>')`, never by key.
+ * Typed configuration (see `core/src/kernel/config-registry.ts`). Values are
+ * stored per `(group, key)` as JSON so a boolean stays a boolean; the shape is
+ * validated against the zod schema of `defineConfigGroup({ group, ... })` on
+ * write, and reads go through `config.get('<group>')`, never by key.
  */
 export const configValues = pgTable(
   'config_values',
@@ -29,7 +29,7 @@ export const configValues = pgTable(
     key: varchar({ length: 64 }).notNull(),
     value: jsonb().notNull(),
     updatedAt: updatedAt(),
-    /** Who last wrote it; null for seeds and for the ETL. */
+    /** Who last wrote it; null for seeds and jobs. */
     updatedBy: fk(),
   },
   (t) => [primaryKey({ columns: [t.group, t.key] })],
@@ -42,11 +42,12 @@ export type EffectStatus = (typeof EFFECT_STATUSES)[number];
 /**
  * The side-effect ledger.
  *
- * CONVENTIONS: "anything that calls a third party happens *after* commit, via
- * the effects ledger — never inside the transaction". A domain writes a row
- * inside its transaction with `recordEffect(tx, …)` (INSERT … ON CONFLICT DO
- * NOTHING, so recording twice is free), and the dispatcher claims rows with
- * `FOR UPDATE SKIP LOCKED` after the commit and runs the registered handler.
+ * `docs/conventions.md`: "anything that calls a third party happens *after*
+ * commit, via the effects ledger — never inside the transaction". A domain
+ * writes a row inside its transaction with `recordEffect(tx, …)` (INSERT … ON
+ * CONFLICT DO NOTHING, so recording twice is free), and the dispatcher claims
+ * rows with `FOR UPDATE SKIP LOCKED` after the commit and runs the registered
+ * handler.
  *
  * `UNIQUE (scope, scope_id, event_type)` is the whole exactly-once story: the
  * same event for the same aggregate can only ever be enqueued once, and the

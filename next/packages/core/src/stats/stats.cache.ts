@@ -17,7 +17,7 @@ import { statsConfig } from './stats.config';
  *    because a cache is unwell is worse than a slow one.
  * 2. **`generatedAt` is inside the cached value**, so a stale block says so.
  *    Recomputing the timestamp on the way out would make a minute-old number
- *    claim to be current, which is exactly the lie the legacy dashboard told.
+ *    claim to be current.
  * 3. **The key carries the window**, not "today": a chart of last week and a
  *    chart of last month are different entries, and nothing has to be
  *    invalidated when the day rolls over — the key simply changes.

@@ -38,10 +38,11 @@ import { clearAutoRefundPort, registerAutoRefundPort, registerPresaleDomain } fr
  * payment does to the campaign's own counters, what a cancel and a refund put
  * back, and that the window sweep opens and closes on time.
  *
- * Orders are written directly rather than through B1's checkout. This stream
- * attaches to the order aggregate through `order/ports.ts`, and driving the
- * whole checkout here would be testing B1. What the two halves of the kind
- * handler do inside one transaction is exactly what B1 does with them.
+ * Orders are written directly rather than through the real checkout. This
+ * domain attaches to the order aggregate through `order/ports.ts`, and driving
+ * the whole checkout here would be testing the order domain. What the two
+ * halves of the kind handler do inside one transaction is exactly what the
+ * checkout does with them.
  */
 
 let harness: TestCtx;
@@ -236,7 +237,7 @@ async function makeOrder(args: {
 }
 
 /**
- * The whole "place a presale order" path as B1 would drive it: the kind
+ * The whole "place a presale order" path as the checkout drives it: the kind
  * handler's two halves inside one transaction.
  *
  * `lines` is a single line on purpose — `assertOrderShape` refuses anything
@@ -279,14 +280,14 @@ async function placeOrder(args: {
 }
 
 /**
- * B1's pricing pass, in miniature (CR-1-d2).
+ * The checkout's pricing pass, in miniature.
  *
- * `beforeCreate` no longer re-runs the contributor to find out whether it
- * fired: `create` hands it what the pass actually applied. A driver that did
- * not do the same would be testing a guard against a draft no real checkout
- * produces, so this runs every registered contributor over the draft and splits
- * the result exactly as `create` does — on the caller's transaction, which is
- * also how B1 avoids a second pooled connection per checkout.
+ * `beforeCreate` does not re-run the contributor to find out whether it fired:
+ * `create` hands it what the pass actually applied. A driver that did not do
+ * the same would be testing a guard against a draft no real checkout produces,
+ * so this runs every registered contributor over the draft and splits the
+ * result exactly as `create` does — on the caller's transaction, which is also
+ * how the checkout avoids a second pooled connection.
  */
 async function priceDraft(ctx: Ctx, tx: Tx, draft: PricingDraft) {
   const reading = { ...ctx, db: tx as Ctx['db'] };
@@ -297,7 +298,7 @@ async function priceDraft(ctx: Ctx, tx: Tx, draft: PricingDraft) {
   return splitAdjustments(draft.lines, raw).applied;
 }
 
-/** Marks the order paid and fires the hook, the way stream C's callback does. */
+/** Marks the order paid and fires the hook, the way the payment callback does. */
 async function pay(orderId: number): Promise<void> {
   const at = harness.clock.now();
   await withTx(harness.ctx.db, async (tx) => {
@@ -399,19 +400,19 @@ async function effectsFor(scopeId: string, eventType: string) {
 // ---------------------------------------------------------------------------
 
 describe('beforeCreate', () => {
-  it('accepts an order the campaign repriced, at the catalogue price (CR-1-d)', async () => {
+  it('accepts an order the campaign repriced, at the catalogue price', async () => {
     const fixture = await makeActivity();
     const userId = await makeUser();
     // 88.00 is the catalogue price, which is what the *lines* carry: a
     // contributor never rewrites a line, it contributes an adjustment that
-    // lands in `orders.coupon_discount` (CR-3-b1). The guard compares the
-    // discount the campaign owes against what the contributor produces, so
-    // this — the ordinary, correctly priced presale order — passes.
+    // lands in `orders.coupon_discount`. The guard compares the discount the
+    // campaign owes against what the contributor produces, so this — the
+    // ordinary, correctly priced presale order — passes.
     await expect(placeOrder({ userId, fixture, amount: '88.00' })).resolves.toBeGreaterThan(0);
     expect(await readCounters(fixture)).toMatchObject({ activity: { stock: 99, sales: 0 } });
   });
 
-  it('refuses an order the pricing contributor did not reprice (CR-1-d)', async () => {
+  it('refuses an order the pricing contributor did not reprice', async () => {
     const fixture = await makeActivity();
     const userId = await makeUser();
     // The registry replaces by name, so a no-op under the presale contributor's
@@ -503,8 +504,8 @@ describe('placing an order', () => {
       stage: 'final_pending',
       depositAmount: null,
       finalAmount: '118.00',
-      // B1 owns the payment deadline; a second countdown would be a second
-      // answer to the same question.
+      // The order domain owns the payment deadline; a second countdown would be
+      // a second answer to the same question.
       finalDueAt: null,
       finalPaidAt: null,
       shipNotBeforeAt: null,
@@ -535,7 +536,8 @@ describe('placing an order', () => {
   });
 
   it('enforces the campaign quota in the same statement as the stock', async () => {
-    // Legacy checked `total_quota` with a separate SELECT, then decremented.
+    // Not a separate SELECT on `total_quota` and then a decrement: that
+    // oversells.
     const fixture = await makeActivity({ stock: 10, totalQuota: 1 });
     const first = await makeUser();
     const second = await makeUser();
@@ -609,7 +611,7 @@ describe('paying', () => {
     await pay(orderId);
 
     const [reservation] = await repo.listStockLedger(harness.ctx.db, orderId);
-    // The sale has no row of its own — two reasons, frozen schema — so the
+    // The sale has no row of its own — the reason enum has two values — so the
     // reservation row is amended to say what it now means.
     expect(reservation).toMatchObject({
       reason: 'reserve',
@@ -682,8 +684,7 @@ describe('paying', () => {
       expect((await readPresaleOrder(second))?.stage).toBe('cancelled');
 
       // The money is already the shop's, so it has to be given back — and it is
-      // asked for as an effect, because the refund domain has no
-      // system-initiated entry point yet (CR-3-d).
+      // asked for as an effect, so the gateway call happens after commit.
       expect(await effectsFor(String(second), 'presale.refund')).toHaveLength(1);
       expect(await effectsFor(String(second), 'presale.paid')).toHaveLength(0);
       expect(await effectsFor(String(first), 'presale.refund')).toHaveLength(0);
@@ -965,8 +966,8 @@ describe('the admin surface', () => {
   });
 
   it('keeps 已售 across an edit', async () => {
-    // Legacy's `saveAdvance` rewrote the row wholesale and zeroed 已售 every time
-    // somebody fixed a typo in the title.
+    // Rewriting the row wholesale would zero 已售 every time somebody fixed a
+    // typo in the title.
     const fixture = await makeActivity({ stock: 10 });
     const userId = await makeUser();
     await pay(await placeOrder({ userId, fixture }));
@@ -1096,7 +1097,7 @@ describe('the storefront surface', () => {
     expect((await service.detail(ctx, { id: String(fixture.activityId) })).skus).toHaveLength(0);
   });
 
-  it('404s a draft by id, and keeps a paused or ended campaign readable but not buyable (CR-34-k2)', async () => {
+  it('404s a draft by id, and keeps a paused or ended campaign readable but not buyable', async () => {
     const ctx = asUser(await makeUser());
     const draft = await makeActivity({ status: 'draft' });
     await expect(service.detail(ctx, { id: String(draft.activityId) })).rejects.toMatchObject({
@@ -1122,7 +1123,7 @@ describe('the storefront surface', () => {
   });
 });
 
-describe('the CR-3-d refund seam', () => {
+describe('the system refund seam', () => {
   /** Two orders, a quota of one: the second payment is the one that needs it. */
   async function loseTheQuota(): Promise<number> {
     const fixture = await makeActivity({ stock: 10, totalQuota: 1 });

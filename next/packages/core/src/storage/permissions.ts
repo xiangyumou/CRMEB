@@ -3,10 +3,10 @@ import { definePermissions } from '../auth/permissions';
 /**
  * Media-library atoms.
  *
- * The old system had one `上传图片` checkbox covering the library, the folders
- * and the delete button. Deleting is not the same act as uploading — a content
- * editor needs `write`, only a manager needs `delete` — so they are separate
- * atoms here, and the folder tree is separate again.
+ * Deleting is not the same act as uploading — a content editor needs `write`,
+ * only a manager needs `delete` — so one `上传图片` checkbox covering the
+ * library, the folders and the delete button would be too coarse. They are
+ * separate atoms, and the folder tree is separate again.
  *
  * There is deliberately **no atom for the storefront upload endpoint**: a
  * shopper is not an admin and holds no atoms. That endpoint is guarded by

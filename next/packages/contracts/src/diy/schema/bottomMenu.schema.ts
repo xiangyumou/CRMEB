@@ -12,7 +12,6 @@ import {
 /**
  * `bottomMenu` — 底部菜单.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_bottom_menu.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const bottomMenuSchema = defineDiyComponent('bottomMenu', {

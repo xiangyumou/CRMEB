@@ -213,9 +213,9 @@ describe('categories', () => {
     expect(tree.items.map((i) => i.id)).not.toContain(id);
   });
 
-  // CR-3-h: the cheap "has the tree changed?" the storefront asks on every
-  // cold start. It has to be the *same* string the tree carries, or a client
-  // that compares the two decides the menu moved when it did not.
+  // The cheap "has the tree changed?" the storefront asks on every cold start.
+  // It has to be the *same* string the tree carries, or a client that compares
+  // the two decides the menu moved when it did not.
   it('answers the version alone with exactly what the tree carries', async () => {
     await makeCategory(asAdmin(), '版本类目');
     const tree = await storefront.categoryTree(harness.ctx);
@@ -422,7 +422,7 @@ describe('products', () => {
 });
 
 // ---------------------------------------------------------------------------
-// the shelf switch — risk matrix §1
+// the shelf switch
 // ---------------------------------------------------------------------------
 
 describe('taking a product off the shelf', () => {
@@ -593,7 +593,7 @@ describe('stock', () => {
 
     // An order is refunded line by line. Keying the ledger on the order alone
     // would swallow the second refund and leave four units off the shelf for
-    // good — CR-1-a.
+    // good.
     await harness.ctx.withTx((tx) =>
       catalogStockPort.release(tx, 12, [{ skuId, quantity: 2 }], {
         committed: true,
@@ -677,7 +677,7 @@ describe('stock', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 库存预警 (CR-2-e2)
+// 库存预警
 // ---------------------------------------------------------------------------
 
 describe('低库存提醒', () => {
@@ -763,8 +763,8 @@ describe('低库存提醒', () => {
     const product = await makeProduct(asAdmin());
     const skuId = await firstSkuId(harness, product.id);
 
-    // B1 aborts its transaction on a short line, and a 库存预警 about stock
-    // that was never taken would send somebody to restock a full shelf.
+    // Checkout aborts its transaction on a short line, and a 库存预警 about
+    // stock that was never taken would send somebody to restock a full shelf.
     await expect(
       harness.ctx.withTx(async (tx) => {
         await catalogStockPort.reserve(tx, 120, [{ skuId, quantity: 8 }], harness.ctx);
@@ -976,7 +976,7 @@ describe('browse history', () => {
   });
 });
 
-describe('product views, folded by the worker (CR-41-k2)', () => {
+describe('product views, folded by the worker', () => {
   // `created_at` is the database's clock, not the harness's, so the tests fold
   // with no grace period: every committed view is settled.
   const fold = (options: Parameters<typeof foldProductViews>[1] = {}) =>
@@ -1571,7 +1571,7 @@ describe('errors', () => {
 });
 
 // ---------------------------------------------------------------------------
-// CR-2-h §3 — 批量收藏
+// 批量收藏
 // ---------------------------------------------------------------------------
 
 describe('批量收藏', () => {

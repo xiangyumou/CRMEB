@@ -26,7 +26,7 @@ import { handleEvent, verifyUrl } from './wechat-oa.webhook.service';
  * The Official Account domain against a real database, real Redis and a fake
  * `api.weixin.qq.com`.
  *
- * Two of the invariants this stream exists to prove live here — "a webhook
+ * Two of the invariants this domain exists to prove live here — "a webhook
  * replay with the same MsgId replies once" and "a webhook with a bad signature
  * is rejected before any parsing side effect" — and both are written as the
  * *observable* thing: what came back, and what the database says afterwards.
@@ -98,7 +98,7 @@ async function configure(overrides: { messageMode?: 'plain' | 'safe' } = {}): Pr
 /**
  * A triple signed at `NOW`, with a nonce of its own: the callback spends each
  * `(timestamp, nonce)` on one body and refuses a timestamp more than five
- * minutes off its clock (CR-7-k2), exactly as WeChat's own deliveries expect.
+ * minutes off its clock, exactly as WeChat's own deliveries expect.
  */
 let nonceSeq = 1372623149;
 function plainQuery(timestamp = String(NOW_SECONDS), nonce = String((nonceSeq += 1))) {
@@ -532,7 +532,7 @@ describe('menu publish', () => {
 
   it('refuses to publish for a shop that has configured no account', async () => {
     const draft = await menu.create(ctx(), { name: '默认菜单', buttons: tree });
-    // CR-1-j: the app id lives in C's group alone, so blanking it there is
+    // The app id lives in the `wechat` group alone, so blanking it there is
     // what "this shop has no Official Account" means.
     await harness.ctx.config.set(wechatConfig, { oaAppId: '' });
 
@@ -682,7 +682,7 @@ describe('channel QR codes', () => {
     await expect(qrcode.deleteCategory(ctx(), { id: category.id })).resolves.toBeUndefined();
   });
 
-  it('frees a deleted category’s name for reuse (CR-3-e3)', async () => {
+  it('frees a deleted category’s name for reuse', async () => {
     // A code's scene must stay taken for ever — the poster is on a wall. A
     // *category* name is only a label in an admin dropdown, so the opposite is
     // true: 地推 deleted in March has to be available again in April. The
@@ -785,9 +785,9 @@ describe('the material library', () => {
   });
 
   it('recovers from a dead cached token by itself, as every other WeChat call does', async () => {
-    // CR-31-k2: the upload used to call `fetch` with a token it fetched once, so
-    // a token WeChat had already rotated surfaced as `WECHAT_OA_API_FAILED
-    // 40001`. Through C's `upload` it is dropped and the call retried once.
+    // An upload that called `fetch` with a token it fetched once would surface
+    // a token WeChat had already rotated as `WECHAT_OA_API_FAILED 40001`.
+    // Through the client's `upload` it is dropped and the call retried once.
     await harness.redis.set(`wechat:access-token:${oa.appId}`, 'ROTATED_AWAY', 'PX', 60_000);
     const attachmentId = await seedAttachment();
 

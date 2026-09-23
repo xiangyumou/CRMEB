@@ -14,7 +14,6 @@ import {
 /**
  * `goodList` — 商品列表.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_goods_list.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const goodListSchema = defineDiyComponent('goodList', {

@@ -23,7 +23,7 @@ import * as service from './refund.service';
  *
  * Every other refund test builds its operator with `isSuper: true`. That
  * short-circuits `hasPermission` before it reads a single atom, so nothing
- * there shows what a narrow role can and cannot do (CR-14-k).
+ * there shows what a narrow role can and cannot do.
  *
  * The staff half is here too: the staff entry points the 商家管理 console is
  * wired to, and the wall between them and the admin services.
@@ -69,10 +69,10 @@ async function refusalOf(run: () => Promise<unknown>): Promise<DomainError> {
 }
 
 // ---------------------------------------------------------------------------
-// CR-10-k — the 售后设置 group
+// the 售后设置 group
 // ---------------------------------------------------------------------------
 
-describe('CR-10-k — who may rewrite the return address', () => {
+describe('who may rewrite the return address', () => {
   const redirect = { values: { returnAddress: '别处 1 号' } };
 
   it.each([
@@ -107,7 +107,7 @@ describe('CR-10-k — who may rewrite the return address', () => {
 });
 
 // ---------------------------------------------------------------------------
-// CR-14-k — the request atoms, one at a time
+// the request atoms, one at a time
 // ---------------------------------------------------------------------------
 
 const ALL_REQUEST_ATOMS = [
@@ -278,7 +278,7 @@ async function sceneAt(state: 'applied' | 'approved'): Promise<Scene> {
   return s;
 }
 
-describe('CR-14-k — each refund admin action refused for an admin without its atom', () => {
+describe('each refund admin action refused for an admin without its atom', () => {
   it.each(ACTIONS)(
     'refuses %s to an admin holding every other refund atom, and writes nothing',
     async (_label, atom, state, act) => {
@@ -310,7 +310,7 @@ describe('CR-14-k — each refund admin action refused for an admin without its 
   );
 });
 
-describe('CR-14-k — review and execute are separate grants', () => {
+describe('review and execute are separate grants', () => {
   it('request:review approves but cannot confirm the goods came back or retry', async () => {
     const s = await scene('return_and_refund');
     const reviewer = as(adminWith(['refund:request:read', 'refund:request:review'], s.adminId));
@@ -353,10 +353,10 @@ describe('CR-14-k — review and execute are separate grants', () => {
 });
 
 // ---------------------------------------------------------------------------
-// CR-14-k — the staff entry points
+// the staff entry points
 // ---------------------------------------------------------------------------
 
-describe('CR-14-k — the staff console and the admin services stay apart', () => {
+describe('the staff console and the admin services stay apart', () => {
   it('still refuses a staff actor on every admin service, whatever it is', async () => {
     const s = await sceneAt('applied');
     const before = await written(s.refundId);
@@ -398,7 +398,7 @@ describe('CR-14-k — the staff console and the admin services stay apart', () =
   });
 });
 
-describe('CR-14-k — a staff member reviews through the same transitions', () => {
+describe('a staff member reviews through the same transitions', () => {
   it('lists and reads the after-sale', async () => {
     const s = await sceneAt('applied');
     const ctx = as(staffActor(s.staffUserId));

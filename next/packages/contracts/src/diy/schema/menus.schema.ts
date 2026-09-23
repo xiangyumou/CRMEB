@@ -12,7 +12,6 @@ import {
 /**
  * `menus` — 导航组.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_menu.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const menusSchema = defineDiyComponent('menus', {

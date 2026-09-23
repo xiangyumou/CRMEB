@@ -22,9 +22,9 @@ export type ProductKind = z.infer<typeof productKind>;
  * Why a cart row cannot be checked out.
  *
  * `ok` is the only value that lets a line into an order. The rest are shown
- * greyed out with a reason instead of being deleted behind the shopper's back —
- * legacy silently dropped invalid rows from the list, which is how a customer
- * ends up asking support where their basket went.
+ * greyed out with a reason instead of being deleted behind the shopper's back:
+ * rows that silently vanish are how a customer ends up asking support where
+ * their basket went.
  */
 export const cartItemState = z.enum([
   'ok',
@@ -132,7 +132,7 @@ export const pagedCartItems = paged(cartItem);
 export const cartCount = z.object({
   /** Number of cart rows, available and not. The tab-bar badge. */
   items: z.number().int().min(0),
-  /** Sum of every row's quantity. Legacy `count` used this for the badge. */
+  /** Sum of every row's quantity. */
   quantity: z.number().int().min(0),
   availableCount: z.number().int().min(0),
   unavailableCount: z.number().int().min(0),
@@ -159,14 +159,13 @@ export type CartAddBody = z.infer<typeof cartAddBody>;
 export const cartUpdateBody = z
   .object({
     /**
-     * 修改规格 — move this row onto another variant of the same product
-     * (CR-2-h §1).
+     * 修改规格 — move this row onto another variant of the same product.
      *
-     * The storefront used to do it as delete-then-add, which loses the row if
-     * the second call fails. Here it is one transaction, and the merge rule is
-     * the one `addItem` already has: if another row already holds this variant
-     * the two fold together and the answer carries the surviving row, whose
-     * `id` is then **not** the one that was PATCHed.
+     * Delete-then-add would lose the row if the second call failed. Here it is
+     * one transaction, and the merge rule is the one `addItem` already has: if
+     * another row already holds this variant the two fold together and the
+     * answer carries the surviving row, whose `id` is then **not** the one that
+     * was PATCHed.
      */
     skuId: id.optional(),
     /** Absolute quantity. Omit to leave it alone. */
@@ -181,14 +180,13 @@ export const cartUpdateBody = z
 export type CartUpdateBody = z.infer<typeof cartUpdateBody>;
 
 /**
- * 减少数量, by variant rather than by row (CR-2-h §2).
+ * 减少数量, by variant rather than by row.
  *
  * The product detail page's stepper knows the SKU it is looking at, not whether
  * a cart row exists for it, so the alternative is listing the whole cart to
  * find a row id before every tap of the minus button — on the hottest screen in
- * the app. Legacy expressed it as `cart/add` with a negative `cartNum`; a
- * negative quantity on `POST /cart/items` would make "add" mean two things, so
- * it is its own sub-resource.
+ * the app. A negative quantity on `POST /cart/items` would make "add" mean two
+ * things, so it is its own sub-resource.
  *
  * Reaching zero removes the row, and `item` in the answer is then `null`.
  */

@@ -5,10 +5,9 @@ import type { SkuForSale } from '../order';
  * What a cart row is allowed to be, as pure functions.
  *
  * The rule the whole file exists for: **a cart row is never silently deleted**.
- * Legacy's `getUserProductCartList` dropped unsellable rows from the response,
- * which is how a shopper ends up asking support where their basket went. Here
- * a dead row comes back with a `state` and `available: false`, greyed out, with
- * a 清空失效商品 button next to it.
+ * Dropping unsellable rows from the response is how a shopper ends up asking
+ * support where their basket went. So a dead row comes back with a `state` and
+ * `available: false`, greyed out, with a 清空失效商品 button next to it.
  */
 
 /** The most units one cart row may ever hold, whatever the shopper types. */
@@ -79,7 +78,7 @@ export function refuseQuantity(
  */
 export function capFor(sku: SkuForSale): number {
   // `product_virtual_cards_order_item_uq`: one card key per order item, so the
-  // stepper on a 卡密 product does not go past 1 (CR-3-b2).
+  // stepper on a 卡密 product does not go past 1.
   if (sku.productKind === 'virtual_card') return 1;
   const limit =
     sku.purchaseLimitMode !== 'none' && sku.purchaseLimitQuantity !== null

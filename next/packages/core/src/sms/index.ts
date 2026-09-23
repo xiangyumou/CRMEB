@@ -3,8 +3,8 @@
  *
  * | Function                | Caller      | When                                        |
  * | ----------------------- | ----------- | ------------------------------------------- |
- * | `sendVerificationCode`  | E1 (`user`) | 发送验证码 on every login / bind flow        |
- * | `verifyCode`            | E1 (`user`) | inside the flow that consumes the code       |
+ * | `sendVerificationCode`  | `user`      | 发送验证码 on every login / bind flow        |
+ * | `verifyCode`            | `user`      | inside the flow that consumes the code       |
  * | `registerSmsSender`     | tests, boot | swap the provider without touching config    |
  *
  * `verifyCode` throws — it is always called inside a user-facing transaction
@@ -12,9 +12,9 @@
  * provider outage is a refusal the caller has to shape into a 502.
  *
  * This domain has **no config group of its own**: the provider credentials and
- * the per-phone budgets are F1's `sms` group, and the code TTL / attempt budget
- * belong to the login flow, so they live in the `user` domain's
- * `storefront-auth` group and arrive as arguments.
+ * the per-phone budgets are the `system` domain's `sms` group, and the code TTL
+ * / attempt budget belong to the login flow, so they live in the `user`
+ * domain's `storefront-auth` group and arrive as arguments.
  */
 import { registerSiteAuthMethod, smsConfig } from '../system';
 import { smsSenderUsable } from './sms.service';
@@ -54,7 +54,7 @@ export {
  * Wires the domain into the platform; called once per process from the gen'd
  * bootstrap, like `registerPaymentDomain()`.
  *
- * 手机号登录 on `GET /api/v1/site/config` (CR-3-h3) is offered exactly when
+ * 手机号登录 on `GET /api/v1/site/config` is offered exactly when
  * `resolveSender` would return a sender that can deliver. `system` may not
  * import this domain back, so the probe is handed over rather than looked up.
  */

@@ -6,13 +6,11 @@ import * as repo from './presale.repo';
 /**
  * The sale window, opened and closed on time.
  *
- * This replaces legacy's `advanceOff` timer, which ran `StoreAdvanceServices`'
- * "set status = 0 where stop_time < now" as a raw update with no bound, no
- * record of what it did, and no matching "open" half at all — a campaign that
- * was supposed to start on Friday started whenever an operator remembered to
- * press 上架.
+ * Bounded, recorded, and with an "open" half as well as a "close" one, so a
+ * campaign that is supposed to start on Friday starts on Friday rather than
+ * whenever an operator remembers to press 上架.
  *
- * Two halves, and they are not symmetric, because the frozen schema is not:
+ * Two halves, and they are not symmetric, because the schema is not:
  *
  *  - **close** is a real state change. An `active` campaign whose `end_at` has
  *    passed becomes `ended`, which takes it out of the storefront list *and*
@@ -24,10 +22,10 @@ import * as repo from './presale.repo';
  *    storefront list already filters on `start_at <= now < end_at`, so a
  *    campaign becomes buyable by itself at the second its window opens — which
  *    is more timely than any sweep could be. What the open half does is record
- *    `presale.opened` once per campaign, so a notification (stream E2) or a
- *    channel refresh has something to hang off. `UNIQUE (scope, scope_id,
- *    event_type)` on the effects ledger is the exactly-once; the config's
- *    lookback only keeps the query bounded.
+ *    `presale.opened` once per campaign, so a notification or a channel refresh
+ *    has something to hang off. `UNIQUE (scope, scope_id, event_type)` on the
+ *    effects ledger is the exactly-once; the config's lookback only keeps the
+ *    query bounded.
  *
  * Both are safe to run as often as you like and safe to run twice at once.
  */

@@ -30,20 +30,20 @@ import {
  * Where the presale domain attaches to an order.
  *
  * There is no "buy a presale" endpoint. Buying *is* placing an order, so the
- * storefront calls B1's `POST /api/v1/orders` with `kind: 'presale'` and
- * `kindMeta: { activityId }`, and everything here hangs off the frozen seams in
- * `order/ports.ts`. A second checkout path would be a second copy of stock,
- * coupons, freight and idempotency — which is exactly what legacy had, and why
- * `StoreAdvanceServices` and `StoreOrderServices` disagreed about stock.
+ * storefront calls the order domain's `POST /api/v1/orders` with
+ * `kind: 'presale'` and `kindMeta: { activityId }`, and everything here hangs
+ * off the seams in `order/ports.ts`. A second checkout path would be a second
+ * copy of stock, coupons, freight and idempotency, and two copies drift apart
+ * on stock.
  *
  * The rule that decides the design: **presale stock is its own counter.** A
  * campaign selling 500 units of a product that has 10 000 in the warehouse must
- * stop at 500, and the two counters move together in one transaction — A's
- * `StockPort` takes the SKU's, this file takes the campaign's. Four counters
- * move on a sale and all four come back on a cancel or a refund (REFUND-002,
- * QUEUE-008), which is why every movement is written to `presale_stock_ledger`:
- * `UNIQUE (order_id, reason)` makes each direction happen at most once however
- * often the effect ledger retries.
+ * stop at 500, and the two counters move together in one transaction — the
+ * catalog's `StockPort` takes the SKU's, this file takes the campaign's. Four
+ * counters move on a sale and all four come back on a cancel or a refund
+ * (REFUND-002, QUEUE-008), which is why every movement is written to
+ * `presale_stock_ledger`: `UNIQUE (order_id, reason)` makes each direction
+ * happen at most once however often the effect ledger retries.
  *
  * Deposit presale is refused, not half-built. See `presale.rules.ts`.
  */
@@ -86,22 +86,23 @@ export const presaleKindHandler: OrderKindHandler = {
   /**
    * Everything that can refuse the order, before a row exists.
    *
-   * The price check is the fail-closed half of **CR-1-d**, and what it compares
-   * is worth spelling out. `draft.goodsTotal` is the *pre-discount* goods total
-   * — the catalogue price times the quantity — because a `PricingContributor`
-   * does not rewrite line prices, it contributes an adjustment that lands in
-   * `orders.coupon_discount` (CR-3-b1). So comparing the campaign total against
-   * `goodsTotal` would refuse every correctly priced presale order.
+   * The price check is the fail-closed half of the campaign-price guard, and
+   * what it compares is worth spelling out. `draft.goodsTotal` is the
+   * *pre-discount* goods total — the catalogue price times the quantity —
+   * because a `PricingContributor` does not rewrite line prices, it contributes
+   * an adjustment that lands in `orders.coupon_discount`. So comparing the
+   * campaign total against `goodsTotal` would refuse every correctly priced
+   * presale order.
    *
-   * What has to be true instead is that the contributor *fired*: `draft.adjustments`
-   * carries what the pricing pass actually took off, by contributor (CR-1-d2),
-   * so the guard is a lookup by source and refuses unless it is exactly the
-   * difference between the catalogue and the campaign. An unregistered,
-   * replaced or silently-returning-nothing contributor is the one failure that
-   * would bill a shopper the catalogue price for a presale, and this is what
-   * catches it. A missing entry reads as `Money.ZERO`, which is the right
-   * answer twice over: nothing was taken off, and a campaign that discounts
-   * nothing passes because the shopper pays the same either way.
+   * What has to be true instead is that the contributor *fired*:
+   * `draft.adjustments` carries what the pricing pass actually took off, by
+   * contributor, so the guard is a lookup by source and refuses unless it is
+   * exactly the difference between the catalogue and the campaign. An
+   * unregistered, replaced or silently-returning-nothing contributor is the one
+   * failure that would bill a shopper the catalogue price for a presale, and
+   * this is what catches it. A missing entry reads as `Money.ZERO`, which is
+   * the right answer twice over: nothing was taken off, and a campaign that
+   * discounts nothing passes because the shopper pays the same either way.
    */
   async beforeCreate(ctx: Ctx, tx: Tx, draft: PricingDraft): Promise<Record<string, unknown>> {
     const activityId = readSelection(draft, 'activityId');
@@ -140,7 +141,7 @@ export const presaleKindHandler: OrderKindHandler = {
   },
 
   /**
-   * Runs inside B1's order transaction, right beside stream A's SKU
+   * Runs inside the order domain's transaction, right beside the catalog's SKU
    * reservation.
    *
    * Three writes, in this order and for this reason: claim the ledger row
@@ -190,8 +191,8 @@ export const presaleKindHandler: OrderKindHandler = {
       paymentMode: 'full',
       // Full payment has one payment, so the order starts on the final stage.
       // `final_due_at` stays null: the deadline for *this* payment is the
-      // order's own expiry and B1 owns it — a second countdown would be a
-      // second answer to the same question.
+      // order's own expiry and the order domain owns it — a second countdown
+      // would be a second answer to the same question.
       stage: 'final_pending',
       depositAmount: null,
       finalAmount: meta.goodsTotal,
@@ -213,10 +214,10 @@ export const presaleKindHandler: OrderKindHandler = {
  * be judged against what the shopper actually pays.
  *
  * It does not rewrite line prices, because no contributor does: the reduction
- * lands in `orders.coupon_discount` alongside the coupon's (CR-3-b1), and
+ * lands in `orders.coupon_discount` alongside the coupon's, and
  * `order_items.discount_amount` carries each line's share. That is why
- * `beforeCreate` checks this contributor's output rather than the draft's
- * goods total.
+ * `beforeCreate` checks this contributor's output rather than the draft's goods
+ * total.
  *
  * It never throws. It also runs on the preview a shopper is merely looking at,
  * and a line outside the campaign simply keeps its ordinary price — refusing
@@ -282,13 +283,14 @@ export const presalePricingContributor: PricingContributor = {
  * The money arrived.
  *
  * Three things move and they move together: the campaign's reservation becomes
- * a sale (mirroring what stream A's `StockPort.commit` just did on the SKU's),
- * the stage advances to `final_paid`, and the 发货承诺 is frozen onto the row.
+ * a sale (mirroring what the catalog's `StockPort.commit` just did on the
+ * SKU's), the stage advances to `final_paid`, and the 发货承诺 is frozen onto
+ * the row.
  *
  * The stage move is the idempotency guard — `from: ['final_pending']` — so a
  * replayed payment callback commits the sale exactly once. Without it a WeChat
- * retry would add the quantity to `sales` twice, which is the drift legacy's
- * 预售销量 column was famous for.
+ * retry would add the quantity to `sales` twice, and 预售销量 would drift past
+ * what was actually sold.
  *
  * The sale can still be **refused**, and that is not an error either. 限购总量
  * is a ceiling on units sold and `sales` only moves here, so a quota that
@@ -342,9 +344,9 @@ async function handlePaid(tx: Tx, ctx: Ctx, event: { orderId: number; at: Date }
       return;
     }
     // And say so on the reservation row. The sale has no ledger row of its own
-    // — the reason enum has two values and the schema is frozen — so without
-    // this the release's `-quantity` on `sales` would balance against nothing
-    // and REFUND-002 would read as a deficit.
+    // — the reason enum has two values — so without this the release's
+    // `-quantity` on `sales` would balance against nothing and REFUND-002 would
+    // read as a deficit.
     await repo.markLedgerCommitted(tx, {
       orderId: event.orderId,
       quantity: reservation.quantity,
@@ -471,12 +473,10 @@ async function releaseStock(
 /**
  * Asks for a refund the shopper never requested.
  *
- * Recorded as an effect rather than called directly, because the refund domain
- * says in so many words that there is deliberately no "create a refund on
- * behalf of a user" export (**CR-3-d**). `UNIQUE (scope, scope_id, event_type)`
- * makes it exactly-once however many payment callbacks arrive, and with no
- * `AutoRefundPort` registered the handler throws, which parks the row in stream
- * C's 待处理任务 console for a human.
+ * Recorded as an effect rather than called directly, so the gateway call
+ * happens after commit. `UNIQUE (scope, scope_id, event_type)` makes it
+ * exactly-once however many payment callbacks arrive, and a handler that keeps
+ * failing parks the row in the payment domain's 待处理任务 console for a human.
  */
 async function requestAutoRefund(
   tx: Tx,

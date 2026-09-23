@@ -12,9 +12,9 @@ import {
 } from './shipping.freight.rules';
 
 /**
- * The table from `docs/rewrite/tests/regression/cases.md` §pricing/freight,
- * plus the two places where this implementation deliberately differs from the
- * legacy one (fixed postage per unit, and the first-unit bug).
+ * The freight rules case by case, including the two an obvious implementation
+ * gets wrong: fixed postage is per unit, and a missing continuation rule
+ * charges the first price rather than zero.
  */
 
 function region(overrides: Partial<FreightRegion> = {}): FreightRegion {
@@ -101,7 +101,7 @@ describe('regionFor', () => {
     expect(regionFor([city], [110101])).toBeNull();
   });
 
-  it('gives an address with no known division the fallback rule (CR-6-i)', () => {
+  it('gives an address with no known division the fallback rule', () => {
     expect(regionFor([fallback, province, city], [])).toBe(fallback);
   });
 
@@ -127,8 +127,7 @@ describe('firstAndContinuation', () => {
   });
 
   it('charges the first price — not zero — when there is no continuation rule', () => {
-    // Legacy returned 0 here, so a bigger cart shipped free. Fixed on purpose;
-    // see docs/rewrite/status/f2.md §Freight.
+    // Zero here would make a bigger cart ship free.
     const r = region({
       firstUnit: 1,
       firstPriceFen: 1000,
@@ -155,7 +154,7 @@ describe('isFreeByRule', () => {
     freeRules: [{ cityIds: new Set([330000]), minUnits: 5, minAmountFen: 19900 }],
   });
 
-  it('needs both thresholds, as legacy did', () => {
+  it('needs both thresholds', () => {
     expect(isFreeByRule(t, [330102, 330100, 330000], 5, 19900)).toBe(true);
     expect(isFreeByRule(t, [330102, 330100, 330000], 4, 99900)).toBe(false);
     expect(isFreeByRule(t, [330102, 330100, 330000], 9, 10000)).toBe(false);
@@ -188,7 +187,7 @@ describe('computeFreight', () => {
       ],
       [],
     );
-    // Legacy `postage * cart_num`, twice. B1's stand-in charged 800 once.
+    // `postage × quantity`, twice — not 800 once.
     expect(result.perLine).toEqual([1600, 300]);
     expect(result.totalFen).toBe(1900);
   });
@@ -198,7 +197,7 @@ describe('computeFreight', () => {
     expect(result.totalFen).toBe(0);
   });
 
-  it('prices an address with no known division at the fallback region (CR-6-i)', () => {
+  it('prices an address with no known division at the fallback region', () => {
     // First unit ¥10, each further unit ¥5: 1000 + 2 × 500.
     const result = quote([line({ quantity: 3 })], [template()], { cityPath: [] });
     expect(result.totalFen).toBe(2000);

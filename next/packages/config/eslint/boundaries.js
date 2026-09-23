@@ -1,6 +1,6 @@
 /**
  * A tiny ESLint plugin that enforces the import boundaries in
- * `docs/rewrite/CONVENTIONS.md` ("Import boundaries (ESLint-enforced)").
+ * `docs/conventions.md` ("Import boundaries (ESLint-enforced)").
  *
  * Two rules, both deliberately dumb:
  *

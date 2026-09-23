@@ -13,7 +13,6 @@ import {
 /**
  * `headerSerch` — 搜索框.
  *
- * Fields derived from `template/admin/src/components/mobilePage/search_box.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const headerSerchSchema = defineDiyComponent('headerSerch', {

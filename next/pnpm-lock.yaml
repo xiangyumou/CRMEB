@@ -608,55 +608,6 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  packages/etl:
-    dependencies:
-      '@shop/core':
-        specifier: workspace:*
-        version: link:../core
-      '@shop/db':
-        specifier: workspace:*
-        version: link:../db
-      mysql2:
-        specifier: ^3.16.0
-        version: 3.24.4(@types/node@24.13.6)
-      pg:
-        specifier: ^8.23.0
-        version: 8.23.0
-      zod:
-        specifier: ^4.6.5
-        version: 4.6.5
-    devDependencies:
-      '@shop/config':
-        specifier: workspace:*
-        version: link:../config
-      '@shop/testing':
-        specifier: workspace:*
-        version: link:../testing
-      '@testcontainers/mysql':
-        specifier: ^12.1.0
-        version: 12.1.0
-      '@types/node':
-        specifier: ^24.0.0
-        version: 24.13.6
-      '@types/pg':
-        specifier: ^8.11.0
-        version: 8.23.1
-      eslint:
-        specifier: ^10.11.0
-        version: 10.11.0
-      testcontainers:
-        specifier: ^12.1.0
-        version: 12.1.0
-      tsx:
-        specifier: ^4.20.0
-        version: 4.23.15
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vitest:
-        specifier: ^5.0.1
-        version: 5.0.1(@types/node@24.13.6)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
-
   packages/testing:
     dependencies:
       '@shop/contracts':
@@ -2501,9 +2452,6 @@ packages:
     resolution: {integrity: sha512-B+fWiYZBc+0uUD5zDZAeLw9dKj7XEsdnuu6zRZ+no6LNKpeE3P3bJ+N6HINjcIlWR6fW3vUoTneEaGa2V6ehqw==}
     peerDependencies:
       react: ^18 || ^19
-
-  '@testcontainers/mysql@12.1.0':
-    resolution: {integrity: sha512-fNuN+Fs2N0EQBSk6HVplSl7qxFGUX9gzNw0ljr903PbBhvy2BM3Wl4kVAa1lFpizb8cY8mKYAs0C8cDL5JRIAg==}
 
   '@testing-library/dom@10.4.2':
     resolution: {integrity: sha512-yzr2S9HyAIdhz2/6qHgbs665Q7PKVcDF05vsOlHPxG1mo36gKVesdYVeDLnXgfjJ03CrKRk08knc6+E/9m8v2Q==}
@@ -7068,15 +7016,6 @@ snapshots:
       '@tanstack/query-core': 5.103.2
       react: 19.3.0
 
-  '@testcontainers/mysql@12.1.0':
-    dependencies:
-      testcontainers: 12.1.0
-    transitivePeerDependencies:
-      - bare-abort-controller
-      - bare-buffer
-      - react-native-b4a
-      - supports-color
-
   '@testing-library/dom@10.4.2':
     dependencies:
       '@babel/code-frame': 7.29.7
@@ -7934,7 +7873,8 @@ snapshots:
     dependencies:
       possible-typed-array-names: 1.1.0
 
-  aws-ssl-profiles@1.1.2: {}
+  aws-ssl-profiles@1.1.2:
+    optional: true
 
   axe-core@4.13.0: {}
 
@@ -8848,6 +8788,7 @@ snapshots:
   generate-function@2.3.1:
     dependencies:
       is-property: 1.0.2
+    optional: true
 
   generator-function@2.0.1: {}
 
@@ -8965,6 +8906,7 @@ snapshots:
   iconv-lite@0.7.3:
     dependencies:
       safer-buffer: 2.1.2
+    optional: true
 
   ieee754@1.2.1: {}
 
@@ -9080,7 +9022,8 @@ snapshots:
 
   is-number@7.0.0: {}
 
-  is-property@1.0.2: {}
+  is-property@1.0.2:
+    optional: true
 
   is-regex@1.2.1:
     dependencies:
@@ -9267,7 +9210,8 @@ snapshots:
     dependencies:
       yallist: 3.1.1
 
-  lru.min@1.1.5: {}
+  lru.min@1.1.5:
+    optional: true
 
   luxon@3.7.2: {}
 
@@ -9351,6 +9295,7 @@ snapshots:
       lru.min: 1.1.5
       named-placeholders: 1.1.6
       sql-escaper: 1.5.2
+    optional: true
 
   mz@2.7.0:
     dependencies:
@@ -9361,6 +9306,7 @@ snapshots:
   named-placeholders@1.1.6:
     dependencies:
       lru.min: 1.1.5
+    optional: true
 
   nan@2.29.0:
     optional: true
@@ -10096,7 +10042,8 @@ snapshots:
 
   split2@4.2.0: {}
 
-  sql-escaper@1.5.2: {}
+  sql-escaper@1.5.2:
+    optional: true
 
   ssh-remote-port-forward@1.0.4:
     dependencies:

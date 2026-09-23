@@ -6,7 +6,7 @@ import type { PgTable } from 'drizzle-orm/pg-core';
  * Transactions, row locks and conditional updates — the three moves every
  * state change in this system is built from.
  *
- * CONVENTIONS, verbatim:
+ * `docs/conventions.md`, verbatim:
  *  - "Transactions: `withTx(async (tx) => …)`. Anything that calls a third
  *    party happens *after* commit, via the effects ledger."
  *  - "State changes are conditional updates. `UPDATE … WHERE id = $1 AND

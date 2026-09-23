@@ -15,22 +15,20 @@ import type { DbOrTx } from '@shop/db';
  * publishes (`order/ports.ts`), with two differences that are deliberate:
  *
  * - it is declared **here**, by the consumer, not in `order/ports.ts`. This
- *   domain is the one that knows what it needs; the order stream implements an
+ *   domain is the one that knows what it needs; the order domain implements an
  *   interface it can read in one screen rather than having its own port file
  *   grown by somebody else.
- * - it is **optional**. `getUserOrderStatsPort()` returns `undefined` until
- *   something registers an implementation, and the staff routes answer
+ * - it is **optional**. `getUserOrderStatsPort()` returns `undefined` while
+ *   nothing has registered an implementation, and the staff routes answer
  *   `orderCount: null, spendTotal: null` rather than `0`. Nothing else in this
- *   system is allowed to fail soft, but the alternatives here are both worse:
- *   a 500 would take down the whole 用户 screen over two decorative numbers,
- *   and a hard `0` would tell a 店员 that a customer with forty orders is a
+ *   system is allowed to fail soft, but the alternatives here are both worse: a
+ *   500 would take down the whole 用户 screen over two decorative numbers, and
+ *   a hard `0` would tell a 店员 that a customer with forty orders is a
  *   first-time buyer. `null` says "not known", and the contract tells clients
  *   to render 「--」.
  *
- * **Nobody registers it yet** — see `docs/rewrite/cr/CR-2-e4.md`, which asks
- * the order stream for `registerUserOrderStatsPort` next to its existing
- * `installStaffCheck()`. Until that lands, both numbers are `null` in
- * production and the tests pin the behaviour on the fake below.
+ * `order/index.ts` registers it when the order domain loads; the tests here pin
+ * the behaviour on the fake below.
  */
 
 export interface UserOrderStats {
@@ -58,7 +56,7 @@ export function registerUserOrderStatsPort(impl: UserOrderStatsPort): void {
   port = impl;
 }
 
-/** `undefined` while no stream has registered one — see the note above. */
+/** `undefined` while no domain has registered one — see the note above. */
 export function getUserOrderStatsPort(): UserOrderStatsPort | undefined {
   return port;
 }
@@ -81,8 +79,8 @@ export interface FakeUserOrderStatsPort extends UserOrderStatsPort {
 
 /**
  * An in-memory implementation for tests, here rather than in `@shop/testing`
- * for the reason `fakeWechatIdentityPort` is: that package belongs to the
- * orchestrator and a stream may not add to it.
+ * for the reason `fakeWechatIdentityPort` is: `@shop/testing` holds only
+ * cross-domain fakes, and this one serves this domain's tests alone.
  */
 export function fakeUserOrderStatsPort(): FakeUserOrderStatsPort {
   const stats = new Map<number, UserOrderStats>();

@@ -203,7 +203,7 @@ async function paidOrder(
   return { userId, orderId, itemIds: items.map((item) => item.id) };
 }
 
-/** What stream C does when the callback lands, including the paid hooks. */
+/** What the payment domain does when the callback lands, including the paid hooks. */
 async function markPaid(orderId: number): Promise<void> {
   await withTx(harness.ctx.db, async (tx) => {
     const moved = await orderStateMachine.transition(tx, orderId, ['pending_payment'], 'paid', {
@@ -311,7 +311,7 @@ describe('shipping a whole order', () => {
     expect(jobs[0]!.options.delay).toBe(10 * 86_400_000);
   });
 
-  it('records the dispatch in the effects ledger for the notification stream', async () => {
+  it('records the dispatch in the effects ledger for the notification domain', async () => {
     const product = await makeProduct();
     const company = await makeExpressCompany();
     const placed = await paidOrder([product]);
@@ -330,8 +330,8 @@ describe('shipping a whole order', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]!.eventType).toBe('shipment.dispatched');
 
-    // And with no notifier registered (stream E2 has not landed) it still
-    // drains rather than parking a row the operator cannot act on.
+    // And with no notifier registered it still drains rather than parking a row
+    // the operator cannot act on.
     const report = await drainEffects(harness.ctx, { baseBackoffMs: 0, maxBackoffMs: 0 });
     expect(report.parked).toBe(0);
     expect(report.retried).toBe(0);
@@ -573,7 +573,7 @@ describe('tracking', () => {
     return { shipmentId: shipment.id, userId: placed.userId, adminId };
   }
 
-  it('answers "unknown" rather than failing when stream F2 has not landed', async () => {
+  it('answers "unknown" rather than failing when no logistics provider is registered', async () => {
     const { shipmentId, adminId } = await express();
     const tracking = await order.adminTrackShipment(asAdmin(adminId), { id: shipmentId });
     expect(tracking).toMatchObject({ available: false, state: 'unknown', traces: [] });

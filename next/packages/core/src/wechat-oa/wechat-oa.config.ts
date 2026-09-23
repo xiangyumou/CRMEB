@@ -5,17 +5,17 @@ import { defineConfigGroup } from '../kernel/config-registry';
  * `wechat-oa-runtime` — the parts of Official Account behaviour that are ours
  * rather than WeChat's.
  *
- * The credentials are **not** here. They live in two groups this stream does
+ * The credentials are **not** here. They live in two groups this domain does
  * not own and deliberately does not duplicate:
  *
  * | What | Group | Owner |
  * | --- | --- | --- |
- * | `appId` / `appSecret`, API base URL | `wechat` | stream C |
- * | operator-facing token, EncodingAESKey, 消息加解密方式 | `wechat-oa` | stream F1 |
+ * | `appId` / `appSecret`, API base URL | `wechat` | `wechat` |
+ * | operator-facing token, EncodingAESKey, 消息加解密方式 | `wechat-oa` | `system` |
  *
- * `credentials.ts` reads both and prefers F1's, because that is the screen an
- * operator actually fills in; `wechat.oaToken` is the fallback for an install
- * migrated before F1's screen existed. CR-3-e2 asks for the two to be merged.
+ * `credentials.ts` reads both and prefers the `wechat-oa` group's, because that
+ * is the screen an operator actually fills in; `wechat.oaToken` is the
+ * fallback.
  *
  * What is left is genuinely ours: which domains a JS-SDK signature may be
  * issued for, and which subscribe-template ids the storefront should ask
@@ -29,11 +29,11 @@ export const wechatOaRuntimeConfig = defineConfigGroup({
     /**
      * Hosts a JS-SDK signature may be issued for, comma separated.
      *
-     * The legacy endpoint signed whatever URL it was handed, which turns our
-     * jsapi ticket into a signing oracle for anybody's page. Empty means "only
-     * the site's own origin", which is the safe default even though it makes a
-     * fresh install answer `WECHAT_OA_URL_NOT_ALLOWED` until somebody fills it
-     * in — a visible refusal beats a silent one.
+     * Signing whatever URL we are handed would turn our jsapi ticket into a
+     * signing oracle for anybody's page. Empty means "only the site's own
+     * origin", which is the safe default even though it makes a fresh install
+     * answer `WECHAT_OA_URL_NOT_ALLOWED` until somebody fills it in — a visible
+     * refusal beats a silent one.
      */
     jsApiAllowedHosts: z.string().max(1024).default(''),
     /**

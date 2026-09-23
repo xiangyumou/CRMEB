@@ -5,7 +5,6 @@ import { defineDiyComponent, diyColour, diySlider, diyTabs } from './primitives'
 /**
  * `productDesc` — 产品介绍.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_product_desc.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const productDescSchema = defineDiyComponent('productDesc', {

@@ -7,12 +7,11 @@ import { attachmentDataUrl, type AttachmentDataUrlOptions } from './attachment.s
 import { siteConfig } from './site.config';
 
 /**
- * `POST /api/v1/attachments/base64` (CR-7-h2 §2).
+ * `POST /api/v1/attachments/base64`.
  *
- * The legacy `get_image_base64` did `file_get_contents` on a URL the caller
- * supplied, with an allow-list that contained `$request->host()` — the header
- * the caller sends. Every test below is a request that would have succeeded
- * there.
+ * The endpoint fetches a URL the caller supplies, so its allow-list must never
+ * contain anything the caller controls, such as the `Host` header. Every test
+ * below is a request an allow-list built from the request would let through.
  *
  * The fetch is seamed rather than real, because every address this endpoint is
  * *allowed* to reach is a public one: a socket-level happy path would mean
@@ -84,7 +83,7 @@ beforeEach(async () => {
   await harness.ctx.config.set(siteConfig, { publicOrigin: ORIGIN });
 });
 
-describe('图片转 base64 (CR-7-h2)', () => {
+describe('图片转 base64', () => {
   it('returns our own attachment as a data URL', async () => {
     const s = seam(png());
     const result = await attachmentDataUrl(

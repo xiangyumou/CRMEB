@@ -33,17 +33,16 @@ import {
 /**
  * The admin order console — 订单管理.
  *
- * Legacy had 45 routes in `adminapi/route/order.php`; this is 17, and the
- * arithmetic is mostly subtraction:
+ * Seventeen routes, and what is absent is absent on purpose:
  *
- *  - the five split routes (`split_cart_info`, `split_delivery`, `split_order`,
- *    …) are gone with order splitting itself;
- *  - `print/shipping`, `expr/temp`, `order_dump` and the electronic-waybill
- *    routes are out of scope (printers and waybill providers are not ported);
- *  - `distribution/:id` GET+PUT was the brokerage screen, retired;
- *  - `status/:id` and `take/:id` collapse into the two transitions that
- *    actually exist, `POST …/shipments` and `POST …/receipt`;
- *  - `del/:id` + `dels` become one soft delete and one batch.
+ *  - there is no order splitting, so no split routes — a partial shipment is
+ *    a `shipment` covering some of the lines;
+ *  - no receipt printers, express templates or electronic waybills: the shop
+ *    has no printer or waybill provider;
+ *  - no brokerage screen;
+ *  - status changes are the two transitions that actually exist,
+ *    `POST …/shipments` and `POST …/receipt`, not a free-form status write;
+ *  - deletion is one soft delete and one batch.
  *
  * Every write is a POSTed sub-resource with its own permission, so the audit
  * log says what was done rather than "an order was updated".
@@ -96,7 +95,7 @@ export const orderAdminStatistics = defineRoute({
  * 导出订单.
  *
  * CSV text in a JSON envelope, not a streamed file — see `orderExportResult`
- * for why, and CR-2-b2 for what it would take to stream.
+ * for why.
  */
 export const orderAdminExport = defineRoute({
   id: 'order.adminExport',
@@ -270,9 +269,9 @@ export const orderAdminDelete = defineRoute({
 });
 
 /**
- * 批量删除. Legacy `dels` refused the whole batch when one order was still
- * live; this one skips it and says which, because an operator selecting thirty
- * rows should not have to find the one bad row by bisection.
+ * 批量删除. An order that is still live is skipped and named rather than
+ * refusing the whole batch, because an operator selecting thirty rows should
+ * not have to find the one bad row by bisection.
  */
 export const orderAdminDeleteMany = defineRoute({
   id: 'order.adminDeleteMany',
@@ -430,7 +429,7 @@ export const orderAdminCancelShipment = defineRoute({
   ],
 });
 
-/** 物流查询 — through F2's logistics index; `available: false` until it lands. */
+/** 物流查询 — through the logistics provider; `available: false` while none is configured. */
 export const orderAdminShipmentTracking = defineRoute({
   id: 'order.adminShipmentTracking',
   method: 'GET',
@@ -457,9 +456,8 @@ export const orderAdminShipmentTracking = defineRoute({
   ],
 });
 
-// The 物流公司 picker moved to stream F2 (CR-1-b2, settled): it is now
-// `shipping.expressCompanyPicker` in `contracts/src/shipping/`, on the same
-// path, with the same body and the same `order:order:read` permission.
+// The 物流公司 picker is `shipping.expressCompanyPicker` in
+// `contracts/src/shipping/`, under the same `order:order:read` permission.
 
 /**
  * 确认收货, by an operator.

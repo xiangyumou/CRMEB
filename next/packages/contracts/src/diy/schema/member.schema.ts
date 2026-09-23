@@ -12,7 +12,6 @@ import {
 /**
  * `member` — 会员中心.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_member.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const memberSchema = defineDiyComponent('member', {

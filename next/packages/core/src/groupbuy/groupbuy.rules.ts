@@ -10,7 +10,8 @@ import { Money } from '../kernel/money';
  *
  * The rule that is *not* here is "may this shopper take the last seat". That
  * one cannot be a pure function: it is a conditional `UPDATE` in the repo, and
- * writing it as a check would be the read-then-write defect CONVENTIONS names.
+ * writing it as a check would be a read-then-write race (see
+ * `docs/conventions.md`).
  */
 
 export interface ActivityWindow {
@@ -42,10 +43,9 @@ export function assertActivityOpen(activity: ActivityWindow, now: Date): void {
 /**
  * 每单限购份数.
  *
- * Legacy compared against `eb_store_combination.num` in the controller and
- * again in the service, with different operators (`>` and `>=`); one of the two
- * was wrong. Here it is one function, and `perOrderQuantity` is a ceiling on
- * the whole order, not on each line, because a group-buy order is one activity.
+ * One function, so the ceiling cannot be checked with `>` in one place and `>=`
+ * in another. `perOrderQuantity` is a ceiling on the whole order, not on each
+ * line, because a group-buy order is one activity.
  */
 export function assertQuantityAllowed(
   activity: { perOrderQuantity: number },
@@ -115,7 +115,7 @@ export function wasVirtuallyFilled(
 }
 
 /**
- * 取消我发起的团 (legacy `combination/remove`).
+ * 取消我发起的团.
  *
  * Only the leader, only while forming, and only while nobody has paid into it —
  * `seatsTaken === 0` means even the leader's own order is unpaid. A team with a
@@ -151,7 +151,7 @@ export function assertCompletable(group: GroupShape): void {
 }
 
 // ---------------------------------------------------------------------------
-// price — the CR-1-d guard
+// price — the activity-price guard
 // ---------------------------------------------------------------------------
 
 export interface PricedLine {
@@ -182,13 +182,13 @@ export function expectedGoodsTotal(
 }
 
 /**
- * The fail-closed half of CR-1-d.
+ * The fail-closed half of the activity-price guard.
  *
- * With CR-1-d applied, `buildDraft` passes `kind` and every `kindMeta` key into
- * the pricing `selections`, so `groupbuyPricingContributor` fires and B1 books
- * the gap between the catalogue price and the 拼团价 as an adjustment. The
- * shopper is charged the activity price — but by *another* domain's arithmetic,
- * through a registry this domain does not own.
+ * `buildDraft` passes `kind` and every `kindMeta` key into the pricing
+ * `selections`, so `groupbuyPricingContributor` fires and the order domain
+ * books the gap between the catalogue price and the 拼团价 as an adjustment.
+ * The shopper is charged the activity price — but by *another* domain's
+ * arithmetic, through a registry this domain does not own.
  *
  * So the kind handler checks the result instead of trusting it, and checks it
  * where the result exists: after the order lines are written, against what they
@@ -215,14 +215,14 @@ export function assertActivityPriceApplied(args: {
 }
 
 /**
- * The same guard, one step earlier and from the other side (CR-1-d2).
+ * The same guard, one step earlier and from the other side.
  *
- * `PricingDraft.adjustments` now carries what the pricing pass really took off,
- * by contributor, so `beforeCreate` can compare this domain's own adjustment
- * with the gap it was supposed to close — before an order row exists, before
- * stock moves, and without asking the contributor to run a second time inside
- * the creating transaction (which is what cost presale a second pooled
- * connection per checkout).
+ * `PricingDraft.adjustments` carries what the pricing pass really took off, by
+ * contributor, so `beforeCreate` can compare this domain's own adjustment with
+ * the gap it was supposed to close — before an order row exists, before stock
+ * moves, and without asking the contributor to run a second time inside the
+ * creating transaction (which would cost a second pooled connection per
+ * checkout).
  *
  * `afterCreate`'s check stays. The two are not redundant: this one proves the
  * *contributor* fired, that one proves the *written lines* charge what the
@@ -231,8 +231,8 @@ export function assertActivityPriceApplied(args: {
  *
  * Unlike the `charged` form above this is an equality. Both amounts are
  * negative — what the campaign owes the shopper off the catalogue price — and
- * an adjustment that differs either way means this domain's arithmetic and
- * B1's disagree about the same campaign.
+ * an adjustment that differs either way means this domain's arithmetic and the
+ * order domain's disagree about the same campaign.
  */
 export function assertActivityDiscountApplied(args: {
   expected: Money;

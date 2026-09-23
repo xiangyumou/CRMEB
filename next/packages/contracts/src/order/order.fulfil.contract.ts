@@ -14,10 +14,9 @@ import {
  * What the buyer does with a shipped order: look at the parcels and confirm
  * receipt.
  *
- * Three routes where legacy had `order/take`, `order/express/:uni/[:type]` and
- * a detail endpoint that embedded a differently shaped express blob. The
- * shipments are their own sub-resource because an order can have several of
- * them now that partial shipment is a first-class thing.
+ * Three routes. The shipments are their own sub-resource, not a blob inside the
+ * order detail, because an order can have several of them: partial shipment is
+ * a first-class thing.
  *
  * `POST …/receipt` is the same `OrderStateMachine.transition(shipped ->
  * received)` the auto-receive job runs, so the buyer tapping 确认收货 at the

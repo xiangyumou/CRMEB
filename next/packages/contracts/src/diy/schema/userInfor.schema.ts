@@ -5,7 +5,6 @@ import { defineDiyComponent, diyColour, diyListBox, diyTabs, diyUpload } from '.
 /**
  * `userInfor` — 用户信息.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_userInfor.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const userInforSchema = defineDiyComponent('userInfor', {

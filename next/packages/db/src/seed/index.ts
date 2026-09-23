@@ -38,10 +38,10 @@ export interface SeedCounts {
 /**
  * Seed (or re-seed) every reference table.
  *
- * Cities and courier companies carry explicit ids so the ETL and the freight
- * templates can reference them by the value they already use; the identity
- * sequences are pushed past the seeded range afterwards so a later manual
- * insert cannot collide.
+ * Cities and courier companies carry explicit ids so addresses, freight
+ * templates and shipments keep pointing at the same row across re-seeds; the
+ * identity sequences are pushed past the seeded range afterwards so a later
+ * manual insert cannot collide.
  */
 export async function seedReference(db: DbOrTx): Promise<SeedCounts> {
   const cityRows = await loadCities();
@@ -75,8 +75,8 @@ export async function seedReference(db: DbOrTx): Promise<SeedCounts> {
       .onConflictDoUpdate({
         target: expressCompanies.id,
         // The carrier's identity is ours (tracking keys on the code); its order
-        // and 显示 switch are the operator's, migrated by the ETL or set in the
-        // admin, and a re-seed on every upgrade must not reset them (CR-1-r7).
+        // and 显示 switch are the operator's, set in the admin, and a re-seed on
+        // every upgrade must not reset them.
         set: {
           code: sql`excluded.code`,
           name: sql`excluded.name`,
@@ -104,9 +104,9 @@ export async function seedReference(db: DbOrTx): Promise<SeedCounts> {
     .values(notificationTemplateShells)
     .onConflictDoUpdate({
       target: notificationTemplates.code,
-      // The name and audience are the operator's, like an agreement's body
-      // (CR-1-r7). The variables are the event's contract — what the code
-      // fills in — so a release that changes them must reach existing rows.
+      // The name and audience are the operator's, like an agreement's body. The
+      // variables are the event's contract — what the code fills in — so a
+      // release that changes them must reach existing rows.
       set: {
         variables: sql`excluded.variables`,
         updatedAt: sql`now()`,

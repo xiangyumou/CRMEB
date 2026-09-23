@@ -14,8 +14,8 @@ import * as repo from './cms.repo';
  * 文章分类.
  *
  * Two levels, enforced here rather than by the database, because the storefront
- * renders exactly two (a tab row and its sub-tabs) and the legacy editor let
- * operators nest a third that no screen ever displayed. The rules:
+ * renders exactly two (a tab row and its sub-tabs); a third level would be one
+ * no screen ever displays. The rules:
  *
  *  - a category whose own parent is set cannot become a parent
  *    (`CMS_CATEGORY_TOO_DEEP`);
@@ -122,8 +122,7 @@ export async function remove(ctx: Ctx, params: { id: string }): Promise<{ delete
  * The visible tree, nested two deep.
  *
  * Hidden categories are dropped with their children: hiding a parent that left
- * its children on the tab bar is how the legacy navigation ended up with
- * orphans pointing at an empty list.
+ * its children on the tab bar would leave orphans pointing at an empty list.
  */
 export async function publicList(ctx: Ctx): Promise<PublicArticleCategoryList> {
   const rows = await repo.listVisibleCategories(ctx.db);

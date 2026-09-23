@@ -23,26 +23,27 @@ import {
 } from './catalog.staff.schemas';
 
 /**
- * 商品管理 for the mobile 商家管理 console — CR-4-h2, accepted in full.
+ * 商品管理 for the mobile 商家管理 console.
  *
- * Ten routes, every one `auth: 'staff'`: the same guard B2's
- * `/api/v1/staff/orders` declares, resolved against the `orderStaff` config
- * list. There are no permission atoms because staff is not a role — a shopper
- * either is on the list or gets a 403 — and there is deliberately nothing here
- * an admin holding `catalog:*` could not already do from the console. Every
- * route is a thin call onto the same `core/src/catalog` service the admin
- * surface uses, so the two can never drift.
+ * Ten routes, every one `auth: 'staff'`: the same guard `/api/v1/staff/orders`
+ * declares, resolved against the `orderStaff` config list. There are no
+ * permission atoms because staff is not a role — a shopper either is on the
+ * list or gets a 403 — and there is deliberately nothing here an admin holding
+ * `catalog:*` could not already do from the console. Every route is a thin call
+ * onto the same `core/src/catalog` service the admin surface uses, so the two
+ * can never drift.
  *
  * Why these ten and not the console's twenty-nine: they are exactly the calls
- * `template/uni-app/api/admin.js` makes, which CR-4-h2 lists screen by screen.
- * 回收站, 导出, 卡密, 评价 and the whole taxonomy CRUD stay in the console.
+ * the uni-app's 商家管理 screens make. 回收站, 导出, 卡密, 评价 and the whole
+ * taxonomy CRUD stay in the console.
  *
  * One route lives here rather than in `shipping/`: `GET
  * /api/v1/staff/shipping-templates`, the 添加商品 运费模板 picker. It answers
- * with F2's own `shippingTemplateOptions` and its handler calls F2's own
- * `templates.options`, exactly as B2's `/api/v1/staff/express-companies`
- * inherited its body from the admin route. It is grouped with the form it
- * serves rather than split across two files for a schema it does not own.
+ * with the shipping domain's own `shippingTemplateOptions` and its handler
+ * calls the shipping domain's `templates.options`, exactly as
+ * `/api/v1/staff/express-companies` shares its body with the admin route. It is
+ * grouped with the form it serves rather than split across two files for a
+ * schema it does not own.
  */
 
 const productParams = z.object({ id });
@@ -85,7 +86,7 @@ export const catalogStaffProductList = defineRoute({
 });
 
 /**
- * 上架 / 下架, risk-matrix §1 from the phone.
+ * 上架 / 下架 from the phone: the same off-shelf rule as the console.
  *
  * The body is `{ visible }` rather than the console's `{ status }`: the switch
  * on the list has two positions and a staff member has no way to make a draft.
@@ -218,9 +219,9 @@ export const catalogStaffProductSkus = defineRoute({
 /**
  * 修改价格 / 库存.
  *
- * A patch per SKU: an absent key is left alone. Legacy rewrote the whole row,
- * so editing a price from a screen loaded two minutes ago wrote back the stock
- * that screen was showing and un-sold every order placed in between — the one
+ * A patch per SKU: an absent key is left alone. Rewriting the whole row would
+ * let a price edit from a screen loaded two minutes ago write back the stock
+ * that screen was showing and un-sell every order placed in between — the one
  * defect this route exists to not have.
  *
  * A stock change is applied under the SKU's own row lock and rolled up to
@@ -263,7 +264,7 @@ export const catalogStaffProductSkuUpdate = defineRoute({
 // 添加商品
 // ---------------------------------------------------------------------------
 
-/** The 运费模板 select on 添加商品. F2's shape, F2's service, staff-scoped path. */
+/** The 运费模板 select on 添加商品. The shipping domain's shape and service, on a staff-scoped path. */
 export const catalogStaffShippingTemplates = defineRoute({
   id: 'catalog.staffShippingTemplates',
   method: 'GET',

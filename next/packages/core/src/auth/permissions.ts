@@ -1,9 +1,9 @@
 /**
  * Permission atoms.
  *
- * PLAN §1: "权限原子在 `core/<domain>/permissions.ts` 声明 … DB 只存
- * `roles / role_permissions / admin_roles`". The set of atoms is compiled into
- * the app; only the *grants* are data. A renamed atom is therefore a code
+ * Atoms are declared in `core/<domain>/permissions.ts`; the database stores
+ * only `roles / role_permissions / admin_roles`. The set of atoms is compiled
+ * into the app; only the *grants* are data. A renamed atom is therefore a code
  * change plus a data fix-up, never a migration, and a role that still grants a
  * retired atom simply grants nothing.
  */

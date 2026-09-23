@@ -176,10 +176,10 @@ export async function adminCategoryCreate(
  *
  * A move rewrites the materialised path of the whole subtree in one statement
  * (`repo.moveSubtree`) rather than walking it, and refuses two things first:
- * making a category a descendant of itself, and pushing any descendant past
- * the third level. The second check is what legacy never did — it let an
- * operator drag a branch under a leaf and the admin tree simply stopped
- * rendering the part that fell off the end.
+ * making a category a descendant of itself, and pushing any descendant past the
+ * third level. Without the second check an operator could drag a branch under a
+ * leaf and the admin tree would simply stop rendering the part that fell off
+ * the end.
  */
 export async function adminCategoryUpdate(
   ctx: Ctx,
@@ -377,9 +377,8 @@ export async function adminProductCreate(
  * The SKUs are *reconciled*, never replaced: an incoming row is matched to an
  * existing SKU by its spec combination (`comboKey`), so re-pricing a variant
  * keeps its id, its stock, its sales and every cart row and order item that
- * points at it. Legacy deleted `eb_store_product_attr_value` wholesale on every
- * save, which reset stock to whatever the editor happened to be showing and
- * orphaned live carts.
+ * points at it. Deleting and re-inserting the SKUs on every save would reset
+ * stock to whatever the editor happened to be showing and orphan live carts.
  */
 export async function adminProductUpdate(
   ctx: Ctx,
@@ -410,7 +409,7 @@ export async function adminProductUpdate(
 }
 
 /**
- * 上架 / 下架 — risk-matrix §1.
+ * 上架 / 下架.
  *
  * One conditional update guarded on the status it moves from. The moment it
  * commits the product is gone from every storefront list (they all filter
@@ -452,8 +451,8 @@ export async function adminProductSetStatus(
  *
  * Refused while an unfinished order still references the product, because the
  * order detail page renders the product name from the live row when the
- * snapshot is missing a field. The check goes through `OrderFactsPort`
- * (CR-2-a), not through the order tables.
+ * snapshot is missing a field. The check goes through `OrderFactsPort`, not
+ * through the order tables.
  */
 export async function adminProductDelete(ctx: Ctx, input: { id: string }): Promise<void> {
   const id = Number(input.id);
@@ -676,8 +675,8 @@ export async function adminVirtualCardList(
  *
  * The pool *is* the stock: after the insert the SKU's stock is set to the count
  * of unclaimed cards in one statement, rather than incremented by the number of
- * rows this call happened to add. Deriving it is what stops the two drifting —
- * legacy incremented, and a failed half-import left the shop selling cards it
+ * rows this call happened to add. Deriving it is what stops the two drifting:
+ * with an increment, a failed half-import would leave the shop selling cards it
  * did not have.
  *
  * Duplicates are reported, not fatal: an operator re-uploading a spreadsheet
@@ -770,7 +769,7 @@ function newCardKey(): string {
 }
 
 // ---------------------------------------------------------------------------
-// the domain API other streams call
+// the domain API other domains call
 // ---------------------------------------------------------------------------
 
 export interface SaleableSku {
@@ -799,10 +798,10 @@ export interface SaleableSku {
 /**
  * **The** read the cart and the order builder go through.
  *
- * It refuses anything that is not on the shelf, which is the other half of
- * risk-matrix §1: an operator taking a product down mid-checkout must make the
- * next `createOrder` fail rather than let a hidden product be bought. The
- * caller gets `CATALOG_PRODUCT_NOT_ON_SALE` and can name the line.
+ * It refuses anything that is not on the shelf, which is the other half of 下架
+ * hiding a product everywhere: an operator taking a product down mid-checkout
+ * must make the next `createOrder` fail rather than let a hidden product be
+ * bought. The caller gets `CATALOG_PRODUCT_NOT_ON_SALE` and can name the line.
  *
  * It does **not** reserve anything and it does not promise the stock it
  * reports will still be there — only `StockPort.reserve`'s conditional update
@@ -878,19 +877,19 @@ export async function checkPurchaseAllowance(
 }
 
 /**
- * 加购 as a product event (CR-1-f3 §2).
+ * 加购 as a product event.
  *
- * F3's product page reports 加购件数 from `product_events`, next to views,
- * orders and payments, and until now nothing wrote the `cart` kind — the column
- * read zero on every product however busy the shop was. The cart calls this
+ * The stats product page reports 加购件数 from `product_events`, next to views,
+ * orders and payments, and this is the only writer of the `cart` kind — without
+ * it the column would read zero however busy the shop was. The cart calls this
  * from inside its own transaction, beside the `cart_items` upsert, so the
  * number and the row it describes commit together or not at all.
  *
  * `(tx, ctx, input)` — the caller owns the transaction, matching
  * `checkPurchaseAllowance` and the platform's other "join the transaction you
  * are already in" primitives. The cart may not reach `catalog.repo` itself
- * (CONVENTIONS: a repo is private to its domain), and this is the whole of the
- * seam: no read, no verdict, one insert.
+ * (`docs/conventions.md`: a repo is private to its domain), and this is the
+ * whole of the seam: no read, no verdict, one insert.
  */
 export async function recordCartAdd(
   tx: Tx,

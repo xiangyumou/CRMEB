@@ -11,11 +11,11 @@ import * as templates from './shipping.template.service';
 /**
  * One race per conditional state change in `shipping`.
  *
- * CONVENTIONS: "Every conditional state change ships a concurrency test using
- * `runConcurrently`." There are three here — the soft delete's "not already
- * deleted", the template aggregate's delete-then-insert of its child rows, and
- * the courier code's unique index — and each is a read-then-write that every
- * sequential test in `shipping.int.test.ts` passes happily.
+ * `docs/conventions.md`: "Every conditional state change ships a concurrency
+ * test using `runConcurrently`." There are three here — the soft delete's "not
+ * already deleted", the template aggregate's delete-then-insert of its child
+ * rows, and the courier code's unique index — and each is a read-then-write
+ * that every sequential test in `shipping.int.test.ts` passes happily.
  *
  * `forkTestCtx` gives the second operator its own `Ctx`, so the two collide on
  * the row rather than queueing behind one session.

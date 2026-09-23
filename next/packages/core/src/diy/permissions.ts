@@ -3,10 +3,10 @@ import { definePermissions } from '../auth/permissions';
 /**
  * 页面装修.
  *
- * The legacy admin had one coarse `diy` menu permission. Split here because
- * publishing is the dangerous verb: an operator who may rearrange a draft is
- * not necessarily allowed to change what every shopper sees, and "设为首页" and
- * "设为默认数据" are the same kind of act.
+ * More than one coarse `diy` atom, because publishing is the dangerous verb: an
+ * operator who may rearrange a draft is not necessarily allowed to change what
+ * every shopper sees, and "设为首页" and "设为默认数据" are the same kind of
+ * act.
  */
 export const diyPermissions = definePermissions(
   'diy',

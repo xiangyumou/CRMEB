@@ -18,11 +18,11 @@ import { randomBytes } from 'node:crypto';
  *
  * Applied to every phone number in the admin *list*; the detail route returns
  * the real one under its own permission. The middle four digits are the ones
- * that identify a person, and a screenshot of a customer table was one of the
- * leaks named in the release-readiness review.
+ * that identify a person, and a screenshot of a customer table is an easy way
+ * for them to leak.
  *
  * Anything that is not an 11-digit number is masked conservatively rather than
- * returned as-is: a malformed legacy value is still somebody's phone number.
+ * returned as-is: a malformed stored value is still somebody's phone number.
  */
 export function maskPhone(phone: string | null): string | null {
   if (phone === null) return null;
@@ -39,10 +39,8 @@ export function maskPhone(phone: string | null): string | null {
  * The nickname a new account starts with: `用户8000`, from the last four
  * digits of the phone number.
  *
- * Legacy used `mark` / `user_` + a random number and quite often left it
- * literally empty, which is why the old storefront is full of blank comment
- * authors. A WeChat sign-in overwrites this with the real nickname as soon as
- * one arrives.
+ * Never empty, so no review or comment shows a blank author. A WeChat sign-in
+ * overwrites this with the real nickname as soon as one arrives.
  */
 export function defaultNickname(phone: string | null): string {
   if (phone && phone.length >= 4) return `用户${phone.slice(-4)}`;
@@ -83,8 +81,8 @@ export function anonymisedAccount(): string {
 // ---------------------------------------------------------------------------
 
 /**
- * The DB enum says `md5_legacy`; `auth/password.ts` says `md5`. One of them
- * had to be adapted and the column is frozen, so it is this function.
+ * The DB enum says `md5_legacy`; `auth/password.ts` says `md5`. One of them had
+ * to be adapted, and changing a DB enum is a migration, so it is this function.
  */
 export function toPasswordAlgo(stored: 'bcrypt' | 'md5_legacy' | null): 'bcrypt' | 'md5' {
   return stored === 'md5_legacy' ? 'md5' : 'bcrypt';
@@ -93,10 +91,10 @@ export function toPasswordAlgo(stored: 'bcrypt' | 'md5_legacy' | null): 'bcrypt'
 /**
  * What a storefront password must look like.
  *
- * Legacy accepted anything from 6 to 16 characters and nothing else, which
- * allowed `123456` — the single most common password in every Chinese leak
- * corpus — and forbade a passphrase. Here the floor is 6 with a composition
- * rule (not all one class) and the ceiling is bcrypt's own 72 *bytes*.
+ * A length check alone (6 to 16 characters) would allow `123456` — the single
+ * most common password in every Chinese leak corpus — and forbid a passphrase.
+ * So the floor is 6 with a composition rule (not all one class) and the ceiling
+ * is bcrypt's own 72 *bytes*.
  *
  * Returns the reason rather than throwing so the caller decides which error
  * code it is: a self-service change and an operator reset are different routes.
@@ -118,8 +116,8 @@ export function checkPasswordShape(plain: string): 'ok' | 'too-short' | 'too-lon
  * asked for.
  *
  * A customer's first address is always the default: the checkout page has to
- * preselect something, and "no default" meant an empty delivery block that the
- * legacy front end rendered as a blank card with a 提交订单 button under it.
+ * preselect something, and "no default" means an empty delivery block: a blank
+ * card with a 提交订单 button under it.
  */
 export function shouldForceDefault(existingCount: number, requested: boolean): boolean {
   return existingCount === 0 || requested;

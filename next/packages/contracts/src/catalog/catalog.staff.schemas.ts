@@ -5,11 +5,11 @@ import { productFreightMode, productKind, volume, weight } from './schemas';
 /**
  * 移动端商家管理 — the 商品管理 half.
  *
- * B2 built `/api/v1/staff/*` for the phone's 商家管理 and stopped at orders and
- * refunds; CR-4-h2 is the rest, and this file is the catalog's answer to it.
- * Ten routes, `auth: 'staff'`, the same guard `/api/v1/staff/orders` declares —
- * a staff member either has the console or does not, so there are no permission
- * atoms here.
+ * `/api/v1/staff/*` serves the phone's 商家管理; orders and refunds live in the
+ * order domain, and this file is the catalog's part. Ten routes,
+ * `auth: 'staff'`, the same guard `/api/v1/staff/orders` declares — a staff
+ * member either has the console or does not, so there are no permission atoms
+ * here.
  *
  * **Thinner than the console, deliberately.** A list row carries what
  * `template/uni-app/pages/admin/goods/index.vue` renders and nothing else: no
@@ -17,8 +17,9 @@ import { productFreightMode, productKind, volume, weight } from './schemas';
  * scrolls in public), no recycle bin, no export. The per-SKU 成本价 *is* here,
  * because 修改价格/库存 edits it and always has.
  *
- * Every shape is either one of A's admin schemas or a strict subset of one, so
- * the phone and the console can never disagree about what a product is.
+ * Every shape is either one of the catalog's admin schemas or a strict subset
+ * of one, so the phone and the console can never disagree about what a product
+ * is.
  */
 
 // ---------------------------------------------------------------------------
@@ -26,15 +27,14 @@ import { productFreightMode, productKind, volume, weight } from './schemas';
 // ---------------------------------------------------------------------------
 
 /**
- * The four tabs of 商品管理, as keys rather than legacy's `type` 1/2/4/5.
+ * The four tabs of 商品管理, as keys rather than integers.
  *
  * `low-stock` compares against the shop's configured
- * `catalog.stockWarningThreshold` — the one key N1 wired to the `admin_low_stock`
- * notification — so the badge on the phone and the 库存预警 screen in the console
- * are the same number. `in-stock` (仓库中) is everything live that is not on the
- * shelf, which in the rewrite's three-value `status` means `off_shelf` *and*
- * `draft`: legacy had one `is_show` flag and a draft would otherwise be
- * invisible to the phone.
+ * `catalog.stockWarningThreshold` — the same key the `admin_low_stock`
+ * notification reads — so the badge on the phone and the 库存预警 screen in the
+ * console are the same number. `in-stock` (仓库中) is everything live that is
+ * not on the shelf, which in the three-value `status` means `off_shelf` *and*
+ * `draft`; otherwise a draft would be invisible to the phone.
  */
 export const staffProductState = z.enum(['on-sale', 'in-stock', 'sold-out', 'low-stock']);
 export type StaffProductState = z.infer<typeof staffProductState>;
@@ -109,9 +109,9 @@ export type StaffLabelAssignmentBody = z.infer<typeof staffLabelAssignmentBody>;
 /**
  * 批量改分类.
  *
- * `categoryIds`, not the CR's singular `categoryId`: a product belongs to many
- * categories in the frozen schema (`product_categories_map`), and the drawer's
- * own checkbox group collects a list. One name for one thing.
+ * `categoryIds`, not a singular `categoryId`: a product belongs to many
+ * categories (`product_categories_map`), and the drawer's own checkbox group
+ * collects a list. One name for one thing.
  */
 export const staffCategoryAssignmentBody = z.object({
   productIds,
@@ -124,7 +124,7 @@ export const staffBulkResult = z.object({ updated: z.number().int().min(0) });
 
 /**
  * 商品分类 for the picker: id, name, children. Three levels written out, for
- * the reason A's admin tree is (`z.lazy` makes an OpenAPI `$ref` cycle).
+ * the reason the admin tree is (`z.lazy` makes an OpenAPI `$ref` cycle).
  */
 const staffCategoryBase = z.object({ id, name: z.string() });
 const staffCategoryLeaf = staffCategoryBase;
@@ -175,13 +175,12 @@ const EDITABLE = [
 /**
  * A **patch**, not a replacement.
  *
- * Every field but `id` is optional and an absent key is left alone. That is the
- * defect this shape exists to remove: legacy's `postUpdateAttrs` rewrote the
- * whole `eb_store_product_attr_value` row on every save, so editing a price
- * from a screen loaded two minutes ago wrote back the stock that screen was
- * showing and silently un-sold everything bought in between. Here a price edit
- * is a price edit, and the 批量改价 drawer — which sends only the fields the
- * operator filled in — means exactly what it says.
+ * Every field but `id` is optional and an absent key is left alone. Rewriting
+ * the whole SKU row on every save would let a price edit from a screen loaded
+ * two minutes ago write back the stock that screen was showing and silently
+ * un-sell everything bought in between. Here a price edit is a price edit, and
+ * the 批量改价 drawer — which sends only the fields the operator filled in —
+ * means exactly what it says.
  */
 export const staffSkuPatch = z
   .object({
@@ -218,13 +217,13 @@ export type StaffSkuUpdateBody = z.infer<typeof staffSkuUpdateBody>;
 /**
  * The phone's 添加商品 form.
  *
- * **Single-spec only.** A multi-spec product cannot be created from a phone and
- * never could: legacy's form posts `spec_type: 0` and exactly one `attr` row.
- * The console is where a spec matrix is built.
+ * **Single-spec only.** A multi-spec product cannot be created from a phone:
+ * the uni-app form sends exactly one SKU. The console is where a spec matrix is
+ * built.
  *
- * **No `logistics`.** Legacy sent `['1','2']` — 快递 + 到店 — and 门店自提 is
- * retired shop-wide, so the field is not in the request at all rather than
- * accepted and ignored.
+ * **No `logistics`.** 门店自提 is retired shop-wide, so express is the only
+ * mode and the field is not in the request at all rather than accepted and
+ * ignored.
  *
  * Everything else is the admin form's own rules: the freight refinements below
  * are the ones `adminProductForm` runs, because the service builds an
@@ -244,7 +243,7 @@ export const staffProductForm = z
     /** 立即上架. `false` files the product in 仓库中. */
     visible: z.boolean().default(false),
     freightMode: productFreightMode.default('free'),
-    /** Per unit — legacy charged `postage × cart_num`. */
+    /** Per unit: the freight charged is this times the quantity. */
     fixedFreight: money.optional(),
     shippingTemplateId: id.optional(),
     sku: z.object({

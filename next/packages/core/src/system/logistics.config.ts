@@ -7,20 +7,16 @@ const TRACKING_ON: ConfigVisibleWhen = { key: 'provider', equals: 'aliyun-market
 /**
  * `logistics` — express tracking.
  *
- * Legacy source: `eb_system_config` tab 64 (物流查询配置) and 66 (电子面单配置).
- * Read by F2 (shipping) and B2 (fulfilment).
+ * Read by the shipping domain and by fulfilment.
  *
  * 电子面单 (printed waybills) went through 一号通, which is out of scope, so what
  * is left is the tracking query and the default waybill contact — the latter is
  * still worth storing because it is what a shop prints on a return label.
  *
- * **One provider, 阿里云云市场** (CR-2-f2). The group offered 快递100 as well and
- * nothing implemented it: F2 owns the driver, only the market API is in scope,
- * and the seeded 1101 carrier codes are the market API's. A setting that looks
- * supported and silently answers nothing is worse than no setting, so the
- * option, its `customer` field and F2's warn-and-treat-as-`none` branch are all
- * gone. No legacy value maps to it either — `logistics_type` carries `1`
- * (aliyun) — which `packages/etl/src/config.test.ts` pins.
+ * **One provider, 阿里云云市场.** Only the market API has a driver, and the
+ * seeded 1101 carrier codes are the market API's. A setting that looks
+ * supported and silently answers nothing is worse than no setting, so there is
+ * no 快递100 option.
  */
 export const logisticsConfig = defineConfigGroup({
   group: 'logistics',
@@ -64,12 +60,5 @@ export const logisticsConfig = defineConfigGroup({
     senderName: { label: '发件人', type: 'text', section: '发件信息', order: 10 },
     senderPhone: { label: '发件电话', type: 'text', section: '发件信息', order: 11 },
     senderAddress: { label: '发件地址', type: 'text', section: '发件信息', order: 12 },
-  },
-  legacyKeys: {
-    provider: 'logistics_type',
-    appCode: 'system_express_app_code',
-    senderName: 'config_export_to_name',
-    senderPhone: 'config_export_to_tel',
-    senderAddress: 'config_export_to_address',
   },
 });

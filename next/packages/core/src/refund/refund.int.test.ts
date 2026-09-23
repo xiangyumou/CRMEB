@@ -30,11 +30,10 @@ import * as service from './refund.service';
 /**
  * After-sales, one caller at a time.
  *
- * The races are in `refund.concurrency.int.test.ts`. What is left — and what
- * the legacy invariants were mostly about — is the arithmetic of *sending* the
- * money: which payment a refund is frozen against, what happens when there is
- * no such payment, and what a retry is allowed to change. None of it is allowed
- * to move money twice.
+ * The races are in `refund.concurrency.int.test.ts`. What is left is the
+ * arithmetic of *sending* the money: which payment a refund is frozen against,
+ * what happens when there is no such payment, and what a retry is allowed to
+ * change. None of it is allowed to move money twice.
  */
 
 let harness: TestCtx;
@@ -148,10 +147,9 @@ interface PaidOrder {
 /**
  * An order that reached `paid`.
  *
- * `throughWechat: false` is the shape a legacy order has: the money came in
- * some other way (余额, 线下, a migrated 支付宝 order) and there is no
- * `payment_attempts` row to refund against. That is the successor to the
- * legacy pay-type guard (REFUND-001).
+ * `throughWechat: false` is an order whose money came in some other way (余额,
+ * 线下, an imported 支付宝 order): there is no `payment_attempts` row to refund
+ * against (REFUND-001).
  */
 async function paidOrder(
   options: { throughWechat?: boolean; payable?: string } = {},
@@ -313,7 +311,7 @@ const notificationFor = async (key: string) =>
   (await notificationEffects()).find((row) => row.scopeId === key);
 
 // ---------------------------------------------------------------------------
-// CR-2-e2 — the four notifications the after-sales flow owes
+// the four notifications the after-sales flow owes
 // ---------------------------------------------------------------------------
 
 describe('after-sales notifications', () => {
@@ -423,7 +421,7 @@ describe('after-sales notifications', () => {
 });
 
 // ---------------------------------------------------------------------------
-// CR-5-c — the return address is frozen at the approval
+// the return address is frozen at the approval
 // ---------------------------------------------------------------------------
 
 describe('the return address a buyer is shown', () => {
@@ -560,11 +558,9 @@ describe('a refund that goes the way it should', () => {
 
 describe('REFUND-001 — there is no original channel to send it back through', () => {
   /**
-   * The legacy dispatcher listed the pay types it could not refund — `yue`,
-   * `offline`, `alipay`, `allinpay`, empty — and told the operator to handle
-   * them offline. The successor is structural rather than a list: a refund is
-   * frozen against the `payment_attempts` row that collected the money, so an
-   * order that has no such row cannot be refunded through the gateway at all,
+   * The rule is structural rather than a list of pay types: a refund is frozen
+   * against the `payment_attempts` row that collected the money, so an order
+   * that has no such row cannot be refunded through the gateway at all,
    * whatever it was once paid with.
    */
   it('refuses to send, and says so, rather than inventing a transaction', async () => {
@@ -591,14 +587,12 @@ describe('REFUND-001 — there is no original channel to send it back through', 
 
 describe('REFUND-004 — a restock that fails never loses the money', () => {
   /**
-   * The legacy order was: restore the stock, and only then talk to the gateway,
-   * so a failed restore stopped the refund with 库存回退失败. That ordering is
-   * not available here — the money moves at WeChat, which is outside any
-   * transaction — so the guarantee is the other way round: the settlement (the
-   * ledger row, the order roll-up and the restock) is one transaction, and if
-   * the restock throws, *none* of it is written. The refund stays unsettled and
-   * the same `out_refund_no` settles it later, so the money is neither lost nor
-   * sent twice.
+   * Restoring the stock before talking to the gateway is not available — the
+   * money moves at WeChat, which is outside any transaction — so the guarantee
+   * is the other way round: the settlement (the ledger row, the order roll-up
+   * and the restock) is one transaction, and if the restock throws, *none* of
+   * it is written. The refund stays unsettled and the same `out_refund_no`
+   * settles it later, so the money is neither lost nor sent twice.
    */
   it('rolls the settlement back and settles it once the restock works again', async () => {
     const order = await paidOrder();

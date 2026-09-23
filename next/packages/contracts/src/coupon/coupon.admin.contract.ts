@@ -21,11 +21,10 @@ import {
  *
  * Two things to copy from here:
  *
- * 1. **The directory is the URL.** CONVENTIONS' path table says
+ * 1. **The directory is the URL.** The path table in `docs/conventions.md` says
  *    `app/admin-api/<domain>/**`, but Next's App Router derives the URL from
- *    the directory, and CONVENTIONS also says paths are *plural nouns*. The URL
- *    wins: the files live in `app/admin-api/coupons/` and
- *    `app/admin-api/user-coupons/`. See `docs/rewrite/cr/CR-1-golden.md`.
+ *    the directory, and paths are *plural nouns*. The URL wins: the files live
+ *    in `app/admin-api/coupons/` and `app/admin-api/user-coupons/`.
  * 2. **Not-CRUD actions are POSTed sub-resources**, never a `?action=` query or
  *    a PATCH with a magic field: `POST /admin-api/coupons/:id/status`,
  *    `POST /admin-api/coupons/:id/grants`.

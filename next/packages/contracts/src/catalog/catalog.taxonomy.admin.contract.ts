@@ -31,11 +31,9 @@ import {
  * The shop's vocabulary: labels, label categories, parameter templates and
  * protection badges. Four small CRUDs with the same shape.
  *
- * **Protections get their own permission atoms.** In legacy they were
- * registered under a route group whose `cate_name` said 商品参数
- * (`crmeb/app/adminapi/route/product.php:164`), so a role granted "product
- * parameters" silently also granted "edit the guarantee badges shown on every
- * product page". That is a bug, not a convention; it is fixed here.
+ * **Protections get their own permission atoms.** Sharing the parameters' atoms
+ * would mean a role granted "product parameters" silently also granted "edit
+ * the guarantee badges shown on every product page".
  */
 
 const rowParams = z.object({ id });

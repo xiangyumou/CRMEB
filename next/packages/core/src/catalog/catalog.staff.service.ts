@@ -20,11 +20,11 @@ import * as repo from './catalog.repo';
 import { adminProductCreate, adminProductSetStatus, pageBounds } from './catalog.service';
 
 /**
- * 移动端商家管理 — 商品管理 (CR-4-h2).
+ * 移动端商家管理 — 商品管理.
  *
- * Ten thin functions over the catalog A already owns. Nothing here reaches a
- * table the admin surface does not, and nothing here can do something an admin
- * holding `catalog:*` could not: 上架/下架 and 添加商品 call
+ * Ten thin functions over the catalog the admin surface already uses. Nothing
+ * here reaches a table the admin surface does not, and nothing here can do
+ * something an admin holding `catalog:*` could not: 上架/下架 and 添加商品 call
  * `adminProductSetStatus` and `adminProductCreate` outright, so a product
  * created from a phone is the same product, validated the same way, visible to
  * the storefront the instant it commits.
@@ -208,10 +208,10 @@ export async function staffProductSkus(
 /**
  * 修改价格 / 库存, one patch per SKU.
  *
- * Three things this does that legacy's `postUpdateAttrs` did not:
+ * Three deliberate things:
  *
- *  - **an absent key is left alone.** Legacy rewrote the whole row, so a price
- *    edit from a stale screen wrote that screen's stock back and un-sold every
+ *  - **an absent key is left alone.** Rewriting the whole row would let a price
+ *    edit from a stale screen write that screen's stock back and un-sell every
  *    order placed in between. `stock` is only touched when `stock` was sent.
  *  - **the rows are locked before anything is written** (`FOR UPDATE`, in id
  *    order), so a concurrent `reserve` waits for the commit and then decrements

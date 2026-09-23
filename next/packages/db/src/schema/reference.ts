@@ -28,10 +28,10 @@ import { createdAt, deletedAt, fk, instant, pk, updatedAt } from './_shared';
 /**
  * Administrative divisions (provinces → cities → districts).
  *
- * `id` carries the legacy `eb_system_city.city_id` value, not the legacy
- * auto-increment `id`: the legacy tree links `parent_id -> city_id`, so keeping
- * `city_id` as the primary key makes the tree self-consistent with no
- * translation table. Seed rows therefore insert explicit ids.
+ * `id` is fixed by the seed data, not generated: `parent_id` links rows by
+ * those ids, and addresses and freight rules store them, so the tree stays
+ * self-consistent with no translation table. Seed rows therefore insert
+ * explicit ids.
  */
 export const cities = pgTable(
   'cities',
@@ -66,9 +66,9 @@ export type NewCity = typeof cities.$inferInsert;
 // ---------------------------------------------------------------------------
 
 /**
- * Courier companies. Only the identity and the ordering are kept: the legacy
- * electronic-waybill credential columns (`account`, `key`, `net_name`, …) are
- * secrets and now live in the config registry, not in a business table.
+ * Courier companies: the identity and the ordering only. Electronic-waybill
+ * credentials are secrets and live in the config registry, not in a business
+ * table.
  */
 export const expressCompanies = pgTable(
   'express_companies',
@@ -96,9 +96,8 @@ export type NewExpressCompany = typeof expressCompanies.$inferInsert;
 // ---------------------------------------------------------------------------
 
 /**
- * Which legal text this is. Replaces the legacy numeric `eb_agreement.type`
- * (1 付费会员协议, 2 代理商规则, 6 积分协议 and 8 分销说明 left with the
- * features they described).
+ * Which legal text this is. There is no 付费会员协议, 代理商规则, 积分协议 or
+ * 分销说明: they described retired features.
  */
 export const agreementsCode = pgEnum('agreements_code', [
   'user_service',

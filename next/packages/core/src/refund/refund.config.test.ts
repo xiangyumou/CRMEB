@@ -26,7 +26,7 @@ describe('TLS-001 — no verification switch in `refund`', () => {
   });
 });
 
-describe('CR-10-k — the 售后设置 group has atoms of its own', () => {
+describe('the 售后设置 group has atoms of its own', () => {
   it('is read with refund:config:read, so the config service derives refund:config:write', () => {
     // A `:write` atom here would collapse reading and writing onto one grant;
     // the request atoms (review, execute, the remark) must not rewrite the
@@ -57,12 +57,13 @@ describe('secret fields', () => {
 });
 
 /**
- * CR-6-c, from the refund side. A return phone is the field the jsonb
- * double-parse bit first — all digits, so it came back as a number and the
- * whole return address silently fell back to empty. Fixed in `@shop/db`; the
- * round trip is asserted against a real database in `refund.int.test.ts`.
+ * The jsonb round trip, from the refund side. A return phone is the field a
+ * double parse would bite first — all digits, so it would come back as a number
+ * and the whole return address would silently fall back to empty. `@shop/db`
+ * parses once; the round trip is asserted against a real database in
+ * `refund.int.test.ts`.
  */
-describe('the schema is plain strings again', () => {
+describe('the schema is plain strings', () => {
   it('takes a return phone as the string it is', () => {
     expect(refundConfig.schema.parse({ returnPhone: '13800000000' }).returnPhone).toBe(
       '13800000000',

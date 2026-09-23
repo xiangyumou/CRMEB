@@ -13,11 +13,11 @@ import {
 } from './schemas';
 
 /**
- * Roles (老系统的「管理员身份」) and the permission tree the editor renders.
+ * Roles (管理员身份) and the permission tree the editor renders.
  *
  * The tree is built from the atoms `definePermissions` registered in code, so
- * it is always exactly what the server will check — the old `system_menus`
- * table, where a permission could exist in the tree and nowhere else, is gone.
+ * it is always exactly what the server will check: there is no menu table in
+ * which a permission could exist in the tree and nowhere else.
  */
 
 const roleParams = z.object({ id });

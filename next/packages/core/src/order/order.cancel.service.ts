@@ -16,18 +16,16 @@ import { orderStateMachine } from './order.state-machine';
  * Cancellation — the user's, the timeout's and the admin's — behind **one**
  * entry point.
  *
- * Legacy had three: `StoreOrderServices::cancel`, a queue consumer and an
- * admin action, each with its own idea of what to give back. The stock came
- * back in two of them and the coupon in one, so a timed-out order with a
- * coupon quietly ate it.
+ * Three entry points would each grow their own idea of what to give back; the
+ * one that forgot the coupon would let a timed-out order quietly eat it.
  *
  * The order of operations is the whole safety argument:
  *
  *  0. **outside** any transaction, `PaymentPort.closeOrderPayments` asks the
  *     gateway to close every open attempt: `closed` proceeds, `paid` refuses,
- *     `unknown` refuses and releases *nothing* (risk matrix §4 — never guess).
- *     It is outside because it talks to WeChat, and a row lock held for the
- *     length of a gateway round trip is how a checkout table seizes up;
+ *     `unknown` refuses and releases *nothing* (never guess). It is outside
+ *     because it talks to WeChat, and a row lock held for the length of a
+ *     gateway round trip is how a checkout table seizes up;
  *  1. `SELECT … FOR UPDATE` on the order, so a payment cannot start underneath;
  *  2. ask `PaymentPort` *again*, **while holding it** — `ensureNoOpenAttempts`
  *     is database-only and this is the re-check that catches an attempt opened
@@ -38,13 +36,13 @@ import { orderStateMachine } from './order.state-machine';
  *  4. only the winner gives back the stock and the coupon, in the same
  *     transaction, so QUEUE-006's "both or neither" holds by construction.
  *
- * Steps 0 and 2 are the two-call protocol C designed and CR-7-c wired up.
- * Before it, every order whose buyer had opened the WeChat sheet and backed out
- * answered `unknown` forever: the 取消订单 button refused them and the sweep
- * skipped exactly the orders it exists for.
+ * Steps 0 and 2 are the payment port's two-call protocol. Without step 0, every
+ * order whose buyer had opened the WeChat sheet and backed out would answer
+ * `unknown` forever: the 取消订单 button would refuse them and the sweep would
+ * skip exactly the orders it exists for.
  *
  * A paid order is never cancelled — `ORDER_TRANSITIONS` has no such edge. It
- * leaves through stream C's full refund.
+ * leaves through the refund domain's full refund.
  */
 
 export type CancelReason = 'user' | 'timeout' | 'admin' | 'payment-failed';
@@ -179,7 +177,7 @@ export async function cancelOrder(ctx: Ctx, input: CancelInput): Promise<CancelO
         : {}),
     });
 
-    // Hooks run inside this transaction, so a stream that cannot do its part
+    // Hooks run inside this transaction, so a domain that cannot do its part
     // (group-buy releasing a team seat) aborts the cancellation rather than
     // leaving the two halves disagreeing.
     await onOrderCancelled.dispatch(tx, ctx, {

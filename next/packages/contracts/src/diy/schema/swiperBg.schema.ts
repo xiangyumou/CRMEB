@@ -12,7 +12,6 @@ import {
 /**
  * `swiperBg` — 轮播图.
  *
- * Fields derived from `template/admin/src/components/mobilePage/banner.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const swiperBgSchema = defineDiyComponent('swiperBg', {

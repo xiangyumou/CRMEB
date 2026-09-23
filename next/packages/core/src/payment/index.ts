@@ -8,30 +8,30 @@ import { closeOrderPayments, ensureNoOpenAttempts } from './payment.service';
 /**
  * The payment domain's public surface.
  *
- * CONVENTIONS: a domain in `core` may import another domain only through its
- * `index.ts`. So this file is the contract between payment and everybody else,
- * and `payment.repo.ts` in particular is private — nothing outside this folder
- * may write a `payment_attempts` row.
+ * `docs/conventions.md`: a domain in `core` may import another domain only
+ * through its `index.ts`. So this file is the contract between payment and
+ * everybody else, and `payment.repo.ts` in particular is private — nothing
+ * outside this folder may write a `payment_attempts` row.
  *
- * ## What other streams call
+ * ## What other domains call
  *
  * | Function                | Caller | When                                            |
  * | ----------------------- | ------ | ----------------------------------------------- |
- * | `closeOrderPayments`    | B1     | **before** cancelling an order, outside the tx  |
- * | `ensureNoOpenAttempts`  | B1     | inside the cancelling transaction (the port)    |
- * | `settlePayment`         | C only | the one place money becomes state               |
+ * | `closeOrderPayments`    | order  | **before** cancelling an order, outside the tx  |
+ * | `ensureNoOpenAttempts`  | order  | inside the cancelling transaction (the port)    |
+ * | `settlePayment`         | itself | the one place money becomes state               |
  * | `payClient`             | refund | the gateway client, already configured          |
  * | `recordCallback`        | refund | the refund webhook's idempotency insert         |
  * | `applyExceptionRefundNotification` | refund | a refund notification with an `X` number |
  *
  * The cancel path is two calls, not one, and the order matters. The port may
  * not make a network call — it runs inside a transaction with the order row
- * locked — so it can only report what the database already knows. B1 therefore
- * calls `closeOrderPayments(ctx, orderId)` first, outside the transaction, and
- * only proceeds to cancel if it answered `closed`. `paid` means the money
- * arrived and the order is now paid; `unknown` means the gateway did not
- * answer, and **nothing may be released** — not stock, not the coupon
- * (QUEUE-003 / QUEUE-004).
+ * locked — so it can only report what the database already knows. The order
+ * domain therefore calls `closeOrderPayments(ctx, orderId)` first, outside the
+ * transaction, and only proceeds to cancel if it answered `closed`. `paid`
+ * means the money arrived and the order is now paid; `unknown` means the
+ * gateway did not answer, and **nothing may be released** — not stock, not the
+ * coupon (QUEUE-003 / QUEUE-004).
  */
 
 export {
@@ -118,12 +118,12 @@ export {
 export function registerPaymentDomain(): void {
   registerPaymentPort({ ensureNoOpenAttempts, closeOrderPayments });
   registerPaymentEffects();
-  // CR-4-k2: a notification naming another merchant is told to an operator.
+  // A notification naming another merchant is told to an operator.
   registerPaymentNotificationEvents();
-  // `GET /api/v1/site/config` tells the app which pay buttons to draw (CR-7-h2).
-  // It is announced from here, not read from there: `system` is the domain every
-  // other one imports, so an edge back into `payment` would be a cycle — and the
-  // one that existed briefly broke `notification`'s effect handler registration.
-  // A boolean crosses the seam, never a credential.
+  // `GET /api/v1/site/config` tells the app which pay buttons to draw. It is
+  // announced from here, not read from there: `system` is the domain every
+  // other one imports, so an edge back into `payment` would be a cycle — one
+  // that breaks `notification`'s effect handler registration. A boolean crosses
+  // the seam, never a credential.
   registerSitePaymentMethod('wechat', { group: paymentConfig.group, isEnabled: isPaymentEnabled });
 }

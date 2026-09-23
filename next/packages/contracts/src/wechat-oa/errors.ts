@@ -43,12 +43,9 @@ export const wechatOaErrors = defineErrors({
   WECHAT_OA_CATEGORY_NOT_EMPTY: { status: 409, message: '该分类下还有渠道码，无法删除' },
   WECHAT_OA_CATEGORY_NOT_FOUND: { status: 404, message: '渠道码分类不存在' },
   /**
-   * `wechat_qrcode_categories_name_uq`, now scoped to `deleted_at is null`
-   * (CR-3-e3, closed by E4). While the index covered deleted rows too, a name
-   * the operator deleted last month stayed taken by a row nothing on the screen
-   * showed, and the message had to hedge: 「也可能属于一个已删除的分类」. That
-   * cannot happen any more, so it says the one thing that is now true and can
-   * be acted on — some live category has the name.
+   * `wechat_qrcode_categories_name_uq`, scoped to `deleted_at is null`, so a
+   * deleted category never keeps its name taken. The message says the one thing
+   * that is true and can be acted on — some live category has the name.
    */
   WECHAT_OA_CATEGORY_NAME_TAKEN: { status: 409, message: '该分类名称已被占用' },
 
@@ -60,7 +57,7 @@ export const wechatOaErrors = defineErrors({
    * The URL handed to the JS-SDK signature endpoint is not one of ours.
    *
    * Signing an arbitrary URL is signing for somebody else's page: the ticket is
-   * ours, the page is not. The legacy endpoint signed whatever it was given.
+   * ours, the page is not.
    */
   WECHAT_OA_URL_NOT_ALLOWED: { status: 422, message: '该地址不在授权域名内' },
 });

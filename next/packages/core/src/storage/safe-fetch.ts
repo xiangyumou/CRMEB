@@ -8,15 +8,15 @@ import { Readable } from 'node:stream';
  * Fetching a URL somebody typed into the admin, without handing them the
  * internal network.
  *
- * CONVENTIONS: "Never: … `fetch` of a user-supplied URL outside
+ * `docs/conventions.md`: "Never: … `fetch` of a user-supplied URL outside
  * `core/storage/safe-fetch.ts`". This is that file, and it is the only place in
  * the system allowed to do it.
  *
- * The old `onlineUpload` did `file_get_contents($url)`. That reaches
- * `http://127.0.0.1:6379`, `http://169.254.169.254/latest/meta-data/` and every
- * service on the private network, and a blocklist of hostnames does not stop any
- * of it: `localtest.me` resolves to 127.0.0.1, and a host you checked a moment
- * ago can answer differently the next time (DNS rebinding).
+ * A plain fetch of the URL reaches `http://127.0.0.1:6379`,
+ * `http://169.254.169.254/latest/meta-data/` and every service on the private
+ * network, and a blocklist of hostnames does not stop any of it: `localtest.me`
+ * resolves to 127.0.0.1, and a host you checked a moment ago can answer
+ * differently the next time (DNS rebinding).
  *
  * So the rule here is **resolve first, judge the address, then connect to that
  * address** — and do it again for every redirect:
@@ -30,8 +30,8 @@ import { Readable } from 'node:stream';
  * 3. connect to the address we judged — pinned in the *connection layer*, with
  *    the URL still carrying the real name — so DNS cannot change its mind in
  *    between, and TLS still sends the name as SNI and checks the certificate
- *    against it (CR-11-k: dialling an IP literal broke every `https://`
- *    source, because a certificate names hosts, not addresses);
+ *    against it (dialling an IP literal would break every `https://` source,
+ *    because a certificate names hosts, not addresses);
  * 4. follow redirects manually, re-running all of the above on each hop;
  * 5. stop reading at `maxBytes` — a 4-byte URL must not be able to buy a 40GB
  *    download.
@@ -47,8 +47,8 @@ export interface SafeFetchOptions {
   /**
    * Plain `http:` — off by default, on every hop. A plaintext fetch is a
    * man-in-the-middle's choice of file, and the failure is silent: the shop
-   * just has a different image (CR-11-k). An https URL that redirects to http
-   * is refused the same way.
+   * just has a different image. An https URL that redirects to http is refused
+   * the same way.
    */
   allowHttp?: boolean;
   /**

@@ -20,7 +20,7 @@ import { getOrderFacts } from '../order/ports';
 /**
  * Reviews, on both surfaces.
  *
- * Three things here are deliberate and were not true of legacy:
+ * Three things here are deliberate:
  *
  *  - **One review per purchased line, enforced by the database.**
  *    `product_reviews_order_item_uq` plus `ON CONFLICT DO NOTHING` — the
@@ -30,7 +30,7 @@ import { getOrderFacts } from '../order/ports';
  *  - **Eligibility comes from the order domain, not from a join.** The catalog
  *    has no business reading `orders`; `OrderFactsPort` answers "may this user
  *    review this line" and returns `null` for every kind of refusal, so a
- *    stranger probing order ids learns nothing (CR-2-a).
+ *    stranger probing order ids learns nothing.
  *  - **Moderation is a conditional update.** Approving a review guards on the
  *    status it moves from, and the batch version reports the rows it actually
  *    moved rather than the ids it was handed.
@@ -272,8 +272,8 @@ export async function productReviewSummary(
  * row and one 409 rather than two reviews or a 500 from a unique violation.
  *
  * `reviewRequiresAudit` decides whether it appears immediately or waits for
- * moderation; legacy hard-coded "visible at once" and shops discovered the
- * setting existed only after the first abusive review went live.
+ * moderation. It is a setting rather than a fixed "visible at once", so a shop
+ * can hold reviews back before the first abusive one goes live.
  */
 export async function reviewSubmit(ctx: Ctx, body: ReviewSubmitBody): Promise<ProductReview> {
   const userId = requireUserId(ctx);

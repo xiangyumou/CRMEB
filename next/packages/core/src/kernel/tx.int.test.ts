@@ -7,9 +7,9 @@ import { conditionalDelete, conditionalUpdate, lockRow, lockRows, withTx } from 
 /**
  * The three moves every state change is built from, against a real PostgreSQL.
  *
- * The `effects` table stands in for "some row with a status" — it is the one
- * table this stream owns that has a status column, and the mechanics are the
- * ones every domain will copy.
+ * The `effects` table stands in for "some row with a status" — it belongs to
+ * the platform rather than to any one domain, and the mechanics are the ones
+ * every domain will copy.
  */
 
 let harness: TestCtx;
@@ -204,7 +204,7 @@ describe('conditionalUpdate', () => {
   });
 
   it('EXACTLY ONE of N concurrent conditional updates wins', async () => {
-    // The invariant the whole system rests on: CONVENTIONS forbids
+    // The invariant the whole system rests on: `docs/conventions.md` forbids
     // read-then-write on status, stock, seats and counters precisely because
     // this is what happens when twenty callers arrive at once.
     for (let round = 0; round < 5; round += 1) {

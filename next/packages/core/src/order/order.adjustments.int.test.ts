@@ -16,18 +16,17 @@ import * as order from './index';
 import { resetOrderPorts } from './ports';
 
 /**
- * CR-2-h4 — the order reads say what each checkout rule took off.
+ * The order reads say what each checkout rule took off.
  *
  * An activity is priced as a `PricingContributor` adjustment that folds into
- * `couponDiscount` and the line's `discountAmount` alongside the coupon
- * (CR-3-b1), and the line keeps the catalogue `unitPrice`. The checkout
- * preview lists the adjustments; the order reads did not, so once a coupon
- * stacked on a 预售 the ¥10 activity and the ¥5 coupon were one ¥15 nobody
- * could split, and the 订单列表 printed ¥88 for a ¥78 预售.
+ * `couponDiscount` and the line's `discountAmount` alongside the coupon, and
+ * the line keeps the catalogue `unitPrice`. Without a per-rule record, once a
+ * coupon stacked on a 预售 the ¥10 activity and the ¥5 coupon would be one ¥15
+ * nobody could split, and the 订单列表 would print ¥88 for a ¥78 预售.
  *
- * The create path now keeps each rule's share of each line with the line
- * (`order_items.snapshot.adjustments`, no migration), and `orderItem`
- * carries it on every read — list, detail, and the create answer itself.
+ * The create path keeps each rule's share of each line with the line
+ * (`order_items.snapshot.adjustments`), and `orderItem` carries it on every
+ * read — list, detail, and the create answer itself.
  *
  * Every domain is registered the way the web process does it: a presale
  * checkout needs the catalogue, stock, presale and coupon domains together.
@@ -189,7 +188,7 @@ function paidUnitPrice(item: OrderItem): string {
   return Money.fromFen(paid.valueOfFen() / item.quantity).toString();
 }
 
-describe('CR-2-h4 — a 预售 order with a stacked coupon', () => {
+describe('a 预售 order with a stacked coupon', () => {
   it('separates the activity from the coupon, and the list and the detail agree', async () => {
     const userId = await shopper();
     const skuId = await sku(LIST);
@@ -207,7 +206,7 @@ describe('CR-2-h4 — a 预售 order with a stacked coupon', () => {
     });
 
     // The amounts are what they were: the line keeps the catalogue price and
-    // both discounts land in one `couponDiscount` (CR-3-b1).
+    // both discounts land in one `couponDiscount`.
     expect(created).toMatchObject({
       kind: 'presale',
       itemsAmount: '88.00',
@@ -297,7 +296,7 @@ describe('CR-2-h4 — a 预售 order with a stacked coupon', () => {
     });
     expect(created.items[0]!.adjustments).toEqual([]);
 
-    // A line written before CR-2-h4 has no `adjustments` in its snapshot.
+    // A line whose snapshot has no `adjustments` key.
     const [row] = await harness.ctx.db
       .select({ id: orderItems.id, snapshot: orderItems.snapshot })
       .from(orderItems);

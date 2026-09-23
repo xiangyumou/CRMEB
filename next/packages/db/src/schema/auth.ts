@@ -29,7 +29,7 @@ export const admins = pgTable(
     id: pk(),
     /** Login name. Unique case-insensitively — PostgreSQL, unlike MySQL, is case-sensitive. */
     account: varchar({ length: 64 }).notNull(),
-    /** bcrypt hash, or a legacy 32-char MD5 while `passwordAlgo = 'md5'`. */
+    /** bcrypt hash, or an imported 32-char MD5 while `passwordAlgo = 'md5'`. */
     passwordHash: varchar({ length: 255 }).notNull(),
     /** `md5` rows are upgraded to bcrypt on the next successful login. */
     passwordAlgo: varchar({ length: 16 }).notNull().default('bcrypt'),
@@ -155,7 +155,7 @@ export const auditLogs = pgTable(
     /** Forwarded client address. Everything is behind one proxy, so this is advisory. */
     ip: varchar({ length: 64 }),
     /**
-     * Who acted (CR-13-k2): `admin` — a console account, `admin_id` — or
+     * Who acted: `admin` — a console account, `admin_id` — or
      * `staff` — a 店员 on the storefront's staff surface, `user_id`. Rows
      * written before the column existed are all console rows, hence the default.
      */

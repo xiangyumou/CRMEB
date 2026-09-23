@@ -27,8 +27,9 @@ import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kerne
 
 /**
  * The only file in the coupon domain that touches Drizzle tables
- * (CONVENTIONS, "Import boundaries"; enforced by the `boundaries` ESLint rule,
- * which allows `@shop/db/schema/*` from `*.repo.ts` and `*.test.ts` only).
+ * (`docs/conventions.md`, "Import boundaries"; enforced by the `boundaries`
+ * ESLint rule, which allows `@shop/db/schema/*` from `*.repo.ts` and
+ * `*.test.ts` only).
  *
  * A repo function is a *statement*, not a decision: it returns rows, or the
  * number of rows a conditional update changed. Every branch on that number
@@ -166,8 +167,8 @@ export interface TemplateTerms extends ScopeLinks {
  * picker: three statements whatever the page size, never one per coupon.
  *
  * A `user_coupons` row carries the *amounts* as a snapshot but not the scope,
- * exactly as legacy resolved `applicable_type` through the `issue` relation at
- * read time. So the scope must be looked up, and this is the batched way.
+ * which is resolved from the template at read time. So the scope must be looked
+ * up, and this is the batched way.
  */
 export async function templateTermsFor(
   db: DbOrTx,
@@ -217,7 +218,8 @@ export async function templateTerms(db: DbOrTx, templateId: number): Promise<Tem
 }
 
 /**
- * `product_id -> category ids`, batched, for the checkout picker (CR-1-h4).
+ * `product_id -> category ids`, batched, for the checkout picker — the server
+ * decides which categories a line is in, never the request body.
  *
  * The same table, and the same rows, the catalog's `CatalogPort` hands the
  * checkout (`catalog.sale.ts`): the picker and the order must agree on which
@@ -424,9 +426,8 @@ export async function replaceScopeLinks(
  * An unlimited template has no counter, so it is excluded and the caller skips
  * this call entirely.
  *
- * Legacy did `SELECT remain_count` … `if (remain > 0)` … `UPDATE` behind a
- * Redis lock (`StoreCouponIssueServices::issueUserCoupon`). This is one
- * statement and needs no lock.
+ * Read-check-write (`SELECT remain_count` … `if (remain > 0)` … `UPDATE`) would
+ * need a lock around it. This is one statement and needs none.
  */
 export async function takeOneFromSupply(
   tx: Tx,
@@ -583,9 +584,9 @@ export async function redeemUserCoupon(
  * Hand the coupon back on cancel or refund.
  *
  * The CASE keeps it one statement: a coupon whose window has passed while it
- * sat on the order comes back `expired`, not `unused`. Legacy `recoverCoupon`
- * resurrected it to 未使用 regardless, which is how a customer ended up holding
- * a coupon the checkout then refused (`StoreCouponUserServices.php:97-101`).
+ * sat on the order comes back `expired`, not `unused`. Handing it back as
+ * 未使用 regardless would leave a customer holding a coupon the checkout then
+ * refuses.
  */
 export async function releaseUserCoupon(
   tx: Tx,
@@ -629,8 +630,8 @@ export type WalletState = 'unused' | 'used' | 'expired';
 
 /**
  * Which wallet tab a row belongs to. One definition for the shopper's own
- * wallet and the staff view of it (CR-1-h3), so the two can never disagree on
- * what "unused" means.
+ * wallet and the staff view of it, so the two can never disagree on what
+ * "unused" means.
  */
 function walletStateFilter(state: WalletState, now: Date): SQL | undefined {
   return state === 'unused'
@@ -676,9 +677,9 @@ export async function listUserCoupons(
 }
 
 /**
- * One customer's wallet as a 店员 sees it (CR-1-h3): one tab, or every row with
- * the spendable ones first, newest first within each half. Capped by `limit` —
- * the staff drawer does not page.
+ * One customer's wallet as a 店员 sees it: one tab, or every row with the
+ * spendable ones first, newest first within each half. Capped by `limit` — the
+ * staff drawer does not page.
  */
 export async function listUserCouponsForStaff(
   db: DbOrTx,

@@ -236,8 +236,8 @@ describe('admin templates', () => {
   });
 
   it('applies the TOTAL DELTA to the remaining supply, instead of resetting it', async () => {
-    // Legacy reset remain_count = total_count on every save, so renaming a
-    // campaign that had 3 of 1000 left handed out 997 more coupons.
+    // Resetting remain_count = total_count on every save would let renaming a
+    // campaign that had 3 of 1000 left hand out 997 more coupons.
     const id = await makeTemplate({ totalCount: 1000, remainingCount: 3 });
     const detail = await service.adminUpdate(
       harness.ctx,
@@ -607,7 +607,7 @@ describe('listMine', () => {
   });
 });
 
-describe('staffListUserCoupons — 查看优惠券 (CR-1-h3)', () => {
+describe('staffListUserCoupons — 查看优惠券', () => {
   const staffActor = (id: number): Actor => ({
     kind: 'staff',
     id,
@@ -749,7 +749,7 @@ describe('listApplicable', () => {
     expect(result.items).toHaveLength(0);
   });
 
-  describe('CR-1-h4 — a 品类券 is matched against the product, not the body', () => {
+  describe('a 品类券 is matched against the product, not the body', () => {
     /** A ¥15-off 品类券 on `categoryId`, claimed by `userId`. */
     async function categoryCoupon(userId: number, categoryId: number): Promise<string> {
       const template = await service.adminCreate(
@@ -810,7 +810,7 @@ describe('listApplicable', () => {
 });
 
 // ---------------------------------------------------------------------------
-// the domain API other streams call
+// the domain API other domains call
 // ---------------------------------------------------------------------------
 
 describe('quote', () => {
@@ -1031,8 +1031,8 @@ describe('release', () => {
   });
 
   it('gives a lapsed coupon back as EXPIRED, not unused', async () => {
-    // Legacy `recoverCoupon` resurrected expired coupons to 未使用, handing
-    // back something the shopper could not have spent anyway.
+    // Handing it back as 未使用 would give the shopper something they could not
+    // have spent anyway.
     const { userCouponId } = await used(1);
     harness.clock.advance(2 * 24 * 60 * 60 * 1000);
     expect(await release(userCouponId)).toEqual({ released: true });
@@ -1143,8 +1143,8 @@ describe('grantOrderGifts', () => {
   });
 
   it('issues nothing extra when the payment callback is replayed', async () => {
-    // Legacy giveOrderProductCoupon had no guard at all: a repeated WeChat
-    // callback granted the gift coupons again.
+    // Without a guard, a repeated WeChat callback would grant the gift coupons
+    // again.
     await makeTemplate({ claimMode: 'order_gift', perUserLimit: null });
     const userId = await makeUser();
     const input = {

@@ -19,7 +19,7 @@ import { orderRef } from '../order/order.ref.schemas';
 // enums
 // ---------------------------------------------------------------------------
 
-/** What the buyer is asking for. Legacy `refund_type` 1 / 2. */
+/** What the buyer is asking for. */
 export const refundKind = z.enum(['refund_only', 'return_and_refund']);
 export type RefundKind = z.infer<typeof refundKind>;
 
@@ -125,9 +125,8 @@ export type RefundItem = z.infer<typeof refundItem>;
  *
  * Note what is *not* here: an amount. The shopper picks lines and quantities;
  * the service computes the money from the frozen order lines and its own
- * freight rule (risk matrix §6, "Refund completion computed by the service").
- * The legacy controllers took `refund_price` from the request, which is how a
- * crafted body could ask for more than was paid.
+ * freight rule. An amount taken from the request would let a crafted body ask
+ * for more than was paid.
  */
 export const refundApplyBody = z.object({
   orderId: id,
@@ -311,7 +310,7 @@ export const refundReceiveReturnBody = z.object({
 });
 export type RefundReceiveReturnBody = z.infer<typeof refundReceiveReturnBody>;
 
-/** The list of canned reasons the apply screen offers. Legacy `order/refund/reason`. */
+/** The list of canned reasons the apply screen offers. */
 export const refundReasonList = z.object({
   items: z.array(z.string()),
 });

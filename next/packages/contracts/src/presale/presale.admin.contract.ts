@@ -17,11 +17,8 @@ import {
 /**
  * Admin presale routes.
  *
- * Resource segments claimed: `presale-activities/**` and `presale-orders`.
- * Five CRUD routes plus the orders view, which is the whole of the legacy
- * 预售活动 screen (`marketing.php:45-57`) — legacy's `advance/index`,
- * `advance/info/:id`, `advance/save/:id`, `advance/:id` DELETE and
- * `advance/set_status/:id/:status`.
+ * Resource segments claimed: `presale-activities/**` and `presale-orders`. Five
+ * CRUD routes plus the orders view: the whole 预售活动 screen.
  */
 
 const activityParams = z.object({ id });

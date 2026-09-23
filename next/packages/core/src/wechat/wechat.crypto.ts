@@ -10,11 +10,11 @@ import {
 /**
  * WeChat Pay v3 cryptography — every byte of it, on `node:crypto`.
  *
- * There is no SDK here on purpose. The two official PHP/Node SDKs pull in a
- * certificate downloader, a Guzzle middleware stack and a cache of their own,
- * and the fork's easywechat glue (`crmeb/crmeb/services/easywechat/v3pay/`) is
- * where the "unverifiable signature silently becomes a valid response" defect
- * lived. Four pure functions and no ambient state is the whole requirement.
+ * There is no SDK here on purpose. The official SDKs pull in a certificate
+ * downloader, a middleware stack and a cache of their own, and glue around an
+ * SDK is where an "unverifiable signature silently becomes a valid response"
+ * defect hides. Four pure functions and no ambient state is the whole
+ * requirement.
  *
  * Nothing in this file touches the network, the clock or the database, so
  * `wechat.crypto.test.ts` runs in milliseconds and carries the TLS-002/004/005

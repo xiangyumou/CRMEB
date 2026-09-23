@@ -21,9 +21,9 @@ import { render } from './notification.render';
  *
  * ## Why it records an effect and sends nothing
  *
- * CONVENTIONS: "anything that calls a third party happens after commit, via the
- * effects ledger". A notification is the purest case of that rule. If sending
- * were inline:
+ * Anything that calls a third party happens after commit, via the effects
+ * ledger, and a notification is the purest case of that rule. If sending were
+ * inline:
  *
  * - a WeChat timeout would roll back the payment that triggered it;
  * - a customer who turned the template off would fail somebody's refund;

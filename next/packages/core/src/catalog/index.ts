@@ -1,27 +1,28 @@
 /**
  * The catalog domain's public surface.
  *
- * CONVENTIONS: "A domain in `core` may import another domain only through that
- * domain's `index.ts`." So this file is the contract between the catalog and
- * the rest of the system. `catalog.repo.ts` in particular is private: no other
- * domain may read a product table directly, and none needs to.
+ * `docs/conventions.md`: "A domain in `core` may import another domain only
+ * through that domain's `index.ts`." So this file is the contract between the
+ * catalog and the rest of the system. `catalog.repo.ts` in particular is
+ * private: no other domain may read a product table directly, and none needs
+ * to.
  *
- * ## What other streams call
+ * ## What other domains call
  *
- * | Function / export       | Caller     | When                                              |
- * | ----------------------- | ---------- | ------------------------------------------------- |
- * | `getSkuForSale`         | B1         | pricing the cart, confirming and creating an order |
- * | `checkPurchaseAllowance`| B1         | 起购 / 限购, inside the order transaction           |
- * | `recordCartAdd`         | B1         | 加购件数, inside the cart's add transaction          |
- * | `getStockPort()`        | B1 / C / D | reserve, commit, release — via `order/ports.ts`    |
- * | `getCatalogPort()`      | B1         | the batch cart read, via `order/catalog.port.ts`   |
- * | `productCardsFor`       | G1 / G2    | rendering products in a DIY page or a campaign     |
- * | `ProductCard`           | everyone   | the one product-card DTO; add fields, do not fork  |
- * | `catalogPermissions`    | E2         | the permission tree                                |
- * | `catalogConfig`         | F1         | the 商品设置 config group                           |
- * | `runAutoReview`         | worker     | the 系统默认好评 sweep                              |
- * | `pruneBrowseHistory`    | worker     | the 足迹 retention sweep                           |
- * | `foldProductViews`      | worker     | folding view events into `products.views`          |
+ * | Function / export        | Caller                   | When                                               |
+ * | ------------------------ | ------------------------ | -------------------------------------------------- |
+ * | `getSkuForSale`          | checkout                 | pricing the cart, confirming and creating an order |
+ * | `checkPurchaseAllowance` | checkout                 | 起购 / 限购, inside the order transaction          |
+ * | `recordCartAdd`          | cart                     | 加购件数, inside the cart's add transaction        |
+ * | `getStockPort()`         | order, refund, marketing | reserve, commit, release — via `order/ports.ts`    |
+ * | `getCatalogPort()`       | cart, checkout           | the batch cart read, via `order/catalog.port.ts`   |
+ * | `productCardsFor`        | cms                      | rendering the related product under an article     |
+ * | `ProductCard`            | everyone                 | the one product-card DTO; add fields, do not fork  |
+ * | `catalogPermissions`     | system                   | the permission tree and the admin menu             |
+ * | `catalogConfig`          | system                   | the 商品设置 config group                          |
+ * | `runAutoReview`          | worker                   | the 系统默认好评 sweep                             |
+ * | `pruneBrowseHistory`     | worker                   | the 足迹 retention sweep                           |
+ * | `foldProductViews`       | worker                   | folding view events into `products.views`          |
  *
  * `checkPurchaseAllowance` and `recordCartAdd` take `(tx, …)` — a
  * transaction the *caller* owns — matching `recordEffect(tx, ctx, input)`, the
@@ -34,8 +35,8 @@
  * through (from `catalog.sale.ts`) and the 商品设置 config group. The two ports
  * go through `registerCatalogDomain()`, the idempotent shape
  * `@shop/core/domains` looks for, so a test that `resetOrderPorts()` can put
- * them back with one call. (The `OrderFactsPort` stand-in that used to live
- * here moved into the order domain at merge — CR-2-a closed.)
+ * them back with one call. (The `OrderFactsPort` the catalog asks about
+ * purchases is the order domain's to register.)
  *
  * ## Virtual cards: catalog imports them, the order domain hands them out
  *
@@ -43,8 +44,8 @@
  * stock derived from the pool). Handing a card to a paid order line is the
  * order domain's: `order.fulfil.repo.ts::claimVirtualCard`, called by
  * `autoDeliver` on `order.paid`, is the one atomic claim and the one MUT-001
- * mutates. Catalog used to carry a second, unused copy (`issueVirtualCard`);
- * it was deleted so nobody fixes it and believes delivery changed (CR-23-k2).
+ * mutates. Catalog carries no second copy, so nobody can fix one and believe
+ * delivery changed.
  */
 
 import { registerCatalogPort } from '../order';
@@ -86,7 +87,7 @@ export {
   adminVirtualCardImport,
   adminVirtualCardList,
   adminVirtualCardVoid,
-  // the domain API other streams call
+  // the domain API other domains call
   checkPurchaseAllowance,
   getSkuForSale,
   productCardsFor,
@@ -119,7 +120,7 @@ export {
   adminProtectionUpdate,
 } from './catalog.taxonomy.service';
 
-/** 移动端商家管理 — 商品管理 (CR-4-h2). Ten calls, `auth: 'staff'`, no new capability. */
+/** 移动端商家管理 — 商品管理. Ten calls, `auth: 'staff'`, no new capability. */
 export {
   staffAssignCategories,
   staffAssignLabels,
@@ -172,15 +173,15 @@ export {
 
 /**
  * The stock port, also reachable as `getStockPort()`. The refund path is
- * `release(tx, orderId, lines, { committed: true, refundId })` — CR-1-a; there
- * is no separate `releaseSold` any more.
+ * `release(tx, orderId, lines, { committed: true, refundId })`; there is no
+ * separate release for sold units.
  */
 export { catalogStockPort } from './catalog.stock';
 
 /** The batch cart read, also reachable as `resolveCatalogPort()`. */
 export { catalogSalePort } from './catalog.sale';
 
-/** 商品浏览量: the worker folds `product_events` views into `products.views` (CR-41-k2). */
+/** 商品浏览量: the worker folds `product_events` views into `products.views`. */
 export { foldProductViews, VIEW_WATERMARK_KEY } from './catalog.views';
 export type { FoldViewsOptions, FoldViewsReport } from './catalog.views';
 
@@ -189,10 +190,10 @@ export { catalogConfig } from './catalog.config';
 
 export { catalogPermissions } from './permissions';
 
-/** Test helper for the streams that move stock through the port (order, refund). */
+/** Test helper for the domains that move stock through the port (order, refund). */
 export { stockAndSalesOf } from './catalog.repo';
 
-/** Pure rules, re-exported for the streams that render the same numbers. */
+/** Pure rules, re-exported for the domains that render the same numbers. */
 export {
   canAddToCart,
   chargesFreight,

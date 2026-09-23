@@ -7,18 +7,16 @@ import { defineConfigGroup } from '../kernel/config-registry';
  * Both exist because a statistics page is the easiest place in an admin to ask
  * the database for something enormous by accident:
  *
- * - `exportMaxRows` caps a CSV export. The route answers with the file inside
- *   a JSON envelope (CR-2-b2), so the whole thing is built in memory before it
- *   is sent; a cap is not a nicety. Over the cap the export refuses with
- *   `STATS_EXPORT_TOO_LARGE` and asks for a narrower window rather than
- *   quietly handing back a truncated file that looks complete.
+ * - `exportMaxRows` caps a CSV export. The route answers with the file inside a
+ *   JSON envelope, so the whole thing is built in memory before it is sent; a
+ *   cap is not a nicety. Over the cap the export refuses with
+ *   `STATS_EXPORT_TOO_LARGE` and asks for a narrower window rather than quietly
+ *   handing back a truncated file that looks complete.
  * - `cacheSeconds` is how long a computed block is reused. 60 by default: long
  *   enough that a dashboard being watched during a sale does not re-run every
  *   aggregate on every poll, short enough that an operator refreshing after a
  *   fix sees the new number within a minute. `0` turns caching off, which is
  *   what a shop debugging a figure wants.
- *
- * No legacy keys: the old system had neither.
  */
 export const statsConfig = defineConfigGroup({
   group: 'stats',

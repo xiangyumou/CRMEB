@@ -15,7 +15,7 @@ import {
 import { isTrustedHost, publicOrigin } from './site.config';
 
 /**
- * `POST /api/v1/attachments/base64` — one of our own images, inline (CR-7-h2).
+ * `POST /api/v1/attachments/base64` — one of our own images, inline.
  *
  * ## Why this lives in `system`
  *
@@ -23,10 +23,10 @@ import { isTrustedHost, publicOrigin } from './site.config';
  * the only sanctioned way to fetch a user-supplied URL anywhere in the system).
  * But deciding *whose* URL it is means reading `site.publicOrigin` /
  * `extraOrigins`, and that answer lives here — `system/site.config.ts` is the
- * origin's one home (CR-1-e2). `system` already imports `storage` (the media
- * tiles on the dashboard); the edge back would be a cycle, and this file's
- * sibling `site.service.ts` carries the story of what a cycle in `core` costs.
- * So the composition happens on the side that is allowed to compose.
+ * origin's one home. `system` already imports `storage` (the media tiles on the
+ * dashboard); the edge back would be a cycle, and this file's sibling
+ * `site.service.ts` carries the story of what a cycle in `core` costs. So the
+ * composition happens on the side that is allowed to compose.
  *
  * ## What it refuses, and why it will not say which
  *
@@ -142,10 +142,10 @@ function refuse(ctx: Ctx, url: string, reason: string): never {
  *   `publicOrigin`. A deployment that has not been told its own origin gets
  *   `null` rather than a guess: without it there is no such thing as "ours".
  * - an absolute URL whose host `isTrustedHost` recognises — `publicOrigin` or
- *   one of `extraOrigins`, both from the environment, neither typed into a
- *   form and neither taken from the request's `Host` header. That last point is
- *   the legacy bug: `$request->host()` was in the allow-list, so the allow-list
- *   was whatever the caller sent.
+ *   one of `extraOrigins`, both from the environment, neither typed into a form
+ *   and neither taken from the request's `Host` header. That last point matters
+ *   most: with the request's host in the allow-list, the allow-list would be
+ *   whatever the caller sent.
  * - an absolute URL under the object storage public base, matched on scheme,
  *   host, port **and path prefix**, because a shared bucket domain is not ours
  *   in general — only our prefix of it is.

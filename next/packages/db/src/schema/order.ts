@@ -23,24 +23,15 @@ import { users } from './user';
  * Orders, their lines, the shipments that fulfil them, the audit log, the
  * manual invoice request and the post-payment effect ledger.
  *
- * ## What changed from the legacy design
+ * ## Design
  *
- * * **No child orders.** The legacy `pid` / `old_cart_id` / `split_status` /
- *   `surplus_num` machinery existed only so a partially shipped order could be
- *   split into child orders. Here an order is never split: partial shipment is
- *   a `shipments` row covering some `shipment_items`, and progress is
- *   `order_items.shipped_quantity`. Money therefore never has to be re-prorated
- *   across children, which is where most of the legacy split bugs lived.
- * * **Three overlapping legacy state machines become two.** `status` is the
- *   customer-visible lifecycle, `fulfillment_status` is the shipping progress,
- *   and `refund_status` is the after-sales roll-up. The legacy
- *   `refund_status ∈ {3,4}` values, which actually encoded "parent of a split",
- *   have no successor.
- * * Retired columns are gone entirely: `seckill_id`, `bargain_id`,
- *   `use_integral` / `gain_integral` / `back_integral`, `spread_uid`,
- *   `*_brokerage`, `store_id`, `clerk_id`, `verify_code`, `shipping_type`,
- *   `staff_id` / `agent_id` / `division_id`, `mer_id`, `is_channel`,
- *   `gift_*`, `express_dump`, `kuaidi_*`.
+ * * **No child orders.** An order is never split: partial shipment is a
+ *   `shipments` row covering some `shipment_items`, and progress is
+ *   `order_items.shipped_quantity`. Money therefore never has to be
+ *   re-prorated across children.
+ * * **Three orthogonal state columns.** `status` is the customer-visible
+ *   lifecycle, `fulfillment_status` is the shipping progress, and
+ *   `refund_status` is the after-sales roll-up. Each has one meaning.
  */
 
 // ---------------------------------------------------------------------------
@@ -163,9 +154,9 @@ export const orders = pgTable(
 
     createdAt: createdAt(),
     updatedAt: updatedAt(),
-    /** The buyer hid the order from their own list. Legacy `is_del`. */
+    /** The buyer hid the order from their own list. */
     hiddenByUserAt: instant(),
-    /** Admin/system soft delete. Legacy `is_system_del`. */
+    /** Admin/system soft delete. */
     deletedAt: deletedAt(),
   },
   (t) => [
@@ -251,7 +242,7 @@ export interface OrderItemSnapshot {
   /**
    * What each checkout rule (`PricingContributor`s, then the coupon) took off
    * this line, in the order applied; `amount` negative, e.g. `-10.00`. Written
-   * at create (CR-2-h4) — absent on a line written before that. Sums to
+   * at create — absent on a line written before the field existed. Sums to
    * `-discountAmount` until an operator 改价s the order; the difference is theirs.
    */
   adjustments?: Array<{ source: string; label: string; amount: string }>;
@@ -271,9 +262,8 @@ export const orderItems = pgTable(
       .notNull()
       .references((): AnyPgColumn => productSkus.id, { onDelete: 'restrict' }),
     /**
-     * Stable line key within the order. Replaces the reserved-word legacy
-     * column `unique`, and is what the storefront sends when refunding or
-     * reviewing a single line.
+     * Stable line key within the order (not `unique`, a reserved word). It is
+     * what the storefront sends when refunding or reviewing a single line.
      */
     itemKey: varchar({ length: 32 }).notNull(),
     quantity: integer().notNull(),
@@ -399,7 +389,7 @@ export type NewOrderStatusLog = typeof orderStatusLogs.$inferInsert;
 // shipments
 // ---------------------------------------------------------------------------
 
-/** How the goods reach the buyer. Legacy `delivery_type` `express` / `send` / `fictitious`. */
+/** How the goods reach the buyer: a courier, the merchant's own delivery, or virtually. */
 export const shipmentsDeliveryMode = pgEnum('shipments_delivery_mode', [
   'express',
   'merchant_delivery',

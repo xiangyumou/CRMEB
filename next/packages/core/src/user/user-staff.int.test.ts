@@ -13,7 +13,7 @@ import * as repo from './user.repo';
 import * as staff from './user-staff.service';
 
 /**
- * 商家管理 → 用户 (CR-2-h2 §3) against a real PostgreSQL.
+ * 商家管理 → 用户 against a real PostgreSQL.
  *
  * The HTTP half — a shopper getting 403 and a 店员 getting 200 on each of the
  * six — is in `apps/web/app/api/v1/user.int.test.ts`, where the staff guard
@@ -174,8 +174,8 @@ describe('the staff customer list', () => {
     expect(byId.get(String(second.id))).toMatchObject({ orderCount: 0, spendTotal: '0.00' });
   });
 
-  it('answers null, not zero, while no stream has registered the port', async () => {
-    // The whole 用户 screen must still draw when the order stream is not
+  it('answers null, not zero, while no domain has registered the port', async () => {
+    // The whole 用户 screen must still draw when the order domain is not
     // loaded; what it must not do is tell a 店员 that a customer with forty
     // orders is a first-time buyer.
     resetUserOrderStatsPort();
@@ -315,9 +315,9 @@ describe('设置标签', () => {
         labelIds: [baby.id, tech.id],
       },
     );
-    // A singular `{ labelId }` — the shape CR-2-h2 sketched — could add one of
-    // these but never remove one, and the drawer's 确定 submits the whole
-    // selection. Unchecking 数码 has to mean 数码 is gone.
+    // A singular `{ labelId }` could add one of these but never remove one, and
+    // the drawer's 确定 submits the whole selection. Unchecking 数码 has to
+    // mean 数码 is gone.
     const after = await staff.staffSetLabels(
       asStaff(),
       { uid: String(user.id) },

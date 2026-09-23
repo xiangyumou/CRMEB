@@ -75,7 +75,7 @@ import {
 const REFUND_NO_PREFIX = 'RF';
 const OUT_REFUND_NO_PREFIX = 'R';
 
-/** The canned reasons the apply screen offers. Legacy `order/refund/reason`. */
+/** The canned reasons the apply screen offers. */
 export const REFUND_REASONS = [
   '不想要了',
   '商品破损',
@@ -287,11 +287,11 @@ export async function apply(ctx: Ctx, body: RefundApplyBody): Promise<RefundDeta
       operatorUserId: userId,
     });
 
-    // CR-2-e2. The receipt and the 待处理 badge, both inside this transaction
-    // — a request that lost the `refund_items_open_uq` race above must leave
-    // neither behind. The subject is the **refund**, not the order: two
-    // partial refunds of one order are two notifications, which is exactly
-    // what a per-order key would have swallowed.
+    // The receipt and the 待处理 badge, both inside this transaction — a
+    // request that lost the `refund_items_open_uq` race above must leave
+    // neither behind. The subject is the **refund**, not the order: two partial
+    // refunds of one order are two notifications, which is exactly what a
+    // per-order key would have swallowed.
     const applied = {
       refundId: refund.id,
       refundNo: refund.refundNo,
@@ -319,10 +319,10 @@ export async function apply(ctx: Ctx, body: RefundApplyBody): Promise<RefundDeta
 /**
  * Whether freight goes into this request, and how much.
  *
- * Two conditions, both from decision 7 of this stream's status file: nothing has
- * shipped, and the request covers **every** remaining unrefunded unit of the
- * order. A partial refund never carries freight, because the shop still has to
- * post the parcel the rest of the order is in.
+ * Two conditions: nothing has shipped, and the request covers **every**
+ * remaining unrefunded unit of the order. A partial refund never carries
+ * freight, because the shop still has to post the parcel the rest of the order
+ * is in.
  */
 function refundableFreight(
   order: repo.OrderRefundRow,
@@ -711,9 +711,9 @@ export async function settleRefundSucceeded(
     partial: !full,
   });
 
-  // Post-commit work other streams own: the buyer's notification (E2) and
-  // anything B1 hangs off a finished order. Recorded in this transaction so it
-  // cannot happen for a refund that rolled back.
+  // Post-commit work other domains own: the buyer's notification and anything
+  // the order domain hangs off a finished order. Recorded in this transaction
+  // so it cannot happen for a refund that rolled back.
   await recordEffect(tx, ctx, {
     scope: 'order',
     scopeId: String(row.orderId),
@@ -736,15 +736,11 @@ export async function settleRefundSucceeded(
  * Puts the refunded units back on the shelf — but only the ones that never left
  * the warehouse.
  *
- * The legacy rule (`StoreOrderRefundServices::regressionStock`) restocked an
- * order only while `status == 0`, i.e. while nothing at all had shipped, and it
- * restocked the whole cart because a partially shipped order had already been
- * split into child orders. There are no child orders here, so the same rule
- * reads per line: a line whose `shipped_quantity` is still zero goes back, and a
- * line that has gone out does not. A 退货退款 of dispatched goods reaches the
- * shelf through the operator's own inbound step, which is where the inspection
- * that decides whether it is *sellable* belongs — the alternative is a returned
- * broken item silently becoming available stock.
+ * The rule is per line: a line whose `shipped_quantity` is still zero goes
+ * back, and a line that has gone out does not. A 退货退款 of dispatched goods
+ * reaches the shelf through the operator's own inbound step, which is where the
+ * inspection that decides whether it is *sellable* belongs — the alternative is
+ * a returned broken item silently becoming available stock.
  *
  * `committed: true` because a refund only exists for a paid order, so `commit`
  * has already moved `sales`; `refundId` because an order is refunded line by
@@ -849,7 +845,7 @@ export async function reconcileRefund(ctx: Ctx, refundId: number): Promise<Execu
   }
 
   if (gateway.status === 'SUCCESS') {
-    // CR-5-k2: the query path reads the amount exactly as the webhook does.
+    // The query path reads the amount exactly as the webhook does.
     const frozenFen = Money.parse(row.amount).fen;
     if (gateway.refundFen !== frozenFen) {
       await ctx.withTx(async (tx) => {
@@ -891,17 +887,17 @@ const ACK: WebhookResult = { status: 200, body: { code: 'SUCCESS', message: '成
  * notification whose `out_refund_no` is not one of ours is offered to the
  * payment domain, because exception refunds carry their own `X` numbers.
  *
- * What K2 added, each answered 200 so WeChat stops redelivering bytes that will
- * never read any better:
+ * Three checks after the signature, each answered 200 so WeChat stops
+ * redelivering bytes that will never read any better:
  *
- *  - **the event type, before the callback row** (CR-3-k2): only `REFUND.*`.
- *    A transaction event recorded here would burn its notify id in the shared
+ *  - **the event type, before the callback row**: only `REFUND.*`. A
+ *    transaction event recorded here would burn its notify id in the shared
  *    `payment_callbacks` table, and the genuine delivery to the payment webhook
  *    would read as a replay.
- *  - **the merchant** (CR-4-k2): `mchid` present and equal to the one the
- *    refund was sent under (frozen on the row; the configured one otherwise).
- *  - **the amount** (CR-5-k2): a `SUCCESS` whose `amount.refund` is absent or is
- *    not the frozen amount is not settled.
+ *  - **the merchant**: `mchid` present and equal to the one the refund was sent
+ *    under (frozen on the row; the configured one otherwise).
+ *  - **the amount**: a `SUCCESS` whose `amount.refund` is absent or is not the
+ *    frozen amount is not settled.
  *
  * A failed merchant or amount check leaves the refund where it was, records the
  * reason on the callback row, `refunds.last_error` and the refund's log, and
@@ -1068,7 +1064,7 @@ function notifiedRefundFen(amount: unknown): number | null {
 }
 
 // ---------------------------------------------------------------------------
-// a refund answer that does not match the refund (CR-4-k2, CR-5-k2)
+// a refund answer that does not match the refund
 // ---------------------------------------------------------------------------
 
 interface RefundExceptionReason {
@@ -1177,10 +1173,10 @@ type ReturnDetailFields = Pick<
  * The return half of a detail.
  *
  * The address comes from `refunds.return_address`, frozen by the approval that
- * first asked this buyer to ship something back (CR-5-c) — **never** from the
- * config group. A shop that edits its return address afterwards must not
- * silently re-address a parcel that is already in the post, and a buyer holding
- * a screenshot of the old one must not be told they got it wrong.
+ * first asked this buyer to ship something back — **never** from the config
+ * group. A shop that edits its return address afterwards must not silently
+ * re-address a parcel that is already in the post, and a buyer holding a
+ * screenshot of the old one must not be told they got it wrong.
  */
 export function returnDetail(
   row: repo.RefundRow,

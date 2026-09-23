@@ -23,8 +23,8 @@ import * as repo from './system.repo';
 /**
  * Admin accounts.
  *
- * Three rules the old `SystemAdminServices` did not have, and they are the only
- * reason this file is longer than a CRUD wrapper:
+ * Three rules, and they are the only reason this file is longer than a CRUD
+ * wrapper:
  *
  * 1. **A password change always ends every session of that account.** Bumping
  *    `password_version` alone leaves a live cookie working until something reads

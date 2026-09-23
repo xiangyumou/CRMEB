@@ -5,7 +5,6 @@ import { defineDiyComponent, diyColour, diyInput, diyTabs, diyUpload } from './p
 /**
  * `follow` — 关注公众号.
  *
- * Fields derived from `template/admin/src/components/mobilePage/z_wechat_attention.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const followSchema = defineDiyComponent('follow', {

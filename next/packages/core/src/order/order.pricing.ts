@@ -15,15 +15,16 @@ import type { SkuForSale } from './catalog.port';
  *  1. **Discount shares sum back exactly.** Every adjustment is split across
  *     the lines with `Money.allocate` (largest remainder), so
  *     `sum(order_items.discount_amount) === orders.coupon_discount` to the fen.
- *     A later partial refund therefore never has to re-prorate, which is where
- *     the legacy `RefundOrder` arithmetic went wrong.
+ *     A later partial refund therefore never has to re-prorate, and
+ *     re-prorating after the fact is where refund arithmetic goes wrong.
  *  2. **No line is ever discounted below zero.** Adjustments are applied in
  *     `priority` order against what is *left* of each line, and anything that
  *     would overshoot is moved to a line that still has room.
  *
  * `orders.coupon_discount` is the column all of this lands in. It holds every
  * goods-level discount — the coupon and each `PricingContributor` — not just
- * the coupon; see CR-3-b1 and `docs/rewrite/status/b1.md`.
+ * the coupon, despite its name. The per-line `adjustments` snapshot says which
+ * rule took what.
  */
 
 export interface DiscountSplit {
@@ -41,9 +42,9 @@ export interface AppliedAdjustment {
   /** What this rule really took off, after clamping. Negative. */
   amount: Money;
   /**
-   * This rule's share of each line, aligned with the input lines. Negative
-   * (or zero), and sums to `amount` exactly. Persisted per order line so the
-   * order reads can say what each rule took off (CR-2-h4).
+   * This rule's share of each line, aligned with the input lines. Negative (or
+   * zero), and sums to `amount` exactly. Persisted per order line so the order
+   * reads can say what each rule took off.
    */
   perLine: Money[];
 }
@@ -196,7 +197,7 @@ const cubicCentimetresOf = (volumeM3: string | null): number => unitsOf(volumeM3
 /**
  * The `FreightPort` line for one priced line. Freight is quoted on the goods
  * *before* any discount, which is what "满 99 包邮" has always meant in this
- * shop and what the legacy template rules assumed.
+ * shop and what the shipping templates assume.
  */
 export function freightLineOf(line: {
   sku: SkuForSale;
@@ -207,10 +208,10 @@ export function freightLineOf(line: {
     skuId: line.sku.skuId,
     quantity: line.quantity,
     freightTemplateId: line.sku.shippingTemplateId,
-    // CR-1-f2. The mode travels with the line because only this side has the
+    // The mode travels with the line because only this side has the
     // `SkuForSale` in hand; `null` template plus 'free' and `null` template
-    // plus 'fixed' are two different prices and the port cannot tell them
-    // apart from a template id.
+    // plus 'fixed' are two different prices and the port cannot tell them apart
+    // from a template id.
     freightMode: line.sku.freightMode,
     fixedFreightFen:
       line.sku.freightMode === 'fixed' ? Money.parseOrZero(line.sku.fixedFreight).fen : 0,

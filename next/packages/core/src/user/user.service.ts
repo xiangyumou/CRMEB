@@ -99,8 +99,7 @@ export async function addressList(
  *
  * Returns `null` rather than 404 when there is none: "this customer has not
  * saved an address yet" is an ordinary state of a new account, and making the
- * client treat it as an error is how the legacy checkout ended up with a blank
- * delivery card.
+ * client treat it as an error leaves the checkout with a blank delivery card.
  */
 export async function defaultAddress(ctx: Ctx): Promise<{ address: UserAddress | null }> {
   const userId = requireUserId(ctx);

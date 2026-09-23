@@ -11,10 +11,10 @@ import * as categories from './cms.category.service';
  *
  * The sanitiser's table lives next door in `cms.sanitize.test.ts` and needs no
  * database. What is proven here is everything the database is the authority
- * for: the two-level tree, the slug's unique index, the published filter that
- * the legacy system did not have, and the view counter under concurrency —
- * which is the one thing a unit test cannot show, because the defect being
- * fixed was a read-modify-write race.
+ * for: the two-level tree, the slug's unique index, the published filter, and
+ * the view counter under concurrency — which is the one thing a unit test
+ * cannot show, because the defect it guards against is a read-modify-write
+ * race.
  */
 
 let harness: TestCtx;
@@ -335,9 +335,9 @@ describe('文章 storefront', () => {
   });
 
   /**
-   * The invariant the rewrite exists for: twenty simultaneous readers add
-   * twenty views. The legacy code read the counter, added one in PHP and wrote
-   * it back, so this test would have landed somewhere between 1 and 20.
+   * Twenty simultaneous readers add twenty views. Reading the counter, adding
+   * one in application code and writing it back would land this test somewhere
+   * between 1 and 20.
    */
   it('loses no view under concurrency', async () => {
     const article = await articles.create(harness.ctx, articleForm({ status: 'published' }));

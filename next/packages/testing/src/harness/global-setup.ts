@@ -77,7 +77,7 @@ async function startRedis(): Promise<string> {
   if (process.env.SHOP_TEST_REDIS_URL) return process.env.SHOP_TEST_REDIS_URL;
   redisContainer = await new GenericContainer(REDIS_IMAGE)
     .withExposedPorts(6379)
-    // Production runs `noeviction` (PLAN §1); tests must too, or a test that
+    // Production runs `noeviction`; tests must too, or a test that
     // fills Redis would pass here and fail in production.
     .withCommand(['redis-server', '--maxmemory-policy', 'noeviction', '--save', ''])
     .withWaitStrategy(Wait.forLogMessage(/Ready to accept connections/))
@@ -136,7 +136,7 @@ async function buildTemplate(pgUrl: string): Promise<void> {
   const template = new pg.Client({ connectionString: templateUrl(pgUrl) });
   await template.connect();
   try {
-    // PLAN §3: catalog search uses pg_trgm, so it must exist in the template.
+    // Catalog search uses pg_trgm, so it must exist in the template.
     await template.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
 
     const migrations = await readMigrations();

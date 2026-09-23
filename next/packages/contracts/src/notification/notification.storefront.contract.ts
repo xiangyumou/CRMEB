@@ -20,9 +20,8 @@ import {
  * `user_id = ctx.actor.id` in its `WHERE`, and a row that belongs to another
  * user answers 404 — never 403, which would confirm it exists.
  *
- * Deleting is a soft delete of *this user's copy* (`deleted_at`), matching the
- * legacy `msgLookDel`: the message may also be part of a send record an
- * operator needs to see.
+ * Deleting is a soft delete of *this user's copy* (`deleted_at`): the message
+ * may also be part of a send record an operator needs to see.
  */
 
 const messageParams = z.object({ id });
@@ -67,9 +66,9 @@ export const notificationMyUnreadCount = defineRoute({
 /**
  * Reading the detail does **not** mark it read.
  *
- * The legacy detail route flipped `is_lock` on fetch, which meant a prefetch or
- * a double render silently consumed the unread badge. The client calls
- * `POST …/read` when the user has actually seen it.
+ * Marking on fetch would let a prefetch or a double render silently consume the
+ * unread badge. The client calls `POST …/read` when the user has actually seen
+ * it.
  */
 export const notificationMyDetail = defineRoute({
   id: 'notification.myDetail',

@@ -245,7 +245,7 @@ export const catalogProductReviews = defineRoute({
   ],
 });
 
-/** The counts above the review list. Legacy `reply/config/:id`. */
+/** The counts above the review list. */
 export const catalogProductReviewSummary = defineRoute({
   id: 'catalog.productReviewSummary',
   method: 'GET',

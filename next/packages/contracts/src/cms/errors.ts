@@ -4,9 +4,9 @@ import { defineErrors } from '../_conventions/errors';
  * Article and article-category error codes.
  *
  * The storefront gets exactly one refusal — `CMS_ARTICLE_NOT_FOUND` — and it
- * covers "no such id", "soft-deleted" and "not published". Legacy listed and
- * served drafts and hidden articles to anybody who guessed the id; telling the
- * public *which* of the three it is would put that back.
+ * covers "no such id", "soft-deleted" and "not published". Telling the public
+ * *which* of the three it is would confirm that a draft or hidden article
+ * exists to anybody guessing ids.
  */
 export const cmsErrors = defineErrors({
   CMS_ARTICLE_NOT_FOUND: { status: 404, message: '文章不存在' },

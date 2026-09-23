@@ -21,15 +21,12 @@ import { shippingTemplates } from './shipping';
  *
  * ## The deposit flow is declared but inert
  *
- * `eb_store_advance` carries `type` (0 全款 / 1 定金), `deposit`,
- * `pay_start_time` and `pay_stop_time`, and the admin form edits all four —
- * but nothing on the legacy order side ever reads them. A presale order is one
- * order, paid once, in full (verified: `deposit` appears in exactly one PHP
- * file, the admin save parameter list). The columns are kept here because the
- * admin screen is being ported and the data migrates, and `presale_orders`
- * carries the stage machine so stream D can switch the flow on without a
- * schema change. Until then every presale order goes straight to
- * `final_paid`.
+ * An activity carries a payment mode (全款 / 定金), a deposit amount and a
+ * balance window, and the admin form edits them — but no order flow reads
+ * them yet. A presale order is one order, paid once, in full. The columns are
+ * kept, and `presale_orders` carries the stage machine, so the deposit flow
+ * can be switched on without a schema change. Until then every presale order
+ * goes straight to `final_paid`.
  *
  * ## Four ledgers
  *
@@ -45,7 +42,7 @@ import { shippingTemplates } from './shipping';
 // activities
 // ---------------------------------------------------------------------------
 
-/** Legacy `eb_store_advance.type`: 0 = full payment, 1 = deposit + final payment. */
+/** `full` = one payment; `deposit` = a deposit, then the balance (not driven yet). */
 export const presaleActivitiesPaymentMode = pgEnum('presale_activities_payment_mode', [
   'full',
   'deposit',
@@ -85,7 +82,7 @@ export const presaleActivities = pgTable(
     /** `deposit` mode only: the window in which the balance may be paid. */
     finalPaymentStartAt: instant(),
     finalPaymentEndAt: instant(),
-    /** Days after (final) payment before the goods ship. Legacy `deliver_time`. */
+    /** Days after (final) payment before the goods ship. */
     shipAfterDays: integer().notNull().default(0),
     shippingTemplateId: fk().references(() => shippingTemplates.id, { onDelete: 'restrict' }),
     sortOrder: integer().notNull().default(0),

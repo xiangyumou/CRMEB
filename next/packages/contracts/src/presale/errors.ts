@@ -26,9 +26,9 @@ export const presaleErrors = defineErrors({
   /**
    * The order was priced without the activity's presale price.
    *
-   * Fails closed, for the same reason as `GROUPBUY_PRICE_NOT_APPLIED`: B1's
-   * pricing pipeline does not yet hand `kindMeta` to the `PricingContributor`s
-   * (CR-1-d), and selling at the wrong price is worse than refusing.
+   * Fails closed, for the same reason as `GROUPBUY_PRICE_NOT_APPLIED`: the
+   * presale price is taken off by a `PricingContributor` this domain does not
+   * own, and selling at the wrong price is worse than refusing.
    */
   PRESALE_PRICE_NOT_APPLIED: { status: 409, message: '预售价未生效，请稍后重试' },
 });

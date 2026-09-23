@@ -36,7 +36,7 @@ import {
 /**
  * The media library against a real PostgreSQL and a real Redis.
  *
- * The cases that matter are the ones the old uploader got wrong: a file whose
+ * The cases that matter are the ones a naive uploader gets wrong: a file whose
  * bytes disagree with its name, a remote URL pointing inside the network, and a
  * scan token that could be used more than once.
  */
@@ -307,7 +307,7 @@ describe('remote import', () => {
     expect(calls).toEqual(['https://cdn.example.com/banner.png']);
   });
 
-  // CR-11-k: plain http is the operator's decision, off by default.
+  // Plain http is the operator's decision, off by default.
   it('refuses plain http unless 允许 http 地址导入 is on', async () => {
     const ctx = as(adminActor(adminId));
     const { calls, seam } = cdn(png(1, 1, 8).bytes);
@@ -477,7 +477,7 @@ describe('storefront upload', () => {
     ).toBe('FORBIDDEN');
   });
 
-  it('gives a 店员 its own directory, ceiling and budget (CR-5-h §2)', async () => {
+  it('gives a 店员 its own directory, ceiling and budget', async () => {
     registerStaffCheck({ isStaff: async (_db, userId) => userId === shopperId });
     const ctx = as(userActor(shopperId));
     await ctx.config.set(storageConfig, {
@@ -518,7 +518,7 @@ describe('scan-to-upload', () => {
     const first = await scanUpload(harness.ctx, { token: minted.token }, png(1, 1, 1));
     expect(first.attachment.kind).toBe('image');
 
-    // The old system's token stayed valid for every scan until it expired.
+    // A token that stayed valid until it expired would take this second scan.
     expect(await code(scanUpload(harness.ctx, { token: minted.token }, png(1, 1, 2)))).toBe(
       'STORAGE_SCAN_TOKEN_INVALID',
     );
@@ -576,8 +576,8 @@ describe('scan-to-upload', () => {
     );
   });
 
-  // CR-12-k: an unauthenticated multipart endpoint bounds its work before it
-  // parses anything.
+  // An unauthenticated multipart endpoint bounds its work before it parses
+  // anything.
   it('throttles per client address before the body is read', async () => {
     let reads = 0;
     const reader = async (): Promise<IncomingFile> => {

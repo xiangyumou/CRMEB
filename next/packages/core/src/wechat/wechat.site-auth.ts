@@ -3,16 +3,17 @@ import { wechatMiniConfig, wechatOaConfig } from '../system';
 import { wechatConfig } from './wechat.config';
 
 /**
- * 公众号 and mini-program sign-in on `GET /api/v1/site/config` (CR-3-h3).
+ * 公众号 and mini-program sign-in on `GET /api/v1/site/config`.
  *
- * The app reads these as the legacy `wechat_status` / `wechat_auth_switch`
- * and decides where a signed-out shopper goes. A method is offered only when
- * it can actually sign someone in:
+ * The app reads these as `wechat_status` / `wechat_auth_switch` and decides
+ * where a signed-out shopper goes. A method is offered only when it can
+ * actually sign someone in:
  *
  * - the operator's 启用 switch (`wechat-oa.enabled` / `wechat-mini.enabled`),
- *   which E1's `oaApp` / `miniApp` refuse without (`AUTH_WECHAT_NOT_CONFIGURED`);
+ *   which sign-in's `oaApp` / `miniApp` refuse without
+ *   (`AUTH_WECHAT_NOT_CONFIGURED`);
  * - the app id **and** the secret in this domain's `wechat` group — the code
- *   exchange needs both, and the legacy `wechat_status` was exactly "appid and
+ *   exchange needs both, which is what `wechat_status` means: "appid and
  *   appsecret are not blank".
  *
  * Only booleans leave this file. `registerWechatDomain()` hands the probes to

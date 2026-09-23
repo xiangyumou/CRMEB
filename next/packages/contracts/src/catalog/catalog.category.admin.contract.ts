@@ -17,10 +17,10 @@ import {
  * Admin category routes, `/admin-api/catalog/categories`.
  *
  * The domain owns the `catalog/**` segment on both surfaces rather than a bare
- * `categories/**`: "category" is a word three streams use (product categories,
+ * `categories/**`: "category" is a word three domains use (product categories,
  * article categories, attachment categories) and the App Router makes the
- * directory the URL, so an unqualified segment would be a merge collision
- * waiting to happen. The stream brief fixes the prefix.
+ * directory the URL, so an unqualified segment would be a collision waiting to
+ * happen.
  */
 
 const categoryParams = z.object({ id });

@@ -16,7 +16,7 @@ import { id, instant, pageQuery, paged, sortQuery } from '../_conventions/common
 // admins
 // ---------------------------------------------------------------------------
 
-/** `admins.status`: 1 enabled, 0 disabled. A boolean on the wire, as agreed in CONVENTIONS. */
+/** `admins.status`: 1 enabled, 0 disabled. A boolean on the wire, per `docs/conventions.md`. */
 export const adminListItem = z.object({
   id,
   account: z.string(),
@@ -264,7 +264,7 @@ export type PermissionTree = z.infer<typeof permissionTree>;
 // audit log
 // ---------------------------------------------------------------------------
 
-/** Who wrote an audit row: a console admin, or a 店员 on the staff surface (CR-13-k2). */
+/** Who wrote an audit row: a console admin, or a 店员 on the staff surface. */
 export const auditActorKind = z.enum(['admin', 'staff']);
 export type AuditActorKind = z.infer<typeof auditActorKind>;
 
@@ -371,9 +371,9 @@ export const configFieldDescriptor = z.object({
   secret: z.boolean().optional(),
   /**
    * Shown but not editable: an environment-derived deployment fact rather than
-   * an operator's decision (N1 / CR-1-e2). The form renders the value as plain
-   * text, `help` says where it comes from, and the save route refuses the key
-   * with `CONFIG_FIELD_READ_ONLY`.
+   * an operator's decision. The form renders the value as plain text, `help`
+   * says where it comes from, and the save route refuses the key with
+   * `CONFIG_FIELD_READ_ONLY`.
    */
   readOnly: z.boolean().optional(),
 });
@@ -489,13 +489,12 @@ export const agreementParams = z.object({ key: agreementKey });
 // ---------------------------------------------------------------------------
 
 /**
- * What the storefront may read of the operator's own settings (CR-7-h2).
+ * What the storefront may read of the operator's own settings.
  *
- * **One route, not six.** The legacy app asked six endpoints — `basicConfig`,
- * `getLogo`, `getShare`, `getCrmebCopyRight`, `getCustomerType`, `getOpenAdv` —
- * for what is one row in the console, on the first screen a cold visitor sees.
- * They are folded into one payload the app fetches once and caches by
- * `version`.
+ * **One route, not six.** The app needs the basics, the logos, the share card,
+ * the copyright line, the 客服 setting and the splash screen, all on the first
+ * screen a cold visitor sees. They are one payload the app fetches once and
+ * caches by `version`.
  *
  * **Nothing secret is in here, by construction.** Every value is a field of the
  * `site`, `wechat-mini` or `payment` config group whose descriptor is *not*
@@ -538,14 +537,14 @@ export const sitePublicConfig = z.object({
   /**
    * Which payment buttons the cashier may show. Booleans only, derived from
    * whether the gateway's credentials are complete. WeChat Pay v3 is the only
-   * gateway in scope, so it is the only key; the app's mapper treats every
-   * other legacy flag as `0`.
+   * gateway, so it is the only key; the app's mapper reports every other
+   * payment method as off.
    */
   payments: z.object({ wechat: z.boolean() }),
   /**
-   * Which sign-in methods the app may offer (CR-3-h3). Booleans only, derived
-   * from whether each method's settings are complete — never a credential, the
-   * same rule as `payments`:
+   * Which sign-in methods the app may offer. Booleans only, derived from
+   * whether each method's settings are complete — never a credential, the same
+   * rule as `payments`:
    *
    * - `wechatOa` — 公众号 one-tap login: the OA is switched on and its app id
    *   and secret are both filled in. The H5 build inside WeChat goes to
@@ -555,8 +554,8 @@ export const sitePublicConfig = z.object({
    *   sends a signed-out shopper to the phone + SMS page.
    * - `phone` — 手机号登录: an SMS sender is usable, so a code can be sent.
    *
-   * The app's mapper turns them into the legacy `wechat_status`,
-   * `wechat_auth_switch` and `phone_auth_switch`.
+   * The app's mapper turns them into the `wechat_status`, `wechat_auth_switch`
+   * and `phone_auth_switch` flags its pages read.
    */
   auth: z.object({
     wechatOa: z.boolean(),
@@ -671,10 +670,10 @@ export const attachmentDataUrlExample: AttachmentDataUrl = {
  * The cards across the top of the admin home page.
  *
  * The shape is a *list of contributed tiles*, not a fixed record, because the
- * numbers come from several domains: `system` and `storage` contribute their own
- * and F2 registers the order/user ones later through `DashboardContributor`.
- * A tile whose contributor is not registered simply is not in the list — the
- * page never shows a zero it invented.
+ * numbers come from several domains: `system` and `storage` contribute their
+ * own and `stats` registers the order and user ones through
+ * `DashboardContributor`. A tile whose contributor is not registered simply is
+ * not in the list — the page never shows a zero it invented.
  */
 export const dashboardTile = z.object({
   key: z.string(),

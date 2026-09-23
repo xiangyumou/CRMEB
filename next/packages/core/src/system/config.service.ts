@@ -27,12 +27,10 @@ import '../config-groups.gen';
 /**
  * The generic settings screen.
  *
- * The old admin had one hand-written page per config tab — about fifty of them,
- * plus `edit_basics`/`save_basics` aliased across unrelated modules so that
- * "which tab am I saving" was decided by request parameters. Here a domain
- * declares `defineConfigGroup({ group, schema, ui, legacyKeys })` in
+ * A domain declares `defineConfigGroup({ group, schema, ui })` in
  * `core/src/<domain>/<group>.config.ts`, and these three functions serve every
- * group there will ever be.
+ * group there will ever be — no hand-written page per tab, and no request
+ * parameter deciding which tab is being saved.
  *
  * ## Secrets
  *
@@ -99,7 +97,7 @@ export function describeGroup(def: ConfigGroupDef): ConfigGroupDescriptor {
   entries.sort((a, b) => (a.ui?.order ?? a.index) - (b.ui?.order ?? b.index));
   for (const entry of entries) {
     // A key with no `ui` entry is deliberately not editable in the admin: it is
-    // a value the ETL or a job writes, not an operator.
+    // a value a job or the code writes, not an operator.
     if (!entry.ui) continue;
     fields.push(fieldDescriptor(entry.key, entry.ui));
   }
@@ -124,7 +122,7 @@ function secretKeys(def: ConfigGroupDef): Set<string> {
  * Which keys of a group the deployment decides rather than an operator.
  *
  * The screen renders these as plain text and never submits them; this is the
- * half that holds for a stale tab or a hand-made request (N1 / CR-1-e2).
+ * half that holds for a stale tab or a hand-made request.
  */
 function readOnlyKeys(def: ConfigGroupDef): Set<string> {
   const out = new Set<string>();
@@ -210,14 +208,14 @@ export async function configSave(
     throw new DomainError('FORBIDDEN', { details: { permission: writePermission } });
   }
 
-  // The keys the form shows, not every key of the schema (CR-9-k2). A schema
-  // key with no `ui` entry is written by a job, the ETL or `ctx.config.set` —
-  // `wechat.apiBaseUrl` / `payment.apiBaseUrl` exist so a test can point a
-  // client at a fake — and accepting it here let a `payment:config:write`
-  // holder repoint the WeChat client at their own host and read the write-only
-  // AppSecret off the next token refresh. "Not on the screen" now means "not
-  // writable from the screen"; a group that ever needs a hidden writable key
-  // has to say so in its `ui`, not inherit it from the schema.
+  // The keys the form shows, not every key of the schema. A schema key with no
+  // `ui` entry is written by a job or `ctx.config.set` — `wechat.apiBaseUrl` /
+  // `payment.apiBaseUrl` exist so a test can point a client at a fake — and
+  // accepting it here would let a `payment:config:write` holder repoint the
+  // WeChat client at their own host and read the write-only AppSecret off the
+  // next token refresh. "Not on the screen" means "not writable from the
+  // screen"; a group that ever needs a hidden writable key has to say so in its
+  // `ui`, not inherit it from the schema.
   const known = writableKeys(def);
   const unknown = Object.keys(body.values).filter((key) => !known.has(key));
   if (unknown.length > 0) {
@@ -252,7 +250,7 @@ export async function configSave(
   await ctx.config.set(def, patch as never, { updatedBy: adminIdOrNull(ctx) });
   // The storefront's `GET /api/v1/site/config` is a 60-second Redis cache over
   // three of these groups; saving one of them drops it so the operator sees
-  // their change in the app now rather than within the minute (CR-7-h2).
+  // their change in the app now rather than within the minute.
   await invalidateSiteConfigCache(ctx, def.group);
   ctx.logger.info(
     { group: def.group, keys: Object.keys(patch).filter((k) => !secrets.has(k)) },

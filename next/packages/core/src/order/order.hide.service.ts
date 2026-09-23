@@ -5,14 +5,14 @@ import { requireOrderRef } from './order.ref';
 import * as repo from './order.repo';
 
 /**
- * 删除订单, which deletes nothing (CR-4-h §6).
+ * 删除订单, which deletes nothing.
  *
- * Legacy's `is_del` flag, and the reason it was a flag: the order the buyer
- * swipes away is still the shop's record of a sale. The invoice may not be
- * issued yet, the after-sales window may still be open, and the accountant
- * reconciles against rows nobody may drop. So the button sets
- * `orders.hidden_by_user_at`, the buyer's list stops showing it, and every
- * staff and admin query keeps seeing it — the asymmetry is the feature.
+ * It is a flag because the order the buyer swipes away is still the shop's
+ * record of a sale. The invoice may not be issued yet, the after-sales window
+ * may still be open, and the accountant reconciles against rows nobody may
+ * drop. So the button sets `orders.hidden_by_user_at`, the buyer's list stops
+ * showing it, and every staff and admin query keeps seeing it — the asymmetry
+ * is the feature.
  *
  * Two rules and both are in the WHERE, never in a prior read:
  *

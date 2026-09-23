@@ -18,13 +18,13 @@
  * | worker `storage.cleanOrphans` | `cleanOrphanAttachments` |
  * | any domain needing a file | `resolveStorage(ctx)` → the configured driver |
  *
- * **Other streams:** do not call `ctx.storage.put` directly if the file should
+ * **Other domains:** do not call `ctx.storage.put` directly if the file should
  * appear in the media library — call `attachmentUpload` (or `storeFile` through
  * it) so the bytes are sniffed, deduped and recorded. `ctx.storage` is for
  * generated artefacts nobody browses, such as an export .xlsx.
  *
  * `safeFetch` is exported because it is the **only** sanctioned way to fetch a
- * user-supplied URL anywhere in the system (CONVENTIONS).
+ * user-supplied URL anywhere in the system (`docs/conventions.md`).
  */
 export {
   attachmentDeleteMany,

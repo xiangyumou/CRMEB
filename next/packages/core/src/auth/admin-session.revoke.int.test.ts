@@ -4,17 +4,17 @@ import { createTestCtx, type TestCtx } from '@shop/testing';
 import { createAdminSessionStore } from './admin-session.store';
 
 /**
- * K-SEC-A1 (CR-8-k), pinned against a real Redis.
+ * Revoking every session of an admin, pinned against a real Redis.
  *
- * The session key slides on every `resolve`; the per-admin index that
- * `revokeAllForAdmin` reads is given `ttlMs * 4` once, at `create`, and never
- * slid. So a session kept alive past four TTLs has fallen out of the index, and
- * a password change or a disable no longer reaches it. With the production TTL
- * of 8 h that is anybody who keeps a console tab open for 32 h.
+ * The session key slides on every `resolve`, and the per-admin index that
+ * `revokeAllForAdmin` reads is given `ttlMs * 4` at `create`. If the index were
+ * never slid, a session kept alive past four TTLs would fall out of it, and a
+ * password change or a disable would no longer reach it. With the production
+ * TTL of 8 h that is anybody who keeps a console tab open for 32 h.
  *
  * The TTL is shrunk to 600 ms so the four-TTL horizon is 2.4 s of wall time
- * (Redis expiry does not follow the harness clock). CR-8-k: `resolve` now
- * slides the index with the session and re-lists the session in it.
+ * (Redis expiry does not follow the harness clock). `resolve` slides the index
+ * with the session and re-lists the session in it.
  */
 
 let harness: TestCtx;
@@ -47,7 +47,7 @@ function store() {
   return createAdminSessionStore({ redis: harness.ctx.redis, ttlMs: TTL_MS });
 }
 
-describe('K-SEC-A1 — revoking every session of an admin', () => {
+describe('revoking every session of an admin', () => {
   it('reaches a session inside its first four TTLs', async () => {
     const sessions = store();
     const token = await sessions.create(SESSION, 0);
@@ -74,7 +74,7 @@ describe('K-SEC-A1 — revoking every session of an admin', () => {
   it('re-lists a live session whose index has already expired, so the next revoke reaches it', async () => {
     const sessions = store();
     const token = await sessions.create(SESSION, 0);
-    // A session from before CR-8-k whose index has lapsed.
+    // A session whose index has lapsed.
     await harness.ctx.redis.del(`admin:sess:index:${SESSION.adminId}`);
     expect(await sessions.countFor(SESSION.adminId)).toBe(0);
 

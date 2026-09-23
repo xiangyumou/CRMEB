@@ -28,10 +28,10 @@ import {
  *
  * The detail screen's 订单 and 优惠券 tabs are **not** routes here: they are
  * `GET /admin-api/orders?userId=` and `GET /admin-api/user-coupons?userId=`,
- * owned by B2 and by the coupon stream. Adding a `users/:id/orders` route would
- * mean this domain reading `orders`, which the import boundary forbids and
- * which would break every time B2 changed a column. 地址 is here because
- * addresses are this domain's own table.
+ * owned by the order and coupon domains. Adding a `users/:id/orders` route
+ * would mean this domain reading `orders`, which the import boundary forbids
+ * and which would break every time the order list changed a column. 地址 is
+ * here because addresses are this domain's own table.
  *
  * Granting a coupon from the user page is `POST /admin-api/coupons/:id/grants`
  * — coupon's own route, coupon's own permission.
@@ -115,8 +115,8 @@ export const userAdminUpdate = defineRoute({
  * 启用 / 禁用.
  *
  * Disabling bumps `password_version`, which kills every live token of that
- * account on its next request. The legacy system flipped `status` and left the
- * JWT working until it expired — up to 30 days of a "banned" customer ordering
+ * account on its next request. Flipping `status` alone would leave the token
+ * working until it expired — up to 30 days of a "banned" customer ordering
  * normally.
  */
 export const userAdminSetStatus = defineRoute({
@@ -181,9 +181,8 @@ export const userAdminAddressList = defineRoute({
  * Batch group / label assignment from the list's checkbox selection.
  *
  * `mode` exists because 批量打标签 almost always means "add this label to these
- * 200 people", and the legacy `save_set_label` replaced the whole set — so an
- * operator tagging a campaign silently stripped every other label from every
- * selected customer.
+ * 200 people"; if it always replaced the whole set, an operator tagging a
+ * campaign would silently strip every other label from every selected customer.
  */
 export const userAdminBatchSetGroups = defineRoute({
   id: 'user.adminBatchSetGroups',

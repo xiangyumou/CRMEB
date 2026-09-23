@@ -15,9 +15,9 @@ export const authErrors = defineErrors({
 export type AuthErrorCode = keyof typeof authErrors;
 
 /**
- * Storefront sign-in (stream E1). A second registry in the same file because
- * `pnpm gen` aggregates one `errors.ts` per domain and flattens every export in
- * it — so both surfaces stay legible without inventing a second domain folder.
+ * Storefront sign-in. A second registry in the same file because `pnpm gen`
+ * aggregates one `errors.ts` per domain and flattens every export in it — so
+ * both surfaces stay legible without inventing a second domain folder.
  *
  * Nothing here distinguishes "no such account" from "wrong password", and
  * nothing here reveals whether a phone number is registered. Both would be free

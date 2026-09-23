@@ -11,9 +11,8 @@ import { Money } from '../kernel/money';
  *
  * The rule that is deliberately *not* here is "may this shopper take the last
  * unit". That one cannot be a pure function — it is a conditional `UPDATE` in
- * the repo, and writing it as a check would be the read-then-write defect
- * CONVENTIONS names (legacy `StoreAdvanceServices` did exactly that: a
- * `SELECT stock`, a PHP comparison, then a decrement).
+ * the repo, and writing it as a check (a `SELECT stock`, a comparison, then a
+ * decrement) would be a read-then-write race.
  */
 
 export interface ActivityWindow {
@@ -45,12 +44,8 @@ export function assertActivityOpen(activity: ActivityWindow, now: Date): void {
 /**
  * Full payment only.
  *
- * The deposit columns exist in the frozen schema (SCHEMA.md §6.3) and the ETL
- * has to put the legacy `type` / `deposit` / `pay_*_time` values somewhere, but
- * nothing drives them: legacy's own order side never read them either
- * (`deposit` appears in exactly one PHP file, the admin save parameter list).
- * Refusing loudly here is what stops a half-built deposit flow shipping by
- * accident.
+ * The deposit columns exist in the schema, but nothing drives them. Refusing
+ * loudly here is what stops a half-built deposit flow shipping by accident.
  */
 export function assertFullPayment(activity: { paymentMode: 'full' | 'deposit' }): void {
   if (activity.paymentMode === 'full') return;
@@ -73,12 +68,10 @@ export interface PricedLine {
  *  - **exactly one line.** `presale_stock_ledger_order_reason_uq` is
  *    `UNIQUE (order_id, reason)`, so an order has at most one reservation row
  *    and one release row; a two-line order could not record what it took. That
- *    is not a limitation being worked around, it is the schema saying what
- *    legacy also did — a presale item was bought through 立即购买 only, never
- *    from a mixed cart.
- *  - **quantity within `perOrderQuantity`.** Legacy compared against
- *    `eb_store_advance.num` in the controller and again in the service with
- *    different operators (`>` and `>=`); one of the two was wrong.
+ *    is not a limitation being worked around, it is the schema saying how a
+ *    presale item is bought: through 立即购买 only, never from a mixed cart.
+ *  - **quantity within `perOrderQuantity`**, checked once, here, so the ceiling
+ *    cannot be `>` in one place and `>=` in another.
  */
 export function assertOrderShape(
   activity: { perOrderQuantity: number },
@@ -120,13 +113,13 @@ export function expectedGoodsTotal(
 }
 
 /**
- * The fail-closed half of CR-1-d.
+ * The fail-closed half of the campaign-price guard.
  *
- * CR-1-d landed, so `buildDraft` hands `kind` and `kindMeta` to the pricing
- * contributors and the presale price reaches the shopper as a named adjustment.
- * This guard is what keeps that true: the kind handler compares the discount
- * the campaign owes against the discount the registered contributor actually
- * produces for that draft, and refuses the order when they differ.
+ * `buildDraft` hands `kind` and `kindMeta` to the pricing contributors and the
+ * presale price reaches the shopper as a named adjustment. This guard is what
+ * keeps that true: the kind handler compares the discount the campaign owes
+ * against the discount the registered contributor actually produces for that
+ * draft, and refuses the order when they differ.
  *
  * The failure it exists for is silent by nature — a contributor that stops
  * being registered bills the shopper the catalogue price for a presale, with
@@ -165,8 +158,8 @@ export function shipNotBefore(paidAt: Date, shipAfterDays: number): Date {
  * them (REFUND-002).
  *
  * Only the two activity columns are applied by this domain; the two product
- * columns are what stream A's `StockPort` applied in the same transaction, and
- * they are recorded so a restore is one row read rather than four
+ * columns are what the catalog's `StockPort` applied in the same transaction,
+ * and they are recorded so a restore is one row read rather than four
  * recomputations. `committed` says whether the reservation had already become a
  * sale — the difference between a cancel (it had not) and a refund (it had).
  */
@@ -182,9 +175,9 @@ export interface StockDeltas {
  *
  * The two `sales` columns start at zero and are amended to `+quantity` when the
  * money arrives (`repo.markLedgerCommitted`). The sale has no ledger row of its
- * own because `presale_stock_ledger_reason` has exactly two values and the
- * schema is frozen, so the reservation row carries it — otherwise a refund's
- * `-quantity` on `sales` would balance against nothing.
+ * own because `presale_stock_ledger_reason` has exactly two values, so the
+ * reservation row carries it — otherwise a refund's `-quantity` on `sales`
+ * would balance against nothing.
  */
 export function reserveDeltas(quantity: number): StockDeltas {
   return {

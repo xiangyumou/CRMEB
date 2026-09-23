@@ -17,7 +17,7 @@ import * as repo from './user.repo';
 import { getUserOrderStatsPort, type UserOrderStats } from './user-order-stats.port';
 
 /**
- * 商家管理 → 用户: the six `/api/v1/staff/*` routes of CR-2-h2 §3.
+ * 商家管理 → 用户: the six `/api/v1/staff/*` user routes.
  *
  * This file exists rather than a `staff: true` flag on `user-admin.service.ts`
  * because the two surfaces answer different questions about the same rows, and
@@ -26,12 +26,12 @@ import { getUserOrderStatsPort, type UserOrderStats } from './user-order-stats.p
  * does not publish — the unmasked phone never leaves `toStaffItem`, and there
  * is no staff path to `loadDetail`.
  *
- * `auth: 'staff'` is checked by `handle()` before any of this runs (B2's
- * `StaffCheck` against `order_notice_admin_uids`), so these functions assume a
- * 店员 and check no permission atom: there is no finer grain to check. What
- * they do assume is a *signed-in* one — `requireUserId` is called on every
- * write so that a route wired without the staff guard fails closed rather than
- * letting an anonymous caller relabel customers.
+ * `auth: 'staff'` is checked by `handle()` before any of this runs (the
+ * fulfilment domain's `StaffCheck` against `order_notice_admin_uids`), so these
+ * functions assume a 店员 and check no permission atom: there is no finer grain
+ * to check. What they do assume is a *signed-in* one — `requireUserId` is
+ * called on every write so that a route wired without the staff guard fails
+ * closed rather than letting an anonymous caller relabel customers.
  */
 
 interface Paged<T> {
@@ -102,7 +102,7 @@ async function decorate(ctx: Ctx, rows: repo.UserRow[]): Promise<StaffUserListIt
 const NO_ORDERS: UserOrderStats = { orderCount: 0, spendTotal: '0.00' };
 
 /**
- * `undefined` when no stream has registered `UserOrderStatsPort`, which the
+ * `undefined` when no domain has registered `UserOrderStatsPort`, which the
  * mapper turns into `null` on both numbers — see the port's own note for why
  * that is not zero and not a 500.
  */

@@ -26,9 +26,9 @@ const MAX_PASSES = 40;
  * already unusable. The sweep exists so the wallet's "已过期" tab and the admin
  * list tell the truth, and so `user_coupons_expiry_idx` stays small.
  *
- * Legacy had no job at all: it swept the whole table opportunistically from
- * inside `getUserValidCouponCount` (`StoreCouponUserServices::checkInvalidCoupon`),
- * so one shopper opening their wallet wrote to every row in the table.
+ * It is a job rather than a sweep on read: sweeping opportunistically from a
+ * wallet read would make one shopper opening their wallet write to every row in
+ * the table.
  */
 export async function expireOverdueCoupons(ctx: Ctx): Promise<number> {
   const now = ctx.clock.now();

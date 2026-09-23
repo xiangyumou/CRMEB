@@ -106,7 +106,7 @@ export async function counts(ctx: Ctx): Promise<OrderCounts> {
 
 /**
  * The route-facing detail. A stranger and an unknown reference get the same
- * 404, and `:id` is the surrogate id or the order number (CR-1-h).
+ * 404, and `:id` is the surrogate id or the order number.
  */
 export async function detail(ctx: Ctx, params: { id: string }): Promise<OrderDetail> {
   const { orderId, userId } = await requireOrderRef(ctx, params.id);
@@ -125,7 +125,7 @@ export async function detailOf(
 }
 
 /**
- * 订单赠券 — the coupons this order earned (CR-5-h2).
+ * 订单赠券 — the coupons this order earned.
  *
  * Lives here rather than in the coupon domain because the interesting half is
  * the *ownership* question, and this domain is the only one that may read
@@ -139,10 +139,9 @@ export async function detailOf(
  * difference between "no coupons" and "no such order of yours". The 404 says
  * neither.
  *
- * Legacy put these inside the order detail payload, written at create time from
- * `give_coupon_ids`. Keeping it a separate call means the wallet-shaped part of
- * the answer can change without widening `OrderDetail`, and the 订单详情 page
- * still renders while it is in flight.
+ * Keeping this a separate call rather than a field of the order detail means
+ * the wallet-shaped part of the answer can change without widening
+ * `OrderDetail`, and the 订单详情 page still renders while it is in flight.
  */
 export async function giftCoupons(
   ctx: Ctx,
@@ -180,7 +179,7 @@ function toOrderItem(row: repo.OrderItemRow): OrderItem {
     totalAmount: row.totalAmount,
     refundedQuantity: row.refundedQuantity,
     shippedQuantity: row.shippedQuantity,
-    // Written at create since CR-2-h4; an older line has none to show.
+    // Written at create; a line whose snapshot has no `adjustments` shows none.
     adjustments: snapshot.adjustments ?? [],
   };
 }

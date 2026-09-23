@@ -28,9 +28,8 @@ let harness: TestCtx;
 
 beforeAll(async () => {
   // Kept for the template-in-use checks, which count the products pointing at a
-  // template. The freight port itself no longer needs the catalog registered:
-  // since CR-1-f2 the line carries its own `freightMode`, so the port stopped
-  // re-reading the skus through the `CatalogPort` once per quote.
+  // template. The freight port itself does not need the catalog registered: the
+  // line carries its own `freightMode`, so the port never re-reads skus.
   registerCatalogDomain();
   harness = await createTestCtx({ now: '2026-06-01T00:00:00.000Z' });
 }, 180_000);
@@ -126,10 +125,10 @@ async function makeSku(options: {
 /**
  * A `FreightLine` as checkout hands one over.
  *
- * `freightMode` and `fixedFreightFen` travel **with** the line (CR-1-f2): the
- * port no longer re-reads the sku to learn how it is charged, so a test that
- * writes `freightMode: 'fixed'` onto the product has to say so here too —
- * exactly as `order.pricing.ts` does, from the `SkuForSale` it already holds.
+ * `freightMode` and `fixedFreightFen` travel **with** the line: the port does
+ * not re-read the sku to learn how it is charged, so a test that writes
+ * `freightMode: 'fixed'` onto the product has to say so here too — exactly as
+ * `order.pricing.ts` does, from the `SkuForSale` it already holds.
  */
 function quoteLine(skuId: number, overrides: Record<string, unknown> = {}) {
   return {
@@ -334,7 +333,7 @@ describe('FreightPort.quote', () => {
     expect(beijing.totalFen).toBe(4000);
   });
 
-  it('prices an address with no known division at the fallback region, not free (CR-6-i)', async () => {
+  it('prices an address with no known division at the fallback region, not free', async () => {
     const template = await templates.create(
       harness.ctx,
       form({
@@ -361,9 +360,9 @@ describe('FreightPort.quote', () => {
     const skuId = await makeSku({ freightMode: 'template', templateId: template.id });
     const lines = [quoteLine(skuId, { quantity: 3, freightTemplateId: Number(template.id) })];
 
-    // A migrated address the ETL could not place (`city_id` NULL, CR-3-j) and
-    // one naming a division the city table does not have: both are priced like
-    // a province the template does not list — ¥20 + 2 × ¥10.
+    // An address with no division (`city_id` NULL) and one naming a division
+    // the city table does not have: both are priced like a province the
+    // template does not list — ¥20 + 2 × ¥10.
     const noCity = await freightPort.quote(harness.ctx.db, harness.ctx, {
       addressCityId: null,
       lines,
@@ -446,11 +445,11 @@ describe('FreightPort.quote', () => {
   });
 
   /**
-   * 满额包邮 is settled here and nowhere else (CR-1-f2). Checkout cannot do it:
-   * by the time it knows the goods total it has already been handed a per-line
-   * quote, and a fixed-postage line is the case that proves the difference —
-   * legacy's `getOrderPriceGroup` charged it regardless of the threshold, which
-   * is the bug an operator reports as 「满额包邮不生效」.
+   * 满额包邮 is settled here and nowhere else. Checkout cannot do it: by the
+   * time it knows the goods total it has already been handed a per-line quote,
+   * and a fixed-postage line is the case that proves the difference — charging
+   * it regardless of the threshold is the bug an operator reports as
+   * 「满额包邮不生效」.
    *
    * The setting is in 元 and everything else here is 分, so the boundary is
    * worth pinning from both sides rather than only from above.
@@ -615,11 +614,11 @@ describe('LogisticsPort.track', () => {
     expect(result).toEqual({ state: 'unknown', traces: [] });
   });
 
-  it('offers 阿里云云市场 as the only provider (CR-2-f2)', async () => {
+  it('offers 阿里云云市场 as the only provider', async () => {
     // The setting is gone, not merely unimplemented: a value the driver cannot
-    // serve must not be selectable, or the form promises tracking it will
-    // never deliver. The stored group refuses it too, so an ETL'd or
-    // hand-edited row cannot put the shop back into that state.
+    // serve must not be selectable, or the form promises tracking it will never
+    // deliver. The stored group refuses it too, so an imported or hand-edited
+    // row cannot put the shop back into that state.
     await expect(
       harness.ctx.config.set(logisticsConfig, {
         provider: 'kuaidi100' as never,

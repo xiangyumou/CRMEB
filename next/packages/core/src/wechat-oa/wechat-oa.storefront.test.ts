@@ -4,11 +4,11 @@ import { DomainError } from '../kernel/errors';
 import { assertAllowed, jsapiSignature } from './wechat-oa.storefront.service';
 
 /**
- * The JS-SDK signature and the check the legacy endpoint did not have.
+ * The JS-SDK signature and the host check in front of it.
  *
- * `WechatServices::jsSdk` signed whatever URL it was handed, which turns the
- * account's `jsapi_ticket` into a signing oracle: any site could then call
- * `wx.chooseWXPay` and `wx.getLocation` with our brand on the permission sheet.
+ * Signing whatever URL is handed in would turn the account's `jsapi_ticket`
+ * into a signing oracle: any site could then call `wx.chooseWXPay` and
+ * `wx.getLocation` with our brand on the permission sheet.
  */
 
 describe('jsapiSignature', () => {

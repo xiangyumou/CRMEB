@@ -23,10 +23,9 @@ import {
  *
  * `verifySignature` therefore runs on the raw query string, before any XML is
  * looked at, and in safe mode `verifyMessageSignature` runs on the still
- * encrypted `Encrypt` element before it is decrypted. The legacy
- * `wechat/serve` parsed the XML first and checked the signature inside the SDK
- * afterwards, which is how a malformed body became a 500 that WeChat then
- * retried three times.
+ * encrypted `Encrypt` element before it is decrypted. Parsing the XML first and
+ * checking the signature afterwards would turn a malformed body into a 500 that
+ * WeChat then retries three times.
  *
  * ## Modes
  *

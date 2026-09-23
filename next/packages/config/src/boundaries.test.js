@@ -5,8 +5,8 @@ import { boundariesPlugin } from '../eslint/boundaries.js';
 
 /**
  * The import-boundary rules are the only mechanical enforcement of the
- * "Import boundaries" section of CONVENTIONS.md. Ten streams will bump into
- * them, so a false positive is expensive and a false negative lets the
+ * "Import boundaries" section of `docs/conventions.md`. Every package bumps
+ * into them, so a false positive is expensive and a false negative lets the
  * architecture rot quietly. Both directions are tested.
  */
 

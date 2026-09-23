@@ -45,7 +45,7 @@ import { likePattern } from './catalog.rules';
 
 /**
  * The only file in the catalog domain that touches Drizzle tables, apart from
- * `catalog.order-bridge.repo.ts` (which exists to be deleted — see `ports.ts`).
+ * the test fixtures in `catalog.fixtures.repo.ts`.
  *
  * A repo function is a *statement*, not a decision: it returns rows, or the
  * number of rows a conditional update changed. Every branch on that number
@@ -248,8 +248,8 @@ export async function countCategoryProducts(db: DbOrTx, categoryId: number): Pro
  *
  * `path` is a prefix, so a move is `replace(path, oldPrefix, newPrefix)` over
  * every row whose path starts with the old one; `level` shifts by the depth
- * difference. Doing this row by row is where legacy category trees went wrong
- * — a half-finished move left orphans whose parent chain no longer resolved.
+ * difference. Doing this row by row risks a half-finished move that leaves
+ * orphans whose parent chain no longer resolves.
  */
 export async function moveSubtree(
   tx: Tx,
@@ -270,10 +270,10 @@ export async function moveSubtree(
 /**
  * A cheap version token for the storefront tree.
  *
- * The uni-app caches the tree and refetches only when this moves, which is what
- * the legacy `category_version` endpoint did with a config key an operator had
- * to remember to bump. Derived instead: newest update plus row count, so any
- * insert, edit or delete changes it and nothing has to be maintained.
+ * The uni-app caches the tree and refetches only when this moves. It is derived
+ * rather than a key an operator has to remember to bump: newest update plus row
+ * count, so any insert, edit or delete changes it and nothing has to be
+ * maintained.
  */
 export async function categoryVersion(db: DbOrTx): Promise<string> {
   const rows = await db
@@ -472,10 +472,10 @@ const FEATURE_COLUMN = {
  * The shopper's list.
  *
  * `status = 'on_shelf' AND deleted_at IS NULL` is not optional and is not the
- * caller's job: risk-matrix §1 requires that taking a product off the shelf
- * hides it everywhere, and this function being unable to return one is half of
- * that promise (the other half is `findSellableProduct`, which the stock
- * reservation goes through).
+ * caller's job: taking a product off the shelf must hide it everywhere, at
+ * once, and this function being unable to return one is half of that promise
+ * (the other half is `findSellableProduct`, which the stock reservation goes
+ * through).
  *
  * Search is `ILIKE '%…%'` over `name` and `keyword`, which the two `gin_trgm_ops`
  * indexes serve. Case-insensitive and substring by construction, and correct
@@ -604,7 +604,7 @@ export async function updateProduct(
  * Two operators clicking the switch at the same instant must not both report
  * success, and — more importantly — the storefront reads all filter on this
  * column, so the moment this commits the product is gone from every list and
- * every reservation. risk-matrix §1.
+ * every reservation.
  */
 export async function setProductStatus(
   tx: Tx,
@@ -651,8 +651,8 @@ export async function restoreProduct(
 /**
  * The newest `product_events` id recorded at least `graceMs` ago, by the
  * database's clock — the one `created_at` defaults from — or `null` when there
- * is none. The view fold stops here, so an insert whose id was handed out
- * but whose transaction has not committed yet is never stepped over (CR-41-k2).
+ * is none. The view fold stops here, so an insert whose id was handed out but
+ * whose transaction has not committed yet is never stepped over.
  */
 export async function lastSettledEventId(db: DbOrTx, graceMs: number): Promise<number | null> {
   const [row] = await db
@@ -667,7 +667,8 @@ export async function lastSettledEventId(db: DbOrTx, graceMs: number): Promise<n
 /**
  * Folds the view events in `(afterId, throughId]` into `products.views`: one
  * `UPDATE … FROM (SELECT product_id, count(*) …)`, each product row touched
- * once per batch rather than once per view (CR-41-k2).
+ * once per batch rather than once per view, so a busy product's row is not a
+ * lock every page view queues on.
  */
 export async function foldViewEvents(
   tx: Tx,
@@ -761,10 +762,8 @@ export async function replaceRecommendations(
  * "Buy this, get that coupon."
  *
  * The table lives in `schema/coupon.ts` and its comment says the coupon domain
- * owns it, but the coupon slice shipped no route for it and legacy edits the
- * link from the product page (`StoreProductCouponServices`). The rows are
- * written here, read by `coupon.listProductGiftTemplates`. Recorded in
- * `docs/rewrite/status/a.md`.
+ * owns it, but the operator edits the link from the product page, so the rows
+ * are written here and read by `coupon.listProductGiftTemplates`.
  */
 export async function replaceGiftCoupons(
   tx: Tx,
@@ -1008,12 +1007,13 @@ export async function findSku(db: DbOrTx, id: number): Promise<SkuRow | null> {
  * One product's SKUs with `FOR UPDATE`, in ascending id order.
  *
  * The staff 修改价格/库存 editor writes several rows from one screen and then
- * rolls the product up, so the rows have to agree — CONVENTIONS' "use `lockRow`
- * when several rows must agree". Ordering by id is what keeps two operators
- * editing overlapping rows from deadlocking each other, and holding the lock is
- * what makes a concurrent `reserve` queue behind the edit and decrement the new
- * number instead of racing it. The stock decrement itself is still the single
- * conditional statement in `decStock`; this lock only serialises the roll-up.
+ * rolls the product up, so the rows have to agree — `docs/conventions.md`'s
+ * "use `lockRow` when several rows must agree". Ordering by id is what keeps
+ * two operators editing overlapping rows from deadlocking each other, and
+ * holding the lock is what makes a concurrent `reserve` queue behind the edit
+ * and decrement the new number instead of racing it. The stock decrement itself
+ * is still the single conditional statement in `decStock`; this lock only
+ * serialises the roll-up.
  */
 export async function lockSkusOfProduct(tx: Tx, productId: number): Promise<SkuRow[]> {
   return tx
@@ -1071,9 +1071,8 @@ export async function deleteSkus(tx: Tx, ids: readonly number[]): Promise<number
  * product-level `stock` column is denormalised alongside in the same
  * transaction.
  *
- * Legacy `StoreProductAttrValueServices::decProductAttrStock` read the row,
- * compared in PHP and then wrote — the read-then-write the brief names under
- * "Fix, don't port". STOCK-003 is this statement.
+ * Reading the row, comparing in application code and then writing would let two
+ * buyers take the last unit. STOCK-003 is this statement.
  */
 export async function reserveSkuStock(
   tx: Tx,
@@ -1114,11 +1113,10 @@ export async function commitSkuSale(
 /**
  * The refund path: stock back **and** `sales` down, in one statement.
  *
- * `greatest(0, …)` rather than a bare subtraction: `product_skus_sales_non_negative`
- * would abort the whole refund transaction if two releases raced past zero, and
- * an over-released counter is a reporting inaccuracy while a failed refund is a
- * customer with no money. Legacy's `incStockDecSales` did both halves as two
- * unguarded statements and could leave sales negative.
+ * `greatest(0, …)` rather than a bare subtraction:
+ * `product_skus_sales_non_negative` would abort the whole refund transaction if
+ * two releases raced past zero, and an over-released counter is a reporting
+ * inaccuracy while a failed refund is a customer with no money.
  */
 export async function releaseSoldSkuStock(
   tx: Tx,
@@ -1232,7 +1230,7 @@ export async function listSkusForProducts(
  * happen once per *order*, so they key on `('order', orderId)`. A refund does
  * not: an order is refunded line by line, so a refund release keys on
  * `('refund', refundId)` — a single per-order key would swallow the second
- * partial refund and leave that stock off the shelf forever (CR-1-a).
+ * partial refund and leave that stock off the shelf forever.
  */
 export async function claimStockOperation(
   tx: Tx,
@@ -1350,8 +1348,8 @@ export async function countUnclaimedCards(db: DbOrTx, skuId: number): Promise<nu
  * Set a card SKU's stock to the size of its unclaimed pool, in one statement.
  *
  * The pool *is* the stock for a `virtual_card` product; deriving it rather than
- * adding to it is what stops the two drifting, which is how legacy sold cards
- * that did not exist.
+ * adding to it is what stops the two drifting — a drifted count sells cards
+ * that do not exist.
  */
 export async function syncCardStock(tx: Tx, skuId: number): Promise<number> {
   const rows = await tx
@@ -2167,7 +2165,7 @@ export type ProductEventPlatform = (typeof productEvents.$inferSelect)['platform
  *
  * Browse history and the operator's traffic dashboard read the same rows, so a
  * view is written once. `user_visits` (page path, geo, dwell time) belongs to
- * F2 and is a different thing; see `docs/rewrite/status/a.md`.
+ * the user domain and is a different thing.
  */
 export async function recordProductView(
   tx: DbOrTx,
@@ -2196,14 +2194,13 @@ export async function recordFavoriteEvent(
 }
 
 /**
- * Record units going into a cart (CR-1-f3 §2).
+ * Record units going into a cart.
  *
  * Unlike a view or a favourite this one carries a `skuId` and a real
- * `quantity`: F3's product page reports 加购件数 as
+ * `quantity`: the stats product page reports 加购件数 as
  * `sum(quantity) filter (where kind = 'cart')`, not a row count. The event is
- * the *delta* the shopper just added, so two taps of 加入购物车 with `1` are two
- * rows summing to 2 — the same number legacy accumulated in
- * `eb_store_product_log.cart_num`.
+ * the *delta* the shopper just added, so two taps of 加入购物车 with `1` are
+ * two rows summing to 2.
  *
  * Append-only and never retracted: emptying the cart afterwards does not
  * un-add it, because the metric is interest, not inventory.
@@ -2232,8 +2229,7 @@ export async function recordCartEvent(
  * 我的足迹: the shopper's most recent view of each product.
  *
  * `max(created_at)` grouped by product, so revisiting a product moves it to the
- * top rather than filling the list with the same card twenty times. Legacy kept
- * a separate `eb_store_visit` row per visit and de-duplicated in PHP.
+ * top rather than filling the list with the same card twenty times.
  */
 export async function listBrowseHistory(
   db: DbOrTx,

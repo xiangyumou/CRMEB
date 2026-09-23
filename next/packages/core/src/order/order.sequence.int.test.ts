@@ -39,11 +39,10 @@ import { onOrderPaid, resetOrderPorts } from './ports';
  * Every other integration test in this repository asks one question: put the
  * system in state X, do Y, assert Z. That finds the defects somebody thought
  * of. This file exists for the ones nobody thought of: it drives the *real*
- * services — B1's checkout, C's payment and after-sales against the fake
- * WeChat gateway, B2's fulfilment, D's group buy, D2's presale windows and the
- * two sweeps the worker runs — in an order chosen by a seeded PRNG, and after
- * **every single step** it re-checks six properties that must hold no matter
- * what happened before.
+ * services — checkout, payment and after-sales against the fake WeChat gateway,
+ * fulfilment, group buy, the presale windows and the two sweeps the worker runs
+ * — in an order chosen by a seeded PRNG, and after **every single step** it
+ * re-checks six properties that must hold no matter what happened before.
  *
  * Six invariants, from the ledger row:
  *
@@ -64,7 +63,7 @@ import { onOrderPaid, resetOrderPorts } from './ports';
  * exactly.
  *
  * The world: three ordinary shoppers with one two-unit order each, placed
- * through B1's checkout; a two-seat group buy whose every join becomes a fourth,
+ * through checkout; a two-seat group buy whose every join becomes a fourth,
  * fifth, … shopper the same moves act on; a presale campaign whose window the
  * sweep flips 100 minutes in. The worker's effects dispatcher is one of the
  * moves, and the ledger is drained and the six properties re-checked once more
@@ -74,10 +73,9 @@ import { onOrderPaid, resetOrderPorts } from './ports';
  * `SHOP_SEQ_STEPS=400` widen it for a soak run without editing the file
  * (STAB-001 uses the defaults).
  *
- * Two findings it made are asserted at the bottom: CR-1-k2 (a paid order's
- * units are counted as sold — the paid hook commits the sale) and CR-2-k2
- * (`order.paid`/`order.refunded` effects are delivered, not parked as
- * `unknown`). Both were `it.fails` until R2 fixed them.
+ * Two things it found are pinned at the bottom as ordinary tests: a paid
+ * order's units are counted as sold (the paid hook commits the sale), and
+ * `order.paid`/`order.refunded` effects are delivered, not parked as `unknown`.
  */
 
 let harness: TestCtx;
@@ -266,7 +264,7 @@ async function makeSku(
   return { productId: product!.id, skuId: sku!.id };
 }
 
-/** One ordinary shopper with one ordinary two-unit order, through B1's checkout. */
+/** One ordinary shopper with one ordinary two-unit order, through checkout. */
 async function makeShopper(world: World): Promise<Shopper> {
   const userId = await makeUser('seq-user');
   const { productId, skuId } = await makeSku('测试商品', '60.00', 10);
@@ -749,7 +747,7 @@ const STEPS_BY_NAME: Record<StepName, Step> = {
     return `dispatchEffects ${JSON.stringify(report)}`;
   },
 
-  /** D2's window sweep: opens what has started, closes what has ended. */
+  /** The presale window sweep: opens what has started, closes what has ended. */
   async presaleWindowSweep(world) {
     const report = await sweepPresaleWindows(harness.ctx);
     world.presale.swept += 1;
@@ -908,13 +906,12 @@ async function checkInvariants(world: World): Promise<string[]> {
         `INV5 sku ${sku.id}: stock ${sku.stock} + placed ${placed} - restocked ${returned} != initial ${initial}`,
       );
     }
-    // `sales` counts exactly the units that were paid for and not put back:
-    // the paid hook commits the sale (CR-1-k2), and the one release that takes
-    // it back is a settled refund's restock of an undispatched line — the same
-    // `returned` as above. A refunded line that had already shipped is not
-    // restocked (the operator's inbound step decides whether it is sellable),
-    // so its units stay both off the shelf and in `sales`, as legacy's
-    // `regressionStock` left them.
+    // `sales` counts exactly the units that were paid for and not put back: the
+    // paid hook commits the sale, and the one release that takes it back is a
+    // settled refund's restock of an undispatched line — the same `returned` as
+    // above. A refunded line that had already shipped is not restocked (the
+    // operator's inbound step decides whether it is sellable), so its units
+    // stay both off the shelf and in `sales`.
     const sold = paid - returned;
     if (sku.sales !== sold) {
       broken.push(
@@ -1046,14 +1043,12 @@ describe('SEQ-001 — a fixed-seed interleaving of real operations', () => {
 });
 
 /**
- * CR-1-k2 — found by the sequence above. A paid order's units are never counted
- * as sold: `StockPort.commit` (catalog.stock.ts, the one place that increments
- * `product_skus.sales`) has no production caller, and no `onOrderPaid` hook
- * reaches it. `sales` stays 0 however much is paid, and the refund path's
- * `greatest(0, sales - n)` hides the drift. Flips green when the paid
- * transaction commits the sale.
+ * Found by the sequence above. `StockPort.commit` (catalog.stock.ts, the one
+ * place that increments `product_skus.sales`) is reached only through the
+ * `onOrderPaid` hook; without it `sales` stays 0 however much is paid, and the
+ * refund path's `greatest(0, sales - n)` hides the drift.
  */
-describe('CR-1-k2 — a paid order is counted as sold', () => {
+describe('a paid order is counted as sold', () => {
   it('moves the SKU from reserved to sold when the payment is booked', async () => {
     const world = await buildWorld();
     const shopper = world.shoppers[0]!;
@@ -1147,15 +1142,14 @@ describe('CR-1-k2 — a paid order is counted as sold', () => {
 });
 
 /**
- * CR-2-k2 — found by the sequence's final drain. `payment.service.ts` records an
+ * Found by the sequence's final drain. `payment.service.ts` records an
  * `('order', id, 'order.paid')` effect in every paid transaction and
  * `refund.service.ts` an `('order', id, 'order.refunded')` one in every settled
- * refund, and no domain registers a handler for either. The dispatcher retries
- * each one eight times ("no handler for order/order.paid") and parks it as
- * `unknown` — one row in 待处理 and one error log per paid order, forever.
- * Flips green when both rows either get a handler or stop being written.
+ * refund. With no handler for either, the dispatcher would retry each one eight
+ * times ("no handler for order/order.paid") and park it as `unknown` — one row
+ * in 待处理 and one error log per paid order, forever.
  */
-describe('CR-2-k2 — every effect a paid and refunded order records is delivered', () => {
+describe('every effect a paid and refunded order records is delivered', () => {
   it('leaves nothing parked for want of a handler', async () => {
     const world = await buildWorld();
     const shopper = world.shoppers[0]!;

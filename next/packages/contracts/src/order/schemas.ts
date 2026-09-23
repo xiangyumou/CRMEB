@@ -34,7 +34,7 @@ export const orderStatus = z.enum([
 ]);
 export type OrderStatus = z.infer<typeof orderStatus>;
 
-/** Mirrors `orders_fulfillment_status`. Read-only for this stream; B2 moves it. */
+/** Mirrors `orders_fulfillment_status`. Only fulfilment moves it; checkout never does. */
 export const orderFulfillmentStatus = z.enum(['unfulfilled', 'partially_fulfilled', 'fulfilled']);
 export type OrderFulfillmentStatus = z.infer<typeof orderFulfillmentStatus>;
 
@@ -42,7 +42,7 @@ export type OrderFulfillmentStatus = z.infer<typeof orderFulfillmentStatus>;
 export const orderRefundStatus = z.enum(['none', 'requested', 'partially_refunded', 'refunded']);
 export type OrderRefundStatus = z.infer<typeof orderRefundStatus>;
 
-/** Mirrors `orders_kind`. `groupbuy` and `presale` are driven by stream D's `OrderKindHandler`. */
+/** Mirrors `orders_kind`. `groupbuy` and `presale` are driven by their `OrderKindHandler`. */
 export const orderKind = z.enum(['normal', 'groupbuy', 'presale']);
 export type OrderKind = z.infer<typeof orderKind>;
 
@@ -58,9 +58,9 @@ export type OrderCancelReason = z.infer<typeof orderCancelReason>;
  * Where the lines come from.
  *
  * `cart` prices the ticked rows (or the named subset); `buy-now` prices one
- * variant that never entered the cart. Legacy modelled 立即购买 as a hidden
- * cart row with `is_new = 1` and then had to remember to delete it; here the
- * two are one union and nothing is written until the order is created.
+ * variant that never entered the cart. 立即购买 is not a hidden cart row that
+ * has to be remembered and deleted: the two are one union and nothing is
+ * written until the order is created.
  */
 export const checkoutSource = z.enum(['cart', 'buy-now']);
 export type CheckoutSource = z.infer<typeof checkoutSource>;
@@ -81,7 +81,7 @@ const checkoutInput = z.object({
   /** The coupon the shopper picked in `/api/v1/user-coupons/applicable`. */
   userCouponId: id.nullish(),
   kind: orderKind.default('normal'),
-  /** Opaque payload for the `OrderKindHandler` of a non-`normal` order (stream D). */
+  /** Opaque payload for the `OrderKindHandler` of a non-`normal` order. */
   kindMeta: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -198,7 +198,8 @@ export const checkoutPreview = z.object({
   /**
    * Every goods-level discount added together: the coupon plus each
    * `PricingContributor`. It is what `orders.coupon_discount` stores and what
-   * the per-line `discountAmount`s sum to. See `docs/rewrite/status/b1.md`.
+   * the per-line `discountAmount`s sum to. The name is the column's; it holds
+   * more than the coupon.
    */
   couponDiscount: money,
   adjustments: z.array(priceAdjustment),
@@ -258,9 +259,9 @@ export const checkoutCreateBody = checkoutInput
      * Client-generated, unique per submit attempt. A second POST with the same
      * key returns the order the first one created instead of creating another.
      *
-     * Legacy guarded this with a Redis lock that was never tested and could not
-     * survive a restart (`CacheService::lock('orderCreate…')`, risk matrix §2);
-     * here it is a uniqueness constraint in the same transaction as the order.
+     * It is a uniqueness constraint in the same transaction as the order, not a
+     * lock in a cache, so it survives a restart and a double tap cannot slip
+     * between check and insert.
      */
     idempotencyKey: z
       .string()
@@ -273,8 +274,8 @@ export const checkoutCreateBody = checkoutInput
     /**
      * What the shopper was shown. When present and the server's recomputation
      * disagrees, the order is refused with `ORDER_PRICE_CHANGED` instead of
-     * charging a price nobody agreed to (risk matrix §1, "SKU swap between
-     * confirm and create").
+     * charging a price nobody agreed to (say, an operator edited the SKU
+     * between confirm and create).
      */
     expectedPayableAmount: money.optional(),
   })
@@ -304,7 +305,7 @@ export const orderItem = z.object({
   originalUnitPrice: money.nullable(),
   /**
    * This line's share of `couponDiscount`: every goods-level discount, the
-   * coupon and each activity price alike (CR-3-b1). `adjustments` says which.
+   * coupon and each activity price alike. `adjustments` says which.
    */
   discountAmount: money,
   totalAmount: money,
@@ -312,12 +313,13 @@ export const orderItem = z.object({
   shippedQuantity: z.number().int().min(0),
   /**
    * What each checkout rule took off this line, in the order applied — the
-   * preview's `adjustments`, split per line and kept with the order (CR-2-h4).
-   * An activity price (`presale:activity-price`, `groupbuy:activity-price`)
-   * and a stacked coupon (`coupon:*`) are separate entries, so the price the
-   * shopper paid per unit is `unitPrice` less the activity entries over
-   * `quantity`. Sums to `-discountAmount`, unless an operator 改价'd the order
-   * (the difference is theirs). Empty for a line written before CR-2-h4.
+   * preview's `adjustments`, split per line and kept with the order. An
+   * activity price (`presale:activity-price`, `groupbuy:activity-price`) and a
+   * stacked coupon (`coupon:*`) are separate entries, so the price the shopper
+   * paid per unit is `unitPrice` less the activity entries over `quantity`.
+   * Sums to `-discountAmount`, unless an operator 改价'd the order (the
+   * difference is theirs). Empty for a line written before per-line adjustments
+   * were kept.
    */
   adjustments: z.array(priceAdjustment),
 });
@@ -467,7 +469,7 @@ export const orderCancelBody = z.object({
 export type OrderCancelBody = z.infer<typeof orderCancelBody>;
 
 /**
- * The answer to 删除订单 (CR-4-h §6).
+ * The answer to 删除订单.
  *
  * A single `true`, and not the order: the row the buyer just asked to stop
  * seeing is the one thing this response has no business handing back. The page

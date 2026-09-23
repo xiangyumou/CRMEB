@@ -213,7 +213,7 @@ describe('申请开票', () => {
     ).toBe(true);
   });
 
-  it('carries the order’s line summary, read from the order rather than copied (CR-4-h §7)', async () => {
+  it('carries the order’s line summary, read from the order rather than copied', async () => {
     const placed = await paidOrder();
     const invoice = await order.orderInvoices.request(
       as(placed.userId),

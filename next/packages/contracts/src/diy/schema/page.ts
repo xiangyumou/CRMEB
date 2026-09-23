@@ -19,23 +19,24 @@ export const diyPageValue = z.record(z.string(), diyComponentNode);
 export type DiyPageValue = z.infer<typeof diyPageValue>;
 
 /**
- * What `diy_pages.content` holds. `value` is the legacy payload verbatim;
- * everything beside it is ours. `z.looseObject` so a future key added by a
- * newer editor survives a read/write cycle in an older deployment.
+ * What `diy_pages.content` holds. `value` is the editor's component tree
+ * verbatim; everything beside it is page metadata. `z.looseObject` so a future
+ * key added by a newer editor survives a read/write cycle in an older
+ * deployment.
  */
 export const diyPageContent = z.looseObject({
   value: diyPageValue,
   /**
-   * Opaque build stamp the legacy editor wrote into `eb_diy.version`
-   * (e.g. `"67bd313ce57d7"`). Carried through so an ETL'd page is unchanged.
+   * Opaque editor build stamp (e.g. `"67bd313ce57d7"`). Carried through
+   * untouched.
    */
   version: z.string().optional(),
-  /** Legacy `eb_diy.order_status`: personal-centre order block style. */
+  /** Personal-centre order block style. */
   orderStatus: z.number().int().optional(),
 });
 export type DiyPageContent = z.infer<typeof diyPageContent>;
 
-/** Background image repeat mode; legacy `eb_diy.bg_tab_val`. */
+/** Background image repeat mode. */
 export const diyBackgroundMode = z.enum(['full', 'repeat', 'fixed']);
 export type DiyBackgroundMode = z.infer<typeof diyBackgroundMode>;
 
@@ -128,9 +129,9 @@ export function diyPageEntriesInOrder(value: DiyPageValue): DiyPageEntry[] {
 
 /**
  * Rebuilds the object so key order matches render order and every key equals
- * its node's `timestamp`. The editor writes pages through this; an ETL'd page
- * is left alone, because rewriting keys on import would change bytes we promised
- * not to touch.
+ * its node's `timestamp`. The editor writes pages through this; a stored page
+ * is otherwise left alone, because rewriting its keys on read would change
+ * bytes we promised not to touch.
  */
 export function reindexDiyPageValue(entries: readonly DiyPageEntry[]): DiyPageValue {
   const out: Record<string, DiyComponentNode> = {};

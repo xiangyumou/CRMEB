@@ -24,9 +24,9 @@ import type { EnqueueOptions, JobQueue } from './queue';
  * key space; `Job.validateOptions` throws `Custom Id cannot contain :`) and one
  * that parses as an integer. Every producer in this repository builds
  * `name:id`, so without this mapping every checkout, shipment and receipt
- * confirmation answered 500 on a real Redis after its transaction had already
- * committed (CR-15-k). `__` never appears in a producer's key, so the mapping
- * is injective for the keys that exist.
+ * confirmation would answer 500 on a real Redis after its transaction had
+ * already committed. `__` never appears in a producer's key, so the mapping is
+ * injective for the keys that exist.
  */
 export function toJobId(dedupeKey: string): string {
   const mapped = dedupeKey.replaceAll(':', '__');

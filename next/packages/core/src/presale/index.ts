@@ -1,13 +1,12 @@
 /**
  * The presale domain's public surface.
  *
- * CONVENTIONS: "A domain in `core` may import another domain only through that
- * domain's `index.ts`." So this file is the boundary, and `presale.repo.ts` in
- * particular is private — nothing outside this folder may read a `presale_*`
- * table.
+ * A domain in `core` may import another domain only through that domain's
+ * `index.ts`, so this file is the boundary, and `presale.repo.ts` in particular
+ * is private — nothing outside this folder may read a `presale_*` table.
  *
  * Almost nothing here is called by another domain. Presale does not *ask* for
- * anything: it attaches to the order aggregate through the frozen seams in
+ * anything: it attaches to the order aggregate through the seams in
  * `order/ports.ts` and is invoked, never invoking. The exception is the window
  * sweep the worker runs.
  */

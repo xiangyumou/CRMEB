@@ -4,17 +4,13 @@ import { defineConfigGroup } from '../kernel/config-registry';
 /**
  * `storefront-auth` — how the shop's own sign-in behaves.
  *
- * Distinct from F1's `sms` group, which holds the *provider*: an operator who
+ * Distinct from the `sms` group, which holds the *provider*: an operator who
  * changes SMS vendor does not want to re-decide how long a login code lives,
  * and an operator lengthening the code's life has no business near an
  * AccessKeySecret. The groups are also read by different domains.
  *
- * Legacy sources: `verify_expire_time` (a *minutes* value, default 1),
- * `sms.maxMinuteCount` / `maxPhoneCount` / `maxIpCount` hard-coded at
- * `LoginController.php:117-140`, and `LoginThrottleGuard::WINDOW = 900`.
- * The per-phone budgets moved to the `sms` group where F1 had already put
- * them; only the per-IP one is here, because it is a login-abuse control
- * rather than a spend control.
+ * The per-phone budgets live in the `sms` group; only the per-IP one is here,
+ * because it is a login-abuse control rather than a spend control.
  *
  * Every field has a default: a fresh install must be able to sign somebody in
  * before anybody has opened this form.
@@ -33,7 +29,7 @@ export const storefrontAuthConfig = defineConfigGroup({
      */
     siteUrl: z.string().max(255).default(''),
 
-    /** Seconds. The legacy default was 60, which is not enough time to read an SMS. */
+    /** Seconds. 60 is not enough time to read an SMS. */
     codeTtlSec: z.number().int().min(60).max(1800).default(300),
     /** Seconds before the same number may ask again, in the same scene. */
     codeResendSec: z.number().int().min(30).max(600).default(60),
@@ -103,15 +99,6 @@ export const storefrontAuthConfig = defineConfigGroup({
 
     defaultAvatar: { label: '默认头像', type: 'text', section: '资料', order: 40 },
     addressLimit: { label: '收货地址数量上限', type: 'number', section: '资料', order: 41 },
-  },
-  // `verify_expire_time` is deliberately **not** mapped. The legacy value is in
-  // *minutes* and defaults to 1; copying it across would set the code TTL to one
-  // second and break every login on the day of the migration. The same class of
-  // mistake as F1's `order_cancel_time`, but with no unit hint in the key name,
-  // so the safe move is to take the new default.
-  legacyKeys: {
-    defaultAvatar: 'h5_avatar',
-    siteUrl: 'site_url',
   },
 });
 

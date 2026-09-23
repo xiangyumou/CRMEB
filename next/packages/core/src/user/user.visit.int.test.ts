@@ -7,15 +7,13 @@ import * as repo from './user.repo';
 import { recordVisit } from './user.visit.service';
 
 /**
- * The page-view beacon, and the figure it exists to feed (CR-1-f3 §1).
+ * The page-view beacon, and the figure it exists to feed.
  *
  * The assertion that matters is not "a row was inserted" — it is that 访客数
- * moves. `user_visits` has had a schema, an aggregate and a passing test since
- * F3 and has never contained a row, so the thing to prove is that the beacon
- * and the aggregate agree about what a visitor *is*: a signed-in user id, or
- * failing that an address. A recorder that wrote a row the aggregate did not
- * count would leave the figure at 0 with a full table, which is worse than the
- * empty table it replaces.
+ * moves. So the thing to prove is that the beacon and the aggregate agree about
+ * what a visitor *is*: a signed-in user id, or failing that an address. A
+ * recorder that wrote a row the aggregate did not count would leave the figure
+ * at 0 with a full table, which is worse than an empty one.
  */
 
 let harness: TestCtx;

@@ -10,9 +10,9 @@ import * as repo from './theme.repo';
  * 主题 — the colour tokens the renderer applies globally, plus the factory copy
  * of each decorated surface.
  *
- * Deliberately small: the brief keeps the theme marketplace, download, export
- * and preview-image pipeline out of this rewrite. What is here is what 一键换色
- * needed — read the tokens, edit the tokens, switch which theme is active.
+ * Deliberately small: the theme marketplace, download, export and preview-image
+ * pipeline are out of scope. What is here is what 一键换色 needs — read the
+ * tokens, edit the tokens, switch which theme is active.
  */
 
 function tokensOf(row: repo.ThemeRow): Record<string, unknown> {

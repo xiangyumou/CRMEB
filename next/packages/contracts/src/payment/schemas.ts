@@ -9,9 +9,8 @@ import { id, instant, money, pageQuery, paged, sortQuery } from '../_conventions
  * layer — so `payment.service.ts` keeps the pair honest by assigning one to the
  * other, and stops compiling if they drift.
  *
- * WeChat Pay v3 is the only gateway (CONVENTIONS §Scope guard). There is no
- * `payType` field anywhere here: balance, Alipay, AllInPay and offline left with
- * the features that used them, and no historical order is migrated.
+ * WeChat Pay v3 is the only gateway. There is no `payType` field anywhere here:
+ * balance, Alipay, AllInPay and offline payment are not offered.
  */
 
 // ---------------------------------------------------------------------------
@@ -70,9 +69,9 @@ export type CapitalFlowDirection = z.infer<typeof capitalFlowDirection>;
  *
  * `openid` is optional and only consulted when the caller's WeChat identity is
  * not yet bound in `wechat_identities` — the mini-program and the OA both hand
- * the server a code first (stream E1), and the bound identity always wins.
- * A shopper cannot pay into somebody else's openid by sending one: the attempt
- * is created with `payerUserId = ctx.actor.id` either way.
+ * the server a code first, and the bound identity always wins. A shopper cannot
+ * pay into somebody else's openid by sending one: the attempt is created with
+ * `payerUserId = ctx.actor.id` either way.
  */
 export const startPaymentBody = z.object({
   channel: paymentChannel,
@@ -90,11 +89,11 @@ export type StartPaymentBody = z.infer<typeof startPaymentBody>;
  * What a mini-program or OA client feeds to `wx.requestPayment` / JSSDK
  * `chooseWXPay`.
  *
- * The key names are WeChat's, not ours — `timeStamp` really is camel-cased
- * that way and `package` really is a reserved word — because
- * `template/uni-app/utils/wechatPayment.js` forwards this object verbatim and
- * `tests/static/wechat-payment-test.mjs` asserts exactly this key set.
- * `signType` is `RSA` and only `RSA`: v2's MD5 is not ported.
+ * The key names are WeChat's, not ours — `timeStamp` really is camel-cased that
+ * way and `package` really is a reserved word — because
+ * `template/uni-app/utils/wechatPayment.js` forwards this object verbatim to
+ * `uni.requestPayment`. `signType` is `RSA` and only `RSA`: v2's MD5 is not
+ * supported.
  */
 export const jsapiPayParams = z.object({
   appId: z.string(),
@@ -365,8 +364,8 @@ export type PaymentEffectRetryResult = z.infer<typeof paymentEffectRetryResult>;
  * The outer envelope of every v3 callback, parsed from the **raw request body**
  * *after* its platform signature verified.
  *
- * It is exported from the contracts rather than the service so the fake gateway
- * and the uni-app stream describe the same shape, but no route declares it as a
+ * It is exported from the contracts rather than the service so every party to
+ * a v3 callback can describe the same shape, but no route declares it as a
  * `body`: `handle()` would consume the stream to parse it and the signature is
  * computed over the exact bytes. The webhook route files read
  * `ctx.request.text()` themselves. See `payment.webhook.contract.ts`.

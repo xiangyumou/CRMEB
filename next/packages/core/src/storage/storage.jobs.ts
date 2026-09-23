@@ -11,10 +11,10 @@ import { storageConfig } from './storage.config';
  * This job is the second half: once a tombstone is older than
  * `storage.orphanRetentionDays`, the object is removed and the row is purged.
  *
- * It is the successor to the old `clearPoster`, which deleted **by directory
- * listing** — it walked `public/uploads/routine/` and removed anything older
- * than a day, whether or not a record pointed at it. Here the database is the
- * only authority: nothing is deleted that does not have a tombstoned row, and
+ * It never deletes **by directory listing** — walking an uploads folder and
+ * removing anything older than a day, whether or not a record points at it,
+ * loses pictures that are still in use. The database is the only authority:
+ * nothing is deleted that does not have a tombstoned row, and
  * `listSweepableAttachments` refuses to touch a key any live row still uses
  * (two uploads of identical bytes share one object).
  *

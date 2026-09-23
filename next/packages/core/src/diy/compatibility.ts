@@ -5,15 +5,14 @@ import {
 } from '@shop/contracts/diy/removed';
 
 /**
- * The port of `DiyCompatibilityServices::clean`
- * (`crmeb/app/services/diy/DiyCompatibilityServices.php:28`).
+ * Retired components and dead links, filtered out of saved page JSON.
  *
  * Read-time only. A page decorated before 拼团 / 秒杀 / 积分商城 were dropped still
  * has those components and those links in its saved JSON; the row is never
  * rewritten, so the filter is applied on the way out and re-enabling a feature
  * stays a code change rather than a data migration.
  *
- * Three ways an entry is dropped, all taken from the PHP in its own order:
+ * Three ways an entry is dropped, checked in this order:
  *
  * 1. its **key** is a retired component name — this is how the theme blobs are
  *    stored, keyed by name (`moren.js`);
@@ -22,23 +21,23 @@ import {
  * 3. its value navigates to a page that no longer exists, checked at
  *    `info[1].value` first and then at `link`, `url` and `value`.
  *
- * Everything else recurses. Lists are re-indexed after the deletions
- * (`array_values`), objects keep their keys — which is exactly why a component
- * survives cleaning byte-identically unless something inside it was removed.
+ * Everything else recurses. Lists are re-indexed after the deletions, objects
+ * keep their keys — which is exactly why a component survives cleaning
+ * byte-identically unless something inside it was removed.
  */
 
 const removedPaths = new Set(REMOVED_STOREFRONT_PAGES);
 
 /**
- * `in_array(ltrim(explode('?', $v)[0], '/'), $paths, true)` — note there is no
- * `http` exemption here, matching the PHP: a URL with a scheme cannot equal a
- * bare `pages/...` entry, so the check is a no-op for external links.
+ * The path without its query string and leading slash, looked up exactly. There
+ * is no `http` exemption: a URL with a scheme cannot equal a bare `pages/...`
+ * entry, so the check is a no-op for external links.
  */
 function pointsAtRemovedPage(value: unknown): boolean {
   return typeof value === 'string' && removedPaths.has(normaliseStorefrontPath(value));
 }
 
-/** `$value['info'][1]['value'] ?? null` — the positional link slot of an image row. */
+/** `info[1].value` — the positional link slot of an image row. */
 function navigationTargetOf(value: object): unknown {
   const info = (value as { info?: unknown }).info;
   if (!Array.isArray(info)) return undefined;
@@ -49,7 +48,7 @@ function navigationTargetOf(value: object): unknown {
 
 const LINK_FIELDS = ['link', 'url', 'value'] as const;
 
-/** `is_array($data)` is true for both a JSON object and a JSON list. */
+/** A JSON object and a JSON list are both containers that recurse. */
 function isContainer(value: unknown): value is Record<string, unknown> | unknown[] {
   return typeof value === 'object' && value !== null;
 }
@@ -60,7 +59,7 @@ function shouldDrop(key: string, value: unknown): boolean {
   if (!isContainer(value)) return false;
   if (pointsAtRemovedPage(navigationTargetOf(value))) return true;
   for (const field of LINK_FIELDS) {
-    // `isset()` is false for null, so a null link is not a removed link.
+    // A null link is not a removed link.
     const candidate = (value as Record<string, unknown>)[field];
     if (candidate !== undefined && candidate !== null && pointsAtRemovedPage(candidate))
       return true;
@@ -86,7 +85,7 @@ export function cleanDiyData<T>(data: T): T {
         changed = true;
         continue;
       }
-      // `continue` in the PHP skips the recursion for a non-array value.
+      // Only a container recurses; a scalar is kept as it is.
       const cleaned = isContainer(value) ? cleanDiyData(value) : value;
       if (cleaned !== value) changed = true;
       out.push(cleaned);

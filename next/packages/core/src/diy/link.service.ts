@@ -8,13 +8,12 @@ import * as repo from './link.repo';
 /**
  * The link registry: the storefront routes an operator may point a decorated
  * component at. It is admin data rather than a constant because the uni-app
- * route table changes on its own schedule — the legacy system kept the same
- * list in `sys_data('uni_app_link')`.
+ * route table changes on its own schedule.
  *
  * Reads hide the retired pages. A link row pointing at
- * `pages/points_mall/index` may still exist (the ETL carries every row over),
- * but offering it in the picker would let an operator create the exact dead
- * link that `cleanDiyData` then strips on the way out.
+ * `pages/points_mall/index` may still exist, but offering it in the picker
+ * would let an operator create the exact dead link that `cleanDiyData` then
+ * strips on the way out.
  */
 
 function toWire(row: repo.PageLinkRow): DiyLink {

@@ -68,11 +68,11 @@ export function registerPaymentEffects(): void {
  * ERP push. None of those is built: the in-transaction work (the stock commit,
  * the campaign seats, auto-delivery, the 站内信) runs on `onOrderPaid` hooks.
  *
- * So the row is delivered to a logged no-op rather than left without a handler
- * (CR-2-k2): an unhandled effect retries eight times and parks as `unknown`,
- * which would give an operator one row per paid order in 待处理任务 that no
- * action clears. The row itself stays, as the ledger's record that the payment
- * was booked; a real consumer replaces this registration.
+ * So the row is delivered to a logged no-op rather than left without a handler:
+ * an unhandled effect retries eight times and parks as `unknown`, which would
+ * give an operator one row per paid order in 待处理任务 that no action clears.
+ * The row itself stays, as the ledger's record that the payment was booked; a
+ * real consumer replaces this registration.
  */
 async function logOrderPaid(ctx: Ctx, effect: Effect): Promise<void> {
   ctx.logger.info(

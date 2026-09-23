@@ -4,10 +4,10 @@ import { userVisits } from '@shop/db/schema/stats';
 /**
  * The only writer of `user_visits` in the system.
  *
- * `stats` reads the table and is select-only on purpose — CR-1-f3 asked for
- * the recorder to live with whoever owns the storefront session rather than
- * with the domain that aggregates it, so that `stats.repo.ts` being provably
- * free of writes stays true.
+ * `stats` reads the table and is select-only on purpose: the recorder lives
+ * with whoever owns the storefront session rather than with the domain that
+ * aggregates it, so that `stats.repo.ts` being provably free of writes stays
+ * true.
  */
 
 export interface InsertVisitInput {

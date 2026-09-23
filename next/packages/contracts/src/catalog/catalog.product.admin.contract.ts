@@ -31,8 +31,8 @@ import {
  * Note which things are **POSTed sub-resources** rather than fields of the
  * update body: shelf status, restore-from-recycle-bin, the card-key import and
  * voiding a card. Each is a different job with a different permission and a
- * different audit line, and legacy folding them into one `save` is how a
- * product got taken off the shelf by somebody editing its description.
+ * different audit line; folded into one `save`, a product could be taken off
+ * the shelf by somebody editing its description.
  */
 
 const productParams = z.object({ id });
@@ -222,10 +222,10 @@ export const catalogAdminProductUpdate = defineRoute({
 /**
  * 上架 / 下架.
  *
- * risk-matrix §1: taking a product off the shelf must hide it from every
- * storefront list *and* refuse an order for it. Both halves hang off this one
- * status column, which is why it is a conditional update guarded on the value
- * it moves from rather than a blind write.
+ * Taking a product off the shelf must hide it from every storefront list *and*
+ * refuse an order for it. Both halves hang off this one status column, which is
+ * why it is a conditional update guarded on the value it moves from rather than
+ * a blind write.
  */
 export const catalogAdminProductSetStatus = defineRoute({
   id: 'catalog.adminProductSetStatus',
@@ -420,8 +420,8 @@ export const catalogAdminVirtualCardList = defineRoute({
  * Import a batch of card keys.
  *
  * The pool **is** the stock: importing bumps `product_skus.stock` in the same
- * transaction, and the form refuses a hand-typed stock for a card product.
- * Legacy kept the two apart and sold cards that did not exist.
+ * transaction, and the form refuses a hand-typed stock for a card product. Kept
+ * apart, the two drift and the shop sells cards that do not exist.
  */
 export const catalogAdminVirtualCardImport = defineRoute({
   id: 'catalog.adminVirtualCardImport',

@@ -26,7 +26,7 @@ describe('render', () => {
     expect(render('您的订单 {{trackingNo}} 已发货', data)).toBe('您的订单  已发货');
   });
 
-  it('leaves a single brace alone — the legacy ETL wording keeps some', () => {
+  it('leaves a single brace alone — stored wording may still use them', () => {
     expect(render('订单 {order_id}', data)).toBe('订单 {order_id}');
   });
 

@@ -7,7 +7,7 @@ import { wechatConfig, type WechatConfig } from './wechat.config';
  * The first-party WeChat client: identity, the app access token, and messages.
  *
  * No SDK, `fetch` and `node:crypto` only. Two things here are load-bearing for
- * other streams and are therefore spelled out rather than left to a library:
+ * other domains and are therefore spelled out rather than left to a library:
  *
  *  1. **The access token is single-flighted.** WeChat invalidates the previous
  *     token every time you ask for a new one, so two concurrent refreshes do
@@ -116,9 +116,9 @@ export interface WechatCoreClient {
   callBytes(app: WechatApp, req: WechatCall): Promise<WechatBytesResult>;
   /**
    * A multipart upload with the same token handling as `call`: the cached
-   * token, the single flight, and `40001 → drop it and retry once` (CR-31-k2).
-   * Answers WeChat's JSON exactly as `call` does — an `errcode` is a return
-   * value, a transport failure throws.
+   * token, the single flight, and `40001 → drop it and retry once`. Answers
+   * WeChat's JSON exactly as `call` does — an `errcode` is a return value, a
+   * transport failure throws.
    */
   upload<T>(app: WechatApp, req: WechatUpload): Promise<T>;
 }

@@ -20,7 +20,7 @@ import {
 import '../order';
 
 /**
- * 移动端商家管理 — 商品管理, against a real PostgreSQL (CR-4-h2).
+ * 移动端商家管理 — 商品管理, against a real PostgreSQL.
  *
  * The `auth: 'staff'` guard itself is HTTP and is pinned in
  * `apps/web/app/api/v1/staff/products/catalog-staff.int.test.ts`. What is proved
@@ -98,9 +98,8 @@ describe('the staff product list', () => {
   /**
    * 仓库中 covers `draft` as well as `off_shelf`.
    *
-   * Legacy had one `is_show` flag; the rewrite splits "never published" from
-   * "taken down". A draft that only showed in 全部 would be a product the phone
-   * could see and never act on.
+   * The status splits "never published" from "taken down". A draft that only
+   * showed in 全部 would be a product the phone could see and never act on.
    */
   it('仓库中 is everything live that is not on the shelf, drafts included', async () => {
     await seedTabs();
@@ -122,7 +121,7 @@ describe('the staff product list', () => {
     expect(namesOf(page.items)).toEqual(['售罄商品']);
   });
 
-  /** The threshold is `catalog.stockWarningThreshold` — N1's `admin_low_stock` number. */
+  /** The threshold is `catalog.stockWarningThreshold`, the one 库存预警 uses. */
   it('库存警告 compares against the configured threshold, not a hard-coded one', async () => {
     await seedTabs();
     expect(

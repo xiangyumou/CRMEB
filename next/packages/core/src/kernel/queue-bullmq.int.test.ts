@@ -5,8 +5,8 @@ import { createBullQueue, toJobId } from './queue-bullmq';
 /**
  * The real adapter against a real Redis — the one place `dedupeKey` meets
  * BullMQ's `jobId` rules. Every other suite runs on `memoryQueue()`, which
- * accepts any string; CR-15-k was found by the admin e2e suite because nothing
- * here had ever handed BullMQ a `name:id` key.
+ * accepts any string, so only this suite hands BullMQ a `name:id` key before
+ * the e2e suites do.
  */
 
 let harness: TestCtx;

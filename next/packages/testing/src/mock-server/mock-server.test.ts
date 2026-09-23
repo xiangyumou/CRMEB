@@ -11,9 +11,8 @@ import {
 } from './index';
 
 /**
- * The mock server is what the uni-app and admin-shell streams build against
- * before any handler exists, so "it answers, and it validates" is a promise to
- * two other streams.
+ * The mock server is what the uni-app and the admin build against before a
+ * handler exists, so "it answers, and it validates" is a promise to both.
  */
 
 let server: RunningMockServer;
@@ -180,10 +179,10 @@ describe('routing', () => {
 
 describe('bySpecificity', () => {
   /**
-   * Fixed three times on 2026-09-23 (J3, B3, E4). A comparator that is not a
-   * total order makes `sort` registry-order dependent, so the failure shows up
-   * in a file nobody touched the day an unrelated route is added. This pins the
-   * property itself over the whole table, not one pair that happened to break.
+   * A comparator that is not a total order makes `sort` registry-order
+   * dependent, so the failure shows up in a file nobody touched the day an
+   * unrelated route is added. This pins the property itself over the whole
+   * table, not one pair that happened to break.
    */
   it('is a total order over every registered route', () => {
     // Violations are collected and asserted once: an `expect` per pair is a
@@ -264,7 +263,7 @@ describe('matchRoute', () => {
   });
 
   /**
-   * CR-3-e4. The server sorts its routes so that a static segment wins over a
+   * The server sorts its routes so that a static segment wins over a
    * `:param` one, and for a long time it did that with a comparator that
    * returned 0 for any two paths that never disagreed about staticness. That
    * is not a total order, and `Array.prototype.sort` given one may reorder

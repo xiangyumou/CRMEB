@@ -17,8 +17,8 @@ import { sha256Hex } from './password';
  * request path compares `passwordVersion` with the admin row (that would be a
  * database read per request). So the index must list every live session for as
  * long as it lives — `resolve()` slides the index together with the session and
- * re-adds the session to it (CR-8-k: a session kept alive past the index's own
- * TTL used to fall out of it and survive a password change).
+ * re-adds the session to it (otherwise a session kept alive past the index's
+ * own TTL would fall out of it and survive a password change).
  *
  * The token is stored hashed, exactly as on the storefront: a Redis dump must
  * not be replayable.
@@ -49,9 +49,9 @@ export interface AdminSessionStore {
   /** Returns the session and slides its TTL forward, or `null`. */
   resolve(token: string): Promise<(AdminSession & { sessionId: string }) | null>;
   /**
-   * Reads the session **without** sliding it. For a long-lived connection
-   * that re-checks its session (the bell's SSE stream, CR-15-k2): an open tab
-   * must not keep an idle admin signed in for ever.
+   * Reads the session **without** sliding it. For a long-lived connection that
+   * re-checks its session (the bell's SSE stream): an open tab must not keep an
+   * idle admin signed in for ever.
    */
   peek(token: string): Promise<AdminSession | null>;
   destroy(token: string): Promise<void>;

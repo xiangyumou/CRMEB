@@ -239,10 +239,10 @@ export const pagedWechatMedia = paged(wechatMedium);
 /**
  * Upload takes an **attachment id**, never a file.
  *
- * The media library is F1's and already has the file; re-uploading the bytes
- * through a second multipart endpoint would give us two copies and two places
- * to get the MIME check wrong. `POST /admin-api/wechat-media` pushes an
- * attachment we already hold to WeChat and records the handle.
+ * The attachment library already has the file; re-uploading the bytes through a
+ * second multipart endpoint would give us two copies and two places to get the
+ * MIME check wrong. `POST /admin-api/wechat-media` pushes an attachment we
+ * already hold to WeChat and records the handle.
  */
 export const wechatMediaUploadBody = z.object({
   attachmentId: id,

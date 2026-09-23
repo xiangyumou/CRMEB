@@ -18,7 +18,7 @@ export const catalogErrors = defineErrors({
   CATALOG_CATEGORY_TOO_DEEP: { status: 422, message: '商品分类最多三级' },
   /** Moving a category under its own descendant would make a cycle. */
   CATALOG_CATEGORY_CYCLE: { status: 422, message: '不能把分类移动到它自己的下级分类下' },
-  /** Children or live products still point at it. Legacy deleted it anyway and orphaned both. */
+  /** Children or live products still point at it; deleting it would orphan both. */
   CATALOG_CATEGORY_IN_USE: { status: 409, message: '该分类下还有子分类或商品，无法删除' },
 
   // -- products ------------------------------------------------------------

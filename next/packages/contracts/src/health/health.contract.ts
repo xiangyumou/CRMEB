@@ -48,7 +48,7 @@ export const adminHealth = defineRoute({
 });
 
 // ---------------------------------------------------------------------------
-// Readiness (CR-1-j2)
+// Readiness
 // ---------------------------------------------------------------------------
 
 const checkResult = z.enum(['ok', 'failed']);
@@ -67,8 +67,9 @@ export const readinessPayload = z.object({
     worker: checkResult,
   }),
   /**
-   * Informational, **never** a failing check (CR-40-k2): what is queued behind
-   * a ready stack. Absent when it could not be measured in time.
+   * Informational, **never** a failing check: what is queued behind a ready
+   * stack. A backlog does not stop the stack serving, so it never fails
+   * readiness. Absent when it could not be measured in time.
    */
   backlog: z
     .object({
@@ -99,8 +100,7 @@ export const storefrontReadiness = defineRoute({
   // "Not ready yet" is this route's success case, not an incident. The
   // readiness gate polls it on every deploy, so at `error` a forty-second start
   // writes forty lines that describe nothing wrong — and buries the one that
-  // does, in the window where somebody is deciding whether to roll back
-  // (CR-1-j3).
+  // does, in the window where somebody is deciding whether to roll back.
   expectedStatuses: [503],
   examples: [
     {

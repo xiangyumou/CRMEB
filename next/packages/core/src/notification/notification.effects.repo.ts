@@ -6,12 +6,6 @@ import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kerne
 /**
  * The read side of 通知发送记录, over the effects ledger.
  *
- * Same shape as C's `payment.effects.repo.ts`, and for the same reason: the
- * platform repo gives the dispatcher what the dispatcher needs, the console
- * needs a filtered page and a re-queue, and neither stream owns
- * `core/src/effects/`. CR-4-c asks for both upstream; if it is accepted these
- * become re-exports.
- *
  * Every query is pinned to `scope = 'notification'`. One domain's console must
  * not become everybody's — a notification operator has no business seeing a
  * parked refund.

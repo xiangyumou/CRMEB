@@ -3,9 +3,9 @@ import type { DbOrTx } from '@shop/db';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 
 /**
- * The only file that touches `config_values`. CONVENTIONS: "Only `*.repo.ts`
- * files touch Drizzle tables" — the ESLint boundary rule enforces it, and the
- * kernel holds itself to the same rule the domains do.
+ * The only file that touches `config_values`. `docs/conventions.md`: "Only
+ * `*.repo.ts` files touch Drizzle tables" — the ESLint boundary rule enforces
+ * it, and the kernel holds itself to the same rule the domains do.
  */
 
 export interface ConfigRow {

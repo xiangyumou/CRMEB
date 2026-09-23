@@ -8,11 +8,10 @@ import { withTx } from './tx';
 /**
  * Typed configuration.
  *
- * PLAN §1: the 575-key `sys_config` blob is gone. A domain declares one group —
- * a zod schema plus the metadata a form needs — in
- * `core/src/system/config/<group>.config.ts`; values live in
- * `config_values(group, key, value jsonb)`; one `<ConfigGroupForm>` renders
- * every config page; the ETL maps old keys across via `legacyKeys`.
+ * There is no key-value settings blob. A domain declares one group — a zod
+ * schema plus the metadata a form needs — in `core/src/<domain>/<group>.config.ts`;
+ * values live in `config_values(group, key, value jsonb)`; one
+ * `<ConfigGroupForm>` renders every config page.
  *
  * Two rules make this work:
  *  1. **Every field has a `.default()`.** A group must be readable before
@@ -68,16 +67,15 @@ export interface ConfigFieldUi {
   /** Rendered write-only: the current value is never sent to the browser. */
   secret?: boolean;
   /**
-   * Shown, but not an operator's to change (N1 / CR-1-e2).
+   * Shown, but not an operator's to change.
    *
    * Some settings are facts about the deployment rather than decisions about
-   * the shop — `site.publicOrigin` is the example that prompted this. The
-   * legacy installer wrote `site_url` into `eb_system_config` and the SSL
-   * screen rewrote it, so a shop that moved domains carried `http://localhost`
-   * in its WeChat links until somebody noticed. The value now comes from the
-   * environment, and a field that shows the *current* one while refusing to
-   * save it is honest: leaving it off the screen entirely just makes an
-   * operator hunt for where the wrong value is coming from.
+   * the shop — `site.publicOrigin` is the example. An origin typed into a
+   * settings screen goes stale the day the shop moves domains, and every
+   * WeChat link then carries the old one until somebody notices. The value
+   * comes from the environment, and a field that shows the *current* one while
+   * refusing to save it is honest: leaving it off the screen entirely just
+   * makes an operator hunt for where the wrong value is coming from.
    *
    * The screen renders it as plain text with no control, `configSave` refuses
    * the key with `CONFIG_FIELD_READ_ONLY`, and the two are independent — the
@@ -100,8 +98,6 @@ export interface ConfigGroupDef<S extends z.ZodObject = z.ZodObject> {
   title: string;
   schema: S;
   ui: Partial<Record<keyof z.infer<S> & string, ConfigFieldUi>>;
-  /** Old `sys_config` keys the ETL should map into this field. */
-  legacyKeys?: Partial<Record<keyof z.infer<S> & string, string | readonly string[]>>;
   /** Permission atom required to read/write this group in the admin UI. */
   permission?: string;
 }
@@ -112,7 +108,7 @@ const registry = new Map<string, ConfigGroupDef>();
  * Declares a config group and registers it. Registration is a side effect of
  * the module being imported, which is exactly how the `pnpm gen` config bucket
  * works: importing every `*.config.ts` file fills this map, so no shared index
- * has to be edited and parallel streams never conflict.
+ * has to be edited when a domain adds a group.
  */
 export function defineConfigGroup<S extends z.ZodObject>(
   def: ConfigGroupDef<S>,
@@ -176,7 +172,7 @@ export interface ConfigService {
    */
   get<S extends z.ZodObject>(group: ConfigGroupDef<S>): Promise<z.infer<S>>;
   /**
-   * The same typed read, for code that is inside a transaction (CR-53-k2).
+   * The same typed read, for code that is inside a transaction.
    *
    * A cache hit is the same as `get`. On a miss the rows are read through the
    * caller's `tx`, never through a second pooled connection. A transaction
@@ -339,7 +335,7 @@ export function createConfigService(options: ConfigServiceOptions): ConfigServic
   };
 }
 
-/** Removes stored keys the schema no longer knows about. Used by the ETL report. */
+/** Removes stored keys the schema no longer knows about, e.g. after a field is dropped. */
 export async function pruneUnknownKeys(db: DbOrTx, group: ConfigGroupDef): Promise<string[]> {
   const known = new Set(Object.keys(group.schema.shape));
   const rows = await loadGroup(db, group.group);

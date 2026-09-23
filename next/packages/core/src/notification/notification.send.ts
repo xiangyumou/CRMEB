@@ -46,10 +46,10 @@ export interface SendContext {
 /**
  * Turns the event's `link` into something a WeChat message can open.
  *
- * A relative path is joined onto `site.publicOrigin` (CR-1-e2); an absolute URL
- * is left alone. With no origin configured the link is dropped rather than sent
- * as a bare path, because WeChat renders an unopenable link as a dead blue
- * word and the customer taps it anyway.
+ * A relative path is joined onto `site.publicOrigin`; an absolute URL is left
+ * alone. With no origin configured the link is dropped rather than sent as a
+ * bare path, because WeChat renders an unopenable link as a dead blue word and
+ * the customer taps it anyway.
  */
 export function absoluteLink(baseUrl: string, link: string | undefined): string | undefined {
   if (link === undefined || link === '') return undefined;

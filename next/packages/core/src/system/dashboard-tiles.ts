@@ -3,12 +3,12 @@ import { countTile, registerDashboardContributor } from './dashboard';
 import * as repo from './system.repo';
 
 /**
- * The tiles this stream contributes, and the registration bucket for the two
- * domains it owns.
+ * The tiles `system` contributes, and the registration bucket for `system` and
+ * `storage`.
  *
  * Registration is a side effect of import, exactly like config groups, so
- * `system/index.ts` imports this file and nothing else has to know. A domain in
- * another stream registers its own from its own `index.ts`, importing
+ * `system/index.ts` imports this file and nothing else has to know. Any other
+ * domain registers its own from its own `index.ts`, importing
  * `registerDashboardContributor` from `@shop/core/system`.
  *
  * `storage`'s contributor is registered from here rather than from its own

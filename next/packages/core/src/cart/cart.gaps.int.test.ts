@@ -12,13 +12,14 @@ import * as stats from '../stats';
 import * as cart from './index';
 
 /**
- * CR-2-h §1 and §2: 修改规格 and 减少数量-by-variant, against a real database.
+ * 修改规格 and 减少数量-by-variant, against a real database.
  *
- * Both replace a storefront workaround that could lose the shopper's row. The
- * old 修改规格 was `DELETE` then `POST` from the page, so a failure between the
- * two left no row at all; the old minus button listed the whole cart to find a
- * row id before it could decrement it. What is tested here is that each is now
- * *one transaction* and that its conditional statements decide the winner.
+ * Both are server operations so the storefront needs no workaround that could
+ * lose the shopper's row: 修改规格 as `DELETE` then `POST` from the page leaves
+ * no row at all if the second call fails, and a minus button that lists the
+ * whole cart to find a row id races with every other tab. What is tested here
+ * is that each is *one transaction* and that its conditional statements decide
+ * the winner.
  */
 
 let harness: TestCtx;
@@ -114,7 +115,7 @@ async function expectDomainError(promise: Promise<unknown>, code: string): Promi
 }
 
 // ---------------------------------------------------------------------------
-// CR-2-h §1 — 修改规格
+// 修改规格
 // ---------------------------------------------------------------------------
 
 describe('changing a row’s SKU', () => {
@@ -281,7 +282,7 @@ describe('changing a row’s SKU', () => {
 });
 
 // ---------------------------------------------------------------------------
-// CR-2-h §2 — 减少数量 by variant
+// 减少数量 by variant
 // ---------------------------------------------------------------------------
 
 describe('decrementing by SKU', () => {
@@ -367,7 +368,7 @@ describe('decrementing by SKU', () => {
 });
 
 // ---------------------------------------------------------------------------
-// CR-1-f3 §2 — 加购件数
+// 加购件数
 // ---------------------------------------------------------------------------
 
 /**
@@ -406,7 +407,7 @@ describe('加购件数', () => {
     await cart.addItem(as(userId), { skuId: String(skuIds[0]!), quantity: 1 });
     expect(await cartQuantityOf()).toBe(1);
 
-    // Per product, which is the column F3 draws on 商品排行.
+    // Per product, which is the column stats draws on 商品排行.
     const ranking = await stats.productRanking(harness.ctx, {
       ...windowAroundNow(),
       sortBy: 'cartQuantity',

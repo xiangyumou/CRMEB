@@ -1,8 +1,8 @@
 /**
  * Time is injected, never read from the ambient system inside domain code
- * (CONVENTIONS: "inject `Clock`; never call `Date.now()` in domain code"). The
- * ESLint preset bans `Date.now` in `packages/core`, so a test can always pin
- * the clock and an expiry test never has to sleep.
+ * (`docs/conventions.md`: "inject `Clock`; never call `Date.now()` in domain
+ * code"). The ESLint preset bans `Date.now` in `packages/core`, so a test can
+ * always pin the clock and an expiry test never has to sleep.
  */
 
 export interface Clock {

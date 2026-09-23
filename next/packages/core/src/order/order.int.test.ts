@@ -255,7 +255,7 @@ describe('checkout preview', () => {
     });
 
     expect(preview.itemsAmount).toBe('120.00');
-    // Fixed postage is per unit, as legacy's `postage × cart_num` was.
+    // Fixed postage is per unit: `postage × quantity`.
     expect(preview.freightAmount).toBe('16.00');
     expect(preview.couponDiscount).toBe('10.00');
     expect(preview.payableAmount).toBe('126.00');
@@ -310,8 +310,8 @@ describe('checkout preview', () => {
     // The cart preview before an address exists. The product charges postage,
     // so a zero here is the "no address yet" rule, not a free product. It is
     // checkout's rule, not the freight port's: an address that exists but
-    // carries no known division is priced at the template's fallback region
-    // (CR-6-i), so "nowhere yet" has to stop before the port is asked.
+    // carries no known division is priced at the template's fallback region so
+    // "nowhere yet" has to stop before the port is asked.
     const userId = await makeUser();
     const item = await makeProduct({ price: '60.00', freight: '8.00' });
     await addToCart(userId, item, 2);
@@ -352,9 +352,9 @@ describe('checkout preview', () => {
   });
 
   /**
-   * CR-3-b2, the other door in. 立即购买 never touches the cart, so the cart's
-   * own refusal does not cover it; the cap has to sit in `assertSellable`,
-   * where both sources meet.
+   * The other door in. 立即购买 never touches the cart, so the cart's own
+   * refusal does not cover it; the cap has to sit in `assertSellable`, where
+   * both sources meet.
    */
   it('refuses more than one card key on 立即购买 too', async () => {
     const userId = await makeUser();
@@ -378,13 +378,13 @@ describe('checkout preview', () => {
   });
 
   /**
-   * The other side of CR-3-b2: the cap is a cap, not a ban. One card goes
-   * through checkout and B2's `autoDeliver` hands over exactly one key — which
-   * is the whole reason the cap exists, since
+   * The other side of the one-card cap: it is a cap, not a ban. One card goes
+   * through checkout and fulfilment's `autoDeliver` hands over exactly one key
+   * — which is the whole reason the cap exists, since
    * `product_virtual_cards_order_item_uq` would let a line of two claim one
    * card and silently lose the other.
    */
-  it('lets a single card key through checkout, and B2 delivers exactly one', async () => {
+  it('lets a single card key through checkout, and fulfilment delivers exactly one', async () => {
     const userId = await makeUser();
     const item = await makeProduct({ kind: 'virtual_card' });
     await harness.ctx.db.insert(productVirtualCards).values([
@@ -402,7 +402,7 @@ describe('checkout preview', () => {
     const orderId = Number(detail.id);
     expect(detail.items[0]?.quantity).toBe(1);
 
-    // What stream C does when the money lands.
+    // What the payment domain does when the money lands.
     await harness.ctx.db
       .update(orders)
       .set({ status: 'paid', paidAt: harness.clock.now(), paidAmount: '60.00' })
@@ -685,7 +685,7 @@ describe('order creation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// the notifications checkout owes (CR-2-e2)
+// the notifications checkout owes
 // ---------------------------------------------------------------------------
 
 describe('order-created notifications', () => {
@@ -781,8 +781,8 @@ describe('order-created notifications', () => {
 
 describe('the stock port', () => {
   /**
-   * STOCK-001. Legacy's stock helper accepted any number: `0` reported success
-   * against no movement, and a negative one added inventory while counting a
+   * STOCK-001. A stock helper that accepts any number reports success for `0`
+   * against no movement, and adds inventory for a negative one while counting a
    * sale.
    */
   it('refuses a line of zero, negative or fractional units without touching anything', async () => {
@@ -929,9 +929,9 @@ describe('cancellation', () => {
   });
 
   /**
-   * QUEUE-006. Legacy released the coupon and the stock through two service
-   * calls with no shared transaction, so a stock failure left a `coupon_back`
-   * row and a cancelled order whose inventory had not come back.
+   * QUEUE-006. Releasing the coupon and the stock in two calls with no shared
+   * transaction would let a stock failure leave a returned coupon and a
+   * cancelled order whose inventory had not come back.
    */
   it('rolls the whole cancellation back when the stock cannot be returned', async () => {
     const { userId, item, couponId, orderId } = await makeOrder({ coupon: true });
@@ -1133,7 +1133,7 @@ describe('my orders', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 删除订单 (CR-4-h §6)
+// 删除订单
 // ---------------------------------------------------------------------------
 
 describe('hiding a finished order', () => {
@@ -1192,7 +1192,7 @@ describe('hiding a finished order', () => {
     expect(hidden[0]!.operatorUserId).toBe(userId);
   });
 
-  it('accepts the order number as well as the id (CR-1-h)', async () => {
+  it('accepts the order number as well as the id', async () => {
     const { userId, orderId, detail } = await makeOrder();
     await finish(orderId, 'cancelled');
 
@@ -1258,14 +1258,15 @@ describe('hiding a finished order', () => {
 });
 
 /**
- * CR-1-r1. Checkout's `create` and B2's `autoDeliver` each read a config group
- * while their transaction is open. Through `ctx.config.get` a cold cache took
- * a second pooled connection for that read, the CR-53-k2 shape: `max` checkouts
- * at once, each holding one connection and waiting for another. On a pool of
- * one that is not a race but a certainty, so these run on a pool of one with
- * the cache emptied first. Before the fix both fail at the acquire timeout.
+ * Checkout's `create` and fulfilment's `autoDeliver` each read a config group
+ * while their transaction is open. Through `ctx.config.get` a cold cache would
+ * take a second pooled connection for that read: `max` checkouts at once, each
+ * holding one connection and waiting for another. On a pool of one that is not
+ * a race but a certainty, so these run on a pool of one with the cache emptied
+ * first. Reading through `ctx.config.get` instead of `getIn` fails both at the
+ * acquire timeout.
  */
-describe('CR-1-r1 — config read through the transaction, not a second connection', () => {
+describe('config read through the transaction, not a second connection', () => {
   async function onPoolOfOne<T>(userId: number | null, fn: (ctx: Ctx) => Promise<T>): Promise<T> {
     const small = createDb(harness.db.url, { max: 1, acquireTimeoutMs: 1_000 });
     small.pool.on('error', () => {});

@@ -12,10 +12,9 @@ import { users } from './user';
  * through a single `INSERT … ON CONFLICT DO UPDATE`, so two concurrent adds can
  * never produce two rows.
  *
- * Nothing about the legacy `is_new` "buy now" pseudo-cart survives: a direct
- * purchase, a group-buy join and a presale order are built from a request
- * payload and never touch this table. Neither do the retired `seckill_id`,
- * `bargain_id` or `combination_id` columns.
+ * There is no "buy now" pseudo-cart row: a direct purchase, a group-buy join
+ * and a presale order are built from a request payload and never touch this
+ * table.
  */
 export const cartItems = pgTable(
   'cart_items',

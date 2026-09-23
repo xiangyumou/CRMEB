@@ -20,11 +20,10 @@ import {
  * The shopper's own account: `/api/v1/profile`, `/api/v1/addresses`,
  * `/api/v1/account-cancellations`.
  *
- * Every route here is scoped to the caller. None of them takes a user id —
- * not as a parameter, not in a body — which is what makes "user A reads user
- * B's address" unrepresentable rather than merely checked for. The legacy
- * `UserAddressServices::address($id)` had no ownership check at all, and
- * `editAddress` had one that was a single `=` typo.
+ * Every route here is scoped to the caller. None of them takes a user id — not
+ * as a parameter, not in a body — which is what makes "user A reads user B's
+ * address" unrepresentable rather than merely checked for: an ownership check
+ * can be forgotten or mistyped, a missing parameter cannot.
  */
 
 export const userGetProfile = defineRoute({
@@ -85,7 +84,7 @@ export const userAddressList = defineRoute({
  *
  * A separate route rather than a flag on the list because checkout asks for
  * exactly this and nothing else, and paging through 20 addresses to find the
- * one with `isDefault` is what the legacy uni-app did on every cart render.
+ * one with `isDefault` would happen on every cart render.
  */
 export const userDefaultAddress = defineRoute({
   id: 'user.defaultAddress',
@@ -218,11 +217,10 @@ export const userAddressSetDefault = defineRoute({
 /**
  * File a 注销申请.
  *
- * Two steps, not one. The legacy `SetUserCancel` flipped `is_del = 1` the
- * instant the button was tapped — no confirmation, no review, no way back, and
- * the admin 同意/拒绝 endpoints were empty stubs that returned success. Here the
- * request is a row an operator has to act on, and approval anonymises rather
- * than deletes, because orders, refunds and invoices still point at the id.
+ * Two steps, not one. Deleting the account the instant the button is tapped
+ * would leave no confirmation, no review and no way back. The request is a row
+ * an operator has to act on, and approval anonymises rather than deletes,
+ * because orders, refunds and invoices still point at the id.
  */
 export const userRequestCancellation = defineRoute({
   id: 'user.requestCancellation',
@@ -270,12 +268,10 @@ export const userWithdrawCancellation = defineRoute({
 });
 
 /**
- * The page-view beacon (CR-1-f3 §1).
+ * The page-view beacon.
  *
- * 访客数 / 浏览量 and the 地域分布 column have had a table, tested SQL and a
- * frozen contract since F3, and nothing has ever written a row: the legacy
- * `setVisit` call was dropped when stream H found no route behind it. This is
- * that route.
+ * 访客数 / 浏览量 and the 地域分布 column are computed from the rows this route
+ * writes.
  *
  * `user-optional` and **204**, because of what a beacon is. It is fired from
  * `navigator.sendBeacon` or an `onShow` hook while the page is busy doing the

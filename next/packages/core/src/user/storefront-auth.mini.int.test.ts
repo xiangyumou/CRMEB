@@ -15,12 +15,12 @@ import { storefrontAuthConfig } from './storefront-auth.config';
  *
  * The rest of the sign-in suite (`storefront-auth.int.test.ts`) runs on the
  * in-memory `WechatIdentityPort` fake, which answers whatever a test seeded.
- * This file deliberately does not: it keeps the *real* adapter and stream C's
- * HTTP client and points them at `startFakeOaServer()`, so the access-token
- * fetch, the mini-program credential check and WeChat's own refusal codes are
- * all in the path. A phone binding that works against a hand-written stub and
- * fails against a server that can say `40029` is the bug this file exists to
- * catch.
+ * This file deliberately does not: it keeps the *real* adapter and the `wechat`
+ * domain's HTTP client and points them at `startFakeOaServer()`, so the
+ * access-token fetch, the mini-program credential check and WeChat's own
+ * refusal codes are all in the path. A phone binding that works against a
+ * hand-written stub and fails against a server that can say `40029` is the bug
+ * this file exists to catch.
  *
  * Nothing here reaches the real WeChat: the fake is a `node:http` server on a
  * loopback port, and `apiBaseUrl` is pointed at it.

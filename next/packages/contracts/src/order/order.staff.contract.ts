@@ -41,20 +41,13 @@ import {
  * 移动端商家管理 — the staff console the shop owner opens inside the mini
  * program.
  *
- * **Who is staff is not a role.** Legacy kept the uid list in the
- * `order_notice_admin_uids` config key and enforced it with
- * `CustomerMiddleware` on the whole `admin` group (`api/route/v1.php:118`).
- * That is reproduced exactly: the list is the `orderStaff` config group, B2
- * registers a `StaffCheck` against it, and `auth: 'staff'` is what every route
- * here declares. No permission atoms — a staff member either has the console or
- * does not.
+ * **Who is staff is not a role.** Staff are a list of user ids, the
+ * `orderStaff` config group; the order domain registers a `StaffCheck` against
+ * it, and `auth: 'staff'` is what every route here declares. No permission
+ * atoms — a staff member either has the console or does not.
  *
- * Legacy's group had 37 routes. Nineteen of them were the product and user
- * management screens (`admin/product/*`, `admin/user/*`), which belong to
- * streams A and E1 and are not re-created here. Of the eighteen order routes,
- * three called endpoints that never existed (`split_cart_info`,
- * `split_delivery`, `offline`) — stream H should delete them from
- * `template/uni-app/api/admin.js`, they have always been broken.
+ * Only the order screens live here. Product and user management stay on the web
+ * console.
  *
  * Every route answers with the same shapes as the web console, minus
  * `costAmount` and the soft-delete column: the phone has no business showing
@@ -104,14 +97,11 @@ export const staffStatisticsRoute = defineRoute({
 });
 
 /**
- * 统计明细 — the same numbers as the header, grouped by day (CR-4-h §1).
+ * 统计明细 — the same numbers as the header, grouped by day.
  *
  * The page above this route draws a line chart and a 详细数据 table from one
- * window, and legacy served it from two endpoints (`admin/order/time` for the
- * chart, `admin/order/statistics` for the table) that counted differently:
- * the chart summed `pay_price` over paid orders, the table paginated a
- * per-day aggregate built from a different WHERE. They could and did disagree
- * on the same day. Here both read one series.
+ * window, and both read this one series. Two endpoints that each count in their
+ * own way can disagree about the same day.
  *
  * `from` / `to` are Asia/Shanghai calendar days, both inclusive, and default
  * to the last 30 days. A window wider than 92 days
@@ -322,19 +312,18 @@ export const staffShipmentTracking = defineRoute({
   examples: [{ name: 'in-transit', params: { id: '4001' }, response: shipmentTrackingExample }],
 });
 
-// Moved to stream F2 as `shipping.staffExpressCompanyPicker` (CR-1-b2),
-// same path and same body.
+// The express-company picker is `shipping.staffExpressCompanyPicker`.
 
 // ---------------------------------------------------------------------------
-// after-sales, handed to stream C
+// after-sales, through the refund domain
 // ---------------------------------------------------------------------------
 
 /**
- * The refund routes read and write stream C's aggregate through `refund`'s
- * staff entry points (CR-14-k: not the admin services, whose atoms a staff
- * actor never holds) — B2 owns the surface, C owns the money. The shapes below are C's
- * own, imported unchanged, so a field C adds shows up here without a second
- * edit.
+ * The refund routes read and write the refund aggregate through `refund`'s
+ * staff entry points, not the admin services, whose permission atoms a staff
+ * actor never holds. This domain owns the surface; the refund domain owns the
+ * money. The shapes below are the refund domain's own, imported unchanged, so a
+ * field added there shows up here without a second edit.
  */
 export const staffRefundList = defineRoute({
   id: 'order.staffRefundList',
@@ -371,10 +360,10 @@ export const staffRefundDetail = defineRoute({
  * 同意/拒绝退款 from the phone.
  *
  * One route with a `decision` rather than two sub-resources, because that is
- * the single button pair the uni-app screen has; it delegates to C's staff
- * `approve` / `reject`, which own every refusal code listed here. `FORBIDDEN`
- * (`reason: '店员审核售后未开启'`) until the shop turns on
- * `order-staff.allowStaffRefundReview` (CR-14-k).
+ * the single button pair the uni-app screen has; it delegates to the refund
+ * domain's staff `approve` / `reject`, which own every refusal code listed
+ * here. `FORBIDDEN` (`reason: '店员审核售后未开启'`) until the shop turns on
+ * `order-staff.allowStaffRefundReview`, which is off by default.
  */
 export const staffRefundReview = defineRoute({
   id: 'order.staffRefundReview',
@@ -415,14 +404,14 @@ export const staffRefundReview = defineRoute({
 });
 
 /**
- * 售后备注 from the phone (CR-4-h §2).
+ * 售后备注 from the phone.
  *
  * The web console has `POST /admin-api/refunds/:id/remark`, which overwrites
- * `refunds.admin_remark`. This one appends to the refund's log instead: the
- * schema is frozen, there is no `refunds.staff_remark`, and taking over the
- * console's single column would let a staff member erase an operator's note
- * without either of them seeing it happen. The note comes back in `logs`, attributed
- * and in order, and the refund's status is untouched.
+ * `refunds.admin_remark`. This one appends to the refund's log instead: there
+ * is no `refunds.staff_remark`, and taking over the console's single column
+ * would let a staff member erase an operator's note without either of them
+ * seeing it happen. The note comes back in `logs`, attributed and in order, and
+ * the refund's status is untouched.
  */
 export const staffRefundRemark = defineRoute({
   id: 'order.staffRefundRemark',

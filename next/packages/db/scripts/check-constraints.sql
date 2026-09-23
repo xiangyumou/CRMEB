@@ -1,6 +1,6 @@
 -- Constraint sanity checks.
 --
--- Proves that the invariants the rewrite depends on are enforced by the
+-- Proves that the invariants the application depends on are enforced by the
 -- database, not merely by the services. Run against a freshly migrated,
 -- seeded database:
 --

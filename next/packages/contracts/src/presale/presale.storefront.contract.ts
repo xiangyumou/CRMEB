@@ -13,10 +13,10 @@ import {
  * Storefront presale routes, under `/api/v1/presale/`.
  *
  * Two reads and nothing else. Buying a presale item is placing an order, so it
- * goes through B1's `POST /api/v1/orders` with `kind: 'presale'` and
+ * goes through checkout's `POST /api/v1/orders` with `kind: 'presale'` and
  * `kindMeta: { activityId }`; the `OrderKindHandler` reserves the presale
  * stock, writes the `presale_orders` row and the `presale_stock_ledger`
- * reservation inside B1's transaction.
+ * reservation inside the order's transaction.
  */
 
 const activityParams = z.object({ id });

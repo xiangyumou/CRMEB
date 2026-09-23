@@ -7,7 +7,7 @@ import { allConfigGroups, type ConfigFieldUi } from '../kernel/config-registry';
 export type AuditActorKind = 'admin' | 'staff';
 
 export interface AuditEntry {
-  /** Defaults to `admin`. A `staff` row names the 店员 in `userId` (CR-13-k2). */
+  /** Defaults to `admin`. A `staff` row names the 店员 in `userId`. */
   actorKind?: AuditActorKind;
   adminId: number | null;
   userId?: number | null;
@@ -28,8 +28,8 @@ export interface AuditEntry {
  *
  * This is the backstop. The primary source is the config registry: every field
  * a group marks `secret: true` or `type: 'password'` is stripped by name too
- * (CR-9-k — `PUT /admin-api/system/config/payment` nests `merchantPrivateKey`
- * under `values`, a name no hand-kept list would think of). Matching is
+ * (`PUT /admin-api/system/config/payment` nests `merchantPrivateKey` under
+ * `values`, a name no hand-kept list would think of). Matching is
  * case-insensitive.
  */
 const STRIP = [
@@ -77,9 +77,9 @@ function redactValue(value: unknown, keys: Set<string>, depth: number): unknown 
 }
 
 /**
- * Recursive redaction (objects and arrays, to a depth cap) plus a hard size cap:
- * an audit row is a sentence, not a dump. The audit log is read by more people
- * than hold the credentials, so a secret at any depth is replaced (CR-9-k).
+ * Recursive redaction (objects and arrays, to a depth cap) plus a hard size
+ * cap: an audit row is a sentence, not a dump. The audit log is read by more
+ * people than hold the credentials, so a secret at any depth is replaced.
  */
 export function redactPayload(payload: unknown, limit = 4000): string | null {
   if (payload === undefined || payload === null) return null;

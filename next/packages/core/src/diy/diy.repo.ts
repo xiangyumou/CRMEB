@@ -83,14 +83,13 @@ export async function findHomePage(db: DbOrTx): Promise<DiyPageRow | null> {
 }
 
 /**
- * The newest published page of a kind, for the storefront surfaces that have
- * no id of their own — 个人中心 is asked for by name, not by number (CR-3-h2).
+ * The newest published page of a kind, for the storefront surfaces that have no
+ * id of their own — 个人中心 is asked for by name, not by number.
  *
  * Newest by `updated_at`, because nothing marks one `user_center` page as the
- * live one the way `is_home` does for the home page: the legacy data had a
- * single 个人中心 settings row and the new editor lets an operator keep drafts
- * beside it, so "the one most recently worked on and published" is the only
- * answer that does not need a new column.
+ * live one the way `is_home` does for the home page: the editor lets an
+ * operator keep drafts beside it, so "the one most recently worked on and
+ * published" is the only answer that does not need a new column.
  */
 export async function findLatestPublishedOfKind(
   db: DbOrTx,
@@ -158,7 +157,7 @@ export interface DiyPageGuard {
  * latter — which is not a theoretical case, since a fixed clock in the tests
  * makes every save land on the same instant.
  *
- * Callers that legitimately do not care (a rename, the ETL) omit it.
+ * Callers that legitimately do not care (a rename) omit it.
  */
 export async function updatePage(
   db: DbOrTx,

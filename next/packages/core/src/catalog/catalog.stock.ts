@@ -10,21 +10,19 @@ import * as repo from './catalog.repo';
  * The catalog's implementation of `StockPort`.
  *
  * Stock leaves the shelf when the order is *placed*, not when it is paid. That
- * is the whole of risk-matrix §1's second row: the last unit must be
- * unsellable the instant somebody commits to buying it, and the only way to
- * make that true under concurrency is one statement whose WHERE clause carries
- * the precondition —
+ * is the whole point: the last unit must be unsellable the instant somebody
+ * commits to buying it, and the only way to make that true under concurrency is
+ * one statement whose WHERE clause carries the precondition —
  *
  *     UPDATE product_skus SET stock = stock - $n WHERE id = $1 AND stock >= $n
  *
  * Two shoppers both run it; PostgreSQL serialises them on the row; the loser
- * changes no rows and is told 库存不足. Legacy read the row, compared in PHP and
- * then wrote (`StoreProductAttrValueServices::decProductAttrStock`), which is
- * the defect the brief names under "Fix, don't port".
+ * changes no rows and is told 库存不足. Reading the row, comparing in
+ * application code and then writing would let both of them through.
  *
  * `sales` is a separate column moved only by `commit`, because a placed order
  * is not a sale. `release` therefore takes `{ committed }` to say whether it
- * has to come back down again (CR-1-a).
+ * has to come back down again.
  *
  * Nothing here touches the product-level denormalised counters directly; each
  * method rolls the affected products up afterwards in the same transaction, so
@@ -50,7 +48,7 @@ async function rollupFor(tx: Tx, lines: readonly StockLine[]): Promise<void> {
  * sale; a fractional one would leave a fractional shelf. The contracts already
  * require an integer `quantity >= 1`, so reaching here with anything else is a
  * programmer error — and one that must stop the caller's transaction rather
- * than quietly mint inventory. Legacy's helper accepted any number.
+ * than quietly mint inventory.
  */
 function assertPositive(lines: readonly StockLine[]): void {
   for (const line of lines) {
@@ -63,7 +61,7 @@ function assertPositive(lines: readonly StockLine[]): void {
 }
 
 /**
- * 库存预警, at the moment a SKU falls under the line (CR-2-e2).
+ * 库存预警, at the moment a SKU falls under the line.
  *
  * **On the crossing, never on the state.** Every decrement below the threshold
  * would notify on every subsequent order of a SKU that is simply low, which is
@@ -83,9 +81,9 @@ function assertPositive(lines: readonly StockLine[]): void {
  * worse trade than a warning those callers do not want anyway.
  */
 async function warnOnLowStock(tx: Tx, ctx: Ctx, lines: readonly StockLine[]): Promise<void> {
-  // Through `tx`, never the pool (CR-53-k2): this runs while the SKU row lock
-  // is held, and a second pooled connection taken here wedges the pool once
-  // `max` checkouts queue on one SKU (`catalog.stock.pool.int.test.ts`).
+  // Through `tx`, never the pool: this runs while the SKU row lock is held, and
+  // a second pooled connection taken here wedges the pool once `max` checkouts
+  // queue on one SKU (`catalog.stock.pool.int.test.ts`).
   const { stockWarningThreshold: threshold } = await ctx.config.getIn(tx, catalogConfig);
   if (threshold <= 0) return;
 
@@ -137,7 +135,7 @@ export const catalogStockPort: StockPort = {
    *
    * Returns the lines that could not be satisfied rather than throwing, because
    * the caller wants to tell the shopper *which* item ran out, and because a
-   * partial success must still roll back — B1 aborts its transaction on a
+   * partial success must still roll back — checkout aborts its transaction on a
    * non-empty result and every decrement made here goes with it.
    *
    * Lines are processed in ascending SKU id. Two orders containing the same two

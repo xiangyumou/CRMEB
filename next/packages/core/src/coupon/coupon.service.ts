@@ -40,7 +40,7 @@ import * as repo from './coupon.repo';
  * Coupon domain services.
  *
  * Plain functions taking `(ctx, input)` — no classes, no module-level state —
- * so a route file is the one line CONVENTIONS asks for
+ * so a route file is the one line `docs/conventions.md` asks for
  * (`handle(route, (ctx, { query }) => couponService.adminList(ctx, query))`)
  * and a test needs nothing but `createTestCtx()`.
  *
@@ -112,11 +112,11 @@ export async function adminCreate(
 /**
  * Edit.
  *
- * The one interesting line is the supply: legacy reset `remain_count =
- * total_count` on every edit (`StoreCouponIssueServices::saveCoupon` :79-84),
- * so renaming a 1000-coupon campaign that had 3 left handed out 997 more. Here
- * the *delta* is applied — raise the total by 100 and 100 more become
- * claimable; lower it and the remainder shrinks, floored at zero.
+ * The one interesting line is the supply: resetting
+ * `remain_count = total_count` on every edit would let renaming a 1000-coupon
+ * campaign that had 3 left hand out 997 more. So the *delta* is applied — raise
+ * the total by 100 and 100 more become claimable; lower it and the remainder
+ * shrinks, floored at zero.
  */
 export async function adminUpdate(
   ctx: Ctx,
@@ -211,10 +211,10 @@ export async function adminGrant(
 }
 
 /**
- * The one grant path behind both consoles. `activeOnly` is the staff
- * console's: the web console may hand a draft to a test account, a 店员 may
- * only hand out what marketing has released (CR-10-k2). The status is read
- * inside the grant's transaction, so the answer is the one the grant used.
+ * The one grant path behind both consoles. `activeOnly` is the staff console's:
+ * the web console may hand a draft to a test account, a 店员 may only hand out
+ * what marketing has released. The status is read inside the grant's
+ * transaction, so the answer is the one the grant used.
  */
 async function grant(
   ctx: Ctx,
@@ -283,7 +283,7 @@ export async function adminListUserCoupons(
 }
 
 // ---------------------------------------------------------------------------
-// 移动端店员发券 (CR-5-h2)
+// 移动端店员发券
 // ---------------------------------------------------------------------------
 
 /**
@@ -336,7 +336,7 @@ export async function staffGrant(ctx: Ctx, body: StaffCouponGrantBody): Promise<
 }
 
 /**
- * One customer's coupons, for 「查看优惠券」 in the staff console (CR-1-h3).
+ * One customer's coupons, for 「查看优惠券」 in the staff console.
  *
  * `auth: 'staff'` has already been checked by `handle()`; this checks the
  * actor kind again so that a route wired without the guard fails closed with
@@ -496,7 +496,7 @@ export async function listApplicable(
   const userId = requireUserId(ctx);
   const now = ctx.clock.now();
   // The server owns the catalogue: a line's categories are looked up from its
-  // product, never taken from the body (CR-1-h4). A client-sent list was both
+  // product, never taken from the body. A client-sent list would be both
   // missing (the confirm page has none to send) and a client-controlled
   // eligibility input. `categoryIds` on the body is accepted and ignored.
   const productIds = body.lines.map((line) => Number(line.productId));
@@ -536,7 +536,7 @@ export async function listApplicable(
 }
 
 // ---------------------------------------------------------------------------
-// domain API — what other streams call (re-exported from index.ts)
+// domain API — what other domains call (re-exported from index.ts)
 // ---------------------------------------------------------------------------
 
 export interface QuoteInput {
@@ -552,13 +552,12 @@ export interface QuoteResult {
 }
 
 /**
- * What this coupon takes off this cart. Pure read — it writes nothing, so B1
- * can call it while pricing and again while confirming.
+ * What this coupon takes off this cart. Pure read — it writes nothing, so
+ * checkout can call it while pricing and again while confirming.
  *
  * The *amounts* come from the wallet row (a snapshot taken when the coupon was
  * issued, so re-pricing a campaign never changes a coupon already held); the
- * *scope* comes from the live template, which is what legacy did by resolving
- * `applicable_type` through the `issue` relation at read time.
+ * *scope* comes from the live template, resolved at read time.
  */
 export async function quote(ctx: Ctx, input: QuoteInput): Promise<QuoteResult> {
   const row = await repo.findUserCoupon(ctx.db, input.userCouponId);
@@ -597,11 +596,9 @@ export interface RedeemInput {
  * Spend the coupon, inside the caller's order transaction.
  *
  * One conditional update; zero affected rows throws `COUPON_NOT_USABLE`, which
- * aborts the caller's transaction and therefore the order. Called by B1 from
- * `createOrder`, exactly where legacy called `redeemCoupon`
- * (`StoreOrderCreateServices.php:266-275`) and for the same reason: pricing
- * must not write, and redemption must not happen anywhere but the order's own
- * transaction.
+ * aborts the caller's transaction and therefore the order. Called by checkout
+ * from `createOrder`, because pricing must not write, and redemption must not
+ * happen anywhere but the order's own transaction.
  *
  * The argument order is `(tx, ctx, input)` to match `recordEffect` — the other
  * platform primitive a domain calls from inside somebody else's transaction.
@@ -640,8 +637,7 @@ export interface ReleaseResult {
  * own error.
  *
  * A coupon whose window closed while it sat on the order comes back `expired`,
- * not `unused` — see `releaseUserCoupon` in the repo for why legacy got this
- * wrong.
+ * not `unused` — see `releaseUserCoupon` in the repo for why.
  */
 export async function release(tx: Tx, ctx: Ctx, input: ReleaseInput): Promise<ReleaseResult> {
   const { won } = await repo.releaseUserCoupon(tx, {
@@ -656,8 +652,8 @@ export async function release(tx: Tx, ctx: Ctx, input: ReleaseInput): Promise<Re
 }
 
 /**
- * Issue every active new-user coupon to a freshly registered account. Called
- * by E1 inside the registration transaction.
+ * Issue every active new-user coupon to a freshly registered account. Called by
+ * sign-in inside the registration transaction.
  *
  * Idempotent by "already holds one from this template", which is what makes a
  * retried registration issue nothing the second time (USER-002). Never throws:
@@ -692,8 +688,7 @@ export interface OrderGiftInput {
   productIds: readonly number[];
   /**
    * What the order actually paid. Required because `order_gift` templates carry
-   * `gift_min_order_amount`, which cannot be evaluated without it — the brief's
-   * sketch of this signature omitted it. See `docs/rewrite/status/golden.md`.
+   * `gift_min_order_amount`, which cannot be evaluated without it.
    */
   paidAmount: Money;
 }
@@ -703,10 +698,10 @@ export interface OrderGiftInput {
  * bought, plus every active `order_gift` template whose threshold the order
  * meets. Called from the order-paid effect handler.
  *
- * Idempotent through `user_coupons_order_gift_uq (source_order_id, template_id)
- * WHERE source_kind = 'gift_order'`, so replaying the payment callback issues
- * nothing more. Legacy had no such guard and double-granted on a repeated
- * callback (`StoreProductCouponServices::giveOrderProductCoupon`).
+ * Idempotent through `user_coupons_order_gift_uq` — unique on
+ * `(source_order_id, template_id)` where `source_kind = 'gift_order'` — so
+ * replaying the payment callback issues nothing more. Without it a repeated
+ * callback would grant the gifts twice.
  *
  * Never throws: the order is already paid, and a coupon that could not be
  * issued is a support ticket, not a failed payment.

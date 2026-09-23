@@ -179,7 +179,7 @@ export async function listByStatus(
 }
 
 // ---------------------------------------------------------------------------
-// The operator console (CR-4-c)
+// The operator console
 // ---------------------------------------------------------------------------
 
 /**
@@ -286,13 +286,12 @@ export async function findById(
 /**
  * The statuses an operator may hand back to the dispatcher.
  *
- * CR-4-c says `unknown | failed`; `EFFECT_STATUSES` is
- * `pending | done | unknown` and has no `failed` — a handler that fails is
- * either retried (`pending`, still the dispatcher's) or parked (`unknown`). So
- * the list is `unknown` alone: a `pending` row needs no rescuing and re-queueing
- * it would fight the dispatcher holding its lease, and `done` is done. The
- * constant exists so that if a `failed` status is ever added it joins here and
- * nothing else changes.
+ * `EFFECT_STATUSES` is `pending | done | unknown` and has no `failed` — a
+ * handler that fails is either retried (`pending`, still the dispatcher's) or
+ * parked (`unknown`). So the list is `unknown` alone: a `pending` row needs no
+ * rescuing and re-queueing it would fight the dispatcher holding its lease, and
+ * `done` is done. The constant exists so that if a `failed` status is ever
+ * added it joins here and nothing else changes.
  */
 export const RETRYABLE_EFFECT_STATUSES = ['unknown'] as const satisfies readonly EffectStatus[];
 

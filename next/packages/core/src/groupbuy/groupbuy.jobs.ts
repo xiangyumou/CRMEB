@@ -8,10 +8,9 @@ import * as repo from './groupbuy.repo';
 /**
  * What happens when a team runs out of time.
  *
- * Legacy had `PinkJob.php` plus a `pinkExpiration` timer that called
- * `virtualCombination()` unconditionally, so every campaign faked its teams
- * whether or not the shop wanted that. Here the sweep asks the config
- * (`groupbuy.virtualFillOnExpiry`, CR-2-d) and the two outcomes are explicit.
+ * The sweep asks the config (`groupbuy.virtualFillOnExpiry`) whether to fake
+ * the missing members, so no campaign fakes its teams unless the shop wants
+ * that, and the two outcomes are explicit.
  *
  * Two entry points, on purpose:
  *
@@ -39,7 +38,7 @@ export interface SettleResult {
  * The group row is locked first because the decision spans the group, its
  * members and the activity's stock ledger; `takeSeat` from a payment landing at
  * the same instant blocks on that lock and then loses its `expires_at > now`
- * guard, which is exactly the "join vs expiry" race this stream has to win
+ * guard, which is exactly the "join vs expiry" race this domain has to win
  * deterministically.
  */
 export async function settleGroup(ctx: Ctx, groupId: number): Promise<SettleResult> {

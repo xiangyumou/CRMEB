@@ -23,19 +23,16 @@ import { orderStateMachine } from './order.state-machine';
 /**
  * Shipping and receipt.
  *
- * Three legacy services collapse into this file — `StoreOrderDeliveryServices`
- * (972 lines), `StoreOrderSplitServices` (410) and `StoreOrderTakeServices`
- * (235) — and most of the shrinkage is the split machinery disappearing. What
- * is left is worth stating plainly, because it is the whole design:
+ * Dispatch, partial dispatch and receipt live in this one file, with no
+ * split-order machinery. The design is worth stating plainly:
  *
  *  1. **A dispatch is a `shipments` row plus `shipment_items` plus N
  *     conditional bumps of `order_items.shipped_quantity`.** There is no
  *     child order, no re-prorated money, no `surplus_num`.
  *  2. **The bound lives in the UPDATE.** `shipped + q <= quantity - refunded`
  *     is in the WHERE of every bump, so a refund approved mid-form and a second
- *     operator pressing 发货 are both handled by the database saying "zero rows"
- *     — which is the defect the brief names (`delivery` is read-then-write in
- *     the old code).
+ *     operator pressing 发货 are both handled by the database saying "zero
+ *     rows", where a read-then-write would ship the same units twice.
  *  3. **Only the last outstanding unit moves the order.** The roll-up is
  *     computed from the *locked* line states and then applied as
  *     `paid -> shipped` through `OrderStateMachine.transition`, so two
@@ -332,7 +329,7 @@ function shipmentMessage(body: ShipBody): string {
  * Only the transport details. Which lines went out is settled by
  * `shipment_items` and `shipped_quantity`, and changing *that* means cancelling
  * the shipment and shipping again — otherwise the two would have to be kept in
- * step by hand, which is how the legacy edit screen lost units.
+ * step by hand, and a hand-kept pair loses units.
  */
 export async function updateShipment(
   ctx: Ctx,
@@ -379,11 +376,11 @@ export async function updateShipment(
  *
  * Allowed only while the order is still `paid` — i.e. this shipment did not
  * finish it. Once every line is out the order is `shipped`, and
- * `ORDER_TRANSITIONS` has no `shipped -> paid` edge: walking the customer-facing
- * status backwards is not something this system does, because a buyer who was
- * told 已发货 and then sees 待发货 will open a ticket faster than the operator
- * can fix the waybill. The correction for a fully shipped order is 修改发货信息,
- * which is why that route exists. Recorded in `docs/rewrite/status/b2.md`.
+ * `ORDER_TRANSITIONS` has no `shipped -> paid` edge: walking the
+ * customer-facing status backwards is not something this system does, because a
+ * buyer who was told 已发货 and then sees 待发货 will open a ticket faster than
+ * the operator can fix the waybill. The correction for a fully shipped order is
+ * 修改发货信息, which is why that route exists.
  */
 export async function cancelShipment(
   ctx: Ctx,
@@ -758,7 +755,7 @@ export async function adminTrackShipment(
   return trackShipment(ctx, params);
 }
 
-// The 快递公司 picker moved to stream F2's `shipping` domain (CR-1-b2,
-// settled): `expressCompanies.pickerList` in `core/src/shipping/`, same body,
-// same order. `fulfilRepo.listExpressCompanies` / `findExpressCompany` stay —
-// 发货 still has to validate the carrier it was handed.
+// The 快递公司 picker belongs to the `shipping` domain:
+// `expressCompanies.pickerList` in `core/src/shipping/`.
+// `fulfilRepo.listExpressCompanies` / `findExpressCompany` stay here — 发货
+// still has to validate the carrier it was handed.

@@ -37,11 +37,11 @@ import * as service from './payment.service';
 /**
  * The payment races.
  *
- * Four of the seven scenarios the stream brief makes mandatory live here —
- * duplicate callback delivery, a callback racing an order cancel, a late
- * callback arriving after the gateway order was closed, and the reconciliation
- * sweep racing a callback — plus a statement-level race for each conditional
- * update they depend on.
+ * Four of the seven mandatory payment race scenarios live here — duplicate
+ * callback delivery, a callback racing an order cancel, a late callback
+ * arriving after the gateway order was closed, and the reconciliation sweep
+ * racing a callback — plus a statement-level race for each conditional update
+ * they depend on.
  *
  * Two things make these real rather than decorative:
  *
@@ -91,8 +91,9 @@ beforeEach(async () => {
   gateway.behaviour.signResponsesWithWrongKey = false;
   gateway.behaviour.failNext = null;
   gateway.behaviour.dropNext = false;
-  // The cancel below is B1's real one, so it needs B1's state machine and this
-  // domain registered as the `PaymentPort` — both halves of it.
+  // The cancel below is the order domain's real one, so it needs its state
+  // machine and this domain registered as the `PaymentPort` — both halves of
+  // it.
   resetOrderPorts();
   registerOrderStateMachine(order.orderStateMachine);
   registerCatalogDomain();
@@ -243,14 +244,13 @@ function notify(signed: SignedNotification): Promise<service.WebhookResult> {
 }
 
 /**
- * B1's real `cancelOrder`, in the three words this file's assertions are
- * written in.
+ * The order domain's real `cancelOrder`, in the three words this file's
+ * assertions are written in.
  *
- * It used to be a local re-implementation of the two-call protocol, because
- * B1's own cancel made only the second call and so answered `blocked` for every
- * order in this file. `CR-7-c` wired the first call up, so the races below now
- * run against the code that ships. All this wrapper does is turn B1's two
- * refusals — both `DomainError`s — back into `paid` and `blocked`.
+ * The races run against the code that ships, not a local re-implementation of
+ * the two-call protocol, so a cancel that skipped the first call would fail
+ * here. All this wrapper does is turn the two refusals — both `DomainError`s —
+ * back into `paid` and `blocked`.
  */
 async function cancelOrder(ctx: Ctx, orderId: number): Promise<'cancelled' | 'paid' | 'blocked'> {
   try {
@@ -667,11 +667,11 @@ describe('PAYC-004 — starting the same payment twice', () => {
  * Not a race, but it shares this file's gateway fixture and it is the guard the
  * races above rest on.
  *
- * The legacy v3 driver failed *closed* on an unverifiable signature, which is
- * right as far as it goes — what it had no word for was "we do not know". So
- * the caller guessed, and a guess here releases stock against money that may
- * have arrived. Every path below must end in `PAYMENT_STATE_UNKNOWN` or the
- * attempt status `unknown`, and never in `closed` or `paid`.
+ * Failing *closed* on an unverifiable signature is right as far as it goes, but
+ * without a word for "we do not know" the caller guesses, and a guess here
+ * releases stock against money that may have arrived. Every path below must end
+ * in `PAYMENT_STATE_UNKNOWN` or the attempt status `unknown`, and never in
+ * `closed` or `paid`.
  */
 describe('TLS-006 — an unverifiable gateway answer never becomes closed or paid', () => {
   it('refuses a query response signed with the wrong key', async () => {

@@ -6,9 +6,8 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
  * The one query `refund.system.service.ts` needs and `refund.repo.ts` does not
  * have: "has this order already been refunded automatically, and why".
  *
- * It lives in its own `*.repo.ts` rather than growing `refund.repo.ts` because
- * that file is being edited by another stream; a new file merges, an added
- * function in a hot file conflicts. Same folder, same privacy — nothing outside
+ * It lives in its own `*.repo.ts`, beside the service that uses it, rather than
+ * growing `refund.repo.ts`. Same folder, same privacy — nothing outside
  * `core/src/refund/` imports either of them.
  */
 
@@ -22,9 +21,9 @@ export interface SystemRefundRow {
 /**
  * Every automatic refund on an order, oldest first.
  *
- * `is_automatic` is the column legacy called `is_pink_cancel`; it is TRUE only
- * for a refund the shop opened by itself, so a buyer's own request can never be
- * mistaken for the system's and cancel out a genuine second refund.
+ * `is_automatic` is TRUE only for a refund the shop opened by itself, so a
+ * buyer's own request can never be mistaken for the system's and cancel out a
+ * genuine second refund.
  *
  * Soft-deleted rows are excluded: a hidden refund is hidden from the buyer's
  * list, and `deleted_at` here would mean an operator erased the record, in

@@ -44,15 +44,14 @@ import {
 /**
  * Group-buy services: everything a route file calls.
  *
- * The split CONVENTIONS asks for holds throughout — the service decides, the
- * repo states. Every `if` about an affected row count is here; every SQL
- * statement is in `groupbuy.repo.ts`. What is *not* here is joining a team:
- * that is an order, and it lives in `groupbuy.order.ts` behind B1's seams.
+ * The service decides, the repo states: every `if` about an affected row count
+ * is here; every SQL statement is in `groupbuy.repo.ts`. What is *not* here is
+ * joining a team: that is an order, and it lives in `groupbuy.order.ts` behind
+ * the order domain's seams.
  *
  * The admin surface is audited for free: `handle()` writes an `audit_logs` row
  * for every mutating admin route, so 立即成团 carries the operator's account
- * without this file writing a line. Legacy passed `$operator` as a bare string
- * into `virtualCombination()` and nobody ever read it.
+ * without this file writing a line.
  */
 
 type Paged<T> = { items: T[]; total: number; page: number; pageSize: number };
@@ -118,8 +117,8 @@ export async function adminActivityCreate(
  * `seatsRequired` and `groupTtlSeconds` are copied onto every group when it
  * opens (`groupbuy_groups.seats_total`, `expires_at`), so raising the team size
  * mid-campaign cannot move the goalposts for a team already forming. That is
- * the whole reason those two columns are duplicated on the group row, and it is
- * the bug behind legacy's "my three-person team suddenly needs five".
+ * the whole reason those two columns are duplicated on the group row: without
+ * it, a shopper's three-person team suddenly needs five.
  */
 export async function adminActivityUpdate(
   ctx: Ctx,
@@ -166,9 +165,8 @@ export async function adminActivitySetStatus(
 /**
  * Soft delete, refused while a team is still forming.
  *
- * Legacy deleted the `eb_store_combination` row outright and left every live
- * `eb_store_pink` pointing at nothing, which is why the 拼团详情 page had a
- * "活动已失效" branch that showed an empty card. Here the foreign key is
+ * Deleting the activity outright would leave every live team pointing at
+ * nothing, and the 拼团详情 page showing an empty card. The foreign key is
  * `ON DELETE RESTRICT` and this guard gives the operator a sentence instead of
  * a constraint error.
  */
@@ -288,8 +286,7 @@ export async function adminGroupDetail(
  *
  * Gated on its own permission atom (`groupbuy:group:complete`) and on the
  * shop-wide 虚拟成团 switch: an operator may not fake a team in a shop that has
- * decided not to fake teams. Legacy's button was reachable by anyone with the
- * 拼团 menu and asked nobody.
+ * decided not to fake teams.
  */
 export async function adminGroupComplete(
   ctx: Ctx,
@@ -310,9 +307,9 @@ export async function adminGroupComplete(
     }
     const filled = await repo.virtuallyFillAndSucceed(tx, { groupId: id, now: ctx.clock.now() });
     if (!filled.won) throw new DomainError('GROUPBUY_GROUP_NOT_COMPLETABLE');
-    // The same effect the expiry path records for the same update (CR-3-h4),
-    // so 拼团成功 reaches a team an operator completed. `manual` lets the
-    // notification word it differently; nothing reads it yet.
+    // The same effect the expiry path records for the same update, so 拼团成功
+    // reaches a team an operator completed. `manual` lets the notification word
+    // it differently; nothing reads it yet.
     await recordEffect(tx, ctx, {
       scope: 'groupbuy',
       scopeId: String(id),
@@ -357,7 +354,7 @@ const SUMMARY_CACHE_SECONDS = 60;
 const SUMMARY_CACHE_KEY = 'groupbuy:summary';
 
 /**
- * 人气条 (CR-1-h2) — 「已有 N 人参与拼团」 plus a row of faces.
+ * 人气条 — 「已有 N 人参与拼团」 plus a row of faces.
  *
  * Two aggregate scans over `groupbuy_members`, on the public landing tab of a
  * marketing surface, which is the shape of request that arrives in bursts: a
@@ -480,12 +477,12 @@ export async function groupDetail(ctx: Ctx, input: { id: string }): Promise<Grou
 }
 
 /**
- * 取消我发起的团 (legacy `combination/remove`).
+ * 取消我发起的团.
  *
  * Only a team nobody has paid into. Once money is in, the way out is the
  * *order* — `POST /api/v1/orders/:id/cancel` for an unpaid one, an after-sale
  * for a paid one — and the membership follows through `onOrderCancelled` /
- * `onOrderRefunded`. Legacy's `removePink` deleted rows directly and left the
+ * `onOrderRefunded`. Deleting the membership rows directly would leave the
  * orders behind.
  */
 export async function withdraw(ctx: Ctx, input: { id: string }): Promise<GroupbuyGroupView> {
@@ -538,10 +535,9 @@ export async function myGroups(
 /**
  * Poster **data**, not a poster.
  *
- * Legacy's `getPinkPoster` rendered a PNG server-side with GD, stored it as an
- * attachment and leaked one file per group — a cache nothing ever swept. The
- * client composes the image; the server answers with the fields and the string
- * the QR code should encode.
+ * The client composes the image; the server answers with the fields and the
+ * string the QR code should encode. A PNG rendered server-side would be an
+ * attachment per group — a cache nothing sweeps.
  */
 export async function poster(ctx: Ctx, input: { id: string }): Promise<GroupbuyPoster> {
   const id = Number(input.id);
@@ -593,7 +589,7 @@ async function buildGroupView(ctx: Ctx, groupId: number): Promise<GroupbuyGroupV
     expiresAt: row.expiresAt.toISOString(),
     succeededAt: row.succeededAt?.toISOString() ?? null,
     // Paid and unrefunded only: an unpaid order is not a participant, and
-    // showing one would be the "phantom member" legacy's participant list had.
+    // showing one would be a "phantom member" in the participant list.
     members: paid.map((member) => ({
       userId: toId(member.userId),
       nickname: member.nickname,

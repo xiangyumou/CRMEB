@@ -35,12 +35,12 @@ import * as service from './payment.service';
  *
  * No other test held the two sides at that instant, and MUT-001 showed it:
  * `lockOrderForPayment` without `.for('update')` passed every payment and
- * cancel test in the tree (CR-22-k2). This file holds them there
- * deterministically, with no sleeps: an `onOrderCancelled` hook runs *inside*
- * the cancelling transaction, after the transition and before the commit, and
- * from there it starts a payment on its own connection and waits until
- * PostgreSQL reports that payment blocked on a lock. Then it lets the cancel
- * commit, and the payment must see a cancelled order.
+ * cancel test in the tree. This file holds them there deterministically, with
+ * no sleeps: an `onOrderCancelled` hook runs *inside* the cancelling
+ * transaction, after the transition and before the commit, and from there it
+ * starts a payment on its own connection and waits until PostgreSQL reports
+ * that payment blocked on a lock. Then it lets the cancel commit, and the
+ * payment must see a cancelled order.
  */
 
 let harness: TestCtx;

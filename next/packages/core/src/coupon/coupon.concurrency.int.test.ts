@@ -11,9 +11,9 @@ import * as repo from './coupon.repo';
 import * as service from './coupon.service';
 
 /**
- * The races. COUPON-006, COUPON-007 and COUPON-008 from
- * `docs/rewrite/invariants.md` are the three the brief makes mandatory; the
- * rest are here because every conditional state change in the domain owes one.
+ * The races. COUPON-006, COUPON-007 and COUPON-008 from `docs/invariants.md`
+ * are the three the ledger requires; the rest are here because every
+ * conditional state change in the domain owes one.
  *
  * Two things make these real rather than decorative:
  *
@@ -322,7 +322,7 @@ describe('COUPON-008 — one user tapping 领取 twice', () => {
     // **at least one and never more than the limit**, in dense slots — the
     // limit is a ceiling, never a quota the race fills. Refusing is the likely
     // direction, not a guaranteed one: on a loaded machine a racer can reach
-    // its read after the first commit (CR-51-k2, STAB-001 round 2).
+    // its read after the first commit (STAB-001).
     const userId = await makeUser();
     const templateId = await makeTemplate({
       perUserLimit: 3,

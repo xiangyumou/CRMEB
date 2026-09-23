@@ -8,9 +8,8 @@ import { createWechatClient } from './wechat.client';
 import { wechatConfig } from './wechat.config';
 
 /**
- * TLS-001 for the Official Account and mini-program client (CR-21-k2's
- * neighbouring gap; the pay client has `wechat.pay.tls.test.ts`, the refund
- * client is R2's).
+ * TLS-001 for the Official Account and mini-program client (the pay client has
+ * `wechat.pay.tls.test.ts`, the refund client `refund.tls.test.ts`).
  *
  * These calls matter more than most for the handshake: `/cgi-bin/token`,
  * `/sns/oauth2/access_token` and `/sns/jscode2session` carry the **AppSecret on

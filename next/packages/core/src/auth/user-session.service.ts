@@ -9,11 +9,11 @@ import * as repo from './user-session.repo';
 /**
  * Storefront sessions.
  *
- * Two defects from `docs/release-readiness.md` are fixed here:
+ * Two properties matter here:
  *
- *  - "商城令牌不绑定密码" — a session records the `passwordVersion` it was
- *    minted with and is refused the moment the user's current version differs,
- *    so changing a password really does log every device out;
+ *  - a token is bound to the password — a session records the `passwordVersion`
+ *    it was minted with and is refused the moment the user's current version
+ *    differs, so changing a password really does log every device out;
  *  - the token itself is never stored. `user_sessions.token_hash` holds
  *    `sha256(token)`, so a database dump cannot be replayed against the API.
  *

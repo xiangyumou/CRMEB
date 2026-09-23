@@ -16,8 +16,8 @@ import {
 /**
  * Fulfilment arithmetic, with no database anywhere near it.
  *
- * Three families of property live here, and each one is a bug the legacy shop
- * shipped:
+ * Three families of property live here, and each one guards a bug that is easy
+ * to ship:
  *
  *  1. a ship plan never exceeds what is outstanding, and counts a refunded
  *     unit as settled rather than as something still owed;
@@ -216,7 +216,7 @@ describe('rollUpFulfillment', () => {
     ).toBe('fulfilled');
   });
 
-  /** The bug that kept 待发货 permanently non-empty in the legacy shop. */
+  /** Otherwise 待发货 would never empty. */
   it('is fulfilled when the only unshipped unit was refunded', () => {
     expect(
       rollUpFulfillment([
@@ -370,7 +370,7 @@ describe('csvCell', () => {
     expect(csvCell('line1\nline2')).toBe('"line1\nline2"');
   });
 
-  /** CSV injection: the legacy exporter wrote these straight through. */
+  /** CSV injection: a cell written straight through would run in Excel. */
   it('defuses a formula, whichever character opens it', () => {
     expect(csvCell("=cmd|'/c calc'!A1")).toBe("'=cmd|'/c calc'!A1");
     expect(csvCell('+1234')).toBe("'+1234");

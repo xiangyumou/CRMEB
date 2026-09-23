@@ -20,15 +20,15 @@ import {
 /**
  * Checkout and the buyer's own orders.
  *
- * Six routes, and the shape of the first two is the whole design: `preview`
- * and `create` take the *same* input, and the server prices both from scratch.
- * Legacy handed the client a cache key from `order/confirm`, priced it in
- * `order/computed/:key`, and then created from the key again — three chances
- * for the cached draft and the world to disagree.
+ * Six routes, and the shape of the first two is the whole design: `preview` and
+ * `create` take the *same* input, and the server prices both from scratch.
+ * There is no cached draft handed to the client between the two, so nothing can
+ * disagree with the cart, the prices or the stock by the time the order is
+ * created.
  *
- * `POST /api/v1/orders/:id/cancel` replaces `order/cancel`, which legacy
- * registered inside the **cart** route group. Fulfilment (receipt, delivery)
- * and payment live on the same resource but belong to streams B2 and C.
+ * Cancelling is `POST /api/v1/orders/:id/cancel`. Fulfilment (receipt,
+ * delivery) and payment live on the same resource but are defined in
+ * `order.fulfil.contract.ts` and the `payment` domain.
  */
 
 export const checkoutPreviewRoute = defineRoute({
@@ -197,10 +197,10 @@ export const orderGetDetail = defineRoute({
   summary: '订单详情',
   tags: ['order'],
   /**
-   * `:id` is the surrogate id **or** the 24-digit `orderNo` (CR-1-h). The order
-   * number is the only identifier that appears outside the app — on the WeChat
-   * payment record, in the 客服 conversation — so a deep link built from one has
-   * to resolve. `orderRef` explains why the two can never collide.
+   * `:id` is the surrogate id **or** the 24-digit `orderNo`. The order number
+   * is the only identifier that appears outside the app — on the WeChat payment
+   * record, in the 客服 conversation — so a deep link built from one has to
+   * resolve. `orderRef` explains why the two can never collide.
    */
   params: orderRefParams,
   response: orderDetail,
@@ -256,13 +256,13 @@ export const orderCancel = defineRoute({
 });
 
 /**
- * 删除订单 — which deletes nothing (CR-4-h §6).
+ * 删除订单 — which deletes nothing.
  *
- * This is legacy's `is_del`: the buyer's own list stops showing a finished
- * order, and the shop keeps every row of it. That asymmetry is the whole point
- * — the money, the invoice and the after-sales window all outlive the button —
- * so the verb is `DELETE` only because that is what the tap means to the person
- * pressing it, and `hidden_by_user_at` is what it writes.
+ * The buyer's own list stops showing a finished order, and the shop keeps every
+ * row of it. That asymmetry is the whole point — the money, the invoice and the
+ * after-sales window all outlive the button — so the verb is `DELETE` only
+ * because that is what the tap means to the person pressing it, and
+ * `hidden_by_user_at` is what it writes.
  *
  * Only `completed`, `cancelled` and `refunded` may be hidden: anything else is
  * still in flight and the buyer would be hiding an order they may need to act

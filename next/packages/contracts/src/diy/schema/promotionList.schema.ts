@@ -5,7 +5,6 @@ import { defineDiyComponent, diyColour, diyGroup, diyListBox, diyTabs } from './
 /**
  * `promotionList` — 商品选项卡.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_product.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const promotionListSchema = defineDiyComponent('promotionList', {

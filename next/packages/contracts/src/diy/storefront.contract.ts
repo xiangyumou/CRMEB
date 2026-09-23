@@ -20,14 +20,13 @@ import {
 /**
  * 页面装修 — what the uni-app renderer reads.
  *
- * Public: the decorated home page is the first thing a cold visitor sees, and
- * the legacy `/api/diy/get_diy` was open too. Nothing user-specific is in the
- * payload; the components that need a login fetch their own data.
+ * Public: the decorated home page is the first thing a cold visitor sees.
+ * Nothing user-specific is in the payload; the components that need a login
+ * fetch their own data.
  *
  * Every response carries `version`, and the handlers also set it as the `ETag`.
  * The app polls the cheap `/version` route on resume and only re-fetches the
- * page when the string changed — the same trick as the legacy
- * `get_diy_version`, which existed because the payload is large and changes
+ * page when the string changed, because the payload is large and changes
  * rarely.
  */
 
@@ -57,13 +56,12 @@ export const diyPage = defineRoute({
 });
 
 /**
- * 个人中心 (CR-3-h2 §1).
+ * 个人中心.
  *
- * A separate route rather than a slug on `pages/:id`, which the CR offered as
- * an alternative: `:id` is `z.string().regex(/^\d+$/)` everywhere in these
- * contracts, and widening it so one caller can pass a word would weaken the
- * param for the other twenty routes that share it. A fixed path costs one
- * file.
+ * A separate route rather than a slug on `pages/:id`: `:id` is
+ * `z.string().regex(/^\d+$/)` everywhere in these contracts, and widening it so
+ * one caller can pass a word would weaken the param for the other twenty routes
+ * that share it. A fixed path costs one file.
  *
  * Same envelope as `pages/:id`, so the renderer needs nothing new — including
  * `version`, so the app polls 个人中心 exactly the way it polls the home page.
@@ -92,17 +90,17 @@ export const diyUserCenterPage = defineRoute({
 });
 
 /**
- * 商品详情 (CR-2-h3).
+ * 商品详情.
  *
  * `pages/goods_details/index.vue` renders its whole body — gallery, price,
  * specs, 服务, 评价, 图文详情 — through `PageDesign`, so without this read the
  * product page is blank above the bottom bar. Same fixed-path shape as
  * `pages/user-center`: the newest published `product_detail` page.
  *
- * Unlike 个人中心 it never 404s. A shop that never decorated its product page
- * still sells products, so the answer is then the built-in default
- * (`PRODUCT_DETAIL_DEFAULT_VALUE`, the legacy install's own default detail
- * page) with `id: null`. A draft is never served.
+ * Unlike 个人中心 it never 404s. A shop that never decorated its product page still
+ * sells products, so the answer is then the built-in default
+ * (`PRODUCT_DETAIL_DEFAULT_VALUE`, the theme's default detail page) with `id:
+ * null`. A draft is never served.
  */
 export const diyProductDetailPageRoute = defineRoute({
   id: 'diy.productDetailPage',
@@ -142,12 +140,11 @@ export const diyProductDetailPageRoute = defineRoute({
 });
 
 /**
- * 底部导航 — legacy `getNavigation` (CR-3-h2 §2).
+ * 底部导航.
  *
- * The legacy reader took the live home page's saved components and picked the
- * one named `pagefoot`, case-insensitively. This does the same, off the same
- * page, so an operator decorates the tab bar where they always did and no
- * second surface has to be kept in step.
+ * Read off the live home page: the saved component named `pagefoot`,
+ * case-insensitively. An operator decorates the tab bar on the home page, and
+ * no second surface has to be kept in step.
  */
 export const diyNavigationRoute = defineRoute({
   id: 'diy.navigation',
@@ -182,11 +179,11 @@ export const diyNavigationRoute = defineRoute({
 });
 
 /**
- * 版式 — which built-in layout 分类页 / 个人中心 use (CR-3-h2 §3).
+ * 版式 — which built-in layout 分类页 / 个人中心 use.
  *
- * Always answers. A shop that never picked gets 版式一, which is what the
- * legacy call's failure branch fell back to, so an unconfigured install and a
- * broken one look the same to the app — on purpose, because they should.
+ * Always answers. A shop that never picked gets 版式一, which is also what the app
+ * falls back to when the call fails, so an unconfigured install and a broken
+ * one look the same to the app — on purpose, because they should.
  */
 export const diyLayoutRoute = defineRoute({
   id: 'diy.layout',

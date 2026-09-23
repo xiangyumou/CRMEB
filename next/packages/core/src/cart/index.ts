@@ -6,8 +6,7 @@
  * that way: the cart reads live catalogue data through `order/catalog.port.ts`
  * and 再次购买 asks the order domain for its lines, while checkout empties the
  * two `cart_items` rows it consumed from inside `order.repo.ts`. Keeping the
- * arrow one-way is what stops the two module graphs from becoming circular —
- * see `docs/rewrite/status/b1.md`.
+ * arrow one-way is what stops the two module graphs from becoming circular.
  */
 export {
   addItem,

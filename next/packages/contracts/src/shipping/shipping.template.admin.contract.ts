@@ -14,13 +14,13 @@ import {
 /**
  * 运费模板, `/admin-api/shipping/templates`.
  *
- * The URL is namespaced under `shipping/` for the reason stream A namespaced
- * the catalog: "templates", "cities" and "regions" are words several domains
+ * The URL is namespaced under `shipping/` for the reason the catalog is
+ * namespaced: "templates", "cities" and "regions" are words several domains
  * would like, and in the App Router the directory *is* the URL, so an
- * unqualified segment is a merge collision waiting to happen. The two routes
- * this stream inherits from B2 (`/admin-api/express-companies` and
- * `/api/v1/staff/express-companies`) are the deliberate exceptions: their paths
- * are frozen by CR-1-b2.
+ * unqualified segment is a collision waiting to happen. The express-company
+ * pickers (`/admin-api/express-companies` and
+ * `/api/v1/staff/express-companies`) are the deliberate exceptions: the order
+ * console and the mobile staff console call them by those paths.
  */
 
 const templateParams = z.object({ id });
@@ -53,10 +53,8 @@ export const shippingTemplateList = defineRoute({
  * The 运费模板 select on the product editor.
  *
  * Its own route rather than a page of the list, because the picker wants every
- * template in one call and none of the region detail. Stream A's product form
- * currently stores `shippingTemplateId` as free text (status/a.md decision 11);
- * swapping in a `select` with `loadOptions` over this route is the one-line
- * change that decision anticipates.
+ * template in one call and none of the region detail. The product editor's
+ * 运费模板 select loads its options from here.
  */
 export const shippingTemplateOptionList = defineRoute({
   id: 'shipping.templateOptions',

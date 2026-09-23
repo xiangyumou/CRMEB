@@ -1,7 +1,7 @@
 import { registerNotificationEvents } from '../notification';
 
 /**
- * The payment domain's own admin notification (CR-4-k2).
+ * The payment domain's own admin notification.
  *
  * `admin_payment_exception` covers money we received and cannot book — it
  * points at a `payment_exceptions` row, which carries an automatic refund. A

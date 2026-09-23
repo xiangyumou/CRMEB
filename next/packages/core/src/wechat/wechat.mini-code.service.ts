@@ -15,9 +15,9 @@ import * as repo from './wechat.mini-code.repo';
  * Three properties, in the order they matter:
  *
  *  1. **The pair `(page, scene)` is the cache key**, because WeChat's answer
- *     for a pair never changes. The legacy app asked WeChat on every render of
- *     every poster; a shop with one product on the home screen could spend a
- *     day's quota before lunch and then show broken images to everybody.
+ *     for a pair never changes. Asking WeChat on every render of every poster,
+ *     a shop with one product on the home screen could spend a day's quota
+ *     before lunch and then show broken images to everybody.
  *  2. **The bytes are ours.** The response is stored through the storage
  *     driver and the shopper is handed a URL on the shop's own host. WeChat's
  *     own image URLs expire; a poster generated for a WeChat Moment does not.
@@ -38,7 +38,7 @@ const DIRECTORY = 'wechat-mini-code';
 const CACHE_MAX_AGE_SEC = 365 * 24 * 60 * 60;
 
 /**
- * New codes one account may mint per hour (CR-11-k2).
+ * New codes one account may mint per hour.
  *
  * A cached pair is free and stays free. A *new* pair costs a
  * `wxa/getwxacodeunlimit` call, a PNG in the storage root and a row, and the

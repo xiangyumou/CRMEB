@@ -14,11 +14,9 @@ import { definePermissions } from '../auth/permissions';
  *    download the shop's margins.
  *  - `card:read` is separate from every other read because the rows are
  *    redeemable secrets. Seeing a card number is not seeing a product.
- *  - **`protection:*` exists at all** because legacy registered the 商品保障
- *    routes under a group whose `cate_name` said 商品参数
- *    (`crmeb/app/adminapi/route/product.php:164`), so a role granted "product
- *    parameters" silently also granted "edit the guarantee badges shown on
- *    every product page". Brief: "Fix, don't port".
+ *  - **`protection:*` exists at all** because folding the 商品保障 routes into
+ *    商品参数 would mean a role granted "product parameters" silently also
+ *    granted "edit the guarantee badges shown on every product page".
  *
  * The atom string is `catalog:<resource>:<action>`; `definePermissions` adds the
  * domain prefix, so the keys here omit it.

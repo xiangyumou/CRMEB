@@ -43,10 +43,10 @@ export const groupbuyErrors = defineErrors({
   /**
    * The order was priced without the activity's group price.
    *
-   * Fails closed. B1's pricing pipeline does not yet hand `kindMeta` to the
-   * `PricingContributor`s (CR-1-d), so a group-buy order can reach creation
-   * priced at the ordinary SKU price. Selling at the wrong price is worse than
-   * refusing, so `beforeCreate` refuses.
+   * Fails closed. The group price is taken off by a `PricingContributor` in
+   * checkout's pricing pass, which this domain does not own; if that adjustment
+   * is missing or the written lines charge more than the activity price, the
+   * order is refused. Selling at the wrong price is worse than refusing.
    */
   GROUPBUY_PRICE_NOT_APPLIED: { status: 409, message: '拼团价未生效，请稍后重试' },
 });

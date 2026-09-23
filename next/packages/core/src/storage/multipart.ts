@@ -4,29 +4,28 @@ import type { IncomingFile } from './storage.service';
 /**
  * Pulling the one file part out of a `multipart/form-data` request.
  *
- * `handle()` (orchestrator-owned) parses JSON bodies and nothing else, which is
- * why the upload contracts declare no `body` and carry their options in the
- * query string. The route therefore reads the form itself, and this is the
- * shared half so that four routes do not each invent their own field name and
- * their own error.
+ * `handle()` parses JSON bodies and nothing else, which is why the upload
+ * contracts declare no `body` and carry their options in the query string. The
+ * route therefore reads the form itself, and this is the shared half so that
+ * four routes do not each invent their own field name and their own error.
  *
  * It lives in `core` rather than in the route because `FormData`, `File` and
  * `Blob` are web standards available in Node, not `next/*` imports — the
  * `boundaries` rule is about framework coupling, and there is none here.
  *
- * The field is `file` and only `file` (CR-5-h §1). It used to accept `image`
- * and `multipart` too, which meant the contract could not state a name and a
- * client sending the wrong one silently worked here and nowhere else. Extra
- * file parts under other names are ignored; a file under *only* another name
- * is `STORAGE_UPLOAD_FIELD_MISSING`.
+ * The field is `file` and only `file`. Accepting `image` and `multipart` too
+ * would mean the contract could not state a name, and a client sending the
+ * wrong one would silently work here and nowhere else. Extra file parts under
+ * other names are ignored; a file under *only* another name is
+ * `STORAGE_UPLOAD_FIELD_MISSING`.
  *
  * The filename is read but never used as a path: `Storage.put` takes it as a
  * *hint* and honours only a whitelisted extension.
  */
 
 /**
- * The one field name the contract names (CR-5-h §1). Anything else is a client
- * bug, and saying so beats the shopper re-picking the same photo.
+ * The one field name the contract names. Anything else is a client bug, and
+ * saying so beats the shopper re-picking the same photo.
  */
 const FIELD_NAME = 'file';
 

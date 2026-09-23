@@ -20,28 +20,26 @@ import { users } from './user';
 /**
  * Coupon templates and the coupons users hold.
  *
- * Legacy had two tables for one concept (`eb_store_coupon` + the front-end
- * issue row `eb_store_coupon_issue`) plus a redundant claim log
- * (`eb_store_coupon_issue_user`). All three collapse into `coupon_templates`
- * and `user_coupons`.
+ * One concept, one table each: `coupon_templates` is what an operator issues,
+ * `user_coupons` is what a user holds, and a claim is simply a `user_coupons`
+ * row — there is no separate claim log.
  *
- * Member-only coupons (legacy `receive_type = 4`) left with paid membership and
- * have no representation here. Points-priced coupons (`integral`) went with the
- * points system.
+ * There are no member-only or points-priced coupons: paid membership and
+ * points are retired features.
  */
 
 // ---------------------------------------------------------------------------
 // templates
 // ---------------------------------------------------------------------------
 
-/** What the coupon may be spent on. Legacy `type` 0/1/2. */
+/** What the coupon may be spent on. */
 export const couponTemplatesScope = pgEnum('coupon_templates_scope', [
   'all_products',
   'categories',
   'products',
 ]);
 
-/** How a user comes to hold one. Legacy `receive_type` 1/2/3 (4 = member, retired). */
+/** How a user comes to hold one. */
 export const couponTemplatesClaimMode = pgEnum('coupon_templates_claim_mode', [
   'manual',
   'new_user',
@@ -172,7 +170,7 @@ export type CouponTemplateCategory = typeof couponTemplateCategories.$inferSelec
 export type NewCouponTemplateCategory = typeof couponTemplateCategories.$inferInsert;
 
 /**
- * "Buy this product, get this coupon." Legacy `eb_store_product_coupon`.
+ * "Buy this product, get this coupon."
  * Lives here rather than in `catalog.ts` so the coupon domain owns every
  * product ↔ coupon link.
  */

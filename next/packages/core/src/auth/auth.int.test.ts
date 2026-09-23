@@ -351,7 +351,8 @@ describe('storefront sessions', () => {
   });
 
   it('REJECTS a session whose passwordVersion is stale, and revokes it on sight', async () => {
-    // release-readiness: "商城令牌不绑定密码". This is the fix.
+    // Otherwise a changed password would leave every old token working
+    // ("商城令牌不绑定密码").
     const lookup = fakeUserLookup([{ id: 7, passwordVersion: 1 }]);
     registerUserLookup(lookup);
     const issued = await sessions.issue(harness.ctx, {

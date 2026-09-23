@@ -27,7 +27,7 @@ import * as service from './refund.service';
 import { refundSystemInitiated } from './refund.system.service';
 
 /**
- * CR-3-d — the refund nobody asked for.
+ * The refund nobody asked for.
  *
  * A failed group buy and an expired presale both owe a shopper their money
  * back, and there is no buyer to apply and no operator to approve. What must

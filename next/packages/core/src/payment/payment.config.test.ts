@@ -17,14 +17,14 @@ const GROUPS = [paymentConfig, wechatConfig] as const;
 /**
  * TLS-001.
  *
- * The legacy stack shipped a switch that turned certificate verification off,
- * and a CA-bundle path an operator could point anywhere. Both exist because
- * somebody's server once had a stale trust store and disabling the check made
- * the error go away — after which every payment on that shop was one DNS answer
- * away from being read and rewritten.
+ * A switch that turns certificate verification off, or a CA-bundle path an
+ * operator can point anywhere, is what gets added when a server has a stale
+ * trust store and disabling the check makes the error go away — after which
+ * every payment on that shop is one DNS answer away from being read and
+ * rewritten.
  *
- * There is no successor. Verification is the global `fetch`'s, the trust store
- * is the container's, and neither is reachable from an admin form. This test is
+ * So there is neither. Verification is the global `fetch`'s, the trust store is
+ * the container's, and neither is reachable from an admin form. This test is
  * the guard that keeps it that way: a future field called `verifySsl` or
  * `caBundle` fails here before it reaches a review.
  */
@@ -58,8 +58,8 @@ describe('TLS-001 — no TLS toggle, in any group this stream owns', () => {
 describe('secret fields are declared secret', () => {
   const SECRETS: Record<string, readonly string[]> = {
     payment: ['apiV3Key', 'merchantPrivateKey', 'platformPublicKey'],
-    // `miniToken` / `miniAesKey` joined the group in E4, when the mini
-    // program's callback credentials moved off F1's `wechat-mini` group.
+    // The `wechat` group holds every WeChat credential, the mini program's
+    // callback token and AES key included.
     wechat: ['oaAppSecret', 'oaToken', 'oaAesKey', 'miniAppSecret', 'miniToken', 'miniAesKey'],
   };
 
@@ -74,16 +74,14 @@ describe('secret fields are declared secret', () => {
 });
 
 /**
- * CR-6-c, now fixed in `@shop/db`.
- *
- * An all-digit setting — a WeChat 商户号 is nothing else — used to come back
- * from the `jsonb` column as a *number*, `z.string()` refused it, and
- * `ConfigService` repaired the field to its default: the shop reported
- * 支付尚未配置 with a filled-in form and said nothing about why. The schema is a
- * plain `z.string()` again; the round trip itself is asserted against a real
- * database in `payment.int.test.ts`, because that is where the bug lived.
+ * An all-digit setting — a WeChat 商户号 is nothing else — must not come back
+ * from the `jsonb` column as a *number*: `z.string()` would refuse it and
+ * `ConfigService` would repair the field to its default, so the shop would
+ * report 支付尚未配置 with a filled-in form and say nothing about why. The
+ * schema is a plain `z.string()`; the round trip itself is asserted against a
+ * real database in `payment.int.test.ts`, because that is where it can break.
  */
-describe('the schema is plain strings again', () => {
+describe('the schema is plain strings', () => {
   it('takes a 商户号 as the string it is', () => {
     expect(paymentConfig.schema.parse({ mchId: '1900000001' }).mchId).toBe('1900000001');
   });

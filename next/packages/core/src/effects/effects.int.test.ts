@@ -248,7 +248,7 @@ describe('the dispatcher', () => {
   });
 });
 
-describe('a dispatcher run drains while there is work (CR-40-k2)', () => {
+describe('a dispatcher run drains while there is work', () => {
   const T0 = '2026-06-01T00:00:00.000Z';
 
   async function queue(count: number, delayMs?: number) {
@@ -354,7 +354,7 @@ describe('claim ordering', () => {
 });
 
 /**
- * The operator console (CR-4-c).
+ * The operator console.
  *
  * The read side is a screen; the write side is the only thing in the admin that
  * can make a third-party call happen a second time, so it is a conditional

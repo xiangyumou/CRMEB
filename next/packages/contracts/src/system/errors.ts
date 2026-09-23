@@ -3,10 +3,10 @@ import { defineErrors } from '../_conventions/errors';
 /**
  * `system` error codes.
  *
- * One code per decision the caller can act on. The generic 401/403/404/422 cases
- * come from `commonErrors` and are not repeated; what is here is either a
- * refusal an operator must understand ("this role is still in use") or a
- * safety rule the old system did not have ("you cannot disable yourself").
+ * One code per decision the caller can act on. The generic 401/403/404/422
+ * cases come from `commonErrors` and are not repeated; what is here is either a
+ * refusal an operator must understand ("this role is still in use") or a safety
+ * rule ("you cannot disable yourself").
  */
 export const systemErrors = defineErrors({
   /** The admin id does not exist or is soft-deleted. */
@@ -49,9 +49,9 @@ export const systemErrors = defineErrors({
   SYSTEM_CONFIG_UNKNOWN_KEY: { status: 422, message: '包含未知的配置项' },
   /**
    * The patch named a `readOnly` field — one the deployment's environment
-   * decides, not an operator (N1 / CR-1-e2). The settings screen renders those
-   * as plain text and never submits them, so this is a stale tab or a
-   * hand-made request. `details` carries `{ keys }`.
+   * decides, not an operator. The settings screen renders those as plain text
+   * and never submits them, so this is a stale tab or a hand-made request.
+   * `details` carries `{ keys }`.
    */
   CONFIG_FIELD_READ_ONLY: { status: 422, message: '该配置项由部署环境决定，不能在后台修改' },
 

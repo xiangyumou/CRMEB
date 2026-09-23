@@ -8,13 +8,11 @@ const TENCENT: ConfigVisibleWhen = { key: 'provider', equals: 'tencent' };
 /**
  * `sms` — the SMS provider.
  *
- * Legacy source: `eb_system_config` tabs 18 / 96 / 97 / 98 / 99. The old system
- * routed SMS through 一号通 (`sms_account` + `sms_token`), which is out of scope
- * — so the provider list here is the two direct ones CRMEB also supported,
- * Aliyun and Tencent Cloud, plus `none`, which is the default and makes the
- * shop work without any SMS account at all.
+ * 一号通 is out of scope, so the provider list is the two direct ones, Aliyun
+ * and Tencent Cloud, plus `none`, which is the default and makes the shop work
+ * without any SMS account at all.
  *
- * E1 reads this group when sending a verification code.
+ * The user domain reads this group when sending a verification code.
  */
 export const smsConfig = defineConfigGroup({
   group: 'sms',
@@ -127,17 +125,5 @@ export const smsConfig = defineConfigGroup({
 
     perPhonePerHour: { label: '每号码每小时上限', type: 'number', section: '频率', order: 40 },
     perPhonePerDay: { label: '每号码每天上限', type: 'number', section: '频率', order: 41 },
-  },
-  legacyKeys: {
-    provider: 'sms_type',
-    aliyunAccessKeyId: 'aliyun_AccessKeyId',
-    aliyunAccessKeySecret: 'aliyun_AccessKeySecret',
-    aliyunRegionId: 'aliyun_RegionId',
-    aliyunSignName: 'aliyun_SignName',
-    tencentAppId: 'tencent_sms_app_id',
-    tencentSecretId: 'tencent_sms_secret_id',
-    tencentSecretKey: 'tencent_sms_secret_key',
-    tencentSignName: 'tencent_sms_sign_name',
-    tencentRegion: 'tencent_sms_region',
   },
 });

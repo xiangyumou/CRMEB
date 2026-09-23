@@ -2,7 +2,7 @@ import type { Ctx } from '../kernel/context';
 
 /**
  * The Redis keys behind the cached public 装修 reads, and the one function that
- * drops them (CR-3-h2).
+ * drops them.
  *
  * **A module of its own, deliberately.** The reads live in
  * `diy-storefront.service.ts`, which imports `toStorefront` from
@@ -20,7 +20,7 @@ const CACHE_SECONDS = 60;
 
 export const DIY_CACHE = {
   seconds: CACHE_SECONDS,
-  /** The cleaned storefront home page, `pages/home` and `version` (CR-42-k2). */
+  /** The cleaned storefront home page, `pages/home` and `version`. */
   home: 'diy:home:v1',
   userCenter: 'diy:user-center:v1',
   navigation: 'diy:navigation:v1',

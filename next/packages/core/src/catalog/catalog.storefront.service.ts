@@ -23,9 +23,10 @@ import { pageBounds, platformOf, toProductCard } from './catalog.service';
  *
  * Every read here goes through a repo function that has `status = 'on_shelf'`
  * and `deleted_at IS NULL` built into its WHERE clause — not passed in as an
- * option a caller could forget. That is half of risk-matrix §1, and the reason
- * `listSellableProducts` and `findSellableProduct` exist as separate functions
- * from `listProducts` and `findProduct` rather than as a flag on them.
+ * option a caller could forget. That is half of 下架 hiding a product
+ * everywhere at once, and the reason `listSellableProducts` and
+ * `findSellableProduct` exist as separate functions from `listProducts` and
+ * `findProduct` rather than as a flag on them.
  */
 
 // ---------------------------------------------------------------------------
@@ -37,8 +38,8 @@ import { pageBounds, platformOf, toProductCard } from './catalog.service';
  *
  * `version` is derived from the newest update plus the row count, so any
  * insert, edit, hide or delete moves it. The uni-app caches the tree and
- * refetches only when it changes; legacy bumped a config key by hand and
- * operators forgot, so shoppers saw last month's menu until the cache expired.
+ * refetches only when it changes. A key bumped by hand would be forgotten, and
+ * shoppers would see last month's menu until the cache expired.
  */
 export async function categoryTree(ctx: Ctx): Promise<{
   items: {
@@ -82,7 +83,7 @@ export async function categoryTree(ctx: Ctx): Promise<{
 }
 
 /**
- * The version alone (CR-3-h).
+ * The version alone.
  *
  * One aggregate over `product_categories` instead of the whole tree, for the
  * revalidation the storefront does on every cold start. It is the same string
@@ -162,8 +163,8 @@ export async function productList(
  * itself and needs to know why.
  *
  * The view is recorded here, once, into `product_events`. Browse history and
- * the operator's traffic report read the same rows — see decision 4 in
- * `docs/rewrite/status/a.md`; F2 must not write a second view row.
+ * the operator's traffic report read the same rows, so nothing else may write a
+ * second view row for the same page view.
  */
 export async function productDetail(ctx: Ctx, input: { id: string }): Promise<StorefrontProduct> {
   const productId = Number(input.id);
@@ -186,11 +187,11 @@ export async function productDetail(ctx: Ctx, input: { id: string }): Promise<St
 
   const favorited = userId === null ? null : await repo.isFavorited(ctx.db, { userId, productId });
 
-  // One insert, no row lock (CR-41-k2). `products.views` used to be bumped
-  // here too, in the same transaction: every concurrent view of one product
-  // queued on that product's row lock — the page most likely to be hot is the
-  // one that slowed down — and every bump wrote a new wide `products` tuple.
-  // The worker folds these rows into `products.views` once a minute
+  // One insert, no row lock. Bumping `products.views` here too, in the same
+  // transaction, would make every concurrent view of one product queue on that
+  // product's row lock — the page most likely to be hot would be the one that
+  // slowed down — and every bump would write a new wide `products` tuple. The
+  // worker folds these rows into `products.views` once a minute
   // (`foldProductViews`, `catalog.foldProductViews`).
   await repo.recordProductView(ctx.db, { productId, userId, platform: platformOf(ctx) });
 
@@ -401,9 +402,9 @@ export async function favoriteAdd(
 }
 
 /**
- * 批量收藏 (CR-2-h §3).
+ * 批量收藏.
  *
- * One transaction where the storefront used to fire N requests, so the answer's
+ * One transaction rather than N requests from the storefront, so the answer's
  * `favorited: true` is true of every id at the same instant. Partial-tolerant
  * on purpose: an id whose product went off shelf between the list and the
  * button comes back `false` rather than taking the other 49 down with it —
@@ -476,9 +477,9 @@ export async function favoriteRemoveBatch(
  * 我的足迹, derived from `product_events` rather than a table of its own.
  *
  * Grouped by product and ordered by the most recent view, so revisiting a
- * product moves it to the top instead of filling the list with twenty copies —
- * legacy kept one `eb_store_visit` row per visit and de-duplicated in PHP,
- * which is why the page got slower the more a shopper browsed.
+ * product moves it to the top instead of filling the list with twenty copies,
+ * and the database does the de-duplication rather than the application, so the
+ * page does not slow down the more a shopper browses.
  *
  * The window is `browseHistoryDays`; the pruning job removes what falls out of
  * it, so the list and the retention policy cannot disagree.

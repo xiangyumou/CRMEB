@@ -11,13 +11,12 @@ import './index';
 import '../domains.gen';
 
 /**
- * The settings screens, read as an attacker holding a *narrow* console role
- * (K2, AUDIT.md K-SEC-C1 and K-SEC-C2; K-SEC-R9 pinned for CR-10-k).
+ * The settings screens, read as an attacker holding a *narrow* console role.
  *
  * The contract the config routes promise is: a credential is write-only (the
- * form gets an "is set" boolean), and the form writes the fields it shows.
- * K2 pinned each way round that contract as `it.fails`. K-SEC-C1 (CR-8-k2) and
- * K-SEC-C2 (CR-9-k2) now hold (R3); K-SEC-R9 is still pinned for CR-10-k.
+ * form gets an "is set" boolean), the form writes only the fields it shows, and
+ * each group is written only with its own write atom. Each case below is one
+ * way round that contract.
  */
 
 let harness: TestCtx;
@@ -48,14 +47,13 @@ beforeEach(async () => {
   resetWechatTokenFlight();
 });
 
-describe('K-SEC-C1 — the OA callback token on the settings screen', () => {
+describe('the OA callback token on the settings screen', () => {
   // `wechat-oa.token` is the whole of the 明文-mode webhook's authentication
-  // (`sha1(sort(token, timestamp, nonce))`), yet the field is `type: 'text'`,
-  // so `configGet` hands it to anyone holding `system:config:read` — the
-  // lowest settings atom there is. With it, every OA callback body can be
-  // forged (CR-7-k2). The sibling `wechat.oaToken` *is* secret; the registry
-  // heuristic in system.test.ts misses this one because it does not match
-  // `token`. CR-8-k2.
+  // (`sha1(sort(token, timestamp, nonce))`). As a plain `text` field,
+  // `configGet` would hand it to anyone holding `system:config:read` — the
+  // lowest settings atom there is — and with it every OA callback body could be
+  // forged. So it is a secret, and the registry heuristic in system.test.ts
+  // matches `token` to keep it one.
   it('never returns the webhook token to a read-only settings role', async () => {
     await harness.ctx.config.set(wechatOaConfig, { token: 'the-callback-token' });
 
@@ -65,15 +63,15 @@ describe('K-SEC-C1 — the OA callback token on the settings screen', () => {
   });
 });
 
-describe('K-SEC-C2 — a schema key the form never shows', () => {
-  // `configSave` accepts every key of the zod schema, not only the ones with a
-  // `ui` entry. `wechat.apiBaseUrl` has none — it exists so the tests can point
-  // the client at a fake — but a holder of `payment:config:write` can post it.
-  // `refresh()` then sends `appid` and the stored **AppSecret** on the query
-  // string of `GET {apiBaseUrl}/cgi-bin/token`: a write-only credential read
-  // back by pointing the server at a host the attacker controls, and an SSRF
-  // from the app container while it lasts. The fake OA server stands in for
-  // the attacker's host. CR-9-k2 (same for `payment.apiBaseUrl`).
+describe('a schema key the form never shows', () => {
+  // `wechat.apiBaseUrl` has no `ui` entry — it exists so the tests can point
+  // the client at a fake. If `configSave` accepted every key of the zod schema,
+  // a holder of `payment:config:write` could post it, and `refresh()` would
+  // then send `appid` and the stored **AppSecret** on the query string of
+  // `GET {apiBaseUrl}/cgi-bin/token`: a write-only credential read back by
+  // pointing the server at a host the attacker controls, and an SSRF from the
+  // app container while it lasts. The fake OA server stands in for the
+  // attacker's host. The same holds for `payment.apiBaseUrl`.
   it('refuses to repoint the WeChat client from the settings form', async () => {
     // The shop is configured the ordinary way, with the real WeChat host.
     await harness.ctx.config.set(wechatConfig, {
@@ -110,12 +108,13 @@ describe('K-SEC-C2 — a schema key the form never shows', () => {
   });
 });
 
-describe('K-SEC-R9 — the 售后设置 group and the 备注 atom', () => {
-  // `refundConfig.permission` was `refund:request:write`, which the refund
-  // domain declares as 备注售后单. `writePermissionFor` derives a write atom
-  // only from a `:read` one, so the remark permission was also the permission
-  // to rewrite the address buyers post their returns to. CR-10-k: the group now
-  // declares `refund:config:read`, and writing it takes `refund:config:write`.
+describe('the 售后设置 group and the 备注 atom', () => {
+  // `writePermissionFor` derives a write atom only from a `:read` one. Were
+  // `refundConfig.permission` the refund domain's 备注售后单 atom
+  // (`refund:request:write`), the remark permission would also be the
+  // permission to rewrite the address buyers post their returns to. So the
+  // group declares `refund:config:read`, and writing it takes
+  // `refund:config:write`.
   it('does not let the remark permission rewrite the return address', async () => {
     await configSave(
       as(['refund:request:write']),

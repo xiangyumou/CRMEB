@@ -11,10 +11,10 @@ import { definePermissions } from '../auth/permissions';
  *  - whoever maintains the carrier list edits 快递公司 (`express:read` /
  *    `express:write`).
  *
- * What is deliberately **not** here: the 快递公司 *picker* on B2's 发货 form.
- * That route keeps `order:order:read` (CR-1-b2), so an operator trusted to
- * dispatch goods needs no second grant to see the list of couriers. Only the
- * management screen costs `shipping:express:*`.
+ * What is deliberately **not** here: the 快递公司 *picker* on the 发货 form.
+ * That route keeps `order:order:read`, so an operator trusted to dispatch goods
+ * needs no second grant to see the list of couriers. Only the management screen
+ * costs `shipping:express:*`.
  *
  * The city tree has no atom of its own either — it is immutable seed data that
  * the template editor needs, so it rides on `shipping:template:read`.

@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { validateReplyPayload } from './wechat-oa.reply.service';
 
 /**
- * A reply body that cannot be rendered is worse than no reply: the legacy
- * `WechatReplyServices::setReply` stored whatever it was given, the send path
- * silently did nothing, and the operator's evidence that it worked was the
+ * A reply body that cannot be rendered is worse than no reply: the send path
+ * silently does nothing, and the operator's only evidence that it worked is the
  * success toast.
  */
 describe('validateReplyPayload', () => {

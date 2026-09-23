@@ -6,8 +6,7 @@ const MAP_ON: ConfigVisibleWhen = { key: 'provider', equals: ['tencent', 'amap']
 
 /**
  * `map` — the map provider used for address picking and 门店 coordinates.
- *
- * Legacy source: `eb_system_config` tab 124 (地图配置) — `tengxun_map_key`.
+
  *
  * The web key is **not** a secret: it ships to the browser by design, and
  * marking it one would only mean an operator could never check what they typed.
@@ -51,8 +50,5 @@ export const mapConfig = defineConfigGroup({
       order: 3,
     },
     defaultCity: { label: '默认城市', type: 'text', visibleWhen: MAP_ON, order: 4 },
-  },
-  legacyKeys: {
-    webKey: 'tengxun_map_key',
   },
 });

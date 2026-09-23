@@ -6,7 +6,7 @@ import type { CatalogPort, SkuForSale } from '../order';
 import * as repo from './catalog.repo';
 
 /**
- * The catalog's implementation of B1's `CatalogPort`.
+ * The catalog's implementation of the order domain's `CatalogPort`.
  *
  * `getSkuForSale` (in `catalog.service.ts`) is the single-variant read that
  * *refuses* anything off the shelf, which is what order creation wants. The
@@ -14,7 +14,7 @@ import * as repo from './catalog.repo';
  * the one whose product an operator took down an hour ago, so the shopper can
  * see why it is greyed out and remove it. So this port answers in batch and
  * reports rather than throws — `onSale` and `deleted` are fields, not
- * exceptions — and B1 decides what to do with each row.
+ * exceptions — and the cart or checkout decides what to do with each row.
  *
  * Both reads sit on the same repo functions, so there is one definition of
  * "on the shelf" (`status = 'on_shelf'`, not soft-deleted, variant visible) and

@@ -8,10 +8,8 @@ import { id, instant, pageQuery, paged } from '../_conventions/common';
  * one row of configuration per event. `notification_templates.code` is the
  * registry key; the row says which channels are on and what each one sends.
  *
- * The legacy `eb_system_notification` smeared five channels across 26 columns
- * (`wechat_tempid`, `routine_kid`, `sms_id`, `ent_wechat_text`, …), so adding a
- * channel was a migration and reading the table told you nothing. Here a
- * template is one row with one `channels` object, and the operator screen is a
+ * A template is one row with one `channels` object, not a column per channel
+ * setting, so adding a channel is not a migration. The operator screen is a
  * list of events with a switch per channel.
  */
 

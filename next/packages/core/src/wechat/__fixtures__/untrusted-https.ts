@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net';
 import type { TLSSocket } from 'node:tls';
 
 /**
- * An HTTPS server nobody trusts, for TLS-001 (CR-21-k2).
+ * An HTTPS server nobody trusts, for TLS-001.
  *
  * A self-signed certificate for `localhost` (SAN `DNS:localhost`,
  * `IP:127.0.0.1`), minted per process from a fresh RSA key by a small DER
@@ -14,9 +14,8 @@ import type { TLSSocket } from 'node:tls';
  * stays empty, which is what shows the request — and whatever credential it
  * carried on its query string — never left the process.
  *
- * `startHttpsServer` is the same thing with a caller's handler and names, for
- * a test that needs a TLS peer it *can* trust: `safeFetch`'s real transport
- * (CR-11-k).
+ * `startHttpsServer` is the same thing with a caller's handler and names, for a
+ * test that needs a TLS peer it *can* trust: `safeFetch`'s real transport.
  *
  * Test support only; imported by `*.tls.test.ts` files and nothing else.
  */
@@ -59,9 +58,9 @@ function oid(dotted: string): Buffer {
 
 /**
  * A self-signed certificate for `hosts` (DNS SANs; the first is also the CN),
- * plus `IP:127.0.0.1` unless `ipSan: false` — a certificate that names only
- * DNS names is what a real CDN presents, and what a client that dials an IP
- * literal fails to validate (CR-11-k).
+ * plus `IP:127.0.0.1` unless `ipSan: false` — a certificate that names only DNS
+ * names is what a real CDN presents, and what a client that dials an IP literal
+ * fails to validate.
  */
 export function selfSigned(
   key: { privateKey: KeyObject; publicKey: KeyObject },

@@ -7,10 +7,10 @@
  * `boundaries/no-restricted-source` resolves a cross-domain import against
  * `<domain>/index.ts`, so a nested `wechat/oa/` would either be unreachable
  * from other domains or force `wechat`'s own index to re-export half of this
- * file. Stream C hit the same wall and made `wechat` flat for the same reason.
- * This domain imports C's client through `../wechat` and nothing else.
+ * file; `wechat` is flat for the same reason. This domain imports the WeChat
+ * client through `../wechat` and nothing else.
  *
- * ## What other streams may use
+ * ## What other domains may use
  *
  * Almost nothing, deliberately. The admin services are for the route files;
  * the webhook service is for the two bare route handlers. The one genuinely
@@ -41,12 +41,7 @@ export * as wechatOaStorefront from './wechat-oa.storefront.service';
  * The domain registers no effect handler and no order hook: it answers requests
  * and it answers WeChat, and importing this module is all the registration it
  * has (the config group and the permission atoms register as a side effect of
- * their own modules loading). CONVENTIONS allows either form.
- *
- * It did export one, and that broke `buckets.test.ts`: the test derives the
- * expected call from the *directory* name and `domains.gen.ts` calls it through
- * the import alias, which for a hyphenated domain is `wechat_oa` — two spellings
- * of one domain that only ever disagree here. **CR-1-e3** asks for the
- * comparison to be normalised; until then a domain with a hyphen in its name
- * cannot have a registrar, and this one does not need one.
+ * their own modules loading). Either form is allowed, and a registrar with
+ * nothing to register would only be one more thing for `domains.gen.ts` to
+ * call.
  */

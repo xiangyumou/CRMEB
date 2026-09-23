@@ -127,8 +127,8 @@ export async function saveTemplate(
  * inactive or soft-deleted account is excluded here rather than filtered in the
  * bell, so a departed colleague's inbox stops filling up.
  *
- * `status = 1` is "enabled" (`schema/auth.ts`); the legacy fan-out had no such
- * filter at all and every disabled account kept accruing 站内信.
+ * `status = 1` is "enabled" (`schema/auth.ts`); without the filter every
+ * disabled account keeps accruing 站内信.
  */
 export async function findAdminRecipients(
   db: DbOrTx,

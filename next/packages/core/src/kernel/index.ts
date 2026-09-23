@@ -1,9 +1,9 @@
 /**
  * The domain kernel: the primitives every domain is built from.
  *
- * Orchestrator-owned after the `rewrite-p0-freeze` tag — a stream that needs
- * something here files a CR rather than adding to it, because ten streams copy
- * these patterns and a fork of `Money` or of `withTx` would be a disaster.
+ * Changed deliberately and rarely — every domain copies these patterns, and a
+ * fork of `Money` or of `withTx` would be a disaster. A domain that needs
+ * something here asks for it rather than growing its own.
  */
 export * from './clock';
 export * from './context';

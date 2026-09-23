@@ -25,28 +25,22 @@ import * as service from './groupbuy.service';
 import { registerGroupbuyDomain } from './index';
 
 /**
- * Two legacy smoke rows, over teams opened and joined through B1's real
- * checkout and paid through the order state machine and its paid hooks, as
- * stream C's callback does.
+ * Two smoke rows, over teams opened and joined through the real checkout and
+ * paid through the order state machine and its paid hooks, as the payment
+ * callback does.
  *
- * SMOKE-009 — the group-buy poster, offline.
+ * SMOKE-009 — the group-buy poster, offline. The server answers the poster's
+ * *data* and the client draws it (`groupbuy.service.ts` › `poster`), so the
+ * proof is that it needs nothing outside: nothing is pre-seeded, every outbound
+ * `fetch` throws, no WeChat credential is configured — and the poster still
+ * comes back whole, writes no attachment, and an unknown team is the contract's
+ * 404.
  *
- * Legacy's `getPinkPoster` drew a PNG with GD, fetched a WeChat QR code, and
- * uploaded the result as an attachment; the smoke pre-seeded that attachment so
- * the QR step would not call WeChat, and proved the endpoint answered instead
- * of a 500. The rewrite answers the poster's *data* and the client draws it
- * (`groupbuy.service.ts` › `poster`), so the offline property is stronger and
- * has to be proved differently: nothing is pre-seeded, every outbound `fetch`
- * throws, no WeChat credential is configured — and the poster still comes back
- * whole, writes no attachment, and an unknown team is the contract's 404.
- *
- * SMOKE-012 — a team succeeds once. Legacy called `successPinkEdit` twice and
- * checked the leader's and the member's rows moved once. Here success is one
- * conditional update of the team row (`succeedGroup`), which every member —
- * leader included — reads their status from, and the "notification" is the
- * `groupbuy.settle` effect. Everything that could complete the team a second
- * time is run after it filled: its own expiry timer, the sweep, and an
- * operator's 立即成团.
+ * SMOKE-012 — a team succeeds once. Success is one conditional update of the
+ * team row (`succeedGroup`), which every member — leader included — reads their
+ * status from, and the "notification" is the `groupbuy.settle` effect.
+ * Everything that could complete the team a second time is run after it filled:
+ * its own expiry timer, the sweep, and an operator's 立即成团.
  */
 
 let harness: TestCtx;
@@ -253,7 +247,7 @@ describe('SMOKE-009 — the group-buy poster, offline', () => {
     const second = await service.poster(asUser(friend), { id: String(groupId) });
 
     expect(second).toEqual(first);
-    // Legacy wrote one attachment per poster and never swept them.
+    // An attachment per poster would be a cache nothing sweeps.
     expect(await harness.ctx.db.select().from(attachments)).toEqual([]);
   });
 
@@ -381,18 +375,18 @@ describe('SMOKE-012 — a team succeeds once, and says so once', () => {
 });
 
 // ---------------------------------------------------------------------------
-// CR-3-h4
+// 立即成团
 // ---------------------------------------------------------------------------
 
 /**
- * Found while checking SMOKE-012: a team an operator completes (立即成团) never
- * says so. `adminGroupComplete` fills the seats and moves the team to
- * `succeeded` through `virtuallyFillAndSucceed`, but — unlike the expiry path
- * in `settleGroup`, which does the same update — it records no
- * `groupbuy.settle` effect, so whatever E2 hangs off that effect (拼团成功 to
- * the leader and the members) never fires for a manually completed team.
+ * A team an operator completes (立即成团) must say so, like one the expiry path
+ * completes. `adminGroupComplete` fills the seats and moves the team to
+ * `succeeded` through `virtuallyFillAndSucceed`, the same update `settleGroup`
+ * makes; without its own `groupbuy.settle` effect, whatever the notification
+ * domain hangs off that effect (拼团成功 to the leader and the members) would
+ * never fire for a manually completed team.
  */
-describe('CR-3-h4 — 立即成团 says so', () => {
+describe('立即成团 says so', () => {
   it('records one groupbuy.settle effect when an operator completes a team', async () => {
     const leader = await makeShopper('团长');
     const groupId = await openTeam(leader);

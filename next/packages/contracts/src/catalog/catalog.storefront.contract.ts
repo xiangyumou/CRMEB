@@ -32,9 +32,8 @@ import {
  * **Off-shelf and deleted products are invisible here, and that is a promise
  * the queries keep rather than the callers.** Every read in this file filters
  * on `status = 'on_shelf' AND deleted_at IS NULL`, including `productDetail` —
- * risk-matrix §1 says taking a product off the shelf must hide it *and* refuse
- * an order for it, and half of that is enforced by this file being unable to
- * return one.
+ * taking a product off the shelf must hide it *and* refuse an order for it, and
+ * half of that is enforced by this file being unable to return one.
  */
 
 const productParams = z.object({ id });
@@ -75,7 +74,7 @@ export const catalogCategoryTree = defineRoute({
 });
 
 /**
- * "Has the category tree changed?" in two fields (CR-3-h).
+ * "Has the category tree changed?" in two fields.
  *
  * The uni-app caches the whole tree on the device and revalidates it on every
  * cold start, because the 分类 tab must paint instantly. Without this route it
@@ -86,11 +85,9 @@ export const catalogCategoryTree = defineRoute({
  * in whole seconds, a dash, and the visible-category count, so any insert, edit,
  * hide or delete moves it. Both routes also send it as an `ETag`.
  *
- * **This is the interim shape.** CR-1-s asks for `If-None-Match` support in
- * `handle()`, which would let `GET /api/v1/catalog/categories` answer 304 and
- * cover the "I want the tree if it moved" case in one round trip instead of
- * two. Until that lands, `handle()` has no way to return a bodyless 304 and
- * this route is the cheap half.
+ * `GET /api/v1/catalog/categories` also answers 304 to a matching
+ * `If-None-Match`, which covers "I want the tree if it moved" in one round
+ * trip; this route is for a client that only wants to know.
  */
 export const catalogCategoryVersion = defineRoute({
   id: 'catalog.categoryVersion',
@@ -158,7 +155,7 @@ export const catalogProductDetail = defineRoute({
   ],
 });
 
-/** The SKU matrix on its own, for the cart popup. Legacy `v2/get_attr/:id/:type`. */
+/** The SKU matrix on its own, for the cart popup. */
 export const catalogProductSkus = defineRoute({
   id: 'catalog.productSkus',
   method: 'GET',
@@ -185,8 +182,7 @@ export const catalogProductSkus = defineRoute({
 
 /**
  * The live price and stock of one SKU, for the detail page to refresh after a
- * spec change without re-fetching the whole product. Legacy
- * `product/real_price/:id/:unique`.
+ * spec change without re-fetching the whole product.
  */
 export const catalogSkuPrice = defineRoute({
   id: 'catalog.skuPrice',
@@ -337,7 +333,7 @@ export const catalogFavoriteAdd = defineRoute({
 });
 
 /**
- * 批量收藏 (CR-2-h §3).
+ * 批量收藏.
  *
  * Idempotent like its singular sibling, and partial-tolerant: an id whose
  * product is gone or off shelf comes back `favorited: false` instead of taking

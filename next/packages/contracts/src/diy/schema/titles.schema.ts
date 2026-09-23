@@ -5,7 +5,6 @@ import { defineDiyComponent, diyColour, diyInput, diySlider, diyTabs } from './p
 /**
  * `titles` — 文本标题.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_title.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const titlesSchema = defineDiyComponent('titles', {

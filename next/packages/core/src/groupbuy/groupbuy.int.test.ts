@@ -42,9 +42,9 @@ import { registerGroupbuyDomain } from './index';
  * paid order does to a team, what a cancel and a refund put back, and that a
  * failed team never loses a shopper's money silently.
  *
- * Orders are written directly rather than through B1's checkout. This stream
- * attaches to the order aggregate through `order/ports.ts`, and driving the
- * whole checkout here would be testing B1.
+ * Orders are written directly rather than through the real checkout. This
+ * domain attaches to the order aggregate through `order/ports.ts`, and driving
+ * the whole checkout here would be testing the order domain.
  */
 
 let harness: TestCtx;
@@ -64,8 +64,8 @@ beforeEach(async () => {
   // `truncateAll` empties the settings table but not the config cache, and a
   // test that switches 虚拟成团 on would otherwise leak it into the next one.
   await harness.ctx.config.invalidate(groupbuyConfig.group);
-  // The 人气条 is cached in Redis for a minute (CR-1-h2); without this a test
-  // reads the previous test's count.
+  // The 人气条 is cached in Redis for a minute; without this a test reads the
+  // previous test's count.
   await harness.redis.flushdb();
   harness.clock.set(NOW);
   resetOrderPorts();
@@ -131,7 +131,7 @@ async function makeActivity(
     .values({
       name: `坚果礼盒${sequence}`,
       imageUrl: 'https://example.test/p.png',
-      // On the shelf so the CR-1-d tests below can buy it through B1's real
+      // On the shelf so the price tests below can buy it through the real
       // checkout; the rest of this file writes its orders directly.
       status: 'on_shelf',
       // `products_freight_source` insists a `template` product names a template.
@@ -234,7 +234,7 @@ async function makeOrder(args: {
 }
 
 /**
- * The whole "place a group-buy order" path as B1 would drive it: the kind
+ * The whole "place a group-buy order" path as the checkout drives it: the kind
  * handler's two halves inside one transaction.
  */
 async function placeOrder(args: {
@@ -271,7 +271,7 @@ async function placeOrder(args: {
   return { orderId: order.orderId, groupId: member!.groupId };
 }
 
-/** Marks the order paid and fires the hook, the way stream C's callback does. */
+/** Marks the order paid and fires the hook, the way the payment callback does. */
 async function pay(orderId: number): Promise<void> {
   const at = harness.clock.now();
   await withTx(harness.ctx.db, async (tx) => {
@@ -357,15 +357,15 @@ async function effectsFor(orderId: number, eventType: string) {
 // ---------------------------------------------------------------------------
 
 /**
- * CR-1-d, applied: `buildDraft` passes `kind` and every `kindMeta` key into the
- * pricing `selections`, so the contributor sees which activity the shopper
- * picked and the 拼团价 reaches the order by itself.
+ * `buildDraft` passes `kind` and every `kindMeta` key into the pricing
+ * `selections`, so the contributor sees which activity the shopper picked and
+ * the 拼团价 reaches the order by itself.
  *
- * These are the only tests in this file that drive B1's real checkout. They
- * have to: the whole point is that the price travels from the activity table
- * through `preview`/`create` without this domain writing the number itself.
+ * These are the only tests in this file that drive the real checkout. They have
+ * to: the whole point is that the price travels from the activity table through
+ * `preview`/`create` without this domain writing the number itself.
  */
-describe('the group-buy price through the real checkout (CR-1-d)', () => {
+describe('the group-buy price through the real checkout', () => {
   beforeEach(() => {
     // The catalogue port `buildDraft` reads SKUs through, the freight port it
     // quotes with, and the state machine its inserts are validated against.
@@ -403,9 +403,10 @@ describe('the group-buy price through the real checkout (CR-1-d)', () => {
     const meta = { activityId: String(fixture.activityId) };
 
     const preview = await checkout.preview(ctx, buyNow(fixture, meta));
-    // 88.00 in the catalogue, 59.00 in the activity. B1 books the difference as
-    // an adjustment rather than rewriting the unit price, so `itemsAmount`
-    // stays the catalogue total and the shopper is shown where the 29.00 went.
+    // 88.00 in the catalogue, 59.00 in the activity. The checkout books the
+    // difference as an adjustment rather than rewriting the unit price, so
+    // `itemsAmount` stays the catalogue total and the shopper is shown where
+    // the 29.00 went.
     expect(preview.itemsAmount).toBe('88.00');
     expect(preview.payableAmount).toBe('59.00');
     expect(preview.lines[0]?.totalAmount).toBe('59.00');
@@ -468,13 +469,13 @@ describe('the group-buy price through the real checkout (CR-1-d)', () => {
 });
 
 describe('beforeCreate', () => {
-  it('refuses an order whose draft is not at the activity price (CR-1-d)', async () => {
+  it('refuses an order whose draft is not at the activity price', async () => {
     const fixture = await makeActivity();
     const userId = await makeUser();
-    // 88.00 is the catalogue price. With CR-1-d applied a real checkout can no
-    // longer produce it for a `groupbuy` order, which is exactly why this guard
-    // stays: it is what would catch the contributor being dropped, reordered or
-    // silently returning `[]` again.
+    // 88.00 is the catalogue price. A real checkout cannot produce it for a
+    // `groupbuy` order, which is exactly why this guard matters: it is what
+    // would catch the contributor being dropped, reordered or silently
+    // returning `[]`.
     await expect(placeOrder({ userId, fixture, amount: '88.00' })).rejects.toMatchObject({
       code: 'GROUPBUY_PRICE_NOT_APPLIED',
     });
@@ -575,7 +576,8 @@ describe('placing an order', () => {
   });
 
   it('enforces the campaign quota in the same statement as the stock', async () => {
-    // STOCK-004: legacy checked `total_quota` with a separate SELECT.
+    // STOCK-004: `total_quota` is checked in the same `UPDATE`, not a separate
+    // SELECT that could be stale by the time it decrements.
     const fixture = await makeActivity({ stock: 10, totalQuota: 1 });
     const first = await makeUser();
     const second = await makeUser();
@@ -827,15 +829,15 @@ describe('the expiry sweep', () => {
 });
 
 /**
- * CR-3-d, accepted and implemented: a failed team gives the money back by
- * itself, through `refund.refundSystemInitiated`.
+ * A failed team gives the money back by itself, through
+ * `refund.refundSystemInitiated`.
  *
  * What these two prove is the join — that the effect the sweep records reaches
  * the refund domain, and that draining it again does not open a second refund.
  * The refund's own arithmetic (the ceiling, the freight, shipped lines) is
  * proved next door in `refund/refund.system.int.test.ts`.
  */
-describe('the CR-3-d system refund', () => {
+describe('the system refund for a failed team', () => {
   async function driveRefundEffects(orderIds: number[]): Promise<void> {
     const handler = await import('../effects/index').then((m) =>
       m.getEffectHandler('order', 'groupbuy.refund'),
@@ -987,14 +989,14 @@ describe('the storefront surface', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 人气条 (CR-1-h2)
+// 人气条
 // ---------------------------------------------------------------------------
 
 /**
- * `summary` counts **distinct users currently taking part**, which is the whole
- * difference from legacy: `getCombinationIndex` counted rows in `store_pink`,
- * so refunds, dead teams and repeat joins all pushed the number up and it could
- * only ever grow. Each case below is one of the ways that number used to lie.
+ * `summary` counts **distinct users currently taking part**. Counting member
+ * rows instead would let refunds, dead teams and repeat joins all push the
+ * number up, so it could only ever grow. Each case below is one of the ways
+ * that number could lie.
  */
 /** The avatars those users joined with, in the order given. */
 async function avatarsOf(userIds: readonly number[]): Promise<string[]> {
@@ -1181,7 +1183,7 @@ describe('the admin surface', () => {
       },
     );
 
-    // Legacy's `saveCombination` reset the counters on every edit.
+    // An edit must not reset the counters.
     expect(edited.skus[0]).toMatchObject({ stock: 50, sales: 1 });
     expect(edited.title).toBe('改过名字的活动');
   });

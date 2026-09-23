@@ -20,7 +20,7 @@ import { requireOaCredentials } from './wechat-oa.credentials';
 import * as repo from './wechat-oa.repo';
 
 /**
- * The bridge between F1's media library and WeChat's material store.
+ * The bridge between the admin media library and WeChat's material store.
  *
  * Upload takes an **attachment id**, never a file: the bytes are already ours,
  * and a second multipart endpoint would be a second place to get the MIME check

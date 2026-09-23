@@ -19,24 +19,21 @@ import {
  * list routes:
  *
  * 1. **The picker** — `GET /admin-api/express-companies` and
- *    `GET /api/v1/staff/express-companies`. Taken over from stream B2 exactly
- *    as CR-1-b2 asks: same paths, same `expressCompanyList` body, same
- *    `order:order:read` permission on the admin one. B2's 发货 form and the
- *    mobile staff console change one import and nothing else. Enabled
- *    companies only, ordered `sortOrder DESC, id ASC` — identical to
- *    `order.fulfil.repo.ts::listExpressCompanies`, which this replaces.
+ *    `GET /api/v1/staff/express-companies`: the `expressCompanyList` body, and
+ *    the `order:order:read` permission on the admin one, because the console's
+ *    发货 form and the mobile staff console are its callers. Enabled companies
+ *    only, ordered `sortOrder DESC, id ASC`.
  * 2. **The management screen** — `/admin-api/shipping/express-companies`, paged,
  *    including disabled rows, with its own `shipping:express:*` atoms.
  *
- * The legacy `express/sync_express` bulk import from 一号通 has no successor:
- * 一号通 is out of scope shop-wide, and the 1101 seeded rows already cover
+ * There is no bulk import from a provider: the 1101 seeded rows already cover
  * every carrier the tracking provider knows.
  */
 
 const companyParams = z.object({ id });
 
 // ---------------------------------------------------------------------------
-// the picker — paths frozen by CR-1-b2
+// the picker — paths the 发货 form and the staff console call
 // ---------------------------------------------------------------------------
 
 export const expressCompanyPicker = defineRoute({
@@ -45,8 +42,8 @@ export const expressCompanyPicker = defineRoute({
   path: '/admin-api/express-companies',
   auth: 'admin',
   // Deliberately an `order:` atom, not `shipping:express:read`. The caller is
-  // B2's 发货 form; an operator who may ship must not need a second grant to
-  // see the company list. See `docs/rewrite/status/f2.md`.
+  // order console's 发货 form; an operator who may ship must not need a second
+  // grant to see the company list.
   permission: 'order:order:read',
   summary: '物流公司列表',
   tags: ['shipping'],

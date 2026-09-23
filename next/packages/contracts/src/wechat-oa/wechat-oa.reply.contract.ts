@@ -14,10 +14,9 @@ import {
  * Auto-replies, `/admin-api/wechat-auto-replies`.
  *
  * Three triggers share one table and one screen, because they are one decision
- * — "what does the account say back" — and the legacy split into three
- * controllers (`wechat/reply`, `wechat/code_reply/:id`, `wechat/keyword`) meant
- * three half-identical forms and a subscribe reply that could not be previewed
- * next to the keyword ones.
+ * — "what does the account say back". Three separate screens would mean three
+ * half-identical forms and a subscribe reply that could not be previewed next
+ * to the keyword ones.
  *
  * `subscribe` and `default` are singletons, enforced by a partial unique index
  * rather than by a read-then-insert; a second one is

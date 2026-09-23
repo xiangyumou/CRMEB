@@ -1,7 +1,8 @@
 /**
  * Shared Vitest presets.
  *
- * Every package gets two projects, matching the convention in CONVENTIONS.md:
+ * Every package gets two projects, matching the convention in
+ * `docs/conventions.md`:
  *
  *   unit  `src/**\/*.test.ts`      — no PostgreSQL, no Redis, no Docker
  *   int   `src/**\/*.int.test.ts`  — real PG 17 + Redis 7 via the @shop/testing harness
@@ -23,8 +24,8 @@ const ALWAYS_EXCLUDE = ['**/node_modules/**', '**/dist/**', '**/.next/**'];
  * @property {string[]} [unitInclude]
  * @property {string[]} [intInclude]
  * @property {string[]} [setupFiles]
- * @property {unknown[]} [extraProjects] Extra vitest projects (used to pull
- *   `apps/web/src/server` in until P0-b gives that app its own package.json).
+ * @property {unknown[]} [extraProjects] Extra vitest projects appended after
+ *   `unit` and `int`.
  */
 
 /** @param {ShopVitestOptions} options */

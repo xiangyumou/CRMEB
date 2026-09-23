@@ -40,7 +40,7 @@ import { conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
  * ESLint rule enforces it). It *reads* `products`, `product_skus`, `orders` and
  * `users` for the display joins the admin and storefront lists need, and
  * *writes* nothing outside the four `groupbuy_*` tables: the SKU stock ledger
- * is stream A's `StockPort` and the order is B1's.
+ * is the catalog's `StockPort` and the order belongs to the order domain.
  *
  * The statements worth reading are `takeSeat`, `freeSeat` and
  * `reserveActivityStock`. Each carries every precondition in its `WHERE`, so
@@ -215,14 +215,12 @@ export async function countFormingGroupsByActivity(
 }
 
 /**
- * The 人气条 over every live activity (CR-1-h2).
+ * The 人气条 over every live activity.
  *
  * "In a team" means a member who has not left (`joined`), in a group that is
  * still `forming` or already `succeeded`. A `failed` or `cancelled` team is not
  * somebody currently taking part, and a `refunded` member left — counting
- * either is how a 人气条 ends up larger than the shop's whole customer base,
- * which is what legacy's `getCombinationIndex` did (it counted rows in
- * `store_pink`, refunds and all).
+ * either is how a 人气条 ends up larger than the shop's whole customer base.
  *
  * Distinct **users**, not rows: one person who joined three teams is one
  * participant.
@@ -446,11 +444,10 @@ export async function skuIdsOfProduct(db: DbOrTx, productId: number): Promise<nu
  * Takes `quantity` off the activity SKU row and then the activity row, each in
  * one statement carrying `stock >= quantity` and the quota in its `WHERE`.
  *
- * Legacy checked the quota with a separate `SELECT` and then decremented
- * (`StoreCombinationServices::decCombinationStock`), which oversells under
- * load. Here the quota is part of the same `UPDATE`.
+ * The quota is part of the same `UPDATE`: checking it with a separate `SELECT`
+ * and then decrementing oversells under load.
  *
- * `false` means one of the two changed nothing. The caller is inside B1's order
+ * `false` means one of the two changed nothing. The caller is inside the order
  * transaction and throws, which rolls the other one back — a half-applied
  * reservation cannot survive.
  */
@@ -1135,10 +1132,11 @@ export async function findUserIdentity(
 }
 
 /**
- * What the order's goods actually charge, after every adjustment B1 applied.
+ * What the order's goods actually charge, after every adjustment the order
+ * domain applied.
  *
- * The other half of the CR-1-d guard. `order_items.total_amount` is the line
- * subtotal minus its share of the discounts, and it is the only place the
+ * The other half of the activity-price guard. `order_items.total_amount` is the
+ * line subtotal minus its share of the discounts, and it is the only place the
  * 拼团价 can be read back from once it has been through the pricing pipeline —
  * the contributor books a *discount*, it does not rewrite the unit price.
  */

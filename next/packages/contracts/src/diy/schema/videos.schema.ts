@@ -5,7 +5,6 @@ import { defineDiyComponent, diyTabs, diyUpload } from './primitives';
 /**
  * `videos` — 视频.
  *
- * Fields derived from `template/admin/src/components/mobilePage/home_video.vue`.
  * Loose by construction: unknown keys round-trip untouched.
  */
 export const videosSchema = defineDiyComponent('videos', {

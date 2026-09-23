@@ -18,18 +18,16 @@ import {
  *
  * The buyer asks, an operator issues the invoice **outside** the system and
  * records the number, or rejects with a reason. There is no e-invoice provider
- * and no red-ink reversal: legacy's `autoInvoice` / `autoInvoiceRed` timers
- * drove 一号通's invoicing service, which is on the not-ported list, so the
- * status set is the four values `order_invoices_status` actually has.
+ * and no red-ink reversal, so the status set is the four values
+ * `order_invoices_status` actually has.
  *
  * `order_invoices_open_uq` allows exactly one `requested`-or-`issued` row per
  * order, which is why `invoiceRequest` can be a plain insert and learn "already
  * asked" from the unique violation rather than from a prior SELECT.
  *
- * Legacy had a separate 发票抬头 address book (`UserInvoiceController`, ten
- * routes in `v2.php`). It is not ported: the header fields are frozen onto the
- * request at the moment it is made, which is the only thing that mattered, and
- * the storefront can remember the last one locally.
+ * There is no separate 发票抬头 address book: the header fields are frozen onto
+ * the request at the moment it is made, which is the only thing that matters,
+ * and the storefront can remember the last one locally.
  */
 
 export const invoiceRequest = defineRoute({

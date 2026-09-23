@@ -33,20 +33,20 @@ import type { PaymentContext } from './payment.repo';
  * Three outcomes exist for every gateway interaction — *it happened*, *it
  * definitely did not happen*, and *we do not know* — and the third is a first
  * class state (`payment_attempts.status = 'unknown'`) rather than a branch that
- * picks one of the other two. The legacy driver had no name for not-knowing, so
- * a timeout during close released stock and a coupon for an order that WeChat
- * then reported paid. Everything below is arranged so that path cannot exist:
- * only `markAttemptClosed`, which requires a confirmation timestamp, ever tells
- * the rest of the system that money can no longer arrive.
+ * picks one of the other two. Without a name for not-knowing, a timeout during
+ * close would release stock and a coupon for an order that WeChat then reports
+ * paid. Everything below is arranged so that path cannot exist: only
+ * `markAttemptClosed`, which requires a confirmation timestamp, ever tells the
+ * rest of the system that money can no longer arrive.
  *
  * ## Transaction shape
  *
- * A gateway call never happens inside a transaction (CONVENTIONS). So each
- * operation is: a short transaction that claims a row, a network call with the
- * row already claimed, and a second short transaction that records the answer.
- * If the process dies between them the row stays in its claimed state and the
- * reconciliation job picks it up, because "claimed" states are exactly the ones
- * `listStaleAttempts` looks for.
+ * A gateway call never happens inside a transaction (`docs/conventions.md`). So
+ * each operation is: a short transaction that claims a row, a network call with
+ * the row already claimed, and a second short transaction that records the
+ * answer. If the process dies between them the row stays in its claimed state
+ * and the reconciliation job picks it up, because "claimed" states are exactly
+ * the ones `listStaleAttempts` looks for.
  */
 
 // ---------------------------------------------------------------------------
@@ -124,10 +124,10 @@ export interface StartPaymentInput extends StartPaymentBody {
 /**
  * `POST /api/v1/orders/:id/payments` — the route-facing entry point.
  *
- * `:id` is the surrogate id **or** the 24-digit order number (CR-1-h): the
- * cashier is reached from a deep link as often as from the order list. The
- * reference is resolved against the caller's own orders, so an unknown number
- * and a stranger's number are the same `PAYMENT_ORDER_NOT_FOUND`.
+ * `:id` is the surrogate id **or** the 24-digit order number: the cashier is
+ * reached from a deep link as often as from the order list. The reference is
+ * resolved against the caller's own orders, so an unknown number and a
+ * stranger's number are the same `PAYMENT_ORDER_NOT_FOUND`.
  */
 export async function start(
   ctx: Ctx,
@@ -619,11 +619,11 @@ async function exception(
       payload: { exceptionId: toId(row.id), reason: input.reason },
     });
 
-    // CR-2-e2. Inside the same `if (row)`, so a replayed callback that found
-    // the row already there wakes nobody a second time — and inside the
-    // settlement transaction, so an exception that rolls back is not announced
-    // at all. The automatic refund above does not make this redundant: it can
-    // fail, and somebody has to know money arrived that the shop cannot book.
+    // Inside the same `if (row)`, so a replayed callback that found the row
+    // already there wakes nobody a second time — and inside the settlement
+    // transaction, so an exception that rolls back is not announced at all. The
+    // automatic refund above does not make this redundant: it can fail, and
+    // somebody has to know money arrived that the shop cannot book.
     await notify(tx, ctx, {
       event: 'admin_payment_exception',
       subject: { scope: 'payment_exception', id: row.id },
@@ -680,18 +680,18 @@ export function ackOrThrow(result: WebhookResult): WebhookResult['body'] {
  * and a body we will never accept answers 401. Success is acknowledged only
  * after the state change has committed.
  *
- * Two checks sit between the signature and the money (K2):
+ * Two checks sit between the signature and the money:
  *
- *  - **the event type, before the callback row** (CR-3-k2). Both webhooks share
+ *  - **the event type, before the callback row.** Both webhooks share
  *    `payment_callbacks` and its `UNIQUE (mch_id, provider_notify_id)`, so a
  *    refund event recorded here would burn its notify id and the genuine
  *    delivery to the refund webhook would read as a replay. Anything that is
  *    not `TRANSACTION.*` is acknowledged — a misroute will never parse better —
  *    and leaves no row.
- *  - **the merchant, before settlement** (CR-4-k2). `mchid` must be present and
- *    be the merchant the attempt was created under (the configured one when no
- *    attempt matches). A body naming another merchant is recorded under the
- *    merchant it named, raised to an operator, and neither booked nor refunded.
+ *  - **the merchant, before settlement.** `mchid` must be present and be the
+ *    merchant the attempt was created under (the configured one when no attempt
+ *    matches). A body naming another merchant is recorded under the merchant it
+ *    named, raised to an operator, and neither booked nor refunded.
  */
 export async function handleTransactionNotify(
   ctx: Ctx,
@@ -782,10 +782,10 @@ export async function handleTransactionNotify(
       const expectedMchId = attempt?.mchId ?? runtime.mchId;
       if (namedMchId !== expectedMchId) {
         // Correctly signed, but not for the merchant this money should have
-        // reached (PAYC-005, CR-4-k2): a service-provider setup, a platform key
-        // or APIv3 key shared across merchant ids. It is not ours to book, and
-        // not ours to refund either, so there is no exception row — a human
-        // looks at the callback and the merchant platform.
+        // reached (PAYC-005): a service-provider setup, a platform key or APIv3
+        // key shared across merchant ids. It is not ours to book, and not ours
+        // to refund either, so there is no exception row — a human looks at the
+        // callback and the merchant platform.
         ctx.logger.error(
           { mchId: namedMchId, expected: expectedMchId, outTradeNo, transactionId },
           'payment notify merchant mismatch; not settled',

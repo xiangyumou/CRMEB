@@ -68,7 +68,7 @@ export async function findOrderForUser(
  * Cancellation needs it because it spans several rows that must agree — the
  * order, its coupon, its stock — and because `PaymentPort.ensureNoOpenAttempts`
  * is asked *while holding it*, so a payment cannot start underneath a
- * cancellation (risk matrix §4, "shared order lock").
+ * cancellation.
  */
 export async function lockOrder(tx: Tx, id: number): Promise<OrderRow | null> {
   const rows = await tx.select().from(orders).where(eq(orders.id, id)).limit(1).for('update');
@@ -225,7 +225,7 @@ export async function countByStatus(
 
 /**
  * 累计订单 / 累计消费 for a page of customers — the order domain's answer to
- * `UserOrderStatsPort` (CR-2-e4).
+ * `UserOrderStatsPort`.
  *
  * **The counting rule, once.** A qualifying order is a *paid order* as
  * `stats/DEFINITIONS.md` §2 defines one — `paid_at is not null and deleted_at
@@ -241,9 +241,9 @@ export async function countByStatus(
  * `revenue`). Deliberately not `paid_amount - refunded_amount`: a partial
  * refund is money that moved on its own day and the console reports it as its
  * own figure, so netting it here would make the 店员's number a third
- * definition of 消费总额 — the exact drift CR-2-e4 exists to prevent. A *fully*
- * refunded order contributes nothing because it is not in the population at
- * all, which is the case an operator would actually notice.
+ * definition of 消费总额 — the exact drift the port exists to prevent. A
+ * *fully* refunded order contributes nothing because it is not in the
+ * population at all, which is the case an operator would actually notice.
  *
  * One grouped query for the whole page (the list route asks about twenty), so
  * a customer list stays one query rather than twenty-one. A user with no
@@ -323,10 +323,10 @@ export async function listExpiredUnpaid(
  * one reason: the dependency between the two domains has to point one way, and
  * it points **cart -> order** (the cart reads live catalogue data through
  * `order/catalog.port.ts`, and 再次购买 reads an order). Letting checkout call
- * back into `cart/index.ts` would close the loop and make the two module
- * graphs circular. B1 owns both domains, a `*.repo.ts` is the one kind of file
- * allowed to import `@shop/db/schema/*`, and these are two statements — so the
- * seam costs less than the cycle would. Recorded in `docs/rewrite/status/b1.md`.
+ * back into `cart/index.ts` would close the loop and make the two module graphs
+ * circular. A `*.repo.ts` is the one kind of file allowed to import
+ * `@shop/db/schema/*`, and these are two statements — so the seam costs less
+ * than the cycle would.
  */
 export interface CartLine {
   cartItemId: number;
@@ -375,7 +375,7 @@ export async function deleteCartLines(
 }
 
 // ---------------------------------------------------------------------------
-// addresses (stream E1's table; read-only here — see docs/rewrite/status/b1.md)
+// addresses (the user domain's table; read-only here)
 // ---------------------------------------------------------------------------
 
 export async function findAddress(
@@ -454,8 +454,8 @@ export async function transitionStatus(
 }
 
 /**
- * 删除订单, which has never deleted anything: the buyer's own list stops showing
- * the order and the shop's copy is untouched (CR-4-h §6).
+ * 删除订单, which has never deleted anything: the buyer's own list stops
+ * showing the order and the shop's copy is untouched.
  *
  * Everything that decides the answer is in the WHERE — the owner, the statuses
  * a finished order may be in, and `hidden_by_user_at IS NULL`. Two taps of the
@@ -507,11 +507,8 @@ export async function countStatusLogs(
 /**
  * "Second submit returns the first order", built on a UNIQUE index.
  *
- * Legacy guarded order creation with `CacheService::lock('orderCreate…')`: a
- * Redis key, never tested, gone after a restart, and with no relationship to
- * the transaction it was supposed to protect (risk matrix §2). The fix in the
- * brief is "an idempotency key with a UNIQUE column", and since CR-1-b1 landed
- * that column exists:
+ * A lock key in Redis would be gone after a restart and have no relationship to
+ * the transaction it is supposed to protect. A UNIQUE column does not:
  *
  *     idempotency_key varchar(64)
  *     UNIQUE (user_id, idempotency_key) WHERE idempotency_key IS NOT NULL

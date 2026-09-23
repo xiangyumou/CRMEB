@@ -4,18 +4,17 @@ import { defineConfigGroup } from '../kernel/config-registry';
 /**
  * `notification` — how the shop's own notifications behave.
  *
- * The credentials are *not* here: the OA and mini-program apps live in F1's
- * `wechat-oa` / `wechat-mini` groups and in C's `wechat` group, and the SMS
- * provider in F1's `sms`. Group names are global, so this stream declares one
- * group and reads the other four.
+ * The credentials are *not* here: the OA and mini-program apps live in the
+ * `wechat-oa` / `wechat-mini` groups and in the `wechat` group, and the SMS
+ * provider in `sms`. Group names are global, so this domain declares one group
+ * and reads the other four.
  *
- * The shop's public origin is **not** here either, any more. It was, as a
- * local adapter for CR-1-e2 (`siteBaseUrl` / `jsApiExtraHosts`); the CR was
- * accepted and the fields moved to F1's `site` group as `publicOrigin` /
- * `extraOrigins`, read through `publicOrigin(ctx)` and `isTrustedHost(ctx, …)`
- * from `@shop/core/system`. 站点公开地址 under 通知设置 was not where an
- * operator looked for it, and the JS-SDK signer had to import this domain to
- * ask a question that has nothing to do with notifications.
+ * The shop's public origin is **not** here either: it is the `site` group's
+ * `publicOrigin` / `extraOrigins`, read through `publicOrigin(ctx)` and
+ * `isTrustedHost(ctx, …)` from `@shop/core/system`. 站点公开地址 under 通知设置
+ * is not where an operator looks for it, and the JS-SDK signer would have to
+ * import this domain to ask a question that has nothing to do with
+ * notifications.
  */
 export const notificationConfig = defineConfigGroup({
   group: 'notification',

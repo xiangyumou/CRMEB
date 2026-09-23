@@ -87,7 +87,7 @@ describe('the transition table', () => {
     expect(canTransition('shipped', 'cancelled')).toBe(false);
   });
 
-  it('is frozen, so no stream can widen it at runtime', () => {
+  it('is frozen, so no domain can widen it at runtime', () => {
     expect(Object.isFrozen(ORDER_TRANSITIONS)).toBe(true);
   });
 });
@@ -148,7 +148,7 @@ describe('lifecycle hook registries', () => {
 });
 
 describe('port registration', () => {
-  it('throws a clear DomainError until the owning stream registers', () => {
+  it('throws a clear DomainError until the owning domain registers', () => {
     for (const get of [getStockPort, getPaymentPort, getFreightPort, getOrderStateMachine]) {
       expect(get).toThrow(DomainError);
       expect(get).toThrow('尚未注册');
