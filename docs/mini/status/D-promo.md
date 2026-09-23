@@ -4,8 +4,9 @@ Branch `storefront/mini-D-promo`, worktree `/home/xiangyu/Projects/CRMEB-mini-wt
 Brief: 拼团 (list, activity, team, 我的拼团), 预售 (list, detail), 优惠券 (领券中心, 我的优惠券),
 share handlers, 小程序码 + scene decode, canvas-2D poster, e2e journeys.
 
-B (`storefront/mini-B-shopping`: SkuSheet, checkout `kindMeta`, poster stub) is **not merged**
-into `storefront/mini` yet. Until it is, the activity pages hand checkout what S4's draft takes.
+`storefront/mini` (with C and A2) merged in. B (`storefront/mini-B-shopping`: checkout
+`kindMeta`, poster stub) is **not merged** yet: until it is, the activity pages store B's draft
+shape through a cast.
 
 ## Done
 
@@ -28,15 +29,15 @@ into `storefront/mini` yet. Until it is, the activity pages hand checkout what S
 ## In progress
 
 - Pages done with tests: 领券中心, 我的优惠券, 我的拼团, 拼团 list, 拼团商品 (activity), 拼团进度
-  (team page). Next: 预售 list and detail.
+  (team page), 预售 list, 预售商品. Every promo page is built.
 - Activity checkout: `features/promo/checkout.ts` stores B's draft shape (`source: 'buy-now'`,
   `item`, `kind`, `kindMeta`) through a cast until B's `CheckoutDraft` is merged (TODO(merge B)).
 
 ## Next
 
-1. Pages: presale, presale-detail.
-2. After B merges: SkuSheet + checkout `kindMeta`, replace B's poster stub.
-3. e2e specs-mini, pages.md, screenshots, checklist.
+1. After B merges: `CheckoutDraft` with `kind`/`kindMeta` (drop the cast), replace B's poster
+   stub on 商品详情.
+2. e2e specs-mini, pages.md, screenshots, checklist.
 
 ## Decisions
 
@@ -48,6 +49,7 @@ into `storefront/mini` yet. Until it is, the activity pages hand checkout what S
   the team page, where the SKU is picked.
 - 拼团进度 shows members as taken seats (团长 / 已参团), never by nickname or avatar: the page is
   shared outside the shop. Invite = WeChat share or the poster (badge 「N 人团 · 还差 N 人成团」).
+- 预售 pages say 「全款预订」 and 「无需另付尾款」: the backend sells presale in full only.
 - The 拼团 list shows the participant count only; `groupbuy.summary.avatars` are not drawn (a
   shopper's face beside this shop's products does not belong on a public page).
 
