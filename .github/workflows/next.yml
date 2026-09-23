@@ -1,36 +1,37 @@
 name: next
 
-# The merge gate for the rewrite (PLAN §4 "合并门"): typecheck, lint with the
-# import boundaries, unit tests, integration tests on a real PostgreSQL 17 and
-# Redis 7, the contract example check, and formatting.
+# The merge gate: typecheck, lint with the import boundaries, the guards, unit
+# tests, integration tests on a real PostgreSQL 17 and Redis 7, the contract
+# example check, formatting, both Playwright suites and the build.
 #
 # It also builds and publishes the three container images and rehearses a
-# deploy against them (CR-3-j2). `deploy/next/**` is in the paths filter for
-# that reason: the compose file and the upgrade scripts are part of what this
+# deploy against them. The deploy directory is in the paths filter for that
+# reason: the compose file and the upgrade scripts are part of what this
 # workflow gates.
 #
-# Runs for changes under `next/` and `deploy/next/` only — the legacy PHP tree
-# has its own workflows and must not be disturbed. Nothing here touches the
-# production host: the cutover is `deploy/next/cutover.md`, run by a person.
+# Nothing here touches the production host. A release is deployed by a person,
+# with the command the images job prints (deploy/README.md).
 
 on:
   push:
-    branches: [master, "rewrite/**"]
+    branches: [master, 'rewrite/**']
     paths:
-      - "next/**"
-      - "deploy/next/**"
-      - "template/uni-app/**"
-      - ".github/workflows/next.yml"
+      - 'next/**'
+      - 'deploy/next/**'
+      - 'template/uni-app/**'
+      - '.github/workflows/next.yml'
+      - '.github/scripts/**'
   pull_request:
     paths:
-      - "next/**"
-      - "deploy/next/**"
-      - "template/uni-app/**"
-      - ".github/workflows/next.yml"
+      - 'next/**'
+      - 'deploy/next/**'
+      - 'template/uni-app/**'
+      - '.github/workflows/next.yml'
+      - '.github/scripts/**'
   # The concurrency soak below is a flake hunt, not a gate, so it runs on a
-  # clock rather than on every push (CR-4-k §2).
+  # clock rather than on every push.
   schedule:
-    - cron: "0 18 * * *" # 02:00 CST, after the day's merges
+    - cron: '0 18 * * *' # 02:00 CST, after the day's merges
   workflow_dispatch:
 
 concurrency:
@@ -43,10 +44,10 @@ defaults:
 
 env:
   # Response validation is a merge-gate check, not a production cost.
-  VALIDATE_RESPONSES: "1"
+  VALIDATE_RESPONSES: '1'
   # Keep turbo quiet and deterministic in CI.
-  TURBO_TELEMETRY_DISABLED: "1"
-  DO_NOT_TRACK: "1"
+  TURBO_TELEMETRY_DISABLED: '1'
+  DO_NOT_TRACK: '1'
 
 jobs:
   static:
@@ -86,11 +87,10 @@ jobs:
       - name: Lint
         run: corepack pnpm lint
 
-      # `next/guards` (CR-4-k §1): the checks that no single stream can make —
-      # a retired legacy route with no replacement, a secret that reached a
-      # response, a menu entry pointing at nothing. It exits non-zero on `fail`
-      # and zero on `pending`, so it gates today while streams are still in
-      # flight, and starts failing on its own once the last one merges.
+      # The whole-tree checks no single package's tests can make: a client call
+      # with no route behind it, a secret that reached a response, a menu entry
+      # pointing at nothing, a migration that is not additive, a business rule
+      # with no test. Exits non-zero on any failure.
       - name: Guards
         run: corepack pnpm guards
 
@@ -112,14 +112,6 @@ jobs:
 
       - name: Contract examples
         run: corepack pnpm --filter @shop/contracts check:examples
-
-      # Migrations stay additive, or the statement that is not says so in
-      # writing: `deploy/next/upgrade.sh` rolls a failed release back to the
-      # previous images unattended, and that is only safe while the previous
-      # image tolerates the new schema (OPS-007).
-      - name: Migrations stay additive
-        working-directory: .
-        run: node tests/static/next-migration-guard.cjs
 
       - name: Prettier
         run: corepack pnpm format:check
@@ -165,11 +157,11 @@ jobs:
       - name: Integration tests
         run: corepack pnpm test:int
 
-  # CR-4-k §3. No `pnpm gen` and no `pnpm build` step here on purpose: the
-  # suite's `webServer` is `e2e/admin/scripts/serve.ts`, which generates,
-  # starts the containers, seeds and builds before it serves. Playwright
-  # starts `webServer` before `globalSetup`, so a globalSetup that created the
-  # database would create it after the server had already failed to connect.
+  # No `pnpm build` step here on purpose: the suite's `webServer` is
+  # `e2e/admin/scripts/serve.ts`, which starts the containers, seeds and builds
+  # before it serves. Playwright starts `webServer` before `globalSetup`, so a
+  # globalSetup that created the database would create it after the server had
+  # already failed to connect.
   e2e-admin:
     name: admin e2e (playwright)
     runs-on: ubuntu-latest
@@ -265,9 +257,7 @@ jobs:
           docker pull redis:7-alpine
 
       # `CI` is set by Actions, so the config forbids `.only`, retries once,
-      # and never reuses a running server. Journeys blocked on another
-      # stream's open CR are `fixme` (skipped, listed with the CR id), not
-      # failures. See docs/rewrite/status/i.md.
+      # and never reuses a running server.
       - name: Storefront e2e
         run: corepack pnpm --filter @shop/e2e-storefront test
 
@@ -289,14 +279,14 @@ jobs:
           path: next/e2e/storefront/test-results
           retention-days: 14
 
-  # CR-4-k §2 (STAB-001). The races the concurrency suite covers — the last
+  # STAB-001. The races the concurrency suite covers — the last
   # unit of stock, two refund approvals, a callback meeting the reconciliation
   # sweep — are decided by the database, so one green run proves the statement
   # is right and fifty prove the *test* is right, catching the one that passes
   # because two transactions happened not to overlap.
   #
   # It never talks to a real WeChat, SMS or Aliyun endpoint and never runs
-  # against anything but a Testcontainers database (K-hardening.md §4).
+  # against anything but a Testcontainers database.
   concurrency-soak:
     name: concurrency soak (50 rounds)
     # Nightly and on demand — never on a pull request: this is a flake hunt,
@@ -339,7 +329,7 @@ jobs:
           for round in $(seq 1 50); do
             echo "::group::round $round"
             # vitest lives in @shop/core, and its file filters are substrings,
-            # not globs (CR-52-k2): these two match the STAB-001 set.
+            # not globs: these two match the STAB-001 set.
             if ! corepack pnpm --filter @shop/core exec vitest run --project int \
                  --sequence.seed="$round" --sequence.shuffle \
                  concurrency.int.test.ts order.sequence.int.test.ts \
@@ -366,7 +356,7 @@ jobs:
     # still guard, which is a question about the tree, not about the change.
     # Each of the ten protections is removed in a scratch copy of HEAD and its
     # named tests must fail; a survivor or a mutation string that no longer
-    # matches exits non-zero (CR-20-k2).
+    # matches exits non-zero.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -433,7 +423,7 @@ jobs:
         run: corepack pnpm build
 
   shell:
-    name: shellcheck (deploy/next)
+    name: shellcheck (deploy, CI scripts)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     defaults:
@@ -448,13 +438,32 @@ jobs:
       - name: shellcheck
         run: |
           shellcheck --source-path=SCRIPTDIR -x \
-            deploy/next/*.sh deploy/next/lib/*.sh deploy/next/rehearsal/*.sh
+            deploy/next/*.sh deploy/next/lib/*.sh deploy/next/rehearsal/*.sh \
+            .github/scripts/*.sh
+
+  # The publish rules the images job relies on — a conflicting candidate never
+  # overwrites a tag, an unanswerable registry is never read as "absent" —
+  # proved against a throwaway registry rather than trusted from reading bash.
+  publish-rules:
+    name: publish rules (local registry)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Prove the publish rules
+        run: .github/scripts/publish-release.test.sh
 
   images:
     name: images (web, worker, edge)
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    needs: [static, build]
+    needs: [static, build, publish-rules]
     # Publishing happens for the branches that can become a release. A pull
     # request builds in `rehearsal` below and pushes nothing.
     if: github.event_name == 'push'
@@ -491,7 +500,7 @@ jobs:
       # right for a stack that only serves /admin and the APIs and **wrong for a
       # release** — so a release builds the real H5 bundle, and a checkout where
       # that build fails says so loudly instead of shipping the placeholder
-      # quietly. Stream H proved the build runs headlessly (docs/rewrite/status/h.md).
+      # quietly.
       - uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -531,8 +540,8 @@ jobs:
           printf 'dist=%s\n' "$dist" >> "$GITHUB_OUTPUT"
           printf 'storefront=%s\n' "$storefront" >> "$GITHUB_OUTPUT"
 
-      # One architecture. The production host is a single amd64 box (PLAN §7),
-      # so a second one would double the build for an image nothing will run.
+      # One architecture. The production host is a single amd64 box, so a
+      # second one would double the build for an image nothing will run.
       #
       # `docker/build-push-action` rather than a bare `docker buildx build`:
       # `type=gha` needs the Actions cache token, which the action puts in the
@@ -570,10 +579,10 @@ jobs:
           cache-from: type=gha,scope=next-edge
           cache-to: type=gha,scope=next-edge,mode=max
 
-      # The publish rules live in scripts/publish-release.sh (proved against a
-      # real registry by tests/deployment/publish-release.sh), not inline here,
-      # so they are exercised rather than read. REL-006 is the guard that keeps
-      # it that way.
+      # The publish rules live in .github/scripts/publish-release.sh (proved
+      # against a real registry by the publish-rules job), not inline here, so
+      # they are exercised rather than read. REL-006 is the guard that keeps it
+      # that way.
       - name: Publish the commit-scoped tags
         id: publish
         run: |
@@ -584,7 +593,7 @@ jobs:
               worker) image="$WORKER_IMAGE" ;;
               edge) image="$EDGE_IMAGE" ;;
             esac
-            digest="$(bash scripts/publish-release.sh tags "$image" "$GITHUB_SHA" \
+            digest="$(bash .github/scripts/publish-release.sh tags "$image" "$GITHUB_SHA" \
               "$image:ci-$GITHUB_SHA-amd64" | tail -1)"
             test -n "$digest"
             printf '%s=%s@%s\n' "$role" "$image" "$digest" >> "$GITHUB_OUTPUT"
