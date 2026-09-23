@@ -5,13 +5,9 @@ import { defineConfigGroup } from '../kernel/config-registry';
  * 拼团设置.
  *
  * `virtualFillOnExpiry` is the shop's answer to "do we invent buyers when a
- * team does not fill". The stream brief asked for a per-activity switch; the
- * frozen `groupbuy_activities` has no column for it and legacy had none either
- * (`virtualCombination()` was reachable only from the admin button and from the
- * expiry timer, which called it unconditionally). Filed as **CR-2-d**; the
- * recommendation there is to leave it shop-wide, because a campaign-level
- * toggle would let anyone who can edit an activity fake teams without holding
- * the `groupbuy:group:complete` permission.
+ * team does not fill". It is shop-wide rather than per activity on purpose: a
+ * campaign-level toggle would let anyone who can edit an activity fake teams
+ * without holding the `groupbuy:group:complete` permission.
  *
  * The group declares the *read* atom, as every config group does; the settings
  * service derives the write gate from it (`writePermissionFor`), so seeing this
@@ -40,8 +36,8 @@ export const groupbuyConfig = defineConfigGroup({
       .default('/pages/activity/groupbuy/detail?groupId={groupId}'),
     /**
      * The 拼团频道 head images. Config rather than a table because there are
-     * two of them and legacy kept them in `sys_config` too; a DIY page that
-     * wants richer banners uses stream G's components instead.
+     * two of them; a DIY page that wants richer banners uses the DIY components
+     * instead.
      */
     banners: z
       .array(z.object({ imageUrl: z.string().max(512), link: z.string().max(255).nullable() }))

@@ -29,18 +29,16 @@ import {
  * Where the group-buy domain attaches to an order.
  *
  * There is no "join a group" endpoint. Joining *is* placing an order, so the
- * storefront calls B1's `POST /api/v1/orders` with `kind: 'groupbuy'` and
- * `kindMeta: { activityId, groupId? }`, and everything here hangs off the
- * frozen seams in `order/ports.ts`. A second checkout path would be a second
- * copy of stock, coupons, freight and idempotency — which is exactly what
- * legacy had, and why `StorePinkServices` and `StoreOrderServices` disagreed
- * about stock.
+ * storefront calls the order domain's `POST /api/v1/orders` with
+ * `kind: 'groupbuy'` and `kindMeta: { activityId, groupId? }`, and everything
+ * here hangs off the frozen seams in `order/ports.ts`. A second checkout path
+ * would be a second copy of stock, coupons, freight and idempotency, and two
+ * copies drift apart on stock.
  *
  * The one rule that decides the whole design: **a seat is taken when the order
  * is paid, not when it is placed.** An unpaid order holds activity stock (so a
  * campaign cannot be oversold by people who never pay) but holds no seat (so a
- * team is never blocked by somebody who wandered off). Legacy counted rows in
- * `eb_store_pink` and got both wrong.
+ * team is never blocked by somebody who wandered off).
  */
 
 const KIND = 'groupbuy';
@@ -90,9 +88,9 @@ export const groupbuyKindHandler: OrderKindHandler = {
    * price even on a correctly priced group-buy order and comparing the two
    * directly would refuse every order.
    *
-   * What can be checked here is the adjustment itself: CR-1-d2 puts the applied
-   * adjustments on the draft, so this asks whether this domain's contributor
-   * took off exactly the gap it owes. Cheap, and it fails before a row exists.
+   * What can be checked here is the adjustment itself: the draft carries the
+   * applied adjustments, so this asks whether this domain's contributor took
+   * off exactly the gap it owes. Cheap, and it fails before a row exists.
    */
   async beforeCreate(ctx: Ctx, tx: Tx, draft: PricingDraft): Promise<Record<string, unknown>> {
     const activityId = readSelection(draft, 'activityId');
@@ -146,17 +144,18 @@ export const groupbuyKindHandler: OrderKindHandler = {
   },
 
   /**
-   * Runs inside B1's order transaction, right beside stream A's SKU
+   * Runs inside the order domain's transaction, right beside the catalog's SKU
    * reservation.
    *
    * Two things happen and neither is a seat: the activity's own stock ledger
    * comes down, and a membership row is written as a statement of *intent*.
    * The seat itself waits for the money.
    *
-   * It also carries the fail-closed half of **CR-1-d**: the order's lines exist
-   * by now, so what they charge can be compared with what the activity says
-   * they cost. Throwing rolls back B1's whole transaction — the order, its
-   * lines, the stock reservation — which is the point.
+   * It also carries the fail-closed half of the activity-price guard: the
+   * order's lines exist by now, so what they charge can be compared with what
+   * the activity says they cost. Throwing rolls back the whole order
+   * transaction — the order, its lines, the stock reservation — which is the
+   * point.
    */
   async afterCreate(ctx: Ctx, tx: Tx, orderId: number, rawMeta: Record<string, unknown>) {
     const meta = readMeta(rawMeta);
@@ -168,12 +167,12 @@ export const groupbuyKindHandler: OrderKindHandler = {
       activityId: meta.activityId,
     });
 
-    // CR-2-r1 — lock order: the group row first, the activity SKU row second,
-    // as `handleRefunded` and `settleDeparture` take them. Without this the
-    // join took the SKU row here and the group row implicitly later, through
+    // Lock order: the group row first, the activity SKU row second, as
+    // `handleRefunded` and `settleDeparture` take them. Otherwise the join
+    // would take the SKU row here and the group row implicitly later, through
     // `groupbuy_members.group_id`'s foreign key (`FOR KEY SHARE`), and a
-    // leader's refund on the same team — group first, SKU second — deadlocked
-    // with it.
+    // leader's refund on the same team — group first, SKU second — would
+    // deadlock with it.
     //
     // Under the lock the team is re-read: `beforeCreate` checked it without
     // one, and it may have failed, been cancelled or filled since. The lock
@@ -215,9 +214,9 @@ export const groupbuyKindHandler: OrderKindHandler = {
       role = 'leader';
 
       // The team's own clock. An effect rather than a delayed queue job,
-      // because this runs inside B1's order transaction and a queue is not
-      // transactional: an enqueue here could be delivered before — or without
-      // — the group row it names. `groupbuy.sweepExpiredGroups` is the backstop.
+      // because this runs inside the order transaction and a queue is not
+      // transactional: an enqueue here could be delivered before — or without —
+      // the group row it names. `groupbuy.sweepExpiredGroups` is the backstop.
       await recordEffect(tx, ctx, {
         scope: 'groupbuy',
         scopeId: String(groupId),
@@ -239,9 +238,9 @@ export const groupbuyKindHandler: OrderKindHandler = {
         quantity: meta.quantity,
       });
     } catch (error) {
-      // `groupbuy_members_group_user_uq` is the database's version of legacy's
-      // `isPinkBe()` read-then-write check. Two simultaneous joins by the same
-      // shopper both reach here; one of them gets a 23505 and a 409.
+      // `groupbuy_members_group_user_uq` is the "already in this team" check,
+      // made by the database so it cannot race. Two simultaneous joins by the
+      // same shopper both reach here; one of them gets a 23505 and a 409.
       if (repo.isUniqueViolation(error)) throw new DomainError('GROUPBUY_ALREADY_IN_GROUP');
       throw error;
     }
@@ -258,9 +257,9 @@ export const groupbuyKindHandler: OrderKindHandler = {
  * Priority 50 — before coupons (100), because a coupon's 满减 threshold should
  * be judged against what the shopper actually pays.
  *
- * It fires on `kind === 'groupbuy'` alone, which B1 puts into `selections`
- * alongside every `kindMeta` key (CR-1-d). An ordinary order naming the same
- * SKU keeps the catalogue price, and `assertActivityPriceApplied` in
+ * It fires on `kind === 'groupbuy'` alone, which the order domain puts into
+ * `selections` alongside every `kindMeta` key. An ordinary order naming the
+ * same SKU keeps the catalogue price, and `assertActivityPriceApplied` in
  * `afterCreate` refuses any group-buy order this did not reach.
  */
 export const groupbuyPricingContributor: PricingContributor = {
@@ -327,10 +326,9 @@ function isOpenNow(ctx: Ctx, activity: repo.ActivityRow): boolean {
  * Losing that statement is not an error: it means the team filled or died while
  * this payment was in flight. The money is already ours, so the order is not
  * rolled back; the membership is marked refunded, the activity stock goes back,
- * and a `groupbuy.refund` effect asks for the money back after commit. Legacy
- * had no answer here at all — `createPink` counted rows before inserting and
- * two simultaneous last joins simply both succeeded, producing a four-person
- * three-person team.
+ * and a `groupbuy.refund` effect asks for the money back after commit. Counting
+ * rows before inserting instead would let two simultaneous last joins both
+ * succeed, producing a four-person three-person team.
  */
 async function handlePaid(
   tx: Tx,
@@ -353,8 +351,8 @@ async function handlePaid(
     return;
   }
 
-  // The reservation becomes a sale on the activity's ledger, mirroring what
-  // stream A's `StockPort.commit` just did on the SKU's. It can still be
+  // The reservation becomes a sale on the activity's ledger, mirroring what the
+  // catalog's `StockPort.commit` just did on the SKU's. It can still be
   // refused: `total_quota` is a ceiling on sales, and sales are counted here.
   const sold = await commitOrderLines(tx, event.orderId);
   if (!sold) {
@@ -610,12 +608,10 @@ async function commitOrderLines(tx: Tx, orderId: number): Promise<boolean> {
 /**
  * Asks for a refund the shopper never requested.
  *
- * Recorded as an effect rather than called directly, because the refund domain
- * says in so many words that there is deliberately no "create a refund on
- * behalf of a user" export and that a failed group buy "is a future caller"
- * (**CR-3-d**). `UNIQUE (scope, scope_id, event_type)` makes it exactly-once
- * however many sweeps run, and with no `AutoRefundPort` registered the handler
- * throws, which parks the row in stream C's 待处理任务 console for a human.
+ * Recorded as an effect rather than called directly, so the gateway call
+ * happens after commit. `UNIQUE (scope, scope_id, event_type)` makes it
+ * exactly-once however many sweeps run, and a handler that keeps failing parks
+ * the row in the payment domain's 待处理任务 console for a human.
  */
 export async function requestAutoRefund(
   tx: Tx,

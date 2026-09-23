@@ -7,16 +7,13 @@ import { settleGroup } from './groupbuy.jobs';
 /**
  * What the group-buy domain does *after* the transaction commits.
  *
- * CONVENTIONS: "Anything that calls a third party happens after commit, via the
- * effects ledger — never inside the transaction." Legacy ran the 拼团 success
- * notifications inside the pink transaction unless the caller remembered to
- * pass `deferEffects` (`StorePinkServices::pinkComplete` →
- * `executeDeferredEffect`), which meant a WeChat timeout could roll back a team
- * that had genuinely completed. Here there is no flag: every notification is an
- * effect, always.
+ * Anything that calls a third party happens after commit, via the effects
+ * ledger — never inside the transaction. A notification sent inside it would
+ * let a WeChat timeout roll back a team that had genuinely completed, so there
+ * is no flag to opt in: every notification is an effect, always.
  *
- * Four event types, recorded in `groupbuy.order.ts` and `groupbuy.jobs.ts` — and
- * `groupbuy.settle` also by 立即成团 (`groupbuy.service.ts`, CR-3-h4):
+ * Four event types, recorded in `groupbuy.order.ts` and `groupbuy.jobs.ts` —
+ * and `groupbuy.settle` also by 立即成团 (`groupbuy.service.ts`):
  *
  * | scope      | event_type         | when                                        |
  * | ---------- | ------------------ | ------------------------------------------- |
@@ -34,18 +31,16 @@ import { settleGroup } from './groupbuy.jobs';
  */
 
 // ---------------------------------------------------------------------------
-// CR-3-d: the system-initiated refund
+// the system-initiated refund
 // ---------------------------------------------------------------------------
 
 /**
  * How a failed team gives the money back.
  *
- * CR-3-d was accepted and `refund/index.ts` now exports
- * `refundSystemInitiated`, so this is no longer a stand-in for a missing
- * export — it is an ordinary seam. It stays because a unit test that wants to
- * watch the effect handler should not have to stand up a paid order, a payment
- * attempt and a refundable line; `registerAutoRefundPort` lets it substitute a
- * spy, and the default is the real thing.
+ * The default is `refundSystemInitiated` from `refund/index.ts`. The port
+ * exists because a unit test that wants to watch the effect handler should not
+ * have to stand up a paid order, a payment attempt and a refundable line;
+ * `registerAutoRefundPort` lets it substitute a spy.
  *
  * What it is *not* is an extension point: the only registration outside a test
  * is the default below, and anything that opens a `refunds` row still goes
@@ -129,9 +124,9 @@ async function handleRefundEffect(ctx: Ctx, effect: Effect): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * The two notification effects have no handler of their own yet: stream E2 owns
- * 订阅消息 / 公众号模板消息 and will register `groupbuy.join` and
- * `groupbuy.settle` against its own template mapping.
+ * The two notification effects have no message of their own: the notification
+ * domain owns 订阅消息 / 公众号模板消息 and has no template mapped to
+ * `groupbuy.join` or `groupbuy.settle`.
  *
  * They are registered here as logging no-ops rather than left unregistered,
  * because an unhandled effect retries eight times and then parks as `unknown`,

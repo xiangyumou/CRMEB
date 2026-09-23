@@ -1,8 +1,8 @@
 /**
  * The group-buy domain's public surface.
  *
- * CONVENTIONS: "A domain in `core` may import another domain only through that
- * domain's `index.ts`." So this file is the boundary, and `groupbuy.repo.ts` in
+ * A domain in `core` may import another domain only through that domain's
+ * `index.ts`, so this file is the boundary, and `groupbuy.repo.ts` in
  * particular is private — nothing outside this folder may read a `groupbuy_*`
  * table.
  *
@@ -10,8 +10,8 @@
  * anything: it attaches to the order aggregate through the frozen seams in
  * `order/ports.ts` and is invoked, never invoking. The exceptions are the two
  * jobs the worker runs and, in the other direction, the one call this domain
- * makes into another — `refund.refundSystemInitiated`, added by **CR-3-d**, for
- * the money a failed team owes back.
+ * makes into another — `refund.refundSystemInitiated`, for the money a failed
+ * team owes back.
  */
 
 export {

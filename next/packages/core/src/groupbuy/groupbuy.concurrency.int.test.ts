@@ -209,7 +209,7 @@ async function makeOrder(ctx: Ctx, userId: number, fixture: ActivityFixture): Pr
   return order!.id;
 }
 
-/** B1's two halves of a checkout, in one transaction, on this caller's connection. */
+/** The checkout's two halves, in one transaction, on this caller's connection. */
 async function placeOrder(
   ctx: Ctx,
   args: { userId: number; fixture: ActivityFixture; groupId?: number },
@@ -242,7 +242,7 @@ async function placeOrder(
   return { orderId, groupId: member!.groupId };
 }
 
-/** Stream C's paid callback, on this caller's connection. */
+/** The payment domain's paid callback, on this caller's connection. */
 async function pay(ctx: Ctx, orderId: number): Promise<void> {
   const at = ctx.clock.now();
   await withTx(ctx.db, async (tx) => {
@@ -327,10 +327,9 @@ describe('the last seat', () => {
    * STOCK-004 / the headline race. A two-seat team whose leader has paid has one
    * seat left; five joiners pay for it at the same instant.
    *
-   * Legacy counted rows in `eb_store_pink` before inserting, so this produced a
-   * six-person two-person team. Here `takeSeat` carries `seats_taken <
-   * seats_total` in its `WHERE`: one caller wins, four are refunded, and the
-   * team is full rather than over-full.
+   * Counting rows before inserting would produce a six-person two-person team.
+   * `takeSeat` carries `seats_taken < seats_total` in its `WHERE`: one caller
+   * wins, four are refunded, and the team is full rather than over-full.
    */
   it('goes to exactly one of five simultaneous payers', async () => {
     const fixture = await makeActivity({ seatsRequired: 2, stock: 20 });
@@ -440,7 +439,7 @@ describe('the activity ledgers', () => {
   });
 
   /**
-   * The same thing at the width of the pool (CR-1-d2).
+   * The same thing at the width of the pool.
    *
    * The harness opens twelve connections, and `beforeCreate` runs while its
    * caller already holds one of them. A handler that reaches for a second — the
@@ -545,9 +544,9 @@ describe('the activity ledgers', () => {
 
 describe('a payment landing as the team expires', () => {
   /**
-   * The race the brief calls "join vs team expiry", and the one that can strand
-   * a shopper's money. `settleGroup` locks the group row; `takeSeat` blocks on
-   * that lock and then re-reads, so exactly one of the two outcomes happens:
+   * The "join vs team expiry" race, and the one that can strand a shopper's
+   * money. `settleGroup` locks the group row; `takeSeat` blocks on that lock
+   * and then re-reads, so exactly one of the two outcomes happens:
    *
    *  - the payment got in first: the member holds a seat, and the sweep sees a
    *    paid member and asks for their money back;
@@ -704,7 +703,7 @@ describe('leadership', () => {
   });
 });
 
-describe('a join into a team that fails a moment before (CR-2-r1)', () => {
+describe('a join into a team that fails a moment before', () => {
   /** `beforeCreate` passes on a forming team; the team's fate moves; then `afterCreate`. */
   async function joinAcross(
     ctx: Ctx,
@@ -812,8 +811,8 @@ describe('a join into a team that fails a moment before (CR-2-r1)', () => {
 
 describe('one shopper, two clicks', () => {
   /**
-   * Legacy's `isPinkBe()` read the membership and then inserted, so a shopper
-   * who double-tapped 参团 joined the same team twice and paid twice.
+   * Reading the membership and then inserting would let a shopper who
+   * double-tapped 参团 join the same team twice and pay twice.
    * `groupbuy_members_group_user_uq` makes that a 23505, which the kind handler
    * turns into a 409.
    */
