@@ -29,15 +29,15 @@ import { rangeKey, resolveRange, shanghaiDayLabel, type ResolvedRange } from './
  *
  * Read `DEFINITIONS.md` next door first: this file computes, it does not
  * decide. Every figure's meaning is settled there, and the point of writing it
- * down was that the legacy pages each invented their own — three screens, three
+ * down is that pages left alone each invent their own — three screens, three
  * numbers for one day, and no way to tell which one to believe.
  *
  * Three rules hold everywhere below:
  *
  * 1. **A tile and its chart come from the same SQL**, with the bucket as the
- *    only difference. A tile is never the sum of its chart's buckets, because
- *    a distinct count (访客数, 成交用户数) is not additive and summing it
- *    over-counts every returning visitor — which the legacy dashboard did.
+ *    only difference. A tile is never the sum of its chart's buckets, because a
+ *    distinct count (访客数, 成交用户数) is not additive and summing it
+ *    over-counts every returning visitor.
  * 2. **`previous` is the same query over the window immediately before.** Not
  *    an estimate, not last month's stored total.
  * 3. **Nothing is invented.** A bucket where nothing happened is a true zero;
@@ -606,7 +606,7 @@ async function rankingRows(
 }
 
 // ---------------------------------------------------------------------------
-// exports — CSV inside a JSON envelope (CR-2-b2)
+// exports — CSV inside a JSON envelope
 // ---------------------------------------------------------------------------
 
 /**

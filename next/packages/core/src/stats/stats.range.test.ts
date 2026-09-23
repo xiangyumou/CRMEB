@@ -14,9 +14,9 @@ import {
 /**
  * The window arithmetic, without a database.
  *
- * Everything that made the legacy statistics pages disagree lives here: which
- * day an instant belongs to, which day the range includes, how long a bucket
- * is, and what "the window before this one" means.
+ * Everything that can make two statistics pages disagree lives here: which day
+ * an instant belongs to, which day the range includes, how long a bucket is,
+ * and what "the window before this one" means.
  */
 
 const clock = fixedClock('2026-02-04T02:00:00+08:00');

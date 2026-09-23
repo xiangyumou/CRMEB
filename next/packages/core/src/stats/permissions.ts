@@ -10,8 +10,8 @@ import { definePermissions } from '../auth/permissions';
  * **Export is its own atom, deliberately.** Reading 交易统计 on screen and
  * walking out with the whole window as a CSV are different acts: the file
  * leaves the building and the audit trail behind it is one row saying somebody
- * exported. The legacy system had a single 统计 permission covering both, and
- * every operator who could open the page could take the file.
+ * exported. With a single 统计 permission covering both, every operator who
+ * could open the page could take the file.
  *
  * There is no `stats:*:write`: nothing in this domain writes anything.
  */

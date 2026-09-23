@@ -13,13 +13,13 @@ import { userAddresses } from '@shop/db/schema/user';
  *
  * ## The one file allowed to read other domains' tables
  *
- * CONVENTIONS forbids reaching into another domain's tables; this domain is
- * the documented exception, and this file is where the exception lives. That
- * is only tolerable because of what is *not* here: no `insert`, no `update`,
- * no `delete`, no `withTx`, no conditional update, no lock. A statistics
- * domain that can write is a statistics domain that can corrupt an order, and
- * "read-only" has to be a property you can check by reading one file rather
- * than a promise made in a comment.
+ * `docs/conventions.md` forbids reaching into another domain's tables; this
+ * domain is the documented exception, and this file is where the exception
+ * lives. That is only tolerable because of what is *not* here: no `insert`, no
+ * `update`, no `delete`, no `withTx`, no conditional update, no lock. A
+ * statistics domain that can write is a statistics domain that can corrupt an
+ * order, and "read-only" has to be a property you can check by reading one file
+ * rather than a promise made in a comment.
  *
  * The prices, states and rules those tables encode stay behind their own
  * domains: nothing here interprets `orders.status`, decides whether a refund
@@ -31,9 +31,9 @@ import { userAddresses } from '@shop/db/schema/user';
  * Every aggregate takes `(db, args)` where `args.bucket` is either a bucket
  * size — one row per hour / day / month — or `'window'`, meaning "one row for
  * the whole window". Both go through the same SQL so a tile and its chart can
- * never drift apart, which is how the legacy dashboard came to disagree with
- * the page it linked to. A distinct count is still computed per window rather
- * than summed from the buckets, because distinctness is not additive.
+ * never drift apart and a dashboard tile never disagrees with the page it links
+ * to. A distinct count is still computed per window rather than summed from the
+ * buckets, because distinctness is not additive.
  *
  * All bucketing is `date_trunc(unit, ts at time zone 'Asia/Shanghai')` cast
  * back to an instant, so a boundary is a Shanghai midnight and not a UTC one.
@@ -298,9 +298,8 @@ export async function totalUsersAt(db: DbOrTx, at: Date): Promise<number> {
  * 访客数 / 浏览量.
  *
  * A visitor is a signed-in user or, failing that, an IP — the only identity
- * `user_visits` carries. Nothing writes this table yet (CR-1-f3), so both
- * figures read 0 on a live shop; the definition is settled and the SQL is
- * tested, so the day a page view is recorded the screens are correct.
+ * `user_visits` carries. The table is filled by the user domain's page-view
+ * beacon (`POST /api/v1/visits`).
  */
 export async function visitAggregate(
   db: DbOrTx,
@@ -322,11 +321,11 @@ export async function visitAggregate(
  * 商品浏览量 / 商品访客数 / 加购件数.
  *
  * `view` rows are written by the catalog domain on every product detail read;
- * `cart` rows by the cart's add path, through `catalog.recordCartAdd`, since
- * CR-1-f3 §2 — 加购件数 sums their `quantity`, so it is units added and not taps
- * of the button. Anonymous views count
- * towards 浏览量 and never towards 访客数: `product_events` has no session
- * identity, and inventing one would make the conversion rate a fiction.
+ * `cart` rows by the cart's add path, through `catalog.recordCartAdd` —
+ * 加购件数 sums their `quantity`, so it is units added and not taps of the
+ * button. Anonymous views count towards 浏览量 and never towards 访客数:
+ * `product_events` has no session identity, and inventing one would make the
+ * conversion rate a fiction.
  */
 export async function productEventAggregate(
   db: DbOrTx,

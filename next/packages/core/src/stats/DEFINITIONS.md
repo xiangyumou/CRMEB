@@ -5,13 +5,11 @@ computed from exactly one of the definitions below. Nothing on a page may
 redefine a figure locally, and a figure that cannot be sourced is **dropped**
 rather than shown as zero.
 
-Why this file exists: the legacy system computed 营业额 three different ways
-(the trade page by `pay_time` excluding refunded orders, the order page by
-`add_time` including them, the dashboard by `add_time` because the option key
-was misspelled `'timekey'`), 退款 four ways, and 访客 twice. Three screens
-showed three different numbers for the same day and the operator had no way to
-know which was right. So: one figure, one definition, one SQL expression, read
-by every page.
+Why this file exists: 营业额 has several plausible definitions — by payment
+time excluding refunded orders, by creation time including them — and so do
+退款 and 访客. Let each screen pick one and three screens show three different
+numbers for the same day, with no way for the operator to know which is right.
+So: one figure, one definition, one SQL expression, read by every page.
 
 ---
 
@@ -23,12 +21,12 @@ by every page.
   `paid_at >= from and paid_at < to`. No `BETWEEN`, no `23:59:59`, so a
   payment at 23:59:59.7 is never lost.
 - Omitting the range means **the last 30 Shanghai days ending today**
-  (today included), which is what the legacy pages defaulted to.
+  (today included).
 - The range may not be inverted and may not exceed **1096 days** (three years
   plus a leap day); either is `STATS_RANGE_INVALID` with `details.maxDays`.
 - The **bucket is derived from the length, never chosen**: up to 2 days →
-  `hour`, up to 92 days → `day`, beyond that → `month`. Legacy let the caller
-  ask for a 3-month window bucketed daily and then drew every third label of a
+  `hour`, up to 92 days → `day`, beyond that → `month`. A caller-chosen bucket
+  invites a 3-month window bucketed daily, drawn as every third label of a
   daily series, silently dropping two thirds of the data.
 - Bucket labels: `09` for an hour, `2026-02-03` for a day, `2026-02` for a
   month. Every series has exactly one value per bucket, in bucket order, zero
@@ -67,12 +65,11 @@ from their own list (`hidden_by_user_at`) changes nothing.
 **Money is bucketed where the money moved.** A payment counts on the day it was
 taken; a refund counts on the day it went back, not on the day the order was
 paid. So a day's 营业额 never changes retroactively — which is the property an
-operator reading last month's chart needs, and the reason this file departs
-from F2's status-file decision 16 (`sum(paid_amount - refunded_amount)` by
-`paid_at`, which rewrites history whenever an old order is refunded). Decision
-17 (refunds by `succeeded_at`) is kept and is what forced the choice: the two
-cannot both hold, because 营业额 would then be neither the paid-day figure nor
-the cash figure. See `docs/rewrite/status/f3.md`.
+operator reading last month's chart needs. The alternative,
+`sum(paid_amount - refunded_amount)` by `paid_at`, rewrites history whenever
+an old order is refunded, and it cannot be combined with refunds counted by
+`succeeded_at`: 营业额 would then be neither the paid-day figure nor the cash
+figure.
 
 ## 3. The figures
 
@@ -120,7 +117,7 @@ total, two decimals, and a kind that never occurred is absent rather than 0 %.
 A distinct count is **not** additive: the window's 访客数 is its own query, not
 the sum of its buckets, and the same visitor on two days counts once in the
 tile and twice in the chart. That is correct and is what every analytics tool
-does; the legacy dashboard summed the buckets and over-counted.
+does; summing the buckets would over-count.
 
 Breakdown: **下单来源** counts paid orders by `orders.platform`.
 
@@ -167,36 +164,33 @@ paidQuantity | paidAmount | favorites` descending with the product id as the
 tie-break, so the page is stable between reloads. Only products with at least
 one non-zero figure in the window appear.
 
-## 4. What has no source yet
+## 4. Where the rows come from
 
-Two figures are defined above but read **0** on a live shop, because nothing
-writes their rows yet. They are kept (not dropped) because the tables exist,
-the definitions are settled, and the gap is one insert in somebody else's
-domain — `docs/rewrite/cr/CR-1-f3.md` asks for both:
+- **访客数 / 浏览量** come from `user_visits`, filled by the storefront
+  page-view beacon (`POST /api/v1/visits`, the user domain). **地域访客** reads
+  its `province`, which the beacon does not resolve, so every visitor counts
+  under `未知`; `stay_ms` is not recorded either. The figure is kept rather
+  than dropped because the column exists and the definition is settled.
+- **加购件数** comes from `product_events` rows of `kind = 'cart'`, written
+  inside the cart's add transaction. `cart_items` is not a substitute, because
+  a row is deleted when the order is placed, so yesterday's additions would
+  disappear from history exactly when they start to matter.
 
-- **访客数 / 浏览量 / 地域访客** need `user_visits`. No storefront code records
-  a page view; the table, its `province` and its `stay_ms` are unused.
-- **加购件数** needs `product_events` rows of `kind = 'cart'`. The cart domain
-  writes none; `cart_items` is not a substitute, because a row is deleted when
-  the order is placed, so yesterday's additions disappear from history exactly
-  when they start to matter.
+Everything else: `product_events` carries `view` and `favorite` rows from the
+catalog domain, and the order, payment and refund figures come from `orders` /
+`order_items` / `refunds` / `refund_items` directly, which is why this domain
+does **not** need `kind in ('order', 'pay', 'refund')` events and must never
+write them.
 
-Everything else on every page is live today: `product_events` carries `view`
-and `favorite` rows from the catalog domain, and the order, payment and refund
-figures come from `orders` / `order_items` / `refunds` / `refund_items`
-directly, which is why this domain does **not** need `kind in ('order', 'pay',
-'refund')` events and must never write them.
+## 5. Not reported — absent, never zero-filled
 
-## 5. Retired — dropped, never zero-filled
-
-Gone with the features they measured, and deliberately absent from every
-response rather than present and zero: 余额 / 充值 / 佣金 / 积分 / 付费会员
-statistics, 资金流水 and 账单记录 (they were a balance ledger), 余额统计 (a
-route group with no routes in it), the WeChat-subscribe block, and the four
-legacy `home/*` dashboard endpoints. The home page's tiles now arrive through
-`registerDashboardContributor`, and its charts are `stats/orders`,
-`stats/users` and `stats/products/ranking` — the same three definitions as the
-pages, not a fourth copy.
+Statistics for features this shop does not have are absent from every
+response rather than present and zero: 余额 / 充值 / 佣金 / 积分 / 付费会员,
+资金流水 and 账单记录 (a balance ledger), 余额统计, and the WeChat-subscribe
+block. There are no separate home-page dashboard endpoints either: the home
+page's tiles arrive through `registerDashboardContributor`, and its charts are
+`stats/orders`, `stats/users` and `stats/products/ranking` — the same three
+definitions as the pages, not a fourth copy.
 
 ## 6. Reading rules
 

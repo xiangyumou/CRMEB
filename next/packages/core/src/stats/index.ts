@@ -12,14 +12,14 @@
  * | `GET /admin-api/stats/trade`                | `tradeStats`              |
  * | `GET /admin-api/stats/trade/exports`        | `tradeExport`             |
  * | `GET /admin-api/stats/orders`               | `orderStats`              |
- * | `GET /admin-api/dashboard/header` (F1)      | the dashboard contributor |
+ * | `GET /admin-api/dashboard/header` (system)  | the dashboard contributor |
  *
  * **No job.** This domain writes no row, so it has no row to sweep: the
- * retention of `product_events` is the catalog domain's `catalog.pruneHistory`
- * and `user_visits` has no writer at all yet (CR-1-f3). When a visit recorder
- * lands, `stats.pruneVisits` lands with it and its `delete` goes in a separate
- * `stats.retention.repo.ts`, so `stats.repo.ts` stays `select`-only and that
- * claim stays checkable by reading one file.
+ * retention of `product_events` is the catalog domain's `catalog.pruneHistory`,
+ * and `user_visits` is written by the user domain's page-view beacon. A
+ * retention sweep for visits belongs with its writer, or in a separate
+ * `stats.retention.repo.ts` — never in `stats.repo.ts`, which stays
+ * `select`-only so that claim stays checkable by reading one file.
  *
  * **Other domains do not call this one.** Nothing here is a dependency of any
  * business flow: a statistics page is downstream of everything and upstream of
