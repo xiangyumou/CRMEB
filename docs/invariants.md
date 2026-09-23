@@ -1638,6 +1638,14 @@ A 拼团 poster points at the team page from the route catalogue, not at a hand-
 
 ## System, storage and uploads
 
+### SHARE-003
+
+The version a 小程序码 opens (`env_version`) is `wechat-mini.codeEnvVersion` — `release` unless an operator picks `trial` or `develop` — for both the catalogue endpoint and the legacy one, and codes are cached per version: a code minted for one version is never served while the setting names another, and switching back reuses the earlier code without calling WeChat.
+
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > asks for release by default`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > asks for the configured version, and caches per version`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > keeps the legacy endpoint on the same rule`
+
 ### SYS-001
 
 An admin route answers 401 with no session and 403 for a signed-in admin who does not hold its atom; the atom-holder gets 200.
@@ -1741,10 +1749,11 @@ A save is refused whole when the schema rejects a value or the group does not de
 
 ### SYS-015
 
-The `storefront-appearance` group answers a fresh install with every field defaulted (the contract's `appAppearanceDefaults`), always yields exactly the four fixed tabs — 首页, 分类, 购物车, 我的 — in that order, falls back to the default label when one is blanked, and refuses any colour that is not `#RRGGBB` (and a radius off the scale, and an over-long label) whole, writing nothing.
+The `storefront-appearance` group answers a fresh install with every field defaulted (the contract's `appAppearanceDefaults`), always yields exactly the four fixed tabs — 首页, 分类, 购物车, 我的 — in that order, falls back to the default label when one is blanked, serves a blank accent colour as `null` (the client then uses the primary colour), and refuses any colour that is not `#RRGGBB` (and a radius off the scale, and an over-long label) whole, writing nothing.
 
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > answers a fresh install with every appearance default`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the theme and the tab bar the operator saved`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the accent colour, and a blanked one as none`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > falls back to the default label when the operator blanks one`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > refuses <label>, and writes nothing`
 - `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — hexColor > refuses <label>`
@@ -1762,6 +1771,48 @@ A save to any group `GET /api/v1/app/config` is built from drops its cache and m
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > agrees with GET /site/config on every value the two share`
 - `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > answers a caller holding the current version with a bodyless 304`
 - `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > sends the new settings once the <label> group is saved`
+
+### SYS-017
+
+`GET /api/v1/app/config` carries the server's clock (`serverTime`) outside its `version`: it is stamped per request after the cache, never stored in the cached copy, never moves the weak `ETag`, and goes out as the `X-Server-Time` header on every answer, so a caller holding the current version still gets a bodyless 304 that tells it the time.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-017 — the server clock rides outside the version > stamps serverTime per request, from the cache too, without moving the version`
+- `apps/web/app/api/v1/app/config.int.test.ts::SYS-017 — the server clock rides outside the ETag > stamps every answer with the server time, in the body and the X-Server-Time header`
+- `apps/web/app/api/v1/app/config.int.test.ts::SYS-017 — the server clock rides outside the ETag > keeps answering 304 as the clock moves, and the 304 still carries the time`
+
+### SYS-018
+
+`app/config.subscribeScenes` is built on the server from the operator's subscribe templates, one list per tap in the contract's `appSubscribeScene` enum: the three checkouts ask for shipping, then payment, then creation templates; the two after-sale taps ask for the refund templates; blank ids are dropped, duplicates kept once, and no list is longer than WeChat's three.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-018 — subscribe scenes are built on the server > asks each tap for its templates, shipping first, deduplicated, at most three`
+- `packages/core/src/system/app-config.int.test.ts::SYS-018 — subscribe scenes are built on the server > answers [] for every tap when no template is set`
+- `packages/core/src/system/app-config.int.test.ts::SYS-018 — subscribe scenes are built on the server > skips blank ids and fills from the next list`
+- `packages/contracts/src/system/app.schemas.test.ts::SYS-018 — subscribe scenes > has one key per scene the mini-program asks from, and caps each at three ids`
+
+### SYS-019
+
+`app/config.webviewDomains` is the `wechat-mini` group's 业务域名 list, lower-cased and deduplicated; a save carrying anything but bare host names (a scheme, a path, a port, a wildcard) is refused whole and writes nothing.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-019 — web-view domains > serves the operator list lower-cased and deduplicated, one per line or comma`
+- `packages/core/src/system/app-config.int.test.ts::SYS-019 — web-view domains > refuses <label>, and writes nothing`
+- `packages/contracts/src/system/app.schemas.test.ts::SYS-019 — webview domains > refuses <label>`
+
+### SYS-020
+
+The mini-program's splash (`app/config.splashAd.link`) is a `LinkTarget`: the stored `site.splashLinkTarget`, else the legacy `splashLink` as a `webview` link when it is an https URL, else `null`; a legacy uni-app path is never guessed at, and `site/config` keeps serving the legacy string unchanged.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > serves the stored LinkTarget, while site/config keeps the legacy path`
+- `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > falls back to an https legacy link as a web-view, and to none for a uni-app path`
+- `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > refuses a LinkTarget that does not parse, and writes nothing`
+
+### SYS-021
+
+`deriveTheme` (`packages/contracts/src/system/theme.ts`, shared by the mini-program and the admin preview) keeps the operator's brand colour and makes the text readable: the primary-text and price tokens reach 4.5:1 on white for every input, the text on the primary colour reaches at least 3:1, a missing accent is the primary colour, and the module stays zod-free at runtime.
+
+- `packages/contracts/src/system/theme.test.ts::SYS-021 — deriveTheme keeps text readable > <label>: text on white reaches 4.5:1, text on the colour 3:1`
+- `packages/contracts/src/system/theme.test.ts::SYS-021 — deriveTheme keeps text readable > holds for 200 random colours`
+- `packages/contracts/src/system/theme.test.ts::SYS-021 — deriveTheme keeps text readable > falls back: no accent is the primary colour, no price is the primary text colour`
+- `packages/contracts/src/system/theme.test.ts::zod-free > imports nothing at runtime, so the mini-program may ship it`
 
 ### SYSC-001
 

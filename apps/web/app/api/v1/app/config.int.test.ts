@@ -118,3 +118,24 @@ describe('GET /api/v1/app/config — conditional', () => {
     expect((await read({ 'if-none-match': fresh! })).status).toBe(304);
   });
 });
+
+describe('SYS-017 — the server clock rides outside the ETag', () => {
+  it('stamps every answer with the server time, in the body and the X-Server-Time header', async () => {
+    const response = await read();
+    const body = (await response.json()) as AppPublicConfig;
+    expect(body.serverTime).toBe(harness.clock.now().toISOString());
+    expect(response.headers.get('x-server-time')).toBe(body.serverTime);
+  });
+
+  it('keeps answering 304 as the clock moves, and the 304 still carries the time', async () => {
+    const first = await read();
+    const tag = first.headers.get('etag')!;
+
+    harness.clock.advance(90_000);
+    const response = await read({ 'if-none-match': tag });
+    expect(response.status).toBe(304);
+    expect(await response.text()).toBe('');
+    expect(response.headers.get('etag')).toBe(tag);
+    expect(response.headers.get('x-server-time')).toBe(harness.clock.now().toISOString());
+  });
+});

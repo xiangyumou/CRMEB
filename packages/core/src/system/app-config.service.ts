@@ -1,10 +1,16 @@
+import type { LinkTarget } from '@shop/contracts/decor/link';
 import type {
   AppAppearance,
   AppPublicConfig,
+  AppSubscribeScene,
   AppTabBarItem,
   AppTabKey,
 } from '@shop/contracts/system/app.schemas';
-import { appAppearanceDefaults } from '@shop/contracts/system/app.schemas';
+import {
+  appAppearanceDefaults,
+  MAX_SUBSCRIBE_TEMPLATES,
+  webviewDomain,
+} from '@shop/contracts/system/app.schemas';
 
 import type { Ctx } from '../kernel/context';
 import {
@@ -21,7 +27,7 @@ import {
   type StorefrontAppearanceConfig,
 } from './storefront-appearance.config';
 import * as repo from './system.repo';
-import { wechatMiniConfig } from './wechat-mini.config';
+import { wechatMiniConfig, webviewDomainsOf } from './wechat-mini.config';
 
 /**
  * `GET /api/v1/app/config` — the mini-program's launch payload.
@@ -48,12 +54,19 @@ import { wechatMiniConfig } from './wechat-mini.config';
  * Cached 60 s in Redis under its own key and dropped from `configSave` when a
  * source group is saved (`invalidateAppConfigCache`); `version` is the newest
  * save across those groups and doubles as the weak `ETag`.
+ *
+ * `serverTime` is the one per-request value: it is stamped after the cache
+ * (`tagged`), never stored in it, never part of `version`, and also sent as
+ * the `X-Server-Time` header so a bodyless 304 carries it too.
  */
 
-const CACHE_KEY = 'app:config:v1';
+/** v2: the payload grew `subscribeScenes`, `webviewDomains`, `accentColor`, a typed splash link. */
+const CACHE_KEY = 'app:config:v2';
 const CACHE_SECONDS = 60;
 
 type SubscribeTemplatesByScene = AppPublicConfig['subscribeTemplates'];
+/** What is built and cached: everything but the per-request clock. */
+type CachedAppConfig = Omit<AppPublicConfig, 'serverTime'>;
 
 export interface AppConfigSources {
   subscribeTemplates: {
@@ -112,23 +125,25 @@ export async function invalidateAppConfigCache(ctx: Ctx, group: string): Promise
   }
 }
 
-function tagged(ctx: SiteReadCtx, payload: AppPublicConfig): AppPublicConfig {
+function tagged(ctx: SiteReadCtx, payload: CachedAppConfig): AppPublicConfig {
+  const serverTime = ctx.clock.now().toISOString();
   ctx.setHeader?.('ETag', `W/"${payload.version}"`);
   ctx.setHeader?.('Cache-Control', 'no-cache');
-  return payload;
+  ctx.setHeader?.('X-Server-Time', serverTime);
+  return { ...payload, serverTime };
 }
 
-async function readCache(ctx: Ctx): Promise<AppPublicConfig | null> {
+async function readCache(ctx: Ctx): Promise<CachedAppConfig | null> {
   try {
     const raw = await ctx.redis.get(CACHE_KEY);
-    return raw === null ? null : (JSON.parse(raw) as AppPublicConfig);
+    return raw === null ? null : (JSON.parse(raw) as CachedAppConfig);
   } catch (error) {
     ctx.logger.warn({ err: error, key: CACHE_KEY }, 'app: config cache read failed');
     return null;
   }
 }
 
-async function buildAppConfig(ctx: Ctx): Promise<AppPublicConfig> {
+async function buildAppConfig(ctx: Ctx): Promise<CachedAppConfig> {
   const [site, mini, appearance, payments, auth, subscribeTemplates, requiresPhone, version] =
     await Promise.all([
       ctx.config.get(siteConfig),
@@ -160,10 +175,14 @@ async function buildAppConfig(ctx: Ctx): Promise<AppPublicConfig> {
     splashAd: {
       enabled: site.splashEnabled && orNull(site.splashImage) !== null,
       imageUrl: orNull(site.splashImage),
-      link: orNull(site.splashLink),
+      link: splashLinkOf(site.splashLinkTarget, site.splashLink),
       seconds: site.splashSeconds,
     },
     subscribeTemplates,
+    subscribeScenes: subscribeScenesOf(subscribeTemplates),
+    webviewDomains: webviewDomainsOf(mini.webviewDomains).filter(
+      (domain) => webviewDomain.safeParse(domain).success,
+    ),
     appearance: appearanceOf(appearance),
     version,
   };
@@ -203,6 +222,48 @@ async function wechatRequiresPhoneOf(ctx: Ctx): Promise<boolean> {
   }
 }
 
+/**
+ * Which templates each tap asks for (C08), in the order they are asked, at
+ * most three. An order's checkout asks for shipping first — the message a
+ * shopper wants most — then payment, then creation; the three checkouts share
+ * that list. The after-sale taps ask for the refund templates.
+ *
+ * The operator groups templates by message (`subscribeTemplates`); the pages
+ * ask by tap. This is the one place the two meet, so no client carries it.
+ */
+export function subscribeScenesOf(
+  templates: SubscribeTemplatesByScene,
+): Record<AppSubscribeScene, string[]> {
+  const pick = (...lists: string[][]) =>
+    [...new Set(lists.flat().filter((id) => id.trim() !== ''))].slice(0, MAX_SUBSCRIBE_TEMPLATES);
+  const order = () => pick(templates.orderShip, templates.orderPay, templates.orderCreate);
+  return {
+    checkout: order(),
+    groupbuyCheckout: order(),
+    presaleCheckout: order(),
+    refundApply: pick(templates.refund),
+    returnShipment: pick(templates.refund),
+  };
+}
+
+/**
+ * The splash's tap for the mini-program: the stored `LinkTarget`; failing
+ * that, the legacy `splashLink` when it is an https URL (opened in the
+ * web-view, where the client still checks the host, C12); otherwise `null`.
+ * A legacy uni-app path is not guessed at: a wrong page is worse than none.
+ */
+export function splashLinkOf(target: LinkTarget | null, legacy: string): LinkTarget | null {
+  if (target) return target;
+  const url = legacy.trim();
+  if (!/^https:\/\/[^\s]+$/i.test(url) || url.length > 2048) return null;
+  try {
+    new URL(url);
+  } catch {
+    return null;
+  }
+  return { kind: 'webview', url };
+}
+
 type TabField = Extract<keyof StorefrontAppearanceConfig, `tab${string}`>;
 
 const TAB_FIELDS: Record<AppTabKey, { label: TabField; icon: TabField; selected: TabField }> = {
@@ -234,6 +295,7 @@ export function appearanceOf(values: StorefrontAppearanceConfig): AppAppearance 
     theme: {
       primaryColor: values.primaryColor,
       primaryContrastColor: values.primaryContrastColor,
+      accentColor: orNull(values.accentColor),
       priceColor: values.priceColor,
       radius: values.radius,
     },

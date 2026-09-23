@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { appAppearanceDefaults, appPublicConfig } from '@shop/contracts/system/app.schemas';
+import {
+  appAppearanceDefaults,
+  appPublicConfig,
+  appSubscribeScene,
+} from '@shop/contracts/system/app.schemas';
 import { subscribeScene } from '@shop/contracts/wechat-oa/schemas';
 import { configValues } from '@shop/db/schema/system';
 import { createTestCtx, type TestCtx } from '@shop/testing';
@@ -7,7 +11,7 @@ import { allConfigGroups } from '../kernel/config-registry';
 import { anonymousActor, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { wechatOaStorefront } from '../wechat-oa';
-import { appConfigGet, appConfigSourceGroups } from './app-config.service';
+import { appConfigGet, appConfigSourceGroups, subscribeScenesOf } from './app-config.service';
 import { configSave, describeGroup } from './config.service';
 import { siteConfigGet } from './site.service';
 import './index';
@@ -127,6 +131,7 @@ describe('SYS-015 — 小程序外观', () => {
     expect(appearance.theme).toEqual({
       primaryColor: '#1677ff',
       primaryContrastColor: '#000000',
+      accentColor: null,
       priceColor: '#FF4D4F',
       radius: 'large',
     });
@@ -148,6 +153,13 @@ describe('SYS-015 — 小程序外观', () => {
     });
   });
 
+  it('serves the accent colour, and a blanked one as none', async () => {
+    await save('storefront-appearance', { accentColor: '#FF7E00' });
+    expect((await appConfigGet(anonymous())).appearance.theme.accentColor).toBe('#FF7E00');
+    await save('storefront-appearance', { accentColor: '' });
+    expect((await appConfigGet(anonymous())).appearance.theme.accentColor).toBeNull();
+  });
+
   it('falls back to the default label when the operator blanks one', async () => {
     // Clearing the box on the settings screen must not leave a tab with no text.
     await save('storefront-appearance', { tabCartLabel: '   ', tabCategoryLabel: '' });
@@ -162,6 +174,7 @@ describe('SYS-015 — 小程序外观', () => {
     ['a CSS keyword', { tabBarBackgroundColor: 'transparent' }],
     ['a hex without its #', { tabBarColor: '282828' }],
     ['an eight-digit hex', { tabBarSelectedColor: '#E93323FF' }],
+    ['an accent colour name', { accentColor: 'orange' }],
     ['a radius off the scale', { radius: 'huge' }],
     ['a label too long for the bar', { tabHomeLabel: '这是一个很长的首页标签' }],
   ])('refuses %s, and writes nothing', async (_label, values) => {
@@ -281,7 +294,7 @@ describe('SYS-016 — one payload, always current', () => {
       support: app.support,
       auth: appAuth,
       payments: app.payments,
-      splashAd: app.splashAd,
+      splashAd: { ...app.splashAd, link: null },
     }).toEqual({
       name: site.name,
       logo: site.logo,
@@ -289,9 +302,129 @@ describe('SYS-016 — one payload, always current', () => {
       support: site.support,
       auth: site.auth,
       payments: site.payments,
-      splashAd: site.splashAd,
+      // The one deliberate difference: the tap is a LinkTarget here (SYS-020).
+      splashAd: { ...site.splashAd, link: null },
     });
     expect(app.support.kind).toBe('mini-program');
     expect(app.splashAd.enabled).toBe(true);
+  });
+});
+
+describe('SYS-017 — the server clock rides outside the version', () => {
+  it('stamps serverTime per request, from the cache too, without moving the version', async () => {
+    const first = await appConfigGet(anonymous());
+    expect(first.serverTime).toBe(NOW);
+
+    harness.clock.advance(30_000);
+    const second = await appConfigGet(anonymous());
+    expect(second.serverTime).toBe(harness.clock.now().toISOString());
+    expect(second.version).toBe(first.version);
+
+    // The cached copy never holds a clock of its own.
+    const cached = JSON.parse((await harness.redis.get('app:config:v2')) ?? '{}') as object;
+    expect(cached).not.toHaveProperty('serverTime');
+  });
+});
+
+describe('SYS-018 — subscribe scenes are built on the server', () => {
+  it('asks each tap for its templates, shipping first, deduplicated, at most three', async () => {
+    await save('wechat-oa-runtime', {
+      subscribeOrderCreate: 'tmpl-create',
+      subscribeOrderPay: 'tmpl-pay, tmpl-ship',
+      subscribeOrderShip: 'tmpl-ship, tmpl-delivered',
+      subscribeRefund: 'tmpl-refund-1, tmpl-refund-2, tmpl-refund-3, tmpl-refund-4',
+    });
+
+    const { subscribeScenes } = await appConfigGet(anonymous());
+    const order = ['tmpl-ship', 'tmpl-delivered', 'tmpl-pay'];
+    expect(subscribeScenes).toEqual({
+      checkout: order,
+      groupbuyCheckout: order,
+      presaleCheckout: order,
+      refundApply: ['tmpl-refund-1', 'tmpl-refund-2', 'tmpl-refund-3'],
+      returnShipment: ['tmpl-refund-1', 'tmpl-refund-2', 'tmpl-refund-3'],
+    });
+    expect(Object.keys(subscribeScenes).sort()).toEqual([...appSubscribeScene.options].sort());
+  });
+
+  it('answers [] for every tap when no template is set', async () => {
+    const { subscribeScenes } = await appConfigGet(anonymous());
+    for (const scene of appSubscribeScene.options) expect(subscribeScenes[scene]).toEqual([]);
+  });
+
+  it('skips blank ids and fills from the next list', () => {
+    expect(
+      subscribeScenesOf({
+        orderCreate: ['c'],
+        orderPay: [' ', 'p'],
+        orderShip: [],
+        refund: [''],
+      }),
+    ).toMatchObject({ checkout: ['p', 'c'], refundApply: [] });
+  });
+});
+
+describe('SYS-019 — web-view domains', () => {
+  it('serves the operator list lower-cased and deduplicated, one per line or comma', async () => {
+    expect((await appConfigGet(anonymous())).webviewDomains).toEqual([]);
+    await save('wechat-mini', {
+      webviewDomains: 'Shop.Example.com\n h5.example.com, shop.example.com\n\n',
+    });
+    expect((await appConfigGet(anonymous())).webviewDomains).toEqual([
+      'shop.example.com',
+      'h5.example.com',
+    ]);
+  });
+
+  it.each([
+    ['a scheme', 'https://shop.example.com'],
+    ['a path', 'shop.example.com/pay'],
+    ['a port', 'shop.example.com:8443'],
+    ['a wildcard', '*.example.com'],
+  ])('refuses %s, and writes nothing', async (_label, webviewDomains) => {
+    expect(
+      await code(configSave(harness.ctx, { group: 'wechat-mini' }, { values: { webviewDomains } })),
+    ).toBe('VALIDATION_FAILED');
+    expect(await harness.ctx.db.select().from(configValues)).toHaveLength(0);
+  });
+});
+
+describe('SYS-020 — the splash taps through a LinkTarget', () => {
+  const on = { splashEnabled: true, splashImage: '/uploads/adv.png' };
+
+  it('serves the stored LinkTarget, while site/config keeps the legacy path', async () => {
+    await save('site', {
+      ...on,
+      splashLink: '/pages/goods_details/index?id=12',
+      splashLinkTarget: { kind: 'product', id: '12' },
+    });
+    expect((await appConfigGet(anonymous())).splashAd.link).toEqual({ kind: 'product', id: '12' });
+    expect((await siteConfigGet(anonymous())).splashAd.link).toBe(
+      '/pages/goods_details/index?id=12',
+    );
+  });
+
+  it('falls back to an https legacy link as a web-view, and to none for a uni-app path', async () => {
+    await save('site', { ...on, splashLink: 'https://shop.example.com/sale' });
+    expect((await appConfigGet(anonymous())).splashAd.link).toEqual({
+      kind: 'webview',
+      url: 'https://shop.example.com/sale',
+    });
+
+    await save('site', { ...on, splashLink: '/pages/goods_details/index?id=12' });
+    expect((await appConfigGet(anonymous())).splashAd.link).toBeNull();
+  });
+
+  it('refuses a LinkTarget that does not parse, and writes nothing', async () => {
+    expect(
+      await code(
+        configSave(
+          harness.ctx,
+          { group: 'site' },
+          { values: { splashLinkTarget: { kind: 'route', to: { route: 'nowhere', params: {} } } } },
+        ),
+      ),
+    ).toBe('VALIDATION_FAILED');
+    expect(await harness.ctx.db.select().from(configValues)).toHaveLength(0);
   });
 });

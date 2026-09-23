@@ -130,7 +130,7 @@
 
 商城接口（`auth: user-optional`）：`decor.pageHome`、`decor.pageUserCenter`、`decor.pageResolve`，分别对应 `GET /api/v1/pages/home`、`/user-center`、`/:id?previewToken=`。
 
-pages.md 第 5 节里写的是建议的 id `diy.page*`，实际的 id 是 `decor.page*`。
+pages.md 第 5 节已改为实际的 id `decor.page*`（早期稿子写的是建议的 `diy.page*`）。
 
 ## 6. 页面解析器
 
@@ -204,4 +204,4 @@ pages.md 第 5 节里写的是建议的 id `diy.page*`，实际的 id 是 `decor
 
 - `minClient` 目前是按块类型设置的。如果某个 props 版本需要更高的客户端，目前只能改用新的块类型，没有按版本单独设置的办法。
 - 拼团和预售活动的列表接口不支持按 id 过滤，手动模式会从一页 100 条活动里挑选，超出这 100 条的活动会被跳过。
-- design.md 第 3.2 节要求把 `diyThemeTokens` 改为有类型的 schema。这项工作要改旧 `diy` 域的配置，不在本期 F1 的范围内，还没有做。
+- `diyThemeTokens` 不改类型：小程序的主题 token 来自有类型的 `storefront-appearance`（`app/config.appearance`），旧的 token 包留给旧 uni-app，原因见 design.md 第 3.2 节。
