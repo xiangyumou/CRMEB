@@ -1,18 +1,18 @@
 import { z } from 'zod';
 
-import { blockStyle, imageUrl } from './common';
-import { IMAGE_CUBE_LAYOUTS, type ImageCubeLayout } from './constants';
-import { linkTarget } from './link';
-import { ui } from './meta';
+import { blockProps, imageUrl } from '../base';
+import { IMAGE_CUBE_LAYOUTS, type ImageCubeLayout } from '../constants';
+import { linkTarget } from '../link';
+import { ui } from '../meta';
+import { defineBlock } from '../registry';
 
-/** 图片魔方 — DRAFT, moves to `@shop/contracts` in stream F1. */
-
+/** 图片魔方. */
 export const imageCubeCell = z.object({
   image: imageUrl,
   link: linkTarget.optional().meta(ui({ label: '跳转链接', field: 'link' })),
 });
 
-export const imageCubeProps = z.object({
+export const imageCubeProps = blockProps({
   layout: z
     .enum(Object.keys(IMAGE_CUBE_LAYOUTS) as [ImageCubeLayout, ...ImageCubeLayout[]])
     .default('left1right2')
@@ -47,7 +47,14 @@ export const imageCubeProps = z.object({
     .max(40)
     .default(10)
     .meta(ui({ label: '图片间距（750 设计稿 px）', group: '样式' })),
-  style: blockStyle.prefault({}),
 });
 
 export type ImageCubeProps = z.infer<typeof imageCubeProps>;
+export type ImageCubeCell = z.infer<typeof imageCubeCell>;
+
+export const imageCubeBlock = defineBlock({
+  type: 'imageCube',
+  v: 1,
+  props: imageCubeProps,
+  meta: { label: '图片魔方', pages: ['home', 'custom', 'user_center'] },
+});

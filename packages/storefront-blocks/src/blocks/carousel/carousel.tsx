@@ -1,6 +1,6 @@
 import { Image, Swiper, SwiperItem } from '@tarojs/components';
 
-import type { CarouselProps } from '../../schema/carousel';
+import type { CarouselProps } from '@shop/contracts/decor/all-blocks';
 import { cssColor, designVars, tapProps } from '../shared/css';
 import { BlockFrame } from '../shared/frame';
 import type { BlockProps } from '../shared/types';

@@ -1,4 +1,4 @@
-import type { LinkTarget } from '../../schema/link';
+import type { LinkTarget } from '@shop/contracts/decor/link';
 
 /**
  * What every block component receives.

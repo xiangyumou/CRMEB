@@ -1,10 +1,11 @@
 import { z } from 'zod';
 
-import { blockStyle, color, imageUrl } from './common';
-import { linkTarget } from './link';
-import { ui } from './meta';
+import { blockProps, color, imageUrl } from '../base';
+import { linkTarget } from '../link';
+import { ui } from '../meta';
+import { defineBlock } from '../registry';
 
-/** 轮播 — DRAFT, moves to `@shop/contracts` in stream F1. */
+/** 轮播. */
 export const carouselSlide = z.object({
   image: imageUrl,
   link: linkTarget.optional().meta(ui({ label: '跳转链接', field: 'link' })),
@@ -16,7 +17,7 @@ export const carouselSlide = z.object({
     .meta(ui({ label: '图片说明' })),
 });
 
-export const carouselProps = z.object({
+export const carouselProps = blockProps({
   slides: z
     .array(carouselSlide)
     .min(1, '至少一张图片')
@@ -56,8 +57,14 @@ export const carouselProps = z.object({
   indicatorActiveColor: color
     .default('#ffffff')
     .meta(ui({ label: '当前指示点颜色', group: '播放' })),
-  style: blockStyle.prefault({}),
 });
 
 export type CarouselProps = z.infer<typeof carouselProps>;
 export type CarouselSlide = z.infer<typeof carouselSlide>;
+
+export const carouselBlock = defineBlock({
+  type: 'carousel',
+  v: 1,
+  props: carouselProps,
+  meta: { label: '轮播', pages: ['home', 'custom', 'user_center'] },
+});

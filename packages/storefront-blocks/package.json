@@ -31,6 +31,7 @@
     "fidelity": "tsx fidelity/run.ts"
   },
   "dependencies": {
+    "@shop/contracts": "workspace:*",
     "zod": "^4.6.5"
   },
   "peerDependencies": {
