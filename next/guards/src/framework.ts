@@ -2,32 +2,29 @@
  * The guard harness.
  *
  * A guard is a pure function over the repository's own text: contracts, route
- * files, permission atoms, config descriptors, the uni-app API layer, the
- * regression matrices. It never starts a server and never opens a database, so
- * `pnpm guards` is a second or two and can run on every commit.
+ * files, permission atoms, config descriptors, the uni-app sources, the
+ * migrations, the CI workflow and the rule catalogue. It never starts a server
+ * and never opens a database, so `pnpm guards` is a second or two and can run
+ * on every commit.
  *
- * Three verdicts, and only three:
+ * Two verdicts:
  *
- *   `fail`    something is wrong now — the guard exits non-zero.
- *   `pending` something is not wrong *yet*: it belongs to a stream that has not
- *             merged. Counted and printed, never fatal. The second hardening
- *             pass turns every one of these into a pass or a fail.
- *   `note`    context worth printing. Never fatal.
+ *   `fail`  something is wrong now — the guard exits non-zero.
+ *   `note`  context worth printing. Never fatal.
  *
- * The `pending` level is what lets this run before E1 / D / F2 / E2 / S / J
- * land. It is deliberately noisy: a pending entry prints its stream, so the
- * report doubles as the "what is still owed" list.
+ * There is deliberately no "known, fix later" level. A property that is
+ * allowed to be false somewhere is an allow-list entry inside the check, with
+ * the reason next to it, and every such list is compared exactly: an entry
+ * that stops applying is itself a failure, so a list can only shrink.
  */
 
-export type Level = 'fail' | 'pending' | 'note';
+export type Level = 'fail' | 'note';
 
 export interface Finding {
   level: Level;
   /** File, id or row the finding is about. */
   where: string;
   message: string;
-  /** Stream that owns the resolution, for `pending`. */
-  stream?: string;
 }
 
 export interface CheckResult {
@@ -46,10 +43,6 @@ export interface Check {
 
 export function fail(where: string, message: string): Finding {
   return { level: 'fail', where, message };
-}
-
-export function pending(where: string, stream: string, message: string): Finding {
-  return { level: 'pending', where, message, stream };
 }
 
 export function note(where: string, message: string): Finding {
@@ -75,26 +68,4 @@ export function result(
 
 export function count(findings: readonly Finding[], level: Level): number {
   return findings.filter((f) => f.level === level).length;
-}
-
-/**
- * A pending finding is only pending while its stream is in flight. Once
- * `lib/streams.ts` says the stream has merged, the same finding is a failure —
- * whichever check produced it, and without that check having to know. This is
- * what makes the final all-merged run strict by itself: nothing is re-enabled,
- * the orchestrator flips the last streams and anything still owed fails.
- */
-export function settle(check: CheckResult, merged: (stream: string) => boolean): CheckResult {
-  return {
-    ...check,
-    findings: check.findings.map((finding) =>
-      finding.level === 'pending' && finding.stream !== undefined && merged(finding.stream)
-        ? {
-            ...finding,
-            level: 'fail',
-            message: `${finding.message} — owed by ${finding.stream}, which has merged`,
-          }
-        : finding,
-    ),
-  };
 }

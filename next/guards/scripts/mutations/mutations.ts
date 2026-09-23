@@ -9,7 +9,7 @@
  * happened. When that happens, re-read the protection and update the strings
  * here; do not loosen the check.
  *
- * `tests` name the guarding tests the way the ledger does: a file under
+ * `tests` name the guarding tests the way `docs/invariants.md` does: a file under
  * `packages/core`, the top-level `describe` title, and optionally a pattern
  * over the `it` title. The runner narrows each vitest run with `-t` on the
  * `describe` titles and then reads the JSON report, so the selection is exact
@@ -17,10 +17,7 @@
  * is killed when at least one selected test fails. The same selection is the
  * baseline, which must run at least one test per entry and pass every one.
  *
- * The ten are the ones MUT-001 lists (`docs/rewrite/invariants.md`), in its
- * order. Where the legacy stack had one protection and the rewrite has two
- * implementations of it, the mutation targets the one the shipping code path
- * calls (see `virtual-card-claim`).
+ * The ten are the ones MUT-001 lists (`docs/invariants.md`), in its order.
  */
 
 export type TestProject = 'unit' | 'int';
@@ -196,8 +193,7 @@ export const MUTATIONS: readonly Mutation[] = [
   {
     id: 'virtual-card-claim',
     protection: 'the virtual-card atomic claim',
-    // B2's claim, the one `autoDeliver` calls on `order.paid` and the only one
-    // there is: catalog's unused copy (`issueVirtualCard`) was deleted (CR-23-k2).
+    // The claim `autoDeliver` calls on `order.paid`, and the only one there is.
     file: 'packages/core/src/order/order.fulfil.repo.ts',
     summary: 'the card subquery loses `FOR UPDATE SKIP LOCKED`',
     search: '         order by id limit 1 for update skip locked)`,',

@@ -5,12 +5,10 @@ import { isScript, walk } from '../lib/files';
 import { nextRoot, rel, uniApp } from '../lib/paths';
 
 /**
- * The scope guard, enforced instead of remembered.
+ * The shop's scope, enforced instead of remembered (CORE-002).
  *
- * `CONVENTIONS.md` § "Scope guard" lists what is not ported. Legacy's
- * `retired-code-guard.cjs` did the same job for the PHP tree by looking for
- * service class names; there are no classes here, so the unit is the
- * **identifier or URL token**: a word that can only mean the retired feature,
+ * The features below are ones the shop deliberately does not have. The unit
+ * is the **identifier or URL token**: a word that can only mean the feature,
  * matched as a whole word in code (never in prose) and as a whole path segment
  * in a URL.
  *
@@ -64,19 +62,17 @@ const SOURCE_ROOTS = [
   path.join(nextRoot, 'apps/worker/src'),
   path.join(nextRoot, 'packages/core/src'),
   path.join(nextRoot, 'packages/contracts/src'),
-  path.join(nextRoot, 'packages/etl/src'),
   path.join(uniApp, 'api'),
 ];
 
 /**
  * Files that must name a retired feature in order to keep it out: the guard's
- * own word list, the ETL mappers that read a legacy column and drop it, and the
- * uni-app mappers that pin a retired flag to a falsy constant so the page
- * branch is dead without the page being edited (status/h.md).
+ * own word list, and the uni-app mappers that answer a page's flag for a
+ * feature the shop does not have with a falsy constant, so that branch of the
+ * page never renders.
  */
 const ALLOWED = [
   /^next\/guards\//,
-  /^next\/packages\/etl\/src\/mappers\//,
   /^template\/uni-app\/api\/mappers\//,
   /^template\/uni-app\/api\/README\.md$/,
 ];
@@ -117,7 +113,7 @@ const DENY_LISTS: readonly DenyListFile[] = [
   {
     file: /^next\/apps\/web\/src\/admin\/diy\/defaults\/bottomMenu\.default\.ts$/,
     words: ['自建客服'],
-    why: "`icon: 'icon-kefu'` is an iconfont glyph name in the legacy DIY default payload, on a 客服 entry whose link the operator sets; the retired module is the page kefu/mobile_list, which REMOVED_STOREFRONT_PAGES drops",
+    why: "`icon: 'icon-kefu'` is an iconfont glyph name in the DIY default payload, on a 客服 entry whose link the operator sets; the retired module is the page kefu/mobile_list, which REMOVED_STOREFRONT_PAGES drops",
   },
 ];
 
