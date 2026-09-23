@@ -17,18 +17,24 @@ into `storefront/mini` yet. Until it is, the activity pages hand checkout what S
   home, page, presale, product) → `encodeScene` → `decodeEnter` → the same route; share path
   equals the server's `toMiniPath`.
 
+- Poster: `features/share/poster-layout.ts` (pure layout → draw ops, tested), `platform/poster.ts`
+  (canvas 2D node, `downloadFile`, `canvasToTempFilePath`, `saveImageToPhotosAlbum`,
+  `openSetting`) with `platform/poster.h5.ts` (DOM canvas, download link) and
+  `platform/poster-draw.ts` (the shared replay); `features/share/poster-sheet.tsx` (drawing /
+  ready / saving / saved / denied → 去设置 / failed → 重试, 「不显示商品图片」) and
+  `features/share/share-sheet.tsx` (分享给好友 + 生成海报). Taro fake gained the album, setting,
+  selector-query and canvas APIs; `fake-api.ts` took B's `query` change verbatim (merges clean).
+
 ## In progress
 
-- `platform/poster.ts` + `features/share`.
+- Pages.
 
 ## Next
 
-1. (poster, see above)
-2. `platform/poster.ts` + `features/share` (layout, PosterSheet, ShareSheet).
-3. Pages: coupons, my-coupons, my-groupbuys, groupbuy, groupbuy-team, groupbuy-detail, presale,
+1. Pages: coupons, my-coupons, my-groupbuys, groupbuy, groupbuy-team, groupbuy-detail, presale,
    presale-detail.
-4. After B merges: SkuSheet + checkout `kindMeta`, replace B's poster stub.
-5. e2e specs-mini, pages.md, screenshots, checklist.
+2. After B merges: SkuSheet + checkout `kindMeta`, replace B's poster stub.
+3. e2e specs-mini, pages.md, screenshots, checklist.
 
 ## Decisions
 
