@@ -1081,6 +1081,28 @@ describe('the storefront surface', () => {
     expect(byId.get(String(soldOut.activityId))?.canBuy).toBe(false);
   });
 
+  it('narrows the list to one product: its live campaigns only, none for a product with none', async () => {
+    const shown = await makeActivity();
+    await makeActivity();
+    const draft = await makeActivity({ status: 'draft' });
+    const ctx = asUser(await makeUser());
+
+    const forProduct = await service.list(ctx, {
+      page: 1,
+      pageSize: 20,
+      productId: String(shown.productId),
+    });
+    expect(forProduct.total).toBe(1);
+    expect(forProduct.items.map((item) => item.activityId)).toEqual([String(shown.activityId)]);
+
+    const hidden = await service.list(ctx, {
+      page: 1,
+      pageSize: 20,
+      productId: String(draft.productId),
+    });
+    expect(hidden).toMatchObject({ total: 0, items: [] });
+  });
+
   it('serves the detail with enabled SKUs only and the catalogue price struck through', async () => {
     const fixture = await makeActivity({ stock: 5 });
     const ctx = asUser(await makeUser());

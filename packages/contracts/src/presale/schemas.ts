@@ -205,7 +205,14 @@ export const presaleCard = z.object({
 });
 export type PresaleCard = z.infer<typeof presaleCard>;
 
-export const presaleListQuery = pageQuery;
+export const presaleListQuery = pageQuery.extend({
+  /**
+   * Only this product's activities — what 商品详情 asks to learn whether a product is on
+   * 预售 right now. The list's own rule still holds: `active` and inside its window.
+   */
+  productId: id.optional(),
+});
+export type PresaleListQuery = z.infer<typeof presaleListQuery>;
 export const pagedPresaleCards = paged(presaleCard);
 
 export const presaleStorefrontSku = z.object({

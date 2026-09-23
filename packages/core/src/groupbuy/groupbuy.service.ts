@@ -334,6 +334,7 @@ export async function list(ctx: Ctx, query: GroupbuyListQuery): Promise<Paged<Gr
   const now = ctx.clock.now();
   const { rows, total } = await repo.listActivities(ctx.db, {
     visibleAt: now,
+    productId: query.productId === undefined ? undefined : Number(query.productId),
     sortBy: 'sortOrder',
     sortOrder: 'desc',
     ...pageBounds(query),

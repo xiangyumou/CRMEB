@@ -313,7 +313,13 @@ export const groupbuyCard = z.object({
 });
 export type GroupbuyCard = z.infer<typeof groupbuyCard>;
 
-export const groupbuyListQuery = pageQuery;
+export const groupbuyListQuery = pageQuery.extend({
+  /**
+   * Only this product's activities — what 商品详情 asks to learn whether a product is on
+   * 拼团 right now. The list's own rule still holds: `active` and inside its window.
+   */
+  productId: id.optional(),
+});
 export type GroupbuyListQuery = z.infer<typeof groupbuyListQuery>;
 export const pagedGroupbuyCards = paged(groupbuyCard);
 

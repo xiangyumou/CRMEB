@@ -1001,6 +1001,29 @@ describe('the system refund for a failed team', () => {
 });
 
 describe('the storefront surface', () => {
+  it('narrows the list to one product: its live activities only, none for a product with none', async () => {
+    const shown = await makeActivity();
+    await makeActivity();
+    const draft = await makeActivity({ status: 'draft' });
+
+    const forProduct = await service.list(harness.ctx, {
+      page: 1,
+      pageSize: 20,
+      productId: String(shown.productId),
+    });
+    expect(forProduct.total).toBe(1);
+    expect(forProduct.items.map((item) => item.activityId)).toEqual([String(shown.activityId)]);
+    expect(forProduct.items[0]?.productId).toBe(String(shown.productId));
+
+    // A product whose only activity is not live is in none, as far as the shopper can tell.
+    const hidden = await service.list(harness.ctx, {
+      page: 1,
+      pageSize: 20,
+      productId: String(draft.productId),
+    });
+    expect(hidden).toMatchObject({ total: 0, items: [] });
+  });
+
   it('offers a team only once its leader has paid', async () => {
     const fixture = await makeActivity({ stock: 10 });
     const leader = await makeUser();
