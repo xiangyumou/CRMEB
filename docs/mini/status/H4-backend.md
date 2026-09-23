@@ -45,9 +45,32 @@ search → the rest of C's gaps → merge checklist.
    `GET /api/v1/orders/:id/gift-coupons`, already exists), the C07 `referrerInfo` fallback,
    and B's pay-result invalidation. Docs: pages.md §2.3 note and §5 rows, decor.md 角标 note.
 
+6. Stream B's gaps (added mid-task by the coordinator), all read-side:
+   - (a) `groupbuy.list` and `presale.list` take `?productId=`: that product's live activities
+     only (the same visibility window as the unfiltered list). No new route: 商品详情 asks
+     each list with `pageSize: 1`.
+   - (b) `coupon.claimableList` takes `?productId=`: among the claimable templates, the
+     shop-wide ones, those naming the product, and those naming a category it is filed under
+     (its direct `product_categories_map` rows, the ones the checkout reads). SQL twin of
+     `eligibleLineIndexes`. COUPON-009.
+   - (c) `catalog.productList` takes `?couponId=` — a coupon **template** id
+     (`userCoupon.templateId`, `claimableCoupon.templateId`), not the wallet row id. Shop-wide:
+     every sellable product; 指定商品: those; 品类券: the products under its categories. An
+     unknown or draft template lists nothing; a disabled or deleted one still answers (its
+     coupons stay spendable). The scope comes from the coupon domain's new `productScope`
+     (catalog → coupon, the existing import direction). COUPON-009 (both lists agree with what
+     `coupon.listApplicable` covers).
+   - (d) `GET /api/v1/app/config` gains `display { categorySubcategories, productReviews,
+productRecommendations, productServiceTags }`, from four switches on the
+     `storefront-appearance` group (小程序外观 → 页面显示). All default `true` (what the pages
+     show today). Config fields with defaults: no migration. SYS-015 extended.
+   - (e) `order.checkoutPreview` gains `shipAfterDays: number | null`: the presale campaign's
+     days after full payment (the column `handlePaid` stamps `ship_not_before_at` from), `null`
+     for any other kind. Through a new optional `OrderKindHandler.previewTerms` port method.
+
 ## In progress
 
-- Merge checklist.
+- Merge checklist (rerun after item 6).
 
 ## Client follow-ups
 
@@ -70,3 +93,19 @@ search → the rest of C's gaps → merge checklist.
   in the e2e seed) come first either way.
 - Test fixtures: `apps/mini/src/test/order-fixtures.ts` items default to
   `reviewed: false, reviewable: false`, details to `groupbuyTeamId: null`.
+- 商品详情 拼团 / 预售 bars (`features/product/activities.ts`): replace the two
+  `pageSize: 100` reads and the local filter with
+  `useRouteQuery('groupbuy.list', { query: { productId, pageSize: 1 } })` (and the same for
+  `presale.list`); keep the `canBuy` check.
+- 商品详情 领券 row (`features/product/product-coupons.tsx`): pass `productId` to
+  `coupon.claimableList`.
+- 商品列表 (`packages/goods/list`): pass `couponId` through to `catalog.productList` and drop
+  the "cannot narrow" note; whoever links 我的优惠券「去使用」 must pass the coupon's
+  **`templateId`**, not its `id`.
+- 分类 (`features/catalog/category-tree.ts` `showsSubcategories`) → `config.display.categorySubcategories`;
+  商品详情 评价 / 为你推荐 / 服务 → `display.productReviews` / `productRecommendations` /
+  `productServiceTags`. Read them as `config.display?.x ?? true` if a cached payload from an
+  older server can reach the page. Fixture: `apps/mini/src/test/app-config-fixture.ts` has
+  `display` all `true`.
+- 确认订单: `preview.shipAfterDays` replaces the `presale.detail` read for the presale note
+  (`checkout-fixture.ts` defaults it to `null`).
