@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * An **order reference**: the `:id` of every storefront route that names an
- * order (CR-1-h).
+ * order.
  *
  * The storefront carries one identifier per order and uses it for two things at
  * once — it prints it (订单号) and it routes on it. Only the surrogate id was

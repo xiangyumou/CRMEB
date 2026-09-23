@@ -9,8 +9,8 @@ import { defineErrors } from '../_conventions/errors';
  * unusable, which is why that one stays a single `COUPON_NOT_USABLE` in the
  * coupon domain.
  *
- * The three cancellation codes are the cancel-vs-pay decision table from the
- * brief, verbatim: the gateway says `closed` (cancel proceeds), `paid`
+ * The three cancellation codes are the cancel-vs-pay decision table: when a
+ * cancel races a payment, the gateway says `closed` (cancel proceeds), `paid`
  * (`ORDER_ALREADY_PAID`, and the order is marked paid first) or `unknown`
  * (`ORDER_PAYMENT_STATE_UNKNOWN`, and nothing at all is released).
  */
@@ -71,12 +71,12 @@ export const orderErrors = defineErrors({
 export type OrderErrorCode = keyof typeof orderErrors;
 
 /**
- * Fulfilment, invoice and staff-console codes (stream B2).
+ * Fulfilment, invoice and staff-console codes.
  *
- * A separate `defineErrors` call in the same file, because `pnpm gen` collects
- * one `errors.ts` per domain and flattens every registry it exports — so B2
- * adds a registry instead of editing B1's, and the two never conflict on a
- * line. Same rule as above: one code per decision the caller can act on.
+ * A separate `defineErrors` call in the same file: `pnpm gen` collects one
+ * `errors.ts` per domain and flattens every registry it exports, so the
+ * fulfilment side keeps its codes apart from checkout's. Same rule as above:
+ * one code per decision the caller can act on.
  *
  * The shipping codes are deliberately three, not ten. An operator can do
  * something different about "this order cannot be shipped at all"

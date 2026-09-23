@@ -24,23 +24,21 @@ import {
 /**
  * Fulfilment, the admin order console, invoices and the mobile staff console.
  *
- * B1 owns `schemas.ts` (the shopper's view of an order); this file is stream
- * B2's half of the same domain and only ever *extends* B1's shapes, never
- * rewrites them — `adminOrderListItem` is `orderListItem` plus the columns an
- * operator needs, so a field added to the storefront order appears in the
- * console for free.
+ * `schemas.ts` is the shopper's view of an order; this file only ever *extends*
+ * those shapes, never rewrites them — `adminOrderListItem` is `orderListItem`
+ * plus the columns an operator needs, so a field added to the storefront order
+ * appears in the console for free.
  *
  * Three things are worth reading before the rest:
  *
  *  1. **There is no order splitting.** A partial shipment is a `shipment` that
- *     covers some `shipmentLines`; progress lives on `orderItem.shippedQuantity`
- *     and rolls up into `orders.fulfillment_status`. The legacy parent/child
- *     cascade (`StoreOrderServices.php:1064-1076`) has no successor, and the
- *     uni-app's `split_cart_info` / `split_delivery` calls never had a route to
- *     begin with — stream H should delete them.
+ *     covers some `shipmentLines`; progress lives on
+ *     `orderItem.shippedQuantity` and rolls up into
+ *     `orders.fulfillment_status`. No child order is ever created, so nothing
+ *     has to cascade between orders.
  *  2. **The fulfilment enum is spelled `unfulfilled / partially_fulfilled /
- *     fulfilled`**, matching the frozen `orders_fulfillment_status` PostgreSQL
- *     enum, not the brief's prose `unshipped / partially_shipped / shipped`.
+ *     fulfilled`**, matching the `orders_fulfillment_status` PostgreSQL enum,
+ *     not `unshipped / partially_shipped / shipped`.
  *  3. **Virtual goods are never shipped by hand except `virtual_manual`.** Card
  *     keys and coupon goods are delivered by the paid hook, one card per order
  *     item, and the resulting `shipment` carries `deliveryMode: 'virtual'`.
@@ -50,7 +48,7 @@ import {
 // shipments
 // ---------------------------------------------------------------------------
 
-/** Mirrors `shipments_delivery_mode`. Legacy `delivery_type` express / send / fictitious. */
+/** Mirrors `shipments_delivery_mode`: courier, the shop's own delivery, or nothing to ship. */
 export const shipmentDeliveryMode = z.enum(['express', 'merchant_delivery', 'virtual']);
 export type ShipmentDeliveryMode = z.infer<typeof shipmentDeliveryMode>;
 
@@ -196,12 +194,12 @@ export const shipmentCancelBody = z.object({
 export type ShipmentCancelBody = z.infer<typeof shipmentCancelBody>;
 
 /**
- * One step of a courier's tracking feed, from stream F2's logistics index.
+ * One step of a courier's tracking feed, from the logistics provider.
  *
  * `available: false` is the honest answer while no logistics provider is
  * configured: the shipment and its tracking number are still shown, the trace
- * list is simply empty. Legacy returned an empty array either way and the UI
- * could not tell "not configured" from "not scanned yet".
+ * list is simply empty. An empty array alone would not let the UI tell "not
+ * configured" from "not scanned yet".
  */
 export const shipmentTrace = z.object({
   at: instant,
@@ -236,9 +234,8 @@ export const shipmentTrackingExample = {
   queriedAt: '2026-02-02T12:00:00+08:00',
 } satisfies ShipmentTracking;
 
-// The 快递公司 picker shape moved to `contracts/src/shipping/schemas.ts`
-// (`expressCompany` / `expressCompanyList` / `expressCompanyListExample`) when
-// stream F2 took the two routes over — CR-1-b2, settled. Import it from there.
+// The 快递公司 picker shape lives in `contracts/src/shipping/schemas.ts`
+// (`expressCompany` / `expressCompanyList` / `expressCompanyListExample`).
 
 // ---------------------------------------------------------------------------
 // the order timeline
@@ -332,8 +329,8 @@ export const orderUserBriefExample = {
 } satisfies OrderUserBrief;
 
 /**
- * The console list row: B1's `orderListItem` plus who bought it, where it goes
- * and how far it got.
+ * The console list row: the storefront's `orderListItem` plus who bought it,
+ * where it goes and how far it got.
  */
 export const adminOrderListItem = orderListItem.extend({
   platform: clientPlatform,
@@ -384,7 +381,7 @@ export const adminOrderDetail = adminOrderListItem.extend({
   /** Deadline for `shipped -> received`; the auto-receive job reads it. */
   autoReceiveAt: instant.nullable(),
   shipments: z.array(shipment),
-  /** Live after-sales on this order, for the 退款 link into stream C's pages. */
+  /** Live after-sales on this order, for the 退款 link into the refund pages. */
   refundIds: z.array(id),
 });
 export type AdminOrderDetail = z.infer<typeof adminOrderDetail>;
@@ -402,12 +399,11 @@ export const adminOrderDetailExample = {
 } satisfies AdminOrderDetail;
 
 /**
- * The legacy filter set, one query key per filter.
+ * The console's filters, one query key per axis.
  *
- * Legacy packed 待发货 / 待收货 / 已完成 into a single `status` integer that
- * mixed `status`, `paid`, `refund_status` and `is_del` together, which is why
- * 已退款 and 待收货 could never be asked for at once. Here every axis is its
- * own key and the console's tab bar is a preset over them.
+ * 待发货 / 待收货 / 已完成 are not one `status` value: status, fulfilment,
+ * refund state and deletion are separate keys, so 已退款 and 待收货 can be
+ * asked for at once, and the console's tab bar is a preset over them.
  */
 export const adminOrderListQuery = pageQuery
   .extend({
@@ -425,7 +421,7 @@ export const adminOrderListQuery = pageQuery
     createdTo: instant.optional(),
     paidFrom: instant.optional(),
     paidTo: instant.optional(),
-    /** `true` lists the soft-deleted orders instead of the live ones. Legacy `is_system_del`. */
+    /** `true` lists the soft-deleted orders instead of the live ones. */
     deleted: z.stringbool().default(false),
   })
   .extend(sortQuery(['id', 'createdAt', 'paidAt', 'payableAmount']).shape);
@@ -449,13 +445,12 @@ export type OrderRemarkBody = z.infer<typeof orderRemarkBody>;
  * 改价, before payment only.
  *
  * The operator names a **discount** and, optionally, a new freight amount; the
- * server recomputes `payableAmount` through the same arithmetic B1 prices with
- * (`payableOf` + `distribute`) and re-splits the per-line shares so that
+ * server recomputes `payableAmount` through the same arithmetic checkout prices
+ * with (`payableOf` + `distribute`) and re-splits the per-line shares so that
  * `sum(order_items.discount_amount) === orders.coupon_discount` still holds to
- * the fen. Legacy let the operator type the final total and then wrote it
- * straight onto `pay_price`, leaving the line shares stale and every later
- * partial refund wrong — that is the defect this shape exists to remove, so
- * there is deliberately no "set the total" field.
+ * the fen. Typing the final total straight onto the order would leave the line
+ * shares stale and every later partial refund wrong, so there is deliberately
+ * no "set the total" field.
  */
 export const orderPriceBody = z.object({
   /** Taken off the goods total, on top of any coupon. `"0.00"` undoes a previous change. */
@@ -540,7 +535,6 @@ export type OrderStatisticsQuery = z.infer<typeof orderStatisticsQuery>;
  * a route cannot answer with a file, and the admin kit turns `content` into a
  * download client-side. Bounded by `exportMaxRows` in the `order` config group
  * (2000 by default) — `truncated` says when the window was wider than that.
- * XLSX and a real streamed download wait for F1's storage (CR-2-b2).
  */
 export const orderExportResult = z.object({
   filename: z.string(),
@@ -577,12 +571,10 @@ export const invoiceType = z.enum(['plain', 'special']);
 export type InvoiceType = z.infer<typeof invoiceType>;
 
 /**
- * What the order was for, on the invoice record (CR-4-h §7).
+ * What the order was for, on the invoice record.
  *
- * The 发票记录 row shows a thumbnail and a product name, and before this it had
- * only an order number to show instead — a visible downgrade from legacy. The
- * fix is *not* to copy the lines onto `order_invoices`: legacy's
- * `store_order_invoice` was a second copy of the order and the two drifted the
+ * The 发票记录 row shows a thumbnail and a product name. They are *not* copied
+ * onto `order_invoices`: a second copy of the order would drift from it the
  * moment anything was refunded. This is read from `order_items` on the way out,
  * so it cannot disagree with the order it describes.
  *
@@ -740,10 +732,8 @@ export const pagedInvoices = paged(orderInvoice);
 /**
  * Who may open the mobile console.
  *
- * Not a role: legacy read the uid list out of the `order_notice_admin_uids`
- * config key and enforced it in `CustomerMiddleware`. Here it is the same list,
- * typed as the `orderStaff` config group, and `auth: 'staff'` in the contract
- * is what `handle()` checks it with.
+ * Not a role: staff are a list of user ids in the `orderStaff` config group,
+ * and `auth: 'staff'` in the contract is what `handle()` checks it with.
  */
 export const staffIdentity = z.object({
   isStaff: z.boolean(),
@@ -751,7 +741,8 @@ export const staffIdentity = z.object({
   nickname: z.string().nullable(),
   /**
    * What this staff member may do from the phone. It follows the `order-staff`
-   * group. All false for someone who is not staff (CR-1-r6).
+   * group, so the phone can hide the buttons the shop has not switched on. All
+   * false for someone who is not staff.
    */
   abilities: z.object({
     /** `order-staff.allowStaffRefundReview` — 退款审核 / 确认收货. */
@@ -783,7 +774,7 @@ export const staffStatisticsExample = {
 } satisfies StaffStatistics;
 
 /**
- * The per-day breakdown behind 统计明细 (CR-4-h §1).
+ * The per-day breakdown behind 统计明细.
  *
  * A **day** here is a calendar day in Asia/Shanghai, not a UTC day and not the
  * host's day: the shop is single-tenant and its operators read 今天 as the day
@@ -862,9 +853,9 @@ export const pagedStaffOrders = paged(staffOrderListItem);
 /**
  * 同意/拒绝退款, from the phone.
  *
- * The staff console never refunds money itself: it forwards to stream C's
- * `refund.approve` / `refund.reject`, which is the only code allowed to talk to
- * the gateway. The response is C's `refundDetail`, unchanged.
+ * The staff console never refunds money itself: it forwards to the refund
+ * domain's `approve` / `reject`, which is the only code allowed to talk to the
+ * gateway. The response is the refund domain's `refundDetail`, unchanged.
  */
 export const staffRefundReviewBody = z.object({
   decision: z.enum(['approve', 'reject']),
@@ -874,7 +865,7 @@ export const staffRefundReviewBody = z.object({
 export type StaffRefundReviewBody = z.infer<typeof staffRefundReviewBody>;
 
 /**
- * 售后备注, from the phone (CR-4-h §2).
+ * 售后备注, from the phone.
  *
  * The field is `remark`, not the console's `adminRemark`, and the difference is
  * not cosmetic: `refunds.admin_remark` is a single column the web console
