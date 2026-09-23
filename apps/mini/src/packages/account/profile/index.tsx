@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View } from '@tarojs/components';
 import { useRouteMutation, useRouteQuery } from '@shop/api-client/react';
 import { maskPhone } from '@/lib/format';
-import { navigate } from '@/platform';
+import { NicknameField, navigate } from '@/platform';
 import { LoginGate } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
 import { AvatarPicker } from '@/ui/avatar-picker';
@@ -10,7 +10,6 @@ import { Button } from '@/ui/button';
 import { Cell, CellGroup } from '@/ui/cell';
 import { ErrorBlock } from '@/ui/error-block';
 import { toast } from '@/ui/feedback';
-import { Field } from '@/ui/field';
 import { PageShell } from '@/ui/page-shell';
 import { CellSkeleton } from '@/ui/skeleton';
 import { SubmitBar, errorMessage, fieldErrorsOf } from '../shared/form';
@@ -74,10 +73,9 @@ function ProfileForm() {
         <AvatarPicker src={profile.data.avatarUrl} />
       </View>
       <CellGroup>
-        <Field
+        <NicknameField
           id="profile-nickname"
           label="昵称"
-          type="nickname"
           placeholder="填写昵称"
           value={value}
           maxLength={NICKNAME_MAX}

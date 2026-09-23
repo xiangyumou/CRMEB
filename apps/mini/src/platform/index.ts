@@ -58,6 +58,7 @@ export {
   useShare,
   type ShareContent,
 } from './share';
+export { NicknameField } from './nickname-field';
 export { storage } from './storage';
 export {
   MAX_TEMPLATES,
