@@ -8,6 +8,7 @@ import { articleSource, couponSource, need } from '@shop/contracts/decor/sources
 import {
   productCategories,
   productCategoriesMap,
+  productFavorites,
   productLabelCategories,
   productLabels,
   productLabelsMap,
@@ -16,6 +17,7 @@ import {
 import { articles } from '@shop/db/schema/cms';
 import { couponTemplates } from '@shop/db/schema/coupon';
 import { decorDocuments, decorRevisions } from '@shop/db/schema/decor';
+import { orders } from '@shop/db/schema/order';
 import { users } from '@shop/db/schema/user';
 import { createTestCtx, forkTestCtx, type TestCtx } from '@shop/testing';
 import * as coupon from '../coupon';
@@ -978,5 +980,198 @@ describe('the built-in 个人中心 — DECOR-005', () => {
     expect((await decor.resolveUserCenter(anonymous(), NO_CLIENT)).version).toBe(
       USER_CENTER_DEFAULT_VERSION,
     );
+  });
+});
+
+describe('the batch-1 blocks (G1)', () => {
+  /** Writes `blocks` straight into a draft row, past `saveDraft`, as an old build might have. */
+  async function rawPreview(blocks: unknown[], as: Ctx = anonymous()) {
+    const { id } = await drafted('custom', []);
+    await ctx.db
+      .update(decorDocuments)
+      .set({ draft: doc(blocks) })
+      .where(eq(decorDocuments.id, Number(id)));
+    const { previewToken } = await decor.createPreviewToken(ctx, { id });
+    return decor.resolveDocument(as, { id, previewToken, clientVersion: null });
+  }
+
+  it('DECOR-003: a 商品网格 stored at v1 is served at v2 as the two-column grid it was, with its products', async () => {
+    const a = await product({ name: '甲' });
+    const page = await rawPreview([
+      {
+        id: 'old',
+        type: 'productGrid',
+        v: 1,
+        props: { source: { mode: 'manual', ids: [a] }, titleLines: 1, showTag: false },
+      },
+    ]);
+    expect(page.blocks[0]).toMatchObject({
+      id: 'old',
+      v: 2,
+      props: { layout: 'grid2', titleLines: 1, showTag: false, showMarketPrice: true },
+    });
+    expect(idsIn(page, 0, 'products')).toEqual([a]);
+  });
+
+  it('DECOR-017: rich text is stored sanitised, and served sanitised even when the row was not', async () => {
+    const dirty =
+      '<p onclick="steal()">须知</p><script>alert(1)</script><iframe src="https://x.example"></iframe>' +
+      '<img src="javascript:alert(1)"><img src="https://cdn.example.com/a.jpg" style="width:9999px">';
+    const clean =
+      '<p>须知</p><img src="https://cdn.example.com/a.jpg" style="max-width:100%;height:auto;display:block">';
+
+    const { id } = await drafted('custom', [
+      { id: 'r', type: 'richText', v: 1, props: { html: dirty } },
+    ]);
+    expect((await decor.getDocument(ctx, { id })).draft.blocks[0]!.props.html).toBe(clean);
+
+    const page = await rawPreview([{ id: 'r', type: 'richText', v: 1, props: { html: dirty } }]);
+    expect(page.blocks[0]!.props.html).toBe(clean);
+  });
+
+  it('DECOR-013: a 商品选项卡 resolves every tab’s products with the page, each by its own rule', async () => {
+    const category = await productCategory('新品');
+    const inCategory = await product({}, { categoryId: category });
+    const picked = await product();
+    const page = await previewOf([
+      {
+        id: 't',
+        type: 'productTabs',
+        v: 1,
+        props: {
+          tabs: [
+            { title: '新品', source: { mode: 'category', categoryId: String(category), limit: 4 } },
+            { title: '精选', source: { mode: 'manual', ids: [picked] } },
+            { title: '空', source: { mode: 'manual', ids: [] } },
+          ],
+        },
+      },
+    ]);
+    expect(idsIn(page, 0, 'tab0')).toEqual([inCategory]);
+    expect(idsIn(page, 0, 'tab1')).toEqual([picked]);
+    expect(page.blocks[0]!.data.tab2).toEqual([]);
+  });
+
+  describe('per-shopper state of the 个人中心 blocks — DECOR-015', () => {
+    async function order(userId: number, status: 'pending_payment' | 'paid' | 'shipped') {
+      sequence += 1;
+      await ctx.db.insert(orders).values({
+        orderNo: `G1${String(sequence).padStart(10, '0')}`,
+        userId,
+        platform: 'wechat_mini',
+        status,
+        ...(status === 'pending_payment'
+          ? {}
+          : { paidAt: new Date(NOW), paidAmount: '10.00', transactionNo: `T${sequence}` }),
+        ...(status === 'shipped'
+          ? {
+              fulfillmentStatus: 'fulfilled' as const,
+              shippedAt: new Date(NOW),
+              refundStatus: 'requested' as const,
+            }
+          : {}),
+        totalQuantity: 1,
+        itemsAmount: '10.00',
+        payableAmount: '10.00',
+        receiverName: '张三',
+        receiverPhone: '13800000000',
+        receiverProvince: '广东省',
+        receiverCity: '深圳市',
+        receiverDetail: '某路 1 号',
+      });
+    }
+
+    const userCenter = (showStats = true) => [
+      { id: 'card', type: 'userCard', v: 1, props: { showStats } },
+      { id: 'orders', type: 'orderEntry', v: 1, props: {} },
+    ];
+
+    it('DECOR-015: a shopper gets their own order counts, profile and totals; a guest gets none', async () => {
+      const uid = await user('g1-shopper');
+      await ctx.db.update(users).set({ nickname: '小林' }).where(eq(users.id, uid));
+      await order(uid, 'pending_payment');
+      await order(uid, 'pending_payment');
+      await order(uid, 'paid');
+      await order(uid, 'shipped');
+      const a = await product();
+      await ctx.db.insert(productFavorites).values({ userId: uid, productId: Number(a) });
+      const other = await user('g1-other');
+      await order(other, 'paid');
+
+      const page = await previewOf(userCenter(), harness.as(shopper(uid)));
+      expect(page.blocks.map((block) => block.data)).toEqual([{}, {}]);
+      expect(page.personal).toEqual({
+        card: {
+          user: {
+            kind: 'userSummary',
+            user: {
+              nickname: '小林',
+              avatarUrl: null,
+              stats: { coupons: 0, favorites: 1, history: 0 },
+            },
+          },
+        },
+        orders: {
+          counts: {
+            kind: 'orderCounts',
+            counts: { unpaid: 2, unshipped: 1, unreceived: 1, aftersale: 1 },
+          },
+        },
+      });
+
+      const theirs = await previewOf(userCenter(), harness.as(shopper(other)));
+      expect(theirs.personal?.orders?.counts).toMatchObject({
+        counts: { unpaid: 0, unshipped: 1, unreceived: 0, aftersale: 0 },
+      });
+      expect((await previewOf(userCenter(), anonymous())).personal).toBeNull();
+    });
+
+    it('DECOR-015: the totals are read only when the card shows them', async () => {
+      const uid = await user('g1-nostats');
+      const page = await previewOf(userCenter(false), harness.as(shopper(uid)));
+      expect(page.personal?.card?.user).toEqual({
+        kind: 'userSummary',
+        user: { nickname: null, avatarUrl: null, stats: null },
+      });
+    });
+
+    it('DECOR-015: a live 个人中心 is cached without anyone’s state, and each shopper still gets theirs', async () => {
+      const first = await user('g1-first');
+      const second = await user('g1-second');
+      await order(first, 'pending_payment');
+      const id = await live(
+        'user_center',
+        [...userCenter(), carousel('c', [slide])],
+        'user_center',
+      );
+      expect(id).toBeTruthy();
+
+      const one = await decor.resolveUserCenter(harness.as(shopper(first)), NO_CLIENT);
+      const two = await decor.resolveUserCenter(harness.as(shopper(second)), NO_CLIENT);
+      expect(one.version).toBe(two.version);
+      expect(one.personal?.orders?.counts).toMatchObject({ counts: { unpaid: 1 } });
+      expect(two.personal?.orders?.counts).toMatchObject({ counts: { unpaid: 0 } });
+
+      const raw = await harness.redis.get(decor.revisionCacheKey(Number(one.version.slice(4))));
+      expect(raw).not.toBeNull();
+      expect(JSON.parse(raw!)).not.toHaveProperty('personal');
+      expect(raw).not.toMatch(/"unpaid":\d/);
+      expect(raw).not.toContain('orderCounts","counts"');
+      // What the cache keeps is which state to fetch, never the state.
+      expect(JSON.parse(raw!).blocks[1].personalNeeds).toEqual({ counts: { kind: 'orderCounts' } });
+    });
+
+    it('DECOR-015: a personal lookup that fails costs its slot, not the page', async () => {
+      const uid = await user('g1-gone');
+      const signedIn = harness.as(shopper(uid));
+      await ctx.db
+        .update(users)
+        .set({ deletedAt: new Date(NOW) })
+        .where(eq(users.id, uid));
+      const page = await previewOf(userCenter(), signedIn);
+      expect(page.blocks.map((block) => block.id)).toEqual(['card', 'orders']);
+      expect(page.personal?.card).toBeUndefined();
+      expect(page.personal?.orders?.counts).toMatchObject({ kind: 'orderCounts' });
+    });
   });
 });

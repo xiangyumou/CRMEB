@@ -26,21 +26,27 @@ demo 81.0 KB, total 469.0 KB; react ×1; no zod.
   - `examples.ts`: productGrid v2, `decorBlockExamples` (one per type).
   - Tests: `blocks.test.ts`, `rich-text.test.ts`, `decor.test.ts` updated.
 
+- **Core** (`packages/core/src/decor/`): `orderEntryCountsFor` / `userSummaryFor` in
+  `decor.resolvers.ts`; `decor-resolve.service.ts` keeps each block's `personalNeeds` (config
+  only) in the cached public page and resolves them per request with a session (each kind once
+  per request; failure costs the slot). Int tests in `decor.int.test.ts` ("the batch-1 blocks
+  (G1)"): v1 productGrid served as v2, rich text sanitised on save and on resolve, productTabs
+  slots, per-shopper counts/profile/totals never cached. `docs/invariants.md`: DECOR-003/013/015
+  citations, DECOR-015 text, new DECOR-017. `pnpm guards` green.
+
 ## In progress
 
-- Core personal layer (`orderCounts`, `userSummary`), int tests.
+- storefront-blocks components.
 
 ## Next
 
-1. Core: personal layer; int tests (v1 productGrid still served, rich text sanitised on resolve,
-   personal state never cached); invariants DECOR-015 update, DECOR-017.
-2. storefront-blocks: components + scss for every block; `RichText` in the DOM shim; fixtures;
+1. storefront-blocks: components + scss for every block; `RichText` in the DOM shim; fixtures;
    tests on React 18 + 19; `BlockList` personal / intent; registry test.
-3. Admin (`apps/web/src/admin/decor/`): `richText` + `hotspots` fields, generic render wiring,
+2. Admin (`apps/web/src/admin/decor/`): `richText` + `hotspots` fields, generic render wiring,
    spike-page fixtures.
-4. Mini demo page entries; `CONTRACTS_RUNTIME` += `decor/rich-text`.
-5. Fidelity run → `docs/mini/status/G1-fidelity/`; `docs/mini/decor.md`.
-6. Full checklist; size delta.
+3. Mini demo page entries; `CONTRACTS_RUNTIME` += `decor/rich-text`.
+4. Fidelity run → `docs/mini/status/G1-fidelity/`; `docs/mini/decor.md`.
+5. Full checklist; size delta.
 
 ## Notes
 
