@@ -65,6 +65,9 @@ interruption.
   an editor-only placeholder (`canvas-images.ts`). `templates.test.ts` checks each against
   `checkDocument` for its kind.
 
+- G1 follow-up: a new 热区 has no link (was: home); the field says so, and `linkTarget` now reads
+  `请选择跳转链接` when a required link is missing (contract message change, reported).
+
 ## In progress
 
 - Final checks, screenshots.
