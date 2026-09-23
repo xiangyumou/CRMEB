@@ -8,17 +8,15 @@ import { shapeOf } from '../lib/route-files';
 /**
  * "Every URL the admin client can call resolves to a registered route."
  *
- * Legacy needed a parser for this: `template/admin/src` built URLs as strings
- * (`url: 'order/list'`), so the guard had to read every `url:` literal and match
- * it against the PHP route table — 216 lines of extractor, and it still could
- * only see literals.
- *
- * Here the admin UI calls `callRoute(routeDef, …)` and the URL is *derived* from
- * the contract, so the property is true by construction and what is left to
- * guard is the construction itself:
+ * The admin UI calls `callRoute(routeDef, …)` and the URL is *derived* from the
+ * contract, so the property is true by construction and what is left to guard
+ * is the construction itself. (An admin that builds URLs as strings needs a
+ * parser for every `url:` literal and still only sees the literals; this one
+ * never has to.)
  *
  *   1. no API path literal outside the api seam — a hand-built `/admin-api/…`
- *      string is how the legacy failure mode comes back;
+ *      string is a URL no contract checks, which can drift from the route it
+ *      meant;
  *   2. no `fetch(` in a page or a component — data goes through the generated
  *      hooks, and the one allowed caller is `call-route.ts` itself.
  *

@@ -3,10 +3,10 @@ import { contractsAndRoutes } from './contracts';
 import type { Finding } from '../framework';
 
 /**
- * ROUTE-001 in `docs/rewrite/invariants.md`: "every registered route resolves to
+ * ROUTE-001 in `docs/invariants.md`: "every registered route resolves to
  * a real handler, and nothing else is reachable".
  *
- * The check itself is what asserts it; this file is the test id the ledger can
+ * The check itself is what asserts it; this file is the test the catalogue can
  * point at, and it splits the check's findings by direction so a failure names
  * which half broke. Both halves matter and they fail differently: a contract
  * with no route file is a 404 on a URL the client believes in, and a route file

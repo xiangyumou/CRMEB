@@ -14,9 +14,8 @@ import {
 /**
  * ROUTE-001, both ways round.
  *
- * Legacy's version of this guard walked `Route::group` files and asked whether
- * the controller method existed. Here the contract is the registry, the
- * directory is the router, and the two must agree exactly:
+ * The contract is the registry, the directory is the router, and the two must
+ * agree exactly:
  *
  *   - every contract resolves to a `route.ts` that exports its method;
  *   - every exported method of every `route.ts` is described by a contract;
@@ -31,8 +30,8 @@ import {
  * There is exactly one, and it is a decision rather than an oversight:
  * `defineRoute` describes a request and a response body, and an SSE stream has
  * neither — it has a long-lived `text/event-stream` and a sequence of events.
- * N1 shipped the endpoint as a bare handler for that reason (the file's own
- * header says so), and the admin client carries the matching exception in
+ * The endpoint is a bare handler for that reason (the file's own header says
+ * so), and the admin client carries the matching exception in
  * `checks/admin-client.ts` (`HAND_BUILT`), so both ends of the one
  * uncontracted URL are written down in the two places a reader would look.
  *

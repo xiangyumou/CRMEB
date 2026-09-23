@@ -14,8 +14,9 @@ import '../lib/install-domains';
  *      which locks the screen for everybody including the super admin);
  *   2. every menu entry's atom is declared, or the entry is invisible for ever;
  *   3. no atom is unused — an atom no route and no menu entry names is a
- *      checkbox in the role editor that grants nothing, which is how legacy's
- *      商品保障 ended up hidden inside the 商品参数 group (CAT-016).
+ *      checkbox in the role editor that grants nothing, and usually means a
+ *      route borrowed a neighbour's atom instead — the way 商品保障 must not
+ *      hide inside the 商品参数 group (CAT-016).
  *
  * The implicit atoms every admin holds (`auth:profile:*`) are exempt from (3):
  * they are granted by `IMPLICIT_ADMIN_PERMISSIONS`, not by a role.

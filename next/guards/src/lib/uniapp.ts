@@ -1,12 +1,16 @@
 /**
- * Reading `template/uni-app/api/*.js`.
+ * Reading the uni-app sources.
  *
- * The storefront's API layer is plain JavaScript: one function per legacy
- * export, a URL and a mapper. Every `request.<verb>('…')` either resolves to a
- * contract or carries a `// CONTRACT-PENDING(<stream>)` marker above it.
+ * The storefront's API layer (`api/*.js`) is plain JavaScript: one function per
+ * call the pages make, a URL and a mapper. Every `request.<verb>('…')` must
+ * resolve to a contract.
  *
- * These helpers are pure so the marker algebra — which is the only subtle part —
- * can be unit-tested without the repository.
+ * The rest of the app is read for two structural facts: which pages
+ * `pages.json` registers, and which local modules each file imports — per
+ * compilation target, because uni-app's `#ifdef` blocks mean the H5 and the
+ * mini-program builds see different code.
+ *
+ * Everything here is pure, so it is unit-tested without the repository.
  */
 
 export interface UniCall {
@@ -14,14 +18,9 @@ export interface UniCall {
   line: number;
   method: string;
   url: string;
-  /** Stream named by the marker covering this line, if any. */
-  pending: string | null;
 }
 
 const CALL = /request\.(get|post|put|patch|delete)\(\s*(['"`])((?:\\.|(?!\2)[\s\S])*)\2/g;
-const MARKER = /CONTRACT-PENDING\(([^)]+)\)/;
-const DIVIDER = /^\s*\/\/\s*-{10,}\s*$/;
-const COMMENT = /^\s*\/\//;
 
 /**
  * `/api/v1/orders/${id}/cancel` -> `/api/v1/orders/:param/cancel`.
@@ -49,45 +48,7 @@ export function normaliseUrl(raw: string): string {
   return out;
 }
 
-/**
- * Which stream's marker is in force on each line.
- *
- * A marker covers every call below it until a `// ------` section divider that
- * is not part of the marker's own comment block, or until the next marker. The
- * unit is the comment **block**, not the line: a marker's explanation often runs
- * for several lines and is closed by the divider underneath it, and that divider
- * must not cancel the marker that introduced it.
- */
-export function pendingByLine(lines: readonly string[]): Array<string | null> {
-  const active: Array<string | null> = new Array(lines.length).fill(null);
-  let current: string | null = null;
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i] ?? '';
-    if (!COMMENT.test(line)) {
-      active[i] = current;
-      i += 1;
-      continue;
-    }
-    let end = i;
-    let marker: string | null = null;
-    let divider = false;
-    while (end < lines.length && COMMENT.test(lines[end] ?? '')) {
-      const found = MARKER.exec(lines[end] ?? '');
-      if (found) marker = found[1] ?? null;
-      else if (DIVIDER.test(lines[end] ?? '')) divider = true;
-      end += 1;
-    }
-    if (marker) current = marker;
-    else if (divider) current = null;
-    for (; i < end; i += 1) active[i] = current;
-  }
-  return active;
-}
-
 export function extractCalls(file: string, source: string): UniCall[] {
-  const lines = source.split('\n');
-  const active = pendingByLine(lines);
   const out: UniCall[] = [];
   CALL.lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -98,8 +59,103 @@ export function extractCalls(file: string, source: string): UniCall[] {
       line,
       method: (match[1] ?? '').toUpperCase(),
       url: normaliseUrl(match[3] ?? ''),
-      pending: active[line - 1] ?? null,
     });
   }
   return out;
+}
+
+/** The two targets the shop ships: the H5 site and the WeChat mini-program. */
+export const TARGETS = ['H5', 'MP-WEIXIN'] as const;
+export type Target = (typeof TARGETS)[number];
+
+/** Is a conditional-compilation platform name on for this target? */
+function platformOn(name: string, target: Target): boolean {
+  return name === target || (name === 'MP' && target === 'MP-WEIXIN');
+}
+
+/** `H5 || MP-WEIXIN`, `APP-PLUS`, `!H5` … — no parentheses in this codebase. */
+function evaluate(expression: string, target: Target): boolean {
+  return expression.split('||').some((any) =>
+    any.split('&&').every((term) => {
+      const atom = term.trim();
+      return atom.startsWith('!')
+        ? !platformOn(atom.slice(1).trim(), target)
+        : platformOn(atom, target);
+    }),
+  );
+}
+
+const CONDITION = /#(ifdef|ifndef)\s+([\w\s|&!-]+?)(?:\s*-->|\s*\*\/|\s*$)/;
+
+/**
+ * The source one target compiles: lines inside an `#ifdef` / `#ifndef` block
+ * that is off for `target` are dropped, and so are the directive lines.
+ */
+export function preprocess(source: string, target: Target): string {
+  const stack: Array<{ outer: boolean; on: boolean }> = [];
+  let active = true;
+  const kept: string[] = [];
+  for (const line of source.split('\n')) {
+    const open = CONDITION.exec(line);
+    if (open) {
+      let on = evaluate(open[2] ?? '', target);
+      if (open[1] === 'ifndef') on = !on;
+      stack.push({ outer: active, on });
+      active = active && on;
+      continue;
+    }
+    const top = stack.at(-1);
+    if (/#else\b/.test(line) && top) {
+      active = top.outer && !top.on;
+      continue;
+    }
+    if (/#endif\b/.test(line) && top) {
+      active = top.outer;
+      stack.pop();
+      continue;
+    }
+    if (active) kept.push(line);
+  }
+  return kept.join('\n');
+}
+
+/** The `<script>` blocks of a `.vue` file, or the whole of a `.js` one. */
+export function scriptOf(file: string, source: string): string {
+  if (!file.endsWith('.vue')) return source;
+  return [...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
+    .map((m) => m[1] ?? '')
+    .join('\n');
+}
+
+const STATIC_FROM = /(?:^|[\n;])\s*(?:import|export)\s+[\w*${}\s,]+?\s+from\s*(['"])([^'"]+)\1/g;
+const BARE_IMPORT = /(?:^|[\n;])\s*import\s*(['"])([^'"]+)\1/g;
+
+/**
+ * Every module specifier a static `import … from`, `export … from` or bare
+ * `import '…'` names. Comments are removed first, so a commented-out import is
+ * not an import.
+ */
+export function importsOf(script: string): string[] {
+  const code = script.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const out: string[] = [];
+  for (const pattern of [STATIC_FROM, BARE_IMPORT]) {
+    pattern.lastIndex = 0;
+    for (const match of code.matchAll(pattern)) out.push(match[2] ?? '');
+  }
+  return out;
+}
+
+/** A specifier this app resolves itself: relative, or `@/` from the app root. */
+export function isLocal(specifier: string): boolean {
+  return specifier.startsWith('./') || specifier.startsWith('../') || specifier.startsWith('@/');
+}
+
+/** What a local specifier may resolve to, in the order the bundler tries. */
+export const RESOLVE_SUFFIXES = ['', '.js', '.vue', '.json', '/index.js', '/index.vue'];
+
+/** The string elements of `export const <name> = [ … ]`, or null when there is no such list. */
+export function exportedStringList(source: string, name: string): string[] | null {
+  const block = new RegExp(`export\\s+const\\s+${name}\\s*=\\s*\\[([\\s\\S]*?)\\]`).exec(source);
+  if (!block) return null;
+  return [...(block[1] ?? '').matchAll(/(['"])([^'"]*)\1/g)].map((m) => m[2] ?? '');
 }

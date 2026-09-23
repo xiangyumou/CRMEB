@@ -1,5 +1,5 @@
 /**
- * A small lexical scanner for the `tx-pool` check (CR-53-k2): which functions
+ * A small lexical scanner for the `tx-pool` check: which functions
  * take a transaction, and where inside them the code reaches for the pool.
  *
  * There is no TypeScript AST to lean on here (`typescript` 7 ships no stable

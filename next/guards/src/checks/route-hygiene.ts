@@ -35,16 +35,13 @@ interface Exemption {
   url: string;
   method: string;
   why: string;
-  /** Set when the exemption is a defect somebody else owns, not a decision. */
-  cr?: string;
-  stream?: string;
 }
 
 const AUDIT_EXEMPT: readonly Exemption[] = [
   {
     url: '/admin-api/auth/login',
     method: 'POST',
-    why: 'auth: public — there is no admin actor yet, so handle() writes no row at all (see AUDIT.md K-SEC-A4)',
+    why: 'auth: public — there is no admin actor yet, so handle() writes no row at all; every sign-in outcome is recorded under auth.adminLogin instead (SYS-012)',
   },
   {
     url: '/admin-api/catalog/sku-matrix',
@@ -106,14 +103,6 @@ export const routeHygiene = defineCheck(
         if (!exemption) continue;
         covered.push(method);
         exemptionsHit.add(`${method} ${shape}`);
-        if (exemption.cr) {
-          findings.push({
-            level: 'pending',
-            where,
-            stream: exemption.stream ?? '?',
-            message: `${method} ${exemption.why} — ${exemption.cr}`,
-          });
-        }
       }
       const needed = writes.filter((m) => !covered.includes(m));
       if (needed.length > 0 && !namesAuditTarget(file.text)) {
