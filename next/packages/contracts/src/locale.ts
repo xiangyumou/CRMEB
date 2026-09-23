@@ -3,10 +3,10 @@ import { z } from 'zod';
 /**
  * Makes zod speak Simplified Chinese.
  *
- * CONVENTIONS: error messages are "Human-readable, Simplified Chinese, safe to
- * show to the end user". A 422 body carries per-field messages straight from
- * zod, so without this every validation failure would show the shopper
- * "Invalid input: expected string, received undefined".
+ * Error messages are human-readable, Simplified Chinese and safe to show to the
+ * end user (`docs/conventions.md`). A 422 body carries per-field messages
+ * straight from zod, so without this every validation failure would show the
+ * shopper "Invalid input: expected string, received undefined".
  *
  * Importing this module is the whole API — it configures the global zod
  * instance. Anything that turns a `ZodError` into a response imports it:

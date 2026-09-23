@@ -33,8 +33,8 @@ import {
  * them (退出所有设备). That is why there is no `POST /auth/logout` — the verb
  * was already in the method.
  *
- * Fifteen routes replace the legacy system's twenty-one across two auth
- * generations. Nothing here returns a JWT, and nothing accepts one.
+ * Fifteen routes, one generation of auth. Nothing here returns a JWT, and
+ * nothing accepts one.
  */
 
 // ---------------------------------------------------------------------------

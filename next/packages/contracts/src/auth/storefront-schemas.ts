@@ -5,16 +5,13 @@ import { userProfile, userProfileExample, type UserProfile } from '../user/schem
 /**
  * Storefront sign-in.
  *
- * One generation of auth, not two. The legacy system carried v1 (`mp_auth`,
- * `wechat/auth_login`) and v2 (`routine/auth_*`, `v2/wechat/auth_*`) side by
- * side, each with its own token format and its own notion of "bound"; the
- * uni-app picked between them at runtime. Everything below is the single
- * replacement, and there is no compatibility surface.
+ * One generation of auth: one token format and one notion of "bound", for the
+ * mini-program, the OA and H5 alike. There is no compatibility surface.
  *
  * The session is an **opaque bearer token**, not a JWT. It is hashed into
- * `user_sessions` (P0-A's `UserSessionService`), carries the `password_version`
- * it was minted with, and dies the instant that version moves — which is what
- * makes "改密码 = 所有设备下线" true rather than aspirational.
+ * `user_sessions` (`UserSessionService`), carries the `password_version` it was
+ * minted with, and dies the instant that version moves — which is what makes
+ * "改密码 = 所有设备下线" true rather than aspirational.
  */
 
 // ---------------------------------------------------------------------------
@@ -25,9 +22,8 @@ import { userProfile, userProfileExample, type UserProfile } from '../user/schem
  * Why a code is being asked for.
  *
  * The scene is part of the Redis key, so a code minted for 注销 cannot be
- * replayed against 登录. The legacy system used one key per phone number for
- * every purpose, which meant a code sent to confirm a phone change would also
- * log you in.
+ * replayed against 登录. With one key per phone number for every purpose, a
+ * code sent to confirm a phone change would also log you in.
  */
 export const smsScene = z.enum([
   'login',
@@ -98,8 +94,8 @@ export type PasswordLoginBody = z.infer<typeof passwordLoginBody>;
  *
  * A phone that has no account gets one, because the alternative — a 404 that
  * tells the shopper to go and register with the same phone and the same code —
- * is the single most abandoned step in the legacy funnel. `registered` in the
- * response says which happened, so the client can show 欢迎加入 once.
+ * is where a sign-up funnel loses people. `registered` in the response says
+ * which happened, so the client can show 欢迎加入 once.
  */
 export const smsLoginBody = z.object({
   phone: phoneNumber,
@@ -133,8 +129,8 @@ export type ResetPasswordBody = z.infer<typeof resetPasswordBody>;
  *
  * Either proof works: the old password, or a fresh SMS code to the bound
  * number. An account created by WeChat has no password to quote, and refusing
- * to let it ever set one is how the legacy system produced accounts that could
- * only be reached from inside WeChat forever.
+ * to let it ever set one would leave accounts that can only be reached from
+ * inside WeChat forever.
  */
 export const changePasswordBody = z
   .object({
@@ -182,15 +178,15 @@ export type BindPhoneBody = z.infer<typeof bindPhoneBody>;
  * The result of a WeChat sign-in attempt.
  *
  * Flat rather than a discriminated union: `zod-to-openapi` renders a union as
- * `anyOf`, and the generated TanStack client then hands the uni-app stream a
- * type it has to narrow by hand at every call site. `status` is the
- * discriminator and the two payload fields are nullable.
+ * `anyOf`, and the generated TanStack client then hands the caller a type it
+ * has to narrow by hand at every call site. `status` is the discriminator and
+ * the two payload fields are nullable.
  *
  * `phone-required` means the openid resolved but no account is bound to it and
  * the shop requires a phone number. `bindToken` stands in for the openid for a
  * few minutes so the second call does not have to redeem the WeChat `code`
- * again — WeChat codes are single-use, and the legacy flow's "re-authorise and
- * try again" loop came from exactly that.
+ * again — WeChat codes are single-use, and redeeming one twice sends the
+ * shopper round a "re-authorise and try again" loop.
  */
 export const wechatLoginResult = z.object({
   status: z.enum(['signed-in', 'phone-required']),

@@ -16,8 +16,8 @@ import { z } from 'zod';
  * 2. **Nothing is defaulted or coerced.** No `.default()`, no `z.coerce`. The
  *    parser validates; `parseDiyPageValue` hands back the caller's own object so
  *    key order — which the fixtures are byte-compared on — cannot drift.
- * 3. **Numbers may arrive as strings.** The old editor round-tripped some
- *    sliders through `<input>`, so `diyNumeric` accepts both.
+ * 3. **Numbers may arrive as strings.** Saved pages carry some slider values as
+ *    strings, so `diyNumeric` accepts both.
  */
 
 /** A number that may have been persisted as a string. */

@@ -52,8 +52,8 @@ export interface RouteDef<
   /**
    * Error statuses that are an ordinary answer for this route and are logged at
    * `info` instead of `warn`/`error`. Declared per route, never inferred: a
-   * readiness probe's 503 is "not yet", polled on every deploy (CR-1-j3); the
-   * same 503 anywhere else is a dependency failure and stays `error`.
+   * readiness probe's 503 is "not yet", polled on every deploy; the same 503
+   * anywhere else is a dependency failure and stays `error`.
    */
   expectedStatuses?: readonly number[];
   examples: readonly RouteExample[];

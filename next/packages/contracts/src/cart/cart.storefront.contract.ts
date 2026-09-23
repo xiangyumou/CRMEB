@@ -21,12 +21,10 @@ import {
 /**
  * Storefront cart routes, `/api/v1/cart`.
  *
- * Every one of them is `auth: 'user'`: there is no anonymous cart. Legacy
- * scattered these over two API versions and six names
- * (`cart/add`, `cart/num`, `v2/set_cart_num`, `v2/reset_cart`, `cart/del`,
- * `cart/count`); here the collection is `/cart/items` and the two things that
- * are not CRUD — bulk removal and bulk ticking — are POSTed sub-resources, as
- * CONVENTIONS requires.
+ * Every one of them is `auth: 'user'`: there is no anonymous cart. The
+ * collection is `/cart/items`, and the two things that are not CRUD — bulk
+ * removal and bulk ticking — are POSTed sub-resources, as `docs/conventions.md`
+ * requires.
  *
  * Every mutation answers with the fresh `cart` counters so the tab-bar badge
  * never needs a second round trip.
@@ -317,9 +315,9 @@ export const cartSetSelection = defineRoute({
 });
 
 /**
- * 再次购买 — legacy `order/again`, which rebuilt a *pseudo cart* keyed by the
- * old order and then priced that. Here it simply puts the order's still-
- * sellable variants back in the real cart and reports what it could not.
+ * 再次购买. It puts the order's still-sellable variants back in the real cart
+ * and reports what it could not, rather than pricing a separate pseudo cart
+ * built from the old order.
  */
 export const cartRebuy = defineRoute({
   id: 'cart.rebuy',

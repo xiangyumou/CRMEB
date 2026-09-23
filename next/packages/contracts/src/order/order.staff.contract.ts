@@ -407,11 +407,11 @@ export const staffRefundReview = defineRoute({
  * 售后备注 from the phone.
  *
  * The web console has `POST /admin-api/refunds/:id/remark`, which overwrites
- * `refunds.admin_remark`. This one appends to the refund's log instead: the
- * schema is frozen, there is no `refunds.staff_remark`, and taking over the
- * console's single column would let a staff member erase an operator's note
- * without either of them seeing it happen. The note comes back in `logs`, attributed
- * and in order, and the refund's status is untouched.
+ * `refunds.admin_remark`. This one appends to the refund's log instead: there
+ * is no `refunds.staff_remark`, and taking over the console's single column
+ * would let a staff member erase an operator's note without either of them
+ * seeing it happen. The note comes back in `logs`, attributed and in order, and
+ * the refund's status is untouched.
  */
 export const staffRefundRemark = defineRoute({
   id: 'order.staffRefundRemark',

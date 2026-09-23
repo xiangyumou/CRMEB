@@ -22,21 +22,17 @@ import {
 /**
  * 统计, `/admin-api/stats/*`. Eight read-only routes, no writes anywhere.
  *
- * The legacy surface was twenty routes plus four dashboard endpoints, and most
- * of the difference is three deletions rather than three consolidations:
+ * What is deliberately absent:
  *
- * - **资金流水 / 账单记录 (`statistic/flow/*`) are gone.** They were a balance
- *   and recharge ledger, and balance, recharge, commission, points and paid
- *   membership are all out of scope shop-wide.
- * - **余额统计 is gone.** It was a route group with zero routes in it — an
- *   empty shell the admin menu still linked to.
+ * - **No 资金流水 / 账单记录 / 余额统计.** Those are balance and recharge
+ *   ledgers, and balance, recharge, commission, points and paid membership are
+ *   not part of the shop.
  * - **The admin home page has no statistics routes of its own.** Its tiles come
- *   from stream F1's `GET /admin-api/system/dashboard/header`, which this
- *   stream feeds through `registerDashboardContributor`, and its two charts and
- *   its product ranking are `stats/orders`, `stats/users` and
- *   `stats/products/ranking` with a range. Legacy had `home/header`,
- *   `home/order`, `home/user` and `home/rank` computing the same figures a
- *   fourth time — and disagreeing with the statistics pages about all of them.
+ *   from the system domain's `GET /admin-api/system/dashboard/header`, which
+ *   this domain feeds through `registerDashboardContributor`, and its two
+ *   charts and its product ranking are `stats/orders`, `stats/users` and
+ *   `stats/products/ranking` with a range — so the home page and the statistics
+ *   pages can never disagree about a figure.
  */
 
 export const statsUsers = defineRoute({

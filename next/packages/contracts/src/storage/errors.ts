@@ -4,21 +4,20 @@ import { defineErrors } from '../_conventions/errors';
  * `storage` error codes.
  *
  * Every upload refusal is a 4xx a user can act on, and each one names the rule
- * it broke rather than "上传失败". The three that matter most are the ones the
- * old system did not have at all: a file whose *bytes* are not what its name
- * and `Content-Type` claim, a remote URL pointing inside the network, and a
- * scan token used twice.
+ * it broke rather than "上传失败". The three that matter most: a file whose
+ * *bytes* are not what its name and `Content-Type` claim, a remote URL pointing
+ * inside the network, and a scan token used twice.
  */
 export const storageErrors = defineErrors({
   /** No `file` part in the multipart body, or it was empty. */
   STORAGE_NO_FILE: { status: 422, message: '请选择要上传的文件' },
   /**
-   * There *is* a file in the request, under some other field name (CR-5-h §1).
-   * Separated from `STORAGE_NO_FILE` because it is a client bug with a one-word
-   * fix and no amount of the user retrying will help: `details` carries
+   * There *is* a file in the request, under some other field name. Separated
+   * from `STORAGE_NO_FILE` because it is a client bug with a one-word fix and
+   * no amount of the user retrying will help: `details` carries
    * `{ expected: 'file', received: [...] }` so the log says which name to
-   * change. Legacy read `image`, the admin kit sends `file`, and a mismatch
-   * used to look to the shopper exactly like picking no photo at all.
+   * change. Otherwise a mismatch would look to the shopper exactly like picking
+   * no photo at all.
    */
   STORAGE_UPLOAD_FIELD_MISSING: { status: 422, message: '上传字段名不正确，应为 file' },
   /** Over the configured size limit. `details` carries `{ maxBytes, size }`. */

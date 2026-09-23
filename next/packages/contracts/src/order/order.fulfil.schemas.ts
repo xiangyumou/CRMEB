@@ -870,10 +870,10 @@ export type StaffRefundReviewBody = z.infer<typeof staffRefundReviewBody>;
  * The field is `remark`, not the console's `adminRemark`, and the difference is
  * not cosmetic: `refunds.admin_remark` is a single column the web console
  * overwrites, and a staff member is not an admin — there is no
- * `refunds.staff_remark` to write and the schema is frozen. A staff note is
- * therefore **appended to the refund's log** instead of replacing anything, so
- * two people remarking on the same refund cannot silently erase each other and
- * the note comes back in `logs` on the detail, in order, attributed.
+ * `refunds.staff_remark` column to write. A staff note is therefore **appended
+ * to the refund's log** instead of replacing anything, so two people remarking
+ * on the same refund cannot silently erase each other and the note comes back
+ * in `logs` on the detail, in order, attributed.
  */
 export const staffRefundRemarkBody = z.object({
   remark: z.string().min(1).max(255),

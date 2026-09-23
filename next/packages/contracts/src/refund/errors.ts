@@ -12,8 +12,8 @@ import { defineErrors } from '../_conventions/errors';
  *  - `REFUND_EXCEEDS_PAID` — the cumulative ceiling under the order-row lock,
  *    backstopped by `orders_refunded_within_paid` (REFUND-007).
  *  - `REFUND_AMOUNT_MISMATCH` — a retry arrived carrying a different amount
- *    from the one frozen at creation. Refused, never silently ignored the way
- *    the legacy `applyRefund` did (REFUND-005).
+ *    from the one frozen at creation. Refused, never silently ignored
+ *    (REFUND-005).
  *  - `REFUND_STATE_UNKNOWN` — the gateway's answer was lost. The frozen
  *    `out_refund_no` is queryable; it is never re-sent under a new number.
  */

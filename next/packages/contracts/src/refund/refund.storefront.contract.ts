@@ -18,10 +18,9 @@ import {
 /**
  * Storefront after-sales, `/api/v1/refunds` and `/api/v1/refund-reasons`.
  *
- * The legacy surface was eight routes hanging off `order/refund/*` and keyed by
- * a composite `uni` string. Here after-sales is its own resource with its own
- * id, which is what lets a shopper have two open requests on two lines of one
- * order — something the legacy order-level duplicate check forbade.
+ * After-sales is its own resource with its own id, not a sub-route of the
+ * order, which is what lets a shopper have two open requests on two lines of
+ * one order.
  */
 
 export const refundReasons = defineRoute({

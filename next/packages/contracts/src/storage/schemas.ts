@@ -218,10 +218,9 @@ export type AttachmentImportBody = z.infer<typeof attachmentImportBody>;
 /**
  * Scan-to-upload.
  *
- * The old system kept **one global token** in a cache key, so any scan by
- * anybody uploaded into whoever asked last. Here a token is minted per admin,
- * is single-use, short-lived, and the attachment it produces is owned by the
- * admin who minted it.
+ * A token is minted per admin, is single-use, short-lived, and the attachment
+ * it produces is owned by the admin who minted it. One shared token would let
+ * any scan by anybody upload into whoever asked last.
  */
 export const scanToken = z.object({
   token: z.string(),
@@ -257,13 +256,12 @@ export type ScanTokenStatus = z.infer<typeof scanTokenStatus>;
  * What the shopper is uploading, and therefore where it lands and how big it
  * may be.
  *
- * `staff` is the odd one out (CR-5-h §2). 商家管理's 添加商品 screen uploads a
- * *shop* asset from a storefront session, so it goes through this route with a
- * storefront token — but it is not a shopper's picture: it is kept in its own
- * directory, allowed to be larger, and refused outright unless the caller is on
- * the 店员 list. Before this it was sent as `review`, which was wrong on every
- * axis: wrong directory, wrong retention, and it ate the shopper's hourly
- * budget.
+ * `staff` is the odd one out. 商家管理's 添加商品 screen uploads a *shop* asset
+ * from a storefront session, so it goes through this route with a storefront
+ * token — but it is not a shopper's picture: it is kept in its own directory,
+ * allowed to be larger, and refused outright unless the caller is on the 店员
+ * list. Sending it as `review` would be wrong on every axis: wrong directory,
+ * wrong retention, and it would eat the shopper's hourly budget.
  */
 export const userUploadPurpose = z.enum(['avatar', 'review', 'refund', 'staff']);
 export type UserUploadPurpose = z.infer<typeof userUploadPurpose>;

@@ -16,7 +16,7 @@ import { id, instant, pageQuery, paged, sortQuery } from '../_conventions/common
 // admins
 // ---------------------------------------------------------------------------
 
-/** `admins.status`: 1 enabled, 0 disabled. A boolean on the wire, as agreed in CONVENTIONS. */
+/** `admins.status`: 1 enabled, 0 disabled. A boolean on the wire, per `docs/conventions.md`. */
 export const adminListItem = z.object({
   id,
   account: z.string(),

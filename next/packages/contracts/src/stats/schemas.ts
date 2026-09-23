@@ -6,23 +6,22 @@ import { id, instant } from '../_conventions/common';
  *
  * ## Why every figure is a plain `number`
  *
- * CONVENTIONS says money is a `"12.00"` string, and it is right — for money
- * that somebody is going to be charged. These are *display aggregates*: sums
- * produced by PostgreSQL, rounded to two decimals, read by a human and drawn
- * as a chart. None of them ever reaches a payment, a refund or a ledger. Stream
- * F1's `dashboardTile` already carries a money figure as a number with a
- * `format` discriminator, and one shape for both dashboards is worth more here
- * than a rule aimed at transactional money. A yuan amount up to ten digits is
- * exact in a double, so nothing is lost on the way out.
+ * `docs/conventions.md` says money is a `"12.00"` string, and it is right — for
+ * money that somebody is going to be charged. These are *display aggregates*:
+ * sums produced by PostgreSQL, rounded to two decimals, read by a human and
+ * drawn as a chart. None of them ever reaches a payment, a refund or a ledger.
+ * The system domain's `dashboardTile` already carries a money figure as a
+ * number with a `format` discriminator, and one shape for both dashboards is
+ * worth more here than a rule aimed at transactional money. A yuan amount up to
+ * ten digits is exact in a double, so nothing is lost on the way out.
  *
  * ## Why every figure has one definition
  *
- * The legacy pages each computed "revenue" their own way — the trade page by
- * `pay_time` excluding refunded orders, the order page by `add_time` including
- * them, the dashboard by `add_time` because of a misspelled option key — so
- * three screens showed three different numbers for the same day. Every figure
- * here is defined once, in `packages/core/src/stats/DEFINITIONS.md`, and every
- * page reads the same definition.
+ * If each page computed "revenue" its own way — by payment time or creation
+ * time, with or without refunded orders — three screens would show three
+ * different numbers for the same day. Every figure here is defined once, in
+ * `packages/core/src/stats/DEFINITIONS.md`, and every page reads the same
+ * definition.
  */
 
 // ---------------------------------------------------------------------------
@@ -91,13 +90,11 @@ export type StatsBreakdown = z.infer<typeof statsBreakdown>;
  * Both ends are instants because that is what the admin kit's `dateRange`
  * filter sends; the service immediately turns them into **Asia/Shanghai
  * calendar days** and every bucket boundary is a Shanghai midnight. Omitting
- * them means the last 30 days ending today, which is what the legacy pages
- * defaulted to.
+ * them means the last 30 days ending today.
  *
  * The bucket is derived, not chosen: up to 2 days → `hour`, up to 92 days →
- * `day`, beyond that → `month`. Legacy let the caller ask for a 3-month window
- * bucketed daily and then drew every third label over a daily series, silently
- * dropping two thirds of the data.
+ * `day`, beyond that → `month`. A caller-chosen bucket invites a long window
+ * drawn daily with most of its labels dropped.
  */
 export const statsRangeQuery = z.object({
   from: instant.optional(),
@@ -117,7 +114,7 @@ const statsPage = z.object({
   generatedAt: instant,
 });
 
-/** CSV in a JSON envelope, exactly as CR-2-b2 settled it for stream B2's order export. */
+/** CSV in a JSON envelope, exactly like the order export. */
 export const statsExportResult = z.object({
   filename: z.string(),
   contentType: z.literal('text/csv'),

@@ -30,8 +30,8 @@ import {
  *
  * These are the routes behind the admin kit's `AssetSource`: `listCategories`
  * is the tree, `listAssets` is the list, `upload` is the POST and `remove` is
- * the deletions sub-resource. Building the picker against the interface rather
- * than the routes is what let P0-b ship it before this stream existed.
+ * the deletions sub-resource. The picker is built against that interface, not
+ * against the routes.
  *
  * **The upload routes declare no `body` schema.** The request is
  * `multipart/form-data` with one part named `file`; `handle()` only parses JSON

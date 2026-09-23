@@ -9,9 +9,9 @@
  *    cover (or vice versa);
  *  - two examples of one route share a name (the mock server selects by name).
  *
- * Every route is a promise to the uni-app stream and the admin shell, both of
- * which develop against the mock server before any handler exists — so an
- * example that does not parse is a broken promise, not a nit.
+ * Every route is a promise to the uni-app and the admin shell, both of which
+ * can develop against the mock server before any handler exists — so an example
+ * that does not parse is a broken promise, not a nit.
  *
  * Run: `pnpm --filter @shop/contracts check:examples`
  */

@@ -8,10 +8,10 @@ import { id, instant, money, pageQuery, paged, sortQuery } from '../_conventions
  * kept honest by `presale.service.ts` assigning one to the other.
  *
  * **Full payment only.** `paymentMode` and `stage` carry the deposit vocabulary
- * because the columns exist (SCHEMA.md §6.3) and the ETL has to put the legacy
- * values somewhere, but no route drives a deposit: an activity saved with
- * `paymentMode: 'deposit'` is refused with `PRESALE_DEPOSIT_NOT_SUPPORTED`, and
- * every presale order goes `final_pending → final_paid`.
+ * because the columns exist (SCHEMA.md §6.3), but no route drives a deposit: an
+ * activity saved with `paymentMode: 'deposit'` is refused with
+ * `PRESALE_DEPOSIT_NOT_SUPPORTED`, and every presale order goes
+ * `final_pending → final_paid`.
  */
 
 // ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ export const presaleActivityListItem = z.object({
   perOrderQuantity: z.number().int().min(1),
   startAt: instant,
   endAt: instant,
-  /** 预售发货：付款后 N 天内发货. Legacy `deliver_time`. */
+  /** 预售发货：付款后 N 天内发货. */
   shipAfterDays: z.number().int().min(0),
   sortOrder: z.number().int(),
   createdAt: instant,

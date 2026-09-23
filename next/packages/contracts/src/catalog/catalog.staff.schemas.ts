@@ -108,9 +108,9 @@ export type StaffLabelAssignmentBody = z.infer<typeof staffLabelAssignmentBody>;
 /**
  * 批量改分类.
  *
- * `categoryIds`, not the CR's singular `categoryId`: a product belongs to many
- * categories in the frozen schema (`product_categories_map`), and the drawer's
- * own checkbox group collects a list. One name for one thing.
+ * `categoryIds`, not a singular `categoryId`: a product belongs to many
+ * categories (`product_categories_map`), and the drawer's own checkbox group
+ * collects a list. One name for one thing.
  */
 export const staffCategoryAssignmentBody = z.object({
   productIds,

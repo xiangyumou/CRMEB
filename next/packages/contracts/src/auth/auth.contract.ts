@@ -7,10 +7,10 @@ import { adminLoginBody, adminProfile, adminProfileExample } from './schemas';
  * handler sets an opaque `admin_session` cookie (httpOnly, SameSite=Lax,
  * Secure in production) and the shell reads identity from this payload.
  *
- * `logout` and `me` need a session but no privilege. `defineRoute` (frozen)
- * requires a permission for every `auth: 'admin'` route, so they declare the
- * two atoms under `auth:session:*`, which `@shop/core/auth` grants implicitly
- * to every authenticated admin. See `IMPLICIT_ADMIN_PERMISSIONS`.
+ * `logout` and `me` need a session but no privilege. `defineRoute` requires a
+ * permission for every `auth: 'admin'` route, so they declare the two atoms
+ * under `auth:session:*`, which `@shop/core/auth` grants implicitly to every
+ * authenticated admin. See `IMPLICIT_ADMIN_PERMISSIONS`.
  */
 
 export const adminLogin = defineRoute({

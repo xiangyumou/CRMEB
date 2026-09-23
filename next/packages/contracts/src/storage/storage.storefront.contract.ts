@@ -23,21 +23,21 @@ import {
  */
 
 /**
- * `multipart/form-data` with **exactly one** part named `file` (CR-5-h §1).
+ * `multipart/form-data` with **exactly one** part named `file`.
  *
  * The field name is part of the contract, not a convention: an upload has no
  * JSON body for `handle()` to validate, so nothing else can catch the client
- * that sends `image` (legacy's name) or `multipart` (the old uni-app pages').
- * A file under any other name is `STORAGE_UPLOAD_FIELD_MISSING`, which names
- * the fix, rather than `STORAGE_NO_FILE`, which told the shopper to pick a
- * photo they had already picked.
+ * that sends `image` or `multipart`. A file under any other name is
+ * `STORAGE_UPLOAD_FIELD_MISSING`, which names the fix, rather than
+ * `STORAGE_NO_FILE`, which would tell the shopper to pick a photo they had
+ * already picked.
  *
  * Further file parts in the same request are **ignored**, not refused: the one
  * named `file` is the upload, and a form that also carries, say, a thumbnail
  * the server does not want should not fail outright.
  *
  * `purpose=staff` is refused unless the caller is on the 店员 list, and carries
- * its own size ceiling — see `userUploadPurpose` (CR-5-h §2).
+ * its own size ceiling — see `userUploadPurpose`.
  */
 export const storageUserUpload = defineRoute({
   id: 'storage.userUpload',

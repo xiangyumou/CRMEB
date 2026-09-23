@@ -4,9 +4,9 @@
  *   src/<domain>/**\/*.contract.ts  ->  src/routes.gen.ts   (`allRoutes`)
  *   src/<domain>/errors.ts          ->  src/errors.gen.ts   (`errorRegistry`)
  *
- * Domains own their own files and never edit a shared index, so ten streams can
- * add routes in parallel without ever touching the same line. Directories whose
- * name starts with `_` are conventions/helpers, not domains.
+ * Domains own their own files and never edit a shared index, so two changes in
+ * different domains never touch the same line. Directories whose name starts
+ * with `_` are conventions/helpers, not domains.
  *
  * Run: `pnpm --filter @shop/contracts gen`
  */

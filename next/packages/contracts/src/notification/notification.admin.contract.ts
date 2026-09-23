@@ -34,9 +34,8 @@ import {
  *
  * `GET /admin-api/notifications/stream` is the SSE endpoint the bell subscribes
  * to. It has no contract: a `RouteDef` describes one request and one response
- * body, and a stream is neither. It is documented in `docs/rewrite/status/e2.md`
- * and implemented as a bare route handler, which P0-b anticipated when it wrote
- * the bell against a raw `EventSource`.
+ * body, and a stream is neither. It is a bare route handler, and the bell reads
+ * it with a raw `EventSource`.
  */
 
 const codeParams = z.object({ code: z.string().min(1).max(64) });
@@ -267,10 +266,9 @@ export const notificationAdminUnreadCount = defineRoute({
 /**
  * Reading is an explicit act.
  *
- * The legacy `jnotice` marked every new order seen the moment the badge polled
- * it, so opening the dashboard in two tabs lost the badge in one of them. Here
- * nothing the bell does on its own mutates read state; only this route and
- * `read-all` do.
+ * Nothing the bell does on its own mutates read state; only this route and
+ * `read-all` do. Marking messages seen when the badge polls would lose the
+ * badge in one of two open dashboard tabs.
  */
 export const notificationAdminMarkRead = defineRoute({
   id: 'notification.adminMarkRead',
