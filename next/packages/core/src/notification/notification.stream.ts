@@ -4,10 +4,10 @@ import type { Ctx } from '../kernel/context';
 /**
  * The SSE producer.
  *
- * P0-b's header bell already listens on `/admin-api/notifications/stream` with
- * a raw `EventSource`; this is the other half. The route handler subscribes to
- * one Redis channel per admin and forwards whatever arrives; the fan-out
- * publishes to it **after** the transaction that wrote the row has committed.
+ * The admin header bell listens on `/admin-api/notifications/stream` with a raw
+ * `EventSource`; this is the other half. The route handler subscribes to one
+ * Redis channel per admin and forwards whatever arrives; the fan-out publishes
+ * to it **after** the transaction that wrote the row has committed.
  *
  * ## Why a channel per admin, and not one channel with a recipient field
  *
@@ -69,10 +69,10 @@ export async function publishToAdmin(
 }
 
 /**
- * How many bell streams one admin may hold open **in one web process**
- * (CR-15-k2). A tab holds one; eight is more tabs than anybody works in, and
- * a loop opening streams with a stolen or valid cookie stops there instead of
- * at the process's file-descriptor limit.
+ * How many bell streams one admin may hold open **in one web process**. A tab
+ * holds one; eight is more tabs than anybody works in, and a loop opening
+ * streams with a stolen or valid cookie stops there instead of at the process's
+ * file-descriptor limit.
  */
 export const MAX_STREAMS_PER_ADMIN = 8;
 
@@ -96,14 +96,14 @@ interface Hub {
 }
 
 /**
- * One subscriber connection per process (per base client), shared by every
- * open stream (CR-15-k2).
+ * One subscriber connection per process (per base client), shared by every open
+ * stream.
  *
- * It used to be a `redis.duplicate()` per stream, so any admin session could
- * open connections in a loop until Redis `maxclients` ran out — taking the
- * sessions, rate limits and the queue down with it. Now N tabs cost one
- * connection, the channels are reference-counted, and the connection is
- * dropped when the last stream closes.
+ * With a `redis.duplicate()` per stream, any admin session could open
+ * connections in a loop until Redis `maxclients` ran out — taking the sessions,
+ * rate limits and the queue down with it. Shared, N tabs cost one connection,
+ * the channels are reference-counted, and the connection is dropped when the
+ * last stream closes.
  */
 const hubs = new WeakMap<Redis, Hub>();
 

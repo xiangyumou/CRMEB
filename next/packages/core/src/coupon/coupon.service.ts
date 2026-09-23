@@ -536,7 +536,7 @@ export async function listApplicable(
 }
 
 // ---------------------------------------------------------------------------
-// domain API — what other streams call (re-exported from index.ts)
+// domain API — what other domains call (re-exported from index.ts)
 // ---------------------------------------------------------------------------
 
 export interface QuoteInput {

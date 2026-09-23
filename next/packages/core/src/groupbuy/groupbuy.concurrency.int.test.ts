@@ -22,7 +22,7 @@ import { groupbuyKindHandler } from './groupbuy.order';
 import { registerGroupbuyDomain } from './index';
 
 /**
- * The races. This is the point of the stream.
+ * The races. This is the point of the domain.
  *
  * Every conditional state change in the group-buy domain is here: the seat
  * (`takeSeat`), the four activity ledgers (`reserveActivityStock`), the team's
