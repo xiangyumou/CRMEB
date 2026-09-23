@@ -1,3 +1,5 @@
+import type { ProductCardData } from '@/ui/product-card';
+
 /**
  * A 拼团 / 预售 activity's phase for the shopper, from its window and stock. `canBuy` is the
  * server's decision and wins: this only picks the words for why it said no.
@@ -44,4 +46,34 @@ export function shipText(shipAfterDays: number): string {
 /** 「已拼 12 件」 / 「已售 12 件」: nothing below one (C16: no made-up popularity). */
 export function salesText(verb: '已拼' | '已售', sales: number): string {
   return sales > 0 ? `${verb} ${sales} 件` : '';
+}
+
+/**
+ * A 拼团 / 预售 card as the kit's `ProductCard` takes it: the activity price, with the list price
+ * struck through when there is one.
+ */
+export function activityCard(card: {
+  activityId: string;
+  title: string;
+  intro: string | null;
+  imageUrl: string | null;
+  price: string;
+  originalPrice: string | null;
+  stock: number;
+  sales: number;
+}): { product: ProductCardData; activityPrice: string | undefined } {
+  const product: ProductCardData = {
+    id: card.activityId,
+    name: card.title,
+    subtitle: card.intro,
+    imageUrl: card.imageUrl ?? '',
+    cardImageUrl: null,
+    price: card.originalPrice ?? card.price,
+    originalPrice: null,
+    stock: card.stock,
+    salesDisplay: card.sales,
+    labels: [],
+    canAddToCart: false,
+  };
+  return { product, activityPrice: card.originalPrice ? card.price : undefined };
 }

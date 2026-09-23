@@ -27,12 +27,12 @@ into `storefront/mini` yet. Until it is, the activity pages hand checkout what S
 
 ## In progress
 
-- Pages: 领券中心, 我的优惠券, 我的拼团 done (with tests); next the 拼团 and 预售 pages.
+- Pages done with tests: 领券中心, 我的优惠券, 我的拼团, 拼团 list. Next: 拼团 activity, team page,
+  预售 list and detail.
 
 ## Next
 
-1. Pages: coupons, my-coupons, my-groupbuys, groupbuy, groupbuy-team, groupbuy-detail, presale,
-   presale-detail.
+1. Pages: groupbuy-detail, groupbuy-team, presale, presale-detail.
 2. After B merges: SkuSheet + checkout `kindMeta`, replace B's poster stub.
 3. e2e specs-mini, pages.md, screenshots, checklist.
 
@@ -40,12 +40,15 @@ into `storefront/mini` yet. Until it is, the activity pages hand checkout what S
 
 - Activity pages are the promo sub-package's own `groupbuy-detail` / `presale-detail` (already in
   the catalogue), not B's 商品详情: the two pages share no code with B's page but the SkuSheet.
+- The 拼团 list shows the participant count only; `groupbuy.summary.avatars` are not drawn (a
+  shopper's face beside this shop's products does not belong on a public page).
 
 ## Backend gaps (for the report)
 
 - `catalog.productList` has no `couponId` filter (B noted it too).
 - 预售 is full payment only (`PRESALE_DEPOSIT_NOT_SUPPORTED`): no deposit / balance window.
 - `app/config` has no switch for product-poster sharing.
-- `groupbuy.banners[].link` is a legacy path string, not a `LinkTarget`.
+- `groupbuy.banners[].link` is a legacy path string, not a `LinkTarget` (only a link that decodes
+  to a catalogue route is tappable).
 - The order detail does not name its group (`groupId`): the team is found through
   `groupbuy.myGroups` by `orderId`.
