@@ -500,6 +500,11 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
             json(res, { errcode: 40097, errmsg: 'invalid args' });
             return;
           }
+          const envVersion = body['env_version'] ?? 'release';
+          if (envVersion !== 'release' && envVersion !== 'trial' && envVersion !== 'develop') {
+            json(res, { errcode: 40097, errmsg: 'invalid args: env_version' });
+            return;
+          }
           miniCodes.push({ page: String(body['page'] ?? ''), scene });
           png(res);
           return;

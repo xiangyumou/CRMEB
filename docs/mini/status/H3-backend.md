@@ -33,9 +33,18 @@ Merged `storefront/mini` at 299956592 (G1 decor blocks) before touching the deco
      `system/` rather than design.md's `diy/theme.ts`: it derives `app/config`'s appearance, and
      `diy` is the legacy domain. SYS-021; design.md §3.3 updated.
 
+3. 小程序码 `env_version` (H2's open question)
+   - `wechat-mini.codeEnvVersion` (`release` default | `trial` | `develop`, select on the
+     settings screen) → `getwxacodeunlimit`'s `env_version`, both endpoints.
+   - Cached per version with **no migration**: a non-release code's row has page
+     `<env>:<page>`. The unique key stays `(page, scene)` because the previous image (rollback)
+     inserts with `ON CONFLICT (page, scene)`; changing the index would break it.
+   - Fake OA refuses an unknown `env_version` (40097). SHARE-003; C11 updated.
+   - (The config field itself landed in the task-1 commit, alongside `webviewDomains`.)
+
 ## In progress
 
-- Task 3: 小程序码 `env_version` from config.
+- Task 4: fake "device mode".
 
 ## Client follow-ups (stream A)
 

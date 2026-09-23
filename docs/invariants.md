@@ -1638,6 +1638,14 @@ A 拼团 poster points at the team page from the route catalogue, not at a hand-
 
 ## System, storage and uploads
 
+### SHARE-003
+
+The version a 小程序码 opens (`env_version`) is `wechat-mini.codeEnvVersion` — `release` unless an operator picks `trial` or `develop` — for both the catalogue endpoint and the legacy one, and codes are cached per version: a code minted for one version is never served while the setting names another, and switching back reuses the earlier code without calling WeChat.
+
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > asks for release by default`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > asks for the configured version, and caches per version`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > keeps the legacy endpoint on the same rule`
+
 ### SYS-001
 
 An admin route answers 401 with no session and 403 for a signed-in admin who does not hold its atom; the atom-holder gets 200.

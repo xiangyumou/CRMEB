@@ -137,6 +137,6 @@ export {
  */
 export { attachmentDataUrl } from './attachment.service';
 export { smsConfig } from './sms.config';
-export { wechatMiniConfig } from './wechat-mini.config';
+export { wechatMiniConfig, type MiniCodeEnvVersion } from './wechat-mini.config';
 export { wechatOaConfig } from './wechat-oa.config';
 export * as systemRepo from './system.repo';
