@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { id, instant, pageQuery, paged } from '../_conventions/common';
 import { DESIGNATIONS, DOCUMENT_KINDS, type Designation, type DocumentKind } from './constants';
-import { documentIssue, pageDocument, pageDocumentEnvelope, pageRootProps } from './document';
+import { documentIssue, pageDocument, pageDocumentEnvelope } from './document';
 import { personalSlot, resolvedSlot } from './sources';
 
 /** Wire schemas of the decor routes. The document model itself is in `document.ts`. */
@@ -163,6 +163,19 @@ export const resolvedBlock = z.object({
 });
 export type ResolvedBlock = z.infer<typeof resolvedBlock>;
 
+/**
+ * Root props as the storefront receives them: `pageRootProps` with every
+ * default already applied, so the client's type has no optional-by-default
+ * fields (a response schema's input and output must agree).
+ */
+export const servedRootProps = z.object({
+  title: z.string(),
+  background: z.string(),
+  shareEnabled: z.boolean(),
+  shareTitle: z.string(),
+  shareImage: z.string().optional(),
+});
+
 export const resolvedPage = z.object({
   /** `null` for the built-in 个人中心. */
   id: id.nullable(),
@@ -170,7 +183,7 @@ export const resolvedPage = z.object({
   /** The revision served; `null` for a preview (the draft) and for the built-in page. */
   revision: z.number().int().min(1).nullable(),
   preview: z.boolean(),
-  root: z.object({ props: pageRootProps }),
+  root: z.object({ props: servedRootProps }),
   /** Only the blocks this client and this shopper should see, in page order. */
   blocks: z.array(resolvedBlock),
   /**
