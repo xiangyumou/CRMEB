@@ -35,3 +35,19 @@ export function page<T>(items: T[]) {
 export function rejected(code: string, message: string, status = 422) {
   return { status, body: { code, message } };
 }
+
+export const productFixture: ResponseOf<'catalog.favoriteList'>['items'][number]['product'] = {
+  id: '11',
+  name: '纯棉毛巾',
+  subtitle: null,
+  imageUrl: '/uploads/p/11.jpg',
+  cardImageUrl: null,
+  price: '19.90',
+  originalPrice: null,
+  stock: 20,
+  salesDisplay: 3,
+  unitName: '条',
+  kind: 'physical',
+  labels: [],
+  canAddToCart: true,
+};

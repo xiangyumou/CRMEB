@@ -19,20 +19,21 @@ Updated at every commit so the work can resume after an interruption.
   minimal hook: tapping the address opens select mode, the preview/create body sends
   `addressId`. Tests.
 
+- 我的收藏 / 浏览记录 (管理 mode, batch 取消收藏 / 删除, 清空; history grouped by day) and 我的评价
+  (stars, pictures, reply; 待审核 as a neutral 「审核后展示」). Tests.
+
 ## In progress
 
-- 收藏, 浏览记录, 我的评价.
+- 消息列表 / 详情.
 
 ## Next
 
-1. 地址列表 (select mode) / 地址编辑 (RegionPicker, 导入微信地址); checkout reads the choice.
-4. 收藏, 浏览记录, 我的评价; 消息列表 / 详情.
-5. 发票: 抬头 list / edit (微信导入), 开票记录 / 详情, 申请开票.
-6. 注销账号; 协议 page (`pages/agreement`).
-7. content: 资讯列表 / 详情, web-view (C12).
-8. 我的 tab: user-centre decor through a local renderer until B's `DecorPage` lands.
-9. Vitest per page; e2e specs in `e2e/storefront/specs-mini`; `docs/mini/pages.md`; screenshots
-   in `docs/mini/status/E-screens/`; checklist; sizes.
+2. 发票: 抬头 list / edit (微信导入), 开票记录 / 详情, 申请开票.
+3. 注销账号; 协议 page (`pages/agreement`).
+4. content: 资讯列表 / 详情, web-view (C12).
+5. 我的 tab: user-centre decor through a local renderer until B's `DecorPage` lands.
+6. e2e specs in `e2e/storefront/specs-mini`; `docs/mini/pages.md`; screenshots in
+   `docs/mini/status/E-screens/`; checklist; sizes.
 
 ## Backend gaps found
 
