@@ -53,10 +53,23 @@ mini citations in `docs/invariants.md`, the mini sections of `architecture.md` /
   `specs-mini/`); stale timing comments in `storefront-e2e-mini` fixed. actionlint is not
   installed here, so the workflow was only YAML-parsed.
 
+## Final checklist (2026-09-24, at `fc5a10bfe`; `storefront/mini` still `91e3893fc`, merge a no-op)
+
+- `pnpm turbo run gen typecheck lint test:unit build`: pass (45/45).
+- `pnpm --filter @shop/e2e-storefront test:mini`: pass, 30 (the presale-coupon test is the
+  intended `test.fail`, and fails as expected).
+- `pnpm --filter @shop/e2e-storefront test`: pass, 34 (first run could not start: this worktree
+  lacked `apps/uni-app/node_modules`; after `npm ci` there, green).
+- `pnpm turbo run build --filter @shop/web && pnpm --filter @shop/e2e-admin e2e`: pass, 50.
+- `pnpm exec prettier --check .`: pass. `pnpm guards`: 15 checks, 0 failures.
+- actionlint: not installed, not run; `ci.yml` YAML-parses.
+
 ## In progress
 
-- Final merge and checklist.
+- Nothing.
 
 ## Pending
 
-- Account-page specs wait for E to merge into `storefront/mini`.
+- Account-page (E) specs: E had not merged into `storefront/mini` when this stream finished.
+- For other streams: the presale order-page price bug (`coupons.spec.ts` `test.fail`); password
+  login not built; privacy sheet only on device (D03).
