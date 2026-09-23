@@ -5,8 +5,14 @@ import { TAB_PAGES } from './platform/tab-pages';
  * else lives in a sub-package (docs/mini: main ≤ 1.5 MB, total ≤ 8 MB).
  */
 export default defineAppConfig({
-  pages: TAB_PAGES.map((tab) => tab.pagePath),
+  pages: [...TAB_PAGES.map((tab) => tab.pagePath), 'pages/product/index'],
   subPackages: [
+    {
+      // docs/mini/pages.md: checkout, cashier and the result page; stream B adds the rest.
+      root: 'packages/order',
+      name: 'order',
+      pages: ['checkout/index', 'cashier/index', 'pay-result/index'],
+    },
     {
       root: 'subpackages/demo',
       name: 'demo',

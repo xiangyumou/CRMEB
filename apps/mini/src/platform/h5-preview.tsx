@@ -1,0 +1,33 @@
+import { Button } from '@tarojs/components';
+import { fetchTransport } from '@shop/api-client';
+import { PlatformUnsupportedError, type MiniPlatform, type PhoneNumberButtonProps } from './types';
+
+/**
+ * The plain H5 build (`build:h5`): the pages in a browser, for the DIY preview. It is not a
+ * storefront a shopper can use, so it has no WeChat: sign-in, the phone button and payment
+ * all refuse, and the server sees an `h5` client.
+ */
+
+function PhoneNumberButton({ children, className, onResult }: PhoneNumberButtonProps) {
+  return (
+    <Button
+      className={className ?? ''}
+      onClick={() =>
+        onResult({ ok: false, reason: 'failed', message: 'H5 预览不支持微信手机号授权' })
+      }
+    >
+      {children}
+    </Button>
+  );
+}
+
+export const previewPlatform: MiniPlatform = {
+  kind: 'h5-preview',
+  api: { baseUrl: '', transport: fetchTransport(), clientPlatform: 'h5' },
+  login: () => Promise.reject(new PlatformUnsupportedError('微信登录', 'h5-preview')),
+  PhoneNumberButton,
+  requestPayment: () =>
+    Promise.resolve({ kind: 'failed', message: 'H5 预览不支持微信支付' } as const),
+  requestSubscribe: () => Promise.resolve({}),
+  chooseAddress: () => Promise.reject(new PlatformUnsupportedError('导入微信地址', 'h5-preview')),
+};

@@ -47,6 +47,20 @@ const pageHide = new Channel<void>();
 const pageLoad = new Channel<void>();
 const events = new Map<string, Set<(...args: unknown[]) => void>>();
 let networkType = 'wifi';
+const storageMap = new Map<string, unknown>();
+
+/** What `Taro.request` answers; a test replaces it (`taroFake.onRequest = …`). */
+export type RequestHandler = (option: {
+  url: string;
+  method: string;
+  header: Record<string, string>;
+  data?: string | undefined;
+}) => { statusCode: number; data: unknown } | Promise<{ statusCode: number; data: unknown }>;
+
+const unhandledRequest: RequestHandler = (option) => {
+  throw new Error(`taro-fake: no request handler for ${option.method} ${option.url}`);
+};
+const DEFAULT_LOGIN_CODE = 'fake-login-code';
 
 export interface RecordedCall {
   api: string;
@@ -56,6 +70,19 @@ export interface RecordedCall {
 /** The test-side controls. */
 export const taroFake = {
   calls: [] as RecordedCall[],
+  /** `Taro.login()` answers `{ code: loginCode }`. */
+  loginCode: DEFAULT_LOGIN_CODE,
+  onRequest: unhandledRequest,
+  /** `Taro.requestPayment()` resolves, or rejects with this `errMsg`. */
+  paymentError: null as string | null,
+  /** `useRouter().params`. */
+  routerParams: {} as Record<string, string>,
+  /** What a tap on `<Button openType="getPhoneNumber">` reports. */
+  phoneNumberDetail: { code: 'fake-phone-code', errMsg: 'getPhoneNumber:ok' } as {
+    code?: string;
+    errMsg: string;
+  },
+  storage: storageMap,
   showApp: () => appShow.emit(undefined),
   hideApp: () => appHide.emit(undefined),
   setNetwork(isConnected: boolean, type = isConnected ? 'wifi' : 'none') {
@@ -68,6 +95,12 @@ export const taroFake = {
   listenerCounts: () => ({ appShow: appShow.size, appHide: appHide.size, network: network.size }),
   reset() {
     this.calls = [];
+    this.loginCode = DEFAULT_LOGIN_CODE;
+    this.onRequest = unhandledRequest;
+    this.paymentError = null;
+    this.routerParams = {};
+    this.phoneNumberDetail = { code: 'fake-phone-code', errMsg: 'getPhoneNumber:ok' };
+    storageMap.clear();
     networkType = 'wifi';
     for (const channel of [appShow, appHide, network, pageShow, pageHide, pageLoad])
       channel.clear();
@@ -106,6 +139,14 @@ export function useLoad(callback: () => void): void {
   usePageLifecycle(pageLoad, callback, true);
 }
 
+export function useLaunch(callback: () => void): void {
+  usePageLifecycle(pageLoad, callback, true);
+}
+
+export function useRouter() {
+  return { path: '/pages/test/index', params: taroFake.routerParams };
+}
+
 export const eventCenter = {
   on(name: string, handler: (...args: unknown[]) => void) {
     const set = events.get(name) ?? new Set();
@@ -141,6 +182,22 @@ const Taro = {
   setTabBarBadge: (args: unknown) => record('setTabBarBadge', args, {}),
   removeTabBarBadge: (args: unknown) => record('removeTabBarBadge', args, {}),
   navigateTo: (args: unknown) => record('navigateTo', args, {}),
+  redirectTo: (args: unknown) => record('redirectTo', args, {}),
+  login: () => record('login', undefined, { code: taroFake.loginCode, errMsg: 'login:ok' }),
+  requestPayment(args: unknown) {
+    taroFake.calls.push({ api: 'requestPayment', args });
+    const errMsg = taroFake.paymentError;
+    return errMsg === null
+      ? Promise.resolve({ errMsg: 'requestPayment:ok' })
+      : Promise.reject(Object.assign(new Error(errMsg), { errMsg }));
+  },
+  request(option: Parameters<RequestHandler>[0]) {
+    taroFake.calls.push({ api: 'request', args: option });
+    return Promise.resolve().then(() => taroFake.onRequest(option));
+  },
+  getStorageSync: (key: string): unknown => storageMap.get(key) ?? '',
+  setStorageSync: (key: string, value: unknown) => void storageMap.set(key, value),
+  removeStorageSync: (key: string) => void storageMap.delete(key),
   showToast: (args: unknown) => record('showToast', args, {}),
   eventCenter,
   getCurrentInstance,
@@ -148,6 +205,8 @@ const Taro = {
   useDidShow,
   useDidHide,
   useLoad,
+  useLaunch,
+  useRouter,
 };
 
 export default Taro;

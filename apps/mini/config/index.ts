@@ -14,7 +14,43 @@ const repoRoot = path.resolve(appRoot, '../..');
  * workspace package by symlink and webpack resolves it to its real path, which is neither.
  * Without this, `import … from '@shop/contracts/…'` fails with "no loader for .ts".
  */
-const workspaceSources = [path.join(repoRoot, 'packages/contracts/src')];
+const workspaceSources = [
+  path.join(repoRoot, 'packages/contracts/src'),
+  path.join(repoRoot, 'packages/api-client/src'),
+];
+
+/**
+ * One copy each of React and TanStack Query. `@shop/api-client` resolves both from its own
+ * `node_modules` (its dev dependencies are React 19 and a Query built against it); the
+ * mini-program must use its own React 18 and the Query instance its `QueryClientProvider`
+ * lives in, or the hooks see no client and React throws "invalid hook call".
+ */
+function ownCopy(name: string): string {
+  return path.dirname(require.resolve(`${name}/package.json`, { paths: [appRoot] }));
+}
+const singletons = {
+  react: ownCopy('react'),
+  '@tanstack/react-query': ownCopy('@tanstack/react-query'),
+  '@tanstack/query-core': path.dirname(
+    require.resolve('@tanstack/query-core/package.json', {
+      paths: [ownCopy('@tanstack/react-query')],
+    }),
+  ),
+};
+
+/**
+ * `TARO_APP_PLATFORM_EMULATION=mp` builds the H5 app as the e2e suite's "模拟小程序"
+ * (`src/platform/h5-mp-emulation.tsx`) into its own directory. Only H5 may carry it: the
+ * WeChat package must never contain test-only code, so asking for it there is an error.
+ */
+const emulation = process.env.TARO_APP_PLATFORM_EMULATION ?? '';
+const taroEnv = process.env.TARO_ENV ?? 'weapp';
+if (emulation !== '' && (emulation !== 'mp' || taroEnv !== 'h5')) {
+  throw new Error(
+    `TARO_APP_PLATFORM_EMULATION=${emulation} is only valid as "mp" for an H5 build (TARO_ENV=${taroEnv}).`,
+  );
+}
+const buildName = emulation === 'mp' ? 'h5-mp-emulation' : taroEnv;
 
 /**
  * Dependencies that ship syntax newer than our target (babel.config.js): TanStack Query's
@@ -44,8 +80,7 @@ function webpackChain(chain: Chain) {
   chain.plugin('global-object').use(GlobalObjectPlugin);
   // Every build records its module list for scripts/size-report.mjs (a flag would not survive
   // turbo's strict env mode, and the file is small).
-  const platform = process.env.TARO_ENV ?? 'weapp';
-  const outFile = path.join(appRoot, '.bundle-stats', `${platform}.json`);
+  const outFile = path.join(appRoot, '.bundle-stats', `${buildName}.json`);
   chain.plugin('bundle-stats').use(BundleStatsPlugin, [outFile]);
 }
 
@@ -62,11 +97,19 @@ export default defineConfig<'webpack5'>(async (merge) => {
       828: 1.81 / 2,
     },
     sourceRoot: 'src',
-    outputRoot: `dist/${process.env.TARO_ENV ?? 'weapp'}`,
+    outputRoot: `dist/${buildName}`,
     plugins: [],
     defineConstants: {},
+    // Compile-time `process.env.*` for src/platform. Taro only defines the `TARO_APP_*` keys it
+    // finds in `.env*` files; these two must exist (as `''`) in every build, or the WeChat
+    // runtime, which has no `process`, would throw on the bare reference.
+    env: {
+      TARO_APP_API_ORIGIN: JSON.stringify(process.env.TARO_APP_API_ORIGIN ?? ''),
+      TARO_APP_PLATFORM_EMULATION: JSON.stringify(emulation),
+    },
     alias: {
       '@': path.join(appRoot, 'src'),
+      ...singletons,
     },
     copy: { patterns: [], options: {} },
     framework: 'react',
