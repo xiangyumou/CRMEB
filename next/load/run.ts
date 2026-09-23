@@ -1,5 +1,5 @@
 /**
- * K2 §4 — the load smoke.
+ * The load smoke.
  *
  *     cd next && pnpm --filter @shop/e2e-admin exec tsx ../../load/run.ts
  *
@@ -22,7 +22,7 @@
  *     measured; `pg_stat_statements` reset at the boundary.
  *
  * Everything binds to 127.0.0.1 and nothing leaves the machine. Results land
- * in `$TMPDIR/k2-load/<timestamp>/` (never in the repository).
+ * in `$TMPDIR/shop-load/<timestamp>/` (never in the repository).
  */
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -50,20 +50,20 @@ import {
 
 const env = (name: string, fallback: number) => Number(process.env[name] ?? fallback);
 
-const VUS = env('K2_LOAD_VUS', 16);
-const SECONDS = env('K2_LOAD_SECONDS', 60);
-const WARMUP = env('K2_LOAD_WARMUP', 15);
-const WEB_PORT = env('K2_LOAD_PORT', 3471);
-const PG_PORT = env('K2_LOAD_PG_PORT', 55471);
-const REDIS_PORT = env('K2_LOAD_REDIS_PORT', 56471);
-const MAX_LOAD = env('K2_LOAD_MAX_LOADAVG', 12);
-const MAX_WAIT_MIN = env('K2_LOAD_MAX_WAIT_MIN', 30);
+const VUS = env('SHOP_LOAD_VUS', 16);
+const SECONDS = env('SHOP_LOAD_SECONDS', 60);
+const WARMUP = env('SHOP_LOAD_WARMUP', 15);
+const WEB_PORT = env('SHOP_LOAD_PORT', 3471);
+const PG_PORT = env('SHOP_LOAD_PG_PORT', 55471);
+const REDIS_PORT = env('SHOP_LOAD_REDIS_PORT', 56471);
+const MAX_LOAD = env('SHOP_LOAD_MAX_LOADAVG', 12);
+const MAX_WAIT_MIN = env('SHOP_LOAD_MAX_WAIT_MIN', 30);
 const PRODUCTS = 20;
 const BASE = `http://127.0.0.1:${WEB_PORT}`;
 const DATABASE = 'shop_load';
-const PREFIX = 'k2-load';
+const PREFIX = 'shop-load';
 
-const OUT = path.join(tmpdir(), 'k2-load', new Date().toISOString().replace(/[:.]/g, '-'));
+const OUT = path.join(tmpdir(), 'shop-load', new Date().toISOString().replace(/[:.]/g, '-'));
 mkdirSync(OUT, { recursive: true });
 
 /** compose.yml's limits, in MiB. `edge` is not run: nothing here needs nginx. */
@@ -499,7 +499,7 @@ const FLOWS: Record<string, { weight: number; run: Flow }> = {
           item: { skuId: product.skuId, quantity: 1 },
           addressId: shopper.addressId,
           kind: 'normal',
-          idempotencyKey: `k2load-${randomBytes(12).toString('hex')}`,
+          idempotencyKey: `shopload-${randomBytes(12).toString('hex')}`,
         },
       });
       if (created.status !== 201)
@@ -697,7 +697,7 @@ async function main() {
     UPLOADS_DIR: uploadsDir,
     UPLOADS_PUBLIC_PREFIX: '/uploads',
     HEARTBEAT_INTERVAL_MS: '15000',
-    LOG_LEVEL: process.env.K2_LOAD_LOG_LEVEL ?? 'warn',
+    LOG_LEVEL: process.env.SHOP_LOAD_LOG_LEVEL ?? 'warn',
     QUEUE_NAME: 'shop',
   };
   const worker = await startScoped(
@@ -725,7 +725,7 @@ async function main() {
       NODE_OPTIONS: '--max-old-space-size=384',
       PORT: String(WEB_PORT),
       APP_ORIGIN: BASE,
-      APP_VERSION: 'k2-load',
+      APP_VERSION: 'shop-load',
       DB_POOL_MAX: '10',
       VALIDATE_RESPONSES: '0',
     },

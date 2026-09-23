@@ -3,8 +3,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 /**
- * `next/load` is a directory of scripts, not a workspace package: adding one
- * would mean a lockfile edit. Every dependency is therefore resolved *as if*
+ * `next/load` is a directory of scripts, not a workspace package, so it has no
+ * dependencies of its own. Every dependency is resolved *as if*
  * imported from `@shop/e2e-admin`, which already depends on `@shop/core`,
  * `@shop/db`, `@shop/testing`, `pg` and `tsx` — and the scripts run through
  * that package's `tsx`:
