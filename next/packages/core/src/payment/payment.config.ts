@@ -11,9 +11,9 @@ import {
 /**
  * The `payment` config group: WeChat Pay v3 merchant credentials.
  *
- * WeChat Pay v3 is the only gateway (CONVENTIONS §Scope guard), so there is no
- * driver selector here — the legacy `pay_wechat_type` switch between the v2 and
- * v3 channels (GATEWAY-002) has no successor because v2 is not ported.
+ * WeChat Pay v3 is the only gateway (`docs/conventions.md` §Scope guard), so
+ * there is no driver selector here — no switch between v2 and v3 channels
+ * (GATEWAY-002), because v2 is not supported.
  *
  * Every secret is `secret: true`: the admin form receives an "is set" boolean
  * and plaintext only travels back when an operator retypes it. Nothing in this
@@ -25,14 +25,13 @@ import {
 /**
  * A stored text setting.
  *
- * `config_values.value` is `jsonb`, and for a while a string written to it came
- * back as a *number* whenever it was all digits — a 商户号, a phone number —
- * because the value was parsed twice on the way out. `CR-6-c` is fixed in
- * `@shop/db` (json and jsonb reach drizzle as text and are parsed once), so this
- * is now a plain string again. The round trip is still covered by a test in
- * every group this stream owns, because the failure mode was silent: the field
- * fell back to its default and the shop reported 支付尚未配置 with a filled-in
- * form.
+ * `config_values.value` is `jsonb`, and a string written to it must come back a
+ * string even when it is all digits — a 商户号, a phone number. Parsing the
+ * value twice on the way out would turn it into a *number*; `@shop/db` has json
+ * and jsonb reach drizzle as text and parses them once, so this is a plain
+ * string. The round trip is covered by a test in every group this domain owns,
+ * because the failure mode is silent: the field falls back to its default and
+ * the shop reports 支付尚未配置 with a filled-in form.
  */
 const configText = (max: number) => z.string().max(max).default('');
 

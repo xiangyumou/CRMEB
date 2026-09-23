@@ -85,10 +85,10 @@ export async function reconcileStalePayments(
 /**
  * Closes the gateway orders of orders whose payment window has passed.
  *
- * It does *not* cancel the order: cancelling is B1's, and it releases stock and
- * coupons. This sweep only makes the money side final, so that when B1's
- * auto-cancel runs, `ensureNoOpenAttempts` can answer `closed` truthfully
- * instead of blocking on an `unknown` forever.
+ * It does *not* cancel the order: cancelling is the order domain's, and it
+ * releases stock and coupons. This sweep only makes the money side final, so
+ * that when the order auto-cancel runs, `ensureNoOpenAttempts` can answer
+ * `closed` truthfully instead of blocking on an `unknown` forever.
  */
 export async function closeExpiredPayments(
   ctx: Ctx,

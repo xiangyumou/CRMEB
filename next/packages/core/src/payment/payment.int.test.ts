@@ -33,10 +33,9 @@ import * as service from './payment.service';
  *
  * The races live next door in `payment.concurrency.int.test.ts`; this file
  * covers what a *single* correctly-signed notification, a single cancel and a
- * single reconciliation must do — which is where most of the legacy invariants
- * were written, and where the awkward ones (money for an order this shop does
- * not have, an amount that disagrees, a merchant that no longer matches) are
- * decided.
+ * single reconciliation must do — which is where most of the invariants are
+ * decided, including the awkward ones (money for an order this shop does not
+ * have, an amount that disagrees, a merchant that no longer matches).
  *
  * Everything runs against the fake gateway from `@shop/testing`: real RSA
  * signatures, real AEAD, real refusals. Nothing here calls WeChat.
@@ -67,8 +66,8 @@ beforeEach(async () => {
   // which is right — and would also let the assertions below pass while
   // proving nothing. Registration is idempotent.
   registerNotificationDomain();
-  // The order domain's paid hook commits the sale through the catalogue's
-  // stock port (CR-1-k2), as the web process wires it.
+  // The order domain's paid hook commits the sale through the catalogue's stock
+  // port, as the web process wires it.
   registerCatalogDomain();
   gateway.transactions.clear();
   gateway.refunds.clear();
@@ -231,7 +230,10 @@ function resource(
   };
 }
 
-/** B1's two-call cancel protocol, spelled out (see `payment.concurrency.int.test.ts`). */
+/**
+ * The order domain's two-call cancel protocol, spelled out (see
+ * `payment.concurrency.int.test.ts`).
+ */
 async function cancelOrder(ctx: Ctx, orderId: number): Promise<'cancelled' | 'paid' | 'blocked'> {
   const state = await service.closeOrderPayments(ctx, orderId);
   if (state === 'paid') return 'paid';
@@ -279,7 +281,7 @@ const flowRows = (kind: 'order_payment' | 'exception_refund' | 'order_refund') =
   harness.ctx.db.select().from(capitalFlows).where(eq(capitalFlows.kind, kind));
 
 // ---------------------------------------------------------------------------
-// CR-6-c — the setting that comes back is the setting that went in
+// the setting that comes back is the setting that went in
 // ---------------------------------------------------------------------------
 
 describe('an all-digit setting survives the round trip through `config_values`', () => {
@@ -334,8 +336,8 @@ describe('PAY-004 — a valid notification settles the order exactly once', () =
     expect(await exceptionRows()).toEqual([]);
     expect((await attemptRows(paid.orderId))[0]!.status).toBe('paid');
 
-    // The sale is committed in the same transaction (CR-1-k2): the fixture
-    // never reserved, so only `sales` moves.
+    // The sale is committed in the same transaction: the fixture never
+    // reserved, so only `sales` moves.
     const [item] = await harness.ctx.db
       .select({ skuId: orderItems.skuId })
       .from(orderItems)
@@ -426,12 +428,11 @@ describe('CLIENT-001 — what the cashier is told', () => {
 
 describe('PAY-001 — a notification for an order this shop does not have', () => {
   /**
-   * The legacy controller acknowledged an unknown order and did nothing, which
-   * is where "we were paid and nobody noticed" starts. Here it is still
-   * acknowledged — WeChat must stop retrying — but the money becomes a
-   * `payment_exceptions` row and an automatic refund effect. The invariant the
-   * legacy row was protecting (no side effect on an order we do not have) still
-   * holds: no order changes, no capital flow, no `order.paid`.
+   * Acknowledging an unknown order and doing nothing is where "we were paid and
+   * nobody noticed" starts. So it is acknowledged — WeChat must stop retrying —
+   * but the money becomes a `payment_exceptions` row and an automatic refund
+   * effect. And there is still no side effect on an order we do not have: no
+   * order changes, no capital flow, no `order.paid`.
    */
   it('acknowledges it, touches no order, and books it as an exception to refund', async () => {
     const started = await startedPayment();
@@ -492,8 +493,8 @@ describe('PAY-002 — an order that is already paid', () => {
   });
 
   /**
-   * CR-2-e2. The automatic refund above does not make this redundant: it can
-   * fail, and somebody has to know money arrived that the shop cannot book.
+   * The automatic refund above does not make this redundant: it can fail, and
+   * somebody has to know money arrived that the shop cannot book.
    */
   it('puts the exception on an operator’s list, once however often it is delivered', async () => {
     const paid = await paidAtGateway();
