@@ -27,7 +27,7 @@ A test names the rule it proves by putting the ID in its title —
 
 Every outbound WeChat transport (payment, refund, the official account and the mini-program) and the remote-import fetch keep certificate-chain and hostname verification on, and nothing can turn it off: verification is the platform `fetch`'s and the trust store is the container's, so no config group has a verification switch, and the tests assert that none can grow one.
 
-- `packages/core/src/payment/payment.config.test.ts::TLS-001 — no TLS toggle, in any group this stream owns > has no verification switch in <group>`
+- `packages/core/src/payment/payment.config.test.ts::TLS-001 — no TLS toggle in any payment config group > has no verification switch in <group>`
 - `packages/core/src/payment/payment.config.test.ts::keeps the API host configurable but off the form, so it cannot be re-pointed by hand`
 - `packages/core/src/refund/refund.config.test.ts::TLS-001 — no verification switch in refund > has none in the schema`
 - `packages/core/src/wechat/wechat.pay.tls.test.ts::TLS-001 — the pay client refuses a gateway it cannot authenticate > refuses the handshake, so the query never reaches the server`

@@ -39,7 +39,7 @@ describe('toJobId', () => {
 });
 
 describe('createBullQueue', () => {
-  it('enqueues a job whose dedupeKey carries a colon (CR-15-k)', async () => {
+  it('enqueues a job whose dedupeKey carries a colon', async () => {
     await expect(
       queue.enqueue(
         'order.autoCancel',

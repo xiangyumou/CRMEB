@@ -444,7 +444,7 @@ function slot<T>(label: string) {
     get(): T {
       if (value === undefined) {
         throw new DomainError('INTERNAL', {
-          message: `${label} 尚未注册（拥有该端口的 stream 未加载）`,
+          message: `${label} 尚未注册（提供该端口的领域未加载）`,
         });
       }
       return value;

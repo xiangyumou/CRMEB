@@ -206,7 +206,7 @@ export async function seedE2E(options: {
     // priced on the address's city *path* (`shipping.freight.port.ts`
     // `cityPathOf`), and an address with no `cityId` quotes no freight at all
     // — the fallback region is never even consulted. The template database
-    // has no division reference data (production loads it through the ETL),
+    // has no division reference data (`db:seed` loads it, the template skips it),
     // so the one path the journeys ship to is inserted here.
     const [province] = await db
       .insert(cities)

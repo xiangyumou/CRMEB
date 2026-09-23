@@ -188,34 +188,6 @@ export function localReadStream(root: string, key: string): ReturnType<typeof cr
   return createReadStream(full);
 }
 
-/**
- * S3-compatible driver.
- *
- * A throwing stub rather than a half-driver, so nobody ships a silent no-op to
- * production. The real driver is `createS3Storage` in `core/src/storage/s3.ts`,
- * which is what `storage.driver = 's3'` resolves to; key generation stays
- * server-side exactly as in the local driver.
- */
-export function createS3Storage(_options: {
-  bucket: string;
-  region: string;
-  endpoint?: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  publicBaseUrl: string;
-}): Storage {
-  const notImplemented = (): never => {
-    throw new Error('storage: S3 驱动尚未实现（stream F1），请将 storage.driver 配置为 local');
-  };
-  return {
-    put: notImplemented,
-    get: notImplemented,
-    delete: notImplemented,
-    url: notImplemented,
-    exists: notImplemented,
-  };
-}
-
 /** In-memory driver for unit tests. Same key-generation rules as the real one. */
 export function memoryStorage(now: () => Date = () => new Date(0)): Storage & {
   files: Map<string, Buffer>;

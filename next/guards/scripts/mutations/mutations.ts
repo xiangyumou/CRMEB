@@ -243,7 +243,7 @@ export const MUTATIONS: readonly Mutation[] = [
       },
       {
         file: 'src/payment/payment.config.test.ts',
-        describe: 'TLS-001 — no TLS toggle, in any group this stream owns',
+        describe: 'TLS-001 — no TLS toggle in any payment config group',
         project: 'unit',
       },
     ],

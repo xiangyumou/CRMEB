@@ -242,7 +242,7 @@ describe('the Redis cache', () => {
   });
 });
 
-describe('config.getIn — a read inside a transaction (CR-53-k2)', () => {
+describe('config.getIn — a read inside a transaction', () => {
   it('sees the transaction’s own uncommitted rows, which a pooled read cannot', async () => {
     let inside: number | undefined;
     let pooled: number | undefined;
