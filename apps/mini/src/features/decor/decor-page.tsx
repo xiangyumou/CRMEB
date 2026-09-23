@@ -3,11 +3,10 @@ import { View } from '@tarojs/components';
 import type { ResponseOf } from '@shop/api-client';
 import type { StorefrontRoute } from '@shop/api-client/routes';
 import { BlockList, type BlockIntent, type PersonalSlots } from '@shop/storefront-blocks';
-import { callPhone } from '@/platform';
+import { callPhone, openLinkTarget } from '@/platform';
 import { requireLogin } from '@/session/session';
 import { ContactArea, sessionFromOf, useSupport } from '@/ui/contact-button';
 import { toast } from '@/ui/feedback';
-import { openLinkTarget } from './open-link';
 import './decor-page.scss';
 
 export type ResolvedPage = ResponseOf<'decor.pageHome'>;
@@ -62,7 +61,7 @@ export function DecorPage({ page, route }: DecorPageProps) {
         blocks={page.blocks}
         data={data}
         personal={page.personal as Readonly<Record<string, PersonalSlots>> | null}
-        onLink={openLinkTarget}
+        onLink={(link) => void openLinkTarget(link)}
         onIntent={onIntent}
         renderIntent={renderIntent}
       />

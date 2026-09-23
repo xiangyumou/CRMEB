@@ -2,12 +2,13 @@ import { create } from 'zustand';
 import { isApiError, type ResponseOf } from '@shop/api-client';
 import { api } from '@/data/api';
 import { assetUrl } from '@/lib/asset-url';
-import { setShareDefaults, setSubscribeTemplates, storage, type SubscribeScene } from '@/platform';
+import { setServerTime } from '@/lib/server-clock';
+import { setShareDefaults, setSubscribeTemplates, setWebviewDomains, storage } from '@/platform';
 import { useThemeStore } from '@/theme/store';
 
 /**
  * `GET /api/v1/app/config`: the launch payload (theme, tab bar, sign-in options, share card,
- * subscribe templates, 客服, splash).
+ * subscribe templates, web-view domains, 客服, splash).
  *
  * Cold start paints from the copy kept in storage, then asks the server with
  * `If-None-Match: W/"<version>"`: a 304 keeps the copy, a 200 replaces it. Offline, the copy
@@ -30,30 +31,12 @@ export function useAppConfig(): AppConfig | null {
   return useAppConfigStore((state) => state.config);
 }
 
-/**
- * Which `subscribeTemplates` a scene asks for (C08; at most three are sent, in this order).
- * An order's checkout asks for shipping first, the message the shopper wants most. The backend
- * groups templates by message, not by the page that asks, so the mapping lives here until
- * `app/config` carries per-scene lists (reported gap).
- */
-export function templatesByScene(
-  templates: AppConfig['subscribeTemplates'],
-): Record<SubscribeScene, string[]> {
-  const order = [...templates.orderShip, ...templates.orderPay, ...templates.orderCreate];
-  return {
-    checkout: order,
-    groupbuyCheckout: order,
-    presaleCheckout: order,
-    refundApply: [...templates.refund],
-    returnShipment: [...templates.refund],
-  };
-}
-
 /** Hand a config to everything that reads it. */
 export function applyAppConfig(config: AppConfig, source: 'cache' | 'network'): void {
   useAppConfigStore.setState({ config, source });
   useThemeStore.getState().applyAppearance(config.appearance);
-  setSubscribeTemplates(templatesByScene(config.subscribeTemplates));
+  setSubscribeTemplates(config.subscribeScenes);
+  setWebviewDomains(config.webviewDomains);
   const title = config.share.title || config.name;
   const imageUrl = assetUrl(config.share.image);
   setShareDefaults({ ...(title ? { title } : {}), ...(imageUrl ? { imageUrl } : {}) });
@@ -65,7 +48,7 @@ function readCache(): AppConfig | null {
   try {
     const parsed = JSON.parse(raw) as Partial<AppConfig>;
     // A copy from an older build that lacks what this one reads is no copy.
-    return typeof parsed.version === 'string' && parsed.appearance && parsed.subscribeTemplates
+    return typeof parsed.version === 'string' && parsed.appearance && parsed.subscribeScenes
       ? (parsed as AppConfig)
       : null;
   } catch {
@@ -91,6 +74,9 @@ async function load(): Promise<void> {
     const fresh = await api.call('system.appConfigGet', undefined, {
       headers: cached ? { 'If-None-Match': `W/"${cached.version}"` } : undefined,
     });
+    // Only a fresh answer's time counts: the stored copy's is as old as the copy. A 304 has no
+    // body; its `X-Server-Time` header is read by the transport (lib/server-clock).
+    setServerTime(Date.parse(fresh.serverTime));
     storage.set(APP_CONFIG_KEY, JSON.stringify(fresh));
     applyAppConfig(fresh, 'network');
   } catch (error) {

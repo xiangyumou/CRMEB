@@ -55,13 +55,3 @@ export function navBarMetrics(): NavBarMetrics {
     return FALLBACK;
   }
 }
-
-/**
- * Opens another mini-program (a DIY link of kind `miniprogram`). WeChat asks the shopper first;
- * a refusal is not an error.
- */
-export function openMiniProgram(appId: string, path?: string): void {
-  void Promise.resolve(Taro.navigateToMiniProgram({ appId, ...(path ? { path } : {}) })).catch(
-    () => undefined,
-  );
-}

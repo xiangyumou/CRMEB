@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { useAppConfig } from '@/app-config';
 import { assetUrl } from '@/lib/asset-url';
-import { storage } from '@/platform';
+import { serverNow } from '@/lib/server-clock';
+import { openLinkTarget, storage } from '@/platform';
 import { Image } from '@/ui/image';
 import { Pressable } from '@/ui/pressable';
-import { openLinkTarget } from './open-link';
 import { SPLASH_DAY_KEY, shopDay, splashDue } from './splash';
 import './splash-overlay.scss';
 
@@ -20,7 +20,7 @@ const SCREEN_RATIO = 750 / 1334;
 export function SplashOverlay() {
   const config = useAppConfig();
   const ad = config?.splashAd;
-  const [today] = useState(() => shopDay(Date.now()));
+  const [today] = useState(() => shopDay(serverNow()));
   const [phase, setPhase] = useState<'waiting' | 'open' | 'closed'>('waiting');
   const [left, setLeft] = useState(0);
 
@@ -58,7 +58,7 @@ export function SplashOverlay() {
           className="splash__picture"
           onClick={() => {
             close();
-            openLinkTarget(link);
+            void openLinkTarget(link);
           }}
         >
           <Image src={assetUrl(ad.imageUrl)} label="开屏图片" ratio={SCREEN_RATIO} lazy={false} />

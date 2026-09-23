@@ -59,7 +59,13 @@ export type RequestHandler = (option: {
   method: string;
   header: Record<string, string>;
   data?: string | undefined;
-}) => { statusCode: number; data: unknown } | Promise<{ statusCode: number; data: unknown }>;
+}) => RequestAnswer | Promise<RequestAnswer>;
+
+interface RequestAnswer {
+  statusCode: number;
+  data: unknown;
+  header?: Record<string, string>;
+}
 
 const unhandledRequest: RequestHandler = (option) => {
   throw new Error(`taro-fake: no request handler for ${option.method} ${option.url}`);
@@ -279,6 +285,7 @@ const Taro = {
   removeTabBarBadge: (args: unknown) => record('removeTabBarBadge', args, {}),
   setTabBarItem: (args: unknown) => record('setTabBarItem', args, {}),
   navigateTo: (args: unknown) => record('navigateTo', args, {}),
+  navigateToMiniProgram: (args: unknown) => record('navigateToMiniProgram', args, {}),
   redirectTo: (args: unknown) => record('redirectTo', args, {}),
   switchTab: (args: unknown) => record('switchTab', args, {}),
   reLaunch: (args: unknown) => record('reLaunch', args, {}),
@@ -327,7 +334,6 @@ const Taro = {
     }),
   getEnterOptionsSync: () => taroFake.enterOptions,
   makePhoneCall: (args: unknown) => record('makePhoneCall', args, {}),
-  navigateToMiniProgram: (args: unknown) => record('navigateToMiniProgram', args, {}),
   getWindowInfo: () => ({ statusBarHeight: 20, windowWidth: 375, windowHeight: 812 }),
   getMenuButtonBoundingClientRect: () => ({ top: 24, left: 281, height: 32, width: 87 }),
   previewImage: (args: unknown) => record('previewImage', args, {}),
