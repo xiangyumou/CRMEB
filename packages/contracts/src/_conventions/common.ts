@@ -4,6 +4,23 @@ import { z } from 'zod';
 export const id = z.string().regex(/^[1-9]\d*$/, 'id 格式不正确');
 
 /**
+ * A list of ids in a query string: a comma list or the key repeated. At most
+ * 100, one full page.
+ *
+ * `?ids=12,7,31`, `?ids=12&ids=7` and the two mixed all parse to one array,
+ * in the order given.
+ */
+export const idList = z
+  .union([z.string(), z.array(z.string())])
+  .transform((value) =>
+    (Array.isArray(value) ? value : [value])
+      .flatMap((part) => part.split(','))
+      .map((part) => part.trim())
+      .filter((part) => part !== ''),
+  )
+  .pipe(z.array(id).min(1).max(100));
+
+/**
  * Money is a decimal string with exactly two fraction digits ("12.00"), never a JS number.
  * Stored as numeric(12,2); the domain works in integer fen through `Money` in core/kernel.
  */

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { id, instant, money, pageQuery, paged, sortQuery } from '../_conventions/common';
+import { id, idList, instant, money, pageQuery, paged, sortQuery } from '../_conventions/common';
 
 /**
  * Shapes shared by the catalog routes.
@@ -984,20 +984,6 @@ export const productSkuMatrix = z.object({
   specs: z.array(storefrontSpec),
   skus: z.array(storefrontSku),
 });
-
-/**
- * A query-string id list: `?ids=12,7,31`, `?ids=12&ids=7`, or both mixed.
- * At most 100 — one full page, so a picked list never spills onto page two.
- */
-const idList = z
-  .union([z.string(), z.array(z.string())])
-  .transform((value) =>
-    (Array.isArray(value) ? value : [value])
-      .flatMap((part) => part.split(','))
-      .map((part) => part.trim())
-      .filter((part) => part !== ''),
-  )
-  .pipe(z.array(id).min(1).max(100));
 
 export const storefrontProductListQuery = pageQuery
   .extend({
