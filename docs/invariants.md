@@ -39,7 +39,7 @@ Every outbound WeChat transport (payment, refund, the official account and the m
 - `packages/core/src/wechat/wechat.client.tls.test.ts::refuses a token-bearing JSON call`
 - `packages/core/src/wechat/wechat.client.tls.test.ts::refuses a binary call (小程序码)`
 - `packages/core/src/wechat/wechat.client.tls.test.ts::refuses a multipart upload (素材)`
-- `packages/core/src/storage/safe-fetch.tls.test.ts::safeFetch over real TLS (CR-11-k) > keeps certificate verification on in the production transport (TLS-001)`
+- `packages/core/src/storage/safe-fetch.tls.test.ts::safeFetch over real TLS > keeps certificate verification on in the production transport (TLS-001)`
 - `packages/core/src/refund/refund.tls.test.ts::TLS-001 — the refund client refuses a gateway it cannot authenticate > refuses the refund create at the handshake, so the request never reaches the server`
 - `packages/core/src/refund/refund.tls.test.ts::refuses the refund query the same way — a SUCCESS is only trustworthy over an authenticated channel`
 
@@ -218,9 +218,9 @@ Multi-item order pricing splits the coupon across every line. A line written at 
 - `packages/core/src/order/order.int.test.ts::order creation > per-line discount shares add back up to the order total`
 - `packages/core/src/order/order.pricing.test.ts::splitAdjustments > adds the shares back to the total for an awkward three-way split`
 - `packages/core/src/order/order.pricing.test.ts::distribute > gives the leftover fen to the largest remainder, deterministically`
-- `packages/core/src/order/order.adjustments.int.test.ts::CR-2-h4 — a 预售 order with a stacked coupon > separates the activity from the coupon, and the list and the detail agree`
-- `packages/core/src/order/order.adjustments.int.test.ts::CR-2-h4 — a 预售 order with a stacked coupon > lists only the coupon on an ordinary order, split over its lines`
-- `packages/core/src/order/order.pricing.test.ts::splitAdjustments > keeps each adjustment's own per-line share, which the order lines persist (CR-2-h4)`
+- `packages/core/src/order/order.adjustments.int.test.ts::a 预售 order with a stacked coupon > separates the activity from the coupon, and the list and the detail agree`
+- `packages/core/src/order/order.adjustments.int.test.ts::a 预售 order with a stacked coupon > lists only the coupon on an ordinary order, split over its lines`
+- `packages/core/src/order/order.pricing.test.ts::splitAdjustments > keeps each adjustment's own per-line share, which the order lines persist`
 
 ## Stock
 
@@ -356,7 +356,7 @@ One card per order line, for good: a claim hands the same card back on a replay,
 - `packages/core/src/cart/cart.rules.test.ts::capFor > is one for a card-key product, whatever limit the product carries`
 - `packages/core/src/order/order.int.test.ts::checkout preview > refuses more than one card key per line`
 - `packages/core/src/order/order.int.test.ts::checkout preview > refuses more than one card key on 立即购买 too`
-- `packages/core/src/order/order.int.test.ts::checkout preview > lets a single card key through checkout, and B2 delivers exactly one`
+- `packages/core/src/order/order.int.test.ts::checkout preview > lets a single card key through checkout, and fulfilment delivers exactly one`
 
 ### CAT-011
 
@@ -724,7 +724,7 @@ A dispatch can be revoked only while the order has not left `paid`; revoking ret
 
 A courier API that is down or absent answers `available: false` rather than taking the order page with it.
 
-- `packages/core/src/order/order.fulfil.int.test.ts::tracking > answers "unknown" rather than failing when stream F2 has not landed`
+- `packages/core/src/order/order.fulfil.int.test.ts::tracking > answers "unknown" rather than failing when no logistics provider is registered`
 - `packages/core/src/order/order.fulfil.int.test.ts::tracking > does not let a courier API outage take the order page down`
 
 ### FULFILL-007
@@ -895,7 +895,7 @@ It obeys the same cumulative ceiling an applied refund does — never more than 
 It settles through the same path an approved request does — one capital-flow row, one `StockPort.release`, the order's roll-up and `onOrderRefunded` — and a failed group buy's paid members each end up with exactly one refund however many sweeps run, while a member who never paid gets none.
 
 - `packages/core/src/refund/refund.system.int.test.ts::a refund the shop opens by itself > settles through the same path an approved request does`
-- `packages/core/src/groupbuy/groupbuy.int.test.ts::the CR-3-d system refund > gives every paid member exactly one refund, however many sweeps run`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the system refund for a failed team > gives every paid member exactly one refund, however many sweeps run`
 
 ## Registration and notifications
 
@@ -1076,8 +1076,8 @@ An expired under-filled team refunds every paid member exactly once, through the
 
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > fails an under-filled team and asks for one refund per paid member`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > is idempotent — a second sweep records no second refund`
-- `packages/core/src/groupbuy/groupbuy.int.test.ts::the CR-3-d system refund > gives every paid member exactly one refund, however many sweeps run`
-- `packages/core/src/groupbuy/groupbuy.int.test.ts::the CR-3-d system refund > lets a test substitute the refund seam`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the system refund for a failed team > gives every paid member exactly one refund, however many sweeps run`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the system refund for a failed team > lets a test substitute the refund seam`
 
 ### RISK-D-006
 
@@ -1086,7 +1086,7 @@ An expired under-filled team refunds every paid member exactly once, through the
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > refuses 立即成团 while the shop has 虚拟成团 switched off`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > fills the team virtually when the shop has said it may`
 - `apps/web/app/admin-api/groupbuy-activities/groupbuy.int.test.ts::/admin-api/groupbuy-groups and /admin-api/groupbuy-statistics > refuses 立即成团 to an admin who may read teams but not complete them`
-- `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::CR-3-h4 — 立即成团 says so > records one groupbuy.settle effect when an operator completes a team`
+- `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::立即成团 says so > records one groupbuy.settle effect when an operator completes a team`
 
 ### RISK-D-007
 
@@ -1107,10 +1107,10 @@ One shopper cannot hold two seats in one team however fast they click, and a tea
 
 The 拼团价 is what a group-buy order charges, and an ordinary order for the same SKU still charges the catalogue price. The activity price reaches the order through the pricing contributor, and the kind handler checks the _result_: `afterCreate` compares what the written lines charge against what the activity says they cost and rolls the whole order back if the goods cost more. Charging less is allowed — a coupon on top is the shopper's business.
 
-- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout (CR-1-d) > prices a group-buy order at the activity price, preview and create`
-- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout (CR-1-d) > leaves the same SKU at its ordinary price on an ordinary order`
-- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout (CR-1-d) > prices a shopper joining an open team the same way`
-- `packages/core/src/groupbuy/groupbuy.int.test.ts::beforeCreate > refuses an order whose draft is not at the activity price (CR-1-d)`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > prices a group-buy order at the activity price, preview and create`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > leaves the same SKU at its ordinary price on an ordinary order`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > prices a shopper joining an open team the same way`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::beforeCreate > refuses an order whose draft is not at the activity price`
 
 ## 页面装修 (DIY)
 
@@ -1125,14 +1125,14 @@ A saved page survives parse → serialise byte for byte, including keys no schem
 
 Retired components and links to removed storefront pages are filtered on **read**, never on write: the stored row keeps every node, and the storefront is served the page with those nodes stripped.
 
-- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity with DiyCompatibilityServices::clean > covers every branch of the PHP`
+- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity fixtures > covers every branch of the filter`
 - `packages/core/src/diy/diy.int.test.ts::the storefront read > serves the home page with the retired components stripped`
 
 ### DIY-003
 
 Cleaning preserves key order and returns its input by identity when nothing is stripped, so a cleaned page still serialises byte for byte.
 
-- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity with DiyCompatibilityServices::clean > keeps key order, so a cleaned page still serialises byte for byte`
+- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity fixtures > keeps key order, so a cleaned page still serialises byte for byte`
 
 ### DIY-004
 
@@ -1170,7 +1170,7 @@ PostgreSQL `jsonb` reorders the keys inside a node; the guarantee that survives 
 
 超级组件 (`customComponent`) is renderable but not creatable: the palette does not offer it, because the shop has no designer for its inner layout and a freshly created 超级组件 could never be filled. Existing nodes keep their config panel and their `customComponents` tree round-trips untouched.
 
-- `packages/contracts/src/diy/schema/round-trip.test.ts::the registry > keeps customComponent renderable but out of the palette (CR-2-g2)`
+- `packages/contracts/src/diy/schema/round-trip.test.ts::the registry > keeps customComponent renderable but out of the palette`
 
 ## Storefront end to end
 
@@ -1211,7 +1211,7 @@ An order is created `pending_payment`, paid through the cashier with the worker 
 
 The storefront's public config offers WeChat Pay as the only way to pay, and reports it available only once its credentials are complete.
 
-- `packages/core/src/system/system.int.test.ts::站点公开配置 (CR-7-h2) > says WeChat Pay is available only once the credentials are complete`
+- `packages/core/src/system/system.int.test.ts::站点公开配置 > says WeChat Pay is available only once the credentials are complete`
 
 ### SMOKE-008
 
@@ -1231,7 +1231,7 @@ The group-buy poster is drawn by the client: the server composes and uploads not
 
 The storefront is served DIY data with the components and navigation entries the shop does not have removed whole, and every other node kept.
 
-- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity with DiyCompatibilityServices::clean > covers every branch of the PHP`
+- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity fixtures > covers every branch of the filter`
 - `packages/core/src/diy/diy.int.test.ts::the storefront read > serves the home page with the retired components stripped`
 
 ### SMOKE-011
@@ -1287,7 +1287,7 @@ The concurrency set (payment creation vs cancellation, refund agreement in two p
 - `packages/core/src/coupon/coupon.concurrency.int.test.ts::COUPON-008 — one user tapping 领取 twice > never lets simultaneous taps exceed a limit above one`
 - `packages/core/src/order/order.fulfil.concurrency.int.test.ts::two dispatchers replaying the same virtual delivery > gives the last card to exactly one of two orders racing for it`
 - `packages/core/src/groupbuy/groupbuy.concurrency.int.test.ts::leadership > passes to exactly one heir while a join is in flight`
-- `packages/core/src/groupbuy/groupbuy.concurrency.int.test.ts::a join into a team that fails a moment before (CR-2-r1) > queues behind a transaction holding the team, then sees what it decided`
+- `packages/core/src/groupbuy/groupbuy.concurrency.int.test.ts::a join into a team that fails a moment before > queues behind a transaction holding the team, then sees what it decided`
 - `packages/core/src/order/order.sequence.int.test.ts::SEQ-001 — a fixed-seed interleaving of real operations > holds every invariant after every step, seed <seed>`
 - `guards/src/checks/pipeline.test.ts::readPipeline > STAB-001 — fails when the soak loses its schedule, its rounds or its logs`
 
@@ -1461,7 +1461,7 @@ A password change revokes every session of that account, the caller's own includ
 
 - `packages/core/src/system/system.int.test.ts::own profile > changes my password and revokes every session I hold`
 - `apps/web/app/admin-api/admins/system.int.test.ts::/admin-api/profile > revokes every session, including the caller’s, on a password change`
-- `packages/core/src/auth/admin-session.revoke.int.test.ts::K-SEC-A1 — revoking every session of an admin > reaches a session that has been kept alive past four TTLs`
+- `packages/core/src/auth/admin-session.revoke.int.test.ts::revoking every session of an admin > reaches a session that has been kept alive past four TTLs`
 
 ### SYS-008
 
@@ -1496,9 +1496,9 @@ A write is audited with its actor, route and target; every credential-named fiel
 
 - `apps/web/app/admin-api/admins/system.int.test.ts::/admin-api/admins > creates with 201 and writes an audit row without the password in it`
 - `apps/web/app/admin-api/admins/system.int.test.ts::/admin-api/audit-logs > does not record a read`
-- `packages/core/src/auth/audit.redact.test.ts::K-SEC-U12 — what the operation log keeps of a request body > redacts the same credential one level down, as the config form sends it`
+- `packages/core/src/auth/audit.redact.test.ts::what the operation log keeps of a request body > redacts the same credential one level down, as the config form sends it`
 - `apps/web/src/server/handle.int.test.ts::what the operation log keeps of a config save > leaves no part of the payment keys in audit_logs`
-- `packages/core/src/auth/admin-login.trail.int.test.ts::K-SEC-A4 — what a password-guessing run leaves behind > leaves a readable trail of the failed attempts, without the password`
+- `packages/core/src/auth/admin-login.trail.int.test.ts::what a password-guessing run leaves behind > leaves a readable trail of the failed attempts, without the password`
 - `apps/web/app/api/v1/staff/products/catalog-staff.int.test.ts::/api/v1/staff/products/:id/skus > records the reprice in the operation log, naming the 店员 and the product`
 - `apps/web/src/server/handle.int.test.ts::the 操作日志 reader lists both kinds of actor > returns admin and staff rows, each naming its actor, and filters by kind`
 
@@ -1582,7 +1582,7 @@ A remote import is refused for private, loopback, link-local and cloud-metadata 
 The connection is made to the address that was judged, presenting the original Host, so a second resolution cannot return a different answer.
 
 - `packages/core/src/storage/safe-fetch.test.ts::safeFetch — the happy path > connects to the address it judged, presenting the original Host`
-- `packages/core/src/storage/safe-fetch.tls.test.ts::safeFetch over real TLS (CR-11-k) > imports an https source: judged address, real name for SNI and the certificate`
+- `packages/core/src/storage/safe-fetch.tls.test.ts::safeFetch over real TLS > imports an https source: judged address, real name for SNI and the certificate`
 - `packages/core/src/storage/safe-fetch.tls.test.ts::dials each redirect hop at that hop’s own judged address`
 
 ### STOR-006
@@ -1686,7 +1686,7 @@ The rule that applies is the narrowest one covering the address — district, th
 
 A free-shipping rule waives the freight for the lines it covers when the order reaches its quantity or its amount threshold, and 满额包邮 (the shop-wide threshold) waives all of it.
 
-- `packages/core/src/shipping/shipping.freight.rules.test.ts::isFreeByRule > needs both thresholds, as legacy did`
+- `packages/core/src/shipping/shipping.freight.rules.test.ts::isFreeByRule > needs both thresholds`
 - `packages/core/src/shipping/shipping.freight.rules.test.ts::isFreeByRule > treats an unused threshold as satisfied`
 - `packages/core/src/shipping/shipping.int.test.ts::FreightPort.quote > drops the group once its free rule is satisfied`
 - `packages/core/src/shipping/shipping.int.test.ts::FreightPort.quote > zeroes the postage once the shop-wide 满额包邮 threshold is met`
