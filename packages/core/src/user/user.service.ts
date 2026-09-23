@@ -10,7 +10,9 @@ import type {
 import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
+import { notify, registerNotificationEvents } from '../notification';
 import { isStoredImageUrl } from '../storage';
+import { checkText, requestMediaCheck, type MediaRiskHandler } from '../wechat';
 import { storefrontAuthConfig } from './storefront-auth.config';
 import { pageBounds, shouldForceDefault } from './user.rules';
 import * as repo from './user.repo';
@@ -45,8 +47,24 @@ export async function updateProfile(ctx: Ctx, body: UserProfileForm): Promise<Us
       details: [{ field: 'body.nickname', message: '昵称不能为空' }],
     });
   }
+  const before = await repo.findById(ctx.db, userId);
+  if (!before || before.deletedAt !== null) throw new DomainError('USER_NOT_FOUND');
+  // 内容安全 (C09, CONTENT-002): a changed nickname goes to WeChat first. Only
+  // `risky` refuses it; WeChat being unreachable lets it through (fail-open).
+  if (nickname !== undefined && nickname !== before.nickname) {
+    const verdict = await checkText(ctx, { userId, content: nickname, scene: 1, what: 'nickname' });
+    if (verdict === 'risky') throw new DomainError('USER_NICKNAME_REJECTED');
+  }
   const avatarUrl =
     body.avatarUrl === undefined ? undefined : await acceptedAvatar(ctx, userId, body.avatarUrl);
+  const { defaultAvatar } = await ctx.config.get(storefrontAuthConfig);
+  const avatarToCheck =
+    avatarUrl !== undefined &&
+    avatarUrl !== null &&
+    avatarUrl !== before.avatarUrl &&
+    avatarUrl !== defaultAvatar.trim()
+      ? avatarUrl
+      : null;
   await ctx.withTx(async (tx) => {
     const result = await repo.updateProfile(tx, {
       id: userId,
@@ -60,9 +78,59 @@ export async function updateProfile(ctx: Ctx, body: UserProfileForm): Promise<Us
       now: ctx.clock.now(),
     });
     if (!result.won) throw new DomainError('USER_NOT_FOUND');
+    // A new picture is checked after the fact, by push (CONTENT-004).
+    if (avatarToCheck !== null) {
+      await requestMediaCheck(tx, ctx, {
+        subject: 'avatar',
+        subjectId: userId,
+        userId,
+        mediaUrl: avatarToCheck,
+        scene: 1,
+      });
+    }
   });
   return getProfile(ctx);
 }
+
+/** The in-app notice a customer gets when WeChat turned their avatar down. */
+export const AVATAR_REJECTED_EVENT = 'user_avatar_rejected';
+
+export function registerUserNotificationEvents(): void {
+  registerNotificationEvents([
+    {
+      code: AVATAR_REJECTED_EVENT,
+      name: '头像未通过审核',
+      description: '用户上传的头像未通过微信内容安全检测，已恢复为默认头像',
+      audience: 'user',
+      variables: [],
+      channels: ['inApp'],
+      defaults: {
+        title: '头像未通过审核',
+        body: '您上传的头像未通过内容安全审核，已恢复为默认头像，请重新上传。',
+      },
+    },
+  ]);
+}
+
+/**
+ * `wxa_media_check` said an avatar is `risky`: the default avatar comes back
+ * — only if the account still shows that picture — and the customer is told.
+ */
+export const resetRiskyAvatar: MediaRiskHandler = async (tx, ctx, input) => {
+  const reset = await repo.resetAvatarIf(tx, {
+    id: input.subjectId,
+    url: input.mediaUrl,
+    now: ctx.clock.now(),
+  });
+  if (!reset.won) return 'none';
+  await notify(tx, ctx, {
+    event: AVATAR_REJECTED_EVENT,
+    subject: { scope: 'content-security-check', id: input.checkId },
+    userId: input.subjectId,
+    data: {},
+  });
+  return 'avatar_reset';
+};
 
 /**
  * The avatar to store, or `USER_AVATAR_NOT_ALLOWED` (USER-019).

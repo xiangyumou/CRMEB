@@ -9,6 +9,7 @@ import {
   pagedAdminReviews,
   pagedReviews,
   productReview,
+  submittedReview,
   productReviewExample,
   reviewBatchStatusBody,
   reviewBatchStatusResult,
@@ -274,7 +275,7 @@ export const catalogReviewSubmit = defineRoute({
   summary: '发表商品评价',
   tags: ['catalog'],
   body: reviewSubmitBody,
-  response: productReview,
+  response: submittedReview,
   status: 201,
   errors: ['CATALOG_REVIEW_NOT_ALLOWED', 'CATALOG_REVIEW_ALREADY_WRITTEN'],
   examples: [
@@ -287,7 +288,30 @@ export const catalogReviewSubmit = defineRoute({
         content: '料子很舒服，洗了不变形。',
         images: ['https://cdn.example.com/r/5001-1.png'],
       },
-      response: { ...productReviewExample, replyContent: null, replyAt: null },
+      response: {
+        ...productReviewExample,
+        replyContent: null,
+        replyAt: null,
+        moderation: 'published',
+      },
+    },
+    {
+      name: 'held-for-moderation',
+      body: {
+        orderItemId: '9102',
+        productScore: 5,
+        serviceScore: 5,
+        content: '很满意，包装私密。',
+        images: [],
+      },
+      response: {
+        ...productReviewExample,
+        content: '很满意，包装私密。',
+        images: [],
+        replyContent: null,
+        replyAt: null,
+        moderation: 'pending',
+      },
     },
   ],
 });

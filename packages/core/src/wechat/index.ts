@@ -21,6 +21,7 @@
 
 import { registerSiteAuthMethod, wechatMiniConfig, wechatOaConfig } from '../system';
 import { wechatConfig } from './wechat.config';
+import { registerContentSecurityEffects } from './wechat.sec-check';
 import { wechatMiniLoginUsable, wechatOaLoginUsable } from './wechat.site-auth';
 
 export {
@@ -89,6 +90,28 @@ export {
 
 /** `/api/v1/webhooks/wechat-mini`: the mini program's 消息推送, recorded into the effects ledger. */
 export {
+  checkText,
+  contentSecurityPort,
+  listMediaChecks,
+  MEDIA_CHECK_EVENT,
+  MEDIA_CHECK_SCOPE,
+  registerContentSecurityPort,
+  registerMediaRiskHandler,
+  requestMediaCheck,
+  resetContentSecurityPort,
+  wechatContentSecurityDriver,
+  type ContentSecurityPort,
+  type MediaCheckAnswer,
+  type MediaRiskHandler,
+  type MediaSubject,
+  type MsgSecCheckAnswer,
+  type SecCheckScene,
+  type SecCheckSuggest,
+  type TextVerdict,
+} from './wechat.sec-check';
+export { contentSecurityConfig, type ContentSecurityConfig } from './wechat.sec-check.config';
+
+export {
   handleMiniPush,
   MINI_PUSH_EVENTS,
   MINI_PUSH_FRESHNESS_SECONDS,
@@ -144,6 +167,8 @@ export {
  * boolean crosses the seam, never a credential.
  */
 export function registerWechatDomain(): void {
+  // 内容安全 (C09): submit pictures to mediaCheckAsync, act on wxa_media_check.
+  registerContentSecurityEffects();
   registerSiteAuthMethod('wechatOa', {
     groups: [wechatOaConfig.group, wechatConfig.group],
     isEnabled: wechatOaLoginUsable,

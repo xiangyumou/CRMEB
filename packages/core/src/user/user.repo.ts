@@ -268,6 +268,20 @@ export async function touchLastLogin(
     .where(eq(users.id, args.id));
 }
 
+/**
+ * Puts the default avatar back, but only if the account still shows `url` —
+ * a customer who already replaced it keeps the replacement (C09).
+ */
+export async function resetAvatarIf(
+  tx: Tx,
+  args: { id: number; url: string; now: Date },
+): Promise<ConditionalUpdateResult> {
+  return conditionalUpdate(tx, users, {
+    where: and(eq(users.id, args.id), eq(users.avatarUrl, args.url)),
+    set: { avatarUrl: null, updatedAt: args.now },
+  });
+}
+
 export async function updateProfile(
   tx: Tx,
   args: {

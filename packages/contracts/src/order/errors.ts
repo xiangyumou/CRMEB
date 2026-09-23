@@ -151,6 +151,8 @@ export const orderFulfilErrors = defineErrors({
   ORDER_INVOICE_NOT_REQUESTABLE: { status: 409, message: '该订单当前不可申请开票' },
   /** Already issued, rejected or cancelled. */
   ORDER_INVOICE_NOT_ACTIONABLE: { status: 409, message: '该开票申请当前状态无法执行此操作' },
+  /** WeChat's 内容安全 judged the 抬头 name `risky` (C09); fail-open when WeChat is unreachable. */
+  ORDER_INVOICE_TITLE_REJECTED: { status: 422, message: '发票抬头包含不当信息，请修改后再提交' },
 });
 
 export type OrderFulfilErrorCode = keyof typeof orderFulfilErrors;

@@ -43,6 +43,13 @@
       "when": 1790176502359,
       "tag": "0005_mini_shipping_management",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790178077508,
+      "tag": "0006_content_security",
+      "breakpoints": true
     }
   ]
 }

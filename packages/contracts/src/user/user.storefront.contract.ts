@@ -47,7 +47,7 @@ export const userUpdateProfile = defineRoute({
   tags: ['user'],
   body: userProfileForm,
   response: userProfile,
-  errors: ['USER_NOT_FOUND', 'USER_AVATAR_NOT_ALLOWED'],
+  errors: ['USER_NOT_FOUND', 'USER_AVATAR_NOT_ALLOWED', 'USER_NICKNAME_REJECTED'],
   examples: [
     {
       name: 'nickname-and-avatar',

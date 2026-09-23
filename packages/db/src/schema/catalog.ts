@@ -615,6 +615,13 @@ export const productReviews = pgTable(
     content: varchar({ length: 1000 }),
     images: jsonb().$type<string[]>().notNull().default(emptyJsonArray),
     status: productReviewsStatus().notNull().default('published'),
+    /**
+     * Why a shopper's review is waiting in 待审核 rather than published, when
+     * the reason is 内容安全 (C09): `sec_check_risky`, `sec_check_review` or
+     * `sec_check_unavailable`. `null` for everything else, including a review
+     * held back only because 评价需审核 is on.
+     */
+    moderationReason: varchar({ length: 32 }),
     replyContent: varchar({ length: 500 }),
     replyAt: instant(),
     replyByAdminId: fk().references((): AnyPgColumn => admins.id, { onDelete: 'set null' }),
