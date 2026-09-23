@@ -4,8 +4,10 @@
  * Nothing reachable from this entry imports zod or a contract at run time:
  * the contracts type the calls (`import type`) and the generated table
  * (`routes.gen.ts`) carries the four fields a request needs. `bundle.test.ts`
- * holds that line. Response validation lives in `@shop/api-client/validate`,
- * which this entry never imports.
+ * holds that line. `storefront-routes.gen.ts`, the page catalogue (route key ->
+ * mini-program path, also `@shop/api-client/routes`), is plain data too.
+ * Response validation lives in `@shop/api-client/validate`, which this entry
+ * never imports.
  */
 export { createApiClient, routeMeta } from './client';
 export type {
@@ -32,6 +34,14 @@ export type {
 } from './transport';
 export { buildPath, buildUrl, serialiseQuery } from './url';
 export { storefrontRouteList } from './routes.gen';
+export { storefrontRoutes } from './storefront-routes.gen';
+export type {
+  StorefrontRoute,
+  StorefrontRouteEntry,
+  StorefrontRouteKey,
+  StorefrontRouteParams,
+  StorefrontShare,
+} from './storefront-routes.gen';
 export type {
   ClientErrorCode,
   ClientPlatform,

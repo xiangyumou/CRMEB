@@ -7,10 +7,11 @@
   "exports": {
     ".": "./src/index.ts",
     "./react": "./src/react.ts",
-    "./validate": "./src/validate.ts"
+    "./validate": "./src/validate.ts",
+    "./routes": "./src/storefront-routes.gen.ts"
   },
   "scripts": {
-    "gen": "tsx scripts/gen.ts",
+    "gen": "tsx scripts/gen.ts && tsx scripts/gen-storefront-routes.ts",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test:unit": "vitest run --project unit --project unit-react18",
