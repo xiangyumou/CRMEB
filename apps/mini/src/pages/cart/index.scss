@@ -1,8 +1,11 @@
 @use '../../ui/tokens' as *;
 
 // Tab pages: WeChat's tab bar sits outside the page, so the bar rests on the page's bottom edge.
-// In the H5 build Taro's tab bar is inside the page and publishes its height.
-$tab-offset: var(--taro-tabbar-height, 0px);
+// In the H5 build Taro's tab bar covers the bottom 50px of the viewport. Taro's H5 PostCSS step
+// (postcss-plugin-constparse) rewrites the bare word `taro-tabbar-height` to that height and
+// leaves it alone for weapp, where the invalid second `bottom` is dropped and `0` stands. (It
+// also rewrites the word inside `var(--taro-tabbar-height)`, so the custom property cannot be
+// used.)
 
 .cart {
   padding-bottom: $space-5;
@@ -86,7 +89,8 @@ $tab-offset: var(--taro-tabbar-height, 0px);
     display: flex;
     position: fixed;
     right: 0;
-    bottom: $tab-offset;
+    bottom: 0;
+    bottom: taro-tabbar-height;
     left: 0;
     z-index: $z-bar;
     align-items: center;
