@@ -2,7 +2,20 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { configureApi, resetApiConfig } from '@/admin/api/config';
+import {
+  userAdminBatchSetGroups,
+  userAdminBatchSetLabels,
+  userAdminDetail,
+  userAdminList,
+  userAdminResetPassword,
+  userAdminSetStatus,
+  userAdminUpdate,
+} from '@shop/contracts/user/user.admin.contract';
+import { userGroupList, userLabelList } from '@shop/contracts/user/user.taxonomy.contract';
+import type { AdminUserDetail, AdminUserListItem } from '@shop/contracts/user/schemas';
+
+import { resetApiConfig } from '@/admin/api/config';
+import { on, stubRoutes, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { CustomersPage } from './customers';
@@ -17,13 +30,7 @@ import { CustomersPage } from './customers';
  * rendering are the kit's own tests' job.
  */
 
-interface Call {
-  method: string;
-  url: string;
-  body: unknown;
-}
-
-const row = {
+const row: AdminUserListItem = {
   id: '1001',
   account: '13800138000',
   phone: '138****8000',
@@ -38,11 +45,11 @@ const row = {
 };
 
 /** The detail route's shape; the drawer reads every one of these. */
-const detail = {
+const detail: AdminUserDetail = {
   ...row,
   phone: '13800138000',
   // Three fields the list row does not carry. They are here rather than `null`
-  // so the edit test can watch them survive a save (CR-3-d2).
+  // so the edit test can watch them survive a save.
   realName: '王小明',
   birthday: null,
   adminRemark: '老客户，走加急',
@@ -55,65 +62,40 @@ const detail = {
   updatedAt: '2026-09-20T08:31:00+08:00',
 };
 
-function stubApi(): Call[] {
-  const calls: Call[] = [];
-  configureApi({
-    async fetch(input, init) {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const method = init?.method ?? 'GET';
-      calls.push({
-        method,
-        url,
-        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
-      });
-
-      const payload = url.includes('/admin-api/user-groups')
-        ? {
-            items: [
-              {
-                id: '3',
-                name: '高价值客户',
-                sortOrder: 0,
-                memberCount: 1,
-                createdAt: row.createdAt,
-              },
-            ],
-            total: 1,
-            page: 1,
-            pageSize: 100,
-          }
-        : url.includes('/admin-api/user-labels')
-          ? {
-              items: [
-                {
-                  id: '7',
-                  categoryId: null,
-                  categoryName: null,
-                  name: '母婴',
-                  sortOrder: 0,
-                  memberCount: 1,
-                  createdAt: row.createdAt,
-                },
-              ],
-              total: 1,
-              page: 1,
-              pageSize: 200,
-            }
-          : url.includes('/password')
-            ? { ok: true, revokedSessions: 2 }
-            : url.includes('/group-assignments') || url.includes('/label-assignments')
-              ? { affected: 1 }
-              : method === 'GET' && url.includes('/admin-api/users?')
-                ? { items: [row], total: 1, page: 1, pageSize: 20 }
-                : { ...detail, status: 'disabled' };
-
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    },
-  });
-  return calls;
+function stubApi(): StubCall[] {
+  return stubRoutes([
+    on(userGroupList, {
+      items: [
+        { id: '3', name: '高价值客户', sortOrder: 0, memberCount: 1, createdAt: row.createdAt },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 100,
+    }),
+    on(userLabelList, {
+      items: [
+        {
+          id: '7',
+          categoryId: null,
+          categoryName: null,
+          name: '母婴',
+          sortOrder: 0,
+          memberCount: 1,
+          createdAt: row.createdAt,
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 200,
+    }),
+    on(userAdminList, { items: [row], total: 1, page: 1, pageSize: 20 }),
+    on(userAdminDetail, detail),
+    on(userAdminUpdate, detail),
+    on(userAdminSetStatus, { ...detail, status: 'disabled' }),
+    on(userAdminResetPassword, { ok: true, revokedSessions: 2 }),
+    on(userAdminBatchSetGroups, { affected: 1 }),
+    on(userAdminBatchSetLabels, { affected: 1 }),
+  ]);
 }
 
 afterEach(() => {
