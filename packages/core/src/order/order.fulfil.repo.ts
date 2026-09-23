@@ -303,6 +303,18 @@ export async function listExpressCompanies(db: DbOrTx): Promise<ExpressCompanyRo
     .orderBy(desc(expressCompanies.sortOrder), asc(expressCompanies.id));
 }
 
+/**
+ * The company a shipment names, enabled or not: a carrier retired after the
+ * parcel left is still the carrier that took it.
+ */
+export async function findExpressCompanyEvenDisabled(
+  db: DbOrTx,
+  id: number,
+): Promise<ExpressCompanyRow | null> {
+  const rows = await db.select().from(expressCompanies).where(eq(expressCompanies.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
 export async function findExpressCompany(
   db: DbOrTx,
   id: number,

@@ -96,7 +96,7 @@ export const invoiceTitleCreate = defineRoute({
   body: invoiceTitleForm,
   response: invoiceTitle,
   status: 201,
-  errors: ['USER_INVOICE_TITLE_LIMIT_REACHED'],
+  errors: ['USER_INVOICE_TITLE_LIMIT_REACHED', 'USER_INVOICE_TITLE_REJECTED'],
   examples: [
     {
       name: 'company-plain',
@@ -154,7 +154,7 @@ export const invoiceTitleUpdate = defineRoute({
   params: z.object({ id }),
   body: invoiceTitleForm,
   response: invoiceTitle,
-  errors: ['USER_INVOICE_TITLE_NOT_FOUND'],
+  errors: ['USER_INVOICE_TITLE_NOT_FOUND', 'USER_INVOICE_TITLE_REJECTED'],
   examples: [
     {
       name: 'ok',

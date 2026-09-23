@@ -8,9 +8,10 @@ import * as repo from './groupbuy.repo';
 /**
  * What happens when a team runs out of time.
  *
- * The sweep asks the config (`groupbuy.virtualFillOnExpiry`) whether to fake
- * the missing members, so no campaign fakes its teams unless the shop wants
- * that, and the two outcomes are explicit.
+ * A team that did not fill fails, and every paid member is refunded. There is
+ * no 虚拟成团: the shop decided (2026-09-23) never to invent members, because
+ * on the mini-program a filled-by-nobody team reads as a fake transaction.
+ * An empty team (nobody paid) is cancelled.
  *
  * Two entry points, on purpose:
  *
@@ -21,7 +22,7 @@ import * as repo from './groupbuy.repo';
  *    delayed delivery can be late or lost and because an effect parked after
  *    eight failures stops trying. It is the belt to the timer's braces.
  *
- * Both are idempotent: `failGroup` and `virtuallyFillAndSucceed` both carry
+ * Both are idempotent: `failGroup` and `cancelEmptyGroup` carry
  * `status = 'forming'` in their `WHERE`, so the second caller changes nothing.
  */
 
@@ -42,7 +43,6 @@ export interface SettleResult {
  * deterministically.
  */
 export async function settleGroup(ctx: Ctx, groupId: number): Promise<SettleResult> {
-  const config = await ctx.config.get(groupbuyConfig);
   const now = ctx.clock.now();
 
   return ctx.withTx(async (tx) => {
@@ -54,7 +54,7 @@ export async function settleGroup(ctx: Ctx, groupId: number): Promise<SettleResu
       return { groupId, outcome: 'unchanged' as const, refunds: 0 };
     }
 
-    // Nobody ever paid: there is nothing to refund and nothing to fake.
+    // Nobody ever paid: there is nothing to refund.
     if (group.seatsTaken === 0) {
       const cancelled = await repo.cancelEmptyGroup(tx, { groupId, now });
       return {
@@ -62,18 +62,6 @@ export async function settleGroup(ctx: Ctx, groupId: number): Promise<SettleResu
         outcome: cancelled.won ? ('cancelled' as const) : ('unchanged' as const),
         refunds: 0,
       };
-    }
-
-    if (config.virtualFillOnExpiry) {
-      const filled = await repo.virtuallyFillAndSucceed(tx, { groupId, now });
-      if (!filled.won) return { groupId, outcome: 'unchanged' as const, refunds: 0 };
-      await recordEffect(tx, ctx, {
-        scope: 'groupbuy',
-        scopeId: String(groupId),
-        eventType: 'groupbuy.settle',
-        payload: { groupId: String(groupId), outcome: 'succeeded', virtual: true },
-      });
-      return { groupId, outcome: 'succeeded' as const, refunds: 0 };
     }
 
     const failed = await repo.failGroup(tx, { groupId, now });

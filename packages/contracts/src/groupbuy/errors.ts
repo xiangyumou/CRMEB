@@ -35,8 +35,11 @@ export const groupbuyErrors = defineErrors({
 
   /** 立即成团 on a group that is not `forming`, or that nobody has paid into yet. */
   GROUPBUY_GROUP_NOT_COMPLETABLE: { status: 409, message: '该团当前无法手动成团' },
-  /** The shop-wide 虚拟成团 switch is off, so an under-filled group cannot be completed. */
-  GROUPBUY_VIRTUAL_FILL_DISABLED: { status: 409, message: '未开启虚拟成团，无法补齐人数' },
+  /** 立即成团 on an under-filled group: the shop never invents members (虚拟成团 is off for good). */
+  GROUPBUY_VIRTUAL_FILL_DISABLED: {
+    status: 409,
+    message: '本店不支持虚拟成团，未满员的团不能立即成团',
+  },
 
   /** Deleting an activity that still has forming groups or live orders. */
   GROUPBUY_ACTIVITY_IN_USE: { status: 409, message: '该活动还有进行中的团，无法删除' },

@@ -103,9 +103,11 @@ export function assertGroupJoinable(group: GroupShape, now: Date): void {
 
 /**
  * A succeeded team with fewer real members than seats was completed by
- * 虚拟成团 — either the expiry sweep with `virtualFillOnExpiry` on, or an
- * operator pressing 立即成团. There is no flag for it; the two counters are the
- * evidence, and they cannot drift out of agreement with themselves.
+ * 虚拟成团 — before 2026-09-23 the expiry sweep could do that when the shop
+ * had switched it on, and an operator could with 立即成团. Neither can any
+ * more, but teams completed that way keep reading as such. There is no flag
+ * for it; the two counters are the evidence, and they cannot drift out of
+ * agreement with themselves.
  */
 export function wasVirtuallyFilled(
   group: { status: string; seatsTotal: number },

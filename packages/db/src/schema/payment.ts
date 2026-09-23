@@ -314,3 +314,69 @@ export const capitalFlows = pgTable(
 
 export type CapitalFlow = typeof capitalFlows.$inferSelect;
 export type NewCapitalFlow = typeof capitalFlows.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// 小程序发货信息管理 (WeChat's view of a mini-program payment)
+// ---------------------------------------------------------------------------
+
+/** How WeChat says the buyer confirmed receipt: 1 手动, 2 自动, or our own verified component callback. */
+export const wechatTradeOrdersConfirmSource = pgEnum('wechat_trade_orders_confirm_source', [
+  'manual',
+  'auto',
+  'component',
+]);
+
+/**
+ * One row per order paid through the mini program once its shipping has been
+ * reported to WeChat — what 小程序发货信息管理 knows about the payment.
+ *
+ * WeChat freezes a managed mini program's money until it has been told the
+ * goods left (`upload_shipping_info`) and the buyer confirmed receipt. The row
+ * is written by the effect that makes the upload, and by the
+ * `trade_manage_order_settlement` push. It is WeChat's side of the story only:
+ * the order's own `shipped -> received` stays on `orders` and moves through the
+ * state machine, never through this table.
+ *
+ * `outTradeNo` / `transactionId` are copied from the paid `payment_attempts`
+ * row, because the push names the payment and not our order.
+ */
+export const wechatTradeOrders = pgTable(
+  'wechat_trade_orders',
+  {
+    id: pk(),
+    orderId: fk()
+      .notNull()
+      .references(() => orders.id, { onDelete: 'cascade' }),
+    paymentAttemptId: fk()
+      .notNull()
+      .references(() => paymentAttempts.id, { onDelete: 'restrict' }),
+    mchId: varchar({ length: 64 }).notNull(),
+    outTradeNo: varchar({ length: 64 }).notNull(),
+    transactionId: varchar({ length: 64 }).notNull(),
+    /** The first upload WeChat accepted. */
+    uploadedAt: instant(),
+    /** The upload that told WeChat everything is out: the unified one, or the last split one. */
+    allDeliveredAt: instant(),
+    /** WeChat lets a payment's shipping be corrected once; this is when that was spent. */
+    correctedAt: instant(),
+    /** When WeChat (or its 确认收货 component, verified with `get_order`) says the buyer confirmed. */
+    confirmedAt: instant(),
+    confirmSource: wechatTradeOrdersConfirmSource(),
+    /** When WeChat released the money to the merchant. */
+    settledAt: instant(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('wechat_trade_orders_order_uq').on(t.orderId),
+    uniqueIndex('wechat_trade_orders_out_trade_no_uq').on(t.outTradeNo),
+    index('wechat_trade_orders_transaction_idx').on(t.transactionId),
+    check(
+      'wechat_trade_orders_confirm_shape',
+      sql`(${t.confirmedAt} is null) = (${t.confirmSource} is null)`,
+    ),
+  ],
+);
+
+export type WechatTradeOrder = typeof wechatTradeOrders.$inferSelect;
+export type NewWechatTradeOrder = typeof wechatTradeOrders.$inferInsert;

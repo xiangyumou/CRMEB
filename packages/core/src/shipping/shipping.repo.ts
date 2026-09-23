@@ -183,6 +183,8 @@ export interface ExpressCompanyValues {
   name: string;
   sortOrder: number;
   isEnabled: boolean;
+  /** `undefined` leaves the column alone; `null` clears it. */
+  wechatDeliveryId?: string | null | undefined;
 }
 
 export async function insertExpressCompany(

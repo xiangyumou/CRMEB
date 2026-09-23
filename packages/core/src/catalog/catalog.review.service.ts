@@ -6,6 +6,7 @@ import type {
   ProductReview,
   ReviewSubmitBody,
   ReviewSummary,
+  SubmittedReview,
 } from '@shop/contracts/catalog/schemas';
 import type { Tx } from '@shop/db';
 
@@ -16,6 +17,7 @@ import * as repo from './catalog.repo';
 import { summariseReviews } from './catalog.rules';
 import { asArray, pageBounds } from './catalog.service';
 import { getOrderFacts } from '../order/ports';
+import { checkText, requestMediaCheck, type MediaRiskHandler, type TextVerdict } from '../wechat';
 
 /**
  * Reviews, on both surfaces.
@@ -274,10 +276,26 @@ export async function productReviewSummary(
  * `reviewRequiresAudit` decides whether it appears immediately or waits for
  * moderation. It is a setting rather than a fixed "visible at once", so a shop
  * can hold reviews back before the first abusive one goes live.
+ *
+ * 内容安全 (C09, CONTENT-001): the text goes to WeChat's `msgSecCheck` first,
+ * outside the transaction. A `risky` or `review` verdict, or no verdict at all,
+ * **holds** the review in 待审核 with the reason — it is never refused, because
+ * this shop's honest reviews trip the check too often (the owner's call,
+ * 2026-09-23). The answer says `moderation: 'pending'` and nothing more; the
+ * client shows 「评价已提交，审核后展示」. Each picture is queued for
+ * `mediaCheckAsync` in the same transaction as the review.
  */
-export async function reviewSubmit(ctx: Ctx, body: ReviewSubmitBody): Promise<ProductReview> {
+export async function reviewSubmit(ctx: Ctx, body: ReviewSubmitBody): Promise<SubmittedReview> {
   const userId = requireUserId(ctx);
   const config = await ctx.config.get(catalogConfig);
+  const verdict = await checkText(ctx, {
+    userId,
+    content: body.content ?? '',
+    scene: 2,
+    what: 'review',
+  });
+  const moderationReason = HELD_BY[verdict];
+  const status = moderationReason !== null || config.reviewRequiresAudit ? 'pending' : 'published';
 
   return ctx.withTx(async (tx) => {
     const line = await getOrderFacts().findReviewableLine(tx, {
@@ -300,15 +318,52 @@ export async function reviewSubmit(ctx: Ctx, body: ReviewSubmitBody): Promise<Pr
       serviceScore: body.serviceScore,
       content: body.content ?? null,
       images: body.images,
-      status: config.reviewRequiresAudit ? 'pending' : 'published',
+      status,
+      moderationReason,
       createdAt: now,
       updatedAt: now,
     });
     if (!row) throw new DomainError('CATALOG_REVIEW_ALREADY_WRITTEN');
 
-    return toProductReview(row);
+    for (const url of new Set(body.images)) {
+      await requestMediaCheck(tx, ctx, {
+        subject: 'review_image',
+        subjectId: row.id,
+        userId,
+        mediaUrl: url,
+        scene: 2,
+      });
+    }
+
+    return {
+      ...toProductReview(row),
+      moderation: status === 'published' ? 'published' : 'pending',
+    };
   });
 }
+
+/** Which text verdicts hold a review for a person, and the reason recorded. */
+const HELD_BY: Record<TextVerdict, string | null> = {
+  pass: null,
+  skipped: null,
+  review: 'sec_check_review',
+  risky: 'sec_check_risky',
+  unavailable: 'sec_check_unavailable',
+};
+
+/**
+ * `wxa_media_check` said a review picture is `risky`: it comes off the review
+ * (its address stays on the `content_security_checks` row). The review itself
+ * stays as it was — one bad picture is not a bad review.
+ */
+export const hideRiskyReviewImage: MediaRiskHandler = async (tx, ctx, input) =>
+  (await repo.removeReviewImage(tx, {
+    id: input.subjectId,
+    url: input.mediaUrl,
+    now: ctx.clock.now(),
+  }))
+    ? 'image_hidden'
+    : 'none';
 
 export async function myReviews(
   ctx: Ctx,
@@ -444,6 +499,7 @@ async function decorateAdminReviews(
       orderId: row.orderId === null ? null : String(row.orderId),
       orderItemId: row.orderItemId === null ? null : String(row.orderItemId),
       status: row.status,
+      moderationReason: row.moderationReason,
     };
   });
 }

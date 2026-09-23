@@ -63,6 +63,7 @@ export function ExpressCompaniesPage() {
           idColumn<ExpressCompanyRow>({ sortable: true }),
           textColumn<ExpressCompanyRow>({ title: '名称', dataIndex: 'name', sortable: true }),
           textColumn<ExpressCompanyRow>({ title: '编码', dataIndex: 'code' }),
+          textColumn<ExpressCompanyRow>({ title: '微信快递编码', dataIndex: 'wechatDeliveryId' }),
           {
             title: '排序',
             dataIndex: 'sortOrder',
@@ -126,14 +127,23 @@ export function ExpressCompaniesPage() {
             span: 12,
             help: '物流查询接口使用的编码，如 SF、ZTO',
           },
+          {
+            kind: 'text',
+            name: 'wechatDeliveryId',
+            label: '微信快递编码',
+            span: 12,
+            help: '小程序发货信息管理使用的编码（微信运力列表中的 delivery_id，如 SF），留空表示未设置',
+          },
           { kind: 'number', name: 'sortOrder', label: '排序', span: 12, min: 0, max: 9999 },
           { kind: 'switch', name: 'isEnabled', label: '启用', span: 12 },
         ]}
         initialValues={modal.record ?? { sortOrder: 0, isEnabled: true }}
         route={modal.record ? expressCompanyUpdate : expressCompanyCreate}
-        toInput={(values) =>
-          modal.record ? { params: { id: modal.record.id }, body: values } : { body: values }
-        }
+        toInput={(values) => {
+          // An emptied text box means "not set", which the API spells `null`.
+          const body = { ...values, wechatDeliveryId: values.wechatDeliveryId || null };
+          return modal.record ? { params: { id: modal.record.id }, body } : { body };
+        }}
         invalidate={[expressCompanyAdminList]}
         successMessage="已保存"
       />

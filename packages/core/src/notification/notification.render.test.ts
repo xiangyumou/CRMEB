@@ -5,9 +5,11 @@ import {
   placeholdersIn,
   render,
   renderFields,
+  renderRoute,
   toTemplateData,
   WECHAT_FIELD_LIMIT,
 } from './notification.render';
+import { registerNotificationEvents } from './notification.registry';
 
 describe('render', () => {
   const data = { orderNo: 'SO202602140001', amount: '99.00' };
@@ -120,5 +122,40 @@ describe('formatShopTime', () => {
     const lateUtc = new Date('2026-06-01T16:30:00.000Z');
     expect(formatShopTime(lateUtc, 'day')).toBe('2026-06-02');
     expect(formatShopTime(lateUtc, 'minute')).toBe('2026-06-02 00:30');
+  });
+});
+
+describe('renderRoute', () => {
+  it('fills the params in first, then validates the route — NOTIF-006', () => {
+    expect(
+      renderRoute({ route: 'order', params: { id: '{{orderId}}' } }, { orderId: '3001' }),
+    ).toEqual({ route: 'order', params: { id: '3001' } });
+  });
+
+  it('answers null rather than a wrong destination when a variable is missing — NOTIF-006', () => {
+    expect(renderRoute({ route: 'order', params: { id: '{{orderId}}' } }, {})).toBeNull();
+    expect(
+      renderRoute({ route: 'refund', params: { id: '{{refundId}}' } }, { refundId: 'x' }),
+    ).toBeNull();
+  });
+
+  it('refuses at registration a route the catalogue does not let a message open — NOTIF-006', () => {
+    const event = {
+      code: 'test_bad_route',
+      name: '测试',
+      description: '测试',
+      audience: 'user' as const,
+      variables: [],
+      channels: ['inApp' as const],
+      defaults: { title: 't', body: 'b' },
+    };
+    expect(() =>
+      registerNotificationEvents([{ ...event, route: { route: 'login', params: {} } }]),
+    ).toThrow(/可通知的商城路由/);
+    expect(() =>
+      registerNotificationEvents([
+        { ...event, route: { route: 'nowhere' as 'order', params: {} } },
+      ]),
+    ).toThrow(/可通知的商城路由/);
   });
 });

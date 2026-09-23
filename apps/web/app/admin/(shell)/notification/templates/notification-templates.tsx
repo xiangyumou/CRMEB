@@ -254,6 +254,7 @@ function fieldsFor(template: NotificationTemplate): FormField[] {
             kind: 'text',
             name: ['channels', 'wechatMini', 'page'],
             label: '小程序页面',
+            help: '已废弃：订单、售后、拼团等事件打开的页面由系统决定，此处填写的页面只对没有固定页面的事件生效',
             visibleWhen: enabled('wechatMini'),
           },
     );
