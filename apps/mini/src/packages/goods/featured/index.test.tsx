@@ -44,7 +44,7 @@ describe('精品推荐', () => {
   });
 
   it('starts on 精品推荐 without a tab (or with an unknown one)', async () => {
-    taroFake.routerParams = { tab: 'seckill' };
+    taroFake.routerParams = { tab: 'bogus' };
     serve();
     await renderPage(<Featured />);
     expect(await screen.findByText('柔雾丝绒礼盒')).toBeTruthy();
