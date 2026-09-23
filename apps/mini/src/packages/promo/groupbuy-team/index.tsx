@@ -242,7 +242,7 @@ function Team({ view, onStale }: { view: TeamView; onStale: () => void }) {
 
           <Text className="groupbuy-team__note">{headline.note}</Text>
 
-          <View className="groupbuy-team__actions">
+          <View className="groupbuy-team__actions" id="team-actions">
             {actions.map((action, index) => (
               <Button
                 key={action.kind}
