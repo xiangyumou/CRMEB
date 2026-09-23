@@ -65,6 +65,7 @@ describe('首页', () => {
     await renderPage(<Home />);
 
     const product = await screen.findByText('柔雾丝绒礼盒');
+    expect(screen.getByRole('link', { name: '搜索商品' })).toBeTruthy();
     expect(screen.getByText('温感按摩油')).toBeTruthy();
     expect(screen.queryByText('未来的块')).toBeNull();
     fireEvent.click(product);
@@ -72,6 +73,35 @@ describe('首页', () => {
       api: 'navigateTo',
       args: { url: '/pages/product/index?id=12' },
     });
+  });
+
+  it('keeps one search entry: the bar’s, or the page’s own 搜索框 block', async () => {
+    const withSearch = resolvedPageFixture();
+    withSearch.blocks = [
+      {
+        id: 'b-search',
+        type: 'searchBar',
+        v: 1,
+        props: {
+          placeholder: '搜索好物',
+          hotWords: [],
+          shape: 'round',
+          sticky: false,
+          style: { marginY: 'none', paddingX: 'none', radius: 'none' },
+          visibility: { audience: 'all', platforms: [] },
+        },
+        data: {},
+      },
+      ...withSearch.blocks,
+    ];
+    serveApi({ ...visits, 'GET /api/v1/pages/home': () => ({ body: withSearch }) });
+
+    await renderPage(<Home />);
+
+    expect(await screen.findByText('搜索好物')).toBeTruthy();
+    // The bar's own entry (「搜索商品」) gives way to the block's.
+    expect(screen.queryByRole('link', { name: '搜索商品' })).toBeNull();
+    expect(screen.getByText('示例首页')).toBeTruthy();
   });
 
   it('says the home page is being set up when none is designated', async () => {

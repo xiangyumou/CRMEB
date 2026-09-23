@@ -21,7 +21,8 @@ import './index.scss';
 
 /**
  * 首页 (tab `home`, custom navigation bar): the shop's designated DIY home page
- * (`GET /pages/home`), the 开屏浮层, pull to refresh, sharing to friends and the timeline.
+ * (`GET /pages/home`) under a bar with a search entry (the title instead when the page has its
+ * own 搜索框 block), the 开屏浮层, pull to refresh, sharing to friends and the timeline.
  *
  * The resolved page carries per-shopper state (`personal`, e.g. which coupons are claimed), so
  * it is fetched again when the shopper signs in or out.
@@ -33,6 +34,8 @@ export default function Home() {
   const signedIn = useSignedIn();
   const home = useRouteQuery('decor.pageHome');
   const root = home.data?.root.props;
+  // The page's own 搜索框 block is the search entry; the bar then only says where you are.
+  const ownSearch = home.data?.blocks.some((block) => block.type === 'searchBar') ?? false;
 
   const lastSignedIn = useRef(signedIn);
   const { refetch } = home;
@@ -51,14 +54,19 @@ export default function Home() {
     },
   );
 
+  const title = root?.title ?? config?.name ?? '首页';
   return (
-    <PageShell title={root?.title ?? config?.name ?? '首页'}>
-      <NavBar>
-        <SearchBar
-          className="home__search"
-          onOpen={() => void navigate({ route: 'search', params: {} })}
-        />
-      </NavBar>
+    <PageShell title={title}>
+      {ownSearch ? (
+        <NavBar title={title} />
+      ) : (
+        <NavBar>
+          <SearchBar
+            className="home__search"
+            onOpen={() => void navigate({ route: 'search', params: {} })}
+          />
+        </NavBar>
+      )}
       <Body query={home} />
       <SplashOverlay />
     </PageShell>
