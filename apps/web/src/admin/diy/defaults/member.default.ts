@@ -701,7 +701,7 @@ export const memberDefault = {
           },
           {
             title: '链接',
-            value: '/pages/users/user_visit/index',
+            value: '/pages/users/visit_list/index',
             tips: '请输入链接',
             max: 100,
           },
