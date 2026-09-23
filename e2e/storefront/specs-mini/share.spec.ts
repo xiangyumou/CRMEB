@@ -119,3 +119,35 @@ test('SHARE-001: a 小程序码 opens the product, activity, coupon or decor pag
   expect(failedRequests).toEqual([]);
   await shopper.api.dispose();
 });
+
+test("a product's 分享 sheet makes a poster carrying the product's 小程序码", async ({
+  miniPage: page,
+  wechatUser,
+  shop,
+  playwright,
+  consoleErrors,
+  failedRequests,
+}) => {
+  const shopper = await returningShopper(page, wechatUser, shop, playwright);
+  const product = new ProductPage(page);
+  await product.open(shop.fixtures.postageProductId);
+
+  await shown(page).getByRole('button', { name: '分享' }).click();
+  await expect(shown(page).getByText('微信好友', { exact: true })).toBeVisible();
+  const code = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/v1/share/mini-codes',
+  );
+  await shown(page).getByRole('button', { name: '生成分享海报' }).click();
+
+  // The poster asks for this product's code, and is ready to save once drawn.
+  const answered = await code;
+  expect(answered.status()).toBe(200);
+  expect(new URL(answered.url()).searchParams.get('id')).toBe(
+    String(shop.fixtures.postageProductId),
+  );
+  await expect(shown(page).getByText('保存到相册', { exact: true })).toBeVisible();
+
+  expect(consoleErrors).toEqual([]);
+  expect(failedRequests).toEqual([]);
+  await shopper.api.dispose();
+});

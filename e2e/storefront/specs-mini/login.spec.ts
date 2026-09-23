@@ -95,7 +95,7 @@ test('a WeChat user the shop knows is signed in on opening the app, with no logi
   await shopper.api.dispose();
 });
 
-test('a new WeChat user signs up with an SMS code, and a wrong code leaves the code usable', async ({
+test('a new WeChat user ticks the terms, signs up with an SMS code, and a wrong code leaves it usable', async ({
   miniPage: page,
   wechatUser,
   shop,
@@ -106,6 +106,17 @@ test('a new WeChat user signs up with an SMS code, and a wrong code leaves the c
 
   // The silent sign-in finds no account for this openid: the login page asks for a phone.
   await page.goto(miniRoute('pages/login/index'));
+
+  // Nothing is shared with the shop before the terms are ticked.
+  const phoneAsked = { count: 0 };
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname.startsWith('/api/v1/auth/sessions/wechat-mini/phone'))
+      phoneAsked.count += 1;
+  });
+  await shown(page).getByText('手机号快速登录', { exact: true }).click();
+  await expect(shown(page).getByText('请先阅读并同意用户协议和隐私政策')).toBeVisible();
+  expect(phoneAsked.count).toBe(0);
+
   await shown(page).getByRole('checkbox', { name: '我已阅读并同意用户协议和隐私政策' }).click();
   await shown(page).getByText('短信验证码登录', { exact: true }).click();
   await shown(page).locator('input[placeholder="请输入手机号"]').fill(phone);

@@ -16,6 +16,12 @@ mini citations in `docs/invariants.md`, the mini sections of `architecture.md` /
   401 renewal with read replay, 401 renewal with a write replayed once.
 - `specs-mini/share.spec.ts`: a 小程序码 for product, 拼团, 预售, 领券中心 (`_`) and a 微页面 opens
   its page from the `(page, scene)` the server cached (SHARE-001).
+- `specs-mini/coupons.spec.ts`: a category-scoped coupon at 确认订单; a presale with a stacked
+  coupon on the order pages — **`test.fail`: the mini 订单详情 prints ¥88.00 (catalogue
+  `unitPrice`) and 优惠券 -¥15.00 (activity + coupon) where the uni-app prints ¥78.00 / ¥5.00.**
+- `specs-mini/app-config.spec.ts`: ETag / 304 / new version after a save; the login page shows
+  the shop's logo and name. `share.spec.ts` also: 分享 → 生成分享海报 asks for the product's code.
+- `login.spec.ts`: the terms gate before 手机号快速登录.
 - `specs-mini/reviews.spec.ts`: a held review appears only once the merchant publishes it
   (CONTENT-001); a clean one appears at once and leaves when hidden.
 
