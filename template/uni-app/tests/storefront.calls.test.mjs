@@ -161,3 +161,15 @@ describe('一键换色 — the presell list never fails on a shop with no theme'
     expect(calls.map((c) => c.route)).toEqual(['GET /api/v1/diy/theme']);
   });
 });
+
+describe('the page-view beacon lands on the contract route', () => {
+  it('recordVisit sends the view, then the stay, to POST /visits', async () => {
+    const user = await import('../api/user.js');
+    await user.recordVisit('/pages/index/index');
+    await user.recordVisit('/pages/index/index', 1200);
+    expect(calls.map((c) => [c.route, c.data])).toEqual([
+      ['POST /api/v1/visits', { path: '/pages/index/index' }],
+      ['POST /api/v1/visits', { path: '/pages/index/index', stayMs: 1200 }],
+    ]);
+  });
+});

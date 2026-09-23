@@ -501,3 +501,16 @@ export function makeUpinvoice(data) {
     msg: '申请成功',
   });
 }
+
+/**
+ * 页面访问上报 — the page-view beacon behind 访客数 / 浏览量 / 平均停留时长.
+ *
+ * Sent once when a page is shown (no `stayMs`: that is the view) and once when it is
+ * hidden or closed, with the milliseconds it was on screen. `optionalAuth`: a signed-in
+ * shopper is counted as themselves, anybody else by address, and a beacon never sends
+ * a visitor to the login page. `utils/visitBeacon.js` is the only caller.
+ */
+export function recordVisit(path, stayMs) {
+  const body = stayMs === undefined ? { path } : { path, stayMs };
+  return request.post('/api/v1/visits', body, { optionalAuth: true });
+}
