@@ -648,7 +648,15 @@ describe('REFUND-006 — reconciliation racing a refund callback', () => {
     const report = await runConcurrently(3, () => drainEffects(racer(), { batchSize: 5 }));
 
     expect(report.rejected).toEqual([]);
-    expect(report.fulfilled.reduce((sum, r) => sum + r.done, 0)).toBe(1);
+    // Every row the three dispatchers finished was finished by exactly one of
+    // them. Settling records `order.refunded` (delivered to a logged no-op since
+    // CR-2-k2), so the count is not simply 1: it is the rows now `done`.
+    const done = await harness.ctx.db
+      .select({ eventType: effectsTable.eventType })
+      .from(effectsTable)
+      .where(eq(effectsTable.status, 'done'));
+    expect(report.fulfilled.reduce((sum, r) => sum + r.done, 0)).toBe(done.length);
+    expect(done.filter((row) => row.eventType === 'refund.execute')).toHaveLength(1);
     expect(gateway.refunds.size).toBe(1);
     expect((await refundRow(id)).status).toBe('succeeded');
     expect(await flowRows('order_refund')).toHaveLength(1);

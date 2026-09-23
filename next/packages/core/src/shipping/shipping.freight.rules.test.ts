@@ -100,6 +100,14 @@ describe('regionFor', () => {
   it('returns null when the template has no fallback rule at all', () => {
     expect(regionFor([city], [110101])).toBeNull();
   });
+
+  it('gives an address with no known division the fallback rule (CR-6-i)', () => {
+    expect(regionFor([fallback, province, city], [])).toBe(fallback);
+  });
+
+  it('returns null for an address with no known division when there is no fallback rule', () => {
+    expect(regionFor([province, city], [])).toBeNull();
+  });
 });
 
 describe('firstAndContinuation', () => {
@@ -190,8 +198,18 @@ describe('computeFreight', () => {
     expect(result.totalFen).toBe(0);
   });
 
-  it('quotes zero when there is no address yet', () => {
+  it('prices an address with no known division at the fallback region (CR-6-i)', () => {
+    // First unit ¥10, each further unit ¥5: 1000 + 2 × 500.
     const result = quote([line({ quantity: 3 })], [template()], { cityPath: [] });
+    expect(result.totalFen).toBe(2000);
+    expect(result.undeliverable).toEqual([]);
+  });
+
+  it('quotes zero for an address with no known division when the template has no fallback region', () => {
+    const t = template({
+      regions: [region({ isFallback: false, cityIds: new Set([330000]), firstPriceFen: 800 })],
+    });
+    const result = quote([line({ quantity: 3 })], [t], { cityPath: [] });
     expect(result.totalFen).toBe(0);
   });
 

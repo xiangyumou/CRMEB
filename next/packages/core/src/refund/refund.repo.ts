@@ -480,6 +480,22 @@ export async function setReturnShipment(
   });
 }
 
+/**
+ * Writes `last_error` without moving the status: a gateway answer that does not
+ * match the refund (CR-4-k2, CR-5-k2) is shown to an operator on the row it
+ * concerns, and the row stays where it was.
+ */
+export async function setLastError(
+  tx: DbOrTx,
+  id: number,
+  lastError: string,
+): Promise<ConditionalUpdateResult> {
+  return conditionalUpdate(tx, refunds, {
+    where: eq(refunds.id, id),
+    set: { lastError: lastError.slice(0, 512) },
+  });
+}
+
 export async function setAdminRemark(
   tx: DbOrTx,
   id: number,

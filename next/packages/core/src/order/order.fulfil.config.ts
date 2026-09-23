@@ -90,6 +90,13 @@ export const orderStaffConfig = defineConfigGroup({
     staffUserIds: z.array(z.number().int().positive()).max(200).default([]),
     /** Whether a staff member may 改价 from the phone. Off matches the legacy screen. */
     allowStaffRepricing: z.boolean().default(false),
+    /**
+     * Whether a staff member may 同意 / 拒绝 an after-sale from the phone
+     * (CR-14-k). Off by default, like 改价: an approved 仅退款 goes straight to
+     * the gateway, so a shop opts in to letting its assistants move money.
+     * Reading the after-sales list and adding a note need no switch.
+     */
+    allowStaffRefundReview: z.boolean().default(false),
   }),
   ui: {
     staffUserIds: {
@@ -102,6 +109,12 @@ export const orderStaffConfig = defineConfigGroup({
       label: '允许店员改价',
       type: 'switch',
       help: '关闭后店员只能备注和发货，改价仅限后台',
+      section: '店员',
+    },
+    allowStaffRefundReview: {
+      label: '允许店员审核售后',
+      type: 'switch',
+      help: '开启后店员可在移动端同意或拒绝售后申请；同意仅退款会直接原路退款。确认收货和重试仍仅限后台',
       section: '店员',
     },
   },

@@ -1,6 +1,7 @@
 import { registerStaffRefundPort } from '../order';
-import { adminApprove, adminDetail, adminList, adminReject, staffRemark } from './refund.admin';
+import { staffApprove, staffDetail, staffList, staffReject, staffRemark } from './refund.admin';
 import { registerRefundEffects } from './refund.effects';
+import { registerRefundNotificationEvents } from './refund.notifications';
 
 /**
  * The refund domain's public surface.
@@ -34,11 +35,13 @@ import { registerRefundEffects } from './refund.effects';
  * past this file.
  */
 
+// `detail` (any after-sale by id, no ownership check) is deliberately not here
+// (CR-6-k2): the storefront reads through `myDetail`, the admin through
+// `adminDetail`, and in-domain callers import it from `./refund.service`.
 export {
   applicableItems,
   apply,
   cancel,
-  detail,
   executeRefund,
   handleRefundNotify,
   hide,
@@ -78,6 +81,7 @@ export {
 export { refundConfig, returnAddress, type RefundConfig } from './refund.config';
 export { refundPermissions } from './permissions';
 export { registerRefundEffects } from './refund.effects';
+export { REFUND_EXCEPTION_EVENT, registerRefundNotificationEvents } from './refund.notifications';
 
 /**
  * Wires the domain into the platform. Called once per process from the gen'd
@@ -86,17 +90,25 @@ export { registerRefundEffects } from './refund.effects';
  */
 export function registerRefundDomain(): void {
   registerRefundEffects();
+  // CR-4-k2 / CR-5-k2: a gateway answer that does not match the refund.
+  registerRefundNotificationEvents();
   // B2's staff console owns the phone-sized surface, this domain owns the
-  // money: `/api/v1/staff/refunds*` forwards straight into the admin services,
-  // permission checks and all, so a store assistant and an operator审核 through
-  // exactly the same code. Until this runs, the staff routes answer INTERNAL —
-  // which is the right failure, because a staff console that silently reviewed
-  // nothing would be worse.
+  // money. The port used to forward into the admin services, whose admin atoms
+  // a staff actor can never hold, so every staff request answered 403
+  // (CR-14-k). It now gets the staff entry points: they accept only a `staff`
+  // actor (the `auth: 'staff'` allow-list is the gate), reach only what the
+  // phone has, and share the transition code with the console, so 同意 on the
+  // phone and 同意 in the console still move the row the same way. Until this
+  // runs, the staff routes answer INTERNAL.
   registerStaffRefundPort({
-    list: adminList,
-    detail: adminDetail,
-    approve: (ctx, params, body) => adminApprove(ctx, { ...params, ...body }),
-    reject: (ctx, params, body) => adminReject(ctx, { ...params, ...body }),
+    list: staffList,
+    detail: staffDetail,
+    approve: (ctx, params, body) =>
+      staffApprove(ctx, {
+        ...params,
+        ...(body.remark === undefined ? {} : { remark: body.remark }),
+      }),
+    reject: (ctx, params, body) => staffReject(ctx, { ...params, ...body }),
     // 售后备注 is the one staff action that is not the console's: it appends to
     // the refund's log instead of overwriting `refunds.admin_remark` (CR-4-h §2).
     remark: (ctx, params, body) => staffRemark(ctx, { ...params, ...body }),

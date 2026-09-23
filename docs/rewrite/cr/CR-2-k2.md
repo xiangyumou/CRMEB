@@ -1,6 +1,6 @@
 # CR-2-k2: every paid and every refunded order parks an `unknown` effect row
 
-**Stream:** K2 (hardening second pass) **Status:** OPEN, for the orchestrator (C recorded the effects; E2 and B1 were to consume them; all have merged)
+**Stream:** K2 (hardening second pass) **Status:** RESOLVED (R2, option 1; commit in `docs/rewrite/status/r2.md`)
 **Files:** `next/packages/core/src/payment/payment.service.ts` (~543, records `order.paid`), `next/packages/core/src/refund/refund.service.ts` (~716, records `order.refunded`)
 **Pinned by:** `next/packages/core/src/order/order.sequence.int.test.ts`, `it.fails` "CR-2-k2 — every effect a paid and refunded order records is delivered"
 
@@ -43,3 +43,22 @@ One of:
 
 Either way, flip the `it.fails` above to `it`. The first option is smaller and
 keeps the ledger as an audit trail of the two events.
+
+## Resolution (R2)
+
+Option 1. `payment/payment.effects.ts` registers `('order', 'order.paid')` and
+`refund/refund.effects.ts` registers `('order', 'order.refunded')`, both to a
+logged no-op (the `presale.effects.ts` pattern), from the existing
+`registerPaymentEffects()` / `registerRefundEffects()`. The rows stay as the
+ledger's record and the extension point; a real consumer replaces the
+registration. The pin `order.sequence.int.test.ts::CR-2-k2 — every effect a paid and refunded order records is delivered > leaves nothing parked for want of a handler`
+is now `it`.
+
+`refund.concurrency.int.test.ts::… > sends one refund however many effect dispatchers run`
+counted `done === 1`; settling now also delivers `order.refunded`, so it asserts
+that the dispatchers' `done` total equals the rows now `done` (no row finished
+twice) and that `refund.execute` is one of them, once.
+
+Note: the effect is keyed `('order', orderId, 'order.refunded')`, so an order's
+second settled partial refund records no second row. Harmless while the
+consumer is a log line; a real consumer should key by refund.

@@ -3,8 +3,14 @@ import { eq } from 'drizzle-orm';
 import { admins } from '@shop/db/schema/auth';
 import { products, productSkus } from '@shop/db/schema/catalog';
 import { orderItems, orders, type OrderItemSnapshot } from '@shop/db/schema/order';
-import { capitalFlows, paymentCallbacks } from '@shop/db/schema/payment';
-import { refunds } from '@shop/db/schema/refund';
+import {
+  capitalFlows,
+  paymentAttempts,
+  paymentCallbacks,
+  paymentExceptions,
+} from '@shop/db/schema/payment';
+import { refundLogs, refunds } from '@shop/db/schema/refund';
+import { effects as effectsTable } from '@shop/db/schema/system';
 import { users } from '@shop/db/schema/user';
 import {
   createTestCtx,
@@ -15,12 +21,20 @@ import {
   type TestCtx,
 } from '@shop/testing';
 import { resetEffectHandlers } from '../effects';
+import { registerNotificationDomain } from '../notification';
 import type { Actor, Ctx } from '../kernel/context';
 import { installFulfilmentHooks } from '../order';
 import { registerStockPort, resetOrderPorts } from '../order/ports';
-import { handleTransactionNotify, paymentConfig, startPayment } from '../payment';
+import {
+  handleTransactionNotify,
+  paymentConfig,
+  PAYMENT_NOTIFY_MISMATCH_EVENT,
+  registerPaymentNotificationEvents,
+  startPayment,
+} from '../payment';
 import { wechatConfig } from '../wechat';
 import * as admin from './refund.admin';
+import { REFUND_EXCEPTION_EVENT, registerRefundNotificationEvents } from './refund.notifications';
 import * as repo from './refund.repo';
 import * as service from './refund.service';
 
@@ -35,9 +49,11 @@ import * as service from './refund.service';
  * other endpoint, naming another merchant, or stating an amount that is not
  * the one we froze.
  *
- * The `it.fails` cases are the defects filed as CR-3-k2, CR-4-k2 and CR-5-k2.
- * They pass today *because* the assertion fails; each flips to a failure the
- * day the fix lands, which is the signal to turn it into a plain `it`.
+ * K2 pinned CR-3-k2, CR-4-k2 and CR-5-k2 here as expected failures; R2 fixed
+ * them and they are plain `it`s now, beside the cases that pin *how* each is
+ * refused: 200, no callback row for a misroute, and an operator notification
+ * (never a settlement, never an automatic refund) for a merchant or amount that
+ * does not match.
  */
 
 let harness: TestCtx;
@@ -63,6 +79,11 @@ beforeEach(async () => {
   await flushTestRedis(harness.redis);
   harness.clock.set(NOW);
   resetEffectHandlers();
+  // The operator notifications CR-4-k2 / CR-5-k2 raise are asserted below;
+  // `notify` drops an event nobody registered.
+  registerNotificationDomain();
+  registerPaymentNotificationEvents();
+  registerRefundNotificationEvents();
   resetOrderPorts();
   installFulfilmentHooks();
   registerStockPort({
@@ -312,6 +333,13 @@ const refundRow = (id: number) =>
     .then((rows) => rows[0]!);
 
 const callbackRows = () => harness.ctx.db.select().from(paymentCallbacks);
+const notificationRows = (event: string) =>
+  harness.ctx.db
+    .select({ scopeId: effectsTable.scopeId, payload: effectsTable.payload })
+    .from(effectsTable)
+    .then((rows) => rows.filter((row) => row.scopeId.startsWith(`${event}:`)));
+const refundLogRows = (refundId: number) =>
+  harness.ctx.db.select().from(refundLogs).where(eq(refundLogs.refundId, refundId));
 const flowRows = (kind: 'order_payment' | 'order_refund') =>
   harness.ctx.db.select().from(capitalFlows).where(eq(capitalFlows.kind, kind));
 
@@ -357,7 +385,7 @@ describe('K-SEC-P6 — a signed event delivered to the other webhook', () => {
   // WeChat retry and acknowledged without booking anything: money taken at
   // the gateway, an order still `pending_payment`, and the auto-cancel job on
   // its way.
-  it.fails('lets the genuine delivery book the payment after a misrouted copy of it', async () => {
+  it('lets the genuine delivery book the payment after a misrouted copy of it', async () => {
     const started = await paidAtGateway();
     const signed = gateway.signTransactionNotification({ outTradeNo: started.outTradeNo });
 
@@ -366,6 +394,24 @@ describe('K-SEC-P6 — a signed event delivered to the other webhook', () => {
     const genuine = await handleTransactionNotify(racer(), signed);
     expect(genuine.status).toBe(200);
     expect((await orderRow(started.orderId)).status).toBe('paid');
+  });
+
+  it('answers a misroute 200 and records no callback row, in either direction (CR-3-k2)', async () => {
+    const order = await paidOrder();
+    const before = (await callbackRows()).length;
+
+    const transaction = gateway.signTransactionNotification({ outTradeNo: order.outTradeNo });
+    expect((await service.handleRefundNotify(racer(), transaction)).status).toBe(200);
+
+    const refund = await processingRefund(order);
+    gateway.markRefunded(refund.outRefundNo, 'SUCCESS');
+    const refunded = gateway.signRefundNotification({ outRefundNo: refund.outRefundNo });
+    expect((await handleTransactionNotify(racer(), refunded)).status).toBe(200);
+    expect(await callbackRows()).toHaveLength(before);
+
+    // And the refund's own delivery, arriving after its misrouted copy, settles it.
+    expect((await service.handleRefundNotify(racer(), refunded)).status).toBe(200);
+    expect((await refundRow(refund.id)).status).toBe('succeeded');
   });
 });
 
@@ -379,7 +425,7 @@ describe('K-SEC-P7 — a well-signed notification naming another merchant', () =
   // foreign merchant written onto the capital flow. The AEAD key is the only
   // thing binding the body to this shop; the merchant number is the second
   // lock, and it is not turned.
-  it.fails('never marks an order paid on a transaction another merchant collected', async () => {
+  it('never marks an order paid on a transaction another merchant collected', async () => {
     const started = await paidAtGateway();
     const signed = gateway.signTransactionNotification({
       outTradeNo: started.outTradeNo,
@@ -393,7 +439,7 @@ describe('K-SEC-P7 — a well-signed notification naming another merchant', () =
     expect(await flowRows('order_payment')).toEqual([]);
   });
 
-  it.fails('never settles a refund on a notification from another merchant', async () => {
+  it('never settles a refund on a notification from another merchant', async () => {
     const order = await paidOrder();
     const refund = await processingRefund(order);
     gateway.markRefunded(refund.outRefundNo, 'SUCCESS');
@@ -421,6 +467,70 @@ describe('K-SEC-P7 — a well-signed notification naming another merchant', () =
     const [row] = await callbackRows();
     expect(row!.mchId).toBe(OTHER_MCH_ID);
   });
+
+  it('tells an operator, and neither books nor refunds the foreign payment (CR-4-k2)', async () => {
+    const started = await paidAtGateway();
+    const signed = gateway.signTransactionNotification({
+      outTradeNo: started.outTradeNo,
+      resource: transactionResource(started.outTradeNo, { mchid: OTHER_MCH_ID }),
+    });
+
+    expect((await handleTransactionNotify(racer(), signed)).status).toBe(200);
+    // A replay of the same delivery changes nothing and wakes nobody twice.
+    expect((await handleTransactionNotify(racer(), signed)).status).toBe(200);
+
+    const [callback] = await callbackRows();
+    expect(callback!.result).toMatch(/^exception: merchant_mismatch/);
+    const [attempt] = await harness.ctx.db
+      .select()
+      .from(paymentAttempts)
+      .where(eq(paymentAttempts.orderId, started.orderId));
+    expect(attempt!.status).not.toBe('paid');
+    // Not a payment exception: that row carries an automatic refund, and this
+    // money is not ours to send back.
+    expect(await harness.ctx.db.select().from(paymentExceptions)).toEqual([]);
+    const told = await notificationRows(PAYMENT_NOTIFY_MISMATCH_EVENT);
+    expect(told).toHaveLength(1);
+    expect(told[0]!.scopeId).toBe(
+      `${PAYMENT_NOTIFY_MISMATCH_EVENT}:payment_callback:${callback!.id}`,
+    );
+  });
+
+  it('refuses a payment notification that names no merchant at all (CR-4-k2)', async () => {
+    const started = await paidAtGateway();
+    const resource = transactionResource(started.outTradeNo);
+    delete resource['mchid'];
+    const signed = gateway.signTransactionNotification({
+      outTradeNo: started.outTradeNo,
+      resource,
+    });
+
+    expect((await handleTransactionNotify(racer(), signed)).status).toBe(200);
+    expect((await orderRow(started.orderId)).status).toBe('pending_payment');
+    expect((await callbackRows())[0]!.result).toMatch(/^exception: merchant_mismatch/);
+  });
+
+  it('leaves a refund from another merchant for an operator, on the row and in its log (CR-4-k2)', async () => {
+    const order = await paidOrder();
+    const refund = await processingRefund(order);
+    gateway.markRefunded(refund.outRefundNo, 'SUCCESS');
+    const signed = gateway.signRefundNotification({
+      outRefundNo: refund.outRefundNo,
+      resource: refundResource(refund.outRefundNo, { mchid: OTHER_MCH_ID }),
+    });
+
+    expect((await service.handleRefundNotify(racer(), signed)).status).toBe(200);
+
+    const row = await refundRow(refund.id);
+    expect(row.status).toBe('processing');
+    expect(row.lastError).toContain(OTHER_MCH_ID);
+    expect((await refundLogRows(refund.id)).some((log) => log.message?.includes('退款异常'))).toBe(
+      true,
+    );
+    expect(await notificationRows(REFUND_EXCEPTION_EVENT)).toHaveLength(1);
+    const callback = (await callbackRows()).find((entry) => entry.mchId === OTHER_MCH_ID);
+    expect(callback!.result).toMatch(/^exception: merchant_mismatch/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -432,7 +542,8 @@ describe('K-SEC-R6 — the amount inside a refund notification', () => {
     const order = await paidOrder();
     const refund = await processingRefund(order);
     gateway.markRefunded(refund.outRefundNo, 'SUCCESS');
-    // A signed body that claims WeChat gave back all 100.00, not the 50.00 we sent.
+    // A signed body that claims WeChat gave back all 100.00, not the 50.00 we
+    // sent. Since CR-5-k2 it is not booked at all — least of all as 100.00.
     const signed = gateway.signRefundNotification({
       outRefundNo: refund.outRefundNo,
       resource: refundResource(refund.outRefundNo, {
@@ -442,7 +553,14 @@ describe('K-SEC-R6 — the amount inside a refund notification', () => {
 
     await service.handleRefundNotify(racer(), signed);
 
+    expect((await refundRow(refund.id)).refundedAmount).toBe('0.00');
+    expect((await orderRow(order.orderId)).refundedAmount).toBe('0.00');
+
+    // The matching answer books exactly the frozen amount.
+    const matching = gateway.signRefundNotification({ outRefundNo: refund.outRefundNo });
+    await service.handleRefundNotify(racer(), matching);
     const row = await refundRow(refund.id);
+    expect(row.status).toBe('succeeded');
     expect(row.refundedAmount).toBe('50.00');
     expect((await orderRow(order.orderId)).refundedAmount).toBe('50.00');
   });
@@ -452,25 +570,66 @@ describe('K-SEC-R6 — the amount inside a refund notification', () => {
   // refund — the shopper is owed 49.99 and every ledger says they were paid.
   // The payment webhook refuses a disagreeing amount into an exception
   // (GATEWAY-001); the refund webhook should not be the softer of the two.
-  it.fails(
-    'does not book a refund whose notified amount disagrees with the frozen one',
-    async () => {
-      const order = await paidOrder();
-      const refund = await processingRefund(order);
-      gateway.markRefunded(refund.outRefundNo, 'SUCCESS');
-      const signed = gateway.signRefundNotification({
-        outRefundNo: refund.outRefundNo,
-        resource: refundResource(refund.outRefundNo, {
-          amount: { total: 10000, refund: 1, payer_total: 10000, payer_refund: 1 },
-        }),
-      });
+  it('does not book a refund whose notified amount disagrees with the frozen one', async () => {
+    const order = await paidOrder();
+    const refund = await processingRefund(order);
+    gateway.markRefunded(refund.outRefundNo, 'SUCCESS');
+    const signed = gateway.signRefundNotification({
+      outRefundNo: refund.outRefundNo,
+      resource: refundResource(refund.outRefundNo, {
+        amount: { total: 10000, refund: 1, payer_total: 10000, payer_refund: 1 },
+      }),
+    });
 
-      const result = await service.handleRefundNotify(racer(), signed);
+    const result = await service.handleRefundNotify(racer(), signed);
 
-      expect(result.status).toBe(200);
-      expect((await refundRow(refund.id)).status).not.toBe('succeeded');
-      expect((await orderRow(order.orderId)).refundedAmount).toBe('0.00');
-      expect(await flowRows('order_refund')).toEqual([]);
-    },
-  );
+    expect(result.status).toBe(200);
+    expect((await refundRow(refund.id)).status).not.toBe('succeeded');
+    expect((await orderRow(order.orderId)).refundedAmount).toBe('0.00');
+    expect(await flowRows('order_refund')).toEqual([]);
+  });
+
+  it('raises a disagreeing or missing amount to an operator (CR-5-k2)', async () => {
+    const order = await paidOrder();
+    const refund = await processingRefund(order);
+    gateway.markRefunded(refund.outRefundNo, 'SUCCESS');
+    const noAmount = refundResource(refund.outRefundNo);
+    delete noAmount['amount'];
+    const signed = gateway.signRefundNotification({
+      outRefundNo: refund.outRefundNo,
+      resource: noAmount,
+    });
+
+    expect((await service.handleRefundNotify(racer(), signed)).status).toBe(200);
+
+    const row = await refundRow(refund.id);
+    expect(row.status).toBe('processing');
+    expect(row.lastError).toContain('网关未给出退款金额');
+    const callback = (await callbackRows()).find((entry) => entry.kind === 'refund_success');
+    expect(callback!.result).toMatch(/^exception: amount_mismatch/);
+    expect(await notificationRows(REFUND_EXCEPTION_EVENT)).toHaveLength(1);
+  });
+
+  it('reads the amount on the query path too, and says so once however often the sweep asks (CR-5-k2)', async () => {
+    const order = await paidOrder();
+    const refund = await processingRefund(order);
+    gateway.markRefunded(refund.outRefundNo, 'SUCCESS');
+    // WeChat's record of this refund says 0.01 went back, not 50.00.
+    gateway.refunds.get(refund.outRefundNo)!.refundFen = 1;
+
+    const first = await service.reconcileRefund(racer(), refund.id);
+    const second = await service.reconcileRefund(racer(), refund.id);
+
+    expect(first.status).toBe('unknown');
+    expect(second.status).toBe('unknown');
+    const row = await refundRow(refund.id);
+    expect(row.status).toBe('processing');
+    expect(row.lastError).toBe('网关退款金额 0.01 与退款单金额 50.00 不符');
+    expect((await orderRow(order.orderId)).refundedAmount).toBe('0.00');
+    expect(await flowRows('order_refund')).toEqual([]);
+    expect(
+      (await refundLogRows(refund.id)).filter((log) => log.message?.includes('退款异常')),
+    ).toHaveLength(1);
+    expect(await notificationRows(REFUND_EXCEPTION_EVENT)).toHaveLength(1);
+  });
 });

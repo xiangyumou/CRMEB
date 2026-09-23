@@ -1,4 +1,5 @@
-import { registerEffectHandler } from '../effects';
+import { registerEffectHandler, type Effect } from '../effects';
+import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { refundException } from './payment.service';
 import { findException } from './payment.repo';
@@ -22,8 +23,12 @@ import { findException } from './payment.repo';
  * A row an operator has already handled (`refunded`, `ignored`) makes the
  * handler a no-op rather than an error: the human beat the machine to it, which
  * is a success, not a failure to retry.
+ *
+ * The second registration, `('order', 'order.paid')`, is the hand-off row every
+ * booked payment records (see `logOrderPaid`).
  */
 export function registerPaymentEffects(): void {
+  registerEffectHandler('order', 'order.paid', logOrderPaid);
   registerEffectHandler('payment', 'payment.exception.refund', async (ctx, effect) => {
     const exceptionId = Number(effect.scopeId);
     if (!Number.isInteger(exceptionId)) {
@@ -55,4 +60,23 @@ export function registerPaymentEffects(): void {
       throw error;
     }
   });
+}
+
+/**
+ * `order.paid` is recorded in every payment transaction as the extension point
+ * for what hangs off a paid order after commit — 订阅消息, a receipt printer, an
+ * ERP push. None of those is built: the in-transaction work (the stock commit,
+ * the campaign seats, auto-delivery, the 站内信) runs on `onOrderPaid` hooks.
+ *
+ * So the row is delivered to a logged no-op rather than left without a handler
+ * (CR-2-k2): an unhandled effect retries eight times and parks as `unknown`,
+ * which would give an operator one row per paid order in 待处理任务 that no
+ * action clears. The row itself stays, as the ledger's record that the payment
+ * was booked; a real consumer replaces this registration.
+ */
+async function logOrderPaid(ctx: Ctx, effect: Effect): Promise<void> {
+  ctx.logger.info(
+    { scope: effect.scope, scopeId: effect.scopeId, event: effect.eventType },
+    'order.paid: no post-commit consumer registered',
+  );
 }

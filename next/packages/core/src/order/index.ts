@@ -1,4 +1,7 @@
 import { registerUserOrderStatsPort } from '../user';
+// Before `order.fulfil.effects`: both install a paid hook on import, and the
+// sale has to be committed first (CR-1-k2; see `order.stock.hooks.ts`).
+import { installStockCommitHook } from './order.stock.hooks';
 import { installFulfilmentHooks } from './order.fulfil.effects';
 import { orderFacts } from './order.facts.repo';
 import * as orderRepo from './order.repo';
@@ -37,8 +40,9 @@ import { registerOrderFacts, registerOrderStateMachine } from './ports';
  * through `getOrderStateMachine()`; the `OrderFactsPort` the catalog asks
  * about purchases and reviewable lines; the staff check `auth: 'staff'` fails
  * closed without; the `UserOrderStatsPort` the staff 用户 screen's 累计订单 /
- * 累计消费 need (CR-2-e4); and the order-paid hook plus the notification
- * handlers that have to be installed before the first payment lands. Importing
+ * 累计消费 need (CR-2-e4); and the order-paid hooks — the stock commit that
+ * turns the reservation into a sale (CR-1-k2), then auto-delivery — that have
+ * to be installed before the first payment lands. Importing
  * the domain calls it once; a test that `resetOrderPorts()` calls it again.
  *
  * `UserOrderStatsPort` is declared by the *user* domain and implemented here
@@ -55,6 +59,7 @@ export function registerOrderDomain(): void {
   registerUserOrderStatsPort({
     statsFor: (db, userIds) => orderRepo.statsForUsers(db, userIds),
   });
+  installStockCommitHook();
   installFulfilmentHooks();
 }
 

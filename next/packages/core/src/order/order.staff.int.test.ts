@@ -6,6 +6,7 @@ import { users } from '@shop/db/schema/user';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import type { Actor, Ctx } from '../kernel/context';
 import { registerRefundDomain } from '../refund';
+import { orderStaffConfig } from './order.fulfil.config';
 import * as orderStaff from './order.staff.service';
 
 /**
@@ -37,6 +38,9 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await harness.db.truncateAll();
+  // Config reads are cached in Redis; a switch one case turned on must not
+  // outlive the rows the truncate just removed.
+  await harness.redis.flushdb();
   harness.clock.set(NOW);
   // The staff refund routes forward into stream C through a port; without this
   // they answer INTERNAL, which is the deliberate failure mode.
@@ -309,5 +313,72 @@ describe('售后备注 — a staff note on a refund', () => {
     await expect(
       orderStaff.refundRemark(asStaff(userId), { id: '999999' }, { remark: '无主备注' }),
     ).rejects.toMatchObject({ code: 'REFUND_NOT_FOUND' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 售后 审核 from the phone (CR-14-k)
+// ---------------------------------------------------------------------------
+
+describe('CR-14-k — the staff after-sales screen answers a staff member', () => {
+  // Every one of these used to be FORBIDDEN for every staff user: the port
+  // forwarded into the admin services, which demand an admin atom.
+  it('lists and reads the after-sales', async () => {
+    const userId = await makeUser();
+    const refundId = await makeRefund(userId, await makeOrder(userId));
+
+    const list = await orderStaff.refundList(asStaff(userId), { page: 1, pageSize: 20 });
+    expect(list.items.map((item) => item.id)).toEqual([String(refundId)]);
+    const detail = await orderStaff.refundDetail(asStaff(userId), { id: String(refundId) });
+    expect(detail.status).toBe('applied');
+  });
+
+  it('refuses 同意 and 拒绝 while the shop has not turned staff review on, and moves nothing', async () => {
+    const userId = await makeUser();
+    const refundId = await makeRefund(userId, await makeOrder(userId));
+
+    for (const body of [
+      { decision: 'approve' as const },
+      { decision: 'reject' as const, reason: '不符合条件' },
+    ]) {
+      await expect(
+        orderStaff.refundReview(asStaff(userId), { id: String(refundId) }, body),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', details: { reason: '店员审核售后未开启' } });
+    }
+    const [row] = await harness.ctx.db.select().from(refunds).where(eq(refunds.id, refundId));
+    expect(row!.status).toBe('applied');
+    expect(row!.reviewedAt).toBeNull();
+  });
+
+  it('approves once the switch is on, attributed to the staff user rather than an admin', async () => {
+    await harness.ctx.config.set(orderStaffConfig, { allowStaffRefundReview: true });
+    const userId = await makeUser();
+    const refundId = await makeRefund(userId, await makeOrder(userId));
+
+    const detail = await orderStaff.refundReview(
+      asStaff(userId),
+      { id: String(refundId) },
+      { decision: 'approve', reason: '已核实' },
+    );
+
+    expect(detail.status).toBe('approved');
+    expect(detail.logs.map((entry) => entry.message)).toContain('店员同意退款：已核实');
+    const [row] = await harness.ctx.db.select().from(refunds).where(eq(refunds.id, refundId));
+    expect(row!.reviewedByAdminId).toBeNull();
+  });
+
+  it('rejects once the switch is on', async () => {
+    await harness.ctx.config.set(orderStaffConfig, { allowStaffRefundReview: true });
+    const userId = await makeUser();
+    const refundId = await makeRefund(userId, await makeOrder(userId));
+
+    const detail = await orderStaff.refundReview(
+      asStaff(userId),
+      { id: String(refundId) },
+      { decision: 'reject', reason: '商品已签收超过 7 天' },
+    );
+
+    expect(detail.status).toBe('rejected');
+    expect(detail.rejectReason).toBe('商品已签收超过 7 天');
   });
 });

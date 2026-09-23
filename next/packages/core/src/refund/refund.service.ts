@@ -26,6 +26,7 @@ import {
   recordCapitalFlow,
   type WebhookResult,
 } from '../payment';
+import { REFUND_EXCEPTION_EVENT } from './refund.notifications';
 import * as repo from './refund.repo';
 import {
   freightRefundable,
@@ -848,6 +849,16 @@ export async function reconcileRefund(ctx: Ctx, refundId: number): Promise<Execu
   }
 
   if (gateway.status === 'SUCCESS') {
+    // CR-5-k2: the query path reads the amount exactly as the webhook does.
+    const frozenFen = Money.parse(row.amount).fen;
+    if (gateway.refundFen !== frozenFen) {
+      await ctx.withTx(async (tx) => {
+        const locked = await repo.lockRefund(tx, refundId);
+        if (!locked || locked.status === 'succeeded') return;
+        await raiseRefundException(tx, ctx, locked, amountMismatch(gateway.refundFen, frozenFen));
+      });
+      return { status: 'unknown', message: '网关退款金额与退款单不符，待人工核对' };
+    }
     await ctx.withTx((tx) =>
       settleRefundSucceeded(tx, ctx, refundId, {
         gatewayRefundId: gateway.refundId,
@@ -879,6 +890,22 @@ const ACK: WebhookResult = { status: 200, body: { code: 'SUCCESS', message: '成
  * admin retry contend for the same rows instead of both booking a refund. A
  * notification whose `out_refund_no` is not one of ours is offered to the
  * payment domain, because exception refunds carry their own `X` numbers.
+ *
+ * What K2 added, each answered 200 so WeChat stops redelivering bytes that will
+ * never read any better:
+ *
+ *  - **the event type, before the callback row** (CR-3-k2): only `REFUND.*`.
+ *    A transaction event recorded here would burn its notify id in the shared
+ *    `payment_callbacks` table, and the genuine delivery to the payment webhook
+ *    would read as a replay.
+ *  - **the merchant** (CR-4-k2): `mchid` present and equal to the one the
+ *    refund was sent under (frozen on the row; the configured one otherwise).
+ *  - **the amount** (CR-5-k2): a `SUCCESS` whose `amount.refund` is absent or is
+ *    not the frozen amount is not settled.
+ *
+ * A failed merchant or amount check leaves the refund where it was, records the
+ * reason on the callback row, `refunds.last_error` and the refund's log, and
+ * tells an operator (`admin_refund_exception`).
  */
 export async function handleRefundNotify(
   ctx: Ctx,
@@ -898,11 +925,22 @@ export async function handleRefundNotify(
     return { status: 401, body: { code: 'FAIL', message: '签名验证失败' } };
   }
 
+  if (!notification.eventType.startsWith('REFUND.')) {
+    ctx.logger.warn(
+      { eventType: notification.eventType, notifyId: notification.notifyId },
+      'refund notify: not a refund event; acknowledged without a callback row',
+    );
+    return ACK;
+  }
+
   const resource = notification.resource;
   const outRefundNo = stringOrNull(resource.out_refund_no);
   const status = stringOrNull(resource.refund_status) ?? '';
   const gatewayRefundId = stringOrNull(resource.refund_id);
-  const mchId = stringOrNull(resource.mchid) ?? client.mchId;
+  const namedMchId = stringOrNull(resource.mchid);
+  // Filed under the merchant the body named, so a foreign one is visible as such.
+  const mchId = namedMchId ?? client.mchId;
+  const refundFen = notifiedRefundFen(resource.amount);
 
   try {
     return await ctx.withTx(async (tx) => {
@@ -922,7 +960,14 @@ export async function handleRefundNotify(
       const result =
         outRefundNo === null
           ? 'ignored: no out_refund_no'
-          : await applyRefundNotification(tx, ctx, { outRefundNo, status, gatewayRefundId });
+          : await applyRefundNotification(tx, ctx, {
+              outRefundNo,
+              status,
+              gatewayRefundId,
+              namedMchId,
+              configuredMchId: client.mchId,
+              refundFen,
+            });
 
       await markCallbackProcessed(tx, callback.id, { at: ctx.clock.now(), result });
       return ACK;
@@ -948,12 +993,30 @@ function callbackKind(
 async function applyRefundNotification(
   tx: Tx,
   ctx: Ctx,
-  args: { outRefundNo: string; status: string; gatewayRefundId: string | null },
+  args: {
+    outRefundNo: string;
+    status: string;
+    gatewayRefundId: string | null;
+    /** `mchid` as the body stated it; `null` when absent. */
+    namedMchId: string | null;
+    configuredMchId: string;
+    /** `amount.refund` in 分, or `null` when absent or not a positive integer. */
+    refundFen: number | null;
+  },
 ): Promise<string> {
   const row = await repo.lockRefundByOutRefundNo(tx, args.outRefundNo);
   if (!row) {
     // Not an after-sales refund: it may be an exception refund, which the
-    // payment domain owns and numbers itself.
+    // payment domain owns and numbers itself. It was sent under the configured
+    // merchant, so a body naming any other is not settled against it either;
+    // the exception row stays `refunding`, which is on an operator's list.
+    if (args.namedMchId !== args.configuredMchId) {
+      ctx.logger.error(
+        { outRefundNo: args.outRefundNo, mchId: args.namedMchId, expected: args.configuredMchId },
+        'refund notify merchant mismatch; not settled',
+      );
+      return `exception: merchant_mismatch (named ${args.namedMchId ?? 'none'}, expected ${args.configuredMchId})`;
+    }
     const handled = await applyExceptionRefundNotification(tx, ctx, {
       refundNo: args.outRefundNo,
       status: args.status,
@@ -962,7 +1025,23 @@ async function applyRefundNotification(
     return handled ?? `ignored: unknown refund ${args.outRefundNo}`;
   }
 
+  const expectedMchId = row.requestContext?.mchId ?? args.configuredMchId;
+  if (args.namedMchId !== expectedMchId) {
+    if (row.status === 'succeeded') return 'ignored: already settled';
+    const reason: RefundExceptionReason = {
+      code: 'merchant_mismatch',
+      message: `退款通知商户号不符：通知 ${args.namedMchId ?? '（缺失）'}，退款单 ${expectedMchId}`,
+    };
+    await raiseRefundException(tx, ctx, row, reason);
+    return `exception: merchant_mismatch (named ${args.namedMchId ?? 'none'}, expected ${expectedMchId})`;
+  }
+
   if (args.status === 'SUCCESS') {
+    const frozenFen = Money.parse(row.amount).fen;
+    if (args.refundFen !== frozenFen && row.status !== 'succeeded') {
+      await raiseRefundException(tx, ctx, row, amountMismatch(args.refundFen, frozenFen));
+      return `exception: amount_mismatch (notified ${args.refundFen ?? 'none'} fen, frozen ${frozenFen} fen)`;
+    }
     const settled = await settleRefundSucceeded(tx, ctx, row.id, {
       gatewayRefundId: args.gatewayRefundId,
       source: 'notify',
@@ -980,6 +1059,77 @@ async function applyRefundNotification(
 
 function stringOrNull(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/** `amount.refund` as WeChat states it: a positive whole number of 分, or nothing. */
+function notifiedRefundFen(amount: unknown): number | null {
+  const value = (amount as { refund?: unknown } | null | undefined)?.refund;
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
+// ---------------------------------------------------------------------------
+// a refund answer that does not match the refund (CR-4-k2, CR-5-k2)
+// ---------------------------------------------------------------------------
+
+interface RefundExceptionReason {
+  code: 'merchant_mismatch' | 'amount_mismatch';
+  /** Shown on the refund (`last_error`), in its log and in the notification. */
+  message: string;
+}
+
+function amountMismatch(notifiedFen: number | null, frozenFen: number): RefundExceptionReason {
+  return {
+    code: 'amount_mismatch',
+    message:
+      notifiedFen === null
+        ? `网关未给出退款金额，退款单金额 ${Money.fromFen(frozenFen).toString()}`
+        : `网关退款金额 ${Money.fromFen(notifiedFen).toString()} 与退款单金额 ${Money.fromFen(frozenFen).toString()} 不符`,
+  };
+}
+
+/**
+ * Puts a refund the gateway answered for, but not as we asked, in front of an
+ * operator — and does nothing else to it.
+ *
+ * The status stays where it was (`processing`, `unknown`, `approved`): moving it
+ * to `succeeded` would book an amount the bank disagrees with, and moving it to
+ * `failed` would free the lines for a second refund of money that may well have
+ * moved. `last_error`, the refund's log and `admin_refund_exception` say why.
+ *
+ * Idempotent on the message: the reconciliation sweep re-queries a `processing`
+ * refund every few minutes, and the same discrepancy is written and announced
+ * once, not once per sweep.
+ */
+async function raiseRefundException(
+  tx: Tx,
+  ctx: Ctx,
+  row: repo.RefundRow,
+  reason: RefundExceptionReason,
+): Promise<void> {
+  const message = reason.message.slice(0, 500);
+  ctx.logger.error(
+    { refundId: row.id, outRefundNo: row.outRefundNo, reason: reason.code, message },
+    'refund answer does not match the refund; left for an operator',
+  );
+  if (row.lastError === message) return;
+
+  await repo.setLastError(tx, row.id, message);
+  await repo.insertLog(tx, {
+    refundId: row.id,
+    fromStatus: row.status,
+    toStatus: row.status,
+    message: `退款异常，待人工核对：${message}`,
+  });
+  await notify(tx, ctx, {
+    event: REFUND_EXCEPTION_EVENT,
+    subject: { scope: 'refund', id: `${row.id}:${reason.code}` },
+    data: {
+      refundId: row.id,
+      refundNo: row.refundNo,
+      amount: row.amount,
+      reason: message,
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------

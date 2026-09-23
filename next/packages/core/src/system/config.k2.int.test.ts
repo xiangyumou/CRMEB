@@ -111,11 +111,12 @@ describe('K-SEC-C2 — a schema key the form never shows', () => {
 });
 
 describe('K-SEC-R9 — the 售后设置 group and the 备注 atom', () => {
-  // `refundConfig.permission` is `refund:request:write`, which the refund
+  // `refundConfig.permission` was `refund:request:write`, which the refund
   // domain declares as 备注售后单. `writePermissionFor` derives a write atom
-  // only from a `:read` one, so the remark permission is also the permission to
-  // rewrite the address buyers post their returns to. CR-10-k.
-  it.fails('does not let the remark permission rewrite the return address', async () => {
+  // only from a `:read` one, so the remark permission was also the permission
+  // to rewrite the address buyers post their returns to. CR-10-k: the group now
+  // declares `refund:config:read`, and writing it takes `refund:config:write`.
+  it('does not let the remark permission rewrite the return address', async () => {
     await configSave(
       as(['refund:request:write']),
       { group: 'refund' },

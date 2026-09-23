@@ -1,4 +1,5 @@
-import { registerEffectHandler } from '../effects';
+import { registerEffectHandler, type Effect } from '../effects';
+import type { Ctx } from '../kernel/context';
 import * as repo from './refund.repo';
 import { executeRefund } from './refund.service';
 
@@ -23,6 +24,7 @@ import { executeRefund } from './refund.service';
  * operator can see and act on, which is what the 待处理 console is for.
  */
 export function registerRefundEffects(): void {
+  registerEffectHandler('order', 'order.refunded', logOrderRefunded);
   registerEffectHandler('refund', 'refund.execute', async (ctx, effect) => {
     const refundId = Number(effect.scopeId);
     if (!Number.isInteger(refundId)) {
@@ -46,4 +48,24 @@ export function registerRefundEffects(): void {
       );
     }
   });
+}
+
+/**
+ * `order.refunded` is recorded when a refund settles, as the extension point
+ * for the buyer's notification and anything that hangs off a finished order.
+ * The 站内信 already goes out from the in-transaction `onOrderRefunded` hook,
+ * and nothing else consumes the row yet.
+ *
+ * So it is delivered to a logged no-op rather than left without a handler
+ * (CR-2-k2): an unhandled effect retries eight times and parks as `unknown`,
+ * one row per refund in 待处理任务 that no operator action clears. The row stays
+ * as the ledger's record of the settlement; a real consumer replaces this
+ * registration. (It is keyed per order, so it records the order's first
+ * settled refund; the `refunds` row and its log are the record of each one.)
+ */
+async function logOrderRefunded(ctx: Ctx, effect: Effect): Promise<void> {
+  ctx.logger.info(
+    { scope: effect.scope, scopeId: effect.scopeId, event: effect.eventType },
+    'order.refunded: no post-commit consumer registered',
+  );
 }

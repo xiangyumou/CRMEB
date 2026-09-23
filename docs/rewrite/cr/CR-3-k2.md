@@ -1,6 +1,6 @@
 # CR-3-k2 — a signed event posted to the wrong webhook burns its notify id
 
-**Stream:** K2 (hardening) **Status:** OPEN — for the orchestrator (streams C / payment and refund have merged; the fix touches both webhooks and the shared verifier)
+**Stream:** K2 (hardening) **Status:** RESOLVED (R2; commit in `docs/rewrite/status/r2.md`)
 **Files:** `next/packages/core/src/wechat/wechat.pay.ts:493` (`eventType` parsed, never compared), `next/packages/core/src/payment/payment.service.ts:682-760` (`handleTransactionNotify`), `next/packages/core/src/refund/refund.service.ts:883-931` (`handleRefundNotify`)
 **Pinned by:** `next/packages/core/src/refund/refund.webhook.int.test.ts::K-SEC-P6 — a signed event delivered to the other webhook > lets the genuine delivery book the payment after a misrouted copy of it (CR-3-k2)` (`it.fails`)
 
@@ -38,3 +38,16 @@ reverse) must keep passing.
 ## Until then
 
 Reconciliation is the backstop; nothing is booked wrongly, only late.
+
+## Resolution (R2)
+
+Both handlers check `notification.eventType` right after verification and
+before the transaction: the payment webhook takes `TRANSACTION.*`, the refund
+webhook `REFUND.*`. Anything else is answered 200 (`SUCCESS`), logged at warn,
+and writes **no** `payment_callbacks` row. `wechat.pay.ts` is unchanged (it
+already exposed `eventType`).
+
+- Flipped: `packages/core/src/refund/refund.webhook.int.test.ts::K-SEC-P6 — a signed event delivered to the other webhook > lets the genuine delivery book the payment after a misrouted copy of it`.
+- Added: `… > answers a misroute 200 and records no callback row, in either direction (CR-3-k2)`
+  (and the refund's own delivery still settles after its misrouted copy).
+- The two neighbouring passing tests still pass.

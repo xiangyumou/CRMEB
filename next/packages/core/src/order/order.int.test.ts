@@ -303,6 +303,28 @@ describe('checkout preview', () => {
     expect(preview.freightAmount).toBe('0.00');
   });
 
+  it('quotes zero freight while no address is chosen yet, and asks for one (FREIGHT-006)', async () => {
+    // The cart preview before an address exists. The product charges postage,
+    // so a zero here is the "no address yet" rule, not a free product. It is
+    // checkout's rule, not the freight port's: an address that exists but
+    // carries no known division is priced at the template's fallback region
+    // (CR-6-i), so "nowhere yet" has to stop before the port is asked.
+    const userId = await makeUser();
+    const item = await makeProduct({ price: '60.00', freight: '8.00' });
+    await addToCart(userId, item, 2);
+
+    const preview = await order.preview(as(userId), {
+      source: 'cart',
+      cartItemIds: [],
+      kind: 'normal',
+    });
+
+    expect(preview.receiver).toBeNull();
+    expect(preview.freightAmount).toBe('0.00');
+    expect(preview.addressRequired).toBe(true);
+    expect(preview.payableAmount).toBe('120.00');
+  });
+
   it('refuses an off-shelf line instead of quietly dropping it', async () => {
     const userId = await makeUser();
     const item = await makeProduct({ status: 'off_shelf' });

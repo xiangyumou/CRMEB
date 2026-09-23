@@ -19,6 +19,7 @@ import {
   type SignedNotification,
   type TestCtx,
 } from '@shop/testing';
+import { registerCatalogDomain } from '../catalog';
 import { resetEffectHandlers } from '../effects';
 import type { Actor, Ctx } from '../kernel/context';
 import { registerNotificationDomain } from '../notification';
@@ -66,6 +67,9 @@ beforeEach(async () => {
   // which is right — and would also let the assertions below pass while
   // proving nothing. Registration is idempotent.
   registerNotificationDomain();
+  // The order domain's paid hook commits the sale through the catalogue's
+  // stock port (CR-1-k2), as the web process wires it.
+  registerCatalogDomain();
   gateway.transactions.clear();
   gateway.refunds.clear();
   gateway.calls.length = 0;
@@ -329,6 +333,18 @@ describe('PAY-004 — a valid notification settles the order exactly once', () =
     expect(await effectRows('order.paid')).toHaveLength(1);
     expect(await exceptionRows()).toEqual([]);
     expect((await attemptRows(paid.orderId))[0]!.status).toBe('paid');
+
+    // The sale is committed in the same transaction (CR-1-k2): the fixture
+    // never reserved, so only `sales` moves.
+    const [item] = await harness.ctx.db
+      .select({ skuId: orderItems.skuId })
+      .from(orderItems)
+      .where(eq(orderItems.orderId, paid.orderId));
+    const [sku] = await harness.ctx.db
+      .select({ stock: productSkus.stock, sales: productSkus.sales })
+      .from(productSkus)
+      .where(eq(productSkus.id, item!.skuId));
+    expect(sku).toEqual({ stock: 100, sales: 1 });
 
     const callbacks = await callbackRows();
     expect(callbacks).toHaveLength(1);

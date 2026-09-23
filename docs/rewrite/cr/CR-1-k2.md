@@ -1,6 +1,6 @@
 # CR-1-k2: a paid order is never counted as sold
 
-**Stream:** K2 (hardening second pass) **Status:** OPEN, for the orchestrator (streams A and B1/C have merged; the fix spans a hook registration)
+**Stream:** K2 (hardening second pass) **Status:** RESOLVED (R2, `rewrite/ws-r2-payments`; commit in `docs/rewrite/status/r2.md`) — see "Resolution" at the end
 **Files:** `next/packages/core/src/catalog/catalog.stock.ts` (`catalogStockPort.commit`), `next/packages/core/src/payment/payment.service.ts` (`onOrderPaid.dispatch`), `next/packages/core/src/order/ports.ts` (`onOrderPaid`)
 **Pinned by:** `next/packages/core/src/order/order.sequence.int.test.ts`, `it.fails` "CR-1-k2 — a paid order is counted as sold"
 
@@ -63,3 +63,34 @@ Then:
    `presale:commit-sale` alone, and make sure they are not committed twice. The
    `catalog.stock.commit` ledger key makes a second call a no-op for the same
    order, so the only risk is intent, not double counting.
+
+## Resolution (R2)
+
+- **The hook.** `order/order.stock.hooks.ts` registers `order:commit-sale` on
+  `onOrderPaid`; it reads the order's lines (`stockLinesOf`, what checkout
+  reserved and what cancel releases) and calls `resolveStockPort().commit`.
+  It is installed on import of that file — which `order/index.ts` imports ahead
+  of `order.fulfil.effects.ts` — and again from `registerOrderDomain()`. In the
+  production module graph it is the **first** paid hook, ahead of
+  `order:auto-deliver`, `groupbuy:take-seat` and `presale:commit-sale`
+  (`order/order.stock.hooks.test.ts`, which imports `domains.gen` fresh).
+  After a test's `resetOrderPorts()` + `registerAllDomains()` the registrars run
+  alphabetically, so `groupbuy:take-seat` precedes it there; that order is
+  harmless (the campaign hooks never touch `product_skus`), and a real
+  ordering guarantee needs `ports.ts` — see CR-1-r2.
+- **Presale (item 3).** Committed by this hook, like every paid order.
+  `presale:commit-sale` moves only the campaign ledger
+  (`presale_activity_skus.sales`), never the SKU's, so there is one writer of
+  the SKU-level sale. Asserted by
+  `order.sequence.int.test.ts::CR-1-k2 — a paid order is counted as sold > commits a presale order once, however often the sale is committed again`
+  (a replayed `commit` and a replayed full `onOrderPaid.dispatch` leave SKU
+  `sales` 2 and campaign `sales` 2).
+- **Pin flipped:** `… > moves the SKU from reserved to sold when the payment is booked` is `it`.
+- **INV5 tightened** to `sales === paid − restocked`. `sold` in the driver was
+  "paid minus `refundedQuantity`", which is not what `sales` means: a refunded
+  line that had already shipped is not restocked (refund.service `restock`,
+  legacy `regressionStock`), so its units stay off the shelf _and_ in `sales`.
+  The comparison now uses the same `returned` count as the stock half of INV5.
+  All four seeds pass with `!==`.
+- `payment/payment.int.test.ts` now registers the catalogue (the hook needs the
+  stock port, as in every real process) and PAY-004 asserts `sales` moved.

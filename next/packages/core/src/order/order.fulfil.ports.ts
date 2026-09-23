@@ -77,6 +77,10 @@ export function resolveLogisticsPort(): LogisticsPort | undefined {
  * gateway, a `refunds` row or `orders.refunded_amount`. The shapes are C's own
  * contract types, passed through untouched, so a field C adds appears on the
  * phone without a second edit here.
+ *
+ * The implementation must be staff-facing, not the admin services: those
+ * demand admin atoms a staff actor never holds (CR-14-k). The refund domain
+ * registers its `staff*` entry points, which accept only a `staff` actor.
  */
 export interface StaffRefundPort {
   list(ctx: Ctx, query: AdminRefundListQuery): Promise<PagedAdminRefunds>;

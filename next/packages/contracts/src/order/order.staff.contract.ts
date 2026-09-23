@@ -315,7 +315,8 @@ export const staffShipmentTracking = defineRoute({
 
 /**
  * The refund routes read and write stream C's aggregate through `refund`'s
- * `index.ts` — B2 owns the surface, C owns the money. The shapes below are C's
+ * staff entry points (CR-14-k: not the admin services, whose atoms a staff
+ * actor never holds) — B2 owns the surface, C owns the money. The shapes below are C's
  * own, imported unchanged, so a field C adds shows up here without a second
  * edit.
  */
@@ -354,8 +355,10 @@ export const staffRefundDetail = defineRoute({
  * 同意/拒绝退款 from the phone.
  *
  * One route with a `decision` rather than two sub-resources, because that is
- * the single button pair the uni-app screen has; it delegates to C's
- * `approve` / `reject`, which own every refusal code listed here.
+ * the single button pair the uni-app screen has; it delegates to C's staff
+ * `approve` / `reject`, which own every refusal code listed here. `FORBIDDEN`
+ * (`reason: '店员审核售后未开启'`) until the shop turns on
+ * `order-staff.allowStaffRefundReview` (CR-14-k).
  */
 export const staffRefundReview = defineRoute({
   id: 'order.staffRefundReview',

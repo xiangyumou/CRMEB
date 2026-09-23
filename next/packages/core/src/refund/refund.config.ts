@@ -11,8 +11,12 @@ import type { Ctx } from '../kernel/context';
  * money. What is left is genuinely per-shop: the return address printed on the
  * buyer's screen once a `return_and_refund` is approved.
  *
- * Nothing here is secret, so the whole group is readable by any operator who can
- * open the form.
+ * Nothing here is secret, so the whole group is readable by anyone holding
+ * `refund:config:read`. Writing it takes `refund:config:write` (derived by the
+ * config service from the `:read` atom), because the return address decides
+ * where buyers send goods: it is not something the remark atom
+ * (`refund:request:write`), which the group used to declare, or an approval
+ * atom may change (CR-10-k).
  */
 
 /**
@@ -32,7 +36,7 @@ const configText = (max: number) => z.string().max(max).default('');
 export const refundConfig = defineConfigGroup({
   group: 'refund',
   title: '售后设置',
-  permission: 'refund:request:write',
+  permission: 'refund:config:read',
   schema: z.object({
     /** Consignee for returned goods. Empty means "no address configured yet". */
     returnName: configText(32),

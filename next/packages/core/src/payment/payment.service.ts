@@ -21,6 +21,7 @@ import {
   type WechatPayClient,
 } from '../wechat';
 import { NOTIFY_PATHS, paymentConfig, paymentCredentials } from './payment.config';
+import { PAYMENT_NOTIFY_MISMATCH_EVENT } from './payment.notifications';
 import * as repo from './payment.repo';
 import type { PaymentContext } from './payment.repo';
 
@@ -678,6 +679,19 @@ export function ackOrThrow(result: WebhookResult): WebhookResult['body'] {
  * WeChat retries any non-200, so a failure we might recover from answers 500
  * and a body we will never accept answers 401. Success is acknowledged only
  * after the state change has committed.
+ *
+ * Two checks sit between the signature and the money (K2):
+ *
+ *  - **the event type, before the callback row** (CR-3-k2). Both webhooks share
+ *    `payment_callbacks` and its `UNIQUE (mch_id, provider_notify_id)`, so a
+ *    refund event recorded here would burn its notify id and the genuine
+ *    delivery to the refund webhook would read as a replay. Anything that is
+ *    not `TRANSACTION.*` is acknowledged — a misroute will never parse better —
+ *    and leaves no row.
+ *  - **the merchant, before settlement** (CR-4-k2). `mchid` must be present and
+ *    be the merchant the attempt was created under (the configured one when no
+ *    attempt matches). A body naming another merchant is recorded under the
+ *    merchant it named, raised to an operator, and neither booked nor refunded.
  */
 export async function handleTransactionNotify(
   ctx: Ctx,
@@ -697,11 +711,22 @@ export async function handleTransactionNotify(
     return { status: 401, body: { code: 'FAIL', message: '签名验证失败' } };
   }
 
+  if (!notification.eventType.startsWith('TRANSACTION.')) {
+    ctx.logger.warn(
+      { eventType: notification.eventType, notifyId: notification.notifyId },
+      'payment notify: not a transaction event; acknowledged without a callback row',
+    );
+    return ACK;
+  }
+
   const resource = notification.resource;
   const outTradeNo = stringOrNull(resource.out_trade_no);
   const transactionId = stringOrNull(resource.transaction_id);
   const tradeState = stringOrNull(resource.trade_state);
-  const mchId = stringOrNull(resource.mchid) ?? runtime.mchId;
+  const namedMchId = stringOrNull(resource.mchid);
+  // The callback row is keyed by the merchant the body named, so a foreign
+  // notification is visible as exactly that. Absent, it is filed under ours.
+  const mchId = namedMchId ?? runtime.mchId;
   const amount = (resource.amount ?? {}) as { total?: unknown; payer_total?: unknown };
   const paidFen = positiveFen(amount.payer_total) ?? positiveFen(amount.total);
 
@@ -751,14 +776,37 @@ export async function handleTransactionNotify(
         });
         return ACK;
       }
-      if (mchId !== runtime.mchId) {
-        // Correctly signed by WeChat, but for a merchant we are not configured
-        // as. Money we cannot even attribute: a human looks at it (PAYC-005).
-        ctx.logger.error({ mchId, expected: runtime.mchId }, 'payment notify merchant mismatch');
-      }
-
       const attempt =
         outTradeNo === null ? null : await repo.lockAttemptByOutTradeNo(tx, outTradeNo);
+
+      const expectedMchId = attempt?.mchId ?? runtime.mchId;
+      if (namedMchId !== expectedMchId) {
+        // Correctly signed, but not for the merchant this money should have
+        // reached (PAYC-005, CR-4-k2): a service-provider setup, a platform key
+        // or APIv3 key shared across merchant ids. It is not ours to book, and
+        // not ours to refund either, so there is no exception row — a human
+        // looks at the callback and the merchant platform.
+        ctx.logger.error(
+          { mchId: namedMchId, expected: expectedMchId, outTradeNo, transactionId },
+          'payment notify merchant mismatch; not settled',
+        );
+        await notify(tx, ctx, {
+          event: PAYMENT_NOTIFY_MISMATCH_EVENT,
+          subject: { scope: 'payment_callback', id: callback.id },
+          data: {
+            ...(attempt ? { orderId: attempt.orderId } : {}),
+            outTradeNo: outTradeNo ?? '',
+            transactionId,
+            mchId: namedMchId ?? '（缺失）',
+            expectedMchId,
+          },
+        });
+        await repo.markCallbackProcessed(tx, callback.id, {
+          at: ctx.clock.now(),
+          result: `exception: merchant_mismatch (named ${namedMchId ?? 'none'}, expected ${expectedMchId})`,
+        });
+        return ACK;
+      }
 
       const outcome = await settlePayment(tx, ctx, attempt, {
         transactionId,

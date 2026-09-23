@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Ctx } from '../kernel/context';
+import { isKnownPermission } from '../auth/permissions';
+import { refundPermissions } from './permissions';
 import { refundConfig, returnAddress, type RefundConfig } from './refund.config';
 
 /**
@@ -21,6 +23,26 @@ describe('TLS-001 — no verification switch in `refund`', () => {
 
   it('has none on the form', () => {
     expect(Object.keys(refundConfig.ui ?? {}).filter((key) => FORBIDDEN.test(key))).toEqual([]);
+  });
+});
+
+describe('CR-10-k — the 售后设置 group has atoms of its own', () => {
+  it('is read with refund:config:read, so the config service derives refund:config:write', () => {
+    // A `:write` atom here would collapse reading and writing onto one grant;
+    // the request atoms (review, execute, the remark) must not rewrite the
+    // address buyers post their returns to.
+    expect(refundConfig.permission).toBe(refundPermissions['config:read']);
+    expect(refundConfig.permission).toBe('refund:config:read');
+    expect(isKnownPermission('refund:config:write')).toBe(true);
+    expect(Object.values(refundPermissions)).toContain('refund:config:write');
+  });
+
+  it('shares no atom with the after-sale requests', () => {
+    const requestAtoms = Object.values(refundPermissions).filter((atom) =>
+      atom.startsWith('refund:request:'),
+    );
+    expect(requestAtoms).not.toContain(refundConfig.permission);
+    expect(requestAtoms).not.toContain('refund:config:write');
   });
 });
 

@@ -61,7 +61,9 @@ import * as repo from './order.repo';
  *  - `costAmount` and the margin it implies;
  *  - the soft-delete column and 删除订单 altogether;
  *  - 改价, unless `order-staff.allowStaffRepricing` is on (off by default,
- *    matching the legacy screen).
+ *    matching the legacy screen);
+ *  - 售后 同意 / 拒绝, unless `order-staff.allowStaffRefundReview` is on (off by
+ *    default, CR-14-k).
  */
 
 // ---------------------------------------------------------------------------
@@ -345,9 +347,10 @@ export async function shipmentTracking(
  * B2 owns the surface, C owns the money.
  *
  * Every one of these is a straight forward to `refund`'s own service through
- * the `StaffRefundPort`, so the staff console can never diverge from what the
- * web after-sales screen does — and B2 contains no code that touches a
- * gateway, a `refunds` row or `orders.refunded_amount`.
+ * the `StaffRefundPort` — its staff entry points, which accept only a `staff`
+ * actor and share the transition code with the web after-sales screen
+ * (CR-14-k) — so B2 contains no code that touches a gateway, a `refunds` row
+ * or `orders.refunded_amount`.
  *
  * Until stream C registers the port, the routes answer 501 rather than
  * pretending: a phone that silently shows an empty after-sales list is worse
@@ -378,6 +381,13 @@ export async function refundReview(
   body: StaffRefundReviewBody,
 ): Promise<AdminRefundDetail> {
   const port = refundPort();
+  // CR-14-k. A decision, and for a 仅退款 an approval sends the money, so the
+  // shop opts in, the way it does for 改价. Said with a reason, so the phone
+  // shows "not enabled" rather than something that reads like a broken account.
+  const { allowStaffRefundReview } = await ctx.config.get(orderStaffConfig);
+  if (!allowStaffRefundReview) {
+    throw new DomainError('FORBIDDEN', { details: { reason: '店员审核售后未开启' } });
+  }
   if (body.decision === 'approve') {
     return port.approve(ctx, params, body.reason === undefined ? {} : { remark: body.reason });
   }

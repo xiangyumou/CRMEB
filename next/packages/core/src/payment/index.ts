@@ -2,6 +2,7 @@ import { registerPaymentPort } from '../order/ports';
 import { registerSitePaymentMethod } from '../system';
 import { isPaymentEnabled, paymentConfig } from './payment.config';
 import { registerPaymentEffects } from './payment.effects';
+import { registerPaymentNotificationEvents } from './payment.notifications';
 import { closeOrderPayments, ensureNoOpenAttempts } from './payment.service';
 
 /**
@@ -86,6 +87,10 @@ export {
 } from './payment.config';
 export { paymentPermissions } from './permissions';
 export { registerPaymentEffects } from './payment.effects';
+export {
+  PAYMENT_NOTIFY_MISMATCH_EVENT,
+  registerPaymentNotificationEvents,
+} from './payment.notifications';
 
 /**
  * The refund domain needs exactly two things from payment's tables: the
@@ -113,6 +118,8 @@ export {
 export function registerPaymentDomain(): void {
   registerPaymentPort({ ensureNoOpenAttempts, closeOrderPayments });
   registerPaymentEffects();
+  // CR-4-k2: a notification naming another merchant is told to an operator.
+  registerPaymentNotificationEvents();
   // `GET /api/v1/site/config` tells the app which pay buttons to draw (CR-7-h2).
   // It is announced from here, not read from there: `system` is the domain every
   // other one imports, so an edge back into `payment` would be a cycle — and the

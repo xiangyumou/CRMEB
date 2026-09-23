@@ -334,6 +334,49 @@ describe('FreightPort.quote', () => {
     expect(beijing.totalFen).toBe(4000);
   });
 
+  it('prices an address with no known division at the fallback region, not free (CR-6-i)', async () => {
+    const template = await templates.create(
+      harness.ctx,
+      form({
+        regions: [
+          {
+            isFallback: true,
+            cityIds: [],
+            firstUnit: 1,
+            firstPrice: '20.00',
+            additionalUnit: 1,
+            additionalPrice: '10.00',
+          },
+          {
+            isFallback: false,
+            cityIds: ['330100'],
+            firstUnit: 2,
+            firstPrice: '6.00',
+            additionalUnit: 1,
+            additionalPrice: '2.00',
+          },
+        ],
+      }),
+    );
+    const skuId = await makeSku({ freightMode: 'template', templateId: template.id });
+    const lines = [quoteLine(skuId, { quantity: 3, freightTemplateId: Number(template.id) })];
+
+    // A migrated address the ETL could not place (`city_id` NULL, CR-3-j) and
+    // one naming a division the city table does not have: both are priced like
+    // a province the template does not list — ¥20 + 2 × ¥10.
+    const noCity = await freightPort.quote(harness.ctx.db, harness.ctx, {
+      addressCityId: null,
+      lines,
+    });
+    expect(noCity).toEqual({ totalFen: 4000, perLine: [4000] });
+
+    const unknownCity = await freightPort.quote(harness.ctx.db, harness.ctx, {
+      addressCityId: 999_999_999,
+      lines,
+    });
+    expect(unknownCity.totalFen).toBe(4000);
+  });
+
   it('charges by weight when the template says so', async () => {
     const template = await templates.create(
       harness.ctx,

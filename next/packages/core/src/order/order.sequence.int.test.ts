@@ -29,7 +29,9 @@ import * as refundService from '../refund';
 import { registerShippingFreightPort } from '../shipping';
 import { wechatConfig } from '../wechat';
 import * as order from './index';
-import { resetOrderPorts } from './ports';
+import { resolveStockPort } from './catalog.port';
+import { COMMIT_SALE_HOOK } from './order.stock.hooks';
+import { onOrderPaid, resetOrderPorts } from './ports';
 
 /**
  * SEQ-001 — a fixed-seed interleaving of real operations.
@@ -72,9 +74,10 @@ import { resetOrderPorts } from './ports';
  * `SHOP_SEQ_STEPS=400` widen it for a soak run without editing the file
  * (STAB-001 uses the defaults).
  *
- * Two findings are pinned at the bottom as `it.fails`: CR-1-k2 (a paid order's
- * units are never counted as sold) and CR-2-k2 (`order.paid`/`order.refunded`
- * effects have no handler and park as `unknown`).
+ * Two findings it made are asserted at the bottom: CR-1-k2 (a paid order's
+ * units are counted as sold — the paid hook commits the sale) and CR-2-k2
+ * (`order.paid`/`order.refunded` effects are delivered, not parked as
+ * `unknown`). Both were `it.fails` until R2 fixed them.
  */
 
 let harness: TestCtx;
@@ -886,13 +889,13 @@ async function checkInvariants(world: World): Promise<string[]> {
   for (const sku of skuRows) {
     const initial = world.skuStock.get(sku.id)!;
     let placed = 0; // taken off the shelf by a line that was not cancelled
-    let sold = 0; // paid for and not refunded
+    let paid = 0; // of those, on an order whose payment was booked
     for (const item of itemRows) {
       if (item.skuId !== sku.id) continue;
       const row = byOrder.get(item.orderId);
       if (row === undefined || row.status === 'cancelled') continue;
       placed += item.quantity;
-      if (row.paidAt !== null) sold += item.quantity - item.refundedQuantity;
+      if (row.paidAt !== null) paid += item.quantity;
     }
     let returned = 0; // put back by a settled refund
     for (const line of refundItemRows) {
@@ -905,12 +908,18 @@ async function checkInvariants(world: World): Promise<string[]> {
         `INV5 sku ${sku.id}: stock ${sku.stock} + placed ${placed} - restocked ${returned} != initial ${initial}`,
       );
     }
-    // `sales` may only count units that were paid for and kept. It should
-    // equal `sold`; today nothing commits the sale at payment and it stays 0
-    // — CR-1-k2, pinned by the `it.fails` at the bottom. Tighten this to `!==`
-    // when that test flips.
-    if (sku.sales > sold) {
-      broken.push(`INV5 sku ${sku.id}: sales ${sku.sales} > paid, unrefunded units ${sold}`);
+    // `sales` counts exactly the units that were paid for and not put back:
+    // the paid hook commits the sale (CR-1-k2), and the one release that takes
+    // it back is a settled refund's restock of an undispatched line — the same
+    // `returned` as above. A refunded line that had already shipped is not
+    // restocked (the operator's inbound step decides whether it is sellable),
+    // so its units stay both off the shelf and in `sales`, as legacy's
+    // `regressionStock` left them.
+    const sold = paid - returned;
+    if (sku.sales !== sold) {
+      broken.push(
+        `INV5 sku ${sku.id}: sales ${sku.sales} != paid ${paid} - restocked ${returned} (${sold})`,
+      );
     }
     if (sku.stock < 0 || sku.sales < 0) {
       broken.push(`INV5 sku ${sku.id}: negative stock/sales (${sku.stock}/${sku.sales})`);
@@ -1045,7 +1054,7 @@ describe('SEQ-001 — a fixed-seed interleaving of real operations', () => {
  * transaction commits the sale.
  */
 describe('CR-1-k2 — a paid order is counted as sold', () => {
-  it.fails('moves the SKU from reserved to sold when the payment is booked', async () => {
+  it('moves the SKU from reserved to sold when the payment is booked', async () => {
     const world = await buildWorld();
     const shopper = world.shoppers[0]!;
     const intent = await startPayment(as(shopper.userId), {
@@ -1072,6 +1081,69 @@ describe('CR-1-k2 — a paid order is counted as sold', () => {
     expect(sku).toEqual({ stock: 8, sales: 2 });
     expect(product?.sales).toBe(2);
   });
+
+  // The paid hook commits every kind of order, a presale one included, and
+  // `presale:commit-sale` moves only the campaign's own ledger. So the SKU's
+  // `sales` goes up once per order — and a second commit for the same order,
+  // however it arrives, is a no-op by the port's `catalog.stock.commit` key.
+  it('commits a presale order once, however often the sale is committed again', async () => {
+    const world = await buildWorld();
+    const buyer = await makeUser('seq-ps');
+    const detail = await order.create(as(buyer), {
+      source: 'buy-now',
+      cartItemIds: [],
+      item: { skuId: String(world.presale.skuId), quantity: 2 },
+      kind: 'presale',
+      kindMeta: { activityId: String(world.presale.activityId) },
+      idempotencyKey: 'seq-ps-0000000001',
+    });
+    const orderId = Number(detail.id);
+    const intent = await startPayment(as(buyer), {
+      orderId,
+      channel: 'wechat_mini',
+      openid: `oFake${buyer}`,
+    });
+    gateway.markPaid(intent.outTradeNo);
+    const ack = await handleTransactionNotify(
+      harness.ctx,
+      gateway.signTransactionNotification({ outTradeNo: intent.outTradeNo }),
+    );
+    expect(ack.status).toBe(200);
+
+    const skuSales = async () =>
+      (
+        await harness.ctx.db
+          .select({ stock: productSkus.stock, sales: productSkus.sales })
+          .from(productSkus)
+          .where(eq(productSkus.id, world.presale.skuId))
+      )[0];
+    const campaignSales = async () =>
+      (
+        await harness.ctx.db
+          .select({ sales: presaleActivitySkus.sales })
+          .from(presaleActivitySkus)
+          .where(eq(presaleActivitySkus.activityId, world.presale.activityId))
+      )[0]?.sales;
+    expect(onOrderPaid.names().filter((name) => name.endsWith(':commit-sale'))).toEqual(
+      expect.arrayContaining([COMMIT_SALE_HOOK, 'presale:commit-sale']),
+    );
+    expect(await skuSales()).toEqual({ stock: 198, sales: 2 });
+    expect(await campaignSales()).toBe(2);
+
+    // Replay the sale: the port directly, then every paid hook as a whole.
+    await harness.ctx.withTx(async (tx) => {
+      await resolveStockPort().commit(tx, orderId, [{ skuId: world.presale.skuId, quantity: 2 }]);
+      await onOrderPaid.dispatch(tx, harness.ctx, {
+        orderId,
+        orderNo: detail.orderNo,
+        userId: buyer,
+        at: harness.clock.now(),
+        paidAmount: Money.parse(detail.payableAmount),
+      });
+    });
+    expect(await skuSales()).toEqual({ stock: 198, sales: 2 });
+    expect(await campaignSales()).toBe(2);
+  });
 });
 
 /**
@@ -1084,7 +1156,7 @@ describe('CR-1-k2 — a paid order is counted as sold', () => {
  * Flips green when both rows either get a handler or stop being written.
  */
 describe('CR-2-k2 — every effect a paid and refunded order records is delivered', () => {
-  it.fails('leaves nothing parked for want of a handler', async () => {
+  it('leaves nothing parked for want of a handler', async () => {
     const world = await buildWorld();
     const shopper = world.shoppers[0]!;
     const intent = await startPayment(as(shopper.userId), {

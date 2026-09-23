@@ -1,6 +1,6 @@
 # CR-6-k2 — `refund.detail` is exported without an ownership check
 
-**Stream:** K2 (hardening) **Status:** OPEN — for stream C (refund); one-line fix
+**Stream:** K2 (hardening) **Status:** RESOLVED (R2; commit in `docs/rewrite/status/r2.md`)
 **Files:** `next/packages/core/src/refund/index.ts:41`, `next/packages/core/src/refund/refund.service.ts:993`
 
 ## What
@@ -24,3 +24,10 @@ behaviour of the public entry points stays asserted by
 ## Until then
 
 Not a live leak: no route calls it.
+
+## Resolution (R2)
+
+`detail` is gone from `refund/index.ts`'s export list, with a comment saying
+why; in-domain callers import it from `./refund.service`. Nothing outside the
+domain used it (web typechecks). `refund/refund.exports.test.ts::CR-6-k2 — the refund domain’s public surface > does not export the unchecked detail read`
+keeps it out.

@@ -96,7 +96,11 @@ export function unitsOf(line: FreightInputLine, mode: ChargeMode): number {
   }
 }
 
-/** The region that prices this address: the most specific city match, else the fallback. */
+/**
+ * The region that prices this address: the most specific city match, else the
+ * fallback. An empty `cityPath` (a division we do not know) matches no city
+ * rule and so gets the fallback too — never "no region", which would ship free.
+ */
 export function regionFor(
   regions: readonly FreightRegion[],
   cityPath: readonly number[],
@@ -167,8 +171,12 @@ interface Group {
  * Prices one cart against one address.
  *
  * `cityPath` is the address's division and its ancestors, most specific first.
- * An empty path means "no address yet", and every template line is quoted at
- * zero — B1 already short-circuits that case, this is belt and braces.
+ * An empty path is an address whose division is missing or unknown — a
+ * migrated address whose city the ETL could not map (CR-3-j), or one saved
+ * without a `cityId`. It is priced like an address in a province the template
+ * does not list: at the fallback region, or free when the template has none
+ * (CR-6-i). "No address yet" never reaches here: checkout quotes zero without
+ * asking the port.
  */
 export function computeFreight(input: {
   lines: readonly FreightInputLine[];
@@ -201,7 +209,6 @@ export function computeFreight(input: {
       undeliverable.push({ skuId: line.skuId, templateId: template.templateId });
       continue;
     }
-    if (input.cityPath.length === 0) continue;
     const region = regionFor(template.regions, input.cityPath);
     if (region === null) continue;
     const existing = groups.get(line.templateId);
