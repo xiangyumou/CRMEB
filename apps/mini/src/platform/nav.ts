@@ -199,6 +199,57 @@ export function parseLoginRedirect(value: string | undefined): StorefrontRoute |
   return { route: key, params: clean } as StorefrontRoute;
 }
 
+/**
+ * A page on the stack as `getCurrentPages()` returns it. WeChat gives `route` (no leading
+ * slash, no query) and `options`; Taro's H5 router gives `route` and `path` with a leading
+ * slash, the query only in `path`; Taro's runtime adds `$taroParams` on both.
+ */
+export interface StackPage {
+  route?: string | undefined;
+  path?: string | undefined;
+  options?: Record<string, string | undefined> | undefined;
+  $taroParams?: Record<string, string | undefined> | undefined;
+}
+
+/**
+ * How the login page leaves once signed in (pages.md §3.2). `back` when the page under it is
+ * the redirect target itself, same route and same params (商品详情 → 登录 → 商品详情):
+ * `navigateBack` returns to it, where `redirectTo` would stack a second copy of it. `replace`
+ * otherwise (the target is another page, or login was the first page): the login page is
+ * replaced by the target, or a tab is switched to.
+ */
+export function loginReturn(
+  target: StorefrontRoute | { route: string; params?: object },
+  stack: readonly StackPage[],
+): 'back' | 'replace' {
+  const previous = stack.length >= 2 ? stack[stack.length - 2] : undefined;
+  const entry = entryOf(target.route);
+  if (!previous || !entry) return 'replace';
+  const [path = ''] = (previous.route ?? previous.path ?? '').replace(/^\//, '').split('?');
+  if (path !== entry.path) return 'replace';
+  const key = target.route as StorefrontRouteKey;
+  // A tab takes its params through `navigate` (pending tab params), never through going back.
+  if (entry.tab) return definedParams(key, target.params ?? {}).length === 0 ? 'back' : 'replace';
+  const query = previous.path?.split('?')[1] ?? '';
+  const options = {
+    ...Object.fromEntries(new URLSearchParams(query)),
+    ...previous.$taroParams,
+    ...previous.options,
+  };
+  const params = readRouteParams(key, options);
+  return toPath({ route: key, params }) === toPath(target) ? 'back' : 'replace';
+}
+
+/** Leaves the login page for `target` once signed in, as `loginReturn` decides. */
+export async function returnFromLogin(
+  target: StorefrontRoute | { route: string; params?: object },
+): Promise<void> {
+  const stack: readonly StackPage[] =
+    typeof Taro.getCurrentPages === 'function' ? Taro.getCurrentPages() : [];
+  if (loginReturn(target, stack) === 'back') await Taro.navigateBack({ delta: 1 });
+  else await navigate(target, { replace: true });
+}
+
 /** The route of a page path (`pages/product/index`), for launch options; `null` if unknown. */
 export function routeKeyOfPath(path: string): StorefrontRouteKey | null {
   const clean = path.replace(/^\//, '').split('?')[0] ?? '';

@@ -25,10 +25,22 @@ Five small fixes, one commit each. Updated at every commit.
   `ariaLabel="<title>[，已售罄]"`, as the kit's `ProductCard` does. The DOM shim renders
   `ariaRole` as `role` on `View`, so the admin canvas and the block tests see it
   (`getByRole('link', { name })`).
+- **Login return.** `platform/nav.ts` `loginReturn(target, getCurrentPages())` decides, and
+  `returnFromLogin` does: `navigateBack` when the page under 登录 is the redirect target (same
+  catalogue path, same declared params, read from WeChat's `options`, Taro's `$taroParams` or
+  the H5 `path` query, a mini-program code's `scene` included; a tab without params), else
+  `navigate(target, { replace: true })` as before. Unit-tested (WeChat and H5 stack shapes,
+  scene, other product, first page, tabs). WeChat semantics, reasoned from the docs (no device
+  here): `redirectTo` closes the current page and opens a _new_ instance, so 商品 → 登录 →
+  `redirectTo(商品)` left `[商品, 商品]` on WeChat as well as H5; `navigateBack({ delta: 1 })`
+  closes 登录 and shows the existing 商品 instance (`onShow`, state kept). WeChat's
+  `getCurrentPages()` pages carry `route` (no slash) and `options`; Taro's H5 router's carry
+  `route` and `path` with the query. Device item **D13** in `docs/mini/device-check.md`; D02
+  now checks the icons too.
 
 ## In progress
 
-- Login return, client version.
+- Client version.
 
 ## Next
 

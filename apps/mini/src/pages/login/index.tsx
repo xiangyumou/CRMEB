@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Image, Text, View } from '@tarojs/components';
 import { useAppConfig } from '@/app-config';
 import { assetUrl } from '@/lib/asset-url';
-import { goBack, navigate, parseLoginRedirect, platform, useRouteParams } from '@/platform';
+import { goBack, parseLoginRedirect, platform, returnFromLogin, useRouteParams } from '@/platform';
 import {
   bindPhone,
   bindPhoneWithSms,
@@ -22,7 +22,8 @@ import './index.scss';
  * 登录 (`login { redirect? }`, docs/mini/auth.md, design.md §5 G). Reached from
  * `requireLogin()` when the silent sign-in could not finish on its own: the shop wants a phone
  * number (快速登录, or an SMS code), the shopper signed out, or WeChat failed. Comes back to
- * `redirect` (a catalogue route, never a path) once signed in; 暂不登录 just goes back.
+ * `redirect` (a catalogue route, never a path) once signed in, going back when that is the page
+ * under it (`loginReturn`); 暂不登录 just goes back.
  */
 export default function LoginPage() {
   const { redirect } = useRouteParams('login');
@@ -39,7 +40,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (session.status !== 'signed-in') return;
     const target = parseLoginRedirect(redirect) ?? { route: 'home' as const, params: {} };
-    void navigate(target, { replace: true });
+    void returnFromLogin(target);
   }, [session.status, redirect]);
 
   function needAgreement(): boolean {

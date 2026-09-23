@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { taroFake } from '@/test/taro-fake/taro';
 import {
   goBack,
+  loginReturn,
   navigate,
   parseLoginRedirect,
   readRouteParams,
+  returnFromLogin,
   routeKeyOfPath,
   takeTabParams,
   toPath,
@@ -98,5 +100,60 @@ describe('parseLoginRedirect', () => {
   it('maps a page path back to its key', () => {
     expect(routeKeyOfPath('/packages/order/cashier/index?orderId=1')).toBe('cashier');
     expect(routeKeyOfPath('pages/nowhere')).toBeNull();
+  });
+});
+
+describe('loginReturn', () => {
+  const product = { route: 'product', params: { id: '7' } } as const;
+  const login = { route: 'packages/account/login/index' };
+
+  it('goes back to the page under login when it is the target (WeChat: route + options)', () => {
+    const stack = [{ route: 'pages/product/index', options: { id: '7' } }, login];
+    expect(loginReturn(product, stack)).toBe('back');
+  });
+
+  it('goes back on H5, where the params are only in the path', () => {
+    const stack = [
+      { route: '/pages/product/index', path: '/pages/product/index?id=7&stamp=3' },
+      { route: '/pages/login/index', path: '/pages/login/index?redirect=x&stamp=4' },
+    ];
+    expect(loginReturn(product, stack)).toBe('back');
+  });
+
+  it('goes back to a product opened from a mini-program code (scene)', () => {
+    const stack = [{ route: 'pages/product/index', options: { scene: 'id%3D7' } }, login];
+    expect(loginReturn(product, stack)).toBe('back');
+  });
+
+  it('replaces login when the page under it is another page, or another product', () => {
+    expect(loginReturn(product, [{ route: 'pages/category/index', options: {} }, login])).toBe(
+      'replace',
+    );
+    expect(
+      loginReturn(product, [{ route: 'pages/product/index', options: { id: '8' } }, login]),
+    ).toBe('replace');
+  });
+
+  it('replaces login when it is the first page (opened from a share)', () => {
+    expect(loginReturn(product, [login])).toBe('replace');
+    expect(loginReturn(product, [])).toBe('replace');
+  });
+
+  it('goes back to a tab under it, unless the tab is sent params', () => {
+    const stack = [{ route: 'pages/cart/index', options: {} }, login];
+    expect(loginReturn({ route: 'cart', params: {} }, stack)).toBe('back');
+    const category = [{ route: 'pages/category/index', options: {} }, login];
+    expect(loginReturn({ route: 'category', params: { categoryId: '3' } }, category)).toBe(
+      'replace',
+    );
+  });
+
+  it('navigates back, or replaces login with the target', async () => {
+    taroFake.pageStack = [{ route: 'pages/product/index', options: { id: '7' } }, login];
+    await returnFromLogin(product);
+    expect(lastCall()).toEqual({ api: 'navigateBack', args: { delta: 1 } });
+    taroFake.pageStack = [{ route: 'pages/index/index', options: {} }, login];
+    await returnFromLogin(product);
+    expect(lastCall()).toEqual({ api: 'redirectTo', args: { url: '/pages/product/index?id=7' } });
   });
 });
