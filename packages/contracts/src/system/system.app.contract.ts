@@ -1,5 +1,10 @@
 import { defineRoute } from '../_conventions/route';
-import { appAppearanceDefaults, appPublicConfig, appPublicConfigExample } from './app.schemas';
+import {
+  appAppearanceDefaults,
+  appDisplayDefaults,
+  appPublicConfig,
+  appPublicConfigExample,
+} from './app.schemas';
 
 /**
  * `GET /api/v1/app/config` — the mini-program's launch payload.
@@ -53,6 +58,7 @@ export const systemAppConfigGet = defineRoute({
         },
         webviewDomains: [],
         appearance: appAppearanceDefaults,
+        display: appDisplayDefaults,
         version: '0',
         serverTime: '2026-09-24T08:00:00.000+08:00',
       },

@@ -43,6 +43,12 @@ export const appConfigFixture: AppConfig = {
       ],
     },
   },
+  display: {
+    categorySubcategories: true,
+    productReviews: true,
+    productRecommendations: true,
+    productServiceTags: true,
+  },
   version: '1758500000000',
   serverTime: '2026-09-24T08:00:00.000+08:00',
 };

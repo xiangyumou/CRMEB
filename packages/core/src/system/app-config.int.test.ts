@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   appAppearanceDefaults,
+  appDisplayDefaults,
   appPublicConfig,
   appSubscribeScene,
 } from '@shop/contracts/system/app.schemas';
@@ -150,6 +151,22 @@ describe('SYS-015 — 小程序外观', () => {
         { key: 'cart', label: '购物车', iconUrl: null, selectedIconUrl: null },
         { key: 'me', label: '会员', iconUrl: null, selectedIconUrl: null },
       ],
+    });
+  });
+
+  it('shows every optional part of 分类 and 商品详情 until the operator switches one off', async () => {
+    expect((await appConfigGet(anonymous())).display).toEqual(appDisplayDefaults);
+    expect(Object.values(appDisplayDefaults).every(Boolean)).toBe(true);
+
+    await save('storefront-appearance', {
+      showCategorySubcategories: false,
+      showProductRecommendations: false,
+    });
+    expect((await appConfigGet(anonymous())).display).toEqual({
+      categorySubcategories: false,
+      productReviews: true,
+      productRecommendations: false,
+      productServiceTags: true,
     });
   });
 

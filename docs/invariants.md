@@ -1772,9 +1772,10 @@ A save is refused whole when the schema rejects a value or the group does not de
 
 ### SYS-015
 
-The `storefront-appearance` group answers a fresh install with every field defaulted (the contract's `appAppearanceDefaults`), always yields exactly the four fixed tabs — 首页, 分类, 购物车, 我的 — in that order, falls back to the default label when one is blanked, serves a blank accent colour as `null` (the client then uses the primary colour), and refuses any colour that is not `#RRGGBB` (and a radius off the scale, and an over-long label) whole, writing nothing.
+The `storefront-appearance` group answers a fresh install with every field defaulted (the contract's `appAppearanceDefaults`), always yields exactly the four fixed tabs — 首页, 分类, 购物车, 我的 — in that order, falls back to the default label when one is blanked, serves a blank accent colour as `null` (the client then uses the primary colour), and refuses any colour that is not `#RRGGBB` (and a radius off the scale, and an over-long label) whole, writing nothing. Its 页面显示 switches (`display`: 分类 second-level categories, 商品详情 reviews, 为你推荐 and service tags) all default to shown — what those pages showed before the switches — and each turns off alone.
 
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > answers a fresh install with every appearance default`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > shows every optional part of 分类 and 商品详情 until the operator switches one off`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the theme and the tab bar the operator saved`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the accent colour, and a blanked one as none`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > falls back to the default label when the operator blanks one`
