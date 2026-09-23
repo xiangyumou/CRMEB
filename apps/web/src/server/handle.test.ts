@@ -380,6 +380,26 @@ describe('authentication', () => {
     );
     expect(seen).toEqual(['wechat-mini', null]);
   });
+
+  it('reads a well-formed X-Client-Version onto the context and ignores junk', async () => {
+    const seen: unknown[] = [];
+    const GET = handle(
+      okRoute,
+      async (ctx) => {
+        seen.push(ctx.clientVersion);
+        return { page: 1 };
+      },
+      { container: container() },
+    );
+    for (const version of ['1.4.0', '2.0.0-beta.3', 'not a version', '9'.repeat(40), null]) {
+      await GET(
+        new Request('https://shop.example/api/v1/things', {
+          headers: version === null ? {} : { 'x-client-version': version },
+        }),
+      );
+    }
+    expect(seen).toEqual(['1.4.0', '2.0.0-beta.3', undefined, undefined, undefined]);
+  });
 });
 
 describe('authorisation', () => {
