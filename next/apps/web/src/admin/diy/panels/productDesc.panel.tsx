@@ -18,11 +18,11 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 import { DiyAlignField } from './_fields';
 
 /**
- * 产品介绍 — ports `c_product_desc.vue`. A商品详情 component: one switch on the
+ * 产品介绍. A商品详情 component: one switch on the
  * content tab, the title's own style on the style tab, then 通用样式.
  *
- * `borderRadius` is a bare `"0"` string in the default and reaches `rCom`
- * nowhere; `fillet` is the radius the panel actually edits. Left untouched.
+ * `borderRadius` is a bare `"0"` string in the default and is not an operator
+ * setting; `fillet` is the radius the panel actually edits. Left untouched.
  */
 export default defineDiyPanel<ProductDescComponent>({
   key: 'productDesc',

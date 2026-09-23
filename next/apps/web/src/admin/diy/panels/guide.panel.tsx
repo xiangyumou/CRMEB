@@ -14,13 +14,13 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 辅助线 — ports `c_auxiliary_line.vue`.
+ * 辅助线.
  *
  * `lineStyle.tabList` carries the CSS the renderer uses (`dashed` / `solid` /
  * `dotted`) on each tab, so the stored `tabVal` is an index into that list and
  * nothing else needs writing.
  *
- * `lineBgColor` (底部背景) is in the default and reaches `rCom` nowhere; the
+ * `lineBgColor` (底部背景) is in the default but is not an operator setting; the
  * bottom background an operator can actually edit is the one `c_common_style`
  * draws, and 辅助线 has no `bottomBgColor`. Left untouched.
  */

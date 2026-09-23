@@ -22,29 +22,24 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 超级组件 — ports `c_custom_component.vue`, the only panel whose row set is
+ * 超级组件, the only panel whose row set is
  * chosen by a **select** rather than a tab strip: `selectType.activeValue` is
  * one of `user` / `article` / `coupon` / `goods`, and each names a whole
  * 数据设置 block. `user` has none — it is the default and shows nothing between
- * 信息设置 and 组件设计, which is not a bug (`updateRCom` has no `user` branch).
+ * 信息设置 and 组件设计, which is not a bug: 会员用户 has no data settings.
  *
- * Two things the legacy panel does that this one deliberately does not:
+ * Opening a node never writes to it. Some stored pages carry the whole
+ * `…DataConfig` family and some do not; the 数据样式 block draws whatever the
+ * node has. `customComponent.default.ts` carries the family, so a fresh
+ * 超级组件 has every row. 显示数量 is drawn once for the filtered article
+ * branch.
  *
- * - **It writes on open.** `patchConfig` creates thirteen groups the factory
- *   default does not carry, including the whole `…DataConfig` family. A page
- *   saved by the old admin therefore has them and one saved by an older build
- *   does not. Panels here never add keys, so the 数据样式 block draws whatever
- *   the node has, which is nothing for a fresh 超级组件 — same as the legacy
- *   render before its patch runs.
- * - **`articleNum` is pushed twice** (`:452` and `:457`), so the filtered
- *   article branch shows 显示数量 twice. Rendered once.
+ * `customBtnConfig` names an inner-layout designer (the stored
+ * `customComponents`). This editor has no such designer — it would be a
+ * page-sized surface of its own — so the stored `customComponents` value is
+ * carried through untouched.
  *
- * `customBtnConfig` opens `CustomDesign`, a second drag-and-drop editor for the
- * component's inner layout that writes `customComponents`. That designer is a
- * page-sized surface of its own and is **not** part of G2; see g2.md decision 4
- * and CR-2-g2. The stored `customComponents` value is carried through untouched.
- *
- * `couponNum` is commented out at `:498` and gets no control.
+ * `couponNum` is not an operator setting and gets no control.
  */
 export default defineDiyPanel<CustomComponentComponent>({
   key: 'customComponent',
@@ -118,7 +113,7 @@ export default defineDiyPanel<CustomComponentComponent>({
             <>
               <DiySelectField {...f.bind('couponType')} />
               <DiySelectField {...f.bind('couponUserType')} />
-              {/* 会员用户 has no 发送方式 — `:492`, a `!=` against the string '2'. */}
+              {/* 会员用户 has no 发送方式 — a `!=` against the string '2'. */}
               {String(value.couponUserType?.activeValue ?? '') !== '2' ? (
                 <DiySelectField {...f.bind('couponSendType')} />
               ) : null}

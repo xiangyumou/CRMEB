@@ -3,10 +3,9 @@ import type { HomeCombComponent } from '@shop/contracts/diy/schema/homeComb.sche
 /**
  * Factory default for `homeComb` — 轮播搜索.
  *
- * Copied from `template/admin/src/components/mobilePage/home_comb.vue`,
- * the object the legacy editor dropped into the page. Panel labels and all:
- * the renderer reads some of them, and a page saved without them is not the
- * page the storefront expects.
+ * The component exactly as a freshly dropped one is saved. Panel labels and
+ * all: the renderer reads some of them, and a page saved without them is not
+ * the page the storefront expects.
  *
  * `timestamp` is assigned by the store when the component is dropped.
  */

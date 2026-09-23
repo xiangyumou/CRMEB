@@ -7,7 +7,7 @@ import { DiyCommonStyleSection, DiySection, DiySetUpTabs } from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 import { DiyRichTextField } from './_fields';
 
-/** 富文本 — ports `c_ueditor_box.vue`: the HTML body and 通用样式. */
+/** 富文本: the HTML body and 通用样式. */
 export default defineDiyPanel<RichTextComponent>({
   key: 'richText',
   schema: richTextSchema,

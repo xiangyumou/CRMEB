@@ -118,14 +118,14 @@ export interface DiyRecordPickerFieldProps extends DiyFieldProps<{
   kind: DiyPickerKind;
   label?: string | undefined;
   max?: number | undefined;
-  /** Key the id is stored under inside each row. Legacy pages use `id`. */
+  /** Key the id is stored under inside each row. Stored pages use `id`. */
   idKey?: string | undefined;
 }
 
 /**
  * The `{ list: [...] }` config a component uses for "指定数据".
  *
- * Rows are kept whole: the legacy payload stores the product's name, image and
+ * Rows are kept whole: the stored payload carries the product's name, image and
  * price alongside its id so the renderer can paint before the API answers, and
  * dropping those would change what the storefront shows.
  */

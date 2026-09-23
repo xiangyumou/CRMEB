@@ -33,11 +33,11 @@ import videosPanel from './videos.panel';
 /**
  * Every config panel the editor knows, in `DIY_COMPONENT_KEYS` (palette) order.
  *
- * **Owned by stream G2 from here on.** Adding a panel is two lines — an import
+ * Adding a panel is two lines — an import
  * and a row in the array — and nothing else in the editor changes. A component
  * key with no panel is not broken: `<DiyPanelHost>` falls back to the raw JSON
  * editor, which is also what the three render-only keys (`newVip`, `presale`,
- * `swipers`) get, since they have no editor UI in the old admin either.
+ * `swipers`) get by design.
  */
 export const diyPanels: readonly AnyDiyPanelDefinition[] = [
   articleListPanel,

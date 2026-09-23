@@ -20,21 +20,20 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 文章列表 — ports `c_new_list.vue`.
+ * 文章列表.
  *
- * `selectConfig` is a `c_select` whose options the legacy panel fetched with
- * `categoryList()` on mount and wrote into `selectConfig.list`. A panel may not
- * call a route, so the category tree comes from the `DiyDataSource` port
- * instead; `DiyCategoryPickerField` patches `activeValue` and leaves the stored
- * `list` exactly as it was, so a page saved by the old admin keeps the option
- * labels it was saved with.
+ * `selectConfig` is a `c_select` whose stored `selectConfig.list` holds the
+ * category options. A panel may not call a route, so the category tree comes
+ * from the `DiyDataSource` port; `DiyCategoryPickerField` patches
+ * `activeValue` and leaves the stored `list` exactly as it was, so a stored
+ * page keeps the option labels it was saved with.
  *
- * `likeSuccessColor` is the only tone-gated row (`:71-75`); the four text
- * colours below it are shown whatever the tone is, which reads like an
- * oversight in the Vue file but is what an operator's saved page was edited
- * against. Ported as-is.
+ * `likeSuccessColor` is the only tone-gated row; the four text colours below
+ * it are shown whatever the tone is, which is what operators' saved pages were
+ * edited against.
  *
- * `goodsList` and `selectList` are in the default and reach `rCom` nowhere.
+ * `goodsList` and `selectList` are in the default but are not operator
+ * settings.
  */
 export default defineDiyPanel<ArticleListComponent>({
   key: 'articleList',
@@ -54,7 +53,7 @@ export default defineDiyPanel<ArticleListComponent>({
         <DiySection title={value.titleArticle ?? '文章设置'} when={f.tab === 0}>
           {/* `DiyCategoryPickerField` types `activeValue` as `unknown`, which
               is not assignable from the schema's `DiySelection`; spelled out
-              rather than spread. See CR-1-g2, note 3. */}
+              rather than spread. */}
           <DiyCategoryPickerField
             value={value.selectConfig}
             onChange={(next) =>

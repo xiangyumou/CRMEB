@@ -14,19 +14,16 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 视频 — ports `c_video.vue`.
+ * 视频.
  *
- * Its default predates the 内边距 / 外边距 rework and still carries the four
- * scalar sliders `topConfig` / `bottomConfig` / `prConfig` / `mbConfig`. Both
- * the legacy panel and the renderer handle that by *synthesising*
- * `paddingConfig` and `marginConfig` from them — `c_video.vue:patchConfig` and
- * `videos.vue:40-68` build the same four-sided object from the same scalars.
+ * 视频 nodes carry the four scalar sliders `topConfig` / `bottomConfig` /
+ * `prConfig` / `mbConfig`, and some stored ones carry nothing else for
+ * spacing. For those, the storefront renderer (`videos.vue`) *synthesises*
+ * `paddingConfig` and `marginConfig` from the scalars.
  *
- * The renderer's fallback is the reason this panel can edit the scalars
- * directly instead: a node with no `paddingConfig` renders from `topConfig` and
- * friends, so editing them changes the page exactly as the legacy panel's
- * synthesised spacing would, without this panel writing two objects into a node
- * that never had them. When a node does carry `paddingConfig`, `c_common_style`
+ * That fallback is why this panel edits the scalars directly on such a node:
+ * editing them changes the page exactly as synthesised spacing would, without
+ * this panel writing two objects into a node that never had them. When a node does carry `paddingConfig`, `c_common_style`
  * draws it and the scalars stop mattering — to the renderer too.
  */
 export default defineDiyPanel<VideosComponent>({
@@ -37,7 +34,7 @@ export default defineDiyPanel<VideosComponent>({
   description: '一段视频，带封面与比例',
   Panel({ value, onChange, ctx }) {
     const f = bindDiyPanel(value, onChange, ctx.disabled);
-    const legacySpacing = value.paddingConfig === undefined && value.marginConfig === undefined;
+    const scalarSpacing = value.paddingConfig === undefined && value.marginConfig === undefined;
 
     return (
       <>
@@ -49,7 +46,7 @@ export default defineDiyPanel<VideosComponent>({
           <DiyTabsField {...f.bind('scaleConfig')} />
         </DiySection>
 
-        <DiySection title="边距设置" when={f.tab === 1 && legacySpacing}>
+        <DiySection title="边距设置" when={f.tab === 1 && scalarSpacing}>
           <DiySliderField {...f.bind('topConfig')} min={0} max={100} />
           <DiySliderField {...f.bind('bottomConfig')} min={0} max={100} />
           <DiySliderField {...f.bind('prConfig')} min={0} max={100} />

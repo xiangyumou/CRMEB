@@ -2,7 +2,7 @@
  * The shared field editors every DIY config panel is built from.
  *
  * Import from `@/admin/diy/fields`, never from the individual files: this list
- * is the frozen surface stream G2 builds against.
+ * is the stable surface the panels build against.
  */
 
 export { DiyFieldRow, DiySection, DiySetUpTabs } from './section';

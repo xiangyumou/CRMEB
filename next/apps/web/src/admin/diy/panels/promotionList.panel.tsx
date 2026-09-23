@@ -17,19 +17,18 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 import { DiyPromotionTabsField } from './_fields';
 
 /**
- * 商品选项卡 — ports `c_home_product.vue`, whose `getRComStyle` is a four-deep
- * nest over `styleConfig` × `toneConfig` × `cartConfig` × `toneCartConfig`:
- * 32 leaves, all of which say one of four things.
+ * 商品选项卡. Its style rows depend on `styleConfig` × `toneConfig` ×
+ * `cartConfig` × `toneCartConfig`: 32 combinations, all of which say one of
+ * three things.
  *
  * - The colours (`decorateColor…` / `textColor…`) appear only for a custom
  *   `toneConfig`, and *which pair* is the style's: 样式一 decorate+textColor2,
  *   样式二 decorate+textColor, 样式三 decorate2+textColor2, 样式四以后
  *   decorate+textColor3.
  * - The 购物车按钮 heading and `toneCartConfig` appear when the cart button is
- *   shown **or** the tone is custom. The `||` is not a simplification: the
- *   `type2 != 0, type3 != 0` leaves all include `fourStyle` while the
- *   `type2 == 0, type3 != 0` leaves do not (`:341-367` against `:328-336`).
- *   Legacy quirk, reproduced.
+ *   shown **or** the tone is custom. The `||` is deliberate, not a
+ *   simplification: with the cart button hidden, a custom tone still offers
+ *   the cart colours.
  * - `goodsPriceColor` and `bntBgColor` need the cart button shown *and* a
  *   custom cart tone.
  *

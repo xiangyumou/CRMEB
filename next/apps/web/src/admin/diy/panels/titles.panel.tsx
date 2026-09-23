@@ -19,10 +19,9 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 /**
  * 文本标题 — the reference panel for "a small component with a link".
  *
- * Ports `c_home_title.vue`. Note `linkConfig` is an *input* object
- * (`{title, value, place, max, type:'link'}`), not a link object: the legacy
- * panel rendered `c_input_item` with `type: 'link'` and stored a bare path. The
- * field editor below keeps that shape, so the saved bytes are unchanged.
+ * Note `linkConfig` is an *input* object (`{title, value, place, max,
+ * type:'link'}`) holding a bare path, not a link object. The field editor
+ * below keeps that shape, so the saved bytes are unchanged.
  */
 export default defineDiyPanel<TitlesComponent>({
   key: 'titles',

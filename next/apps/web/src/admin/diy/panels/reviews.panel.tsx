@@ -15,11 +15,10 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 商品评价 — ports `c_reviews.vue`.
+ * 商品评价.
  *
- * `layoutConfig` is the card-select at the top of the panel *and* was a second
- * row inside 评价列表; the second one is commented out (`c_reviews.vue:62-65`),
- * so it appears once.
+ * `layoutConfig` is the card-select at the top of the panel, and it appears
+ * only there, not again inside 评价列表.
  */
 export default defineDiyPanel<ReviewsComponent>({
   key: 'reviews',

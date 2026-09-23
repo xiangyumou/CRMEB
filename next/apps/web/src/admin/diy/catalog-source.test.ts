@@ -10,7 +10,7 @@ import {
 import { createStubDiyDataSource } from './data-source';
 
 /**
- * The real data source, over the catalog contracts (brief item 4 + CR-3-g2).
+ * The real data source, over the catalog contracts.
  *
  * The pickers are the only place a DIY node can gain a product, a category or a
  * 商品标签 id, so what this layer sends and what it maps back is as load-bearing

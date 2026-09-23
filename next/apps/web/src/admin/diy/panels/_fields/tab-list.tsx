@@ -11,15 +11,14 @@ import type { DiyFieldProps } from '../../panel-api';
  *
  * A row is `{text, dataType, microPage, classPage}`. `dataType.tabVal` picks
  * which target is live: `0` 微页面 fills `microPage`, `1` 商品分类 fills
- * `classPage`. Both targets stay in the row either way — `c_tab_list.vue:103`
- * only blanks the *name* when adding a row, never deletes the other object —
- * so switching the type back does not lose what was chosen.
+ * `classPage`. Both targets stay in the row either way — adding a row only
+ * blanks the *name*, never deletes the other object — so switching the type
+ * back does not lose what was chosen.
  *
- * Both targets are `{name, id}` pairs, not URLs: the legacy picker returned
- * `...?id=8&name=首页` and split it into the two fields
- * (`c_tab_list.vue:66-78`). They are typed here rather than picked, because the
- * dynamic half of the link registry is injected by streams A and F2 and a panel
- * may not call a route. Same two keys, same values.
+ * Both targets are `{name, id}` pairs, not URLs (a link such as
+ * `...?id=8&name=首页` split into the two fields). They are typed here rather
+ * than picked, because the dynamic half of the link registry comes from other
+ * domains and a panel may not call a route. Same two keys, same values.
  */
 
 export interface DiyTabListRow {

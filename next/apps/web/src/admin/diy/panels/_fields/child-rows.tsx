@@ -12,9 +12,9 @@ import type { DiyFieldProps } from '../../panel-api';
  * Nothing to do with products despite the file name; `news.listConfig` is the
  * only user. Each row is `{chiild: [{title, val, max, pla}, …], show}` — yes,
  * `chiild`, misspelled in the payload and therefore load-bearing — and the row
- * that is titled 链接 gets the link picker (`c_product.vue:21-26`).
+ * that is titled 链接 gets the link picker.
  *
- * The 状态 switch appears only when the config's `type` is truthy (`:30`).
+ * The 状态 switch appears only when the config's `type` is truthy.
  */
 
 export interface DiyChildRow {

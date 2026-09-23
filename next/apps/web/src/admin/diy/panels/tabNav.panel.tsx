@@ -14,10 +14,9 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 import { DiyTabListField } from './_fields';
 
 /**
- * 选项卡 — ports `c_nav_bar.vue`.
+ * 选项卡.
  *
- * Three watchers write the same nine-branch tree, which is one rule: the style
- * tab shows a decoration colour and a selected-text colour, and *which pair* it
+ * One rule decides the style tab: it shows a decoration colour and a selected-text colour, and *which pair* it
  * shows depends on `styleConfig.tabVal` — 风格一 `decorateColor` + `textColor`,
  * 风格二 `decorateColor2` + `textColor2`, 风格三 `decorateColor` + `textColor3`.
  * Both only when `toneConfig.tabVal` is custom; following the theme shows
@@ -25,10 +24,8 @@ import { DiyTabListField } from './_fields';
  * differs (#333 / #E93323 / #FFF) and the operator's edit to one must not follow
  * them to another.
  *
- * `titleLeft` is commented out in the Vue file (`:12-15`, `:83-86`, …) so the
- * 展示设置 section has no heading of its own there; it is given one here because
- * a heading-less section in the new shell would sit flush against the tabs.
- * That is presentation only — no key changes.
+ * The 展示设置 section is given a heading because a heading-less section would
+ * sit flush against the tabs. That is presentation only — no key changes.
  */
 export default defineDiyPanel<TabNavComponent>({
   key: 'tabNav',

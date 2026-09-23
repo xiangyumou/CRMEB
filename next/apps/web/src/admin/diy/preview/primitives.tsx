@@ -9,8 +9,8 @@ import type { DiyComponentValue } from '../panel-api';
  * Shared bits for the canvas previews.
  *
  * The previews are **schematic**, not a second renderer. The real one is the
- * uni-app page (`template/uni-app/components/pageDiy/`), which is not being
- * rewritten; reimplementing it here would mean maintaining two renderers that
+ * uni-app page (`template/uni-app/subpackage/diyComponents/`); reimplementing
+ * it here would mean maintaining two renderers that
  * must agree pixel for pixel, and the one that matters would still be the other
  * one. What the operator needs on the canvas is the order of the page, which
  * component each block is, and enough of its content — the banner images, the
@@ -46,7 +46,7 @@ export function list(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
-/** `node[key].color[0].item`, the shape every colour control in the legacy editor saves. */
+/** `node[key].color[0].item`, the shape every stored colour control has. */
 export function colorOf(node: DiyComponentValue, key: string, fallback: string): string {
   return str(pick(node, key, 'color', 0, 'item'), fallback);
 }
@@ -138,8 +138,8 @@ export function PreviewImage({
 }
 
 /**
- * `@LOCAL@@/assets/images/pink02.png` is how the legacy editor stored a path
- * relative to the admin's own assets. Nothing in this build serves those, so
+ * `@LOCAL@@/assets/images/pink02.png` is how some stored pages name a path
+ * relative to an editor's bundled assets. Nothing here serves those, so
  * they render as placeholders rather than as broken images.
  */
 export function resolveAssetUrl(url: string | undefined): string | null {

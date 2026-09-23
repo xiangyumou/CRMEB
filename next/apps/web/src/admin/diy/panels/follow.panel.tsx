@@ -14,17 +14,16 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 关注公众号 — ports `c_wechat_attention.vue`.
+ * 关注公众号.
  *
  * Four one-row sections on the content tab, each with its own heading from the
  * node (`titleLeft`, `positionTitle`, `pictrueTitle` — misspelled in the payload
  * — and `codeTitle`).
  *
- * `themeColor` (按钮颜色) never reaches `rCom`: the style branch is `titleRight`
- * plus `c_common_style`, and `c_common_style` has no `themeColor` row. So the
- * legacy admin shows a 关注按钮 heading with nothing under it. The empty heading
- * is dropped rather than inventing the control it implies; the stored colour is
- * carried through untouched.
+ * `themeColor` (按钮颜色) has no row: the style tab is `titleRight` plus
+ * `c_common_style`, and `c_common_style` has no `themeColor` row. There is no
+ * 关注按钮 heading either, rather than one with nothing under it; the stored
+ * colour is carried through untouched.
  */
 export default defineDiyPanel<FollowComponent>({
   key: 'follow',

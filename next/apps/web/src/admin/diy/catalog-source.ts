@@ -29,7 +29,7 @@ import {
  * is the picker's `useQuery`; this layer only maps contract DTOs onto the
  * picker's `{id, name, image, subtitle}`.
  *
- * There is no `brand` kind. 品牌 (`eb_store_brand`) is not in the frozen schema,
+ * There is no `brand` kind. The shop has no 品牌 table,
  * so there is no route to page and nothing to pick; see `data-source.tsx`.
  */
 
@@ -94,7 +94,7 @@ export function createCatalogDiyDataSource(
           page: query.page,
           pageSize: query.pageSize,
           // 已上架 only: a DIY page must not advertise a product the shopper
-          // cannot open. The legacy picker filters the same way.
+          // cannot open.
           tab: 'on_shelf',
           ...(query.keyword ? { keyword: query.keyword } : {}),
           ...(query.categoryId ? { categoryId: query.categoryId } : {}),
@@ -116,8 +116,8 @@ export function createCatalogDiyDataSource(
       }
 
       // One detail call per id, and only for ids a saved page already carries —
-      // the pickers store the row whole (name, image), so this runs for legacy
-      // payloads that stored bare ids.
+      // the pickers store the row whole (name, image), so this runs only for
+      // stored payloads that carry bare ids.
       const rows = await Promise.all(
         ids.map(async (id): Promise<DiyPickerItem> => {
           try {
@@ -156,7 +156,7 @@ function toProductItem(row: {
 
 /**
  * The `targets` callback `createDiyLinkSource` wants, for the 商品 and 商品分类
- * tabs of `<LinkPicker>`. 文章 stays empty until stream F2 ships its list.
+ * tabs of `<LinkPicker>`. 文章 has no list here and stays empty.
  */
 export async function catalogLinkTargets(
   type: Exclude<LinkTargetType, 'page' | 'custom'>,

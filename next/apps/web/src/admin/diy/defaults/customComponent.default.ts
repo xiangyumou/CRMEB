@@ -3,10 +3,9 @@ import type { CustomComponentComponent } from '@shop/contracts/diy/schema/custom
 /**
  * Factory default for `customComponent` — 超级组件.
  *
- * Copied from `template/admin/src/components/mobilePage/home_custom_component.vue`,
- * the object the legacy editor dropped into the page. Panel labels and all:
- * the renderer reads some of them, and a page saved without them is not the
- * page the storefront expects.
+ * The component exactly as a freshly dropped one is saved. Panel labels and
+ * all: the renderer reads some of them, and a page saved without them is not
+ * the page the storefront expects.
  *
  * `timestamp` is assigned by the store when the component is dropped.
  */
@@ -620,16 +619,14 @@ export const customComponentDefault = {
     min: 0,
   },
   /**
-   * CR-3-g2 — the seven groups `c_custom_component.vue:147-330` injects on
-   * open: the 组件设计 button's own config and the six `…DataConfig` groups the
-   * 数据样式 block (`DiyDataStyleSection`) edits. Without them 数据样式 drew
+   * Seven groups: the 组件设计 button's own config and the six `…DataConfig`
+   * groups the 数据样式 block (`DiyDataStyleSection`) edits. A panel draws a
+   * row only when the node carries its key, so without them 数据样式 would draw
    * nothing on a fresh node.
    *
-   * `customComponents` is deliberately **not** added. `patchConfig` never
-   * creates it — only the inner designer's save does
-   * (`c_custom_component.vue:633`) — and that designer is out of scope
-   * (CR-2-g2). An absent key round-trips as absent; an invented empty one
-   * would not.
+   * `customComponents` is deliberately **not** added. Only the inner component
+   * designer creates it, and this editor has no such designer. An absent key
+   * round-trips as absent; an invented empty one would not.
    */
   customBtnConfig: {
     title: '设计组件',

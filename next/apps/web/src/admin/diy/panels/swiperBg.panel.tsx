@@ -18,9 +18,7 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 /**
  * 轮播图 — the reference panel for "a component with an image list".
  *
- * Ports `template/admin/src/components/mobileConfig/c_banner.vue`, whose 300
- * lines are three `watch`ers recomputing which widgets to show. The same rules,
- * stated once: the indicator colours only exist when 色调 is 自定义, and the
+ * Two rules decide which rows show: the indicator colours only exist when 色调 is 自定义, and the
  * gap slider only exists in 样式二 (the three-up carousel).
  */
 export default defineDiyPanel<SwiperBgComponent>({

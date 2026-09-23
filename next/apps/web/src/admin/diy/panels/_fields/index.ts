@@ -1,10 +1,9 @@
 /**
  * Panel-local field composites.
  *
- * The eight editors CR-1-g2 asked for — `DiyCommonStyleSection`,
- * `DiyDataStyleSection`, the six `misc-fields` widgets and `DiyMenuListField` —
- * were promoted into `@/admin/diy/fields` and are imported from there.
- * What is left here is the narrower set: compositions specific to one or two
+ * The shared editors — `DiyCommonStyleSection`, `DiyDataStyleSection`, the six
+ * `misc-fields` widgets and `DiyMenuListField` — live in `@/admin/diy/fields`
+ * and are imported from there. What is here is the narrower set: compositions specific to one or two
  * panels (`c_icon_style`, the 宫格 / 头部 style blocks, the hotspot cube, the
  * promotion tabs, the remove-only goods-label picker, the rich-text box).
  * Nothing here forks an editor in the barrel.

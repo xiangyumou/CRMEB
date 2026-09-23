@@ -37,8 +37,7 @@ import { DIY_PAGE_SELECTION, isPinned, type DiyEditorNode } from './store';
 /**
  * The middle pane: the page as a phone-width column.
  *
- * Selection, ordering and per-row actions mirror the legacy canvas
- * (`diyIndex.vue:120`): hide, delete, duplicate, move up, move down — in that
+ * Per-row actions: hide, delete, duplicate, move up, move down — in that
  * order, on hover, over the top-right of the row. Hiding never deletes; an
  * `isHide` node stays in the saved page and is skipped by the renderer
  * (`pageDesign.vue:554`), which is the whole point of having the flag.

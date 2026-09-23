@@ -17,12 +17,12 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 import { DiyCubeCellsField, DiyCubeStyleField } from './_fields';
 
 /**
- * 图片魔方 — ports `c_picture_cube.vue`.
+ * 图片魔方.
  *
- * The legacy panel is a canvas: pick one of eleven cube layouts, click a cell,
- * and the single-row `c_menu_list` underneath edits that cell. The cells and
- * their links are the payload (`picStyle.picList`), the mirror row is not, so
- * this panel edits the cells directly and leaves `menuConfig` alone. See
+ * Pick one of eleven cube layouts, then edit its cells. The cells and their
+ * links are the payload (`picStyle.picList`); the stored `menuConfig` mirror
+ * row is not, so this panel edits the cells directly and leaves `menuConfig`
+ * alone. See
  * `_fields/cube.tsx` for why the layout's `count` travels with its index.
  */
 export default defineDiyPanel<PictureCubeComponent>({

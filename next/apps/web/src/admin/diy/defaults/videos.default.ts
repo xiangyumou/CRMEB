@@ -3,10 +3,9 @@ import type { VideosComponent } from '@shop/contracts/diy/schema/videos.schema';
 /**
  * Factory default for `videos` — 视频.
  *
- * Copied from `template/admin/src/components/mobilePage/home_video.vue`,
- * the object the legacy editor dropped into the page. Panel labels and all:
- * the renderer reads some of them, and a page saved without them is not the
- * page the storefront expects.
+ * The component exactly as a freshly dropped one is saved. Panel labels and
+ * all: the renderer reads some of them, and a page saved without them is not
+ * the page the storefront expects.
  *
  * `timestamp` is assigned by the store when the component is dropped.
  */
@@ -270,12 +269,12 @@ export const videosDefault = {
     ],
   },
   /**
-   * CR-3-g2: `c_video.vue:111-135` creates both groups on open, deriving the
-   * four sides from the scalar sliders above — top, 左右, bottom, 左右 for the
-   * padding and `mbConfig` for the top margin. All four are 0 here, so the
-   * pair is all zeros. `c_video`'s `patchConfig` writes no `isAll`, so neither
-   * does this. The scalars stay, in step, because the uni renderer
-   * (`home_video.vue:40-68`) still falls back to them.
+   * Both spacing groups, because the panel draws a row only when the node
+   * carries its key. The four sides derive from the scalar sliders above —
+   * top, 左右, bottom, 左右 for the padding and `mbConfig` for the top margin.
+   * All four are 0 here, so the pair is all zeros, and like stored 视频 nodes
+   * it has no `isAll`. The scalars stay, in step, because the storefront
+   * renderer (`subpackage/diyComponents/videos.vue`) still falls back to them.
    */
   paddingConfig: {
     title: '内边距',

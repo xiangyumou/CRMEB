@@ -18,22 +18,18 @@ import type { DiyComponentValue } from './panel-api';
  *
  * Deliberately a `useReducer` rather than a store library: undo/redo wants a
  * single serialisable snapshot per edit, which is what a reducer already
- * produces, and adding a dependency would mean editing a `package.json` this
- * stream does not own.
+ * produces, without another dependency.
  *
- * Three things the legacy editor did that this reproduces exactly, because the
- * saved bytes depend on them:
+ * Three rules of the stored page format, which the saved bytes depend on:
  *
- * 1. **Order lives in `timestamp`, not in key order.** `diyIndex.vue:739`
- *    rewrites every node's timestamp to `Date.now() * 1000 + index` after a
- *    drag. This store only rewrites when the order actually needs it (see
- *    `stampNodes`), so opening a page and saving it unchanged leaves it
- *    unchanged.
- * 2. **`id` is `'id' + timestamp`.** Written by `mobildConfig.js:445`. Kept in
- *    step whenever a timestamp moves.
+ * 1. **Order lives in `timestamp`, not in key order.** A reorder stamps every
+ *    node with `Date.now() * 1000 + index`. This store only rewrites when the
+ *    order actually needs it (see `stampNodes`), so opening a page and saving
+ *    it unchanged leaves it unchanged.
+ * 2. **`id` is `'id' + timestamp`**, kept in step whenever a timestamp moves.
  * 3. **`pageFoot` / `bottomMenu` are appended by the page, not dragged.**
- *    `diyIndex.vue:1180` adds `pageFoot` to every home page on save and
- *    `bottomMenu` to every product-detail page. They are held aside in
+ *    Every home page is saved with a `pageFoot` and every product-detail page
+ *    with a `bottomMenu`. They are held aside in
  *    `footer` and re-appended on serialise, which is why `DiyPanelContext.remove`
  *    is absent for them.
  */
@@ -101,17 +97,16 @@ export interface DiyEditorState extends DiySnapshot {
 const HISTORY_LIMIT = 50;
 
 // ---------------------------------------------------------------------------
-// placement rules (ported from diyIndex.vue)
+// placement rules
 // ---------------------------------------------------------------------------
 
-/** Components the legacy editor allowed at most one of. `diyIndex.vue:840`. */
+/** Components a page holds at most one of. */
 export const DIY_SINGLETON_KEYS = ['headerSerch', 'tabNav', 'homeComb', 'customerService'] as const;
 
 /**
  * `homeComb` (轮播搜索) bundles a banner with a search box, so it cannot share a
- * page with the standalone search box or with the tab bar — `diyIndex.vue:835`,
- * which checks `isSearch || isTab` when adding it and `isComb` when adding
- * either of them. 搜索框 and 选项卡 do coexist; the tab bar is placed directly
+ * page with the standalone search box or with the tab bar, whichever is added
+ * first. 搜索框 and 选项卡 do coexist; the tab bar is placed directly
  * under the search box.
  */
 const EXCLUSIVE_GROUPS: readonly (readonly string[])[] = [
@@ -120,8 +115,8 @@ const EXCLUSIVE_GROUPS: readonly (readonly string[])[] = [
 ];
 
 /**
- * Components pinned to the top of the page, in this order. The legacy editor
- * both inserted them there and refused to drag them (`diyIndex.vue:797`).
+ * Components pinned to the top of the page, in this order: they are inserted
+ * there and cannot be dragged.
  */
 export const DIY_PINNED_KEYS = ['homeComb', 'headerSerch', 'tabNav'] as const;
 
@@ -267,8 +262,8 @@ function isOrdered(nodes: readonly DiyEditorNode[]): boolean {
  * Rewrites `timestamp` (and the `id` derived from it) so the page's order is
  * recoverable from the saved data — but only when it has to be.
  *
- * The legacy editor rewrote every timestamp on every drag and every save, which
- * meant a page changed even when nothing about it had. Here the page is left
+ * Restamping on every drag and every save would change a page even when
+ * nothing about it had. Here the page is left
  * exactly as it was loaded unless its order is no longer ascending, which is
  * the only thing the renderer reads the field for.
  */
@@ -278,7 +273,7 @@ function stampNodes(nodes: readonly DiyEditorNode[], now: number): readonly DiyE
   return nodes.map((node, index) => {
     const stamp = base + index;
     const value: DiyComponentValue = { ...node.value, timestamp: stamp };
-    // Only pages that already carry `id` keep carrying it. `mobildConfig.js:445`.
+    // Only pages that already carry `id` keep carrying it.
     if ('id' in node.value) value.id = `id${stamp}`;
     return { ...node, value };
   });
@@ -292,9 +287,8 @@ export interface SerialiseOptions {
 /**
  * The component map to save.
  *
- * The footer is appended last, exactly where the legacy editor put it, and a
- * page whose kind wants a footer but has none gets the factory one — which is
- * what `diyIndex.vue:1180` did on every save of a home page.
+ * The footer is appended last, and a page whose kind wants a footer but has
+ * none gets the factory one.
  */
 export function toDiyContent(state: DiyEditorState, options: SerialiseOptions = {}): DiyPageValue {
   const now = options.now ?? Date.now();
@@ -319,10 +313,10 @@ export function toDiyContent(state: DiyEditorState, options: SerialiseOptions = 
 /**
  * Keeps the footer last in render order.
  *
- * The renderer sorts by `timestamp` (`pageDesign.vue:561`), so a footer that
- * kept an old stamp while the body was restamped with today's clock would be
- * drawn at the top of the page. Legacy had the same hole and papered over it by
- * saving `pageFoot` without a `timestamp` at all, which sorts last by accident.
+ * The storefront renderer sorts by `timestamp` (`pageDesign.vue`), so a footer
+ * that kept an old stamp while the body was restamped with today's clock would
+ * be drawn at the top of the page. Some stored pages carry `pageFoot` without a
+ * `timestamp` at all, which sorts last only by accident.
  * This only touches the node when it would otherwise sort wrong.
  */
 function trailing(
@@ -476,8 +470,7 @@ export function diyEditorReducer(state: DiyEditorState, action: DiyEditorAction)
       const { from, to } = action;
       const source = state.nodes[from];
       if (!source || from === to || to < 0 || to >= state.nodes.length) return state;
-      // The pinned block keeps its place; the legacy editor refused the drag
-      // outright (`diyIndex.vue:797`) and so does this.
+      // The pinned block keeps its place: the drag is refused outright.
       const floor = state.nodes.filter((node) => isPinned(node.value)).length;
       if (isPinned(source.value) || to < floor) return state;
       const nodes = [...state.nodes];

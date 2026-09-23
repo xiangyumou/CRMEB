@@ -18,19 +18,17 @@ import { DiyFieldRow } from './section';
  * separate composite rather than a fork.
  *
  * Which entry gets the link picker is decided by its **title**, not its index:
- * `c_menu_list.vue:80` gates the link affordance on `infos.title == '链接'`, so
- * a three-entry row picks a link for its third field and not its 描述.
+ * the link affordance is gated on `infos.title == '链接'`, so a three-entry row picks a link for its third field and not its 描述.
  *
- * `configData.type` turns on the per-row 状态 switch bound to `item.show`
- * (`:87-90`). Only the components whose rows can be hidden carry it.
+ * `configData.type` turns on the per-row 状态 switch bound to `item.show`.
+ * Only the components whose rows can be hidden carry it.
  *
- * `listStyle` values, from `c_menu_list.vue:17-30`: `0` 图片, `1` 图标, and for
+ * `listStyle` values: `0` 图片, `1` 图标, and for
  * `assetConfig` only, `2` 数字(上) / `3` 数字(左). `-1` means the component has
  * no picker at all and always uses the image.
  *
- * The icon is a class name (`mb-iconfont` + `item.icon`). The legacy editor
- * opens a font picker for it; there is no icon font in the new admin, so the
- * class is typed. It is the same stored value either way.
+ * The icon is a class name (`mb-iconfont` + `item.icon`). There is no icon
+ * font in the admin, so the class is typed rather than picked. It is the same stored value either way.
  */
 
 export interface DiyMenuRow {
@@ -82,7 +80,7 @@ export function DiyMenuListField({
   const listStyle = Number(config.listStyle ?? 0);
   const cap = max ?? (Number(config.maxList ?? 0) || undefined);
   // `isCube` means the rows are fixed slots of a cube layout: editable, but
-  // neither addable nor removable (`c_menu_list.vue:37`).
+  // neither addable nor removable.
   const fixed = Boolean(config.isCube);
 
   const setInfo = (row: DiyMenuRow, index: number, next: string): DiyMenuRow => {

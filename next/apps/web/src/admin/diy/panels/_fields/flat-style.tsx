@@ -12,7 +12,7 @@ import type { DiyFieldProps } from '../../panel-api';
  *
  * That is why they cannot go through `DiySliderField` or `DiyColourField`,
  * which both patch a config object. A colour here is a plain `'#333333'`
- * string; a size is a plain number. Writing either in the frozen editors'
+ * string; a size is a plain number. Writing either in the shared editors'
  * shape would rewrite the node into something `menus.vue` cannot read.
  */
 
@@ -194,9 +194,8 @@ export interface DiyGridItemStyleFieldProps extends DiyFieldProps<{
  * `c_grid_item_style` — the 宫格项 box.
  *
  * 上下内边距 (`itemPaddingTop`) is rendered only when the node already has the
- * key. The legacy widget draws it unconditionally (`c_grid_item_style.vue:13`)
- * although no factory default contains it, so drawing it here would let an
- * operator add a key to a page that has never had one.
+ * key. No factory default contains it, so drawing it unconditionally would let
+ * an operator add a key to a page that has never had one.
  */
 export function DiyGridItemStyleField({
   value,

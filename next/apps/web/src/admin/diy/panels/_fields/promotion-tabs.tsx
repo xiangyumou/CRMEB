@@ -23,7 +23,7 @@ import { DiyGoodsLabelField } from './pickers';
  * misspelled in the payload and so is load-bearing, exactly as in `c_product`.
  *
  * Two rows depend on the component's chosen style rather than the tab's own
- * state (`c_promotion.vue:13` and `:23`), which is why `style` is a prop:
+ * state, which is why `style` is a prop:
  * 样式一 shows the 简介 field as well as the 标题, and 样式五 gives each tab an
  * image.
  *
@@ -33,10 +33,9 @@ import { DiyGoodsLabelField } from './pickers';
  * the node says, so opening such a tab does not silently reinterpret it as
  * something else.
  *
- * Brands have no picker, and will not get one: 品牌 (`eb_store_brand`) is not in
- * the frozen schema, so no route lists brands and there is nothing to page
- * through. CR-3-g2 asked for a `brand` kind on `DiyPickerKind` and it was
- * dropped for that reason. The stored `brandConfig.brandVal` is shown read-only
+ * Brands have no picker, and will not get one: the shop has no 品牌 table, so no
+ * route lists brands and there is nothing to page through, and
+ * `DiyPickerKind` has no `brand`. The stored `brandConfig.brandVal` is shown read-only
  * rather than discarded, so a tab saved against a brand still renders what it
  * always rendered.
  */

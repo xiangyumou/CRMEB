@@ -20,7 +20,7 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 底部导航 — ports `pageFoot.vue` (the panel; the singleton, not a palette entry).
+ * 底部导航 — the singleton footer, not a palette entry.
  *
  * The one component that does **not** end in `c_common_style`: it has no
  * `paddingConfig`, `marginConfig`, `componentBgConfig`, `borderConfig` or
@@ -28,19 +28,18 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
  * `topConfig` / `bottomConfig` / `prConfig` / `mbConfig` sliders. Hence the
  * hand-written 通用样式 section here.
  *
- * Three indices, from `getRComStyle` (`pageFoot.vue:265-313`):
+ * Three indices:
  *
  * - `navConfig.tabVal` — `0` 底部固定 uses `bgColor`; 底部悬浮 uses `bgColor2`
  *   and additionally offers 左右边距 / 下边距 / 圆角, which a fixed bar cannot have.
  * - `navStyleConfig.tabVal` — `2` (图片) hides the text colours entirely.
  * - `toneConfig.tabVal` — `0` follows the theme, otherwise the two text colours.
  *
- * `effectConfig` (展示效果) is commented out at `:235-238` and gets no control.
+ * `effectConfig` (展示效果) is not an operator setting and gets no control.
  *
  * `menuList` is a **bare array at the top level**, not a `{list}` config object,
  * so it goes through the kit's `SortableListField` rather than
- * `DiySortableListField`. `imgList` is positional: `[0]` 选中, `[1]` 未选中
- * (`c_foot.vue:26`).
+ * `DiySortableListField`. `imgList` is positional: `[0]` 选中, `[1]` 未选中.
  */
 
 interface FootMenu {

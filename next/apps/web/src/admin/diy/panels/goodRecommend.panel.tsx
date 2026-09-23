@@ -24,20 +24,20 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 import { DiyClassListField, DiyGoodsLabelField } from './_fields';
 
 /**
- * 优品推荐 — ports `c_good_recommend.vue`, six watchers over four indices.
+ * 优品推荐, four indices.
  *
  * - `headerType.tabVal` — `0` 文字 uses `headerText` and unlocks the three
  *   header-text style rows; anything else is an image and hides all four.
  * - `typeConfig.activeValue` — `1` 指定商品 picks products, `3` 指定分类 picks
  *   categories and `4` 商品标签 picks labels; the latter two also get 数量 and
- *   排序. The value is compared with `==` in the Vue file, so the stored value
- *   may be the string `'1'` as easily as the number; compared loosely here too.
+ *   排序. Stored pages carry the value as the string `'1'` as easily as the
+ *   number, so it is compared loosely.
  * - `cartConfig.tabVal` — `0` 显示 adds the button style rows on both tabs.
  * - `toneConfig` / `toneCartConfig` — the two independent colour groups.
  *
- * `productList` is in the default and reaches `rCom` nowhere; the picked
- * products live in `goodsList`. `getConfig` refetches the preview list from the
- * API on every change, which is a preview concern, not a panel one.
+ * `productList` is in the default but is not an operator setting; the picked
+ * products live in `goodsList`. Refetching the preview list on every change is
+ * a preview concern, not a panel one.
  */
 export default defineDiyPanel<GoodRecommendComponent>({
   key: 'goodRecommend',

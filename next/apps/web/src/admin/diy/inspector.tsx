@@ -18,8 +18,8 @@ import { DIY_PAGE_SELECTION, selectedNode } from './store';
  * Its whole job is to turn the current selection into a `DiyPanelContext` and
  * hand it to `<DiyPanelHost>`. Everything a config panel is allowed to do —
  * change its node, reset it, remove it — arrives through that context and
- * nothing else, which is what lets stream G2 write panels against a frozen
- * interface without ever touching this file.
+ * nothing else, so a panel is written against a stable interface without ever
+ * touching this file.
  */
 
 export function DiyInspector({ registry = diyPanelRegistry }: { registry?: DiyPanelRegistry }) {
@@ -40,7 +40,7 @@ export function DiyInspector({ registry = diyPanelRegistry }: { registry?: DiyPa
       disabled: readOnly,
     };
     // `pageFoot` / `bottomMenu` belong to the page, so their panel gets no
-    // remove button — exactly what the frozen API promises.
+    // remove button — exactly what the panel API promises.
     return isFooter ? base : { ...base, remove: () => dispatch({ type: 'remove', uid: node.uid }) };
   }, [node, state.meta.kind, theme, readOnly, isFooter, dispatch]);
 
