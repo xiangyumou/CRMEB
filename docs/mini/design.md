@@ -213,14 +213,21 @@ DIY 块的圆角由装修属性控制（例如商品块的「圆角 / 直角」�
 
 ### 3.2 运营可以修改的 token
 
-对应后台「装修 → 主题」和 `app/config.theme`。`diyThemeTokens` 目前是 `Record<string, unknown>`，F1 流要把它改为有类型的 schema：
+对应后台「系统设置 → 小程序外观」（配置分组 `storefront-appearance`）和 `app/config.appearance`。这组字段本身就有类型（契约 `appAppearance`，颜色一律 `#RRGGBB`，保存时校验），就是这里说的「v2 token」：
 
-| 字段（`diyThemeTokens` v2） | 对应 token                                 | 说明                                                         |
-| --------------------------- | ------------------------------------------ | ------------------------------------------------------------ |
-| `primary`                   | `--color-primary`（再派生 on、soft、text） | 品牌主色；旧数据的 `theme` 键在迁移时改名                    |
-| `accent`                    | `--color-accent`（再派生 on）              | 辅助色；为空时等于主色（单色方案）                           |
-| `price`                     | `--color-price`                            | 价格色；为空时等于 `primary` 派生出的 `--color-primary-text` |
-| `tabBar.selectedColor`      | tabBar 选中色                              | 为空时等于 `--color-primary-text`                            |
+| 字段（`app/config.appearance`） | 配置字段                 | 对应 token                                 | 说明                                          |
+| ------------------------------- | ------------------------ | ------------------------------------------ | --------------------------------------------- |
+| `theme.primaryColor`            | `primaryColor`           | `--color-primary`（再派生 on、soft、text） | 品牌主色                                      |
+| `theme.accentColor`             | `accentColor`            | `--color-accent`（再派生 on）              | 辅助色；为空时是 `null`，等于主色（单色方案） |
+| `theme.priceColor`              | `priceColor`             | `--color-price`                            | 价格色；不过线时按第 3.3 节加深               |
+| `theme.radius`                  | `radius`                 | `--radius-factor`                          | 圆角档位                                      |
+| `tabBar.selectedColor` 等       | `tabBarSelectedColor` 等 | tabBar 颜色                                | 另有 4 个 tab 的文字和图标                    |
+
+**旧的 `diyThemeTokens` 不改类型**（原计划由 F1 改成有类型的 schema，H3 评估后决定不做）：
+
+1. 它是旧 `diy` 域「一键换色」的数据，线上的 uni-app 读 `tokens.theme`（`apps/uni-app/api/mappers/diy.js` 的 `pageColorStatus`），后台 DIY 编辑器读 `theme` 和 `accent`。原计划把 `theme` 改名为 `primary`，会让线上 uni-app 的换色失效，违反「旧前端照常工作」。
+2. 只改 TypeScript 类型、不改运行时校验做不到诚实：线上库里的 token 包是运营随意保存过的，把 `Record<string, unknown>` 声明成 `{ theme?: string; … }` 等于对类型撒谎；而加上 zod 校验，又会改变旧接口 `PUT /admin-api/diy/themes/:id` 接受什么，这是旧行为的改变。
+3. 小程序根本不读它：小程序的主题来自上表，已经有类型。切换完成、旧 uni-app 下线后，`diy` 主题整个退役，不需要再迁移。
 
 其余 token（文字灰阶、背景、边框、语义色、全部尺寸）**不开放**。理由：
 

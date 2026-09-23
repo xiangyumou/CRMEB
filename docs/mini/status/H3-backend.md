@@ -59,9 +59,16 @@ Merged `storefront/mini` at 299956592 (G1 decor blocks) before touching the deco
      `ui/tokens/nutui-bridge.scss`, `platform/tab-bar.ts`; Countdown's 304 header.
    - decor.md note on ids; wechat-compliance C08 / C12 backend parts marked done.
 
+6. `diyThemeTokens` typing — **not done, by decision** (design.md §3.2 rewritten, decor.md §9):
+   the v2 token set is `storefront-appearance` / `app/config.appearance`, already typed
+   (now with `accentColor`). The legacy bag stays `Record<string, unknown>`: renaming
+   `theme` → `primary` breaks the live uni-app (`pageColorStatus` reads `tokens.theme`), a
+   narrower TS type over unvalidated stored data would be a lie, and a zod schema would change
+   what the legacy `PUT /admin-api/diy/themes/:id` accepts.
+
 ## In progress
 
-- Task 6: `diyThemeTokens` typing.
+- Merge checklist.
 
 ## Client follow-ups (stream A)
 
