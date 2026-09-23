@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { useRouteMutation, useRouteQuery } from '@shop/api-client/react';
-import { newIdempotencyKey, useCheckoutDraft } from '@/features/checkout/draft';
+import {
+  checkoutBody,
+  newIdempotencyKey,
+  useCheckoutDraft,
+  type CheckoutDraft,
+} from '@/features/checkout/draft';
 import { LoginCard } from '@/session/login-card';
 import { useSession } from '@/session/session';
 import { navigate } from '@/platform';
@@ -29,15 +34,15 @@ export default function CheckoutPage() {
   return (
     <PageShell title="确认订单">
       <LoginCard reason="登录后即可结算">
-        <Preview skuId={draft.skuId} quantity={draft.quantity} />
+        <Preview draft={draft} />
       </LoginCard>
     </PageShell>
   );
 }
 
-function Preview({ skuId, quantity }: { skuId: string; quantity: number }) {
+function Preview({ draft }: { draft: CheckoutDraft }) {
   const signedIn = useSession((state) => state.session.status === 'signed-in');
-  const body = { source: 'buy-now', item: { skuId, quantity } } as const;
+  const body = checkoutBody(draft);
   const preview = useRouteQuery('order.checkoutPreview', { body }, { enabled: signedIn });
   const create = useRouteMutation('order.create');
   const [idempotencyKey] = useState(newIdempotencyKey);

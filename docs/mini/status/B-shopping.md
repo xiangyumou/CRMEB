@@ -25,18 +25,25 @@ Updated at every commit so the work can resume after an interruption.
   商品评价 (score, rating tabs with counts, picture preview; `features/product/review-item.tsx`).
   All with tests.
 
+- 商品详情: gallery, price / sales, 拼团 / 预售 entries (`features/product/activities.ts`),
+  领券 sheet (`features/product/product-coupons.tsx`, shop-wide coupons only), 已选 → SkuSheet,
+  服务 / 参数 sheets, reviews summary + first two, description through the 富文本 block,
+  为你推荐, action bar (客服, 购物车 badge, 收藏, 加入购物车, 立即购买), sold-out and 404
+  「商品已下架」, share sheet with the poster entry reserved for stream D
+  (`features/share/poster.ts`). `features/checkout/draft.ts` now types cart / buy-now and
+  kind / kindMeta.
+
 ## In progress
 
-- 商品详情.
+- Merge `storefront/mini` (F2 + H3): 微页面 `previewToken`, `splashAd.link` as `LinkTarget`.
 
 ## Next
 
-1. 商品详情 (fixed design, SkuSheet, coupons, favourite, share, activity entries).
-2. 购物车 (tab; quantity through `cart.updateItemPut`).
-3. 下单 / 收银台 / 支付结果.
-4. Vitest per page, e2e page objects and specs in `e2e/storefront/specs-mini` (seed a decor v2
+1. 购物车 (tab; quantity through `cart.updateItemPut`).
+2. 下单 / 收银台 / 支付结果.
+3. Vitest per page, e2e page objects and specs in `e2e/storefront/specs-mini` (seed a decor v2
    home).
-5. `docs/mini/pages.md` for page-form changes; guard allow-lists; sizes; 375px screenshots in
+4. `docs/mini/pages.md` for page-form changes; guard allow-lists; sizes; 375px screenshots in
    `docs/mini/status/B-screens/`.
 
 ## Backend gaps found (not changed; for a later backend task)
@@ -47,7 +54,8 @@ Updated at every commit so the work can resume after an interruption.
   visibility by client version cannot tell builds apart until then.
 - `groupbuy.list` / `presale.list` take no `productId` filter; `catalog.productDetail` does not
   say which activities a product is in.
-- `coupon.claimableList` takes no `productId` filter.
+- `coupon.claimableList` takes no `productId` filter and does not say which products / categories
+  a scoped coupon covers: 商品详情「领券」 shows shop-wide (`all_products`) coupons only.
 - `productList { couponId }` (我的优惠券「去使用」) cannot narrow the list: the storefront API
   neither filters products by coupon nor exposes a user coupon's scope ids. The list shows
   everything with a note.
