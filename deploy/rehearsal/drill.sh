@@ -1078,7 +1078,9 @@ case_status_reports() {
 
 # The point of asking the candidate first: a release with nothing to migrate
 # stops nothing. `web` is recreated, so there is a moment with no `web`, and
-# this case measures it rather than pretending it is zero.
+# the edge is recreated after it; this case measures the longest gap rather
+# than pretending it is zero, and holds it to a few seconds (the path that
+# stops the writers, measured the same way below, is down for all of it).
 case_no_migration_keeps_serving() {
   ensure_deployed || return 1
   on_release web "$web_v1" || {
@@ -1103,7 +1105,7 @@ case_no_migration_keeps_serving() {
   check 'worker is on v2' on_release worker "$worker_v2"
   check 'edge is on v2' on_release edge "$edge_v2"
   check 'web answered again afterwards' [ "$gap" -ge 0 ]
-  check 'no gap in answers was longer than 10 s' [ "$gap" -le 10000 ]
+  check 'no gap in answers was longer than 5 s' [ "$gap" -le 5000 ]
 }
 
 # Only `web` changes, so Compose recreates only `web`, under a new address,
@@ -1157,6 +1159,8 @@ YAML
   set_setting NEXT_COMPOSE_OVERLAYS ''
   [ "$rc" -eq 0 ] || return 1
   check 'it stopped nothing' lacks 'stopping the application services' "$workdir/config-only.log"
+  check 'it saw the images were the running ones' grep -q 'only the Compose files can change' "$workdir/config-only.log"
+  check 'APP_VERSION still names the build that runs' lacks_fixed 'APP_VERSION=drill-config-only' "$settings"
   check 'web was left alone' [ "$(container_of web)" = "$web_before" ]
   check 'worker was left alone' [ "$(container_of worker)" = "$worker_before" ]
   check 'the edge was recreated with the change' [ "$(container_of edge)" != "$edge_before" ]

@@ -26,8 +26,9 @@
 #        and proved (`pg_dump` reads one consistent snapshot, and that dump is
 #        the way back), the reference seed runs beside the live stack, and
 #        `up -d` recreates only the services whose image or configuration
-#        changed. A release that changes only the Compose files — a label, a
-#        redirect — goes through here too, and changes only what they change;
+#        changed, `web` first and the edge last. A release that changes only
+#        the Compose files — a label, a redirect — goes through here too, and
+#        changes only what they change;
 #
 #   5. the stack has to pass the readiness gate;
 #   6. **any failure after the candidates are pinned rolls the images back to
@@ -143,6 +144,18 @@ fi
 say "candidate web:    $web_candidate"
 say "candidate worker: $worker_candidate"
 say "candidate edge:   $edge_candidate"
+
+# The same three images as are running: a release of the Compose files alone.
+# `APP_VERSION` names the commit the running images were built from, and they
+# do not change, so neither does it; changing it would recreate `web` and
+# `worker` for nothing.
+same_images=0
+if [ "${previous_ref[web]}" = "$web_candidate" ] &&
+  [ "${previous_ref[worker]}" = "$worker_candidate" ] &&
+  [ "${previous_ref[edge]}" = "$edge_candidate" ]; then
+  same_images=1
+  say 'the candidates are the images already running: only the Compose files can change'
+fi
 
 # --- 2. pull before anything is stopped --------------------------------------
 for candidate in "$web_candidate" "$worker_candidate" "$edge_candidate"; do
@@ -292,13 +305,15 @@ pin_candidates() {
   set_setting NEXT_WEB_IMAGE "$web_candidate"
   set_setting NEXT_WORKER_IMAGE "$worker_candidate"
   set_setting NEXT_EDGE_IMAGE "$edge_candidate"
-  [ -z "$app_version" ] || set_setting APP_VERSION "$app_version"
+  if [ -n "$app_version" ] && [ "$same_images" -eq 0 ]; then
+    set_setting APP_VERSION "$app_version"
+  fi
 }
 
 take_backup() {
   say 'backing up the database'
-  backup_file="$(bash "$here/backup.sh" --out "$backup_dir/pre-upgrade-$stamp.sql.gz" | tail -n1)" ||
-    return 1
+  bash "$here/backup.sh" --out "$backup_dir/pre-upgrade-$stamp.sql.gz" | sed '$d' || return 1
+  backup_file="$backup_dir/pre-upgrade-$stamp.sql.gz"
   printf 'backup=%s\n' "$backup_file" >>"$manifest"
   say "backup: $backup_file"
 }
@@ -356,7 +371,16 @@ fi
 if [ "$path" = 'stopped' ]; then
   say 'starting the stack on the candidates'
 else
-  say 'applying the release: Compose recreates only what changed'
+  # One service at a time, `web` first: a single `up` would stop every
+  # service it recreates before starting any of them, and the edge, which
+  # waits for a healthy `web`, would be down for all of it. This way the edge
+  # keeps serving while `web` is replaced (it finds the new one by name), and
+  # is itself replaced last, in the second or so nginx takes to start.
+  say 'applying the release: Compose recreates only what changed, web first'
+  for service in web worker; do
+    compose up -d --wait --wait-timeout 300 --no-deps "$service" >/dev/null ||
+      fail "$service did not become healthy"
+  done
 fi
 compose up -d --wait --wait-timeout 300 >/dev/null ||
   fail 'the stack did not become healthy'
