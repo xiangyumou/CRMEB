@@ -15,7 +15,7 @@ Five small fixes, one commit each. Updated at every commit.
   `applyTabBarLook` still takes a shop's uploaded icons (downloaded, then `setTabBarItem`); an
   icon that is not uploaded or fails to download now goes back to the bundled one
   (`bundledTabIcon`), so removing an upload takes effect. Main package 639.2 → 646.4 KB
-  (+7.2 KB); total 855.7 → 862.9 KB.
+  (+7.2 KB) at this commit; total 855.7 → 862.9 KB.
 - **Spec text.** `lib/spec.ts` `formatSpec` (`白|L` → `白 / L`, empty values dropped) is the one
   formatter; used by `ui/order-card.tsx` (订单列表 / 详情 lines), 售后 apply / detail / card,
   确认订单, 购物车, 已选 (sku-select) and 商品评价, replacing four inline `replace`s and four raw
@@ -46,10 +46,28 @@ Five small fixes, one commit each. Updated at every commit.
   (strict env mode). How to bump per release: `docs/mini/device-check.md` §9, pointed to from
   `docs/contributing.md`. Tested in `data/api.test.ts` (Vitest sets `1.0.0-test`).
 
+- **Screenshot.** [`A3-polish/tab-bar-375.png`](A3-polish/tab-bar-375.png): 分类 at 375 px,
+  DPR 2, from the H5 build with the API unreachable (hence 加载失败), showing the four icons with
+  分类 selected.
+
+## Checks (2026-09-24, at the last feature commit)
+
+- `pnpm turbo run gen typecheck lint test:unit build`: everything passed except one
+  `@shop/web#test:unit` case, `product-editor.test.tsx` 「offers the shipping templates as a
+  select…」, which timed out at 120 s, and a Vitest fork for `crud-table.test.tsx` that did not
+  start (「Timeout waiting for worker to respond」), with other streams' builds running on the
+  same machine. Neither file is touched here. `pnpm turbo run test:unit --filter @shop/web` on its
+  own then passed: 63 files, 857 tests. `@shop/mini`: 72 files, 315 tests; size-report ok.
+- `pnpm --filter @shop/e2e-storefront test:mini`: 11 passed.
+- `pnpm exec prettier --check .`: clean. `pnpm guards`: 15 checks, 0 failures.
+- Weapp sizes: main 639.2 → 647.4 KB (+8.2 KB: 6.4 KB of icons, the rest code); total 855.7 →
+  864.0 KB.
+
 ## In progress
 
 - Nothing.
 
 ## Next
 
-- Final checks and the 375 px H5 screenshot of the tab bar.
+- Review and the merge into `storefront/mini`. Device items: D02 (icons, upload override) and D13
+  (login return) in `docs/mini/device-check.md`.
