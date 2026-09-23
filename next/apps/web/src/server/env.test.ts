@@ -12,7 +12,7 @@ const REQUIRED = { DATABASE_URL: 'postgres://unused', REDIS_URL: 'redis://unused
 
 afterEach(() => resetEnv());
 
-describe('SHOP_FAKE_SMS (CR-3-i)', () => {
+describe('SHOP_FAKE_SMS', () => {
   it('is off unless set', () => {
     expect(envSchema.parse(REQUIRED).SHOP_FAKE_SMS).toBeUndefined();
   });

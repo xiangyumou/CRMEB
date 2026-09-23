@@ -6,8 +6,8 @@ import { handle } from '../../../../src/server';
  * `/api/v1/cities` — 省市区 for the address form.
  *
  * Immutable seed data: the response carries a `version` fingerprint that is
- * also served as a weak ETag, which is why the legacy `city/clean_cache` route
- * has no successor.
+ * also served as a weak ETag, so there is no cache to clear and no route that
+ * clears it.
  */
 export const GET = handle(cityTreePublic, (ctx) => cityTree(ctx));
 

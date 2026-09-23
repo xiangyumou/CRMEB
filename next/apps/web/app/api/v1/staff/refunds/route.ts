@@ -3,9 +3,10 @@ import { orderStaff } from '@shop/core/order';
 import { handle } from '../../../../../src/server';
 
 /**
- * `/api/v1/staff/refunds` — B2 owns the surface, stream C owns the money.
+ * `/api/v1/staff/refunds` — the order domain owns the surface, the refund
+ * domain owns the money.
  *
- * Straight through the `StaffRefundPort` to C's own service, so the phone can
+ * Straight through the `StaffRefundPort` to the refund service, so the phone can
  * never diverge from the web after-sales screen and no code here touches a
  * gateway, a `refunds` row or `orders.refunded_amount`.
  */

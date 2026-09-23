@@ -14,14 +14,14 @@ import {
 import './handle';
 
 /**
- * CR-8-c. A Next route module imports only the domain it serves, so before
- * `@shop/core/domains` existed:
+ * A Next route module imports only the domain it serves, so without
+ * `@shop/core/domains`:
  *
- *  - the checkout route never loaded `@shop/core/catalog` and silently ran on
- *    B1's fallback catalogue adapter, and the cancel route saw no `PaymentPort`
- *    and skipped the payment guard entirely with a debug log;
- *  - `system.dispatchEffects` claimed `refund.execute` with no handler
- *    registered and parked it as `unknown`, permanently — a refund approved
+ *  - the checkout route would never load `@shop/core/catalog` and would
+ *    silently run on the fallback catalogue adapter, and the cancel route would
+ *    see no `PaymentPort` and skip the payment guard entirely with a debug log;
+ *  - `system.dispatchEffects` would claim `refund.execute` with no handler
+ *    registered and park it as `unknown`, permanently — a refund approved
  *    just before a deploy, with the buyer waiting.
  *
  * Both failures are silent at build time, which is why they are asserted here.

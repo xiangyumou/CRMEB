@@ -8,7 +8,7 @@ export const POST = handle(
   async (ctx, { params, body }) => {
     const updated = await notificationAdmin.toggleChannel(ctx, params, body);
     // The channel is part of the target: 谁把短信通知关了 is a different question
-    // from 谁改了这个模板, and both are asked of the same template (CR-17-k).
+    // from 谁改了这个模板, and both are asked of the same template.
     ctx.audit(`notification-template:${params.code}:${params.channel}`);
     return updated;
   },

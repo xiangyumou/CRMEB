@@ -9,8 +9,8 @@ import { defineJob } from '../define-job';
  * filter on the window too — so a missed run cannot let an expired coupon be
  * spent. It exists so the 已过期 tab and the admin list tell the truth.
  *
- * Legacy had no job here at all: it swept the table from inside
- * `getUserValidCouponCount`, so one shopper opening their wallet wrote to
+ * A job and not a side effect of a read: sweeping the table while counting a
+ * shopper's valid coupons would let one shopper opening their wallet write to
  * every expired row in the database.
  */
 export default defineJob({

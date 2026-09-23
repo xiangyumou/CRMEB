@@ -7,7 +7,7 @@ import { setContainer, type Container } from '../../../../src/server/container';
 import type { Env } from '../../../../src/server/env';
 
 /**
- * `GET /api/v1/diy/pages/product-detail` as HTTP (CR-2-h3).
+ * `GET /api/v1/diy/pages/product-detail` as HTTP.
  *
  * The domain behaviour — default when nothing is published, a draft ignored,
  * the newest published page wins — is pinned down in

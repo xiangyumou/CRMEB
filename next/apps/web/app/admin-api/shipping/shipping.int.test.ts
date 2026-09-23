@@ -176,7 +176,7 @@ describe('/admin-api/shipping/templates', () => {
     const created = (await response.json()) as { id: string };
 
     const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
-      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      // Sign-ins are audited too; this test is about the operation.
       (row) => row.routeId !== 'auth.adminLogin',
     );
     expect(audit).toHaveLength(1);
@@ -320,7 +320,7 @@ describe('/admin-api/shipping/express-companies', () => {
     expect(await response.json()).toMatchObject({ isEnabled: false });
 
     const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
-      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      // Sign-ins are audited too; this test is about the operation.
       (row) => row.routeId !== 'auth.adminLogin',
     );
     expect(audit.map((row) => row.routeId)).toEqual([

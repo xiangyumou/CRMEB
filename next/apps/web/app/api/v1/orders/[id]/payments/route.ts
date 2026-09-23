@@ -10,7 +10,7 @@ import { handle } from '../../../../../../src/server';
  * returns the same attempt rather than minting a second one, and an order that
  * is already paid answers `alreadyPaid` instead of a new intent (CLIENT-001).
  *
- * `:id` is the order's surrogate id or its 24-digit number (CR-1-h).
+ * `:id` is the order's surrogate id or its 24-digit number.
  */
 export const POST = handle(paymentStart, (ctx, { params, body }) =>
   payment.start(ctx, params, body),

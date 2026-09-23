@@ -8,9 +8,9 @@ import { handle } from '../../../src/server';
 /**
  * `/admin-api/groupbuy-activities` — the campaign list and the create form.
  *
- * The segment is `groupbuy-activities` rather than legacy's `combination`:
- * the legacy word is a transliteration of nothing and the URL is what an
- * operator's browser history shows.
+ * The segment is `groupbuy-activities` rather than `combination`: that word is
+ * a transliteration of nothing and the URL is what an operator's browser
+ * history shows.
  */
 export const GET = handle(groupbuyAdminActivityList, (ctx, { query }) =>
   groupbuy.adminActivityList(ctx, query),

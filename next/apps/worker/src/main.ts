@@ -8,10 +8,9 @@ import { recordFailedJob } from '@shop/core/kernel';
 /**
  * The worker process.
  *
- * Replaces three containers from the old stack (queue, timer, workerman) with
- * one: BullMQ handles both on-demand jobs and repeatable schedules, and the
- * repeatable schedule is *declared* by each job rather than configured
- * somewhere else.
+ * One container for queued and scheduled work: BullMQ handles both on-demand
+ * jobs and repeatable schedules, and the repeatable schedule is *declared* by
+ * each job rather than configured somewhere else.
  *
  * Two operational promises:
  *  - **liveness**: `worker:heartbeat` is refreshed every `HEARTBEAT_INTERVAL_MS`

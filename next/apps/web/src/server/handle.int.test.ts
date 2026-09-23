@@ -266,14 +266,14 @@ describe('the admin auth routes', () => {
     expect(JSON.stringify(rows[0])).not.toContain(PASSWORD);
   });
 
-  it('records the login outcome, never its body — the service writes it, not handle() (CR-12-k2)', async () => {
+  it('records the login outcome, never its body — the service writes it, not handle()', async () => {
     const id = await seedAdmin({ isSuper: true });
     const { POST: login } = await import('../../app/admin-api/auth/login/route');
     await login(
       post(
         '/admin-api/auth/login',
         { account: 'admin', password: PASSWORD },
-        // The edge's X-Real-IP, the one address clientIp() believes (CR-14-k2).
+        // The edge's X-Real-IP, the one address clientIp() believes.
         { 'x-real-ip': '198.51.100.23', 'user-agent': 'probe-agent/1.0' },
       ),
     );
@@ -308,7 +308,7 @@ describe('the admin auth routes', () => {
   });
 });
 
-describe('what the operation log keeps of a config save (CR-9-k)', () => {
+describe('what the operation log keeps of a config save', () => {
   it('leaves no part of the payment keys in audit_logs', async () => {
     await seedAdmin({ isSuper: true });
     const { POST: login } = await import('../../app/admin-api/auth/login/route');
@@ -346,7 +346,7 @@ describe('what the operation log keeps of a config save (CR-9-k)', () => {
   });
 });
 
-describe('the 操作日志 reader lists both kinds of actor (CR-13-k2)', () => {
+describe('the 操作日志 reader lists both kinds of actor', () => {
   it('returns admin and staff rows, each naming its actor, and filters by kind', async () => {
     await seedAdmin({ isSuper: true });
     const [shopper] = await harness.ctx.db

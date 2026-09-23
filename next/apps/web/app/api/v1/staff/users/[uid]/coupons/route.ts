@@ -2,7 +2,7 @@ import { staffUserCouponList } from '@shop/contracts/coupon/coupon.staff.contrac
 import * as coupon from '@shop/core/coupon';
 import { handle } from '../../../../../../../src/server';
 
-/** `/api/v1/staff/users/:uid/coupons` — what one customer holds (CR-1-h3). */
+/** `/api/v1/staff/users/:uid/coupons` — what one customer holds. */
 export const GET = handle(staffUserCouponList, (ctx, { params, query }) =>
   coupon.staffListUserCoupons(ctx, params, query),
 );

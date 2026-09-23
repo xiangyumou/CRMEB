@@ -20,7 +20,7 @@ export function healthPayload(ctx: Ctx): HealthPayload {
 }
 
 // ---------------------------------------------------------------------------
-// Readiness (CR-1-j2)
+// Readiness
 // ---------------------------------------------------------------------------
 
 /** Never let one hung dependency hold the whole probe open. */
@@ -152,7 +152,7 @@ export async function readinessPayload(ctx: Ctx): Promise<ReadinessPayload> {
 }
 
 /**
- * The effects backlog, as a detail and never as a check (CR-40-k2).
+ * The effects backlog, as a detail and never as a check.
  *
  * A late notification is not a reason to hold a release or pull a container
  * out of rotation, so this cannot fail the probe: if it cannot be measured

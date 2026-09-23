@@ -5,7 +5,7 @@ import { handle } from '../../../../../src/server';
 /**
  * `/admin-api/stats/products/exports` — 商品统计导出.
  *
- * CSV inside a JSON envelope (CR-2-b2); the page turns `content` into a
+ * CSV inside a JSON envelope; the page turns `content` into a
  * download. Its own permission atom: reading the page and walking out with the
  * window as a file are different acts.
  */

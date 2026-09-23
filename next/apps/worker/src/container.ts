@@ -1,6 +1,6 @@
 import { createDb, type DbHandle } from '@shop/db';
 // Side-effect import: installs every domain — its ports and its effect
-// handlers (CR-8-c) — before the dispatcher or the job registry can run.
+// handlers — before the dispatcher or the job registry can run.
 // `system.dispatchEffects` parks an effect it has no handler for, permanently,
 // so this has to happen at boot and not in a handler.
 import '@shop/core/domains';
@@ -55,7 +55,7 @@ export function buildWorkerContainer(env: Env = loadEnv()): WorkerContainer {
     base: { app: 'worker' },
   });
   // Acquire and idle-in-transaction timeouts come from `createDb`'s defaults
-  // (`DB_POOL_ACQUIRE_TIMEOUT_MS`, `DB_IDLE_IN_TX_TIMEOUT_MS`; CR-53-k2).
+  // (`DB_POOL_ACQUIRE_TIMEOUT_MS`, `DB_IDLE_IN_TX_TIMEOUT_MS`).
   const dbHandle = createDb(env.DATABASE_URL, {
     max: env.DB_POOL_MAX,
     onConnectionError: (err) => logger.warn({ err }, 'database connection ended outside a query'),

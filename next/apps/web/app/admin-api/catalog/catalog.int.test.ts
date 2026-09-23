@@ -382,7 +382,7 @@ describe('/api/v1/catalog', () => {
     expect(typeof body.version).toBe('string');
   });
 
-  it('answers a caller holding the current version with a 304, on both routes (CR-1-s)', async () => {
+  it('answers a caller holding the current version with a 304, on both routes', async () => {
     const headers = await adminCookie();
     await makeCategory(headers);
 

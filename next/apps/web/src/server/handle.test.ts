@@ -421,7 +421,7 @@ describe('authorisation', () => {
     expect(response.headers.get('content-type')).toBeNull();
   });
 
-  it('403s a staff route until stream B2 registers a StaffCheck', async () => {
+  it('403s a staff route until the order domain registers a StaffCheck', async () => {
     const staffRoute = defineRoute({
       id: 'test.staff',
       method: 'GET',
@@ -685,7 +685,7 @@ describe('request id and logging', () => {
     );
   });
 
-  // CR-1-j3: a readiness probe's 503 is "not yet", polled on every deploy;
+  // A readiness probe's 503 is "not yet", polled on every deploy;
   // logged at `error` it buries the one line that is. The route declares the
   // status; nothing is inferred, and a route that says nothing logs as before.
   it('logs a status the route declares as expected at info, and the same status elsewhere as before', async () => {
@@ -801,7 +801,7 @@ describe('audit log', () => {
   });
 });
 
-describe('conditional GET — ctx.etag / ctx.notModified (CR-1-s)', () => {
+describe('conditional GET — ctx.etag / ctx.notModified', () => {
   const versioned = (version: string) =>
     handle(
       okRoute,

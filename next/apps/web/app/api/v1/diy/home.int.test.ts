@@ -6,10 +6,9 @@ import { setContainer, type Container } from '../../../../src/server/container';
 import type { Env } from '../../../../src/server/env';
 
 /**
- * `GET /api/v1/diy/pages/home` answering `If-None-Match` (CR-1-s, the second
- * half of CR-42-k2).
+ * `GET /api/v1/diy/pages/home` answering `If-None-Match`.
  *
- * The payload is cached for 60 s and dropped by every 装修 write (R4); what is
+ * The payload is cached for 60 s and dropped by every 装修 write; what is
  * proved here is the HTTP half: a caller holding the current version gets a
  * bodyless 304 with the same weak tag, the answer comes from the cached entry
  * without reading the row, and a publish makes the old tag stale at once.
@@ -75,7 +74,7 @@ async function read(headers: Record<string, string> = {}) {
   return GET(new Request(`${ORIGIN}/api/v1/diy/pages/home`, { headers }));
 }
 
-describe('GET /api/v1/diy/pages/home — conditional (CR-1-s)', () => {
+describe('GET /api/v1/diy/pages/home — conditional', () => {
   it('sends the page and its weak tag to a caller that has nothing', async () => {
     await seedHome();
     const response = await read();

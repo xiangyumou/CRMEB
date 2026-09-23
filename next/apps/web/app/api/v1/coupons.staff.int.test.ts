@@ -14,7 +14,7 @@ import { setContainer, type Container } from '../../../src/server/container';
 import type { Env } from '../../../src/server/env';
 
 /**
- * 订单赠券 and 店员发券 as HTTP (CR-5-h2).
+ * 订单赠券 and 店员发券 as HTTP.
  *
  * These three routes are worth testing at this layer rather than in
  * `@shop/core`, because in all three the interesting decision is one a route
@@ -358,7 +358,7 @@ describe('POST /api/v1/staff/coupon-grants', () => {
     expect(await remaining(templateId)).toBe(100);
   });
 
-  /** CR-10-k2: a 店员 hands out only what marketing released, and never to themselves. */
+  /** A 店员 hands out only what marketing released, and never to themselves. */
   it('404s a draft template and 422s a grant to the 店员’s own account, touching nothing', async () => {
     const member = await staff();
     const customer = await shopper();
@@ -395,7 +395,7 @@ describe('POST /api/v1/staff/coupon-grants', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 查看客户持有的优惠券 (CR-1-h3)
+// 查看客户持有的优惠券
 // ---------------------------------------------------------------------------
 
 describe('GET /api/v1/staff/users/:uid/coupons', () => {

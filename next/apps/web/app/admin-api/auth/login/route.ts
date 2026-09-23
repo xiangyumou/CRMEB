@@ -10,7 +10,7 @@ import { requestMeta } from '../../../api/v1/auth/_request';
  * SameSite=Lax, and Secure whenever `NODE_ENV=production`.
  *
  * The route is public, so `handle()` audits nothing here; the service writes
- * every outcome itself under `auth.adminLogin` (CR-12-k2), with the address
+ * every outcome itself under `auth.adminLogin`, with the address
  * from `clientIp()` and the user agent — never the body.
  */
 export const POST = handle(adminLogin, async (ctx, { body }) => {

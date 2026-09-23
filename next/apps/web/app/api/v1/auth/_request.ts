@@ -7,7 +7,7 @@ export { clientIp };
  * What the sign-in services want to know about the caller, read off the request.
  *
  * The address is `clientIp()`: the `X-Real-IP` the edge sets from its own view
- * of the peer, never a header the client wrote (CR-14-k2, see
+ * of the peer, never a header the client wrote (see
  * `src/server/request-meta.ts`). The throttle keys still pair it with the
  * account wherever they can, never the address alone.
  */

@@ -216,7 +216,7 @@ describe('/admin-api/groupbuy-activities', () => {
     expect(created).toMatchObject({ title: '三人成团 · 坚果礼盒', seatsRequired: 3, stock: 200 });
 
     const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
-      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      // Sign-ins are audited too; this test is about the operation.
       (row) => row.routeId !== 'auth.adminLogin',
     );
     expect(audit).toHaveLength(1);

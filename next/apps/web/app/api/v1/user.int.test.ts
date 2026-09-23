@@ -210,7 +210,7 @@ describe('POST /api/v1/auth/sms-codes', () => {
     expect((await fromClient('13800138201', '203.0.113.10')).status).toBe(202);
   });
 
-  it('ignores an X-Forwarded-For the client wrote itself (CR-14-k2)', async () => {
+  it('ignores an X-Forwarded-For the client wrote itself', async () => {
     // The attack: a fresh made-up address per request, to get a fresh per-IP
     // budget each time. The edge's `X-Real-IP` is the one address that counts,
     // so every one of these is the same caller.
@@ -353,7 +353,7 @@ describe('/admin-api/users', () => {
     expect(await response.json()).toMatchObject({ status: 'disabled' });
 
     const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
-      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      // Sign-ins are audited too; this test is about the operation.
       (row) => row.routeId !== 'auth.adminLogin',
     );
     expect(audit).toHaveLength(1);
@@ -370,7 +370,7 @@ describe('/admin-api/users', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * The six `/api/v1/staff/*` user routes as HTTP (CR-2-h2 §3).
+ * The six `/api/v1/staff/*` user routes as HTTP.
  *
  * The services are covered in `@shop/core`; the two things only a request can
  * prove are here. First, `auth: 'staff'` is on every one of the six: a shopper
@@ -381,8 +381,8 @@ describe('/admin-api/users', () => {
  * the schema, not the service, is what `VALIDATE_RESPONSES` checks.
  *
  * `installStaffCheck()` comes from importing `@shop/core/order`, exactly as it
- * does in the running app; who is staff is `orderStaffConfig`, B2's config
- * group, and the tests set it rather than stubbing the check.
+ * does in the running app; who is staff is `orderStaffConfig`, the order
+ * domain's config group, and the tests set it rather than stubbing the check.
  */
 describe('/api/v1/staff/users', () => {
   /** The six, as [module path, method, url, body]. */
@@ -451,7 +451,7 @@ describe('/api/v1/staff/users', () => {
     const listed = await (await callRoute(0, String(row!.id), headers)).json();
     expect(listed.items[0].phone).toBe('138****8000');
     expect(JSON.stringify(listed)).not.toContain(PHONE);
-    // The order domain registers `UserOrderStatsPort` (CR-2-e4, W4T), so a
+    // The order domain registers `UserOrderStatsPort`, so a
     // customer with no paid order is a real zero, not "not known".
     expect(listed.items[0]).toMatchObject({ orderCount: 0, spendTotal: '0.00' });
   });

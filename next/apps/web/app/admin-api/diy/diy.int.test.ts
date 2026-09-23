@@ -169,7 +169,7 @@ describe('/admin-api/diy/pages', () => {
     const created = await createPage(headers);
 
     const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
-      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      // Sign-ins are audited too; this test is about the operation.
       (row) => row.routeId !== 'auth.adminLogin',
     );
     expect(audit).toHaveLength(1);
@@ -226,12 +226,12 @@ describe('/admin-api/diy/pages/:id/content', () => {
     const body = (await saved.json()) as { version: string; content: unknown };
     // Deep equality, not bytes: `jsonb` sorts the keys inside a node, so what
     // comes back out of PostgreSQL is the same page with `timestamp` moved
-    // (invariants DIY-008, CR-1-g1). No value is lost or coerced.
+    // (DIY-008). No value is lost or coerced.
     expect(body.content).toEqual(CONTENT);
     expect(body.version).not.toBe(created.version);
 
     const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
-      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      // Sign-ins are audited too; this test is about the operation.
       (row) => row.routeId !== 'auth.adminLogin',
     );
     expect(audit.at(-1)).toMatchObject({

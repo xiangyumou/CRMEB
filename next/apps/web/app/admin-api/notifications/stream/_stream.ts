@@ -7,7 +7,7 @@ import { getContainer } from '../../../../src/server';
  * keep-alive (a route file may export only handlers). See `route.ts` for why
  * this is a bare handler and not `handle()`.
  *
- * ## The session is re-checked on every keep-alive (CR-15-k2)
+ * ## The session is re-checked on every keep-alive
  *
  * The cookie used to be resolved once, at connect, and the stream then
  * forwarded that admin's channel until the client went away — so a password

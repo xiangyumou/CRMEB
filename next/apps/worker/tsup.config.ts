@@ -3,7 +3,7 @@ import { defineConfig } from 'tsup';
 /**
  * One bundled entry point, so the production image is `node dist/main.js` with
  * only the native/optional dependencies left external. Bundling keeps the
- * image small, which matters on a 2-core / 3.6 GB box (PLAN §1).
+ * image small, which matters on a 2-core / 3.6 GB box.
  */
 export default defineConfig({
   entry: ['src/main.ts'],

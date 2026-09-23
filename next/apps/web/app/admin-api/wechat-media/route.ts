@@ -8,7 +8,7 @@ import { handle } from '../../../src/server';
 /**
  * `/admin-api/wechat-media` — the handles WeChat gave us for material we hold.
  *
- * `POST` takes an **attachment id**, not a file: the bytes are already in F1's
+ * `POST` takes an **attachment id**, not a file: the bytes are already in the
  * media library, and a second multipart endpoint would be a second place to get
  * the MIME check wrong.
  */
