@@ -37,8 +37,17 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=server-internal-net
+      # Plain HTTP only ever redirects. The session cookies are `Secure` in
+      # production, so a browser on http:// accepts the sign-in response and
+      # then drops its cookie: the admin login "succeeds" and lands back on
+      # an empty form. Serving nothing over http:// means that cannot happen.
+      # Certificate issuance is unaffected: Traefik answers its own ACME
+      # HTTP-01 challenge on `web` ahead of any router.
       - traefik.http.routers.crmeb-next-http.rule=Host(`${NEXT_HOST:?set NEXT_HOST before switching traffic}`)
       - traefik.http.routers.crmeb-next-http.entrypoints=web
+      - traefik.http.routers.crmeb-next-http.middlewares=crmeb-next-https-redirect
+      - traefik.http.middlewares.crmeb-next-https-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.crmeb-next-https-redirect.redirectscheme.permanent=true
       - traefik.http.routers.crmeb-next-https.rule=Host(`${NEXT_HOST:?}`)
       - traefik.http.routers.crmeb-next-https.entrypoints=websecure
       - traefik.http.routers.crmeb-next-https.tls=true

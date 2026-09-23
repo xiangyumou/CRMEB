@@ -233,6 +233,10 @@ never take the domain by accident. `compose.traefik.yml` adds both: the labels f
 the `web` and `websecure` entrypoints (certificate resolver `myresolver`), and the edge's second
 network, `server-internal-net`.
 
+The `web` (plain HTTP) router only redirects to HTTPS, permanently. It must never serve the site:
+the session cookies are `Secure` in production, so on `http://` a browser takes the sign-in
+response and drops its cookie, and the admin login appears to fail silently.
+
 The overlay is a setting of the deployment, not a step someone remembers. Name it in
 `deployment.env`:
 

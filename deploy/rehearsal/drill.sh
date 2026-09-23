@@ -542,6 +542,11 @@ if labels.get('traefik.enable') != 'true':
     failures.append('with the overlay the edge has no traefik.enable=true')
 if labels.get('traefik.http.routers.crmeb-next-https.rule') != 'Host(`drill.invalid`)':
     failures.append('with the overlay the https router is not Host(NEXT_HOST)')
+# The session cookies are Secure: an http:// page that is served, not
+# redirected, signs people in and then forgets them.
+if labels.get('traefik.http.routers.crmeb-next-http.middlewares') != 'crmeb-next-https-redirect' \
+        or labels.get('traefik.http.middlewares.crmeb-next-https-redirect.redirectscheme.scheme') != 'https':
+    failures.append('with the overlay the http router does not redirect to https')
 if 'server-internal-net' in (plain.get('networks') or {}):
     failures.append('without the overlay the edge is on server-internal-net')
 if any(key.startswith('traefik.') for key in (plain.get('labels') or {})):
