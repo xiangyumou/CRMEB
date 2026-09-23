@@ -31,24 +31,23 @@ import * as repo from './order.repo';
 /**
  * The admin order console.
  *
- * One legacy controller (`StoreOrderController`, 27 actions) and four services
- * collapse to this file plus `order.fulfil.service.ts`. The two things that
- * changed and matter:
+ * This file plus `order.fulfil.service.ts` is the whole console. Two design
+ * points matter:
  *
- *  - **The filter set is orthogonal.** Legacy's single `status` integer mixed
- *    `status`, `paid`, `refund_status` and `is_del`, so 已退款 and 待收货 could
- *    not be asked for together. Here every axis is its own query key and the
- *    tab bar is a preset over them.
+ *  - **The filter set is orthogonal.** Every axis (status, payment, refund
+ *    state, deletion) is its own query key and the tab bar is a preset over
+ *    them, so 已退款 and 待收货 can be asked for together; one combined status
+ *    code could not express that.
  *  - **改价 recomputes rather than overwrites.** The operator names a discount;
  *    `orders.payable_amount` and every `order_items.discount_amount` are
- *    derived from it with B1's own arithmetic, so a later partial refund reads
- *    a line share that is still correct. Legacy wrote the operator's total onto
- *    `pay_price` and left the line shares stale.
+ *    derived from it with checkout's own arithmetic, so a later partial refund
+ *    reads a line share that is still correct. Writing the operator's total
+ *    onto the order alone would leave the line shares stale.
  */
 
 const iso = (value: Date | null): string | null => (value === null ? null : value.toISOString());
 
-/** `orders_platform` (underscores) back to `X-Client-Platform` (hyphens). B1 owns the forward map. */
+/** `orders_platform` (underscores) back to `X-Client-Platform` (hyphens). Checkout owns the forward map. */
 const PLATFORM: Record<string, ClientPlatform> = {
   h5: 'h5',
   wechat_oa: 'wechat-oa',
@@ -79,7 +78,7 @@ function toOrderItem(row: repo.OrderItemRow): OrderItem {
     totalAmount: row.totalAmount,
     refundedQuantity: row.refundedQuantity,
     shippedQuantity: row.shippedQuantity,
-    // Written at create since CR-2-h4; an older line has none to show.
+    // Written at create; a line whose snapshot has no `adjustments` shows none.
     adjustments: snapshot.adjustments ?? [],
   };
 }
@@ -312,8 +311,7 @@ export interface ConsoleOperator {
  * The same console action is reachable from the web admin and from the mobile
  * staff console, and the timeline has to say which. `operator_kind` already
  * distinguishes them, so one helper serves both surfaces and there is no second
- * copy of 备注/改价/修改地址 for the phone — which is how the two drifted in
- * legacy (`AdminOrderController` and `admin/StoreOrderController`).
+ * copy of 备注/改价/修改地址 for the phone to drift away from the web's.
  */
 export function operatorOf(ctx: Ctx): ConsoleOperator {
   if (ctx.actor.kind === 'admin') {
@@ -372,7 +370,7 @@ export async function adminRemark(
  * `status = 'pending_payment'` is in the WHERE of `applyRepricing`, so a
  * payment that landed while the form was open makes this affect zero rows and
  * the operator is told — rather than the system quietly rewriting the price of
- * an order somebody has already paid for, which is what legacy did.
+ * an order somebody has already paid for.
  */
 export async function adminAdjustPrice(
   ctx: Ctx,
@@ -390,8 +388,9 @@ export async function adminAdjustPrice(
     }
 
     const items = await repo.listItems(tx, [orderId]);
-    // `orders.coupon_discount` is every goods-level discount, B1's decision.
-    // The operator's discount is added to it, never substituted for it.
+    // `orders.coupon_discount` is every goods-level discount, checkout's
+    // decision. The operator's discount is added to it, never substituted for
+    // it.
     const existing = Money.sum(items.map((item) => Money.parse(item.discountAmount)));
     const outcome = rules.reprice({
       lines: items.map((item) => ({
@@ -435,12 +434,12 @@ export async function adminAdjustPrice(
       ...logActor(operator),
     });
 
-    // CR-2-e2. The buyer has to be told the amount moved, or they pay the old
-    // one and the order sticks. Inside the transaction: an operator whose
-    // repricing lost the race against a payment (`applied.won === false`
-    // above) must not have sent 订单金额已修改 for a price that never changed.
-    // `oldAmount` comes from the locked row read before the update, so it is
-    // the amount the buyer actually saw.
+    // The buyer has to be told the amount moved, or they pay the old one and
+    // the order sticks. Inside the transaction: an operator whose repricing
+    // lost the race against a payment (`applied.won === false` above) must not
+    // have sent 订单金额已修改 for a price that never changed. `oldAmount`
+    // comes from the locked row read before the update, so it is the amount the
+    // buyer actually saw.
     //
     // The subject carries the **resulting amount**, not just the order id, for
     // the reason the CR gives about two partial refunds of one order. An order
@@ -532,10 +531,10 @@ export async function adminConfirmReceipt(
 /**
  * 删除订单 — a soft delete, and only of a finished order.
  *
- * Legacy's `is_del` / `is_system_del` pair let an operator remove a `paid`
- * order from every list while its stock, its coupon and its money stayed
- * committed. Here the WHERE says `cancelled | completed | refunded`, so an
- * order in flight cannot be made to disappear.
+ * Removing a `paid` order from every list would leave its stock, its coupon and
+ * its money committed with nobody looking at them. So the WHERE says
+ * `cancelled | completed | refunded`, and an order in flight cannot be made to
+ * disappear.
  */
 export async function adminDelete(ctx: Ctx, params: { id: string }): Promise<{ deleted: boolean }> {
   const adminId = requireAdminId(ctx);
@@ -683,8 +682,7 @@ const SHIPMENT_HEADER = [
  * `handle()` validates every response against the contract, so a route cannot
  * answer with a binary stream; the kit turns `content` into a download on the
  * client. Bounded by `exportMaxRows` — an unbounded export of a shop's whole
- * order history is how the legacy admin ran itself out of memory. CR-2-b2
- * proposes the streamed XLSX once F1's storage lands.
+ * order history can run the server out of memory.
  */
 export async function adminExport(ctx: Ctx, query: OrderExportQuery): Promise<OrderExportResult> {
   const { exportMaxRows } = await ctx.config.get(orderFulfilConfig);

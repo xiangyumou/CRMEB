@@ -50,20 +50,18 @@ import * as repo from './order.repo';
  * 移动端商家管理 — the phone console.
  *
  * Almost every function here is the web console's function with two columns
- * taken off. That is deliberate: legacy had `AdminOrderController` (web) and
- * `admin/StoreOrderController` (uni-app) implementing 备注/改价/发货 twice, and
- * they drifted — the phone's 改价 never re-split the line discounts at all.
- * One implementation, two surfaces, and the timeline records which one acted
- * through `operator_kind`.
+ * taken off. That is deliberate: two implementations of 备注/改价/发货, one per
+ * surface, drift apart — a phone 改价 that forgets to re-split the line
+ * discounts is the typical result. One implementation, two surfaces, and the
+ * timeline records which one acted through `operator_kind`.
  *
  * What the phone deliberately does *not* get:
  *
  *  - `costAmount` and the margin it implies;
  *  - the soft-delete column and 删除订单 altogether;
- *  - 改价, unless `order-staff.allowStaffRepricing` is on (off by default,
- *    matching the legacy screen);
- *  - 售后 同意 / 拒绝, unless `order-staff.allowStaffRefundReview` is on (off by
- *    default, CR-14-k).
+ *  - 改价, unless `order-staff.allowStaffRepricing` is on (off by default);
+ *  - 售后 同意 / 拒绝, unless `order-staff.allowStaffRefundReview` is on (off
+ *    by default).
  */
 
 // ---------------------------------------------------------------------------
@@ -103,7 +101,8 @@ export async function me(ctx: Ctx): Promise<StaffIdentity> {
   const ids = await staffUserIds(ctx.db);
   const [brief] = await fulfilRepo.listUserBriefs(ctx.db, [userId]);
   const isStaff = ids.includes(userId);
-  // The phone shows 退款审核 / 改价 only when the route behind them would let it through (CR-1-r6).
+  // The phone shows 退款审核 / 改价 only when the route behind them would let
+  // it through.
   const { allowStaffRefundReview, allowStaffRepricing } = await ctx.config.get(orderStaffConfig);
   return {
     isStaff,
@@ -202,7 +201,7 @@ export async function statistics(ctx: Ctx): Promise<StaffStatistics> {
 }
 
 /**
- * 统计明细 — the same window as the header, one row per day (CR-4-h §1).
+ * 统计明细 — the same window as the header, one row per day.
  *
  * Three things are decided here rather than in the page:
  *
@@ -344,24 +343,24 @@ export async function shipmentTracking(
   return fulfil.trackShipment(ctx, params);
 }
 
-// 快递公司 for the staff console: F2's `shipping` domain answers it now (CR-1-b2).
+// 快递公司 for the staff console: the `shipping` domain answers it.
 
 // ---------------------------------------------------------------------------
-// after-sales, forwarded to stream C
+// after-sales, forwarded to the refund domain
 // ---------------------------------------------------------------------------
 
 /**
- * B2 owns the surface, C owns the money.
+ * Fulfilment owns the surface, the refund domain owns the money.
  *
  * Every one of these is a straight forward to `refund`'s own service through
  * the `StaffRefundPort` — its staff entry points, which accept only a `staff`
- * actor and share the transition code with the web after-sales screen
- * (CR-14-k) — so B2 contains no code that touches a gateway, a `refunds` row
- * or `orders.refunded_amount`.
+ * actor and share the transition code with the web after-sales screen — so this
+ * file contains no code that touches a gateway, a `refunds` row or
+ * `orders.refunded_amount`.
  *
- * Until stream C registers the port, the routes answer 501 rather than
- * pretending: a phone that silently shows an empty after-sales list is worse
- * than one that says the feature is not wired up yet.
+ * If the refund domain has not registered the port, the routes answer 501
+ * rather than pretending: a phone that silently shows an empty after-sales list
+ * is worse than one that says the feature is not wired up.
  */
 function refundPort(): NonNullable<ReturnType<typeof resolveStaffRefundPort>> {
   const port = resolveStaffRefundPort();
@@ -388,9 +387,9 @@ export async function refundReview(
   body: StaffRefundReviewBody,
 ): Promise<AdminRefundDetail> {
   const port = refundPort();
-  // CR-14-k. A decision, and for a 仅退款 an approval sends the money, so the
-  // shop opts in, the way it does for 改价. Said with a reason, so the phone
-  // shows "not enabled" rather than something that reads like a broken account.
+  // A decision, and for a 仅退款 an approval sends the money, so the shop opts
+  // in, the way it does for 改价. Said with a reason, so the phone shows "not
+  // enabled" rather than something that reads like a broken account.
   const { allowStaffRefundReview } = await ctx.config.get(orderStaffConfig);
   if (!allowStaffRefundReview) {
     throw new DomainError('FORBIDDEN', { details: { reason: '店员审核售后未开启' } });
@@ -409,11 +408,11 @@ export async function refundReview(
 }
 
 /**
- * 售后备注 (CR-4-h §2).
+ * 售后备注.
  *
  * A note, not a decision: the refund's status is untouched and nothing is
- * overwritten. C appends it to `refund_logs`, which is also where it comes back
- * from — the detail's `logs` array.
+ * overwritten. The refund domain appends it to `refund_logs`, which is also
+ * where it comes back from — the detail's `logs` array.
  */
 export async function refundRemark(
   ctx: Ctx,

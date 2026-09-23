@@ -6,14 +6,14 @@ import { onOrderPaid } from './ports';
 export const COMMIT_SALE_HOOK = 'order:commit-sale';
 
 /**
- * The money arrived, so the reservation becomes a sale (CR-1-k2).
+ * The money arrived, so the reservation becomes a sale.
  *
  * `StockPort.commit` is the only thing that moves `product_skus.sales` (and,
  * through its roll-up, `products.sales`) up. Checkout reserved the stock, the
  * cancel path hands it back uncommitted, and the refund path hands it back with
- * `committed: true` — which only balances if this ran at payment. Before this
- * hook nothing called `commit`, so 已售 stayed at the migrated figure forever
- * and a refund lowered a number the payment had never raised.
+ * `committed: true` — which only balances if this ran at payment. Without this
+ * hook 已售 would never rise, and a refund would lower a number the payment had
+ * never raised.
  *
  * It runs for **every** paid order, whatever its kind. Group buy and presale
  * keep their own campaign ledgers (`groupbuy:take-seat`, `presale:commit-sale`)

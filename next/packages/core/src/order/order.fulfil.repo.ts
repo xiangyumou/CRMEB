@@ -31,9 +31,9 @@ import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kerne
 import type { OrderStatus } from './ports';
 
 /**
- * Every Drizzle statement stream B2 owns. B1's `order.repo.ts` keeps the
- * checkout and cancellation statements; the two files never overlap, which is
- * what lets both streams live in one domain directory.
+ * Every Drizzle statement fulfilment owns. `order.repo.ts` keeps the checkout
+ * and cancellation statements; the two files never overlap, so a change to one
+ * flow cannot silently alter a statement the other depends on.
  *
  * Statements, not decisions — with one thing worth reading twice.
  * `bumpShippedQuantity` carries the fulfilment invariant in its WHERE clause:
@@ -44,22 +44,22 @@ import type { OrderStatus } from './ports';
  * ```
  *
  * Zero affected rows is the *only* correct way to learn that a line cannot take
- * another `$q` units. Legacy's `doDelivery` read `cart_num`, subtracted in PHP
- * and wrote the result back, so two operators pressing 发货 together shipped
- * the same units twice and a refund landing mid-form shipped goods that had
+ * another `$q` units. Reading the quantity, subtracting in application code and
+ * writing the result back would let two operators pressing 发货 together ship
+ * the same units twice, and a refund landing mid-form ship goods that had
  * already been refunded. There is no read here at all.
  *
  * ## Tables from other domains, read-only
  *
- * Three tables are read here that B2 does not own, the same way B1 reads
- * `user_addresses`:
+ * Four tables are read here that fulfilment does not own, the same way checkout
+ * reads `user_addresses`:
  *
- * | Table                   | Owner | Why                                            |
- * | ----------------------- | ----- | ---------------------------------------------- |
- * | `users`                 | E1    | the buyer's name and phone on a console row    |
- * | `refunds`               | C     | the 退款 link on the order detail (ids only)   |
- * | `express_companies`     | F2    | the 发货 form's company picker (CR-1-b2)       |
- * | `product_virtual_cards` | A     | claiming one card key per paid order item      |
+ * | Table                   | Owner    | Why                                         |
+ * | ----------------------- | -------- | ------------------------------------------- |
+ * | `users`                 | user     | the buyer's name and phone on a console row |
+ * | `refunds`               | refund   | the 退款 link on the order detail (ids only) |
+ * | `express_companies`     | shipping | the 发货 form's company picker              |
+ * | `product_virtual_cards` | catalog  | claiming one card key per paid order item   |
  *
  * All four are SELECTs except the card claim, which is the conditional UPDATE
  * `packages/db/src/schema/catalog.ts` documents as the intended one.
@@ -177,9 +177,9 @@ export interface LineProgress {
  * Every line's progress, with `FOR UPDATE` on the item rows.
  *
  * Shipping has to decide against *all* the lines at once (does this dispatch
- * finish the order?), so the rows must agree — CONVENTIONS' "use `lockRow` when
- * several rows must agree". The per-line write is still a conditional update;
- * the lock only serialises the roll-up decision.
+ * finish the order?), so the rows must agree — `docs/conventions.md`'s "use
+ * `lockRow` when several rows must agree". The per-line write is still a
+ * conditional update; the lock only serialises the roll-up decision.
  */
 export async function lockLineProgress(tx: Tx, orderId: number): Promise<LineProgress[]> {
   const rows = await tx
@@ -292,7 +292,7 @@ export async function markShipmentsDelivered(
 }
 
 // ---------------------------------------------------------------------------
-// express companies (F2's reference data — CR-1-b2)
+// express companies (the shipping domain's reference data)
 // ---------------------------------------------------------------------------
 
 export async function listExpressCompanies(db: DbOrTx): Promise<ExpressCompanyRow[]> {
@@ -316,7 +316,7 @@ export async function findExpressCompany(
 }
 
 // ---------------------------------------------------------------------------
-// card keys (stream A's table; the claim the schema comment specifies)
+// card keys (the catalog's table; the claim the schema comment specifies)
 // ---------------------------------------------------------------------------
 
 /**
@@ -522,7 +522,7 @@ export interface UserBriefRow {
   phone: string | null;
 }
 
-/** Stream E1's table, read-only — the same arrangement B1 has with `user_addresses`. */
+/** The user domain's table, read-only — the same arrangement checkout has with `user_addresses`. */
 export async function listUserBriefs(
   db: DbOrTx,
   userIds: readonly number[],
@@ -539,7 +539,7 @@ export async function listUserBriefs(
     .where(inArray(users.id, [...new Set(userIds)]));
 }
 
-/** Stream C's table, read-only: the console links to C's pages, it never writes a refund. */
+/** The refund domain's table, read-only: the console links to its pages, it never writes a refund. */
 export async function listRefundIds(
   db: DbOrTx,
   orderIds: readonly number[],
@@ -576,7 +576,7 @@ export interface RangeTotals {
   refundedAmount: string;
 }
 
-/** One pass over the window. Legacy ran four separate queries and could disagree with itself. */
+/** One pass over the window, so the four totals cannot disagree with each other. */
 export async function rangeTotals(
   db: DbOrTx,
   args: { from: Date; to: Date },
@@ -740,7 +740,7 @@ export async function setItemDiscount(
     .where(eq(orderItems.id, args.orderItemId));
 }
 
-/** The receiver snapshot only. `user_addresses` is E1's and is never written from here. */
+/** The receiver snapshot only. `user_addresses` belongs to the user domain and is never written from here. */
 export async function updateReceiver(
   tx: Tx,
   args: { orderId: number; set: Record<string, unknown> },
@@ -838,7 +838,8 @@ export async function insertInvoice(
 /**
  * The one live request per order is `order_invoices_open_uq`, a partial unique
  * index. `insertInvoice` learns "already asked" from the violation rather than
- * from a prior SELECT, which is the same argument as B1's idempotency key.
+ * from a prior SELECT, which is the same argument as checkout's idempotency
+ * key.
  */
 const OPEN_INVOICE_CONSTRAINT = 'order_invoices_open_uq';
 

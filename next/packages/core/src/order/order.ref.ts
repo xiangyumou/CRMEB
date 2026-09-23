@@ -6,7 +6,7 @@ import { fromId } from '../kernel/ids';
 import * as refRepo from './order.ref.repo';
 
 /**
- * Resolving the `:id` of a storefront order route (CR-1-h).
+ * Resolving the `:id` of a storefront order route.
  *
  * Every storefront route that names an order takes **either** the surrogate id
  * **or** the 24-digit order number, and every one of them resolves it here so

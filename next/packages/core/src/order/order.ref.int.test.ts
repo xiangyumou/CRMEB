@@ -9,9 +9,9 @@ import { detail } from './order.query.service';
 import { requireOrderRef, resolveOrderRef } from './order.ref';
 
 /**
- * CR-1-h, against a real PostgreSQL: `:id` on a storefront order route is the
- * surrogate id **or** the 24-digit order number, and the owner is in the WHERE
- * either way.
+ * Order references against a real PostgreSQL: `:id` on a storefront order route
+ * is the surrogate id **or** the 24-digit order number, and the owner is in the
+ * WHERE either way.
  */
 
 let harness: TestCtx;

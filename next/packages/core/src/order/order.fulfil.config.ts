@@ -4,11 +4,10 @@ import { defineConfigGroup } from '../kernel/config-registry';
 /**
  * The fulfilment half of the order settings.
  *
- * A **second** group next to B1's `order`, rather than four more fields inside
- * it: `defineConfigGroup` registers by group name and two streams editing one
- * group definition is a merge conflict on every field. Operators see two
- * sections on the same settings page, which is also how the legacy screen was
- * laid out (下单 / 发货收货).
+ * A **second** group next to checkout's `order`, rather than more fields inside
+ * it: each group is owned by the code that reads it, so the checkout and
+ * fulfilment settings change independently. Operators see two sections on the
+ * same settings page (下单 / 发货收货).
  */
 export const orderFulfilConfig = defineConfigGroup({
   group: 'order-fulfil',
@@ -16,17 +15,14 @@ export const orderFulfilConfig = defineConfigGroup({
   schema: z.object({
     /**
      * Days a shipped order waits before the system confirms receipt for the
-     * buyer. Legacy `system_delivery_time`, in days, read as a string.
+     * buyer.
      */
     autoReceiveDays: z.number().int().min(1).max(90).default(10),
     /** Orders the auto-receive sweep takes per pass; the delayed job does the real work. */
     autoReceiveSweepLimit: z.number().int().min(1).max(2_000).default(200),
     /**
      * Days a `received` order waits for a review before it becomes `completed`.
-     * Legacy `system_comment_time`, in days — the same unit on both sides, so
-     * the value carries over untouched. It claimed `order_activity_time` until
-     * CR-2-j: that key is 活动未支付订单取消时间 in *hours*, which would have
-     * arrived here as a sixty-day review window.
+     * In days, like every other timer in this group.
      */
     reviewWindowDays: z.number().int().min(0).max(90).default(7),
     completionSweepLimit: z.number().int().min(1).max(2_000).default(200),
@@ -69,13 +65,12 @@ export const orderFulfilConfig = defineConfigGroup({
 /**
  * Who may open the mobile staff console.
  *
- * Legacy kept this in the `order_notice_admin_uids` config key and enforced it
- * with `CustomerMiddleware` — it was never a role, and making it one now would
- * mean inventing a second identity system for shoppers. So it stays a list of
- * user ids, typed, and B2 registers the `StaffCheck` that `auth: 'staff'`
+ * Staff are shoppers with a phone, not admins: making this a role would mean
+ * inventing a second identity system for shoppers. So it is a list of user ids,
+ * typed, and fulfilment registers the `StaffCheck` that `auth: 'staff'`
  * consults against it.
  *
- * The same list is what the notification stream wants for 新订单提醒, which is
+ * The same list is what the notification domain wants for 新订单提醒, which is
  * why the group is named for the people rather than for the console.
  */
 export const orderStaffConfig = defineConfigGroup({
@@ -84,13 +79,13 @@ export const orderStaffConfig = defineConfigGroup({
   schema: z.object({
     /** User ids allowed into `/api/v1/staff/*`. Empty means the console is closed to everyone. */
     staffUserIds: z.array(z.number().int().positive()).max(200).default([]),
-    /** Whether a staff member may 改价 from the phone. Off matches the legacy screen. */
+    /** Whether a staff member may 改价 from the phone. Off by default. */
     allowStaffRepricing: z.boolean().default(false),
     /**
-     * Whether a staff member may 同意 / 拒绝 an after-sale from the phone
-     * (CR-14-k). Off by default, like 改价: an approved 仅退款 goes straight to
-     * the gateway, so a shop opts in to letting its assistants move money.
-     * Reading the after-sales list and adding a note need no switch.
+     * Whether a staff member may 同意 / 拒绝 an after-sale from the phone Off
+     * by default, like 改价: an approved 仅退款 goes straight to the gateway,
+     * so a shop opts in to letting its assistants move money. Reading the
+     * after-sales list and adding a note need no switch.
      */
     allowStaffRefundReview: z.boolean().default(false),
   }),

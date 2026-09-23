@@ -20,20 +20,21 @@ import { orderStateMachine } from './order.state-machine';
 import { onOrderPaid, registerOrderStateMachine, resetOrderPorts } from './ports';
 
 /**
- * The races B2 owes.
+ * The fulfilment races.
  *
- * Four of them, and each one is a thing the legacy shop got wrong by reading a
- * row and then writing it:
+ * Four of them, and each one goes wrong the moment a row is read and then
+ * written:
  *
  *  1. two operators pressing 发货 on the same order at the same moment;
  *  2. the buyer's 确认收货 landing at the same moment as the auto-receive job;
  *  3. a dispatch racing a refund approval for the same line;
  *  4. two effect dispatchers replaying the same virtual delivery.
  *
- * What makes them real rather than decorative is the same three things B1's
- * file relies on: `runConcurrently` releases every caller from one barrier,
- * every caller gets its own pooled connection from `forkTestCtx`, and
- * `isWinner` reads an explicit outcome flag instead of truthiness.
+ * What makes them real rather than decorative is the same three things
+ * `order.concurrency.int.test.ts` relies on: `runConcurrently` releases every
+ * caller from one barrier, every caller gets its own pooled connection from
+ * `forkTestCtx`, and `isWinner` reads an explicit outcome flag instead of
+ * truthiness.
  */
 
 let harness: TestCtx;
@@ -243,10 +244,10 @@ const shipBody = (companyId: number, lines: { orderItemId: string; quantity: num
 });
 
 /**
- * What stream C will do when a refund is approved: take units off the line
- * under the mirror of the ship bound. Written here rather than imported
- * because C has not landed — the point of the test is that B2's dispatch bound
- * holds *against* it, whichever of the two commits first.
+ * What the refund domain does when a refund is approved: take units off the
+ * line under the mirror of the ship bound. Written here rather than imported so
+ * the test isolates the two bounds — the point is that the dispatch bound holds
+ * *against* it, whichever of the two commits first.
  */
 async function approveRefund(ctx: Ctx, args: { orderItemId: number; quantity: number }) {
   return withTx(ctx.db, async (tx) =>
@@ -473,8 +474,8 @@ describe('shipping while a refund is approved for the same line', () => {
     expect(item.shippedQuantity).toBe(1);
     expect(item.refundedQuantity).toBe(1);
 
-    // One unit sent, one refunded: nothing is outstanding, so the order is
-    // done rather than stuck in 部分发货 the way legacy left it.
+    // One unit sent, one refunded: nothing is outstanding, so the order is done
+    // rather than stuck in 部分发货.
     const row = await orderRow(placed.orderId);
     if (row.status === 'shipped') {
       expect(row.fulfillmentStatus).toBe('fulfilled');

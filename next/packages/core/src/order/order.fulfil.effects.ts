@@ -13,7 +13,7 @@ import { onOrderPaid } from './ports';
 import { orderStateMachine } from './order.state-machine';
 
 /**
- * What happens to an order *after* somebody pays for it, on B2's side.
+ * What happens to an order *after* somebody pays for it, on fulfilment's side.
  *
  * Two rules shape this whole file:
  *
@@ -90,9 +90,9 @@ export interface AutoDeliverOutcome {
  * Hands over everything the system can hand over by itself: card keys and
  * coupons.
  *
- * `virtual_manual` is deliberately *not* here — "虚拟商品" in the legacy sense
- * is a thing a human does something about (an account is topped up, a service
- * is booked), and auto-shipping it would tell the buyer it was delivered when
+ * `virtual_manual` is deliberately *not* here — that kind of "虚拟商品" is a
+ * thing a human does something about (an account is topped up, a service is
+ * booked), and auto-shipping it would tell the buyer it was delivered when
  * nobody had touched it. It goes out through the normal 发货 button with
  * `deliveryMode: 'virtual'`.
  *
@@ -152,8 +152,8 @@ export async function autoDeliver(ctx: Ctx, orderId: number): Promise<AutoDelive
       }
       // `product_virtual_cards_order_item_uq` is one card per line, so a
       // card-key line is a one-card line. A quantity above 1 is a checkout
-      // defect (CR-3-b2); the buyer still gets their card and the operator
-      // sees the warning rather than a silently half-delivered order.
+      // defect; the buyer still gets their card and the operator sees the
+      // warning rather than a silently half-delivered order.
       const existing = await fulfilRepo.findClaimedCard(tx, line.orderItemId);
       const card =
         existing ??
@@ -223,7 +223,8 @@ export async function autoDeliver(ctx: Ctx, orderId: number): Promise<AutoDelive
       to: rollUp,
     });
     if (rollUp === 'fulfilled') {
-      // On `tx`: the card rows and the order row are held here (CR-1-r1).
+      // On `tx`: the card rows and the order row are held here, and a second
+      // pooled connection could wait on them.
       const { autoReceiveDays } = await ctx.config.getIn(tx, orderFulfilConfig);
       await orderStateMachine.transition(tx, orderId, ['paid'], 'shipped', {
         at: now,
@@ -277,10 +278,10 @@ registerEffectHandler('order', VIRTUAL_DELIVERY, async (ctx, effect) => {
 /**
  * "你的包裹已发出".
  *
- * Behind the ledger because it leaves the building. With no notifier
- * registered — stream E2 has not landed — this logs and succeeds, on purpose:
- * parking one `unknown` effect row per shipment would give an operator a queue
- * of rows they cannot act on, which is worse than no notification at all.
+ * Behind the ledger because it leaves the building. With no notifier registered
+ * this logs and succeeds, on purpose: parking one `unknown` effect row per
+ * shipment would give an operator a queue of rows they cannot act on, which is
+ * worse than no notification at all.
  */
 registerEffectHandler('shipment', 'shipment.dispatched', async (ctx, effect) => {
   await notify(ctx, effect, 'shipment.dispatched');

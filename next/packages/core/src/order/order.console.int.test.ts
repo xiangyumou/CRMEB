@@ -24,11 +24,11 @@ import { onOrderPaid, registerOrderStateMachine, resetOrderPorts } from './ports
 /**
  * The admin order console, against a real PostgreSQL.
  *
- * The console is where the legacy shop's sharpest edges were, and each one has
- * a case here: 改价 rewriting an order somebody had already paid for, 修改地址
- * changing the label of a parcel already in a van, and 删除订单 hiding a live
- * order whose stock and money stayed committed. All three are WHERE clauses
- * now, which is precisely why they need a database to test.
+ * The console has sharp edges, and each one has a case here: 改价 rewriting an
+ * order somebody had already paid for, 修改地址 changing the label of a parcel
+ * already in a van, and 删除订单 hiding a live order whose stock and money
+ * stayed committed. All three are refused by WHERE clauses, which is precisely
+ * why they need a database to test.
  */
 
 let harness: TestCtx;
@@ -397,7 +397,7 @@ describe('改价', () => {
     expect((await orderRow(placed.orderId)).payableAmount).toBe('60.00');
   });
 
-  /** The legacy defect: 改价 rewriting an order the buyer had already paid for. */
+  /** 改价 must never rewrite an order the buyer has already paid for. */
   it('refuses once the money has arrived', async () => {
     const adminId = await makeAdmin();
     const placed = await placeOrder();
@@ -426,8 +426,8 @@ describe('改价', () => {
   });
 
   /**
-   * CR-2-e2. A buyer who is not told pays the amount they were shown, the
-   * gateway takes the wrong total, and the order sits there.
+   * A buyer who is not told pays the amount they were shown, the gateway takes
+   * the wrong total, and the order sits there.
    */
   it('tells the buyer, with both amounts, in the same transaction', async () => {
     const adminId = await makeAdmin();

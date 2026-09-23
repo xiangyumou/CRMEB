@@ -19,10 +19,10 @@ import { registerOrderStateMachine, resetOrderPorts } from './ports';
 /**
  * The races.
  *
- * Every conditional state change in this stream owes one, and five of them are
- * named in the brief: the last unit of stock, the duplicate submit, cancel
- * against the paid transition, one coupon against two orders, and the
- * auto-cancel against the shopper's own tap.
+ * Every conditional state change in checkout and cancellation owes one: the
+ * last unit of stock, the duplicate submit, cancel against the paid transition,
+ * one coupon against two orders, and the auto-cancel against the shopper's own
+ * tap.
  *
  * What makes them real rather than decorative:
  *
@@ -347,7 +347,7 @@ describe('cancel racing the paid transition', () => {
     return { userId, orderId: Number(detail.id), skuId: item.skuId };
   }
 
-  /** What stream C will do inside its own transaction when the callback lands. */
+  /** What the payment domain does inside its own transaction when the callback lands. */
   async function markPaid(ctx: Ctx, orderId: number): Promise<Attempt> {
     return withTx(ctx.db, async (tx) => {
       const moved = await orderStateMachine.transition(tx, orderId, ['pending_payment'], 'paid', {

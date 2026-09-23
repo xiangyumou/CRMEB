@@ -5,25 +5,25 @@ import type { Money } from '../kernel/money';
 import { DomainError } from '../kernel/errors';
 
 /**
- * The cross-domain seams of the order aggregate, frozen for wave 1.
+ * The cross-domain seams of the order aggregate.
  *
- * Six streams touch an order without owning it: payment and refund (C),
- * fulfilment (B2), group-buy and presale (D), catalog stock (A), freight (F2).
- * If they reached into each other's tables the rewrite would deadlock on
- * merge order, so this file is the *only* thing they share, and it lands
- * before any of them start.
+ * Several domains touch an order without owning it: payment and refund,
+ * fulfilment, group-buy and presale, catalog stock, freight. If they reached
+ * into each other's tables every change to one would ripple through the others,
+ * so this file is the *only* thing they share.
  *
  * Everything here is an interface, a type, or a registry. There is no
- * behaviour: the implementations arrive with their owning stream
- * (`registerStockPort` from A, `registerPaymentPort` from C, …) and the fakes
- * for tests live in `@shop/testing`.
+ * behaviour: the implementations are registered by their owning domain
+ * (`registerStockPort` from catalog, `registerPaymentPort` from payment, …) and
+ * the fakes for tests live in `@shop/testing`.
  *
- * Rules that are not negotiable, because they encode defects we are fixing:
+ * Rules that are not negotiable:
  *  - a transition is a **conditional update**, decided on the affected row
- *    count, never a read-then-write (release-readiness: `takeOrder`/`delivery`);
+ *    count, never a read-then-write, so two concurrent requests (a
+ *    double-tapped 收货, two staff shipping the same order) cannot both win;
  *  - hooks run **inside** the caller's transaction and may only touch the
  *    database — anything that calls a third party records an effect instead
- *    (CONVENTIONS: "never inside the transaction");
+ *    (`docs/conventions.md`: "never inside the transaction");
  *  - hooks must be **idempotent**, because the effect ledger retries.
  */
 
@@ -33,7 +33,7 @@ import { DomainError } from '../kernel/errors';
 
 /**
  * The order lifecycle. Refund state is *not* here: a refund is its own
- * aggregate owned by stream C, and an order carries a denormalised
+ * aggregate owned by the refund domain, and an order carries a denormalised
  * `refundStatus` alongside this one.
  */
 export const ORDER_STATUSES = [
@@ -51,12 +51,14 @@ export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export type TransitionTable<S extends string> = Readonly<Partial<Record<S, readonly S[]>>>;
 
 /**
- * The canonical table. B1 owns the behaviour, but the shape is fixed here so
- * that D and C can write their guards before B1 lands.
+ * The canonical table. The order domain owns the behaviour; the shape lives
+ * here so the kind handlers and the payment and refund domains can write their
+ * guards against it without importing the order service.
  */
 export const ORDER_TRANSITIONS: TransitionTable<OrderStatus> = Object.freeze({
-  // Mirrors the `orders_status` enum and its diagram in `db/src/schema/order.ts`.
-  // Only an unpaid order is cancelled; a paid one leaves through a full refund (stream C).
+  // Mirrors the `orders_status` enum and its diagram in
+  // `db/src/schema/order.ts`. Only an unpaid order is cancelled; a paid one
+  // leaves through a full refund.
   pending_payment: ['paid', 'cancelled'],
   paid: ['shipped', 'refunded'],
   shipped: ['received', 'refunded'],
@@ -83,7 +85,7 @@ export interface TransitionResult {
 }
 
 /**
- * Implemented by B1 as exactly one statement:
+ * Implemented by the order domain as exactly one statement:
  *
  *     UPDATE orders SET status = $to, ... WHERE id = $id AND status IN ($from)
  *
@@ -204,7 +206,7 @@ export interface StockLine {
 }
 
 /**
- * Stock, owned by stream A.
+ * Stock, owned by the catalog domain.
  *
  * Reserve at order creation, commit on payment, release on cancel/refund.
  * Every method is one atomic statement per line — `incStockDecSales`' read-then
@@ -230,12 +232,11 @@ export interface StockPort {
   /**
    * Returns the lines that could NOT be satisfied. Empty array means success.
    *
-   * `ctx` is optional, and trailing, because the decrement itself needs
-   * nothing from it: it is there so that A can record 库存预警 for a SKU this
-   * reservation pushed under its threshold (CR-2-e2), inside the caller's
-   * transaction. A caller that has a context passes it; the fakes and the
-   * tests that drive the port directly do not, and get no warning — which is
-   * what they want.
+   * `ctx` is optional, and trailing, because the decrement itself needs nothing
+   * from it: it is there so that the catalog can record 库存预警 for a SKU this
+   * reservation pushed under its threshold, inside the caller's transaction. A
+   * caller that has a context passes it; the fakes and the tests that drive the
+   * port directly do not, and get no warning — which is what they want.
    */
   reserve(tx: Tx, orderId: number, lines: readonly StockLine[], ctx?: Ctx): Promise<StockLine[]>;
   release(
@@ -249,11 +250,10 @@ export interface StockPort {
 }
 
 /**
- * Payment, owned by stream C.
+ * Payment, owned by the payment domain.
  *
- * `ensureNoOpenAttempts` is the "payment vs cancel" lock (risk matrix §4): the
- * cancel path asks payment whether money may still arrive, and acts on the
- * answer —
+ * `ensureNoOpenAttempts` is the "payment vs cancel" lock: the cancel path asks
+ * payment whether money may still arrive, and acts on the answer —
  *
  *   `closed`  no attempt can succeed any more; the cancel may proceed;
  *   `paid`    money already arrived; run the paid transition and refuse the cancel;
@@ -264,8 +264,8 @@ export interface StockPort {
  * locked, so it must not perform network I/O that can hang without a timeout.
  * Being database-only it cannot resolve an attempt that is still open — it
  * answers `unknown` rather than going to find out — so cancellation is a
- * **two-call protocol** (CR-7-c): `closeOrderPayments` first, outside the
- * transaction, where talking to WeChat costs nobody a row lock, and then
+ * **two-call protocol**: `closeOrderPayments` first, outside the transaction,
+ * where talking to WeChat costs nobody a row lock, and then
  * `ensureNoOpenAttempts` as the re-check under the lock, which is what catches
  * an attempt that opened in between.
  */
@@ -278,24 +278,25 @@ export interface PaymentPort {
 }
 
 /**
- * Freight, owned by stream F2. Called by B1 while pricing a cart.
+ * Freight, owned by the shipping domain. Called by checkout while pricing a
+ * cart.
  *
  * Amounts are integer 分 so the port stays free of the `Money` class at its
  * boundary; `perLine` is aligned with the `lines` argument and must sum to
- * `totalFen`, so B1 can attribute shipping per item for a partial refund.
+ * `totalFen`, so checkout can attribute shipping per item for a partial refund.
  */
 export interface FreightLine {
   skuId: number;
   quantity: number;
   freightTemplateId: number | null;
   /**
-   * How this line is charged (CR-1-f2).
+   * How this line is charged.
    *
    * `freightTemplateId` alone cannot say: a line that ships **free** and a line
    * with a **fixed** postage both carry `null`, and they price differently —
-   * free is 0, fixed is `fixedFreightFen × quantity` (legacy
-   * `OrderFreightCalculator::getOrderPriceGroup`). Without this the port had to
-   * re-read the skus its caller had just read, once per quote.
+   * free is 0, fixed is `fixedFreightFen × quantity`. Carrying the mode means
+   * the port does not re-read the skus its caller has just read, once per
+   * quote.
    */
   freightMode: 'free' | 'fixed' | 'template';
   /** 分 per unit. `0` unless `freightMode === 'fixed'`. */
@@ -328,11 +329,12 @@ export interface FreightPort {
 }
 
 /**
- * How a marketing stream (coupon, group-buy, presale, …) adjusts a price.
+ * How a marketing domain (coupon, group-buy, presale, …) adjusts a price.
  *
  * Contributors are pure: they look at the draft and return adjustments, they do
- * not write. B1 applies them in `priority` order and splits every adjustment
- * across lines with `Money.allocate`, so the parts always sum back exactly.
+ * not write. Checkout applies them in `priority` order and splits every
+ * adjustment across lines with `Money.allocate`, so the parts always sum back
+ * exactly.
  */
 export interface PricingLine {
   skuId: number;
@@ -364,7 +366,7 @@ export interface PriceAdjustment {
   label: string;
   /** Negative for a discount. Always applied to the goods total. */
   amount: Money;
-  /** Per-line split; when omitted B1 allocates by line subtotal. */
+  /** Per-line split; when omitted checkout allocates by line subtotal. */
   perLine?: readonly Money[];
   /** Opaque data the contributor needs again at order-creation time. */
   meta?: Record<string, unknown>;
@@ -395,8 +397,8 @@ export interface OrderKindHandler {
 /**
  * Order facts — the one inbound seam. Every port above is order calling out;
  * this is another domain asking the order domain a read-only question it cannot
- * answer itself (CR-2-a: reviews, lifetime purchase limits, the delete guard).
- * The order domain registers the implementation; callers never read `orders`.
+ * answer itself (reviews, lifetime purchase limits, the delete guard). The
+ * order domain registers the implementation; callers never read `orders`.
  */
 export interface ReviewableLine {
   orderId: number;

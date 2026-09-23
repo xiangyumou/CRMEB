@@ -8,7 +8,7 @@ import * as repo from './order.repo';
 
 /**
  * 累计订单 / 累计消费 — the order domain's implementation of the user domain's
- * `UserOrderStatsPort` (CR-2-e4).
+ * `UserOrderStatsPort`.
  *
  * The user side already pins the *shape* of this on a fake
  * (`user/user-staff.int.test.ts`): one batched call per page, an absent id
@@ -154,8 +154,8 @@ describe('statsForUsers — 哪些订单算数', () => {
     await makeOrder(userId, { status: 'completed', paidAmount: '80.00', deleted: true });
     await makeOrder(userId, { status: 'completed', paidAmount: '90.00', hiddenByUser: true });
 
-    // 删除订单 on the storefront is visibility only (CR-4-h §6): the shopper
-    // tidied their own list, they did not un-spend the money.
+    // 删除订单 on the storefront is visibility only: the shopper tidied their
+    // own list, they did not un-spend the money.
     expect((await repo.statsForUsers(harness.ctx.db, [userId])).get(userId)).toEqual({
       orderCount: 1,
       spendTotal: '90.00',
@@ -197,7 +197,7 @@ describe('statsForUsers — 哪些订单算数', () => {
   });
 });
 
-describe('registerOrderDomain — the port CR-2-e4 asked for', () => {
+describe('registerOrderDomain — the user order stats port', () => {
   it('registers UserOrderStatsPort, so the staff screen stops answering null', async () => {
     const userId = await makeUser();
     await makeOrder(userId, { status: 'completed', paidAmount: '3980.00' });

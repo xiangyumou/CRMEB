@@ -95,7 +95,7 @@ describe('splitAdjustments', () => {
     expect(split.applied.map((a) => a.amount.toString())).toEqual(['-20.00', '-10.00']);
   });
 
-  it("keeps each adjustment's own per-line share, which the order lines persist (CR-2-h4)", () => {
+  it("keeps each adjustment's own per-line share, which the order lines persist", () => {
     const cart = lines('88.00', '12.00');
     const split = splitAdjustments(cart, [
       discount('presale:activity-price', '-10.00', ['10.00', '0.00']),
@@ -276,11 +276,11 @@ describe('freightLineOf', () => {
   });
 
   /**
-   * The point of CR-1-f2. A free line and a fixed-postage line both carry
-   * `shippingTemplateId: null`, so the template id alone cannot tell the port
-   * which one it is looking at — and they price differently. Carrying the mode
-   * on the line is what let the `FreightPort` stop re-reading the skus that
-   * checkout had just read, once per quote.
+   * A free line and a fixed-postage line both carry `shippingTemplateId: null`,
+   * so the template id alone cannot tell the port which one it is looking at —
+   * and they price differently. Carrying the mode on the line is what spares
+   * the `FreightPort` re-reading the skus that checkout has just read, once per
+   * quote.
    */
   it('carries the freight mode so the port never has to re-read the sku', () => {
     expect(freightLineOf({ sku: sku(), quantity: 1, subtotal: yuan('1.00') })).toMatchObject({
@@ -309,7 +309,7 @@ describe('freightLineOf', () => {
   });
 
   it('ignores a stray fixed postage on a line that is not charged one', () => {
-    // Legacy left `postage` filled in after an operator switched a product to a
+    // `postage` can stay filled in after an operator switches a product to a
     // template; charging it anyway is the 「改了模板还在收固定运费」 bug.
     expect(
       freightLineOf({

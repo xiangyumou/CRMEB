@@ -5,10 +5,8 @@ import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm';
 import type { OrderFactsPort, ReviewableLine } from './ports';
 
 /**
- * The order domain's answers to the catalog's questions — `OrderFactsPort`
- * (CR-2-a). Stream A wrote these as a stand-in inside `catalog/` while B1 had
- * not landed; the orchestrator moved them here at merge, which is where a read
- * of `orders` belongs. Everything is a read.
+ * The order domain's answers to the catalog's questions — `OrderFactsPort` —
+ * here, because this is where a read of `orders` belongs. Everything is a read.
  *
  * One deliberate cross-domain touch remains: `findLinesAwaitingReview` joins
  * `product_reviews` to skip lines the shopper (or an earlier sweep) already
@@ -89,8 +87,8 @@ export const orderFacts: OrderFactsPort = {
 
   /**
    * Keyed on `completed_at`, which the state machine stamps on the
-   * `received -> completed` transition (B2's sweep or the shopper's own
-   * confirmation), so "N days after completion" means exactly that and not
+   * `received -> completed` transition (the fulfilment sweep or the shopper's
+   * own confirmation), so "N days after completion" means exactly that and not
    * "N days since anything last touched the row".
    */
   async findLinesAwaitingReview(tx, args): Promise<ReviewableLine[]> {

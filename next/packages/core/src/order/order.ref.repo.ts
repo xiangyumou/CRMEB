@@ -3,7 +3,7 @@ import { orders } from '@shop/db/schema/order';
 import { and, eq, isNull } from 'drizzle-orm';
 
 /**
- * The one statement behind an order reference (CR-1-h).
+ * The one statement behind an order reference.
  *
  * `orders_order_no_uq` makes this an index lookup, and the owner is in the
  * WHERE rather than checked afterwards, so a stranger's order number is

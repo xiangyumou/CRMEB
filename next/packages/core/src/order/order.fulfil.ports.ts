@@ -16,9 +16,10 @@ type PagedAdminRefunds = {
 };
 
 /**
- * The two seams fulfilment needs from streams that have not landed.
+ * The seams fulfilment needs from other domains: courier tracking, staff
+ * after-sales and notifications.
  *
- * Both follow the shape `ports.ts` already established — a slot, a registrar
+ * They follow the shape `ports.ts` already established — a slot, a registrar
  * and a `resolve*` that returns `undefined` rather than throwing — because the
  * console has to work without them. The difference from `ports.ts`'s slots is
  * deliberate: a missing `StockPort` is a bug, a missing logistics provider is
@@ -26,7 +27,7 @@ type PagedAdminRefunds = {
  */
 
 // ---------------------------------------------------------------------------
-// logistics (stream F2)
+// logistics (the shipping domain)
 // ---------------------------------------------------------------------------
 
 export interface TrackingTrace {
@@ -40,8 +41,8 @@ export interface TrackingResult {
 }
 
 /**
- * `shipping`'s courier lookup. Implemented by F2 over 快递鸟/阿里云快递; B2 only
- * ever asks and renders.
+ * `shipping`'s courier lookup. Implemented by the shipping domain over
+ * 快递鸟/阿里云快递; fulfilment only ever asks and renders.
  */
 export interface LogisticsPort {
   track(
@@ -58,29 +59,30 @@ export function registerLogisticsPort(impl: LogisticsPort): void {
 
 /**
  * `undefined` means no provider is configured, and the contract has a field for
- * exactly that (`shipmentTracking.available`). Legacy answered an empty array
- * either way, so an operator could not tell "not configured" from "not scanned
- * yet" and opened a ticket about the courier.
+ * exactly that (`shipmentTracking.available`). An empty array for both cases
+ * would leave an operator unable to tell "not configured" from "not scanned
+ * yet", and they would open a ticket about the courier.
  */
 export function resolveLogisticsPort(): LogisticsPort | undefined {
   return logistics;
 }
 
 // ---------------------------------------------------------------------------
-// after-sales, for the staff console (stream C)
+// after-sales, for the staff console (the refund domain)
 // ---------------------------------------------------------------------------
 
 /**
  * What `/api/v1/staff/refunds*` forwards to.
  *
- * B2 owns the surface, C owns the money: the staff console never touches a
- * gateway, a `refunds` row or `orders.refunded_amount`. The shapes are C's own
- * contract types, passed through untouched, so a field C adds appears on the
- * phone without a second edit here.
+ * Fulfilment owns the surface, the refund domain owns the money: the staff
+ * console never touches a gateway, a `refunds` row or `orders.refunded_amount`.
+ * The shapes are the refund domain's own contract types, passed through
+ * untouched, so a field it adds appears on the phone without a second edit
+ * here.
  *
- * The implementation must be staff-facing, not the admin services: those
- * demand admin atoms a staff actor never holds (CR-14-k). The refund domain
- * registers its `staff*` entry points, which accept only a `staff` actor.
+ * The implementation must be staff-facing, not the admin services: those demand
+ * admin atoms a staff actor never holds. The refund domain registers its
+ * `staff*` entry points, which accept only a `staff` actor.
  */
 export interface StaffRefundPort {
   list(ctx: Ctx, query: AdminRefundListQuery): Promise<PagedAdminRefunds>;
@@ -88,11 +90,11 @@ export interface StaffRefundPort {
   approve(ctx: Ctx, params: { id: string }, body: RefundApproveBody): Promise<AdminRefundDetail>;
   reject(ctx: Ctx, params: { id: string }, body: RefundRejectBody): Promise<AdminRefundDetail>;
   /**
-   * 售后备注 (CR-4-h §2), and deliberately not the console's `adminRemark`.
+   * 售后备注, and deliberately not the console's `adminRemark`.
    *
    * That one overwrites `refunds.admin_remark`; this one appends to the
    * refund's log, because the actor is a `user` with no admin row behind it and
-   * the frozen schema has no `refunds.staff_remark` to write instead.
+   * `refunds` has no staff remark column to write instead.
    */
   remark(ctx: Ctx, params: { id: string }, body: StaffRefundRemarkBody): Promise<AdminRefundDetail>;
 }
@@ -108,7 +110,7 @@ export function resolveStaffRefundPort(): StaffRefundPort | undefined {
 }
 
 // ---------------------------------------------------------------------------
-// notifications (stream E2)
+// notifications (the notification domain)
 // ---------------------------------------------------------------------------
 
 export interface FulfilmentNotice {

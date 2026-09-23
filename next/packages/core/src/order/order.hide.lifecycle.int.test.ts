@@ -23,13 +23,12 @@ import { onOrderPaid, registerOrderStateMachine, resetOrderPorts } from './ports
  * SMOKE-006 — 删除订单 over an order that got where it is the real way.
  *
  * `order.int.test.ts` › "hiding a finished order" covers the rule with orders
- * written straight into their terminal state, and its only refusal is an
- * unpaid order. The legacy smoke (`RetainedPathSmokeTest`) was about the
- * *shipped* refusal: a buyer must not be able to swipe away an order that is
- * on its way. So here the order is created, paid (the state machine plus the
- * paid hooks, as stream C's callback does), shipped by an admin, received by
- * the buyer and completed by the review-window job — and the delete is tried
- * at each step that matters.
+ * written straight into their terminal state, and its only refusal is an unpaid
+ * order. This one is about the *shipped* refusal: a buyer must not be able to
+ * swipe away an order that is on its way. So here the order is created, paid
+ * (the state machine plus the paid hooks, as the payment callback does),
+ * shipped by an admin, received by the buyer and completed by the review-window
+ * job — and the delete is tried at each step that matters.
  */
 
 let harness: TestCtx;

@@ -32,21 +32,20 @@ import { orderStateMachine } from './order.state-machine';
 import { registerOrderStateMachine, resetOrderPorts } from './ports';
 
 /**
- * CR-7-c: cancelling an order with a live WeChat payment behind it.
+ * Cancelling an order with a live WeChat payment behind it.
  *
  * `order.int.test.ts` proves the cancel path against `fakePaymentPort`, which
  * answers whatever the test tells it to. That is the right tool for "what does
- * B1 do with each of the three answers", and the wrong one for the defect this
- * file exists for, because the defect was never in the branches — it was that
- * B1 only ever made *one* of the two calls the protocol needs, so the real
- * port could only ever answer `unknown`.
+ * the cancel path do with each of the three answers", and the wrong one for the
+ * protocol itself: a cancel path that made only *one* of the two calls would
+ * pass every branch test, while the real port could only ever answer `unknown`.
  *
- * So everything here runs against stream C's real payment domain, registered
- * through `registerPaymentDomain()`, talking to the fake WeChat gateway from
+ * So everything here runs against the real payment domain, registered through
+ * `registerPaymentDomain()`, talking to the fake WeChat gateway from
  * `@shop/testing`: real RSA signing, real AEAD, and a server that refuses to
  * close a transaction somebody has paid. The order under test is a real one
- * from B1's checkout, so its stock is genuinely reserved and its coupon
- * genuinely spent — which is what "released" and "nothing released" mean below.
+ * from checkout, so its stock is genuinely reserved and its coupon genuinely
+ * spent — which is what "released" and "nothing released" mean below.
  *
  * The buyer being modelled is the ordinary one: they tapped 立即支付, the
  * WeChat sheet came up, and they closed it. Their attempt sits in `pending`,
@@ -140,8 +139,8 @@ interface Shopper {
 }
 
 /**
- * A real order from B1's checkout: two units reserved out of ten, and a coupon
- * moved to `used` unless the test asks for one without.
+ * A real order from checkout: two units reserved out of ten, and a coupon moved
+ * to `used` unless the test asks for one without.
  */
 async function makeOrder(options: { coupon?: boolean } = {}): Promise<Shopper> {
   sequence += 1;

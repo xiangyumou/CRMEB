@@ -5,7 +5,7 @@ import { generateOrderNo, generateOutTradeNo } from '../kernel/ids';
 import { isOrderNo } from './order.ref';
 
 /**
- * The assertion CR-1-h's decision rests on: **an order number is never
+ * The assertion the order reference rests on: **an order number is never
  * mistakable for an order id**, so one `:id` parameter can carry either without
  * a discriminator and without a "try one, then the other" fallback.
  */

@@ -1,6 +1,6 @@
 import { registerUserOrderStatsPort } from '../user';
 // Before `order.fulfil.effects`: both install a paid hook on import, and the
-// sale has to be committed first (CR-1-k2; see `order.stock.hooks.ts`).
+// sale has to be committed first (see `order.stock.hooks.ts`).
 import { installStockCommitHook } from './order.stock.hooks';
 import { installFulfilmentHooks } from './order.fulfil.effects';
 import { orderFacts } from './order.facts.repo';
@@ -12,38 +12,39 @@ import { registerOrderFacts, registerOrderStateMachine } from './ports';
 /**
  * The order domain's public surface.
  *
- * CONVENTIONS: "A domain in `core` may import another domain only through that
- * domain's `index.ts`". So this file is the contract between the order
- * aggregate and everybody else, and `order.repo.ts` in particular is private.
+ * `docs/conventions.md`: "A domain in `core` may import another domain only
+ * through that domain's `index.ts`". So this file is the contract between the
+ * order aggregate and everybody else, and `order.repo.ts` in particular is
+ * private.
  *
  * | Export                | Caller | When                                       |
  * | --------------------- | ------ | ------------------------------------------ |
  * | `preview` / `create`  | routes | 确认订单 / 提交订单                         |
  * | `cancel`              | routes | 取消订单                                    |
- * | `cancelOrder`         | C, B2  | payment failed, admin close-out             |
+ * | `cancelOrder`         | payment, fulfilment | payment failed, admin close-out |
  * | `autoCancel` / `sweepExpiredOrders` | jobs | the payment window closed     |
  * | `list` / `counts` / `detail` | routes | 我的订单                             |
- * | `hide`                | routes | 删除订单 (visibility only, CR-4-h §6)       |
+ * | `hide`                | routes | 删除订单 (visibility only)                  |
  * | `rebuyLines`          | cart   | 再次购买                                    |
  * | `resolveCatalogPort`  | cart   | live price, stock and status of a variant   |
  *
  * **Direction of dependency.** The cart imports the order domain; the order
  * domain never imports the cart. That is why the catalogue seam
- * (`catalog.port.ts`, the read interface the catalog implements) is
- * re-exported from here, and why the two `cart_items` statements checkout
- * needs live in `order.repo.ts`. Recorded in `docs/rewrite/status/b1.md`.
+ * (`catalog.port.ts`, the read interface the catalog implements) is re-exported
+ * from here, and why the two `cart_items` statements checkout needs live in
+ * `order.repo.ts`.
  */
 
 /**
  * Everything the order domain registers, in one idempotent call (the shape
- * `@shop/core/domains` looks for): the state machine streams C, B2 and D reach
- * through `getOrderStateMachine()`; the `OrderFactsPort` the catalog asks
- * about purchases and reviewable lines; the staff check `auth: 'staff'` fails
- * closed without; the `UserOrderStatsPort` the staff 用户 screen's 累计订单 /
- * 累计消费 need (CR-2-e4); and the order-paid hooks — the stock commit that
- * turns the reservation into a sale (CR-1-k2), then auto-delivery — that have
- * to be installed before the first payment lands. Importing
- * the domain calls it once; a test that `resetOrderPorts()` calls it again.
+ * `@shop/core/domains` looks for): the state machine the payment, refund,
+ * fulfilment and kind-handler code reach through `getOrderStateMachine()`; the
+ * `OrderFactsPort` the catalog asks about purchases and reviewable lines; the
+ * staff check `auth: 'staff'` fails closed without; the `UserOrderStatsPort`
+ * the staff 用户 screen's 累计订单 / 累计消费 need; and the order-paid hooks —
+ * the stock commit that turns the reservation into a sale, then auto-delivery —
+ * that have to be installed before the first payment lands. Importing the
+ * domain calls it once; a test that `resetOrderPorts()` calls it again.
  *
  * `UserOrderStatsPort` is declared by the *user* domain and implemented here
  * for the reason the port exists at all: "how many orders has this customer
@@ -79,8 +80,8 @@ export { orderConfig } from './order.config';
  *
  * Pure, and exported because a marketing domain's tests have to be able to
  * build the same `PricingDraft.adjustments` this service hands to
- * `beforeCreate` (CR-1-d2). A driver that skipped the clamping would be
- * testing a kind handler's guard against a draft no real checkout produces.
+ * `beforeCreate`. A driver that skipped the clamping would be testing a kind
+ * handler's guard against a draft no real checkout produces.
  */
 export { splitAdjustments } from './order.pricing';
 export type { AppliedAdjustment, DiscountSplit } from './order.pricing';
@@ -105,7 +106,7 @@ export type {
 } from './catalog.port';
 
 // ---------------------------------------------------------------------------
-// stream B2 — fulfilment, the admin console, invoices, the staff console
+// fulfilment, the admin console, invoices, the staff console
 // ---------------------------------------------------------------------------
 
 export { orderPermissions } from './permissions';
@@ -140,7 +141,7 @@ export * as orderStaff from './order.staff.service';
 // reach it through this file.
 export { autoDeliver, installFulfilmentHooks } from './order.fulfil.effects';
 
-/** The seams B2 needs from streams that have not landed (F2, C, E2). */
+/** The seams fulfilment needs from other domains (logistics, refund, notification). */
 export {
   registerFulfilmentNotifier,
   registerLogisticsPort,

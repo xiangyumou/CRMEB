@@ -10,7 +10,7 @@ import { orderStaffConfig } from './order.fulfil.config';
 import * as orderStaff from './order.staff.service';
 
 /**
- * The 商家管理 console's own two additions (CR-4-h §1 and §2).
+ * The 商家管理 console's own two additions: 统计明细 and 售后备注.
  *
  * 统计明细 needs a real database for one reason: the day boundary. A day is
  * Asia/Shanghai's, and the rows are bucketed by PostgreSQL from a `timestamptz`
@@ -42,8 +42,8 @@ beforeEach(async () => {
   // outlive the rows the truncate just removed.
   await harness.redis.flushdb();
   harness.clock.set(NOW);
-  // The staff refund routes forward into stream C through a port; without this
-  // they answer INTERNAL, which is the deliberate failure mode.
+  // The staff refund routes forward into the refund domain through a port;
+  // without this they answer INTERNAL, which is the deliberate failure mode.
   registerRefundDomain();
 });
 
@@ -219,7 +219,7 @@ describe('统计明细 — the per-day series', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 售后备注 (CR-4-h §2)
+// 售后备注
 // ---------------------------------------------------------------------------
 
 /** A minimal order, since a refund's detail joins to one. */
@@ -317,12 +317,12 @@ describe('售后备注 — a staff note on a refund', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 售后 审核 from the phone (CR-14-k)
+// 售后 审核 from the phone
 // ---------------------------------------------------------------------------
 
-describe('CR-14-k — the staff after-sales screen answers a staff member', () => {
-  // Every one of these used to be FORBIDDEN for every staff user: the port
-  // forwarded into the admin services, which demand an admin atom.
+describe('the staff after-sales screen answers a staff member', () => {
+  // A port that forwarded into the admin services would answer FORBIDDEN to
+  // every staff user, because those demand an admin atom.
   it('lists and reads the after-sales', async () => {
     const userId = await makeUser();
     const refundId = await makeRefund(userId, await makeOrder(userId));

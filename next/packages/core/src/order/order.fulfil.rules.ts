@@ -105,8 +105,8 @@ export type FulfillmentStatus = 'unfulfilled' | 'partially_fulfilled' | 'fulfill
  *
  * A refunded unit counts as settled, not as outstanding: an order whose only
  * unshipped unit was refunded is `fulfilled`, because nothing is ever going to
- * be sent for it. Legacy compared `cart_num` with `delivery_num` and left such
- * an order stuck in 部分发货 forever, which is why 待发货 never emptied.
+ * be sent for it. Counting it as outstanding would leave such an order stuck in
+ * 部分发货 forever, and 待发货 would never empty.
  */
 export function rollUpFulfillment(lines: readonly LineState[]): FulfillmentStatus {
   if (lines.length === 0) return 'unfulfilled';
@@ -163,9 +163,9 @@ export type RepriceOutcome =
  * 改价, as arithmetic.
  *
  * The operator names a discount; the new `orders.coupon_discount` is
- * `existingDiscount + operatorDiscount`, split across the lines with B1's own
- * `distribute`, and `payableAmount` comes from B1's own `payableOf`. Nothing
- * here invents a number.
+ * `existingDiscount + operatorDiscount`, split across the lines with checkout's
+ * own `distribute`, and `payableAmount` comes from checkout's own `payableOf`.
+ * Nothing here invents a number.
  *
  * Two properties, both asserted in `order.fulfil.rules.test.ts`:
  *
@@ -212,9 +212,8 @@ export function reprice(input: RepriceInput): RepriceOutcome {
  * with `=`, `+`, `-` or `@` is prefixed with a single quote.
  *
  * That is CSV injection — a buyer whose 收货人 is `=cmd|'/c calc'!A1` gets it
- * executed when an operator opens the export in Excel. The legacy exporter
- * wrote cells straight through `PhpSpreadsheet::setValue`, which is the same
- * hole.
+ * executed when an operator opens the export in Excel. Writing cells straight
+ * through, as most spreadsheet libraries do by default, leaves that hole open.
  */
 export function csvCell(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return '';
