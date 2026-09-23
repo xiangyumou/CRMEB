@@ -74,13 +74,20 @@ and `apps/mini/config`.
   反馈. Screenshots, 375 px at DPR 2 from the H5 build with the API unreachable, are in
   [`A-gallery/`](A-gallery/).
 
+- **Budgets and checks** (at the gallery commit):
+  - The weapp main package is 489.6 KB against a 1.5 MB budget; all packages total 566.5 KB.
+  - The production weapp build holds no demo sub-package and no test code.
+  - These all pass: `turbo typecheck lint test:unit build` (41 files, 174 tests), e2e
+    `test:mini`, `prettier --check`, `pnpm guards`.
+
 ## In progress
 
-- Budgets, e2e `test:mini`, final checks.
+- Nothing.
 
 ## Next
 
-- Hand-over report.
+- Pages from streams B–E on this kit.
+- The backend gaps in the hand-over report.
 
 ## Needs a device check
 
