@@ -80,4 +80,19 @@ describe('h5-mp-emulation platform', () => {
     );
     await expect(emulationPlatform.login()).rejects.toThrow(/login-code 失败 \(404/);
   });
+
+  it('answers the 确认收货 component as the test data says, confirming by default', async () => {
+    const target = { transactionId: '4200' };
+    await expect(emulationPlatform.openOrderConfirm(target)).resolves.toEqual({
+      kind: 'confirmed',
+    });
+    window.localStorage.setItem(
+      EMULATION_STORAGE_KEY,
+      JSON.stringify({ openid: 'o_test', phone: '13900000001', receipt: 'cancel' }),
+    );
+    await expect(emulationPlatform.openOrderConfirm(target)).resolves.toEqual({
+      kind: 'cancelled',
+    });
+  });
 });
+

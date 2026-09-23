@@ -5,6 +5,7 @@ import type {
   AvatarButtonProps,
   ChosenAddress,
   MiniPlatform,
+  OrderConfirmOutcome,
   PaymentOutcome,
   PhoneNumberButtonProps,
   SubscribeResult,
@@ -47,6 +48,8 @@ export interface EmulatedWechatUser {
   subscribe?: 'accept' | 'reject' | undefined;
   /** What 导入微信地址 returns; `null` = the shopper cancels. Default: a fixed address. */
   address?: ChosenAddress | null | undefined;
+  /** How the 确认收货 component ends. Default `confirm`. */
+  receipt?: 'confirm' | 'cancel' | 'fail' | undefined;
 }
 
 const DEFAULT_ADDRESS: ChosenAddress = {
@@ -157,4 +160,16 @@ export const emulationPlatform: MiniPlatform = {
   AvatarButton,
   chooseImages: pickImages,
   uploadFile: uploadWithFetch,
+  /**
+   * WeChat's 确认收货 page, answered by the test data. Confirming there is between the shopper
+   * and WeChat: the server hears of it from the fake `get_order` (H2), which the harness keeps.
+   */
+  openOrderConfirm(): Promise<OrderConfirmOutcome> {
+    const behaviour = emulatedUser().receipt ?? 'confirm';
+    if (behaviour === 'cancel') return Promise.resolve({ kind: 'cancelled' });
+    if (behaviour === 'fail') {
+      return Promise.resolve({ kind: 'failed', message: 'openBusinessView:fail (模拟)' });
+    }
+    return Promise.resolve({ kind: 'confirmed' });
+  },
 };

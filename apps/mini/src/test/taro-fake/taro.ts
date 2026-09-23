@@ -106,6 +106,8 @@ export const taroFake = {
   subscribeAnswer: 'accept' as 'accept' | 'reject' | 'ban' | 'filter',
   /** `chooseAddress` resolves with this, or rejects (`null`: the shopper cancelled). */
   address: null as Record<string, string> | null,
+  /** What the 确认收货 component (`openBusinessView`) reports as `extraData.status`. */
+  businessViewStatus: 'success' as 'success' | 'fail' | 'cancel',
   /** `chooseMedia` temp paths, or `null` for a cancel. */
   media: ['wxfile://tmp/1.jpg'] as string[] | null,
   /** `uploadFile` answers this (a function: called per upload, for a sequence). */
@@ -159,6 +161,7 @@ export const taroFake = {
     this.subscribeAnswer = 'accept';
     this.address = null;
     this.media = ['wxfile://tmp/1.jpg'];
+    this.businessViewStatus = 'success';
     this.upload = { statusCode: 201, data: '{"url":"/uploads/a.png"}' };
     this.enterOptions = { path: 'pages/index/index', query: {}, scene: 1001 };
     this.shareHandlers = { message: null, timeline: null };
@@ -316,6 +319,11 @@ const Taro = {
     record('downloadFile', args, {
       statusCode: 200,
       tempFilePath: `wxfile://tmp/${args.url.split('/').pop()}`,
+    }),
+  openBusinessView: (args: unknown) =>
+    record('openBusinessView', args, {
+      errMsg: 'openBusinessView:ok',
+      extraData: { status: taroFake.businessViewStatus },
     }),
   getEnterOptionsSync: () => taroFake.enterOptions,
   makePhoneCall: (args: unknown) => record('makePhoneCall', args, {}),
