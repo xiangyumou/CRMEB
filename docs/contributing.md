@@ -17,30 +17,47 @@ pnpm --filter @shop/contracts check:examples
 pnpm guards
 pnpm turbo run build --filter @shop/web && pnpm --filter @shop/e2e-admin e2e
 pnpm --filter @shop/e2e-storefront test
+pnpm --filter @shop/e2e-storefront test:mini
 ```
 
-| Step                | What it proves                                                                                                                                                                                                                                                                                                                   |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `typecheck`, `lint` | Strict types, and the import boundaries: no business logic in route files, `core` free of Next.js and React, the admin UI free of `core` and `db`, tables touched only by `*.repo.ts`.                                                                                                                                           |
-| `test:unit`         | The pure logic. If the web suite flakes under turbo's parallelism, rerun `pnpm --filter @shop/web test:unit` on its own before calling it a failure.                                                                                                                                                                             |
-| `test:int`          | Services against real PostgreSQL and Redis, including every concurrency test. `--force` because a cached pass proves nothing about the current database. Needs Docker.                                                                                                                                                           |
-| `prettier --check`  | Formatting.                                                                                                                                                                                                                                                                                                                      |
-| `check:examples`    | Every contract example parses against its route's schemas, so the mock server and the docs show valid payloads.                                                                                                                                                                                                                  |
-| `pnpm guards`       | The whole-tree checks: contracts and routes agree, permission atoms are declared and used, retired features stay out, no secrets, migrations are additive, the uni-app resolves every call and page, the business-rule catalogue is consistent, the release pipeline keeps its rules. It must end with 0 failures and 0 pending. |
-| admin e2e           | The admin console in a real browser, against the production build of `apps/web`. Build first: the suite serves whatever build exists, and a stale one hides fixes.                                                                                                                                                               |
-| storefront e2e      | The H5 storefront in mobile Chromium, through the edge, against the built app and worker.                                                                                                                                                                                                                                        |
+`turbo run … build` covers the whole workspace, the mini-program included: `apps/mini`,
+`@shop/api-client` and `@shop/storefront-blocks` are typechecked, linted and unit-tested like any
+other package, and `@shop/mini`'s `build` is the WeChat package, the H5 preview, the "模拟小程序"
+H5 build and the size gate (`scripts/size-report.mjs`) in one. Every `taro build` there runs with
+`--no-check`, which skips Taro's config doctor: the doctor fetches a schema from GitHub, rejects
+a valid `compile.include`, and then exits 0 without building, leaving the old `dist/` in place
+([S1 workaround 1](mini/spikes/S1-taro.md)). Keep the flag on any new build script. A Taro
+build strips types without checking them, so a passing build proves nothing about types:
+`typecheck` (`tsc --noEmit`) is that check.
+
+| Step                | What it proves                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `typecheck`, `lint` | Strict types, and the import boundaries: no business logic in route files, `core` free of Next.js and React, the admin UI free of `core` and `db`, tables touched only by `*.repo.ts`.                                                                                                                                                                                                                                                               |
+| `test:unit`         | The pure logic. If the web suite flakes under turbo's parallelism, rerun `pnpm --filter @shop/web test:unit` on its own before calling it a failure.                                                                                                                                                                                                                                                                                                 |
+| `test:int`          | Services against real PostgreSQL and Redis, including every concurrency test. `--force` because a cached pass proves nothing about the current database. Needs Docker.                                                                                                                                                                                                                                                                               |
+| `prettier --check`  | Formatting.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `check:examples`    | Every contract example parses against its route's schemas, so the mock server and the docs show valid payloads.                                                                                                                                                                                                                                                                                                                                      |
+| `pnpm guards`       | The whole-tree checks: contracts and routes agree, permission atoms are declared and used, retired features stay out, no secrets, migrations are additive, the uni-app resolves every call and page, the mini-program's pages, route catalogue, platform seam, privacy declarations and committed config agree (`mini`), the business-rule catalogue is consistent, the release pipeline keeps its rules. It must end with 0 failures and 0 pending. |
+| admin e2e           | The admin console in a real browser, against the production build of `apps/web`. Build first: the suite serves whatever build exists, and a stale one hides fixes.                                                                                                                                                                                                                                                                                   |
+| storefront e2e      | The H5 storefront in mobile Chromium, through the edge, against the built app and worker. `test:mini` runs the mini-program's "模拟小程序" H5 build (`specs-mini/`) the same way, with fakes for WeChat sign-in and payment.                                                                                                                                                                                                                         |
 
 Depending on what the change touches, also run:
 
 - `apps/uni-app/**`: `cd apps/uni-app && npm test && npm run build:h5` (and `npm run
 build:mp-weixin` if a `#ifdef MP-WEIXIN` block changed).
+- `apps/mini/**`, `packages/api-client/**` or `packages/storefront-blocks/**`: the checklist
+  covers them (above); `pnpm --filter @shop/mini build` on its own is the quick way to see the
+  package sizes. Anything that changes what runs on a phone (the platform seam, a page's first
+  render, the tab bar, sign-in, payment) also gets a pass in 微信开发者工具 and on a real device,
+  per [mini/device-check.md](mini/device-check.md); report what you could not check.
 - `deploy/**` or `docker/**`: `shellcheck deploy/*.sh deploy/lib/*.sh deploy/rehearsal/*.sh` and the
   drill, `deploy/rehearsal/drill.sh` (it builds the three images; allow about fifteen minutes).
 - `.github/**`: `actionlint`, and `.github/scripts/publish-release.test.sh` if the publish script
   changed.
 
-CI (`.github/workflows/ci.yml`) runs the checklist, shellcheck, the publish-script proof and the
-drill on every pull request that touches the code; the uni-app's `npm test` is yours to run.
+CI (`.github/workflows/ci.yml`) runs the checklist (`test:mini` in its own job, beside the H5
+storefront suite), shellcheck, the publish-script proof and the drill on every pull request that
+touches the code; the uni-app's `npm test` and the real-device pass are yours to run.
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat(coupon): …`,
 `fix(order): …`).

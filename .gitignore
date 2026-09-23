@@ -34,3 +34,6 @@ openapi.json
 /apps/mini/.swc/
 /apps/mini/.bundle-stats/
 /apps/mini/.env.*.local
+# miniprogram-ci's upload key: kept outside the repository (docs/mini/device-check.md); this
+# only stops an accidental `git add` of one dropped in by mistake. The `mini` guard fails on it.
+private.*.key

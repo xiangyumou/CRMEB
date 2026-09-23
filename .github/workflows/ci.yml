@@ -2,7 +2,9 @@ name: ci
 
 # The merge gate: typecheck, lint with the import boundaries, the guards, unit
 # tests, integration tests on a real PostgreSQL 17 and Redis 7, the contract
-# example check, formatting, both Playwright suites and the build.
+# example check, formatting, the Playwright suites (admin, the uni-app
+# storefront, the mini-program's "模拟小程序" build) and the build, which
+# includes the WeChat mini-program package and its size gate.
 #
 # It also builds and publishes the three container images and rehearses a
 # deploy against them. The deploy directory is in the paths filter for that
@@ -71,6 +73,8 @@ jobs:
       - name: Generate aggregates
         run: corepack pnpm gen
 
+      # Every workspace package through turbo — apps/mini, @shop/api-client and
+      # @shop/storefront-blocks included (each has typecheck, lint and test:unit).
       - name: Typecheck
         run: corepack pnpm typecheck
 
@@ -223,6 +227,18 @@ jobs:
       - name: Generate aggregates
         run: corepack pnpm gen
 
+      # `scripts/serve.ts` runs `next build` only when `apps/web/.next` has no
+      # BUILD_ID, so a restored build saves each storefront job several minutes.
+      # The key is every source `next build` compiles; a stale `.next` would
+      # silently serve the old server (docs/mini/spikes/S4-e2e.md).
+      - name: Cache the web build
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/web/.next
+            !apps/web/.next/cache
+          key: next-build-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'apps/web/app/**', 'apps/web/src/**', 'apps/web/public/**', 'apps/web/*.ts', 'apps/web/*.mjs', 'apps/web/*.json', 'packages/*/src/**', 'packages/*/package.json', 'packages/storefront-blocks/scripts/**') }}
+
       # The H5 bundle the edge serves is built from the real uni-app tree by
       # the suite's own webServer (`src/h5.ts` runs `npm run build:h5`); it
       # needs that tree's own dependencies, which are npm, not pnpm.
@@ -272,6 +288,78 @@ jobs:
         if: failure()
         with:
           name: storefront-test-results
+          path: e2e/storefront/test-results
+          retention-days: 14
+
+  # The mini-program's journeys (`test:mini`): the same stack as the job above,
+  # serving `apps/mini`'s "模拟小程序" H5 build instead of the uni-app, plus a
+  # fake api.weixin.qq.com. A job of its own rather than a step of the uni-app
+  # one (docs/mini/spikes/S4-e2e.md): one stack serves one client, and this
+  # suite takes seconds where the uni-app one takes minutes. The WeChat package
+  # itself (weapp build, size gate, test-only scan) is the build job's.
+  storefront-e2e-mini:
+    name: storefront e2e (playwright, mini-program emulation)
+    runs-on: ubuntu-latest
+    # Cold: image pulls, the emulation build (~10 s), `next build` unless the
+    # cache has it, then the journeys (~10 s).
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: corepack pnpm install --frozen-lockfile
+
+      # The web server and the emulation build both import generated files.
+      - name: Generate aggregates
+        run: corepack pnpm gen
+
+      # `scripts/serve.ts` runs `next build` only when `apps/web/.next` has no
+      # BUILD_ID, so a restored build saves each storefront job several minutes.
+      # The key is every source `next build` compiles; a stale `.next` would
+      # silently serve the old server (docs/mini/spikes/S4-e2e.md).
+      - name: Cache the web build
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/web/.next
+            !apps/web/.next/cache
+          key: next-build-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'apps/web/app/**', 'apps/web/src/**', 'apps/web/public/**', 'apps/web/*.ts', 'apps/web/*.mjs', 'apps/web/*.json', 'packages/*/src/**', 'packages/*/package.json', 'packages/storefront-blocks/scripts/**') }}
+
+      - name: Install the browser
+        run: corepack pnpm --filter @shop/e2e-storefront exec playwright install --with-deps chromium
+
+      - name: Pre-pull the service images
+        run: |
+          docker pull postgres:17-alpine
+          docker pull redis:7-alpine
+
+      # `serve.ts` builds `apps/mini/dist/h5-mp-emulation` itself. `CI` is set,
+      # so `.only` is forbidden, one retry, no reuse of a running server.
+      - name: Mini-program e2e
+        run: corepack pnpm --filter @shop/e2e-storefront test:mini
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        if: always()
+        with:
+          name: storefront-mini-playwright-report
+          path: e2e/storefront/playwright-report
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        if: failure()
+        with:
+          name: storefront-mini-test-results
           path: e2e/storefront/test-results
           retention-days: 14
 
@@ -415,6 +503,11 @@ jobs:
       - name: Generate aggregates
         run: corepack pnpm gen
 
+      # Every package's `build`, through turbo. For apps/mini that is the WeChat
+      # package (`build:weapp`), the H5 preview and `scripts/size-report.mjs`:
+      # the main / sub-package / total budgets, no eval or new Function, ES2018
+      # syntax, every app.json page present, one React, no zod, and none of
+      # the e2e emulation in `dist/weapp` (docs/mini/spikes/S1-taro.md, S4).
       - name: Build
         run: corepack pnpm build
 

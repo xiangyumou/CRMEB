@@ -248,6 +248,27 @@ is absorbed in one mapper rather than across pages. `utils/diyRegistry.js` lists
 it can render; the `uniapp` guard checks it against the contracts' registry, and checks that every
 call in `api/` resolves to a route.
 
+### The new mini-program (in progress)
+
+`apps/mini` is the WeChat mini-program that replaces the uni-app: Taro 4 on React 18, in the pnpm
+workspace. Until the cutover the uni-app above is still what ships; the edge image still serves the
+uni-app H5 build.
+
+- **Where it is going**: [docs/mini/](mini/) — the page map and route catalogue
+  ([pages.md](mini/pages.md)), the design rules ([design.md](mini/design.md)), sign-in
+  ([auth.md](mini/auth.md)), the WeChat platform rules ([wechat-compliance.md](mini/wechat-compliance.md)),
+  the spike reports ([spikes/](mini/spikes/)), the real-device kit
+  ([device-check.md](mini/device-check.md)) and each stream's status ([status/](mini/status/)).
+- **Built from**: `@shop/api-client` (the typed `/api/v1` client, over `Taro.request` in the
+  mini-program and `fetch` on H5, plus the zod-free route catalogue `@shop/api-client/routes`) and
+  `@shop/storefront-blocks` (the DIY blocks, rendered by the mini-program and by the admin's editor
+  canvas). Contracts are imported as types only; nothing carries zod at run time.
+- **Seams**: only `src/platform/` calls WeChat (`Taro.*`: navigation, sign-in, payment, the tab bar,
+  storage); NutUI only inside `src/ui/`. `pnpm build` builds the WeChat package, the H5 preview and
+  the "模拟小程序" H5 build the e2e suite drives, and fails on the package-size budget.
+- **Checked by** the `mini` guard (pages ⇄ `app.config.ts` ⇄ route catalogue, the platform seam,
+  privacy declarations, retired URLs, no AppSecret or upload key) and `pnpm --filter @shop/e2e-storefront test:mini`.
+
 ## Edge
 
 `docker/edge/nginx.conf`, in front of `web`:
@@ -262,15 +283,15 @@ call in `api/` resolves to a route.
 
 ## Tests and checks
 
-| Layer             | Where                        | Runs against                                                                                                                                         |
-| ----------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit              | `*.test.ts` next to the code | Nothing external.                                                                                                                                    |
-| Integration       | `*.int.test.ts`              | PostgreSQL and Redis in Testcontainers; `runConcurrently` for every conditional update.                                                              |
-| Contract examples | `packages/contracts`         | Every example parses against its route.                                                                                                              |
-| Guards            | `guards/`                    | The whole tree: contracts vs routes, permissions, retired features, secrets, migrations, the uni-app, the invariant catalogue, the release pipeline. |
-| Admin e2e         | `e2e/admin`                  | The production build of `apps/web`, Playwright, fakes for every third party.                                                                         |
-| Storefront e2e    | `e2e/storefront`             | The H5 build in mobile Chromium, through the edge, against the built app and worker.                                                                 |
-| Deploy drill      | `deploy/rehearsal/drill.sh`  | The production Compose stack, built locally: first deploy, upgrades that must roll back, rollback, backup and restore.                               |
+| Layer             | Where                        | Runs against                                                                                                                                                           |
+| ----------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit              | `*.test.ts` next to the code | Nothing external.                                                                                                                                                      |
+| Integration       | `*.int.test.ts`              | PostgreSQL and Redis in Testcontainers; `runConcurrently` for every conditional update.                                                                                |
+| Contract examples | `packages/contracts`         | Every example parses against its route.                                                                                                                                |
+| Guards            | `guards/`                    | The whole tree: contracts vs routes, permissions, retired features, secrets, migrations, the uni-app, the mini-program, the invariant catalogue, the release pipeline. |
+| Admin e2e         | `e2e/admin`                  | The production build of `apps/web`, Playwright, fakes for every third party.                                                                                           |
+| Storefront e2e    | `e2e/storefront`             | The H5 build in mobile Chromium, through the edge, against the built app and worker; `test:mini` runs the mini-program's "模拟小程序" build the same way.              |
+| Deploy drill      | `deploy/rehearsal/drill.sh`  | The production Compose stack, built locally: first deploy, upgrades that must roll back, rollback, backup and restore.                                                 |
 
 CI (`.github/workflows/ci.yml`) runs all of them, and a nightly soak repeats the concurrency
 suites 50 times with shuffled order.

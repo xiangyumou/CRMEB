@@ -33,27 +33,28 @@ somewhere is an entry in an allow-list inside the check, with the reason next
 to it (below). The last line is the count:
 
 ```
-14 checks, 0 failure(s)
+15 checks, 0 failure(s)
 ```
 
 ## The checks
 
-| name            | asserts                                                                                                                         |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `domains`       | every domain in `domains.gen.ts` is imported by name, so its registrations really run                                           |
-| `contracts`     | contract ⇄ route file, both ways, and the folder's `[param]` is the contract's `:param` (ROUTE-001)                             |
-| `route-hygiene` | `dynamic = 'force-dynamic'` everywhere; `ctx.audit(target)` on every admin write                                                |
-| `permissions`   | every route and menu atom is declared; every declared atom is used                                                              |
-| `admin-client`  | no hand-built `/admin-api/…` URL and no raw `fetch()` outside the api seam                                                      |
-| `fixtures`      | a web test that stubs the API answers through `respondWith`, so every fixture is parsed by its contract                         |
-| `uniapp`        | every storefront call resolves; every page and local import exists for H5 and MP-WEIXIN; the DIY registry matches the contracts |
-| `retired`       | no feature the shop does not have comes back as an identifier or a URL token (CORE-002)                                         |
-| `banned`        | no `eval`, `new Function`, `child_process`, `dangerouslySetInnerHTML`; the core clock lint rule is still an error               |
-| `secrets`       | no secret config field can leave through a response schema                                                                      |
-| `tx-pool`       | no `ctx.config.get(` / `ctx.db` / `ctx.withTx(` inside a function that takes a `tx`, `Tx` or `DbOrTx` (STAB-001)                |
-| `migrations`    | every destructive statement in `packages/db/migrations` carries `-- destructive: approved` (OPS-007)                            |
-| `pipeline`      | `ci.yml` publishes through `publish-release.sh`, never promotes, and keeps its guards, soak and admin e2e gates (REL-*)         |
-| `invariants`    | every rule in `docs/invariants.md` cites a test that exists, and every rule a test title names exists                           |
+| name            | asserts                                                                                                                                                                                         |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `domains`       | every domain in `domains.gen.ts` is imported by name, so its registrations really run                                                                                                           |
+| `contracts`     | contract ⇄ route file, both ways, and the folder's `[param]` is the contract's `:param` (ROUTE-001)                                                                                             |
+| `route-hygiene` | `dynamic = 'force-dynamic'` everywhere; `ctx.audit(target)` on every admin write                                                                                                                |
+| `permissions`   | every route and menu atom is declared; every declared atom is used                                                                                                                              |
+| `admin-client`  | no hand-built `/admin-api/…` URL and no raw `fetch()` outside the api seam                                                                                                                      |
+| `fixtures`      | a web test that stubs the API answers through `respondWith`, so every fixture is parsed by its contract                                                                                         |
+| `uniapp`        | every storefront call resolves; every page and local import exists for H5 and MP-WEIXIN; the DIY registry matches the contracts                                                                 |
+| `mini`          | the Taro mini-program: pages ⇄ `app.config.ts` ⇄ route catalogue, the platform seam, NutUI in `src/ui`, privacy, committed config, no upload key or AppSecret                                   |
+| `retired`       | no feature the shop does not have comes back as an identifier or a URL token (CORE-002)                                                                                                         |
+| `banned`        | no `eval`, `new Function`, `child_process`, `dangerouslySetInnerHTML`; the core clock lint rule is still an error; `eval` / `new Function` also in the mini-program and its two shared packages |
+| `secrets`       | no secret config field can leave through a response schema                                                                                                                                      |
+| `tx-pool`       | no `ctx.config.get(` / `ctx.db` / `ctx.withTx(` inside a function that takes a `tx`, `Tx` or `DbOrTx` (STAB-001)                                                                                |
+| `migrations`    | every destructive statement in `packages/db/migrations` carries `-- destructive: approved` (OPS-007)                                                                                            |
+| `pipeline`      | `ci.yml` publishes through `publish-release.sh`, never promotes, and keeps its guards, soak and admin e2e gates (REL-*)                                                                         |
+| `invariants`    | every rule in `docs/invariants.md` cites a test that exists, and every rule a test title names exists                                                                                           |
 
 ## The allow-lists
 
@@ -77,6 +78,12 @@ baseline and a hiding place.
 - `checks/uniapp.ts` — `NOT_RENDERED_BY_PAGE`: DIY components the editor saves
   that the page renderer does not draw (`bottomMenu`, drawn by the product
   page's footer).
+- `checks/mini.ts` — `UNBUILT_ROUTES`: storefront route keys whose page the
+  mini-program has not built yet (streams A and B shrink it page by page); an
+  entry fails once its page is registered or its key leaves the catalogue.
+  `UNCATALOGUED_PAGES`: registered pages with no route key, with the reason
+  (the shell's `pages/home/index`, which the catalogue calls
+  `pages/index/index`).
 - `checks/retired.ts` — `ALLOWED` and `DENY_LISTS`: the files that name a
   retired feature in order to refuse it.
 - `checks/banned.ts` — `FETCH_ALLOW` (one file per entry, with the host it
@@ -86,6 +93,30 @@ baseline and a hiding place.
   on the trimmed source line, so editing an excused line makes it a finding
   again.
 
+## The `mini` check
+
+`apps/mini` read against `@shop/contracts/system/storefront-routes` and
+[`docs/mini/wechat-compliance.md`](../docs/mini/wechat-compliance.md). It runs
+next to `uniapp` until the cutover, when it replaces it. Every finding is
+tagged with its rule:
+
+| rule            | asserts                                                                                                                                                                                                                                                                             |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[pages]`       | every page `app.config.ts` registers has its source; every page file (`<name>.config.ts` + `<name>.tsx` under `src/pages`, `src/packages`, `src/subpackages`) is registered; tabBar pages are in the main package; dev-only pages live in `subpackages/demo`, which nothing imports |
+| `[routes]`      | every catalogue path is a registered page, every registered page (demo aside) has a route key, and the `tab: true` keys are the tab bar: `platform/tab-pages.ts` keys and `tabBar.list` paths                                                                                       |
+| `[platform]`    | no `Taro.x` / `wx.x`, no `@tarojs/taro` import but the lifecycle hooks, and no private `openType` (phone, avatar, privacy) outside `src/platform/` — in the app, `@shop/api-client` and `@shop/storefront-blocks`; no `getUserProfile` / `getUserInfo` anywhere (C05)               |
+| `[nutui]`       | `@nutui/*` only under `apps/mini/src/ui/` (scripts and stylesheets), never in the shared packages                                                                                                                                                                                   |
+| `[privacy]`     | every `requiredPrivateInfos` API the app calls is declared, and only `chooseAddress` may be (C04); once `platform/privacy.ts` exists, every privacy-guarded API the platform uses is in its `PRIVACY_APIS`                                                                          |
+| `[retired]`     | no retired feature (the `retired` word list) in a page path, a catalogue path, or a page/API URL literal                                                                                                                                                                            |
+| `[config]`      | `project.config.json` keeps `urlCheck: true`; the only AppIDs a committed file (`project.config.json`, `.env*` but `.env.*.local`) may name are the shop's `wx4f4b772125e155ed` and `touristappid`; no committed `.env*` sets an `http://` `TARO_APP_API_ORIGIN` (C03)              |
+| `[credentials]` | no miniprogram-ci upload key (`private.*.key`) under `apps/mini` or tracked anywhere in git; no 32-hex-digit AppSecret-shaped token in any file under `apps/mini` (build output aside — `scripts/size-report.mjs` scans `dist/weapp` for the same)                                  |
+
+`app.config.ts` is evaluated the way Taro's config compiler does (an ES module
+whose default export is `defineAppConfig({...})`), so the check sees the
+manifest the build writes, including the parts computed from `TAB_PAGES`.
+Tests (`*.test.*`, `src/test/`) are exempt from `[platform]`, `[nutui]` and
+`[privacy]`.
+
 ## Tests
 
 `pnpm --filter @shop/guards test:unit` covers the readers (uni-app sources,
@@ -93,7 +124,18 @@ test titles, the catalogue, transaction scanning, migrations, the workflow)
 against small strings, and runs two checks over the real tree as tests:
 `checks/contracts.test.ts` (ROUTE-001) and `checks/retired.test.ts` (CORE-002).
 
+`checks/mini.mutations.test.ts` proves the `mini` check by mutation, on every
+commit: each mutant in `scripts/mutations/mini.ts` (at least one per rule) is
+applied to a scratch copy of `apps/mini` and the check must fail with that
+rule's tag; the unmutated copy must pass, and so must a copy committing the
+shop's own AppID. Its turbo inputs include all of `apps/mini` but build output
+and the two shared packages, so a cached pass is never replayed over a changed
+app.
+
 ## Mutations
+
+The `mini` mutants run in-process with the unit tests (above). The rest of this
+section is MUT-001.
 
 `pnpm --filter @shop/guards mutations` applies each of the ten mutations in
 `scripts/mutations/mutations.ts` to a temporary copy of the tree and expects the
