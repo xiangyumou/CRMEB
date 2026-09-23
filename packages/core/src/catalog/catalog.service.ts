@@ -321,6 +321,7 @@ export async function adminProductList(
     keyword: query.keyword,
     categoryId: query.categoryId === undefined ? undefined : Number(query.categoryId),
     labelId: query.labelId === undefined ? undefined : Number(query.labelId),
+    ids: query.ids?.map(Number),
     kind: query.kind,
     priceFrom: query.priceFrom,
     priceTo: query.priceTo,

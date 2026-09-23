@@ -12,7 +12,7 @@ import {
 } from '@shop/contracts/groupbuy/groupbuy.admin.contract';
 import type { GroupbuyActivityListItem } from '@shop/contracts/groupbuy/schemas';
 
-import { callRoute } from '../api';
+import { ApiError, callRoute } from '../api';
 import { formatInstant, formatMoney } from '../kit';
 import {
   listLabels,
@@ -86,20 +86,26 @@ export function createDiyDataSource(options: DiyDataSourceOptions = {}): DiyData
 // shared
 // ---------------------------------------------------------------------------
 
-/** One detail call per id; a record deleted since the page was saved shows its bare id. */
-function resolveEach(
+/**
+ * One detail call per id. A record deleted since the page was saved answers
+ * 404 and drops out; any other failure is the caller's, so an outage never
+ * reads as "nothing was picked".
+ */
+async function resolveEach(
   ids: readonly string[],
   load: (id: string) => Promise<DiyPickerItem>,
 ): Promise<DiyPickerItem[]> {
-  return Promise.all(
+  const rows = await Promise.all(
     ids.map(async (id) => {
       try {
-        return await load(id);
-      } catch {
-        return { id, name: `#${id}` };
+        return [await load(id)];
+      } catch (error) {
+        if (ApiError.is(error) && error.status === 404) return [];
+        throw error;
       }
     }),
   );
+  return rows.flat();
 }
 
 const SCAN_PAGE_SIZE = 100;

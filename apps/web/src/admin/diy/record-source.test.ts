@@ -122,7 +122,7 @@ describe('文章', () => {
     expect(result.items).toEqual([{ id: '101', name: '双十一活动说明', subtitle: '2026-10-20' }]);
   });
 
-  it('resolves stored ids through the detail route, and survives a deleted one', async () => {
+  it('resolves stored ids through the detail route, dropping a deleted one', async () => {
     const calls = stubRoutes([
       on(cmsArticleDetail, (call) =>
         call.params.id === '9'
@@ -136,8 +136,16 @@ describe('文章', () => {
     expect(calls.map((call) => call.params.id)).toEqual(['101', '9']);
     expect(rows).toEqual([
       { id: '101', name: '双十一活动说明', image: '/uploads/cover.png', subtitle: '新闻资讯' },
-      { id: '9', name: '#9' },
     ]);
+  });
+
+  it('throws on anything but a 404, so an outage never reads as "nothing picked"', async () => {
+    stubRoutes([
+      on(cmsArticleDetail, () =>
+        respondWithError(500, { code: 'INTERNAL', message: '服务器开小差了' }),
+      ),
+    ]);
+    await expect(source().resolve('article', ['101'])).rejects.toMatchObject({ status: 500 });
   });
 
   it('nests the visible 文章分类 under their parents', async () => {
@@ -249,7 +257,6 @@ describe('优惠券', () => {
     ]);
     expect(await source().resolve('coupon', ['1', '9'])).toEqual([
       { id: '1', name: '满 100 减 10', subtitle: '满 ¥100.00 减 ¥10.00' },
-      { id: '9', name: '#9' },
     ]);
   });
 });

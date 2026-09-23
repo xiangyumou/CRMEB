@@ -1,7 +1,4 @@
-import {
-  catalogAdminProductDetail,
-  catalogAdminProductList,
-} from '@shop/contracts/catalog/catalog.product.admin.contract';
+import { catalogAdminProductList } from '@shop/contracts/catalog/catalog.product.admin.contract';
 import { catalogAdminCategoryTree } from '@shop/contracts/catalog/catalog.category.admin.contract';
 import { catalogAdminLabelList } from '@shop/contracts/catalog/catalog.taxonomy.admin.contract';
 
@@ -67,23 +64,35 @@ export async function listProducts(query: DiyPickerQuery): Promise<DiyPickerResu
   return { items: page.items.map(toProductItem), total: page.total };
 }
 
+/** The most ids one list call takes; the contract refuses more. */
+const RESOLVE_CHUNK = 100;
+
 /**
- * Stored product ids back into rows: one detail call per id. It runs only for
- * ids a saved page already carries — the pickers store the row whole (name,
- * image) — so the count stays small.
+ * Stored product ids back into rows, through the product list's `ids` filter.
+ * A block holds at most 50 products, so this is one call.
+ *
+ * Under the default tab a deleted product is absent, so it drops out here, as
+ * does anything that is not an id at all. An off-shelf product is still a row,
+ * marked in its second line: the operator should see what they picked even
+ * while the storefront skips it.
  */
 export async function resolveProducts(ids: readonly string[]): Promise<DiyPickerItem[]> {
-  return Promise.all(
-    ids.map(async (id): Promise<DiyPickerItem> => {
-      try {
-        const detail = await callRoute(catalogAdminProductDetail, { params: { id } });
-        return toProductItem({ ...detail, id });
-      } catch {
-        // A deleted product must not blank the whole picker.
-        return { id, name: `#${id}` };
-      }
-    }),
-  );
+  const found = new Map<string, DiyPickerItem>();
+  const unique = [...new Set(ids)].filter((id) => /^[1-9]\d*$/.test(id));
+  for (let start = 0; start < unique.length; start += RESOLVE_CHUNK) {
+    const chunk = unique.slice(start, start + RESOLVE_CHUNK);
+    const page = await callRoute(catalogAdminProductList, {
+      query: { page: 1, pageSize: chunk.length, ids: chunk.join(',') },
+    });
+    for (const row of page.items) {
+      const item = toProductItem(row);
+      found.set(
+        row.id,
+        row.status === 'on_shelf' ? item : { ...item, subtitle: `${item.subtitle} · 未上架` },
+      );
+    }
+  }
+  return ids.flatMap((id) => found.get(id) ?? []);
 }
 
 /** 商品标签: enabled labels only. */
@@ -111,7 +120,10 @@ export async function resolveLabels(ids: readonly string[]): Promise<DiyPickerIt
   // No by-id route for labels; the list is small and one page holds it.
   const page = await callRoute(catalogAdminLabelList, { query: { page: 1, pageSize: 100 } });
   const byId = new Map(page.items.map((label) => [label.id, label.name]));
-  return ids.map((id) => ({ id, name: byId.get(id) ?? `#${id}` }));
+  return ids.flatMap((id) => {
+    const name = byId.get(id);
+    return name === undefined ? [] : [{ id, name }];
+  });
 }
 
 /** The 商品分类 tree, nesting kept. */

@@ -68,6 +68,18 @@ export const catalogAdminProductList = defineRoute({
       query: { page: 1, pageSize: 20, keyword: '白T', categoryId: '17' },
       response: { items: [adminProductListItemExample], total: 1, page: 1, pageSize: 20 },
     },
+    {
+      // A saved DIY page's 指定商品, back into rows: 9 has been deleted since,
+      // so it is absent; the rest come back in the order asked for.
+      name: 'by-ids',
+      query: { page: 1, pageSize: 3, ids: '4,9,1' },
+      response: {
+        items: [{ ...adminProductListItemExample, id: '4' }, adminProductListItemExample],
+        total: 2,
+        page: 1,
+        pageSize: 3,
+      },
+    },
   ],
 });
 

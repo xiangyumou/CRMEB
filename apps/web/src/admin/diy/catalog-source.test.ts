@@ -1,13 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { catalogAdminCategoryTree } from '@shop/contracts/catalog/catalog.category.admin.contract';
-import {
-  catalogAdminProductDetail,
-  catalogAdminProductList,
-} from '@shop/contracts/catalog/catalog.product.admin.contract';
+import { catalogAdminProductList } from '@shop/contracts/catalog/catalog.product.admin.contract';
 import { catalogAdminLabelList } from '@shop/contracts/catalog/catalog.taxonomy.admin.contract';
 import {
-  adminProductDetailExample,
   adminProductListItemExample,
   type AdminProductListItem,
   productCategoryChildExample,
@@ -109,20 +105,36 @@ describe('the catalog picker kinds', () => {
     expect(result.items).toEqual([{ id: '3', name: '包邮', subtitle: '促销' }]);
   });
 
-  it('resolves stored product ids one detail call each, and survives a deleted one', async () => {
+  it('resolves stored product ids in one list call, in their order, without the deleted', async () => {
     const calls = stubRoutes([
-      on(catalogAdminProductDetail, (call) =>
-        call.params.id === '9'
-          ? respondWithError(404, { code: 'NOT_FOUND', message: '资源不存在' })
-          : { ...adminProductDetailExample, ...product },
+      on(catalogAdminProductList, {
+        // The server leaves out 9, deleted since the page was saved.
+        items: [{ ...product, id: '3', name: '白T恤', status: 'off_shelf' }, product],
+        total: 2,
+        page: 1,
+        pageSize: 4,
+      }),
+    ]);
+    const rows = await resolveProducts(['7', '9', '3', 'not-an-id']);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.query.get('ids')).toBe('7,9,3');
+    expect(calls[0]?.query.get('pageSize')).toBe('3');
+    // No tab: an off-shelf pick is still the operator's pick.
+    expect(calls[0]?.query.get('tab')).toBeNull();
+    expect(rows).toEqual([
+      { id: '7', name: '牛仔外套', image: '/uploads/7.png', subtitle: '¥199.00' },
+      { id: '3', name: '白T恤', image: '/uploads/7.png', subtitle: '¥199.00 · 未上架' },
+    ]);
+  });
+
+  it('throws when the list cannot be read, rather than answering "nothing picked"', async () => {
+    stubRoutes([
+      on(catalogAdminProductList, () =>
+        respondWithError(500, { code: 'INTERNAL', message: '服务器开小差了' }),
       ),
     ]);
-    const rows = await resolveProducts(['7', '9']);
-
-    expect(calls).toHaveLength(2);
-    expect(rows[0]).toMatchObject({ id: '7', name: '牛仔外套', subtitle: '¥199.00' });
-    // The picker keeps rendering; the missing row shows its bare id.
-    expect(rows[1]).toEqual({ id: '9', name: '#9' });
+    await expect(resolveProducts(['7'])).rejects.toMatchObject({ status: 500 });
   });
 
   it('flattens the category tree into the picker tree, keeping the nesting', async () => {

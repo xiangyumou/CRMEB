@@ -29,10 +29,10 @@ export interface AssetListResult {
 /**
  * Everything `<AssetPicker>` needs from the material library.
  *
- * The kit ships the UI and an in-memory stub. The `storage` domain implements
- * this interface on top of the real `/admin-api/attachments` routes and installs
- * it with `<AssetSourceProvider source={…}>` in the shell layout.
- * Nothing else in the kit changes.
+ * The kit ships the UI only. The `storage` domain implements this interface
+ * on top of the real `/admin-api/attachments` routes and installs it with
+ * `<AssetSourceProvider source={…}>` in the shell layout; tests install
+ * `createStubAssetSource()` from `@/test/asset-source`.
  */
 export interface AssetSource {
   listCategories(): Promise<AssetCategory[]>;

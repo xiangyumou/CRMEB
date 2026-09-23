@@ -89,7 +89,6 @@ export {
 export { AssetPicker, useAssetPicker } from './asset/asset-picker';
 export type { AssetPickerHandle, AssetPickerProps } from './asset/asset-picker';
 export { AssetSourceProvider, useAssetSource } from './asset/asset-source-context';
-export { createStubAssetSource } from './asset/stub-source';
 export type {
   AssetCategory,
   AssetItem,

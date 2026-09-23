@@ -364,6 +364,8 @@ export interface ProductListFilter {
   keyword?: string | undefined;
   categoryId?: number | undefined;
   labelId?: number | undefined;
+  /** Only these products; the list then comes back in this order. */
+  ids?: readonly number[] | undefined;
   kind?: ProductKindValue | undefined;
   priceFrom?: string | undefined;
   priceTo?: string | undefined;
@@ -422,6 +424,7 @@ function productWhere(filter: ProductListFilter): SQL | undefined {
     filter.labelId !== undefined
       ? sql`exists (select 1 from ${productLabelsMap} l where l.product_id = ${products.id} and l.label_id = ${filter.labelId})`
       : undefined,
+    filter.ids !== undefined ? inArray(products.id, [...filter.ids]) : undefined,
   );
 }
 
@@ -437,13 +440,18 @@ export async function listProducts(
   const where = productWhere(args);
   const column = PRODUCT_SORT[args.sortBy ?? 'id'];
   const direction = args.sortOrder === 'asc' ? asc : desc;
+  // An id list is its own order: the caller stored these, in this sequence.
+  const order =
+    args.ids !== undefined
+      ? [sql`array_position(${sql.param([...args.ids])}::bigint[], ${products.id})`]
+      : [direction(column), desc(products.id)];
 
   const [rows, counted] = await Promise.all([
     db
       .select()
       .from(products)
       .where(where)
-      .orderBy(direction(column), desc(products.id))
+      .orderBy(...order)
       .offset(args.offset)
       .limit(args.limit),
     db.select({ total: count }).from(products).where(where),

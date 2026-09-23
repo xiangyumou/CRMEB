@@ -47,7 +47,8 @@ export function createStubDiyDataSource(): DiyDataSource {
     },
     async resolve(kind, ids) {
       const byId = new Map(rows[kind].map((row) => [row.id, row]));
-      return ids.map((id) => byId.get(id) ?? { id, name: `#${id}` });
+      // As the real source: an id with no record drops out.
+      return ids.flatMap((id) => byId.get(id) ?? []);
     },
     async categories(kind) {
       return [

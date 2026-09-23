@@ -16,6 +16,7 @@ import { shippingTemplateOptionList } from '@shop/contracts/shipping/shipping.te
 
 import { resetApiConfig } from '@/admin/api/config';
 import { on, stubRoutes, type StubCall } from '@/test/api';
+import { withStubAssets } from '@/test/asset-source';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { ProductEditorPage, formValuesOf } from './product-editor';
@@ -172,7 +173,7 @@ describe('商品编辑器', () => {
 
   it('loads a product into the form and saves it back through PUT', async () => {
     const calls = stubApi();
-    renderAdmin(<ProductEditorPage productId="1" />, { identity: editor });
+    renderAdmin(withStubAssets(<ProductEditorPage productId="1" />), { identity: editor });
 
     await waitFor(() => expect(screen.getByLabelText('商品名称')).toHaveValue('简约白 T 恤'));
     // The matrix renders one row per existing combination.
@@ -205,7 +206,7 @@ describe('商品编辑器', () => {
    */
   it('offers the shipping templates as a select, and only in 运费模板 mode', async () => {
     stubApi();
-    renderAdmin(<ProductEditorPage productId="1" />, { identity: editor });
+    renderAdmin(withStubAssets(<ProductEditorPage productId="1" />), { identity: editor });
 
     await waitFor(() => expect(screen.getByLabelText('商品名称')).toHaveValue('简约白 T 恤'));
 

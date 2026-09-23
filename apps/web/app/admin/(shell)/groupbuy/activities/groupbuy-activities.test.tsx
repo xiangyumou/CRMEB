@@ -16,6 +16,7 @@ import {
 
 import { resetApiConfig } from '@/admin/api/config';
 import { on, stubRoutes, type StubCall } from '@/test/api';
+import { withStubAssets } from '@/test/asset-source';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { GroupbuyActivitiesPage } from './groupbuy-activities';
@@ -68,7 +69,7 @@ const allPermissions = {
 describe('拼团活动', () => {
   it('lists campaigns from the contract route', async () => {
     const calls = stubApi();
-    renderAdmin(<GroupbuyActivitiesPage />, { identity: allPermissions });
+    renderAdmin(withStubAssets(<GroupbuyActivitiesPage />), { identity: allPermissions });
 
     expect(await screen.findByText('三人成团 · 坚果礼盒')).toBeInTheDocument();
     expect(screen.getByText('进行中')).toBeInTheDocument();
@@ -84,7 +85,7 @@ describe('拼团活动', () => {
 
   it('hides every write action from a read-only admin', async () => {
     stubApi();
-    renderAdmin(<GroupbuyActivitiesPage />, {
+    renderAdmin(withStubAssets(<GroupbuyActivitiesPage />), {
       identity: { ...testIdentity, permissions: ['groupbuy:activity:read'] },
     });
 
@@ -99,7 +100,7 @@ describe('拼团活动', () => {
 
   it('pauses through the status sub-resource, not the edit form', async () => {
     const calls = stubApi();
-    renderAdmin(<GroupbuyActivitiesPage />, { identity: allPermissions });
+    renderAdmin(withStubAssets(<GroupbuyActivitiesPage />), { identity: allPermissions });
     await screen.findByText('三人成团 · 坚果礼盒');
 
     await userEvent.click(screen.getByRole('button', { name: '暂停' }));
@@ -113,7 +114,7 @@ describe('拼团活动', () => {
 
   it('reads the activity before editing it, and sends the SKU rows back', async () => {
     const calls = stubApi();
-    renderAdmin(<GroupbuyActivitiesPage />, { identity: allPermissions });
+    renderAdmin(withStubAssets(<GroupbuyActivitiesPage />), { identity: allPermissions });
     await screen.findByText('三人成团 · 坚果礼盒');
 
     await userEvent.click(screen.getByRole('button', { name: '编辑' }));
@@ -147,7 +148,7 @@ describe('拼团活动', () => {
 
   it('opens the campaign orders through the nested route', async () => {
     const calls = stubApi();
-    renderAdmin(<GroupbuyActivitiesPage />, { identity: allPermissions });
+    renderAdmin(withStubAssets(<GroupbuyActivitiesPage />), { identity: allPermissions });
     await screen.findByText('三人成团 · 坚果礼盒');
 
     await userEvent.click(screen.getByRole('button', { name: '订单' }));

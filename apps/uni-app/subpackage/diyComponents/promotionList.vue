@@ -68,9 +68,6 @@
 
 <script>
 import commonWrapper from "./commonWrapper.vue";
-// import {
-// 	getProductslist
-// } from '@/api/store.js';
 import goodList from "./goodList.vue";
 export default {
   name: "promotionList",
@@ -335,12 +332,6 @@ export default {
       },
       immediate: true,
     },
-    goodType: {
-      handler(value) {
-        //value !== undefined && this.getGroomList();
-      },
-      immediate: true,
-    },
     tempArr() {
       this.$nextTick(() => {
         if (this.productVideoStatus) {
@@ -368,7 +359,6 @@ export default {
     this.$eventHub.$on("product_video_observe", () => {
       this.observeVideo();
     });
-    // this.getGroomList();
     let that = this;
     let type = that.goodType == 0 ? 3 : that.goodType;
     let goodDataConfig = {
@@ -482,51 +472,6 @@ export default {
     changeTab(item) {
       this.goodType = item.tabVal;
       this.activeValue = item;
-      // this.tempArr = [];
-      // this.page = 1;
-      // this.loadend = false;
-      // let onloadH = true;
-      // this.getGroomList(onloadH);
-    },
-    // 精品推荐
-    getGroomList(onloadH) {
-      let that = this;
-      let type = that.goodType == 0 ? 3 : that.goodType;
-      if (that.loadend) return false;
-      if (that.loading) return false;
-      if (onloadH) {
-        that.$set(that, "iSshowH", true);
-      }
-      let datas = {
-        page: that.page,
-        limit: this.numConfig,
-      };
-      if (type == 1) {
-        datas.ids = that.activeValue.goodsList.ids.join();
-      } else if (type == 2) {
-        datas.brand_id = that.activeValue.brandConfig.brandVal.join();
-      } else if (type == 3) {
-        datas.cate_id = that.activeValue.selectConfig.activeValue.join();
-      } else if (type == 4) {
-        datas.store_label_id = that.activeValue.goodsLabel.activeValue.join();
-      }
-      getProductslist(datas)
-        .then(({ data }) => {
-          that.$set(that, "iSshowH", false);
-          let maxPage = Math.ceil(this.numConfig / this.limit);
-          let list = data,
-            loadend = list.length < that.limit || that.page >= maxPage;
-          let tempArr = that.$util.SplitArray(list, that.tempArr);
-          that.$set(that, "tempArr", tempArr.slice(0, this.numConfig));
-          that.loadend = loadend;
-          that.loadTitle = loadend ? "没有更多内容啦~" : "加载更多";
-          that.page = that.page + 1;
-          that.loading = false;
-        })
-        .catch((res) => {
-          that.loading = false;
-          that.loadTitle = "加载更多";
-        });
     },
     // 首发新品切换
     ProductNavTab(item, index) {

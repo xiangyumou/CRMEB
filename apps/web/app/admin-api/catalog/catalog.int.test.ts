@@ -23,8 +23,8 @@ import type { Env } from '../../../src/server/env';
  * the service runs, that a body is validated before anything is written, that
  * the declared status codes come back, and that a write lands in `audit_logs`.
  *
- * Plus one end-to-end pass of risk-matrix §1 over HTTP, because "下架 hides the
- * product" is a claim about the whole stack and not about a service function.
+ * Plus one end-to-end pass of 下架 over HTTP, because "下架 hides the product"
+ * is a claim about the whole stack and not about a service function.
  */
 
 let harness: TestCtx;
@@ -238,6 +238,55 @@ describe('/admin-api/catalog/products', () => {
     expect(response.status).toBe(422);
     expect((await response.json()).code).toBe('VALIDATION_FAILED');
     expect(await harness.ctx.db.select().from(products)).toHaveLength(0);
+  });
+
+  it('answers ?ids= in the order asked, without the deleted, and refuses more than 100', async () => {
+    const headers = await adminCookie(['catalog:product:read']);
+    const insert = async (name: string, values: Partial<typeof products.$inferInsert> = {}) => {
+      const [row] = await harness.ctx.db
+        .insert(products)
+        .values({
+          name,
+          status: 'on_shelf',
+          imageUrl: 'https://cdn.example.com/p.jpg',
+          price: '60.00',
+          stock: 5,
+          freightMode: 'free',
+          unitName: '件',
+          ...values,
+        })
+        .returning({ id: products.id });
+      return String(row!.id);
+    };
+    const first = await insert('甲', { price: '10.00' });
+    const offShelf = await insert('乙', { status: 'off_shelf' });
+    const deleted = await insert('丙', { deletedAt: new Date('2026-05-01T00:00:00.000Z') });
+    const last = await insert('丁', { price: '90.00' });
+    await insert('戊'); // not asked for
+
+    const { GET } = await import('./products/route');
+    const ids = async (query: string): Promise<string[]> => {
+      const response = await GET(get(`/admin-api/catalog/products?${query}`, headers));
+      expect(response.status).toBe(200);
+      return ((await response.json()) as { items: { id: string }[] }).items.map((row) => row.id);
+    };
+
+    // An operator's saved pick is shown whatever its shelf state; a deleted
+    // product is gone, so it is absent rather than an error.
+    expect(await ids(`pageSize=4&ids=${last},${deleted},${offShelf},${first}`)).toEqual([
+      last,
+      offShelf,
+      first,
+    ]);
+    // The list's order is the ids', whatever the sort key says.
+    expect(await ids(`ids=${first}&ids=${last}&sortBy=price&sortOrder=desc`)).toEqual([
+      first,
+      last,
+    ]);
+
+    const tooMany = Array.from({ length: 101 }, (_unused, i) => String(i + 1)).join(',');
+    const refused = await GET(get(`/admin-api/catalog/products?ids=${tooMany}`, headers));
+    expect(refused.status).toBe(422);
   });
 
   it('keeps the export behind its own permission, because the rows carry cost prices', async () => {

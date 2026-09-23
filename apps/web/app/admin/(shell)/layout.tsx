@@ -9,9 +9,9 @@ import { StorageAssetSourceProvider } from '@/admin/storage/asset-source-provide
  * Everything behind a login lives under this route group. The group's
  * parentheses keep it out of the URL: `app/admin/(shell)/coupons` is `/admin/coupons`.
  *
- * `StorageAssetSourceProvider` is the swap the kit README describes: it
- * puts the real `/admin-api/attachments` library behind `<AssetPicker>` in
- * place of the in-memory `createStubAssetSource()`, for every page at once.
+ * `StorageAssetSourceProvider` puts the real `/admin-api/attachments` library
+ * behind every `<AssetPicker>` in the shell, for every page at once. The kit
+ * has no fallback source, so a picker outside it throws.
  */
 export default function ShellLayout({ children }: { children: ReactNode }) {
   return (

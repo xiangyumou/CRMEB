@@ -57,7 +57,14 @@ export type DiyPickerKind = 'product' | 'article' | 'coupon' | 'combination' | '
 
 export interface DiyDataSource {
   list(kind: DiyPickerKind, query: DiyPickerQuery): Promise<DiyPickerResult>;
-  /** Resolves ids already stored in a saved page back into display rows. */
+  /**
+   * Resolves ids already stored in a saved page back into display rows, in
+   * the order given.
+   *
+   * An id whose record no longer exists is left out. Any other failure
+   * throws: a picker that took an outage for "nothing is picked" would let
+   * the operator overwrite the saved ids with an empty list.
+   */
   resolve(kind: DiyPickerKind, ids: readonly string[]): Promise<DiyPickerItem[]>;
   /** Product categories and article categories, as a tree. */
   categories(kind: 'product' | 'article'): Promise<DiyTreeNode[]>;

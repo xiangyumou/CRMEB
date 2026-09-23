@@ -11,6 +11,7 @@ import type { ProductCategory } from '@shop/contracts/catalog/schemas';
 
 import { resetApiConfig } from '@/admin/api/config';
 import { on, stubRoutes, type StubCall } from '@/test/api';
+import { withStubAssets } from '@/test/asset-source';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { ProductCategoriesPage } from './product-categories';
@@ -50,7 +51,7 @@ const writer = {
 describe('商品分类', () => {
   it('lists categories with their level and product count', async () => {
     const calls = stubApi();
-    renderAdmin(<ProductCategoriesPage />, { identity: writer });
+    renderAdmin(withStubAssets(<ProductCategoriesPage />), { identity: writer });
 
     expect(await screen.findByText('男装')).toBeInTheDocument();
     expect(screen.getByText('2 级')).toBeInTheDocument();
@@ -60,7 +61,7 @@ describe('商品分类', () => {
 
   it('hides the write actions from a read-only admin', async () => {
     stubApi();
-    renderAdmin(<ProductCategoriesPage />, {
+    renderAdmin(withStubAssets(<ProductCategoriesPage />), {
       identity: { ...testIdentity, permissions: ['catalog:category:read'] },
     });
 
@@ -72,7 +73,7 @@ describe('商品分类', () => {
 
   it('hides a category through the visibility sub-resource, not the edit form', async () => {
     const calls = stubApi();
-    renderAdmin(<ProductCategoriesPage />, { identity: writer });
+    renderAdmin(withStubAssets(<ProductCategoriesPage />), { identity: writer });
     await screen.findByText('男装');
 
     await userEvent.click(screen.getByRole('button', { name: zhName('隐藏') }));
@@ -86,7 +87,7 @@ describe('商品分类', () => {
 
   it('edits through the contract body, keeping the parent id it was filed under', async () => {
     const calls = stubApi();
-    renderAdmin(<ProductCategoriesPage />, { identity: writer });
+    renderAdmin(withStubAssets(<ProductCategoriesPage />), { identity: writer });
     await screen.findByText('男装');
 
     await userEvent.click(screen.getByRole('button', { name: zhName('编辑') }));
