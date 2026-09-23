@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Alert,
   Button,
   Card,
   Col,
@@ -16,7 +15,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 
 import type { RouteInput } from '../../api/call-route';
 import type { AnyRouteDef, ResponseOf } from '../../api/contracts';
@@ -24,7 +23,7 @@ import { ApiError } from '../../api/errors';
 import { useRouteMutation } from '../../api/hooks';
 import { AssetField } from '../form/asset-field';
 import { MoneyInput } from '../form/money-input';
-import { applyApiErrorToForm } from '../form/zod-bridge';
+import { FormErrorBanner, useFieldErrors } from '../form/form-errors';
 import {
   buildConfigPayload,
   isConfigFieldVisible,
@@ -40,7 +39,11 @@ export interface ConfigGroupFormProps<R extends AnyRouteDef> {
   values: ConfigValues | undefined;
   /** The save route. */
   route: R;
-  /** Default `(payload) => ({ params: { group }, body: { values: payload } })`. */
+  /**
+   * Default `(payload) => ({ params: { group }, body: { values: payload } })`.
+   * Keep the payload under `body.values`: a 422 names a field `values.<key>`,
+   * and that is how the form finds the field to show it on.
+   */
   toInput?: ((payload: ConfigValues) => RouteInput<R>) | undefined;
   invalidate?: readonly AnyRouteDef[] | undefined;
   successMessage?: string | undefined;
@@ -109,16 +112,22 @@ export function ConfigGroupForm<R extends AnyRouteDef>({
     if (values) form.setFieldsValue(values);
   }, [values, form]);
 
-  useEffect(() => {
-    if (mutation.error) applyApiErrorToForm(form, mutation.error);
-  }, [mutation.error, form]);
+  const visibleFields = descriptor.fields.filter((field) => isConfigFieldVisible(field, current));
+  // A read-only field has no `name`, and a secret lives outside the form, so
+  // neither can show an error of its own: theirs go in the banner.
+  const errorFieldNames = visibleFields
+    .filter((field) => field.readOnly !== true && field.kind !== 'password')
+    .map((field) => field.key);
+  const serverMatch = useFieldErrors(form, mutation.error, errorFieldNames, { prefix: 'values' });
 
-  const banner = useMemo(() => {
-    const error = mutation.error;
-    if (!ApiError.is(error)) return null;
-    if (error.status === 422 && error.fieldErrors) return null;
-    return error.message;
-  }, [mutation.error]);
+  const error = mutation.error;
+  const banner = !ApiError.is(error)
+    ? null
+    : !serverMatch
+      ? { message: error.message, details: [] }
+      : serverMatch.unmatched.length > 0
+        ? { message: error.message, details: serverMatch.unmatched }
+        : null;
 
   const defaultSpan = 24 / columns;
 
@@ -144,9 +153,7 @@ export function ConfigGroupForm<R extends AnyRouteDef>({
         <Typography.Paragraph type="secondary">{descriptor.description}</Typography.Paragraph>
       ) : null}
       {header}
-      {banner ? (
-        <Alert type="error" showIcon message={banner} style={{ marginBottom: 16 }} />
-      ) : null}
+      {banner ? <FormErrorBanner message={banner.message} details={banner.details} /> : null}
 
       <Form
         form={form}
@@ -155,9 +162,7 @@ export function ConfigGroupForm<R extends AnyRouteDef>({
         {...defined({ initialValues: values })}
         onFinish={(raw) => submit(raw as ConfigValues)}
       >
-        {groupBySection(
-          descriptor.fields.filter((field) => isConfigFieldVisible(field, current)),
-        ).map(({ section, fields }) => (
+        {groupBySection(visibleFields).map(({ section, fields }) => (
           <Fragment key={section ?? ''}>
             {section === undefined ? null : (
               <Divider titlePlacement="start" plain style={{ margin: '4px 0 16px' }}>
@@ -239,10 +244,10 @@ function groupBySection(
  *
  * No `name`, deliberately: the field never joins the form's values, so it
  * cannot be submitted even by a `buildConfigPayload` that forgot to skip it,
- * and `applyApiErrorToForm` has no field to attach an error to. A disabled
- * `<Input>` would have been fewer lines and the wrong shape — it reads as "you
- * may not do this *yet*", and antd still carries a disabled field's value in
- * the payload.
+ * and a 422 naming it has no field to land on, so it shows in the banner. A
+ * disabled `<Input>` would have been fewer lines and the wrong shape — it reads
+ * as "you may not do this *yet*", and antd still carries a disabled field's
+ * value in the payload.
  *
  * `help` carries the source (`由部署环境决定：env:PUBLIC_ORIGIN`), which the
  * server folded in, so the screen answers "then where do I change it".

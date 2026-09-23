@@ -44,53 +44,110 @@ export function zodFieldRule(schema: AnyObjectSchema, name: FieldName): FormRule
   };
 }
 
-/** `['sku', 0, 'price']` from `"sku.0.price"`. */
-export function issuePathToName(path: readonly PropertyKey[]): (string | number)[] {
-  return path.map((segment) =>
-    typeof segment === 'number'
-      ? segment
-      : /^\d+$/.test(String(segment))
-        ? Number(segment)
-        : String(segment),
-  );
-}
-
-/** Pushes zod issues onto the matching antd fields. Returns how many landed. */
-export function applyZodIssues(form: FormInstance, error: z.ZodError): number {
-  const byPath = new Map<string, string[]>();
-  for (const issue of error.issues) {
-    const key = JSON.stringify(issuePathToName(issue.path));
-    const list = byPath.get(key) ?? [];
-    list.push(issue.message);
-    byPath.set(key, list);
-  }
-  const fields = [...byPath.entries()].map(([key, errors]) => ({
-    name: JSON.parse(key) as (string | number)[],
-    errors,
-  }));
-  form.setFields(fields.filter((field) => field.name.length > 0));
-  return fields.length;
+/** Where each error landed: on a field the form renders, or nowhere. */
+export interface FieldErrorMatch {
+  /** Named exactly as the field registered, so `form.setFields` finds it. */
+  matched: { name: (string | number)[]; errors: string[] }[];
+  /** Messages no rendered field can show, each once. They belong in a banner. */
+  unmatched: string[];
 }
 
 /**
- * Maps a server 422 back onto the form.
+ * Matches error paths (`'skus.1.price'`) against the fields a form renders.
  *
- * Handles every `details` shape `parseFieldErrors` knows (zod `flatten()`,
- * a flat `{field: message}` map, or a raw issue list). Returns `true` when at
- * least one message landed on a field — the caller can then skip the toast,
- * because the operator can already see what is wrong.
+ * - Segments compare as strings, so `'a.0.b'` finds a field named
+ *   `['a', 0, 'b']` as well as one named `'a.0.b'`.
+ * - A path with no field of its own lands on the nearest field that holds it:
+ *   `skus.1.price` shows under a `custom` field named `skus`.
+ * - `prefix` is stripped first when present: a settings form sends its fields
+ *   as `{ values: {...} }`, so the server names them `values.siteName`.
+ * - Anything else, `params.id` or a field that is not on screen, is returned
+ *   in `unmatched` rather than dropped.
  */
-export function applyApiErrorToForm(form: FormInstance, error: unknown): boolean {
-  if (!ApiError.is(error) || error.status !== 422) return false;
+export function matchFieldErrors(
+  errors: Readonly<Record<string, string | readonly string[]>>,
+  fieldNames: readonly FieldName[],
+  options: { prefix?: string | undefined } = {},
+): FieldErrorMatch {
+  const fields = new Map<string, (string | number)[]>();
+  for (const name of fieldNames) {
+    const path = toNamePath(name);
+    if (path.length > 0) fields.set(pathKey(path), path);
+  }
+
+  const byField = new Map<string, { name: (string | number)[]; errors: string[] }>();
+  const unmatched = new Set<string>();
+  for (const [raw, messages] of Object.entries(errors)) {
+    const list = typeof messages === 'string' ? [messages] : messages;
+    const target = nearestField(fields, stripPrefix(raw, options.prefix));
+    if (!target) {
+      for (const message of list) unmatched.add(message);
+      continue;
+    }
+    const key = pathKey(target);
+    const entry = byField.get(key) ?? { name: target, errors: [] };
+    for (const message of list) if (!entry.errors.includes(message)) entry.errors.push(message);
+    byField.set(key, entry);
+  }
+  return { matched: [...byField.values()], unmatched: [...unmatched] };
+}
+
+/**
+ * The 422 field errors in `error` matched against `fieldNames`, or `null` when
+ * `error` is not a 422 that names any field. `parseFieldErrors` knows every
+ * `details` shape: `handle()`'s `{ field, message }` list, zod `flatten()`, a
+ * flat `{field: message}` map and a raw issue list.
+ */
+export function matchApiError(
+  error: unknown,
+  fieldNames: readonly FieldName[],
+  options: { prefix?: string | undefined } = {},
+): FieldErrorMatch | null {
+  if (!ApiError.is(error) || error.status !== 422) return null;
   const fieldErrors = parseFieldErrors(error.details);
-  if (!fieldErrors) return false;
-  const entries = Object.entries(fieldErrors);
-  if (entries.length === 0) return false;
-  form.setFields(
-    entries.map(([path, message]) => ({
-      name: issuePathToName(path.split('.')),
-      errors: [message],
-    })),
-  );
-  return true;
+  return fieldErrors ? matchFieldErrors(fieldErrors, fieldNames, options) : null;
+}
+
+/** Shows matched errors on their fields. Unmatched ones are the caller's to show. */
+export function applyFieldErrors(form: FormInstance, matched: FieldErrorMatch['matched']): void {
+  if (matched.length > 0) form.setFields(matched);
+}
+
+/** Pushes zod issues onto the fields that render them, and returns the rest. */
+export function applyZodIssues(
+  form: FormInstance,
+  error: z.ZodError,
+  fieldNames: readonly FieldName[],
+): FieldErrorMatch {
+  const byPath: Record<string, string[]> = {};
+  for (const issue of error.issues) {
+    const key = issue.path.map(String).join('.');
+    (byPath[key] ??= []).push(issue.message);
+  }
+  const match = matchFieldErrors(byPath, fieldNames);
+  applyFieldErrors(form, match.matched);
+  return match;
+}
+
+function pathKey(path: readonly (string | number)[]): string {
+  return JSON.stringify(path.map(String));
+}
+
+function stripPrefix(path: string, prefix: string | undefined): string {
+  return prefix !== undefined && path.startsWith(`${prefix}.`)
+    ? path.slice(prefix.length + 1)
+    : path;
+}
+
+function nearestField(
+  fields: ReadonlyMap<string, (string | number)[]>,
+  path: string,
+): (string | number)[] | undefined {
+  if (path === '') return undefined;
+  const segments = path.split('.');
+  for (let length = segments.length; length > 0; length -= 1) {
+    const found = fields.get(pathKey(segments.slice(0, length)));
+    if (found) return found;
+  }
+  return undefined;
 }

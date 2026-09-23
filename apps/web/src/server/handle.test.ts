@@ -9,6 +9,7 @@ import {
   silentLogger,
 } from '@shop/core/kernel';
 import { registerStaffCheck, resetUserLookup } from '@shop/core/auth';
+import { toApiError } from '../admin/api/errors';
 import { ADMIN_COOKIE, checkCsrf, handle, readCookie, searchParamsToObject } from './handle';
 import type { Container } from './container';
 import type { Env } from './env';
@@ -279,6 +280,35 @@ describe('input parsing', () => {
     expect(response.status).toBe(422);
     const details = (await body(response)).details;
     expect(details.map((d: { field: string }) => d.field).sort()).toEqual(['count', 'name']);
+  });
+
+  it('sends 422 field errors the admin client maps back onto form fields', async () => {
+    const nestedRoute = defineRoute({
+      id: 'test.nested',
+      method: 'POST',
+      path: '/admin-api/things',
+      auth: 'public',
+      summary: 'nested',
+      tags: ['test'],
+      body: z.object({
+        name: z.string().min(2, '名称至少 2 个字'),
+        sku: z.array(z.object({ price: z.string().regex(/^\d+\.\d{2}$/, '价格不合法') })),
+      }),
+      response: z.object({ ok: z.boolean() }),
+      examples: [{ name: 'ok', body: { name: 'ab', sku: [] }, response: { ok: true } }],
+    });
+    const POST = handle(nestedRoute, async () => ({ ok: true }), { container: container() });
+    const response = await POST(
+      new Request('https://shop.example/admin-api/things', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'a', sku: [{ price: '1.00' }, { price: 'x' }] }),
+      }),
+    );
+    expect(response.status).toBe(422);
+    expect(toApiError(response.status, await body(response)).fieldErrors).toEqual({
+      name: '名称至少 2 个字',
+      'sku.1.price': '价格不合法',
+    });
   });
 
   it('rejects a body that is not JSON', async () => {

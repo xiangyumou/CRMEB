@@ -181,9 +181,9 @@ function handle(url: URL, init: RequestInit | undefined): Response | null {
 /** The demo's one deliberate failure path, to show 422 mapping onto fields. */
 function validate(body: Record<string, unknown> | undefined): Response | null {
   if (body?.['name'] === '422') {
-    return fail(422, 'VALIDATION_FAILED', '提交的数据有误', {
-      fieldErrors: { name: ['这个名称已被占用（来自服务端的 422 演示）'] },
-    });
+    return fail(422, 'VALIDATION_FAILED', '提交的数据有误', [
+      { field: 'name', message: '这个名称已被占用（来自服务端的 422 演示）' },
+    ]);
   }
   return null;
 }

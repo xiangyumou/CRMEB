@@ -72,9 +72,13 @@ export function toApiError(status: number, payload: unknown): ApiError {
 
 /**
  * Normalises the shapes a 422 `details` may take into `{ path: message }`:
+ * - `[{ field: 'a.0.b', message }]`         (what `handle()` sends)
  * - `{ fieldErrors: { name: ['必填'] } }`  (zod `flatten()`)
  * - `{ name: '必填' }`                      (flat map)
  * - `[{ path: ['a', 0, 'b'], message }]`    (zod `issues`)
+ *
+ * The first message for a path wins. `handle()`'s `<body>` entry (a body that
+ * is not JSON) names no field, so it is left out.
  */
 export function parseFieldErrors(details: unknown): Record<string, string> | null {
   if (!details || typeof details !== 'object') return null;
@@ -83,9 +87,15 @@ export function parseFieldErrors(details: unknown): Record<string, string> | nul
     const out: Record<string, string> = {};
     for (const issue of details) {
       if (!issue || typeof issue !== 'object') continue;
-      const rec = issue as { path?: unknown; message?: unknown };
-      const path = Array.isArray(rec.path) ? rec.path.join('.') : undefined;
-      if (path && typeof rec.message === 'string' && !(path in out)) out[path] = rec.message;
+      const rec = issue as { field?: unknown; path?: unknown; message?: unknown };
+      const path =
+        typeof rec.field === 'string'
+          ? rec.field
+          : Array.isArray(rec.path)
+            ? rec.path.join('.')
+            : undefined;
+      if (!path || path === '<body>' || typeof rec.message !== 'string') continue;
+      if (!(path in out)) out[path] = rec.message;
     }
     return Object.keys(out).length > 0 ? out : null;
   }

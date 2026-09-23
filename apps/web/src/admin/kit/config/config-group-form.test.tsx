@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { resetApiConfig } from '@/admin/api/config';
-import { on, stubRoutes } from '@/test/api';
+import { on, respondWithError, stubRoutes } from '@/test/api';
 import { renderAdmin, zhName } from '@/test/render';
 
 import { ConfigGroupForm } from './config-group-form';
@@ -164,6 +164,44 @@ describe('<ConfigGroupForm> secrets', () => {
 
     await user.click(screen.getByRole('button', { name: zhName('保存') }));
     await waitFor(() => expect(calls[0]?.url).toBe('/admin-api/config/demo'));
+  });
+});
+
+describe('<ConfigGroupForm> server errors', () => {
+  function stubRejection(details: unknown) {
+    stubRoutes([
+      on(saveRoute, () =>
+        respondWithError(422, { code: 'VALIDATION_FAILED', message: '提交的数据有误', details }),
+      ),
+    ]);
+  }
+
+  const banner = () => document.querySelector('.ant-alert');
+
+  async function save(): Promise<void> {
+    const user = userEvent.setup();
+    renderAdmin(<ConfigGroupForm descriptor={descriptor} values={values} route={saveRoute} />);
+    await user.click(screen.getByRole('button', { name: zhName('保存') }));
+  }
+
+  it('shows an error on a saved value under its field, without a banner', async () => {
+    stubRejection([{ field: 'values.siteName', message: '站点名称过长' }]);
+    await save();
+
+    const item = screen.getByLabelText('站点名称').closest('.ant-form-item');
+    await waitFor(() => expect(item).toHaveTextContent('站点名称过长'));
+    expect(banner()).toBeNull();
+  });
+
+  it('shows an error no field renders as a banner, with its message', async () => {
+    stubRejection([
+      { field: 'values.apiSecret', message: '密钥格式不正确' },
+      { field: 'params.group', message: '配置分组不存在' },
+    ]);
+    await save();
+
+    await waitFor(() => expect(banner()).toHaveTextContent('密钥格式不正确'));
+    expect(banner()).toHaveTextContent('配置分组不存在');
   });
 });
 

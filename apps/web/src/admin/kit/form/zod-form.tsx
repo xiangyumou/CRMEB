@@ -1,13 +1,14 @@
 'use client';
 
-import { Alert, Button, Col, Form, Row, Space, type FormInstance } from 'antd';
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { Button, Col, Form, Row, Space, type FormInstance } from 'antd';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { z } from 'zod';
 
 import { ApiError } from '../../api/errors';
 import { renderControl, valuePropNameOf } from './field-control';
+import { FormErrorBanner, useFieldErrors } from './form-errors';
 import { toNamePath, type FieldSpec } from './types';
-import { applyApiErrorToForm, applyZodIssues, isFieldRequired, zodFieldRule } from './zod-bridge';
+import { applyZodIssues, isFieldRequired, zodFieldRule } from './zod-bridge';
 import { defined } from '../props';
 
 type AnyObjectSchema = z.ZodObject<z.ZodRawShape>;
@@ -33,8 +34,8 @@ export interface ZodFormProps<S extends AnyObjectSchema> {
   /** `false` hides the built-in buttons — what `ModalForm`/`DrawerForm` do. */
   footer?: ReactNode | false | undefined;
   /**
-   * The failed mutation, if any. A 422 is mapped onto fields; anything else is
-   * shown as a banner above the form.
+   * The failed mutation, if any. A 422 is shown on the fields it names; what no
+   * rendered field can show, and any other failure, is a banner above the form.
    */
   error?: unknown | undefined;
   labelCol?: number | undefined;
@@ -47,7 +48,9 @@ export interface ZodFormProps<S extends AnyObjectSchema> {
  *   disagree with the contract.
  * - Cross-field rules (`.refine`, `.superRefine`) are enforced on submit by
  *   parsing the whole object and pushing the issues back onto fields.
- * - A server 422 is mapped onto fields from `details`.
+ * - A server 422 is mapped onto fields from `details`. An error on a row of a
+ *   `custom` field shows under that field; one no visible field can show
+ *   (`params.id`, a field hidden by `visibleWhen`) is listed in the banner.
  * - `onSubmit` receives `z.output`, i.e. the parsed value ready to send.
  *
  * ```tsx
@@ -91,29 +94,38 @@ export function ZodForm<S extends AnyObjectSchema>({
 
   const defaultSpan = 24 / columns;
 
-  useEffect(() => {
-    if (error) applyApiErrorToForm(form, error);
-  }, [error, form]);
+  const visibleFields = fields.filter(
+    (spec) => spec.visibleWhen === undefined || spec.visibleWhen(values),
+  );
+  // A `hidden` field renders `noStyle`, so it cannot show an error.
+  const errorFieldNames = visibleFields
+    .filter((spec) => spec.kind !== 'hidden')
+    .map((spec) => spec.name);
 
-  const bannerMessage = useMemo(() => {
-    if (!ApiError.is(error)) return null;
-    if (error.status === 422 && error.fieldErrors) return null;
-    if (error.status === 401) return null;
-    return error.message;
-  }, [error]);
+  const serverMatch = useFieldErrors(form, error, errorFieldNames);
+  // Whole-form rule failures that no field can show, from the last submit.
+  const [clientUnmatched, setClientUnmatched] = useState<string[]>([]);
+
+  const banner = useMemo(() => {
+    if (ApiError.is(error) && error.status !== 401) {
+      if (!serverMatch) return { message: error.message, details: [] };
+      if (serverMatch.unmatched.length > 0) {
+        return { message: error.message, details: serverMatch.unmatched };
+      }
+    }
+    if (clientUnmatched.length > 0) return { message: '提交的数据有误', details: clientUnmatched };
+    return null;
+  }, [error, serverMatch, clientUnmatched]);
 
   async function handleFinish(raw: unknown): Promise<void> {
     const result = schema.safeParse(raw);
     if (!result.success) {
-      applyZodIssues(form, result.error);
+      setClientUnmatched(applyZodIssues(form, result.error, errorFieldNames).unmatched);
       return;
     }
+    setClientUnmatched([]);
     await onSubmit(result.data as z.output<S>);
   }
-
-  const visibleFields = fields.filter(
-    (spec) => spec.visibleWhen === undefined || spec.visibleWhen(values),
-  );
 
   return (
     <Form
@@ -122,13 +134,12 @@ export function ZodForm<S extends AnyObjectSchema>({
       disabled={disabled}
       {...defined({ initialValues: initialValues as Record<string, unknown> | undefined })}
       onFinish={(raw) => void handleFinish(raw)}
+      onFinishFailed={() => setClientUnmatched([])}
       requiredMark
       scrollToFirstError
       {...(layout === 'horizontal' && labelCol ? { labelCol: { flex: `${labelCol}px` } } : {})}
     >
-      {bannerMessage ? (
-        <Alert type="error" showIcon message={bannerMessage} style={{ marginBottom: 16 }} />
-      ) : null}
+      {banner ? <FormErrorBanner message={banner.message} details={banner.details} /> : null}
 
       <Row gutter={16}>
         {visibleFields.map((spec) => {
