@@ -1,7 +1,10 @@
 import type { Tx } from '@shop/db';
 import type { Ctx } from '../kernel/context';
 import { registerEffectHandler, type Effect } from '../effects/index';
+import { formatShopTime, notify } from '../notification';
 import { refundSystemInitiated } from '../refund';
+import { PRESALE_EVENTS } from './presale.notifications';
+import * as repo from './presale.repo';
 
 /**
  * What the presale domain does *after* the transaction commits.
@@ -22,10 +25,10 @@ import { refundSystemInitiated } from '../refund';
  * | `presale` | `presale.opened`   | a campaign's sale window opened                 |
  * | `presale` | `presale.closed`   | a campaign's sale window closed                 |
  *
- * Four of the five are notifications with no message yet (the notification
- * domain owns 订阅消息 / 公众号模板消息 and maps no template to them).
- * `presale.refund` is the exception: it moves money, through the refund
- * domain's own entry point.
+ * `presale.paid` and `presale.refund` are where the shopper hears about it —
+ * see `presale.notifications.ts`. `presale.refund` also moves money, through
+ * the refund domain's own entry point. The other three have nobody to tell:
+ * see `nobodyToTell` below.
  */
 
 // ---------------------------------------------------------------------------
@@ -94,7 +97,8 @@ interface RefundPayload {
  * gives exactly one effect per order however many payment callbacks arrive,
  * and `refundSystemInitiated` is idempotent per `(orderId, reason)` on top of
  * that, so a retried effect finds the refund it already opened and returns it
- * instead of opening a second.
+ * instead of opening a second. The shopper's notice is recorded in the same
+ * transaction, so it exists exactly when the refund does.
  *
  * A throw here is still the right failure: the dispatcher retries eight times
  * and then parks the row as `unknown`, where the 待处理任务 console lists it
@@ -104,14 +108,17 @@ interface RefundPayload {
  */
 async function handleRefundEffect(ctx: Ctx, effect: Effect): Promise<void> {
   const payload = effect.payload as RefundPayload;
+  const orderId = Number(payload.orderId);
   const port = autoRefundPort;
-  const result = await ctx.withTx((tx) =>
-    port.refund(tx, ctx, {
-      orderId: Number(payload.orderId),
+  const result = await ctx.withTx(async (tx) => {
+    const refund = await port.refund(tx, ctx, {
+      orderId,
       reason: 'presale_expired',
       note: `预售活动 ${payload.activityId} 限购总量已满，无法发货`,
-    }),
-  );
+    });
+    await notifySoldOut(tx, ctx, { orderId, refundId: refund.refundId });
+    return refund;
+  });
   ctx.logger.info(
     {
       orderId: payload.orderId,
@@ -128,31 +135,82 @@ async function handleRefundEffect(ctx: Ctx, effect: Effect): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * The four notification effects have no message of their own: the notification
- * domain owns 订阅消息 / 公众号模板消息 and maps no template to them.
+ * 预售付款成功, with the ship date the payment fixed.
  *
- * They are registered here as logging no-ops rather than left unregistered,
- * because an unhandled effect retries eight times and then parks as `unknown`,
- * which would fill the operators' 待处理任务 console with rows nobody can act
- * on. A logged no-op is honest: the state change happened, the message did not.
+ * Read at dispatch time: `presale_orders.ship_not_before_at` is frozen onto the
+ * order in the payment's transaction, so it is there by now, and an order that
+ * has left `final_paid` since (cancelled, refunded) is not told it will ship.
+ * `notify` keys the notice on the order, so a retried effect sends nothing twice.
  */
-async function logOnly(ctx: Ctx, effect: Effect): Promise<void> {
-  ctx.logger.info(
-    {
-      scope: effect.scope,
-      scopeId: effect.scopeId,
-      event: effect.eventType,
-      payload: effect.payload,
-    },
-    'presale effect: no notification transport registered (stream E2)',
+async function handlePaidEffect(ctx: Ctx, effect: Effect): Promise<void> {
+  const payload = effect.payload as { orderId: string };
+  const notice = await repo.findOrderNotice(ctx.db, Number(payload.orderId));
+  if (!notice || notice.stage !== 'final_paid' || notice.shipNotBeforeAt === null) return;
+  const shipDate = formatShopTime(notice.shipNotBeforeAt, 'day');
+
+  await ctx.withTx((tx) =>
+    notify(tx, ctx, {
+      event: PRESALE_EVENTS.paid,
+      subject: { scope: 'order', id: notice.orderId },
+      userId: notice.userId,
+      data: {
+        orderId: notice.orderId,
+        orderNo: notice.orderNo,
+        activityTitle: notice.activityTitle,
+        amount: notice.paidAmount ?? '',
+        shipDate,
+      },
+    }),
   );
 }
 
+/**
+ * 预售名额已满, inside the transaction that opened the refund. The amount is
+ * what the shopper paid: nothing of a presale order ships before its payment
+ * stands, so the system refund gives back all of it.
+ */
+async function notifySoldOut(
+  tx: Tx,
+  ctx: Ctx,
+  args: { orderId: number; refundId: number },
+): Promise<void> {
+  const notice = await repo.findOrderNotice(tx, args.orderId);
+  if (!notice) return;
+  await notify(tx, ctx, {
+    event: PRESALE_EVENTS.soldOut,
+    subject: { scope: 'order', id: notice.orderId },
+    userId: notice.userId,
+    data: {
+      orderId: notice.orderId,
+      orderNo: notice.orderNo,
+      activityTitle: notice.activityTitle,
+      amount: notice.paidAmount ?? '',
+      refundId: args.refundId,
+    },
+  });
+}
+
+/**
+ * The effects that tell nobody anything.
+ *
+ * - `presale.released` follows a cancel or a refund, and the shopper already
+ *   hears about both from the order domain (订单取消提醒, 退款到账提醒). A
+ *   second message saying the campaign got its units back would be about the
+ *   shop's bookkeeping, not their order.
+ * - `presale.opened` and `presale.closed` are about a campaign, and a campaign
+ *   has no audience: there is no 预约提醒 list of shoppers waiting for it.
+ *
+ * They still get a handler, because an unhandled effect retries eight times and
+ * then parks as `unknown` in the operators' 待处理任务 console, where nobody can
+ * act on it. The rows stay in the ledger as the record of what happened.
+ */
+async function nobodyToTell(): Promise<void> {}
+
 /** Idempotent; `registerEffectHandler` replaces by `(scope, eventType)`. */
 export function registerPresaleEffects(): void {
-  registerEffectHandler('order', 'presale.paid', logOnly);
-  registerEffectHandler('order', 'presale.released', logOnly);
+  registerEffectHandler('order', 'presale.paid', handlePaidEffect);
+  registerEffectHandler('order', 'presale.released', nobodyToTell);
   registerEffectHandler('order', 'presale.refund', handleRefundEffect);
-  registerEffectHandler('presale', 'presale.opened', logOnly);
-  registerEffectHandler('presale', 'presale.closed', logOnly);
+  registerEffectHandler('presale', 'presale.opened', nobodyToTell);
+  registerEffectHandler('presale', 'presale.closed', nobodyToTell);
 }

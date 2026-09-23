@@ -7,8 +7,11 @@
  *
  * Almost nothing here is called by another domain. Presale does not *ask* for
  * anything: it attaches to the order aggregate through the seams in
- * `order/ports.ts` and is invoked, never invoking. The exception is the window
- * sweep the worker runs.
+ * `order/ports.ts` and is invoked, never invoking. The exceptions are the
+ * window sweep the worker runs and, in the other direction, the two calls this
+ * domain makes into others — `refund.refundSystemInitiated`, for a payment the
+ * campaign could not honour, and `notification.notify`, for telling the
+ * shopper.
  */
 
 export {
@@ -49,12 +52,14 @@ export {
 } from './presale.effects';
 
 import { registerPresaleEffects } from './presale.effects';
+import { registerPresaleNotificationEvents } from './presale.notifications';
 import { registerPresaleOrderSeams } from './presale.order';
 import './presale.config';
 
 /**
  * Wires the domain into the platform: the order kind handler, the pricing
- * contributor, the three lifecycle hooks and the four effect handlers.
+ * contributor, the three lifecycle hooks, the five effect handlers and the two
+ * shopper notifications.
  *
  * Idempotent — every registry replaces by name — so the web bootstrap and a
  * worker job module in the same process may both call it.
@@ -62,6 +67,7 @@ import './presale.config';
 export function registerPresaleDomain(): void {
   registerPresaleOrderSeams();
   registerPresaleEffects();
+  registerPresaleNotificationEvents();
 }
 
 // Importing this module registers the domain. Nothing in `core` depends on
