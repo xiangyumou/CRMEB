@@ -18,21 +18,28 @@ interruption.
   import types only (+ zod-free constants). S3 editor code in `apps/web/src/admin/decor` adapted to
   the new `route` link shape.
 
+- DB `packages/db/src/schema/decor.ts` + migration `0004_decor.sql` (hand-added append-only
+  trigger); `EXPECTED_MIGRATIONS` = 5.
+- Core `packages/core/src/decor/`: repo, document service (CRUD, draft lock, publish, rollback,
+  designate, preview token), reference checks (warnings), per-need resolvers, resolve service
+  (cache per revision, visibility/platform/minClient filter, personal coupon state), permissions.
+  `decor` added to the guards' install list.
+- Route files: `apps/web/app/admin-api/decor/**`, `apps/web/app/api/v1/pages/**` (`_page.ts` reads
+  `X-Client-Version`, computes the ETag). `pnpm guards` green.
+
 ## In progress
 
-- DB schema `packages/db/src/schema/decor.ts` + migration 0004.
+- Tests: core int (`decor.int.test.ts`, `decor.concurrency.int.test.ts`), web int
+  (`apps/web/app/admin-api/decor/decor.int.test.ts`, `apps/web/app/api/v1/pages/pages.int.test.ts`).
 
 ## Next
 
-1. Core `packages/core/src/decor/`: repo, document service (CRUD, draft lock, publish, rollback,
-   designate), preview tokens, resolver + registry of per-need resolvers, cache, permissions.
-2. Guards: add `decor` to `guards/src/lib/install-domains.ts`.
-3. Admin (`apps/web/app/admin-api/decor/**`) and storefront (`apps/web/app/api/v1/pages/**`)
-   route files; int tests incl. `runConcurrently`.
-4. `docs/invariants.md` DECOR rows, `docs/mini/decor.md`.
-5. Merge checklist.
+1. `docs/invariants.md` DECOR rows (IDs already cited in code comments: DECOR-001…016),
+   `docs/mini/decor.md`.
+2. Merge checklist.
 
 ## Decisions / deviations so far
 
 - `platforms` visibility is `hidden` in the editor until F2 adds a multi-select control.
-- Preview token: opaque random token in Redis (no signing secret exists in env).
+- Preview token: opaque random token in Redis, stored hashed (no signing secret exists in env).
+  Response field is `previewToken` (the secrets guard reserves `token`).

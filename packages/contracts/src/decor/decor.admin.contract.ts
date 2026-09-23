@@ -327,7 +327,7 @@ export const decorPreviewToken = defineRoute({
       name: 'ok',
       params: { id: '7' },
       response: {
-        token: 'q7Hk2xVbN0aLr9sE4tYwUc1mZpD8fJgA3iKoT6vX5eR',
+        previewToken: 'q7Hk2xVbN0aLr9sE4tYwUc1mZpD8fJgA3iKoT6vX5eR',
         expiresAt: '2026-09-23T10:15:00+08:00',
       },
     },

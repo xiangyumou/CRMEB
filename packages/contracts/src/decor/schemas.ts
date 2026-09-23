@@ -136,8 +136,11 @@ export const designationsResponse = z.object({
 export type DesignationsResponse = z.infer<typeof designationsResponse>;
 
 export const previewTokenResponse = z.object({
-  /** Pass as `?previewToken=` to `GET /api/v1/pages/:id`. Read-only, this document only. */
-  token: z.string(),
+  /**
+   * Pass as `?previewToken=` to `GET /api/v1/pages/:id`. Read-only, this
+   * document's draft only. (Not named `token`: the secrets guard reserves it.)
+   */
+  previewToken: z.string(),
   expiresAt: instant,
 });
 export type PreviewTokenResponse = z.infer<typeof previewTokenResponse>;
