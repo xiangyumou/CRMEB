@@ -95,8 +95,9 @@ const CONFIG_GROUP: ConfigGroupDescriptor = {
  * `/admin/dev/kit` and kept out of the production menu (`devOnly`).
  *
  * It runs against real `defineRoute` contracts answered by an in-memory
- * fetch — no handler, no database — so it keeps working through Phase 0 and
- * breaks loudly if a kit component stops honouring the contract shapes.
+ * fetch — no handler, no database — so it needs nothing but the admin shell,
+ * and breaks loudly if a kit component stops honouring the contract shapes.
+ * `<LinkPicker>` reads the in-memory `createDemoLinkSource()` the same way.
  */
 export function KitDemo() {
   const modal = useFormModal<DemoWidget>();
