@@ -40,15 +40,45 @@ export interface PaymentRequest {
 export type PaymentOutcome =
   { kind: 'paid' } | { kind: 'cancelled' } | { kind: 'failed'; message: string };
 
-/** What a tap on the phone-number button produced. */
+/**
+ * What a tap on the phone-number button produced. `unavailable`: WeChat will not verify numbers
+ * right now (errno 1400001, the shop's quota is used up); offer SMS instead (C05).
+ */
 export type PhoneCodeResult =
-  { ok: true; code: string } | { ok: false; reason: 'denied' | 'failed'; message: string };
+  | { ok: true; code: string }
+  | { ok: false; reason: 'denied' | 'unavailable' | 'failed'; message: string };
 
 export interface PhoneNumberButtonProps {
   children: ReactNode;
   className?: string | undefined;
   disabled?: boolean | undefined;
   onResult: (result: PhoneCodeResult) => void;
+}
+
+/** What a tap on the avatar button produced: a temporary file to upload. */
+export type AvatarResult = { ok: true; tempPath: string } | { ok: false; message: string };
+
+export interface AvatarButtonProps {
+  children: ReactNode;
+  className?: string | undefined;
+  /** What a screen reader says (the button shows only the picture). */
+  label?: string | undefined;
+  onResult: (result: AvatarResult) => void;
+}
+
+export interface UploadRequest {
+  url: string;
+  /** A temporary file path (`wxfile://…`, or a `blob:` URL on H5). */
+  filePath: string;
+  /** The multipart field name (`POST /uploads` wants `file`). */
+  name: string;
+  headers: Record<string, string>;
+}
+
+export interface UploadResponse {
+  status: number;
+  /** The raw body text. */
+  body: string;
 }
 
 export interface SubscribeResult {
@@ -87,15 +117,21 @@ export interface MiniPlatform {
   /** `wx.requestPayment()` with the parameters `payment.start` returned. */
   requestPayment(request: PaymentRequest): Promise<PaymentOutcome>;
   /**
-   * `wx.requestSubscribeMessage()` before 提交订单 (C08).
-   * TODO(stream A): implement for weapp and emulation; this spike does not need it.
+   * `wx.requestSubscribeMessage()` (C08). Only `subscribe()` (platform/subscribe.ts) calls it,
+   * synchronously from a tap.
    */
   requestSubscribe(templateIds: string[]): Promise<SubscribeResult>;
   /**
-   * `wx.chooseAddress()` (导入微信地址), behind the privacy check (C03).
-   * TODO(stream A): implement for weapp and emulation; this spike seeds the address instead.
+   * `wx.chooseAddress()` (导入微信地址, C04). `null` when the shopper cancelled or refused:
+   * the caller falls back to typing the address in.
    */
   chooseAddress(): Promise<ChosenAddress | null>;
+  /** `<button open-type="chooseAvatar">`: WeChat's avatar picker (C05). */
+  AvatarButton: ComponentType<AvatarButtonProps>;
+  /** `wx.chooseMedia()` for pictures: temporary paths, `[]` when cancelled. */
+  chooseImages(count: number): Promise<string[]>;
+  /** `wx.uploadFile()`: one multipart part. Resolves for every HTTP status. */
+  uploadFile(request: UploadRequest): Promise<UploadResponse>;
 }
 
 /** Thrown by a capability this build does not have (H5 preview) or does not have yet (TODO). */

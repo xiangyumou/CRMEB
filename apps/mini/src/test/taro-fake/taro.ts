@@ -47,6 +47,8 @@ const pageHide = new Channel<void>();
 const pageLoad = new Channel<void>();
 const events = new Map<string, Set<(...args: unknown[]) => void>>();
 let networkType = 'wifi';
+type PrivacyResolve = (option: { event: string; buttonId?: string }) => void;
+let privacyListener: ((resolve: PrivacyResolve, info: { referrer: string }) => void) | null = null;
 const storageMap = new Map<string, unknown>();
 
 /** What `Taro.request` answers; a test replaces it (`taroFake.onRequest = …`). */
@@ -82,6 +84,11 @@ export const taroFake = {
     code?: string;
     errMsg: string;
   },
+  /** What a tap on `<Button openType="chooseAvatar">` reports. */
+  avatarDetail: { avatarUrl: 'wxfile://tmp/avatar.png', errMsg: 'chooseAvatar:ok' } as {
+    avatarUrl?: string;
+    errMsg: string;
+  },
   storage: storageMap,
   showApp: () => appShow.emit(undefined),
   hideApp: () => appHide.emit(undefined),
@@ -92,6 +99,15 @@ export const taroFake = {
   /** Every mounted component's `useDidShow` runs, as when its page comes back. */
   showPage: () => pageShow.emit(undefined),
   hidePage: () => pageHide.emit(undefined),
+  /**
+   * WeChat raising `onNeedPrivacyAuthorization` (a private API called before consent). Returns
+   * what the app resolved it with, as it arrives.
+   */
+  needPrivacy(referrer = 'chooseAddress') {
+    const resolved: Array<{ event: string; buttonId?: string }> = [];
+    privacyListener?.((option) => resolved.push(option), { referrer });
+    return resolved;
+  },
   listenerCounts: () => ({ appShow: appShow.size, appHide: appHide.size, network: network.size }),
   reset() {
     this.calls = [];
@@ -100,8 +116,10 @@ export const taroFake = {
     this.paymentError = null;
     this.routerParams = {};
     this.phoneNumberDetail = { code: 'fake-phone-code', errMsg: 'getPhoneNumber:ok' };
+    this.avatarDetail = { avatarUrl: 'wxfile://tmp/avatar.png', errMsg: 'chooseAvatar:ok' };
     storageMap.clear();
     networkType = 'wifi';
+    privacyListener = null;
     for (const channel of [appShow, appHide, network, pageShow, pageHide, pageLoad])
       channel.clear();
     events.clear();
@@ -199,6 +217,12 @@ const Taro = {
   setStorageSync: (key: string, value: unknown) => void storageMap.set(key, value),
   removeStorageSync: (key: string) => void storageMap.delete(key),
   showToast: (args: unknown) => record('showToast', args, {}),
+  pxTransform: (size: number) => `${size}rpx`,
+  canIUse: (_schema: string) => true,
+  onNeedPrivacyAuthorization(listener: typeof privacyListener) {
+    privacyListener = listener;
+  },
+  openPrivacyContract: (args: unknown) => record('openPrivacyContract', args, {}),
   eventCenter,
   getCurrentInstance,
   nextTick,
