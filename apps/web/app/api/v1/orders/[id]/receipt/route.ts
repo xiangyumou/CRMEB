@@ -9,6 +9,8 @@ import { handle } from '../../../../../../src/server';
  * auto-receive job run the same one, so whoever loses the race simply finds it
  * already done.
  */
-export const POST = handle(orderConfirmReceipt, (ctx, { params }) => confirmReceipt(ctx, params));
+export const POST = handle(orderConfirmReceipt, (ctx, { params, body }) =>
+  confirmReceipt(ctx, params, body),
+);
 
 export const dynamic = 'force-dynamic';

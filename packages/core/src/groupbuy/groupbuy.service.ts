@@ -25,6 +25,7 @@ import type {
   MyGroupbuyListQuery,
 } from '@shop/contracts/groupbuy/schemas';
 import { GROUPBUY_SUMMARY_AVATAR_LIMIT } from '@shop/contracts/groupbuy/schemas';
+import { toMiniPath } from '@shop/contracts/system/storefront-routes';
 import { DomainError } from '../kernel/errors';
 import { toId, toIdOrNull } from '../kernel/ids';
 import type { Ctx } from '../kernel/context';
@@ -284,9 +285,10 @@ export async function adminGroupDetail(
 /**
  * 立即成团.
  *
- * Gated on its own permission atom (`groupbuy:group:complete`) and on the
- * shop-wide 虚拟成团 switch: an operator may not fake a team in a shop that has
- * decided not to fake teams.
+ * Gated on its own permission atom (`groupbuy:group:complete`), and it never
+ * invents members: 虚拟成团 is off for good (2026-09-23; see
+ * `groupbuy.config.ts`), so an under-filled team is refused with
+ * `GROUPBUY_VIRTUAL_FILL_DISABLED` and settles at its deadline like any other.
  */
 export async function adminGroupComplete(
   ctx: Ctx,
@@ -294,13 +296,12 @@ export async function adminGroupComplete(
   body: { reason?: string | undefined },
 ): Promise<GroupbuyGroupDetail> {
   const id = Number(input.id);
-  const config = await ctx.config.get(groupbuyConfig);
 
   await ctx.withTx(async (tx) => {
     const group = await repo.lockGroup(tx, id);
     if (!group) throw new DomainError('GROUPBUY_GROUP_NOT_FOUND');
     assertCompletable(group);
-    if (group.seatsTaken < group.seatsTotal && !config.virtualFillOnExpiry) {
+    if (group.seatsTaken < group.seatsTotal) {
       throw new DomainError('GROUPBUY_VIRTUAL_FILL_DISABLED', {
         details: { seatsTaken: group.seatsTaken, seatsTotal: group.seatsTotal },
       });
@@ -542,10 +543,10 @@ export async function myGroups(
 export async function poster(ctx: Ctx, input: { id: string }): Promise<GroupbuyPoster> {
   const id = Number(input.id);
   requireShopper(ctx);
-  const config = await ctx.config.get(groupbuyConfig);
   const row = await repo.findGroupRow(ctx.db, id);
   if (!row) throw new DomainError('GROUPBUY_GROUP_NOT_FOUND');
-  const page = config.posterPage.replaceAll('{groupId}', String(id));
+  const route = { route: 'groupbuyTeam', params: { id: toId(id) } } as const;
+  const page = toMiniPath(route);
   return {
     groupId: toId(id),
     title: row.activityTitle,
@@ -558,6 +559,7 @@ export async function poster(ctx: Ctx, input: { id: string }): Promise<GroupbuyP
     leaderAvatarUrl: row.leaderAvatarUrl,
     qrPayload: page,
     page,
+    route,
   };
 }
 

@@ -1,4 +1,4 @@
-import { registerNotificationEvents } from '../notification';
+import { registerNotificationEvents, type NotificationRouteTemplate } from '../notification';
 
 /**
  * What a group-buy shopper is told, and when.
@@ -46,6 +46,20 @@ const TEAM_LINK = '/pages/activity/goods_combination_status/index?id={{groupId}}
 const ORDER_LINK = '/pages/goods/order_details/index?order_id={{orderNo}}';
 const USER_CHANNELS = ['inApp', 'wechatOa', 'wechatMini', 'sms'] as const;
 
+/**
+ * The mini-program pages (docs/mini/pages.md §3.4). The `link`s above stay for
+ * the 公众号 template message, which opens the H5 storefront.
+ */
+const TEAM_ROUTE: NotificationRouteTemplate = {
+  route: 'groupbuyTeam',
+  params: { id: '{{groupId}}' },
+};
+/** A failed team is refunded automatically: the refund is what to look at. */
+const REFUND_ROUTE: NotificationRouteTemplate = {
+  route: 'refund',
+  params: { id: '{{refundId}}' },
+};
+
 /** Idempotent: the registry accepts the same code twice with the same name. */
 export function registerGroupbuyNotificationEvents(): void {
   registerNotificationEvents([
@@ -61,6 +75,7 @@ export function registerGroupbuyNotificationEvents(): void {
         body: '「{{activityTitle}}」开团成功，{{seatsTotal}} 人成团，请在 {{expiresAt}} 前邀请好友参团。',
       },
       link: TEAM_LINK,
+      route: TEAM_ROUTE,
     },
     {
       code: GROUPBUY_EVENTS.joined,
@@ -74,6 +89,7 @@ export function registerGroupbuyNotificationEvents(): void {
         body: '您已加入「{{activityTitle}}」的拼团，成团后我们会尽快发货。',
       },
       link: TEAM_LINK,
+      route: TEAM_ROUTE,
     },
     {
       code: GROUPBUY_EVENTS.succeeded,
@@ -87,6 +103,7 @@ export function registerGroupbuyNotificationEvents(): void {
         body: '「{{activityTitle}}」拼团成功，订单 {{orderNo}} 将尽快为您发货。',
       },
       link: TEAM_LINK,
+      route: TEAM_ROUTE,
     },
     {
       code: GROUPBUY_EVENTS.failed,
@@ -100,6 +117,7 @@ export function registerGroupbuyNotificationEvents(): void {
         body: '「{{activityTitle}}」{{reason}}，订单 {{orderNo}} 的 ¥{{amount}} 将原路退回。',
       },
       link: ORDER_LINK,
+      route: REFUND_ROUTE,
     },
   ]);
 }

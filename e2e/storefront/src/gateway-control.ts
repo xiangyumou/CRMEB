@@ -35,12 +35,12 @@ import type { FakeOaServer } from '@shop/testing/wechat';
  *    server's real `jscode2session` call redeems it for that openid;
  *  - `mini/phone-code` `{ phone }`: what the `getPhoneNumber` button returns,
  *    taught to the fake's `getuserphonenumber` the same way;
- *  - `mini/request-payment` `{ outTradeNo, package }`: the shopper confirming
- *    `wx.requestPayment` — the server must have placed that transaction on
- *    the fake gateway and handed the page a `prepay_id=` package; then
- *    `complete-payment`'s two steps. (The fake does not map a `prepay_id`
- *    back to its order, so the page names the order; see
- *    docs/mini/spikes/S4-e2e.md.)
+ *  - `mini/request-payment` `{ package }`: the shopper confirming
+ *    `wx.requestPayment` — exactly what a phone hands WeChat, the
+ *    `prepay_id=` package and nothing else. The fake gateway maps the
+ *    `prepay_id` back to the transaction the server placed (an unknown one
+ *    is a 409: a bug in the page, not a payment); then `complete-payment`'s
+ *    two steps.
  *
  * Nothing here is a shortcut through domain code: both operations still go
  * through the real webhook route and the real signature the gateway would
@@ -140,22 +140,19 @@ export async function startGatewayControl(options: GatewayControlOptions): Promi
       return;
     }
     if (action === 'request-payment') {
-      const { outTradeNo, package: pkg } = body as { outTradeNo?: unknown; package?: unknown };
-      if (
-        typeof outTradeNo !== 'string' ||
-        typeof pkg !== 'string' ||
-        !pkg.startsWith('prepay_id=')
-      ) {
-        respond(res, 400, { error: 'outTradeNo and a prepay_id package are required' });
+      const { package: pkg } = body as { package?: unknown };
+      if (typeof pkg !== 'string' || !pkg.startsWith('prepay_id=')) {
+        respond(res, 400, { error: 'a prepay_id package is required' });
         return;
       }
       // wx.requestPayment only ever pays a transaction the server placed;
-      // an unknown one is a bug in the page, not a payment.
-      if (!gateway.transactions.has(outTradeNo)) {
-        respond(res, 409, { error: `no transaction ${outTradeNo} on the fake gateway` });
+      // an unknown prepay_id is a bug in the page, not a payment.
+      const transaction = gateway.transactionForPrepay(pkg);
+      if (!transaction) {
+        respond(res, 409, { error: `no transaction for ${pkg} on the fake gateway` });
         return;
       }
-      respond(res, 200, await settle(outTradeNo));
+      respond(res, 200, await settle(transaction.outTradeNo));
       return;
     }
     respond(res, 404, { error: `unknown mini action ${action}` });

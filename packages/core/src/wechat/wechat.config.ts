@@ -56,15 +56,14 @@ export const wechatConfig = defineConfigGroup({
     miniAppId: configText(64),
     miniAppSecret: configText(128),
     /**
-     * The token and AES key of the mini program's own message callback, and
-     * the mode it is configured in.
+     * The token and AES key of the mini program's 消息推送, and the mode it is
+     * configured in (公众平台 → 开发管理 → 消息推送, 数据格式 JSON).
      *
-     * They sit here because this group holds every WeChat credential. **Nothing
-     * reads them yet**: 自建客服 and the mini-program message callback are out
-     * of scope, so there is no callback to verify a signature for. They are
-     * kept rather than dropped so an operator who has the values can store them
-     * once, next to the rest, and not have to find them again when a callback
-     * arrives.
+     * `wechat.mini-push.ts` verifies `/api/v1/webhooks/wechat-mini` with them:
+     * 发货信息管理's `trade_manage_*` events (C07) and 内容安全's
+     * `wxa_media_check` verdicts (C09) arrive there. 自建客服 is still out of
+     * scope; customer-service messages to the same URL are acknowledged and
+     * dropped.
      */
     miniToken: configText(64),
     miniAesKey: configText(64),
@@ -112,7 +111,7 @@ export const wechatConfig = defineConfigGroup({
       label: '小程序消息 Token',
       type: 'password',
       secret: true,
-      help: '小程序消息推送尚未启用，此处仅保留迁移过来的值',
+      help: '公众平台「开发管理 → 消息推送」中的 Token；推送地址为 /api/v1/webhooks/wechat-mini，数据格式选 JSON',
       section: '小程序',
       order: 30,
     },

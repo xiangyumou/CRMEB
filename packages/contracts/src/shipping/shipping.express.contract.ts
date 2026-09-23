@@ -23,6 +23,9 @@ import {
  *    the `order:order:read` permission on the admin one, because the console's
  *    发货 form and the mobile staff console are its callers. Enabled companies
  *    only, ordered `sortOrder DESC, id ASC`.
+ *    The storefront reads the same list at `GET /api/v1/express-companies`
+ *    (public reference data) for the 退货物流 form, whose legacy page had no
+ *    list to pick from.
  * 2. **The management screen** — `/admin-api/shipping/express-companies`, paged,
  *    including disabled rows, with its own `shipping:express:*` atoms.
  *
@@ -57,6 +60,17 @@ export const staffExpressCompanyPicker = defineRoute({
   path: '/api/v1/staff/express-companies',
   auth: 'staff',
   summary: '店员物流公司列表',
+  tags: ['shipping'],
+  response: expressCompanyList,
+  examples: [{ name: 'ok', response: expressCompanyListExample }],
+});
+
+export const expressCompanyOptions = defineRoute({
+  id: 'shipping.expressCompanyOptions',
+  method: 'GET',
+  path: '/api/v1/express-companies',
+  auth: 'public',
+  summary: '快递公司列表（退货物流）',
   tags: ['shipping'],
   response: expressCompanyList,
   examples: [{ name: 'ok', response: expressCompanyListExample }],

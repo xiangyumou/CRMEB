@@ -42,7 +42,12 @@ export const invoiceRequest = defineRoute({
   body: invoiceRequestBody,
   response: orderInvoice,
   status: 201,
-  errors: ['ORDER_NOT_FOUND', 'ORDER_INVOICE_ALREADY_OPEN', 'ORDER_INVOICE_NOT_REQUESTABLE'],
+  errors: [
+    'ORDER_NOT_FOUND',
+    'ORDER_INVOICE_ALREADY_OPEN',
+    'ORDER_INVOICE_NOT_REQUESTABLE',
+    'ORDER_INVOICE_TITLE_REJECTED',
+  ],
   examples: [
     {
       name: 'company-plain',

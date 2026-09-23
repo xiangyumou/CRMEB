@@ -50,6 +50,16 @@ export const paymentErrors = defineErrors({
   /** The gateway refused the create/query/close/refund with a business code. `details` carries it. */
   PAYMENT_GATEWAY_REFUSED: { status: 502, message: '支付网关拒绝了本次请求，请稍后重试' },
   /**
+   * 小程序发货信息管理's 同步 (`is_trade_managed` / `set_msg_jump_path`): WeChat
+   * answered with an `errcode`. `details`: `{ step, errcode, errmsg }`.
+   */
+  PAYMENT_MINI_TRADE_SYNC_FAILED: { status: 502, message: '同步微信发货信息管理失败，请稍后重试' },
+  /** The mini program's AppID / AppSecret are not filled in, so WeChat cannot be asked anything. */
+  PAYMENT_MINI_NOT_CONFIGURED: {
+    status: 409,
+    message: '请先在「微信公众号 / 小程序」设置中填写小程序 AppID 与 AppSecret',
+  },
+  /**
    * The gateway did not answer, or answered something we refuse to trust
    * (bad signature, unfetchable platform certificate). Nothing is released.
    */

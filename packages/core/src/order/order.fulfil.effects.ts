@@ -9,7 +9,7 @@ import * as rules from './order.fulfil.rules';
 import { resolveFulfilmentNotifier } from './order.fulfil.ports';
 import { scheduleAutoReceive } from './order.fulfil.service';
 import * as repo from './order.repo';
-import { onOrderPaid } from './ports';
+import { onOrderPaid, onShipmentDispatched } from './ports';
 import { orderStateMachine } from './order.state-machine';
 
 /**
@@ -246,6 +246,19 @@ export async function autoDeliver(ctx: Ctx, orderId: number): Promise<AutoDelive
       scopeId: String(shipment.id),
       eventType: 'shipment.dispatched',
       payload: { orderId, userId: order.userId, shipmentId: shipment.id },
+    });
+
+    await onShipmentDispatched.dispatch(tx, ctx, {
+      orderId,
+      orderNo: order.orderNo,
+      userId: order.userId,
+      at: now,
+      shipmentId: shipment.id,
+      deliveryMode: 'virtual',
+      allDelivered: rollUp === 'fulfilled',
+      otherShipments: (await fulfilRepo.listShipments(tx, [orderId]))
+        .filter((other) => other.id !== shipment.id)
+        .map((other) => ({ id: other.id, cancelled: other.status === 'cancelled' })),
     });
 
     return {

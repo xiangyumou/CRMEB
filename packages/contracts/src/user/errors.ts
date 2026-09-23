@@ -20,6 +20,12 @@ export const userErrors = defineErrors({
    * shop's default avatar and not an image `POST /uploads` stored (USER-019).
    */
   USER_AVATAR_NOT_ALLOWED: { status: 422, message: '请上传头像图片后再保存' },
+  /**
+   * WeChat's 内容安全 (`msgSecCheck`) judged the new nickname `risky` (C09).
+   * Only a mini-program account is checked; WeChat being unreachable lets the
+   * nickname through (fail-open, see `wechat.sec-check.ts`).
+   */
+  USER_NICKNAME_REJECTED: { status: 422, message: '昵称包含不当信息，请修改后再保存' },
 
   /** Unknown id, somebody else's row, or already deleted. One code for all three. */
   USER_ADDRESS_NOT_FOUND: { status: 404, message: '收货地址不存在' },
@@ -30,6 +36,8 @@ export const userErrors = defineErrors({
   USER_INVOICE_TITLE_NOT_FOUND: { status: 404, message: '发票抬头不存在' },
   /** `INVOICE_TITLE_LIMIT` (20) live titles per customer. `details` carries `{ limit }`. */
   USER_INVOICE_TITLE_LIMIT_REACHED: { status: 409, message: '发票抬头数量已达上限' },
+  /** WeChat's 内容安全 judged the title's name `risky` (C09); same rules as the nickname. */
+  USER_INVOICE_TITLE_REJECTED: { status: 422, message: '发票抬头包含不当信息，请修改后再保存' },
 
   /** A cancellation request is already open; the customer withdraws it or waits. */
   USER_CANCELLATION_PENDING: { status: 409, message: '您已提交过注销申请，请等待审核' },

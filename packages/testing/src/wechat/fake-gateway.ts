@@ -215,6 +215,18 @@ export interface FakeWechatGateway {
   /** Every request the app made, in order. */
   calls: RecordedCall[];
   transactions: Map<string, FakeTransaction>;
+  /**
+   * Every `prepay_id` a create has answered (JSAPI, mini-program, app and the
+   * one inside an H5 cashier URL), mapped to its merchant order number. A
+   * phone's `wx.requestPayment` names nothing but `package: 'prepay_id=…'`, so
+   * this is how an emulated pay sheet finds the transaction it pays.
+   */
+  prepayIds: Map<string, string>;
+  /**
+   * The transaction a `prepay_id` (or a whole `prepay_id=…` package) was
+   * issued for, or `undefined` for one this gateway never issued.
+   */
+  transactionForPrepay(prepayIdOrPackage: string): FakeTransaction | undefined;
   /** Keyed by merchant refund number — the number the app is certain it owns. */
   refunds: Map<string, FakeRefund>;
   behaviour: FakeGatewayBehaviour;
@@ -280,6 +292,7 @@ export async function startFakeWechatGateway(
   const now = options.now ?? (() => Date.now());
   const calls: RecordedCall[] = [];
   const transactions = new Map<string, FakeTransaction>();
+  const prepayIds = new Map<string, string>();
   const refunds = new Map<string, FakeRefund>();
   const behaviour: FakeGatewayBehaviour = {
     refundBalanceFen: null,
@@ -409,17 +422,22 @@ export async function startFakeWechatGateway(
    * Fresh on every call, including a repeat create of the same unpaid order.
    */
   function createAnswer(tradeType: FakeTradeType, outTradeNo: string): Record<string, string> {
+    const prepayId = (): string => {
+      const minted = `wx${randomBytes(16).toString('hex')}`;
+      prepayIds.set(minted, outTradeNo);
+      return minted;
+    };
     switch (tradeType) {
       case 'h5': {
         const cashier = new URL(h5CashierUrl);
         cashier.searchParams.set('out_trade_no', outTradeNo);
-        cashier.searchParams.set('prepay_id', `wx${randomBytes(16).toString('hex')}`);
+        cashier.searchParams.set('prepay_id', prepayId());
         return { h5_url: cashier.toString() };
       }
       case 'native':
         return { code_url: `weixin://wxpay/bizpayurl?pr=${randomBytes(6).toString('hex')}` };
       default:
-        return { prepay_id: `wx${randomBytes(16).toString('hex')}` };
+        return { prepay_id: prepayId() };
     }
   }
 
@@ -767,6 +785,14 @@ export async function startFakeWechatGateway(
     keys,
     calls,
     transactions,
+    prepayIds,
+    transactionForPrepay(prepayIdOrPackage) {
+      const prepayId = prepayIdOrPackage.startsWith('prepay_id=')
+        ? prepayIdOrPackage.slice('prepay_id='.length)
+        : prepayIdOrPackage;
+      const outTradeNo = prepayIds.get(prepayId);
+      return outTradeNo === undefined ? undefined : transactions.get(outTradeNo);
+    },
     refunds,
     behaviour,
     server,

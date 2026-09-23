@@ -126,4 +126,13 @@ describe('paged routes', () => {
     expectTypeOf<'cart.setSelection'>().not.toExtend<PagedRouteId>();
     expectTypeOf<PageItemOf<'catalog.productList'>['id']>().toEqualTypeOf<string>();
   });
+
+  it('take page and pageSize as a number or a string, and nothing else', () => {
+    expectTypeOf<NonNullable<InputOf<'order.list'>['query']>['page']>().toEqualTypeOf<
+      number | string | undefined
+    >();
+    void client.call('order.list', { query: { page: 2, pageSize: '20' } });
+    // @ts-expect-error an object is not a page number
+    void client.call('order.list', { query: { page: {} } });
+  });
 });

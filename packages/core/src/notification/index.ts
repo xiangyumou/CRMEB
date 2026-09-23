@@ -37,6 +37,7 @@ export {
   findNotificationEvent,
   allNotificationEvents,
   type NotificationEvent,
+  type NotificationRouteTemplate,
   type NotificationAudience,
 } from './notification.registry';
 

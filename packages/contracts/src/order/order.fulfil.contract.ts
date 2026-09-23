@@ -32,14 +32,36 @@ export const orderConfirmReceipt = defineRoute({
   summary: '确认收货',
   tags: ['order'],
   params: orderRefParams,
-  body: z.object({}).default({}),
+  /**
+   * `via: 'wechat-component'` when the mini program's 确认收货 component
+   * (`openBusinessView('weappOrderConfirm')`) reported `success`. The server
+   * does not take the client's word for it: it asks WeChat (`get_order`) and
+   * only then moves the order (C07). Without it, the plain 确认收货.
+   */
+  body: z.object({ via: z.enum(['wechat-component']).optional() }).default({}),
   response: orderDetail,
-  errors: ['ORDER_NOT_FOUND', 'ORDER_NOT_RECEIVABLE'],
+  errors: ['ORDER_NOT_FOUND', 'ORDER_NOT_RECEIVABLE', 'ORDER_WECHAT_RECEIPT_UNCONFIRMED'],
   examples: [
     {
       name: 'ok',
       params: { id: '9001' },
       body: {},
+      response: {
+        ...orderDetailExample,
+        status: 'received',
+        fulfillmentStatus: 'fulfilled',
+        paidAmount: '118.00',
+        payExpiresAt: null,
+        paidAt: '2026-02-01T10:03:00+08:00',
+        shippedAt: '2026-02-02T09:00:00+08:00',
+        receivedAt: '2026-02-04T18:00:00+08:00',
+        items: [{ ...orderDetailExample.items[0]!, shippedQuantity: 2 }],
+      },
+    },
+    {
+      name: 'wechat-component',
+      params: { id: '9001' },
+      body: { via: 'wechat-component' },
       response: {
         ...orderDetailExample,
         status: 'received',

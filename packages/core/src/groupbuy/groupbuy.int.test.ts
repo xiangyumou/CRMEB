@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { and, eq, inArray } from 'drizzle-orm';
 import { products, productSkus } from '@shop/db/schema/catalog';
 import { notificationMessages, notificationTemplates } from '@shop/db/schema/notification';
-import { effects } from '@shop/db/schema/system';
+import { configValues, effects } from '@shop/db/schema/system';
 import { wechatIdentities } from '@shop/db/schema/wechat';
 import {
   groupbuyActivities,
@@ -68,7 +70,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await harness.db.truncateAll();
   // `truncateAll` empties the settings table but not the config cache, and a
-  // test that switches 虚拟成团 on would otherwise leak it into the next one.
+  // test that stores config would otherwise leak it into the next one.
   await harness.ctx.config.invalidate(groupbuyConfig.group);
   // The 人气条 is cached in Redis for a minute; without this a test reads the
   // previous test's count.
@@ -809,26 +811,39 @@ describe('the expiry sweep', () => {
     expect(await effectsFor(opened.orderId, 'groupbuy.refund')).toHaveLength(1);
   });
 
-  it('fills the team virtually when the shop has said it may', async () => {
+  it('RISK-D-006 — fails and refunds an under-filled team even with the retired 虚拟成团 switch stored as on', async () => {
     const fixture = await makeActivity({ seatsRequired: 3, ttlSeconds: 3_600, stock: 10 });
     const leader = await makeUser();
     const opened = await placeOrder({ userId: leader, fixture });
     await pay(opened.orderId);
-    await setVirtualFill(true);
+    await storeRetiredVirtualFill();
 
     harness.clock.set('2026-06-01T02:00:00.000Z');
     const report = await settleExpiredGroups(harness.ctx);
 
-    expect(report).toMatchObject({ succeeded: 1, refunds: 0 });
-    expect(await readGroup(opened.groupId)).toMatchObject({
-      status: 'succeeded',
-      seatsTaken: 3,
-    });
-    // One real buyer in a three-seat team: the admin list must say so.
+    expect(report).toMatchObject({ succeeded: 0, failed: 1, refunds: 1 });
+    expect(await readGroup(opened.groupId)).toMatchObject({ status: 'failed', seatsTaken: 1 });
+    expect(await effectsFor(opened.orderId, 'groupbuy.refund')).toHaveLength(1);
     const detail = await service.adminGroupDetail(asAdmin(['groupbuy:group:read']), {
       id: String(opened.groupId),
     });
-    expect(detail.virtuallyFilled).toBe(true);
+    expect(detail.virtuallyFilled).toBe(false);
+  });
+
+  it('RISK-D-006 — migration 0004 deletes a stored 虚拟成团 switch', async () => {
+    await storeRetiredVirtualFill();
+    const sql = readFileSync(
+      fileURLToPath(
+        new URL('../../../db/migrations/0005_groupbuy_virtual_fill_off.sql', import.meta.url),
+      ),
+      'utf8',
+    );
+    await harness.db.handle.pool.query(sql);
+    const left = await harness.ctx.db
+      .select()
+      .from(configValues)
+      .where(eq(configValues.group, 'groupbuy'));
+    expect(left.map((row) => row.key)).not.toContain('virtualFillOnExpiry');
   });
 
   it('cancels a team nobody ever paid into', async () => {
@@ -1002,14 +1017,16 @@ describe('the storefront surface', () => {
     ).rejects.toMatchObject({ code: 'GROUPBUY_GROUP_NOT_WITHDRAWABLE' });
   });
 
-  it('answers the poster with data and a payload, never an image', async () => {
+  it('answers the poster with data and a payload, never an image — SHARE-002', async () => {
     const fixture = await makeActivity({ stock: 10 });
     const leader = await makeUser('小明');
     const opened = await placeOrder({ userId: leader, fixture });
     await pay(opened.orderId);
 
     const poster = await service.poster(asUser(leader), { id: String(opened.groupId) });
-    expect(poster.qrPayload).toContain(String(opened.groupId));
+    expect(poster.route).toEqual({ route: 'groupbuyTeam', params: { id: String(opened.groupId) } });
+    expect(poster.page).toBe(`packages/promo/groupbuy-team/index?id=${opened.groupId}`);
+    expect(poster.qrPayload).toBe(poster.page);
     expect(poster.seatsLeft).toBe(2);
     expect(poster.leaderNickname).toBe('小明');
   });
@@ -1166,7 +1183,7 @@ describe('the admin surface', () => {
     ).rejects.toMatchObject({ code: 'GROUPBUY_ACTIVITY_IN_USE' });
   });
 
-  it('refuses 立即成团 while the shop has 虚拟成团 switched off', async () => {
+  it('RISK-D-006 — refuses 立即成团 on an under-filled team, whatever the retired switch says', async () => {
     const fixture = await makeActivity({ stock: 10 });
     const leader = await makeUser();
     const opened = await placeOrder({ userId: leader, fixture });
@@ -1177,9 +1194,11 @@ describe('the admin surface', () => {
       service.adminGroupComplete(admin, { id: String(opened.groupId) }, {}),
     ).rejects.toMatchObject({ code: 'GROUPBUY_VIRTUAL_FILL_DISABLED' });
 
-    await setVirtualFill(true);
-    const detail = await service.adminGroupComplete(admin, { id: String(opened.groupId) }, {});
-    expect(detail).toMatchObject({ status: 'succeeded', seatsTaken: 3, virtuallyFilled: true });
+    await storeRetiredVirtualFill();
+    await expect(
+      service.adminGroupComplete(admin, { id: String(opened.groupId) }, {}),
+    ).rejects.toMatchObject({ code: 'GROUPBUY_VIRTUAL_FILL_DISABLED' });
+    expect(await readGroup(opened.groupId)).toMatchObject({ status: 'forming', seatsTaken: 1 });
   });
 
   it('keeps the sales counter across an edit', async () => {
@@ -1255,8 +1274,15 @@ async function allMembers(groupId: number) {
     .orderBy(groupbuyMembers.id);
 }
 
-async function setVirtualFill(enabled: boolean): Promise<void> {
-  await harness.ctx.config.set(groupbuyConfig, { virtualFillOnExpiry: enabled });
+/**
+ * What a shop that had 虚拟成团 switched on before 2026-09-23 still has stored:
+ * the key the `groupbuy` group no longer declares.
+ */
+async function storeRetiredVirtualFill(): Promise<void> {
+  await harness.ctx.db
+    .insert(configValues)
+    .values({ group: 'groupbuy', key: 'virtualFillOnExpiry', value: true });
+  await harness.ctx.config.invalidate(groupbuyConfig.group);
 }
 
 // ---------------------------------------------------------------------------
@@ -1394,6 +1420,7 @@ describe('shopper notifications', () => {
     expect(opened?.content).toContain('3 人成团，请在 2026-06-01 09:00 前邀请好友参团');
     expect(opened?.data).toMatchObject({
       link: `/pages/activity/goods_combination_status/index?id=${leader.groupId}`,
+      route: { route: 'groupbuyTeam', params: { id: String(leader.groupId) } },
     });
 
     const [joined] = await inbox(joinerId);
@@ -1401,7 +1428,7 @@ describe('shopper notifications', () => {
     expect(joined).toMatchObject({ code: 'groupbuy_joined', title: '参团成功' });
   });
 
-  it('tells every paid member 拼团成功 when the team fills, on every channel switched on', async () => {
+  it('tells every paid member 拼团成功 when the team fills, on every channel switched on — NOTIF-006', async () => {
     // The operator configures the event in 通知管理 before the team fills.
     const current = await notificationAdmin.getTemplate(superAdmin(), {
       code: 'groupbuy_succeeded',
@@ -1424,6 +1451,7 @@ describe('shopper notifications', () => {
             templateKey: '1001',
             templateId: 'TPL_MINI_GROUP_OK',
             fields: { character_string1: '{{orderNo}}', thing2: '{{activityTitle}}' },
+            // Deprecated: the event's catalogue route decides the page.
             page: 'pages/activity/goods_combination_status/index?id={{groupId}}',
           },
           sms: { enabled: true, templateCode: 'SMS_GROUP_OK' },
@@ -1469,7 +1497,7 @@ describe('shopper notifications', () => {
         .find((call) => (call.body as { touser: string }).touser === `mini-openid-${index}`);
       expect(miniSend?.body).toMatchObject({
         template_id: 'TPL_MINI_GROUP_OK',
-        page: `pages/activity/goods_combination_status/index?id=${team.groupId}`,
+        page: `packages/promo/groupbuy-team/index?id=${team.groupId}`,
         data: { character_string1: { value: orderNo }, thing2: { value: team.title } },
       });
 

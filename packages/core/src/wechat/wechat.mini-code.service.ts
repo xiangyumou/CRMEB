@@ -1,4 +1,13 @@
-import type { MiniCodeQuery, MiniCodeResult } from '@shop/contracts/wechat/schemas';
+import {
+  encodeScene,
+  storefrontRoute,
+  storefrontRouteDef,
+} from '@shop/contracts/system/storefront-routes';
+import type {
+  MiniCodeQuery,
+  MiniCodeResult,
+  ShareMiniCodeQuery,
+} from '@shop/contracts/wechat/schemas';
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { enforce, fixedWindow } from '../kernel/rate-limit';
@@ -92,8 +101,49 @@ export async function miniCodeUrl(ctx: Ctx, query: MiniCodeQuery): Promise<MiniC
       details: [{ field: 'scene', message: `scene 最长 ${SCENE_MAX_BYTES} 字节` }],
     });
   }
-  const key = { page: query.page, scene };
+  return mintOrReuse(ctx, { page: query.page, scene });
+}
 
+/**
+ * The code for a route-catalogue key: `GET /api/v1/share/mini-codes`.
+ *
+ * The page is the catalogue's and the scene is `encodeScene`'s, so a caller
+ * names only what it shares. The params are validated against the key (the
+ * catalogue's params are strict) before anything is looked up or minted: a
+ * code for `home` that carries an `id` is refused, not generated with the
+ * `id` silently dropped.
+ */
+export async function shareMiniCodeUrl(
+  ctx: Ctx,
+  query: ShareMiniCodeQuery,
+): Promise<MiniCodeResult> {
+  const params = query.id === undefined ? {} : { id: query.id };
+  const parsed = storefrontRoute.safeParse({ route: query.route, params });
+  if (!parsed.success || !storefrontRouteDef(query.route).miniCode) {
+    throw new DomainError('VALIDATION_FAILED', {
+      details: [{ field: 'id', message: `${query.route} 页面的参数不正确` }],
+    });
+  }
+  let scene: string;
+  try {
+    scene = encodeScene(parsed.data);
+  } catch (error) {
+    // Every `miniCode` key's scene fits by construction (its test proves it);
+    // reaching this is a catalogue change that broke that, not a bad request.
+    ctx.logger.error({ err: error, route: query.route }, '小程序码 scene 无法编码');
+    throw new DomainError('VALIDATION_FAILED', {
+      details: [{ field: 'route', message: `${query.route} 无法生成小程序码` }],
+    });
+  }
+  return mintOrReuse(ctx, { page: storefrontRouteDef(query.route).path, scene });
+}
+
+/** The cached code for `(page, scene)`, or a new one minted and stored. */
+async function mintOrReuse(
+  ctx: Ctx,
+  key: { page: string; scene: string },
+): Promise<MiniCodeResult> {
+  const { scene } = key;
   const cached = await repo.findByPageScene(ctx.db, key);
   if (cached) return { url: cached.url };
 

@@ -9,6 +9,13 @@ import type { ConfigFieldDescriptor } from '@/admin/kit/config/types';
 import { InstantText } from '@/admin/kit/instant-text';
 import { PageContainer } from '@/admin/kit/page-container';
 
+import { MiniTradePanel } from './mini-trade-panel';
+
+/** Groups whose screen carries an action beside the form. */
+const PANELS: Record<string, () => React.ReactNode> = {
+  'wechat-mini-trade': () => <MiniTradePanel />,
+};
+
 /**
  * One settings screen, for every config group there is.
  *
@@ -81,6 +88,7 @@ export function SettingsGroupPage({ group }: { group: string }) {
           successMessage="已保存"
           disabled={!writable}
         />
+        {PANELS[group]?.() ?? null}
       </Space>
     </PageContainer>
   );
