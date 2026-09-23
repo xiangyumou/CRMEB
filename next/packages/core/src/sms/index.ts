@@ -16,7 +16,16 @@
  * belong to the login flow, so they live in the `user` domain's
  * `storefront-auth` group and arrive as arguments.
  */
-export { sendVerificationCode, verifyCode, resolveSender } from './sms.service';
+import { registerSiteAuthMethod, smsConfig } from '../system';
+import { smsSenderUsable } from './sms.service';
+
+export {
+  sendVerificationCode,
+  verifyCode,
+  resolveSender,
+  smsProviderConfigured,
+  smsSenderUsable,
+} from './sms.service';
 export type { SendCodeOptions, SendCodeResult } from './sms.service';
 
 export {
@@ -40,3 +49,15 @@ export {
   resendWaitMs,
   type VerifyOutcome,
 } from './verification-code';
+
+/**
+ * Wires the domain into the platform; called once per process from the gen'd
+ * bootstrap, like `registerPaymentDomain()`.
+ *
+ * 手机号登录 on `GET /api/v1/site/config` (CR-3-h3) is offered exactly when
+ * `resolveSender` would return a sender that can deliver. `system` may not
+ * import this domain back, so the probe is handed over rather than looked up.
+ */
+export function registerSmsDomain(): void {
+  registerSiteAuthMethod('phone', { groups: [smsConfig.group], isEnabled: smsSenderUsable });
+}

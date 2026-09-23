@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { PRODUCT_DETAIL_DEFAULT_VALUE } from '@shop/contracts/diy/product-detail.default';
 import { themes } from '@shop/db/schema/diy';
 import { createTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
 import { sql } from 'drizzle-orm';
@@ -21,6 +22,7 @@ import {
   getNavigation,
   getPage,
   getPageVersion,
+  getProductDetailPage,
   getStorefrontPage,
   getUserCenterPage,
   listLinks,
@@ -560,6 +562,85 @@ describe('个人中心 / 底部导航 / 版式 (CR-3-h2)', () => {
     await expect(getUserCenterPage(ctx)).rejects.toMatchObject({
       code: 'DIY_USER_CENTER_PAGE_MISSING',
     });
+  });
+});
+
+describe('商品详情 (CR-2-h3)', () => {
+  async function seedProductDetail(content: Record<string, unknown> = PROD_PAGE) {
+    const page = await createPage(ctx, { name: '商品详情', kind: 'product_detail', title: '详情' });
+    await savePageContent(ctx, { id: page.id, content, publish: true });
+    return page;
+  }
+
+  it('answers the built-in default when nothing is published, not a 404', async () => {
+    const served = await getProductDetailPage(ctx);
+
+    expect(served.id).toBeNull();
+    expect(served.kind).toBe('product_detail');
+    expect(served.version).toBe('builtin-product-detail-1');
+    // The constant verbatim: `cleanDiyData` has nothing to strip from it.
+    expect(served.content).toEqual(PRODUCT_DETAIL_DEFAULT_VALUE);
+    expect(Object.keys(served.content)).toEqual(Object.keys(PRODUCT_DETAIL_DEFAULT_VALUE));
+    // The same keys as any other storefront page, so the renderer needs nothing new.
+    expect(Object.keys(served).sort()).toEqual(
+      ['background', 'content', 'id', 'kind', 'name', 'schemaVersion', 'title', 'version'].sort(),
+    );
+  });
+
+  it('holds the default to the same validation a saved page gets', async () => {
+    // Saving it through the editor's own path is the strictest check there is.
+    const page = await createPage(ctx, { name: '商品详情', kind: 'product_detail' });
+    await expect(
+      savePageContent(ctx, { id: page.id, content: PRODUCT_DETAIL_DEFAULT_VALUE }),
+    ).resolves.toMatchObject({ id: page.id });
+  });
+
+  it('ignores a draft, and a published page wins over the default', async () => {
+    const draft = await createPage(ctx, { name: '商品详情草稿', kind: 'product_detail' });
+    await savePageContent(ctx, { id: draft.id, content: PROD_PAGE });
+    expect((await getProductDetailPage(ctx)).id).toBeNull();
+
+    const published = await seedProductDetail();
+    const served = await getProductDetailPage(ctx);
+    expect(served.id).toBe(published.id);
+    expect(served.title).toBe('详情');
+    expect(served.content).toEqual(PROD_PAGE);
+  });
+
+  it('serves the newest published page, and never another kind', async () => {
+    // A published 个人中心 is not a product page.
+    const other = await createPage(ctx, { name: '个人中心', kind: 'user_center' });
+    await savePageContent(ctx, { id: other.id, content: PROD_PAGE, publish: true });
+    expect((await getProductDetailPage(ctx)).id).toBeNull();
+
+    const first = await seedProductDetail();
+    harness.clock.advance(5000);
+    const second = await seedProductDetail({});
+    expect((await getProductDetailPage(ctx)).id).toBe(second.id);
+
+    await deletePage(ctx, { id: second.id });
+    expect((await getProductDetailPage(ctx)).id).toBe(first.id);
+  });
+
+  it('strips retired components from a published page, like every storefront read', async () => {
+    await seedProductDetail(RETIRED);
+    const { content } = await getProductDetailPage(ctx);
+    // The same two survivors the home-page read keeps from this fixture.
+    expect(Object.keys(content)).toEqual(['1600000000000002', '1600000000000004']);
+  });
+
+  it('caches, and a publish drops the entry so the default gives way at once', async () => {
+    await getProductDetailPage(ctx);
+    expect(await harness.redis.get('diy:product-detail:v1')).not.toBeNull();
+
+    const page = await createPage(ctx, { name: '商品详情', kind: 'product_detail' });
+    await savePageContent(ctx, { id: page.id, content: {} });
+    // A draft save also invalidates, harmlessly; the default is re-served.
+    expect((await getProductDetailPage(ctx)).id).toBeNull();
+
+    await publishPage(ctx, { id: page.id });
+    expect(await harness.redis.get('diy:product-detail:v1')).toBeNull();
+    expect((await getProductDetailPage(ctx)).id).toBe(page.id);
   });
 });
 

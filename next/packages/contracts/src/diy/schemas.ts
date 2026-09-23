@@ -112,6 +112,18 @@ export const diyStorefrontPage = z.object({
 export type DiyStorefrontPage = z.infer<typeof diyStorefrontPage>;
 
 /**
+ * 商品详情 — `GET /api/v1/diy/pages/product-detail` (CR-2-h3).
+ *
+ * The storefront envelope with one difference: `id` is `null` when the answer
+ * is the built-in default (`PRODUCT_DETAIL_DEFAULT_VALUE`) rather than a saved
+ * page, because there is no row for it to name and inventing an id would send
+ * a caller of `pages/:id` to a page that does not exist. The renderer never
+ * reads `id` (`toLegacyDiyPage` maps it to `0`).
+ */
+export const diyProductDetailPage = diyStorefrontPage.extend({ id: id.nullable() });
+export type DiyProductDetailPage = z.infer<typeof diyProductDetailPage>;
+
+/**
  * 底部导航 — the decorated tab bar (CR-3-h2 §2).
  *
  * `navigation` is the saved `pageFoot` component **verbatim**, not a re-shaped

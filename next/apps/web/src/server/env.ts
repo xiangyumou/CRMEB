@@ -46,6 +46,21 @@ export const envSchema = z.object({
   QUEUE_NAME: z.string().default('shop'),
   /** Commit sha, surfaced by `/api/v1/health`. */
   APP_VERSION: z.string().default('dev'),
+
+  /**
+   * `'1'` swaps the SMS provider for the in-memory `fakeSmsSender()` (CR-3-i):
+   * a verification code is minted and stored in Redis exactly as usual, and is
+   * never delivered. It exists for an out-of-process test server — the
+   * storefront e2e suite reads the code back out of Redis — which cannot call
+   * `registerSmsSender()` from inside the test the way an integration test does.
+   *
+   * An environment variable and not an `sms.provider` value on purpose: a shop
+   * must never be able to pick "fake" from the console. Nothing under
+   * `deploy/next/` may set it (`env.test.ts` checks), and the process logs a
+   * `warn` at boot whenever it is on. Unset, `''` and `'0'` are off; anything
+   * but those and `'1'` refuses to boot, rather than guessing what `true` meant.
+   */
+  SHOP_FAKE_SMS: z.enum(['', '0', '1']).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

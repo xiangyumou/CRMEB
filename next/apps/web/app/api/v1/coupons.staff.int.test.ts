@@ -358,3 +358,66 @@ describe('POST /api/v1/staff/coupon-grants', () => {
     expect(await remaining(templateId)).toBe(100);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 查看客户持有的优惠券 (CR-1-h3)
+// ---------------------------------------------------------------------------
+
+describe('GET /api/v1/staff/users/:uid/coupons', () => {
+  async function read(uid: string, headers: Record<string, string>, search = '') {
+    const { GET } = await import('./staff/users/[uid]/coupons/route');
+    return GET(get(`/api/v1/staff/users/${uid}/coupons${search}`, headers), {
+      params: Promise.resolve({ uid }),
+    });
+  }
+
+  async function grant(member: { headers: Record<string, string> }, userId: number, name: string) {
+    const templateId = await makeTemplate(name);
+    const { POST } = await import('./staff/coupon-grants/route');
+    const body = { userId: String(userId), couponId: String(templateId) };
+    const response = await POST(json('POST', '/api/v1/staff/coupon-grants', body, member.headers));
+    expect(response.status).toBe(200);
+  }
+
+  it('401s without a session, and 403s the customer asking about themselves', async () => {
+    const customer = await shopper();
+    expect((await read(String(customer.userId), {})).status).toBe(401);
+
+    const response = await read(String(customer.userId), customer.headers);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it("answers the customer's own coupons in the storefront wallet shape, nobody else's", async () => {
+    const member = await staff();
+    const [customer, other] = [await shopper(), await shopper()];
+    await grant(member, customer.userId, '满 100 减 10');
+    await grant(member, other.userId, '满 200 减 30');
+
+    const response = await read(String(customer.userId), member.headers);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { items: { title: string; status: string }[] };
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]).toMatchObject({ title: '满 100 减 10', status: 'unused' });
+
+    // The same row the customer's own wallet shows.
+    const { GET: wallet } = await import('./user-coupons/route');
+    const own = (await (
+      await wallet(get('/api/v1/user-coupons?page=1&pageSize=20&state=unused', customer.headers))
+    ).json()) as { items: unknown[] };
+    expect(body.items[0]).toEqual(own.items[0]);
+
+    const used = await read(String(customer.userId), member.headers, '?state=used');
+    expect(await used.json()).toEqual({ items: [] });
+  });
+
+  it('404s an unknown customer and 422s a malformed state', async () => {
+    const member = await staff();
+    const unknown = await read('999999', member.headers);
+    expect(unknown.status).toBe(404);
+    expect(await unknown.json()).toMatchObject({ code: 'USER_NOT_FOUND', message: '用户不存在' });
+
+    const bad = await read(String(member.userId), member.headers, '?state=all');
+    expect(bad.status).toBe(422);
+  });
+});

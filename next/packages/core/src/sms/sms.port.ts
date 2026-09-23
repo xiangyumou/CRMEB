@@ -41,10 +41,13 @@ export interface SmsSender {
 /**
  * A sender registered at boot, which wins over whatever the config group says.
  *
- * This exists for two callers and no others: the integration tests, which
- * register `fakeSmsSender()`, and a future stream that needs to route SMS
- * through something the config group cannot describe. Production leaves it
- * unset and the provider comes from `sms.provider`.
+ * This exists for these callers and no others: the integration tests, which
+ * register `fakeSmsSender()`; `apps/web`'s container when the process was
+ * started with `SHOP_FAKE_SMS=1` (CR-3-i — the out-of-process e2e server, which
+ * logs a `warn` at boot and which no deploy template may set); and a future
+ * stream that needs to route SMS through something the config group cannot
+ * describe. Production leaves it unset and the provider comes from
+ * `sms.provider`.
  */
 let override: SmsSender | undefined;
 

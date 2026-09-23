@@ -269,6 +269,26 @@ describe('coupon — 订单赠券 and the staff drawer (B3)', () => {
     expect(byDays).toMatchObject({ coupon_time: 30, start_use_time: 0, end_use_time: 0, type: 2 });
   });
 
+  it('maps 查看优惠券 with the wallet mapper, in the order the route answers (CR-1-h3)', () => {
+    const rows = toLegacyUserCouponList(example('GET /api/v1/staff/users/:uid/coupons'));
+    expect(rows).toHaveLength(2);
+    // the drawer renders these; `coupon_time` absent → it formats the two dates
+    expect(rows[0]).toMatchObject({
+      id: 9001,
+      coupon_title: '满 100 减 10',
+      coupon_price: '10.00',
+      use_min_price: '100.00',
+      type: 0,
+      is_use: 0,
+    });
+    expect(rows[0].coupon_time).toBeUndefined();
+    expect(rows[0].end_use_time).toBeGreaterThan(rows[0].start_use_time);
+    // spendable first: the spent one comes second, and says so
+    expect(rows[1]).toMatchObject({ id: 8990, coupon_title: '满 200 减 30', is_use: 1 });
+    assertRenderable(rows);
+    expect(toLegacyUserCouponList({ items: [] })).toEqual([]);
+  });
+
   it('sends one customer and one coupon per grant', () => {
     expect(fromLegacyCouponGrant(101, 1)).toEqual(exampleBody('POST /api/v1/staff/coupon-grants'));
   });
@@ -433,12 +453,42 @@ describe('站点公开配置 — one GET /api/v1/site/config, six readers (F4)',
       special_invoice_status: '1',
       site_func: ['combination'],
     });
-    // no source in the contract (CR-3-h3): absent, as they were before the route
-    for (const flag of ['wechat_status', 'wechat_auth_switch', 'phone_auth_switch']) {
-      expect(basic).not.toHaveProperty(flag);
-    }
     assertRenderable(basic);
     expect(toLegacyBasicConfig({ ...SITE, payments: { wechat: false } }).pay_weixin_open).toBe(0);
+  });
+
+  it('BASIC_CONFIG: the three login-method switches, in the legacy spelling (CR-3-h3)', () => {
+    // `getMallBasicConfig` answered `wechat_status` as a boolean and the two
+    // `routine_auth_type` switches as (int) 1 / 0; the pages test them for truthiness.
+    expect(toLegacyBasicConfig(SITE)).toMatchObject({
+      wechat_status: true,
+      wechat_auth_switch: 1,
+      phone_auth_switch: 1,
+    });
+
+    // The contract's `nothing-filled-in` example: a fresh install offers none.
+    const bare = { ...SITE, auth: { wechatOa: false, wechatMini: false, phone: false } };
+    expect(toLegacyBasicConfig(bare)).toMatchObject({
+      wechat_status: false,
+      wechat_auth_switch: 0,
+      phone_auth_switch: 0,
+    });
+
+    // Each flag moves on its own: an H5 shop with a 公众号 and SMS but no mini program.
+    const h5 = toLegacyBasicConfig({
+      ...SITE,
+      auth: { wechatOa: true, wechatMini: false, phone: true },
+    });
+    expect([h5.wechat_status, h5.wechat_auth_switch, h5.phone_auth_switch]).toEqual([true, 0, 1]);
+
+    // A payload cached by an older server has no `auth`: everything off, which
+    // is what the app saw before the flags existed — never a thrown TypeError.
+    const { auth: _dropped, ...older } = SITE;
+    expect(toLegacyBasicConfig(older)).toMatchObject({
+      wechat_status: false,
+      wechat_auth_switch: 0,
+      phone_auth_switch: 0,
+    });
   });
 
   it('getLogo picks the 登录页 logo for type 2 and falls back either way', () => {
@@ -527,6 +577,23 @@ describe('底部导航 and 版式 (F4)', () => {
       diy_data: { value: 2, my_banner_status: 0, my_menus_status: 0, business_status: 0 },
       routine_my_menus: [],
     });
+  });
+
+  it('maps the 商品详情 DIY page, built-in default included (CR-2-h3)', () => {
+    const page = toLegacyDiyPage(example('GET /api/v1/diy/pages/product-detail'));
+    // The default has no row: `id: null` maps to 0, which nothing on the page reads.
+    expect(page).toMatchObject({ id: 0, type: 'product_detail', title: '商品详情' });
+    expect(page.is_bg_color).toBe(0);
+    expect(page.is_bg_pic).toBe(0);
+    assertRenderable(page);
+    // What PageDesign renders on the product page, and the bar productBottom styles.
+    const names = Object.values(page.value).map((node) => node.name);
+    expect(names).toEqual(['productInfo', 'productService', 'reviews', 'productDesc', 'bottomMenu']);
+    // `productBottom.vue` finds its config by name and reads these off it.
+    const bottom = Object.values(page.value).find((node) => node.name === 'bottomMenu');
+    expect(bottom.componentBgConfig.colorConfig.color).toHaveLength(2);
+    expect(Array.isArray(bottom.showContent.type)).toBe(true);
+    expect(bottom.cartButton).toHaveProperty('tabVal');
   });
 
   it('maps the 个人中心 DIY page like any other page', () => {

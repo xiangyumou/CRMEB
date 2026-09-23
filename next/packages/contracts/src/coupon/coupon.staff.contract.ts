@@ -8,21 +8,24 @@ import {
   staffCouponExample,
   staffCouponGrantBody,
   staffCouponListQuery,
+  staffUserCouponListQuery,
+  staffUserCoupons,
   userCouponExample,
 } from './schemas';
 
 /**
- * 移动端店员发券, plus the 订单赠券 panel on the shopper's own order page (CR-5-h2).
+ * 移动端店员发券, plus the 订单赠券 panel on the shopper's own order page
+ * (CR-5-h2), plus 查看客户持有的优惠券 (CR-1-h3).
  *
- * Three routes, two audiences:
+ * Four routes, two audiences:
  *
  *  - `GET /api/v1/orders/:id/gift-coupons` is the **shopper's**. Legacy showed
  *    the coupons an order had earned inside the order detail payload
  *    (`StoreOrderCreateServices` wrote them from `give_coupon_ids`); here the
  *    order detail stays a single shape owned by B1 and the coupons are their
  *    own call, so a wallet write never has to widen an order response.
- *  - `GET /api/v1/staff/coupons` and `POST /api/v1/staff/coupon-grants` are the
- *    **staff console's**. `auth: 'staff'` and no permission atom, exactly like
+ *  - `GET /api/v1/staff/coupons`, `POST /api/v1/staff/coupon-grants` and
+ *    `GET /api/v1/staff/users/:uid/coupons` are the **staff console's**. `auth: 'staff'` and no permission atom, exactly like
  *    every other route in `order.staff.contract.ts`: staff is the
  *    `order-staff.staffUserIds` roster, not a role, and a staff member either
  *    has the console or does not.
@@ -134,5 +137,63 @@ export const staffCouponGrant = defineRoute({
       body: { userId: '101', couponId: '1' },
       response: { granted: 0, skippedUserIds: ['101'] },
     },
+  ],
+});
+
+/**
+ * What one customer holds — 商家管理 → 用户 → 详情 → 「查看优惠券」 (CR-1-h3).
+ *
+ * A 店员 may read it: they already see the customer and may grant coupons, and
+ * what the customer holds is the same trust level (the orchestrator's decision
+ * on the CR). Same door as the rest of this file — `auth: 'staff'`, no atom.
+ *
+ * `items` are the storefront 我的优惠券 item verbatim. Without `?state` every
+ * coupon comes back, the spendable ones (`unused` and inside their window)
+ * first, newest first within each half; with it, that one wallet tab. At most
+ * `STAFF_USER_COUPON_LIMIT` rows, because the drawer does not page.
+ *
+ * An unknown customer is `USER_NOT_FOUND`, the same answer
+ * `GET /api/v1/staff/users/:uid` gives; a customer with no coupons is
+ * `{ items: [] }`.
+ */
+export const staffUserCouponList = defineRoute({
+  id: 'coupon.staffUserCoupons',
+  method: 'GET',
+  path: '/api/v1/staff/users/:uid/coupons',
+  auth: 'staff',
+  summary: '店员查看客户持有的优惠券',
+  tags: ['coupon'],
+  params: z.object({ uid: id }),
+  query: staffUserCouponListQuery,
+  response: staffUserCoupons,
+  errors: ['USER_NOT_FOUND'],
+  examples: [
+    {
+      name: 'spendable-first',
+      params: { uid: '1001' },
+      query: {},
+      response: {
+        items: [
+          userCouponExample,
+          {
+            ...userCouponExample,
+            id: '8990',
+            templateId: '2',
+            title: '满 200 减 30',
+            discountAmount: '30.00',
+            minSpend: '200.00',
+            status: 'used',
+            usedAt: '2026-03-01T12:00:00+08:00',
+          },
+        ],
+      },
+    },
+    {
+      name: 'unused-only',
+      params: { uid: '1001' },
+      query: { state: 'unused' },
+      response: { items: [userCouponExample] },
+    },
+    { name: 'none', params: { uid: '1002' }, query: {}, response: { items: [] } },
   ],
 });

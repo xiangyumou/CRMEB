@@ -1,12 +1,18 @@
+import {
+  PRODUCT_DETAIL_DEFAULT_VALUE,
+  PRODUCT_DETAIL_DEFAULT_VERSION,
+} from '@shop/contracts/diy/product-detail.default';
 import type {
   DiyLayout,
   DiyLayoutType,
   DiyNavigation,
+  DiyProductDetailPage,
   DiyStorefrontPage,
 } from '@shop/contracts/diy/schemas';
 
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
+import { cleanDiyData } from './compatibility';
 import { versionOf } from './content';
 import { DIY_CACHE } from './diy.cache';
 import { diyConfig } from './diy.config';
@@ -14,10 +20,10 @@ import { toStorefront, type ReadCtx } from './diy-page.service';
 import * as repo from './diy.repo';
 
 /**
- * The three public 装修 reads the app makes that G1's four routes did not
- * answer (CR-3-h2): 个人中心, 底部导航 and the 版式 switch.
+ * The public 装修 reads the app makes that G1's four routes did not answer:
+ * 个人中心, 底部导航 and the 版式 switch (CR-3-h2), and 商品详情 (CR-2-h3).
  *
- * ## Why these three are cached and `pages/home` is not
+ * ## Why these are cached and `pages/home` is not
  *
  * The home page already has a cheap poll of its own — `GET /api/v1/diy/version`
  * plus the `ETag`, which the app checks on resume and which lets a 200 KB page
@@ -36,6 +42,7 @@ const {
   seconds: CACHE_SECONDS,
   userCenter: USER_CENTER_KEY,
   navigation: NAVIGATION_KEY,
+  productDetail: PRODUCT_DETAIL_KEY,
 } = DIY_CACHE;
 
 /**
@@ -68,6 +75,50 @@ export async function getUserCenterPage(ctx: ReadCtx): Promise<DiyStorefrontPage
   const payload = toStorefront(row);
   await writeCache(ctx, USER_CENTER_KEY, payload);
   return tagged(ctx, payload);
+}
+
+// ---------------------------------------------------------------------------
+// 商品详情
+// ---------------------------------------------------------------------------
+
+/**
+ * `GET /api/v1/diy/pages/product-detail` (CR-2-h3).
+ *
+ * The newest published `product_detail` page, found by `kind` exactly as 个人
+ * 中心 is. When there is none — every shop until an operator decorates one —
+ * the built-in default instead of a 404: `pages/goods_details/index.vue` has no
+ * body except this page, and a shop that never touched 装修 still sells.
+ *
+ * The default is the legacy install's own default detail page
+ * (`PRODUCT_DETAIL_DEFAULT_VALUE`); it goes through `cleanDiyData` like any
+ * saved page would (a no-op on it, which the tests pin), so a component retired
+ * later is stripped from it without anyone remembering to edit the constant.
+ *
+ * Cached like 个人中心: this is read on every product page view, far more often
+ * than any other 装修 surface, and every 装修 write drops the key.
+ */
+export async function getProductDetailPage(ctx: ReadCtx): Promise<DiyProductDetailPage> {
+  const cached = await readCache<DiyProductDetailPage>(ctx, PRODUCT_DETAIL_KEY);
+  if (cached !== null) return tagged(ctx, cached);
+
+  const row = await repo.findLatestPublishedOfKind(ctx.db, 'product_detail');
+  const payload: DiyProductDetailPage = row ? toStorefront(row) : builtInProductDetailPage();
+
+  await writeCache(ctx, PRODUCT_DETAIL_KEY, payload);
+  return tagged(ctx, payload);
+}
+
+function builtInProductDetailPage(): DiyProductDetailPage {
+  return {
+    id: null,
+    name: '商品详情',
+    kind: 'product_detail',
+    title: '商品详情',
+    content: cleanDiyData(PRODUCT_DETAIL_DEFAULT_VALUE),
+    schemaVersion: 1,
+    background: null,
+    version: PRODUCT_DETAIL_DEFAULT_VERSION,
+  };
 }
 
 // ---------------------------------------------------------------------------

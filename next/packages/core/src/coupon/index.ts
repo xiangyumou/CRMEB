@@ -39,6 +39,7 @@ export {
   listNewUser,
   staffGrant,
   staffListCoupons,
+  staffListUserCoupons,
   // the domain API other streams call
   grantNewUser,
   grantOrderGifts,

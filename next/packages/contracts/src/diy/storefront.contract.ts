@@ -3,9 +3,14 @@ import { z } from 'zod';
 import { id } from '../_conventions/common';
 import { defineRoute } from '../_conventions/route';
 import {
+  PRODUCT_DETAIL_DEFAULT_VALUE,
+  PRODUCT_DETAIL_DEFAULT_VERSION,
+} from './product-detail.default';
+import {
   diyLayout,
   diyLayoutType,
   diyNavigation,
+  diyProductDetailPage,
   diyStorefrontPage,
   diyStorefrontPageExample,
   diyStorefrontTheme,
@@ -81,6 +86,56 @@ export const diyUserCenterPage = defineRoute({
         name: '个人中心',
         kind: 'user_center',
         title: '我的',
+      },
+    },
+  ],
+});
+
+/**
+ * 商品详情 (CR-2-h3).
+ *
+ * `pages/goods_details/index.vue` renders its whole body — gallery, price,
+ * specs, 服务, 评价, 图文详情 — through `PageDesign`, so without this read the
+ * product page is blank above the bottom bar. Same fixed-path shape as
+ * `pages/user-center`: the newest published `product_detail` page.
+ *
+ * Unlike 个人中心 it never 404s. A shop that never decorated its product page
+ * still sells products, so the answer is then the built-in default
+ * (`PRODUCT_DETAIL_DEFAULT_VALUE`, the legacy install's own default detail
+ * page) with `id: null`. A draft is never served.
+ */
+export const diyProductDetailPageRoute = defineRoute({
+  id: 'diy.productDetailPage',
+  method: 'GET',
+  path: '/api/v1/diy/pages/product-detail',
+  auth: 'public',
+  summary: '商品详情装修数据',
+  tags: ['diy'],
+  response: diyProductDetailPage,
+  examples: [
+    // First on purpose: the mock server answers with the first example, and a
+    // mock product page should look like a real shop's first product page.
+    {
+      name: 'built-in default',
+      response: {
+        id: null,
+        name: '商品详情',
+        kind: 'product_detail',
+        title: '商品详情',
+        content: PRODUCT_DETAIL_DEFAULT_VALUE,
+        schemaVersion: 1,
+        background: null,
+        version: PRODUCT_DETAIL_DEFAULT_VERSION,
+      },
+    },
+    {
+      name: 'published',
+      response: {
+        ...diyStorefrontPageExample,
+        id: '5',
+        name: '商品详情',
+        kind: 'product_detail',
+        title: '商品详情',
       },
     },
   ],

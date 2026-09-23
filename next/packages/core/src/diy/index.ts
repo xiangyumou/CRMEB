@@ -11,6 +11,7 @@
  * | `getPageVersion`      | H      | the cheap poll on resume, before re-downloading a page     |
  * | `getActiveTheme`      | H      | the colour tokens the renderer applies globally            |
  * | `getUserCenterPage`   | H      | 个人中心 — `GET /api/v1/diy/pages/user-center`              |
+ * | `getProductDetailPage` | H     | 商品详情 — `GET /api/v1/diy/pages/product-detail` (CR-2-h3) |
  * | `getNavigation`       | H      | 底部导航 — `GET /api/v1/diy/navigation`                      |
  * | `getLayout`           | H      | the 版式 switch — `GET /api/v1/diy/layouts/:type`           |
  * | `cleanDiyData`        | H      | only if a page is read outside these functions; they clean |
@@ -65,7 +66,12 @@ export { diyConfig } from './diy.config';
 
 export { invalidateDiyStorefrontCache } from './diy.cache';
 
-export { getLayout, getNavigation, getUserCenterPage } from './diy-storefront.service';
+export {
+  getLayout,
+  getNavigation,
+  getProductDetailPage,
+  getUserCenterPage,
+} from './diy-storefront.service';
 
 export {
   createLink,

@@ -5,8 +5,10 @@ import type { SmsMessage, SmsSendResult, SmsSender } from './sms.port';
  *
  * It lives in `core` rather than in `@shop/testing` because
  * `packages/testing/**` belongs to the orchestrator and a stream may not add to
- * it; nothing outside a test ever registers it, and registering it is an
- * explicit call, not a config value.
+ * it. Registering it is an explicit call, never a config value: the tests
+ * call it, and so does `apps/web`'s container when the process env says
+ * `SHOP_FAKE_SMS=1` (CR-3-i) — an env var an operator would have to type, not
+ * a choice on the 短信设置 screen.
  */
 
 export interface FakeSmsSender extends SmsSender {

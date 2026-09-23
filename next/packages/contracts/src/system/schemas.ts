@@ -529,6 +529,27 @@ export const sitePublicConfig = z.object({
    */
   payments: z.object({ wechat: z.boolean() }),
   /**
+   * Which sign-in methods the app may offer (CR-3-h3). Booleans only, derived
+   * from whether each method's settings are complete — never a credential, the
+   * same rule as `payments`:
+   *
+   * - `wechatOa` — 公众号 one-tap login: the OA is switched on and its app id
+   *   and secret are both filled in. The H5 build inside WeChat goes to
+   *   `wechat_login` instead of the plain sign-in page.
+   * - `wechatMini` — mini-program 授权登录: the mini program is switched on and
+   *   its app id and secret are both filled in. Otherwise the mini-program
+   *   sends a signed-out shopper to the phone + SMS page.
+   * - `phone` — 手机号登录: an SMS sender is usable, so a code can be sent.
+   *
+   * The app's mapper turns them into the legacy `wechat_status`,
+   * `wechat_auth_switch` and `phone_auth_switch`.
+   */
+  auth: z.object({
+    wechatOa: z.boolean(),
+    wechatMini: z.boolean(),
+    phone: z.boolean(),
+  }),
+  /**
    * The 客服 entry. `mini-program` means "open the mini-program's own chat",
    * `phone` means "dial `phone`", `none` means the button is not rendered.
    * `qrcodeUrl` is the 客服二维码 `components/kefuIcon` shows on H5 and is
@@ -580,6 +601,7 @@ export const sitePublicConfigExample: SitePublicConfig = {
     publicSecurityUrl: '',
   },
   payments: { wechat: true },
+  auth: { wechatOa: true, wechatMini: true, phone: true },
   support: { kind: 'phone', phone: '400-000-0000', qrcodeUrl: null },
   splashAd: {
     enabled: true,

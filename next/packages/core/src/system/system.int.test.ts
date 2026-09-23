@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { admins } from '@shop/db/schema/auth';
 import { configValues } from '@shop/db/schema/system';
@@ -33,6 +33,7 @@ import { configGet, configGroupList, configSave, describeGroup } from './config.
 import { allConfigGroups } from '../kernel/config-registry';
 import { agreementGet } from './agreement.service';
 import { siteConfigGet, siteConfigSourceGroups } from './site.service';
+import { fakeSmsSender, registerSmsSender, resetSmsSender } from '../sms';
 import { dashboardHeader } from './dashboard';
 import './index';
 // Side-effect import: the same bootstrap `handle()` performs on every request.
@@ -565,8 +566,17 @@ describe('站点公开配置 (CR-7-h2)', () => {
     expect((await siteConfigGet(anonymous())).name).toBe('第三版');
   });
 
-  it('is built from exactly the three groups that drop its cache', async () => {
-    expect([...siteConfigSourceGroups()].sort()).toEqual(['payment', 'site', 'wechat-mini']);
+  it('is built from exactly the groups that drop its cache', async () => {
+    // `payment` registers the pay button; `sms`, `wechat` and `wechat-oa`
+    // arrive with the sign-in methods (CR-3-h3).
+    expect([...siteConfigSourceGroups()].sort()).toEqual([
+      'payment',
+      'site',
+      'sms',
+      'wechat',
+      'wechat-mini',
+      'wechat-oa',
+    ]);
   });
 
   /**
@@ -612,6 +622,143 @@ describe('站点公开配置 (CR-7-h2)', () => {
     // till rather than be absent.
     await configSave(ctx, { group: 'payment' }, { values: { mchId: '1900000109' } });
     expect((await siteConfigGet(anonymous())).payments.wechat).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+/**
+ * `auth` on `GET /api/v1/site/config` (CR-3-h3): which sign-in methods the app
+ * may offer. Each flag is raised by a probe its owner registers — `wechat` for
+ * the two WeChat logins, `sms` for 手机号登录 — so this also proves the
+ * registrations are really installed by `domains.gen`.
+ */
+describe('站点公开配置 — 登录方式 (CR-3-h3)', () => {
+  const anonymous = (): Ctx => harness.ctx.as(anonymousActor);
+  const auth = async () => (await siteConfigGet(anonymous())).auth;
+
+  const OA_APP_ID = 'wx-oa-appid-7f3c1e';
+  const OA_SECRET = 'oa-secret-c0ffee-9d41';
+  const MINI_APP_ID = 'wx-mini-appid-51b2aa';
+  const MINI_SECRET = 'mini-secret-beef-7a3e';
+  const SMS_KEY_ID = 'LTAI-key-id-3e9d';
+  const SMS_KEY_SECRET = 'sms-secret-feed-1b2c';
+
+  afterEach(() => resetSmsSender());
+
+  it('offers nothing on a fresh install', async () => {
+    expect(await auth()).toEqual({ wechatOa: false, wechatMini: false, phone: false });
+  });
+
+  it('offers 公众号 login once it is switched on and its app id and secret are both set', async () => {
+    const ctx = as(superId);
+    await configSave(ctx, { group: 'wechat' }, { values: { oaAppId: OA_APP_ID } });
+    await configSave(ctx, { group: 'wechat-oa' }, { values: { enabled: true } });
+    // An app id with no secret cannot exchange a code: not offered.
+    expect((await auth()).wechatOa).toBe(false);
+
+    // Saving the `wechat` group drops the cached payload.
+    await configSave(ctx, { group: 'wechat' }, { values: { oaAppSecret: OA_SECRET } });
+    expect(await auth()).toEqual({ wechatOa: true, wechatMini: false, phone: false });
+
+    // The operator's switch off again: E1 refuses, so the app must not offer it.
+    await configSave(ctx, { group: 'wechat-oa' }, { values: { enabled: false } });
+    expect((await auth()).wechatOa).toBe(false);
+  });
+
+  it('offers mini-program login once it is switched on and its app id and secret are both set', async () => {
+    const ctx = as(superId);
+    await configSave(
+      ctx,
+      { group: 'wechat' },
+      { values: { miniAppId: MINI_APP_ID, miniAppSecret: MINI_SECRET } },
+    );
+    // Credentials alone are not enough: 启用小程序 is off.
+    expect((await auth()).wechatMini).toBe(false);
+
+    await configSave(ctx, { group: 'wechat-mini' }, { values: { enabled: true } });
+    expect(await auth()).toEqual({ wechatOa: false, wechatMini: true, phone: false });
+
+    // The 公众号 credentials say nothing about the mini program, and vice versa.
+    // (A blank secret on save means "not retyped" and keeps it; the app id clears.)
+    await configSave(ctx, { group: 'wechat' }, { values: { miniAppId: '' } });
+    await configSave(
+      ctx,
+      { group: 'wechat' },
+      { values: { oaAppId: OA_APP_ID, oaAppSecret: OA_SECRET } },
+    );
+    expect((await auth()).wechatMini).toBe(false);
+  });
+
+  it('offers 手机号登录 exactly when resolveSender would return a sender that delivers', async () => {
+    const ctx = as(superId);
+    await configSave(
+      ctx,
+      { group: 'sms' },
+      { values: { provider: 'aliyun', aliyunAccessKeyId: SMS_KEY_ID } },
+    );
+    expect((await auth()).phone).toBe(false);
+
+    await configSave(
+      ctx,
+      { group: 'sms' },
+      { values: { aliyunAccessKeySecret: SMS_KEY_SECRET, aliyunSignName: '示例商城' } },
+    );
+    expect(await auth()).toEqual({ wechatOa: false, wechatMini: false, phone: true });
+
+    await configSave(ctx, { group: 'sms' }, { values: { provider: 'none' } });
+    expect((await auth()).phone).toBe(false);
+  });
+
+  it('offers 手机号登录 when a sender is registered at boot (tests, SHOP_FAKE_SMS)', async () => {
+    registerSmsSender(fakeSmsSender());
+    expect((await auth()).phone).toBe(true);
+  });
+
+  it('carries booleans, never the credentials that decide them', async () => {
+    const ctx = as(superId);
+    await configSave(
+      ctx,
+      { group: 'wechat' },
+      {
+        values: {
+          oaAppId: OA_APP_ID,
+          oaAppSecret: OA_SECRET,
+          miniAppId: MINI_APP_ID,
+          miniAppSecret: MINI_SECRET,
+        },
+      },
+    );
+    await configSave(ctx, { group: 'wechat-oa' }, { values: { enabled: true } });
+    await configSave(ctx, { group: 'wechat-mini' }, { values: { enabled: true } });
+    await configSave(
+      ctx,
+      { group: 'sms' },
+      {
+        values: {
+          provider: 'aliyun',
+          aliyunAccessKeyId: SMS_KEY_ID,
+          aliyunAccessKeySecret: SMS_KEY_SECRET,
+          aliyunSignName: '示例商城',
+        },
+      },
+    );
+
+    const payload = await siteConfigGet(anonymous());
+    expect(payload.auth).toEqual({ wechatOa: true, wechatMini: true, phone: true });
+    // The app ids and the SMS key id are not `secret: true`, so the registry
+    // property test above does not cover them; they must not appear either.
+    const serialised = JSON.stringify(payload);
+    for (const value of [
+      OA_APP_ID,
+      OA_SECRET,
+      MINI_APP_ID,
+      MINI_SECRET,
+      SMS_KEY_ID,
+      SMS_KEY_SECRET,
+    ]) {
+      expect(serialised).not.toContain(value);
+    }
   });
 });
 

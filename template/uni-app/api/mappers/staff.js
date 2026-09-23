@@ -824,7 +824,9 @@ export function fromLegacyStaffUserQuery(where) {
  * 契约有意做薄（E4：「一个店员该看到一个客户的多少」）：没有真实姓名、生日、身份证、
  * 地址，手机号永远是打码的 `138****8000`。页面上那几个字段都挂着 `v-if`，所以缺了
  * 就是不渲染，正是想要的效果。`coupon_num` 是详情页唯一一个没有 `v-if` 的：契约里
- * 没有这个数，所以按 E4 对「未知」的写法渲染成 `--`（见 docs/rewrite/cr/CR-1-h3.md）。
+ * 没有这个数，所以按 E4 对「未知」的写法渲染成 `--`。CR-1-h3 给了「查看优惠券」一条
+ * 读路由（`getUserCoupon({uid})`，列表本身），但没有把张数加进 E4 的用户详情——那要
+ * 用户域去数优惠券域的表，不是一次批量查询（见 docs/rewrite/status/w5t.md §1）。
  */
 export function toLegacyStaffUser(dto) {
   if (!dto) return {};

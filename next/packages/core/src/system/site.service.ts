@@ -31,7 +31,11 @@ import { wechatMiniConfig } from './wechat-mini.config';
  * logged at `warn` and the payload is rebuilt.
  */
 
-const CACHE_KEY = 'site:config:v1';
+/**
+ * `v2` since CR-3-h3 added `auth`: a `v1` payload cached by the previous build
+ * lacks it and would fail response validation for up to a minute after deploy.
+ */
+const CACHE_KEY = 'site:config:v2';
 const CACHE_SECONDS = 60;
 
 /**
@@ -76,6 +80,40 @@ export function resetSitePaymentMethods(): void {
 }
 
 /**
+ * A sign-in method the app may offer, and how to tell whether it works
+ * (CR-3-h3).
+ *
+ * The same inversion as `registerSitePaymentMethod`, for the same reason: the
+ * answer depends on the `wechat` group's credentials and on whether an SMS
+ * sender is usable, and `sms` and `wechat` both import `system`, so `system`
+ * may import neither. Each owner registers a probe; this file only ever learns
+ * a boolean.
+ *
+ * `groups` rather than one `group`: a WeChat login is decided by the
+ * operator's 启用 switch (`wechat-oa` / `wechat-mini`, here in `system`) *and*
+ * the credentials (`wechat`), and saving either has to drop the cache.
+ */
+export type SiteAuthMethod = keyof SitePublicConfig['auth'];
+
+export interface SiteAuthMethodSource {
+  /** The config groups that decide it; saving any of them drops the cache. */
+  groups: readonly string[];
+  /** `true` once the method can actually sign a shopper in. Never a credential. */
+  isEnabled: (ctx: Ctx) => Promise<boolean>;
+}
+
+const authMethods = new Map<SiteAuthMethod, SiteAuthMethodSource>();
+
+export function registerSiteAuthMethod(method: SiteAuthMethod, source: SiteAuthMethodSource): void {
+  authMethods.set(method, source);
+}
+
+/** Test helper. Never call this from app code. */
+export function resetSiteAuthMethods(): void {
+  authMethods.clear();
+}
+
+/**
  * The groups whose values the payload is built from.
  *
  * Saving any of them drops the cache and moves `version`. A function rather
@@ -86,6 +124,7 @@ export function resetSitePaymentMethods(): void {
 export function siteConfigSourceGroups(): string[] {
   const groups = new Set<string>([siteConfig.group, wechatMiniConfig.group]);
   for (const source of paymentMethods.values()) groups.add(source.group);
+  for (const source of authMethods.values()) for (const group of source.groups) groups.add(group);
   return [...groups];
 }
 
@@ -183,6 +222,7 @@ async function buildSiteConfig(ctx: Ctx): Promise<SitePublicConfig> {
       publicSecurityUrl: site.publicSecurityUrl,
     },
     payments: await paymentsOf(ctx),
+    auth: await authOf(ctx),
     support: supportOf(site, mini),
     splashAd: {
       enabled: site.splashEnabled && orNull(site.splashImage) !== null,
@@ -215,6 +255,29 @@ async function paymentsOf(ctx: Ctx): Promise<SitePublicConfig['payments']> {
     }),
   );
   return payments;
+}
+
+/**
+ * Which sign-in methods the app may offer (CR-3-h3).
+ *
+ * Same discipline as `paymentsOf`: every method starts at `false` and only a
+ * registered probe can raise it, and a probe that throws is a `warn` and a
+ * `false`. A method advertised when it cannot work is the worse failure — the
+ * shopper is sent to a login page whose one button answers
+ * `AUTH_WECHAT_NOT_CONFIGURED` — so doubt resolves to "not offered".
+ */
+async function authOf(ctx: Ctx): Promise<SitePublicConfig['auth']> {
+  const auth: SitePublicConfig['auth'] = { wechatOa: false, wechatMini: false, phone: false };
+  await Promise.all(
+    [...authMethods].map(async ([method, source]) => {
+      try {
+        auth[method] = await source.isEnabled(ctx);
+      } catch (error) {
+        ctx.logger.warn({ err: error, method }, 'site: sign-in method probe failed');
+      }
+    }),
+  );
+  return auth;
 }
 
 /**

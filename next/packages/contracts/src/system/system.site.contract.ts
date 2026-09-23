@@ -45,6 +45,7 @@ export const systemSiteConfigGet = defineRoute({
           publicSecurityUrl: '',
         },
         payments: { wechat: false },
+        auth: { wechatOa: false, wechatMini: false, phone: false },
         support: { kind: 'none', phone: null, qrcodeUrl: null },
         splashAd: { enabled: false, imageUrl: null, link: null, seconds: 3 },
         version: '0',

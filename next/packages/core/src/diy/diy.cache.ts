@@ -22,16 +22,17 @@ export const DIY_CACHE = {
   seconds: CACHE_SECONDS,
   userCenter: 'diy:user-center:v1',
   navigation: 'diy:navigation:v1',
+  productDetail: 'diy:product-detail:v1',
 } as const;
 
-const KEYS = [DIY_CACHE.userCenter, DIY_CACHE.navigation] as const;
+const KEYS = [DIY_CACHE.userCenter, DIY_CACHE.navigation, DIY_CACHE.productDetail] as const;
 
 /**
  * Drops every cached storefront read.
  *
  * Called from each 装修 write that can change one — saving content, publishing,
  * switching the home page, restoring the factory copy, deleting. All the keys
- * go together rather than one per mutation: they are two values off one page,
+ * go together rather than one per mutation: they are a few values off a few pages,
  * an extra `DEL` costs nothing, and a per-mutation map is a thing to get wrong
  * later.
  *

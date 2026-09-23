@@ -1,8 +1,10 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { smsConfig } from '../system';
 import { canonicalQuery, createAliyunSmsSender, percentEncode, signatureFor } from './sms-aliyun';
 import { fakeSmsSender } from './sms.fake';
 import { nullSmsSender } from './sms.port';
+import { smsProviderConfigured } from './sms.service';
 import { CODE_LENGTH, codeKey, generateCode, resendKey } from './verification-code';
 
 describe('percentEncode', () => {
@@ -163,5 +165,46 @@ describe('generateCode', () => {
   it('covers the leading-zero range', () => {
     const codes = Array.from({ length: 2000 }, () => generateCode());
     expect(codes.some((code) => code.startsWith('0'))).toBe(true);
+  });
+});
+
+/**
+ * `resolveSender`'s rule, as the predicate `GET /api/v1/site/config` asks
+ * (CR-3-h3) — the same function `resolveSender` itself now calls, so the two
+ * cannot disagree about whether a code can be sent.
+ */
+describe('smsProviderConfigured', () => {
+  const config = (values: Record<string, unknown>) => smsConfig.schema.parse(values);
+  const ALIYUN = {
+    provider: 'aliyun',
+    aliyunAccessKeyId: 'LTAI-test',
+    aliyunAccessKeySecret: 'secret',
+    aliyunSignName: '示例商城',
+  };
+
+  it('is true for Aliyun with its key id, key secret and sign name', () => {
+    expect(smsProviderConfigured(config(ALIYUN))).toBe(true);
+  });
+
+  it('is false while any of the three is blank', () => {
+    for (const key of ['aliyunAccessKeyId', 'aliyunAccessKeySecret', 'aliyunSignName']) {
+      expect(smsProviderConfigured(config({ ...ALIYUN, [key]: '' }))).toBe(false);
+    }
+  });
+
+  it('is false for 不启用, and for Tencent however complete (declared, not implemented)', () => {
+    expect(smsProviderConfigured(config({ ...ALIYUN, provider: 'none' }))).toBe(false);
+    expect(smsProviderConfigured(config({}))).toBe(false);
+    expect(
+      smsProviderConfigured(
+        config({
+          provider: 'tencent',
+          tencentAppId: '1400000000',
+          tencentSecretId: 'id',
+          tencentSecretKey: 'key',
+          tencentSignName: '示例商城',
+        }),
+      ),
+    ).toBe(false);
   });
 });

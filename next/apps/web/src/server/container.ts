@@ -13,6 +13,7 @@ import {
 } from '@shop/core/kernel';
 import { createBullQueue } from '@shop/core/kernel/queue-bullmq';
 import { AdminAuthService, UserSessionService } from '@shop/core/auth';
+import { fakeSmsSender, registerSmsSender } from '@shop/core/sms';
 import Redis from 'ioredis';
 import { loadEnv, type Env } from './env';
 
@@ -57,6 +58,29 @@ function asConfigCache(redis: Redis): ConfigCache {
   };
 }
 
+let fakeSmsAnnounced = false;
+
+/**
+ * `SHOP_FAKE_SMS=1` (CR-3-i): register the in-memory SMS sender in this
+ * process's own module graph, so `POST /api/v1/auth/sms-codes` succeeds and
+ * the code is only ever in Redis. Logged at `warn` once per process — a box
+ * that has it on by mistake says so at boot, not when a shopper complains.
+ *
+ * Deliberately not a value of the `sms` config group; see `env.ts`.
+ */
+export function applyProcessOverrides(env: Env, logger: Pick<Logger, 'warn'>): void {
+  if (env.SHOP_FAKE_SMS !== '1') return;
+  registerSmsSender(fakeSmsSender());
+  if (fakeSmsAnnounced) return;
+  fakeSmsAnnounced = true;
+  logger.warn({ env: 'SHOP_FAKE_SMS' }, 'fake SMS sender active — codes are not delivered');
+}
+
+/** Test helper: let the next `applyProcessOverrides` warn again. */
+export function resetProcessOverrides(): void {
+  fakeSmsAnnounced = false;
+}
+
 export function buildContainer(env: Env = loadEnv()): Container {
   const dbHandle = createDb(env.DATABASE_URL, { max: env.DB_POOL_MAX });
   const redis = new Redis(env.REDIS_URL, {
@@ -74,6 +98,7 @@ export function buildContainer(env: Env = loadEnv()): Container {
     now: () => clock.now(),
   });
   const config = createConfigService({ db: dbHandle.db, cache: asConfigCache(redis), clock });
+  applyProcessOverrides(env, logger);
 
   return {
     env,

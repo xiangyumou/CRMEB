@@ -84,16 +84,22 @@ function obj(value) {
  * (`record_No`, `icp_url`, `network_security`, `network_security_url`),
  * `pay_weixin_open` (收银台), `special_invoice_status` (开票), `site_func`
  * (`libs/permission.js`). Every pay flag other than WeChat reads `0`: WeChat Pay v3
- * is the only gateway in scope (f4.md deviation 3). The three login-method switches
- * (`wechat_status`, `wechat_auth_switch`, `phone_auth_switch`) have no source in the
- * contract and are deliberately absent, which is what the app saw before this
- * route existed — CR-2-h3.
+ * is the only gateway in scope (f4.md deviation 3).
+ *
+ * The three login-method switches come from `auth` (CR-3-h3), in the legacy
+ * spelling `getMallBasicConfig` answered: `wechat_status` a boolean (公众号 app id
+ * and secret set — `libs/login.js` sends H5-in-WeChat to `wechat_login`),
+ * `wechat_auth_switch` / `phone_auth_switch` `1`/`0` (`libs/login.js` picks
+ * `wechat_login` over `binding_phone` on MP; `wechat_login` shows 授权登录 /
+ * 手机号登录; `binding_phone` pops 1 or 2 pages). An older payload without
+ * `auth` reads as all off, which is what the app saw before.
  */
 export function toLegacyBasicConfig(dto) {
   const src = obj(dto);
   const logo = obj(src.logo);
   const filing = obj(src.filing);
   const payments = obj(src.payments);
+  const auth = obj(src.auth);
   return {
     site_name: text(src.name),
     site_logo: text(logo.main),
@@ -107,6 +113,9 @@ export function toLegacyBasicConfig(dto) {
     yue_pay_status: 0,
     offline_pay_status: 0,
     friend_pay_status: 0,
+    wechat_status: auth.wechatOa === true,
+    wechat_auth_switch: auth.wechatMini ? 1 : 0,
+    phone_auth_switch: auth.phone ? 1 : 0,
     // B2's invoice form carries both 普票 and 专票 (see toLegacyProfile)
     special_invoice_status: '1',
     // 拼团 is the one activity module this build keeps

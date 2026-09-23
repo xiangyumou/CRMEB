@@ -17,8 +17,11 @@ import type {
   StaffCoupon,
   StaffCouponGrantBody,
   StaffCouponListQuery,
+  StaffUserCouponListQuery,
+  StaffUserCoupons,
   UserCoupon,
 } from '@shop/contracts/coupon/schemas';
+import { STAFF_USER_COUPON_LIMIT } from '@shop/contracts/coupon/schemas';
 import type { PageQuery } from '@shop/contracts/conventions';
 import type { Tx } from '@shop/db';
 import { DomainError } from '../kernel/errors';
@@ -308,6 +311,41 @@ export async function staffListCoupons(
  */
 export async function staffGrant(ctx: Ctx, body: StaffCouponGrantBody): Promise<CouponGrantResult> {
   return adminGrant(ctx, { id: body.couponId }, { userIds: [body.userId] });
+}
+
+/**
+ * One customer's coupons, for 「查看优惠券」 in the staff console (CR-1-h3).
+ *
+ * `auth: 'staff'` has already been checked by `handle()`; this checks the
+ * actor kind again so that a route wired without the guard fails closed with
+ * `FORBIDDEN` instead of handing any signed-in shopper somebody else's wallet.
+ *
+ * The rows are read by `uid` from the route, never from the actor — the
+ * caller is the 店员, not the customer — and the mapping is `toUserCoupon`, the
+ * storefront wallet's, so the staff view cannot show a field the customer's
+ * own wallet does not.
+ */
+export async function staffListUserCoupons(
+  ctx: Ctx,
+  params: { uid: string },
+  query: StaffUserCouponListQuery,
+): Promise<StaffUserCoupons> {
+  if (ctx.actor.kind !== 'staff') throw new DomainError('FORBIDDEN');
+  const userId = Number(params.uid);
+  if (!(await repo.existingUserIds(ctx.db, [userId])).has(userId)) {
+    throw new DomainError('USER_NOT_FOUND');
+  }
+  const rows = await repo.listUserCouponsForStaff(ctx.db, {
+    userId,
+    state: query.state,
+    now: ctx.clock.now(),
+    limit: STAFF_USER_COUPON_LIMIT,
+  });
+  const terms = await repo.templateTermsFor(
+    ctx.db,
+    rows.map((row) => row.templateId),
+  );
+  return { items: rows.map((row) => toUserCoupon(row, termsOf(terms, row.templateId))) };
 }
 
 // ---------------------------------------------------------------------------

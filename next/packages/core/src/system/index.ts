@@ -93,14 +93,19 @@ export { isTrustedHost, publicOrigin, siteConfig } from './site.config';
  * `registerSitePaymentMethod` is how a gateway says it is usable *without*
  * `system` importing it: this domain is a sink and must import none, or
  * `notification`'s effect handler registers itself under `undefined/undefined`
- * (see the comment in `site.service.ts`).
+ * (see the comment in `site.service.ts`). `registerSiteAuthMethod` (CR-3-h3)
+ * is the same seam for the sign-in methods; `wechat` and `sms` register them.
  */
 export {
   invalidateSiteConfigCache,
+  registerSiteAuthMethod,
   registerSitePaymentMethod,
+  resetSiteAuthMethods,
   resetSitePaymentMethods,
   siteConfigGet,
   siteConfigSourceGroups,
+  type SiteAuthMethod,
+  type SiteAuthMethodSource,
   type SitePaymentMethod,
   type SitePaymentMethodSource,
 } from './site.service';

@@ -350,6 +350,12 @@
           "style": {
             "navigationBarTitleText": "预售列表"
           }
+        },
+        {
+          "path": "presell_details/index",
+          "style": {
+            "navigationStyle": "custom"
+          }
         }
       ]
     },

@@ -60,6 +60,7 @@ import { toLegacyShipment } from './mappers/fulfil.js';
 import {
   fromLegacyStaffCouponQuery,
   toLegacyStaffCoupons,
+  toLegacyUserCouponList,
   fromLegacyCouponGrant,
   couponGrantMessage,
 } from './mappers/coupon.js';
@@ -493,22 +494,23 @@ function fanOutByUid(uid, call, msg) {
 
 // ---------------------------------------------------------------------------
 // 赠送优惠券 — B3 的 `GET /api/v1/staff/coupons` 和 `POST /api/v1/staff/coupon-grants`
-// （CR-5-h2 §2，契约 next/packages/contracts/src/coupon/coupon.staff.contract.ts）。
+// （CR-5-h2 §2），查看优惠券 — `GET /api/v1/staff/users/:uid/coupons`（CR-1-h3）；
+// 契约 next/packages/contracts/src/coupon/coupon.staff.contract.ts。
 // ---------------------------------------------------------------------------
 
 /**
- * 可赠送的优惠券
+ * 可赠送的优惠券 / 客户持有的优惠券
  *
- * 抽屉还有第二种用法：详情页的「查看优惠券」（`num == 2`）带着 `uid` 来问「这位客户
- * 手里有哪些券」。店员端没有这条读路由（docs/rewrite/cr/CR-1-h3.md），所以带 uid 时
- * 不上网，直接以一句说明拒绝：抽屉 toast 这句话、显示空态，而不是把「店里可发的券」
- * 冒充成「客户持有的券」。
+ * 抽屉有两种用法。发券（`num` 为 0 / 1）不带 uid，读 B3 的
+ * `GET /api/v1/staff/coupons`，店里可发的券。详情页的「查看优惠券」（`num == 2`）
+ * 带着 `uid` 问「这位客户手里有哪些券」：`GET /api/v1/staff/users/:uid/coupons`
+ * （CR-1-h3），答的是和「我的优惠券」同一个条目，所以用 `toLegacyUserCouponList`，
+ * 可用的排在前面。这时抽屉不显示搜索框，`coupon_title` 不传。
  */
 export function getUserCoupon(data) {
   const uid = data && data.uid !== undefined && data.uid !== null ? String(data.uid).trim() : '';
   if (uid && uid !== '0') {
-    const message = '店员端暂不能查看客户持有的优惠券';
-    return Promise.reject({ status: 0, code: 'NOT_SUPPORTED', message, msg: message });
+    return request.get(`/api/v1/staff/users/${uid}/coupons`, {}, { map: toLegacyUserCouponList });
   }
   return request.get('/api/v1/staff/coupons', fromLegacyStaffCouponQuery(data), {
     map: toLegacyStaffCoupons,

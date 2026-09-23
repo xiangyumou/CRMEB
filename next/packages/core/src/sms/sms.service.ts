@@ -1,3 +1,4 @@
+import type { z } from 'zod';
 import { smsConfig } from '../system';
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
@@ -31,6 +32,35 @@ import {
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
+type SmsConfigValues = z.infer<typeof smsConfig.schema>;
+
+/**
+ * Whether the `sms` group names a provider this build can send through.
+ *
+ * `resolveSender`'s rule, extracted so `GET /api/v1/site/config` can say
+ * whether 手机号登录 works (CR-3-h3) without a second copy of it to drift:
+ * Aliyun with its key id, key secret and sign name all filled in. `none` and
+ * Tencent (declared, not implemented — see below) are not.
+ */
+export function smsProviderConfigured(config: SmsConfigValues): boolean {
+  return (
+    config.provider === 'aliyun' &&
+    config.aliyunAccessKeyId !== '' &&
+    config.aliyunAccessKeySecret !== '' &&
+    config.aliyunSignName !== ''
+  );
+}
+
+/**
+ * Whether `resolveSender` would hand back a sender that can deliver: a
+ * registered one (tests, `SHOP_FAKE_SMS`), or a configured provider. Anything
+ * else resolves to `nullSmsSender`, which refuses every send.
+ */
+export async function smsSenderUsable(ctx: Ctx): Promise<boolean> {
+  if (getSmsSenderOverride()) return true;
+  return smsProviderConfigured(await ctx.config.get(smsConfig));
+}
+
 /** Aliyun and Tencent are both in the config group; only Aliyun is implemented. */
 export async function resolveSender(ctx: Ctx): Promise<SmsSender> {
   const registered = getSmsSenderOverride();
@@ -38,9 +68,7 @@ export async function resolveSender(ctx: Ctx): Promise<SmsSender> {
 
   const config = await ctx.config.get(smsConfig);
   if (config.provider === 'aliyun') {
-    if (!config.aliyunAccessKeyId || !config.aliyunAccessKeySecret || !config.aliyunSignName) {
-      return nullSmsSender;
-    }
+    if (!smsProviderConfigured(config)) return nullSmsSender;
     return createAliyunSmsSender({
       accessKeyId: config.aliyunAccessKeyId,
       accessKeySecret: config.aliyunAccessKeySecret,

@@ -209,8 +209,10 @@
 				that.getPresellProductList();
 			},
 			goDetails(item) {
+				// 预售详情, keyed by the activity id (CR-2-i): it reads the presale price and
+				// buys with `advanceId`, which the plain product page cannot.
 				uni.navigateTo({
-					url: '/pages/goods_details/index?id=' + item.id
+					url: '/pages/activity/presell_details/index?id=' + item.id
 				})
 			}
 		},

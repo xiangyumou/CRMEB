@@ -110,7 +110,7 @@ export function diyLayout(type, map) {
 
 /**
  * 获取装修数据
- * @param string type 'home' | 'category' | 'user' …
+ * @param string type 'home' | 'category' | 'user' | 'detail'
  * @param object data {theme_id} 预览用
  */
 export function getThemeInfo(type, data) {
@@ -134,9 +134,16 @@ export function getThemeInfo(type, data) {
   if (type === 'category') {
     return diyLayout('category', toLegacyLayout);
   }
-  // 其余（今天只有商品详情的 `'detail'`）没有按类型读装修页的路由：路由只收
-  // `category | user`，带别的值是 422。不上网，给一页空装修——和以前那个 422 之后
-  // 页面停在的状态相同。docs/rewrite/cr/CR-2-h3.md 向装修域要这条读路由。
+  // 商品详情整页都是装修（`pages/goods_details` 把它交给 PageDesign，底部栏读其中的
+  // `bottomMenu`）：`GET /api/v1/diy/pages/product-detail`（CR-2-h3）。没发布过
+  // 商品详情页的店铺拿到内置默认页（`id` 为 null），所以这条读永远有内容。
+  if (type === 'detail') {
+    return request.get('/api/v1/diy/pages/product-detail', {}, {
+      noAuth: true,
+      map: toLegacyDiyPage,
+    });
+  }
+  // 其余类型没有按类型读装修页的路由。不上网，给一页空装修。
   return Promise.resolve({ data: {}, msg: '', status: 200 });
 }
 

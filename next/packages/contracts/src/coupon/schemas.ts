@@ -494,6 +494,33 @@ export const orderGiftCoupons = z.object({
 });
 export type OrderGiftCoupons = z.infer<typeof orderGiftCoupons>;
 
+// ---------------------------------------------------------------------------
+// 店员查看客户持有的优惠券 (CR-1-h3)
+// ---------------------------------------------------------------------------
+
+/**
+ * `?state=` is the wallet's own three tabs (`myCouponListQuery`), but optional:
+ * without it the answer is every coupon the customer holds, the spendable ones
+ * first — which is what 「查看优惠券」 opens on.
+ */
+export const staffUserCouponListQuery = z.object({
+  state: z.enum(['unused', 'used', 'expired']).optional(),
+});
+export type StaffUserCouponListQuery = z.infer<typeof staffUserCouponListQuery>;
+
+/**
+ * The storefront 我的优惠券 item, unchanged, so the uni-app maps it with the
+ * mapper it already has. Not paged: the drawer has no "load more". The newest
+ * `STAFF_USER_COUPON_LIMIT` of them, spendable first.
+ */
+export const staffUserCoupons = z.object({
+  items: z.array(userCoupon),
+});
+export type StaffUserCoupons = z.infer<typeof staffUserCoupons>;
+
+/** How many coupons the staff view returns at most. Nobody scrolls a drawer further. */
+export const STAFF_USER_COUPON_LIMIT = 100;
+
 export const staffCouponExample: StaffCoupon = {
   id: '1',
   name: '满 100 减 10',

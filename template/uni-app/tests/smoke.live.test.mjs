@@ -320,10 +320,22 @@ d('the api layer against the contract mock', () => {
     expect(res.msg).toBe('赠送成功');
   });
 
-  it('查看优惠券 refuses without a request — there is no staff read of a customer’s coupons', async () => {
-    await expect(admin.getUserCoupon({ coupon_title: '', uid: 1001 })).rejects.toMatchObject({
-      msg: expect.any(String),
-    });
+  it('查看优惠券 reads the customer’s own coupons, spendable first (CR-1-h3)', async () => {
+    const seen = [];
+    const original = globalThis.uni.request;
+    globalThis.uni.request = (options) => {
+      seen.push(options.url);
+      return original(options);
+    };
+    let res;
+    try {
+      res = await admin.getUserCoupon({ coupon_title: '', uid: 1001 });
+    } finally {
+      globalThis.uni.request = original;
+    }
+    expect(seen.some((url) => url.includes('/api/v1/staff/users/1001/coupons'))).toBe(true);
+    expect(res.data[0]).toMatchObject({ coupon_title: '满 100 减 10', is_use: 0 });
+    expect(res.data[0].end_use_time).toBeGreaterThan(res.data[0].start_use_time);
   });
 
   it('订单赠券 maps to the 支付成功 sheet', async () => {
@@ -390,7 +402,7 @@ d('the api layer against the contract mock', () => {
     expect(seen.filter((url) => url.includes('/api/v1/site/config'))).toHaveLength(1);
   });
 
-  it('底部导航 answers the pageFoot component, 版式 a number, 个人中心 a DIY page', async () => {
+  it('底部导航 answers the pageFoot component, 版式 a number, 个人中心 and 商品详情 DIY pages', async () => {
     const nav = await pub.getNavigation();
     expect(nav.data).toHaveProperty('effectConfig');
     const category = await api.getThemeInfo('category');
@@ -400,9 +412,12 @@ d('the api layer against the contract mock', () => {
     expect(menus.data.routine_my_menus).toEqual([]);
     const center = await api.getThemeInfo('user');
     expect(center.data).toHaveProperty('value');
-    // 商品详情 has no read route (CR-2-h3): an empty page, not a 422
+    // 商品详情 (CR-2-h3): the mock answers the built-in default page
     const detail = await api.getThemeInfo('detail');
-    expect(detail.data).toEqual({});
+    expect(detail.data.type).toBe('product_detail');
+    const names = Object.values(detail.data.value).map((node) => node.name);
+    expect(names).toContain('productInfo');
+    expect(names).toContain('bottomMenu');
   });
 
   it('海报 base64 posts one url per image and composes {image, code}', async () => {
