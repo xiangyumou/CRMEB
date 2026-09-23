@@ -14,7 +14,7 @@ import {
   runConcurrently,
   type TestCtx,
 } from '@shop/testing';
-import { registerCatalogDomain, reviewSubmit, stockAndSalesOf } from '../catalog';
+import { registerCatalogDomain, reviewSubmit, runAutoReview, stockAndSalesOf } from '../catalog';
 import { registerNotificationDomain } from '../notification';
 import { registerShippingFreightPort } from '../shipping';
 import type { Actor, Ctx } from '../kernel/context';
@@ -1072,6 +1072,7 @@ describe('my orders', () => {
       finished: 0,
       cancelled: 0,
       refunding: 0,
+      unreviewed: 0,
     });
 
     const detail = await order.detail(as(mine.userId), { id: String(mine.orderId) });
@@ -1237,6 +1238,55 @@ describe('ORDER-010 — review state on the shopper’s lines, and 待评价', (
       { reviewed: true, reviewable: false },
       { reviewed: false, reviewable: false },
     ]);
+  });
+
+  const unreviewedTab = async (userId: number) =>
+    (
+      await order.list(as(userId), { page: 1, pageSize: 20, tab: 'unreviewed', sortOrder: 'desc' })
+    ).items.map((item) => item.id);
+
+  it('counts 待评价 as the orders with a reviewable line, and the tab lists exactly those', async () => {
+    const received = await twoLineOrder('received');
+    const userId = received.userId;
+    expect(await order.counts(as(userId))).toMatchObject({ finished: 1, unreviewed: 1 });
+    expect(await unreviewedTab(userId)).toEqual([received.orderId]);
+
+    // One line reviewed: the other still owes one, so the order stays.
+    await review(userId, received.lineIds[0]);
+    expect(await order.counts(as(userId))).toMatchObject({ unreviewed: 1 });
+
+    // Both reviewed: it leaves 待评价 and stays 已完成.
+    await review(userId, received.lineIds[1]);
+    expect(await order.counts(as(userId))).toMatchObject({ finished: 1, unreviewed: 0 });
+    expect(await unreviewedTab(userId)).toEqual([]);
+  });
+
+  it('leaves out an order not yet received, one refunded line by line, and another shopper’s', async () => {
+    const { userId, orderId, lineIds } = await twoLineOrder('completed');
+    const other = await twoLineOrder('completed');
+    // Not received yet: nothing to review, whatever its lines.
+    const shipped = await twoLineOrder('shipped');
+    expect(await order.counts(as(shipped.userId))).toMatchObject({ unreviewed: 0 });
+
+    await harness.ctx.db
+      .update(orderItems)
+      .set({ refundedQuantity: 1 })
+      .where(eq(orderItems.id, Number(lineIds[1])));
+    await review(userId, lineIds[0]);
+    // One line reviewed, the other refunded in full: nothing left to review.
+    expect(await order.counts(as(userId))).toMatchObject({ finished: 1, unreviewed: 0 });
+    expect(await unreviewedTab(userId)).toEqual([]);
+    expect(await unreviewedTab(other.userId)).toEqual([other.orderId]);
+    expect(orderId).not.toBe(other.orderId);
+  });
+
+  it('stops counting a line once the auto-review job has written its default review', async () => {
+    const { userId } = await twoLineOrder('completed');
+    expect(await order.counts(as(userId))).toMatchObject({ unreviewed: 1 });
+    harness.clock.set('2026-06-30T00:00:00.000Z');
+    const swept = await runAutoReview(harness.ctx);
+    expect(swept.written).toBe(2);
+    expect(await order.counts(as(userId))).toMatchObject({ finished: 1, unreviewed: 0 });
   });
 });
 

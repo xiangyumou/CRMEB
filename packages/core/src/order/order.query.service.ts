@@ -65,11 +65,12 @@ export async function list(
 }
 
 /**
- * The seven badges from one grouped query.
+ * The badges from one grouped query.
  *
  * `refunding` counts orders with any live after-sales, so an order can be in
  * two badges at once — which is what the tab bar has always shown, because an
- * order being refunded is still 待收货 until the refund succeeds.
+ * order being refunded is still 待收货 until the refund succeeds. `unreviewed`
+ * (待评价, ORDER-010) is likewise a subset of `finished`.
  */
 export async function counts(ctx: Ctx): Promise<OrderCounts> {
   const userId = requireUserId(ctx);
@@ -83,9 +84,11 @@ export async function counts(ctx: Ctx): Promise<OrderCounts> {
     finished: 0,
     cancelled: 0,
     refunding: 0,
+    unreviewed: 0,
   };
   for (const row of rows) {
     out.all += row.n;
+    out.unreviewed += row.unreviewed;
     if (row.refunding) out.refunding += row.n;
     switch (row.status) {
       case 'pending_payment':

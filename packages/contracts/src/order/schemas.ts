@@ -523,6 +523,13 @@ export const orderListTab = z.enum([
   'finished',
   'cancelled',
   'refunding',
+  /**
+   * 待评价: a `received` or `completed` order with at least one `reviewable` line
+   * (`storefrontOrderItem`, ORDER-010). A subset of 已完成; the order leaves it when its last
+   * line is reviewed — by the shopper, or by the auto-review job `autoReviewDays` after
+   * completion.
+   */
+  'unreviewed',
 ]);
 export type OrderListTab = z.infer<typeof orderListTab>;
 
@@ -537,7 +544,7 @@ export type OrderListQuery = z.infer<typeof orderListQuery>;
 
 export const pagedOrders = paged(storefrontOrderListItem);
 
-/** The badge numbers on the tab bar. One query, not eight. */
+/** The badge numbers on the tab bar. One query, not nine. */
 export const orderCounts = z.object({
   all: z.number().int().min(0),
   unpaid: z.number().int().min(0),
@@ -546,6 +553,8 @@ export const orderCounts = z.object({
   finished: z.number().int().min(0),
   cancelled: z.number().int().min(0),
   refunding: z.number().int().min(0),
+  /** 待评价, the `unreviewed` tab's orders (ORDER-010). Also counted in `finished`. */
+  unreviewed: z.number().int().min(0),
 });
 export type OrderCounts = z.infer<typeof orderCounts>;
 
@@ -557,6 +566,7 @@ export const orderCountsExample = {
   finished: 5,
   cancelled: 1,
   refunding: 0,
+  unreviewed: 2,
 } satisfies OrderCounts;
 
 export const orderCancelBody = z.object({

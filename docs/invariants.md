@@ -628,8 +628,11 @@ An order whose second stock deduction fails rolls back completely: no order row,
 
 ### ORDER-010
 
-A line on the shopper's own order is `reviewable` exactly when `catalog.reviewSubmit` accepts it: the order is `received` or `completed`, the line is not refunded in full, and it has no review yet. `reviewed` is any review row for the line — published, held for moderation or removed by the shop — because each of them makes a second review `CATALOG_REVIEW_ALREADY_WRITTEN`. The list and the detail say the same.
+A line on the shopper's own order is `reviewable` exactly when `catalog.reviewSubmit` accepts it: the order is `received` or `completed`, the line is not refunded in full, and it has no review yet. `reviewed` is any review row for the line — published, held for moderation or removed by the shop — because each of them makes a second review `CATALOG_REVIEW_ALREADY_WRITTEN`. The list and the detail say the same. 待评价 (`order.counts.unreviewed`, the `unreviewed` tab, the 订单入口 badge) is the shopper's live orders with at least one such line; it has no deadline of its own — the auto-review job's default review, `autoReviewDays` after completion, is what takes a line out.
 
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > counts 待评价 as the orders with a reviewable line, and the tab lists exactly those`
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > leaves out an order not yet received, one refunded line by line, and another shopper’s`
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > stops counting a line once the auto-review job has written its default review`
 - `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > marks a line reviewable only once received, and reviewed once written — held or not`
 - `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > agrees with what reviewSubmit accepts: a fully refunded line is not reviewable`
 

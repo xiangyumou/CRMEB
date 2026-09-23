@@ -217,7 +217,7 @@ export async function couponStatesFor(
 /**
  * The 订单入口 badges for the signed-in shopper (DECOR-015), from the same
  * query as the 我的订单 tab bar. `aftersale` is the orders with a live
- * after-sales; `unreviewed` is left out — nothing counts reviewable lines yet.
+ * after-sales; `unreviewed` is 待评价 (ORDER-010).
  */
 export async function orderEntryCountsFor(ctx: Ctx): Promise<OrderEntryCounts> {
   const counts = await order.counts(ctx);
@@ -226,6 +226,7 @@ export async function orderEntryCountsFor(ctx: Ctx): Promise<OrderEntryCounts> {
     unshipped: counts.unshipped,
     unreceived: counts.unreceived,
     aftersale: counts.refunding,
+    unreviewed: counts.unreviewed,
   };
 }
 

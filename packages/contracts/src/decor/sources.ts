@@ -244,8 +244,9 @@ const count = z.number().int().min(0);
 
 /**
  * The 订单入口 badges, by `ORDER_ENTRY_KEYS`. `aftersale` is the orders with a
- * live after-sales. `unreviewed` is absent: nothing counts reviewable lines
- * yet, and the entry then shows no badge rather than a wrong one.
+ * live after-sales; `unreviewed` is `order.counts`' 待评价 (ORDER-010). It stays
+ * optional in the schema: a server from before the count sends none, and the
+ * entry then shows no badge rather than a wrong one.
  */
 export const orderEntryCounts = z.object({
   unpaid: count,

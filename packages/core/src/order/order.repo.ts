@@ -175,9 +175,25 @@ export function tabFilter(tab: OrderListTab): SQL | undefined {
       return eq(orders.status, 'cancelled');
     case 'refunding':
       return ne(orders.refundStatus, 'none');
+    case 'unreviewed':
+      return awaitingReview();
     default:
       return undefined;
   }
+}
+
+/**
+ * 待评价 (ORDER-010): `received` or `completed`, with a line not refunded in full and not yet
+ * reviewed — `isReviewable` in `order.query.service.ts`, in SQL, and what `catalog.reviewSubmit`
+ * accepts. Reads `product_reviews` for the same reason as `reviewedItemIds`.
+ */
+export function awaitingReview(): SQL {
+  return sql`(${orders.status} in ('received', 'completed') and exists (
+    select 1 from order_items oi
+    where oi.order_id = ${orders.id}
+      and oi.refunded_quantity < oi.quantity
+      and not exists (select 1 from product_reviews pr where pr.order_item_id = oi.id)
+  ))`;
 }
 
 export interface OrderListFilter {
@@ -226,22 +242,34 @@ export async function listOrders(
   return { rows, total: Number(counted[0]?.total ?? 0) };
 }
 
-/** One grouped query behind all seven badges, rather than seven `count(*)`s. */
+/**
+ * One grouped query behind all the badges, rather than a `count(*)` each. `unreviewed` is
+ * the group's 待评价 orders (`awaitingReview`).
+ */
 export async function countByStatus(
   db: DbOrTx,
   userId: number,
-): Promise<{ status: OrderStatus; fulfillmentStatus: string; refunding: boolean; n: number }[]> {
+): Promise<
+  {
+    status: OrderStatus;
+    fulfillmentStatus: string;
+    refunding: boolean;
+    n: number;
+    unreviewed: number;
+  }[]
+> {
   const rows = await db
     .select({
       status: orders.status,
       fulfillmentStatus: orders.fulfillmentStatus,
       refunding: sql<boolean>`${orders.refundStatus} <> 'none'`,
       n: sql<number>`count(*)::int`,
+      unreviewed: sql<number>`(count(*) filter (where ${awaitingReview()}))::int`,
     })
     .from(orders)
     .where(and(eq(orders.userId, userId), liveForUser()))
     .groupBy(orders.status, orders.fulfillmentStatus, sql`${orders.refundStatus} <> 'none'`);
-  return rows.map((row) => ({ ...row, n: Number(row.n) }));
+  return rows.map((row) => ({ ...row, n: Number(row.n), unreviewed: Number(row.unreviewed) }));
 }
 
 /**
