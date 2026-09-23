@@ -15,6 +15,7 @@
     "build:h5:mp-emulation": "TARO_APP_PLATFORM_EMULATION=mp taro build --type h5 --no-check",
     "build": "pnpm run build:weapp && pnpm run build:h5 && pnpm run size",
     "size": "node scripts/size-report.mjs",
+    "tab-icons": "node scripts/tab-icons.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test:unit": "vitest run --project unit"

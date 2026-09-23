@@ -35,14 +35,20 @@ export default defineAppConfig({
     backgroundTextStyle: 'dark',
   },
   // Native tab bar (4 fixed tabs). Labels and colours are re-applied at runtime from
-  // `app/config` appearance (platform/tab-bar.ts); the icons are bundled PNGs. See
+  // `app/config` appearance (platform/tab-bar.ts); the icons are bundled PNGs
+  // (scripts/tab-icons.mjs), replaced at runtime by a shop's uploaded ones. See
   // docs/mini/spikes/S1-taro.md for why not `custom: true`.
   tabBar: {
     color: '#666666',
     selectedColor: '#e1251b',
     backgroundColor: '#ffffff',
     borderStyle: 'white',
-    list: TAB_PAGES.map((tab) => ({ pagePath: tab.pagePath, text: tab.text })),
+    list: TAB_PAGES.map((tab) => ({
+      pagePath: tab.pagePath,
+      text: tab.text,
+      iconPath: `assets/tab-bar/${tab.icon}.png`,
+      selectedIconPath: `assets/tab-bar/${tab.icon}-active.png`,
+    })),
   },
   // Inject only the components a page actually uses (smaller, faster start).
   lazyCodeLoading: 'requiredComponents',
