@@ -1,6 +1,11 @@
 import { registerPaymentPort } from '../order/ports';
 import { registerSitePaymentMethod } from '../system';
 import { isPaymentEnabled, paymentConfig } from './payment.config';
+import {
+  installMiniTradeHooks,
+  registerMiniTradeEffects,
+  registerMiniTradeNotificationEvents,
+} from './payment.mini-trade';
 import { registerPaymentEffects } from './payment.effects';
 import { registerPaymentNotificationEvents } from './payment.notifications';
 import { closeOrderPayments, ensureNoOpenAttempts } from './payment.service';
@@ -86,6 +91,19 @@ export {
   type PaymentConfig,
 } from './payment.config';
 export { paymentPermissions } from './permissions';
+export {
+  CORRECT_SHIPPING,
+  MINI_TRADE_MANAGED_EVENT,
+  MSG_JUMP_PATH,
+  SHIPPING_OVERDUE_EVENT,
+  UPLOAD_SHIPPING,
+  installMiniTradeHooks,
+  miniTradeStatus,
+  syncMiniTrade,
+  wechatReceipt,
+} from './payment.mini-trade';
+export { miniTradeConfig, type MiniTradeConfig } from './payment.mini-trade.config';
+export { findTradeOrderByOrder as findWechatTradeOrder } from './payment.mini-trade.repo';
 export { registerPaymentEffects } from './payment.effects';
 export {
   PAYMENT_NOTIFY_MISMATCH_EVENT,
@@ -118,6 +136,11 @@ export {
 export function registerPaymentDomain(): void {
   registerPaymentPort({ ensureNoOpenAttempts, closeOrderPayments });
   registerPaymentEffects();
+  // 小程序发货信息管理 (C07): report shipments of mini-program payments, and
+  // act on WeChat's settlement pushes.
+  installMiniTradeHooks();
+  registerMiniTradeEffects();
+  registerMiniTradeNotificationEvents();
   // A notification naming another merchant is told to an operator.
   registerPaymentNotificationEvents();
   // `GET /api/v1/site/config` tells the app which pay buttons to draw. It is

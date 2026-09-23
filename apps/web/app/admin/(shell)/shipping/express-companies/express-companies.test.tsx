@@ -29,6 +29,7 @@ const row: ExpressCompanyRow = {
   name: '顺丰速运',
   sortOrder: 100,
   isEnabled: true,
+  wechatDeliveryId: 'SF',
   createdAt: '2026-01-01T00:00:00+08:00',
   updatedAt: '2026-01-01T00:00:00+08:00',
 };

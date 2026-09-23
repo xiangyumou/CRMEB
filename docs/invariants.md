@@ -834,6 +834,65 @@ An invoice can only be asked for on an order that was paid for and not refunded,
 - `packages/core/src/order/order.invoice.int.test.ts::申请开票 > refuses an order whose money went back`
 - `packages/core/src/order/order.invoice.int.test.ts::what the buyer can see > tells a stranger the invoice does not exist`
 
+## 小程序发货信息管理 (WeChat mini-program shipping)
+
+### WXSHIP-001
+
+A shipment of an order paid through the mini program (`payment_attempts.channel = wechat_mini`) is reported to WeChat's 发货信息管理 (`upload_shipping_info`) after its transaction commits, through the effects ledger, keyed by the payment's `transaction_id` and the payer's openid. One shipment that sends everything is one unified upload (`delivery_mode: 1`); a split delivery is one express upload per shipment in dispatch order, `is_all_delivered` on the last. 顺丰 carries the masked receiver phone, a virtual delivery is `logistics_type: 3` with no waybill. A payment through any other channel, or any payment while 录入发货信息 is off, is never reported.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > uploads one unified express shipment with the carrier’s WeChat code — WXSHIP-001`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > adds the masked receiver phone for 顺丰 — WXSHIP-001`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > reports a split delivery in parts, the last one saying all delivered — WXSHIP-001`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > reports a virtual delivery as logistics_type 3 without a waybill — WXSHIP-001`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > reports nothing for a payment made outside the mini program, or while switched off — WXSHIP-001`
+
+### WXSHIP-002
+
+An upload WeChat refused is retried by the ledger, and one WeChat already has (`10060002`, `10060023`) finishes as reported. An express shipment whose carrier has no 微信快递编码 is not sent with a guess: the effect waits, and goes out once an operator fills the code in.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > waits, retrying, while the carrier has no WeChat code — and sends once it is filled in — WXSHIP-002`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > retries a WeChat refusal, and finishes on “already shipped” — WXSHIP-002`
+
+### WXSHIP-003
+
+修改发货信息 on a reported shipment re-uploads it at most once, which is WeChat's own limit; a second correction is not sent.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > corrects a reported waybill once, as WeChat allows, and never twice — WXSHIP-003`
+
+### WXSHIP-004
+
+The mini program's push URL (`/api/v1/webhooks/wechat-mini`) acts only on a delivery signed with our token, fresh (±5 minutes), single-use for its signature triple, and — in 安全/兼容模式 — decrypted with our AES key and addressed to our appid; in 安全模式 a plaintext delivery is refused. A known event becomes one ledger row however often WeChat re-delivers it; an unknown event is acknowledged and dropped.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > answers the URL check only when it is signed with our token — WXSHIP-004`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > refuses a bad signature, a plaintext push in 安全模式, a stale one and a reused nonce — WXSHIP-004`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > accepts plain JSON when 明文模式 is configured, and drops events nobody handles — WXSHIP-004`
+
+### WXSHIP-005
+
+WeChat's settlement push (`trade_manage_order_settlement`) moves a shipped order to received through the same conditional transition the buyer's 确认收货 and the auto-receive job use: a push repeated, and a push racing the buyer's tap, leave exactly one receipt.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > moves the order to received on a settlement push, once, however often WeChat repeats it — WXSHIP-005`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > stamps the settlement when the money moves, without moving the order again — WXSHIP-005`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > leaves one receipt when the settlement push and the buyer’s tap race — WXSHIP-005`
+
+### WXSHIP-006
+
+The 确认收货 component (`GET /api/v1/orders/:id/wechat-receipt`) is handed a payment number only for the signed-in shopper's own order, once it is shipped and WeChat was told everything left; a stranger's order is `ORDER_NOT_FOUND`. A receipt confirmed through the component (`{ via: 'wechat-component' }`) moves the order only after WeChat's `get_order` says the buyer confirmed; otherwise `ORDER_WECHAT_RECEIPT_UNCONFIRMED` and the order stays shipped.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > hands the payment number to the order’s owner only — WXSHIP-006`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > answers null for an order WeChat was not told about — WXSHIP-006`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > moves the order only once WeChat’s get_order says the buyer confirmed — WXSHIP-006`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > refuses the component path for an order that was never reported — WXSHIP-006`
+
+### WXSHIP-007
+
+WeChat's shipping reminder and its 已纳入发货信息管理 notice reach operators as in-app notices. 同步 (`is_trade_managed` + `set_msg_jump_path`) is an operator's action with `payment:config:write`, run by hand rather than on a config save, and says so when the mini program is not configured or WeChat refuses.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > tells operators about WeChat’s shipping reminder and about being put under management — WXSHIP-007`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > records WeChat’s answer and points messages at the order page — WXSHIP-007`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > says so when the mini program is not configured, and when WeChat refuses — WXSHIP-007`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > is an admin’s, not a shopper’s — WXSHIP-007`
+
 ## Refunds
 
 ### REFUND-001

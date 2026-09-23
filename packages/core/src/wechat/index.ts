@@ -65,6 +65,52 @@ export {
   type WechatTradeState,
 } from './wechat.pay';
 
+/** 小程序发货信息管理: the port, the driver over `api.weixin.qq.com` and the wire mapping. */
+export {
+  describeItems,
+  isShunfeng,
+  maskPhone,
+  miniShippingPort,
+  registerMiniShippingPort,
+  resetMiniShippingPort,
+  rfc3339Shanghai,
+  SHIPPING_SETTLED_ERRCODES,
+  uploadShippingBody,
+  wechatMiniShippingDriver,
+  type MiniLogisticsType,
+  type MiniShippingAnswer,
+  type MiniShippingPackage,
+  type MiniShippingPort,
+  type MiniTradeKey,
+  type MiniTradeManagedAnswer,
+  type MiniTradeOrderAnswer,
+  type MiniUploadShipping,
+} from './wechat.shipping';
+
+/** `/api/v1/webhooks/wechat-mini`: the mini program's 消息推送, recorded into the effects ledger. */
+export {
+  handleMiniPush,
+  MINI_PUSH_EVENTS,
+  MINI_PUSH_FRESHNESS_SECONDS,
+  MINI_PUSH_SCOPE,
+  verifyMiniPushUrl,
+  type MiniPushEvent,
+  type MiniPushMessage,
+  type MiniPushResult,
+} from './wechat.mini-push';
+
+/** The message-callback envelope, shared by the OA callback and the mini program's push. */
+export {
+  aesKeyOf,
+  decryptMessage,
+  encryptMessage,
+  equalsSignature,
+  signatureOf,
+  verifyMessageSignature,
+  verifySignature,
+  WechatMessageCryptoError,
+} from './wechat.message-crypto';
+
 export {
   AeadDecryptError,
   aeadDecrypt,

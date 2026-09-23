@@ -11,7 +11,8 @@ import type { AddressInfo } from 'node:net';
  * `message/template/send`, `message/subscribe/send`,
  * `menu/create`, `menu/delete`, `qrcode/create`, `ticket/getticket`,
  * `media/upload`, the material store, `sns/jscode2session`,
- * `wxa/business/getuserphonenumber` and `wxa/getwxacodeunlimit`. Nothing in the
+ * `wxa/business/getuserphonenumber`, `wxa/getwxacodeunlimit` and the four
+ * 发货信息管理 endpoints under `wxa/sec/order/` (see "Shipping" below). Nothing in the
  * test suite may reach the real WeChat, and the client's retry rules
  * (`40001 → drop the token and try once more`) only mean anything against a
  * server that can actually refuse.
@@ -39,6 +40,25 @@ import type { AddressInfo } from 'node:net';
  * Both kinds are **single-use**, as WeChat's are: the second redemption of a
  * code is `40163 code been used`, so a client that replays a `wx.login()` code
  * (or a server that redeems one twice) fails here as it would on a phone.
+ *
+ * ## Shipping (小程序发货信息管理)
+ *
+ * `wxa/sec/order/upload_shipping_info` keeps one record per payment
+ * (`tradeOrders`, keyed `tx:<transaction_id>` or `mch:<mchid>:<out_trade_no>`)
+ * and enforces the rules the shop has to get right, with WeChat's codes:
+ *
+ * - 分拆发货 (`delivery_mode: 2`) only for 实体物流 (`logistics_type: 1`) —
+ *   `10060006` otherwise;
+ * - `express_company` and `tracking_no` for 实体物流; `receiver_contact`, masked,
+ *   for 顺丰 (`SF`); `item_desc` at most 120 characters; `upload_time` RFC 3339;
+ *   the payer's openid — `47001` for any of them missing;
+ * - once everything is reported, **one** re-upload (重新发货) is allowed:
+ *   an identical one is `10060023`, a second different one `10060003`;
+ * - a refunded payment (`order_state` 5, via `setTradeOrderState`) is `10060004`.
+ *
+ * `get_order` reports `order_state` (seed or move it with `setTradeOrderState`;
+ * an unknown payment is `10060001`), `set_msg_jump_path` stores `msgJumpPath`,
+ * and `is_trade_managed` answers `behaviour.tradeManaged` for our appid.
  */
 
 export interface FakeOaCall {
@@ -72,6 +92,22 @@ export interface FakeOaBehaviour {
    * `image/*` on success, which is why the caller has to look at the bytes.
    */
   failWxaCode: { errcode: number; errmsg: string } | null;
+  /** While set, every `wxa/sec/order/upload_shipping_info` is refused with this. */
+  failShipping: { errcode: number; errmsg: string } | null;
+  /** What `is_trade_managed` answers. */
+  tradeManaged: boolean;
+}
+
+/** One payment as 发货信息管理 sees it. */
+export interface FakeTradeOrder {
+  /** 1 待发货, 2 已发货, 3 确认收货, 4 交易完成, 5 已退款, 6 资金待结算. */
+  orderState: number;
+  /** Every accepted `upload_shipping_info` body, in order. */
+  uploads: Array<Record<string, unknown>>;
+  /** Set once `is_all_delivered` (or a unified upload) was accepted. */
+  allDelivered: boolean;
+  /** The one 重新发货 is spent. */
+  corrected: boolean;
 }
 
 /** What a seeded `wx.login()` code redeems to. */
@@ -112,6 +148,14 @@ export interface FakeOaServer {
   setMiniCode(code: string, session: FakeMiniSession): void;
   /** Teach `wxa/business/getuserphonenumber` one code, good once; the same rules. */
   setPhoneCode(code: string, phone: FakePhoneNumber): void;
+  /** 发货信息管理's record per payment, keyed `tx:<transaction_id>` or `mch:<mchid>:<out_trade_no>`. */
+  tradeOrders: Map<string, FakeTradeOrder>;
+  /** The record for one transaction id, if WeChat has one. */
+  tradeOrder(transactionId: string): FakeTradeOrder | undefined;
+  /** Seed or move a payment's `order_state` (3 = the buyer confirmed, 5 = refunded). */
+  setTradeOrderState(transactionId: string, orderState: number): void;
+  /** What `set_msg_jump_path` last stored, or `null`. */
+  readonly msgJumpPath: string | null;
   callsTo(path: string): FakeOaCall[];
   reset(): void;
   close(): Promise<void>;
@@ -153,7 +197,11 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
     ticketExpiresIn: 7200,
     dropNext: false,
     failWxaCode: null,
+    failShipping: null,
+    tradeManaged: true,
   };
+  const tradeOrders = new Map<string, FakeTradeOrder>();
+  let msgJumpPath: string | null = null;
   let publishedMenu: unknown = null;
   let issued = 0;
   let messageSeq = 0;
@@ -191,6 +239,87 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
   function png(res: ServerResponse): void {
     res.writeHead(200, { 'content-type': 'image/png', 'content-length': String(PNG_1X1.length) });
     res.end(PNG_1X1);
+  }
+
+  /** `upload_shipping_info`, with the rules the module comment lists. */
+  function uploadShipping(body: Record<string, unknown>): { errcode: number; errmsg: string } {
+    if (behaviour.failShipping) return behaviour.failShipping;
+    const bad = (what: string) => ({ errcode: 47001, errmsg: `data format error: ${what}` });
+    const orderKey = (body['order_key'] ?? {}) as Record<string, unknown>;
+    const key =
+      orderKey['order_number_type'] === 2 && typeof orderKey['transaction_id'] === 'string'
+        ? `tx:${orderKey['transaction_id']}`
+        : orderKey['order_number_type'] === 1 &&
+            typeof orderKey['mchid'] === 'string' &&
+            typeof orderKey['out_trade_no'] === 'string'
+          ? `mch:${orderKey['mchid']}:${orderKey['out_trade_no']}`
+          : null;
+    if (key === null) return bad('order_key');
+    const logisticsType = body['logistics_type'];
+    const deliveryMode = body['delivery_mode'];
+    if (![1, 2, 3, 4].includes(logisticsType as number)) return bad('logistics_type');
+    if (deliveryMode !== 1 && deliveryMode !== 2) return bad('delivery_mode');
+    if (deliveryMode === 2 && logisticsType !== 1) {
+      return { errcode: 10060006, errmsg: '非快递发货时不允许分拆发货' };
+    }
+    const list = body['shipping_list'];
+    if (!Array.isArray(list) || list.length === 0 || list.length > 15) return bad('shipping_list');
+    for (const item of list as Array<Record<string, unknown>>) {
+      const desc = item['item_desc'];
+      if (typeof desc !== 'string' || desc === '' || [...desc].length > 120)
+        return bad('item_desc');
+      if (logisticsType === 1) {
+        if (typeof item['tracking_no'] !== 'string' || item['tracking_no'] === '') {
+          return bad('tracking_no');
+        }
+        if (typeof item['express_company'] !== 'string' || item['express_company'] === '') {
+          return bad('express_company');
+        }
+        if (item['express_company'] === 'SF') {
+          const contact = (item['contact'] ?? {}) as Record<string, unknown>;
+          const receiver = contact['receiver_contact'];
+          if (typeof receiver !== 'string' || !/^\d{0,3}\*{4}\d{4}$/.test(receiver)) {
+            return bad('contact.receiver_contact (顺丰必填且需掩码)');
+          }
+        }
+      }
+    }
+    const uploadTime = body['upload_time'];
+    if (
+      typeof uploadTime !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)$/.test(uploadTime)
+    ) {
+      return bad('upload_time');
+    }
+    const payer = (body['payer'] ?? {}) as Record<string, unknown>;
+    if (typeof payer['openid'] !== 'string' || payer['openid'] === '') return bad('payer.openid');
+
+    const order = tradeOrders.get(key) ?? {
+      orderState: 1,
+      uploads: [],
+      allDelivered: false,
+      corrected: false,
+    };
+    tradeOrders.set(key, order);
+    if (order.orderState === 5) return { errcode: 10060004, errmsg: '支付单处于不可发货的状态' };
+    if (order.allDelivered) {
+      if (order.orderState !== 2) return { errcode: 10060004, errmsg: '支付单处于不可发货的状态' };
+      const same = order.uploads.some((earlier) => sameShipping(earlier, body));
+      if (same) return { errcode: 10060023, errmsg: '发货信息未更新' };
+      if (order.corrected) return { errcode: 10060003, errmsg: '已使用重新发货机会' };
+      order.corrected = true;
+      order.uploads.push(body);
+      return { errcode: 0, errmsg: 'ok' };
+    }
+    if (order.uploads.some((earlier) => sameShipping(earlier, body))) {
+      return { errcode: 10060023, errmsg: '发货信息未更新' };
+    }
+    order.uploads.push(body);
+    if (deliveryMode === 1 || body['is_all_delivered'] === true) {
+      order.allDelivered = true;
+      order.orderState = 2;
+    }
+    return { errcode: 0, errmsg: 'ok' };
   }
 
   async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -325,6 +454,48 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
           png(res);
           return;
         }
+        case '/wxa/sec/order/upload_shipping_info':
+          json(res, uploadShipping(body));
+          return;
+        case '/wxa/sec/order/get_order': {
+          const key =
+            body['transaction_id'] !== undefined
+              ? `tx:${String(body['transaction_id'])}`
+              : `mch:${String(body['merchant_id'] ?? '')}:${String(body['merchant_trade_no'] ?? '')}`;
+          const order = tradeOrders.get(key);
+          if (!order) {
+            json(res, { errcode: 10060001, errmsg: '支付单不存在' });
+            return;
+          }
+          json(res, {
+            errcode: 0,
+            errmsg: 'ok',
+            order: {
+              order_state: order.orderState,
+              ...(key.startsWith('tx:') ? { transaction_id: key.slice(3) } : {}),
+              shipping: { delivery_mode: order.uploads.at(-1)?.['delivery_mode'] ?? null },
+            },
+          });
+          return;
+        }
+        case '/wxa/sec/order/set_msg_jump_path': {
+          const path = String(body['path'] ?? '');
+          if (path === '') {
+            json(res, { errcode: 47001, errmsg: 'data format error: path' });
+            return;
+          }
+          msgJumpPath = path;
+          json(res, { errcode: 0, errmsg: 'ok' });
+          return;
+        }
+        case '/wxa/sec/order/is_trade_managed': {
+          if (body['appid'] !== MINI_APP_ID) {
+            json(res, { errcode: 40013, errmsg: 'invalid appid' });
+            return;
+          }
+          json(res, { errcode: 0, errmsg: 'ok', is_trade_managed: behaviour.tradeManaged });
+          return;
+        }
         default:
           json(res, { errcode: 48001, errmsg: `fake oa: ${url.pathname} 未实现` });
           return;
@@ -456,6 +627,24 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
     setPhoneCode(code, phone) {
       phoneCodes.set(code, phone);
     },
+    tradeOrders,
+    tradeOrder(transactionId) {
+      return tradeOrders.get(`tx:${transactionId}`);
+    },
+    setTradeOrderState(transactionId, orderState) {
+      const key = `tx:${transactionId}`;
+      const order = tradeOrders.get(key) ?? {
+        orderState,
+        uploads: [],
+        allDelivered: false,
+        corrected: false,
+      };
+      order.orderState = orderState;
+      tradeOrders.set(key, order);
+    },
+    get msgJumpPath() {
+      return msgJumpPath;
+    },
     callsTo(path) {
       return calls.filter((call) => call.path === path);
     },
@@ -473,10 +662,20 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
       behaviour.ticketExpiresIn = 7200;
       behaviour.dropNext = false;
       behaviour.failWxaCode = null;
+      behaviour.failShipping = null;
+      behaviour.tradeManaged = true;
+      tradeOrders.clear();
+      msgJumpPath = null;
     },
     close: () =>
       new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),
       ),
   };
+}
+
+/** Two uploads describe the same shipping when all but `upload_time` match. */
+function sameShipping(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const strip = ({ upload_time: _ignored, ...rest }: Record<string, unknown>) => rest;
+  return JSON.stringify(strip(a)) === JSON.stringify(strip(b));
 }

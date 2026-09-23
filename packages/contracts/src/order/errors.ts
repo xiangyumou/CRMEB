@@ -114,6 +114,16 @@ export const orderFulfilErrors = defineErrors({
   // --- receipt ------------------------------------------------------------
   /** Not `shipped` — already received, still unshipped, cancelled or refunded. */
   ORDER_NOT_RECEIVABLE: { status: 409, message: '订单当前状态不可确认收货' },
+  /**
+   * `{ via: 'wechat-component' }`, but WeChat's `get_order` does not (yet) say
+   * the buyer confirmed — or it could not be asked. `details.verdict`:
+   * `not-confirmed` | `unavailable`. The client may retry, or fall back to a
+   * plain 确认收货; the settlement push catches up either way.
+   */
+  ORDER_WECHAT_RECEIPT_UNCONFIRMED: {
+    status: 409,
+    message: '微信尚未确认收货，请稍后重试',
+  },
 
   // --- statistics ---------------------------------------------------------
   /**

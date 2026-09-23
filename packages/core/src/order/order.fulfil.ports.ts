@@ -142,9 +142,42 @@ export function resolveFulfilmentNotifier(): FulfilmentNotifier | undefined {
   return notifier;
 }
 
+// ---------------------------------------------------------------------------
+// WeChat's 确认收货 component (the payment domain)
+// ---------------------------------------------------------------------------
+
+/**
+ * `confirmed`: WeChat's `get_order` says the buyer confirmed receipt of this
+ * order's mini-program payment. `not-confirmed`: WeChat answered, and it has
+ * not. `unavailable`: there is nobody to ask — not a mini-program payment, not
+ * reported to WeChat, or WeChat did not answer.
+ */
+export type WechatReceiptVerdict = 'confirmed' | 'not-confirmed' | 'unavailable';
+
+/**
+ * Asked before `{ via: 'wechat-component' }` moves an order: WeChat's own rule
+ * is that the component's `success` callback must be checked with `get_order`
+ * before the merchant believes it (C07). The payment domain implements it,
+ * because the payment is what WeChat knows the order by.
+ */
+export interface WechatReceiptVerifier {
+  verify(ctx: Ctx, input: { orderId: number }): Promise<WechatReceiptVerdict>;
+}
+
+let receiptVerifier: WechatReceiptVerifier | undefined;
+
+export function registerWechatReceiptVerifier(impl: WechatReceiptVerifier): void {
+  receiptVerifier = impl;
+}
+
+export function resolveWechatReceiptVerifier(): WechatReceiptVerifier | undefined {
+  return receiptVerifier;
+}
+
 /** Test helper. Never call this from app code. */
 export function resetFulfilmentPorts(): void {
   logistics = undefined;
   staffRefunds = undefined;
   notifier = undefined;
+  receiptVerifier = undefined;
 }

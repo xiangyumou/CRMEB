@@ -79,6 +79,15 @@ export const expressCompanies = pgTable(
     name: varchar({ length: 100 }).notNull(),
     sortOrder: integer().notNull().default(0),
     isEnabled: boolean().notNull().default(true),
+    /**
+     * The carrier's code in WeChat's own list (`get_delivery_list`'s
+     * `delivery_id`, e.g. `SF`), which 小程序发货信息管理 requires as
+     * `express_company`. It is not `code`: that one is the tracking provider's
+     * name for the carrier (`shunfeng`). NULL until an operator fills it in; a
+     * mini-program shipment by a carrier without one waits in the effects
+     * ledger for it.
+     */
+    wechatDeliveryId: varchar({ length: 32 }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
