@@ -1091,7 +1091,7 @@ A channel that fails retries only itself: the effect goes back to pending with t
 
 The events that can fire are compiled in, and a template row is seeded from the registry on first use with in-app on and every channel that costs money or needs a credential off.
 
-- `packages/core/src/notification/notification.int.test.ts::fan-out > seeds the template from the registry and writes the in-app message`
+- `packages/core/src/notification/notification.int.test.ts::fan-out > seeds the template from the registry and writes the in-app message — NOTIF-006`
 - `packages/core/src/notification/notification.int.test.ts::fan-out > does not send at all when the operator turned the event off`
 - `packages/core/src/notification/notification.int.test.ts::fan-out > sends in-app from a template shell the reference-data seed wrote with no channels`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::shopper notifications > lists the four events in 通知管理 with in-app on, over the empty shells the seed writes`
@@ -1105,6 +1105,16 @@ Rendering cannot lose a message: an unknown placeholder renders empty rather tha
 - `packages/core/src/notification/notification.render.test.ts::render > renders an unknown placeholder as nothing, never as itself`
 - `packages/core/src/notification/notification.render.test.ts::render > does not re-render what a value itself contains`
 - `packages/core/src/notification/notification.render.test.ts::renderFields > drops a field that rendered empty instead of sending ""`
+
+### NOTIF-006
+
+A customer event names the mini-program page it opens as a route-catalogue key and a `{{…}}` params template, and registration refuses a key the catalogue does not mark `notify`. The template is filled first and validated second: a valid result is stored on the in-app message as `data.route` and is the subscribe message's `page` (`toMiniPath`), overriding the deprecated hand-typed page; a result that does not validate sends no destination rather than a wrong one.
+
+- `packages/core/src/notification/notification.render.test.ts::renderRoute > fills the params in first, then validates the route — NOTIF-006`
+- `packages/core/src/notification/notification.render.test.ts::renderRoute > answers null rather than a wrong destination when a variable is missing — NOTIF-006`
+- `packages/core/src/notification/notification.render.test.ts::renderRoute > refuses at registration a route the catalogue does not let a message open — NOTIF-006`
+- `packages/core/src/notification/notification.int.test.ts::fan-out > seeds the template from the registry and writes the in-app message — NOTIF-006`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::shopper notifications > tells every paid member 拼团成功 when the team fills, on every channel switched on — NOTIF-006`
 
 ### USER-010
 
