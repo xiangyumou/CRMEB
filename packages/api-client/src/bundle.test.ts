@@ -69,6 +69,13 @@ const REACT_SAMPLE = `
 export { ApiClientProvider, useRouteQuery, useInfiniteRouteQuery, useRouteMutation, invalidateRoutes } from '@shop/api-client/react';
 `;
 
+/** The page catalogue alone, the way the mini-program's `platform/nav.ts` takes it. */
+const ROUTES_SAMPLE = `
+import { storefrontRoutes, type StorefrontRoute } from '@shop/api-client/routes';
+export const pathOf = (r: StorefrontRoute) => storefrontRoutes[r.route].path;
+export { storefrontRoutes };
+`;
+
 const VALIDATE = `export { contractValidator } from '@shop/api-client/validate';`;
 
 /** Things that must not reach a mini-program bundle, by the file they come from. */
@@ -127,6 +134,16 @@ describe('bundle', () => {
     const result = await bundle(EVERYTHING);
     report('main entry, everything', result);
     assertMiniSafe(result);
+    expect(result.code).toContain('packages/order/detail/index');
+  });
+
+  it('the page catalogue (`@shop/api-client/routes`) is plain data: no zod, no contract', async () => {
+    const result = await bundle(ROUTES_SAMPLE);
+    report('page catalogue (routes entry)', result);
+    assertMiniSafe(result);
+    expect(result.code).toContain('packages/order/detail/index');
+    expect(result.code).toContain('packages/account/reviews/index');
+    expect(result.bytes).toBeLessThan(8 * 1024);
   });
 
   it('the react entry, with react and TanStack Query left to the app, is just as clean', async () => {

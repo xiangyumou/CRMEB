@@ -29,8 +29,9 @@ const count = await client.call('cart.count'); // no input needed, none asked fo
 | `@shop/api-client`          | `createApiClient`, `ApiError`, `fetchTransport`, `taroTransport`, the route table, types        | none                                                   |
 | `@shop/api-client/react`    | `ApiClientProvider`, `useRouteQuery`, `useInfiniteRouteQuery`, `useRouteMutation`, invalidation | peers `react` ^18 \|\| ^19, `@tanstack/react-query` ^5 |
 | `@shop/api-client/validate` | `contractValidator()`, `contractOf(id)`: response checks against the full contracts             | zod + every contract (about 865 KB)                    |
+| `@shop/api-client/routes`   | `storefrontRoutes`, the page catalogue (route key -> mini-program page), and its types          | none                                                   |
 
-The main entry and `react` never import `validate`. `src/bundle.test.ts` checks this and fails if zod, a contract module, an admin or staff path, `eval`/`new Function`, or `URL`/`URLSearchParams` gets into a minified ES2017 bundle.
+The main entry and `react` never import `validate`; the main entry re-exports the page catalogue too. `src/bundle.test.ts` checks this and fails if zod, a contract module, an admin or staff path, `eval`/`new Function`, or `URL`/`URLSearchParams` gets into a minified ES2017 bundle.
 Use `validate` in tests, dev builds and the mock-server run, not in a shipped mini program.
 
 ## What a call does
@@ -123,6 +124,20 @@ A transport is `(request: { url, method, headers, body, signal, timeoutMs }) => 
 - It also holds type-only maps from route id to the contract (`import type`), to the parts the route declares, and to its declared error codes.
 
 If the file is missing, run `pnpm gen` from the repo root.
+
+## The page catalogue
+
+`storefrontRoutes` is not `storefrontRouteList`: the list above is the API's endpoints, the catalogue is the mini-program's pages. The catalogue itself (zod params, `toMiniPath`, `encodeScene`, `decodeScene`) lives in `@shop/contracts/system/storefront-routes`; see [docs/mini/pages.md](../../docs/mini/pages.md) §3. `scripts/gen-storefront-routes.ts` (part of `gen`) writes `src/storefront-routes.gen.ts` from it, also gitignored:
+
+```ts
+import { storefrontRoutes, type StorefrontRoute } from '@shop/api-client/routes';
+
+storefrontRoutes.order; // { path: 'packages/order/detail/index', params: ['id', 'outTradeNo'], tab: false, share: 'none' }
+```
+
+- One entry per key: `path` (no leading `/`), `params` (the names the key takes; `order` lists both of its alternatives), `tab`, `share`.
+- `StorefrontRouteKey`, `StorefrontRoute` and `StorefrontRouteParams<K>` come from the contracts through `import type`.
+- Keys are append-only. A key this build does not know (a link saved by a newer backend) opens the home page.
 
 ## Scripts
 
