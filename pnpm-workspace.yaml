@@ -10,6 +10,8 @@ packages:
 # fallback, so we skip the compile rather than add a toolchain to CI and to the
 # 2-core production box. See docs/rewrite/cr/CR-1-p0a.md.
 allowBuilds:
+  '@parcel/watcher': false # optional native file watcher of sass; only `sass --watch` uses it
+  '@swc/core': false # postinstall only verifies the prebuilt binary (via @tarojs/helper)
   cpu-features: false # optional CPU detection for ssh2 (testcontainers -> docker-modem)
   esbuild: true
   msgpackr-extract: false # optional msgpack accelerator for bullmq
@@ -19,3 +21,8 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - '@tanstack/query-core@5.103.2'
   - '@tanstack/react-query@5.103.2'
+# One sass for the workspace: storefront-blocks compiles its styles with it, and
+# auto-install-peers would otherwise hand next's and vite's optional `sass`
+# peer the newest release.
+overrides:
+  sass: 1.104.1
