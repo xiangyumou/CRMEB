@@ -25,7 +25,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { chromium, type Frame, type Page } from '@playwright/test';
+import { chromium, type Frame, type Locator, type Page } from '@playwright/test';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 
@@ -72,11 +72,30 @@ async function stubAdminApi(page: Page): Promise<void> {
   });
 }
 
-/** Waits until every `<img>` in the frame has decoded. */
+/**
+ * Waits until every `<img>` inside a block has decoded. Only block images: the
+ * H5 shell has `<img>`s of its own (the tab bar's) without a `src`.
+ */
 async function imagesSettled(frame: Frame | Page): Promise<void> {
   await frame.waitForFunction(() =>
-    Array.from(document.images).every((image) => image.complete && image.naturalWidth > 0),
+    Array.from(document.querySelectorAll<HTMLImageElement>('[data-block] img')).every(
+      (image) => image.complete && image.naturalWidth > 0,
+    ),
   );
+}
+
+/**
+ * Screenshots a block, clipped to its box snapped to device pixels (DPR 2).
+ * Not an element screenshot: that rounds the box out to whole CSS pixels, and
+ * vw lengths come out a hair short (169.98 px for 170), so the two sides would
+ * differ by a row of whatever lies below the block.
+ */
+async function shootBlock(page: Page, block: Locator): Promise<Buffer> {
+  const box = await block.boundingBox();
+  if (!box) throw new Error('the block is not rendered');
+  const snap = (value: number): number => Math.round(value * 2) / 2;
+  const clip = { x: snap(box.x), y: snap(box.y), width: snap(box.width), height: snap(box.height) };
+  return page.screenshot({ clip });
 }
 
 async function shootAdmin(): Promise<Record<Block, Buffer>> {
@@ -118,9 +137,17 @@ async function shootAdmin(): Promise<Record<Block, Buffer>> {
     });
     await page.waitForTimeout(500);
     await page.mouse.move(0, 0);
+    // Put the canvas on the device-pixel grid: the editor lays it out at a
+    // fractional y (379.14), and a clip across that seam blends two rows.
+    const top = (await frameElement.boundingBox())?.y ?? 0;
+    const nudge = Math.ceil(top * 2) / 2 - top;
+    await page.locator('[data-testid="decor-editor"]').evaluate((element, px) => {
+      (element as HTMLElement).style.marginTop = `${px}px`;
+    }, nudge);
+    await page.waitForTimeout(200);
     const shots = {} as Record<Block, Buffer>;
     for (const block of BLOCKS) {
-      shots[block] = await frame.locator(`[data-block="${block}"]`).first().screenshot();
+      shots[block] = await shootBlock(page, frame.locator(`[data-block="${block}"]`).first());
       writeFileSync(resolve(out, `admin-${block}.png`), shots[block]);
     }
     return shots;
@@ -133,7 +160,8 @@ async function shootH5(url: string): Promise<Record<Block, Buffer>> {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({
-      viewport: { width: 375, height: 812 },
+      // Tall enough that every block is on screen: `shootBlock` clips the viewport.
+      viewport: { width: 375, height: 1600 },
       deviceScaleFactor: 2,
       isMobile: true,
       hasTouch: true,
@@ -143,7 +171,7 @@ async function shootH5(url: string): Promise<Record<Block, Buffer>> {
     await imagesSettled(page);
     const shots = {} as Record<Block, Buffer>;
     for (const block of BLOCKS) {
-      shots[block] = await page.locator(`[data-block="${block}"]`).first().screenshot();
+      shots[block] = await shootBlock(page, page.locator(`[data-block="${block}"]`).first());
       writeFileSync(resolve(out, `h5-${block}.png`), shots[block]);
     }
     return shots;
