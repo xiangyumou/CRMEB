@@ -28,3 +28,9 @@ openapi.json
 # Local agent tooling
 .codex/
 .zcode/
+
+# The mini-program's build by-products: Taro's SWC config cache, the bundle module lists
+# written by every build (config/bundle-stats.ts), and a developer's own AppID.
+/apps/mini/.swc/
+/apps/mini/.bundle-stats/
+/apps/mini/.env.*.local
