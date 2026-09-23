@@ -29,6 +29,13 @@
       "when": 1790167444522,
       "tag": "0003_attachments_url_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790176561240,
+      "tag": "0004_decor",
+      "breakpoints": true
     }
   ]
 }
