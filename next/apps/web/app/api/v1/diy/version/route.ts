@@ -3,7 +3,7 @@ import * as diy from '@shop/core/diy';
 import { handle } from '../../../../../src/server';
 
 /**
- * The cheap poll the app makes on resume: the page
+ * The cheap poll the app makes on resume. Legacy `get_diy_version`: the page
  * payload is large and changes rarely, so the client compares this string
  * before downloading it again.
  */

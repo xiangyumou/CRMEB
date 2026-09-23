@@ -18,8 +18,8 @@ import { DashboardPage } from './dashboard';
  * The thing worth asserting about the home page is that it *contributes*
  * nothing: the tiles come from `/admin-api/dashboard/header`, which is already
  * permission-filtered server-side, and each block below only asks for the
- * route its atom opens. A home page that computed its own figures would show
- * three different numbers for one day.
+ * route its atom opens. A home page that computed its own figures is how the
+ * legacy admin ended up showing three different numbers for one day.
  */
 
 interface Call {
