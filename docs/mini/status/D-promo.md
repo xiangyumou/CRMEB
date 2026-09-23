@@ -27,12 +27,14 @@ into `storefront/mini` yet. Until it is, the activity pages hand checkout what S
 
 ## In progress
 
-- Pages done with tests: 领券中心, 我的优惠券, 我的拼团, 拼团 list. Next: 拼团 activity, team page,
-  预售 list and detail.
+- Pages done with tests: 领券中心, 我的优惠券, 我的拼团, 拼团 list, 拼团商品 (activity). Next: team
+  page, 预售 list and detail.
+- Activity checkout: `features/promo/checkout.ts` stores B's draft shape (`source: 'buy-now'`,
+  `item`, `kind`, `kindMeta`) through a cast until B's `CheckoutDraft` is merged (TODO(merge B)).
 
 ## Next
 
-1. Pages: groupbuy-detail, groupbuy-team, presale, presale-detail.
+1. Pages: groupbuy-team, presale, presale-detail.
 2. After B merges: SkuSheet + checkout `kindMeta`, replace B's poster stub.
 3. e2e specs-mini, pages.md, screenshots, checklist.
 
@@ -40,6 +42,10 @@ into `storefront/mini` yet. Until it is, the activity pages hand checkout what S
 
 - Activity pages are the promo sub-package's own `groupbuy-detail` / `presale-detail` (already in
   the catalogue), not B's 商品详情: the two pages share no code with B's page but the SkuSheet.
+- Activity pages use their own flat SKU sheet (`features/promo/activity-sku-sheet.tsx`): the
+  activity SKUs come as a flat list with `specText`, not the product's spec matrix.
+- 拼团商品 lists open teams by seats and time left only (no leader name or avatar); 去参团 opens
+  the team page, where the SKU is picked.
 - The 拼团 list shows the participant count only; `groupbuy.summary.avatars` are not drawn (a
   shopper's face beside this shop's products does not belong on a public page).
 

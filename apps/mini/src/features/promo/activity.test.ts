@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { activityDeadline, activityPhase, salesText, shipText } from './activity';
+import {
+  activityCard,
+  activityDeadline,
+  activityPhase,
+  salesText,
+  shipText,
+  ttlText,
+} from './activity';
 
 const NOW = Date.parse('2026-09-24T10:00:00Z');
 const window = {
@@ -35,5 +42,40 @@ describe('words', () => {
     expect(shipText(0)).toBe('付款后尽快发货');
     expect(salesText('已拼', 0)).toBe('');
     expect(salesText('已售', 3)).toBe('已售 3 件');
+  });
+});
+
+describe('ttlText', () => {
+  it('says days, hours or minutes', () => {
+    expect(ttlText(86400)).toBe('1 天');
+    expect(ttlText(2 * 86400)).toBe('2 天');
+    expect(ttlText(36 * 3600)).toBe('36 小时');
+    expect(ttlText(5400)).toBe('1.5 小时');
+    expect(ttlText(600)).toBe('10 分钟');
+  });
+});
+
+describe('activityCard', () => {
+  const card = {
+    activityId: '1',
+    title: '双人团',
+    intro: null,
+    imageUrl: null,
+    price: '59.00',
+    originalPrice: '88.00' as string | null,
+    stock: 3,
+    sales: 0,
+  };
+
+  it('shows the activity price with the list price struck', () => {
+    const { product, activityPrice } = activityCard(card);
+    expect(product).toMatchObject({ id: '1', name: '双人团', price: '88.00', imageUrl: '' });
+    expect(activityPrice).toBe('59.00');
+  });
+
+  it('shows the activity price alone without a list price', () => {
+    const { product, activityPrice } = activityCard({ ...card, originalPrice: null });
+    expect(product.price).toBe('59.00');
+    expect(activityPrice).toBeUndefined();
   });
 });

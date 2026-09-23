@@ -77,3 +77,14 @@ export function activityCard(card: {
   };
   return { product, activityPrice: card.originalPrice ? card.price : undefined };
 }
+
+/** 拼团有效期 in words: 「24 小时」「2 天」「30 分钟」. */
+export function ttlText(seconds: number): string {
+  const day = 24 * 3600;
+  if (seconds >= day && seconds % day === 0) return `${seconds / day} 天`;
+  if (seconds >= 3600) {
+    const hours = Math.round((seconds / 3600) * 10) / 10;
+    return `${hours} 小时`;
+  }
+  return `${Math.max(1, Math.round(seconds / 60))} 分钟`;
+}
