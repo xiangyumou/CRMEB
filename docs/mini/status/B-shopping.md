@@ -43,17 +43,27 @@ Updated at every commit so the work can resume after an interruption.
   移入收藏 via `catalog.favoriteAddBatch`), 结算 → `{ source: 'cart' }` draft, 为你推荐, guest
   and empty states. `features/cart/cart-view.ts` + `cart-row.tsx`; `test/cart-fixture.ts`.
 
+- 下单 / 收银台 / 支付结果: 确认订单 prices three ways (without a coupon, the shopper's coupons for
+  those lines, with the chosen one: the best usable unless the shopper picks another or none),
+  address sheet (address book, 导入微信地址 mapped onto the city tree, 新增), the product's custom
+  form (`features/checkout/custom-form.tsx`), remark, presale ship time (`presale.detail`), the
+  subscribe request in the tap before `order.create`, `ORDER_PRICE_CHANGED` re-pricing.
+  收银台: amount, countdown to `payExpiresAt`, `wechat_mini`, a failed sheet is checked with
+  `payment.status` before 重新支付, expired / already paid. 支付结果 polls `payment.status`
+  (1 s, up to 60 s, then 刷新), 查看订单 / 继续购物 / 邀请好友参团, 为你推荐.
+  `features/checkout/checkout-view.ts`, `coupon-sheet.tsx`, `address-sheet.tsx`;
+  `test/checkout-fixture.ts`. The old `packages/order/s4.scss` is gone.
+
 ## In progress
 
-- 下单 (确认订单) rewrite.
+- e2e page objects and specs in `e2e/storefront/specs-mini`.
 
 ## Next
 
 1. Merge `storefront/mini` again once A2 lands (subscribe scenes, server clock, theme).
-2. 下单 / 收银台 / 支付结果.
-3. Vitest per page, e2e page objects and specs in `e2e/storefront/specs-mini` (seed a decor v2
+2. e2e page objects and specs in `e2e/storefront/specs-mini` (seed a decor v2
    home).
-4. `docs/mini/pages.md` for page-form changes; guard allow-lists; sizes; 375px screenshots in
+3. `docs/mini/pages.md` for page-form changes; guard allow-lists; sizes; 375px screenshots in
    `docs/mini/status/B-screens/`.
 
 ## Backend gaps found (not changed; for a later backend task)
@@ -72,3 +82,6 @@ Updated at every commit so the work can resume after an interruption.
 - `app/config` has no switches for 分类「显示二级类目」 or 商品详情「评价 / 推荐 / 服务标签」.
   (`splashAd.link` as a `LinkTarget`: resolved by H3.)
 - `order.create` takes no invoice; invoices are asked for after payment (`order.invoiceRequest`).
+- Custom-form `image` fields cannot be filled in the mini app: `upload` purposes are only avatar /
+  review / refund / staff. The field shows a note to contact 客服.
+- `order.checkoutPreview` does not carry a presale's ship time; 确认订单 reads `presale.detail`.
