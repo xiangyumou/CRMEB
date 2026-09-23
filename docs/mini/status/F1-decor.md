@@ -35,13 +35,21 @@ interruption.
   (7: 404 home, ETag/304, per-request filter, user-center default, preview token).
 - `docs/invariants.md` DECOR-001…016 with citations; `docs/mini/decor.md` design doc.
 
+- Response schema `resolvedPage.root.props` uses `servedRootProps` (no defaults) so the api-client
+  `ResponseOf` stays exact (`packages/api-client/src/types.test.ts`).
+- Merge checklist green (2026-09-23): turbo gen/typecheck/lint/test:unit/build; test:int --force
+  (core 1436, web 319, worker 6, testing 9); prettier; check:examples (453 routes); guards (14/0);
+  uni-app npm test (477 passed, 32 skipped); mini build size-report ok (main 381 KB, no zod).
+
 ## In progress
 
-- Merge checklist.
+- Nothing. Branch ready for the coordinator.
 
 ## Next
 
-1. Final report.
+- F2: un-hide `visibility.platforms` (multi-select), LinkPicker for parameterised routes.
+- Open: per-version `minClient`; campaign manual picks limited to one list page of 100;
+  `diyThemeTokens` typing (design.md §3.2) not done — it touches the legacy `diy` config.
 
 ## Decisions / deviations so far
 
