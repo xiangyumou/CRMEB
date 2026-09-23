@@ -164,6 +164,53 @@ describe('我的 is never blank', () => {
   });
 });
 
+describe('a shop with nothing configured gets no blank page', () => {
+  /** The body of one method, from its name to the next method at the same indent. */
+  const method = (file, name) => {
+    const page = read(file);
+    const start = page.indexOf(`    ${name}() {`);
+    expect(start, `${file} ${name}`).toBeGreaterThan(-1);
+    const end = page.indexOf('\n    },\n', start);
+    return page.slice(start, end);
+  };
+
+  it('首页: no published home page is an empty state, a failed read the cached copy or 重新连接', () => {
+    const page = read('pages/index/index.vue');
+    const body = method('pages/index/index.vue', 'getDiyData');
+    expect(body).toMatch(/error\.status === 404\) \{\s*this\.homeMissing = true;/);
+    expect(body).toMatch(/uni\.getStorageSync\(HOME_DIY_CACHE\)/);
+    expect(body).toMatch(/this\.errorNetwork = true;/);
+    expect(page).toMatch(/<emptyPage\s+v-if="homeMissing"/);
+  });
+
+  it('微页面: a missing page is an empty state, a failed read 重新连接', () => {
+    const page = read('pages/annex/special/index.vue');
+    const body = method('pages/annex/special/index.vue', 'getDiyData');
+    expect(body).toMatch(/error\.status === 404\) \{\s*this\.pageMissing = true;/);
+    expect(body).toMatch(/this\.errorNetwork = true;/);
+    expect(page).toMatch(/<emptyPage\s+v-if="pageMissing"/);
+    // It does not write the home page's cache key.
+    expect(page).not.toMatch(/setStorageSync\("diyData"/);
+  });
+
+  it('分类: an empty category tree neither throws nor leaves the page blank', () => {
+    const one = read('pages/goods_cate/goods_cate1.vue');
+    expect(one).toMatch(/let len = that\.productList\.length;\s*if \(!len\) return;/);
+    expect(one).toMatch(/<emptyPage v-if="loaded && !productList\.length"/);
+    for (const file of ['pages/goods_cate/goods_cate2.vue', 'pages/goods_cate/goods_cate3.vue']) {
+      const body = read(file);
+      // Both the network and the cached branch stop before reading data[0].
+      expect(body.match(/if \(!data\.length\)/g), file).toHaveLength(2);
+    }
+  });
+
+  it('the tab bar comes back when the decorated one cannot be read', () => {
+    const body = read('components/pageFooter/index.vue');
+    const info = body.slice(body.indexOf('getNavigationInfo() {'), body.indexOf('navigationInfo() {'));
+    expect(info).toMatch(/\.catch\(\(\) => \{[\s\S]*uni\.showTabBar\(\);/);
+  });
+});
+
 // The `data-testid`s the storefront suite (`e2e/storefront`) locates
 // elements by, each on its element. A static id is `data-testid="x"`; a bound one names the expression.
 describe('the storefront suite’s data-testids are on their elements', () => {

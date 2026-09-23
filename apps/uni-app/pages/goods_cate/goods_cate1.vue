@@ -50,6 +50,8 @@
 							</view>
 						</view>
 					</block>
+					<!-- 店铺还没有上架分类：给空状态，不留一片空白 -->
+					<emptyPage v-if="loaded && !productList.length" :title="$t(`暂无分类`)"></emptyPage>
 					<view :style='"height:"+(height-300)+"rpx;"' v-if="number<15"></view>
 				</scroll-view>
 			</view>
@@ -70,16 +72,19 @@
 		getNavigation
 	} from '@/api/public.js'
 	import pageFooter from '@/components/pageFooter/index.vue'
+	import emptyPage from '@/components/emptyPage.vue'
 	const app = getApp();
 	export default {
 		components: {
-			pageFooter
+			pageFooter,
+			emptyPage
 		},
 		data() {
 			return {
 				defimg: require('@/static/images/all_cat.png'),
 				navlist: [],
 				productList: [],
+				loaded: false,
 				navActive: 0,
 				number: "",
 				is_diy: uni.getStorageSync('is_diy'),
@@ -144,6 +149,7 @@
 			infoScroll: function() {
 				let that = this;
 				let len = that.productList.length;
+				if (!len) return;
 				this.number = that.productList[len - 1].children.length;
 				//设置商品列表高度
 				uni.getSystemInfo({
@@ -177,12 +183,14 @@
 					getCategoryList().then(res => {
 						uni.setStorageSync('CAT1_DATA', res.data)
 						that.productList = res.data;
+						that.loaded = true;
 						that.$nextTick(res => {
 							that.infoScroll();
 						})
 					})
 				} else {
 					that.productList = uni.getStorageSync('CAT1_DATA')
+					that.loaded = true;
 					that.$nextTick(res => {
 						that.infoScroll();
 					})

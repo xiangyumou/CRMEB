@@ -31,11 +31,16 @@
       @reconnect="reconnect"
     >
       <template #bottom>
+        <!-- 微页面不存在或已下架：给空状态，不留一片空白 -->
+        <emptyPage
+          v-if="pageMissing"
+          :title="$t(`页面不存在或已下架`)"
+        ></emptyPage>
         <!-- 分类商品模块 -->
         <view
           class="sort-product px-20"
           :style="{ marginTop: sortMpTop + 'px' }"
-          v-if="!styleConfig.length"
+          v-if="!styleConfig.length && !pageMissing"
         >
           <view
             class="rd-24rpx bg--w111-fff p-24 mb-24"
@@ -209,6 +214,7 @@ export default {
       // #endif
       site_config: "",
       errorNetwork: false, // 是否断网
+      pageMissing: false, // 微页面不存在或已下架
       isHeaderSerch: false,
       showHomeComb: false,
       showCateNav: false,
@@ -731,10 +737,18 @@ export default {
       if (this.themeId) data.theme_id = this.themeId;
       getThemeInfo("home", data)
         .then((res) => {
-          uni.setStorageSync("diyData", JSON.stringify(res.data));
+          this.pageMissing = false;
           this.setDiyData(res.data);
         })
         .catch((error) => {
+          // 已经画出来的页面不动
+          if (this.currentDiyData && this.currentDiyData.value) return;
+          // 404：页面不存在或已下架，不是断网
+          if (error && error.status === 404) {
+            this.pageMissing = true;
+            return;
+          }
+          this.errorNetwork = true;
         });
     },
     diyData() {

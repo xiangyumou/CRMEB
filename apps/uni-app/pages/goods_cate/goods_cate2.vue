@@ -651,6 +651,12 @@ export default {
 				getCategoryList().then((res) => {
 					uni.setStorageSync('CAT2_DATA', res.data);
 					let data = res.data;
+					// 没有分类时没有第一项可选，留空列表
+					if (!data.length) {
+						that.categoryList = [];
+						that.categoryErList = [];
+						return;
+					}
 					data.forEach((item) => {
 						item.children.unshift({
 							id: 0,
@@ -671,6 +677,7 @@ export default {
 				});
 			} else {
 				let data = uni.getStorageSync('CAT2_DATA');
+				if (!data.length) return;
 				data.forEach((item) => {
 					item.children.unshift({
 						id: 0,

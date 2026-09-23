@@ -859,6 +859,12 @@ export default {
         getCategoryList().then((res) => {
           let data = res.data;
           uni.setStorageSync("CAT3_DATA", data);
+          // 没有分类时没有第一项可选，留空列表
+          if (!data.length) {
+            that.categoryList = [];
+            that.categoryErList = [];
+            return;
+          }
           data.forEach((item) => {
             item.children.unshift({
               id: 0,
@@ -881,6 +887,7 @@ export default {
         });
       } else {
         let data = uni.getStorageSync("CAT3_DATA");
+        if (!data.length) return;
         data.forEach((item) => {
           item.children.unshift({
             id: 0,

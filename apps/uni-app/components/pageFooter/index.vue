@@ -187,10 +187,16 @@ export default {
       }
     },
     getNavigationInfo() {
-      getNavigation().then((res) => {
-        uni.setStorageSync("diyVersionNav", res.data);
-        this.setNavigationInfo(res.data);
-      });
+      getNavigation()
+        .then((res) => {
+          uni.setStorageSync("diyVersionNav", res.data);
+          this.setNavigationInfo(res.data);
+        })
+        .catch(() => {
+          // 读不到装修的底部导航：页面进来时已经藏了原生 tabBar，
+          // 这里把它放回来，不让用户困在当前页
+          if (this.isTabBar) uni.showTabBar();
+        });
     },
     navigationInfo() {
       let footerNavigation = uni.getStorageSync("footerNavigation");

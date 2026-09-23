@@ -34,11 +34,16 @@
       @reconnect="reconnect"
     >
       <template #bottom>
+        <!-- 店铺还没有发布首页：给空状态，不留一片空白 -->
+        <emptyPage
+          v-if="homeMissing"
+          :title="$t(`店铺正在装修，稍后再来看看吧～`)"
+        ></emptyPage>
         <!-- 分类商品模块 -->
         <view
           class="sort-product px-20"
           :style="{ marginTop: sortMpTop + 'px' }"
-          v-if="!styleConfig.length"
+          v-if="!styleConfig.length && !homeMissing"
         >
           <view
             class="rd-24rpx bg--w111-fff p-24 mb-24"
@@ -144,6 +149,9 @@ import Cache from "@/utils/cache";
 import { applyTheme } from "@/utils/theme.js";
 import PageDesign from "@/subpackage/diyComponents/pageDesign.vue";
 
+/** 上次成功读到的首页装修，读失败时先用它 */
+const HOME_DIY_CACHE = "homeDiyData";
+
 export default {
   computed: {
     // #ifdef MP
@@ -213,6 +221,7 @@ export default {
       // #endif
       site_config: "",
       errorNetwork: false, // 是否断网
+      homeMissing: false, // 店铺还没有发布首页
       isHeaderSerch: false,
       showHomeComb: false,
       showCateNav: false,
@@ -713,10 +722,26 @@ export default {
       if (this.themeId) data.theme_id = this.themeId;
       getThemeInfo("home", data)
         .then((res) => {
-          uni.setStorageSync("diyData", JSON.stringify(res.data));
+          this.homeMissing = false;
+          // 预览别的模板时不覆盖首页的缓存
+          if (!this.themeId) uni.setStorageSync(HOME_DIY_CACHE, res.data);
           this.setDiyData(res.data);
         })
         .catch((error) => {
+          // 已经画出来的首页不动
+          if (this.currentDiyData && this.currentDiyData.value) return;
+          // 店铺还没有发布首页（404）：不是断网，给空状态
+          if (error && error.status === 404) {
+            this.homeMissing = true;
+            return;
+          }
+          // 请求失败：先用上次成功读到的首页，一次都没读到过才给「重新连接」
+          const cached = this.themeId ? null : uni.getStorageSync(HOME_DIY_CACHE);
+          if (cached && cached.value) {
+            this.setDiyData(cached);
+            return;
+          }
+          this.errorNetwork = true;
         });
     },
     diyData() {
