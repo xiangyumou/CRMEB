@@ -70,8 +70,8 @@ export type NewProductCategory = typeof productCategories.$inferInsert;
 // ---------------------------------------------------------------------------
 
 /**
- * What the buyer receives. Replaces the legacy `is_virtual` + `virtual_type`
- * pair (0 普通 / 1 卡密 / 2 优惠券 / 3 虚拟).
+ * What the buyer receives: 普通 (physical), 卡密 (a virtual card), 优惠券 (a
+ * coupon) or 虚拟 (delivered by hand).
  */
 export const productsKind = pgEnum('products_kind', [
   'physical',
@@ -82,10 +82,10 @@ export const productsKind = pgEnum('products_kind', [
 
 export const productsStatus = pgEnum('products_status', ['draft', 'on_shelf', 'off_shelf']);
 
-/** How this product's freight is worked out. Legacy `freight` 1/2/3. */
+/** How this product's freight is worked out. */
 export const productsFreightMode = pgEnum('products_freight_mode', ['free', 'fixed', 'template']);
 
-/** Legacy `is_limit` + `limit_type`: 1 = per order, 2 = lifetime. */
+/** Whether a buyer's quantity is capped, and per order or over their lifetime. */
 export const productsPurchaseLimitMode = pgEnum('products_purchase_limit_mode', [
   'none',
   'per_order',
@@ -107,7 +107,7 @@ export const products = pgTable(
   {
     id: pk(),
     name: varchar({ length: 128 }).notNull(),
-    /** Short marketing line under the name. Legacy `store_info`. */
+    /** Short marketing line under the name. */
     subtitle: varchar({ length: 255 }),
     /** Space-separated search keywords an operator adds by hand. */
     keyword: varchar({ length: 255 }),
@@ -117,21 +117,21 @@ export const products = pgTable(
     kind: productsKind().notNull().default('physical'),
     status: productsStatus().notNull().default('draft'),
     imageUrl: varchar({ length: 512 }).notNull(),
-    /** Extra card image used by some DIY components. Legacy `recommend_image`. */
+    /** Extra card image used by some DIY components. */
     cardImageUrl: varchar({ length: 512 }),
     sliderImages: jsonb().$type<string[]>().notNull().default(emptyJsonArray),
     videoUrl: varchar({ length: 512 }),
     unitName: varchar({ length: 32 }),
     /** Cheapest live SKU price, denormalised for list sorting and filtering. */
     price: money().notNull().default('0.00'),
-    /** Crossed-out reference price. Legacy `ot_price`. */
+    /** Crossed-out reference price. */
     originalPrice: money(),
     /** Cheapest live SKU cost. Operator-only. */
     cost: money(),
     /** Sum of live SKU stock, denormalised. The authoritative number is per SKU. */
     stock: integer().notNull().default(0),
     sales: integer().notNull().default(0),
-    /** Padding added to the displayed sales figure. Legacy `ficti`. */
+    /** Padding added to the displayed sales figure. */
     displaySalesBoost: integer().notNull().default(0),
     views: integer().notNull().default(0),
     specMode: boolean().notNull().default(false),
@@ -245,7 +245,7 @@ export type NewProductRecommendation = typeof productRecommendations.$inferInser
 // specs and SKUs
 // ---------------------------------------------------------------------------
 
-/** One spec axis of a product, e.g. "颜色". Legacy `eb_store_product_attr`. */
+/** One spec axis of a product, e.g. "颜色". */
 export const productSpecs = pgTable(
   'product_specs',
   {
@@ -262,7 +262,7 @@ export const productSpecs = pgTable(
 export type ProductSpec = typeof productSpecs.$inferSelect;
 export type NewProductSpec = typeof productSpecs.$inferInsert;
 
-/** One value on a spec axis, e.g. "红". Legacy JSON blob `attr_values`. */
+/** One value on a spec axis, e.g. "红". */
 export const productSpecValues = pgTable(
   'product_spec_values',
   {
@@ -284,8 +284,8 @@ export type NewProductSpecValue = typeof productSpecValues.$inferInsert;
  * A buyable variant. This is the row stock is decremented on, and the only
  * place stock is authoritative.
  *
- * `skuCode` replaces the reserved-word legacy column `unique`; `specText`
- * replaces `suk`.
+ * `skuCode` is the variant's stable code (not `unique`, a reserved word);
+ * `specText` is its spec values joined for display.
  */
 export const productSkus = pgTable(
   'product_skus',
@@ -370,9 +370,8 @@ export const productVirtualCardsState = pgEnum('product_virtual_cards_state', [
  *
  * `product_virtual_cards_order_item_uq` makes a second card for the same order
  * item impossible even if the effect ledger retries. One order item therefore
- * carries at most one card, which matches the legacy behaviour (`virtualSend`
- * issued one card per order regardless of quantity); a card-kind order item is
- * consequently limited to quantity 1 and B1 must enforce that at checkout.
+ * carries at most one card; a card-kind order item is consequently limited to
+ * quantity 1, and checkout enforces that.
  */
 export const productVirtualCards = pgTable(
   'product_virtual_cards',
@@ -384,7 +383,7 @@ export const productVirtualCards = pgTable(
     skuId: fk()
       .notNull()
       .references(() => productSkus.id, { onDelete: 'cascade' }),
-    /** Stable opaque handle shown to the buyer instead of the raw card. Legacy `card_unique`. */
+    /** Stable opaque handle shown to the buyer instead of the raw card. */
     cardKey: varchar({ length: 32 }).notNull(),
     cardNo: varchar({ length: 255 }).notNull(),
     cardSecret: varchar({ length: 255 }),
@@ -433,7 +432,7 @@ export const productLabelCategories = pgTable(
 export type ProductLabelCategory = typeof productLabelCategories.$inferSelect;
 export type NewProductLabelCategory = typeof productLabelCategories.$inferInsert;
 
-/** How a label renders on a product card. Legacy `eb_store_product_label.type` 0/1. */
+/** How a label renders on a product card. */
 export const productLabelsStyle = pgEnum('product_labels_style', ['text', 'image']);
 
 export const productLabels = pgTable(
@@ -504,7 +503,7 @@ export const productParamTemplates = pgTable(
 export type ProductParamTemplate = typeof productParamTemplates.$inferSelect;
 export type NewProductParamTemplate = typeof productParamTemplates.$inferInsert;
 
-/** The parameters actually shown on one product's detail page. Legacy JSON `params_list`. */
+/** The parameters actually shown on one product's detail page. */
 export const productParams = pgTable(
   'product_params',
   {
@@ -567,7 +566,7 @@ export type NewProductProtectionsMapRow = typeof productProtectionsMap.$inferIns
 // favourites and reviews
 // ---------------------------------------------------------------------------
 
-/** Legacy `eb_store_product_relation` with `type = 'collect'`. The `like` type is dropped. */
+/** A user's 收藏: one row per (user, product). */
 export const productFavorites = pgTable(
   'product_favorites',
   {

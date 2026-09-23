@@ -23,14 +23,12 @@ import { users } from './user';
 /**
  * After-sales: refund requests and their gateway execution.
  *
- * WeChat Pay v3 original-channel refunds only. The legacy design smeared the
- * request across `eb_store_order` (`refund_reason_wap*`, `refund_price`, …) and
- * `eb_store_order_refund`; here the order keeps only the roll-up
- * (`orders.refund_status`, `orders.refunded_amount`) and everything else is a
- * refund row.
+ * WeChat Pay v3 original-channel refunds only. The order keeps only the
+ * roll-up (`orders.refund_status`, `orders.refunded_amount`); everything else
+ * about a request is a refund row.
  */
 
-/** What the buyer is asking for. Legacy `refund_type` 1 / 2. */
+/** What the buyer is asking for. */
 export const refundsKind = pgEnum('refunds_kind', ['refund_only', 'return_and_refund']);
 
 /**
@@ -57,7 +55,7 @@ export const refundsStatus = pgEnum('refunds_status', [
   'cancelled',
 ]);
 
-/** Where the returned goods currently are. Legacy `refund_type` 4 / 5. */
+/** Where the returned goods currently are. */
 export const refundsReturnStage = pgEnum('refunds_return_stage', [
   'not_required',
   'awaiting_shipment',
@@ -133,13 +131,13 @@ export const refunds = pgTable(
     returnPhone: varchar({ length: 20 }),
     /**
      * The shop's return address as it was shown to the buyer when the return
-     * was approved. Frozen (CR-5-c): a later edit of the `refund` config must
-     * not change what a buyer was told to do with goods already in the post.
-     * Null for `refund_only` and for approvals made before an address was set.
+     * was approved. Frozen: a later edit of the `refund` config must not change
+     * what a buyer was told to do with goods already in the post. Null for
+     * `refund_only` and for approvals made before an address was set.
      */
     returnAddress: jsonb().$type<{ name: string; phone: string; address: string }>(),
 
-    /** TRUE when the refund was opened automatically by a failed group buy. Legacy `is_pink_cancel`. */
+    /** TRUE when the refund was opened automatically by a failed group buy. */
     isAutomatic: boolean().notNull().default(false),
 
     reviewedByAdminId: fk().references((): AnyPgColumn => admins.id, { onDelete: 'set null' }),
@@ -201,8 +199,8 @@ export type NewRefund = typeof refunds.$inferInsert;
  * window, and no dependency on the request arriving through a single service.
  *
  * This is deliberately per *item* rather than per *order*: two different lines
- * of one order may legitimately be in after-sales at the same time, which the
- * legacy order-level check forbade. The cumulative ceiling (`SUM(refunds) <=
+ * of one order may legitimately be in after-sales at the same time, which an
+ * order-level check would forbid. The cumulative ceiling (`SUM(refunds) <=
  * paid`) is a different invariant and is enforced by
  * `orders.refunded_amount <= orders.paid_amount` under a `FOR UPDATE` lock on
  * the order row, not by this index.

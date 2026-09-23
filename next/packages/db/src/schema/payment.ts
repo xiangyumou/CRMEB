@@ -18,11 +18,10 @@ import { orders } from './order';
 import { users } from './user';
 
 /**
- * The payment reliability layer, carried over from the fork's own design
- * (`crmeb/upgrade/core-store/order-reliability.php`) and tightened.
+ * The payment reliability layer: attempts, callbacks, exceptions and the
+ * capital-flow ledger.
  *
- * WeChat Pay v3 is the only gateway. Balance, Alipay and AllInPay left with the
- * features that used them; historical orders that used them are not migrated.
+ * WeChat Pay v3 is the only gateway.
  */
 
 // ---------------------------------------------------------------------------

@@ -20,9 +20,8 @@ import { users } from './user';
  * WeChat: the identities a customer signs in with, and the Official Account
  * assets an operator manages (menu, auto-replies, channel QR codes, media).
  *
- * The legacy `eb_wechat_user` duplicated the whole user profile per openid.
- * Here an identity is an identity: the profile lives on `users` and this table
- * only holds what WeChat owns.
+ * An identity is an identity: the profile lives on `users` and this table only
+ * holds what WeChat owns, one row per (platform, openid).
  */
 
 // ---------------------------------------------------------------------------
@@ -79,8 +78,8 @@ export interface WechatMenuButton {
 }
 
 /**
- * Versions of the Official Account menu. The legacy design kept the current
- * menu in `sys_config`, which made "what did we publish last week" unanswerable.
+ * Versions of the Official Account menu, so "what did we publish last week" is
+ * answerable.
  */
 export const wechatOaMenus = pgTable(
   'wechat_oa_menus',
@@ -179,11 +178,11 @@ export const wechatQrcodeCategories = pgTable(
     deletedAt: deletedAt(),
   },
   (t) => [
-    // Scoped to the live rows (CR-3-e3). Unscoped, a deleted folder held its
-    // name for ever: 渠道二维码分类 is a short list of short words, an operator
-    // deletes 双十一 and cannot create it again next year, and the 409 says the
-    // name is taken while the screen shows nothing of the sort. Both
-    // soft-deleting siblings above are scoped the same way.
+    // Scoped to the live rows. Unscoped, a deleted folder held its name for
+    // ever: 渠道二维码分类 is a short list of short words, an operator deletes 双十一 and
+    // cannot create it again next year, and the 409 says the name is taken
+    // while the screen shows nothing of the sort. Both soft-deleting siblings
+    // above are scoped the same way.
     uniqueIndex('wechat_qrcode_categories_name_uq')
       .on(t.name)
       .where(sql`deleted_at is null`),

@@ -6,7 +6,7 @@ import { bigint, numeric, timestamp } from 'drizzle-orm/pg-core';
  * Property names are camelCase; `casing: 'snake_case'` derives the column names.
  */
 
-/** Identity primary key. BY DEFAULT (not ALWAYS) so the ETL can carry legacy ids over. */
+/** Identity primary key. BY DEFAULT (not ALWAYS) so seeds and imports can insert explicit ids. */
 export const pk = () => bigint({ mode: 'number' }).primaryKey().generatedByDefaultAsIdentity();
 
 /** Foreign-key column; chain `.references(() => other.id, { onDelete })` and `.notNull()` at the use site. */

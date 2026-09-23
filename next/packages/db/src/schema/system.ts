@@ -16,10 +16,10 @@ import { createdAt, fk, instant, pk, updatedAt } from './_shared';
  */
 
 /**
- * Replaces the old 575-key `sys_config` blob. Values are stored per
- * `(group, key)` as JSON so a boolean stays a boolean; the shape is validated
- * against the zod schema of `defineConfigGroup({ group, ... })` on write, and
- * reads go through `config.get('<group>')`, never by key.
+ * Typed configuration (see `core/src/kernel/config-registry.ts`). Values are
+ * stored per `(group, key)` as JSON so a boolean stays a boolean; the shape is
+ * validated against the zod schema of `defineConfigGroup({ group, ... })` on
+ * write, and reads go through `config.get('<group>')`, never by key.
  */
 export const configValues = pgTable(
   'config_values',
@@ -29,7 +29,7 @@ export const configValues = pgTable(
     key: varchar({ length: 64 }).notNull(),
     value: jsonb().notNull(),
     updatedAt: updatedAt(),
-    /** Who last wrote it; null for seeds and for the ETL. */
+    /** Who last wrote it; null for seeds and jobs. */
     updatedBy: fk(),
   },
   (t) => [primaryKey({ columns: [t.group, t.key] })],

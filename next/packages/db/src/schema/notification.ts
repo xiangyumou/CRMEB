@@ -28,13 +28,9 @@ import { users } from './user';
 /**
  * Notification templates, in-app messages and the SMS log.
  *
- * The legacy `eb_system_notification` had five channels smeared across 26
- * columns (`wechat_tempid`, `routine_kid`, `sms_id`, `ent_wechat_text`,
- * `app_id`, …). Here a template is one row with one `channels` object, so
- * adding or removing a channel is a code change rather than a migration.
- *
- * Enterprise-WeChat group robots and native App push left with the features
- * that used them; the retained channels are in-app, OA template message,
+ * A template is one row with one `channels` object rather than a column per
+ * channel setting, so adding or removing a channel is a code change rather
+ * than a migration. The channels are in-app, OA template message,
  * mini-program subscribe message and SMS.
  */
 
@@ -69,7 +65,7 @@ export const notificationTemplates = pgTable(
   'notification_templates',
   {
     id: pk(),
-    /** Stable registry key the code sends by, e.g. `order_paid`. Legacy `mark`. */
+    /** Stable registry key the code sends by, e.g. `order_paid`. */
     code: varchar({ length: 64 }).notNull(),
     name: varchar({ length: 100 }).notNull(),
     /** When this fires, in prose, for the operator. */

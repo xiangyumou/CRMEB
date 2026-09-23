@@ -18,14 +18,12 @@ import { cities } from './reference';
 /**
  * Freight templates.
  *
- * The legacy design repeated `(province_id, city_id)` on every rule row and
- * grouped them with a `uniqid` string. Here a rule is a row and the cities it
- * covers are a join table, so "which cities does this rule cover" is a real
- * query instead of a string scan. A rule with **no** city rows is the
- * template's fallback rule (legacy `city_id = 0`).
+ * A rule is a row and the cities it covers are a join table, so "which cities
+ * does this rule cover" is a real query instead of a string scan. A rule with
+ * **no** city rows is the template's fallback rule.
  */
 
-/** What the freight is charged by. Legacy `eb_shipping_templates.type` 1/2/3. */
+/** What the freight is charged by. */
 export const shippingTemplatesChargeMode = pgEnum('shipping_templates_charge_mode', [
   'quantity',
   'weight',

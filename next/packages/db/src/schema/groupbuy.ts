@@ -20,13 +20,8 @@ import { users } from './user';
 /**
  * Group buying.
  *
- * The legacy `eb_store_pink` was one row per participant with a `k_id`
- * self-join, where `k_id = 0` meant "this row is also the group". Seat counting
- * was a `COUNT(*)` under a `FOR UPDATE` on the leader row, and `is_refund` held
- * a pink id rather than a boolean.
- *
- * Here the group is a real row with a real seat counter, so taking the last
- * seat is one conditional UPDATE:
+ * The group is a real row with a real seat counter, separate from its members,
+ * so taking the last seat is one conditional UPDATE:
  *
  * ```sql
  * UPDATE groupbuy_groups
@@ -208,9 +203,9 @@ export const groupbuyMembersStatus = pgEnum('groupbuy_members_status', [
 ]);
 
 /**
- * One participant. `UNIQUE (group_id, user_id)` replaces the legacy
- * `isPinkBe()` read-then-write check, and `UNIQUE (order_id)` makes one order
- * belong to at most one group.
+ * One participant. `UNIQUE (group_id, user_id)` stops a user joining a group
+ * twice without a read-then-write check, and `UNIQUE (order_id)` makes one
+ * order belong to at most one group.
  */
 export const groupbuyMembers = pgTable(
   'groupbuy_members',

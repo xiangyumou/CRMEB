@@ -26,14 +26,14 @@ import { cities } from './reference';
  * streak, agent / staff / division flags, partner id. A customer is an
  * identity with addresses, labels and invoice profiles — nothing more.
  *
- * Admin accounts and *all* session tables belong to `auth.ts` (executor P0-a).
+ * Admin accounts and *all* session tables belong to `auth.ts`.
  */
 
 // ---------------------------------------------------------------------------
 // users
 // ---------------------------------------------------------------------------
 
-/** How `passwordHash` was produced. Legacy MD5 hashes are upgraded on first successful login. */
+/** How `passwordHash` was produced. Imported MD5 hashes are upgraded on first successful login. */
 export const usersPasswordAlgo = pgEnum('users_password_algo', ['bcrypt', 'md5_legacy']);
 
 export const usersStatus = pgEnum('users_status', ['active', 'disabled']);
@@ -155,7 +155,7 @@ export const userGroups = pgTable(
 export type UserGroup = typeof userGroups.$inferSelect;
 export type NewUserGroup = typeof userGroups.$inferInsert;
 
-/** Join table; the legacy single `eb_user.group_id` becomes a many-to-many membership. */
+/** Join table: a user may belong to several groups. */
 export const userGroupsMap = pgTable(
   'user_groups_map',
   {

@@ -1,13 +1,12 @@
 # Business schema
 
 86 tables and 69 enums across 17 domain files, one file per domain in
-`src/schema/<domain>.ts`. This is a clean redesign, not a port: production is
-empty apart from one test user, so nothing here is shaped by legacy
-compatibility.
+`src/schema/<domain>.ts`.
 
 `auth.ts` (admins, roles, role permissions, admin roles, admin and storefront
 sessions) and `system.ts` (config values, audit log, generic job
-infrastructure) are **not** in this document — executor P0-a owns them.
+infrastructure) are the kernel's tables and are described in those files, not
+here.
 
 Conventions in force everywhere: `timestamptz` (no epoch integers), real
 `boolean`, `numeric(12,2)` money read and written as strings, `jsonb` with a TS
@@ -44,15 +43,15 @@ instead of comma-separated id columns, `NULL` instead of `''` or `0` for
 ### Required extension
 
 `products_name_trgm_idx` and `products_keyword_trgm_idx` are GIN indexes using
-`gin_trgm_ops`. **The `0000_init` migration must create `pg_trgm` before the
+`gin_trgm_ops`. **The `0000_init` migration creates `pg_trgm` before the
 `CREATE INDEX` statements**:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 ```
 
-Drizzle does not emit this; the orchestrator adds it at the top of the merged
-migration. Without it the migration fails with
+Drizzle does not emit this; it is written by hand at the top of `0000_init`.
+Without it the migration fails with
 `operator class "gin_trgm_ops" does not exist`.
 
 ---
@@ -61,10 +60,9 @@ migration. Without it the migration fails with
 
 ### 2.1 `orders.status`
 
-The legacy order carried three overlapping state machines (`status`,
-`refund_status`, `refund_type`) plus a `pid` split hierarchy, and
-`refund_status ∈ {3,4}` actually meant "parent of a split order". That is gone.
-Here there are three orthogonal columns with one meaning each.
+An order's state is three orthogonal columns with one meaning each: `status`
+(below), `fulfillment_status` (§2.2) and `refund_status` (§2.3). There is no
+split hierarchy (§6.1).
 
 | From                                             | Event                                           | To                |
 | ------------------------------------------------ | ----------------------------------------------- | ----------------- |
@@ -234,22 +232,21 @@ Every one of these is exercised by `scripts/check-constraints.sql`.
 
 ### 3.1 Why "one open refund per order **item**"
 
-The brief asked for "at most one open refund per order item set". The shape
-chosen is a partial unique index on `refund_items(order_item_id) WHERE is_open`,
+The rule is "at most one open refund per order item". The shape is a partial
+unique index on `refund_items(order_item_id) WHERE is_open`,
 backed by `refund_items.is_open`, a boolean that mirrors the parent refund's
 open-ness and is written in the same statement that changes `refunds.status`.
 
-- It is **per item**, not per order. Legacy blocked a second after-sale on the
-  whole order (`getCount(store_order_id=? AND refund_type IN (1,2,4,5) …)`),
-  which forbade refunding two different lines concurrently. Nothing in the
+- It is **per item**, not per order. Blocking a second after-sale on the whole
+  order would forbid refunding two different lines concurrently. Nothing in the
   business requires that, so the constraint follows the items.
 - A partial index cannot read another table, hence the denormalised `is_open`
-  rather than a predicate over `refunds.status`. Stream C **must** keep it in
-  step; that is the one hand-maintained invariant in the schema.
+  rather than a predicate over `refunds.status`. The refund domain **must** keep
+  it in step; that is the one hand-maintained invariant in the schema.
 - The cumulative ceiling (`SUM(refunds) <= paid`) is a _different_ invariant and
   is not this index's job — it is `orders_refunded_within_paid` under a
   `SELECT … FOR UPDATE` on the order row (REFUND-007).
-- Stream B2 must still refuse to ship while any refund on the order is open;
+- Fulfilment must still refuse to ship while any refund on the order is open;
   that is a service rule, not a constraint.
 
 ### 3.2 Why `user_coupons.claim_slot`
@@ -265,8 +262,8 @@ claim_slot := (SELECT count(*) + 1 FROM user_coupons WHERE template_id = $1 AND 
 
 `user_coupons_slot_uq (template_id, user_id, claim_slot)` means two concurrent
 claims compute the same slot and exactly one survives. A one-per-user template
-is simply `per_user_limit = 1`. This removes the legacy read-then-write window
-(`StoreCouponIssueServices::issueUserCoupon`) without an advisory lock.
+is simply `per_user_limit = 1`. There is no read-then-write window, and no
+advisory lock.
 
 ### 3.3 Virtual card claiming
 
@@ -281,261 +278,31 @@ UPDATE product_virtual_cards
 `product_virtual_cards_order_item_uq` (partial unique on `order_item_id WHERE
 order_item_id IS NOT NULL`) makes a retry of the delivery effect a no-op.
 
-**Consequence, and a decision streams B1/B2 must honour:** one order item can
-hold at most one card, so a `virtual_card` product must be sold with
-`quantity = 1` per line. That matches the legacy behaviour — `virtualSend()`
-issued a single card per order regardless of quantity — but it is now enforced
-rather than accidental. If multi-card lines are ever wanted, the index becomes
+**Consequence, which checkout and fulfilment honour:** one order item can hold
+at most one card, so a `virtual_card` product must be sold with `quantity = 1`
+per line. If multi-card lines are ever wanted, the index becomes
 `(order_item_id, claim_slot)` and the constraint moves to the service.
 
 ### 3.4 Immutable payment-attempt context
 
 `out_trade_no`, `provider`, `channel`, `mch_id`, `app_id`, `amount`,
 `payer_user_id` and `context` are frozen at insert (PAYC-004). There is no
-trigger enforcing this — the schema has no triggers at all — so stream C must
-never `UPDATE` those columns. A repeated pay tap replays the open row (found via
+trigger enforcing this — the schema has no triggers at all — so the payment
+domain never `UPDATE`s those columns. A repeated pay tap replays the open row (found via
 `payment_attempts_open_uq`); a request that disagrees with any frozen column is
 refused, not merged.
 
 ---
 
-## 4. Legacy → new mapping for the ETL
-
-Only the groups listed in PLAN §3 migrate. **Orders, order items, refunds,
-payment attempts, effects, exception payments, carts, group buys, presale
-orders, statistics and logs are not migrated** — the seven production test
-orders are discarded.
-
-### 4.1 Table mapping
-
-| Legacy table                                                                                                                                                                                                                                                                                                                                            | New table(s)                                                                                                                                                  | Notes                                                                                                              |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `eb_system_city`                                                                                                                                                                                                                                                                                                                                        | `cities`                                                                                                                                                      | `id` ← legacy `city_id` (the tree links `parent_id → city_id`); legacy `id` discarded. Seeded, not ETL'd.          |
-| `eb_express`                                                                                                                                                                                                                                                                                                                                            | `express_companies`                                                                                                                                           | `is_show → is_enabled`; waybill credential columns dropped (secrets → config). Seeded.                             |
-| `eb_agreement`                                                                                                                                                                                                                                                                                                                                          | `agreements`                                                                                                                                                  | types 3/4/5/7 → `privacy_policy` / `user_service` / `account_cancellation` / `about_us`; types 1, 2, 6, 8 dropped. |
-| `eb_user`                                                                                                                                                                                                                                                                                                                                               | `users`                                                                                                                                                       | See §4.3.                                                                                                          |
-| `eb_user_address`                                                                                                                                                                                                                                                                                                                                       | `user_addresses`                                                                                                                                              | `is_del → deleted_at`; province/city/district names kept as a snapshot plus real `cities` ids.                     |
-| `eb_user_group` + `eb_user.group_id`                                                                                                                                                                                                                                                                                                                    | `user_groups` + `user_groups_map`                                                                                                                             | single group → many-to-many.                                                                                       |
-| `eb_user_label`, `eb_user_label_relation`                                                                                                                                                                                                                                                                                                               | `user_labels`, `user_labels_map`; `eb_category(type=0)` → `user_label_categories`                                                                             |                                                                                                                    |
-| `eb_user_invoice`                                                                                                                                                                                                                                                                                                                                       | `user_invoice_profiles`                                                                                                                                       |                                                                                                                    |
-| `eb_user_cancel`                                                                                                                                                                                                                                                                                                                                        | `user_cancellation_requests`                                                                                                                                  | `status` 0/1/2 → `pending`/`approved`/`rejected`.                                                                  |
-| `eb_wechat_user`                                                                                                                                                                                                                                                                                                                                        | `wechat_identities`                                                                                                                                           | Profile columns move to `users`; one row per (platform, openid). `user_type` → `platform`.                         |
-| `eb_store_category`                                                                                                                                                                                                                                                                                                                                     | `product_categories`                                                                                                                                          | `pid` → `parent_id`; `path` and `level` computed.                                                                  |
-| `eb_store_product`                                                                                                                                                                                                                                                                                                                                      | `products` (+ `product_descriptions`, `product_params`, `product_categories_map`, `product_labels_map`, `product_protections_map`, `product_recommendations`) | See §4.2.                                                                                                          |
-| `eb_store_product_attr`                                                                                                                                                                                                                                                                                                                                 | `product_specs` + `product_spec_values`                                                                                                                       | JSON `attr_values` exploded into rows.                                                                             |
-| `eb_store_product_attr_value`                                                                                                                                                                                                                                                                                                                           | `product_skus`                                                                                                                                                | `unique → sku_code`, `suk → spec_text`; `type <> 0` rows belong to activities.                                     |
-| `eb_store_product_attr_result`                                                                                                                                                                                                                                                                                                                          | —                                                                                                                                                             | Dropped: a denormalised cache of the two tables above.                                                             |
-| `eb_store_product_description`                                                                                                                                                                                                                                                                                                                          | `product_descriptions`                                                                                                                                        |                                                                                                                    |
-| `eb_store_product_virtual`                                                                                                                                                                                                                                                                                                                              | `product_virtual_cards`                                                                                                                                       | `attr_unique → sku_id`, `card_unique → card_key`, `card_pwd → card_secret`; `uid = 0` → `state = 'unclaimed'`.     |
-| `eb_store_product_label`, `_label_cate`                                                                                                                                                                                                                                                                                                                 | `product_labels`, `product_label_categories`                                                                                                                  |                                                                                                                    |
-| `eb_store_product_param`                                                                                                                                                                                                                                                                                                                                | `product_param_templates`; per-product `params_list` JSON → `product_params`                                                                                  |                                                                                                                    |
-| `eb_store_product_protection`                                                                                                                                                                                                                                                                                                                           | `product_protections`                                                                                                                                         |                                                                                                                    |
-| `eb_store_product_relation`                                                                                                                                                                                                                                                                                                                             | `product_favorites`                                                                                                                                           | Only `type = 'collect'`; `like` dropped.                                                                           |
-| `eb_store_product_reply`                                                                                                                                                                                                                                                                                                                                | `product_reviews`                                                                                                                                             | `unique` → the review's order item.                                                                                |
-| `eb_store_product_rule`                                                                                                                                                                                                                                                                                                                                 | —                                                                                                                                                             | Dropped: an admin convenience list of spec presets, re-enterable.                                                  |
-| `eb_store_product_coupon`                                                                                                                                                                                                                                                                                                                               | `product_gift_coupons`                                                                                                                                        |                                                                                                                    |
-| `eb_store_cart`                                                                                                                                                                                                                                                                                                                                         | `cart_items`                                                                                                                                                  | Activity columns dropped; `is_pay`/`is_del` rows discarded.                                                        |
-| `eb_store_coupon` + `eb_store_coupon_issue`                                                                                                                                                                                                                                                                                                             | `coupon_templates`                                                                                                                                            | Two tables for one concept.                                                                                        |
-| `eb_store_coupon_issue_user`                                                                                                                                                                                                                                                                                                                            | —                                                                                                                                                             | Redundant claim log; superseded by `user_coupons`.                                                                 |
-| `eb_store_coupon_user`                                                                                                                                                                                                                                                                                                                                  | `user_coupons`                                                                                                                                                | `claim_slot` computed per (template, user) in claim order.                                                         |
-| `eb_store_coupon_product`                                                                                                                                                                                                                                                                                                                               | `coupon_template_products` / `coupon_template_categories`                                                                                                     | One table split by which id was set.                                                                               |
-| `eb_shipping_templates*`                                                                                                                                                                                                                                                                                                                                | `shipping_templates` + 5 children                                                                                                                             | The `uniqid` row-group becomes a rule row plus a city join table.                                                  |
-| `eb_store_combination`                                                                                                                                                                                                                                                                                                                                  | `groupbuy_activities` (+ `groupbuy_activity_skus`)                                                                                                            |                                                                                                                    |
-| `eb_store_pink`                                                                                                                                                                                                                                                                                                                                         | `groupbuy_groups` + `groupbuy_members`                                                                                                                        | Not migrated (no production groups).                                                                               |
-| `eb_store_advance`                                                                                                                                                                                                                                                                                                                                      | `presale_activities` (+ `presale_activity_skus`)                                                                                                              |                                                                                                                    |
-| `eb_article`, `_category`, `_content`                                                                                                                                                                                                                                                                                                                   | `articles`, `article_categories`, `article_contents`                                                                                                          |                                                                                                                    |
-| `eb_diy`                                                                                                                                                                                                                                                                                                                                                | `diy_pages`                                                                                                                                                   | `value` → `content` (must round-trip byte-identically), `type` → `kind`, `is_show` → `is_home`.                    |
-| `eb_theme`                                                                                                                                                                                                                                                                                                                                              | `themes`                                                                                                                                                      | The 20 per-surface columns collapse into `data` / `default_data`.                                                  |
-| `eb_page_link`, `eb_page_categroy`                                                                                                                                                                                                                                                                                                                      | `page_links`, `page_link_categories`                                                                                                                          | Rows pointing at retired pages are dropped (`core-store-removed-pages.json`).                                      |
-| `eb_system_attachment`, `_category`                                                                                                                                                                                                                                                                                                                     | `attachments`, `attachment_categories`                                                                                                                        | `att_dir → storage_key` + `url`; `image_type` → `driver`; `sha256` computed during the file rsync.                 |
-| `eb_system_notification`                                                                                                                                                                                                                                                                                                                                | `notification_templates`                                                                                                                                      | 26 per-channel columns → one `channels` object.                                                                    |
-| `eb_message_system`                                                                                                                                                                                                                                                                                                                                     | `notification_messages`                                                                                                                                       | `look → read_at`.                                                                                                  |
-| `eb_sms_record`                                                                                                                                                                                                                                                                                                                                         | `sms_logs`                                                                                                                                                    |                                                                                                                    |
-| `eb_wechat_reply`                                                                                                                                                                                                                                                                                                                                       | `wechat_auto_replies`                                                                                                                                         |                                                                                                                    |
-| `eb_wechat_qrcode`, `_cate`, `_record`                                                                                                                                                                                                                                                                                                                  | `wechat_qrcodes`, `wechat_qrcode_categories`, `wechat_qrcode_scans`                                                                                           |                                                                                                                    |
-| `eb_wechat_media`                                                                                                                                                                                                                                                                                                                                       | `wechat_media`                                                                                                                                                |                                                                                                                    |
-| `eb_store_visit`, `eb_store_product_log`, `eb_user_visit`, `eb_user_search`                                                                                                                                                                                                                                                                             | `product_events`, `user_visits`, `search_logs`                                                                                                                | Not migrated.                                                                                                      |
-| `eb_store_order*`, `eb_store_order_refund`, `_payment_attempt`, `_effect`, `_payment_exception`, `_invoice`, `_status`, `_cart_info`                                                                                                                                                                                                                    | `orders` and the order/payment/refund families                                                                                                                | Not migrated.                                                                                                      |
-| `eb_capital_flow`                                                                                                                                                                                                                                                                                                                                       | `capital_flows`                                                                                                                                               | Not migrated.                                                                                                      |
-| `eb_user_bill`, `eb_qrcode`, `eb_routine_scheme`, `eb_auxiliary`, `eb_wechat_message`, `eb_wechat_news_category`, `eb_lang_*`, `eb_out_*`, `eb_system_crud*`, `eb_system_event*`, `eb_system_file*`, `eb_system_route*`, `eb_system_timer`, `eb_system_pem`, `eb_system_ticket`, `eb_system_storage`, `eb_theme_download`, `eb_upgrade_log`, `eb_cache` | —                                                                                                                                                             | Retired with their features, or developer-tool tables not ported.                                                  |
-
-### 4.2 `eb_store_product` column fate
-
-| Legacy                                                                                       | New                                                            |                                                                        |
-| -------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `store_name` / `store_info` / `keyword`                                                      | `name` / `subtitle` / `keyword`                                |                                                                        |
-| `image` / `recommend_image` / `slider_image`                                                 | `image_url` / `card_image_url` / `slider_images` (jsonb array) |                                                                        |
-| `price` / `ot_price` / `cost`                                                                | `price` / `original_price` / `cost`                            |                                                                        |
-| `is_show` + `is_del`                                                                         | `status` (`draft`/`on_shelf`/`off_shelf`) + `deleted_at`       |                                                                        |
-| `spec_type`                                                                                  | `spec_mode` (boolean: multi-spec)                              |                                                                        |
-| `is_virtual` + `virtual_type`                                                                | `kind`                                                         | 0→`physical`, 1→`virtual_card`, 2→`virtual_coupon`, 3→`virtual_manual` |
-| `freight` + `is_postage` + `postage` + `temp_id`                                             | `freight_mode` + `fixed_freight` + `shipping_template_id`      |                                                                        |
-| `is_limit` + `limit_type` + `limit_num`                                                      | `purchase_limit_mode` + `purchase_limit_quantity`              | 1→`per_order`, 2→`lifetime`                                            |
-| `ficti` / `browse`                                                                           | `display_sales_boost` / `views`                                |                                                                        |
-| `cate_id` / `label_id` / `label_list` / `protection_list` / `recommend_list` / `params_list` | join tables                                                    |                                                                        |
-| `vip_price`, `is_vip`, `vip_product`, `vip_product_type`                                     | —                                                              | paid membership retired                                                |
-| `give_integral`                                                                              | —                                                              | points retired                                                         |
-| `is_seckill`, `is_bargain`, `activity`                                                       | —                                                              | seckill / bargain retired                                              |
-| `is_sub`                                                                                     | —                                                              | brokerage retired                                                      |
-| `mer_id`, `mer_use`, `is_mer_check`                                                          | —                                                              | multi-merchant never used                                              |
-| `logistics`                                                                                  | —                                                              | store pickup retired; everything ships or is delivered virtually       |
-| `command_word`, `soure_link`, `code_path`, `spu` (kept), `default_sku`                       | mostly —                                                       | share-password and Taobao-import features not ported                   |
-| `is_gift`, `gift_price`                                                                      | —                                                              | gift orders retired                                                    |
-| `presale`, `presale_start_time`, `presale_end_time`, `presale_day`                           | `presale_activities`                                           | the product-level presale duplicate is folded into the activity        |
-
-### 4.3 `eb_user` column fate
-
-Kept: `account`, `pwd` → `password_hash` (+ `password_algo`, `password_version`),
-`real_name`, `birthday`, `mark` → `admin_remark`, `nickname`, `avatar`,
-`phone`, `status`, `add_time`/`add_ip`/`last_time`/`last_ip` →
-`created_at`/`register_ip`/`last_login_at`/`last_login_ip`, `login_type` →
-`register_source`, `group_id` → `user_groups_map`, `is_del` → `deleted_at`.
-
-Dropped: `now_money`, `brokerage_price`, `integral`, `exp`, `sign_num`,
-`sign_remind`, `level`, `agent_level`, `spread_open`, `spread_uid`,
-`spread_time`, `is_promoter`, `spread_count`, `pay_count`, `clean_time`,
-`partner_id`, `user_type`, `addres`, `adminid`, `record_phone`,
-`is_money_level`, `is_ever_level`, `overdue_time`, `uniqid`, `card_id`
-(identity-card number: sensitive and unused), and the whole
-`division_*` / `is_agent` / `is_staff` / `agent_id` / `staff_id` block.
-
-Password: bcrypt hashes carry over as `password_algo = 'bcrypt'`; legacy unsalted
-MD5 values as `password_algo = 'md5_legacy'`, upgraded in place on the first
-successful login. `password_version` starts at 1.
-
-### 4.4 Enum value mappings
-
-**`orders.status`** ← `eb_store_order.status` + `paid` + `is_cancel`.
-The legacy DDL comment is wrong; these are the real writers:
-
-| Legacy                          | New                                          |
-| ------------------------------- | -------------------------------------------- |
-| `paid=0, status=0, is_cancel=0` | `pending_payment`                            |
-| `paid=1, status=0`              | `paid`                                       |
-| `status=1`                      | `shipped`                                    |
-| `status=2`                      | `received`                                   |
-| `status=3`                      | `completed`                                  |
-| `status=4`                      | (parent of a split — no successor; see §6.1) |
-| `is_cancel=1`                   | `cancelled`                                  |
-| `status=-2`                     | `refunded`                                   |
-| `status=-1`, `-3`               | no writer / not a stored value — ignore      |
-
-**`orders.refund_status`** ← `eb_store_order.refund_status`:
-0 → `none`, 1 → `requested`, 2 → `refunded`, 3 → `partially_refunded`,
-4 → `requested` (legacy 3/4 encoded split parents, not refund states).
-
-**`refunds.kind` / `status` / `return_stage`** ← `eb_store_order_refund.refund_type`:
-
-| Legacy `refund_type` | `kind`              | `status`            | `return_stage`      |
-| -------------------- | ------------------- | ------------------- | ------------------- |
-| 1 仅退款             | `refund_only`       | from `refund_state` | `not_required`      |
-| 2 退货退款           | `return_and_refund` | from `refund_state` | `awaiting_shipment` |
-| 3 拒绝退款           | (unchanged)         | `rejected`          |                     |
-| 4 商品待退货         | `return_and_refund` | `approved`          | `awaiting_shipment` |
-| 5 退货待收货         | `return_and_refund` | `approved`          | `shipped_back`      |
-| 6 已退款             | (unchanged)         | `succeeded`         | `received`          |
-
-**`refunds.status`** ← `eb_store_order_refund.refund_state`:
-0 → `applied`, 1 → `processing`, 2 → `unknown`, 3 → `succeeded`, 4 → `failed`.
-`is_cancel = 1` → `cancelled`; `is_pink_cancel = 1` → `is_automatic = true`.
-
-**`payment_attempts.status`** ← legacy `status`:
-0 → `submitted`, 1 → `paid`, 2 → `closed`, 3 → `unknown`.
-(`creating`, `closing` and `failed` are new; legacy had no pre-submit or
-close-in-progress state, which is why PAYC-001 was reachable.)
-
-**`payment_exceptions.status`** ← legacy `status`:
-0 → `open`, 1 → `refunded`, 2 → `refund_unknown`, 3 → `refund_failed`,
-4 → `refunding`. `reason` strings carry over unchanged, plus the new
-`amount_mismatch`.
-
-**`effects.status`** — legacy `eb_store_order_effect` rows are not migrated (no orders are).
-
-**`user_coupons.status`** ← `eb_store_coupon_user.status`:
-0 → `unused`, 1 → `used`, 2 → `expired`; `is_fail = 1` → `revoked`.
-`type` `'get'` → `source_kind = 'claim'`, `'send'` → `'admin_grant'`.
-
-**`coupon_templates.claim_mode`** ← `receive_type`:
-1 → `manual`, 2 → `new_user`, 3 → `order_gift`, **4 (会员券) → the row is
-dropped** (paid membership retired).
-**`coupon_templates.scope`** ← `type`: 0 → `all_products`, 1 → `categories`,
-2 → `products`.
-
-**`groupbuy_groups.status`** ← `eb_store_pink.status`:
-1 → `forming`, 2 → `succeeded`, 3 → `failed`. `k_id = 0` → `role = 'leader'`;
-`k_id > 0` → `role = 'member'` with `group_id` = the leader row's id.
-`is_refund` held a _pink id_, not a boolean — it maps to
-`groupbuy_members.status = 'refunded'`.
-
-**`shipping_templates.charge_mode`** ← `type`: 1 → `quantity`, 2 → `weight`,
-3 → `volume`.
-
-**`shipments.delivery_mode`** ← `eb_store_order.delivery_type`:
-`express` → `express`, `send` → `merchant_delivery`, `fictitious` → `virtual`.
-`delivery_split` / `delivery_part_split` have no successor (§6.1).
-
-**`attachments.driver`** ← `image_type`: 1 → `local`, 2/3/4 (Qiniu/OSS/COS) →
-`s3` (all three are S3-compatible; the endpoint lives in config).
-
-**`agreements.code`** ← `eb_agreement.type`: 3 → `privacy_policy`,
-4 → `user_service`, 5 → `account_cancellation`, 7 → `about_us`.
-1, 2, 6, 8 dropped.
-
-**`notification_templates.code`** ← `eb_system_notification.mark`:
-
-| Legacy `mark`                  | New `code`                    |
-| ------------------------------ | ----------------------------- |
-| `verify_code`                  | `sms_verify_code`             |
-| `order_pay_success`            | `order_paid`                  |
-| `order_postage_success`        | `order_shipped`               |
-| `order_deliver_success`        | `order_delivered_by_merchant` |
-| `order_take`                   | `order_received`              |
-| `order_refund`                 | `order_refund_succeeded`      |
-| `send_order_refund_no_status`  | `order_refund_failed`         |
-| `price_revision`               | `order_price_revised`         |
-| `order_pay_false`              | `order_unpaid_reminder`       |
-| `open_pink_success`            | `groupbuy_created`            |
-| `can_pink_success`             | `groupbuy_joined`             |
-| `order_user_groups_success`    | `groupbuy_succeeded`          |
-| `send_order_pink_fial`         | `groupbuy_failed`             |
-| `send_order_pink_clone`        | `groupbuy_cancelled`          |
-| `admin_pay_success_code`       | `admin_order_paid`            |
-| `send_admin_confirm_take_over` | `admin_order_received`        |
-| `send_order_apply_refund`      | `admin_refund_applied`        |
-| `revenue_received`             | — (brokerage retired)         |
-
-**`order_status_logs.change_type`** ← `eb_store_order_status.change_type`:
-
-| Legacy                                                        | New                                  |
-| ------------------------------------------------------------- | ------------------------------------ |
-| `cache_key_create_order`                                      | `created`                            |
-| `pay_success`                                                 | `paid`                               |
-| `order_edit`                                                  | `price_adjusted`                     |
-| `delivery_goods`, `delivery`                                  | `shipped`                            |
-| `delivery_goods_cancel`                                       | `shipment_cancelled`                 |
-| `distribution`                                                | `shipment_updated`                   |
-| `delivery_fictitious`                                         | `virtual_delivered`                  |
-| `take_delivery`, `user_take_delivery`                         | `received`                           |
-| `check_order_over`                                            | `completed`                          |
-| `apply_refund`                                                | `refund_applied`                     |
-| `refund_express`                                              | `refund_approved`                    |
-| `refund_price`                                                | `refund_succeeded` / `refund_failed` |
-| `refund_n`                                                    | `refund_rejected`                    |
-| `cancel_refund_order`                                         | `refund_cancelled`                   |
-| `coupon_back`                                                 | `coupon_returned`                    |
-| `remove_order`                                                | `hidden_by_user`                     |
-| `stock_up_goods`                                              | — (dead branch in the fork)          |
-| `delivery_split`, `split_create_order`, `delivery_part_split` | — (no order splitting)               |
-
-### 4.5 `effects.event_type` registry
+## 4. `effects.event_type` registry
 
 `event_type` is `varchar(64)`, **not** an enum. A `pgEnum` would need
 `ALTER TYPE … ADD VALUE` for every new handler, and that statement cannot run
-inside a migration transaction — with ten streams registering effects, that is
-a merge hazard rather than safety. Handlers are declared in
+inside a migration transaction — with every domain registering effects, that is
+a hazard rather than safety. Handlers are declared in
 `core/<domain>/effects.ts`; keys are dotted and prefixed by domain.
 
-Known keys at freeze time (streams may add more without a migration):
+For example (a domain adds more without a migration):
 
 ```
 order.paid                 order.cancelled           order.shipped
@@ -552,9 +319,9 @@ fixed vocabulary the operator console renders, not an extension point.
 
 ---
 
-## 5. References to `admins`, and merge notes
+## 5. References to `admins`
 
-Wired at the Phase 0 merge. Every operator reference is `ON DELETE SET NULL` (an admin
+Every operator reference is `ON DELETE SET NULL` (an admin
 leaving must never delete business history): `attachments.uploaded_by_admin_id`,
 `product_reviews.reply_by_admin_id`, `user_cancellation_requests.reviewed_by_admin_id`,
 `order_status_logs.operator_admin_id`, `shipments.operator_admin_id`,
@@ -566,51 +333,38 @@ leaving must never delete business history): `attachments.uploaded_by_admin_id`,
 `auth.ts` and the business files import each other, so these references are written
 `(): AnyPgColumn => admins.id`.
 
-Migration notes:
-
-1. `CREATE EXTENSION IF NOT EXISTS pg_trgm;` at the top of `0000_init`.
-2. PostgreSQL truncates identifiers at 63 bytes, and seven of Drizzle's
-   generated FK constraint names exceed that (all on
-   `shipping_template_*`, `groupbuy_activities`, `presale_activities`,
-   `presale_stock_ledger`). They truncate to distinct names and apply cleanly —
-   the migration only emits `NOTICE`s — but if any pair ever collides, name the
-   constraints explicitly rather than renaming the tables.
+PostgreSQL truncates identifiers at 63 bytes, and seven of Drizzle's generated
+FK constraint names exceed that (all on `shipping_template_*`,
+`groupbuy_activities`, `presale_activities`, `presale_stock_ledger`). They
+truncate to distinct names and apply cleanly — the migration only emits
+`NOTICE`s — but if any pair ever collides, name the constraints explicitly
+rather than renaming the tables.
 
 ---
 
-## 6. Judgment calls other streams must know
+## 6. Design decisions
 
 ### 6.1 No order splitting — `shipments` instead
 
-The legacy `pid` / `old_cart_id` / `split_status` / `surplus_num` machinery
-existed only so a partially shipped order could be split into child orders, and
-`StoreOrderSplitServices` then re-prorated coupon, postage and payment across
-the children. Almost every legacy split defect lived in that arithmetic, and
-`assertCumulativeRefundWithinPaid()` had to walk an "order family" because of
-it.
+An order is never split into child orders. Partial shipment is one or more
+`shipments` rows with `shipment_items`, and `order_items.shipped_quantity` is
+the progress. Money is never re-divided, so coupon, postage and payment never
+have to be re-prorated across children, and the refund ceiling is a single row
+check. There is no parent/child order and no "order family" to walk.
 
-An order is now never split. Partial shipment is one or more `shipments` rows
-with `shipment_items`, and `order_items.shipped_quantity` is the progress.
-Money is never re-divided, so the refund ceiling is a single row check.
-**Streams B2 and C:** there is no parent/child order, no `order_family`, and no
-`equal_split`.
+### 6.2 `orders.status` has seven values
 
-### 6.2 `orders.status` has seven values, not six
-
-The brief listed six. `received` was added between `shipped` and `completed`
-because the legacy storefront has a distinct 待评价 tab (legacy `status = 2`
-received vs `3` reviewed) and stream H's mappers need to reproduce it.
+`received` sits between `shipped` and `completed` because the storefront has a
+distinct 待评价 tab: received, not yet reviewed.
 
 ### 6.3 Presale deposits are declared but inert
 
-`eb_store_advance` carries `type` (全款/定金), `deposit`, `pay_start_time` and
-`pay_stop_time`, and the admin form edits all four — but **no legacy order code
-reads any of them**. `deposit` appears in exactly one PHP file, the admin save
-parameter list. A presale order is one order, paid once, in full.
+`presale_activities` carries `payment_mode` (全款/定金), the deposit amount and the
+balance window, and the admin form edits them — but **no order flow reads them
+yet**. A presale order is one order, paid once, in full.
 
-The columns and `presale_orders.stage` are kept so stream D can turn the flow on
-without a schema change, and so the admin screen and the ETL have somewhere to
-put the values. Until then every presale order goes
+The columns and `presale_orders.stage` are kept so the deposit flow can be
+turned on without a schema change. Until then every presale order goes
 `final_pending → final_paid`, and `presale_activities_deposit_shape` makes a
 half-configured deposit activity impossible.
 
@@ -634,36 +388,35 @@ a cross-file reference and hit `TS7022`, that is the fix.
 
 There is no "buy now" pseudo-cart row, no `combination_id`, no `advance_id`.
 A direct purchase, a group-buy join and a presale order are built from the
-request payload. **Stream B1:** order creation takes either a list of
-`cart_items` ids or a direct-purchase payload.
+request payload. Order creation takes either a list of `cart_items` ids or a
+direct-purchase payload.
 
 ### 6.7 Denormalised counters
 
 `products.stock`, `products.sales` and `products.price` mirror the SKU rows for
 list filtering and sorting. The authoritative values are on `product_skus`;
-stock is only ever decremented there. Stream A owns keeping the mirrors in step
-and must do it with an aggregate `UPDATE`, never a read-then-write.
+stock is only ever decremented there. The catalog domain keeps the mirrors in
+step, always with an aggregate `UPDATE`, never a read-then-write.
 
-### 6.8 `payment_callbacks` is new
+### 6.8 `payment_callbacks`
 
-Not in the brief. Added because PAY-007 (two callbacks pay an order exactly
-once) and the late/duplicate-notification rows of the risk matrix are much
-easier to satisfy when a replayed notification collides on
-`(mch_id, provider_notify_id)` than when the handler has to reason about it.
-Stream C may ignore it and rely on the attempt state machine alone, but it is
-cheap.
+PAY-007 (two callbacks pay an order exactly once) and late or duplicate
+notifications are much easier to get right when a replayed notification
+collides on `(mch_id, provider_notify_id)` than when the handler has to reason
+about it alongside the attempt state machine.
 
 ### 6.9 `page_links` / `page_link_categories`
 
-Kept for `<LinkPicker>`, **not seeded** — the legacy rows point at uni-app
-routes, several of which belong to retired features. Stream G1 either seeds
-them from a vetted list or drops the tables via a CR.
+The routes `<LinkPicker>` offers. They are operator data, **not seeded**: the
+uni-app's route table changes on its own schedule. Reads hide links to retired
+pages.
 
 ### 6.10 `wechat_auto_replies.trigger_kind`
 
 `trigger` is a reserved word in PostgreSQL and would break the raw predicate of
-the partial unique index, so the column is `trigger_kind`. Same reasoning as
-`unique → sku_code` / `item_key` and `key → code`.
+the partial unique index, so the column is `trigger_kind`. The same reasoning
+names `product_skus.sku_code`, `order_items.item_key` and the `code` columns
+(rather than `unique` and `key`).
 
 ---
 
@@ -680,16 +433,16 @@ every statement is an upsert on a natural key.
 | `agreements`             | shells in `src/seed/reference-data.ts` | 4    |
 | `notification_templates` | shells in `src/seed/reference-data.ts` | 17   |
 
-The two JSON files are produced by
-`scripts/extract-legacy-seed.mjs [path/to/crmeb.sql]`, which streams the 10 MB
-legacy dump, parses the `INSERT` tuples, and checks for duplicate ids, duplicate
-codes and dangling parents before writing. Both the script and its output are
-committed, so the seed never needs the old repository.
+The two JSON files are committed reference data: the national division tree
+(`parent_id` points at another city's `id`; `code` is the 12-digit division
+code) and the courier list. Cities and courier companies carry explicit ids, so
+a stored address, freight rule or shipment points at the same row after every
+re-seed.
 
 Agreements and notification templates are seeded as **shells**: the code and the
 title are the contract the application depends on, the body is
-installation-specific and arrives with the ETL or is typed by an operator. An
-existing body is never overwritten.
+installation-specific and is typed by an operator. An existing body is never
+overwritten.
 
 Nothing else is seeded — no demo products, no menus, no configuration, no admin
 account.

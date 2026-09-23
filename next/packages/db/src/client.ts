@@ -21,7 +21,7 @@ const JSONB_OID = 3802;
  * node-postgres parses them by default and drizzle's jsonb column then parses
  * any *string* it is handed a second time: a stored `"1900000001"` (a merchant
  * id, a phone number) came back as a number, `"true"` as a boolean, and a
- * schema that expected a string silently fell back to its default (CR-6-c).
+ * schema that expected a string silently fell back to its default.
  *
  * It has to be the driver-wide parser: drizzle passes its own `types` with
  * every query and falls back to `pg.types`, so a pool-level override is never
@@ -39,8 +39,8 @@ export interface DbOptions {
   /**
    * How long a caller waits for a pooled connection before it gets an error
    * (`timeout exceeded when trying to connect`). `0` waits for ever, which is
-   * `pg.Pool`'s own default and the reason CR-53-k2 could wedge a process.
-   * Default: `DB_POOL_ACQUIRE_TIMEOUT_MS`, else 5 s.
+   * `pg.Pool`'s own default and how a lock-holding transaction can wedge a
+   * process (see `createDb`). Default: `DB_POOL_ACQUIRE_TIMEOUT_MS`, else 5 s.
    */
   acquireTimeoutMs?: number;
   /**
@@ -63,7 +63,7 @@ export interface DbOptions {
 
 /** Five seconds: far above any healthy wait for one of ten connections. */
 export const DEFAULT_ACQUIRE_TIMEOUT_MS = 5_000;
-/** Thirty seconds: no request, job or ETL step sits idle inside a transaction that long. */
+/** Thirty seconds: no request or job sits idle inside a transaction that long. */
 export const DEFAULT_IDLE_IN_TX_TIMEOUT_MS = 30_000;
 
 /** A non-negative integer from the environment, or the fallback. */
@@ -80,7 +80,7 @@ function envMs(name: string, fallback: number): number {
 /**
  * The one place a pool is made.
  *
- * Two limits are always on (CR-53-k2). Without them, a transaction that holds
+ * Two limits are always on. Without them, a transaction that holds
  * a row lock and then asks the pool for a second connection waits for ever as
  * soon as every other connection is waiting on that lock: `pg.Pool` has no
  * acquire timeout, PostgreSQL has no idle-in-transaction timeout, and the
