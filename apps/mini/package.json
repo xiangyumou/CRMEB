@@ -1,6 +1,6 @@
 {
   "name": "@shop/mini",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "The WeChat mini-program storefront (Taro 4 + React 18). The H5 build is for e2e and DIY preview only.",
   "browserslist": [

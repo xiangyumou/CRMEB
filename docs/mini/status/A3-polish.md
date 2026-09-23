@@ -37,10 +37,18 @@ Five small fixes, one commit each. Updated at every commit.
   `getCurrentPages()` pages carry `route` (no slash) and `options`; Taro's H5 router's carry
   `route` and `path` with the query. Device item **D13** in `docs/mini/device-check.md`; D02
   now checks the icons too.
+- **X-Client-Version.** `config/index.ts` fixes `process.env.TARO_APP_VERSION` at build time:
+  the `TARO_APP_VERSION` variable when set, else `apps/mini/package.json` `version` (also the
+  upload version in `scripts/preview.mjs`), checked against the server's `clientVersion` shape
+  (a bad one fails the build). `data/api.ts` `CLIENT_VERSION` reads it, so every request and
+  upload sends it. `package.json` goes from `0.0.0` to `1.0.0` (the first release; change it
+  if the release plan says otherwise). `turbo.json` declares `TARO_APP_VERSION` for `build`
+  (strict env mode). How to bump per release: `docs/mini/device-check.md` §9, pointed to from
+  `docs/contributing.md`. Tested in `data/api.test.ts` (Vitest sets `1.0.0-test`).
 
 ## In progress
 
-- Client version.
+- Nothing.
 
 ## Next
 

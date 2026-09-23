@@ -3,8 +3,12 @@ import { serverClockTransport } from '@/lib/server-clock';
 import { platform } from '@/platform';
 import { renewingTransport } from '@/session/renewing-transport';
 
-/** Sent as `X-Client-Version`. TODO(I1): the release version from the build. */
-export const CLIENT_VERSION = '0.0.0';
+/**
+ * Sent as `X-Client-Version`: the release version, fixed at build time (config/index.ts:
+ * `TARO_APP_VERSION`, else apps/mini/package.json `version`). Bumped per release
+ * (docs/mini/device-check.md §9).
+ */
+export const CLIENT_VERSION = process.env.TARO_APP_VERSION || '0.0.0';
 
 interface AuthHooks {
   getToken: () => string | null;

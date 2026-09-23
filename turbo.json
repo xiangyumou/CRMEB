@@ -4,7 +4,7 @@
     "gen": { "dependsOn": ["^gen"], "outputs": ["src/**/*.gen.ts", "openapi.json"] },
     "build": {
       "dependsOn": ["gen", "^build"],
-      "env": ["NEXT_BUILD_CPUS"],
+      "env": ["NEXT_BUILD_CPUS", "TARO_APP_VERSION"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "typecheck": { "dependsOn": ["gen", "^gen"] },

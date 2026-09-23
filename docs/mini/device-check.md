@@ -212,3 +212,18 @@ iPhone 和 Android 各过一遍。每项记「通过 / 失败 / 未测（原因�
    `miniprogram-ci preview --help` 核对一遍。
 
 扫出来的是开发版，要求和第 2.1 节一样（扫码人是成员），真机上同样要开「开发调试」才能访问 http 局域网地址。
+
+## 9. 版本号
+
+小程序的版本号只有一个来源：`apps/mini/package.json` 的 `version`（例如 `1.0.0`）。构建时
+`config/index.ts` 把它写进包里，每个请求都带 `X-Client-Version: <版本>`（`src/data/api.ts`，
+上传图片也一样）；`scripts/preview.mjs` 也用它作为上传版本。服务端据此区分新旧客户端：装修块的
+`minClient` 高于这个版本时，这个客户端就不会收到那一块。
+
+- **每次发版前先改版本号**，和要提交审核的版本一致：修复 `1.0.1`，新功能 `1.1.0`，与旧客户端不兼容的
+  改动 `2.0.0`。改完照常构建（`pnpm --filter @shop/mini build` 或 `device-build.mjs`），提交这次改动。
+- CI 或临时构建可以用环境变量 `TARO_APP_VERSION=1.2.0-rc.1` 覆盖，不改文件；`turbo` 的 `build`
+  已声明这个变量。
+- 格式必须符合服务端的 `clientVersion`（`1`–`3` 段数字，可带 `-后缀`，最长 32 个字符），否则构建直接失败
+  ——不合格式的版本号服务端会忽略，等于没发。
+- 真机上核对：「真机调试」的 Network 里任意一个 `/api/v1` 请求的请求头 `X-Client-Version` 是这次的版本号。
