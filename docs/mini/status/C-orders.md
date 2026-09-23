@@ -22,12 +22,13 @@ order/after-sales specs in `e2e/storefront/specs-mini`.
 - 售后 apply (lines + quantities, 仅退款/退货退款 only when shipped, reason sheet, estimate incl. freight on a whole unshipped refund, words, 6 pictures, subscribe('refundApply') in the tap) with tests.
 - 我的售后 (one list for every order; 全部/处理中/已退款/已关闭) with tests.
 - 售后详情 (status + note, return address + copy, 退货物流, 售后进度 timeline, facts, 撤销/删除/填写退货物流) with tests.
+- 填写退货物流 (寄回地址 + copy, courier picker from `GET /api/v1/express-companies` with search, first 30 listed; waybill cleaned of spaces; optional phone; subscribe('returnShipment') in the tap) with tests.
 - Merged storefront/mini with H2, then again with G1.
 
 ## In progress
 
-- 售后 return-shipment form (express company picker).
+- E2E specs + page objects.
 
 ## Next
 
-- E2E specs and page objects; screenshots; docs/mini/pages.md form changes.
+- Screenshots; docs/mini/pages.md form changes; full checklist.
