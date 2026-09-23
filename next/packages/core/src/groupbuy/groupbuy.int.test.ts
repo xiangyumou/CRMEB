@@ -1425,7 +1425,9 @@ describe('shopper notifications', () => {
       const messages = await inbox(shopper.userId);
       expect(messages).toHaveLength(1);
       expect(messages[0]).toMatchObject({ code: 'groupbuy_succeeded', title: '拼团成功' });
-      expect(messages[0]?.content).toBe(`「${team.title}」拼团成功，订单 ${orderNo} 将尽快为您发货。`);
+      expect(messages[0]?.content).toBe(
+        `「${team.title}」拼团成功，订单 ${orderNo} 将尽快为您发货。`,
+      );
 
       const oaSend = oa
         .callsTo('/cgi-bin/message/template/send')
@@ -1530,11 +1532,13 @@ describe('shopper notifications', () => {
 
   it('lists the four events in 通知管理 with in-app on, over the empty shells the seed writes', async () => {
     // What `db:seed` leaves in the table on every deploy: no channels at all.
-    await harness.ctx.db.insert(notificationTemplates).values(
-      ['groupbuy_created', 'groupbuy_joined', 'groupbuy_succeeded', 'groupbuy_failed'].map(
-        (code) => ({ code, name: code, audience: 'user' as const, variables: ['orderNo'] }),
-      ),
-    );
+    await harness.ctx.db
+      .insert(notificationTemplates)
+      .values(
+        ['groupbuy_created', 'groupbuy_joined', 'groupbuy_succeeded', 'groupbuy_failed'].map(
+          (code) => ({ code, name: code, audience: 'user' as const, variables: ['orderNo'] }),
+        ),
+      );
 
     const page = await notificationAdmin.listTemplates(superAdmin(), {
       page: 1,
