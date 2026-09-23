@@ -29,7 +29,7 @@ import { webhookAck } from './schemas';
  *  3. **Persist before acking.** A notification we cannot book — cancelled
  *     order, unknown merchant order number, a second real payment — becomes a
  *     `payment_exceptions` row *and then* a SUCCESS (PAY-011). Acking first and
- *     logging afterwards is how the legacy system lost money silently.
+ *     logging afterwards loses money silently when the log write fails.
  *  4. **An internal failure answers FAIL** so the gateway retries (PAY-003).
  */
 

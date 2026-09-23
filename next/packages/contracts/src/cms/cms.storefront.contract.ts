@@ -14,11 +14,9 @@ import {
  * The storefront's reading surface, `/api/v1/articles` and
  * `/api/v1/article-categories`.
  *
- * Five legacy routes collapse into two lists and a detail:
- * `article/list/:cid`, `article/hot/list`, `article/new/list` and
- * `article/banner/list` were the same query with one `where` swapped, and
- * `article/new/list` had no caller at all. They are now `GET /api/v1/articles`
- * with `categoryId` and `feature`.
+ * Two lists and a detail. By category, 热门 and banner are the same query with
+ * one `where` swapped, so they are one `GET /api/v1/articles` with `categoryId`
+ * and `feature`.
  *
  * Everything here is `public`: an article is marketing copy, and requiring a
  * session to read one would break the share links the whole feature exists for.
@@ -80,9 +78,8 @@ export const articleListPublic = defineRoute({
 /**
  * Reading an article increments its view counter — one atomic
  * `UPDATE … SET views = views + 1 RETURNING views`, so the number in the
- * response is the one this read produced. Legacy read the `varchar` column,
- * added one in PHP and wrote it back, which loses increments under any
- * concurrency at all.
+ * response is the one this read produced. Reading the counter, adding one and
+ * writing it back would lose increments under any concurrency at all.
  */
 export const articleDetailPublic = defineRoute({
   id: 'cms.articleDetail',

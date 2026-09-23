@@ -12,7 +12,7 @@ import { defineErrors } from '../_conventions/errors';
  *  - **`PAYMENT_STATE_UNKNOWN` is never a guess.** When the gateway did not
  *    answer, the only honest reply is "we do not know yet, nothing was
  *    released" (PAYC-002 / QUEUE-004). Turning an unknown into a `closed` is
- *    the defect this whole stream exists to prevent, so it has its own code and
+ *    the defect this whole domain exists to prevent, so it has its own code and
  *    its own Chinese message telling the operator to check by hand.
  */
 export const paymentErrors = defineErrors({

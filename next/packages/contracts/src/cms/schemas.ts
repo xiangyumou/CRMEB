@@ -4,17 +4,14 @@ import { id, instant, money, pageQuery, paged, sortQuery } from '../_conventions
 /**
  * Articles and article categories.
  *
- * Three things here differ from the legacy shapes on purpose, and each of them
- * is a defect being removed rather than a redesign:
+ * Three things here are deliberate:
  *
- * 1. **`status` is an enum, and the storefront only ever sees `published`.**
- *    Legacy filtered on neither `status` nor `hide`, so a draft was public the
- *    moment it was saved.
- * 2. **`contentHtml` is sanitised on write.** Legacy `htmlspecialchars`'d on
- *    save and `htmlspecialchars_decode`'d on every read — a round trip that
- *    nets exactly zero — so whatever the editor produced, including
- *    `<script>`, was stored and served verbatim.
- * 3. **`views` is a number, not a `varchar`.** It is incremented by one atomic
+ * 1. **`status` is an enum, and the storefront only ever sees `published`**, so
+ *    a draft is not public the moment it is saved.
+ * 2. **`contentHtml` is sanitised on write**, so whatever the editor produced,
+ *    including `<script>`, is never stored or served verbatim. Escaping on save
+ *    and unescaping on read would net exactly zero.
+ * 3. **`views` is a number, not text.** It is incremented by one atomic
  *    `UPDATE … SET views = views + 1`, not read-modify-written.
  */
 
@@ -44,9 +41,8 @@ export type ArticleCategory = z.infer<typeof articleCategory>;
 
 /**
  * The tree arrives flat, depth-first, and the client nests it — the same
- * decision stream F1 took for the attachment tree, for the same two reasons: a
- * `z.lazy` self-reference overflows `zod-to-openapi`, and `CrudTable` wants a
- * flat list.
+ * decision as the attachment tree, for the same two reasons: a `z.lazy`
+ * self-reference overflows `zod-to-openapi`, and `CrudTable` wants a flat list.
  */
 export const articleCategoryList = z.object({ items: z.array(articleCategory) });
 export type ArticleCategoryList = z.infer<typeof articleCategoryList>;
@@ -213,9 +209,8 @@ export type ArticleDetail = z.infer<typeof articleDetail>;
 export const articleListQuery = pageQuery.extend({
   categoryId: id.optional(),
   /**
-   * `hot` and `banner` replace the legacy `article/hot/list` and
-   * `article/banner/list` routes. Ordering is the same in all three cases —
-   * `sortOrder DESC, id DESC` — which is what the legacy DAO did too.
+   * `hot` and `banner` narrow the list to the 热门 and banner articles.
+   * Ordering is the same in all three cases — `sortOrder DESC, id DESC`.
    */
   feature: z.enum(['hot', 'banner']).optional(),
   keyword: z.string().trim().min(1).max(100).optional(),

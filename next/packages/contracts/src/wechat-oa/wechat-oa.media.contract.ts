@@ -14,9 +14,9 @@ import {
  * The WeChat material library, `/admin-api/wechat-media`.
  *
  * `wechat_media` is a **mapping**, not a second media library: the bytes live
- * in F1's `attachments`, and a row here says "WeChat also holds this one, under
- * this handle". That is why the upload route takes an attachment id instead of
- * a file — see `wechatMediaUploadBody`.
+ * in `attachments`, and a row here says "WeChat also holds this one, under this
+ * handle". That is why the upload route takes an attachment id instead of a
+ * file — see `wechatMediaUploadBody`.
  *
  * WeChat is the authority on what it still holds. A temporary asset expires
  * after three days and a permanent one can be deleted from the 公众平台 by

@@ -23,11 +23,11 @@ import {
  * lifetime and the same "two nodes must not both ask" problem), so a burst of
  * page loads produces one call to `cgi-bin/ticket/getticket`, not one per page.
  *
- * The signed URL must be the page's own `location.href` minus the `#`
- * fragment, and it must be on a domain the account has authorised — the
- * service checks it against the configured site URL and refuses otherwise with
- * `WECHAT_OA_URL_NOT_ALLOWED`. The legacy endpoint signed whatever string it
- * was handed, which is a signing oracle for anybody's page.
+ * The signed URL must be the page's own `location.href` minus the `#` fragment,
+ * and it must be on a domain the account has authorised — the service checks it
+ * against the configured site URL and refuses otherwise with
+ * `WECHAT_OA_URL_NOT_ALLOWED`. Signing whatever string is handed over would
+ * make this a signing oracle for anybody's page.
  */
 export const wechatOaJssdkConfig = defineRoute({
   id: 'wechatOa.jssdkConfig',

@@ -21,11 +21,10 @@ import {
 /**
  * 文章管理, `/admin-api/cms/*`.
  *
- * Two legacy routes have no successor: `PUT cms/relation/:id` and
- * `PUT cms/unrelation/:id`, which set and cleared `product_id` from a button in
- * the list. `productId` is a field of the article form like any other, so the
- * relation is edited where the rest of the article is, in one save, with one
- * audit entry — and there is no second write path that skips validation.
+ * There is no separate route to link or unlink an article's product.
+ * `productId` is a field of the article form like any other, so the relation is
+ * edited where the rest of the article is, in one save, with one audit entry —
+ * and there is no second write path that skips validation.
  */
 
 const articleParams = z.object({ id });

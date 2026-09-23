@@ -6,15 +6,14 @@ import { pagedWechatMenus, wechatMenu, wechatMenuExample, wechatMenuForm } from 
 /**
  * The Official Account bottom menu, `/admin-api/wechat-menus`.
  *
- * The legacy design kept the current menu in `sys_config` as a JSON blob, which
- * made "what did we publish last week" unanswerable and "put last week's menu
- * back" a manual retype. Here a menu is a row, several may exist, and exactly
- * one is active (`wechat_oa_menus_active_uq`).
+ * A menu is a row, several may exist, and exactly one is active
+ * (`wechat_oa_menus_active_uq`), so "what did we publish last week" has an
+ * answer and "put last week's menu back" is not a manual retype.
  *
  * **Saving is not publishing.** `PUT` writes the draft; `POST …/publish` is the
  * only route that talks to `cgi-bin/menu/create`, and it is the only one that
- * can fail with `WECHAT_OA_API_FAILED`. The legacy screen did both in one
- * button, so a WeChat outage lost the operator's edits.
+ * can fail with `WECHAT_OA_API_FAILED`, so a WeChat outage never loses the
+ * operator's edits.
  */
 
 const menuParams = z.object({ id });

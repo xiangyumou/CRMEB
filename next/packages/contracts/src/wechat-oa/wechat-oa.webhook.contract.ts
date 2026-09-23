@@ -99,9 +99,9 @@ export const wechatOaWebhookVerify = defineRoute({
 /**
  * Messages and events.
  *
- * No `body` schema, for the same reason C's pay webhooks declare none: the
- * signature in 安全模式 covers the exact bytes, and `handle()` would consume the
- * stream. The route file reads `request.text()` and hands it to
+ * No `body` schema, for the same reason the payment webhooks declare none: the
+ * signature in 安全模式 covers the exact bytes, and `handle()` would consume
+ * the stream. The route file reads `request.text()` and hands it to
  * `wechat-oa.webhook.service.ts`.
  *
  * The response is either `success` (nothing to say) or an XML reply document
