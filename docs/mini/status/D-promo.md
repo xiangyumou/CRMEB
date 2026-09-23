@@ -4,9 +4,7 @@ Branch `storefront/mini-D-promo`, worktree `/home/xiangyu/Projects/CRMEB-mini-wt
 Brief: 拼团 (list, activity, team, 我的拼团), 预售 (list, detail), 优惠券 (领券中心, 我的优惠券),
 share handlers, 小程序码 + scene decode, canvas-2D poster, e2e journeys.
 
-`storefront/mini` (with C and A2) merged in. B (`storefront/mini-B-shopping`: checkout
-`kindMeta`, poster stub) is **not merged** yet: until it is, the activity pages store B's draft
-shape through a cast.
+`storefront/mini` (with A2, B and C) merged in.
 
 ## Done
 
@@ -32,14 +30,20 @@ shape through a cast.
 
 - Pages done with tests: 领券中心, 我的优惠券, 我的拼团, 拼团 list, 拼团商品 (activity), 拼团进度
   (team page), 预售 list, 预售商品. Every promo page is built.
-- Activity checkout: `features/promo/checkout.ts` stores B's draft shape (`source: 'buy-now'`,
-  `item`, `kind`, `kindMeta`) through a cast until B's `CheckoutDraft` is merged (TODO(merge B)).
+- Activity checkout: `features/promo/checkout.ts` builds B's `CheckoutDraft` (`buy-now` item +
+  `kind` / `kindMeta`, `groupId` when joining).
+- B's poster stub replaced: `features/share/poster.tsx` keeps B's `openPoster` / `posterAvailable`
+  and adds `PosterHost`, which 商品详情 renders; a guest is sent to log in first. Tests on
+  商品详情 for both.
+- Decor pages (首页, 微页面), 分类, 商品列表, 精品推荐 and every promo page share; each page's
+  `enableShareAppMessage` matches its `useShare`.
+- e2e: `e2e/storefront/src/mini-pages/promo-pages.ts` page objects; `specs-mini/promo.spec.ts`
+  (four journeys) being run.
 
 ## Next
 
-1. After B merges: `CheckoutDraft` with `kind`/`kindMeta` (drop the cast), replace B's poster
-   stub on 商品详情.
-2. e2e specs-mini (after B: reuse its CheckoutPage / CashierPage), screenshots, checklist.
+1. Run and settle `specs-mini/promo.spec.ts`.
+2. 375px screenshots, checklist.
 
 ## Decisions
 

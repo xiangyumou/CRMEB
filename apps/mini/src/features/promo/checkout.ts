@@ -1,4 +1,4 @@
-import { useCheckoutDraft } from '@/features/checkout/draft';
+import { useCheckoutDraft, type CheckoutDraft } from '@/features/checkout/draft';
 import { navigate } from '@/platform';
 
 /**
@@ -16,11 +16,8 @@ export type ActivityPurchase =
     }
   | { kind: 'presale'; activityId: string; skuId: string; quantity: number };
 
-/**
- * The checkout draft for a purchase, in the shape of stream B's `CheckoutDraft` (a buy-now item
- * plus the order kind).
- */
-export function activityCheckoutDraft(purchase: ActivityPurchase) {
+/** The checkout draft for a purchase: a buy-now item plus the order kind. */
+export function activityCheckoutDraft(purchase: ActivityPurchase): CheckoutDraft {
   const item = { skuId: purchase.skuId, quantity: purchase.quantity };
   if (purchase.kind === 'presale') {
     return {
@@ -43,8 +40,6 @@ export function activityCheckoutDraft(purchase: ActivityPurchase) {
 
 /** Hands the purchase to 确认订单 (in memory, never in the URL) and opens it. */
 export async function startActivityCheckout(purchase: ActivityPurchase): Promise<void> {
-  // TODO(merge B): `CheckoutDraft` takes `kind` / `kindMeta` once stream B is merged; until
-  // then S4's draft only knows a plain buy-now item, so the draft is stored as B will read it.
-  useCheckoutDraft.getState().setDraft(activityCheckoutDraft(purchase) as never);
+  useCheckoutDraft.getState().setDraft(activityCheckoutDraft(purchase));
   await navigate({ route: 'checkout', params: {} });
 }

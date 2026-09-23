@@ -274,4 +274,41 @@ describe('商品详情', () => {
     const share = taroFake.shareHandlers.message?.();
     expect(share).toMatchObject({ title: '柔雾丝绒礼盒', path: '/pages/product/index?id=12' });
   });
+
+  it('draws the product poster from 分享 → 生成海报', async () => {
+    const seen = serve({
+      'GET /api/v1/share/mini-codes': () => ({ body: { url: '/uploads/wechat-mini-code/a.png' } }),
+    });
+    await signIn();
+    await renderPage(<ProductPage />);
+    await screen.findByText('柔雾丝绒礼盒', { selector: '#product-name' });
+    fireEvent.click(screen.getByRole('button', { name: '分享' }));
+    fireEvent.click(await screen.findByRole('button', { name: '生成分享海报' }));
+    expect((await screen.findByAltText('分享海报')).getAttribute('src')).toBe(
+      'wxfile://tmp/poster.jpg',
+    );
+    expect(seen.find((r) => r.key === 'GET /api/v1/share/mini-codes')?.query).toEqual({
+      route: 'product',
+      id: '12',
+    });
+  });
+
+  it('asks a guest to log in before drawing a poster', async () => {
+    useSession.setState({ session: { status: 'phone-required', bindToken: 'b' } });
+    const seen = serve();
+    await renderPage(<ProductPage />);
+    await screen.findByText('柔雾丝绒礼盒', { selector: '#product-name' });
+    fireEvent.click(screen.getByRole('button', { name: '分享' }));
+    fireEvent.click(await screen.findByRole('button', { name: '生成分享海报' }));
+    await waitFor(() =>
+      expect(
+        taroFake.calls.some(
+          (call) =>
+            call.api === 'navigateTo' &&
+            (call.args as { url: string }).url.startsWith('/pages/login/index?redirect='),
+        ),
+      ).toBe(true),
+    );
+    expect(seen.some((r) => r.key === 'GET /api/v1/share/mini-codes')).toBe(false);
+  });
 });
