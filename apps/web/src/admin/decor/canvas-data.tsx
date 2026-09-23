@@ -54,6 +54,9 @@ export function useCanvasSlots(needs: Readonly<Record<string, DataNeed>>): Recor
       queryFn: async () => (await source.resolve(need)) ?? null,
       staleTime: 60_000,
       retry: false,
+      // A canvas that cannot preview a slot draws the block's empty state;
+      // a toast per block on every edit would only be noise.
+      meta: { presentError: false },
     })),
   });
   const slots: Record<string, unknown> = {};

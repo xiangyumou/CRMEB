@@ -7,6 +7,7 @@ import {
   Puck,
   Render,
   createUsePuck,
+  useGetPuck,
   type Config,
   type Data,
   type Dictionary,
@@ -15,7 +16,15 @@ import {
 import type { DocumentKind } from '@shop/contracts/decor/constants';
 import blocksCss from '@shop/storefront-blocks/admin-css';
 import { Button, Space, Tooltip } from 'antd';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 
 import { buildDecorConfig } from './config';
@@ -144,45 +153,105 @@ export interface DecorEditorProps {
   onChange?: ((data: Data) => void) | undefined;
   /** The toolbar: drawn across the top, with undo / redo after it. */
   toolbar?: ReactNode;
+  /** Drawn under the toolbar, full width: the save issues, a read-only notice. */
+  banner?: ReactNode;
   /** Nothing can be changed; the side panels stay for looking. */
   readOnly?: boolean | undefined;
 }
 
-export function DecorEditor({ kind, data, onChange, toolbar, readOnly = false }: DecorEditorProps) {
-  const config = useMemo(() => buildDecorConfig({ kind, custom: DECOR_CUSTOM_FIELDS }), [kind]);
+interface HeaderSlots {
+  toolbar: ReactNode;
+  banner: ReactNode;
+  readOnly: boolean;
+}
+
+const HeaderSlotsContext = createContext<HeaderSlots>({
+  toolbar: null,
+  banner: null,
+  readOnly: false,
+});
+
+/**
+ * Puck's header, replaced. A stable component that reads what to draw from
+ * context: an override defined inline would be a new component type on every
+ * render, and Puck would remount the toolbar — its popovers and focus with it
+ * — on every keystroke in the inspector.
+ */
+function EditorHeader() {
+  const { toolbar, banner, readOnly } = useContext(HeaderSlotsContext);
   return (
-    <Puck
-      config={config}
-      data={data}
-      {...(onChange ? { onChange } : {})}
-      height="100%"
-      dictionary={PUCK_DICTIONARY_ZH}
-      {...(readOnly ? { permissions: READ_ONLY } : {})}
-      viewports={[{ width: CANVAS_WIDTH, height: 'auto', label: '手机', icon: 'Smartphone' }]}
-      iframe={{ enabled: true, syncHostStyles: false }}
-      overrides={{
-        iframe: CanvasStyles,
-        header: () => (
-          <div
-            className="decor-editor-toolbar"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '8px 16px',
-              background: '#fff',
-              borderBottom: '1px solid #f0f0f0',
-              gridArea: 'header',
-            }}
-          >
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
-              {toolbar}
-            </div>
-            {readOnly ? null : <UndoRedo />}
-          </div>
-        ),
-      }}
-    />
+    <div style={{ gridArea: 'header', background: '#fff', borderBottom: '1px solid #f0f0f0' }}>
+      <div
+        className="decor-editor-toolbar"
+        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px' }}
+      >
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+          {toolbar}
+        </div>
+        {readOnly ? null : <UndoRedo />}
+      </div>
+      {banner}
+    </div>
+  );
+}
+
+const OVERRIDES = { iframe: CanvasStyles, header: EditorHeader };
+const VIEWPORTS = [
+  { width: CANVAS_WIDTH, height: 'auto' as const, label: '手机', icon: 'Smartphone' as const },
+];
+const IFRAME = { enabled: true, syncHostStyles: false };
+
+export function DecorEditor({
+  kind,
+  data,
+  onChange,
+  toolbar,
+  banner,
+  readOnly = false,
+}: DecorEditorProps) {
+  const config = useMemo(() => buildDecorConfig({ kind, custom: DECOR_CUSTOM_FIELDS }), [kind]);
+  const slots = useMemo(() => ({ toolbar, banner, readOnly }), [toolbar, banner, readOnly]);
+  return (
+    <HeaderSlotsContext value={slots}>
+      <Puck
+        config={config}
+        data={data}
+        {...(onChange ? { onChange } : {})}
+        height="100%"
+        dictionary={PUCK_DICTIONARY_ZH}
+        {...(readOnly ? { permissions: READ_ONLY } : {})}
+        viewports={VIEWPORTS}
+        iframe={IFRAME}
+        overrides={OVERRIDES}
+      />
+    </HeaderSlotsContext>
+  );
+}
+
+/** Puck's top-level drop zone: where a page's blocks live. */
+const ROOT_ZONE = 'root:default-zone';
+
+/**
+ * Selects a block by id (or, with `null`, nothing — the page settings show),
+ * for pointing at an issue. Only inside the editor: the toolbar and the banner.
+ */
+export function useDecorSelect(): (blockId: string | null) => void {
+  const getPuck = useGetPuck();
+  return useCallback(
+    (blockId) => {
+      const { appState, dispatch } = getPuck();
+      if (blockId === null) {
+        dispatch({ type: 'setUi', ui: { itemSelector: null } });
+        return;
+      }
+      const index = appState.data.content.findIndex(
+        (item) => (item.props as { id?: unknown }).id === blockId,
+      );
+      if (index !== -1) {
+        dispatch({ type: 'setUi', ui: { itemSelector: { index, zone: ROOT_ZONE } } });
+      }
+    },
+    [getPuck],
   );
 }
 

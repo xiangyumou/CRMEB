@@ -30,14 +30,26 @@ interruption.
   shoots its canvas), moved to the new interfaces.
 - Unit tests: `zod-to-puck`, `document`, `canvas`, `fields/link-routes` (72 green).
 
+- Admin pages (`店铺装修（新版）`, menu `decor.menu.ts`, all gated by `decor:page:*`):
+  - `/admin/decor` (`page-list.tsx`): kind filter, 当前首页 / 当前个人中心 card (恢复内置个人中心),
+    designation tags, 线上版本 / 有未发布修改, rename / duplicate / delete (not while designated),
+    设为首页 / 设为个人中心 with a confirm (only published pages of the matching kind).
+  - 新建页面 (`create-document.tsx`): kind, name, 从模板开始 (blank + `templates/`, thumbnails).
+  - `/admin/decor/[id]` (`page-editor.tsx`, via `next/dynamic`): full-window editor; explicit
+    保存草稿 with the draft token; `DECOR_VERSION_CONFLICT` → 载入对方的版本 / 用我的覆盖;
+    发布 with a note (saves first); issues / warnings listed under the toolbar with 定位;
+    unsaved guard (back button confirm + `beforeunload`); “草稿已在别处被修改” tag.
+  - 发布记录 drawer (`revisions.tsx`): 查看 (read-only editor over the revision), 回滚 (confirm),
+    then offer 载入到编辑器.
+  - 预览 drawer (`preview.tsx`): preview token; iframe of `DECOR_PREVIEW_URL` (new optional env,
+    `{id}` `{previewToken}` `{kind}`) or the 体验版 note + copyable `packages/page/index?…`.
+
 ## In progress
 
-- Admin pages under `app/admin/(shell)/decor/**` + `decor.menu.ts`.
+- Page tests (Vitest) and the e2e spec.
 
 ## Next
 
-- Editor page (save draft / conflict / publish / dirty guard / warnings), revisions drawer,
-  preview panel (`DECOR_PREVIEW_URL`), page tests.
-- e2e `e2e/admin/specs/decor.spec.ts`.
+- e2e `e2e/admin/specs/decor.spec.ts` (+ README row, `DECOR_PREVIEW_URL` in the e2e serve env).
 - Templates last (after `git merge storefront/mini` if G1 has merged).
 - Checks, screenshots (`docs/mini/status/F2-screens/`), report.
