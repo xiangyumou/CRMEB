@@ -9,6 +9,7 @@ import {
   pagedAdminReviews,
   pagedReviews,
   productReview,
+  productReviewStatus,
   submittedReview,
   productReviewExample,
   reviewBatchStatusBody,
@@ -334,6 +335,12 @@ export const catalogMyReviews = defineRoute({
         productId: id,
         productName: z.string(),
         productImageUrl: z.string(),
+        /**
+         * The shopper's own list includes reviews still waiting (`pending`, 评价需审核 or
+         * 内容安全) and ones an operator hid; the client says so neutrally
+         * (「审核后展示」), never as an error. Nobody else ever sees those two.
+         */
+        status: productReviewStatus,
       }),
     ),
   }),
@@ -348,6 +355,7 @@ export const catalogMyReviews = defineRoute({
             productId: '1',
             productName: '经典白T恤',
             productImageUrl: 'https://cdn.example.com/p/1.png',
+            status: 'published',
           },
         ],
         total: 1,
