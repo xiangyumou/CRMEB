@@ -36,6 +36,12 @@ export const presaleList = defineRoute({
       query: { page: 1, pageSize: 20 },
       response: { items: [presaleCardExample], total: 1, page: 1, pageSize: 20 },
     },
+    {
+      // A DIY 预售 component's 指定数据: 9 has ended, so it is skipped.
+      name: 'picked',
+      query: { page: 1, pageSize: 20, ids: '9,2' },
+      response: { items: [presaleCardExample], total: 1, page: 1, pageSize: 20 },
+    },
   ],
 });
 

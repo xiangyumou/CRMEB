@@ -1,5 +1,12 @@
 import {
+  fixtureCouponList,
+  fixtureCoupons,
+  fixtureFloatingContact,
+  fixtureFollowOfficialAccount,
   fixtureHotspotImage,
+  fixturePresaleList,
+  fixturePresales,
+  fixtureVideo,
   fixtureNavGrid,
   fixtureNotice,
   fixtureOrderEntry,
@@ -71,7 +78,7 @@ describe('the editor palette', () => {
       const blocking = result.success
         ? []
         : result.error.issues.filter(
-            (issue) => !/^(image|icon|label|text|link)$/.test(String(issue.path.at(-1) ?? '')),
+            (issue) => !/^(image|icon|label|text|link|src)$/.test(String(issue.path.at(-1) ?? '')),
           );
       expect(blocking, type).toEqual([]);
     }
@@ -128,5 +135,61 @@ describe('the batch-1 blocks on the canvas', () => {
     );
     expect(container.querySelector('script, img')).toBeNull();
     expect(container.querySelector('[data-block="richText"]')?.textContent).toBe('ok');
+  });
+});
+
+describe('the batch-2 blocks on the canvas', () => {
+  const g2Data: DecorCanvasData = {
+    resolve: async (need: DataNeed) => {
+      if (need.kind === 'coupons') return fixtureCoupons;
+      if (need.kind === 'presales') return fixturePresales;
+      return null;
+    },
+  };
+
+  it('draws the previewed coupons, as a guest sees them: every ticket 领取', async () => {
+    const { container } = renderAdmin(
+      <DecorCanvasDataProvider value={g2Data}>
+        {renderBlock('couponList', fixtureCouponList)}
+      </DecorCanvasDataProvider>,
+    );
+    expect(await screen.findByText('全场通用券')).toBeInTheDocument();
+    const actions = [...container.querySelectorAll('[data-coupon]')].map((node) =>
+      node.getAttribute('data-action'),
+    );
+    expect(actions).toEqual(['claim', 'claim', 'claim']);
+  });
+
+  it('says a list with nothing to preview is hidden in the store, instead of vanishing', () => {
+    renderAdmin(renderBlock('couponList', fixtureCouponList));
+    expect(screen.getByText('暂无可领取的优惠券，商城中不显示此组件')).toBeInTheDocument();
+  });
+
+  it('shows a presale’s end time, not a countdown against the editor’s clock', async () => {
+    const { container } = renderAdmin(
+      <DecorCanvasDataProvider value={g2Data}>
+        {renderBlock('presaleList', fixturePresaleList)}
+      </DecorCanvasDataProvider>,
+    );
+    await screen.findByText(fixturePresales[0]!.title);
+    expect(container.textContent).not.toMatch(/\d+天 \d{2}:\d{2}:\d{2}/);
+  });
+
+  it('draws a video as its poster, never a playing player', () => {
+    const { container } = renderAdmin(renderBlock('video', fixtureVideo));
+    expect(container.querySelector('[data-block="video"] [data-still]')).not.toBeNull();
+    expect(container.querySelector('video')).toBeNull();
+  });
+
+  it('keeps the floating button in the flow, where it can be selected, and says where it floats', () => {
+    const { container } = renderAdmin(renderBlock('floatingContact', fixtureFloatingContact));
+    expect(container.querySelector('[data-block="floatingContact"]')).not.toBeNull();
+    expect(screen.getByText('悬浮在页面右侧，距底部 240')).toBeInTheDocument();
+  });
+
+  it('explains 关注公众号 instead of drawing what only WeChat can', () => {
+    renderAdmin(renderBlock('followOfficialAccount', fixtureFollowOfficialAccount));
+    expect(screen.getByText('关注公众号')).toBeInTheDocument();
+    expect(screen.getByText(/从扫码/)).toBeInTheDocument();
   });
 });

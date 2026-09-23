@@ -46,13 +46,27 @@ coupons: HeldCoupon[] }`.
   - Fixtures for every new block (`FIXTURE_NOW` / `fixtureServerNow` for the countdown,
     `fixturePersonalG2`). Tests: `marketing-blocks.test.tsx` (27 × React 18 + 19), registry test.
 
+- **Public lists**: `GET /api/v1/groupbuy/activities` and `/api/v1/presale/activities` take
+  `ids` (指定数据, in order, invisible skipped, ≤100 → 422), through `cardsFor`, like
+  `/api/v1/coupons` and `/api/v1/articles` already did. Contract `picked` examples;
+  `picked-lists.int.test.ts` covers both.
+- **Admin**:
+  - Field kind `video`: `VideoField` (`fields/basic.tsx`) — 素材库 pick (`accept="video/mp4"`, a
+    non-mp4 pick is refused with a message), pasted URL, muted metadata-only preview.
+    `AssetPicker` draws a video tile as a `<video>` frame instead of a broken `<img>`.
+    Tests: `fields/video-field.test.tsx`.
+  - The canvas passes `host={{ canvas: true }}` to every block.
+  - Canvas data (`canvas-data.tsx`) now previews coupons, 新人券, 拼团, 预售 and 资讯 through
+    the storefront's public lists (the resolver's filters, as a guest). Tests in `canvas.test.tsx`
+    and "the batch-2 blocks on the canvas" in `canvas-blocks.test.tsx`.
+
 ## In progress
 
-- Admin: video field, canvas flag.
+- Templates, spike page.
 
 ## Next
 
-- Admin canvas data, templates, spike page; mini demo page; fidelity; decor.md; checklist.
+- Mini demo page; fidelity; decor.md; checklist.
 
 ## Notes
 

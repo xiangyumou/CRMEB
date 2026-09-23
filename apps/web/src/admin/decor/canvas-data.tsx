@@ -2,7 +2,28 @@
 
 import { catalogAdminProductList } from '@shop/contracts/catalog/catalog.product.admin.contract';
 import type { AdminProductListItem } from '@shop/contracts/catalog/schemas';
-import type { DataNeed, ProductSource, ProductSummary } from '@shop/contracts/decor/sources';
+import { articleListPublic } from '@shop/contracts/cms/cms.storefront.contract';
+import type { ArticleListItem } from '@shop/contracts/cms/schemas';
+import {
+  couponClaimableList,
+  couponNewUserList,
+} from '@shop/contracts/coupon/coupon.storefront.contract';
+import type { ClaimableCoupon } from '@shop/contracts/coupon/schemas';
+import type {
+  ArticleSource,
+  ArticleSummary,
+  CouponSource,
+  CouponSummary,
+  DataNeed,
+  GroupbuySource,
+  GroupbuySummary,
+  PresaleSource,
+  PresaleSummary,
+  ProductSource,
+  ProductSummary,
+} from '@shop/contracts/decor/sources';
+import { groupbuyList } from '@shop/contracts/groupbuy/groupbuy.storefront.contract';
+import { presaleList } from '@shop/contracts/presale/presale.storefront.contract';
 import { useQueries } from '@tanstack/react-query';
 import { createContext, useContext, type ReactNode } from 'react';
 
@@ -19,8 +40,10 @@ import { callRoute } from '../api';
  * `resolve` returns what the storefront resolver would put in the slot, or
  * `null` for a need the canvas does not preview (the block then draws its
  * empty state). The admin implementation (`createAdminCanvasData`) previews
- * products only; coupons, campaigns and articles are resolved on the
- * storefront and show in the H5 preview and the 体验版, not in the canvas.
+ * products through the admin catalogue, and coupons, 新人券, 拼团, 预售 and
+ * 资讯 through the storefront's own public lists — the same filters the page
+ * resolver applies (DECOR-013), as a signed-out shopper sees them. Per-shopper
+ * state (领取状态, held 新人券) is never previewed.
  */
 export interface DecorCanvasData {
   resolve(need: DataNeed): Promise<unknown>;
@@ -131,14 +154,105 @@ export async function previewProducts(source: ProductSource): Promise<ProductSum
     .map(adminProductSummary);
 }
 
+/** As `toCouponSummary` in the core resolver: the template, without caller state. */
+function couponSummaryOf(item: ClaimableCoupon): CouponSummary {
+  const { claimedCount: _claimed, canClaim: _canClaim, ...rest } = item;
+  return rest;
+}
+
+/** As `toArticleSummary` in the core resolver. */
+function articleSummaryOf(item: ArticleListItem): ArticleSummary {
+  return {
+    id: item.id,
+    title: item.title,
+    coverImageUrl: item.coverImageUrl,
+    summary: item.summary,
+    author: item.author,
+    categoryTitle: item.categoryTitle,
+    views: item.views,
+    publishedAt: item.publishedAt,
+  };
+}
+
+const validIds = (ids: readonly string[]) => ids.filter((id) => /^[1-9]\d*$/.test(id));
+
+/** Coupons claimable now: the picked ones in their order, or the first `limit`. */
+export async function previewCoupons(source: CouponSource): Promise<CouponSummary[]> {
+  if (source.mode === 'manual') {
+    const ids = validIds(source.ids);
+    if (ids.length === 0) return [];
+    const page = await callRoute(couponClaimableList, {
+      query: { page: 1, pageSize: ids.length, ids: ids.join(',') },
+    });
+    return page.items.map(couponSummaryOf);
+  }
+  const page = await callRoute(couponClaimableList, {
+    query: { page: 1, pageSize: source.limit },
+  });
+  return page.items.map(couponSummaryOf);
+}
+
+/** Campaigns inside their window: the picked ones in their order, or the list's first `limit`. */
+async function previewCampaigns<Card>(
+  route: typeof groupbuyList | typeof presaleList,
+  source: GroupbuySource | PresaleSource,
+): Promise<Card[]> {
+  if (source.mode === 'manual') {
+    const ids = validIds(source.ids);
+    if (ids.length === 0) return [];
+    const page = await callRoute(route, {
+      query: { page: 1, pageSize: ids.length, ids: ids.join(',') },
+    });
+    return page.items as Card[];
+  }
+  const page = await callRoute(route, { query: { page: 1, pageSize: source.limit } });
+  return page.items as Card[];
+}
+
+/** Published articles: the picked ones in their order, or a category's first `limit`. */
+export async function previewArticles(source: ArticleSource): Promise<ArticleSummary[]> {
+  if (source.mode === 'manual') {
+    const ids = validIds(source.ids);
+    if (ids.length === 0) return [];
+    const page = await callRoute(articleListPublic, {
+      query: { page: 1, pageSize: ids.length, ids: ids.join(',') },
+    });
+    return page.items.map(articleSummaryOf);
+  }
+  const page = await callRoute(articleListPublic, {
+    query: {
+      page: 1,
+      pageSize: source.limit,
+      ...(source.categoryId ? { categoryId: source.categoryId } : {}),
+    },
+  });
+  return page.items.map(articleSummaryOf);
+}
+
 export function createAdminCanvasData(): DecorCanvasData {
   return {
     async resolve(need) {
-      if (need.kind !== 'products') return null;
-      // A rule still being set up (no category picked yet) previews nothing.
-      if (need.source.mode === 'category' && !need.source.categoryId) return [];
-      if (need.source.mode === 'label' && !need.source.labelId) return [];
-      return previewProducts(need.source);
+      switch (need.kind) {
+        case 'products':
+          // A rule still being set up (no category picked yet) previews nothing.
+          if (need.source.mode === 'category' && !need.source.categoryId) return [];
+          if (need.source.mode === 'label' && !need.source.labelId) return [];
+          return previewProducts(need.source);
+        case 'coupons':
+          return previewCoupons(need.source);
+        case 'newUserCoupons': {
+          const { items } = await callRoute(couponNewUserList, {});
+          return items.slice(0, need.limit).map(couponSummaryOf);
+        }
+        case 'groupbuys':
+          return previewCampaigns<GroupbuySummary>(groupbuyList, need.source);
+        case 'presales':
+          return previewCampaigns<PresaleSummary>(presaleList, need.source);
+        case 'articles':
+          return previewArticles(need.source);
+        default:
+          return null;
+      }
     },
   };
 }

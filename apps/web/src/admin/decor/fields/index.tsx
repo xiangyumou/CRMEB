@@ -11,6 +11,7 @@ import {
   MultiChoiceField,
   SwitchField,
   UnsupportedField,
+  VideoField,
 } from './basic';
 import { LinkField } from './link';
 import {
@@ -24,7 +25,7 @@ import {
 /**
  * The inspector's own controls, by the kind `zodToPuckFields` asks for.
  *
- * They reuse the admin's pickers — `AssetPicker` (素材库) for images, and the
+ * They reuse the admin's pickers — `AssetPicker` (素材库) for images and videos, and the
  * record pickers over `DecorRecordSource` (`../records.tsx`) for products,
  * categories, labels, articles, coupons, campaigns and 微页面. The editor page
  * mounts the providers (`AssetSourceProvider` in the admin shell,
@@ -35,6 +36,7 @@ import {
  */
 export const DECOR_CUSTOM_FIELDS: CustomFieldRenderers = {
   image: (props) => <ImageField {...props} />,
+  video: (props) => <VideoField {...props} />,
   color: (props) => <ColorField {...props} />,
   link: (props) => <LinkField {...props} />,
   productSource: (props) => <ProductSourceField {...props} />,
