@@ -37,9 +37,15 @@ Updated at every commit so the work can resume after an interruption.
   Stable paths for streams D / E: `features/decor/decor-page.tsx` (`DecorPage`) and
   `ui/contact-button.tsx` (`ContactArea`, `useContactIcon`, `sessionFromOf`).
 
+- 购物车 (tab): rows ticked on the server (`cart.setSelection`, optimistic), quantity through
+  `cart.updateItemPut`, 改规格 through the SkuSheet, 失效商品 with reasons, 「改为 N 件」 and 清空,
+  a coupon line from `coupon.applicableList` (best usable, or 「再买 ¥X 可用…」), 管理 (删除,
+  移入收藏 via `catalog.favoriteAddBatch`), 结算 → `{ source: 'cart' }` draft, 为你推荐, guest
+  and empty states. `features/cart/cart-view.ts` + `cart-row.tsx`; `test/cart-fixture.ts`.
+
 ## In progress
 
-- 购物车.
+- 下单 (确认订单) rewrite.
 
 ## Next
 

@@ -13,10 +13,17 @@ const TOKEN = 'preview_token_0123456789';
 const microPage = (preview = false) =>
   resolvedPageFixture({
     id: '9',
-    kind: 'page',
+    kind: 'custom',
     preview,
-    root: { props: { title: '秋季专题', shareEnabled: true, shareTitle: '秋季好物' } },
-  } as Partial<ReturnType<typeof resolvedPageFixture>>);
+    root: {
+      props: {
+        title: '秋季专题',
+        background: '#f5f5f5',
+        shareEnabled: true,
+        shareTitle: '秋季好物',
+      },
+    },
+  });
 
 describe('微页面', () => {
   beforeEach(() => {
@@ -49,9 +56,9 @@ describe('微页面', () => {
     expect(seen.find((r) => r.key === 'GET /api/v1/pages/9')?.query).toEqual({
       previewToken: TOKEN,
     });
-    const share = taroFake.shareHandlers.message?.();
-    expect(share?.path).toBe('/pages/index/index');
-    expect(share?.title).not.toBe('秋季好物');
+    const share = taroFake.shareHandlers.message?.() as { path?: string; title?: string };
+    expect(share.path).toBe('/pages/index/index');
+    expect(share.title).not.toBe('秋季好物');
   });
 
   it('ignores a malformed preview token', async () => {
