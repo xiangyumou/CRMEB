@@ -11,7 +11,7 @@ import type { DiyComponentValue, DiyPanelContext, DiyPanelRegistry } from './pan
  *
  * The fallback is not a placeholder to be removed later. Three keys
  * (`newVip`, `presale`, `swipers`) have no editor UI by design, and a page
- * imported from a newer CRMEB build can hold a component this code has never
+ * saved by a newer version of the editor can hold a component this code has never
  * seen. In both cases the operator must still be able to look at the
  * node — and, at their own risk, fix it — rather than lose it on the next save.
  */
