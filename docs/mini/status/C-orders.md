@@ -23,12 +23,17 @@ order/after-sales specs in `e2e/storefront/specs-mini`.
 - 我的售后 (one list for every order; 全部/处理中/已退款/已关闭) with tests.
 - 售后详情 (status + note, return address + copy, 退货物流, 售后进度 timeline, facts, 撤销/删除/填写退货物流) with tests.
 - 填写退货物流 (寄回地址 + copy, courier picker from `GET /api/v1/express-companies` with search, first 30 listed; waybill cleaned of spaces; optional phone; subscribe('returnShipment') in the tap) with tests.
+- E2E (`e2e/storefront/specs-mini/orders.spec.ts`, `aftersale.spec.ts`; page objects in
+  `src/mini-pages/{order-pages,aftersale-pages,order-shopper,shown}.ts`): pay from 待付款 →
+  待发货 → admin ships (admin API) → 物流 → 确认收货 via WeChat's component → review held
+  for moderation; cancel unpaid; refund → admin approves → 退款成功; return waybill. Green.
+  The e2e seed now gives 顺丰/中通 their WeChat delivery codes (the upload needs them).
 - Merged storefront/mini with H2, then again with G1.
 
 ## In progress
 
-- E2E specs + page objects.
+- docs/mini/pages.md form changes; screenshots; full checklist.
 
 ## Next
 
-- Screenshots; docs/mini/pages.md form changes; full checklist.
+- Final report.
