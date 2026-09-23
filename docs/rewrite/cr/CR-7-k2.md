@@ -1,6 +1,6 @@
 # CR-7-k2 — the OA callback accepts a signature triple forever, for any body, in any mode
 
-**Stream:** K2 (hardening) **Status:** OPEN — for the orchestrator (E2/E3 WeChat OA, merged)
+**Stream:** K2 (hardening) **Status:** RESOLVED in `d6a8795f8` (R3, wave 6)
 **Files:** `next/packages/core/src/wechat-oa/wechat-oa.webhook.service.ts:108-160` (`handleEvent`: mode taken from `encrypt_type` at :112, plain-mode `verifySignature` at :145), `next/packages/core/src/wechat-oa/wechat-oa.crypto.ts:64-72` (`verifySignature`, no freshness)
 **Pinned by:** `next/packages/core/src/wechat-oa/wechat-oa.webhook-forgery.int.test.ts::K-SEC-O1 — what a valid signature triple is good for > refuses a plaintext callback when the account is configured in 安全模式`, `> refuses a triple whose timestamp is outside a five-minute window`, `> refuses a second, different body under a triple that was already used` (all `it.fails`)
 
@@ -43,3 +43,7 @@ CR-8-k2, anybody holding `system:config:read` can also mint fresh triples.
 
 Run the account in 安全模式 does **not** help (point 3). Keeping the webhook's
 query strings out of shared logs limits who holds a triple.
+
+## Resolution (R3, `d6a8795f8`)
+
+The configured 消息加解密方式 chooses the path (安全模式 requires `encrypt_type=aes` and `msg_signature`; 兼容模式 prefers the envelope when present), a disabled account is refused, `timestamp` must be within 300 s of the clock, and `(nonce, timestamp)` is spent in Redis bound to the body's sha256 for 600 s — WeChat's own retry of the same body passes, a different body under the same triple is 403 (fails open on a Redis error, with a warning; the window still bounds it). `verifyUrl` also requires freshness. The three K2 pins in `wechat-oa.webhook-forgery.int.test.ts` flipped; five tests added (same-body retry, +299 s accepted, disabled account, 兼容模式 envelope, stale `verifyUrl`).

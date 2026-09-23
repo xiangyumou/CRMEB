@@ -80,7 +80,7 @@ const json = (path: string, body: unknown) =>
     headers: {
       'content-type': 'application/json',
       'sec-fetch-site': 'same-origin',
-      'x-forwarded-for': '203.0.113.9',
+      'x-real-ip': '203.0.113.9',
     },
   });
 

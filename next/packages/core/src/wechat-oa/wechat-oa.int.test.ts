@@ -37,6 +37,7 @@ let harness: TestCtx;
 let oa: FakeOaServer;
 
 const NOW = '2026-06-01T00:00:00.000Z';
+const NOW_SECONDS = Math.floor(Date.parse(NOW) / 1000);
 const TOKEN = 'shoptoken';
 const AES_KEY = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ';
 const OPENID = 'oABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -94,7 +95,13 @@ async function configure(overrides: { messageMode?: 'plain' | 'safe' } = {}): Pr
 // callback fixtures
 // ---------------------------------------------------------------------------
 
-function plainQuery(timestamp = '1767668400', nonce = '1372623149') {
+/**
+ * A triple signed at `NOW`, with a nonce of its own: the callback spends each
+ * `(timestamp, nonce)` on one body and refuses a timestamp more than five
+ * minutes off its clock (CR-7-k2), exactly as WeChat's own deliveries expect.
+ */
+let nonceSeq = 1372623149;
+function plainQuery(timestamp = String(NOW_SECONDS), nonce = String((nonceSeq += 1))) {
   return {
     timestamp,
     nonce,
@@ -186,12 +193,13 @@ describe('a bad signature is rejected before any parsing side effect', () => {
       appId: oa.appId,
       message: textMessage('优惠券'),
     });
+    const signed = plainQuery();
     const query = {
-      ...plainQuery(),
+      ...signed,
       encrypt_type: 'aes',
       // Signed over *a different* ciphertext, which is exactly the replay the
       // `msg_signature` binding exists to stop.
-      msg_signature: signatureOf([TOKEN, '1767668400', '1372623149', 'SOMETHING ELSE']),
+      msg_signature: signatureOf([TOKEN, signed.timestamp, signed.nonce, 'SOMETHING ELSE']),
     };
     await expect(
       handleEvent(harness.ctx, {
@@ -207,11 +215,12 @@ describe('a bad signature is rejected before any parsing side effect', () => {
       appId: 'wxSOMEBODYELSE001',
       message: textMessage('优惠券'),
     });
+    const signed = plainQuery();
     const result = await handleEvent(harness.ctx, {
       query: {
-        ...plainQuery(),
+        ...signed,
         encrypt_type: 'aes',
-        msg_signature: signatureOf([TOKEN, '1767668400', '1372623149', encrypted]),
+        msg_signature: signatureOf([TOKEN, signed.timestamp, signed.nonce, encrypted]),
       },
       body: `<xml><Encrypt><![CDATA[${encrypted}]]></Encrypt></xml>`,
     });
@@ -411,11 +420,12 @@ describe('the reply engine', () => {
       appId: oa.appId,
       message: textMessage('优惠券'),
     });
+    const signed = plainQuery();
     const result = await handleEvent(harness.ctx, {
       query: {
-        ...plainQuery(),
+        ...signed,
         encrypt_type: 'aes',
-        msg_signature: signatureOf([TOKEN, '1767668400', '1372623149', encrypted]),
+        msg_signature: signatureOf([TOKEN, signed.timestamp, signed.nonce, encrypted]),
       },
       body: `<xml><Encrypt><![CDATA[${encrypted}]]></Encrypt></xml>`,
     });
@@ -772,6 +782,25 @@ describe('the material library', () => {
     expect(medium.attachmentId).toBe(attachmentId);
     expect(medium.expiresAt).toBeNull();
     expect(oa.callsTo('/cgi-bin/material/add_material')).toHaveLength(1);
+  });
+
+  it('recovers from a dead cached token by itself, as every other WeChat call does', async () => {
+    // CR-31-k2: the upload used to call `fetch` with a token it fetched once, so
+    // a token WeChat had already rotated surfaced as `WECHAT_OA_API_FAILED
+    // 40001`. Through C's `upload` it is dropped and the call retried once.
+    await harness.redis.set(`wechat:access-token:${oa.appId}`, 'ROTATED_AWAY', 'PX', 60_000);
+    const attachmentId = await seedAttachment();
+
+    const medium = await media.upload(ctx(), { attachmentId, kind: 'image', isPermanent: true });
+
+    expect(medium.mediaId).toMatch(/^PERM_MEDIA_/);
+    const calls = oa.callsTo('/cgi-bin/material/add_material');
+    expect(calls.map((call) => call.query['access_token'])).toEqual([
+      'ROTATED_AWAY',
+      expect.not.stringMatching(/^ROTATED_AWAY$/),
+    ]);
+    expect(calls.every((call) => call.query['type'] === 'image')).toBe(true);
+    expect(await harness.redis.get(`wechat:access-token:${oa.appId}`)).not.toBe('ROTATED_AWAY');
   });
 
   it('dates a temporary asset three days out', async () => {

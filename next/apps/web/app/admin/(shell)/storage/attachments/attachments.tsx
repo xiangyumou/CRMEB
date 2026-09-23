@@ -308,7 +308,7 @@ export function AttachmentsPage() {
             name: 'url',
             label: '图片网址',
             span: 24,
-            help: '只允许公网 http/https 地址；内网、回环和云元数据地址会被拒绝',
+            help: '只允许公网 https 地址（http 需在存储设置中开启）；内网、回环和云元数据地址会被拒绝',
           },
           { kind: 'text', name: 'name', label: '名称', span: 24, help: '留空则用文件名' },
         ]}

@@ -1,5 +1,8 @@
 import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
+import { request as httpRequest, type IncomingMessage } from 'node:http';
+import { request as httpsRequest } from 'node:https';
+import { isIP, type LookupFunction } from 'node:net';
+import { Readable } from 'node:stream';
 
 /**
  * Fetching a URL somebody typed into the admin, without handing them the
@@ -18,13 +21,17 @@ import { isIP } from 'node:net';
  * So the rule here is **resolve first, judge the address, then connect to that
  * address** — and do it again for every redirect:
  *
- * 1. scheme must be `http:` or `https:`; no `file:`, `ftp:`, `gopher:`, no
- *    credentials in the URL, no non-standard port unless allowed;
+ * 1. scheme must be `https:` (or `http:` where the caller allows it); no
+ *    `file:`, `ftp:`, `gopher:`, no credentials in the URL, no non-standard
+ *    port unless allowed;
  * 2. resolve the hostname ourselves, and refuse if *any* resolved address is
  *    private, loopback, link-local, unique-local, multicast, broadcast,
  *    unspecified, carrier-grade NAT, or a cloud metadata address;
- * 3. connect by IP with the original `Host` header, so the address we judged is
- *    the address we talk to, and DNS cannot change its mind in between;
+ * 3. connect to the address we judged — pinned in the *connection layer*, with
+ *    the URL still carrying the real name — so DNS cannot change its mind in
+ *    between, and TLS still sends the name as SNI and checks the certificate
+ *    against it (CR-11-k: dialling an IP literal broke every `https://`
+ *    source, because a certificate names hosts, not addresses);
  * 4. follow redirects manually, re-running all of the above on each hop;
  * 5. stop reading at `maxBytes` — a 4-byte URL must not be able to buy a 40GB
  *    download.
@@ -38,13 +45,43 @@ export interface SafeFetchOptions {
   /** Ports other than 80/443. Empty by default: port scanning is not a feature. */
   allowedPorts?: readonly number[];
   /**
+   * Plain `http:` — off by default, on every hop. A plaintext fetch is a
+   * man-in-the-middle's choice of file, and the failure is silent: the shop
+   * just has a different image (CR-11-k). An https URL that redirects to http
+   * is refused the same way.
+   */
+  allowHttp?: boolean;
+  /**
    * Test seam. Production resolves through the system resolver; the tests
    * substitute one so "what happens when this name resolves to 127.0.0.1" is a
    * fast, deterministic unit test rather than a network-dependent one.
    */
   resolve?: (hostname: string) => Promise<string[]>;
-  fetchImpl?: typeof fetch;
+  /**
+   * Test seam: the request itself. Production uses `pinnedTransport()`; a stub
+   * sees the real URL and the address it must dial.
+   */
+  transport?: Transport;
+  /**
+   * Test seam, and the only way past the address rules: a real-socket test has
+   * nothing but loopback to talk to. No production caller passes it.
+   */
+  judgeAddress?: (address: string) => AddressVerdict;
 }
+
+/** One request, already judged: where it goes, and what it is called. */
+export interface PinnedRequest {
+  /** The URL as written: the real hostname, for `Host`, SNI and the certificate check. */
+  url: URL;
+  /** The address `resolveAndJudge` approved. The socket goes here and nowhere else. */
+  address: string;
+  headers: Record<string, string>;
+  signal: AbortSignal;
+}
+
+export type Transport = (request: PinnedRequest) => Promise<Response>;
+
+export type AddressVerdict = { blocked: true; reason: string } | { blocked: false };
 
 export interface SafeFetchResult {
   bytes: Uint8Array;
@@ -106,9 +143,7 @@ const BLOCKED_V4: ReadonlyArray<readonly [string, number, string]> = [
   ['240.0.0.0', 4, 'reserved'],
 ];
 
-export function classifyAddress(
-  address: string,
-): { blocked: true; reason: string } | { blocked: false } {
+export function classifyAddress(address: string): AddressVerdict {
   const family = isIP(address);
   if (family === 4) {
     const value = ipv4ToInt(address);
@@ -156,14 +191,19 @@ function normaliseHost(hostname: string): string {
 /** Hostnames that resolve to loopback on purpose and are not worth arguing with. */
 const BLOCKED_HOST_SUFFIXES = ['.localhost', '.local', '.internal', '.localdomain'];
 
-function judgeUrl(raw: string, allowedPorts: readonly number[]): URL {
+function judgeUrl(
+  raw: string,
+  allowedPorts: readonly number[],
+  allowHttp: boolean,
+  judgeAddress: (address: string) => AddressVerdict,
+): URL {
   let url: URL;
   try {
     url = new URL(raw);
   } catch {
     throw new SafeFetchError('refused', 'not a URL');
   }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+  if (url.protocol !== 'https:' && !(allowHttp && url.protocol === 'http:')) {
     throw new SafeFetchError('refused', `scheme ${url.protocol}`);
   }
   if (url.username || url.password) {
@@ -179,7 +219,7 @@ function judgeUrl(raw: string, allowedPorts: readonly number[]): URL {
   }
   // A literal IP is judged here; a name is judged after resolution.
   if (isIP(host) !== 0) {
-    const verdict = classifyAddress(host);
+    const verdict = judgeAddress(host);
     if (verdict.blocked) throw new SafeFetchError('refused', verdict.reason);
   }
   return url;
@@ -188,6 +228,7 @@ function judgeUrl(raw: string, allowedPorts: readonly number[]): URL {
 async function resolveAndJudge(
   hostname: string,
   resolver: (hostname: string) => Promise<string[]>,
+  judgeAddress: (address: string) => AddressVerdict,
 ): Promise<string> {
   const host = normaliseHost(hostname);
   if (isIP(host) !== 0) return host;
@@ -203,7 +244,7 @@ async function resolveAndJudge(
   // *Every* answer must be public. A name that resolves to one public and one
   // private address is a rebinding attempt, not a multi-homed CDN.
   for (const address of addresses) {
-    const verdict = classifyAddress(address);
+    const verdict = judgeAddress(address);
     if (verdict.blocked) throw new SafeFetchError('refused', verdict.reason);
   }
   return addresses[0]!;
@@ -226,8 +267,10 @@ export async function safeFetch(
   const timeoutMs = options.timeoutMs ?? DEFAULTS.timeoutMs;
   const maxRedirects = options.maxRedirects ?? DEFAULTS.maxRedirects;
   const allowedPorts = options.allowedPorts ?? [];
+  const allowHttp = options.allowHttp ?? false;
   const resolver = options.resolve ?? systemResolve;
-  const doFetch = options.fetchImpl ?? fetch;
+  const transport = options.transport ?? pinnedTransport();
+  const judgeAddress = options.judgeAddress ?? classifyAddress;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -236,24 +279,18 @@ export async function safeFetch(
   try {
     let current = raw;
     for (let hop = 0; hop <= maxRedirects; hop += 1) {
-      const url = judgeUrl(current, allowedPorts);
-      const address = await resolveAndJudge(url.hostname, resolver);
-
-      // Connect to the address we judged, presenting the original Host. This is
-      // what closes the rebinding window: between the check and the connection
-      // there is no second DNS lookup for anybody to win.
-      const target = new URL(url.toString());
-      const literal = isIP(address) === 6 ? `[${address}]` : address;
-      target.hostname = literal;
+      const url = judgeUrl(current, allowedPorts, allowHttp, judgeAddress);
+      // Each hop is pinned to *its own* judged address: nothing from the
+      // previous hop's verdict is reused.
+      const address = await resolveAndJudge(url.hostname, resolver, judgeAddress);
 
       let response: Response;
       try {
-        response = await doFetch(target.toString(), {
-          method: 'GET',
-          redirect: 'manual',
+        response = await transport({
+          url,
+          address,
           signal: controller.signal,
           headers: {
-            host: url.host,
             accept: '*/*',
             'user-agent': 'crmeb-next/1.0 (+attachment import)',
           },
@@ -264,22 +301,32 @@ export async function safeFetch(
       }
 
       if (response.status >= 300 && response.status < 400) {
+        await discard(response);
         const location = response.headers.get('location');
         if (!location) throw new SafeFetchError('failed', 'redirect without Location');
-        // Resolved against the *original* URL, not the IP-literal one, so a
-        // relative redirect keeps the real hostname.
         current = new URL(location, url).toString();
         continue;
       }
 
-      if (!response.ok) throw new SafeFetchError('failed', `status ${response.status}`);
+      if (!response.ok) {
+        await discard(response);
+        throw new SafeFetchError('failed', `status ${response.status}`);
+      }
 
       const declaredLength = Number(response.headers.get('content-length') ?? '');
       if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+        await discard(response);
         throw new SafeFetchError('failed', 'too large');
       }
 
-      const bytes = await readBounded(response, maxBytes);
+      let bytes: Uint8Array;
+      try {
+        bytes = await readBounded(response, maxBytes);
+      } catch (error) {
+        // A reset or the timeout mid-body is a failed fetch, not a 500.
+        if (error instanceof SafeFetchError) throw error;
+        throw new SafeFetchError('failed', 'request failed');
+      }
       return {
         bytes,
         contentType: response.headers.get('content-type') ?? undefined,
@@ -290,6 +337,103 @@ export async function safeFetch(
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function discard(response: Response): Promise<void> {
+  await response.body?.cancel().catch(() => undefined);
+}
+
+// ---------------------------------------------------------------------------
+// the transport: the judged address, under the real name
+// ---------------------------------------------------------------------------
+
+/**
+ * A `lookup` that answers every question with the one address that was judged.
+ *
+ * `net.connect` asks it instead of DNS, so the socket goes to that address and
+ * no other — there is no second resolution for a rebinding server to win —
+ * while everything above the socket still sees the hostname. Node asks for
+ * either one address or, with `autoSelectFamily`, a list; both get the same.
+ */
+function pinnedLookup(address: string): LookupFunction {
+  const family = isIP(address);
+  return ((
+    _hostname: string,
+    options: { all?: boolean },
+    callback: (error: null, address: unknown, family?: number) => void,
+  ) => {
+    if (options?.all) callback(null, [{ address, family }]);
+    else callback(null, address, family);
+  }) as unknown as LookupFunction;
+}
+
+/**
+ * The production transport: `node:http` / `node:https`, dialling the judged
+ * address with the URL's own hostname everywhere else.
+ *
+ * - `Host` is the hostname, as Node writes it from the URL;
+ * - SNI is the hostname, so a CDN fronting many sites can choose a
+ *   certificate;
+ * - the certificate is verified — against the system CAs, for the hostname —
+ *   exactly as for any other request. There is no switch here that turns that
+ *   off (TLS-001); `ca` adds a trust anchor for a test server and replaces
+ *   nothing else.
+ * - `agent: false`: a fresh connection per hop, so a pooled socket to some
+ *   other address can never be reused for this one.
+ *
+ * Not `fetch`: its connection layer (undici's) takes the address from the URL,
+ * and making it take a pinned one needs a dispatcher from a second copy of
+ * undici whose version would have to track Node's own.
+ */
+export function pinnedTransport(tls: { ca?: string | string[] } = {}): Transport {
+  return (request) =>
+    new Promise<Response>((resolve, reject) => {
+      const { url } = request;
+      const secure = url.protocol === 'https:';
+      const host = normaliseHost(url.hostname);
+      const common = {
+        hostname: host,
+        port: url.port === '' ? undefined : Number(url.port),
+        path: `${url.pathname}${url.search}`,
+        method: 'GET',
+        headers: request.headers,
+        lookup: pinnedLookup(request.address),
+        signal: request.signal,
+        agent: false as const,
+      };
+      const onResponse = (incoming: IncomingMessage): void => resolve(toResponse(incoming));
+      const outgoing = secure
+        ? httpsRequest(
+            {
+              ...common,
+              // SNI must be a name; for an IP-literal URL there is none to send.
+              ...(isIP(host) === 0 ? { servername: host } : {}),
+              ...(tls.ca === undefined ? {} : { ca: tls.ca }),
+            },
+            onResponse,
+          )
+        : httpRequest(common, onResponse);
+      outgoing.on('error', reject);
+      outgoing.end();
+    });
+}
+
+/** Statuses whose `Response` may not carry a body. */
+const NULL_BODY = new Set([204, 205, 304]);
+
+function toResponse(incoming: IncomingMessage): Response {
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(incoming.headers)) {
+    if (value === undefined) continue;
+    for (const one of Array.isArray(value) ? value : [value]) headers.append(name, one);
+  }
+  const status = incoming.statusCode ?? 502;
+  if (NULL_BODY.has(status) || status < 200 || status > 599) {
+    incoming.resume();
+    return new Response(null, { status: NULL_BODY.has(status) ? status : 502, headers });
+  }
+  const body = Readable.toWeb(incoming) as unknown as ReadableStream<Uint8Array>;
+  return new Response(body, { status, headers });
 }
 
 /**

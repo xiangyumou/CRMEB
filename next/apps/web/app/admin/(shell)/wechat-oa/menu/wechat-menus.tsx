@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Popconfirm, Space, Tag, Tooltip, Typography } from 'antd';
 import {
   wechatOaMenuCreate,
   wechatOaMenuCurrent,
@@ -11,7 +11,7 @@ import {
 } from '@shop/contracts/wechat-oa/wechat-oa.menu.contract';
 import { wechatMenuForm, type WechatMenu } from '@shop/contracts/wechat-oa/schemas';
 
-import { useRouteQuery } from '@/admin/api/hooks';
+import { useInvalidateRoutes, useRouteMutation, useRouteQuery } from '@/admin/api/hooks';
 import { ConfirmButton } from '@/admin/kit/confirm-button';
 import { ModalForm, useFormModal } from '@/admin/kit/form/modal-form';
 import { PageContainer } from '@/admin/kit/page-container';
@@ -68,9 +68,8 @@ export function WechatMenusPage() {
           {
             title: '状态',
             key: 'isActive',
-            width: 110,
-            render: (_value: unknown, row: WechatMenu) =>
-              row.isActive ? <Tag color="success">已生效</Tag> : <Tag color="default">草稿</Tag>,
+            width: 220,
+            render: (_value: unknown, row: WechatMenu) => <MenuStatus row={row} />,
           },
           instantColumn<WechatMenu>({ title: '发布时间', dataIndex: 'publishedAt' }),
           actionsColumn<WechatMenu>({
@@ -82,18 +81,7 @@ export function WechatMenusPage() {
                     编辑
                   </Button>
                 </Can>
-                <ConfirmButton
-                  route={wechatOaMenuPublish}
-                  input={{ params: { id: row.id } }}
-                  title="确认发布这套菜单？"
-                  description="发布后，所有关注者的底部菜单会在几分钟内变成这一套。"
-                  invalidate={[wechatOaMenuList, wechatOaMenuCurrent]}
-                  successMessage="已发布到微信"
-                  permission="wechat-oa:menu:publish"
-                  buttonProps={{ type: 'link', size: 'small' }}
-                >
-                  发布
-                </ConfirmButton>
+                <PublishButton id={row.id} />
                 <Tooltip title={row.isActive ? '生效中的菜单不能删除，先发布另一套' : ''}>
                   <span>
                     <ConfirmButton
@@ -155,6 +143,68 @@ export function WechatMenusPage() {
         successMessage="已保存草稿"
       />
     </PageContainer>
+  );
+}
+
+/**
+ * 已生效 / 草稿, and — on whichever row WeChat last refused — the refusal.
+ *
+ * `publish()` writes WeChat's message to `publish_error` on the row that was
+ * being published. The alert above the table reads `/current`, the *live*
+ * menu, so a refused **draft** (the common case: WeChat checks every URL
+ * against the account's 业务域名) was shown nowhere once the toast went
+ * (CR-33-k2). The row is where the operator is looking when they press 发布.
+ */
+function MenuStatus({ row }: { row: WechatMenu }) {
+  const state = row.isActive ? <Tag color="success">已生效</Tag> : <Tag color="default">草稿</Tag>;
+  if (!row.publishError) return state;
+  return (
+    <Space direction="vertical" size={2}>
+      <Space size={4}>
+        {state}
+        <Tag color="error">发布失败</Tag>
+      </Space>
+      <Typography.Text type="danger" style={{ fontSize: 12 }}>
+        {row.publishError}
+      </Typography.Text>
+    </Space>
+  );
+}
+
+/**
+ * 发布, which refreshes the list and the alert whether WeChat accepted or not.
+ *
+ * `ConfirmButton` invalidates on success only; a refusal is exactly when the
+ * page has something new to show (`publish_error` on the row, and on `/current`
+ * when the live menu was the one refused), and the toast that says so lasts
+ * three seconds (CR-33-k2).
+ */
+function PublishButton({ id }: { id: string }) {
+  const refresh = useInvalidateRoutes();
+  const mutation = useRouteMutation(wechatOaMenuPublish, {
+    invalidate: [wechatOaMenuList, wechatOaMenuCurrent],
+    successMessage: '已发布到微信',
+    // Not awaited: the button is free again as soon as the refusal is back,
+    // and the rows and the alert catch up when the re-read lands.
+    onError: () => {
+      void refresh(wechatOaMenuList, wechatOaMenuCurrent);
+    },
+  });
+  return (
+    <Can permission="wechat-oa:menu:publish">
+      <Popconfirm
+        title="确认发布这套菜单？"
+        description="发布后，所有关注者的底部菜单会在几分钟内变成这一套。"
+        okText="确定"
+        cancelText="取消"
+        okButtonProps={{ loading: mutation.isPending }}
+        onConfirm={() => mutation.mutate({ params: { id } })}
+      >
+        <Button type="link" size="small" loading={mutation.isPending}>
+          发布
+        </Button>
+      </Popconfirm>
+    </Can>
   );
 }
 

@@ -8,8 +8,13 @@ import { registerStaffCheck, resetUserLookup } from '../auth/user-lookup';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { cleanOrphanAttachments } from './storage.jobs';
+import type { Transport } from './safe-fetch';
 import { storageConfig } from './storage.config';
+import { createScanTokenStore } from './scan-token';
 import {
+  REMOTE_IMPORTS_PER_HOUR,
+  SCAN_UPLOADS_PER_IP_PER_HOUR,
+  SCAN_UPLOADS_PER_TOKEN,
   attachmentDeleteMany,
   attachmentImport,
   attachmentList,
@@ -260,20 +265,86 @@ describe('remote import', () => {
   it('refuses the cloud metadata address', async () => {
     const ctx = as(adminActor(adminId));
     expect(
-      await code(attachmentImport(ctx, { url: 'http://169.254.169.254/latest/meta-data/' })),
+      await code(attachmentImport(ctx, { url: 'https://169.254.169.254/latest/meta-data/' })),
     ).toBe('STORAGE_REMOTE_URL_REFUSED');
   });
 
   it('refuses loopback and private addresses', async () => {
     const ctx = as(adminActor(adminId));
     for (const url of [
-      'http://127.0.0.1:6379/',
-      'http://10.0.0.5/logo.png',
+      'https://127.0.0.1:6379/',
+      'https://10.0.0.5/logo.png',
       'file:///etc/passwd',
     ]) {
       expect(await code(attachmentImport(ctx, { url })), url).toBe('STORAGE_REMOTE_URL_REFUSED');
     }
     expect(await harness.ctx.db.select().from(attachments)).toHaveLength(0);
+  });
+
+  /** A public CDN, as far as `safeFetch` can tell, answering with `body`. */
+  function cdn(body: Uint8Array): {
+    calls: string[];
+    seam: { resolve: () => Promise<string[]>; transport: Transport };
+  } {
+    const calls: string[] = [];
+    return {
+      calls,
+      seam: {
+        resolve: async () => ['93.184.216.34'],
+        transport: async ({ url }) => {
+          calls.push(String(url));
+          return new Response(body, { headers: { 'content-type': 'image/png' } });
+        },
+      },
+    };
+  }
+
+  it('imports an https source into the library', async () => {
+    const ctx = as(adminActor(adminId));
+    const { calls, seam } = cdn(png(2, 2, 7).bytes);
+    const result = await attachmentImport(ctx, { url: 'https://cdn.example.com/banner.png' }, seam);
+    expect(result.attachment).toMatchObject({ mime: 'image/png', width: 2, height: 2 });
+    expect(calls).toEqual(['https://cdn.example.com/banner.png']);
+  });
+
+  // CR-11-k: plain http is the operator's decision, off by default.
+  it('refuses plain http unless 允许 http 地址导入 is on', async () => {
+    const ctx = as(adminActor(adminId));
+    const { calls, seam } = cdn(png(1, 1, 8).bytes);
+    expect(
+      await code(attachmentImport(ctx, { url: 'http://cdn.example.com/banner.png' }, seam)),
+    ).toBe('STORAGE_REMOTE_URL_REFUSED');
+    expect(calls).toEqual([]);
+
+    await harness.ctx.config.set(storageConfig, { remoteImportAllowHttp: true });
+    await expect(
+      attachmentImport(ctx, { url: 'http://cdn.example.com/banner.png' }, seam),
+    ).resolves.toMatchObject({ deduped: false });
+    expect(calls).toEqual(['http://cdn.example.com/banner.png']);
+  });
+
+  it('gives 网址导入 an hourly budget per admin, spent before any lookup', async () => {
+    const ctx = as(adminActor(adminId));
+    const [second] = await harness.ctx.db
+      .insert(admins)
+      .values({ account: 'admin-2', passwordHash: 'x', passwordAlgo: 'bcrypt', name: '二号' })
+      .returning({ id: admins.id });
+
+    for (let i = 0; i < REMOTE_IMPORTS_PER_HOUR; i += 1) {
+      expect(await code(attachmentImport(ctx, { url: `https://10.0.0.${i % 250}/a.png` }))).toBe(
+        'STORAGE_REMOTE_URL_REFUSED',
+      );
+    }
+    const { calls, seam } = cdn(png(1, 1, 9).bytes);
+    expect(await code(attachmentImport(ctx, { url: 'https://cdn.example.com/a.png' }, seam))).toBe(
+      'STORAGE_UPLOAD_RATE_LIMITED',
+    );
+    expect(calls).toEqual([]);
+
+    // Somebody else's budget is their own.
+    await expect(
+      attachmentImport(as(adminActor(second!.id)), { url: 'https://cdn.example.com/a.png' }, seam),
+    ).resolves.toMatchObject({ deduped: false });
   });
 });
 
@@ -503,6 +574,70 @@ describe('scan-to-upload', () => {
     expect(await code(scanUpload(harness.ctx, { token: 'nosuchtokenatall1234' }, png()))).toBe(
       'STORAGE_SCAN_TOKEN_INVALID',
     );
+  });
+
+  // CR-12-k: an unauthenticated multipart endpoint bounds its work before it
+  // parses anything.
+  it('throttles per client address before the body is read', async () => {
+    let reads = 0;
+    const reader = async (): Promise<IncomingFile> => {
+      reads += 1;
+      return png();
+    };
+    for (let i = 0; i < SCAN_UPLOADS_PER_IP_PER_HOUR; i += 1) {
+      const token = `guess${String(i).padStart(16, '0')}`;
+      expect(await code(scanUpload(harness.ctx, { token }, reader, { ip: '203.0.113.30' }))).toBe(
+        'STORAGE_SCAN_TOKEN_INVALID',
+      );
+    }
+    // Not one body was read for a code that does not exist.
+    expect(reads).toBe(0);
+
+    const minted = await scanTokenCreate(as(adminActor(adminId)), {});
+    expect(
+      await code(scanUpload(harness.ctx, { token: minted.token }, reader, { ip: '203.0.113.30' })),
+    ).toBe('STORAGE_UPLOAD_RATE_LIMITED');
+    expect(reads).toBe(0);
+
+    // Another address still gets through, with the real code, and only then
+    // is the body read.
+    await expect(
+      scanUpload(harness.ctx, { token: minted.token }, reader, { ip: '203.0.113.31' }),
+    ).resolves.toBeDefined();
+    expect(reads).toBe(1);
+  });
+
+  it('throttles attempts on one code, whatever address they come from', async () => {
+    const minted = await scanTokenCreate(as(adminActor(adminId)), {});
+    const refused = () => file('<?php ', 'a.png', 'image/png');
+    // Each refused file puts the code back (see above) — which is exactly why
+    // the code needs a budget of its own.
+    for (let i = 0; i < SCAN_UPLOADS_PER_TOKEN; i += 1) {
+      expect(
+        await code(
+          scanUpload(harness.ctx, { token: minted.token }, refused(), { ip: `198.18.0.${i}` }),
+        ),
+      ).toBe('STORAGE_FILE_TYPE_REJECTED');
+    }
+    expect(
+      await code(scanUpload(harness.ctx, { token: minted.token }, png(), { ip: '198.18.1.1' })),
+    ).toBe('STORAGE_UPLOAD_RATE_LIMITED');
+  });
+
+  it('completes only a claimed code: never stamps `used` over a pending one', async () => {
+    const minted = await scanTokenCreate(as(adminActor(adminId)), {});
+    const store = createScanTokenStore(harness.ctx.redis, () => harness.ctx.clock.now());
+
+    expect(await store.complete(minted.token, 42)).toBe(false);
+    expect(await store.read(minted.token)).toMatchObject({ state: 'pending', attachmentId: null });
+    expect(await store.complete('nosuchtokenatall1234', 42)).toBe(false);
+
+    expect(await store.claim(minted.token)).not.toBeNull();
+    expect(await store.complete(minted.token, 42)).toBe(true);
+    expect(await store.read(minted.token)).toMatchObject({ state: 'used', attachmentId: 42 });
+    // And a used one is not completed twice.
+    expect(await store.complete(minted.token, 43)).toBe(false);
+    expect(await store.read(minted.token)).toMatchObject({ attachmentId: 42 });
   });
 });
 

@@ -10,6 +10,7 @@ import {
   UserSessionService,
 } from '@shop/core/auth';
 import { createTestCtx, fakeUserLookup, type TestCtx } from '@shop/testing';
+import { SCAN_UPLOADS_PER_IP_PER_HOUR } from '@shop/core/storage';
 import { ADMIN_COOKIE } from '../../../src/server/handle';
 import { setContainer, type Container } from '../../../src/server/container';
 import type { Env } from '../../../src/server/env';
@@ -315,7 +316,7 @@ describe('/admin-api/attachments', () => {
       json(
         'POST',
         '/admin-api/attachments/imports',
-        { url: 'http://169.254.169.254/latest/meta-data/iam/security-credentials/' },
+        { url: 'https://169.254.169.254/latest/meta-data/iam/security-credentials/' },
         headers,
       ),
     );
@@ -381,6 +382,39 @@ describe('scan-to-upload', () => {
       params: { token: token.token },
     });
     expect((await polled.json()).state).toBe('used');
+  });
+
+  it('throttles the public endpoint per client address, before the code is looked at (CR-12-k)', async () => {
+    const { POST: scanUpload } =
+      await import('../../api/v1/attachments/scan-uploads/[token]/route');
+    const from = (ip: string, n: number) => {
+      const token = `made-up-token-${String(n).padStart(8, '0')}`;
+      return scanUpload(
+        upload(`/api/v1/attachments/scan-uploads/${token}`, png(), { 'x-real-ip': ip }),
+        { params: { token } },
+      );
+    };
+
+    for (let i = 0; i < SCAN_UPLOADS_PER_IP_PER_HOUR; i += 1) {
+      const response = await from('203.0.113.20', i);
+      expect((await response.json()).code).toBe('STORAGE_SCAN_TOKEN_INVALID');
+    }
+    const limited = await from('203.0.113.20', 999);
+    expect(limited.status).toBe(429);
+    expect((await limited.json()).code).toBe('STORAGE_UPLOAD_RATE_LIMITED');
+
+    // A client-written X-Forwarded-For buys no fresh bucket (CR-14-k2)…
+    const spoofed = await scanUpload(
+      upload('/api/v1/attachments/scan-uploads/made-up-token-spoofed0', png(), {
+        'x-real-ip': '203.0.113.20',
+        'x-forwarded-for': '198.51.100.9',
+      }),
+      { params: { token: 'made-up-token-spoofed0' } },
+    );
+    expect(spoofed.status).toBe(429);
+    // …and the next phone is not held up by somebody else's.
+    const other = await from('203.0.113.21', 1000);
+    expect((await other.json()).code).toBe('STORAGE_SCAN_TOKEN_INVALID');
   });
 
   it('reads another admin’s token as expired rather than as somebody else’s', async () => {

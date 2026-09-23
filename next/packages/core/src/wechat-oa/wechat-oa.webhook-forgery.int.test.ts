@@ -9,7 +9,7 @@ import { wechatOaConfig } from '../system';
 import { resetWechatTokenFlight, wechatConfig } from '../wechat';
 import { encryptMessage, signatureOf } from './wechat-oa.crypto';
 import * as qrcode from './wechat-oa.qrcode.service';
-import { handleEvent } from './wechat-oa.webhook.service';
+import { handleEvent, verifyUrl } from './wechat-oa.webhook.service';
 
 /**
  * The Official Account callback, read as an attacker (K2, AUDIT.md K-SEC-O1).
@@ -25,9 +25,9 @@ import { handleEvent } from './wechat-oa.webhook.service';
  * callback, in 安全模式 too (next to `msg_signature`), so every access-log line
  * of the webhook holds a triple that is valid forever.
  *
- * The three `it.fails` cases are CR-7-k2. Each flips to a failure when the fix
- * lands; that is the signal to make it a plain `it` (and to move the other
- * suites' fixtures off their months-old `1767668400` timestamp).
+ * The three refusals below were pinned as `it.fails` by K2 and are CR-7-k2;
+ * R3 made them hold (a 300 s window, `(timestamp, nonce)` spent on one body,
+ * and the configured mode — not `encrypt_type` — choosing the path).
  */
 
 let harness: TestCtx;
@@ -60,14 +60,17 @@ beforeEach(async () => {
   resetWechatTokenFlight();
 });
 
-async function configure(messageMode: 'plain' | 'safe'): Promise<void> {
+async function configure(
+  messageMode: 'plain' | 'compatible' | 'safe',
+  enabled = true,
+): Promise<void> {
   await harness.ctx.config.set(wechatConfig, {
     oaAppId: oa.appId,
     oaAppSecret: oa.appSecret,
     apiBaseUrl: oa.url,
   });
   await harness.ctx.config.set(wechatOaConfig, {
-    enabled: true,
+    enabled,
     token: TOKEN,
     encodingAesKey: AES_KEY,
     messageMode,
@@ -134,7 +137,7 @@ describe('K-SEC-O1 — what a valid signature triple is good for', () => {
   // The downgrade: take the query string of any 安全模式 delivery, drop
   // `encrypt_type` and `msg_signature`, and post a plaintext body. The
   // operator chose 安全模式 precisely so that the body is authenticated.
-  it.fails('refuses a plaintext callback when the account is configured in 安全模式', async () => {
+  it('refuses a plaintext callback when the account is configured in 安全模式', async () => {
     await configure('safe');
     await followedVictim();
 
@@ -148,7 +151,7 @@ describe('K-SEC-O1 — what a valid signature triple is good for', () => {
   });
 
   // A triple from last month's access log.
-  it.fails('refuses a triple whose timestamp is outside a five-minute window', async () => {
+  it('refuses a triple whose timestamp is outside a five-minute window', async () => {
     await configure('plain');
     await followedVictim();
 
@@ -164,7 +167,7 @@ describe('K-SEC-O1 — what a valid signature triple is good for', () => {
   // Inside the window, the body-derived dedupe key does not help: a second,
   // different body under the same triple is a new key. Only spending the
   // triple (or the nonce) closes it.
-  it.fails('refuses a second, different body under a triple that was already used', async () => {
+  it('refuses a second, different body under a triple that was already used', async () => {
     await configure('plain');
     const code = await qrcode.create(harness.ctx.as(admin), {
       name: '海报',
@@ -189,5 +192,72 @@ describe('K-SEC-O1 — what a valid signature triple is good for', () => {
 
     expect(await harness.ctx.db.select().from(wechatQrcodeScans)).toHaveLength(1);
     expect((await qrcode.detail(harness.ctx.as(admin), { id: code.id })).followCount).toBe(1);
+  });
+
+  it('still answers WeChat’s own re-delivery of the same body under the same triple', async () => {
+    await configure('plain');
+    await followedVictim();
+    const delivery = { query: triple(NOW_SECONDS), body: event(VICTIM, 'unsubscribe') };
+
+    const first = await handleEvent(harness.ctx, delivery);
+    const retry = await handleEvent(harness.ctx, delivery);
+
+    expect(first.status).toBe(200);
+    expect(retry.status).toBe(200);
+    expect(await victimSubscribed()).toBe(false);
+  });
+
+  it('accepts a triple a little either side of the clock, inside the window', async () => {
+    await configure('plain');
+    await followedVictim();
+    const result = await handleEvent(harness.ctx, {
+      query: triple(NOW_SECONDS + 299, '99'),
+      body: event(VICTIM, 'unsubscribe'),
+    });
+    expect(result.status).toBe(200);
+    expect(await victimSubscribed()).toBe(false);
+  });
+
+  it('refuses every callback while the account is switched off', async () => {
+    await configure('plain', false);
+    await followedVictim();
+    const result = await handleEvent(harness.ctx, {
+      query: triple(NOW_SECONDS),
+      body: event(VICTIM, 'unsubscribe'),
+    });
+    expect(result.status).toBe(403);
+    expect(await victimSubscribed()).toBe(true);
+  });
+
+  it('holds a 兼容模式 delivery that carries an envelope to msg_signature', async () => {
+    await configure('compatible');
+    await followedVictim();
+    const encrypt = encryptMessage({
+      encodingAesKey: AES_KEY,
+      appId: oa.appId,
+      message: event(VICTIM, 'unsubscribe'),
+    });
+    // A plaintext body next to the envelope, and no msg_signature: the plain
+    // signature would pass, but the envelope is preferred when present.
+    const result = await handleEvent(harness.ctx, {
+      query: triple(NOW_SECONDS),
+      body: `${event(VICTIM, 'unsubscribe').slice(0, -6)}<Encrypt><![CDATA[${encrypt}]]></Encrypt></xml>`,
+    });
+    expect(result.status).toBe(403);
+    expect(await victimSubscribed()).toBe(true);
+  });
+
+  it('refuses to echo the URL handshake under a stale triple', async () => {
+    await configure('plain');
+    const stale = { ...triple(NOW_SECONDS - 3600), echostr: 'reflect-me' };
+    await expect(verifyUrl(harness.ctx, stale)).resolves.toEqual({
+      status: 403,
+      body: 'invalid signature',
+    });
+    const fresh = { ...triple(NOW_SECONDS), echostr: 'reflect-me' };
+    await expect(verifyUrl(harness.ctx, fresh)).resolves.toEqual({
+      status: 200,
+      body: 'reflect-me',
+    });
   });
 });

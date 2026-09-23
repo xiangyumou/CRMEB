@@ -1,0 +1,72 @@
+diff --git a/next/guards/src/checks/secrets.ts b/next/guards/src/checks/secrets.ts
+index 170478593..e51b6e969 100644
+--- a/next/guards/src/checks/secrets.ts
++++ b/next/guards/src/checks/secrets.ts
+@@ -88,6 +88,30 @@ function walkSchema(
+   go(schema, []);
+ }
+ 
++/**
++ * Response properties that carry a secret config field's *name* but are not
++ * that field (CR-1-r3).
++ *
++ * The walk matches on the last property name, because a response has no way
++ * to say which config group a value came from. That is exact for names like
++ * `encodingAesKey`, and wrong for `wechat-oa.token` (the OA callback token,
++ * secret since CR-8-k2): `token` is also what every login answers its session
++ * token as and what the 扫码上传 QR carries. Each such place is named here with
++ * what it really is. Exactly compared: an entry that matches no response
++ * property fails, so the list cannot outlive the routes it names, and a *new*
++ * `token` in a response still fails until somebody decides what it is.
++ */
++const SAME_NAME_NOT_SECRET: ReadonlyArray<{ route: string; path: string; is: string }> = [
++  { route: 'auth.miniLogin', path: 'session.token', is: 'the storefront session token' },
++  { route: 'auth.miniPhoneLogin', path: 'session.token', is: 'the storefront session token' },
++  { route: 'auth.oaLogin', path: 'session.token', is: 'the storefront session token' },
++  { route: 'auth.oaPhoneLogin', path: 'session.token', is: 'the storefront session token' },
++  { route: 'auth.passwordLogin', path: 'token', is: 'the storefront session token' },
++  { route: 'auth.register', path: 'token', is: 'the storefront session token' },
++  { route: 'auth.smsLogin', path: 'token', is: 'the storefront session token' },
++  { route: 'storage.scanTokenCreate', path: 'token', is: 'the single-use 扫码上传 code' },
++];
++
+ function isBooleanish(node: z.ZodType): boolean {
+   const type = (node.def as { type?: string }).type;
+   return type === 'boolean';
+@@ -101,6 +125,8 @@ export const secretsNeverLeak = defineCheck(
+     const byKey = new Map(fields.map((f) => [f.key, f]));
+     const findings: Finding[] = [];
+     let properties = 0;
++    const notSecret = new Set(SAME_NAME_NOT_SECRET.map((entry) => `${entry.route}:${entry.path}`));
++    const matched = new Set<string>();
+ 
+     for (const route of allRoutes) {
+       walkSchema(route.response as z.ZodType, (at, node) => {
+@@ -110,6 +136,11 @@ export const secretsNeverLeak = defineCheck(
+         const field = byKey.get(key);
+         if (!field) return;
+         if (isBooleanish(node)) return; // the "is set" flag: that is the contract
++        const where = `${route.id}:${at.join('.')}`;
++        if (notSecret.has(where)) {
++          matched.add(where);
++          return;
++        }
+         findings.push(
+           fail(
+             route.id,
+@@ -119,6 +150,15 @@ export const secretsNeverLeak = defineCheck(
+       });
+     }
+ 
++    for (const stale of [...notSecret].filter((where) => !matched.has(where))) {
++      findings.push(
++        fail(
++          stale.split(':')[0]!,
++          `SAME_NAME_NOT_SECRET names ${stale}, which no response carries as a secret's name any more — delete the entry`,
++        ),
++      );
++    }
++
+     // A group that marks nothing secret while holding something that is plainly a
+     // credential is the other half of SYS-006; the unit test in `system.test.ts`
+     // owns that, so here we only assert the set is not empty — an empty set would

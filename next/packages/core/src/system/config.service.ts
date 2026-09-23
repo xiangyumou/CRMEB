@@ -134,6 +134,16 @@ function readOnlyKeys(def: ConfigGroupDef): Set<string> {
   return out;
 }
 
+/**
+ * Which keys `configSave` accepts: those with a `ui` entry. Deliberately the
+ * same rule `describeGroup` uses to decide what the form shows, so the screen
+ * and the write path cannot disagree about what an operator may set.
+ */
+function writableKeys(def: ConfigGroupDef): Set<string> {
+  const ui = def.ui as Record<string, ConfigFieldUi | undefined>;
+  return new Set(Object.keys(def.schema.shape).filter((key) => ui[key] !== undefined));
+}
+
 function requireGroup(name: string): ConfigGroupDef {
   const def = getConfigGroup(name);
   if (!def) throw new DomainError('SYSTEM_CONFIG_GROUP_NOT_FOUND');
@@ -200,7 +210,15 @@ export async function configSave(
     throw new DomainError('FORBIDDEN', { details: { permission: writePermission } });
   }
 
-  const known = new Set(Object.keys(def.schema.shape));
+  // The keys the form shows, not every key of the schema (CR-9-k2). A schema
+  // key with no `ui` entry is written by a job, the ETL or `ctx.config.set` —
+  // `wechat.apiBaseUrl` / `payment.apiBaseUrl` exist so a test can point a
+  // client at a fake — and accepting it here let a `payment:config:write`
+  // holder repoint the WeChat client at their own host and read the write-only
+  // AppSecret off the next token refresh. "Not on the screen" now means "not
+  // writable from the screen"; a group that ever needs a hidden writable key
+  // has to say so in its `ui`, not inherit it from the schema.
+  const known = writableKeys(def);
   const unknown = Object.keys(body.values).filter((key) => !known.has(key));
   if (unknown.length > 0) {
     throw new DomainError('SYSTEM_CONFIG_UNKNOWN_KEY', { details: { keys: unknown } });

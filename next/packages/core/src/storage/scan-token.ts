@@ -42,8 +42,12 @@ export interface ScanTokenStore {
   }): Promise<{ token: string; expiresAt: Date }>;
   /** Atomically moves `pending` → `claimed`. `null` means expired or spent. */
   claim(token: string): Promise<ScanTokenRecord | null>;
-  /** Records the attachment against a claimed token and marks it `used`. */
-  complete(token: string, attachmentId: number): Promise<void>;
+  /**
+   * Records the attachment against a **claimed** token and marks it `used`.
+   * `false` when the token is not claimed (pending, used, gone): nothing is
+   * written.
+   */
+  complete(token: string, attachmentId: number): Promise<boolean>;
   /** Puts a claimed token back, so a failed store does not burn the QR code. */
   release(token: string): Promise<void>;
   read(token: string): Promise<ScanTokenRecord | null>;
@@ -67,9 +71,13 @@ redis.call('HSET', KEYS[1], 'state', 'claimed')
 return redis.call('HMGET', KEYS[1], 'adminId', 'categoryId', 'directory')
 `;
 
-/** Marks a claimed token used and keeps the record readable for a short while. */
+/**
+ * Marks a claimed token used and keeps the record readable for a short while.
+ * A compare-and-set on `state`, like its two siblings (CR-12-k): an existence
+ * check would stamp `used` over a `pending` record.
+ */
 const COMPLETE_LUA = `
-if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end
+if redis.call('HGET', KEYS[1], 'state') ~= 'claimed' then return 0 end
 redis.call('HSET', KEYS[1], 'state', 'used', 'attachmentId', ARGV[1])
 local ttl = redis.call('PTTL', KEYS[1])
 if ttl < tonumber(ARGV[2]) then
@@ -132,7 +140,14 @@ export function createScanTokenStore(redis: Redis, now: () => Date): ScanTokenSt
     },
 
     async complete(token, attachmentId) {
-      await redis.eval(COMPLETE_LUA, 1, key(token), String(attachmentId), String(USED_LINGER_MS));
+      const done = await redis.eval(
+        COMPLETE_LUA,
+        1,
+        key(token),
+        String(attachmentId),
+        String(USED_LINGER_MS),
+      );
+      return done === 1;
     },
 
     async release(token) {

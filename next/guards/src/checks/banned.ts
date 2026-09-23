@@ -94,15 +94,6 @@ const FETCH_ALLOW: ReadonlyArray<{ path: RegExp; why: string; cr?: string }> = [
     why: 'api.mch.weixin.qq.com: `new URL(args.urlPath, config.apiBaseUrl)`',
   },
   {
-    // E3 merged with this still outside C's client: WeChat's material
-    // endpoints are multipart and `WechatCoreClient.call` speaks JSON only.
-    // The URL is `new URL(path, config.apiBaseUrl)` — not SSRF — but the call
-    // misses the client's `40001 → drop the token and retry once` rule.
-    path: /^next\/packages\/core\/src\/wechat-oa\/wechat-oa\.client\.ts$/,
-    why: "the official account's multipart media upload, with a token C issued; URL from config",
-    cr: 'CR-4-e2 (never filed as a file) → CR-31-k2',
-  },
-  {
     path: /^next\/packages\/core\/src\/shipping\/shipping\.logistics\.port\.ts$/,
     why: 'a hardcoded 阿里云云市场 host (`ALIYUN_HOST`); only the credential is configurable',
   },

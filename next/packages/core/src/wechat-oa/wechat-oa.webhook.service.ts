@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { WechatReplyPayload, WechatReplyType } from '@shop/contracts/wechat-oa/schemas';
 import type { Ctx } from '../kernel/context';
 import { wechatOaRuntimeConfig } from './wechat-oa.config';
@@ -24,12 +25,24 @@ import * as repo from './wechat-oa.repo';
  *
  * ## The order, which is the whole security model
  *
+ * 0. **Is it on, and is this the mode we run in.** A disabled account answers
+ *    nothing. An account configured in 安全模式 refuses a plaintext delivery:
+ *    which path is taken is the *setting's* choice, never the request's
+ *    `encrypt_type` (CR-7-k2 — dropping `encrypt_type` from a logged query
+ *    string used to downgrade the check to one that does not cover the body).
  * 1. **Signature.** `verifySignature` over the three query parameters, or
  *    `verifyMessageSignature` over those plus the still-encrypted payload. This
  *    happens before the body is parsed, before Redis is touched and before
  *    anything is written. The URL is public and unauthenticated in every other
  *    respect: an unsigned "this user just subscribed" would otherwise hand out
  *    the new-follower coupon to anybody who can spell the openid.
+ * 1a. **Freshness and single use** (CR-7-k2). In 明文 mode the signature covers
+ *    `token`, `timestamp` and `nonce` — not the body — and WeChat puts that
+ *    triple on the query string of every callback, so every access-log line
+ *    holds one. A triple is therefore good for five minutes either side of our
+ *    clock, and for **one body**: the first delivery binds `(timestamp, nonce)`
+ *    to the body's hash, WeChat's own retries of that body pass (the dedupe in
+ *    step 3 then answers them), and anything else under the same triple is 403.
  * 2. **Decrypt** (safe and compatible modes), with the appid inside the
  *    envelope checked against ours.
  * 3. **Deduplicate.** WeChat re-delivers on its own timeout, so the same event
@@ -60,6 +73,10 @@ const FORBIDDEN: OaWebhookResult = { status: 403, body: 'invalid signature' };
 const BUDGET_MS = 4_000;
 /** Longer than WeChat's retry schedule (4 deliveries inside ~15 s) with room to spare. */
 const DEDUPE_TTL_SECONDS = 900;
+/** How far a callback's `timestamp` may be from our clock, either way (CR-7-k2). */
+export const FRESHNESS_SECONDS = 300;
+/** Outlives the freshness window on both sides, so a spent triple cannot come back. */
+const NONCE_TTL_SECONDS = 2 * FRESHNESS_SECONDS;
 
 // ---------------------------------------------------------------------------
 // GET: the URL verification handshake
@@ -79,12 +96,14 @@ export async function verifyUrl(
   query: Record<string, string | undefined>,
 ): Promise<OaWebhookResult> {
   const { token } = await oaCredentials(ctx);
-  const ok = verifySignature({
-    token,
-    signature: query['signature'] ?? '',
-    timestamp: query['timestamp'] ?? '',
-    nonce: query['nonce'] ?? '',
-  });
+  const timestamp = query['timestamp'] ?? '';
+  const ok =
+    verifySignature({
+      token,
+      signature: query['signature'] ?? '',
+      timestamp,
+      nonce: query['nonce'] ?? '',
+    }) && isFresh(ctx, timestamp);
   if (!ok) {
     ctx.logger.warn(
       { path: '/api/v1/webhooks/wechat-oa' },
@@ -107,9 +126,19 @@ export interface OaWebhookRequest {
 
 export async function handleEvent(ctx: Ctx, req: OaWebhookRequest): Promise<OaWebhookResult> {
   const credentials = await oaCredentials(ctx);
+  if (!credentials.enabled) {
+    ctx.logger.warn({}, 'oa webhook: callback for a disabled account');
+    return FORBIDDEN;
+  }
   const timestamp = req.query['timestamp'] ?? '';
   const nonce = req.query['nonce'] ?? '';
-  const encrypted = (req.query['encrypt_type'] ?? '') === 'aes';
+
+  // ---- 0: which path — the setting's choice, not the request's -------------
+  const encrypted = chooseEncrypted(credentials.messageMode, req);
+  if (encrypted === null) {
+    ctx.logger.warn({}, 'oa webhook: plaintext callback refused in 安全模式');
+    return FORBIDDEN;
+  }
 
   // ---- 1 & 2: authenticate, then decrypt -----------------------------------
   let plain: string;
@@ -130,6 +159,7 @@ export async function handleEvent(ctx: Ctx, req: OaWebhookRequest): Promise<OaWe
       ctx.logger.warn({}, 'oa webhook: bad message signature');
       return FORBIDDEN;
     }
+    if (!(await spendTriple(ctx, { timestamp, nonce, body: req.body }))) return FORBIDDEN;
     try {
       plain = decryptMessage({
         encodingAesKey: credentials.encodingAesKey,
@@ -152,6 +182,7 @@ export async function handleEvent(ctx: Ctx, req: OaWebhookRequest): Promise<OaWe
       ctx.logger.warn({}, 'oa webhook: bad signature');
       return FORBIDDEN;
     }
+    if (!(await spendTriple(ctx, { timestamp, nonce, body: req.body }))) return FORBIDDEN;
     plain = req.body;
   }
 
@@ -202,6 +233,76 @@ async function withBudget(ctx: Ctx, work: Promise<string>): Promise<string> {
     return await Promise.race([work, budget]);
   } finally {
     if (timer) clearTimeout(timer);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// mode, freshness, single use (CR-7-k2)
+// ---------------------------------------------------------------------------
+
+/**
+ * `true` for the encrypted path, `false` for the plain one, `null` to refuse.
+ *
+ * - 安全模式: encrypted or nothing. The operator chose it so that the body is
+ *   authenticated; a request that simply omits `encrypt_type` does not get to
+ *   choose the check that does not cover the body.
+ * - 兼容模式: WeChat sends both forms in one body. The envelope is preferred
+ *   whenever it is there, so a delivery that carries one is always held to
+ *   `msg_signature`.
+ * - 明文模式: plain, unless the request says it is encrypted (an operator who
+ *   switched 公众平台 first and our screen second still gets their messages).
+ */
+function chooseEncrypted(
+  mode: 'plain' | 'compatible' | 'safe',
+  req: OaWebhookRequest,
+): boolean | null {
+  const saysEncrypted = (req.query['encrypt_type'] ?? '') === 'aes';
+  if (mode === 'safe') return saysEncrypted ? true : null;
+  if (mode === 'compatible') return saysEncrypted || /<Encrypt>/.test(req.body);
+  return saysEncrypted;
+}
+
+/** `timestamp` is a decimal epoch-seconds value within `FRESHNESS_SECONDS` of `ctx.clock`. */
+function isFresh(ctx: Ctx, timestamp: string): boolean {
+  if (!/^\d{1,12}$/.test(timestamp)) return false;
+  const skew = Math.abs(Math.floor(ctx.clock.now().getTime() / 1000) - Number(timestamp));
+  if (skew > FRESHNESS_SECONDS) {
+    ctx.logger.warn({ skew }, 'oa webhook: stale timestamp');
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Spends `(timestamp, nonce)` on this body: `true` for the first body seen
+ * under the triple and for a byte-identical re-delivery of it, `false` for a
+ * stale triple or a different body.
+ *
+ * Binding the body rather than refusing every second use is what keeps
+ * WeChat's own retries working whether or not they re-sign: a retry that
+ * carries the original triple is the same body, passes here, and is answered
+ * from the dedupe cache in step 3 — which is where re-deliveries have always
+ * been handled.
+ *
+ * Redis down: the triple is let through, as the dedupe claim is. The freshness
+ * window still holds, so what is lost for the length of an outage is the
+ * single use inside five minutes, not the protection against last month's log.
+ */
+async function spendTriple(
+  ctx: Ctx,
+  args: { timestamp: string; nonce: string; body: string },
+): Promise<boolean> {
+  if (!isFresh(ctx, args.timestamp)) return false;
+  const key = `wechat-oa:nonce:${args.nonce}:${args.timestamp}`;
+  const digest = createHash('sha256').update(args.body).digest('hex');
+  try {
+    if ((await ctx.redis.set(key, digest, 'EX', NONCE_TTL_SECONDS, 'NX')) === 'OK') return true;
+    if ((await ctx.redis.get(key)) === digest) return true;
+    ctx.logger.warn({}, 'oa webhook: a spent signature triple was reused for another body');
+    return false;
+  } catch (error) {
+    ctx.logger.warn({ err: error }, 'oa webhook nonce store unavailable');
+    return true;
   }
 }
 

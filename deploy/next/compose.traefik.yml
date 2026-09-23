@@ -25,6 +25,13 @@
 
 services:
   edge:
+    environment:
+      # Traefik's network, so the edge takes the client address from the
+      # X-Forwarded-For Traefik appends — and from nobody else (CR-14-k2).
+      # Required: without it every shopper is Traefik's one address, and the
+      # per-IP SMS budget (50 codes a day by default) locks the whole shop
+      # out of SMS sign-in by lunchtime. See cutover.md step 3.
+      NEXT_EDGE_TRUSTED_PROXIES: ${NEXT_EDGE_TRUSTED_PROXIES:?set NEXT_EDGE_TRUSTED_PROXIES to server-internal-net's subnet before switching traffic}
     networks:
       - default
       - server-internal-net

@@ -27,7 +27,7 @@ import { enforce, fixedWindow } from '../kernel/rate-limit';
 import type { Storage } from '../kernel/storage';
 import { getStaffCheck } from '../auth/user-lookup';
 import { isRejected, mimeAgrees, probeImageDimensions, sniffFileType } from './file-type';
-import { safeFetch, SafeFetchError } from './safe-fetch';
+import { safeFetch, SafeFetchError, type SafeFetchOptions } from './safe-fetch';
 import { createS3Storage } from './s3';
 import { createScanTokenStore } from './scan-token';
 import * as repo from './storage.repo';
@@ -592,6 +592,12 @@ export async function attachmentUpload(
 }
 
 /**
+ * 网址导入 per admin per hour. Far more than anybody pastes by hand, and far
+ * less than a useful way to make the server knock on a thousand doors.
+ */
+export const REMOTE_IMPORTS_PER_HOUR = 120;
+
+/**
  * Import by URL — the `onlineUpload` successor.
  *
  * Every refusal from `safeFetch` comes back as the same message, so the
@@ -600,6 +606,7 @@ export async function attachmentUpload(
 export async function attachmentImport(
   ctx: Ctx,
   body: AttachmentImportBody,
+  options: Pick<SafeFetchOptions, 'resolve' | 'transport'> = {},
 ): Promise<UploadResult> {
   const adminId = requireAdminId(ctx);
   const settings = await ctx.config.get(storageConfig);
@@ -607,11 +614,25 @@ export async function attachmentImport(
     body.categoryId === undefined || body.categoryId === null ? null : fromId(body.categoryId);
   if (categoryId !== null) await requireCategory(ctx, categoryId);
 
+  // The one endpoint that makes the server fetch an arbitrary URL gets a
+  // bucket of its own (CR-11-k), spent before any DNS lookup.
+  await enforce(
+    fixedWindow(ctx.redis, {
+      key: `storage:import:admin:${adminId}`,
+      limit: REMOTE_IMPORTS_PER_HOUR,
+      windowMs: 60 * 60 * 1000,
+      nowMs: ctx.clock.now().getTime(),
+    }),
+    'STORAGE_UPLOAD_RATE_LIMITED',
+  );
+
   let fetched;
   try {
     fetched = await safeFetch(body.url, {
       maxBytes: settings.remoteImportMaxBytes,
       timeoutMs: settings.remoteImportTimeoutMs,
+      allowHttp: settings.remoteImportAllowHttp,
+      ...options,
     });
   } catch (error) {
     if (error instanceof SafeFetchError) {
@@ -761,6 +782,18 @@ export async function scanTokenStatusGet(
 }
 
 /**
+ * 扫码上传 attempts per client address per hour. One phone uploading a shop's
+ * worth of photos mints a fresh code per photo; sixty is more than anybody
+ * does by hand and far less than a useful way to make the server parse bodies.
+ */
+export const SCAN_UPLOADS_PER_IP_PER_HOUR = 60;
+/**
+ * Attempts per code. A code is single-use, but a refused file puts it back —
+ * so without this one code could be hammered for its whole life.
+ */
+export const SCAN_UPLOADS_PER_TOKEN = 10;
+
+/**
  * The phone's upload.
  *
  * Public by contract — the phone that scanned the code has no session — so the
@@ -768,21 +801,54 @@ export async function scanTokenStatusGet(
  * the resulting attachment is attributed to the admin who minted it rather than
  * to nobody. A claim that cannot be completed is released, so a picture the
  * sniffer refuses does not burn the QR code.
+ *
+ * It is also an unauthenticated multipart endpoint, so the work it does for a
+ * stranger is bounded **before the body is read** (CR-12-k): `file` may be a
+ * reader, called only once the per-address and per-code budgets are spent and
+ * the code is seen to be pending. `ip` is `clientIp()` — the edge's address.
  */
 export async function scanUpload(
   ctx: Ctx,
   params: { token: string },
-  file: IncomingFile,
+  file: IncomingFile | (() => Promise<IncomingFile>),
+  meta: { ip?: string | null } = {},
 ): Promise<UploadResult> {
-  const settings = await ctx.config.get(storageConfig);
-  const store = createScanTokenStore(ctx.redis, () => ctx.clock.now());
+  const nowMs = ctx.clock.now().getTime();
+  await enforce(
+    fixedWindow(ctx.redis, {
+      // No edge address (a direct call, a test) shares one bucket rather than
+      // being exempt from it.
+      key: `storage:scan-upload:ip:${meta.ip ?? 'unknown'}`,
+      limit: SCAN_UPLOADS_PER_IP_PER_HOUR,
+      windowMs: 60 * 60 * 1000,
+      nowMs,
+    }),
+    'STORAGE_UPLOAD_RATE_LIMITED',
+  );
+  await enforce(
+    fixedWindow(ctx.redis, {
+      key: `storage:scan-upload:token:${params.token}`,
+      limit: SCAN_UPLOADS_PER_TOKEN,
+      windowMs: 60 * 60 * 1000,
+      nowMs,
+    }),
+    'STORAGE_UPLOAD_RATE_LIMITED',
+  );
 
+  const store = createScanTokenStore(ctx.redis, () => ctx.clock.now());
+  // A cheap look first, so a spent or made-up code costs no body parse. The
+  // atomic claim below is still what decides.
+  const seen = await store.read(params.token);
+  if (!seen || seen.state !== 'pending') throw new DomainError('STORAGE_SCAN_TOKEN_INVALID');
+  const incoming = typeof file === 'function' ? await file() : file;
+
+  const settings = await ctx.config.get(storageConfig);
   const claimed = await store.claim(params.token);
   if (!claimed) throw new DomainError('STORAGE_SCAN_TOKEN_INVALID');
 
   try {
     const result = await storeFile(ctx, {
-      file,
+      file: incoming,
       maxBytes: settings.maxUploadBytes,
       directory: claimed.directory ?? 'attachment',
       categoryId: claimed.categoryId,

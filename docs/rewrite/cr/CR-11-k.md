@@ -1,6 +1,6 @@
 # CR-11-k — `safeFetch` connects to an IP literal over TLS, so every https import fails cert validation
 
-**Stream:** K (hardening) **Status:** OPEN — for stream F1 (storage)
+**Stream:** K (hardening) **Status:** RESOLVED in `196e61cf9` (R3, wave 6)
 **Files:** `next/packages/core/src/storage/safe-fetch.ts`
 
 ## What
@@ -106,3 +106,7 @@ what is missing is a single end-to-end path through the real transport.
 - **No rate limit** on `POST /admin-api/attachments/imports`. It is admin-only
   and `storage:attachment:write`, so this is second-order, but the endpoint
   makes the server fetch an arbitrary URL, which is worth a bucket of its own.
+
+## Resolution (R3, `196e61cf9`)
+
+The address is pinned in the connection layer: `pinnedTransport()` (`node:http`/`node:https`) dials with a `lookup` that answers only the judged address, `servername` = the hostname, `agent: false`, verification on — the URL keeps the real name, so `Host`, SNI and the certificate identity are all the name, and each redirect hop is dialled at its own verdict. Not undici's `Agent`: that would need a second undici whose version tracks Node's. Also decided: plain `http:` refused by default on every hop (网址导入 has a `storage.remoteImportAllowHttp` switch, off; F4's own-URL fetch allows it), and 网址导入 has a per-admin hourly budget (120). Tests: `safe-fetch.tls.test.ts` (6, real TLS with name-only certificates on two loopback addresses, no stub transport), `safe-fetch.test.ts` ported to the `transport` seam, `storage.int.test.ts` import/http/budget cases. No K1 pin existed for this CR.

@@ -212,6 +212,7 @@ export const storageAttachmentImport = defineRoute({
   response: uploadResult,
   status: 201,
   errors: [
+    'STORAGE_UPLOAD_RATE_LIMITED',
     'STORAGE_REMOTE_URL_REFUSED',
     'STORAGE_REMOTE_FETCH_FAILED',
     'STORAGE_FILE_TOO_LARGE',

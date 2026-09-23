@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { anonymousActor, type Actor, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
-import { storageConfig } from '../storage';
+import { storageConfig, type Transport } from '../storage';
 import { attachmentDataUrl, type AttachmentDataUrlOptions } from './attachment.service';
 import { siteConfig } from './site.config';
 
@@ -37,14 +37,14 @@ interface Seam extends AttachmentDataUrlOptions {
   calls: string[];
 }
 
-/** A resolver and a `fetch` that answer with `body`, recording what was asked. */
+/** A resolver and a transport that answer with `body`, recording what was asked. */
 function seam(body: Uint8Array | string, addresses: string[] = [PUBLIC_IP]): Seam {
   const calls: string[] = [];
-  const impl = (async (url: string | URL) => {
+  const impl: Transport = async ({ url }) => {
     calls.push(String(url));
     return new Response(body, { status: 200 });
-  }) as unknown as typeof fetch;
-  return { calls, fetch: { resolve: async () => addresses, fetchImpl: impl } };
+  };
+  return { calls, fetch: { resolve: async () => addresses, transport: impl } };
 }
 
 let userSequence = 0;

@@ -161,7 +161,9 @@ describe('describeGroup', () => {
     // vendor console, and hiding them would leave an operator unable to tell
     // which account is configured. The half that grants access must be secret,
     // and that is what this pattern matches.
-    const suspicious = /(secret|password|appcode|serverkey|privatekey|aeskey|apikey)$/i;
+    // `token` joined the pattern with CR-8-k2: `wechat-oa.token` authenticates
+    // every 明文-mode OA callback and was served in clear.
+    const suspicious = /(secret|password|appcode|serverkey|privatekey|aeskey|apikey|token)$/i;
     const leaks: string[] = [];
     for (const group of allConfigGroups()) {
       for (const field of describeGroup(group).fields) {

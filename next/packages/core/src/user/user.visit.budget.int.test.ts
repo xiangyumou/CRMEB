@@ -15,7 +15,9 @@ import { recordVisit } from './user.visit.service';
  * right for what it was built for (collapsing `onShow` re-fires); what is
  * missing is a ceiling per subject across paths.
  *
- * The `it.fails` is CR-11-k2 and flips when a per-subject ceiling lands.
+ * K2 pinned the missing ceiling as `it.fails` (CR-11-k2); R3 added a
+ * per-subject ceiling of 60 rows a minute across paths, above which the beacon
+ * is dropped silently, as a per-path repeat is.
  */
 
 let harness: TestCtx;
@@ -46,7 +48,7 @@ describe('K-SEC-V1 — what one anonymous address can write', () => {
     expect(await harness.ctx.db.select().from(userVisits)).toHaveLength(1);
   });
 
-  it.fails('cannot write more than a browsing session’s worth of rows in a minute', async () => {
+  it('cannot write more than a browsing session’s worth of rows in a minute', async () => {
     const anonymous = harness.as(anonymousActor);
     // Nobody browses 200 distinct pages in one minute; a script does.
     for (let i = 0; i < 200; i += 1) {
@@ -54,5 +56,47 @@ describe('K-SEC-V1 — what one anonymous address can write', () => {
     }
     const rows = await harness.ctx.db.select().from(userVisits);
     expect(rows.length).toBeLessThanOrEqual(60);
+  });
+
+  it('lets a real browsing minute through untouched: sixty distinct pages', async () => {
+    const anonymous = harness.as(anonymousActor);
+    for (let i = 0; i < 60; i += 1) {
+      await recordVisit(anonymous, { path: `/pages/goods_details/index/${i}` }, { ip: ADDRESS });
+    }
+    expect(await harness.ctx.db.select().from(userVisits)).toHaveLength(60);
+  });
+
+  it('does not spend the ceiling on the per-path repeats it already collapses', async () => {
+    const anonymous = harness.as(anonymousActor);
+    // `onShow` re-firing on one page all minute long…
+    for (let i = 0; i < 100; i += 1) {
+      await recordVisit(anonymous, { path: '/pages/index/index' }, { ip: ADDRESS });
+    }
+    // …leaves the visitor's other 59 pages countable.
+    for (let i = 0; i < 59; i += 1) {
+      await recordVisit(anonymous, { path: `/pages/goods_details/index/${i}` }, { ip: ADDRESS });
+    }
+    expect(await harness.ctx.db.select().from(userVisits)).toHaveLength(60);
+  });
+
+  it('counts again once the minute has passed', async () => {
+    const anonymous = harness.as(anonymousActor);
+    for (let i = 0; i < 70; i += 1) {
+      await recordVisit(anonymous, { path: `/p/${i}` }, { ip: ADDRESS });
+    }
+    expect(await harness.ctx.db.select().from(userVisits)).toHaveLength(60);
+    // The window lives in Redis; expiring it is how the minute passes here.
+    await flushTestRedis(harness.redis);
+    await recordVisit(anonymous, { path: '/p/next-minute' }, { ip: ADDRESS });
+    expect(await harness.ctx.db.select().from(userVisits)).toHaveLength(61);
+  });
+
+  it('keeps one visitor’s ceiling off another', async () => {
+    const anonymous = harness.as(anonymousActor);
+    for (let i = 0; i < 70; i += 1) {
+      await recordVisit(anonymous, { path: `/p/${i}` }, { ip: ADDRESS });
+    }
+    await recordVisit(anonymous, { path: '/p/0' }, { ip: '198.51.100.24' });
+    expect(await harness.ctx.db.select().from(userVisits)).toHaveLength(61);
   });
 });

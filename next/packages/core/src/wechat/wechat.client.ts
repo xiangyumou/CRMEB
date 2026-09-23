@@ -88,6 +88,21 @@ export interface WechatCall {
 export type WechatBytesResult =
   { ok: true; bytes: Buffer; contentType: string } | { ok: false; errcode: number; errmsg: string };
 
+/**
+ * A multipart upload: WeChat's material endpoints (`media/upload`,
+ * `material/add_material`) take the file as one form field.
+ */
+export interface WechatUpload {
+  /** Path only, e.g. `/cgi-bin/material/add_material`. */
+  path: string;
+  query?: Record<string, string>;
+  /** The form field WeChat reads the file from — `media` for every material endpoint. */
+  field: string;
+  bytes: Uint8Array;
+  filename: string;
+  contentType: string;
+}
+
 export interface WechatCoreClient {
   oaCodeExchange(code: string): Promise<OaCodeExchange>;
   oaUserInfo(args: { accessToken: string; openid: string }): Promise<WechatProfile>;
@@ -99,6 +114,13 @@ export interface WechatCoreClient {
   call<T>(app: WechatApp, req: WechatCall): Promise<T>;
   /** For the endpoints that answer a file on success and JSON on failure. */
   callBytes(app: WechatApp, req: WechatCall): Promise<WechatBytesResult>;
+  /**
+   * A multipart upload with the same token handling as `call`: the cached
+   * token, the single flight, and `40001 → drop it and retry once` (CR-31-k2).
+   * Answers WeChat's JSON exactly as `call` does — an `errcode` is a return
+   * value, a transport failure throws.
+   */
+  upload<T>(app: WechatApp, req: WechatUpload): Promise<T>;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,17 +190,24 @@ export function createWechatClient(ctx: Ctx): WechatCoreClient {
    * whatever Node's default trust store says, and there is no way to turn it
    * off from anywhere in this system (TLS-001).
    */
-  async function request(baseUrl: string, req: WechatCall): Promise<unknown> {
+  async function request(baseUrl: string, req: WechatCall, form?: FormData): Promise<unknown> {
     const url = new URL(req.path, baseUrl);
     for (const [key, value] of Object.entries(req.query ?? {})) url.searchParams.set(key, value);
 
     const response = await fetch(url, {
       method: req.method,
+      // A form sets its own `multipart/form-data; boundary=…` content type.
       headers: {
         accept: 'application/json',
-        ...(req.body === undefined ? {} : { 'content-type': 'application/json; charset=utf-8' }),
+        ...(form !== undefined || req.body === undefined
+          ? {}
+          : { 'content-type': 'application/json; charset=utf-8' }),
       },
-      ...(req.body === undefined ? {} : { body: JSON.stringify(req.body) }),
+      ...(form !== undefined
+        ? { body: form }
+        : req.body === undefined
+          ? {}
+          : { body: JSON.stringify(req.body) }),
     });
 
     const text = await response.text();
@@ -319,15 +348,20 @@ export function createWechatClient(ctx: Ctx): WechatCoreClient {
     }
   }
 
-  /** A token-bearing call that drops the cached token and retries once on a 40001. */
-  async function authedCall<T>(app: WechatApp, req: WechatCall): Promise<T> {
+  /**
+   * A token-bearing call that drops the cached token and retries once on a 40001.
+   * `form` (built afresh for each attempt, since a sent body is spent) makes it
+   * a multipart upload.
+   */
+  async function authedCall<T>(app: WechatApp, req: WechatCall, form?: () => FormData): Promise<T> {
     const config = await load();
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const token = await acquire(app);
-      const result = await request(config.apiBaseUrl, {
-        ...req,
-        query: { ...req.query, access_token: token },
-      });
+      const result = await request(
+        config.apiBaseUrl,
+        { ...req, query: { ...req.query, access_token: token } },
+        form?.(),
+      );
       const envelope = envelopeOf(result);
       if (envelope.errcode !== undefined && TOKEN_ERRCODES.has(envelope.errcode) && attempt === 0) {
         await invalidate(app);
@@ -516,8 +550,25 @@ export function createWechatClient(ctx: Ctx): WechatCoreClient {
       );
     },
 
-    call: authedCall,
+    call: (app, req) => authedCall(app, req),
     callBytes: authedBytes,
+    upload: (app, req) =>
+      authedCall(
+        app,
+        { method: 'POST', path: req.path, ...(req.query ? { query: req.query } : {}) },
+        () => {
+          const form = new FormData();
+          // `new Uint8Array(bytes)` rather than `bytes`: a `Uint8Array<ArrayBufferLike>`
+          // is not a `BlobPart` under the DOM lib (it could be backed by a
+          // `SharedArrayBuffer`), and the copy is the one-line way to say it is not.
+          form.append(
+            req.field,
+            new Blob([new Uint8Array(req.bytes)], { type: req.contentType }),
+            req.filename,
+          );
+          return form;
+        },
+      ),
   };
 }
 

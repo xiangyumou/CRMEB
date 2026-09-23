@@ -76,6 +76,38 @@ requires it to be **recent**. The key is refreshed from the same event loop
 that runs the jobs and dropped before draining on SIGTERM, so a wedged worker
 turns unhealthy — not merely a dead one.
 
+## The client's address
+
+The edge is the one place that decides who is calling (CR-14-k2). It believes
+`X-Forwarded-For` only from `NEXT_EDGE_TRUSTED_PROXIES` — Traefik's network,
+required by `compose.traefik.yml` — takes the right-most address in it that is
+not Traefik's, and sends the app that single address as both `X-Real-IP` and
+`X-Forwarded-For`, overwriting whatever the client wrote. The app reads
+`X-Real-IP` only. The per-IP SMS budget, 访客数, `last_login_ip` and the audit
+log's IP all rest on this, so the app's port is never published: every request
+reaches it through the edge.
+
+## Where uploads are served from
+
+With the local driver, uploads are served by the edge under `/uploads/` — the
+**same origin** as `/admin` and the API. That is a decision, not an accident
+(CR-13-k item 4):
+
+- a second hostname for uploads needs its own DNS, certificate and ICP filing,
+  and the domain is still waiting on ICP;
+- the uploader refuses HTML, SVG, XML, scripts and executables by content, not
+  by name (STOR-001), and stores the sniffed type;
+- the edge serves every upload with `X-Content-Type-Options: nosniff`,
+  `Content-Security-Policy: default-src 'none'; sandbox`, and
+  `Content-Disposition: attachment` for everything but images and video — so a
+  file that did slip through downloads, or renders with no script and no
+  origin, instead of running beside an admin session.
+
+Revisit it the day either of the first two stops holding — in particular before
+any change that lets SVG or HTML in. With the S3 driver the same rule applies to
+`s3PublicBaseUrl`: point it at a bucket or CDN hostname, never at this site's
+own origin, and give that host the same three headers.
+
 ## Memory
 
 The host is 2 cores / 3.6 GB and runs the old stack too. The five long-running

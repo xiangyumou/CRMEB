@@ -33,6 +33,7 @@ export {
   type TemplateMessageInput,
   type WechatApp,
   type WechatCall,
+  type WechatUpload,
   type WechatBytesResult,
   type WechatCoreClient,
   type WechatProfile,

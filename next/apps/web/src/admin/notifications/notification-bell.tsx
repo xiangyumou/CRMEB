@@ -3,6 +3,7 @@
 import { BellOutlined } from '@ant-design/icons';
 import { Badge, Button, Card, Dropdown, Empty, List, Tooltip, Typography } from 'antd';
 import Link from 'next/link';
+import { useState } from 'react';
 
 import { InstantText } from '../kit/instant-text';
 import { useNotificationStream } from './use-notification-stream';
@@ -22,6 +23,9 @@ const STATUS_HINT: Record<string, string> = {
 export function NotificationBell() {
   const { notifications, unreadCount, status, markRead, markAllRead } =
     useNotificationStream(NOTIFICATION_STREAM_URL);
+  // The status tooltip hangs below the bell, where the open panel's header is:
+  // left up, it covers 全部已读 for as long as the pointer rests on the bell.
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const panel = (
     <Card
@@ -78,8 +82,18 @@ export function NotificationBell() {
   );
 
   return (
-    <Dropdown trigger={['click']} placement="bottomRight" popupRender={() => panel}>
-      <Tooltip title={STATUS_HINT[status] ?? '通知'} placement="bottom">
+    <Dropdown
+      trigger={['click']}
+      placement="bottomRight"
+      popupRender={() => panel}
+      open={panelOpen}
+      onOpenChange={setPanelOpen}
+    >
+      <Tooltip
+        title={STATUS_HINT[status] ?? '通知'}
+        placement="bottom"
+        open={panelOpen ? false : undefined}
+      >
         <Button type="text" aria-label="通知" data-testid="notification-bell">
           <Badge count={unreadCount} size="small" offset={[2, -2]}>
             <BellOutlined style={{ fontSize: 16 }} />

@@ -15,7 +15,7 @@ import { defineConfigGroup } from '../kernel/config-registry';
  * (`getWechatClient` already reads them), and this group keeps only what an
  * operator types into 公众平台 for the message callback.
  *
- * `encodingAesKey` is a **secret**: the descriptor endpoint sends a boolean
+ * `token` and `encodingAesKey` are **secrets**: the descriptor endpoint sends a boolean
  * "is set" flag, the save endpoint ignores the flag coming back, and it is
  * never logged. The old admin rendered it into an input box.
  */
@@ -40,7 +40,11 @@ export const wechatOaConfig = defineConfigGroup({
       help: 'AppID / AppSecret 在「微信公众号 / 小程序」里填写',
       order: 1,
     },
-    token: { label: '验证 Token', type: 'text', order: 4 },
+    // Secret (CR-8-k2): in 明文模式 this token is the whole of the callback's
+    // authentication, so a settings *reader* who can see it can forge any
+    // follow, scan or message. The form shows "已设置" and a blank save keeps
+    // the stored value, as for `encodingAesKey`.
+    token: { label: '验证 Token', type: 'password', secret: true, order: 4 },
     messageMode: {
       label: '消息加解密方式',
       type: 'select',

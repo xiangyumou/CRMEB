@@ -1,6 +1,6 @@
 # CR-8-k2 — the OA callback token is served to every settings reader
 
-**Stream:** K2 (hardening) **Status:** OPEN — for stream F1 (system config) / E3; two-line fix
+**Stream:** K2 (hardening) **Status:** RESOLVED in `468a75bef` (R3, wave 6)
 **Files:** `next/packages/core/src/system/wechat-oa.config.ts:43` (`token: { label: '验证 Token', type: 'text' }`), `next/packages/core/src/system/system.test.ts:165` (the credential heuristic)
 **Pinned by:** `next/packages/core/src/system/config.k2.int.test.ts::K-SEC-C1 — the OA callback token on the settings screen > never returns the webhook token to a read-only settings role` (`it.fails`)
 
@@ -28,3 +28,7 @@ has no `token`.
 
 Anyone with a settings read role can forge OA callbacks (CR-7-k2). Grant
 `system:config:read` accordingly.
+
+## Resolution (R3, `468a75bef`)
+
+`wechat-oa.token` is `type: 'password', secret: true`; `configGet` returns the "is set" boolean. The credential heuristic in `system.test.ts` includes `token`. K-SEC-C1 pin flipped. Side effect on the `secrets` guard (name-matched `token` fields): **CR-1-r3**, with a verified patch.

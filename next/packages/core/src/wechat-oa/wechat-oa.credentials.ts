@@ -27,6 +27,12 @@ export interface OaCredentials {
   appId: string;
   token: string;
   encodingAesKey: string;
+  /**
+   * 消息加解密方式 as the operator configured it. The callback reads it to refuse
+   * a plaintext delivery to an account in 安全模式 (CR-7-k2): the request's own
+   * `encrypt_type` is the attacker's choice, the setting is not.
+   */
+  messageMode: 'plain' | 'compatible' | 'safe';
 }
 
 export async function oaCredentials(ctx: Ctx): Promise<OaCredentials> {
@@ -42,6 +48,7 @@ export async function oaCredentials(ctx: Ctx): Promise<OaCredentials> {
     appId,
     token: oa.token.trim() || core.oaToken.trim(),
     encodingAesKey: oa.encodingAesKey.trim() || core.oaAesKey.trim(),
+    messageMode: oa.messageMode,
   };
 }
 

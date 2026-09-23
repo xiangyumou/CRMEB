@@ -1,6 +1,7 @@
 import { storageScanUpload } from '@shop/contracts/storage/storage.storefront.contract';
 import * as storage from '@shop/core/storage';
 import { handle } from '../../../../../../src/server';
+import { clientIp } from '../../../../../../src/server/request-meta';
 
 /**
  * `/api/v1/attachments/scan-uploads/:token` — the phone's half of 扫码上传.
@@ -9,10 +10,16 @@ import { handle } from '../../../../../../src/server';
  * the token *is* the authorisation. So it is claimed by an atomic Redis script
  * before anything is stored, exactly once, and the attachment is attributed to
  * the admin who minted it rather than to nobody.
+ *
+ * The body is handed over as a reader, not read here: `scanUpload` spends the
+ * per-address and per-code budgets and checks the code first, so a stranger
+ * cannot make the server parse multipart bodies as fast as it can send them
+ * (CR-12-k).
  */
-export const POST = handle(storageScanUpload, async (ctx, { params }) => {
-  const file = await storage.readFilePart(ctx.request);
-  return storage.scanUpload(ctx, params, file);
-});
+export const POST = handle(storageScanUpload, async (ctx, { params }) =>
+  storage.scanUpload(ctx, params, () => storage.readFilePart(ctx.request), {
+    ip: clientIp(ctx.request),
+  }),
+);
 
 export const dynamic = 'force-dynamic';

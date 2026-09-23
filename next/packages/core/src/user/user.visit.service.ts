@@ -37,6 +37,17 @@ import * as repo from './user.visit.repo';
 const WINDOW_MS = 60_000;
 const PER_WINDOW = 1;
 
+/**
+ * Rows one visitor may write per minute across **all** paths (CR-11-k2).
+ *
+ * The per-path window is keyed on a path the caller chooses, so varying it
+ * turned the throttle off: a loop inserted one row per request and set 浏览量
+ * to whatever it liked. Sixty distinct pages a minute is more than a person
+ * browses; above it the beacon is dropped silently, exactly as a per-path
+ * repeat is.
+ */
+const SUBJECT_PER_WINDOW = 60;
+
 /** `wechat-mini` on the wire, `wechat_mini` in the enum — the same three values. */
 function toColumnPlatform(
   platform: ClientPlatform | null,
@@ -78,6 +89,14 @@ export async function recordVisit(ctx: Ctx, body: VisitBody, meta: RequestMeta):
     nowMs: now.getTime(),
   });
   if (!allowed.allowed) return;
+  // Checked second, so a collapsed `onShow` re-fire does not spend the ceiling.
+  const ceiling = await fixedWindow(ctx.redis, {
+    key: `visit:${subject}`,
+    limit: SUBJECT_PER_WINDOW,
+    windowMs: WINDOW_MS,
+    nowMs: now.getTime(),
+  });
+  if (!ceiling.allowed) return;
 
   const userId = ctx.actor.kind === 'user' || ctx.actor.kind === 'staff' ? ctx.actor.id : null;
   await repo.insertVisit(ctx.db, {

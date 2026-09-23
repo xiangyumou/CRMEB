@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { classifyAddress, safeFetch, SafeFetchError } from './safe-fetch';
+import {
+  classifyAddress,
+  safeFetch,
+  SafeFetchError,
+  type PinnedRequest,
+  type Transport,
+} from './safe-fetch';
 
 /**
  * The SSRF guard.
@@ -15,12 +21,12 @@ const PUBLIC_IP = '93.184.216.34';
 function fetchReturning(
   body: Uint8Array | null,
   init: { status?: number; headers?: Record<string, string> } = {},
-): { impl: typeof fetch; calls: string[] } {
+): { impl: Transport; calls: string[] } {
   const calls: string[] = [];
-  const impl = (async (url: string | URL) => {
+  const impl: Transport = async ({ url }) => {
     calls.push(String(url));
     return new Response(body, { status: init.status ?? 200, headers: init.headers ?? {} });
-  }) as unknown as typeof fetch;
+  };
   return { impl, calls };
 }
 
@@ -84,36 +90,61 @@ describe('safeFetch — refusals', () => {
     }
   });
 
+  // CR-11-k: a plaintext import is a man-in-the-middle's choice of file.
+  it('refuses plain http unless the caller allows it', async () => {
+    const { impl, calls } = fetchReturning(new Uint8Array([1]));
+    const error = await refusal(
+      safeFetch('http://example.com/a.png', { resolve, transport: impl }),
+    );
+    expect(error).toMatchObject({ kind: 'refused', message: 'scheme http:' });
+    expect(calls).toEqual([]);
+
+    await expect(
+      safeFetch('http://example.com/a.png', { resolve, transport: impl, allowHttp: true }),
+    ).resolves.toMatchObject({ url: 'http://example.com/a.png' });
+  });
+
+  it('refuses an https source that redirects to plain http', async () => {
+    const impl: Transport = async ({ url }) =>
+      url.protocol === 'https:'
+        ? new Response(null, { status: 302, headers: { location: 'http://example.com/b.png' } })
+        : new Response(new Uint8Array([1]));
+    const error = await refusal(
+      safeFetch('https://example.com/a.png', { resolve, transport: impl }),
+    );
+    expect(error).toMatchObject({ kind: 'refused', message: 'scheme http:' });
+  });
+
   it('refuses credentials in the URL', async () => {
-    const error = await refusal(safeFetch('http://user:pass@example.com/a.png', { resolve }));
+    const error = await refusal(safeFetch('https://user:pass@example.com/a.png', { resolve }));
     expect(error.message).toBe('credentials in URL');
   });
 
   it('refuses a non-standard port, so this is not a port scanner', async () => {
-    expect((await refusal(safeFetch('http://example.com:6379/', { resolve }))).message).toBe(
+    expect((await refusal(safeFetch('https://example.com:6379/', { resolve }))).message).toBe(
       'port 6379',
     );
     // Unless the operator allowed it explicitly.
     const { impl } = fetchReturning(new Uint8Array([1]));
     await expect(
-      safeFetch('http://example.com:8080/a.png', {
+      safeFetch('https://example.com:8080/a.png', {
         resolve,
-        fetchImpl: impl,
+        transport: impl,
         allowedPorts: [8080],
       }),
-    ).resolves.toMatchObject({ url: 'http://example.com:8080/a.png' });
+    ).resolves.toMatchObject({ url: 'https://example.com:8080/a.png' });
   });
 
   it('refuses a literal private address', async () => {
-    expect((await refusal(safeFetch('http://169.254.169.254/latest/meta-data/'))).kind).toBe(
+    expect((await refusal(safeFetch('https://169.254.169.254/latest/meta-data/'))).kind).toBe(
       'refused',
     );
-    expect((await refusal(safeFetch('http://127.0.0.1:80/'))).kind).toBe('refused');
-    expect((await refusal(safeFetch('http://[::1]/'))).kind).toBe('refused');
+    expect((await refusal(safeFetch('https://127.0.0.1:80/'))).kind).toBe('refused');
+    expect((await refusal(safeFetch('https://[::1]/'))).kind).toBe('refused');
   });
 
   it('refuses hostnames that exist to be loopback', async () => {
-    for (const url of ['http://localhost/a', 'http://foo.localhost/a', 'http://db.internal/a']) {
+    for (const url of ['https://localhost/a', 'https://foo.localhost/a', 'https://db.internal/a']) {
       expect((await refusal(safeFetch(url))).message).toBe('loopback hostname');
     }
   });
@@ -123,7 +154,7 @@ describe('safeFetch — refusals', () => {
   it('refuses a public name that RESOLVES to a private address', async () => {
     // `localtest.me` and friends are public names with an A record of 127.0.0.1.
     const error = await refusal(
-      safeFetch('http://totally-normal.example.com/a.png', {
+      safeFetch('https://totally-normal.example.com/a.png', {
         resolve: async () => ['127.0.0.1'],
       }),
     );
@@ -134,47 +165,47 @@ describe('safeFetch — refusals', () => {
   it('refuses a name that resolves to one public AND one private address', async () => {
     // A multi-homed CDN does not answer with 10.0.0.5. A rebinding attempt does.
     const error = await refusal(
-      safeFetch('http://example.com/a.png', { resolve: async () => [PUBLIC_IP, '10.0.0.5'] }),
+      safeFetch('https://example.com/a.png', { resolve: async () => [PUBLIC_IP, '10.0.0.5'] }),
     );
     expect(error.kind).toBe('refused');
   });
 
   it('refuses a redirect into the private network', async () => {
-    const impl = (async (url: string | URL) => {
+    const impl: Transport = async ({ url }) => {
       if (String(url).includes('/start')) {
         return new Response(null, {
           status: 302,
-          headers: { location: 'http://169.254.169.254/latest/meta-data/' },
+          headers: { location: 'https://169.254.169.254/latest/meta-data/' },
         });
       }
       return new Response(new Uint8Array([1]));
-    }) as unknown as typeof fetch;
+    };
 
     const error = await refusal(
-      safeFetch('http://example.com/start', { resolve, fetchImpl: impl }),
+      safeFetch('https://example.com/start', { resolve, transport: impl }),
     );
     expect(error.kind).toBe('refused');
   });
 
   it('stops after too many redirects', async () => {
-    const impl = (async () =>
+    const impl: Transport = async () =>
       new Response(null, {
         status: 302,
-        headers: { location: 'http://example.com/next' },
-      })) as unknown as typeof fetch;
+        headers: { location: 'https://example.com/next' },
+      });
     const error = await refusal(
-      safeFetch('http://example.com/a', { resolve, fetchImpl: impl, maxRedirects: 2 }),
+      safeFetch('https://example.com/a', { resolve, transport: impl, maxRedirects: 2 }),
     );
     expect(error.message).toBe('too many redirects');
   });
 
   it('stops reading at maxBytes even when Content-Length lied', async () => {
-    const impl = (async () =>
+    const impl: Transport = async () =>
       new Response(new Uint8Array(4096), {
         headers: { 'content-length': '10' },
-      })) as unknown as typeof fetch;
+      });
     const error = await refusal(
-      safeFetch('http://example.com/big', { resolve, fetchImpl: impl, maxBytes: 1024 }),
+      safeFetch('https://example.com/big', { resolve, transport: impl, maxBytes: 1024 }),
     );
     expect(error.kind).toBe('failed');
     expect(error.message).toBe('too large');
@@ -185,14 +216,14 @@ describe('safeFetch — refusals', () => {
       headers: { 'content-length': String(50 * 1024 * 1024) },
     });
     expect(
-      (await refusal(safeFetch('http://example.com/big', { resolve, fetchImpl: impl }))).message,
+      (await refusal(safeFetch('https://example.com/big', { resolve, transport: impl }))).message,
     ).toBe('too large');
   });
 
   it('reports an upstream error as a failure, not a refusal', async () => {
     const { impl } = fetchReturning(null, { status: 503 });
     expect(
-      (await refusal(safeFetch('http://example.com/a', { resolve, fetchImpl: impl }))).kind,
+      (await refusal(safeFetch('https://example.com/a', { resolve, transport: impl }))).kind,
     ).toBe('failed');
   });
 });
@@ -200,40 +231,67 @@ describe('safeFetch — refusals', () => {
 describe('safeFetch — the happy path', () => {
   it('connects to the address it judged, presenting the original Host', async () => {
     // This is what closes the DNS-rebinding window: there is no second lookup
-    // between the check and the connection for anybody to win.
-    const seen: Array<{ url: string; host: unknown }> = [];
-    const impl = (async (url: string | URL, init?: { headers?: Record<string, string> }) => {
-      seen.push({ url: String(url), host: init?.headers?.['host'] });
+    // between the check and the connection for anybody to win. And the URL
+    // keeps the name, so SNI and the certificate check see the name too
+    // (CR-11-k: an IP-literal URL failed every https certificate).
+    const seen: PinnedRequest[] = [];
+    const impl: Transport = async (request) => {
+      seen.push(request);
       return new Response(new Uint8Array([0x89, 0x50]), {
         headers: { 'content-type': 'image/png' },
       });
-    }) as unknown as typeof fetch;
+    };
 
     const result = await safeFetch('https://cdn.example.com/banner.png', {
       resolve: async () => [PUBLIC_IP],
-      fetchImpl: impl,
+      transport: impl,
     });
 
-    expect(seen[0]?.url).toBe(`https://${PUBLIC_IP}/banner.png`);
-    expect(seen[0]?.host).toBe('cdn.example.com');
+    expect(seen[0]?.url.toString()).toBe('https://cdn.example.com/banner.png');
+    expect(seen[0]?.address).toBe(PUBLIC_IP);
+    expect(seen[0]?.headers['host']).toBeUndefined();
     expect(result.contentType).toBe('image/png');
     expect(result.bytes).toEqual(new Uint8Array([0x89, 0x50]));
-    // The *name* is reported back, not the IP we dialled.
     expect(result.url).toBe('https://cdn.example.com/banner.png');
   });
 
   it('re-judges the hostname of a relative redirect against the real host', async () => {
     const resolve = vi.fn(async () => [PUBLIC_IP]);
-    const impl = (async (url: string | URL) => {
+    const impl: Transport = async ({ url }) => {
       if (String(url).endsWith('/a')) {
         return new Response(null, { status: 301, headers: { location: '/b.png' } });
       }
       return new Response(new Uint8Array([1]));
-    }) as unknown as typeof fetch;
+    };
 
-    const result = await safeFetch('https://cdn.example.com/a', { resolve, fetchImpl: impl });
+    const result = await safeFetch('https://cdn.example.com/a', { resolve, transport: impl });
     expect(result.url).toBe('https://cdn.example.com/b.png');
     // Resolved again for the second hop rather than reusing the first verdict.
     expect(resolve).toHaveBeenCalledTimes(2);
+  });
+
+  it('pins each redirect hop to that hop’s own judged address', async () => {
+    const addresses: Record<string, string> = {
+      'cdn.example.com': PUBLIC_IP,
+      'img.example.net': '8.8.4.4',
+    };
+    const seen: Array<[string, string]> = [];
+    const impl: Transport = async ({ url, address }) => {
+      seen.push([url.hostname, address]);
+      return url.hostname === 'cdn.example.com'
+        ? new Response(null, {
+            status: 302,
+            headers: { location: 'https://img.example.net/b.png' },
+          })
+        : new Response(new Uint8Array([1]));
+    };
+    await safeFetch('https://cdn.example.com/a', {
+      resolve: async (host) => [addresses[host]!],
+      transport: impl,
+    });
+    expect(seen).toEqual([
+      ['cdn.example.com', PUBLIC_IP],
+      ['img.example.net', '8.8.4.4'],
+    ]);
   });
 });

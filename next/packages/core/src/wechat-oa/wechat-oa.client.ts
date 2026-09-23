@@ -1,6 +1,6 @@
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
-import { getWechatClient, wechatConfig, type WechatCall } from '../wechat';
+import { getWechatClient, type WechatCall } from '../wechat';
 import type { WechatMenuButton } from './wechat-oa.repo';
 
 /**
@@ -8,9 +8,9 @@ import type { WechatMenuButton } from './wechat-oa.repo';
  *
  * C owns the transport: the token cache, the cross-process single flight, the
  * `40001 → drop the token and retry once` rule and the TLS defaults. Everything
- * here goes through `client.call('oa', …)` so none of that is re-implemented,
- * and the one thing C's client cannot do — a multipart upload — is done below
- * with a token C issued.
+ * here goes through `client.call('oa', …)` — or `client.upload('oa', …)` for
+ * the multipart material endpoints — so none of that is re-implemented and
+ * this file never calls `fetch`.
  *
  * Every function raises `WECHAT_OA_API_FAILED` with WeChat's own `errcode` in
  * `details`. That number is the only thing that makes a failed menu publish
@@ -122,14 +122,10 @@ export interface UploadedMedium {
 }
 
 /**
- * Uploads bytes we already hold to WeChat.
- *
- * C's `WechatCoreClient` speaks JSON only, and WeChat's material endpoints are
- * multipart — so this builds the request itself, with a token `client.accessToken`
- * issued. It is the one place in this domain that calls `fetch`, and it is a
- * local adapter: **CR-4-e2** asks stream C for an `upload()` method so the retry
- * and invalidate rules apply here too. Until then a stale token here surfaces as
- * `WECHAT_OA_API_FAILED 40001` and the operator presses the button again.
+ * Uploads bytes we already hold to WeChat, through C's `upload` — so a stale
+ * token here is dropped and retried once like every other WeChat call, instead
+ * of surfacing as `WECHAT_OA_API_FAILED 40001` (CR-31-k2, which carried the
+ * never-filed CR-4-e2).
  */
 export async function uploadMedium(
   ctx: Ctx,
@@ -141,38 +137,16 @@ export async function uploadMedium(
     isPermanent: boolean;
   },
 ): Promise<UploadedMedium> {
-  const client = getWechatClient(ctx);
-  const [token, config] = await Promise.all([
-    client.accessToken('oa'),
-    ctx.config.get(wechatConfig),
-  ]);
-
-  const path = args.isPermanent ? '/cgi-bin/material/add_material' : '/cgi-bin/media/upload';
-  const url = new URL(path, config.apiBaseUrl);
-  url.searchParams.set('access_token', token);
-  url.searchParams.set('type', args.kind);
-
-  const form = new FormData();
-  // `new Uint8Array(bytes)` rather than `bytes`: a `Uint8Array<ArrayBufferLike>`
-  // is not a `BlobPart` under the DOM lib (it could be backed by a
-  // `SharedArrayBuffer`), and the copy is the one-line way to say it is not.
-  form.append(
-    'media',
-    new Blob([new Uint8Array(args.bytes)], { type: args.contentType }),
-    args.filename,
-  );
-
-  const response = await fetch(url, { method: 'POST', body: form });
-  const text = await response.text();
-  let parsed: Envelope & { media_id?: string; url?: string; thumb_media_id?: string };
-  try {
-    parsed = text.length > 0 ? JSON.parse(text) : {};
-  } catch {
-    throw new DomainError('WECHAT_OA_API_FAILED', {
-      message: '微信素材接口返回了非 JSON 响应',
-      details: { errcode: -1, errmsg: text.slice(0, 200) },
-    });
-  }
+  const parsed = await getWechatClient(ctx).upload<
+    Envelope & { media_id?: string; url?: string; thumb_media_id?: string }
+  >('oa', {
+    path: args.isPermanent ? '/cgi-bin/material/add_material' : '/cgi-bin/media/upload',
+    query: { type: args.kind },
+    field: 'media',
+    bytes: args.bytes,
+    filename: args.filename,
+    contentType: args.contentType,
+  });
   expectOk(parsed, '上传素材');
 
   const mediaId = parsed.media_id ?? parsed.thumb_media_id;

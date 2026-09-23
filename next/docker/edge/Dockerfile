@@ -27,6 +27,12 @@ ARG H5_DIST
 
 RUN rm -f /etc/nginx/conf.d/default.conf
 COPY next/docker/edge/nginx.conf /etc/nginx/conf.d/edge.conf
+# The trusted-proxy list for the realip module (CR-14-k2), rendered from
+# NEXT_EDGE_TRUSTED_PROXIES at every start by the image's own entrypoint hook
+# mechanism. Empty by default: nothing is trusted, and the TCP peer is the
+# client. `compose.traefik.yml` requires it once Traefik fronts the edge.
+COPY --chmod=0755 next/docker/edge/40-edge-real-ip.sh /docker-entrypoint.d/40-edge-real-ip.sh
+ENV NEXT_EDGE_TRUSTED_PROXIES=''
 COPY ${H5_DIST}/ /srv/h5/
 
 # The uploads volume is mounted read-only here, and the directory has to exist
@@ -39,8 +45,15 @@ COPY ${H5_DIST}/ /srv/h5/
 # are deliberately not root. The old stack hit exactly this and papered over it
 # with a manual `chown -R 33:33` on the host (deploy/production/README.md); the
 # fix is for every image that declares this path to agree about who owns it.
-RUN mkdir -p /data/uploads \
+#
+# The config test runs against the list the entrypoint would write for the
+# default (empty) value and for a representative one, so a directive that the
+# realip module would refuse fails the build rather than the first start.
+RUN mkdir -p /data/uploads /etc/nginx/edge \
     && chown -R 1000:1000 /data \
+    && NEXT_EDGE_TRUSTED_PROXIES='172.18.0.0/16 fd00::/8' /docker-entrypoint.d/40-edge-real-ip.sh \
+    && nginx -t \
+    && /docker-entrypoint.d/40-edge-real-ip.sh \
     && nginx -t
 
 # nginx:alpine already drops to the `nginx` user for its workers, and the

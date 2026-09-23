@@ -1,6 +1,6 @@
 # CR-13-k — uploaded files are served from the app's own origin with no `nosniff`
 
-**Stream:** K (hardening) **Status:** OPEN — for stream J (deployment / edge)
+**Stream:** K (hardening) **Status:** RESOLVED in `752442503` (R3, wave 6)
 **Files:** `deploy/next/` (J's, not yet written), `next/packages/core/src/storage/storage.config.ts`
 
 ## What
@@ -46,3 +46,7 @@ rather than a broken image.
 K's guards assert the upload path's own half of this (`banned` refuses
 `dangerouslySetInnerHTML` outside the sanitised renderers; `secrets` walks the
 response schemas). The serving side is configuration, which is J's.
+
+## Resolution (R3, `752442503`)
+
+Items 1–2 were already in `next/docker/edge/nginx.conf` (stream J). Item 3: `Content-Disposition` from a `map` on the served type — `inline` for `image/*` (not SVG) and `video/*`, `attachment` otherwise (verified on a built image: png/mp4 inline, pdf/bin attachment). Item 4: `deploy/next/README.md` § "Where uploads are served from" — same origin by decision for the local driver (ICP, sniffing uploader, the three headers), and `s3PublicBaseUrl` must be a different host.

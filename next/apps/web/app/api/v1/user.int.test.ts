@@ -110,12 +110,7 @@ async function shopper(
 ): Promise<{ token: string; headers: Record<string, string> }> {
   const { POST: sendCode } = await import('./auth/sms-codes/route');
   await sendCode(
-    json(
-      'POST',
-      '/api/v1/auth/sms-codes',
-      { phone: PHONE, scene: 'login' },
-      { 'x-forwarded-for': ip },
-    ),
+    json('POST', '/api/v1/auth/sms-codes', { phone: PHONE, scene: 'login' }, { 'x-real-ip': ip }),
   );
   const { POST: smsLogin } = await import('./auth/sessions/sms/route');
   const response = await smsLogin(
@@ -123,7 +118,7 @@ async function shopper(
       'POST',
       '/api/v1/auth/sessions/sms',
       { phone: PHONE, code: sms.lastCodeFor(PHONE) },
-      { 'x-forwarded-for': ip },
+      { 'x-real-ip': ip },
     ),
   );
   // 201: the contract says a sign-in creates a session resource.
@@ -197,20 +192,14 @@ describe('POST /api/v1/auth/sms-codes', () => {
     expect(sms.sent).toHaveLength(0);
   });
 
-  it('counts the per-IP budget against the address the proxy forwarded', async () => {
-    // The route reads the *first* `x-forwarded-for` entry. Reading the last
-    // would put every shopper behind the proxy into one bucket, and the first
-    // few dozen codes of the day would lock out the shop.
+  it('counts the per-IP budget against the address the edge saw', async () => {
+    // The edge sets `X-Real-IP` from its own view of the peer (after trusting
+    // `X-Forwarded-For` only from Traefik), so that is the address counted.
     await harness.ctx.config.set(storefrontAuthConfig, { codePerIpPerDay: 10 });
     const { POST } = await import('./auth/sms-codes/route');
     const fromClient = (phone: string, client: string) =>
       POST(
-        json(
-          'POST',
-          '/api/v1/auth/sms-codes',
-          { phone, scene: 'login' },
-          { 'x-forwarded-for': `${client}, 10.0.0.1` },
-        ),
+        json('POST', '/api/v1/auth/sms-codes', { phone, scene: 'login' }, { 'x-real-ip': client }),
       );
 
     for (let i = 0; i < 10; i += 1) {
@@ -219,6 +208,37 @@ describe('POST /api/v1/auth/sms-codes', () => {
     expect((await fromClient('13800138200', '203.0.113.9')).status).toBe(429);
     // The next shopper through the same proxy is unaffected.
     expect((await fromClient('13800138201', '203.0.113.10')).status).toBe(202);
+  });
+
+  it('ignores an X-Forwarded-For the client wrote itself (CR-14-k2)', async () => {
+    // The attack: a fresh made-up address per request, to get a fresh per-IP
+    // budget each time. The edge's `X-Real-IP` is the one address that counts,
+    // so every one of these is the same caller.
+    await harness.ctx.config.set(storefrontAuthConfig, { codePerIpPerDay: 10 });
+    const { POST } = await import('./auth/sms-codes/route');
+    const statuses: number[] = [];
+    for (let i = 0; i < 12; i += 1) {
+      const response = await POST(
+        json(
+          'POST',
+          '/api/v1/auth/sms-codes',
+          { phone: `138001383${String(i).padStart(2, '0')}`, scene: 'login' },
+          { 'x-real-ip': '203.0.113.50', 'x-forwarded-for': `198.51.100.${i + 1}` },
+        ),
+      );
+      statuses.push(response.status);
+    }
+    expect(statuses).toEqual([...Array<number>(10).fill(202), 429, 429]);
+    // Nor can a forged header pin that spent budget on somebody else.
+    const other = await POST(
+      json(
+        'POST',
+        '/api/v1/auth/sms-codes',
+        { phone: '13800138399', scene: 'login' },
+        { 'x-real-ip': '203.0.113.51', 'x-forwarded-for': '203.0.113.50' },
+      ),
+    );
+    expect(other.status).toBe(202);
   });
 });
 
@@ -460,7 +480,7 @@ describe('POST /api/v1/visits', () => {
         '/api/v1/visits',
         { path: '/pages/index/index' },
         {
-          'x-forwarded-for': '198.51.100.4',
+          'x-real-ip': '198.51.100.4',
         },
       ),
     );

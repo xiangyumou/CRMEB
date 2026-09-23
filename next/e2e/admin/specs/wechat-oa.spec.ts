@@ -146,11 +146,13 @@ test('WeChat refusing the live menu is shown on the page, with its errcode', asy
   expect(refused.status()).toBe(502);
   expect(((await refused.json()) as { code: string }).code).toBe('WECHAT_OA_API_FAILED');
 
-  // The toast goes in three seconds; the alert is what stays. It is read on
-  // load only — the publish button invalidates `/current` on success, not on
-  // failure (CR-33-k2) — so the reload is the operator coming back to the page.
-  await adminPage.reload();
+  // The toast goes in three seconds; the alert is what stays. 发布 re-reads
+  // `/current` on a refusal too (CR-33-k2), so it appears without a reload…
   const alert = adminPage.getByRole('alert').filter({ hasText: '上次发布失败' });
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText('40016');
+  // …and it is still there for the operator coming back to the page.
+  await adminPage.reload();
   await expect(alert).toBeVisible();
   await expect(alert).toContainText('40016');
   // WeChat kept the old menu, and so does the row.
@@ -159,10 +161,9 @@ test('WeChat refusing the live menu is shown on the page, with its errcode', asy
 });
 
 test('WeChat refusing a new draft is shown on the page too', async ({ adminPage }) => {
-  // CR-33-k2: `publish_error` is written to the draft's row, but the alert reads
-  // `/wechat-menus/current` — the *live* menu — and the list has no column for
-  // it. A refused draft leaves only a three-second toast behind.
-  test.fail(true, 'CR-33-k2 — a refused draft’s publish_error is shown nowhere');
+  // CR-33-k2: `publish_error` is written to the draft's row, and the alert reads
+  // `/wechat-menus/current` — the *live* menu. So the refusal is shown on the
+  // draft's own row in the 状态 column, where 发布 was pressed.
 
   await configureOa(true);
   // Clear the live menu's own error from the case above: republishing it
@@ -189,6 +190,13 @@ test('WeChat refusing a new draft is shown on the page too', async ({ adminPage 
   // reason and not for a broken arrangement.
   expect(refused.status()).toBe(502);
 
+  // On the draft's row as soon as the refusal is back, with no reload…
+  const row = adminPage.getByRole('row').filter({ hasText: name });
+  await expect(row.getByText('发布失败')).toBeVisible();
+  await expect(row.getByText('40016')).toBeVisible();
+  // …after one, and nowhere else: the live menu was not the one refused.
   await adminPage.reload();
   await expect(adminPage.getByText('40016')).toBeVisible({ timeout: 5_000 });
+  await expect(row.getByText('40016')).toBeVisible();
+  await expect(adminPage.getByText('上次发布失败')).toHaveCount(0);
 });

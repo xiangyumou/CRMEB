@@ -1,6 +1,6 @@
 # CR-9-k2 — the settings form writes keys it never shows: `apiBaseUrl` leaks the AppSecret
 
-**Stream:** K2 (hardening) **Status:** OPEN — for the orchestrator (P0 config kernel / F1 `configSave`; the two groups are C's and E's)
+**Stream:** K2 (hardening) **Status:** RESOLVED in `468a75bef` (R3, wave 6)
 **Files:** `next/packages/core/src/system/config.service.ts:203-207` (`known = Object.keys(def.schema.shape)`), `next/packages/core/src/wechat/wechat.config.ts:84` (`apiBaseUrl`, no `ui` entry), `next/packages/core/src/payment/payment.config.ts:72` (same), `next/packages/core/src/wechat/wechat.client.ts:251` (`GET {apiBaseUrl}/cgi-bin/token?…&secret=`), `:400` (OAuth code exchange, same)
 **Pinned by:** `next/packages/core/src/system/config.k2.int.test.ts::K-SEC-C2 — a schema key the form never shows > refuses to repoint the WeChat client from the settings form`, `> refuses to repoint the WeChat Pay client from the settings form` (both `it.fails`)
 
@@ -35,3 +35,7 @@ still calls whatever host it is given (the pinned test stores
 
 `payment:config:write` is equivalent to reading the OA and mini-program
 AppSecrets. Grant it only to people who may hold them.
+
+## Resolution (R3, `468a75bef`)
+
+`configSave` accepts only schema keys that have a `ui` entry (`SYSTEM_CONFIG_UNKNOWN_KEY` otherwise), so `wechat.apiBaseUrl` / `payment.apiBaseUrl` cannot be written through the admin. No `ui.hidden` opt-in was needed (those two are the only ui-less keys; `kernel/config-registry.ts` is R1's). Both K-SEC-C2 pins flipped; the K-SEC-R9 pin in the same file stays (CR-10-k, R2).

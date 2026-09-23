@@ -1,6 +1,7 @@
 import type { MiniCodeQuery, MiniCodeResult } from '@shop/contracts/wechat/schemas';
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
+import { enforce, fixedWindow } from '../kernel/rate-limit';
 import { isRejected, resolveStorage, sniffFileType } from '../storage';
 import { wechatMiniConfig } from '../system';
 import { getWechatClient } from './wechat.client';
@@ -36,6 +37,38 @@ const DIRECTORY = 'wechat-mini-code';
 /** A year: the bytes for a pair never change, so the URL is immutable. */
 const CACHE_MAX_AGE_SEC = 365 * 24 * 60 * 60;
 
+/**
+ * New codes one account may mint per hour (CR-11-k2).
+ *
+ * A cached pair is free and stays free. A *new* pair costs a
+ * `wxa/getwxacodeunlimit` call, a PNG in the storage root and a row, and the
+ * scene is any 32 bytes the caller likes — so without a budget one free account
+ * could grow the uploads volume and spend the mini program's API rate at will.
+ * A poster page asks once per product; thirty an hour is generous.
+ */
+const MINT_PER_HOUR = 30;
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * Spends one mint from the caller's hourly budget, or throws `RATE_LIMITED`.
+ *
+ * Keyed on the account: the route is `auth: 'user'`, so there always is one. A
+ * job or an admin tool calling the service has no shopper to charge and is not
+ * the abuse this bounds.
+ */
+async function spendMint(ctx: Ctx): Promise<void> {
+  const actor = ctx.actor;
+  if (actor.kind !== 'user' && actor.kind !== 'staff') return;
+  await enforce(
+    fixedWindow(ctx.redis, {
+      key: `wechat:mini-code:mint:u:${actor.id}`,
+      limit: MINT_PER_HOUR,
+      windowMs: HOUR_MS,
+      nowMs: ctx.clock.now().getTime(),
+    }),
+  );
+}
+
 async function miniConfigured(ctx: Ctx): Promise<boolean> {
   const [mini, core] = await Promise.all([
     ctx.config.get(wechatMiniConfig),
@@ -65,6 +98,7 @@ export async function miniCodeUrl(ctx: Ctx, query: MiniCodeQuery): Promise<MiniC
   if (cached) return { url: cached.url };
 
   if (!(await miniConfigured(ctx))) throw new DomainError('AUTH_WECHAT_NOT_CONFIGURED');
+  await spendMint(ctx);
 
   const result = await getWechatClient(ctx).callBytes('mini', {
     method: 'POST',

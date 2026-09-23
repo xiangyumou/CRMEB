@@ -273,7 +273,8 @@ describe('the admin auth routes', () => {
       post(
         '/admin-api/auth/login',
         { account: 'admin', password: PASSWORD },
-        { 'x-forwarded-for': '198.51.100.23', 'user-agent': 'probe-agent/1.0' },
+        // The edge's X-Real-IP, the one address clientIp() believes (CR-14-k2).
+        { 'x-real-ip': '198.51.100.23', 'user-agent': 'probe-agent/1.0' },
       ),
     );
     const rows = await harness.ctx.db.select().from(auditLogs);

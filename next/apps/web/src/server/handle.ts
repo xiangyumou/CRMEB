@@ -14,9 +14,9 @@ import '@shop/contracts/locale';
 import '@shop/core/domains';
 import { anonymousActor, createCtx, DomainError, type Actor, type Ctx } from '@shop/core/kernel';
 import { getStaffCheck, hasPermission, insertAudit, readBearer } from '@shop/core/auth';
-import { clientIp } from '../../app/api/v1/auth/_request';
 import { getContainer, type Container } from './container';
 import { isProduction } from './env';
+import { clientIp } from './request-meta';
 
 /**
  * `handle(route, fn)` — the only way an HTTP request reaches a service.

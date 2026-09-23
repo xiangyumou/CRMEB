@@ -77,10 +77,11 @@ const RATE_LIMIT_PER_HOUR = 60;
  * Test seam, the same one `safeFetch` declares and for the same reason: every
  * address this endpoint is *allowed* to reach is a public one, so a test that
  * exercised the happy path over a real socket would have to bind a public
- * address. Production passes nothing and gets the system resolver and `fetch`.
+ * address. Production passes nothing and gets the system resolver and the
+ * pinned transport (whose real-socket test is `storage/safe-fetch.tls.test.ts`).
  */
 export interface AttachmentDataUrlOptions {
-  fetch?: Pick<SafeFetchOptions, 'resolve' | 'fetchImpl'>;
+  fetch?: Pick<SafeFetchOptions, 'resolve' | 'transport'>;
 }
 
 export async function attachmentDataUrl(
@@ -107,6 +108,10 @@ export async function attachmentDataUrl(
     fetched = await safeFetch(target, {
       maxBytes: MAX_BYTES,
       timeoutMs: TIMEOUT_MS,
+      // Only ever our own origin or our own bucket (`resolveOwnUrl`), whose
+      // scheme the deployment chose — an `http://` dev origin included. The
+      // address rules still apply to every hop.
+      allowHttp: true,
       ...options.fetch,
     });
   } catch (error) {

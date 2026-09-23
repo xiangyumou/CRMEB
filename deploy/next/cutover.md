@@ -156,6 +156,32 @@ Expected: `server-internal-net bridge`. This network is external and owned by
 Traefik; `compose.traefik.yml` joins it rather than creating it, so a missing
 network fails the switch at step 15 — the one step with downtime running.
 
+Then read its subnet — the one network whose `X-Forwarded-For` the edge will
+believe (CR-14-k2):
+
+```sh
+docker network inspect server-internal-net \
+  --format '{{range .IPAM.Config}}{{.Subnet}} {{end}}'
+```
+
+Put exactly that (for example `172.18.0.0/16`) in `deployment.env` as
+`NEXT_EDGE_TRUSTED_PROXIES`. `compose.traefik.yml` refuses to start without it.
+Too narrow, and every shopper arrives as Traefik's one address — the per-IP SMS
+budget then locks the whole shop out of SMS sign-in within the day. Too wide
+(`0.0.0.0/0` is refused outright), and a caller can name its own address again.
+
+Check the switch file now accepts the settings, so step 15 cannot stop on it
+with the old stack already down:
+
+```sh
+cd /home/ubuntu/apps/CRMEB-next
+docker compose -p crmeb-next --project-directory deploy/next \
+  -f deploy/next/compose.yml -f deploy/next/compose.traefik.yml \
+  --env-file deploy/next/deployment.env config -q && echo switch-ok
+```
+
+Expected: `switch-ok`.
+
 ### 4. Check the host has room
 
 ```sh
@@ -558,6 +584,18 @@ docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' \
 ```
 
 Expected: `crmeb-next_default server-internal-net`.
+
+Confirm the edge sees shoppers rather than Traefik (step 3's setting). From
+your own machine, with a made-up header:
+
+```sh
+curl -fsS -o /dev/null -H 'X-Forwarded-For: 198.51.100.77' 'https://x-zoo.vip/?cutover-ip-check'
+nextc logs --since 1m edge | grep cutover-ip-check | tail -1
+```
+
+Expected: the line starts with **your** public address — not `198.51.100.77`
+(the header you wrote is ignored) and not an address inside
+`NEXT_EDGE_TRUSTED_PROXIES` (Traefik's own, meaning the setting is wrong).
 
 ### 16. Verify through the real domain
 

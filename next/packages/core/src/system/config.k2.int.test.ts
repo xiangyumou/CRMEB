@@ -16,8 +16,8 @@ import '../domains.gen';
  *
  * The contract the config routes promise is: a credential is write-only (the
  * form gets an "is set" boolean), and the form writes the fields it shows.
- * Both `it.fails` below are a way round that contract, and each flips to a
- * failure when its CR lands — the signal to make it a plain `it`.
+ * K2 pinned each way round that contract as `it.fails`. K-SEC-C1 (CR-8-k2) and
+ * K-SEC-C2 (CR-9-k2) now hold (R3); K-SEC-R9 is still pinned for CR-10-k.
  */
 
 let harness: TestCtx;
@@ -56,7 +56,7 @@ describe('K-SEC-C1 — the OA callback token on the settings screen', () => {
   // forged (CR-7-k2). The sibling `wechat.oaToken` *is* secret; the registry
   // heuristic in system.test.ts misses this one because it does not match
   // `token`. CR-8-k2.
-  it.fails('never returns the webhook token to a read-only settings role', async () => {
+  it('never returns the webhook token to a read-only settings role', async () => {
     await harness.ctx.config.set(wechatOaConfig, { token: 'the-callback-token' });
 
     const read = await configGet(as(['system:config:read']), { group: 'wechat-oa' });
@@ -74,7 +74,7 @@ describe('K-SEC-C2 — a schema key the form never shows', () => {
   // back by pointing the server at a host the attacker controls, and an SSRF
   // from the app container while it lasts. The fake OA server stands in for
   // the attacker's host. CR-9-k2 (same for `payment.apiBaseUrl`).
-  it.fails('refuses to repoint the WeChat client from the settings form', async () => {
+  it('refuses to repoint the WeChat client from the settings form', async () => {
     // The shop is configured the ordinary way, with the real WeChat host.
     await harness.ctx.config.set(wechatConfig, {
       oaAppId: oa.appId,
@@ -98,7 +98,7 @@ describe('K-SEC-C2 — a schema key the form never shows', () => {
     expect(leaked).not.toContain(oa.appSecret);
   });
 
-  it.fails('refuses to repoint the WeChat Pay client from the settings form', async () => {
+  it('refuses to repoint the WeChat Pay client from the settings form', async () => {
     await configSave(
       as(['payment:config:write']),
       { group: 'payment' },

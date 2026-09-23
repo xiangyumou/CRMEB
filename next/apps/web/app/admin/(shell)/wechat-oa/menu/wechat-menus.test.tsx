@@ -38,7 +38,15 @@ const menu = {
   updatedAt: '2026-01-04T10:30:00+08:00',
 };
 
-function stubApi(options: { publishError?: string } = {}): Call[] {
+function stubApi(
+  options: {
+    publishError?: string;
+    /** Rows listed after the live one. */
+    drafts?: Array<typeof menu>;
+    /** Answer 发布 with this refusal instead of the menu. */
+    refusePublish?: { status: number; body: unknown };
+  } = {},
+): Call[] {
   const calls: Call[] = [];
   configureApi({
     async fetch(input, init) {
@@ -49,10 +57,17 @@ function stubApi(options: { publishError?: string } = {}): Call[] {
         url,
         body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
       });
+      if (options.refusePublish && url.includes('/publish')) {
+        return new Response(JSON.stringify(options.refusePublish.body), {
+          status: options.refusePublish.status,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      const items = [menu, ...(options.drafts ?? [])];
       const payload = url.includes('/current')
         ? { ...menu, publishError: options.publishError ?? null }
         : method === 'GET'
-          ? { items: [menu], total: 1, page: 1, pageSize: 20 }
+          ? { items, total: items.length, page: 1, pageSize: 20 }
           : menu;
       return new Response(JSON.stringify(payload), {
         status: 200,
@@ -90,6 +105,60 @@ describe('公众号自定义菜单', () => {
 
     expect(await screen.findByText('上次发布失败')).toBeInTheDocument();
     expect(screen.getByText('40016 invalid button type')).toBeInTheDocument();
+  });
+
+  it('shows a refused draft’s error on its own row (CR-33-k2)', async () => {
+    // The alert reads the *live* menu; the draft WeChat refused keeps its
+    // error on its own row, and that is where it has to be read.
+    stubApi({
+      drafts: [
+        {
+          ...menu,
+          id: '2',
+          name: '清明菜单',
+          isActive: false,
+          publishedAt: null as unknown as string,
+          publishError: '发布菜单失败：invalid button size (40016)',
+        },
+      ],
+    });
+    renderAdmin(<WechatMenusPage />, { identity: allPermissions });
+
+    const row = (await screen.findByText('清明菜单')).closest('tr')!;
+    expect(within(row).getByText('草稿')).toBeInTheDocument();
+    expect(within(row).getByText('发布失败')).toBeInTheDocument();
+    expect(within(row).getByText(/40016/)).toBeInTheDocument();
+    // …and not on the live row, nor in the alert.
+    const live = screen.getByText('默认菜单').closest('tr')!;
+    expect(within(live).queryByText('发布失败')).not.toBeInTheDocument();
+    expect(screen.queryByText('上次发布失败')).not.toBeInTheDocument();
+  });
+
+  it('re-reads the list and the alert when WeChat refuses, not only on success', async () => {
+    const calls = stubApi({
+      refusePublish: {
+        status: 502,
+        body: {
+          code: 'WECHAT_OA_API_FAILED',
+          message: '发布菜单失败：invalid button size (40016)',
+          details: { errcode: 40016, errmsg: 'invalid button size' },
+        },
+      },
+    });
+    renderAdmin(<WechatMenusPage />, { identity: allPermissions });
+    await screen.findByText('默认菜单');
+    const reads = (part: string) =>
+      calls.filter((call) => call.method === 'GET' && call.url.includes(part)).length;
+    const listBefore = reads('/admin-api/wechat-menus?');
+    const currentBefore = reads('/current');
+
+    await userEvent.click(screen.getByRole('button', { name: zhName('发布') }));
+    await userEvent.click(await screen.findByRole('button', { name: zhName('确定') }));
+
+    await waitFor(() => {
+      expect(reads('/admin-api/wechat-menus?')).toBeGreaterThan(listBefore);
+      expect(reads('/current')).toBeGreaterThan(currentBefore);
+    });
   });
 
   it('publishes through the publish sub-resource, not by saving', async () => {

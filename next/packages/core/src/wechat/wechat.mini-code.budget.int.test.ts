@@ -19,8 +19,9 @@ import { miniCodeUrl } from './wechat.mini-code.service';
  * account asks for, so one free account can grow the uploads volume and the
  * table without bound and spend the mini program's API rate on it.
  *
- * The `it.fails` is CR-11-k2 and flips when a per-user budget on *uncached*
- * pairs lands.
+ * K2 pinned the missing budget as `it.fails` (CR-11-k2); R3 added a per-user
+ * window of 30 *new* pairs an hour (`RATE_LIMITED` above it). Cached pairs stay
+ * free.
  */
 
 let harness: TestCtx;
@@ -58,11 +59,38 @@ beforeEach(async () => {
 });
 
 describe('K-SEC-M1 — how many new codes one shopper can mint', () => {
-  it.fails('stops minting new codes for one account well before a hundred in an hour', async () => {
+  it('stops minting new codes for one account well before a hundred in an hour', async () => {
     for (let i = 0; i < 100; i += 1) {
       await miniCodeUrl(shopper(), { page: PAGE, scene: `junk=${i}` }).catch(() => undefined);
     }
     expect(oa.callsTo('/wxa/getwxacodeunlimit').length).toBeLessThanOrEqual(30);
     expect((await harness.ctx.db.select().from(wechatMiniCodes)).length).toBeLessThanOrEqual(30);
+  });
+
+  it('answers RATE_LIMITED for the 31st new code in the hour, before calling WeChat', async () => {
+    for (let i = 0; i < 30; i += 1) {
+      await miniCodeUrl(shopper(), { page: PAGE, scene: `id=${i}` });
+    }
+    await expect(miniCodeUrl(shopper(), { page: PAGE, scene: 'id=30' })).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+    });
+    expect(oa.callsTo('/wxa/getwxacodeunlimit')).toHaveLength(30);
+  });
+
+  it('keeps serving codes that already exist, however far over budget', async () => {
+    for (let i = 0; i < 30; i += 1) {
+      await miniCodeUrl(shopper(), { page: PAGE, scene: `id=${i}` });
+    }
+    const again = await miniCodeUrl(shopper(), { page: PAGE, scene: 'id=7' });
+    expect(again.url).toMatch(/wechat-mini-code/);
+    expect(oa.callsTo('/wxa/getwxacodeunlimit')).toHaveLength(30);
+  });
+
+  it('charges each account its own budget', async () => {
+    for (let i = 0; i < 30; i += 1) {
+      await miniCodeUrl(shopper(), { page: PAGE, scene: `id=${i}` });
+    }
+    const other = harness.as({ kind: 'user', id: 2, permissions: [], isSuper: false });
+    await expect(miniCodeUrl(other, { page: PAGE, scene: 'id=99' })).resolves.toHaveProperty('url');
   });
 });

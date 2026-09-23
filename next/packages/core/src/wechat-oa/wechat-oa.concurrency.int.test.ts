@@ -35,6 +35,7 @@ let harness: TestCtx;
 let oa: FakeOaServer;
 
 const NOW = '2026-06-01T00:00:00.000Z';
+const NOW_SECONDS = Math.floor(Date.parse(NOW) / 1000);
 const TOKEN = 'shoptoken';
 const AES_KEY = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ';
 const GH = 'gh_1234567890ab';
@@ -86,7 +87,9 @@ beforeEach(async () => {
 // callback fixtures
 // ---------------------------------------------------------------------------
 
-function plainQuery(timestamp = '1767668400', nonce = '1372623149') {
+/** Signed at `NOW` with a nonce of its own — the callback spends each triple on one body (CR-7-k2). */
+let nonceSeq = 1372623149;
+function plainQuery(timestamp = String(NOW_SECONDS), nonce = String((nonceSeq += 1))) {
   return { timestamp, nonce, signature: signatureOf([TOKEN, timestamp, nonce]) };
 }
 

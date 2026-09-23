@@ -25,7 +25,9 @@ export const wechatMiniCode = defineRoute({
   tags: ['wechat'],
   query: miniCodeQuery,
   response: miniCodeResult,
-  errors: ['AUTH_WECHAT_NOT_CONFIGURED', 'WECHAT_MINI_CODE_FAILED'],
+  // RATE_LIMITED: more than 30 *new* codes in an hour for one account
+  // (CR-11-k2); a code somebody already generated is always free.
+  errors: ['AUTH_WECHAT_NOT_CONFIGURED', 'WECHAT_MINI_CODE_FAILED', 'RATE_LIMITED'],
   examples: [
     {
       name: 'product-poster',

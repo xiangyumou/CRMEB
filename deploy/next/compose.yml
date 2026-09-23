@@ -247,6 +247,11 @@ services:
       # Loopback by default. Publishing on 0.0.0.0 while the old stack still
       # owns the domain is how a half-finished cutover starts serving.
       - '${NEXT_EDGE_BIND:-127.0.0.1:8080}:80'
+    environment:
+      # Who may tell the edge the client's address (CR-14-k2). Empty here: with
+      # nothing in front, the TCP peer *is* the client, and a client's own
+      # X-Forwarded-For is ignored. `compose.traefik.yml` requires it.
+      NEXT_EDGE_TRUSTED_PROXIES: ${NEXT_EDGE_TRUSTED_PROXIES:-}
     volumes:
       - uploads:/data/uploads:ro
     depends_on:

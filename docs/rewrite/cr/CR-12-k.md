@@ -1,6 +1,6 @@
 # CR-12-k — the public scan-upload endpoint is unthrottled, and `COMPLETE_LUA` does not check the state it claims to
 
-**Stream:** K (hardening) **Status:** OPEN — for stream F1 (storage)
+**Stream:** K (hardening) **Status:** RESOLVED in `5276b4206` (R3, wave 6)
 **Files:** `next/packages/core/src/storage/scan-token.ts`, `next/packages/core/src/storage/storage.service.ts`, `next/packages/contracts/src/storage/storage.storefront.contract.ts`
 
 Two small things in the 扫码上传 path. The design is otherwise right — the token
@@ -59,3 +59,7 @@ invariant *is* the security property, and it costs one line.
 of six phones upload through one QR code` covers the claim path. Suggested
 additions: a rate-limit test shaped like the storefront upload one, and a
 `complete()` on a `pending` token returning 0.
+
+## Resolution (R3, `5276b4206`)
+
+`scanUpload` takes the body as a reader and spends a per-client-address bucket (60/h on `clientIp()`) and a per-code bucket (10) and checks the code is pending before calling it; the route passes `() => readFilePart(request)`. `COMPLETE_LUA` is a compare-and-set on `claimed`; `complete()` returns whether it wrote. Tests: core int (address budget with zero body reads, per-code budget, `complete()` on pending/unknown/used), web int (the route throttles per `X-Real-IP`; a spoofed XFF buys nothing).

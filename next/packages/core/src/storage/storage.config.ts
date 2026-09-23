@@ -82,6 +82,11 @@ export const storageConfig = defineConfigGroup({
       .max(100 * 1024 * 1024)
       .default(20 * 1024 * 1024),
     remoteImportTimeoutMs: z.number().int().min(1000).max(30_000).default(8000),
+    /**
+     * Plain `http://` sources for 网址导入. Off: a plaintext fetch is whatever
+     * file a man in the middle chose, and nothing would say so (CR-11-k).
+     */
+    remoteImportAllowHttp: z.boolean().default(false),
 
     /**
      * Days an attachment nothing references may sit before the cleanup job
@@ -209,6 +214,13 @@ export const storageConfig = defineConfigGroup({
       type: 'number',
       section: '网址导入',
       order: 51,
+    },
+    remoteImportAllowHttp: {
+      label: '允许 http 地址导入',
+      type: 'switch',
+      section: '网址导入',
+      help: '默认只允许 https：明文传输的文件可能在途中被替换',
+      order: 52,
     },
 
     orphanRetentionDays: {

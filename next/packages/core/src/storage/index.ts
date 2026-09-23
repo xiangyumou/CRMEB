@@ -42,6 +42,8 @@ export {
   scanTokenCreate,
   scanTokenStatusGet,
   scanUpload,
+  SCAN_UPLOADS_PER_IP_PER_HOUR,
+  SCAN_UPLOADS_PER_TOKEN,
   userUpload,
   type IncomingFile,
   type ResolvedStorage,
@@ -66,8 +68,10 @@ export {
   classifyAddress,
   safeFetch,
   SafeFetchError,
+  type PinnedRequest,
   type SafeFetchOptions,
   type SafeFetchResult,
+  type Transport,
 } from './safe-fetch';
 export { createS3Storage, signS3Request, S3Error, type S3Options } from './s3';
 export { createScanTokenStore, type ScanTokenStore } from './scan-token';

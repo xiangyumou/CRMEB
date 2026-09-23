@@ -100,6 +100,7 @@ export const storageScanUpload = defineRoute({
   response: uploadResult,
   status: 201,
   errors: [
+    'STORAGE_UPLOAD_RATE_LIMITED',
     'STORAGE_SCAN_TOKEN_INVALID',
     'STORAGE_NO_FILE',
     'STORAGE_UPLOAD_FIELD_MISSING',
