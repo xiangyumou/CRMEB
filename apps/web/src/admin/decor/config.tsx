@@ -15,6 +15,7 @@ import { BLOCK_COMPONENTS } from '@shop/storefront-blocks/admin';
 import { Component, useMemo, type ComponentType, type ErrorInfo, type ReactNode } from 'react';
 
 import { useCanvasSlots } from './canvas-data';
+import { withImagePlaceholders } from './canvas-images';
 import { UNKNOWN_BLOCK, type UnknownBlockProps } from './document';
 import {
   defaultsOf,
@@ -120,6 +121,10 @@ function BlockCanvas({
     const result = definition.props.safeParse(props);
     return result.success ? (result.data as Record<string, unknown>) : props;
   }, [definition, props]);
+  const drawn = useMemo(
+    () => withImagePlaceholders(definition.props, parsed),
+    [definition, parsed],
+  );
   const needs = useMemo((): Record<string, DataNeed> => {
     if (!definition.data) return {};
     try {
@@ -141,7 +146,7 @@ function BlockCanvas({
   }
   return (
     <BlockBoundary label={definition.meta.label} watch={props}>
-      <Block props={parsed} data={slots} />
+      <Block props={drawn} data={slots} />
     </BlockBoundary>
   );
 }

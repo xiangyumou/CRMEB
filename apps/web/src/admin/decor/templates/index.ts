@@ -1,6 +1,8 @@
 import type { DocumentKind } from '@shop/contracts/decor/constants';
 import type { StoredDocument } from '@shop/contracts/decor/document';
 
+import { CUSTOM_CAMPAIGN, HOME_MODERN, USER_CENTER_CLEAN } from './documents';
+
 /**
  * 从模板新建: the starting documents offered when a page is created.
  *
@@ -29,7 +31,29 @@ const BLANK: Omit<DecorTemplate, 'kind'> = {
   description: '从零开始，自己添加组件。',
 };
 
-export const DECOR_TEMPLATES: readonly DecorTemplate[] = [];
+export const DECOR_TEMPLATES: readonly DecorTemplate[] = [
+  {
+    key: 'home-modern',
+    kind: 'home',
+    name: '简约首页',
+    description: '大图轮播、三格入口、商品网格。换上图片、选好商品即可发布。',
+    document: HOME_MODERN,
+  },
+  {
+    key: 'user-center-clean',
+    kind: 'user_center',
+    name: '简洁个人中心',
+    description: '用户卡片、订单入口，服务按「优惠与记录」「账户与服务」分两组。',
+    document: USER_CENTER_CLEAN,
+  },
+  {
+    key: 'custom-campaign',
+    kind: 'custom',
+    name: '专题活动',
+    description: '一张专题主图、一大两小的图片魔方和活动商品。',
+    document: CUSTOM_CAMPAIGN,
+  },
+];
 
 /** The templates for a kind, the blank page first. */
 export function templatesFor(kind: DocumentKind): DecorTemplate[] {
