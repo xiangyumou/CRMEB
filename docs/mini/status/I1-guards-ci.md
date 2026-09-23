@@ -26,11 +26,18 @@ Branch `storefront/mini-I1-guards-ci`, from `storefront/mini` (R0's route catalo
   and now has a test that proves it reads the mini-program's tests.
 - `guards/turbo.json`: `test:unit` inputs include all of `apps/mini` but build output, and the two
   shared packages, so a cached pass is not replayed over a changed app.
-
-## In progress
-
-- CI (`.github/workflows/ci.yml`), docs (`contributing.md`, `architecture.md`, `conventions.md`),
-  the DevTools / real-device kit (`docs/mini/device-check.md`, `apps/mini/scripts/`).
+- **CI** (`.github/workflows/ci.yml`, not run; actionlint clean): a separate `storefront-e2e-mini`
+  job runs `test:mini`; both storefront e2e jobs cache the `next build` output; the static job's
+  `turbo run … build` already builds weapp + H5 + the size gate, so no new build step. The images
+  job is unchanged.
+- **Docs**: `contributing.md` (checklist, `--no-check`, `apps/mini/**` item), `architecture.md` and
+  `conventions.md` ("in progress" mini-program sections; the uni-app sections stay),
+  `docs/mini/device-check.md` (Chinese; official AppID, members, backends, WSL2 networking,
+  checklist D01–D12, report template, optional miniprogram-ci path).
+- **Scripts**: `apps/mini/scripts/device-build.mjs` (checked weapp build for DevTools / a phone)
+  and `apps/mini/scripts/preview.mjs` (miniprogram-ci preview; refuses without
+  `WX_MINI_UPLOAD_KEY_PATH` outside the repo, without `--confirm`, or without the CLI installed).
+  `preview.mjs` has never been run against WeChat.
 
 ## Open
 
