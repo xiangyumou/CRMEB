@@ -1327,9 +1327,9 @@ A successful group updates leader and members once, without repeated notificatio
 
 ### CORE-002
 
-The shop has no 砍价, 秒杀, 抽奖, 直播, 分销, 积分, 签到, 付费会员, 充值, 余额支付, 支付宝, 线下支付, 核销, 门店自提, 自建客服 or the other features `pnpm guards`' `retired` check lists: no identifier or URL token for any of them exists in the application source or the uni-app API layer, and every route file is described by a contract, so there is no unlisted surface for one to come back through.
+The shop has no 砍价, 秒杀, 抽奖, 直播, 分销, 积分, 签到, 付费会员, 充值, 余额支付, 支付宝, 线下支付, 核销, 门店自提, 自建客服 or the other features `pnpm guards`' `retired` check lists: no identifier or URL token for any of them exists in the application source, the uni-app API layer or the mini-program (with `@shop/api-client` and `@shop/storefront-blocks`), and every route file is described by a contract, so there is no unlisted surface for one to come back through.
 
-- `guards/src/checks/retired.test.ts::the retired blacklist > finds no retired identifier in the workspace or the uni-app API layer`
+- `guards/src/checks/retired.test.ts::the retired blacklist > finds no retired identifier in the workspace, the uni-app API layer or the mini-program`
 - `guards/src/checks/contracts.test.ts::contracts and route files > leaves no route file that no contract describes`
 
 ## Test strength and stability
