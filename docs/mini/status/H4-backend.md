@@ -68,9 +68,14 @@ productRecommendations, productServiceTags }`, from four switches on the
      days after full payment (the column `handlePaid` stamps `ship_not_before_at` from), `null`
      for any other kind. Through a new optional `OrderKindHandler.previewTerms` port method.
 
-## In progress
+## Checklist (after item 6 and the merge of storefront/mini with stream D)
 
-- Merge checklist (rerun after item 6).
+All green: `pnpm turbo run gen typecheck lint test:unit build` (45/45); `test:int --force
+--concurrency=2` (core 1521, web 324, worker 6, testing 9); `prettier --check .`;
+`check:examples` (461 routes); `pnpm guards` (15 checks, 0 failures); uni-app `npm ci` +
+`npm test` (477 passed, 32 skipped); `test:mini` (15 passed).
+
+Not done (not assigned): D's 「允许生成商品海报」 switch would be one more `display` field.
 
 ## Client follow-ups
 
