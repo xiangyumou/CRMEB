@@ -58,13 +58,20 @@ demo 81.0 KB, total 469.0 KB; react ×1; no zod.
 - `docs/mini/decor.md`: block table (2.3), personal needs, rich-text allow-list, migrated
   draft read, adding a block / an editor field.
 
+- **Checklist (2026-09-24, all pass):** `pnpm turbo run gen typecheck lint test:unit build`
+  (45 tasks); `pnpm turbo run test:int --force --concurrency=4 --filter @shop/core --filter
+@shop/web` (core 1444, web 319); `pnpm exec prettier --check .`; `pnpm --filter
+@shop/contracts check:examples`; `pnpm guards` (15 checks, 0 failures).
+
 ## In progress
 
-- Full checklist.
+- Nothing. Batch 1 is complete on this branch.
 
 ## Next
 
-1. Full checklist; final report.
+- Hand-off: F2 merges `config.tsx` / `fields.tsx` / `zod-to-puck.ts` wiring with its own editor
+  work; open questions are in the final report (待评价 count, host `renderIntent` for 客服,
+  richText 3.28 % residual, device check of `$hairline` / widthFix on real WeChat).
 
 ## Notes
 
