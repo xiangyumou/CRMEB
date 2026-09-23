@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 
-import type { BlockType } from '../schema/document';
-import type { LinkTarget } from '../schema/link';
+import type { BlockType } from '../schema';
+import type { LinkTarget } from '@shop/contracts/decor/link';
 import { Carousel } from './carousel/carousel';
 import { ImageCube } from './image-cube/image-cube';
 import { ProductGrid } from './product-grid/product-grid';

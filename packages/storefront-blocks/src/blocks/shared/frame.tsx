@@ -1,7 +1,7 @@
 import { View } from '@tarojs/components';
 import type { ReactNode } from 'react';
 
-import type { BlockStyle } from '../../schema/common';
+import type { BlockStyle } from '@shop/contracts/decor/base';
 import { cx } from './css';
 import styles from './frame.module.scss';
 

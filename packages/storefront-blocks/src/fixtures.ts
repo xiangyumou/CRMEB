@@ -1,7 +1,9 @@
-import type { CarouselProps } from './schema/carousel';
-import type { ProductSummary } from './schema/common';
-import type { ImageCubeProps } from './schema/image-cube';
-import type { ProductGridProps } from './schema/product-grid';
+import type {
+  CarouselProps,
+  ImageCubeProps,
+  ProductGridProps,
+} from '@shop/contracts/decor/all-blocks';
+import type { ProductSummary } from '@shop/contracts/decor/sources';
 
 /**
  * Fixture data for tests, the admin spike page, the fidelity script and the
@@ -54,7 +56,7 @@ export const fixtureCarousel: CarouselProps = {
     {
       image: banner('#ff7a45', '#e93323', '#ffd666'),
       alt: '秋季上新',
-      link: { kind: 'route', route: 'couponCenter' },
+      link: { kind: 'route', to: { route: 'couponCenter', params: {} } },
     },
     {
       image: banner('#36cfc9', '#1677ff', '#b37feb'),
@@ -75,6 +77,7 @@ export const fixtureCarousel: CarouselProps = {
   indicatorColor: '#ffffff80',
   indicatorActiveColor: '#ffffff',
   style: { marginY: 'none', paddingX: 'none', radius: 'none' },
+  visibility: { audience: 'all', platforms: [] },
 };
 
 export const fixtureProducts: ProductSummary[] = [
@@ -117,12 +120,16 @@ export const fixtureProductGrid: ProductGridProps = {
   showMarketPrice: true,
   showTag: true,
   style: { marginY: 'none', paddingX: 'none', radius: 'none' },
+  visibility: { audience: 'all', platforms: [] },
 };
 
 export const fixtureImageCube: ImageCubeProps = {
   layout: 'left1right2',
   cells: [
-    { image: tile(360, 360, 5), link: { kind: 'route', route: 'groupbuyList' } },
+    {
+      image: tile(360, 360, 5),
+      link: { kind: 'route', to: { route: 'groupbuyList', params: {} } },
+    },
     { image: tile(360, 175, 45), link: { kind: 'article', id: '7' } },
     { image: tile(360, 175, 190), link: { kind: 'webview', url: 'https://example.com/promo' } },
     { image: tile(360, 175, 260) },
@@ -130,6 +137,7 @@ export const fixtureImageCube: ImageCubeProps = {
   height: 360,
   gap: 10,
   style: { marginY: 'sm', paddingX: 'md', radius: 'none' },
+  visibility: { audience: 'all', platforms: [] },
 };
 
 /** A row layout, to exercise `widthFix`. */

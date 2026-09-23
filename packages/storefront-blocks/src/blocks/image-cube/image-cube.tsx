@@ -1,8 +1,8 @@
 import { Image, View } from '@tarojs/components';
 
-import type { LinkTarget } from '../../schema/link';
-import { IMAGE_CUBE_LAYOUTS, type ImageCubeLayout } from '../../schema/constants';
-import type { ImageCubeProps } from '../../schema/image-cube';
+import type { LinkTarget } from '@shop/contracts/decor/link';
+import { IMAGE_CUBE_LAYOUTS, type ImageCubeLayout } from '@shop/contracts/decor/constants';
+import type { ImageCubeProps } from '@shop/contracts/decor/all-blocks';
 import { cx, designVars, tapProps } from '../shared/css';
 import { BlockFrame } from '../shared/frame';
 import type { BlockProps } from '../shared/types';
