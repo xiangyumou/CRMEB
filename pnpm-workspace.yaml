@@ -46,3 +46,7 @@ minimumReleaseAgeExclude:
 overrides:
   '@nutui/nutui-react-taro>codesandbox': '-'
   '@nutui/nutui-react-taro>rehype-highlight': '-'
+  # One sass for the workspace (storefront-blocks and apps/mini compile their styles with
+  # it); auto-install-peers would otherwise hand next's and vite's optional `sass` peer
+  # the newest release, which is inside minimumReleaseAge. See docs/mini/spikes/S3-decor.md.
+  sass: 1.104.1

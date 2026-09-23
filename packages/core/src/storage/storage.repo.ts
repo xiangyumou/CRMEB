@@ -386,6 +386,22 @@ export interface NewAttachmentValues {
   uploadedByUserId: number | null;
 }
 
+/**
+ * Whether a live image attachment answers at exactly this URL. Any uploader:
+ * digest dedupe hands a shopper the row somebody else stored first, and the
+ * URL is equally ours either way.
+ */
+export async function liveImageUrlExists(db: DbOrTx, url: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: attachments.id })
+    .from(attachments)
+    .where(
+      and(eq(attachments.url, url), eq(attachments.kind, 'image'), isNull(attachments.deletedAt)),
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
 export async function insertAttachment(
   db: DbOrTx,
   values: NewAttachmentValues,

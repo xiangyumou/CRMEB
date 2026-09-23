@@ -17,6 +17,7 @@ const repoRoot = path.resolve(appRoot, '../..');
 const workspaceSources = [
   path.join(repoRoot, 'packages/contracts/src'),
   path.join(repoRoot, 'packages/api-client/src'),
+  path.join(repoRoot, 'packages/storefront-blocks/src'),
 ];
 
 /**
@@ -71,9 +72,14 @@ function designWidth(input?: string | number | { file?: string | undefined }): n
   return file.replace(/\\+/g, '/').includes('@nutui') ? 375 : 750;
 }
 
+interface ChainSet {
+  add: (value: string) => ChainSet;
+}
+
 interface Chain {
   plugin: (name: string) => { use: (plugin: unknown, args?: unknown[]) => void };
   performance: { hints: (value: false) => void };
+  resolve: { modules: ChainSet };
 }
 
 function webpackChain(chain: Chain) {
@@ -82,6 +88,11 @@ function webpackChain(chain: Chain) {
   // turbo's strict env mode, and the file is small).
   const outFile = path.join(appRoot, '.bundle-stats', `${buildName}.json`);
   chain.plugin('bundle-stats').use(BundleStatsPlugin, [outFile]);
+  // A last resort after the usual node_modules walk: Taro rewrites `@tarojs/components` to
+  // its platform plugin, which a workspace package compiled from source (storefront-blocks)
+  // cannot reach from its own directory.
+  // Taro leaves `resolve.modules` unset, so the walk has to be restated before the fallback.
+  chain.resolve.modules.add('node_modules').add(path.join(appRoot, 'node_modules'));
 }
 
 // https://docs.taro.zone/docs/next/config
@@ -109,6 +120,9 @@ export default defineConfig<'webpack5'>(async (merge) => {
     },
     alias: {
       '@': path.join(appRoot, 'src'),
+      // React and TanStack Query from this app only: workspace packages compiled from source
+      // (api-client, storefront-blocks) would otherwise resolve their React 19 test copies and
+      // render React 19 elements into this React 18 tree (React error #31). See `singletons`.
       ...singletons,
     },
     copy: { patterns: [], options: {} },

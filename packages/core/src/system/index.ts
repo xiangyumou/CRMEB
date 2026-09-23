@@ -13,6 +13,8 @@
  * | `GET /admin-api/system/config-groups` | `configGroupList` |
  * | `GET/PUT /admin-api/system/config/:group` | `configGet` / `configSave` |
  * | `GET /api/v1/agreements/:key` | `agreementGet` |
+ * | `GET /api/v1/site/config` | `siteConfigGet` |
+ * | `GET /api/v1/app/config` | `appConfigGet` |
  * | `GET /admin-api/dashboard/header` | `dashboardHeader` |
  * | worker `system.pruneAuditLogs` | `pruneAuditLogs` |
  *
@@ -109,6 +111,25 @@ export {
   type SitePaymentMethod,
   type SitePaymentMethodSource,
 } from './site.service';
+/**
+ * `GET /api/v1/app/config` — the mini-program's launch payload: the site's
+ * public settings plus the theme, the tab bar and the subscribe-message
+ * template ids. `registerAppConfigSource` is the same seam as
+ * `registerSiteAuthMethod`, for the values `wechat-oa` and `user` own.
+ */
+export {
+  appConfigGet,
+  appConfigSourceGroups,
+  appearanceOf,
+  invalidateAppConfigCache,
+  registerAppConfigSource,
+  resetAppConfigSources,
+  type AppConfigSources,
+} from './app-config.service';
+export {
+  storefrontAppearanceConfig,
+  type StorefrontAppearanceConfig,
+} from './storefront-appearance.config';
 /**
  * `POST /api/v1/attachments/base64` — an attachment endpoint that lives here
  * because "is this URL ours?" is answered by `site.config.ts`, and `system` may

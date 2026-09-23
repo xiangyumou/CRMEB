@@ -15,10 +15,12 @@ function buildCpus(value: string | undefined): number {
  * The admin UI and both API surfaces ship as one standalone Next server.
  * `@shop/contracts` is published as TypeScript source (see its package.json
  * `exports`), so it has to be transpiled by Next rather than consumed as JS.
+ * So are `@shop/storefront-blocks`' `./schema` and `./fixtures` entries; its
+ * `./admin` entry is prebuilt JS (blocks through the DOM shim, px → vw CSS).
  */
 const nextConfig: NextConfig = {
   output: 'standalone',
-  transpilePackages: ['@shop/contracts'],
+  transpilePackages: ['@shop/contracts', '@shop/storefront-blocks'],
   reactStrictMode: true,
   poweredByHeader: false,
   // The workspace root is the repository root, not `apps/web`; tell Next so the standalone

@@ -24,6 +24,7 @@
     "@nutui/nutui-react-taro": "3.0.19",
     "@shop/api-client": "workspace:*",
     "@shop/contracts": "workspace:*",
+    "@shop/storefront-blocks": "workspace:*",
     "@tanstack/react-query": "^5.103.2",
     "@tarojs/components": "4.2.1",
     "@tarojs/helper": "4.2.1",

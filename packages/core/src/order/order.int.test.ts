@@ -677,6 +677,7 @@ describe('order creation', () => {
         source: 'cart',
         cartItemIds: [String(cartItemId)],
         kind: 'groupbuy',
+        kindMeta: { activityId: '1' },
         idempotencyKey: idempotencyKey(),
       }),
       'VALIDATION_FAILED',

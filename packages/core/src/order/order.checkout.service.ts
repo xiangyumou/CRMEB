@@ -1,5 +1,6 @@
 import type {
   CheckoutCreateBody,
+  CheckoutKind,
   CheckoutLine,
   CheckoutPreview,
   CheckoutPreviewBody,
@@ -281,6 +282,24 @@ function customFormFieldsOf(lines: readonly DraftLine[]): CustomFormField[] {
   return [...seen.values()];
 }
 
+/**
+ * `kindMeta` as the kind handler and the pricing contributors read it: the
+ * declared keys of the kind's own payload, and nothing else.
+ *
+ * The contract already strips undeclared keys; spelling the keys out here
+ * keeps it true for a caller that reaches the service without the contract.
+ */
+function kindSelections(input: CheckoutKind): Record<string, string | undefined> {
+  switch (input.kind) {
+    case 'groupbuy':
+      return { activityId: input.kindMeta.activityId, groupId: input.kindMeta.groupId };
+    case 'presale':
+      return { activityId: input.kindMeta.activityId };
+    default:
+      return {};
+  }
+}
+
 async function buildDraft(
   ctx: Ctx,
   db: DbOrTx,
@@ -322,11 +341,12 @@ async function buildDraft(
 
   // A marketing contributor learns which activity the shopper picked from the
   // same `kindMeta` the kind handler gets, plus `kind` so it can refuse to fire
-  // on an ordinary order.
+  // on an ordinary order. `kind` goes last: nothing in `kindMeta` may overrule
+  // it (ORDER-009).
   const adjustments = await gatherAdjustments(ctx, db, userId, lines, userCouponId, {
     couponId: input.userCouponId ?? undefined,
+    ...kindSelections(input),
     kind: input.kind,
-    ...(input.kindMeta as Record<string, string | undefined> | undefined),
   });
   const discount = splitAdjustments(lines, adjustments);
   const itemsAmount = goodsTotalOf(lines);
@@ -539,7 +559,7 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
             userId,
             lines: draft.lines.map(pricingLineOf),
             goodsTotal: draft.itemsAmount,
-            selections: { ...(body.kindMeta as Record<string, string | undefined>) },
+            selections: kindSelections(body),
             // The handler needs to know its own adjustment reached the order,
             // and `create` is holding the answer at this very moment. Without
             // it a kind handler has to re-run its own contributor inside this

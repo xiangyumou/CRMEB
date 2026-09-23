@@ -685,6 +685,11 @@ async function takePending(ctx: Ctx, token: string): Promise<PendingWechat> {
   return JSON.parse(raw) as PendingWechat;
 }
 
+/** Put a taken bind token back after a step that failed through no fault of the token. */
+async function restorePending(ctx: Ctx, token: string, pending: PendingWechat): Promise<void> {
+  await ctx.redis.set(bindKey(token), JSON.stringify(pending), 'PX', BIND_TOKEN_TTL_MS);
+}
+
 function phoneRequired(bindToken: string): WechatLoginResult {
   return {
     status: 'phone-required',
@@ -869,6 +874,41 @@ async function miniApp(ctx: Ctx): Promise<{ enabled: boolean; appId: string }> {
   return { enabled: mini.enabled && appId !== '', appId };
 }
 
+/**
+ * Invalid `wx.login` codes one address may send per window before
+ * `miniLogin` refuses it without asking WeChat.
+ *
+ * Only *failures* count. A real mini-program sends one valid code per launch,
+ * and mobile carriers put thousands of phones behind one address, so counting
+ * every sign-in would throttle a whole city at lunchtime. A flood of made-up
+ * codes, on the other hand, is nobody's launch — and each one costs a
+ * `code2Session` call against the shop's WeChat quota (AUTH-006).
+ */
+const MINI_CODE_FAILURES_PER_IP = 20;
+const MINI_CODE_FAILURE_WINDOW_MS = 10 * 60 * 1000;
+const miniFailureKey = (ip: string): string => `user:mini-login:fail:${ip}`;
+
+async function assertMiniCodeBudget(ctx: Ctx, ip: string | null): Promise<void> {
+  if (!ip) return;
+  const key = miniFailureKey(ip);
+  const failures = Number((await ctx.redis.get(key)) ?? 0);
+  if (failures < MINI_CODE_FAILURES_PER_IP) return;
+  const ttl = await ctx.redis.pttl(key);
+  throw new DomainError('RATE_LIMITED', {
+    details: { retryAfterMs: ttl > 0 ? ttl : MINI_CODE_FAILURE_WINDOW_MS },
+  });
+}
+
+/**
+ * `wx.login()`'s code → a session, or `phone-required` and a bind token.
+ *
+ * This is also the mini-program's **silent renewal**: a client whose token
+ * expired or was revoked (any 401) calls `wx.login()` again and posts the new
+ * code here. A known openid is signed straight in — `status: 'signed-in'`,
+ * `registered: false`, a fresh token of `sessionTtlDays`, the same account —
+ * without showing the shopper anything. Other devices' sessions are left
+ * alone. See `docs/mini/auth.md`.
+ */
 export async function miniLogin(
   ctx: Ctx,
   body: MiniLoginBody,
@@ -876,7 +916,22 @@ export async function miniLogin(
 ): Promise<WechatLoginResult> {
   const mini = await miniApp(ctx);
   if (!mini.enabled) throw new DomainError('AUTH_WECHAT_NOT_CONFIGURED');
-  const session = await wechatPort().miniCodeToSession(ctx, body.code);
+  const ip = meta.ip ?? null;
+  await assertMiniCodeBudget(ctx, ip);
+  let session: Awaited<ReturnType<WechatIdentityPort['miniCodeToSession']>>;
+  try {
+    session = await wechatPort().miniCodeToSession(ctx, body.code);
+  } catch (error) {
+    if (ip && error instanceof DomainError && error.code === 'AUTH_WECHAT_CODE_INVALID') {
+      await fixedWindow(ctx.redis, {
+        key: miniFailureKey(ip),
+        limit: MINI_CODE_FAILURES_PER_IP,
+        windowMs: MINI_CODE_FAILURE_WINDOW_MS,
+        nowMs: ctx.clock.now().getTime(),
+      });
+    }
+    throw error;
+  }
   return signInWithIdentity(
     ctx,
     {
@@ -896,6 +951,12 @@ export async function miniLogin(
  * The phone number comes back from WeChat's own endpoint, which is proof of
  * ownership — so no SMS code is asked for, unlike the OA flow where the browser
  * can offer no such proof.
+ *
+ * If WeChat refuses the phone code (expired, already used, WeChat down) the
+ * bind token is put back, exactly as `oaPhoneLogin` does for a mistyped SMS
+ * code: the shopper can retry, or fall back to an SMS code on
+ * `POST /auth/sessions/wechat-oa/phone` with the same token, without a fresh
+ * `wx.login()` (AUTH-007).
  */
 export async function miniPhoneLogin(
   ctx: Ctx,
@@ -903,7 +964,13 @@ export async function miniPhoneLogin(
   meta: RequestMeta = {},
 ): Promise<WechatLoginResult> {
   const pending = await takePending(ctx, body.bindToken);
-  const number = await wechatPort().miniPhoneNumber(ctx, body.phoneCode);
+  let number: Awaited<ReturnType<WechatIdentityPort['miniPhoneNumber']>>;
+  try {
+    number = await wechatPort().miniPhoneNumber(ctx, body.phoneCode);
+  } catch (error) {
+    await restorePending(ctx, body.bindToken, pending);
+    throw error;
+  }
   return completeWithPhone(ctx, pending, number.phone, meta);
 }
 
@@ -1021,7 +1088,7 @@ export async function oaPhoneLogin(
   } catch (error) {
     // The bind token was already destroyed by `takePending`. Put it back so a
     // mistyped code does not cost the shopper a fresh WeChat authorisation.
-    await ctx.redis.set(bindKey(body.bindToken), JSON.stringify(pending), 'PX', BIND_TOKEN_TTL_MS);
+    await restorePending(ctx, body.bindToken, pending);
     throw error;
   }
   return completeWithPhone(ctx, pending, body.phone, meta);

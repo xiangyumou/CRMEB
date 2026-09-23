@@ -16,6 +16,7 @@ import {
 } from '../kernel/config-registry';
 import { DomainError } from '../kernel/errors';
 import { hasPermission } from '../auth/rbac';
+import { invalidateAppConfigCache } from './app-config.service';
 import { invalidateSiteConfigCache } from './site.service';
 import * as repo from './system.repo';
 // The gen'd bucket: `defineConfigGroup` registers as a side effect of its
@@ -252,6 +253,9 @@ export async function configSave(
   // three of these groups; saving one of them drops it so the operator sees
   // their change in the app now rather than within the minute.
   await invalidateSiteConfigCache(ctx, def.group);
+  // Same for the mini-program's `GET /api/v1/app/config`, which has its own
+  // cache over a wider set of groups (`appConfigSourceGroups`).
+  await invalidateAppConfigCache(ctx, def.group);
   ctx.logger.info(
     { group: def.group, keys: Object.keys(patch).filter((k) => !secrets.has(k)) },
     'config group saved',

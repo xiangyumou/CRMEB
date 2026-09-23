@@ -66,9 +66,10 @@ export const checkoutSource = z.enum(['cart', 'buy-now']);
 export type CheckoutSource = z.infer<typeof checkoutSource>;
 
 /**
- * What both `preview` and `create` need to know. Kept as a plain object so
- * `create` can extend it; the cross-field rule is attached to each of the two
- * exported schemas, because a `.refine()`d schema can no longer be extended.
+ * What both `preview` and `create` need to know, apart from the order kind.
+ * Kept as a plain object so `create` can extend it; the kind and the
+ * cross-field rule are attached to each of the two exported schemas, because
+ * an intersected or `.refine()`d schema can no longer be extended.
  */
 const checkoutInput = z.object({
   source: checkoutSource.default('cart'),
@@ -80,10 +81,60 @@ const checkoutInput = z.object({
   addressId: id.nullish(),
   /** The coupon the shopper picked in `/api/v1/user-coupons/applicable`. */
   userCouponId: id.nullish(),
-  kind: orderKind.default('normal'),
-  /** Opaque payload for the `OrderKindHandler` of a non-`normal` order. */
-  kindMeta: z.record(z.string(), z.unknown()).optional(),
 });
+
+/**
+ * An activity or team id inside `kindMeta`.
+ *
+ * A decimal string like every other id, and — only here — a positive integer
+ * too, normalised to the string. `kindMeta` was an untyped record until the
+ * mini-program rewrite, and the kind handlers read it with `Number(…)`, so a
+ * number used to work; typing the field must not start refusing it.
+ */
+const kindMetaId = z.union([
+  id,
+  z.number().int().positive().max(Number.MAX_SAFE_INTEGER).transform(String),
+]);
+
+/** `kind: 'groupbuy'` — the activity, and the team to join (absent opens a new team, 开团). */
+export const groupbuyKindMeta = z.object({
+  activityId: kindMetaId,
+  groupId: kindMetaId.optional(),
+});
+export type GroupbuyKindMeta = z.infer<typeof groupbuyKindMeta>;
+
+/** `kind: 'presale'` — the activity whose deposit price and quota apply. */
+export const presaleKindMeta = z.object({ activityId: kindMetaId });
+export type PresaleKindMeta = z.infer<typeof presaleKindMeta>;
+
+/**
+ * The order kind and its payload, one discriminated union on `kind` (ORDER-009).
+ *
+ * The wire names are the ones the untyped `kindMeta` record always had, so the
+ * legacy client's `{ kind: 'groupbuy', kindMeta: { activityId: '12', groupId:
+ * '7' } }` parses unchanged. What changed:
+ *
+ * - `groupbuy` and `presale` must carry their `kindMeta`; the handler refused an
+ *   order without `activityId` anyway, now the preview refuses it too;
+ * - keys a kind does not declare are **stripped**, not passed on. The order
+ *   domain hands `kindMeta` to the pricing contributors next to `kind`, and a
+ *   stray `kind` inside it used to be able to overrule the real one;
+ * - `normal` accepts and discards whatever `kindMeta` a client sends, which is
+ *   what the order domain always did with it.
+ */
+export const checkoutKind = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('normal').default('normal'),
+    kindMeta: z
+      .unknown()
+      .optional()
+      .transform(() => undefined)
+      .optional(),
+  }),
+  z.object({ kind: z.literal('groupbuy'), kindMeta: groupbuyKindMeta }),
+  z.object({ kind: z.literal('presale'), kindMeta: presaleKindMeta }),
+]);
+export type CheckoutKind = z.infer<typeof checkoutKind>;
 
 const buyNowNeedsAnItem = {
   check: (body: { source: CheckoutSource; item?: unknown }) =>
@@ -92,7 +143,7 @@ const buyNowNeedsAnItem = {
   path: ['item'] as const,
 };
 
-export const checkoutPreviewBody = checkoutInput.refine(buyNowNeedsAnItem.check, {
+export const checkoutPreviewBody = checkoutInput.and(checkoutKind).refine(buyNowNeedsAnItem.check, {
   message: buyNowNeedsAnItem.message,
   path: [...buyNowNeedsAnItem.path],
 });
@@ -279,6 +330,7 @@ export const checkoutCreateBody = checkoutInput
      */
     expectedPayableAmount: money.optional(),
   })
+  .and(checkoutKind)
   .refine(buyNowNeedsAnItem.check, {
     message: buyNowNeedsAnItem.message,
     path: [...buyNowNeedsAnItem.path],

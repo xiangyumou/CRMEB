@@ -450,6 +450,32 @@ describe('storefront upload', () => {
     );
   });
 
+  it('refuses an SVG from a shopper whatever it is called', async () => {
+    const ctx = as(userActor(shopperId));
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>';
+    for (const [name, mime] of [
+      ['avatar.svg', 'image/svg+xml'],
+      ['avatar.png', 'image/png'],
+    ] as const) {
+      expect(await code(userUpload(ctx, { purpose: 'avatar' }, file(svg, name, mime)))).toBe(
+        'STORAGE_FILE_TYPE_REJECTED',
+      );
+    }
+    expect(await harness.ctx.db.select().from(attachments)).toHaveLength(0);
+  });
+
+  it('refuses an image over the shopper ceiling, and stores nothing', async () => {
+    const ctx = as(userActor(shopperId));
+    await ctx.config.set(storageConfig, { maxUserUploadBytes: 64 * 1024 });
+    const big = png(1, 1);
+    const bytes = new Uint8Array(64 * 1024 + 1);
+    bytes.set(big.bytes, 0);
+    expect(
+      await code(userUpload(ctx, { purpose: 'avatar' }, { ...big, bytes, filename: 'big.png' })),
+    ).toBe('STORAGE_FILE_TOO_LARGE');
+    expect(await harness.ctx.db.select().from(attachments)).toHaveLength(0);
+  });
+
   it('enforces the per-user hourly budget', async () => {
     const ctx = as(userActor(shopperId));
     await ctx.config.set(storageConfig, { userUploadsPerHour: 2 });

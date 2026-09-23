@@ -1,0 +1,297 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { appAppearanceDefaults, appPublicConfig } from '@shop/contracts/system/app.schemas';
+import { subscribeScene } from '@shop/contracts/wechat-oa/schemas';
+import { configValues } from '@shop/db/schema/system';
+import { createTestCtx, type TestCtx } from '@shop/testing';
+import { allConfigGroups } from '../kernel/config-registry';
+import { anonymousActor, type Ctx } from '../kernel/context';
+import { DomainError } from '../kernel/errors';
+import { wechatOaStorefront } from '../wechat-oa';
+import { appConfigGet, appConfigSourceGroups } from './app-config.service';
+import { configSave, describeGroup } from './config.service';
+import { siteConfigGet } from './site.service';
+import './index';
+// The bootstrap every request runs: without it neither `wechat-oa` nor `user`
+// has registered its reader, and this would test a process no deployment runs.
+import '../domains.gen';
+
+/**
+ * `GET /api/v1/app/config` against a real PostgreSQL and Redis.
+ *
+ * SYS-014 — nothing secret, in any registered group, reaches the payload.
+ * SYS-015 — the appearance group answers with every field defaulted, serves
+ *           what the operator saved, and refuses a colour that is not `#RRGGBB`.
+ * SYS-016 — a save to any source group drops the cache and moves `version` at
+ *           once, and the values it shares with `site/config` agree with it.
+ */
+
+let harness: TestCtx;
+
+const NOW = '2026-09-23T08:00:00.000Z';
+
+const anonymous = (): Ctx => harness.ctx.as(anonymousActor);
+
+async function code(promise: Promise<unknown>): Promise<string> {
+  try {
+    await promise;
+  } catch (error) {
+    if (error instanceof DomainError) return error.code;
+    throw error;
+  }
+  throw new Error('expected a DomainError');
+}
+
+/** Saves through the settings screen's own path, one second after the last save. */
+async function save(group: string, values: Record<string, unknown>): Promise<void> {
+  harness.clock.advance(1_000);
+  await configSave(harness.ctx, { group }, { values });
+}
+
+beforeAll(async () => {
+  harness = await createTestCtx({ now: NOW });
+}, 180_000);
+
+afterAll(async () => {
+  await harness?.close();
+});
+
+beforeEach(async () => {
+  await harness.db.truncateAll();
+  await harness.redis.flushdb();
+  harness.clock.set(NOW);
+  for (const group of allConfigGroups()) await harness.ctx.config.invalidate(group.group);
+});
+
+describe('SYS-014 — the app config leaks nothing', () => {
+  it('answers a request with no session, and the answer matches the contract', async () => {
+    expect(anonymous().actor.kind).toBe('anonymous');
+    const payload = await appConfigGet(anonymous());
+    expect(appPublicConfig.safeParse(payload).success).toBe(true);
+    expect(payload.version).toBe('0');
+  });
+
+  it('cannot leak any secret in any registered group', async () => {
+    const markers: string[] = [];
+    const rows: { group: string; key: string; value: unknown; updatedAt: Date }[] = [];
+    for (const group of allConfigGroups()) {
+      for (const field of describeGroup(group).fields) {
+        if (field.secret !== true) continue;
+        const marker = `LEAKED-${group.group}-${field.key}-${markers.length}`;
+        markers.push(marker);
+        rows.push({
+          group: group.group,
+          key: field.key,
+          value: marker,
+          updatedAt: harness.ctx.clock.now(),
+        });
+      }
+    }
+    expect(markers.length).toBeGreaterThan(5);
+
+    await harness.ctx.db.insert(configValues).values(rows);
+    for (const group of allConfigGroups()) await harness.ctx.config.invalidate(group.group);
+
+    const serialised = JSON.stringify(await appConfigGet(anonymous()));
+    for (const marker of markers) expect(serialised).not.toContain(marker);
+  });
+});
+
+describe('SYS-015 — 小程序外观', () => {
+  it('answers a fresh install with every appearance default', async () => {
+    const { appearance } = await appConfigGet(anonymous());
+    expect(appearance).toEqual(appAppearanceDefaults);
+    expect(appearance.tabBar.items.map((item) => item.key)).toEqual([
+      'home',
+      'category',
+      'cart',
+      'me',
+    ]);
+  });
+
+  it('serves the theme and the tab bar the operator saved', async () => {
+    await save('storefront-appearance', {
+      primaryColor: '#1677ff',
+      primaryContrastColor: '#000000',
+      priceColor: '#FF4D4F',
+      radius: 'large',
+      tabBarColor: '#666666',
+      tabBarSelectedColor: '#1677FF',
+      tabBarBackgroundColor: '#FAFAFA',
+      tabHomeLabel: '逛逛',
+      tabHomeIcon: '/uploads/attach/home.png',
+      tabHomeSelectedIcon: '/uploads/attach/home-on.png',
+      tabMeLabel: '会员',
+    });
+
+    const { appearance } = await appConfigGet(anonymous());
+    expect(appearance.theme).toEqual({
+      primaryColor: '#1677ff',
+      primaryContrastColor: '#000000',
+      priceColor: '#FF4D4F',
+      radius: 'large',
+    });
+    expect(appearance.tabBar).toEqual({
+      color: '#666666',
+      selectedColor: '#1677FF',
+      backgroundColor: '#FAFAFA',
+      items: [
+        {
+          key: 'home',
+          label: '逛逛',
+          iconUrl: '/uploads/attach/home.png',
+          selectedIconUrl: '/uploads/attach/home-on.png',
+        },
+        { key: 'category', label: '分类', iconUrl: null, selectedIconUrl: null },
+        { key: 'cart', label: '购物车', iconUrl: null, selectedIconUrl: null },
+        { key: 'me', label: '会员', iconUrl: null, selectedIconUrl: null },
+      ],
+    });
+  });
+
+  it('falls back to the default label when the operator blanks one', async () => {
+    // Clearing the box on the settings screen must not leave a tab with no text.
+    await save('storefront-appearance', { tabCartLabel: '   ', tabCategoryLabel: '' });
+    const { items } = (await appConfigGet(anonymous())).appearance.tabBar;
+    expect(items.find((item) => item.key === 'cart')?.label).toBe('购物车');
+    expect(items.find((item) => item.key === 'category')?.label).toBe('分类');
+  });
+
+  it.each([
+    ['a colour name', { primaryColor: 'red' }],
+    ['a three-digit hex', { priceColor: '#F00' }],
+    ['a CSS keyword', { tabBarBackgroundColor: 'transparent' }],
+    ['a hex without its #', { tabBarColor: '282828' }],
+    ['an eight-digit hex', { tabBarSelectedColor: '#E93323FF' }],
+    ['a radius off the scale', { radius: 'huge' }],
+    ['a label too long for the bar', { tabHomeLabel: '这是一个很长的首页标签' }],
+  ])('refuses %s, and writes nothing', async (_label, values) => {
+    expect(
+      await code(configSave(harness.ctx, { group: 'storefront-appearance' }, { values })),
+    ).toBe('VALIDATION_FAILED');
+    expect(await harness.ctx.db.select().from(configValues)).toHaveLength(0);
+    expect((await appConfigGet(anonymous())).appearance).toEqual(appAppearanceDefaults);
+  });
+});
+
+describe('SYS-016 — one payload, always current', () => {
+  it('is built from exactly the groups that drop its cache', () => {
+    expect([...appConfigSourceGroups()].sort()).toEqual([
+      'payment',
+      'site',
+      'sms',
+      'storefront-appearance',
+      'storefront-auth',
+      'wechat',
+      'wechat-mini',
+      'wechat-oa',
+      'wechat-oa-runtime',
+    ]);
+  });
+
+  it.each([
+    ['site', { siteName: '新店名' }],
+    ['wechat-mini', { contactPhone: '13800000000' }],
+    ['storefront-appearance', { primaryColor: '#000000' }],
+    ['wechat-oa-runtime', { subscribeOrderPay: 'tmpl-pay-1' }],
+    ['storefront-auth', { requirePhoneForWechat: false }],
+  ] as const)('drops the cache and moves the version when %s is saved', async (group, values) => {
+    const before = await appConfigGet(anonymous());
+
+    // Proves the next read is served from the cache: a write behind the
+    // service's back is not seen…
+    await harness.ctx.db
+      .insert(configValues)
+      .values({ group: 'site', key: 'siteName', value: '后门写入', updatedAt: new Date(0) });
+    await harness.ctx.config.invalidate('site');
+    expect((await appConfigGet(anonymous())).name).toBe(before.name);
+
+    // …until a save through the real path lands in any source group.
+    await save(group, values);
+    const after = await appConfigGet(anonymous());
+    expect(after.version).not.toBe(before.version);
+    expect(after.version).toBe(String(harness.clock.nowMs()));
+    if (group !== 'site') expect(after.name).toBe('后门写入');
+  });
+
+  it('leaves the cache alone when a group it does not read is saved', async () => {
+    const before = await appConfigGet(anonymous());
+    await harness.ctx.db
+      .insert(configValues)
+      .values({ group: 'site', key: 'siteName', value: '后门写入', updatedAt: new Date(0) });
+    await harness.ctx.config.invalidate('site');
+
+    await save('map', { defaultCity: '杭州' });
+    const after = await appConfigGet(anonymous());
+    expect(after.version).toBe(before.version);
+    expect(after.name).toBe(before.name);
+  });
+
+  it('carries the same subscribe ids as GET /wechat/subscribe-templates, all four scenes', async () => {
+    await save('wechat-oa-runtime', {
+      subscribeOrderCreate: '',
+      subscribeOrderPay: ' tmpl-pay-1 , tmpl-pay-2,tmpl-pay-1 ',
+      subscribeOrderShip: 'tmpl-ship',
+      subscribeRefund: 'tmpl-refund,,',
+    });
+
+    const { subscribeTemplates } = await appConfigGet(anonymous());
+    expect(subscribeTemplates).toEqual({
+      orderCreate: [],
+      orderPay: ['tmpl-pay-1', 'tmpl-pay-2'],
+      orderShip: ['tmpl-ship'],
+      refund: ['tmpl-refund'],
+    });
+
+    // Every scene the per-scene route knows has its key here, and agrees.
+    const keyOf = (scene: string) => scene.replace(/-(\w)/g, (_m, c: string) => c.toUpperCase());
+    for (const scene of subscribeScene.options) {
+      const perScene = await wechatOaStorefront.subscribeTemplatesFor(harness.ctx, { scene });
+      expect(subscribeTemplates[keyOf(scene) as keyof typeof subscribeTemplates], scene).toEqual(
+        perScene.templateIds,
+      );
+    }
+  });
+
+  it('says whether a first WeChat sign-in will ask for a phone', async () => {
+    expect((await appConfigGet(anonymous())).auth.wechatRequiresPhone).toBe(true);
+    await save('storefront-auth', { requirePhoneForWechat: false });
+    expect((await appConfigGet(anonymous())).auth.wechatRequiresPhone).toBe(false);
+  });
+
+  it('agrees with GET /site/config on every value the two share', async () => {
+    await save('site', {
+      siteName: '示例商城',
+      logo: '/uploads/a.png',
+      logoSquare: '/uploads/sq.png',
+      shareTitle: '好货不贵',
+      shareImage: '/uploads/share.png',
+      contactPhone: '400-000-0000',
+      splashEnabled: true,
+      splashImage: '/uploads/adv.png',
+    });
+    await save('wechat-mini', { enabled: true, contactType: 'mini-program' });
+
+    const app = await appConfigGet(anonymous());
+    const site = await siteConfigGet(anonymous());
+    const { wechatRequiresPhone: _ignored, ...appAuth } = app.auth;
+    expect({
+      name: app.name,
+      logo: app.logo,
+      share: app.share,
+      support: app.support,
+      auth: appAuth,
+      payments: app.payments,
+      splashAd: app.splashAd,
+    }).toEqual({
+      name: site.name,
+      logo: site.logo,
+      share: site.share,
+      support: site.support,
+      auth: site.auth,
+      payments: site.payments,
+      splashAd: site.splashAd,
+    });
+    expect(app.support.kind).toBe('mini-program');
+    expect(app.splashAd.enabled).toBe(true);
+  });
+});

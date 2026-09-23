@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { isAllowedRedirect } from './storefront-auth.service';
 import {
   anonymisedAccount,
+  blankToNull,
   checkPasswordShape,
   defaultNickname,
+  invoiceTitleProblems,
   isSyntheticAccount,
   maskPhone,
   pageBounds,
@@ -172,5 +174,52 @@ describe('isAllowedRedirect', () => {
 
   it('does not throw on a malformed URL', () => {
     expect(isAllowedRedirect('not a url', 'https://shop.example.com')).toBe(false);
+  });
+});
+
+describe('invoice titles', () => {
+  const company = {
+    headerType: 'company' as const,
+    invoiceType: 'plain' as const,
+    name: '某某公司',
+    dutyNumber: '91330100MA2XXXXX0A',
+    registeredTel: null,
+    registeredAddress: null,
+    bankName: null,
+    bankAccount: null,
+  };
+
+  it('trims, and stores a blank as null', () => {
+    expect(blankToNull(undefined)).toBeNull();
+    expect(blankToNull('')).toBeNull();
+    expect(blankToNull('   ')).toBeNull();
+    expect(blankToNull(' 91330100MA2XXXXX0A ')).toBe('91330100MA2XXXXX0A');
+  });
+
+  it('finds nothing wrong with a complete title', () => {
+    expect(invoiceTitleProblems(company)).toEqual([]);
+    expect(invoiceTitleProblems({ ...company, headerType: 'personal', dutyNumber: null })).toEqual(
+      [],
+    );
+  });
+
+  it('names every field a company 专票 is missing', () => {
+    expect(
+      invoiceTitleProblems({ ...company, invoiceType: 'special', dutyNumber: null }).map(
+        (p) => p.field,
+      ),
+    ).toEqual([
+      'body.dutyNumber',
+      'body.registeredAddress',
+      'body.registeredTel',
+      'body.bankName',
+      'body.bankAccount',
+    ]);
+  });
+
+  it('refuses a title with no name left after trimming', () => {
+    expect(invoiceTitleProblems({ ...company, name: null })).toEqual([
+      { field: 'body.name', message: '请填写抬头名称' },
+    ]);
   });
 });

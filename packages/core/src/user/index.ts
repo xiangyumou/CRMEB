@@ -2,7 +2,8 @@ import { registerUserLookup } from '../auth/user-lookup';
 import * as repo from './user.repo';
 import { wechatIdentityAdapter } from './wechat-identity.adapter';
 import { registerWechatIdentityPort } from './wechat-identity.port';
-import './storefront-auth.config';
+import { registerAppConfigSource } from '../system';
+import { storefrontAuthConfig } from './storefront-auth.config';
 
 /**
  * The `user` domain's public surface: storefront customers, their addresses,
@@ -12,6 +13,7 @@ import './storefront-auth.config';
  * | --- | --- |
  * | `GET/PUT /api/v1/profile` | `getProfile` / `updateProfile` |
  * | `/api/v1/addresses…` | `addressList` / `defaultAddress` / `addressDetail` / `addressCreate` / `addressUpdate` / `addressDelete` / `addressSetDefault` |
+ * | `/api/v1/invoice-titles…` | `invoiceTitleList` / `invoiceTitleDefault` / `invoiceTitleDetail` / `invoiceTitleCreate` / `invoiceTitleUpdate` / `invoiceTitleDelete` / `invoiceTitleSetDefault` |
  * | `/api/v1/account-cancellations…` | `requestCancellation` / `currentCancellation` / `withdrawCancellation` |
  * | `POST /api/v1/auth/sms-codes` | `sendSmsCode` |
  * | `POST /api/v1/auth/sessions/*` | `passwordLogin` / `smsLogin` / `miniLogin` / `miniPhoneLogin` / `oaLogin` / `oaPhoneLogin` |
@@ -37,7 +39,9 @@ import './storefront-auth.config';
  *    direction;
  * 3. the `WechatIdentityPort` over the `wechat` domain's client
  *    (`wechat-identity.adapter.ts`). A test that wants the fake calls
- *    `registerWechatIdentityPort(fakeWechatIdentityPort())` after this.
+ *    `registerWechatIdentityPort(fakeWechatIdentityPort())` after this;
+ * 4. from the bootstrap only (not a bare import): the `wechatRequiresPhone`
+ *    reader behind `GET /api/v1/app/config`.
  *
  * **What other domains need from here.**
  *
@@ -54,13 +58,27 @@ import './storefront-auth.config';
  */
 
 export function registerUserDomain(): void {
+  registerUserPorts();
+  // `GET /api/v1/app/config` says up front whether a first WeChat sign-in will
+  // ask for a phone. The setting is ours (`storefront-auth`) and `system` may
+  // not import this domain, so the answer crosses as a reader. Only from the
+  // bootstrap, never at import: this module can be reached while `system` is
+  // still evaluating, and its registry would not exist yet.
+  registerAppConfigSource('wechatRequiresPhone', {
+    groups: [storefrontAuthConfig.group],
+    read: async (ctx) => (await ctx.config.get(storefrontAuthConfig)).requirePhoneForWechat,
+  });
+}
+
+/** The two ports, which a bare import has always installed and still does. */
+function registerUserPorts(): void {
   registerUserLookup({
     findAuthState: (db, userId) => repo.findAuthState(db, userId),
   });
   registerWechatIdentityPort(wechatIdentityAdapter);
 }
 
-registerUserDomain();
+registerUserPorts();
 
 // ---------------------------------------------------------------------------
 // storefront
@@ -101,6 +119,16 @@ export {
   smsLogin,
   type RequestMeta,
 } from './storefront-auth.service';
+
+export {
+  invoiceTitleCreate,
+  invoiceTitleDefault,
+  invoiceTitleDelete,
+  invoiceTitleDetail,
+  invoiceTitleList,
+  invoiceTitleSetDefault,
+  invoiceTitleUpdate,
+} from './invoice-title.service';
 
 export { pruneVisits, recordVisit } from './user.visit.service';
 

@@ -699,8 +699,8 @@ const STEPS_BY_NAME: Record<StepName, Step> = {
     gb.nextJoiner += 1;
     sequence += 1;
 
-    const meta: Record<string, string> = { activityId: String(gb.activityId) };
-    if (gb.openGroupId !== null && rng() < 0.7) meta['groupId'] = String(gb.openGroupId);
+    const meta: { activityId: string; groupId?: string } = { activityId: String(gb.activityId) };
+    if (gb.openGroupId !== null && rng() < 0.7) meta.groupId = String(gb.openGroupId);
 
     const detail = await order.create(as(userId), {
       source: 'buy-now',

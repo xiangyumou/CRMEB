@@ -585,6 +585,15 @@ Over real HTTP, submitting an order with an already spent coupon is refused befo
 
 - `apps/web/app/api/v1/checkout.int.test.ts::/api/v1/checkout and /api/v1/orders > refuses a coupon that was already spent, and writes nothing`
 
+### ORDER-009
+
+`kind` and `kindMeta` are one discriminated union: a group-buy or presale order carries its own typed payload, a key its kind does not declare is stripped, an ordinary order's `kindMeta` is discarded, and every payload the legacy client sends still parses. Nothing inside `kindMeta` can overrule `kind`, so an ordinary order is never priced at an activity price.
+
+- `packages/contracts/src/order/checkout-kind.test.ts::ORDER-009 — typed kindMeta > what the legacy client sends still parses > previews <label>`
+- `packages/contracts/src/order/checkout-kind.test.ts::ORDER-009 — typed kindMeta > what the union tightens > strips a key the kind does not declare, above all a smuggled kind`
+- `packages/contracts/src/order/checkout-kind.test.ts::ORDER-009 — typed kindMeta > what the union tightens > discards whatever kindMeta an ordinary order carries`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::ORDER-009 — a kind smuggled into kindMeta never reprices an ordinary order`
+
 ## Orders, ownership and the cashier
 
 ### ORDER-005
@@ -677,6 +686,29 @@ The staff console (mobile order management) admits exactly the shoppers on the o
 - `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > 403s a shopper who is not on the list`
 - `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > lets somebody on the list in, and lets them ship`
 - `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > tells an ordinary shopper they are not staff rather than 403ing them`
+
+### AUTH-006
+
+The mini-program sign-in counts only codes WeChat refused against a per-address budget (20 per 10 minutes); past it the address is refused with `RATE_LIMITED` without asking WeChat, a code WeChat accepted never counts, and another address is untouched.
+
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-006 — stops asking WeChat for an address that sent 20 codes WeChat refused`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-006 — never counts a code WeChat accepted`
+
+### AUTH-007
+
+A parked mini-program sign-in survives a phone code WeChat refused, and the same bind token can instead be finished with an SMS code on `POST /auth/sessions/wechat-oa/phone`, which links the mini openid so the next launch is silent.
+
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-007 — keeps the bind token when WeChat refuses the phone code`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-007 — finishes a mini sign-in with an SMS code instead, and links the mini openid`
+
+### AUTH-008
+
+A known mini-program openid renews silently: `signed-in`, `registered: false`, the same account, a fresh token of `sessionTtlDays` recorded as `wechat-mini`, no new account or identity, and the shopper's other sessions stay alive; `registered` is true only on the call that created the account, and a disabled account is not renewed.
+
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — renews an expired session silently: the same account, registered false, a fresh token of sessionTtlDays`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — leaves the shopper’s other sessions alone when renewing`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — refuses to renew a disabled account`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — says registered only on the call that created the account`
 
 ## Fulfilment, the order console and invoices
 
@@ -1003,6 +1035,39 @@ One phone number is one account and one openid is one account, however many regi
 
 - `packages/core/src/user/user.concurrency.int.test.ts::registration > six concurrent creations of one phone number leave one account`
 - `packages/core/src/user/user.concurrency.int.test.ts::registration > six taps on 微信登录 create one account and sign every caller into it`
+
+### USER-016
+
+A customer keeps at most 20 live 发票抬头 and at most one default, including when their own writes race: every write to one customer's book queues on a per-user advisory lock, so six simultaneous promotions all succeed and leave one default, six simultaneous first titles leave one default, and creates racing the cap let exactly the free slots through.
+
+- `packages/core/src/user/invoice-title.int.test.ts::invoice titles > USER-016 — refuses a title past the cap of 20`
+- `packages/core/src/user/invoice-title.int.test.ts::USER-016 — one customer’s title writes, raced > leaves exactly one default when six titles are promoted at once, and every caller succeeds`
+- `packages/core/src/user/invoice-title.int.test.ts::USER-016 — one customer’s title writes, raced > makes exactly one of six simultaneous first titles the default`
+- `packages/core/src/user/invoice-title.int.test.ts::USER-016 — one customer’s title writes, raced > lets exactly the free slots through when six creates race the cap`
+
+### USER-017
+
+A saved 发票抬头 always prefills a `POST /orders/:id/invoice` body the route accepts: the title form and the request share one header schema and its rules, the service re-checks them after trimming, and `invoiceRequestFromTitle` copies only the non-empty header fields.
+
+- `packages/contracts/src/user/invoice-title.test.ts::USER-017 — a saved title prefills the invoice request > copies <label> into a body the request schema accepts`
+- `packages/core/src/user/invoice-title.int.test.ts::invoice titles > USER-017 — every saved title prefills a request body the invoice route accepts`
+
+### USER-018
+
+A 发票抬头 belongs to the customer who saved it: reading, editing, deleting or promoting somebody else's title answers exactly like one that does not exist, and changes nothing.
+
+- `packages/core/src/user/invoice-title.int.test.ts::invoice titles > USER-018 — never reads, edits, deletes or promotes another customer’s title`
+- `apps/web/app/api/v1/user.int.test.ts::/api/v1/invoice-titles > USER-018 — keeps every title route to its owner: a stranger gets 404 on all four`
+
+### USER-019
+
+A shopper's avatar is a picture we hold: `PUT /profile` takes an `avatarUrl` only when it is a live image in our storage, the account's current avatar re-sent, or the shop's configured default avatar (`''` clears it); anything else is `USER_AVATAR_NOT_ALLOWED` and nothing in the request is saved.
+
+- `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > takes an image our uploads stored, whoever uploaded the bytes first`
+- `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > refuses a URL on somebody else’s server, and changes nothing`
+- `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > refuses a deleted attachment and one that is not an image`
+- `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > takes the current avatar back unchanged, as every legacy save re-sends it`
+- `apps/web/app/api/v1/user.int.test.ts::/api/v1/profile > USER-019 — takes the avatar our upload returned and refuses one on another server`
 
 ## Coupons
 
@@ -1530,6 +1595,37 @@ A save is refused whole when the schema rejects a value or the group does not de
 - `packages/core/src/system/system.int.test.ts::config > refuses a value the schema rejects, and writes nothing`
 - `packages/core/src/system/system.int.test.ts::config > refuses a key the group does not declare`
 
+### SYS-014
+
+`GET /api/v1/app/config` is public and never carries a secret: every `secret: true` field of every registered config group, given a distinctive stored value, is absent from the serialised payload.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-014 — the app config leaks nothing > answers a request with no session, and the answer matches the contract`
+- `packages/core/src/system/app-config.int.test.ts::SYS-014 — the app config leaks nothing > cannot leak any secret in any registered group`
+
+### SYS-015
+
+The `storefront-appearance` group answers a fresh install with every field defaulted (the contract's `appAppearanceDefaults`), always yields exactly the four fixed tabs — 首页, 分类, 购物车, 我的 — in that order, falls back to the default label when one is blanked, and refuses any colour that is not `#RRGGBB` (and a radius off the scale, and an over-long label) whole, writing nothing.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > answers a fresh install with every appearance default`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the theme and the tab bar the operator saved`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > falls back to the default label when the operator blanks one`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > refuses <label>, and writes nothing`
+- `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — hexColor > refuses <label>`
+- `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — appearance defaults > are a valid appearance, with the four fixed tabs in order`
+
+### SYS-016
+
+A save to any group `GET /api/v1/app/config` is built from drops its cache and moves its `version` (the weak `ETag`) at once, a save to any other group does not, and a caller holding the current version gets a bodyless 304. The values it shares with `GET /api/v1/site/config` and with `GET /api/v1/wechat/subscribe-templates` are built by the same code and agree with them.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > is built from exactly the groups that drop its cache`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > drops the cache and moves the version when <label> is saved`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > leaves the cache alone when a group it does not read is saved`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > carries the same subscribe ids as GET /wechat/subscribe-templates, all four scenes`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > says whether a first WeChat sign-in will ask for a phone`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > agrees with GET /site/config on every value the two share`
+- `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > answers a caller holding the current version with a bodyless 304`
+- `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > sends the new settings once the <label> group is saved`
+
 ### SYSC-001
 
 Six concurrent disables of one account report exactly one session revocation, and the sessions are gone once.
@@ -1637,11 +1733,13 @@ Identical bytes are stored once: the second upload returns the existing row.
 
 ### STOR-010
 
-The storefront upload needs a shopper session, takes images only, enforces a per-user hourly budget and answers with the file rather than the library row.
+The storefront upload needs a shopper session, takes images only (never an SVG, whatever it is named), refuses a file over the shopper size ceiling, enforces a per-user hourly budget and answers with the file rather than the library row.
 
 - `apps/web/app/admin-api/attachments/storage.int.test.ts::/api/v1/uploads > requires a shopper session`
 - `packages/core/src/storage/storage.int.test.ts::storefront upload > enforces the per-user hourly budget`
 - `packages/core/src/storage/storage.int.test.ts::storefront upload > accepts an image and answers with the file, not the library`
+- `packages/core/src/storage/storage.int.test.ts::storefront upload > refuses an SVG from a shopper whatever it is called`
+- `packages/core/src/storage/storage.int.test.ts::storefront upload > refuses an image over the shopper ceiling, and stores nothing`
 
 ### STOR-011
 
