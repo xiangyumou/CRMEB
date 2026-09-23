@@ -27,7 +27,7 @@ into `storefront/mini` yet. Until it is, the activity pages hand checkout what S
 
 ## In progress
 
-- Pages.
+- Pages: 领券中心, 我的优惠券, 我的拼团 done (with tests); next the 拼团 and 预售 pages.
 
 ## Next
 
