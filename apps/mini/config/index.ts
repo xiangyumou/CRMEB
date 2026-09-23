@@ -14,7 +14,10 @@ const repoRoot = path.resolve(appRoot, '../..');
  * workspace package by symlink and webpack resolves it to its real path, which is neither.
  * Without this, `import … from '@shop/contracts/…'` fails with "no loader for .ts".
  */
-const workspaceSources = [path.join(repoRoot, 'packages/contracts/src')];
+const workspaceSources = [
+  path.join(repoRoot, 'packages/contracts/src'),
+  path.join(repoRoot, 'packages/storefront-blocks/src'),
+];
 
 /**
  * Dependencies that ship syntax newer than our target (babel.config.js): TanStack Query's
@@ -35,9 +38,14 @@ function designWidth(input?: string | number | { file?: string | undefined }): n
   return file.replace(/\\+/g, '/').includes('@nutui') ? 375 : 750;
 }
 
+interface ChainSet {
+  add: (value: string) => ChainSet;
+}
+
 interface Chain {
   plugin: (name: string) => { use: (plugin: unknown, args?: unknown[]) => void };
   performance: { hints: (value: false) => void };
+  resolve: { modules: ChainSet };
 }
 
 function webpackChain(chain: Chain) {
@@ -47,6 +55,11 @@ function webpackChain(chain: Chain) {
   const platform = process.env.TARO_ENV ?? 'weapp';
   const outFile = path.join(appRoot, '.bundle-stats', `${platform}.json`);
   chain.plugin('bundle-stats').use(BundleStatsPlugin, [outFile]);
+  // A last resort after the usual node_modules walk: Taro rewrites `@tarojs/components` to
+  // its platform plugin, which a workspace package compiled from source (storefront-blocks)
+  // cannot reach from its own directory.
+  // Taro leaves `resolve.modules` unset, so the walk has to be restated before the fallback.
+  chain.resolve.modules.add('node_modules').add(path.join(appRoot, 'node_modules'));
 }
 
 // https://docs.taro.zone/docs/next/config
@@ -67,6 +80,10 @@ export default defineConfig<'webpack5'>(async (merge) => {
     defineConstants: {},
     alias: {
       '@': path.join(appRoot, 'src'),
+      // A workspace package compiled from source (storefront-blocks) would otherwise
+      // resolve `react` from its own node_modules — React 19, its test devDependency —
+      // and render React 19 elements into this React 18 tree (React error #31).
+      react: path.join(appRoot, 'node_modules/react'),
     },
     copy: { patterns: [], options: {} },
     framework: 'react',
