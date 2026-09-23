@@ -10,7 +10,8 @@ export default defineAppConfig({
     {
       root: 'subpackages/demo',
       name: 'demo',
-      pages: ['pages/ui/index'],
+      // `pages/blocks` is spike S3's fixture page for the editor-canvas pixel comparison.
+      pages: ['pages/ui/index', 'pages/blocks/index'],
     },
   ],
   window: {
