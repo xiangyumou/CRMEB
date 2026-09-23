@@ -1160,7 +1160,7 @@ YAML
   [ "$rc" -eq 0 ] || return 1
   check 'it stopped nothing' lacks 'stopping the application services' "$workdir/config-only.log"
   check 'it saw the images were the running ones' grep -q 'only the Compose files can change' "$workdir/config-only.log"
-  check 'APP_VERSION still names the build that runs' lacks_fixed 'APP_VERSION=drill-config-only' "$settings"
+  check 'APP_VERSION still names the build that runs' [ "$(setting APP_VERSION)" != 'drill-config-only' ]
   check 'web was left alone' [ "$(container_of web)" = "$web_before" ]
   check 'worker was left alone' [ "$(container_of worker)" = "$worker_before" ]
   check 'the edge was recreated with the change' [ "$(container_of edge)" != "$edge_before" ]
