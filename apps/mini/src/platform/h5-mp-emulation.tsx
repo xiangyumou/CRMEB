@@ -5,6 +5,7 @@ import type {
   AvatarButtonProps,
   ChosenAddress,
   MiniPlatform,
+  OrderConfirmOutcome,
   PaymentOutcome,
   PhoneNumberButtonProps,
   SubscribeResult,
@@ -23,6 +24,8 @@ import type {
  * - `requestPayment` asks the harness to settle the transaction on the fake WeChat Pay gateway
  *   and deliver the signed notification to `/api/v1/webhooks/wechat-pay`, which is what WeChat
  *   does after a real payment sheet; the page then polls `payment.status` as it would on a phone.
+ * - `openOrderConfirm` (确认收货组件) asks the harness to mark the payment confirmed on the fake
+ *   `api.weixin.qq.com`, which the server then reads through `get_order`.
  *
  * Which WeChat user is "holding the phone" is test data: the harness writes it to
  * `localStorage[EMULATION_STORAGE_KEY]` before the app starts. Without one, a random user is
@@ -47,6 +50,8 @@ export interface EmulatedWechatUser {
   subscribe?: 'accept' | 'reject' | undefined;
   /** What 导入微信地址 returns; `null` = the shopper cancels. Default: a fixed address. */
   address?: ChosenAddress | null | undefined;
+  /** How the 确认收货 component ends. Default `confirm`. */
+  receipt?: 'confirm' | 'cancel' | 'fail' | undefined;
 }
 
 const DEFAULT_ADDRESS: ChosenAddress = {
@@ -158,4 +163,16 @@ export const emulationPlatform: MiniPlatform = {
   AvatarButton,
   chooseImages: pickImages,
   uploadFile: uploadWithFetch,
+  /**
+   * WeChat's 确认收货 page, answered by the test data. Confirming there is between the shopper
+   * and WeChat: the harness records it on the fake `api.weixin.qq.com`, whose `get_order` is
+   * what the server asks before it believes the page (C07).
+   */
+  async openOrderConfirm(target): Promise<OrderConfirmOutcome> {
+    const behaviour = emulatedUser().receipt ?? 'confirm';
+    if (behaviour === 'cancel') return { kind: 'cancelled' };
+    if (behaviour === 'fail') return { kind: 'failed', message: 'openBusinessView:fail (模拟)' };
+    await control('confirm-receipt', target);
+    return { kind: 'confirmed' };
+  },
 };

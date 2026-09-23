@@ -47,4 +47,6 @@ export const previewPlatform: MiniPlatform = {
   AvatarButton,
   chooseImages: pickImages,
   uploadFile: uploadWithFetch,
+  openOrderConfirm: () =>
+    Promise.resolve({ kind: 'failed', message: 'H5 预览不支持微信确认收货' } as const),
 };

@@ -1,7 +1,13 @@
 import { create } from 'zustand';
 import type { AppAppearance } from '@shop/contracts/system/app.schemas';
 import type { TabBarLook } from '@/platform';
-import { DEFAULT_PRIMARY, deriveTheme, themeStyle, type DerivedTheme } from './derive';
+import {
+  DEFAULT_PRIMARY,
+  deriveTheme,
+  themeInputOf,
+  themeStyle,
+  type DerivedTheme,
+} from './derive';
 
 /**
  * The shop's theme as the pages use it: derived tokens, the page-style string `PageShell`
@@ -43,10 +49,7 @@ export const useThemeStore = create<ThemeState>()((set, get) => ({
   tabBar: DEFAULT_TAB_BAR,
   revision: 0,
   applyAppearance: (appearance) => {
-    const theme = deriveTheme({
-      primary: appearance.theme.primaryColor,
-      price: appearance.theme.priceColor,
-    });
+    const theme = deriveTheme(themeInputOf(appearance.theme));
     const style = themeStyle(theme, appearance.theme.radius);
     const tabBar: TabBarLook = {
       color: appearance.tabBar.color,

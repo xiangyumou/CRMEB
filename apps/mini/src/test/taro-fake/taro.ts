@@ -59,7 +59,13 @@ export type RequestHandler = (option: {
   method: string;
   header: Record<string, string>;
   data?: string | undefined;
-}) => { statusCode: number; data: unknown } | Promise<{ statusCode: number; data: unknown }>;
+}) => RequestAnswer | Promise<RequestAnswer>;
+
+interface RequestAnswer {
+  statusCode: number;
+  data: unknown;
+  header?: Record<string, string>;
+}
 
 const unhandledRequest: RequestHandler = (option) => {
   throw new Error(`taro-fake: no request handler for ${option.method} ${option.url}`);
@@ -108,6 +114,8 @@ export const taroFake = {
   address: null as Record<string, string> | null,
   /** `chooseInvoiceTitle` resolves with this, or rejects (`null`: the shopper cancelled). */
   invoiceTitle: null as Record<string, string> | null,
+  /** What the 确认收货 component (`openBusinessView`) reports as `extraData.status`. */
+  businessViewStatus: 'success' as 'success' | 'fail' | 'cancel',
   /** `chooseMedia` temp paths, or `null` for a cancel. */
   media: ['wxfile://tmp/1.jpg'] as string[] | null,
   /** `uploadFile` answers this (a function: called per upload, for a sequence). */
@@ -162,6 +170,7 @@ export const taroFake = {
     this.address = null;
     this.invoiceTitle = null;
     this.media = ['wxfile://tmp/1.jpg'];
+    this.businessViewStatus = 'success';
     this.upload = { statusCode: 201, data: '{"url":"/uploads/a.png"}' };
     this.enterOptions = { path: 'pages/index/index', query: {}, scene: 1001 };
     this.shareHandlers = { message: null, timeline: null };
@@ -279,6 +288,7 @@ const Taro = {
   removeTabBarBadge: (args: unknown) => record('removeTabBarBadge', args, {}),
   setTabBarItem: (args: unknown) => record('setTabBarItem', args, {}),
   navigateTo: (args: unknown) => record('navigateTo', args, {}),
+  navigateToMiniProgram: (args: unknown) => record('navigateToMiniProgram', args, {}),
   redirectTo: (args: unknown) => record('redirectTo', args, {}),
   switchTab: (args: unknown) => record('switchTab', args, {}),
   reLaunch: (args: unknown) => record('reLaunch', args, {}),
@@ -324,6 +334,11 @@ const Taro = {
     record('downloadFile', args, {
       statusCode: 200,
       tempFilePath: `wxfile://tmp/${args.url.split('/').pop()}`,
+    }),
+  openBusinessView: (args: unknown) =>
+    record('openBusinessView', args, {
+      errMsg: 'openBusinessView:ok',
+      extraData: { status: taroFake.businessViewStatus },
     }),
   getEnterOptionsSync: () => taroFake.enterOptions,
   makePhoneCall: (args: unknown) => record('makePhoneCall', args, {}),

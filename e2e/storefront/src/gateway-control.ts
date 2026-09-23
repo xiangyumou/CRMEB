@@ -40,7 +40,13 @@ import type { FakeOaServer } from '@shop/testing/wechat';
  *    `prepay_id=` package and nothing else. The fake gateway maps the
  *    `prepay_id` back to the transaction the server placed (an unknown one
  *    is a 409: a bug in the page, not a payment); then `complete-payment`'s
- *    two steps.
+ *    two steps;
+ *  - `mini/confirm-receipt` `{ transactionId } | { merchantId, merchantTradeNo }`:
+ *    the shopper tapping 确认收货 in WeChat's own component
+ *    (`openBusinessView('weappOrderConfirm')`). WeChat records it on its side,
+ *    so the fake's `get_order` answers `order_state` 3 from then on; the
+ *    server still has to ask (C07). A payment WeChat was never told about is a
+ *    409.
  *
  * Nothing here is a shortcut through domain code: both operations still go
  * through the real webhook route and the real signature the gateway would
@@ -153,6 +159,25 @@ export async function startGatewayControl(options: GatewayControlOptions): Promi
         return;
       }
       respond(res, 200, await settle(transaction.outTradeNo));
+      return;
+    }
+    if (action === 'confirm-receipt') {
+      const target = body as {
+        transactionId?: unknown;
+        merchantId?: unknown;
+        merchantTradeNo?: unknown;
+      };
+      const key =
+        typeof target.transactionId === 'string'
+          ? `tx:${target.transactionId}`
+          : `mch:${String(target.merchantId ?? '')}:${String(target.merchantTradeNo ?? '')}`;
+      const order = oa.tradeOrders.get(key);
+      if (!order) {
+        respond(res, 409, { error: `WeChat knows no payment ${key}` });
+        return;
+      }
+      order.orderState = 3;
+      respond(res, 200, { orderState: order.orderState });
       return;
     }
     respond(res, 404, { error: `unknown mini action ${action}` });

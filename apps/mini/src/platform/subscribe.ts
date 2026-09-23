@@ -1,3 +1,4 @@
+import type { AppSubscribeScene } from '@shop/contracts/system/app.schemas';
 import { platform } from './runtime';
 import type { SubscribeResult } from './types';
 
@@ -14,15 +15,14 @@ import type { SubscribeResult } from './types';
  * onClick = () => { const sub = subscribe('checkout'); submit().finally(() => sub) }
  * ```
  */
-export type SubscribeScene =
-  'checkout' | 'groupbuyCheckout' | 'presaleCheckout' | 'refundApply' | 'returnShipment';
+export type SubscribeScene = AppSubscribeScene;
 
 /** WeChat's limit per request. */
 export const MAX_TEMPLATES = 3;
 
 let templates: Partial<Record<SubscribeScene, readonly string[]>> = {};
 
-/** Template ids per scene, from `app/config` (src/app-config). */
+/** Template ids per scene: `app/config.subscribeScenes` (src/app-config). */
 export function setSubscribeTemplates(byScene: Partial<Record<SubscribeScene, readonly string[]>>) {
   templates = byScene;
 }
