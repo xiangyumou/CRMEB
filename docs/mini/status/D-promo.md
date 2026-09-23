@@ -28,6 +28,8 @@ shape through a cast.
 
 ## In progress
 
+- `docs/mini/pages.md` §2.5 rows and a 「D 流」 form-change list written.
+
 - Pages done with tests: 领券中心, 我的优惠券, 我的拼团, 拼团 list, 拼团商品 (activity), 拼团进度
   (team page), 预售 list, 预售商品. Every promo page is built.
 - Activity checkout: `features/promo/checkout.ts` stores B's draft shape (`source: 'buy-now'`,
@@ -37,7 +39,7 @@ shape through a cast.
 
 1. After B merges: `CheckoutDraft` with `kind`/`kindMeta` (drop the cast), replace B's poster
    stub on 商品详情.
-2. e2e specs-mini, pages.md, screenshots, checklist.
+2. e2e specs-mini (after B: reuse its CheckoutPage / CashierPage), screenshots, checklist.
 
 ## Decisions
 
