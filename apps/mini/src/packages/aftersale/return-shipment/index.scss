@@ -17,15 +17,11 @@
 
   &__link {
     @include text($font-caption);
-    color: var(--color-primary);
+    color: var(--color-link);
   }
 
   &__placeholder {
     color: var(--color-text-tertiary);
-  }
-
-  &__fields {
-    background: var(--color-surface);
   }
 
   &__hint {

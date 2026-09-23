@@ -189,8 +189,6 @@ function Form({ refund }: { refund: RefundDetail }) {
           label={company ? `快递公司 ${company.name}` : '选择快递公司'}
           onClick={() => setPicking(true)}
         />
-      </CellGroup>
-      <View className="return-shipment__fields">
         <Field
           id="return-shipment-tracking"
           label="快递单号"
@@ -208,7 +206,7 @@ function Form({ refund }: { refund: RefundDetail }) {
           placeholder="选填，便于商家联系"
           onChange={setPhone}
         />
-      </View>
+      </CellGroup>
       <Text className="return-shipment__hint">请保留快递底单，商家签收后将为你退款</Text>
 
       <View className="return-shipment__bar">

@@ -28,11 +28,15 @@ order/after-sales specs in `e2e/storefront/specs-mini`.
   待发货 → admin ships (admin API) → 物流 → 确认收货 via WeChat's component → review held
   for moderation; cancel unpaid; refund → admin approves → 退款成功; return waybill. Green.
   The e2e seed now gives 顺丰/中通 their WeChat delivery codes (the upload needs them).
+- docs/mini/pages.md updated for the pages as built (form changes listed up top).
+- 375px H5 screenshots in `docs/mini/status/C-screens/` (seeded e2e data; product images are
+  blank because the e2e stack is offline). Taken with a throwaway spec against a warm stack and
+  `FONTCONFIG_FILE` pointing at a CJK font.
 - Merged storefront/mini with H2, then again with G1.
 
 ## In progress
 
-- docs/mini/pages.md form changes; screenshots; full checklist.
+- Full checklist, then the final report.
 
 ## Next
 
