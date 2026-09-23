@@ -128,7 +128,7 @@ export function siteConfigSourceGroups(): string[] {
 }
 
 /** `''` reads as "not filled in" everywhere in the config groups. */
-function orNull(value: string): string | null {
+export function orNull(value: string): string | null {
   const trimmed = value.trim();
   return trimmed === '' ? null : trimmed;
 }
@@ -242,7 +242,7 @@ async function buildSiteConfig(ctx: Ctx): Promise<SitePublicConfig> {
  * this endpoint is the first request the app makes, and a shop whose merchant
  * credentials are half filled in should still be able to show its logo.
  */
-async function paymentsOf(ctx: Ctx): Promise<SitePublicConfig['payments']> {
+export async function paymentsOf(ctx: Ctx): Promise<SitePublicConfig['payments']> {
   const payments: SitePublicConfig['payments'] = { wechat: false };
   await Promise.all(
     [...paymentMethods].map(async ([method, source]) => {
@@ -265,7 +265,7 @@ async function paymentsOf(ctx: Ctx): Promise<SitePublicConfig['payments']> {
  * shopper is sent to a login page whose one button answers
  * `AUTH_WECHAT_NOT_CONFIGURED` — so doubt resolves to "not offered".
  */
-async function authOf(ctx: Ctx): Promise<SitePublicConfig['auth']> {
+export async function authOf(ctx: Ctx): Promise<SitePublicConfig['auth']> {
   const auth: SitePublicConfig['auth'] = { wechatOa: false, wechatMini: false, phone: false };
   await Promise.all(
     [...authMethods].map(async ([method, source]) => {
@@ -291,7 +291,7 @@ async function authOf(ctx: Ctx): Promise<SitePublicConfig['auth']> {
  * `qrcodeUrl` rides alongside `kind` rather than inside it: `kefuIcon` shows
  * the 客服二维码 on H5 whatever the mini-program is configured to do.
  */
-function supportOf(
+export function supportOf(
   site: { contactPhone: string; contactQrcode: string },
   mini: { enabled: boolean; contactType: 'mini-program' | 'phone'; contactPhone: string },
 ): SitePublicConfig['support'] {

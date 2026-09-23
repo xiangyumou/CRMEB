@@ -1595,6 +1595,37 @@ A save is refused whole when the schema rejects a value or the group does not de
 - `packages/core/src/system/system.int.test.ts::config > refuses a value the schema rejects, and writes nothing`
 - `packages/core/src/system/system.int.test.ts::config > refuses a key the group does not declare`
 
+### SYS-014
+
+`GET /api/v1/app/config` is public and never carries a secret: every `secret: true` field of every registered config group, given a distinctive stored value, is absent from the serialised payload.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-014 — the app config leaks nothing > answers a request with no session, and the answer matches the contract`
+- `packages/core/src/system/app-config.int.test.ts::SYS-014 — the app config leaks nothing > cannot leak any secret in any registered group`
+
+### SYS-015
+
+The `storefront-appearance` group answers a fresh install with every field defaulted (the contract's `appAppearanceDefaults`), always yields exactly the four fixed tabs — 首页, 分类, 购物车, 我的 — in that order, falls back to the default label when one is blanked, and refuses any colour that is not `#RRGGBB` (and a radius off the scale, and an over-long label) whole, writing nothing.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > answers a fresh install with every appearance default`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the theme and the tab bar the operator saved`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > falls back to the default label when the operator blanks one`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > refuses <label>, and writes nothing`
+- `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — hexColor > refuses <label>`
+- `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — appearance defaults > are a valid appearance, with the four fixed tabs in order`
+
+### SYS-016
+
+A save to any group `GET /api/v1/app/config` is built from drops its cache and moves its `version` (the weak `ETag`) at once, a save to any other group does not, and a caller holding the current version gets a bodyless 304. The values it shares with `GET /api/v1/site/config` and with `GET /api/v1/wechat/subscribe-templates` are built by the same code and agree with them.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > is built from exactly the groups that drop its cache`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > drops the cache and moves the version when <label> is saved`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > leaves the cache alone when a group it does not read is saved`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > carries the same subscribe ids as GET /wechat/subscribe-templates, all four scenes`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > says whether a first WeChat sign-in will ask for a phone`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > agrees with GET /site/config on every value the two share`
+- `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > answers a caller holding the current version with a bodyless 304`
+- `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > sends the new settings once the <label> group is saved`
+
 ### SYSC-001
 
 Six concurrent disables of one account report exactly one session revocation, and the sessions are gone once.

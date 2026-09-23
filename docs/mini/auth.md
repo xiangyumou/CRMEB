@@ -11,6 +11,8 @@
 - token 只存本地（`wx.setStorageSync`），不要打印到日志，不要拼进 URL。
 - 出错时响应体是 `{ code, message, details? }`。按 `code` 分支，`message` 可以直接给用户看。
 - 开关先看 `GET /api/v1/app/config`：`auth.wechatMini` 为 `false` 时小程序登录没开，只能走短信登录。
+  `auth.wechatRequiresPhone` 为 `true` 时，新用户第一次微信登录会得到 `phone-required`，可以提前把绑定手机号的界面准备好；
+  但仍以登录接口的实际返回为准。
 
 ## 启动：静默登录
 
