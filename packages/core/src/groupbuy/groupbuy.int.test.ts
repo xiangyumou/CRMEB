@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { and, eq, inArray } from 'drizzle-orm';
 import { products, productSkus } from '@shop/db/schema/catalog';
 import { notificationMessages, notificationTemplates } from '@shop/db/schema/notification';
-import { effects } from '@shop/db/schema/system';
+import { configValues, effects } from '@shop/db/schema/system';
 import { wechatIdentities } from '@shop/db/schema/wechat';
 import {
   groupbuyActivities,
@@ -68,7 +70,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await harness.db.truncateAll();
   // `truncateAll` empties the settings table but not the config cache, and a
-  // test that switches 虚拟成团 on would otherwise leak it into the next one.
+  // test that stores config would otherwise leak it into the next one.
   await harness.ctx.config.invalidate(groupbuyConfig.group);
   // The 人气条 is cached in Redis for a minute; without this a test reads the
   // previous test's count.
@@ -809,26 +811,39 @@ describe('the expiry sweep', () => {
     expect(await effectsFor(opened.orderId, 'groupbuy.refund')).toHaveLength(1);
   });
 
-  it('fills the team virtually when the shop has said it may', async () => {
+  it('RISK-D-006 — fails and refunds an under-filled team even with the retired 虚拟成团 switch stored as on', async () => {
     const fixture = await makeActivity({ seatsRequired: 3, ttlSeconds: 3_600, stock: 10 });
     const leader = await makeUser();
     const opened = await placeOrder({ userId: leader, fixture });
     await pay(opened.orderId);
-    await setVirtualFill(true);
+    await storeRetiredVirtualFill();
 
     harness.clock.set('2026-06-01T02:00:00.000Z');
     const report = await settleExpiredGroups(harness.ctx);
 
-    expect(report).toMatchObject({ succeeded: 1, refunds: 0 });
-    expect(await readGroup(opened.groupId)).toMatchObject({
-      status: 'succeeded',
-      seatsTaken: 3,
-    });
-    // One real buyer in a three-seat team: the admin list must say so.
+    expect(report).toMatchObject({ succeeded: 0, failed: 1, refunds: 1 });
+    expect(await readGroup(opened.groupId)).toMatchObject({ status: 'failed', seatsTaken: 1 });
+    expect(await effectsFor(opened.orderId, 'groupbuy.refund')).toHaveLength(1);
     const detail = await service.adminGroupDetail(asAdmin(['groupbuy:group:read']), {
       id: String(opened.groupId),
     });
-    expect(detail.virtuallyFilled).toBe(true);
+    expect(detail.virtuallyFilled).toBe(false);
+  });
+
+  it('RISK-D-006 — migration 0004 deletes a stored 虚拟成团 switch', async () => {
+    await storeRetiredVirtualFill();
+    const sql = readFileSync(
+      fileURLToPath(
+        new URL('../../../db/migrations/0004_groupbuy_virtual_fill_off.sql', import.meta.url),
+      ),
+      'utf8',
+    );
+    await harness.db.handle.pool.query(sql);
+    const left = await harness.ctx.db
+      .select()
+      .from(configValues)
+      .where(eq(configValues.group, 'groupbuy'));
+    expect(left.map((row) => row.key)).not.toContain('virtualFillOnExpiry');
   });
 
   it('cancels a team nobody ever paid into', async () => {
@@ -1166,7 +1181,7 @@ describe('the admin surface', () => {
     ).rejects.toMatchObject({ code: 'GROUPBUY_ACTIVITY_IN_USE' });
   });
 
-  it('refuses 立即成团 while the shop has 虚拟成团 switched off', async () => {
+  it('RISK-D-006 — refuses 立即成团 on an under-filled team, whatever the retired switch says', async () => {
     const fixture = await makeActivity({ stock: 10 });
     const leader = await makeUser();
     const opened = await placeOrder({ userId: leader, fixture });
@@ -1177,9 +1192,11 @@ describe('the admin surface', () => {
       service.adminGroupComplete(admin, { id: String(opened.groupId) }, {}),
     ).rejects.toMatchObject({ code: 'GROUPBUY_VIRTUAL_FILL_DISABLED' });
 
-    await setVirtualFill(true);
-    const detail = await service.adminGroupComplete(admin, { id: String(opened.groupId) }, {});
-    expect(detail).toMatchObject({ status: 'succeeded', seatsTaken: 3, virtuallyFilled: true });
+    await storeRetiredVirtualFill();
+    await expect(
+      service.adminGroupComplete(admin, { id: String(opened.groupId) }, {}),
+    ).rejects.toMatchObject({ code: 'GROUPBUY_VIRTUAL_FILL_DISABLED' });
+    expect(await readGroup(opened.groupId)).toMatchObject({ status: 'forming', seatsTaken: 1 });
   });
 
   it('keeps the sales counter across an edit', async () => {
@@ -1255,8 +1272,15 @@ async function allMembers(groupId: number) {
     .orderBy(groupbuyMembers.id);
 }
 
-async function setVirtualFill(enabled: boolean): Promise<void> {
-  await harness.ctx.config.set(groupbuyConfig, { virtualFillOnExpiry: enabled });
+/**
+ * What a shop that had 虚拟成团 switched on before 2026-09-23 still has stored:
+ * the key the `groupbuy` group no longer declares.
+ */
+async function storeRetiredVirtualFill(): Promise<void> {
+  await harness.ctx.db
+    .insert(configValues)
+    .values({ group: 'groupbuy', key: 'virtualFillOnExpiry', value: true });
+  await harness.ctx.config.invalidate(groupbuyConfig.group);
 }
 
 // ---------------------------------------------------------------------------

@@ -13,10 +13,17 @@ route-catalogue adoption (after R0 merges) → merge checklist.
    - `pageQuery.page/pageSize` input typed `number | string` (was `unknown`); wire format unchanged.
    - `X-Client-Version` parsed in `handle()` into `ctx.clientVersion` (optional; junk ignored).
 
+2. Group-buy 虚拟成团 off for good
+   - `virtualFillOnExpiry` removed from the `groupbuy` config group (so off the settings screen);
+     a stored value is stripped on read; migration `0004_groupbuy_virtual_fill_off` deletes it
+     (rollback safety). Expiring under-filled teams fail and refund.
+   - 立即成团 refuses every under-filled team (`GROUPBUY_VIRTUAL_FILL_DISABLED`, new message);
+     admin alert text updated. RISK-D-006 rewritten; compliance C02 updated.
+
 ## In progress
 
-- 2: group-buy virtual fill off.
+- 3: fakes (single-use mini codes; prepay_id → order in the fake pay gateway).
 
 ## Next
 
-- 3 fakes, 5 发货信息管理, 6 content security, 4 route catalogue (after R0), checklist.
+- 5 发货信息管理, 6 content security, 4 route catalogue (R0 merged at 6b4f48b96), checklist.

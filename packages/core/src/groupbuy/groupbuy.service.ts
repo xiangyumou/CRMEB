@@ -284,9 +284,10 @@ export async function adminGroupDetail(
 /**
  * 立即成团.
  *
- * Gated on its own permission atom (`groupbuy:group:complete`) and on the
- * shop-wide 虚拟成团 switch: an operator may not fake a team in a shop that has
- * decided not to fake teams.
+ * Gated on its own permission atom (`groupbuy:group:complete`), and it never
+ * invents members: 虚拟成团 is off for good (2026-09-23; see
+ * `groupbuy.config.ts`), so an under-filled team is refused with
+ * `GROUPBUY_VIRTUAL_FILL_DISABLED` and settles at its deadline like any other.
  */
 export async function adminGroupComplete(
   ctx: Ctx,
@@ -294,13 +295,12 @@ export async function adminGroupComplete(
   body: { reason?: string | undefined },
 ): Promise<GroupbuyGroupDetail> {
   const id = Number(input.id);
-  const config = await ctx.config.get(groupbuyConfig);
 
   await ctx.withTx(async (tx) => {
     const group = await repo.lockGroup(tx, id);
     if (!group) throw new DomainError('GROUPBUY_GROUP_NOT_FOUND');
     assertCompletable(group);
-    if (group.seatsTaken < group.seatsTotal && !config.virtualFillOnExpiry) {
+    if (group.seatsTaken < group.seatsTotal) {
       throw new DomainError('GROUPBUY_VIRTUAL_FILL_DISABLED', {
         details: { seatsTaken: group.seatsTaken, seatsTotal: group.seatsTotal },
       });

@@ -379,18 +379,15 @@ describe('SMOKE-012 — a team succeeds once, and says so once', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * A team an operator completes (立即成团) must say so, like one the expiry path
- * completes. `adminGroupComplete` fills the seats and moves the team to
- * `succeeded` through `virtuallyFillAndSucceed`, the same update `settleGroup`
- * makes; without its own `groupbuy.settle` effect, whatever the notification
- * domain hangs off that effect (拼团成功 to the leader and the members) would
- * never fire for a manually completed team.
+ * 立即成团 never invents members (虚拟成团 is off for good, 2026-09-23). An
+ * operator pressing it on an under-filled team is refused and records nothing,
+ * and the team settles at its deadline like any other: it fails, and the
+ * failure is the one `groupbuy.settle` it ever records.
  */
 describe('立即成团 says so', () => {
-  it('records one groupbuy.settle effect when an operator completes a team', async () => {
+  it('RISK-D-006 — refuses an under-filled team and records no groupbuy.settle', async () => {
     const leader = await makeShopper('团长');
     const groupId = await openTeam(leader);
-    await harness.ctx.config.set(groupbuyConfig, { virtualFillOnExpiry: true });
     const operator = harness.as({
       kind: 'admin',
       id: 1,
@@ -398,45 +395,21 @@ describe('立即成团 says so', () => {
       isSuper: true,
     });
 
-    const detail = await service.adminGroupComplete(operator, { id: String(groupId) }, {});
-    expect(detail).toMatchObject({ status: 'succeeded', virtuallyFilled: true });
-
-    const settled = await effectsOf('groupbuy', String(groupId), 'groupbuy.settle');
-    expect(settled).toHaveLength(1);
-    expect(settled[0]!.payload).toMatchObject({ outcome: 'succeeded', virtual: true });
-  });
-
-  it('says so once: a second press, the expiry timer and the sweep record nothing more', async () => {
-    const leader = await makeShopper('团长');
-    const groupId = await openTeam(leader);
-    await harness.ctx.config.set(groupbuyConfig, { virtualFillOnExpiry: true });
-    const operator = harness.as({
-      kind: 'admin',
-      id: 1,
-      permissions: ['groupbuy:group:complete'],
-      isSuper: true,
-    });
-    await service.adminGroupComplete(operator, { id: String(groupId) }, {});
-    const { succeededAt } = await readTeam(groupId);
-
-    const again = await service.adminGroupComplete(operator, { id: String(groupId) }, {}).then(
+    const refused = await service.adminGroupComplete(operator, { id: String(groupId) }, {}).then(
       () => null,
       (caught: unknown) => caught,
     );
-    expect((again as DomainError | null)?.code).toBe('GROUPBUY_GROUP_NOT_COMPLETABLE');
+    expect((refused as DomainError | null)?.code).toBe('GROUPBUY_VIRTUAL_FILL_DISABLED');
+    expect(await readTeam(groupId)).toMatchObject({ status: 'forming' });
+    expect(await effectsOf('groupbuy', String(groupId), 'groupbuy.settle')).toEqual([]);
+
     harness.clock.set(new Date(Date.parse(NOW) + 2 * 86_400_000).toISOString());
-    await drainEffects(harness.ctx, { baseBackoffMs: 0, maxBackoffMs: 0 });
-    expect(await settleGroup(harness.ctx, groupId)).toMatchObject({ outcome: 'unchanged' });
     await settleExpiredGroups(harness.ctx);
     await drainEffects(harness.ctx, { baseBackoffMs: 0, maxBackoffMs: 0 });
 
-    expect(await readTeam(groupId)).toMatchObject({ status: 'succeeded', succeededAt });
+    expect(await readTeam(groupId)).toMatchObject({ status: 'failed' });
     const settled = await effectsOf('groupbuy', String(groupId), 'groupbuy.settle');
     expect(settled).toHaveLength(1);
-    expect(settled[0]!.payload).toMatchObject({
-      outcome: 'succeeded',
-      virtual: true,
-      manual: true,
-    });
+    expect(settled[0]!.payload).toMatchObject({ outcome: 'failed', virtual: false });
   });
 });

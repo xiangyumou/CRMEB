@@ -1153,12 +1153,13 @@ An expired under-filled team refunds every paid member exactly once, through the
 
 ### RISK-D-006
 
-虚拟成团 is an act with a permission and an audit row, not a string argument: 立即成团 is refused when the shop has the feature switched off, and refused to an admin who may read teams but not complete them. A team completed by 立即成团 records exactly one `groupbuy.settle` effect, as the expiry path does.
+虚拟成团 never happens (decided 2026-09-23: the mini-program is the only storefront, and a team completed with invented members reads as a fake transaction there). A team that has not filled by its deadline fails and every paid member is refunded, even in a shop that had the retired `virtualFillOnExpiry` switch stored as on; migration `0004_groupbuy_virtual_fill_off` deletes that stored key so a rollback to the previous image cannot revive it. 立即成团 is refused on an under-filled team whatever is stored, records no `groupbuy.settle`, and is refused to an admin who may read teams but not complete them.
 
-- `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > refuses 立即成团 while the shop has 虚拟成团 switched off`
-- `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > fills the team virtually when the shop has said it may`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > RISK-D-006 — fails and refunds an under-filled team even with the retired 虚拟成团 switch stored as on`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > RISK-D-006 — migration 0004 deletes a stored 虚拟成团 switch`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > RISK-D-006 — refuses 立即成团 on an under-filled team, whatever the retired switch says`
 - `apps/web/app/admin-api/groupbuy-activities/groupbuy.int.test.ts::/admin-api/groupbuy-groups and /admin-api/groupbuy-statistics > refuses 立即成团 to an admin who may read teams but not complete them`
-- `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::立即成团 says so > records one groupbuy.settle effect when an operator completes a team`
+- `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::立即成团 says so > RISK-D-006 — refuses an under-filled team and records no groupbuy.settle`
 
 ### RISK-D-007
 
