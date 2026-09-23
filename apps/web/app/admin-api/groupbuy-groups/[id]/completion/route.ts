@@ -5,9 +5,9 @@ import { handle } from '../../../../../src/server';
 /**
  * `/admin-api/groupbuy-groups/:id/completion` — 立即成团.
  *
- * Its own permission atom (`groupbuy:group:complete`) and, inside the service,
- * the shop-wide 虚拟成团 switch: an operator may not fake a team in a shop that
- * has decided not to fake teams, and having the 拼团 menu is not enough.
+ * Its own permission atom (`groupbuy:group:complete`), and never on an
+ * under-filled team: 虚拟成团 is off for good, so the service refuses to invent
+ * members.
  */
 export const POST = handle(groupbuyAdminGroupComplete, async (ctx, { params, body }) => {
   const group = await groupbuy.adminGroupComplete(ctx, params, body);

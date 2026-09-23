@@ -126,10 +126,17 @@ export {
   shipmentsOfOrder,
   sweepAutoReceive,
   sweepCompletions,
+  requireOwnOrder,
+  shipmentReportFacts,
   trackShipment,
   updateShipment,
 } from './order.fulfil.service';
-export type { ReceiptInput, ReceiptOutcome, ShipInput } from './order.fulfil.service';
+export type {
+  ReceiptInput,
+  ReceiptOutcome,
+  ShipInput,
+  ShipmentReportFacts,
+} from './order.fulfil.service';
 
 export * as orderConsole from './order.console.service';
 export * as orderInvoices from './order.invoice.service';
@@ -146,10 +153,12 @@ export {
   registerFulfilmentNotifier,
   registerLogisticsPort,
   registerStaffRefundPort,
+  registerWechatReceiptVerifier,
   resetFulfilmentPorts,
   resolveFulfilmentNotifier,
   resolveLogisticsPort,
   resolveStaffRefundPort,
+  resolveWechatReceiptVerifier,
 } from './order.fulfil.ports';
 export type {
   FulfilmentNotice,
@@ -158,4 +167,6 @@ export type {
   StaffRefundPort,
   TrackingResult,
   TrackingTrace,
+  WechatReceiptVerdict,
+  WechatReceiptVerifier,
 } from './order.fulfil.ports';

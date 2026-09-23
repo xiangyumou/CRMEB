@@ -13,6 +13,7 @@ import { fromId, toId } from '../kernel/ids';
 import * as fulfilRepo from './order.fulfil.repo';
 import { requireOrderRef } from './order.ref';
 import * as repo from './order.repo';
+import { checkText } from '../wechat';
 
 /**
  * 发票.
@@ -146,6 +147,15 @@ export async function request(
   body: InvoiceRequestBody,
 ): Promise<OrderInvoice> {
   const { orderId, userId } = await requireOrderRef(ctx, params.id);
+  // 内容安全 (C09, CONTENT-003): the 抬头 is screened by WeChat before anything
+  // is written. `risky` refuses it; WeChat unreachable lets it through.
+  const verdict = await checkText(ctx, {
+    userId,
+    content: body.name,
+    scene: 1,
+    what: 'invoice-title',
+  });
+  if (verdict === 'risky') throw new DomainError('ORDER_INVOICE_TITLE_REJECTED');
 
   const invoiceId = await ctx.withTx(async (tx): Promise<number> => {
     const order = await repo.findOrderForUser(tx, { id: orderId, userId });

@@ -194,6 +194,20 @@ export const cartUpdateItem = defineRoute({
 });
 
 /**
+ * The same operation as `cart.updateItem`, on `PUT`.
+ *
+ * `wx.request` has no `PATCH`, so the mini-program cannot call `cart.updateItem`.
+ * Same body, same service, same answers; the legacy uni-app keeps its `PATCH`
+ * until it is retired.
+ */
+export const cartUpdateItemPut = defineRoute({
+  ...cartUpdateItem,
+  id: 'cart.updateItemPut',
+  method: 'PUT',
+  summary: '修改购物车商品（PUT，小程序）',
+});
+
+/**
  * 减少数量 by variant — the minus button on the product detail page.
  *
  * A conditional update, so two taps that arrive together take one unit each and

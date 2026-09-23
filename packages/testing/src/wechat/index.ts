@@ -13,3 +13,4 @@
  */
 export * from './fake-gateway';
 export * from './fake-oa-server';
+export * from './mini-push';

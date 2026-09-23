@@ -834,6 +834,115 @@ An invoice can only be asked for on an order that was paid for and not refunded,
 - `packages/core/src/order/order.invoice.int.test.ts::申请开票 > refuses an order whose money went back`
 - `packages/core/src/order/order.invoice.int.test.ts::what the buyer can see > tells a stranger the invoice does not exist`
 
+## 小程序发货信息管理 (WeChat mini-program shipping)
+
+### WXSHIP-001
+
+A shipment of an order paid through the mini program (`payment_attempts.channel = wechat_mini`) is reported to WeChat's 发货信息管理 (`upload_shipping_info`) after its transaction commits, through the effects ledger, keyed by the payment's `transaction_id` and the payer's openid. One shipment that sends everything is one unified upload (`delivery_mode: 1`); a split delivery is one express upload per shipment in dispatch order, `is_all_delivered` on the last. 顺丰 carries the masked receiver phone, a virtual delivery is `logistics_type: 3` with no waybill. A payment through any other channel, or any payment while 录入发货信息 is off, is never reported.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > uploads one unified express shipment with the carrier’s WeChat code — WXSHIP-001`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > adds the masked receiver phone for 顺丰 — WXSHIP-001`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > reports a split delivery in parts, the last one saying all delivered — WXSHIP-001`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > reports a virtual delivery as logistics_type 3 without a waybill — WXSHIP-001`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > reports nothing for a payment made outside the mini program, or while switched off — WXSHIP-001`
+
+### WXSHIP-002
+
+An upload WeChat refused is retried by the ledger, and one WeChat already has (`10060002`, `10060023`) finishes as reported. An express shipment whose carrier has no 微信快递编码 is not sent with a guess: the effect waits, and goes out once an operator fills the code in.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > waits, retrying, while the carrier has no WeChat code — and sends once it is filled in — WXSHIP-002`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > retries a WeChat refusal, and finishes on “already shipped” — WXSHIP-002`
+
+### WXSHIP-003
+
+修改发货信息 on a reported shipment re-uploads it at most once, which is WeChat's own limit; a second correction is not sent.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > corrects a reported waybill once, as WeChat allows, and never twice — WXSHIP-003`
+
+### WXSHIP-004
+
+The mini program's push URL (`/api/v1/webhooks/wechat-mini`) acts only on a delivery signed with our token, fresh (±5 minutes), single-use for its signature triple, and — in 安全/兼容模式 — decrypted with our AES key and addressed to our appid; in 安全模式 a plaintext delivery is refused. A known event becomes one ledger row however often WeChat re-delivers it; an unknown event is acknowledged and dropped.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > answers the URL check only when it is signed with our token — WXSHIP-004`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > refuses a bad signature, a plaintext push in 安全模式, a stale one and a reused nonce — WXSHIP-004`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > accepts plain JSON when 明文模式 is configured, and drops events nobody handles — WXSHIP-004`
+
+### WXSHIP-005
+
+WeChat's settlement push (`trade_manage_order_settlement`) moves a shipped order to received through the same conditional transition the buyer's 确认收货 and the auto-receive job use: a push repeated, and a push racing the buyer's tap, leave exactly one receipt.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > moves the order to received on a settlement push, once, however often WeChat repeats it — WXSHIP-005`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > stamps the settlement when the money moves, without moving the order again — WXSHIP-005`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > leaves one receipt when the settlement push and the buyer’s tap race — WXSHIP-005`
+
+### WXSHIP-006
+
+The 确认收货 component (`GET /api/v1/orders/:id/wechat-receipt`) is handed a payment number only for the signed-in shopper's own order, once it is shipped and WeChat was told everything left; a stranger's order is `ORDER_NOT_FOUND`. A receipt confirmed through the component (`{ via: 'wechat-component' }`) moves the order only after WeChat's `get_order` says the buyer confirmed; otherwise `ORDER_WECHAT_RECEIPT_UNCONFIRMED` and the order stays shipped.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > hands the payment number to the order’s owner only — WXSHIP-006`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > answers null for an order WeChat was not told about — WXSHIP-006`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > moves the order only once WeChat’s get_order says the buyer confirmed — WXSHIP-006`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > refuses the component path for an order that was never reported — WXSHIP-006`
+
+### WXSHIP-007
+
+WeChat's shipping reminder and its 已纳入发货信息管理 notice reach operators as in-app notices. 同步 (`is_trade_managed` + `set_msg_jump_path`) is an operator's action with `payment:config:write`, run by hand rather than on a config save, and says so when the mini program is not configured or WeChat refuses.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > tells operators about WeChat’s shipping reminder and about being put under management — WXSHIP-007`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > records WeChat’s answer and points messages at the order page — WXSHIP-007`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > says so when the mini program is not configured, and when WeChat refuses — WXSHIP-007`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > is an admin’s, not a shopper’s — WXSHIP-007`
+
+## 内容安全 (WeChat content security)
+
+The policy table and the reasons are in `docs/mini/wechat-compliance.md` C09 and at the top of `packages/core/src/wechat/wechat.sec-check.ts`.
+
+### CONTENT-001
+
+Review text a customer submits is checked by WeChat's `msgSecCheck` (scene 2, the author's mini-program openid) before it is saved, and is **never refused** for what it says: `risky`, `review`, or no answer at all (an errcode, or the call never arriving) saves it 待审核 with the reason in `moderation_reason`, and the answer is `moderation: 'pending'`, not an error. A held review is not public until an admin publishes it through 评价管理, and an admin may delete it instead. A `pass` publishes as configured. An account without a mini-program identity, or any account while 内容安全 is off, is not checked.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > publishes a review WeChat passes, checked as a comment for the author — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > saves a risky review 待审核 with a neutral answer, not an error — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds a review WeChat wants a person to look at — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds the review when WeChat cannot answer, rather than publishing it unchecked — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds the review when the call never arrives — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > publishes a held review once an admin approves it — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > lets an admin delete a held review — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > does not check an account without a mini-program identity, or while switched off — CONTENT-001`
+
+### CONTENT-002
+
+A changed nickname is refused (`USER_NICKNAME_REJECTED`) only when WeChat says `risky`, and the old one stays; `review` and WeChat being unavailable save it. An unchanged nickname is not sent to WeChat.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::nicknames and invoice titles are refused only when risky > refuses a risky nickname and keeps the old one — CONTENT-002`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::nicknames and invoice titles are refused only when risky > saves a nickname when WeChat cannot answer, and does not re-check an unchanged one — CONTENT-002`
+
+### CONTENT-003
+
+An invoice-title name — in the 抬头 book (create and update) and on an order's invoice request — is refused (`USER_INVOICE_TITLE_REJECTED`, `ORDER_INVOICE_TITLE_REJECTED`) only when WeChat says `risky`; WeChat being unavailable saves it.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::nicknames and invoice titles are refused only when risky > refuses a risky 抬头 in the book, and saves one when WeChat is down — CONTENT-003`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::nicknames and invoice titles are refused only when risky > refuses a risky 抬头 on an invoice request, and takes one when WeChat is down — CONTENT-003`
+
+### CONTENT-004
+
+Every distinct review picture is submitted to `mediaCheckAsync` (scene 2) after the review commits, through the ledger, as an absolute https address. A `risky` `wxa_media_check` verdict takes that picture off the review and nothing else; the verdict is stored with a conditional update on `submitted`, so a repeated or concurrent push acts once. A `pass` keeps the picture. A submission WeChat refuses is retried and the picture stays visible meanwhile; an account without a mini-program identity is `skipped`.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > sends each review picture once, as an absolute https address — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > takes a risky picture off the review, and a repeated verdict does nothing more — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > keeps a picture WeChat passes — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > keeps the picture and retries while WeChat refuses the submission — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > skips the picture check for an account without a mini-program identity — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > acts once when two different verdict pushes for one picture race — CONTENT-004`
+
+### CONTENT-005
+
+A newly stored avatar (not the current one, not the default) is submitted to `mediaCheckAsync` (scene 1). A `risky` verdict resets the avatar to the default only if the account still shows that picture, and then — only then — sends the in-app notice `user_avatar_rejected`.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > resets a risky avatar and tells the customer — CONTENT-005`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > leaves an avatar the customer has since replaced — CONTENT-005`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > does not check an avatar that did not change — CONTENT-005`
+
 ## Refunds
 
 ### REFUND-001
@@ -982,7 +1091,7 @@ A channel that fails retries only itself: the effect goes back to pending with t
 
 The events that can fire are compiled in, and a template row is seeded from the registry on first use with in-app on and every channel that costs money or needs a credential off.
 
-- `packages/core/src/notification/notification.int.test.ts::fan-out > seeds the template from the registry and writes the in-app message`
+- `packages/core/src/notification/notification.int.test.ts::fan-out > seeds the template from the registry and writes the in-app message — NOTIF-006`
 - `packages/core/src/notification/notification.int.test.ts::fan-out > does not send at all when the operator turned the event off`
 - `packages/core/src/notification/notification.int.test.ts::fan-out > sends in-app from a template shell the reference-data seed wrote with no channels`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::shopper notifications > lists the four events in 通知管理 with in-app on, over the empty shells the seed writes`
@@ -996,6 +1105,16 @@ Rendering cannot lose a message: an unknown placeholder renders empty rather tha
 - `packages/core/src/notification/notification.render.test.ts::render > renders an unknown placeholder as nothing, never as itself`
 - `packages/core/src/notification/notification.render.test.ts::render > does not re-render what a value itself contains`
 - `packages/core/src/notification/notification.render.test.ts::renderFields > drops a field that rendered empty instead of sending ""`
+
+### NOTIF-006
+
+A customer event names the mini-program page it opens as a route-catalogue key and a `{{…}}` params template, and registration refuses a key the catalogue does not mark `notify`. The template is filled first and validated second: a valid result is stored on the in-app message as `data.route` and is the subscribe message's `page` (`toMiniPath`), overriding the deprecated hand-typed page; a result that does not validate sends no destination rather than a wrong one.
+
+- `packages/core/src/notification/notification.render.test.ts::renderRoute > fills the params in first, then validates the route — NOTIF-006`
+- `packages/core/src/notification/notification.render.test.ts::renderRoute > answers null rather than a wrong destination when a variable is missing — NOTIF-006`
+- `packages/core/src/notification/notification.render.test.ts::renderRoute > refuses at registration a route the catalogue does not let a message open — NOTIF-006`
+- `packages/core/src/notification/notification.int.test.ts::fan-out > seeds the template from the registry and writes the in-app message — NOTIF-006`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::shopper notifications > tells every paid member 拼团成功 when the team fills, on every channel switched on — NOTIF-006`
 
 ### USER-010
 
@@ -1153,12 +1272,13 @@ An expired under-filled team refunds every paid member exactly once, through the
 
 ### RISK-D-006
 
-虚拟成团 is an act with a permission and an audit row, not a string argument: 立即成团 is refused when the shop has the feature switched off, and refused to an admin who may read teams but not complete them. A team completed by 立即成团 records exactly one `groupbuy.settle` effect, as the expiry path does.
+虚拟成团 never happens (decided 2026-09-23: the mini-program is the only storefront, and a team completed with invented members reads as a fake transaction there). A team that has not filled by its deadline fails and every paid member is refunded, even in a shop that had the retired `virtualFillOnExpiry` switch stored as on; migration `0005_groupbuy_virtual_fill_off` deletes that stored key so a rollback to the previous image cannot revive it. 立即成团 is refused on an under-filled team whatever is stored, records no `groupbuy.settle`, and is refused to an admin who may read teams but not complete them.
 
-- `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > refuses 立即成团 while the shop has 虚拟成团 switched off`
-- `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > fills the team virtually when the shop has said it may`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > RISK-D-006 — fails and refunds an under-filled team even with the retired 虚拟成团 switch stored as on`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > RISK-D-006 — migration 0004 deletes a stored 虚拟成团 switch`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > RISK-D-006 — refuses 立即成团 on an under-filled team, whatever the retired switch says`
 - `apps/web/app/admin-api/groupbuy-activities/groupbuy.int.test.ts::/admin-api/groupbuy-groups and /admin-api/groupbuy-statistics > refuses 立即成团 to an admin who may read teams but not complete them`
-- `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::立即成团 says so > records one groupbuy.settle effect when an operator completes a team`
+- `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::立即成团 says so > RISK-D-006 — refuses an under-filled team and records no groupbuy.settle`
 
 ### RISK-D-007
 
@@ -1498,6 +1618,23 @@ Every contract has a route file that exports its method, and every route file is
 
 - `guards/src/checks/contracts.test.ts::contracts and route files > matches every contract to a route file that exports its method`
 - `guards/src/checks/contracts.test.ts::leaves no route file that no contract describes`
+
+## Storefront share codes (小程序码)
+
+### SHARE-001
+
+`GET /api/v1/share/mini-codes` accepts only route-catalogue keys marked `miniCode`, and the code it answers opens exactly `storefrontRouteDef(key).path` with `encodeScene(route)` as the scene, which `decodeScene` reads back. The params are validated against the key before anything is looked up or minted: params that do not fit (an `id` on `home`, none on `product`) are `VALIDATION_FAILED` with no WeChat call and no row. It shares `/wechat/mini-qrcodes`'s `(page, scene)` cache, so one pair is minted once whichever endpoint asked first.
+
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > takes the page from the catalogue and the scene from encodeScene — SHARE-001`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > shares the (page, scene) cache with the legacy endpoint — SHARE-001`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > refuses params that do not fit the key, without calling WeChat — SHARE-001`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > refuses a key the catalogue does not mark miniCode — SHARE-001`
+
+### SHARE-002
+
+A 拼团 poster points at the team page from the route catalogue, not at a hand-typed path: `route` is `groupbuyTeam { id }`, and `page` and `qrPayload` are `toMiniPath(route)`.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the storefront surface > answers the poster with data and a payload, never an image — SHARE-002`
 
 ## System, storage and uploads
 

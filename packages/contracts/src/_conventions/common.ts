@@ -29,9 +29,15 @@ export const money = z.string().regex(/^(0|[1-9]\d{0,9})\.\d{2}$/, '金额格式
 /** Instants are ISO-8601 with offset. Stored as timestamptz. */
 export const instant = z.iso.datetime({ offset: true });
 
+/**
+ * `page` and `pageSize` arrive as strings on the wire; a typed client may hand
+ * over numbers. `z.coerce.number<number | string>()` parses exactly as a bare
+ * `z.coerce.number()` does, but declares its input as `number | string` rather
+ * than `unknown`, so `page: {}` is a compile error in `@shop/api-client`.
+ */
 export const pageQuery = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  page: z.coerce.number<number | string>().int().min(1).default(1),
+  pageSize: z.coerce.number<number | string>().int().min(1).max(100).default(20),
 });
 export type PageQuery = z.infer<typeof pageQuery>;
 
@@ -58,6 +64,17 @@ export function sortQuery<const K extends readonly [string, ...string[]]>(keys: 
 /** Which storefront client is calling; sent as the `X-Client-Platform` header. */
 export const clientPlatform = z.enum(['h5', 'wechat-oa', 'wechat-mini']);
 export type ClientPlatform = z.infer<typeof clientPlatform>;
+
+/**
+ * The storefront build's release version, sent as `X-Client-Version`
+ * (`1.4.0`, `1.4.0-beta.2`). Mini-program releases stay on phones for months,
+ * so the DIY resolver reads it to leave out what an old build cannot render.
+ * A header that does not parse is ignored, like an unknown platform.
+ */
+export const clientVersion = z
+  .string()
+  .max(32)
+  .regex(/^\d{1,5}(\.\d{1,5}){0,2}(-[0-9A-Za-z.]{1,20})?$/);
 
 /** A stored file as clients see it. `url` is absolute or site-relative and directly renderable. */
 export const asset = z.object({
