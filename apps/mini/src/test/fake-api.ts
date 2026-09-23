@@ -3,6 +3,7 @@ import { taroFake } from './taro-fake/taro';
 export interface FakeReply {
   status?: number;
   body: unknown;
+  headers?: Record<string, string>;
 }
 
 export interface SeenRequest {
@@ -27,7 +28,11 @@ export function serveApi(routes: Record<string, (body: unknown) => FakeReply>): 
     const reply = handler
       ? handler(body)
       : { status: 404, body: { code: 'NOT_FOUND', message: `no fake for ${key}` } };
-    return { statusCode: reply.status ?? 200, data: JSON.stringify(reply.body) };
+    return {
+      statusCode: reply.status ?? 200,
+      data: JSON.stringify(reply.body),
+      ...(reply.headers ? { header: reply.headers } : {}),
+    };
   };
   return seen;
 }

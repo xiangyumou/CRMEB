@@ -42,9 +42,15 @@ export default defineConfig({
           exclude: [...exclude, ...serverTests, ...intTests],
           css: false,
           restoreMocks: true,
-          // A full antd form render is ~1 s idle and 5–6 s when a dozen
-          // executors share the box; a timeout here would only report load.
-          testTimeout: 20_000,
+          // A full antd form render is ~1–2.5 s idle, but wall-clock time
+          // grows with whatever else the box runs: a full `turbo run` (next
+          // build, taro builds, every package's lint and tests) beside
+          // parallel executors pushed the heaviest suites (diy panels, product
+          // editor, groupbuy activities) past 20 s a test. This timeout is a
+          // hang detector, not a speed budget, so it must outlast load. Fewer
+          // workers would not help: the load is not ours (4 workers, 32 CPUs).
+          testTimeout: 120_000,
+          hookTimeout: 120_000,
         },
       },
       {
