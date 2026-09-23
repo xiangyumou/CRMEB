@@ -109,7 +109,7 @@ export default defineConfig<'webpack5'>(async (merge) => {
     },
     sourceRoot: 'src',
     outputRoot: `dist/${buildName}`,
-    plugins: [],
+    plugins: [path.join(appRoot, 'config/a11y-plugin.js')],
     defineConstants: {},
     // Compile-time `process.env.*` for src/platform. Taro only defines the `TARO_APP_*` keys it
     // finds in `.env*` files; these two must exist (as `''`) in every build, or the WeChat

@@ -114,6 +114,16 @@ export const orderFulfilErrors = defineErrors({
   // --- receipt ------------------------------------------------------------
   /** Not `shipped` — already received, still unshipped, cancelled or refunded. */
   ORDER_NOT_RECEIVABLE: { status: 409, message: '订单当前状态不可确认收货' },
+  /**
+   * `{ via: 'wechat-component' }`, but WeChat's `get_order` does not (yet) say
+   * the buyer confirmed — or it could not be asked. `details.verdict`:
+   * `not-confirmed` | `unavailable`. The client may retry, or fall back to a
+   * plain 确认收货; the settlement push catches up either way.
+   */
+  ORDER_WECHAT_RECEIPT_UNCONFIRMED: {
+    status: 409,
+    message: '微信尚未确认收货，请稍后重试',
+  },
 
   // --- statistics ---------------------------------------------------------
   /**
@@ -141,6 +151,8 @@ export const orderFulfilErrors = defineErrors({
   ORDER_INVOICE_NOT_REQUESTABLE: { status: 409, message: '该订单当前不可申请开票' },
   /** Already issued, rejected or cancelled. */
   ORDER_INVOICE_NOT_ACTIONABLE: { status: 409, message: '该开票申请当前状态无法执行此操作' },
+  /** WeChat's 内容安全 judged the 抬头 name `risky` (C09); fail-open when WeChat is unreachable. */
+  ORDER_INVOICE_TITLE_REJECTED: { status: 422, message: '发票抬头包含不当信息，请修改后再提交' },
 });
 
 export type OrderFulfilErrorCode = keyof typeof orderFulfilErrors;

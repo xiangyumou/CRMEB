@@ -1,6 +1,12 @@
 import { Button } from '@tarojs/components';
 import { fetchTransport } from '@shop/api-client';
-import { PlatformUnsupportedError, type MiniPlatform, type PhoneNumberButtonProps } from './types';
+import { generatedAvatar, pickImages, uploadWithFetch } from './h5-files';
+import {
+  PlatformUnsupportedError,
+  type AvatarButtonProps,
+  type MiniPlatform,
+  type PhoneNumberButtonProps,
+} from './types';
 
 /**
  * The plain H5 build (`build:h5`): the pages in a browser, for the DIY preview. It is not a
@@ -21,6 +27,14 @@ function PhoneNumberButton({ children, className, onResult }: PhoneNumberButtonP
   );
 }
 
+function AvatarButton({ children, className, onResult }: AvatarButtonProps) {
+  return (
+    <Button className={className ?? ''} onClick={() => void generatedAvatar().then(onResult)}>
+      {children}
+    </Button>
+  );
+}
+
 export const previewPlatform: MiniPlatform = {
   kind: 'h5-preview',
   api: { baseUrl: '', transport: fetchTransport(), clientPlatform: 'h5' },
@@ -30,4 +44,7 @@ export const previewPlatform: MiniPlatform = {
     Promise.resolve({ kind: 'failed', message: 'H5 预览不支持微信支付' } as const),
   requestSubscribe: () => Promise.resolve({}),
   chooseAddress: () => Promise.reject(new PlatformUnsupportedError('导入微信地址', 'h5-preview')),
+  AvatarButton,
+  chooseImages: pickImages,
+  uploadFile: uploadWithFetch,
 };

@@ -219,7 +219,7 @@ describe('zodToPuckFields — with the admin controls', () => {
   it('builds every registered 个人中心 block without an unsupported prop', () => {
     expect(() => zodToPuckFields(orderEntryProps, full)).not.toThrow();
     const items = field(zodToPuckFields(serviceGridProps, full), 'items');
-    expect(Object.keys(items.arrayFields)).toEqual(['label', 'icon', 'link']);
+    expect(Object.keys(items.arrayFields)).toEqual(['label', 'icon', 'action', 'link']);
   });
 
   it('honours textarea, placeholder and hidden from the metadata', () => {
@@ -246,6 +246,7 @@ describe('defaultsOf / initialPropsOf', () => {
   it('fills schema defaults, including the inner defaults of a prefault object', () => {
     expect(defaultsOf(productGridProps)).toEqual({
       source: { mode: 'manual', ids: [] },
+      layout: 'grid2',
       titleLines: 2,
       showMarketPrice: true,
       showTag: true,
@@ -256,7 +257,7 @@ describe('defaultsOf / initialPropsOf', () => {
 
   it('starts a required list with its minimum items, from the item defaults', () => {
     expect(initialPropsOf(carouselProps).slides).toEqual([{ image: '', alt: '' }]);
-    expect(initialPropsOf(serviceGridProps).items).toEqual([{ label: '' }]);
+    expect(initialPropsOf(serviceGridProps).items).toEqual([{ label: '', action: 'link' }]);
     // A list with a default keeps it.
     expect(initialPropsOf(orderEntryProps).items).toHaveLength(5);
   });

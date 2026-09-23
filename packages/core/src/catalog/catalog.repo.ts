@@ -1979,6 +1979,22 @@ export async function insertReview(tx: Tx, values: NewReviewValues): Promise<Rev
   return rows[0] ?? null;
 }
 
+/**
+ * Takes one picture off a review (内容安全 said `risky`, C09). `false` when the
+ * picture was no longer on it — edited away, or the review deleted.
+ */
+export async function removeReviewImage(
+  tx: Tx,
+  args: { id: number; url: string; now: Date },
+): Promise<boolean> {
+  const rows = await tx
+    .update(productReviews)
+    .set({ images: sql`${productReviews.images} - ${args.url}::text`, updatedAt: args.now })
+    .where(and(eq(productReviews.id, args.id), sql`${productReviews.images} ? ${args.url}::text`))
+    .returning({ id: productReviews.id });
+  return rows.length > 0;
+}
+
 export interface ReviewListFilter {
   productId?: number | undefined;
   userId?: number | undefined;

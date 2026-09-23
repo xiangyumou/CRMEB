@@ -80,22 +80,24 @@ describe('the mini guard, by mutation', () => {
     expect(failures(report.findings).join('\n')).toBe('');
   });
 
-  it("accepts the shop's own AppID, committed in the project config and a shared env file", async () => {
-    const app = copyApp('official-appid');
+  // The live tree commits the shop's own AppID (the baseline covers it); the tourist
+  // placeholder is the other id a committed file may carry.
+  it('accepts the tourist placeholder, committed in the project config and a shared env file', async () => {
+    const app = copyApp('tourist-appid');
     apply(app, {
-      id: 'official-appid',
+      id: 'tourist-appid',
       rule: 'config',
-      summary: "the shop's approved mini-program AppID",
+      summary: "WeChat DevTools' tourist AppID",
       edits: [
         {
           file: 'project.config.json',
-          search: '"appid": "touristappid"',
-          replace: '"appid": "wx4f4b772125e155ed"',
+          search: '"appid": "wx4f4b772125e155ed"',
+          replace: '"appid": "touristappid"',
         },
         {
           file: '.env.production',
-          search: 'TARO_APP_ID="touristappid"',
-          replace: 'TARO_APP_ID="wx4f4b772125e155ed"',
+          search: 'TARO_APP_ID="wx4f4b772125e155ed"',
+          replace: 'TARO_APP_ID="touristappid"',
         },
       ],
       expect: /$^/,

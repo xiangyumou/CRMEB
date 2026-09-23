@@ -191,10 +191,34 @@ class HookRegistry<E extends OrderEvent> {
   }
 }
 
+/**
+ * A shipment was dispatched: `shipOrder` (the console, the staff console) or
+ * the automatic virtual delivery. `deliveryMode` and `allDelivered` are what
+ * WeChat's 发货信息管理 needs to know about the parcel, frozen at the moment of
+ * dispatch so a later shipment cannot rewrite what this one was.
+ */
+export interface ShipmentDispatchedEvent extends OrderEvent {
+  shipmentId: number;
+  deliveryMode: 'express' | 'merchant_delivery' | 'virtual';
+  /** This shipment put the last outstanding unit on its way (`paid -> shipped`). */
+  allDelivered: boolean;
+  /** The order's other shipments, cancelled ones included, oldest first. */
+  otherShipments: ReadonlyArray<{ id: number; cancelled: boolean }>;
+}
+
+/** 修改发货信息: the transport details of a dispatched shipment changed. */
+export interface ShipmentUpdatedEvent extends OrderEvent {
+  shipmentId: number;
+}
+
 export const onOrderPaid = new HookRegistry<OrderPaidEvent>('order.paid');
 export const onOrderCancelled = new HookRegistry<OrderCancelledEvent>('order.cancelled');
 export const onOrderRefunded = new HookRegistry<OrderRefundedEvent>('order.refunded');
 export const onOrderCompleted = new HookRegistry<OrderCompletedEvent>('order.completed');
+export const onShipmentDispatched = new HookRegistry<ShipmentDispatchedEvent>(
+  'shipment.dispatched',
+);
+export const onShipmentUpdated = new HookRegistry<ShipmentUpdatedEvent>('shipment.updated');
 
 // ---------------------------------------------------------------------------
 // Ports
@@ -519,4 +543,6 @@ export function resetOrderPorts(): void {
   onOrderCancelled.clear();
   onOrderRefunded.clear();
   onOrderCompleted.clear();
+  onShipmentDispatched.clear();
+  onShipmentUpdated.clear();
 }

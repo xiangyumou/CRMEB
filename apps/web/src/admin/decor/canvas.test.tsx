@@ -1,5 +1,8 @@
 import { catalogAdminProductList } from '@shop/contracts/catalog/catalog.product.admin.contract';
 import { adminProductListItemExample } from '@shop/contracts/catalog/schemas';
+import { DECOR_BLOCK_DEFINITIONS, decorBlocks } from '@shop/contracts/decor/all-blocks';
+import { blockProps } from '@shop/contracts/decor/base';
+import { createBlockRegistry, defineBlock } from '@shop/contracts/decor/registry';
 import type { DataNeed } from '@shop/contracts/decor/sources';
 import {
   fixtureCarousel,
@@ -85,11 +88,21 @@ describe('decor canvas', () => {
   });
 
   it('shows a placeholder for a registered block the canvas has no component for yet', () => {
-    const userCenter = buildDecorConfig({ kind: 'user_center', custom });
-    const Render = userCenter.components.orderEntry!.render as (
+    const video = defineBlock({
+      type: 'videoPlayer',
+      v: 1,
+      props: blockProps({}),
+      meta: { label: '视频', pages: ['custom'] },
+    });
+    const withVideo = buildDecorConfig({
+      kind: 'custom',
+      custom,
+      registry: createBlockRegistry([...DECOR_BLOCK_DEFINITIONS, video]),
+    });
+    const Render = withVideo.components.videoPlayer!.render as (
       p: Record<string, unknown>,
     ) => ReactElement;
-    renderAdmin(<Render id="o1" puck={{ isEditing: true }} title="我的订单" items={[]} />);
+    renderAdmin(<Render id="v1" puck={{ isEditing: true }} />);
     expect(screen.getByText(/画布暂无此组件的预览/)).toBeInTheDocument();
   });
 
@@ -103,7 +116,13 @@ describe('decor canvas', () => {
 describe('decor config', () => {
   it('offers only the blocks allowed on the page kind, and hides the rest', () => {
     const home = buildDecorConfig({ kind: 'home', custom });
-    expect(home.categories?.blocks?.components).toEqual(['carousel', 'imageCube', 'productGrid']);
+    const onHome = decorBlocks
+      .list()
+      .filter((definition) => definition.meta.pages.includes('home'))
+      .map((definition) => definition.type);
+    expect(home.categories?.blocks?.components).toEqual(onHome);
+    expect(onHome).toEqual(expect.arrayContaining(['carousel', 'imageCube', 'productGrid']));
+    expect(onHome).not.toContain('userCard');
     expect(home.categories?.other).toEqual({ visible: false });
     // Still registered: a stored page may hold them.
     expect(Object.keys(home.components)).toContain('userCard');

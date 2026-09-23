@@ -129,6 +129,7 @@ function toRow(row: repo.ExpressCompanyRow): ExpressCompanyRow {
   return {
     ...toPicker(row),
     isEnabled: row.isEnabled,
+    wechatDeliveryId: row.wechatDeliveryId,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

@@ -1,6 +1,7 @@
 import { registerEffectHandler } from '../effects';
 import { onOrderCancelled, onOrderCompleted, onOrderPaid, onOrderRefunded } from '../order/ports';
 import { registerFulfilmentNotifier } from '../order';
+import { AVATAR_REJECTED_EVENT, onAvatarRejected } from '../user';
 import {
   fanOut,
   notify,
@@ -35,6 +36,15 @@ registerEffectHandler(NOTIFICATION_SCOPE, NOTIFICATION_EVENT_TYPE, async (ctx, e
 });
 
 export function installNotificationHooks(): void {
+  onAvatarRejected(async (tx, ctx, event) => {
+    await notify(tx, ctx, {
+      event: AVATAR_REJECTED_EVENT,
+      subject: { scope: 'content-security-check', id: event.checkId },
+      userId: event.userId,
+      data: {},
+    });
+  });
+
   onOrderPaid.register('notification:order-paid', async (tx, ctx, event) => {
     const data = {
       orderId: event.orderId,

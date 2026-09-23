@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import type { AnyRouteDef, ClientPlatform, RouteDef } from '@shop/contracts/conventions';
-import { clientPlatform, surfaceOf } from '@shop/contracts/conventions';
+import { clientPlatform, clientVersion, surfaceOf } from '@shop/contracts/conventions';
 // Side-effect import: makes every zod field message Simplified Chinese, which
 // is what CONVENTIONS requires of anything a shopper can see.
 import '@shop/contracts/locale';
@@ -210,6 +210,13 @@ function platformOf(request: Request): ClientPlatform | null {
   return parsed.success ? parsed.data : null;
 }
 
+function clientVersionOf(request: Request): string | undefined {
+  const raw = request.headers.get('x-client-version');
+  if (!raw) return undefined;
+  const parsed = clientVersion.safeParse(raw.trim());
+  return parsed.success ? parsed.data : undefined;
+}
+
 // ---------------------------------------------------------------------------
 // handle()
 // ---------------------------------------------------------------------------
@@ -393,7 +400,7 @@ export function handle<
 
       // -- 5. call ----------------------------------------------------------
       const ctx: RequestCtx = {
-        ...baseCtx(container, actor, platform, requestId, anyRoute.id),
+        ...baseCtx(container, actor, platform, requestId, anyRoute.id, clientVersionOf(request)),
         request,
         setCookie: (name, value, cookieOptions = {}) => {
           cookies.push(
@@ -492,8 +499,10 @@ function baseCtx(
   platform: ClientPlatform | null,
   requestId: string,
   routeId: string,
+  clientVersion?: string,
 ): Ctx {
   return createCtx({
+    ...(clientVersion === undefined ? {} : { clientVersion }),
     db: container.db,
     redis: container.redis,
     clock: container.clock,

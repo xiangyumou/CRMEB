@@ -13,11 +13,11 @@ import { recordEffect } from '../effects';
 import { orderFulfilConfig } from './order.fulfil.config';
 import * as fulfilRepo from './order.fulfil.repo';
 import * as rules from './order.fulfil.rules';
-import { resolveLogisticsPort } from './order.fulfil.ports';
+import { resolveLogisticsPort, resolveWechatReceiptVerifier } from './order.fulfil.ports';
 import * as repo from './order.repo';
 import { detailOf } from './order.query.service';
 import { requireOrderRef } from './order.ref';
-import { onOrderCompleted } from './ports';
+import { onOrderCompleted, onShipmentDispatched, onShipmentUpdated } from './ports';
 import { orderStateMachine } from './order.state-machine';
 
 /**
@@ -131,6 +131,72 @@ async function readShipment(ctx: Ctx, shipmentId: number): Promise<Shipment> {
   const lines = await fulfilRepo.listShipmentItems(ctx.db, [row.id]);
   const context = await shipmentContextFor(ctx, [row.orderId], [row]);
   return toWireShipment(row, lines, context);
+}
+
+/**
+ * What another domain needs to report one shipment to somebody else — today,
+ * WeChat's 小程序发货信息管理 (the payment domain's upload effect).
+ *
+ * `earlierShipmentIds` are this order's other *live* shipments that were
+ * dispatched before this one: a split delivery is reported in dispatch order.
+ */
+export interface ShipmentReportFacts {
+  shipment: Shipment;
+  order: {
+    id: number;
+    orderNo: string;
+    userId: number;
+    status: repo.OrderRow['status'];
+    receiverPhone: string;
+  };
+  expressCompany: { name: string; code: string; wechatDeliveryId: string | null } | null;
+  earlierShipmentIds: number[];
+}
+
+/**
+ * The signed-in shopper's own order, by id or order number — or
+ * `ORDER_NOT_FOUND`, the same answer for a stranger's order as for no order
+ * (AUTH-005). For another domain's storefront route about an order.
+ */
+export async function requireOwnOrder(
+  ctx: Ctx,
+  ref: string,
+): Promise<{ id: number; userId: number; status: repo.OrderRow['status'] }> {
+  const { orderId, userId } = await requireOrderRef(ctx, ref);
+  const owned = await repo.findOrderForUser(ctx.db, { id: orderId, userId });
+  if (!owned) throw new DomainError('ORDER_NOT_FOUND');
+  return { id: owned.id, userId: owned.userId, status: owned.status };
+}
+
+export async function shipmentReportFacts(
+  ctx: Ctx,
+  shipmentId: number,
+): Promise<ShipmentReportFacts | null> {
+  const row = await fulfilRepo.findShipment(ctx.db, shipmentId);
+  if (!row) return null;
+  const order = await repo.findOrder(ctx.db, row.orderId);
+  if (!order) return null;
+  const company =
+    row.expressCompanyId === null
+      ? null
+      : await fulfilRepo.findExpressCompanyEvenDisabled(ctx.db, row.expressCompanyId);
+  const siblings = await fulfilRepo.listShipments(ctx.db, [row.orderId]);
+  return {
+    shipment: await readShipment(ctx, shipmentId),
+    order: {
+      id: order.id,
+      orderNo: order.orderNo,
+      userId: order.userId,
+      status: order.status,
+      receiverPhone: order.receiverPhone,
+    },
+    expressCompany: company
+      ? { name: company.name, code: company.code, wechatDeliveryId: company.wechatDeliveryId }
+      : null,
+    earlierShipmentIds: siblings
+      .filter((other) => other.id < row.id && other.status !== 'cancelled')
+      .map((other) => other.id),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +354,19 @@ export async function shipOrder(ctx: Ctx, input: ShipInput): Promise<Shipment> {
         payload: { orderId: order.id, userId: order.userId, shipmentId: shipment.id },
       });
 
+      await onShipmentDispatched.dispatch(tx, ctx, {
+        orderId: order.id,
+        orderNo: order.orderNo,
+        userId: order.userId,
+        at: now,
+        shipmentId: shipment.id,
+        deliveryMode: input.body.deliveryMode,
+        allDelivered: rollUp === 'fulfilled',
+        otherShipments: (await fulfilRepo.listShipments(tx, [order.id]))
+          .filter((other) => other.id !== shipment.id)
+          .map((other) => ({ id: other.id, cancelled: other.status === 'cancelled' })),
+      });
+
       return { shipmentId: shipment.id, fulfilled: rollUp === 'fulfilled' };
     },
   );
@@ -358,6 +437,19 @@ export async function updateShipment(
 
     const updated = await fulfilRepo.updateShipmentInfo(tx, { shipmentId, set });
     if (!updated.won) throw new DomainError('ORDER_SHIPMENT_NOT_EDITABLE');
+
+    // A plain read: `cancelShipment` locks the order *before* the shipment, so
+    // taking the order lock here, after the shipment row, could deadlock with it.
+    const order = await repo.findOrder(tx, shipment.orderId);
+    if (order) {
+      await onShipmentUpdated.dispatch(tx, ctx, {
+        orderId: order.id,
+        orderNo: order.orderNo,
+        userId: order.userId,
+        at: ctx.clock.now(),
+        shipmentId,
+      });
+    }
 
     await repo.insertStatusLog(tx, {
       orderId: shipment.orderId,
@@ -506,7 +598,13 @@ export async function trackShipment(
 
 export interface ReceiptInput {
   orderId: number;
-  by: 'user' | 'admin' | 'auto';
+  /**
+   * `wechat`: WeChat's 发货信息管理 told us (the `trade_manage_order_settlement`
+   * push) that the buyer confirmed receipt, by hand or by WeChat's own timeout.
+   */
+  by: 'user' | 'admin' | 'auto' | 'wechat';
+  /** Replaces the timeline message; the default names who confirmed. */
+  message?: string;
   operatorAdminId?: number;
   operatorUserId?: number;
   /** `true` turns a lost race into an error. The job leaves it false. */
@@ -554,12 +652,15 @@ export async function receiveOrder(ctx: Ctx, input: ReceiptInput): Promise<Recei
       fromStatus: 'shipped',
       toStatus: 'received',
       message:
-        input.by === 'auto'
+        input.message ??
+        (input.by === 'auto'
           ? '超时未确认，系统自动确认收货'
           : input.by === 'admin'
             ? '后台确认收货'
-            : '用户确认收货',
-      operatorKind: input.by === 'auto' ? 'system' : input.by,
+            : input.by === 'wechat'
+              ? '微信已确认收货'
+              : '用户确认收货'),
+      operatorKind: input.by === 'auto' ? 'system' : input.by === 'wechat' ? 'gateway' : input.by,
       ...(input.operatorAdminId === undefined ? {} : { operatorAdminId: input.operatorAdminId }),
       ...(input.operatorUserId === undefined ? {} : { operatorUserId: input.operatorUserId }),
     });
@@ -592,11 +693,37 @@ export async function receiveOrder(ctx: Ctx, input: ReceiptInput): Promise<Recei
 export const autoReceiveKey = (orderId: number): string => `order-auto-receive:${orderId}`;
 export const completionKey = (orderId: number): string => `order-complete:${orderId}`;
 
-/** `POST /api/v1/orders/:id/receipt`. */
-export async function confirmReceipt(ctx: Ctx, params: { id: string }): Promise<OrderDetail> {
+/**
+ * `POST /api/v1/orders/:id/receipt`.
+ *
+ * With `{ via: 'wechat-component' }` the buyer confirmed in WeChat's own
+ * 确认收货 component, and the order moves only once WeChat's `get_order` agrees
+ * (C07). WeChat may have told us first — the settlement push — so a lost race
+ * here is not an error: the buyer sees the order as it now is.
+ */
+export async function confirmReceipt(
+  ctx: Ctx,
+  params: { id: string },
+  body: { via?: 'wechat-component' | undefined } = {},
+): Promise<OrderDetail> {
   const { orderId, userId } = await requireOrderRef(ctx, params.id);
   const owned = await repo.findOrderForUser(ctx.db, { id: orderId, userId });
   if (!owned) throw new DomainError('ORDER_NOT_FOUND');
+
+  if (body.via === 'wechat-component') {
+    const verifier = resolveWechatReceiptVerifier();
+    const verdict = verifier ? await verifier.verify(ctx, { orderId }) : 'unavailable';
+    if (verdict !== 'confirmed') {
+      throw new DomainError('ORDER_WECHAT_RECEIPT_UNCONFIRMED', { details: { verdict } });
+    }
+    await receiveOrder(ctx, {
+      orderId,
+      by: 'user',
+      operatorUserId: userId,
+      message: '用户在微信确认收货',
+    });
+    return detailOf(ctx, { orderId, userId });
+  }
 
   await receiveOrder(ctx, { orderId, by: 'user', operatorUserId: userId, strict: true });
   return detailOf(ctx, { orderId, userId });

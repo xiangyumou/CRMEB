@@ -1,4 +1,4 @@
-import { registerNotificationEvents } from '../notification';
+import { registerNotificationEvents, type NotificationRouteTemplate } from '../notification';
 
 /**
  * What a presale shopper is told, and when.
@@ -17,7 +17,10 @@ import { registerNotificationEvents } from '../notification';
  * `presale_sold_out` is recorded in the transaction that opens the automatic
  * refund, so it exists exactly when the refund does.
  *
- * Both link to the uni-app order page, which routes on the order number.
+ * Both `link` to the uni-app order page, which routes on the order number
+ * (the 公众号 template message opens the H5 storefront). In the mini program
+ * (`route`, docs/mini/pages.md §3.4) the paid notice opens the order and the
+ * sold-out one the automatic refund.
  */
 
 export const PRESALE_EVENTS = {
@@ -27,6 +30,11 @@ export const PRESALE_EVENTS = {
 
 const ORDER_LINK = '/pages/goods/order_details/index?order_id={{orderNo}}';
 const USER_CHANNELS = ['inApp', 'wechatOa', 'wechatMini', 'sms'] as const;
+const ORDER_ROUTE: NotificationRouteTemplate = { route: 'order', params: { id: '{{orderId}}' } };
+const REFUND_ROUTE: NotificationRouteTemplate = {
+  route: 'refund',
+  params: { id: '{{refundId}}' },
+};
 
 /** Idempotent: the registry accepts the same code twice with the same name. */
 export function registerPresaleNotificationEvents(): void {
@@ -43,6 +51,7 @@ export function registerPresaleNotificationEvents(): void {
         body: '您预订的「{{activityTitle}}」已付款 ¥{{amount}}，将于 {{shipDate}} 起发货。',
       },
       link: ORDER_LINK,
+      route: ORDER_ROUTE,
     },
     {
       code: PRESALE_EVENTS.soldOut,
@@ -56,6 +65,7 @@ export function registerPresaleNotificationEvents(): void {
         body: '「{{activityTitle}}」的预售名额已满，订单 {{orderNo}} 的 ¥{{amount}} 将原路退回。',
       },
       link: ORDER_LINK,
+      route: REFUND_ROUTE,
     },
   ]);
 }

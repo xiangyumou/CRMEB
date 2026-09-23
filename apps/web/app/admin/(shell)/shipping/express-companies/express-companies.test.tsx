@@ -29,6 +29,7 @@ const row: ExpressCompanyRow = {
   name: '顺丰速运',
   sortOrder: 100,
   isEnabled: true,
+  wechatDeliveryId: 'SF',
   createdAt: '2026-01-01T00:00:00+08:00',
   updatedAt: '2026-01-01T00:00:00+08:00',
 };
@@ -56,7 +57,8 @@ describe('快递公司', () => {
     renderAdmin(<ExpressCompaniesPage />, { identity: writer });
 
     expect(await screen.findByText('顺丰速运')).toBeInTheDocument();
-    expect(screen.getByText('SF')).toBeInTheDocument();
+    // 编码 and 微信快递编码 are both SF for 顺丰.
+    expect(screen.getAllByText('SF')).toHaveLength(2);
     expect(calls[0]?.url).toContain('/admin-api/shipping/express-companies?');
     expect(calls[0]?.url).toContain('page=1');
   });

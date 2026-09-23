@@ -3,6 +3,7 @@ import type { InvoiceTitle, InvoiceTitleForm } from '@shop/contracts/user/schema
 import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId } from '../kernel/ids';
+import { checkText } from '../wechat';
 import {
   INVOICE_TITLE_LIMIT,
   blankToNull,
@@ -60,6 +61,7 @@ export async function invoiceTitleDetail(ctx: Ctx, params: { id: string }): Prom
 export async function invoiceTitleCreate(ctx: Ctx, body: InvoiceTitleForm): Promise<InvoiceTitle> {
   const userId = requireUserId(ctx);
   const values = titleValues(body);
+  await screenTitleName(ctx, userId, values.name, null);
   return ctx.withTx(async (tx) => {
     await repo.lockInvoiceTitleBook(tx, userId);
     const existing = await repo.countInvoiceTitles(tx, userId);
@@ -85,6 +87,8 @@ export async function invoiceTitleUpdate(
   const userId = requireUserId(ctx);
   const id = fromId(params.id);
   const values = titleValues(body);
+  const existing = await repo.findInvoiceTitle(ctx.db, { id, userId });
+  await screenTitleName(ctx, userId, values.name, existing?.name ?? null);
   return ctx.withTx(async (tx) => {
     await repo.lockInvoiceTitleBook(tx, userId);
     const now = ctx.clock.now();
@@ -138,6 +142,23 @@ export async function invoiceTitleSetDefault(
 }
 
 /** Trim, blank → `null`, then the header rules again on what will be stored. */
+/**
+ * 内容安全 (C09, CONTENT-003): a new or changed 抬头 name goes to WeChat's
+ * `msgSecCheck` first, outside the transaction. `risky` refuses it; WeChat
+ * being unreachable lets it through (fail-open): the name reaches only the
+ * merchant and the tax office.
+ */
+async function screenTitleName(
+  ctx: Ctx,
+  userId: number,
+  name: string,
+  previous: string | null,
+): Promise<void> {
+  if (name === previous) return;
+  const verdict = await checkText(ctx, { userId, content: name, scene: 1, what: 'invoice-title' });
+  if (verdict === 'risky') throw new DomainError('USER_INVOICE_TITLE_REJECTED');
+}
+
 function titleValues(body: InvoiceTitleForm): Omit<repo.InvoiceTitleInput, 'isDefault'> {
   const values = {
     headerType: body.headerType,

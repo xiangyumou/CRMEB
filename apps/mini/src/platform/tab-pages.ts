@@ -6,7 +6,7 @@
  * runtime imports.
  */
 export const TAB_PAGES = [
-  { key: 'home', pagePath: 'pages/home/index', text: '首页' },
+  { key: 'home', pagePath: 'pages/index/index', text: '首页' },
   { key: 'category', pagePath: 'pages/category/index', text: '分类' },
   { key: 'cart', pagePath: 'pages/cart/index', text: '购物车' },
   { key: 'me', pagePath: 'pages/me/index', text: '我的' },

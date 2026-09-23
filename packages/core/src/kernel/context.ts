@@ -60,6 +60,11 @@ export interface Ctx {
   readonly actor: Actor;
   /** From `X-Client-Platform`; `null` on the admin surface and in jobs. */
   readonly platform: ClientPlatform | null;
+  /**
+   * From `X-Client-Version` when it parses (`clientVersion` in the contracts);
+   * absent on the admin surface, in jobs, and for a client that sent none.
+   */
+  readonly clientVersion?: string | undefined;
   /** Correlates every log line, audit row and job of one request. */
   readonly requestId: string;
   /** Route id from the contract, when the context came from `handle()`. */

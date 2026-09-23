@@ -33,6 +33,7 @@ const row: AdminProductReview = {
   content: '面料很舒服',
   images: [],
   status: 'pending',
+  moderationReason: null,
   replyContent: null,
   replyAt: null,
   createdAt: '2026-06-01T10:00:00+08:00',

@@ -1,11 +1,15 @@
 import { useState } from 'react';
-import { Button, Text, View } from '@tarojs/components';
+import { Text, View } from '@tarojs/components';
 import { useRouteMutation, useRouteQuery } from '@shop/api-client/react';
 import { newIdempotencyKey, useCheckoutDraft } from '@/features/checkout/draft';
-import { LoginCard } from '@/features/session/login-card';
-import { useSession } from '@/features/session/session';
-import { replacePage } from '@/platform';
-import { placeholderStyles as styles } from '@/shell/placeholder';
+import { LoginCard } from '@/session/login-card';
+import { useSession } from '@/session/session';
+import { navigate } from '@/platform';
+import { Button } from '@/ui/button';
+import { Card } from '@/ui/card';
+import { Empty } from '@/ui/empty';
+import { PageShell } from '@/ui/page-shell';
+import '../s4.scss';
 
 /**
  * 确认订单 (`checkout`, not linkable: the draft is in memory). Spike S4's plain version: the
@@ -17,17 +21,17 @@ export default function CheckoutPage() {
   const draft = useCheckoutDraft((state) => state.draft);
   if (!draft) {
     return (
-      <View className={styles.page}>
-        <Text className={styles.muted}>没有待结算的商品</Text>
-      </View>
+      <PageShell title="确认订单">
+        <Empty image="cart" title="没有待结算的商品" />
+      </PageShell>
     );
   }
   return (
-    <View className={styles.page}>
+    <PageShell title="确认订单">
       <LoginCard reason="登录后即可结算">
         <Preview skuId={draft.skuId} quantity={draft.quantity} />
       </LoginCard>
-    </View>
+    </PageShell>
   );
 }
 
@@ -38,20 +42,20 @@ function Preview({ skuId, quantity }: { skuId: string; quantity: number }) {
   const create = useRouteMutation('order.create');
   const [idempotencyKey] = useState(newIdempotencyKey);
 
-  if (preview.isPending) return <Text className={styles.muted}>计算中…</Text>;
-  if (preview.isError) return <Text className={styles.muted}>{preview.error.message}</Text>;
+  if (preview.isPending) return <Text className="s4-note">计算中…</Text>;
+  if (preview.isError) return <Text className="s4-note">{preview.error.message}</Text>;
 
   const { receiver, addressRequired, payableAmount, lines } = preview.data;
   const missingAddress = addressRequired && !receiver;
   return (
     <>
-      <View className={styles.card} id="checkout-address">
+      <Card id="checkout-address">
         {receiver ? (
           <>
-            <Text className={styles.title}>
+            <Text className="s4-title">
               {receiver.name} {receiver.phone}
             </Text>
-            <Text className={styles.muted}>
+            <Text className="s4-muted">
               {receiver.province}
               {receiver.city}
               {receiver.district ?? ''}
@@ -59,33 +63,42 @@ function Preview({ skuId, quantity }: { skuId: string; quantity: number }) {
             </Text>
           </>
         ) : (
-          <Text className={styles.muted}>请先添加收货地址</Text>
+          <Text className="s4-muted">请先添加收货地址</Text>
         )}
-      </View>
-      <View className={styles.card}>
+      </Card>
+      <Card>
         {lines.map((line) => (
-          <Text key={line.itemKey} className={styles.muted}>
+          <Text key={line.itemKey} className="s4-muted">
             {line.productName} × {line.quantity}
           </Text>
         ))}
-        <Text id="checkout-payable">实付 ¥{payableAmount}</Text>
+        <Text className="s4-strong" id="checkout-payable">
+          实付 ¥{payableAmount}
+        </Text>
+      </Card>
+      {create.isError ? <Text className="s4-note">{create.error.message}</Text> : null}
+      <View className="s4-actions">
+        <Button
+          size="lg"
+          block
+          disabled={missingAddress}
+          loading={create.isPending}
+          onClick={() =>
+            create.mutate(
+              { body: { ...body, idempotencyKey, expectedPayableAmount: payableAmount } },
+              {
+                onSuccess: (order) =>
+                  void navigate(
+                    { route: 'cashier', params: { orderId: order.id } },
+                    { replace: true },
+                  ),
+              },
+            )
+          }
+        >
+          提交订单
+        </Button>
       </View>
-      {create.isError ? <Text className={styles.muted}>{create.error.message}</Text> : null}
-      <Button
-        className={styles.button}
-        disabled={missingAddress || create.isPending}
-        onClick={() =>
-          create.mutate(
-            { body: { ...body, idempotencyKey, expectedPayableAmount: payableAmount } },
-            {
-              onSuccess: (order) =>
-                void replacePage(`packages/order/cashier/index?orderId=${order.id}`),
-            },
-          )
-        }
-      >
-        提交订单
-      </Button>
     </>
   );
 }

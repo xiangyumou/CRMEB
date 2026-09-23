@@ -96,7 +96,7 @@ describe('locateIssues', () => {
       document,
     );
     expect(issue).toMatchObject({
-      where: '第 2 个组件「商品网格」',
+      where: '第 2 个组件「商品列表」',
       field: 'source.ids',
       blockId: 'grid',
       root: false,

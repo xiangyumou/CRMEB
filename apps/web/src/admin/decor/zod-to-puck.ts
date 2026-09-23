@@ -33,6 +33,8 @@ export const SEMANTIC_FIELD_KINDS = [
   'groupbuySource',
   'presaleSource',
   'articleSource',
+  'richText',
+  'hotspots',
 ] as const satisfies readonly EditorFieldKind[];
 export type SemanticFieldKind = (typeof SEMANTIC_FIELD_KINDS)[number];
 

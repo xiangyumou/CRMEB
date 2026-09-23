@@ -5,10 +5,22 @@ import { DOCUMENT_KINDS, type DocumentKind } from '@shop/contracts/decor/constan
 import { checkDocument, pageRootProps, type StoredDocument } from '@shop/contracts/decor/document';
 import {
   fixtureCarousel,
+  fixtureHotspotImage,
   fixtureImageCube,
+  fixtureNavGrid,
+  fixtureNotice,
+  fixtureOrderEntry,
   fixtureProductGrid,
+  fixtureProductTabs,
+  fixtureRichText,
+  fixtureSearchBar,
+  fixtureServiceGrid,
+  fixtureSpacer,
+  fixtureTitleBar,
+  fixtureUserCard,
   resolveFixtureProducts,
 } from '@shop/storefront-blocks/fixtures';
+import { BLOCKS, type BlockType } from '@shop/storefront-blocks/schema';
 import { Alert, Card, Segmented, Tag, Typography } from 'antd';
 import { useMemo, useState } from 'react';
 
@@ -37,14 +49,28 @@ import { createDecorDemoRecordSource } from './demo-data-source';
  * fidelity script (`packages/storefront-blocks/fidelity`) shoots its canvas.
  */
 
+/** One of every block, each from its fixture, at the version this build writes. */
+const FIXTURE_BLOCKS: [BlockType, string, Record<string, unknown>][] = [
+  ['searchBar', 'search-bar-1', fixtureSearchBar],
+  ['carousel', 'carousel-1', fixtureCarousel],
+  ['navGrid', 'nav-grid-1', fixtureNavGrid],
+  ['notice', 'notice-1', fixtureNotice],
+  ['titleBar', 'title-bar-1', fixtureTitleBar],
+  ['productGrid', 'product-grid-1', fixtureProductGrid],
+  ['imageCube', 'image-cube-1', fixtureImageCube],
+  ['hotspotImage', 'hotspot-image-1', fixtureHotspotImage],
+  ['productTabs', 'product-tabs-1', fixtureProductTabs],
+  ['spacer', 'spacer-1', fixtureSpacer],
+  ['richText', 'rich-text-1', fixtureRichText],
+  ['userCard', 'user-card-1', fixtureUserCard],
+  ['orderEntry', 'order-entry-1', fixtureOrderEntry],
+  ['serviceGrid', 'service-grid-1', fixtureServiceGrid],
+];
+
 const FIXTURE_DOCUMENT: StoredDocument = {
   schemaVersion: 2,
   root: { props: pageRootProps.parse({ title: '装修试验页' }) },
-  blocks: [
-    { id: 'carousel-1', type: 'carousel', v: 1, props: fixtureCarousel },
-    { id: 'product-grid-1', type: 'productGrid', v: 1, props: fixtureProductGrid },
-    { id: 'image-cube-1', type: 'imageCube', v: 1, props: fixtureImageCube },
-  ],
+  blocks: FIXTURE_BLOCKS.map(([type, id, props]) => ({ id, type, v: BLOCKS[type].v, props })),
 };
 
 const canvasData: DecorCanvasData = {

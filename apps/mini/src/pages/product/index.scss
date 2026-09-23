@@ -1,0 +1,25 @@
+@use '../../ui/tokens' as *;
+
+// Spike S4's plain product page; stream B replaces it.
+.s4-product {
+  &__price {
+    display: block;
+    @include text($font-display);
+    @include tabular;
+    color: var(--color-price);
+  }
+
+  &__name {
+    display: block;
+    margin-top: $space-2;
+    @include text($font-title);
+    color: var(--color-text);
+  }
+
+  &__spec {
+    display: block;
+    margin-top: $space-1;
+    @include text($font-caption);
+    color: var(--color-text-tertiary);
+  }
+}

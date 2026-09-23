@@ -798,6 +798,11 @@ export const adminProductReview = z.object({
   content: z.string().nullable(),
   images: z.array(z.string()),
   status: productReviewStatus,
+  /**
+   * Why it waits in 待审核, when the reason is WeChat's 内容安全 (C09):
+   * `sec_check_risky`, `sec_check_review`, `sec_check_unavailable`; else `null`.
+   */
+  moderationReason: z.string().nullable(),
   replyContent: z.string().nullable(),
   replyAt: instant.nullable(),
   createdAt: instant,
@@ -820,6 +825,16 @@ export const productReview = z.object({
   createdAt: instant,
 });
 export type ProductReview = z.infer<typeof productReview>;
+
+/**
+ * What `POST /catalog/reviews` answers: the review, and whether it is live.
+ * `pending` is neutral on purpose — the client says 「评价已提交，审核后展示」,
+ * whether the reason is 评价需审核 or 内容安全, and never shows it as an error.
+ */
+export const submittedReview = productReview.extend({
+  moderation: z.enum(['published', 'pending']),
+});
+export type SubmittedReview = z.infer<typeof submittedReview>;
 
 export const adminReviewListQuery = pageQuery
   .extend({
@@ -1468,6 +1483,7 @@ export const adminProductReviewExample: AdminProductReview = {
   orderId: '9001',
   orderItemId: '9101',
   status: 'published',
+  moderationReason: null,
 };
 
 export const productVirtualCardExample: ProductVirtualCard = {

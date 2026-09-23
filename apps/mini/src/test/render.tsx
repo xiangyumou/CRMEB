@@ -14,3 +14,13 @@ export function renderWithQuery(
   const result = render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
   return { ...result, client };
 }
+
+/** A page as the app renders it: the query client and the `/api/v1` client. */
+export async function renderPage(
+  ui: ReactNode,
+  client: QueryClient = testQueryClient(),
+): Promise<RenderResult & { client: QueryClient }> {
+  const { ApiClientProvider } = await import('@shop/api-client/react');
+  const { api } = await import('@/data/api');
+  return renderWithQuery(<ApiClientProvider client={api}>{ui}</ApiClientProvider>, client);
+}

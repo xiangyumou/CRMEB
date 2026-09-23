@@ -11,6 +11,7 @@ import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
 import { isStoredImageUrl } from '../storage';
+import { checkText, requestMediaCheck } from '../wechat';
 import { storefrontAuthConfig } from './storefront-auth.config';
 import { pageBounds, shouldForceDefault } from './user.rules';
 import * as repo from './user.repo';
@@ -45,8 +46,24 @@ export async function updateProfile(ctx: Ctx, body: UserProfileForm): Promise<Us
       details: [{ field: 'body.nickname', message: '昵称不能为空' }],
     });
   }
+  const before = await repo.findById(ctx.db, userId);
+  if (!before || before.deletedAt !== null) throw new DomainError('USER_NOT_FOUND');
+  // 内容安全 (C09, CONTENT-002): a changed nickname goes to WeChat first. Only
+  // `risky` refuses it; WeChat being unreachable lets it through (fail-open).
+  if (nickname !== undefined && nickname !== before.nickname) {
+    const verdict = await checkText(ctx, { userId, content: nickname, scene: 1, what: 'nickname' });
+    if (verdict === 'risky') throw new DomainError('USER_NICKNAME_REJECTED');
+  }
   const avatarUrl =
     body.avatarUrl === undefined ? undefined : await acceptedAvatar(ctx, userId, body.avatarUrl);
+  const { defaultAvatar } = await ctx.config.get(storefrontAuthConfig);
+  const avatarToCheck =
+    avatarUrl !== undefined &&
+    avatarUrl !== null &&
+    avatarUrl !== before.avatarUrl &&
+    avatarUrl !== defaultAvatar.trim()
+      ? avatarUrl
+      : null;
   await ctx.withTx(async (tx) => {
     const result = await repo.updateProfile(tx, {
       id: userId,
@@ -60,6 +77,16 @@ export async function updateProfile(ctx: Ctx, body: UserProfileForm): Promise<Us
       now: ctx.clock.now(),
     });
     if (!result.won) throw new DomainError('USER_NOT_FOUND');
+    // A new picture is checked after the fact, by push (CONTENT-004).
+    if (avatarToCheck !== null) {
+      await requestMediaCheck(tx, ctx, {
+        subject: 'avatar',
+        subjectId: userId,
+        userId,
+        mediaUrl: avatarToCheck,
+        scene: 1,
+      });
+    }
   });
   return getProfile(ctx);
 }

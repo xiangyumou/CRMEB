@@ -1,0 +1,37 @@
+@use './tokens' as *;
+
+.shop-stepper {
+  display: inline-flex;
+  align-items: center;
+  height: 56px;
+  border-radius: $radius-sm;
+  background: var(--color-surface-sunken);
+
+  &__button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    font-size: 28px;
+    color: var(--color-text);
+    @include hit-area;
+
+    &.shop-pressable--disabled {
+      color: var(--color-text-disabled);
+    }
+  }
+
+  &__input {
+    width: 72px;
+    height: 56px;
+    @include text($font-body);
+    @include tabular;
+    color: var(--color-text);
+    text-align: center;
+  }
+
+  &--disabled {
+    opacity: 0.4;
+  }
+}

@@ -1,5 +1,7 @@
 'use client';
 
+import { HotspotField } from '../hotspot-field';
+import { RichTextField } from '../rich-text-field';
 import type { CustomFieldRenderers } from '../zod-to-puck';
 import {
   ChoiceField,
@@ -40,6 +42,8 @@ export const DECOR_CUSTOM_FIELDS: CustomFieldRenderers = {
   groupbuySource: (props) => <GroupbuySourceField {...props} />,
   presaleSource: (props) => <PresaleSourceField {...props} />,
   articleSource: (props) => <ArticleSourceField {...props} />,
+  richText: (props) => <RichTextField {...props} />,
+  hotspots: (props) => <HotspotField {...props} renderLink={(link) => <LinkField {...link} />} />,
   switch: (props) => <SwitchField {...props} />,
   choice: (props) => <ChoiceField {...props} />,
   multiChoice: (props) => <MultiChoiceField {...props} />,

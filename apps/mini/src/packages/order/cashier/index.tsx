@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Button, Text, View } from '@tarojs/components';
-import { useRouter } from '@tarojs/taro';
+import { Text, View } from '@tarojs/components';
 import { useApiClient, useRouteQuery } from '@shop/api-client/react';
-import { LoginCard } from '@/features/session/login-card';
-import { useSession } from '@/features/session/session';
-import { platform, replacePage } from '@/platform';
-import { placeholderStyles as styles } from '@/shell/placeholder';
+import { LoginCard } from '@/session/login-card';
+import { useSession } from '@/session/session';
+import { navigate, platform, useRouteParams } from '@/platform';
+import { Button } from '@/ui/button';
+import { Card } from '@/ui/card';
+import { PageShell } from '@/ui/page-shell';
+import '../s4.scss';
 
 /**
  * 收银台 (`cashier`, `packages/order/cashier/index?orderId=`). Spike S4's plain version:
@@ -14,13 +16,13 @@ import { placeholderStyles as styles } from '@/shell/placeholder';
  * server knows whether the money moved. Stream B adds the countdown and the order summary.
  */
 export default function CashierPage() {
-  const orderId = useRouter().params.orderId ?? '';
+  const { orderId = '' } = useRouteParams('cashier');
   return (
-    <View className={styles.page}>
+    <PageShell title="收银台">
       <LoginCard reason="登录后即可支付">
         <Cashier orderId={orderId} />
       </LoginCard>
-    </View>
+    </PageShell>
   );
 }
 
@@ -36,9 +38,9 @@ function Cashier({ orderId }: { orderId: string }) {
   );
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
 
-  if (orderId === '') return <Text className={styles.muted}>没有指定订单</Text>;
-  if (order.isPending) return <Text className={styles.muted}>加载中…</Text>;
-  if (order.isError) return <Text className={styles.muted}>{order.error.message}</Text>;
+  if (orderId === '') return <Text className="s4-note">没有指定订单</Text>;
+  if (order.isPending) return <Text className="s4-note">加载中…</Text>;
+  if (order.isError) return <Text className="s4-note">{order.error.message}</Text>;
 
   const payable = order.data.status === 'pending_payment';
 
@@ -49,8 +51,11 @@ function Cashier({ orderId }: { orderId: string }) {
         params: { id: orderId },
         body: { channel: 'wechat_mini' },
       });
-      const result = `packages/order/pay-result/index?orderId=${orderId}&outTradeNo=${intent.outTradeNo}`;
-      if (intent.alreadyPaid) return void (await replacePage(result));
+      const result = {
+        route: 'payResult',
+        params: { orderId, outTradeNo: intent.outTradeNo },
+      } as const;
+      if (intent.alreadyPaid) return void (await navigate(result, { replace: true }));
       if (!intent.jsapi) throw new Error('服务端没有返回支付参数');
       const outcome = await platform.requestPayment({
         outTradeNo: intent.outTradeNo,
@@ -60,7 +65,7 @@ function Cashier({ orderId }: { orderId: string }) {
         setPhase({ kind: 'notice', text: '已取消支付，订单会为你保留一段时间' });
         return;
       }
-      await replacePage(result);
+      await navigate(result, { replace: true });
     } catch (error) {
       setPhase({ kind: 'notice', text: error instanceof Error ? error.message : String(error) });
     }
@@ -68,24 +73,28 @@ function Cashier({ orderId }: { orderId: string }) {
 
   return (
     <>
-      <View className={styles.card}>
-        <Text className={styles.muted}>订单 {order.data.orderNo}</Text>
-        <Text className={styles.title} id="cashier-amount">
+      <Card className="s4-center">
+        <Text className="s4-muted">订单 {order.data.orderNo}</Text>
+        <Text className="s4-amount" id="cashier-amount">
           ¥{order.data.payableAmount}
         </Text>
-      </View>
+      </Card>
       {phase.kind === 'notice' ? (
-        <Text className={styles.muted} id="cashier-notice">
+        <Text className="s4-note" id="cashier-notice">
           {phase.text}
         </Text>
       ) : null}
-      <Button
-        className={styles.button}
-        disabled={!payable || phase.kind === 'paying'}
-        onClick={() => void pay()}
-      >
-        {payable ? '微信支付' : '订单无需支付'}
-      </Button>
+      <View className="s4-actions">
+        <Button
+          size="lg"
+          block
+          disabled={!payable}
+          loading={phase.kind === 'paying'}
+          onClick={() => void pay()}
+        >
+          {payable ? '微信支付' : '订单无需支付'}
+        </Button>
+      </View>
     </>
   );
 }
