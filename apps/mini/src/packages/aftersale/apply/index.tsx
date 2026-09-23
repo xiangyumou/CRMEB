@@ -6,6 +6,7 @@ import type {
   RefundKind,
 } from '@shop/contracts/refund/schemas';
 import { useApiClient, useInvalidateRoutes, useRouteQuery } from '@shop/api-client/react';
+import { formatSpec } from '@/lib/spec';
 import { navigate, subscribe, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
@@ -247,7 +248,9 @@ function Form({
               </View>
               <View className="refund-apply__info">
                 <Text className="refund-apply__name">{item.productName}</Text>
-                {item.specText ? <Text className="refund-apply__spec">{item.specText}</Text> : null}
+                {item.specText ? (
+                  <Text className="refund-apply__spec">{formatSpec(item.specText)}</Text>
+                ) : null}
                 {blocked ? (
                   <Text className="refund-apply__blocked">
                     {BLOCKED_TEXT[item.blockedReason ?? ''] ?? '暂不可申请'}

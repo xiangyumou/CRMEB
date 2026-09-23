@@ -16,10 +16,14 @@ Five small fixes, one commit each. Updated at every commit.
   icon that is not uploaded or fails to download now goes back to the bundled one
   (`bundledTabIcon`), so removing an upload takes effect. Main package 639.2 → 646.4 KB
   (+7.2 KB); total 855.7 → 862.9 KB.
+- **Spec text.** `lib/spec.ts` `formatSpec` (`白|L` → `白 / L`, empty values dropped) is the one
+  formatter; used by `ui/order-card.tsx` (订单列表 / 详情 lines), 售后 apply / detail / card,
+  确认订单, 购物车, 已选 (sku-select) and 商品评价, replacing four inline `replace`s and four raw
+  prints.
 
 ## In progress
 
-- Spec text, product card role, login return, client version.
+- Product card role, login return, client version.
 
 ## Next
 

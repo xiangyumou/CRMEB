@@ -1,4 +1,5 @@
 import type { ResponseOf } from '@shop/api-client';
+import { formatSpec } from '@/lib/spec';
 
 /**
  * Choosing a variant (SkuSheet, design.md §4.4), as plain functions over the product's specs
@@ -107,5 +108,5 @@ export function selectionText(matrix: SkuMatrix, selection: SkuSelection): strin
   const missing = missingSpecs(matrix, selection);
   if (missing.length > 0) return `请选择 ${missing.join(' ')}`;
   const sku = selectedSku(matrix, selection);
-  return sku && sku.specText ? `已选 ${sku.specText.replace(/\|/g, ' / ')}` : '';
+  return sku && sku.specText ? `已选 ${formatSpec(sku.specText)}` : '';
 }

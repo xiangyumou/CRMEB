@@ -4,6 +4,7 @@ import type { RefundDetail } from '@shop/contracts/refund/schemas';
 import { routeKey, useRouteQuery } from '@shop/api-client/react';
 import { useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { formatDateTime } from '@/lib/format';
+import { formatSpec } from '@/lib/spec';
 import { copyText, goBack, navigate, previewImages, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
@@ -152,7 +153,7 @@ function Body({ id }: { id: string }) {
               <View className="refund-detail__info">
                 <Text className="refund-detail__name">{item.productName}</Text>
                 {item.specText ? (
-                  <Text className="refund-detail__line--muted">{item.specText}</Text>
+                  <Text className="refund-detail__line--muted">{formatSpec(item.specText)}</Text>
                 ) : null}
               </View>
               <Text className="refund-detail__line--muted">×{item.quantity}</Text>

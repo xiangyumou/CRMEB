@@ -1,5 +1,6 @@
 import { Text, View } from '@tarojs/components';
 import type { RefundListItem } from '@shop/contracts/refund/schemas';
+import { formatSpec } from '@/lib/spec';
 import { navigate } from '@/platform';
 import { Button } from '@/ui/button';
 import { Image } from '@/ui/image';
@@ -56,7 +57,9 @@ export function RefundCard({
             </View>
             <View className="refund-card__info">
               <Text className="refund-card__name">{item.productName}</Text>
-              {item.specText ? <Text className="refund-card__spec">{item.specText}</Text> : null}
+              {item.specText ? (
+                <Text className="refund-card__spec">{formatSpec(item.specText)}</Text>
+              ) : null}
             </View>
             <Text className="refund-card__qty">×{item.quantity}</Text>
           </View>

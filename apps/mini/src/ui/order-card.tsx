@@ -1,6 +1,7 @@
 import type { OrderItem, OrderListItem } from '@shop/contracts/order/schemas';
 import { Text, View } from '@tarojs/components';
 import { cx } from '@/lib/cx';
+import { formatSpec } from '@/lib/spec';
 import { navigate } from '@/platform';
 import { Button } from './button';
 import { Countdown } from './countdown';
@@ -33,7 +34,9 @@ export function OrderItemRow({
       </View>
       <View className="shop-order-row__info">
         <Text className="shop-order-row__name">{item.productName}</Text>
-        {item.specText ? <Text className="shop-order-row__spec">{item.specText}</Text> : null}
+        {item.specText ? (
+          <Text className="shop-order-row__spec">{formatSpec(item.specText)}</Text>
+        ) : null}
         {note ? (
           <Tag tone="warning" className="shop-order-row__note">
             {note}
