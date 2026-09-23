@@ -2072,6 +2072,12 @@ A courier code identifies one company: a duplicate is refused by the unique inde
 - `packages/core/src/shipping/shipping.concurrency.int.test.ts::creating the same courier code twice at once > keeps one row and refuses the rest by their code`
 - `apps/web/app/admin-api/shipping/shipping.int.test.ts::/admin-api/shipping/express-companies > refuses a duplicate code as 409 with its Chinese message`
 
+### SHIP-003
+
+The shopper's carrier picker (`GET /api/v1/express-companies`) offers enabled carriers only, at most `limit` (default 50, at most 100), those with a WeChat courier code first and then by `sortOrder`; `keyword` matches the name or the code, case-insensitively, with `%` and `_` taken literally. The operators' pickers stay uncapped.
+
+- `packages/core/src/shipping/shipping.int.test.ts::快递公司 > SHIP-003 — the shopper’s picker: enabled only, a WeChat courier code first, searched and capped`
+
 ### CMS-004
 
 An article slug belongs to one article: concurrent publishes of the same slug leave one winner and `CMS_ARTICLE_SLUG_TAKEN` for the rest, and deleting an article releases its slug rather than squatting on the URL.

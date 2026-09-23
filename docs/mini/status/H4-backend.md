@@ -31,9 +31,18 @@ search → the rest of C's gaps → merge checklist.
      optional (older server → no badge). DECOR-015 test updated.
    - ORDER-010 extended (count, tab, auto-review).
 
+4. `GET /api/v1/express-companies` (`shipping.expressCompanyOptions`) takes
+   `?keyword=&limit=` (`expressCompanyOptionsQuery`): enabled only, a WeChat courier code
+   (`wechatDeliveryId`) first, then `sortOrder DESC, id ASC`; `keyword` (≤ 50, trimmed, blank =
+   none) matches name or code with `ILIKE`, `%`/`_` literal; `limit` 1–100, **default 50**.
+   The only caller of this path is the mini's 填写退货物流 page (the uni-app's staff console
+   reads `/api/v1/staff/express-companies`, and the console `/admin-api/express-companies`;
+   both unchanged and uncapped), so the no-parameter answer is now the first 50, not all
+   ~1100. Response body unchanged. SHIP-003.
+
 ## In progress
 
-- 4: express-company search.
+- 5: the rest of C's gaps.
 
 ## Client follow-ups
 
@@ -49,5 +58,10 @@ search → the rest of C's gaps → merge checklist.
   on `ORDER_ENTRY_KEYS`): `unreviewed` still opens `myReviews` (reviews already written) while
   its badge now counts orders still to review; once 我的订单 has the tab, point it at
   `{ route: 'orderList', params: { tab: 'unreviewed' } }` (and `user-center.test.tsx`).
+- **填写退货物流 (needed):** the page still searches client-side over what the server sent,
+  which is now the first 50; a carrier past those is not found until the search goes to the
+  server: `useRouteQuery('shipping.expressCompanyOptions', { query: { keyword, limit: 30 } })`
+  with a debounced keyword, and drop `PICKER_LIMIT` / the local filter. 顺丰/中通 (WeChat codes
+  in the e2e seed) come first either way.
 - Test fixtures: `apps/mini/src/test/order-fixtures.ts` items default to
   `reviewed: false, reviewable: false`, details to `groupbuyTeamId: null`.

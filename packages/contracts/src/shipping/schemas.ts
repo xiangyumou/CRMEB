@@ -306,6 +306,20 @@ export const expressCompanyListExample = {
   ],
 } satisfies z.infer<typeof expressCompanyList>;
 
+/**
+ * `GET /api/v1/express-companies` — the shopper's 退货物流 picker. Enabled carriers only, at
+ * most `limit` of them, those with a WeChat courier code (`wechatDeliveryId`, which
+ * 小程序发货信息管理 needs) first, then by `sortOrder`. `keyword` matches the name or the
+ * tracking code, case-insensitively, anywhere in it; blank is no filter. Without either
+ * parameter the answer is the first 50 — the seeded table has about 1100 rows, and a phone
+ * has no use for all of them.
+ */
+export const expressCompanyOptionsQuery = z.object({
+  keyword: z.string().trim().max(50).optional(),
+  limit: z.coerce.number<number | string>().int().min(1).max(100).default(50),
+});
+export type ExpressCompanyOptionsQuery = z.infer<typeof expressCompanyOptionsQuery>;
+
 /** The management row. Carries `isEnabled`, which the picker never does — the picker only lists enabled ones. */
 export const expressCompanyRow = expressCompany.extend({
   isEnabled: z.boolean(),

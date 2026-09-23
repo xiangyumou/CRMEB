@@ -289,6 +289,14 @@ describe('/api/v1/express-companies', () => {
     expect(response.status).toBe(200);
     const { items } = (await response.json()) as { items: { code: string }[] };
     expect(items.map((row) => row.code)).toEqual(['SF', 'ZTO']);
+
+    // SHIP-003: searched and capped on the server.
+    const searched = await GET(get('/api/v1/express-companies?keyword=%E4%B8%AD%E9%80%9A&limit=5'));
+    expect(searched.status).toBe(200);
+    const found = (await searched.json()) as { items: { code: string }[] };
+    expect(found.items.map((row) => row.code)).toEqual(['ZTO']);
+    const tooMany = await GET(get('/api/v1/express-companies?limit=101'));
+    expect(tooMany.status).toBe(422);
   });
 });
 
