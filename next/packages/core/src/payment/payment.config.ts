@@ -125,13 +125,6 @@ export const paymentConfig = defineConfigGroup({
       order: 80,
     },
   },
-  legacyKeys: {
-    mchId: ['pay_weixin_mchid', 'pay_new_weixin_mchid'],
-    apiV3Key: 'pay_weixin_key_v3',
-    certSerial: 'pay_weixin_serial_no',
-    merchantPrivateKey: 'pay_weixin_client_key',
-    notifyBaseUrl: 'site_url',
-  },
 });
 
 export type PaymentConfig = z.infer<typeof paymentConfig.schema>;

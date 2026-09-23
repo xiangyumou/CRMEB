@@ -64,10 +64,6 @@ export const orderFulfilConfig = defineConfigGroup({
       section: '导出',
     },
   },
-  legacyKeys: {
-    autoReceiveDays: 'system_delivery_time',
-    reviewWindowDays: 'system_comment_time',
-  },
 });
 
 /**
@@ -117,8 +113,5 @@ export const orderStaffConfig = defineConfigGroup({
       help: '开启后店员可在移动端同意或拒绝售后申请；同意仅退款会直接原路退款。确认收货和重试仍仅限后台',
       section: '店员',
     },
-  },
-  legacyKeys: {
-    staffUserIds: 'order_notice_admin_uids',
   },
 });

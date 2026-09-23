@@ -128,16 +128,4 @@ export const smsConfig = defineConfigGroup({
     perPhonePerHour: { label: '每号码每小时上限', type: 'number', section: '频率', order: 40 },
     perPhonePerDay: { label: '每号码每天上限', type: 'number', section: '频率', order: 41 },
   },
-  legacyKeys: {
-    provider: 'sms_type',
-    aliyunAccessKeyId: 'aliyun_AccessKeyId',
-    aliyunAccessKeySecret: 'aliyun_AccessKeySecret',
-    aliyunRegionId: 'aliyun_RegionId',
-    aliyunSignName: 'aliyun_SignName',
-    tencentAppId: 'tencent_sms_app_id',
-    tencentSecretId: 'tencent_sms_secret_id',
-    tencentSecretKey: 'tencent_sms_secret_key',
-    tencentSignName: 'tencent_sms_sign_name',
-    tencentRegion: 'tencent_sms_region',
-  },
 });

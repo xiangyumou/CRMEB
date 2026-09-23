@@ -96,10 +96,6 @@ describe('the public origin (CR-1-e2)', () => {
     expect(byKey.get('extraOrigins')?.help).toContain('env:EXTRA_ALLOWED_ORIGINS');
     // The rest of the group is still an operator's to change.
     expect(byKey.get('siteName')?.readOnly).toBeUndefined();
-
-    // And nothing carries the legacy value across — that is the one value that
-    // must not come, because the installer rewrote it on every deploy.
-    expect(getConfigGroup('site')!.legacyKeys).not.toHaveProperty('publicOrigin');
   });
 
   it('comes from the environment, with no trailing slash', async () => {

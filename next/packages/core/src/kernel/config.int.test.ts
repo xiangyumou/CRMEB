@@ -31,7 +31,6 @@ const paymentConfig = defineConfigGroup({
     autoCancelMinutes: { label: '未支付自动取消（分钟）', type: 'number' },
     notifyUrls: { label: '回调地址', type: 'json' },
   },
-  legacyKeys: { wechatMchId: ['pay_weixin_mchid'], autoCancelMinutes: 'order_cancel_time' },
   permission: 'system:config:update',
 });
 
@@ -101,10 +100,6 @@ describe('defineConfigGroup', () => {
         },
       }),
     ).toThrow('不能指向自己');
-  });
-
-  it('keeps the legacy key map the ETL needs', () => {
-    expect(paymentConfig.legacyKeys?.wechatMchId).toEqual(['pay_weixin_mchid']);
   });
 });
 

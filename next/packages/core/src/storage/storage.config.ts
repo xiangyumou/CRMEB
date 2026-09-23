@@ -231,26 +231,4 @@ export const storageConfig = defineConfigGroup({
       order: 60,
     },
   },
-  legacyKeys: {
-    // `upload_type`: 1 local, 2 qiniu, 3 oss, 4 cos, … — the ETL folds every
-    // non-1 value to `s3` and carries that vendor's keys across.
-    driver: 'upload_type',
-    s3AccessKeyId: [
-      'accessKey',
-      'qiniu_accessKey',
-      'tengxun_accessKey',
-      'jd_accessKey',
-      'hw_accessKey',
-      'ty_accessKey',
-    ],
-    s3SecretAccessKey: [
-      'secretKey',
-      'qiniu_secretKey',
-      'tengxun_secretKey',
-      'jd_secretKey',
-      'hw_secretKey',
-      'ty_secretKey',
-    ],
-    s3Region: 'jd_storageRegion',
-  },
 });

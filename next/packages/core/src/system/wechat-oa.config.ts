@@ -65,10 +65,4 @@ export const wechatOaConfig = defineConfigGroup({
     },
     verificationFile: { label: '域名校验文件名', type: 'text', order: 7 },
   },
-  legacyKeys: {
-    token: 'wechat_token',
-    encodingAesKey: 'wechat_encodingaeskey',
-    messageMode: 'wechat_encode',
-    verificationFile: 'weixin_ckeck_file',
-  },
 });

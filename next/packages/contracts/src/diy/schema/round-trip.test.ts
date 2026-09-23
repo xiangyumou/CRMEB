@@ -3,7 +3,6 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { legacyDiyRow } from './legacy';
 import {
   diyPageEntriesInOrder,
   parseDiyPageValue,
@@ -47,16 +46,6 @@ describe('the fixture set', () => {
   // lists them as two sources, so this pins that they have not diverged.
   it.each(PROD)('%s is stored exactly as JSON.stringify(x, null, 2)', (file) => {
     const raw = read(file);
-    expect(JSON.stringify(JSON.parse(raw), null, 2)).toBe(raw);
-  });
-});
-
-describe('legacy row round trip', () => {
-  it.each(PROD)('%s parses as an eb_diy row and re-serialises byte for byte', (file) => {
-    const raw = read(file);
-    const parsed = legacyDiyRow.safeParse(JSON.parse(raw));
-    expect(parsed.error?.issues ?? []).toEqual([]);
-    // Serialise the ORIGINAL object, not zod's rebuild: see `parseDiyPageValue`.
     expect(JSON.stringify(JSON.parse(raw), null, 2)).toBe(raw);
   });
 });

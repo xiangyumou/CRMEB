@@ -65,11 +65,4 @@ export const logisticsConfig = defineConfigGroup({
     senderPhone: { label: '发件电话', type: 'text', section: '发件信息', order: 11 },
     senderAddress: { label: '发件地址', type: 'text', section: '发件信息', order: 12 },
   },
-  legacyKeys: {
-    provider: 'logistics_type',
-    appCode: 'system_express_app_code',
-    senderName: 'config_export_to_name',
-    senderPhone: 'config_export_to_tel',
-    senderAddress: 'config_export_to_address',
-  },
 });

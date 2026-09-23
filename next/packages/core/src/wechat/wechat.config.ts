@@ -143,17 +143,6 @@ export const wechatConfig = defineConfigGroup({
       order: 50,
     },
   },
-  legacyKeys: {
-    oaAppId: 'wechat_appid',
-    oaAppSecret: 'wechat_appsecret',
-    // `wechat_token` / `wechat_encodingaeskey` are deliberately absent: they
-    // belong to F1's `wechat-oa` group alone (see `oaToken` above, CR-3-e2).
-    miniAppId: 'routine_appId',
-    miniAppSecret: 'routine_appsecret',
-    miniToken: 'routine_token',
-    miniAesKey: 'routine_encodingaeskey',
-    miniMessageMode: 'routine_encode',
-  },
 });
 
 export type WechatConfig = z.infer<typeof wechatConfig.schema>;

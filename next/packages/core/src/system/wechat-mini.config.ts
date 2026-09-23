@@ -58,8 +58,4 @@ export const wechatMiniConfig = defineConfigGroup({
       order: 9,
     },
   },
-  legacyKeys: {
-    name: 'routine_name',
-    contactType: 'routine_contact_type',
-  },
 });

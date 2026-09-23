@@ -83,8 +83,4 @@ export const orderConfig = defineConfigGroup({
       section: '阈值',
     },
   },
-  legacyKeys: {
-    payWindowMinutes: 'order_cancel_time',
-    freeShippingThreshold: 'store_free_postage',
-  },
 });

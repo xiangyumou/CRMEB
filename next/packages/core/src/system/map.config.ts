@@ -52,7 +52,4 @@ export const mapConfig = defineConfigGroup({
     },
     defaultCity: { label: '默认城市', type: 'text', visibleWhen: MAP_ON, order: 4 },
   },
-  legacyKeys: {
-    webKey: 'tengxun_map_key',
-  },
 });

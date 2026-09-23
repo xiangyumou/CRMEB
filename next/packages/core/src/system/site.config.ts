@@ -88,11 +88,8 @@ export const siteConfig = defineConfigGroup({
     /**
      * 开屏广告 — `pages/guide` shows this before the home page, once a day.
      *
-     * **No `legacyKeys`**, deliberately: the legacy value was not an
-     * `eb_system_config` row at all but a `SystemGroupData` blob read through
-     * `getDbCache('open_adv')`, with an array of images and a video link. One
-     * image with a link and a countdown is what the screen actually renders,
-     * so that is what is stored; a shop re-enters it once.
+     * One image with a link and a countdown is what the screen renders, so
+     * that is what is stored.
      *
      * `splashEnabled` is the switch on its own, rather than "an image means
      * on": an operator who is preparing next week's campaign needs somewhere
@@ -108,12 +105,10 @@ export const siteConfig = defineConfigGroup({
      * Absolute public origin, no trailing slash, e.g. `https://shop.example.com`.
      *
      * Environment-derived and **not** an operator setting: it is a deployment
-     * fact, which is exactly what the legacy installer kept getting wrong when
-     * it rewrote `site_url` on every deploy and left shops with
-     * `http://localhost` in their WeChat links. Its `ui` entry is `readOnly`,
-     * so the settings screen shows the current value as plain text and
-     * `configSave` refuses the key; there are no `legacyKeys`, because the old
-     * value is precisely the one that must not come across.
+     * fact, and a stored copy goes stale the day the shop moves domains,
+     * leaving the old origin (or `http://localhost`) in every WeChat link. Its
+     * `ui` entry is `readOnly`, so the settings screen shows the current value
+     * as plain text and `configSave` refuses the key.
      *
      * Empty is the safe default: with no origin an outbound link is dropped
      * rather than sent as a bare path, and `isTrustedHost` trusts nothing.
@@ -219,28 +214,6 @@ export const siteConfig = defineConfigGroup({
       source: 'env:EXTRA_ALLOWED_ORIGINS',
       order: 71,
     },
-  },
-  legacyKeys: {
-    siteName: 'site_name',
-    siteKeywords: 'site_keywords',
-    siteDescription: 'site_description',
-    contactPhone: ['site_phone', 'contact_number'],
-    companyAddress: 'company_address',
-    logo: 'site_logo',
-    logoSquare: 'site_logo_square',
-    loginLogo: ['login_logo', 'wap_login_logo'],
-    favicon: 'ico_path',
-    icpNumber: 'record_No',
-    icpUrl: 'icp_url',
-    publicSecurityNumber: 'network_security',
-    publicSecurityUrl: 'network_security_url',
-    contactQrcode: ['customer_qrcode', 'wechat_qrcode'],
-    shareQrcode: 'share_qrcode',
-    shareTitle: 'wechat_share_title',
-    shareSummary: 'wechat_share_synopsis',
-    shareImage: 'wechat_share_img',
-    copyrightText: 'nncnL_crmeb_copyright',
-    copyrightImage: 'nncnL_crmeb_copyright_image',
   },
 });
 

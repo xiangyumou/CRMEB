@@ -104,15 +104,6 @@ export const storefrontAuthConfig = defineConfigGroup({
     defaultAvatar: { label: '默认头像', type: 'text', section: '资料', order: 40 },
     addressLimit: { label: '收货地址数量上限', type: 'number', section: '资料', order: 41 },
   },
-  // `verify_expire_time` is deliberately **not** mapped. The legacy value is in
-  // *minutes* and defaults to 1; copying it across would set the code TTL to one
-  // second and break every login on the day of the migration. The same class of
-  // mistake as F1's `order_cancel_time`, but with no unit hint in the key name,
-  // so the safe move is to take the new default.
-  legacyKeys: {
-    defaultAvatar: 'h5_avatar',
-    siteUrl: 'site_url',
-  },
 });
 
 export type StorefrontAuthConfig = z.infer<typeof storefrontAuthConfig.schema>;

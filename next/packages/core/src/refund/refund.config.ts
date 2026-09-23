@@ -60,17 +60,6 @@ export const refundConfig = defineConfigGroup({
       order: 40,
     },
   },
-  legacyKeys: {
-    // The `refund_*` names first, and they are the ones that exist: `crmeb.sql`
-    // ships `refund_name` / `refund_phone` / `refund_address`, never
-    // `site_refund_*`. F1's deleted `trade` group held the real keys while this
-    // group — the one that prints the return address — claimed names nobody had
-    // stored, so a cutover would have shown the buyer an empty address
-    // (CR-6-f1). The `site_*` spellings stay as aliases in case a fork used them.
-    returnName: ['refund_name', 'site_refund_name'],
-    returnPhone: ['refund_phone', 'site_refund_phone'],
-    returnAddress: ['refund_address', 'site_refund_address'],
-  },
 });
 
 export type RefundConfig = z.infer<typeof refundConfig.schema>;
