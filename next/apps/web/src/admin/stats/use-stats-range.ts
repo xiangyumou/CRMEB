@@ -14,7 +14,7 @@ export interface StatsRange {
   set: (next: [Dayjs, Dayjs] | null) => void;
 }
 
-/** The presets every statistics page offers, in the order the legacy pages had. */
+/** The presets every statistics page offers, in the order operators expect. */
 export const RANGE_PRESETS: { label: string; days: number }[] = [
   { label: '今天', days: 1 },
   { label: '昨天', days: -1 },

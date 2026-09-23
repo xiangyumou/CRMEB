@@ -31,8 +31,8 @@ import { INVOICE_HEADER_TYPE, INVOICE_STATUS, INVOICE_TYPE, optionsOf } from '..
 /**
  * 发票管理.
  *
- * Legacy's `store_order_invoice` was a second copy of the order and the two
- * drifted the moment anything was refunded; the row here carries only the
+ * An invoice row that copied the order would drift from it the moment anything
+ * was refunded; the row here carries only the
  * header the buyer froze at request time, so this table never has to reconcile
  * anything. The e-invoice provider is out of scope — finance types the number
  * from whatever system actually issued it.

@@ -29,7 +29,7 @@ const CATEGORIES: AssetCategory[] = [
  *
  * It is NOT a mock in the testing sense: it behaves like the real thing
  * (pagination, keyword filter, upload, delete) so the picker can be developed
- * and reviewed before stream F1 lands the storage routes.
+ * and reviewed without the storage routes.
  */
 export function createStubAssetSource(seed = 24): AssetSource {
   let nextId = seed + 1;

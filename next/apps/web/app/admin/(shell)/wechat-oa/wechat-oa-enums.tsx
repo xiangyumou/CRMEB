@@ -24,8 +24,8 @@ import { MediaSelect } from '@/admin/wechat-oa/media-select';
  * blank tag in production.
  *
  * The reply body is shared on purpose: an auto-reply and a channel code's
- * greeting are the same five shapes, and in the legacy admin they were two
- * hand-written forms that disagreed about which of them needed a media id.
+ * greeting are the same five shapes, and two hand-written forms would disagree
+ * about which of them needed a media id.
  */
 
 export const REPLY_TRIGGER: StatusMap<WechatReplyTrigger> = {
@@ -65,7 +65,7 @@ export const QRCODE_STATUS: StatusMap<WechatQrcodeStatus> = {
  *
  * A table row that only says 图片 tells an operator nothing about *which*
  * reply they are looking at, and opening five edit dialogs to find the right
- * one is how the legacy screen was actually used.
+ * one is not a way to use a screen.
  */
 export function replySummary(
   replyType: WechatReplyType | null,

@@ -14,7 +14,7 @@ import { Can } from '@/admin/session/can';
  *
  * The route answers with the CSV *text* inside a JSON envelope — `handle()`
  * validates every response against its contract, so a route cannot stream a
- * file (CR-2-b2). The download is assembled here, with a BOM, because Excel on
+ * file. The download is assembled here, with a BOM, because Excel on
  * Windows reads a BOM-less UTF-8 CSV as GBK and turns every Chinese column
  * heading into mojibake.
  *

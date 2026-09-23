@@ -9,7 +9,7 @@ import { defineMenu } from './types';
  * `permission` here only decides what the sider shows; the server re-checks the
  * atom declared on each route. Both lists come from `catalogPermissions` in
  * `@shop/core/catalog/permissions.ts`, which is why 商品保障 has an entry of its
- * own rather than hiding behind 商品参数 the way legacy's route group did.
+ * own rather than hiding behind 商品参数.
  *
  * The editor and the card pool are `hidden`: reachable, breadcrumb-able, never
  * listed.

@@ -34,9 +34,9 @@ export interface RouteInput<R extends AnyRouteDef> {
 }
 
 // `NonNullable` matters: with `exactOptionalPropertyTypes`, `RouteDef['params']`
-// is `TParams | undefined`, which never satisfies `extends z.ZodType`. (The frozen
+// is `TParams | undefined`, which never satisfies `extends z.ZodType`. (The
 // `ParamsOf`/`QueryOf`/`BodyOf` in the contracts conventions miss this and collapse
-// to `undefined` for every route — see docs/rewrite/cr/CR-1-p0b.md.)
+// to `undefined` for every route.)
 export type ParamsInputOf<R extends AnyRouteDef> =
   NonNullable<R['params']> extends z.ZodType ? z.input<NonNullable<R['params']>> : never;
 export type QueryInputOf<R extends AnyRouteDef> =

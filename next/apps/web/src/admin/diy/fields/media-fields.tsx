@@ -19,8 +19,8 @@ import { DiyFieldRow } from './section';
  * These are the three places a panel touches the rest of the admin: the asset
  * library, the link registry and the sortable list. All three come from the kit
  * — `AssetPicker`, `LinkPicker`, `SortableListField` — so real data reaches
- * them through the kit's own providers and nothing here needs to change when
- * F1 and A land.
+ * them through the kit's own providers and nothing here knows where it comes
+ * from.
  */
 
 // ---------------------------------------------------------------------------

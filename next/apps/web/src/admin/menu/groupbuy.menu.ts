@@ -3,9 +3,8 @@ import { defineMenu } from './types';
 /**
  * 营销 → 拼团.
  *
- * Three entries where legacy had 拼团商品 / 拼团列表 / 拼团统计 under 营销 →
- * 拼团管理. The paths say `groupbuy`, not `combination`: the legacy segment is a
- * transliteration of nothing and the URL is what an operator's history shows.
+ * Three entries: 拼团商品 / 拼团列表 / 拼团统计. The paths say `groupbuy`, not
+ * `combination`: that segment would be a transliteration of nothing and the URL is what an operator's history shows.
  *
  * `permission` here only decides what the sider shows; the server checks the
  * atom declared on each route again. Both lists come from `groupbuyPermissions`

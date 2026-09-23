@@ -48,7 +48,7 @@ import { COUPON_CLAIM_MODE, COUPON_SCOPE, COUPON_STATUS, couponFields } from '..
  *    things — the server re-checks the atom declared on each route.
  */
 export function CouponTemplatesPage() {
-  // The edit form loads the whole template first (CR-3-d2). The list row has
+  // The edit form loads the whole template first. The list row has
   // no `productIds` / `categoryIds`, and this page renders no control for
   // either, so a form seeded from the row would post the schema's `[]` default
   // and silently unlink every product a scoped coupon applied to.
@@ -252,10 +252,10 @@ function initialValuesOf(row: CouponTemplateDetail) {
 /**
  * 发放给指定用户.
  *
- * Deliberately a plain textarea of user ids rather than a user picker: E1 owns
- * the customer search, and an operator pasting a list out of a spreadsheet is
- * the actual workflow. The result reports how many were skipped for already
- * holding the maximum, which is normal when a group overlaps a previous grant.
+ * Deliberately a plain textarea of user ids rather than a user picker: an
+ * operator pasting a list out of a spreadsheet is the actual workflow. The
+ * result reports how many were skipped for already holding the maximum, which is
+ * normal when a group overlaps a previous grant.
  */
 function GrantModal({
   template,

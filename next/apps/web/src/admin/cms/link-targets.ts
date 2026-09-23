@@ -6,7 +6,7 @@ import type { LinkTargetResult, LinkTargetType } from '../kit';
 /**
  * The CMS half of the DIY link picker.
  *
- * `createDiyLinkSource({ targets })` (stream G1) serves the 商城页面 registry
+ * `createDiyLinkSource({ targets })` serves the 商城页面 registry
  * itself and delegates the searchable halves — a product, a category, an
  * article — to whoever owns the records. This is that callback for `article`,
  * and it composes: a caller that also has the catalog's version chains them and
@@ -22,7 +22,7 @@ import type { LinkTargetResult, LinkTargetType } from '../kit';
  * Only published articles are offered, because a link to a draft is a link to a
  * 404 on the storefront — the one place the admin should not be able to build.
  *
- * The URLs are the uni-app paths the legacy payloads carry
+ * The URLs are the uni-app paths stored pages carry
  * (`/pages/news_details/index?id=`), not admin routes: what is stored here ends
  * up in a DIY page that the mini-program renders.
  */

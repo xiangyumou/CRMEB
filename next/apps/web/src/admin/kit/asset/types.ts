@@ -29,9 +29,9 @@ export interface AssetListResult {
 /**
  * Everything `<AssetPicker>` needs from the material library.
  *
- * P0-b ships the UI and an in-memory stub. Stream F1 (`system` / `storage`)
- * implements this interface on top of the real `/admin-api/storage/*` routes
- * and installs it with `<AssetSourceProvider source={…}>` in the shell layout.
+ * The kit ships the UI and an in-memory stub. The `storage` domain implements
+ * this interface on top of the real `/admin-api/attachments` routes and installs
+ * it with `<AssetSourceProvider source={…}>` in the shell layout.
  * Nothing else in the kit changes.
  */
 export interface AssetSource {

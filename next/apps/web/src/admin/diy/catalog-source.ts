@@ -21,7 +21,7 @@ import {
  *
  * It answers the three kinds the catalog owns — 商品, 商品分类 and 商品标签 — and
  * delegates the rest (文章, 优惠券, 拼团) to the in-memory stub, so a panel that
- * needs one of those still renders while streams F2 / D finish. Replacing a
+ * needs one of those still renders. Replacing a
  * delegated kind is one case in `list` and one in `resolve`; no panel changes.
  *
  * Why a plain object built from `callRoute` rather than hooks: `DiyDataSource`

@@ -41,13 +41,13 @@ import {
  *
  * They are one screen because a label is worthless without its category and
  * the categories are a handful of rows — a separate menu entry for five names
- * is the kind of navigation that made the legacy console so wide. The second
+ * is the kind of navigation that makes a console too wide. The second
  * table carries a `urlPrefix` so both can keep their own page and filters in
  * the URL at once.
  *
- * Note this is the *product* label, not the customer label E1 owns: legacy
- * `eb_store_product.label_id` pointed at the user-label table, which is how a
- * shop ended up tagging shirts as "高价值客户".
+ * Note this is the *product* label, not the customer label: a product that
+ * pointed at the user-label table is how a shop ends up tagging shirts as
+ * "高价值客户".
  */
 export function ProductLabelsPage() {
   const [tab, setTab] = useState<'labels' | 'categories'>('labels');

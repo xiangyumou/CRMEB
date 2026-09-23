@@ -29,11 +29,9 @@ import { BOOL_OPTIONS, protectionFields } from '../catalog-enums';
 /**
  * 商品保障服务 — the 七天无理由退换 / 假一赔十 badges under the buy button.
  *
- * Its own page under its own permission atoms. Legacy registered these routes
- * in the route group whose `cate_name` said 商品参数
- * (`crmeb/app/adminapi/route/product.php:164`), so granting a merchandiser
- * "product parameters" also silently granted "edit the guarantees printed on
- * every product page". Brief: fix, don't port.
+ * Its own page under its own permission atoms, not filed under 商品参数:
+ * granting a merchandiser "product parameters" must not silently grant "edit
+ * the guarantees printed on every product page".
  */
 export function ProductProtectionsPage() {
   const modal = useFormModal<ProductProtection>();

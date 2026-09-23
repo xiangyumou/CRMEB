@@ -19,8 +19,8 @@ import { GroupbuyActivitiesPage } from './groupbuy-activities';
  * What is worth asserting on a kit-built page is the wiring — which route the
  * table asks, that permissions really hide the buttons, and what an action puts
  * on the wire. The one thing here that is not generic is the **edit path**: it
- * must read the activity first and send the per-SKU rows back, because the
- * legacy page rebuilt them on every save and that is how 已售 used to reset.
+ * must read the activity first and send the per-SKU rows back, because
+ * rebuilding them on every save is how 已售 gets reset.
  */
 
 interface Call {

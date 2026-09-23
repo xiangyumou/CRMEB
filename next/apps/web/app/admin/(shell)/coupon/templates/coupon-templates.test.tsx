@@ -49,7 +49,7 @@ const row = {
 /**
  * What the detail route answers and the list row does not: the scope links.
  * This page renders no control for either, so they exist only to be carried
- * back out of the form untouched (CR-3-d2).
+ * back out of the form untouched.
  */
 const detail = { ...row, scope: 'products', productIds: ['31', '42'], categoryIds: [] };
 
@@ -135,7 +135,7 @@ describe('优惠券列表', () => {
   });
 
   /**
-   * CR-3-d2. The bug this is pinned against: 编辑 opened a form seeded from the
+   * The bug this is pinned against: 编辑 opened a form seeded from the
    * list row, which has no `productIds`, so saving an unrelated field posted
    * the schema's `[]` default and unlinked every product the coupon applied to.
    */

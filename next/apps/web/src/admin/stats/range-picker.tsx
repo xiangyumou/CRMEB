@@ -9,9 +9,9 @@ import { presetWindow, RANGE_PRESETS, type StatsRange } from './use-stats-range'
  * 时间范围. Presets plus a range picker, both writing the same two URL keys.
  *
  * The bucket is *not* offered: it is derived from the window's length by the
- * server (≤2 days → hour, ≤92 → day, else month). Legacy let the operator ask
- * for a quarter bucketed daily and then drew every third label over a daily
- * series, quietly dropping two thirds of the data.
+ * server (≤2 days → hour, ≤92 → day, else month). A quarter bucketed daily
+ * would draw every third label over a daily series, quietly dropping two thirds
+ * of the data.
  */
 export function StatsRangePicker({ range }: { range: StatsRange }) {
   const active = (days: number): boolean => {

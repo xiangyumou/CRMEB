@@ -25,11 +25,11 @@ import { requiredPermissions } from './route-permission';
 
 const SIDER_WIDTH = 216;
 
-/** The avatar menu's 个人资料 (CR-16-k: it pushed `/admin/profile`, which is a 404). */
+/** The avatar menu's 个人资料. The page lives under 系统; `/admin/profile` is a 404. */
 export const PROFILE_PATH = '/admin/system/profile';
 
 /**
- * The route-level guard every page gets from the shell (CR-16-k): a URL whose
+ * The route-level guard every page gets from the shell: a URL whose
  * menu entry needs an atom the admin lacks renders the 403 inside the chrome
  * instead of an empty screen and a toast per failed fetch. The atoms come from
  * the menu registry — see `route-permission.ts`.

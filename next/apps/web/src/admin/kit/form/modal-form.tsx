@@ -14,8 +14,7 @@ import { ZodForm } from './zod-form';
 type AnyObjectSchema = z.ZodObject<z.ZodRawShape>;
 
 /**
- * Where an edit form's values come from when the list row is not enough
- * (CR-3-d2).
+ * Where an edit form's values come from when the list row is not enough.
  *
  * A list route answers the columns; an update route takes the whole record.
  * Open the form on the list row and every field the list did not carry is
@@ -71,7 +70,7 @@ export interface EntityFormProps<
   fields: readonly FieldSpec<Extract<keyof z.input<S>, string>>[];
   initialValues?: Partial<z.input<S>> | undefined;
   /**
-   * Load the record before rendering the form (CR-3-d2). Omit it when creating
+   * Load the record before rendering the form. Omit it when creating
    * — `useFormModal({ detail })` omits it for you.
    *
    * What `select` returns is merged over `initialValues`, so a page can still
@@ -392,7 +391,7 @@ function DrawerFormChrome<S extends AnyObjectSchema, R extends AnyRouteDef, D ex
 }
 
 /**
- * The detail route an edit dialog loads before it renders (CR-3-d2).
+ * The detail route an edit dialog loads before it renders.
  *
  * Give it to `useFormModal` next to the table's list route and the wiring is
  * done: `modal.props` carries `load` when a row is being edited and omits it

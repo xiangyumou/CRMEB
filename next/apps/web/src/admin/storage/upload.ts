@@ -4,7 +4,7 @@ import type { AnyRouteDef, ResponseOf } from '../api/contracts';
 /**
  * `callRoute` for a single file.
  *
- * Since CR-4-f1 the kit's `callRoute` sends a `FormData` body itself, so all
+ * The kit's `callRoute` sends a `FormData` body itself, so all
  * this adds is the one-field form an upload route expects. It stays because
  * `uploadFile(route, input, file)` reads better at a call site than building a
  * `FormData` by hand, and because the field name is a server-side convention

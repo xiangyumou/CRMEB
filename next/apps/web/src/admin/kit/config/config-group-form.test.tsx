@@ -310,7 +310,7 @@ describe('<ConfigGroupForm> rendering', () => {
 });
 
 /**
- * Read-only fields (N1 / CR-1-e2).
+ * Read-only fields.
  *
  * `site.publicOrigin` comes from the environment. Leaving it off the screen
  * was the first draft and it was worse: an operator whose WeChat links point

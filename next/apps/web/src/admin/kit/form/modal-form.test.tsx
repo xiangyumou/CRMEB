@@ -11,7 +11,7 @@ import { ModalForm, useFormModal } from './modal-form';
 import type { FieldSpec } from './types';
 
 /**
- * `ModalForm`'s loader (CR-3-d2).
+ * `ModalForm`'s loader.
  *
  * The rule it exists to enforce is one sentence: **an edit form never renders
  * from a list row.** A list route answers the columns, an update route takes

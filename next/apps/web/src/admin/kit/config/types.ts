@@ -2,7 +2,7 @@
  * Descriptor types for `<ConfigGroupForm>`.
  *
  * Deliberately minimal and data-only (no functions in the default shape, no
- * zod) so that P0-A's `defineConfigGroup` in `core/system/config/<group>.config.ts`
+ * zod) so that `defineConfigGroup` in `core/system/config/<group>.config.ts`
  * can emit one straight over the wire, and so the shapes can round-trip through
  * JSON. Anything richer belongs in the group's own page, not here.
  */

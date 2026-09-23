@@ -47,8 +47,8 @@ const KIND_OPTIONS = [
 /**
  * 素材库.
  *
- * Three of the old system's defects are fixed by the routes behind this page
- * rather than by anything visible here, and it is worth knowing which:
+ * Three guarantees come from the routes behind this page rather than from
+ * anything visible here, and it is worth knowing which:
  *
  *  - the client never names a storage path; the server derives the key,
  *    so `../../` in a filename cannot escape anything;

@@ -42,7 +42,7 @@ const detail = {
   ...row,
   phone: '13800138000',
   // Three fields the list row does not carry. They are here rather than `null`
-  // so the edit test can watch them survive a save (CR-3-d2).
+  // so the edit test can watch them survive a save.
   realName: '王小明',
   birthday: null,
   adminRemark: '老客户，走加急',
@@ -191,10 +191,11 @@ describe('用户列表', () => {
   });
 
   /**
-   * CR-3-d2. 真实姓名 / 生日 / 管理员备注 live on the detail, not on the list
-   * row, so 编辑 used to open them blank — and an empty antd box submits `''`,
-   * which `user-admin.service.ts` writes, because it skips a field only when it
-   * is `undefined`. Editing a nickname erased the operator's own notes.
+   * 真实姓名 / 生日 / 管理员备注 live on the detail, not on the list row, so
+   * 编辑 seeded from the row would open them blank — and an empty antd box
+   * submits `''`, which `user-admin.service.ts` writes, because it skips a
+   * field only when it is `undefined`. Editing a nickname would erase the
+   * operator's own notes.
    */
   it('loads the whole customer before editing, so the detail-only fields are not erased', async () => {
     const calls = stubApi();

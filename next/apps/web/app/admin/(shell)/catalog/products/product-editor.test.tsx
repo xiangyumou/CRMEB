@@ -208,8 +208,8 @@ describe('商品编辑器', () => {
   });
 
   /**
-   * 运费模板 is a select over F2's options route, not a typed id (A's decision
-   * 11, now closed). The 计费方式 is part of the label because two templates can
+   * 运费模板 is a select over the shipping options route, not a typed id. The
+   * 计费方式 is part of the label because two templates can
    * share a name and charge differently, and picking the wrong one is a
    * freight bug nobody notices until a customer complains.
    */
@@ -230,7 +230,7 @@ describe('商品编辑器', () => {
     await userEvent.click(screen.getByTitle('大件走重量（按重量）'));
 
     // 固定运费 hides the template select and says the charge is per unit —
-    // legacy multiplied `postage` by `cart_num` and the rewrite kept that.
+    // the order charges `postage` × quantity.
     // antd's radio button puts `pointer-events: none` on the input itself.
     await userEvent
       .setup({ pointerEventsCheck: 0 })

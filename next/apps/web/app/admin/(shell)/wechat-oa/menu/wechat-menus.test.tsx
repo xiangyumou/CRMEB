@@ -107,7 +107,7 @@ describe('公众号自定义菜单', () => {
     expect(screen.getByText('40016 invalid button type')).toBeInTheDocument();
   });
 
-  it('shows a refused draft’s error on its own row (CR-33-k2)', async () => {
+  it('shows a refused draft’s error on its own row', async () => {
     // The alert reads the *live* menu; the draft WeChat refused keeps its
     // error on its own row, and that is where it has to be read.
     stubApi({

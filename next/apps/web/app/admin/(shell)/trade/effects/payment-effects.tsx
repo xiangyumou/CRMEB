@@ -29,7 +29,7 @@ import { EFFECT_STATUS, optionsOf } from '../trade-enums';
  * idempotent, so a transient failure costs a retry and nothing else.
  *
  * A row reaches 需人工处理 only after the ledger's own retries ran out. That is
- * what this screen lists, and for this stream the one that matters is
+ * what this screen lists, and the one that matters most is
  * `refund.execute` — the effect that sends money back to a buyer. A parked
  * `refund.execute` is somebody waiting for a refund that will never leave on
  * its own.
@@ -42,7 +42,7 @@ import { EFFECT_STATUS, optionsOf } from '../trade-enums';
  * produce one re-queue and one 该任务当前状态无法重试.
  *
  * The list is scoped to `payment`, `refund` and `order`. The effects table is
- * platform-owned and this console is not everybody's (`CR-4-c`).
+ * platform-owned and this console is not everybody's.
  */
 export function PaymentEffectsPage() {
   return (

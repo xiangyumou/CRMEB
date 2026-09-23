@@ -50,7 +50,7 @@ import { PRESALE_ACTIVITY_STATUS, PRESALE_PAYMENT_MODE, presaleFields } from '..
  * wants it gone sooner moves the end time or deletes it.
  */
 export function PresaleActivitiesPage() {
-  // `detail` is the kit's (CR-3-d2): the edit dialog loads the whole activity
+  // `detail` is the kit's: the edit dialog loads the whole activity
   // before it renders a single field. `presaleAdminActivityUpdate` takes a
   // whole activity, and the list row carries neither `skus` nor
   // `sliderImages` — a form opened on the row would submit an empty 规格 list

@@ -24,7 +24,7 @@ import {
  *
  * The tiles are **not** computed here. They come from
  * `GET /admin-api/dashboard/header`, which asks every registered
- * `DashboardContributor` — `system`, `storage`, and this stream's `stats` — in
+ * `DashboardContributor` — `system`, `storage` and `stats` — in
  * parallel and permission-filtered. That is why a tile can be *missing* rather
  * than zero: an admin who may not open 交易统计 does not learn today's revenue
  * from the home page instead, and a contributor that throws lands in

@@ -23,9 +23,9 @@ import { MenuTreeEditor } from '@/admin/wechat-oa/menu-tree-editor';
 /**
  * 自定义菜单 — the bottom menu of the Official Account.
  *
- * Saving and publishing are two buttons because they are two decisions. The
- * legacy screen had one, so a WeChat outage lost the operator's edits and a
- * typo went live the moment it was typed. Here a menu is a row, several may be
+ * Saving and publishing are two buttons because they are two decisions. With
+ * one, a WeChat outage loses the operator's edits and a typo goes live the
+ * moment it is typed. Here a menu is a row, several may be
  * kept side by side (a 春节 menu next to the everyday one), and only 发布
  * touches `cgi-bin/menu/create` — which is also why it holds its own
  * permission atom.
@@ -152,8 +152,8 @@ export function WechatMenusPage() {
  * `publish()` writes WeChat's message to `publish_error` on the row that was
  * being published. The alert above the table reads `/current`, the *live*
  * menu, so a refused **draft** (the common case: WeChat checks every URL
- * against the account's 业务域名) was shown nowhere once the toast went
- * (CR-33-k2). The row is where the operator is looking when they press 发布.
+ * against the account's 业务域名) would be shown nowhere once the toast went.
+ * The row is where the operator is looking when they press 发布.
  */
 function MenuStatus({ row }: { row: WechatMenu }) {
   const state = row.isActive ? <Tag color="success">已生效</Tag> : <Tag color="default">草稿</Tag>;
@@ -177,7 +177,7 @@ function MenuStatus({ row }: { row: WechatMenu }) {
  * `ConfirmButton` invalidates on success only; a refusal is exactly when the
  * page has something new to show (`publish_error` on the row, and on `/current`
  * when the live menu was the one refused), and the toast that says so lasts
- * three seconds (CR-33-k2).
+ * three seconds.
  */
 function PublishButton({ id }: { id: string }) {
   const refresh = useInvalidateRoutes();

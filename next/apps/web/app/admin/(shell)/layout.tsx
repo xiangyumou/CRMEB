@@ -9,7 +9,7 @@ import { StorageAssetSourceProvider } from '@/admin/storage/asset-source-provide
  * Everything behind a login lives under this route group. The group's
  * parentheses keep it out of the URL: `app/admin/(shell)/coupons` is `/admin/coupons`.
  *
- * `StorageAssetSourceProvider` is the swap the kit README asks F1 to make: it
+ * `StorageAssetSourceProvider` is the swap the kit README describes: it
  * puts the real `/admin-api/attachments` library behind `<AssetPicker>` in
  * place of the in-memory `createStubAssetSource()`, for every page at once.
  */

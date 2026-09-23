@@ -16,8 +16,8 @@ import { GROUPBUY_ACTIVITY_STATUS } from '../groupbuy-enums';
  * 拼团统计 — one row per campaign.
  *
  * Every number is counted from the teams and their members, not from a
- * denormalised counter, so the page cannot drift from the ledgers the way
- * legacy's `eb_store_combination.sales` did once a refund landed.
+ * denormalised counter, so the page cannot drift from the ledgers once a
+ * refund lands.
  *
  * 成团率 is 已成团 ÷ 开团数 and deliberately excludes teams still forming: a
  * campaign opened an hour ago would otherwise read 0% while nothing has gone

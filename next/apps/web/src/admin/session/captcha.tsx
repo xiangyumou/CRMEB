@@ -17,10 +17,10 @@ let registered: LoginCaptchaComponent | null = null;
 /**
  * Slot for the slider captcha.
  *
- * P0-b ships the hole, not the implementation: the stream that owns
- * `auth/storefront` + admin login hardening (E1) calls this once, from a
+ * The hole, not an implementation: a captcha provider calls this once, from a
  * client module imported by the admin layout, and the login form starts
- * rendering the challenge and sending `captchaToken`.
+ * rendering the challenge and sending `captchaToken`. Until one registers, the
+ * form renders no challenge.
  *
  * ```ts
  * registerLoginCaptcha(SliderCaptcha);

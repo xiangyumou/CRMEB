@@ -77,7 +77,7 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
   const paramTemplates = useRouteQuery(catalogAdminParamTemplateList, {
     query: { page: 1, pageSize: 200, isEnabled: 'true' },
   });
-  // F2's options route: id, name and 计费方式, every template, no paging.
+  // The shipping options route: id, name and 计费方式, every template, no paging.
   const shippingTemplates = useRouteQuery(shippingTemplateOptionList, {});
 
   const create = useRouteMutation(catalogAdminProductCreate, {
@@ -132,7 +132,7 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
     value: row.id,
   }));
   /**
-   * 运费模板 — F2's options route, not a typed id any more (A's decision 11).
+   * 运费模板 — the shipping options route, not a typed id.
    *
    * The select carries the template's 计费方式 in its label because the same
    * template name can charge by 件 or by 重量 and the operator picking one from
@@ -216,7 +216,7 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
         footer={false}
         onSubmit={(values) => {
           // `customForm` has no editor yet, so it is carried across untouched
-          // rather than dropped — see `docs/rewrite/status/a.md`.
+          // rather than dropped.
           const body: AdminProductForm = {
             ...values,
             ...(record?.customForm ? { customForm: record.customForm } : {}),
@@ -419,7 +419,7 @@ function buildFields({
       label: '固定运费',
       span: 8,
       visibleWhen: (values) => values.freightMode === 'fixed',
-      // Legacy charged `postage × cart_num`, and the rewrite kept it: the
+      // The order charges `postage × quantity`: the
       // number below is per unit, not per order. Operators read "固定运费 8 元"
       // as "8 元 regardless of quantity" unless the form says otherwise.
       help: '按件收取：下单数量 × 该金额',

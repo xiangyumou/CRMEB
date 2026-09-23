@@ -40,8 +40,8 @@ export const PRESALE_PAYMENT_MODE: StatusMap<PresalePaymentMode> = {
  * The stage machine of `presale_orders`.
  *
  * Four of the six are unreachable in a full-payment shop and say so, because an
- * operator looking at migrated data will see them and the honest answer is
- * "this came from the old system", not a blank cell.
+ * operator looking at historical orders will see them and the honest answer is
+ * "this is a historical order", not a blank cell.
  */
 export const PRESALE_ORDER_STAGE: StatusMap<PresaleOrderStage> = {
   deposit_pending: { label: '待付定金（历史）', color: 'default' },
@@ -133,7 +133,7 @@ function SkuIdField({
  * that is always refused would be a worse lie than not offering it.
  *
  * The 规格 rows are a `sortableList`, each with the kit's `<SkuPicker>` behind
- * a 选择 button (A2). The server still checks every id really belongs to the
+ * a 选择 button. The server still checks every id really belongs to the
  * product (`PRESALE_SKU_NOT_IN_ACTIVITY`), so a hand-typed id is a 422 rather
  * than a mispriced sale — the picker is what stops the operator reaching that
  * 422 in the first place.

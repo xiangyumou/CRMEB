@@ -6,12 +6,12 @@ import type { LinkPageGroup, LinkSource, LinkTargetResult, LinkTargetType } from
 /**
  * The real `LinkSource` for `<LinkPicker>` — the 商城页面 half of it.
  *
- * The link registry (`diy_links` / `diy_link_categories`) is this stream's, so
- * `listPages` is answered here for good. `listTargets` — products, categories,
- * articles — is not: those belong to streams A and F2, and this implementation
- * composes over whatever they provide rather than duplicating their endpoints.
- * Until they ship, pass `targets` and the picker's other tabs keep working
- * against the kit's stub.
+ * The link registry (`diy_links` / `diy_link_categories`) is the DIY domain's,
+ * so `listPages` is answered here. `listTargets` — products, categories,
+ * articles — is not: those belong to the catalog and the CMS, and this
+ * implementation composes over whatever `targets` provides rather than
+ * duplicating their endpoints. A type `targets` does not answer falls through
+ * to the kit's stub.
  */
 export interface DiyLinkSourceOptions {
   targets?:

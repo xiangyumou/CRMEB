@@ -5,7 +5,7 @@ import { configureApi, resetApiConfig } from '../api';
 import { useNotificationStream } from './use-notification-stream';
 
 /**
- * CR-32-k2: the bell listens for the event the server names, reads the durable
+ * The bell listens for the event the server names, reads the durable
  * inbox on mount, and marks read on the server.
  */
 
@@ -101,7 +101,7 @@ afterEach(() => {
   resetApiConfig();
 });
 
-describe('useNotificationStream (CR-32-k2)', () => {
+describe('useNotificationStream', () => {
   it('seeds the bell from the unread inbox and the unread count on mount', async () => {
     const { result } = renderHook(() => useNotificationStream('/admin-api/notifications/stream'));
     await waitFor(() => expect(result.current.notifications).toHaveLength(1));

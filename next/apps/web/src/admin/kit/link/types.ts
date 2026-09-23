@@ -45,8 +45,8 @@ export interface LinkTargetResult {
 /**
  * Everything `<LinkPicker>` needs.
  *
- * P0-b ships the UI and an in-memory stub. The catalog (A), CMS (F2) and DIY
- * (G1) streams supply the real implementation and install it with
+ * The kit ships the UI and an in-memory stub. A page that needs real targets
+ * (the DIY editor, with the catalog and CMS halves) installs its source with
  * `<LinkSourceProvider source={…}>`.
  */
 export interface LinkSource {

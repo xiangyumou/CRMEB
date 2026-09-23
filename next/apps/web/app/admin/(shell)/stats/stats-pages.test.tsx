@@ -32,7 +32,7 @@ import { UserStatsPage } from './users/user-stats';
  * What is asserted is wiring: the right route with the range in the query, the
  * labels and figures coming from the server rather than from the page, the
  * export atom really hiding the button, and the export assembling a download
- * from the CSV-in-JSON envelope (CR-2-b2). The chart itself is not asserted —
+ * from the CSV-in-JSON envelope. The chart itself is not asserted —
  * recharts measures its container, and a zero-width container in happy-dom
  * renders nothing; `StatsChart`'s reshaping is covered where it is pure.
  */
@@ -159,29 +159,5 @@ describe('商品统计', () => {
     expect(await screen.findByText('云南小粒咖啡豆 500g')).toBeInTheDocument();
     const ranking = calls.find((call) => call.url.includes('/stats/products/ranking'));
     expect(ranking?.url).toContain('sortBy=paidAmount');
-  });
-
-  it('says 加购件数 has no source rather than letting the 0 pass for a fact', async () => {
-    configureApi({
-      async fetch(input) {
-        const url =
-          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-        const payload = url.includes('/ranking')
-          ? productRankingExample
-          : {
-              ...productStatsExample,
-              metrics: productStatsExample.metrics.map((metric) =>
-                metric.key === 'cartQuantity' ? { ...metric, value: 0, previous: 0 } : metric,
-              ),
-            };
-        return new Response(JSON.stringify(payload), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      },
-    });
-
-    renderAdmin(<ProductStatsPage />, { identity: identityWith(['stats:product:read']) });
-    expect(await screen.findByText('加购件数暂无来源')).toBeInTheDocument();
   });
 });

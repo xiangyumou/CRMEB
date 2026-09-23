@@ -39,8 +39,8 @@ export const PRODUCT_STATUS: StatusMap<ProductStatus> = {
 };
 
 /**
- * Legacy stored this as `is_virtual` + `virtual_type`, two columns that could
- * disagree; the rewrite folds them into one `kind`. See the ETL mapper.
+ * One `kind` rather than an `is_virtual` flag plus a `virtual_type`: two
+ * columns can disagree, one cannot.
  */
 export const PRODUCT_KIND: StatusMap<ProductKind> = {
   physical: { label: '实物商品', color: 'blue' },
@@ -78,7 +78,7 @@ export const VIRTUAL_CARD_STATE: StatusMap<ProductVirtualCardState> = {
   void: { label: '已作废', color: 'default' },
 };
 
-/** The 好评 / 中评 / 差评 grouping the legacy console filters by. */
+/** The 好评 / 中评 / 差评 grouping operators filter reviews by. */
 export const REVIEW_RATING_OPTIONS: SelectOption[] = [
   { label: '好评（4-5 分）', value: 'good' },
   { label: '中评（3 分）', value: 'medium' },

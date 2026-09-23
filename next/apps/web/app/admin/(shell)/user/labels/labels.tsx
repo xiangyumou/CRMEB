@@ -34,8 +34,8 @@ import { Can } from '@/admin/session/can';
  * without maintaining labels, which is why the contract gives both the
  * `user:label:*` atoms rather than inventing a third pair nobody would grant.
  *
- * A label name is unique shop-wide, not per category — the legacy data had 母婴
- * under two categories and an operator filtering by it got half the customers.
+ * A label name is unique shop-wide, not per category — 母婴 under two
+ * categories means an operator filtering by it gets half the customers.
  */
 export function UserLabelsPage() {
   const [tab, setTab] = useState('labels');

@@ -28,7 +28,7 @@ import { FieldMapField } from './field-map-field';
  * `core/src/notification/notification.registry.ts` is what the system can
  * actually send, and the table only remembers the operator's choices. So there
  * is no 新建 button and no delete — an event nobody wrote code for could never
- * fire, and the legacy table had four such rows that operators kept editing.
+ * fire, and a row for it would only invite operators to keep editing it.
  *
  * Only the channels an event supports get switches. A customer event has no
  * admin inbox and an admin event has no openid, so offering the switch would be
