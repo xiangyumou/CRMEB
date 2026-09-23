@@ -123,6 +123,25 @@ export function shouldForceDefault(existingCount: number, requested: boolean): b
   return existingCount === 0 || requested;
 }
 
+/**
+ * Live 发票抬头 one customer may keep (USER-016).
+ *
+ * A constant, not a setting: nobody files invoices to twenty companies from
+ * one shopping account, and the cap exists to bound a table a script could
+ * otherwise fill, not to be tuned.
+ */
+export const INVOICE_TITLE_LIMIT = 20;
+
+/**
+ * An optional text field as stored: trimmed, and `null` when nothing is left,
+ * so a form that sends `''` for an untouched input saves "not given" rather
+ * than an empty string the request schema would then refuse.
+ */
+export function blankToNull(value: string | undefined): string | null {
+  const trimmed = value?.trim() ?? '';
+  return trimmed.length === 0 ? null : trimmed;
+}
+
 // ---------------------------------------------------------------------------
 // batch membership
 // ---------------------------------------------------------------------------
@@ -186,4 +205,54 @@ export function pickOrder<T extends Record<string, { asc: unknown; desc: unknown
     T[keyof T] | undefined;
   const chosen = column ?? table[fallback];
   return sortOrder === 'asc' ? chosen.asc : chosen.desc;
+}
+
+// ---------------------------------------------------------------------------
+// invoice titles
+// ---------------------------------------------------------------------------
+
+export interface InvoiceTitleShape {
+  headerType: 'personal' | 'company';
+  invoiceType: 'plain' | 'special';
+  name: string | null;
+  dutyNumber: string | null;
+  registeredTel: string | null;
+  registeredAddress: string | null;
+  bankName: string | null;
+  bankAccount: string | null;
+}
+
+/**
+ * The contract's header rules again, on the *stored* values.
+ *
+ * The schema checks `length > 0` on what arrived, so a 税号 of three spaces
+ * passes it and becomes `null` after `blankToNull` — which the
+ * `user_invoice_profiles_company_needs_duty_number` check would then refuse
+ * with a 500. Checking after normalising turns that into a 422 naming the
+ * field, and keeps "a saved title is always a valid request body" true.
+ */
+export function invoiceTitleProblems(
+  title: InvoiceTitleShape,
+): Array<{ field: string; message: string }> {
+  const problems: Array<{ field: string; message: string }> = [];
+  if (title.name === null) problems.push({ field: 'body.name', message: '请填写抬头名称' });
+  if (title.headerType === 'company' && title.dutyNumber === null) {
+    problems.push({ field: 'body.dutyNumber', message: '企业抬头需要填写税号' });
+  }
+  if (title.invoiceType === 'special') {
+    for (const field of [
+      'registeredAddress',
+      'registeredTel',
+      'bankName',
+      'bankAccount',
+    ] as const) {
+      if (title[field] === null) {
+        problems.push({
+          field: `body.${field}`,
+          message: '专用发票需要填写注册地址、电话、开户行和账号',
+        });
+      }
+    }
+  }
+  return problems;
 }

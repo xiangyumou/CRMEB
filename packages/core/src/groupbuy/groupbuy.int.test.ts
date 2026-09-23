@@ -395,12 +395,16 @@ describe('the group-buy price through the real checkout', () => {
     return { userId, ctx: asUser(userId) };
   }
 
-  const buyNow = (fixture: ActivityFixture, kindMeta?: Record<string, string>) => ({
+  const buyNow = (
+    fixture: ActivityFixture,
+    kindMeta?: { activityId: string; groupId?: string },
+  ) => ({
     source: 'buy-now' as const,
     cartItemIds: [],
     item: { skuId: String(fixture.skuId), quantity: 1 },
-    kind: kindMeta === undefined ? ('normal' as const) : ('groupbuy' as const),
-    ...(kindMeta === undefined ? {} : { kindMeta }),
+    ...(kindMeta === undefined
+      ? { kind: 'normal' as const }
+      : { kind: 'groupbuy' as const, kindMeta }),
   });
 
   it('prices a group-buy order at the activity price, preview and create', async () => {
@@ -453,6 +457,23 @@ describe('the group-buy price through the real checkout', () => {
     expect(created.payableAmount).toBe('88.00');
     expect(created.kind).toBe('normal');
     expect(await repo.findMemberByOrder(harness.ctx.db, Number(created.id))).toBeNull();
+  });
+
+  it('ORDER-009 — a kind smuggled into kindMeta never reprices an ordinary order', async () => {
+    // The contract strips it; this is the service's own half, for a caller
+    // that reaches `preview` without the contract. `kind` is written after
+    // the kind's payload, so `{ kind: 'groupbuy' }` inside it cannot turn the
+    // activity price on for an order that joins no team.
+    const fixture = await makeActivity();
+    const { ctx } = await shopper();
+    const smuggled = {
+      ...buyNow(fixture),
+      kindMeta: { kind: 'groupbuy', activityId: String(fixture.activityId) },
+    } as unknown as Parameters<typeof checkout.preview>[1];
+
+    const preview = await checkout.preview(ctx, smuggled);
+    expect(preview.payableAmount).toBe('88.00');
+    expect(preview.adjustments).toEqual([]);
   });
 
   it('prices a shopper joining an open team the same way', async () => {

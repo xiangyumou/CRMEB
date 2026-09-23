@@ -8,6 +8,13 @@ import {
   paged,
   sortQuery,
 } from '../_conventions/common';
+import {
+  invoiceHeaderInput,
+  invoiceHeaderType,
+  invoiceType,
+  withInvoiceHeaderRules,
+  type InvoiceHeaderInput,
+} from '../order/order.fulfil.schemas';
 
 /**
  * Shapes shared by the user routes.
@@ -85,9 +92,16 @@ export type UserProfile = z.infer<typeof userProfile>;
  * What a shopper may change about themselves.
  *
  * Not the phone (that is `POST /api/v1/auth/phone`, which needs an SMS code)
- * and not the account name (it is the login identity). `avatarUrl` is a URL
- * returned by `POST /api/v1/uploads?purpose=avatar`, so the only way to set an
- * avatar is to have uploaded one through the storage domain.
+ * and not the account name (it is the login identity).
+ *
+ * `avatarUrl` must be one of: the URL `POST /api/v1/uploads?purpose=avatar`
+ * returned (any live image in our storage), the account's current avatar
+ * (clients re-send it on every save), or the shop's configured default avatar.
+ * Anything else is `USER_AVATAR_NOT_ALLOWED` (USER-019). `''` clears it. In
+ * the mini-program, `<button open-type="chooseAvatar">` gives a temporary file:
+ * upload it first, then save the returned URL.
+ *
+ * `nickname` is trimmed; one that is only whitespace is refused.
  */
 export const userProfileForm = z.object({
   nickname: z.string().min(1).max(64).optional(),
@@ -160,6 +174,81 @@ export type UserAddressForm = z.infer<typeof userAddressForm>;
 
 export const userAddressListQuery = pageQuery;
 export const pagedUserAddresses = paged(userAddress);
+
+// ---------------------------------------------------------------------------
+// invoice titles (发票抬头)
+// ---------------------------------------------------------------------------
+
+/**
+ * A saved 发票抬头.
+ *
+ * The field names are the ones `POST /api/v1/orders/:id/invoice` takes, so
+ * prefilling a request is a copy (`invoiceRequestFromTitle`), not a mapping.
+ * The request freezes the fields onto the invoice, so editing or deleting a
+ * title later never rewrites an invoice already asked for.
+ */
+export const invoiceTitle = z.object({
+  id,
+  headerType: invoiceHeaderType,
+  invoiceType,
+  name: z.string(),
+  dutyNumber: z.string().nullable(),
+  drawerPhone: z.string().nullable(),
+  email: z.string().nullable(),
+  registeredTel: z.string().nullable(),
+  registeredAddress: z.string().nullable(),
+  bankName: z.string().nullable(),
+  bankAccount: z.string().nullable(),
+  isDefault: z.boolean(),
+  createdAt: instant,
+  updatedAt: instant,
+});
+export type InvoiceTitle = z.infer<typeof invoiceTitle>;
+
+/**
+ * Create / update a title: exactly the request's header fields and rules
+ * (company needs a 税号, 专票 needs the four bank/registration fields), plus
+ * `isDefault`. An empty string is stored as "not given".
+ */
+export const invoiceTitleForm = withInvoiceHeaderRules(
+  invoiceHeaderInput.extend({
+    /** The first title a customer saves becomes the default whatever this says. */
+    isDefault: z.boolean().default(false),
+  }),
+);
+export type InvoiceTitleForm = z.infer<typeof invoiceTitleForm>;
+
+export const invoiceTitleListQuery = pageQuery;
+export const pagedInvoiceTitles = paged(invoiceTitle);
+
+/**
+ * The `POST /api/v1/orders/:id/invoice` body a saved title prefills: every
+ * non-empty header field, nothing else. The caller adds a `remark` if it has
+ * one. Pure, so the storefront and the tests share it.
+ */
+export function invoiceRequestFromTitle(title: InvoiceTitle): InvoiceHeaderInput {
+  const optional = (value: string | null): string | undefined =>
+    value === null || value === '' ? undefined : value;
+  const body: InvoiceHeaderInput = {
+    headerType: title.headerType,
+    invoiceType: title.invoiceType,
+    name: title.name,
+  };
+  const fields = [
+    'dutyNumber',
+    'drawerPhone',
+    'email',
+    'registeredTel',
+    'registeredAddress',
+    'bankName',
+    'bankAccount',
+  ] as const;
+  for (const field of fields) {
+    const value = optional(title[field]);
+    if (value !== undefined) body[field] = value;
+  }
+  return body;
+}
 
 // ---------------------------------------------------------------------------
 // account cancellation
@@ -448,6 +537,34 @@ export const userAddressExample: UserAddress = {
   isDefault: true,
   createdAt: '2026-01-06T09:00:00+08:00',
   updatedAt: '2026-01-06T09:00:00+08:00',
+};
+
+export const invoiceTitleExample: InvoiceTitle = {
+  id: '7001',
+  headerType: 'company',
+  invoiceType: 'plain',
+  name: '杭州某某科技有限公司',
+  dutyNumber: '91330100MA2XXXXX0A',
+  drawerPhone: '13800138000',
+  email: 'finance@example.com',
+  registeredTel: null,
+  registeredAddress: null,
+  bankName: null,
+  bankAccount: null,
+  isDefault: true,
+  createdAt: '2026-01-06T09:00:00+08:00',
+  updatedAt: '2026-01-06T09:00:00+08:00',
+};
+
+export const invoiceTitleSpecialExample: InvoiceTitle = {
+  ...invoiceTitleExample,
+  id: '7002',
+  invoiceType: 'special',
+  registeredTel: '0571-88888888',
+  registeredAddress: '杭州市西湖区文三路 100 号',
+  bankName: '中国工商银行杭州分行',
+  bankAccount: '1202020209000000000',
+  isDefault: false,
 };
 
 export const cancellationRequestExample: CancellationRequest = {

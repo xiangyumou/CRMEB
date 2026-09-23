@@ -15,11 +15,21 @@ export const userErrors = defineErrors({
   USER_NOT_FOUND: { status: 404, message: '用户不存在' },
   /** Account disabled by an operator. Also raised when a live session's user is disabled. */
   USER_DISABLED: { status: 403, message: '账号已被禁用，请联系客服' },
+  /**
+   * `PUT /profile` with an `avatarUrl` that is not the current avatar, not the
+   * shop's default avatar and not an image `POST /uploads` stored (USER-019).
+   */
+  USER_AVATAR_NOT_ALLOWED: { status: 422, message: '请上传头像图片后再保存' },
 
   /** Unknown id, somebody else's row, or already deleted. One code for all three. */
   USER_ADDRESS_NOT_FOUND: { status: 404, message: '收货地址不存在' },
   /** 20 live addresses per customer. */
   USER_ADDRESS_LIMIT_REACHED: { status: 409, message: '收货地址数量已达上限' },
+
+  /** Unknown id, somebody else's title, or already deleted. One code for all three. */
+  USER_INVOICE_TITLE_NOT_FOUND: { status: 404, message: '发票抬头不存在' },
+  /** `INVOICE_TITLE_LIMIT` (20) live titles per customer. `details` carries `{ limit }`. */
+  USER_INVOICE_TITLE_LIMIT_REACHED: { status: 409, message: '发票抬头数量已达上限' },
 
   /** A cancellation request is already open; the customer withdraws it or waits. */
   USER_CANCELLATION_PENDING: { status: 409, message: '您已提交过注销申请，请等待审核' },

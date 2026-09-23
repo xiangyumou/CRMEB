@@ -91,6 +91,12 @@ export const attachments = pgTable(
     index('attachments_category_idx').on(t.categoryId),
     index('attachments_sha256_idx').on(t.sha256),
     index('attachments_created_at_idx').on(t.createdAt),
+    /**
+     * "Is this URL one of ours?" — `PUT /api/v1/profile` accepts an avatar only
+     * from our own storage. Hash, not btree: equality is the only question and
+     * a URL has no length a btree entry is guaranteed to fit.
+     */
+    index('attachments_url_idx').using('hash', t.url),
     check('attachments_size_non_negative', sql`${t.size} >= 0`),
     check(
       'attachments_dimensions_non_negative',

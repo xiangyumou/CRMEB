@@ -4,6 +4,7 @@ import {
   userCancellationRequests,
   userGroups,
   userGroupsMap,
+  userInvoiceProfiles,
   userLabelCategories,
   userLabels,
   userLabelsMap,
@@ -29,7 +30,8 @@ import { conditionalDelete, conditionalUpdate, type ConditionalUpdateResult } fr
 
 /**
  * The only file allowed to touch `users`, `user_addresses`, `user_groups*`,
- * `user_labels*`, `user_cancellation_requests` and `wechat_identities`.
+ * `user_labels*`, `user_invoice_profiles`, `user_cancellation_requests` and
+ * `wechat_identities`.
  *
  * Statements, not decisions. Every precondition that matters lives in a
  * `WHERE`: a read followed by a write is a race, and the four places this
@@ -271,7 +273,7 @@ export async function updateProfile(
   args: {
     id: number;
     nickname?: string | undefined;
-    avatarUrl?: string | undefined;
+    avatarUrl?: string | null | undefined;
     realName?: string | undefined;
     birthday?: Date | null | undefined;
     adminRemark?: string | undefined;
@@ -657,6 +659,215 @@ export async function setDefaultAddress(
       eq(userAddresses.userId, args.userId),
       isNull(userAddresses.deletedAt),
     ),
+    set: { isDefault: true, updatedAt: args.now },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// invoice titles (user_invoice_profiles)
+// ---------------------------------------------------------------------------
+
+export interface InvoiceTitleRow {
+  id: number;
+  userId: number;
+  headerType: 'personal' | 'company';
+  invoiceType: 'plain' | 'special';
+  name: string;
+  dutyNumber: string | null;
+  drawerPhone: string | null;
+  email: string | null;
+  registeredTel: string | null;
+  registeredAddress: string | null;
+  bankName: string | null;
+  bankAccount: string | null;
+  isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const invoiceTitleColumns = {
+  id: userInvoiceProfiles.id,
+  userId: userInvoiceProfiles.userId,
+  headerType: userInvoiceProfiles.headerType,
+  invoiceType: userInvoiceProfiles.invoiceType,
+  name: userInvoiceProfiles.name,
+  dutyNumber: userInvoiceProfiles.dutyNumber,
+  drawerPhone: userInvoiceProfiles.drawerPhone,
+  email: userInvoiceProfiles.email,
+  registeredTel: userInvoiceProfiles.registeredTel,
+  registeredAddress: userInvoiceProfiles.registeredAddress,
+  bankName: userInvoiceProfiles.bankName,
+  bankAccount: userInvoiceProfiles.bankAccount,
+  isDefault: userInvoiceProfiles.isDefault,
+  createdAt: userInvoiceProfiles.createdAt,
+  updatedAt: userInvoiceProfiles.updatedAt,
+} as const;
+
+const liveTitleOf = (args: { id: number; userId: number }): SQL =>
+  and(
+    eq(userInvoiceProfiles.id, args.id),
+    eq(userInvoiceProfiles.userId, args.userId),
+    isNull(userInvoiceProfiles.deletedAt),
+  )!;
+
+/**
+ * Serialise every write to one customer's title book.
+ *
+ * A transaction-scoped advisory lock keyed on the user id, taken first by
+ * every create / update / delete / set-default. Without it two creates both
+ * count 19 and both insert past the cap, and two promotions each clear the
+ * other's flag before setting their own — one of them then dies on
+ * `user_invoice_profiles_default_uq` with a 500 instead of simply winning in
+ * turn. An advisory lock rather than `SELECT … FOR UPDATE` on `users`, so the
+ * book never blocks the orders and carts whose foreign keys share-lock that
+ * row.
+ */
+export async function lockInvoiceTitleBook(tx: Tx, userId: number): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`user-invoice-titles:${userId}`}, 0))`,
+  );
+}
+
+/** Every title read carries the owner in the WHERE. There is no read by id alone. */
+export async function findInvoiceTitle(
+  db: DbOrTx,
+  args: { id: number; userId: number },
+): Promise<InvoiceTitleRow | null> {
+  const rows = await db
+    .select(invoiceTitleColumns)
+    .from(userInvoiceProfiles)
+    .where(liveTitleOf(args))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listInvoiceTitles(
+  db: DbOrTx,
+  args: { userId: number; limit: number; offset: number },
+): Promise<InvoiceTitleRow[]> {
+  return db
+    .select(invoiceTitleColumns)
+    .from(userInvoiceProfiles)
+    .where(and(eq(userInvoiceProfiles.userId, args.userId), isNull(userInvoiceProfiles.deletedAt)))
+    .orderBy(desc(userInvoiceProfiles.isDefault), desc(userInvoiceProfiles.id))
+    .limit(args.limit)
+    .offset(args.offset);
+}
+
+export async function countInvoiceTitles(db: DbOrTx, userId: number): Promise<number> {
+  const rows = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(userInvoiceProfiles)
+    .where(and(eq(userInvoiceProfiles.userId, userId), isNull(userInvoiceProfiles.deletedAt)));
+  return rows[0]?.n ?? 0;
+}
+
+export async function findDefaultInvoiceTitle(
+  db: DbOrTx,
+  userId: number,
+): Promise<InvoiceTitleRow | null> {
+  const rows = await db
+    .select(invoiceTitleColumns)
+    .from(userInvoiceProfiles)
+    .where(
+      and(
+        eq(userInvoiceProfiles.userId, userId),
+        eq(userInvoiceProfiles.isDefault, true),
+        isNull(userInvoiceProfiles.deletedAt),
+      ),
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export interface InvoiceTitleInput {
+  headerType: 'personal' | 'company';
+  invoiceType: 'plain' | 'special';
+  name: string;
+  dutyNumber: string | null;
+  drawerPhone: string | null;
+  email: string | null;
+  registeredTel: string | null;
+  registeredAddress: string | null;
+  bankName: string | null;
+  bankAccount: string | null;
+  isDefault: boolean;
+}
+
+export async function insertInvoiceTitle(
+  tx: Tx,
+  args: InvoiceTitleInput & { userId: number; now: Date },
+): Promise<InvoiceTitleRow> {
+  const { now, ...values } = args;
+  const rows = await tx
+    .insert(userInvoiceProfiles)
+    .values({ ...values, createdAt: now, updatedAt: now })
+    .returning(invoiceTitleColumns);
+  const row = rows[0];
+  if (!row) throw new Error('user_invoice_profiles: insert returned no row');
+  return row;
+}
+
+export async function updateInvoiceTitle(
+  tx: Tx,
+  args: InvoiceTitleInput & { id: number; userId: number; now: Date },
+): Promise<ConditionalUpdateResult> {
+  const { id, userId, now, ...fields } = args;
+  return conditionalUpdate(tx, userInvoiceProfiles, {
+    where: liveTitleOf({ id, userId }),
+    set: { ...fields, updatedAt: now },
+  });
+}
+
+export async function softDeleteInvoiceTitle(
+  tx: Tx,
+  args: { id: number; userId: number; now: Date },
+): Promise<ConditionalUpdateResult> {
+  return conditionalUpdate(tx, userInvoiceProfiles, {
+    where: liveTitleOf(args),
+    set: { isDefault: false, deletedAt: args.now, updatedAt: args.now },
+  });
+}
+
+/**
+ * Soft-delete every live title of a customer — the cancellation approval, so an
+ * anonymised account keeps no company name, 税号 or bank account behind it.
+ */
+export async function softDeleteInvoiceTitlesOf(
+  tx: Tx,
+  args: { userId: number; now: Date },
+): Promise<number> {
+  const result = await conditionalUpdate(tx, userInvoiceProfiles, {
+    where: and(eq(userInvoiceProfiles.userId, args.userId), isNull(userInvoiceProfiles.deletedAt)),
+    set: { isDefault: false, deletedAt: args.now, updatedAt: args.now },
+  });
+  return result.affected;
+}
+
+/** Clear the current default. Called before setting a new one, in the same transaction. */
+export async function clearDefaultInvoiceTitle(
+  tx: Tx,
+  args: { userId: number; exceptId?: number; now: Date },
+): Promise<number> {
+  const conditions: SQL[] = [
+    eq(userInvoiceProfiles.userId, args.userId),
+    eq(userInvoiceProfiles.isDefault, true),
+    isNull(userInvoiceProfiles.deletedAt),
+  ];
+  if (args.exceptId !== undefined) conditions.push(ne(userInvoiceProfiles.id, args.exceptId));
+  const result = await conditionalUpdate(tx, userInvoiceProfiles, {
+    where: and(...conditions),
+    set: { isDefault: false, updatedAt: args.now },
+  });
+  return result.affected;
+}
+
+export async function setDefaultInvoiceTitle(
+  tx: Tx,
+  args: { id: number; userId: number; now: Date },
+): Promise<ConditionalUpdateResult> {
+  return conditionalUpdate(tx, userInvoiceProfiles, {
+    where: liveTitleOf(args),
     set: { isDefault: true, updatedAt: args.now },
   });
 }

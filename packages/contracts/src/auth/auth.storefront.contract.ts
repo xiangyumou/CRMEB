@@ -147,6 +147,18 @@ export const authSmsLogin = defineRoute({
   ],
 });
 
+/**
+ * 小程序登录, and the mini-program's silent session renewal.
+ *
+ * A client holding no token, or one that just got a 401, calls `wx.login()` and
+ * posts the code. A known openid comes back `signed-in` with `registered:
+ * false` and a fresh token — no UI. `phone-required` only happens for an
+ * openid the shop has never seen while 微信登录需绑定手机号 is on.
+ * `docs/mini/auth.md` has the whole flow.
+ *
+ * `RATE_LIMITED`: one address sent too many codes WeChat refused (AUTH-006).
+ * Valid codes never count.
+ */
 export const authMiniLogin = defineRoute({
   id: 'auth.miniLogin',
   method: 'POST',
@@ -162,6 +174,8 @@ export const authMiniLogin = defineRoute({
     'AUTH_WECHAT_CODE_INVALID',
     'AUTH_WECHAT_UNAVAILABLE',
     'AUTH_ACCOUNT_DISABLED',
+    'USER_DISABLED',
+    'RATE_LIMITED',
   ],
   examples: [
     {
@@ -189,6 +203,13 @@ export const authMiniLogin = defineRoute({
   ],
 });
 
+/**
+ * Finish a `phone-required` mini sign-in with `getPhoneNumber`'s code.
+ *
+ * When WeChat refuses the code the bind token survives (AUTH-007), so the
+ * client can retry, or fall back to an SMS code on
+ * `POST /auth/sessions/wechat-oa/phone` with the same token.
+ */
 export const authMiniPhoneLogin = defineRoute({
   id: 'auth.miniPhoneLogin',
   method: 'POST',
@@ -205,6 +226,7 @@ export const authMiniPhoneLogin = defineRoute({
     'AUTH_WECHAT_UNAVAILABLE',
     'AUTH_WECHAT_ALREADY_BOUND',
     'AUTH_ACCOUNT_DISABLED',
+    'USER_DISABLED',
   ],
   examples: [
     {
@@ -298,6 +320,14 @@ export const authOaLogin = defineRoute({
 
 /**
  * Finish an OA sign-in: the OA has no `getPhoneNumber`, so it is an SMS code.
+ *
+ * Despite the path, it finishes **any** parked WeChat sign-in, the
+ * mini-program's included: a shopper who declines 微信手机号快捷登录 in the
+ * mini-program posts the same `bindToken` here with an SMS code, and the mini
+ * openid is linked (AUTH-007). That is the mini-program's SMS alternative
+ * (`docs/mini/auth.md`), so the platform stays unchecked on purpose. A plain
+ * `POST /auth/sessions/sms` also signs the shopper in but leaves the openid
+ * unlinked, so the next launch asks for a phone number again.
  *
  * The code must be minted with **`scene: 'login'`**, not `bind-phone`. The
  * caller has no session yet — that is the whole point of the route — and
