@@ -59,6 +59,7 @@ export const STREAM_STATE: Readonly<Record<string, StreamState>> = {
   R4: 'merged', // auth/audit/admin shell: CR-8/9/16-k, CR-10/12/13/15/32/34/42-k2
   H4: 'merged', // storefront follow-up: CR-4/5-i, every blockedBy lifted, SMOKE-006…012
   R5: 'in-flight', // wave-6 tail: CR-2-r1 + STAB-001 10/10, CR-1-r1, CR-1-r2, CR-1-s, the CR sweep
+  R6: 'in-flight', // H4's findings: CR-1/2/3-h4, staff 售后 switch, storefront e2e isolation
 };
 
 export const STREAMS: ReadonlySet<string> = new Set(Object.keys(STREAM_STATE));
