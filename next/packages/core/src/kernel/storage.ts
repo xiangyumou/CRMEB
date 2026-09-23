@@ -6,14 +6,13 @@ import path from 'node:path';
 /**
  * The storage port and its local-disk driver.
  *
- * Two of the unfixed defects in `docs/release-readiness.md` live here:
- * `videoDataSave` trusted a client-supplied path, and `onlineUpload` fetched a
- * user-supplied URL. So:
+ * Two classic upload holes meet here: trusting a client-supplied path, and
+ * fetching a user-supplied URL. So:
  *
  *  - **the server generates the key**, always. `put()` takes a directory hint
  *    and a filename hint and returns the key it chose; a caller cannot pick one.
  *  - fetching a remote URL is NOT part of this port. It belongs in
- *    `core/src/storage/safe-fetch.ts`, owned by stream F1.
+ *    `core/src/storage/safe-fetch.ts`, owned by the storage domain.
  */
 
 export interface PutOptions {
@@ -31,7 +30,7 @@ export interface StoredObject {
   key: string;
   size: number;
   contentType: string;
-  /** Lowercase hex sha256 of the bytes, so the ETL can verify a copy. */
+  /** Lowercase hex sha256 of the bytes, so a copy can be verified. */
   sha256: string;
 }
 
@@ -192,9 +191,9 @@ export function localReadStream(root: string, key: string): ReturnType<typeof cr
 /**
  * S3-compatible driver.
  *
- * TODO(F1): implement against the S3 API. Deliberately left as a throwing stub
- * rather than a half-driver, so nobody ships a silent no-op to production. The
- * interface above is what it must satisfy; key generation must stay
+ * A throwing stub rather than a half-driver, so nobody ships a silent no-op to
+ * production. The real driver is `createS3Storage` in `core/src/storage/s3.ts`,
+ * which is what `storage.driver = 's3'` resolves to; key generation stays
  * server-side exactly as in the local driver.
  */
 export function createS3Storage(_options: {

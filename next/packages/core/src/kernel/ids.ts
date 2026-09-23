@@ -4,9 +4,10 @@ import type { Clock } from './clock';
 /**
  * Ids on the wire and order numbers.
  *
- * CONVENTIONS: "IDs are decimal strings". They are `bigint` identity columns in
- * PostgreSQL, but JSON numbers lose precision past 2^53, so every id crosses the
- * boundary as a string. `toId`/`fromId` are the only two places that convert.
+ * `docs/conventions.md`: "IDs are decimal strings". They are `bigint` identity
+ * columns in PostgreSQL, but JSON numbers lose precision past 2^53, so every id
+ * crosses the boundary as a string. `toId`/`fromId` are the only two places
+ * that convert.
  */
 
 const MAX_SAFE = Number.MAX_SAFE_INTEGER;

@@ -65,7 +65,7 @@ export interface Ctx {
   /** Route id from the contract, when the context came from `handle()`. */
   readonly routeId?: string;
 
-  /** `ctx.withTx(async (tx) => …)`, the form CONVENTIONS spells out. */
+  /** `ctx.withTx(async (tx) => …)`, the form `docs/conventions.md` spells out. */
   withTx<T>(fn: (tx: Tx) => Promise<T>, options?: TxOptions): Promise<T>;
   /** A child context with a different actor. Used by jobs acting for a user. */
   as(actor: Actor): Ctx;

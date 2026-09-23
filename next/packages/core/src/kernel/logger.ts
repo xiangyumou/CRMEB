@@ -1,10 +1,11 @@
 import { pino, type Logger as PinoLogger } from 'pino';
 
 /**
- * Structured logging. The redaction list is not optional decoration: the old
- * system logged whole request bodies, and CONVENTIONS forbids "logging secrets
- * or tokens". Anything that smells like a credential is replaced before it is
- * serialised, at every nesting depth we actually produce.
+ * Structured logging. The redaction list is not optional decoration: a logged
+ * request body carries whatever the client sent, and `docs/conventions.md`
+ * forbids "logging secrets or tokens". Anything that smells like a credential
+ * is replaced before it is serialised, at every nesting depth we actually
+ * produce.
  */
 
 export type Logger = PinoLogger;

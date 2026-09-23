@@ -118,7 +118,7 @@ describe('config.get', () => {
     const values = await config.get(paymentConfig);
     expect(values.wechatEnabled).toBe(true);
     expect(values.autoCancelMinutes).toBe(15);
-    // jsonb keeps a boolean a boolean — the old sys_config stored "1".
+    // jsonb keeps a boolean a boolean, not the string "1".
     const rows = await harness.ctx.db.select().from(configValues);
     expect(rows.find((r) => r.key === 'wechatEnabled')?.value).toBe(true);
   });
@@ -135,8 +135,8 @@ describe('config.get', () => {
 });
 
 describe('strings that look like JSON', () => {
-  // CR-6-c: node-postgres parsed jsonb, then drizzle parsed any string again, so
-  // an all-digit merchant id came back as a number and fell to its default.
+  // If node-postgres parsed jsonb and drizzle then parsed any string again, an
+  // all-digit merchant id would come back as a number and fall to its default.
   it.each(['1900000001', 'true', 'null', '{"a":1}', '013800138000', 'abc'])(
     'reads %j back as the string that was saved',
     async (value) => {

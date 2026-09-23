@@ -1,9 +1,9 @@
 /**
  * Money, as integer 分 (fen).
  *
- * CONVENTIONS: "integer fen inside the domain via `Money`; never floats". On
- * the wire and in `numeric(12,2)` money is the decimal string `"12.00"`; inside
- * the domain it is this immutable value object.
+ * `docs/conventions.md`: "integer fen inside the domain via `Money`; never
+ * floats". On the wire and in `numeric(12,2)` money is the decimal string
+ * `"12.00"`; inside the domain it is this immutable value object.
  *
  * The only interesting operation is `allocate`, which splits an amount across
  * weights without ever losing or inventing a fen — the thing an order discount
