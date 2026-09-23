@@ -13,9 +13,11 @@ import { useReducer } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { on, stubRoutes } from '@/test/api';
+import { createStubLinkSource } from '@/test/link-source';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { resetApiConfig } from '../api';
+import { LinkSourceProvider } from '../kit';
 import { DiyCanvas } from './canvas';
 import { useDiyDataSource } from './data-source';
 import { DiyEditor } from './editor';
@@ -52,14 +54,19 @@ const detail = {
   background: null,
 };
 
+const links = createStubLinkSource();
+
+/** The three panes without the page loader; the link fields get the in-memory source. */
 function Harness({ readOnly = false }: { readOnly?: boolean }) {
   const [state, dispatch] = useReducer(diyEditorReducer, detail, createDiyEditorState);
   return (
-    <DiyEditorProvider value={{ state, dispatch, readOnly, theme: DEFAULT_DIY_THEME }}>
-      <DiyPalette />
-      <DiyCanvas />
-      <DiyInspector />
-    </DiyEditorProvider>
+    <LinkSourceProvider source={links}>
+      <DiyEditorProvider value={{ state, dispatch, readOnly, theme: DEFAULT_DIY_THEME }}>
+        <DiyPalette />
+        <DiyCanvas />
+        <DiyInspector />
+      </DiyEditorProvider>
+    </LinkSourceProvider>
   );
 }
 

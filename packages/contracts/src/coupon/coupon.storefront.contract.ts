@@ -46,6 +46,12 @@ export const couponClaimableList = defineRoute({
         pageSize: 20,
       },
     },
+    {
+      // A DIY component's 指定数据: template 5 has run out, so it is skipped.
+      name: 'picked',
+      query: { page: 1, pageSize: 2, ids: '1,5' },
+      response: { items: [claimableCouponExample], total: 1, page: 1, pageSize: 2 },
+    },
   ],
 });
 

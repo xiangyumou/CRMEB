@@ -1232,8 +1232,11 @@ export default {
       let limit = this.$config.LIMIT;
       let data = {};
       if (this.typeConfig == 1) {
-        const goodsList = this.dataConfig.goodsList.list || [];
-        const ids = goodsList.map(item => item.id).filter(Boolean).join(',');
+        // 指定商品: a saved 商品列表 stores the picked ids as `goodsList.ids`;
+        // 优品推荐 and 商品选项卡 keep the picked rows in `goodsList.list`.
+        const picked = this.dataConfig.goodsList || {};
+        const rows = picked.list && picked.list.length ? picked.list.map(item => item.id) : picked.ids || [];
+        const ids = rows.filter(Boolean).join(',');
         if (ids) {
           data = { ids };
         } else {

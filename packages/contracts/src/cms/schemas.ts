@@ -206,8 +206,30 @@ export const articleDetail = articleCore.extend({
 });
 export type ArticleDetail = z.infer<typeof articleDetail>;
 
+/**
+ * A query-string id list: `?ids=12,7,31`, `?ids=12&ids=7`, or both mixed.
+ * At most 100 — one full page, so a picked list never spills onto page two.
+ */
+const idList = z
+  .union([z.string(), z.array(z.string())])
+  .transform((value) =>
+    (Array.isArray(value) ? value : [value])
+      .flatMap((part) => part.split(','))
+      .map((part) => part.trim())
+      .filter((part) => part !== ''),
+  )
+  .pipe(z.array(id).min(1).max(100));
+
 export const articleListQuery = pageQuery.extend({
   categoryId: id.optional(),
+  /** Articles filed under any of these categories — a DIY component's 筛选数据. */
+  categoryIds: idList.optional(),
+  /**
+   * Exactly these articles, in this order — what a DIY component's 指定数据
+   * saved. An id that is not published (a draft, hidden, or deleted) is
+   * skipped, not an error: the page was built before the article went away.
+   */
+  ids: idList.optional(),
   /**
    * `hot` and `banner` narrow the list to the 热门 and banner articles.
    * Ordering is the same in all three cases — `sortOrder DESC, id DESC`.

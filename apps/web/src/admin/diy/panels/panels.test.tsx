@@ -13,7 +13,9 @@ import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { LinkSourceProvider } from '@/admin/kit';
 import { createStubDiyDataSource } from '@/test/diy-data-source';
+import { createStubLinkSource } from '@/test/link-source';
 import { renderAdmin } from '@/test/render';
 
 import { DiyDataSourceProvider } from '../data-source';
@@ -28,13 +30,16 @@ import {
 import { diyPanelRegistry, diyPanels } from './index';
 
 /**
- * Renders under the in-memory data source, so a picker field is tested without
- * the network. `rerender` keeps the provider.
+ * Renders under the in-memory record and link sources, so a picker field is
+ * tested without the network. `rerender` keeps the providers.
  */
 function renderPanel(ui: ReactElement) {
   const source = createStubDiyDataSource();
+  const links = createStubLinkSource();
   const withSource = (node: ReactElement) => (
-    <DiyDataSourceProvider source={source}>{node}</DiyDataSourceProvider>
+    <LinkSourceProvider source={links}>
+      <DiyDataSourceProvider source={source}>{node}</DiyDataSourceProvider>
+    </LinkSourceProvider>
   );
   const result = renderAdmin(withSource(ui));
   return { ...result, rerender: (next: ReactElement) => result.rerender(withSource(next)) };
@@ -780,7 +785,7 @@ describe('every registered panel', () => {
 /**
  * Open every node of a real page, change nothing, and the page is the page.
  *
- * This is the guarantee the whole stream rests on: the saved JSON is a wire
+ * This is the guarantee the whole editor rests on: the saved JSON is a wire
  * contract with the uni-app renderer, so a panel that
  * normalises a value on the way in silently rewrites a customer's storefront.
  * The store is not involved — a panel only ever changes a page through

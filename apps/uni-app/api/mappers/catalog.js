@@ -15,6 +15,9 @@ import {
   pagedList,
   pageDateTime,
   unixSeconds,
+  fromPagePaging,
+  idList,
+  withPickedIds,
 } from './_shared.js';
 
 /** Retired everywhere: 会员价 / svip, 积分, 门店自提, 虚拟商品的线下核销. */
@@ -351,6 +354,40 @@ export function toPageCollectAllResult(dto) {
     added: toInt(dto && dto.added, 0),
     list: items,
   };
+}
+
+/**
+ * A product list's filters → `GET /api/v1/catalog/products`. Two sets of names reach it:
+ *
+ * - the 商品列表 / 搜索 pages: `keyword`, `cid` / `sid`, `labelId`, `priceMin` / `priceMax`,
+ *   `news`, `salesOrder` / `priceOrder`;
+ * - the DIY 商品列表 (which also draws 优品推荐 and 商品选项卡): `ids` for 指定商品,
+ *   `cate_id` for 指定分类 and `store_label_id` for 商品标签, each joined with `,`.
+ */
+export function fromPageProductQuery(data) {
+  const src = data || {};
+  const query = fromPagePaging(src);
+  withPickedIds(query, src.ids);
+  if (src.keyword) query.keyword = String(src.keyword);
+  if (src.cid) query.categoryId = String(src.cid);
+  if (src.sid) query.categoryId = String(src.sid);
+  const categories = idList(src.cate_id !== undefined ? src.cate_id : src.cate_ids);
+  if (categories.length) query.categoryIds = categories.join(',');
+  if (src.labelId) query.labelId = String(src.labelId);
+  const labels = idList(src.store_label_id);
+  if (labels.length) query.labelIds = labels.join(',');
+  if (src.priceMin) query.priceFrom = String(src.priceMin);
+  if (src.priceMax) query.priceTo = String(src.priceMax);
+  if (src.news) query.feature = 'new';
+  if (src.salesOrder) {
+    query.sortBy = 'sales';
+    query.sortOrder = src.salesOrder === 'asc' ? 'asc' : 'desc';
+  }
+  if (src.priceOrder) {
+    query.sortBy = 'price';
+    query.sortOrder = src.priceOrder === 'asc' ? 'asc' : 'desc';
+  }
+  return query;
 }
 
 /** The pages pass ids joined with `,` (or an array). */

@@ -287,7 +287,30 @@ export const claimableCoupon = z.object({
 });
 export type ClaimableCoupon = z.infer<typeof claimableCoupon>;
 
-export const claimableCouponListQuery = pageQuery;
+/**
+ * A query-string id list: `?ids=12,7,31`, `?ids=12&ids=7`, or both mixed.
+ * At most 100 — one full page, so a picked list never spills onto page two.
+ */
+const idList = z
+  .union([z.string(), z.array(z.string())])
+  .transform((value) =>
+    (Array.isArray(value) ? value : [value])
+      .flatMap((part) => part.split(','))
+      .map((part) => part.trim())
+      .filter((part) => part !== ''),
+  )
+  .pipe(z.array(id).min(1).max(100));
+
+export const claimableCouponListQuery = pageQuery.extend({
+  /**
+   * Exactly these templates, in this order — what a DIY component's 指定数据
+   * saved (template ids). A template the shopper cannot claim right now —
+   * paused, not 手动领取, outside its claim window, out of supply, or deleted
+   * — is skipped, not an error.
+   */
+  ids: idList.optional(),
+});
+export type ClaimableCouponListQuery = z.infer<typeof claimableCouponListQuery>;
 export const pagedClaimableCoupons = paged(claimableCoupon);
 
 export const myCouponListQuery = pageQuery.extend({

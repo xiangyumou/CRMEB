@@ -985,11 +985,36 @@ export const productSkuMatrix = z.object({
   skus: z.array(storefrontSku),
 });
 
+/**
+ * A query-string id list: `?ids=12,7,31`, `?ids=12&ids=7`, or both mixed.
+ * At most 100 — one full page, so a picked list never spills onto page two.
+ */
+const idList = z
+  .union([z.string(), z.array(z.string())])
+  .transform((value) =>
+    (Array.isArray(value) ? value : [value])
+      .flatMap((part) => part.split(','))
+      .map((part) => part.trim())
+      .filter((part) => part !== ''),
+  )
+  .pipe(z.array(id).min(1).max(100));
+
 export const storefrontProductListQuery = pageQuery
   .extend({
     keyword: z.string().max(64).optional(),
     categoryId: id.optional(),
     labelId: id.optional(),
+    /**
+     * Exactly these products, in this order — what a DIY component's
+     * 指定商品 saved. An id that is off the shelf or deleted is skipped, not
+     * an error: the page was built before the product went away. The order is
+     * the list's, so `sortBy` does not apply.
+     */
+    ids: idList.optional(),
+    /** Products in any of these categories — a DIY component's 指定分类. */
+    categoryIds: idList.optional(),
+    /** Products carrying any of these labels — a DIY component's 商品标签. */
+    labelIds: idList.optional(),
     priceFrom: money.optional(),
     priceTo: money.optional(),
     /** The 精品/热卖/最新/促销 flags, as one key. */

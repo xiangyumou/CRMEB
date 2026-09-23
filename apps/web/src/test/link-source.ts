@@ -5,7 +5,7 @@ import type {
   LinkTargetQuery,
   LinkTargetResult,
   LinkTargetType,
-} from './types';
+} from '@/admin/kit/link/types';
 
 const PAGES: LinkPageGroup[] = [
   {
@@ -20,7 +20,7 @@ const PAGES: LinkPageGroup[] = [
   {
     group: '订单',
     items: [
-      { id: 'order-list', name: '我的订单', url: '/pages/users/order_list/index' },
+      { id: 'order-list', name: '我的订单', url: '/pages/goods/order_list/index' },
       { id: 'order-refund', name: '退款列表', url: '/pages/users/user_return_list/index' },
     ],
   },
@@ -38,8 +38,8 @@ const NAMES = ['秋季新款外套', '云南普洱茶饼', '无线蓝牙耳机',
 function makeTargets(type: Exclude<LinkTargetType, 'page' | 'custom'>): LinkTarget[] {
   const prefix = {
     product: '/pages/goods_details/index?id=',
-    category: '/pages/goods_list/index?cid=',
-    article: '/pages/news_details/index?id=',
+    category: '/pages/goods/goods_list/index?cid=',
+    article: '/pages/extension/news_details/index?id=',
   }[type];
   const label = { product: '商品', category: '分类', article: '文章' }[type];
   return Array.from({ length: 23 }, (_, index) => ({
@@ -50,7 +50,16 @@ function makeTargets(type: Exclude<LinkTargetType, 'page' | 'custom'>): LinkTarg
   }));
 }
 
-/** In-memory `LinkSource` for Phase 0 and for the kit demo. */
+/**
+ * An in-memory `LinkSource`, for tests only.
+ *
+ * A test that renders `<LinkPicker>` — directly, or through a form or DIY link
+ * field — wraps it in `<LinkSourceProvider source={createStubLinkSource()}>`.
+ * The production editor mounts the real source (`createDiyLinkSource`), and
+ * `useLinkSource()` throws when no provider is mounted, so these rows can never
+ * reach a saved page. The paths are real storefront routes all the same, so a
+ * test that asserts on a picked URL asserts on one the storefront can open.
+ */
 export function createStubLinkSource(): LinkSource {
   const cache: Partial<Record<string, LinkTarget[]>> = {};
 

@@ -133,3 +133,36 @@ export function fromPagePaging(data) {
   if (size !== undefined && size !== null && size !== '') out.pageSize = toInt(size, 20);
   return out;
 }
+
+/**
+ * Ids as a page passes them — joined with `,` or an array, numbers or strings — as
+ * the id strings the contracts take. Anything that is not a positive integer is
+ * dropped, and so is a repeat, so a stale or blank entry cannot fail the request.
+ */
+export function idList(value) {
+  const parts = Array.isArray(value) ? value : String(value === undefined || value === null ? '' : value).split(',');
+  const out = [];
+  for (const part of parts) {
+    const id = String(part === undefined || part === null ? '' : part).trim();
+    if (/^[1-9]\d*$/.test(id) && out.indexOf(id) === -1) out.push(id);
+  }
+  return out;
+}
+
+/** The most ids a storefront list takes in one request. */
+const MAX_PICKED = 100;
+
+/**
+ * A DIY component's 指定数据 → `ids` on a storefront list query. The list then
+ * answers exactly those rows, in that order, so the page size is their number: the
+ * component's 显示数量 belongs to its filtered mode, not to what the operator picked.
+ * Answers whether anything was picked.
+ */
+export function withPickedIds(query, ids) {
+  const picked = idList(ids).slice(0, MAX_PICKED);
+  if (picked.length === 0) return false;
+  query.ids = picked.join(',');
+  query.page = 1;
+  query.pageSize = picked.length;
+  return true;
+}

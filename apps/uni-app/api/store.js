@@ -15,6 +15,7 @@ import {
   toPageFavoriteResult,
   toPageCollectAllResult,
   fromPageIdList,
+  fromPageProductQuery,
 } from './mappers/catalog.js';
 import { toPagePresaleDetail } from './mappers/activity.js';
 import { toPageCartAddResult, fromPageCartAddInput } from './mappers/cart.js';
@@ -43,28 +44,6 @@ export function getProductslist(data) {
     noAuth: true,
     map: toPageProductList,
   });
-}
-
-/** The page's 商品列表筛选 → the contract's query. */
-function fromPageProductQuery(data) {
-  const src = data || {};
-  const query = fromPagePaging(src);
-  if (src.keyword) query.keyword = String(src.keyword);
-  if (src.cid) query.categoryId = String(src.cid);
-  if (src.sid) query.categoryId = String(src.sid);
-  if (src.labelId) query.labelId = String(src.labelId);
-  if (src.priceMin) query.priceFrom = String(src.priceMin);
-  if (src.priceMax) query.priceTo = String(src.priceMax);
-  if (src.news) query.feature = 'new';
-  if (src.salesOrder) {
-    query.sortBy = 'sales';
-    query.sortOrder = src.salesOrder === 'asc' ? 'asc' : 'desc';
-  }
-  if (src.priceOrder) {
-    query.sortBy = 'price';
-    query.sortOrder = src.priceOrder === 'asc' ? 'asc' : 'desc';
-  }
-  return query;
 }
 
 /**

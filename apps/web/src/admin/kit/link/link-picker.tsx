@@ -15,20 +15,25 @@ import {
 } from 'antd';
 import { createContext, use, useCallback, useMemo, useState, type ReactNode } from 'react';
 
-import { createStubLinkSource } from './stub-source';
 import type { LinkSource, LinkTargetType, LinkValue } from './types';
 
 const PAGE_SIZE = 10;
 
 const LinkSourceContext = createContext<LinkSource | null>(null);
-let fallback: LinkSource | null = null;
 
-/** The storefront link catalogue. Defaults to the in-memory stub. */
+/**
+ * The storefront link catalogue, from the nearest `<LinkSourceProvider>`.
+ *
+ * There is deliberately no fallback: a picker rendered without a provider
+ * throws rather than offering links that are not in the shop, because whatever
+ * the operator picks is saved and opened by the storefront. The DIY editor
+ * mounts `createDiyLinkSource()`; tests mount `createStubLinkSource()` from
+ * `@/test/link-source`.
+ */
 export function useLinkSource(): LinkSource {
   const provided = use(LinkSourceContext);
-  if (provided) return provided;
-  fallback ??= createStubLinkSource();
-  return fallback;
+  if (!provided) throw new Error('useLinkSource() needs a <LinkSourceProvider> above it');
+  return provided;
 }
 
 export function LinkSourceProvider({
