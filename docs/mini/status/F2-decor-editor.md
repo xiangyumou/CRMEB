@@ -44,12 +44,20 @@ interruption.
   - 预览 drawer (`preview.tsx`): preview token; iframe of `DECOR_PREVIEW_URL` (new optional env,
     `{id}` `{previewToken}` `{kind}`) or the 体验版 note + copyable `packages/page/index?…`.
 
+- Page tests: `session.test.ts`, `page-editor.test.tsx`, `page-list.test.tsx` (95 green in
+  `src/admin/decor`).
+- e2e `e2e/admin/specs/decor.spec.ts` (3 tests, green): create → save (storefront 404) → publish →
+  publish with unsaved edits → rollback (new revision, draft untouched) → read-only revision view;
+  preview iframe through the token (the e2e stack sets `DECOR_PREVIEW_URL` to the storefront read);
+  designate 首页 → `/api/v1/pages/home`. Cited under DECOR-008 / 011 / 012 / 014; README row.
+  `coupon.spec.ts` failed twice in one full run (antd Select dropdown over 适用范围) and passes
+  alone — not touched by F2; watch it in the final full run.
+
 ## In progress
 
-- Page tests (Vitest) and the e2e spec.
+- `docs/mini/decor.md` notes (editor pages, env, platforms).
 
 ## Next
 
-- e2e `e2e/admin/specs/decor.spec.ts` (+ README row, `DECOR_PREVIEW_URL` in the e2e serve env).
 - Templates last (after `git merge storefront/mini` if G1 has merged).
 - Checks, screenshots (`docs/mini/status/F2-screens/`), report.
