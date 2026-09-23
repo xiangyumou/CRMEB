@@ -18,6 +18,12 @@
   - `好友`：只定义 `onShareAppMessage`；
   - `好友+朋友圈`：两者都定义，页面必须能在单页模式下匿名渲染（C10）。
 
+**已定事项（2026-09-23，用户决定）：**
+
+- **tabBar 用小程序原生 tabBar**，不做自定义 `custom-tab-bar`。4 个 tab 页都在主包；`switchTab` 不能带参数，tab 页的参数经 `pendingTabParams` 传递（第 3.2 节的说明）。
+- **小程序上关闭「虚拟成团」**（`groupbuyConfig.virtualFillOnExpiry`，C02：到期凭空补人有被认定为虚假交易的风险）。由后端流实现：小程序发起的团到期不补人，按拼团失败处理并自动退款；拼团进度页因此只会出现真实成员。
+- **新增「我的评价」「我的拼团」两页**（原先列在第 2.9 节「本期不做页面」）：`packages/account/reviews/index`（`catalog.myReviews`）和 `packages/promo/my-groupbuys/index`（`groupbuy.myGroups`），路由 key `myReviews`、`myGroupbuys` 追加在路由目录末尾。
+
 ---
 
 ## 1. 分包方案
@@ -28,8 +34,8 @@
 | `goods` 商品     | `packages/goods/`     | 商品列表、搜索、精品推荐、商品评价                                      | ≤ 1 MB   | 由 `pages/index/index`、`pages/category/index` 预下载                 |
 | `order` 订单     | `packages/order/`     | 确认订单、收银台、支付结果、订单列表和详情、物流、写评价                | ≤ 1 MB   | 由 `pages/product/index`、`pages/cart/index`、`pages/me/index` 预下载 |
 | `aftersale` 售后 | `packages/aftersale/` | 申请售后、售后列表和详情、填写退货物流                                  | ≤ 1 MB   | —                                                                     |
-| `promo` 营销     | `packages/promo/`     | 拼团、预售、领券中心、我的优惠券、海报画布                              | ≤ 1 MB   | —                                                                     |
-| `account` 账户   | `packages/account/`   | 资料、设置、手机号、密码、地址、收藏、足迹、消息、发票、注销            | ≤ 1 MB   | 由 `pages/me/index` 预下载                                            |
+| `promo` 营销     | `packages/promo/`     | 拼团、我的拼团、预售、领券中心、我的优惠券、海报画布                    | ≤ 1 MB   | —                                                                     |
+| `account` 账户   | `packages/account/`   | 资料、设置、手机号、密码、地址、收藏、足迹、消息、发票、我的评价、注销  | ≤ 1 MB   | 由 `pages/me/index` 预下载                                            |
 | `content` 内容   | `packages/content/`   | 文章列表和详情、web-view                                                | ≤ 1 MB   | —                                                                     |
 | `page` 微页面    | `packages/page/`      | DIY 微页面                                                              | ≤ 1 MB   | —                                                                     |
 
@@ -88,15 +94,16 @@
 
 ### 2.5 `promo` 分包
 
-| 路径                                   | 标题       | 替代旧页面                                                                                    | 接口                                                                              | 登录 | 分享        | 形态改动                                                                                                                                                                                                                     |
-| -------------------------------------- | ---------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ---- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/promo/groupbuy/index`        | 拼团       | `pages/activity/goods_combination/index`                                                      | `groupbuy.list`、`groupbuy.banners`、`groupbuy.summary`                           | 否   | 好友        | 横幅的 `link` 改为 `LinkTarget`（第 6 节）                                                                                                                                                                                   |
-| `packages/promo/groupbuy-detail/index` | 拼团商品   | `pages/activity/goods_combination_details/index`                                              | `groupbuy.detail`、`groupbuy.openGroups`、`catalog.productReviewSummary`          | 动作 | 好友+朋友圈 | 底部栏有「单独购买」（跳到 `product`）和「发起拼团」；「去参团」直接进入结算，带上 `groupId`                                                                                                                                 |
-| `packages/promo/groupbuy-team/index`   | 拼团进度   | `pages/activity/goods_combination_status/index`、`pages/activity/poster-poster/index`（海报） | `groupbuy.groupDetail`、`groupbuy.poster`、`groupbuy.withdraw`、`wechat.miniCode` | 动作 | 好友        | 海报不再是独立页面，改为本页的 `PosterSheet` 弹层，用 canvas 2D 绘制，图片走 downloadFile 域名，不再需要 `system.attachmentDataUrl`。「邀请好友」用 `open-type="share"`，不附带奖励（C10）。本页也会被 `groupbuy_*` 通知打开 |
-| `packages/promo/presale/index`         | 预售       | `pages/activity/presell/index`                                                                | `presale.list`                                                                    | 否   | 好友        | —                                                                                                                                                                                                                            |
-| `packages/promo/presale-detail/index`  | 预售商品   | `pages/activity/presell_details/index`                                                        | `presale.detail`、`catalog.productReviewSummary`                                  | 动作 | 好友+朋友圈 | 在醒目位置显示发货时间（`shipAfterDays`，C02）和活动倒计时                                                                                                                                                                   |
-| `packages/promo/coupons/index`         | 领券中心   | `pages/users/user_get_coupon/index`                                                           | `coupon.claimableList`、`coupon.claim`、`coupon.newUserList`                      | 动作 | 好友        | 领券需要登录；新人券区只在符合资格时显示                                                                                                                                                                                     |
-| `packages/promo/my-coupons/index`      | 我的优惠券 | `pages/users/user_coupon/index`                                                               | `coupon.myList { state }`                                                         | 是   | —           | 「去使用」跳到按券范围筛选的商品列表                                                                                                                                                                                         |
+| 路径                                   | 标题       | 替代旧页面                                                                                    | 接口                                                                              | 登录 | 分享        | 形态改动                                                                                                                                                                                                                                                                           |
+| -------------------------------------- | ---------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ---- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/promo/groupbuy/index`        | 拼团       | `pages/activity/goods_combination/index`                                                      | `groupbuy.list`、`groupbuy.banners`、`groupbuy.summary`                           | 否   | 好友        | 横幅的 `link` 改为 `LinkTarget`（第 6 节）                                                                                                                                                                                                                                         |
+| `packages/promo/groupbuy-detail/index` | 拼团商品   | `pages/activity/goods_combination_details/index`                                              | `groupbuy.detail`、`groupbuy.openGroups`、`catalog.productReviewSummary`          | 动作 | 好友+朋友圈 | 底部栏有「单独购买」（跳到 `product`）和「发起拼团」；「去参团」直接进入结算，带上 `groupId`                                                                                                                                                                                       |
+| `packages/promo/groupbuy-team/index`   | 拼团进度   | `pages/activity/goods_combination_status/index`、`pages/activity/poster-poster/index`（海报） | `groupbuy.groupDetail`、`groupbuy.poster`、`groupbuy.withdraw`、`wechat.miniCode` | 动作 | 好友        | 海报不再是独立页面，改为本页的 `PosterSheet` 弹层，用 canvas 2D 绘制，图片走 downloadFile 域名，不再需要 `system.attachmentDataUrl`。「邀请好友」用 `open-type="share"`，不附带奖励（C10）。本页也会被 `groupbuy_*` 通知打开。小程序关闭了虚拟成团（2026-09-23），这里只有真实成员 |
+| `packages/promo/presale/index`         | 预售       | `pages/activity/presell/index`                                                                | `presale.list`                                                                    | 否   | 好友        | —                                                                                                                                                                                                                                                                                  |
+| `packages/promo/presale-detail/index`  | 预售商品   | `pages/activity/presell_details/index`                                                        | `presale.detail`、`catalog.productReviewSummary`                                  | 动作 | 好友+朋友圈 | 在醒目位置显示发货时间（`shipAfterDays`，C02）和活动倒计时                                                                                                                                                                                                                         |
+| `packages/promo/coupons/index`         | 领券中心   | `pages/users/user_get_coupon/index`                                                           | `coupon.claimableList`、`coupon.claim`、`coupon.newUserList`                      | 动作 | 好友        | 领券需要登录；新人券区只在符合资格时显示                                                                                                                                                                                                                                           |
+| `packages/promo/my-coupons/index`      | 我的优惠券 | `pages/users/user_coupon/index`                                                               | `coupon.myList { state }`                                                         | 是   | —           | 「去使用」跳到按券范围筛选的商品列表                                                                                                                                                                                                                                               |
+| `packages/promo/my-groupbuys/index`    | 我的拼团   | 新页面（旧版没有，只能从订单详情进入自己的团）                                                | `groupbuy.myGroups { status }`                                                    | 是   | —           | 2026-09-23 新增。按状态分 tab（拼团中、已成团、未成团）；点一行跳到 `groupbuyTeam`。入口在「我的」的服务宫格                                                                                                                                                                       |
 
 ### 2.6 `account` 分包
 
@@ -117,6 +124,7 @@
 | `packages/account/invoice-title-edit/index` | 新增 / 编辑发票抬头     | `pages/users/user_invoice_form/index`                                           | 新·`user.invoiceTitleCreate`、新·`user.invoiceTitleUpdate`                                                                          | 是   | —    | 抬头原来存在手机本地 → 改为存服务端；支持「从微信导入」（`chooseInvoiceTitle`，C04）；名称要过内容安全（C09）                                                       |
 | `packages/account/invoice/index`            | 发票详情                | `pages/users/user_invoice_order/index`                                          | `order.myInvoiceDetail`、`order.cancelInvoice`、`order.detail`                                                                      | 是   | —    | —                                                                                                                                                                   |
 | `packages/account/invoice-apply/index`      | 申请开票                | 旧版是订单详情里的「申请开票」按钮（`pages/goods/order_details/index.vue:393`） | 新·`user.invoiceTitleList`、`order.invoiceRequest`                                                                                  | 是   | —    | 从订单详情进入；选择已存的抬头，或者新建                                                                                                                            |
+| `packages/account/reviews/index`            | 我的评价                | 新页面（旧版没有）                                                              | `catalog.myReviews`                                                                                                                 | 是   | —    | 2026-09-23 新增。按时间倒序列出自己写过的评价和商家回复；点商品跳到 `product`，图片用 `previewImage` 预览。入口在「我的」的服务宫格                                 |
 | `packages/account/cancellation/index`       | 注销账号                | `pages/users/user_cancellation/index`                                           | `system.agreementGet { key: 'cancellation' }`、`user.currentCancellation`、`user.requestCancellation`、`user.withdrawCancellation`  | 是   | —    | 先展示协议，再二次确认；已经申请时显示状态，并提供「撤回」                                                                                                          |
 
 ### 2.7 `content` 分包与 `page` 分包
@@ -130,7 +138,7 @@
 
 ### 2.8 旧页面去向汇总
 
-旧页面共 68 个（`apps/uni-app/pages.json`）。新小程序共 **46 个页面**：主包 7 个，分包 39 个。
+旧页面共 68 个（`apps/uni-app/pages.json`）。新小程序共 **51 个页面**：主包 7 个，分包 44 个（含 2026-09-23 新增的我的评价、我的拼团；与路由目录的 key 一一对应）。
 
 | 旧页面                                                                               | 去向                                            |
 | ------------------------------------------------------------------------------------ | ----------------------------------------------- |
@@ -156,7 +164,7 @@
   - `storage.scanUpload`：后台扫码上传；
   - `order.staffMe`、`shipping.staffExpressCompanies`：店员接口；
   - `health.*`。
-- **有接口、但本期不做页面：** `catalog.myReviews`（我的评价）、`groupbuy.myGroups`（我的拼团）。建议之后作为个人中心服务宫格的入口，在 `account` 和 `promo` 分包里补页面。在那之前，用户可以从订单详情进入自己的团。
+- ~~有接口、但本期不做页面：`catalog.myReviews`、`groupbuy.myGroups`~~。2026-09-23 改为本期做：见第 2.5 节的我的拼团、第 2.6 节的我的评价。
 
 ---
 
@@ -177,15 +185,15 @@
 
 这样以后改页面路径，已保存的数据不会失效（计划第 2.1 节）。
 
-- **定义**：`packages/contracts/src/system/storefront-routes.ts`，由 H1 流负责。用 zod 描述每个 key 的参数，后端和后台直接用。
-- **给小程序的精简版**：`pnpm gen` 生成 `storefront-routes.gen.ts`，只含 `{ key: { path, params: string[], tab, share } }` 的纯对象，不带 zod。`packages/api-client` 重新导出它，小程序的 `platform/nav.ts` 提供 `navigate(route)`、`toPath(route)`、`readRouteParams(options)`。
+- **定义**：`packages/contracts/src/system/storefront-routes.ts`（已实现，R0）。用 zod 描述每个 key 的参数，后端和后台直接用。
+- **给小程序的精简版**：`pnpm gen`（`packages/api-client/scripts/gen-storefront-routes.ts`）生成 `packages/api-client/src/storefront-routes.gen.ts`，只含 `{ key: { path, params: string[], tab, share } }` 的纯对象，不带 zod；参数类型经 `import type` 取自契约。`@shop/api-client` 和子路径 `@shop/api-client/routes` 都导出它（`storefrontRoutes`、`StorefrontRouteKey`、`StorefrontRoute`、`StorefrontRouteParams`）。`bundle.test.ts` 保证它不带 zod、不带契约。小程序的 `platform/nav.ts` 提供 `navigate(route)`、`toPath(route)`、`readRouteParams(options)`。
 - **不变的约定**：
-  - key 一旦发布就**不能改名、不能删除**；
+  - key **只能追加**（新 key 加在表尾）：一旦发布就**不能改名、不能删除**；已有 key 只能新增可选参数；
   - 废弃的 key 映射到 `fallback: 'home'`；
   - 小程序遇到不认识的 key（旧版本客户端）就打开首页，不报错，与计划中 `X-Client-Version` 的前向兼容思路一致。
 
 ```ts
-// packages/contracts/src/system/storefront-routes.ts（草案）
+// packages/contracts/src/system/storefront-routes.ts（摘要，完整见源文件）
 export interface StorefrontRouteDef<P extends z.ZodType> {
   path: string; // 小程序路径，无前导 /
   params: P;
@@ -204,7 +212,12 @@ export const storefrontRouteKey = z.enum(Object.keys(storefrontRoutes) as [Store
 export function toMiniPath(r: StorefrontRoute): string; // 'packages/order/detail/index?id=3001'
 export function encodeScene(r: StorefrontRoute): string; // 'id=3001'，≤ 32 字节
 export function decodeScene(key: StorefrontRouteKey, scene: string): StorefrontRoute['params'];
+// 另有：storefrontRouteKeys（按表序的 key 数组）、storefrontRoute（{ route, params } 的 zod 判别联合）、
+// storefrontRouteDef(key)（放宽类型的定义，方便读可选标志）、StorefrontRouteParams<K>、SCENE_MAX_BYTES。
 ```
+
+- 参数对象是 strict 的：多出的参数不通过。`storefrontRoute` 解析不了不认识的 key。
+- `toMiniPath` 先校验路由，参数按名字排序、`encodeURIComponent` 编码，省略未给的可选参数；tab 页永远不带 query。
 
 ### 3.2 路由表
 
@@ -261,12 +274,16 @@ export function decodeScene(key: StorefrontRouteKey, scene: string): StorefrontR
 | `article`              | `id`                                                 | `packages/content/article/index`            | 好友+朋友圈 | ✓        | ✓        | ✓        |
 | `webview`              | `url`                                                | `packages/content/webview/index`            | —           |          |          |          |
 | `page`                 | `id`（DIY 文档）                                     | `packages/page/index`                       | 好友+朋友圈 | ✓        | ✓        |          |
+| `myReviews`            | —                                                    | `packages/account/reviews/index`            | —           |          | ✓        |          |
+| `myGroupbuys`          | —                                                    | `packages/promo/my-groupbuys/index`         | —           |          | ✓        |          |
 
 **说明：**
 
 - **装修 `LinkTarget`** 的 `product`、`category`、`article`、`page` 四种类型分别对应上表的 `product`、`productList { categoryId }`、`article`、`page`。`route(枚举)` 类型只能选 `linkable: true` 的无参 key，或者带简单枚举参数的 key（例如 `orderList { tab }`）。`webview` 和 `miniprogram` 两种类型不经过路由目录：`webview` 由客户端按 C12 检查，`miniprogram` 调用 `navigateToMiniProgram`。
-- **tab 页带参数**（`category { categoryId }`）：`navigate()` 先把参数写入 `pendingTabParams` store，再 `switchTab`；目标页在 `useDidShow` 里读取并清空。
-- **`login.redirect`**：一律经过 `navigate()` 回跳。登录页**不接受**路径字符串，防止被用作开放跳转。
+- **tab 页带参数**（`category { categoryId }`）：tabBar 是原生 tabBar（2026-09-23 决定），`switchTab` 不能带 query，所以 `toMiniPath` 给 tab 页的路径永远不带 query。`navigate()` 先把参数写入 `pendingTabParams` store，再 `switchTab`；目标页在 `useDidShow` 里读取并清空。
+- **`order`** 的参数是 `{ id }` 或 `{ outTradeNo }`，恰好一个；两个都给或都不给都不通过。`outTradeNo` 按微信支付的格式校验（6–32 位 `[0-9A-Za-z_-|*]`）。
+- **`myReviews`、`myGroupbuys`** 是 2026-09-23 追加的 key，在表尾。
+- **`login.redirect`**：一个 `StorefrontRoute` 的 JSON，契约校验它能解析成路由、且不指回 `login`；一律经过 `navigate()` 回跳。登录页**不接受**路径字符串，防止被用作开放跳转。
 
 ### 3.3 scene 编码（小程序码）
 
@@ -274,6 +291,7 @@ export function decodeScene(key: StorefrontRouteKey, scene: string): StorefrontR
 - `miniCode: true` 的 key 都只有一个 `id` 参数，或者没有参数：
   - `product`、`groupbuy`、`groupbuyTeam`、`presale`、`article`、`page` 编码为 `id=<id>`，最长 `3 + 19 = 22` 字节；
   - `home`、`couponCenter` 编码为空串；微信要求 scene 至少 1 个字符，所以写 `_`。
+- `encodeScene` 拒绝没有 `miniCode` 的 key、不认识的 key、超过 32 字节或含有不允许字符的 scene；`decodeScene` 拒绝没有 `miniCode` 的 key 和解析不出合法参数的 scene。`options.scene` 到手时是 URI 编码的，`decodeScene` 两种形式都接受（`%` 不是 scene 允许的字符）。
 - 以后如果要加分享人归因（例如 `r=<userId>`），总长仍须不超过 32 字节：`id=` + 19 位 + `&r=` + 7 位 = 32。**本期不做归因。**
 
 ### 3.4 通知事件与路由 key 的对应（给 H2 流）
