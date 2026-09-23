@@ -67,9 +67,8 @@ if [ -n "$verify_only" ]; then
 fi
 
 # Every table in `public` with its row count, as `table|rows`. `query_to_xml`
-# runs a count per table without building the SQL on the host, so a table named
-# by a stream that lands next week is included without anyone remembering to
-# add it here.
+# runs a count per table without building the SQL on the host, so a table that
+# a later migration adds is included without anyone remembering to add it here.
 row_census_sql="select table_name || '|' || (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.%I', table_name), false, true, '')))[1]::text
   from information_schema.tables
   where table_schema = 'public' and table_type = 'BASE TABLE'

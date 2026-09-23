@@ -9,8 +9,7 @@
 # thing in this directory that does, it is never implied, and it prints what it
 # is about to overwrite and requires `--yes` to proceed unattended. Image
 # rollback and data recovery are separate operations and this script reports
-# them separately — the old stack's rollback.sh says the same thing and it is
-# still the right rule.
+# them separately.
 #
 # Exit codes: 0 rolled back · 1 the target did not come up (the previously
 #             running images were restored) · 2 misuse · 3 needs a human.

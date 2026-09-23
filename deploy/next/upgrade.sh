@@ -21,11 +21,10 @@
 #   7. **any failure from step 5 on rolls the images back to what was
 #      running**, and the script says whether the schema had already moved.
 #
-# Why the automatic rollback, where the old stack's script stayed in
-# maintenance mode: the migrations here are additive (`0000_init` and whatever
-# drizzle adds to it), so the previous image tolerates the new schema, and an
-# unattended failure is better ending on a stack that serves than on a stack
-# that is down. When the migration had already run, the script says so in as
+# Why an automatic rollback rather than stopping in maintenance mode: the
+# migrations are additive (CI refuses one that is not), so the previous image
+# tolerates the new schema, and an unattended failure is better ending on a
+# stack that serves than on a stack that is down. When the migration had already run, the script says so in as
 # many words and names the dump, because *data* recovery is a separate,
 # deliberate operation and this script never performs one.
 #
