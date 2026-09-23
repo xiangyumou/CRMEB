@@ -24,14 +24,6 @@ export const diyErrors = defineErrors({
   /** `diy_pages_home_is_home_kind` — only a `home` page may be the home page. */
   DIY_HOME_KIND_MISMATCH: { status: 409, message: '只有首页类型的页面可以设为首页' },
   DIY_HOME_PAGE_MISSING: { status: 404, message: '尚未设置首页模板' },
-  /**
-   * `GET /api/v1/diy/pages/user-center` and no published 个人中心 page exists.
-   *
-   * Distinct from `DIY_PAGE_NOT_FOUND` on purpose: nothing was looked up by id,
-   * so "模板不存在" would send an operator hunting for a page they think they
-   * deleted. The answer is that they have not published one yet.
-   */
-  DIY_USER_CENTER_PAGE_MISSING: { status: 404, message: '尚未发布个人中心模板' },
   /** `database.page.limitMax`. */
   DIY_COMPONENT_LIMIT_EXCEEDED: { status: 422, message: '您设置的商品个数超出系统限制' },
   DIY_NO_DEFAULT_CONTENT: { status: 404, message: '当前页面还没有保存过默认数据' },

@@ -3,7 +3,9 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { PRODUCT_DETAIL_DEFAULT_VALUE } from '@shop/contracts/diy/product-detail.default';
 import type { DiyPageValue } from '@shop/contracts/diy/schema/page';
+import { USER_CENTER_DEFAULT_VALUE } from '@shop/contracts/diy/user-center.default';
 
 import { DomainError } from '../kernel/errors';
 import { cleanDiyData, isRemovedStorefrontPage } from './compatibility';
@@ -125,6 +127,13 @@ describe('cleanDiyData — over the fixtures', () => {
       expect(cleanDiyData(value)).toBe(value);
     },
   );
+
+  it.each([
+    ['个人中心', USER_CENTER_DEFAULT_VALUE],
+    ['商品详情', PRODUCT_DETAIL_DEFAULT_VALUE],
+  ])('the built-in %s page survives cleaning untouched', (_name, value) => {
+    expect(cleanDiyData(value)).toBe(value);
+  });
 });
 
 describe('isRemovedStorefrontPage', () => {

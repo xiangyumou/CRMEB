@@ -124,6 +124,15 @@ export const diyProductDetailPage = diyStorefrontPage.extend({ id: id.nullable()
 export type DiyProductDetailPage = z.infer<typeof diyProductDetailPage>;
 
 /**
+ * 个人中心 — `GET /api/v1/diy/pages/user-center`.
+ *
+ * The same shape as 商品详情, for the same reason: `id` is `null` when the
+ * answer is the built-in default (`USER_CENTER_DEFAULT_VALUE`).
+ */
+export const diyUserCenterPage = diyStorefrontPage.extend({ id: id.nullable() });
+export type DiyUserCenterPage = z.infer<typeof diyUserCenterPage>;
+
+/**
  * 底部导航 — the decorated tab bar.
  *
  * `navigation` is the saved `pageFoot` component **verbatim**, not a re-shaped

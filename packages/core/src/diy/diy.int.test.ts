@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { PRODUCT_DETAIL_DEFAULT_VALUE } from '@shop/contracts/diy/product-detail.default';
+import { USER_CENTER_DEFAULT_VALUE } from '@shop/contracts/diy/user-center.default';
 import { themes } from '@shop/db/schema/diy';
 import { createTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
 import { sql } from 'drizzle-orm';
@@ -113,6 +114,15 @@ describe('pages', () => {
     const renamed = await updatePage(ctx, { id: page.id, name: '首页 2026' });
     expect(renamed.name).toBe('首页 2026');
     expect(renamed.content).toEqual(PROD_PAGE);
+  });
+
+  it('starts 个人中心 and 商品详情 from the built-in page the storefront shows', async () => {
+    const user = await createPage(ctx, { name: '个人中心', kind: 'user_center' });
+    expect(user.content).toEqual(USER_CENTER_DEFAULT_VALUE);
+    const detail = await createPage(ctx, { name: '商品详情', kind: 'product_detail' });
+    expect(detail.content).toEqual(PRODUCT_DETAIL_DEFAULT_VALUE);
+    // Every other kind starts empty.
+    expect((await createPage(ctx, { name: '专题', kind: 'micro' })).content).toEqual({});
   });
 
   it('filters by kind and keyword', async () => {
@@ -340,6 +350,15 @@ describe('factory defaults', () => {
     expect(restored.content).toEqual(PROD_PAGE);
   });
 
+  it('restores the built-in 个人中心 when the theme holds no copy of it', async () => {
+    await seedTheme({});
+    const page = await createPage(ctx, { name: '个人中心', kind: 'user_center' });
+    await savePageContent(ctx, { id: page.id, content: {} });
+
+    const restored = await restorePageDefault(ctx, { id: page.id });
+    expect(restored.content).toEqual(USER_CENTER_DEFAULT_VALUE);
+  });
+
   it('says so when there is no factory copy', async () => {
     const page = await seedHome();
     await expect(restorePageDefault(ctx, { id: page.id })).rejects.toMatchObject({
@@ -526,16 +545,29 @@ describe('个人中心 / 底部导航 / 版式', () => {
     expect((await getUserCenterPage(ctx)).id).toBe(draft.id);
   });
 
-  it('says nobody has published a 个人中心 rather than "模板不存在"', async () => {
-    await expect(getUserCenterPage(ctx)).rejects.toMatchObject({
-      code: 'DIY_USER_CENTER_PAGE_MISSING',
-    });
+  it('answers the built-in 个人中心 when nothing is published, not a 404', async () => {
+    const served = await getUserCenterPage(ctx);
+    expect(served.id).toBeNull();
+    expect(served.kind).toBe('user_center');
+    expect(served.version).toBe('builtin-user-center-1');
+    // The constant verbatim: `cleanDiyData` has nothing to strip from it.
+    expect(served.content).toEqual(USER_CENTER_DEFAULT_VALUE);
+    expect(Object.keys(served.content)).toEqual(Object.keys(USER_CENTER_DEFAULT_VALUE));
+    expect(Object.keys(served).sort()).toEqual(
+      ['background', 'content', 'id', 'kind', 'name', 'schemaVersion', 'title', 'version'].sort(),
+    );
+
     // A draft is not published, so it does not count.
     const draft = await createPage(ctx, { name: '个人中心', kind: 'user_center' });
     await savePageContent(ctx, { id: draft.id, content: {} });
-    await expect(getUserCenterPage(ctx)).rejects.toMatchObject({
-      code: 'DIY_USER_CENTER_PAGE_MISSING',
-    });
+    expect((await getUserCenterPage(ctx)).id).toBeNull();
+  });
+
+  it('holds the built-in 个人中心 to the same validation a saved page gets', async () => {
+    const page = await createPage(ctx, { name: '个人中心', kind: 'user_center' });
+    await expect(
+      savePageContent(ctx, { id: page.id, content: USER_CENTER_DEFAULT_VALUE }),
+    ).resolves.toMatchObject({ id: page.id });
   });
 
   it('answers 底部导航 with the fixture’s own tab bar, verbatim', async () => {
@@ -620,9 +652,18 @@ describe('个人中心 / 底部导航 / 版式', () => {
     await getUserCenterPage(ctx);
     await deletePage(ctx, { id: page.id });
     expect(await harness.redis.get('diy:user-center:v1')).toBeNull();
-    await expect(getUserCenterPage(ctx)).rejects.toMatchObject({
-      code: 'DIY_USER_CENTER_PAGE_MISSING',
-    });
+    // With the only published page gone, the built-in default is back at once.
+    expect((await getUserCenterPage(ctx)).id).toBeNull();
+  });
+
+  it('lets a published 个人中心 replace the cached built-in default at once', async () => {
+    expect((await getUserCenterPage(ctx)).id).toBeNull();
+    expect(await harness.redis.get('diy:user-center:v1')).not.toBeNull();
+
+    const page = await seedUserCenter();
+    const served = await getUserCenterPage(ctx);
+    expect(served.id).toBe(page.id);
+    expect(served.version).not.toBe('builtin-user-center-1');
   });
 });
 

@@ -1,5 +1,8 @@
 // coupon, payment, diy, system and the shared primitives.
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { example, exampleBody, assertRenderable } from './helpers.mjs';
 import {
   toId,
@@ -64,6 +67,8 @@ import {
   fromPageBase64Input,
   toPageBase64,
 } from '../api/mappers/system.js';
+
+const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('_shared', () => {
   it('keeps money a string and never invents a float', () => {
@@ -651,9 +656,50 @@ describe('底部导航 and 版式', () => {
     expect(bottom.cartButton).toHaveProperty('tabVal');
   });
 
-  it('maps the 个人中心 DIY page like any other page', () => {
+  it('maps the 个人中心 DIY page, built-in default included', () => {
     const page = toPageDiyPage(example('GET /api/v1/diy/pages/user-center'));
-    expect(page).toMatchObject({ id: 4, type: 'user_center', title: '我的' });
-    expect(page.value).toHaveProperty('1716451200000');
+    // The default has no row: `id: null` maps to 0, which nothing on the page reads.
+    expect(page).toMatchObject({ id: 0, type: 'user_center', title: '个人中心' });
+    assertRenderable(page);
+    // What PageDesign renders on 我的: the member header, 订单中心 and its order
+    // row, then 我的服务.
+    const nodes = Object.values(page.value).sort((a, b) => a.timestamp - b.timestamp);
+    expect(nodes.map((node) => node.name)).toEqual(['member', 'titles', 'menus', 'menus']);
+    const [, , orders, services] = nodes;
+    expect(orders.menuConfig.list.map((item) => item.info[0].value)).toEqual([
+      '待付款',
+      '待发货',
+      '待收货',
+      '待评价',
+      '售后',
+    ]);
+    expect(services.leftTopText.text).toBe('我的服务');
+    expect(services.menuConfig.list.length).toBeGreaterThan(0);
+    // `menus.vue` reads these off every node it renders.
+    for (const menu of [orders, services]) {
+      expect(menu.menuStyleConfig).toHaveProperty('tabVal');
+      expect(menu.showConfig).toHaveProperty('tabVal');
+      expect(menu.filletImg).toHaveProperty('valList');
+      expect(menu.pointerColor.color[0]).toHaveProperty('item');
+    }
+  });
+
+  it('links the built-in 个人中心 only to pages the app registers', () => {
+    const pages = JSON.parse(fs.readFileSync(path.join(APP, 'pages.json'), 'utf8'));
+    const registered = new Set(pages.pages.map((page) => `/${page.path}`));
+    for (const sub of pages.subPackages || []) {
+      for (const page of sub.pages) registered.add(`/${sub.root}/${page.path}`);
+    }
+    const links = [];
+    const walk = (value) => {
+      if (typeof value === 'string') {
+        if (value.startsWith('/pages/')) links.push(value.split('?')[0]);
+      } else if (value && typeof value === 'object') {
+        Object.values(value).forEach(walk);
+      }
+    };
+    walk(example('GET /api/v1/diy/pages/user-center').content);
+    expect(links.length).toBeGreaterThan(0);
+    expect(links.filter((link) => !registered.has(link))).toEqual([]);
   });
 });

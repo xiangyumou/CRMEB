@@ -7,11 +7,14 @@ import type {
   DiyLayoutType,
   DiyNavigation,
   DiyProductDetailPage,
-  DiyStorefrontPage,
+  DiyUserCenterPage,
 } from '@shop/contracts/diy/schemas';
+import {
+  USER_CENTER_DEFAULT_VALUE,
+  USER_CENTER_DEFAULT_VERSION,
+} from '@shop/contracts/diy/user-center.default';
 
 import type { Ctx } from '../kernel/context';
-import { DomainError } from '../kernel/errors';
 import { cleanDiyData } from './compatibility';
 import { versionOf } from './content';
 import { DIY_CACHE, readDiyCache, writeDiyCache } from './diy.cache';
@@ -59,17 +62,35 @@ const NAVIGATION_COMPONENT = 'pagefoot';
  * The same envelope `pages/:id` answers, so `pages/user/index.vue` renders it
  * with the renderer it already has. The page is found by `kind`, because 个人
  * 中心 has no id the app could know; the `kind` enum column names it.
+ *
+ * When no `user_center` page is published, which is every shop until an
+ * operator decorates one, the answer is the built-in default instead of a 404:
+ * 我的 has no body except this page, so without it a shopper sees neither their
+ * orders nor their services. The default goes through `cleanDiyData` like a
+ * saved page would, and the tests pin that this is a no-op on it.
  */
-export async function getUserCenterPage(ctx: ReadCtx): Promise<DiyStorefrontPage> {
-  const cached = await readDiyCache<DiyStorefrontPage>(ctx, USER_CENTER_KEY);
+export async function getUserCenterPage(ctx: ReadCtx): Promise<DiyUserCenterPage> {
+  const cached = await readDiyCache<DiyUserCenterPage>(ctx, USER_CENTER_KEY);
   if (cached !== null) return tagged(ctx, cached);
 
   const row = await repo.findLatestPublishedOfKind(ctx.db, 'user_center');
-  if (!row) throw new DomainError('DIY_USER_CENTER_PAGE_MISSING');
+  const payload: DiyUserCenterPage = row ? toStorefront(row) : builtInUserCenterPage();
 
-  const payload = toStorefront(row);
   await writeDiyCache(ctx, USER_CENTER_KEY, payload);
   return tagged(ctx, payload);
+}
+
+function builtInUserCenterPage(): DiyUserCenterPage {
+  return {
+    id: null,
+    name: '个人中心',
+    kind: 'user_center',
+    title: '个人中心',
+    content: cleanDiyData(USER_CENTER_DEFAULT_VALUE),
+    schemaVersion: 1,
+    background: null,
+    version: USER_CENTER_DEFAULT_VERSION,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +101,7 @@ export async function getUserCenterPage(ctx: ReadCtx): Promise<DiyStorefrontPage
  * `GET /api/v1/diy/pages/product-detail`.
  *
  * The newest published `product_detail` page, found by `kind` exactly as 个人
- * 中心 is. When there is none — every shop until an operator decorates one —
+ * 中心 is. When there is none (every shop until an operator decorates one),
  * the built-in default instead of a 404: `pages/goods_details/index.vue` has no
  * body except this page, and a shop that never touched 装修 still sells.
  *

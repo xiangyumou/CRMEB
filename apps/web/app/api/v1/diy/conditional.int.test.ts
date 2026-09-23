@@ -154,6 +154,24 @@ describe('GET /api/v1/diy/pages/user-center', () => {
 
     await provesConditional(reader(GET, '/api/v1/diy/pages/user-center'), () => republish(page.id));
   });
+
+  it('moves off the built-in default once a page is published', async () => {
+    const { GET } = await import('./pages/user-center/route');
+
+    const { before, after } = await provesConditional(
+      reader(GET, '/api/v1/diy/pages/user-center'),
+      async () => {
+        const page = await createPage(harness.ctx, {
+          name: '个人中心',
+          kind: 'user_center',
+          title: '我的',
+        });
+        await savePageContent(harness.ctx, { id: page.id, content: {}, publish: true });
+      },
+    );
+    expect(before).toMatchObject({ id: null });
+    expect(after).not.toMatchObject({ id: null });
+  });
 });
 
 describe('GET /api/v1/diy/pages/product-detail', () => {

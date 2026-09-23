@@ -14,8 +14,10 @@ import {
   diyStorefrontPage,
   diyStorefrontPageExample,
   diyStorefrontTheme,
+  diyUserCenterPage,
   diyVersion,
 } from './schemas';
+import { USER_CENTER_DEFAULT_VALUE, USER_CENTER_DEFAULT_VERSION } from './user-center.default';
 
 /**
  * 页面装修 — what the uni-app renderer reads.
@@ -65,19 +67,39 @@ export const diyPage = defineRoute({
  *
  * Same envelope as `pages/:id`, so the renderer needs nothing new — including
  * `version`, so the app polls 个人中心 exactly the way it polls the home page.
+ *
+ * It never 404s. The answer is the newest published `user_center` page, and
+ * when there is none, the built-in default (`USER_CENTER_DEFAULT_VALUE`) with
+ * `id: null`: `pages/user/index.vue` has no body except this page, and a shop
+ * that never decorated 我的 still needs its orders and its services. A draft is
+ * never served.
  */
-export const diyUserCenterPage = defineRoute({
+export const diyUserCenterPageRoute = defineRoute({
   id: 'diy.userCenterPage',
   method: 'GET',
   path: '/api/v1/diy/pages/user-center',
   auth: 'public',
   summary: '个人中心装修数据',
   tags: ['diy'],
-  response: diyStorefrontPage,
-  errors: ['DIY_USER_CENTER_PAGE_MISSING'],
+  response: diyUserCenterPage,
   examples: [
+    // First on purpose: the mock server answers with the first example, and the
+    // uni-app's mapper test checks every link in it against `pages.json`.
     {
-      name: 'ok',
+      name: 'built-in default',
+      response: {
+        id: null,
+        name: '个人中心',
+        kind: 'user_center',
+        title: '个人中心',
+        content: USER_CENTER_DEFAULT_VALUE,
+        schemaVersion: 1,
+        background: null,
+        version: USER_CENTER_DEFAULT_VERSION,
+      },
+    },
+    {
+      name: 'published',
       response: {
         ...diyStorefrontPageExample,
         id: '4',
@@ -97,7 +119,7 @@ export const diyUserCenterPage = defineRoute({
  * product page is blank above the bottom bar. Same fixed-path shape as
  * `pages/user-center`: the newest published `product_detail` page.
  *
- * Unlike 个人中心 it never 404s. A shop that never decorated its product page still
+ * Like 个人中心 it never 404s. A shop that never decorated its product page still
  * sells products, so the answer is then the built-in default
  * (`PRODUCT_DETAIL_DEFAULT_VALUE`, the theme's default detail page) with `id:
  * null`. A draft is never served.

@@ -68,6 +68,10 @@ export const diyPageGet = defineRoute({
   examples: [{ name: 'ok', params: { id: '1' }, response: diyPageDetailExample }],
 });
 
+/**
+ * A new 个人中心 or 商品详情 page starts with the built-in page the storefront
+ * shows until one is published; every other kind starts empty.
+ */
 export const diyPageCreate = defineRoute({
   id: 'diy.adminPageCreate',
   method: 'POST',
@@ -217,7 +221,8 @@ export const diyPageCopy = defineRoute({
 /**
  * The factory copy lives on the active theme (`themes.default_data`, one blob
  * per surface) rather than on each page, so "save as default" writes there and
- * "restore" reads from there.
+ * "restore" reads from there. A theme without a copy for 个人中心 or 商品详情
+ * restores the built-in page.
  */
 export const diyPageRestoreDefault = defineRoute({
   id: 'diy.adminPageRestoreDefault',

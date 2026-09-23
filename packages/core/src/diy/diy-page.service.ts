@@ -1,3 +1,4 @@
+import { PRODUCT_DETAIL_DEFAULT_VALUE } from '@shop/contracts/diy/product-detail.default';
 import type {
   DiyPageContentBody,
   DiyPageCreateBody,
@@ -6,7 +7,8 @@ import type {
   DiyPageUpdateBody,
   DiyStorefrontPage,
 } from '@shop/contracts/diy/schemas';
-import type { DiyPageValue } from '@shop/contracts/diy/schema/page';
+import type { DiyPageKind, DiyPageValue } from '@shop/contracts/diy/schema/page';
+import { USER_CENTER_DEFAULT_VALUE } from '@shop/contracts/diy/user-center.default';
 
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
@@ -152,12 +154,25 @@ export async function getPage(ctx: Ctx, input: { id: string }): Promise<DiyPageD
   return toDetail(await loadPage(ctx, input.id));
 }
 
+/**
+ * What a new page of each kind starts with.
+ *
+ * 个人中心 and 商品详情 start from the built-in page the storefront shows until
+ * one is published. The operator then edits what shoppers already see rather
+ * than an empty canvas, and publishing a page nobody filled in cannot blank
+ * the 我的 tab or the product page. Every other kind starts empty.
+ */
+const STARTING_CONTENT: Partial<Record<DiyPageKind, DiyPageValue>> = {
+  user_center: USER_CENTER_DEFAULT_VALUE,
+  product_detail: PRODUCT_DETAIL_DEFAULT_VALUE,
+};
+
 export async function createPage(ctx: Ctx, input: DiyPageCreateBody): Promise<DiyPageDetail> {
   const row = await repo.insertPage(ctx.db, {
     name: input.name,
     kind: input.kind,
     title: input.title ?? null,
-    content: { value: {} },
+    content: { value: STARTING_CONTENT[input.kind] ?? {} },
     now: ctx.clock.now(),
   });
   return toDetail(row);
@@ -300,9 +315,10 @@ function surfaceOf(kind: repo.DiyPageKindValue): themeRepo.ThemeSurface | null {
  * Put the page back to its factory content.
  *
  * The factory copy lives on the active theme (`themes.default_data`, one blob
- * per surface) rather than on each row, so a restore reads from there. 微页面
- * has no surface of its own and therefore no factory copy — which is correct,
- * since every 微页面 is bespoke.
+ * per surface) rather than on each row, so a restore reads from there. When the
+ * theme has none for 个人中心 or 商品详情, the built-in page is the factory
+ * copy. 微页面 has no surface of its own and therefore no factory copy — which
+ * is correct, since every 微页面 is bespoke.
  */
 export async function restorePageDefault(ctx: Ctx, input: { id: string }): Promise<DiyPageDetail> {
   const row = await loadPage(ctx, input.id);
@@ -311,9 +327,14 @@ export async function restorePageDefault(ctx: Ctx, input: { id: string }): Promi
 
   const theme = await themeRepo.findActiveTheme(ctx.db);
   const fallback = theme?.defaultData?.[surface] ?? theme?.data?.[surface];
-  if (!fallback) throw new DomainError('DIY_NO_DEFAULT_CONTENT');
+  // A theme without a copy for 个人中心 or 商品详情 still has the built-in page
+  // the storefront shows; every other surface has nothing to go back to.
+  const builtIn = STARTING_CONTENT[row.kind];
+  if (!fallback && !builtIn) throw new DomainError('DIY_NO_DEFAULT_CONTENT');
 
-  const value = validateDiyContent(valueOf(fallback as Record<string, unknown>));
+  const value = validateDiyContent(
+    fallback ? valueOf(fallback as Record<string, unknown>) : builtIn,
+  );
   const now = ctx.clock.now();
   const next = await repo.updatePage(
     ctx.db,
