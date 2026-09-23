@@ -31,18 +31,25 @@ const APP_ROOTS = [
   'packages/contracts/src',
 ];
 
+/**
+ * The mini-program and the packages it compiles from source. WeChat's iOS
+ * runtime refuses dynamic code and review flags it (docs/mini/wechat-compliance.md
+ * C13); `apps/mini/scripts/size-report.mjs` scans the built package, this the source.
+ */
+const MINI_ROOTS = ['apps/mini/src', 'packages/api-client/src', 'packages/storefront-blocks/src'];
+
 const BANS: readonly Ban[] = [
   {
     id: 'eval',
     pattern: /(^|[^.\w])eval\s*\(/,
     message: 'eval() is banned',
-    roots: APP_ROOTS,
+    roots: [...APP_ROOTS, ...MINI_ROOTS],
   },
   {
     id: 'new-function',
     pattern: /new\s+Function\s*\(/,
     message: 'new Function() is banned',
-    roots: APP_ROOTS,
+    roots: [...APP_ROOTS, ...MINI_ROOTS],
   },
   {
     id: 'child-process',

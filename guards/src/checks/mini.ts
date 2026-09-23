@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -23,7 +24,7 @@ import {
   type AppManifest,
   type RegisteredPage,
 } from '../lib/mini';
-import { apiClientSrc, miniApp, rel, storefrontBlocksSrc } from '../lib/paths';
+import { apiClientSrc, miniApp, rel, repoRoot, storefrontBlocksSrc } from '../lib/paths';
 import { retiredInUrl } from './retired';
 
 /**
@@ -31,7 +32,7 @@ import { retiredInUrl } from './retired';
  * WeChat rules in `docs/mini/wechat-compliance.md`. It replaces the `uniapp`
  * check at the cutover; until then both run.
  *
- * Seven rules, each reported with its tag so a finding says which one broke:
+ * Eight rules, each reported with its tag so a finding says which one broke:
  *
  * - **[pages]** The app is whole. Every page `app.config.ts` registers (main
  *   package and sub-packages) has its source file, and every page file under
@@ -58,8 +59,15 @@ import { retiredInUrl } from './retired';
  * - **[retired]** No retired feature (`retired`'s word list) in a page path, a
  *   catalogue path, or a page/API URL literal in the app or the blocks.
  * - **[config]** What is committed is safe to commit: `urlCheck` stays on, the
- *   AppID is the tourist placeholder, and no committed env file sets a plain
+ *   AppID is the shop's own (`wx4f4b772125e155ed`, public) or the tourist
+ *   placeholder and nothing else, and no committed env file sets a plain
  *   `http://` API origin (C03).
+ * - **[credentials]** No WeChat secret sits in the app: no `private.*.key`
+ *   (miniprogram-ci's upload key) under `apps/mini` or tracked anywhere in the
+ *   repository, and no 32-hex-digit AppSecret-like token in any file under
+ *   `apps/mini`. The AppSecret lives only in the server's config; the upload
+ *   key outside the repository (docs/mini/device-check.md). The built
+ *   `dist/weapp` gets the same token scan in `scripts/size-report.mjs`.
  *
  * Tests (`*.test.*`, `src/test/`) are exempt from [platform], [nutui] and
  * [privacy]: the fake Taro runtime is how they stand in for WeChat.
@@ -73,11 +81,39 @@ export const MINI_RULES = [
   'privacy',
   'retired',
   'config',
+  'credentials',
 ] as const;
 export type MiniRule = (typeof MINI_RULES)[number];
 
 /** The sub-package that holds dev-only pages (the UI kit, the S3 block fixture). */
 const DEMO_ROOT = 'subpackages/demo';
+
+/**
+ * The AppIDs a committed file may carry: the shop's approved mini-program (a
+ * public identifier, shown on every share card) and Taro's placeholder. Any
+ * other AppID is someone's own and belongs in `.env.*.local`.
+ */
+const COMMITTED_APP_IDS: ReadonlySet<string> = new Set(['wx4f4b772125e155ed', 'touristappid']);
+
+/** miniprogram-ci's upload key, as WeChat names it on download. */
+const UPLOAD_KEY = /^private\..+\.key$/;
+
+/**
+ * A 32-hex-digit token on its own: the shape of an AppSecret (and of an
+ * mchKey / APIv3 key). Lower-case only, as WeChat issues them; bounded by
+ * non-alphanumerics so a longer hash or an identifier does not match.
+ */
+const SECRET_LIKE = /(?<![0-9A-Za-z])[0-9a-f]{32}(?![0-9A-Za-z])/g;
+
+/** Directories under `apps/mini` the [credentials] scan skips: tools' output, not files anyone writes. */
+const SECRET_SCAN_SKIP = new Set([
+  'node_modules',
+  'dist',
+  '.swc',
+  '.bundle-stats',
+  '.turbo',
+  'coverage',
+]);
 
 /** What this shop may declare in `requiredPrivateInfos` (C04: "此外不声明任何项"). */
 const SHOP_PRIVATE_INFOS: ReadonlySet<string> = new Set(['chooseAddress']);
@@ -217,6 +253,7 @@ export async function checkMini(roots: MiniRoots): Promise<MiniReport> {
   const declared = checkPrivacy(findings, { manifest, scripts, srcRoot, configWhere, shown });
   checkRetired(findings, { pages, scripts, shown, packages, configWhere });
   checkConfig(findings, appRoot, shown);
+  checkCredentials(findings, appRoot, shown, appRoot === miniApp);
 
   return {
     findings,
@@ -679,12 +716,12 @@ function checkConfig(
         ),
       );
     }
-    if (project.appid !== 'touristappid') {
+    if (typeof project.appid !== 'string' || !COMMITTED_APP_IDS.has(project.appid)) {
       findings.push(
         tagged(
           'config',
           shown('project.config.json'),
-          `appid is ${String(project.appid)}; the committed AppID is touristappid, a real one goes in .env.*.local`,
+          `appid is ${String(project.appid)}; commit only the shop's wx4f4b772125e155ed or touristappid, anything else goes in .env.*.local`,
         ),
       );
     }
@@ -702,12 +739,12 @@ function checkConfig(
       if (!match || line.startsWith('#')) continue;
       const [, key, value = ''] = match;
       const where = `${shown(name)}:${index + 1}`;
-      if (key === 'TARO_APP_ID' && value !== 'touristappid') {
+      if (key === 'TARO_APP_ID' && !COMMITTED_APP_IDS.has(value)) {
         findings.push(
           tagged(
             'config',
             where,
-            `commits the AppID ${value}; put it in ${name}.local (gitignored)`,
+            `commits the AppID ${value}, which is not the shop's; put it in ${name}.local (gitignored)`,
           ),
         );
       }
@@ -724,9 +761,89 @@ function checkConfig(
   }
 }
 
+// ---------------------------------------------------------------------------
+// [credentials]
+// ---------------------------------------------------------------------------
+
+/** Every file under `root`, skipping tools' output; names only, read on demand. */
+function filesUnder(root: string): string[] {
+  const out: string[] = [];
+  const stack = [root];
+  while (stack.length > 0) {
+    const dir = stack.pop();
+    if (dir === undefined) break;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (SECRET_SCAN_SKIP.has(entry.name)) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else if (entry.isFile()) out.push(full);
+    }
+  }
+  return out.sort();
+}
+
+function checkCredentials(
+  findings: Finding[],
+  appRoot: string,
+  shown: (relative: string) => string,
+  live: boolean,
+): void {
+  for (const file of filesUnder(appRoot)) {
+    const relative = path.relative(appRoot, file).split(path.sep).join('/');
+    if (UPLOAD_KEY.test(path.basename(file))) {
+      findings.push(
+        tagged(
+          'credentials',
+          shown(relative),
+          'is a miniprogram-ci upload key; keep it outside the repository and point WX_MINI_UPLOAD_KEY_PATH at it',
+        ),
+      );
+      continue;
+    }
+    const buffer = fs.readFileSync(file);
+    if (buffer.includes(0)) continue; // binary: images, fonts
+    const text = buffer.toString('utf8');
+    for (const match of text.matchAll(SECRET_LIKE)) {
+      const line = text.slice(0, match.index).split('\n').length;
+      findings.push(
+        tagged(
+          'credentials',
+          `${shown(relative)}:${line}`,
+          `holds a 32-hex-digit token (${match[0].slice(0, 4)}…), the shape of an AppSecret; secrets live only in the server's config`,
+        ),
+      );
+    }
+  }
+
+  // Tracked anywhere, not only under apps/mini. Only the live tree is a git checkout.
+  if (!live) return;
+  let tracked: string[] = [];
+  try {
+    tracked = execFileSync('git', ['ls-files', '-z', '--', ':(glob)**/private.*.key'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    })
+      .split('\0')
+      .filter(Boolean);
+  } catch {
+    findings.push(
+      note('.', '[credentials] git ls-files failed; tracked upload keys were not checked'),
+    );
+  }
+  for (const file of tracked) {
+    findings.push(
+      tagged(
+        'credentials',
+        file,
+        'is a tracked miniprogram-ci upload key; remove it from git and rotate it',
+      ),
+    );
+  }
+}
+
 export const miniCheck = defineCheck(
   'mini',
-  'the mini-program: pages, route catalogue, platform seam, NutUI, privacy, retired URLs, committed config',
+  'the mini-program: pages, route catalogue, platform seam, NutUI, privacy, retired URLs, committed config, credentials',
   async () => {
     const { findings, summary } = await checkMini({ app: miniApp });
     return result('mini', 'mini-program', summary, findings);

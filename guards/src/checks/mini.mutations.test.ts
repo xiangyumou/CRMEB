@@ -80,6 +80,30 @@ describe('the mini guard, by mutation', () => {
     expect(failures(report.findings).join('\n')).toBe('');
   });
 
+  it("accepts the shop's own AppID, committed in the project config and a shared env file", async () => {
+    const app = copyApp('official-appid');
+    apply(app, {
+      id: 'official-appid',
+      rule: 'config',
+      summary: "the shop's approved mini-program AppID",
+      edits: [
+        {
+          file: 'project.config.json',
+          search: '"appid": "touristappid"',
+          replace: '"appid": "wx4f4b772125e155ed"',
+        },
+        {
+          file: '.env.production',
+          search: 'TARO_APP_ID="touristappid"',
+          replace: 'TARO_APP_ID="wx4f4b772125e155ed"',
+        },
+      ],
+      expect: /$^/,
+    });
+    const report = await checkMini({ app });
+    expect(failures(report.findings).join('\n')).toBe('');
+  });
+
   it('has at least one mutant per rule, each id once', () => {
     for (const rule of MINI_RULES) {
       expect(

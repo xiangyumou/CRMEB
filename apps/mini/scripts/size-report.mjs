@@ -17,6 +17,9 @@
  * - any script does not parse as ES2018, the target in babel.config.js (the WeChat runtime
  *   does not transpile node_modules for us; `es6: false` in project.config.json);
  * - app.json lists a page or sub-package that is not in the output;
+ * - any file carries a 32-hex-digit token (the shape of an AppSecret or a payment key; those live
+ *   only in the server's config), or the output holds a miniprogram-ci upload key
+ *   (`private.*.key`);
  * - any file carries the e2e suite's H5 emulation (`src/platform/h5-mp-emulation.tsx`: its
  *   `/__e2e/` endpoints or its storage key) or the H5 preview, or the module list includes
  *   `src/platform/runtime.h5.tsx` or either implementation (docs/mini/spikes/S4-e2e.md);
@@ -144,6 +147,29 @@ for (const file of files) {
   const source = fs.readFileSync(path.join(dist, file.rel), 'utf8');
   for (const marker of TEST_ONLY_MARKERS) {
     if (source.includes(marker)) failures.push(`${file.rel}: contains test-only "${marker}"`);
+  }
+}
+
+// --- no secrets -----------------------------------------------------------------------------
+// Everything in the package is readable by anyone who opens the mini-program. The `mini` guard
+// checks the source for the same shapes; this checks what the build inlined (env vars included).
+const SECRET_LIKE = /(?<![0-9A-Za-z])[0-9a-f]{32}(?![0-9A-Za-z])/g;
+for (const entry of fs.readdirSync(dist, { withFileTypes: true, recursive: true })) {
+  if (!entry.isFile()) continue;
+  const rel = path
+    .relative(dist, path.join(entry.parentPath, entry.name))
+    .split(path.sep)
+    .join('/');
+  if (/^private\..+\.key$/.test(entry.name)) {
+    failures.push(`${rel}: a miniprogram-ci upload key in the build output`);
+    continue;
+  }
+  if (!/\.(js|json|wxml|wxs|wxss)$/.test(rel) || rel.endsWith('.map')) continue;
+  const source = fs.readFileSync(path.join(dist, rel), 'utf8');
+  for (const match of source.matchAll(SECRET_LIKE)) {
+    failures.push(
+      `${rel}: a 32-hex-digit token (${match[0].slice(0, 4)}…) at offset ${match.index}, the shape of an AppSecret`,
+    );
   }
 }
 

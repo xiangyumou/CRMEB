@@ -349,7 +349,7 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
   {
     id: 'appid-committed',
     rule: 'config',
-    summary: 'a real AppID is committed to a shared env file',
+    summary: "someone's own AppID (not the shop's) is committed to a shared env file",
     edits: [
       {
         file: '.env.production',
@@ -357,7 +357,7 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
         replace: 'TARO_APP_ID="wx0123456789abcdef"',
       },
     ],
-    expect: /commits the AppID wx0123456789abcdef/,
+    expect: /commits the AppID wx0123456789abcdef, which is not the shop's/,
   },
   {
     id: 'http-origin-committed',
@@ -365,5 +365,57 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
     summary: 'a committed env file points the API at plain http',
     edits: [{ file: '.env.test', create: 'TARO_APP_API_ORIGIN="http://192.168.1.10:25000"\n' }],
     expect: /commits a plain-http API origin http:\/\/192\.168\.1\.10:25000/,
+  },
+  {
+    id: 'appid-in-project-config',
+    rule: 'config',
+    summary: "the committed project config names someone's own AppID",
+    edits: [
+      {
+        file: 'project.config.json',
+        search: '"appid": "touristappid"',
+        replace: '"appid": "wx0123456789abcdef"',
+      },
+    ],
+    expect: /appid is wx0123456789abcdef; commit only the shop's/,
+  },
+
+  // --- [credentials] -------------------------------------------------------
+  {
+    id: 'upload-key-in-app',
+    rule: 'credentials',
+    summary: "miniprogram-ci's upload key is dropped into the app directory",
+    edits: [
+      {
+        file: 'private.wx4f4b772125e155ed.key',
+        create: '-----BEGIN RSA PRIVATE KEY-----\nmutant\n-----END RSA PRIVATE KEY-----\n',
+      },
+    ],
+    expect: /private\.wx4f4b772125e155ed\.key: \[credentials\] is a miniprogram-ci upload key/,
+  },
+  {
+    id: 'appsecret-in-env',
+    rule: 'credentials',
+    summary: 'an AppSecret is put in a local env file, where Taro would inline it',
+    edits: [
+      // Built, not written out, so this file itself holds no 32-hex token.
+      {
+        file: '.env.development.local',
+        create: `TARO_APP_SECRET="${'0123456789abcdef'.repeat(2)}"\n`,
+      },
+    ],
+    expect: /\.env\.development\.local:1: \[credentials\] holds a 32-hex-digit token \(0123…\)/,
+  },
+  {
+    id: 'appsecret-in-source',
+    rule: 'credentials',
+    summary: 'an AppSecret-shaped constant appears in the platform code',
+    edits: [
+      {
+        file: 'src/platform/mutant-secret.ts',
+        create: `export const APP_SECRET = '${'fedcba9876543210'.repeat(2)}';\n`,
+      },
+    ],
+    expect: /src\/platform\/mutant-secret\.ts:1: \[credentials\] holds a 32-hex-digit token/,
   },
 ];
