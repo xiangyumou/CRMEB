@@ -9,19 +9,17 @@ import { wechatConfig } from './wechat.config';
 import { miniCodeUrl } from './wechat.mini-code.service';
 
 /**
- * `GET /api/v1/wechat/mini-qrcodes`, read as a signed-in shopper with a loop
- * (K2, AUDIT.md K-SEC-M1).
+ * `GET /api/v1/wechat/mini-qrcodes`, read as a signed-in shopper with a loop.
  *
- * The `(page, scene)` cache makes the *same* pair free after the first call.
- * A *new* pair always costs a `wxa/getwxacodeunlimit` call, a PNG in the
- * storage root and a `wechat_mini_codes` row, and the scene is any string of
- * up to 32 bytes the caller likes. Nothing counts how many new pairs one
- * account asks for, so one free account can grow the uploads volume and the
- * table without bound and spend the mini program's API rate on it.
+ * The `(page, scene)` cache makes the *same* pair free after the first call. A
+ * *new* pair always costs a `wxa/getwxacodeunlimit` call, a PNG in the storage
+ * root and a `wechat_mini_codes` row, and the scene is any string of up to 32
+ * bytes the caller likes. Without a count of new pairs per account, one free
+ * account could grow the uploads volume and the table without bound and spend
+ * the mini program's API rate on it.
  *
- * K2 pinned the missing budget as `it.fails` (CR-11-k2); R3 added a per-user
- * window of 30 *new* pairs an hour (`RATE_LIMITED` above it). Cached pairs stay
- * free.
+ * So each user has a window of 30 *new* pairs an hour (`RATE_LIMITED` above
+ * it). Cached pairs stay free.
  */
 
 let harness: TestCtx;
@@ -58,7 +56,7 @@ beforeEach(async () => {
   await harness.ctx.config.set(wechatMiniConfig, { enabled: true });
 });
 
-describe('K-SEC-M1 — how many new codes one shopper can mint', () => {
+describe('how many new codes one shopper can mint', () => {
   it('stops minting new codes for one account well before a hundred in an hour', async () => {
     for (let i = 0; i < 100; i += 1) {
       await miniCodeUrl(shopper(), { page: PAGE, scene: `junk=${i}` }).catch(() => undefined);

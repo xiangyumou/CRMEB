@@ -13,10 +13,9 @@ import { createWechatPayClient, type WechatPayCredentials } from './wechat.pay';
  * TLS-001, the half `payment.config.test.ts` cannot see.
  *
  * That test proves no config group can grow a "verify SSL" switch. It says
- * nothing about whether the pay client actually verifies the peer — and
- * MUT-001 showed it: `NODE_TLS_REJECT_UNAUTHORIZED = '0'` written into
- * `wechat.pay.ts` left every payment test green, because the fake gateway
- * speaks plain HTTP (CR-21-k2).
+ * nothing about whether the pay client actually verifies the peer — and MUT-001
+ * showed it: `NODE_TLS_REJECT_UNAUTHORIZED = '0'` written into `wechat.pay.ts`
+ * left every payment test green, because the fake gateway speaks plain HTTP.
  *
  * So here the gateway is an HTTPS server whose certificate nobody trusts: a
  * self-signed one for `localhost`, minted per run so no key material lives in

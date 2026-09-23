@@ -30,10 +30,9 @@ import {
  *    will not decrypt — thrown as `PAYMENT_STATE_UNKNOWN`. Nothing is released
  *    on that path. Ever.
  *
- * The legacy driver's `queryOrder`/`closeOrder` failed *closed* on an
- * unverifiable signature (`V3WechatPay.php:268,318`), which is right; what it
- * did not have was a state for "we do not know", so the caller guessed. Here
- * the not-knowing has a name.
+ * Failing *closed* on an unverifiable signature is right, but without a state
+ * for "we do not know" the caller has to guess. Here the not-knowing has a
+ * name.
  */
 
 /**
@@ -423,9 +422,8 @@ export function createWechatPayClient(ctx: Ctx, config: WechatPayCredentials): W
 
     async queryRefund(outRefundNo) {
       // v3 queries a refund by the *merchant refund number*, never by the trade
-      // number — the legacy signature kept a trade-number argument it ignored
-      // (`V3WechatPay.php:229-232`), which is how a caller could pass the wrong
-      // one and get a confident wrong answer.
+      // number — so this takes no trade-number argument: one it ignored would
+      // let a caller pass the wrong one and get a confident wrong answer.
       const raw = await call<Record<string, unknown>>({
         method: 'GET',
         urlPath: `/v3/refund/domestic/refunds/${encodeURIComponent(outRefundNo)}`,

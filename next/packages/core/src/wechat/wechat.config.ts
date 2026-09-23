@@ -5,10 +5,10 @@ import { defineConfigGroup } from '../kernel/config-registry';
  * The `wechat` config group: the Official Account and mini-program app
  * credentials.
  *
- * It lives here rather than under `system/config/` because that folder belongs
- * to stream F1 and fifteen domains writing into it is a merge conflict per
- * domain (CR-2-c). Registration is a side effect of importing this module,
- * which `wechat/index.ts` does.
+ * It lives with the domain that reads it rather than under `system/config/`: a
+ * shared folder every domain writes into would tie them all to `system`.
+ * Registration is a side effect of importing this module, which
+ * `wechat/index.ts` does.
  *
  * Every field has a `.default()`: a fresh install must be able to read the
  * group before anybody has saved it, or the shop cannot boot.
@@ -22,14 +22,13 @@ import { defineConfigGroup } from '../kernel/config-registry';
 /**
  * A stored text setting.
  *
- * `config_values.value` is `jsonb`, and for a while a string written to it came
- * back as a *number* whenever it was all digits — a 商户号, a phone number —
- * because the value was parsed twice on the way out. `CR-6-c` is fixed in
- * `@shop/db` (json and jsonb reach drizzle as text and are parsed once), so this
- * is now a plain string again. The round trip is still covered by a test in
- * every group this stream owns, because the failure mode was silent: the field
- * fell back to its default and the shop reported 支付尚未配置 with a filled-in
- * form.
+ * `config_values.value` is `jsonb`, and a string written to it must come back a
+ * string even when it is all digits — a 商户号, a phone number. Parsing the
+ * value twice on the way out would turn it into a *number*; `@shop/db` has json
+ * and jsonb reach drizzle as text and parses them once, so this is a plain
+ * string. The round trip is covered by a test in every group this domain owns,
+ * because the failure mode is silent: the field falls back to its default and
+ * the shop reports 支付尚未配置 with a filled-in form.
  */
 const configText = (max: number) => z.string().max(max).default('');
 
@@ -44,15 +43,13 @@ export const wechatConfig = defineConfigGroup({
      * The token the OA message callback signs with, and the 43-character AES
      * key for its message encryption (optional: plaintext mode works).
      *
-     * These two are the one WeChat credential pair this group does **not** own
-     * the legacy keys for. F1's `wechat-oa` group declares the same settings
-     * and maps `wechat_token` / `wechat_encodingaeskey`, and a legacy key with
-     * two claimants is the CR-1-j bug: the ETL fans the value out to both
-     * groups, the operator edits one screen, and the other keeps a stale copy.
-     * CR-3-e2 closes here by making F1's group the sole claimant — it is the
-     * screen 公众号消息配置 lives on — while the fields stay declared here so
-     * an install that only ever filled in this screen keeps working.
-     * `oaCredentials()` reads F1's first and falls back to these.
+     * These two are the one WeChat credential pair this group is **not** the
+     * home of. The `system` domain's `wechat-oa` group declares the same
+     * settings, and it is the screen 公众号消息配置 lives on; with two equal
+     * homes the operator would edit one screen and the other would keep a stale
+     * copy. The fields stay declared here so an install that only ever filled
+     * in this screen keeps working: `oaCredentials()` reads the `wechat-oa`
+     * group first and falls back to these.
      */
     oaToken: configText(64),
     oaAesKey: configText(64),
@@ -62,16 +59,12 @@ export const wechatConfig = defineConfigGroup({
      * The token and AES key of the mini program's own message callback, and
      * the mode it is configured in.
      *
-     * They came over from F1's `wechat-mini` group when this group took over
-     * every WeChat credential (CR-1-j, extended to the mini program by E4).
-     * **Nothing reads them yet**: the mini-program message push is not ported
-     * (scope guard — 自建客服 and the mini message callback are out), so there
-     * is no callback to verify a signature for. They are carried rather than
-     * dropped because a migrated shop has the values in
-     * `routine_token` / `routine_encodingaeskey` / `routine_encode` and the ETL
-     * refuses a legacy key that nobody claims and nobody dropped: losing them
-     * would mean retyping credentials that the operator can no longer read off
-     * the old admin.
+     * They sit here because this group holds every WeChat credential. **Nothing
+     * reads them yet**: 自建客服 and the mini-program message callback are out
+     * of scope, so there is no callback to verify a signature for. They are
+     * kept rather than dropped so an operator who has the values can store them
+     * once, next to the rest, and not have to find them again when a callback
+     * arrives.
      */
     miniToken: configText(64),
     miniAesKey: configText(64),

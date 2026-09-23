@@ -11,12 +11,12 @@ import { miniCodeUrl } from './wechat.mini-code.service';
 /**
  * 小程序码 against a fake `api.weixin.qq.com`.
  *
- * The property worth a test is the one the legacy app did not have: **the
- * second caller does not reach WeChat**. `wxa/getwxacodeunlimit` is quota'd per
- * day and the answer for a `(page, scene)` pair never changes, so a shop whose
- * poster page asks on every render burns the quota and then serves broken
- * images to everyone. The fake counts calls, so "hit once, then never again" is
- * an assertion rather than a hope.
+ * The property worth a test: **the second caller does not reach WeChat**.
+ * `wxa/getwxacodeunlimit` is quota'd per day and the answer for a
+ * `(page, scene)` pair never changes, so a shop whose poster page asks on every
+ * render burns the quota and then serves broken images to everyone. The fake
+ * counts calls, so "hit once, then never again" is an assertion rather than a
+ * hope.
  *
  * The other two are the failure shapes: a refusal must not be stored as a
  * picture, and a scene WeChat would reject must be refused before it costs a
