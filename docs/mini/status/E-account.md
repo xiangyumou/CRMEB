@@ -61,14 +61,22 @@ Updated at every commit so the work can resume after an interruption.
   catalogue still declares `addresses { select }`, now unused). The e2e 收藏 now taps the
   product page's 收藏; the address e2e picks the address in B's checkout sheet.
 
+- `test:mini` after the merge: 18/18 green. 375px H5 screenshots in `E-screens/` (14 pages,
+  taken with a throwaway spec on the e2e stack, `FONTCONFIG_FILE` pointing at a CJK font).
+
 ## In progress
 
-- Rerunning `test:mini` after the merge; retaking the screenshots.
+- Final checklist and sizes.
 
 ## Next
 
-6. Screenshots in `docs/mini/status/E-screens/` (retake after the merge); checklist; sizes.
+- Final report.
 
 ## Backend gaps found
+
+- 发货 / 确认收货 in-app messages render with empty variables (「订单 已由 发出，运单号 。」):
+  the fulfilment notifier (`notification.effects.ts`, `registerFulfilmentNotifier`) reads
+  `orderNo` / `company` / `trackingNo` from a notice payload that does not carry them. Seen in
+  `E-screens/07-messages.png`. Not fixed here (core, not E's).
 
 - `catalog.myReviews` returned no status, though the list includes 待审核 and hidden rows.
