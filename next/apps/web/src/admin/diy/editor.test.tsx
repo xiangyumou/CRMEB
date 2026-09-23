@@ -66,7 +66,7 @@ describe('the palette', () => {
     expect(home).not.toContain('member');
 
     const detailPage = paletteGroupsFor('product_detail').flatMap((group) => group.keys);
-    // 商品信息 leads its group, as it did in the legacy editor.
+    // 商品信息 leads its group.
     expect(detailPage).toContain('productInfo');
     expect(detailPage).not.toContain('member');
 

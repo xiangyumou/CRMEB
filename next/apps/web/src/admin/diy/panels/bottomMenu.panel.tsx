@@ -20,7 +20,7 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 底部菜单 — ports `c_bottom_menu.vue`, the商品详情 footer bar. A singleton: the
+ * 底部菜单, the商品详情 footer bar. A singleton: the
  * page has one and it cannot be dropped twice.
  *
  * Three indices:
@@ -31,7 +31,7 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
  *   (`menuPcFillet`) and `1` 图标 gives them a colour, a size and a rotation.
  * - `toneConfig.tabVal` — `1` 自定义 unlocks the two button colours.
  *
- * `padding` is in the default and reaches `rCom` nowhere; the padding an
+ * `padding` is in the default but is not an operator setting; the padding an
  * operator edits is `c_common_style`'s `paddingConfig`. Left untouched.
  */
 export default defineDiyPanel<BottomMenuComponent>({

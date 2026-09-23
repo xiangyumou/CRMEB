@@ -6,7 +6,7 @@ import { z } from 'zod';
  * Only the things that must exist before the database is reachable live here —
  * connection strings, the deployment mode, the uploads root. *Everything else*
  * is typed application configuration in `config_values`, read through
- * `ctx.config.get(group)` (PLAN §1). If you are tempted to add a business knob
+ * `ctx.config.get(group)`. If you are tempted to add a business knob
  * to this file, it belongs in a config group instead.
  */
 
@@ -48,7 +48,7 @@ export const envSchema = z.object({
   APP_VERSION: z.string().default('dev'),
 
   /**
-   * `'1'` swaps the SMS provider for the in-memory `fakeSmsSender()` (CR-3-i):
+   * `'1'` swaps the SMS provider for the in-memory `fakeSmsSender()`:
    * a verification code is minted and stored in Redis exactly as usual, and is
    * never delivered. It exists for an out-of-process test server — the
    * storefront e2e suite reads the code back out of Redis — which cannot call

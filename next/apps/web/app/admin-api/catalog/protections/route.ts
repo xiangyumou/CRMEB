@@ -8,10 +8,9 @@ import { handle } from '../../../../src/server';
 /**
  * `/admin-api/catalog/protections` — 商品保障服务.
  *
- * Under `catalog:protection:*`, not `catalog:param:*`. Legacy registered these
- * routes under a group labelled 商品参数, so a role granted "product
- * parameters" silently also got "edit the guarantee badges on every product
- * page". Brief: "Fix, don't port".
+ * Under `catalog:protection:*`, not `catalog:param:*`: filed under 商品参数, a
+ * role granted "product parameters" would silently also get "edit the
+ * guarantee badges on every product page".
  */
 
 export const GET = handle(catalogAdminProtectionList, (ctx, { query }) =>

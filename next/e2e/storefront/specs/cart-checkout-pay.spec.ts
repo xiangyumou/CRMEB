@@ -25,7 +25,7 @@ import {
  * Most tests arrange the cart through the real cart API so they stay about
  * one motion each; the product page's own 加入购物车, the confirm page's
  * 提交订单, its freight line and its coupon picker each have a test of their
- * own (once CR-2-h3 and CR-4-i §9–§11, all closed).
+ * own.
  *
  * Payment is settled through the fake gateway's control-plane bridge
  * (`payAtCashier`), not by following the cashier's redirect — see that
@@ -153,11 +153,11 @@ test('a shopper applies a granted coupon on the confirm page', async ({
 });
 
 /**
- * CR-1-h4. A 品类券 (`scope: 'categories'`) on the seeded category, which the
+ * A 品类券 (`scope: 'categories'`) on the seeded category, which the
  * postage product is filed under. The confirm page's lines carry no category
- * ids, so before the fix the picker greyed it out and the ¥5 store-wide
- * coupon was applied instead; now the server looks the product's categories
- * up itself. Worth ¥7, it outranks the ¥5 coupon and is the one applied.
+ * ids, so the server looks the product's categories up itself; a picker that
+ * trusted the page would grey it out and apply the ¥5 store-wide coupon
+ * instead. Worth ¥7, it outranks the ¥5 coupon and is the one applied.
  *
  * Arranged through the coupon service and removed again afterwards: every
  * seeded product is in that category, so a 品类券 left in the wallet would

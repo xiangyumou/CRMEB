@@ -183,7 +183,7 @@
         "
       >
         <view class="emptyBox">
-          <image :src="'/static/images/legacy/no-thing.png'"></image>
+          <image :src="'/static/images/common/no-thing.png'"></image>
           <view class="tips">{{ $t(`暂无商品`) }}</view>
         </view>
         <recommend

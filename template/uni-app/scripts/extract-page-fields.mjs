@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 /**
- * extract-page-fields.mjs — stream H (uni-app API layer).
+ * extract-page-fields.mjs — the page-field inventory of the uni-app API layer.
  *
  * Walks every page / component / lib / mixin / store / subpackage file, resolves
  * what each one imports from `api/*.js`, finds the call sites of those imports and
  * records the property paths the caller reads off the resolved (and rejected) value.
  *
- * The result is both the checklist for re-pointing `api/*.js` and the oracle stream I
- * writes its storefront assertions against: if a legacy mapper stops producing one of
- * the paths listed here, a page breaks.
+ * The result is the list of fields each `api/*.js` function must produce: if a page
+ * mapper stops producing one of the paths listed here, a page breaks.
  *
  * Usage:  node scripts/extract-page-fields.mjs [--json] [--check]
  *   (no flag)  rewrite scripts/reports/page-fields.{json,md}
@@ -338,7 +337,7 @@ function toMarkdown(report) {
   L.push(
     'For every export of `api/*.js`: whether a page still calls it, where, and which property paths the caller',
     'reads off the resolved value (`resolved`) and off the rejection (`rejected`). `resolved` is the contract the',
-    "legacy mappers in `api/mappers/` must keep producing; `res.data.*` is the payload, `res.msg` the envelope's message.",
+    "page mappers in `api/mappers/` must keep producing; `res.data.*` is the payload, `res.msg` the envelope's message.",
   );
   L.push('');
   L.push(`**Totals** — ${report.totals.exports} exports, ${report.totals.live} live, ${report.totals.dead} unreferenced.`);

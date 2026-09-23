@@ -3,10 +3,9 @@ import type { PromotionListComponent } from '@shop/contracts/diy/schema/promotio
 /**
  * Factory default for `promotionList` — 商品选项卡.
  *
- * Copied from `template/admin/src/components/mobilePage/home_product.vue`,
- * the object the legacy editor dropped into the page. Panel labels and all:
- * the renderer reads some of them, and a page saved without them is not the
- * page the storefront expects.
+ * The component exactly as a freshly dropped one is saved. Panel labels and
+ * all: the renderer reads some of them, and a page saved without them is not
+ * the page the storefront expects.
  *
  * `timestamp` is assigned by the store when the component is dropped.
  */
@@ -463,9 +462,10 @@ export const promotionListDefault = {
     ],
   },
   /**
-   * CR-3-g2: `c_home_product.vue:288-316` creates both groups on open. It is
-   * the one copy of this block with **no `max`** and with `isAll` after `min`;
-   * the shape is reproduced as written rather than normalised. No scalar
+   * Both spacing groups, because the panel draws a row only when the node
+   * carries its key. It is the one copy of this block with **no `max`** and
+   * with `isAll` after `min`, the shape stored 商品促销 pages carry; it is kept
+   * as they have it rather than normalised. No scalar
    * sliders in this default, so every side is 0.
    */
   paddingConfig: {

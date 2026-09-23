@@ -22,8 +22,7 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 /**
  * 商品列表 — the reference panel for "a component that picks records".
  *
- * Ports `c_home_goods_list.vue`. Two things are worth copying into the other
- * ~15 product-ish panels:
+ * Two things are worth copying into the other ~15 product-ish panels:
  *
  * - `typeConfig.activeValue` is `1` for 指定商品 and `3` for 筛选商品; the
  *   product picker and the category/number/sort trio are mutually exclusive.

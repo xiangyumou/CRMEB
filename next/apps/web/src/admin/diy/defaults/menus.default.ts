@@ -3,10 +3,9 @@ import type { MenusComponent } from '@shop/contracts/diy/schema/menus.schema';
 /**
  * Factory default for `menus` — 导航组.
  *
- * Copied from `template/admin/src/components/mobilePage/home_menu.vue`,
- * the object the legacy editor dropped into the page. Panel labels and all:
- * the renderer reads some of them, and a page saved without them is not the
- * page the storefront expects.
+ * The component exactly as a freshly dropped one is saved. Panel labels and
+ * all: the renderer reads some of them, and a page saved without them is not
+ * the page the storefront expects.
  *
  * `timestamp` is assigned by the store when the component is dropped.
  */
@@ -619,10 +618,8 @@ export const menusDefault = {
     ],
   },
   /**
-   * CR-3-g2 — `c_home_menu.vue:252-256` injects this on open. It draws no row
-   * in either admin (the legacy row list has no `c_custom_btn` for 导航组), but
-   * it is what a 导航组 saved by the old admin carries, so a node created here
-   * now matches one created there.
+   * Draws no row (the 导航组 panel has no 组件设计 button), but saved 导航组
+   * nodes carry it, so a node created here matches a stored one.
    */
   customBtnConfig: {
     title: '设计组件',

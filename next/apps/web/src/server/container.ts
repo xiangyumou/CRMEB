@@ -61,7 +61,7 @@ function asConfigCache(redis: Redis): ConfigCache {
 let fakeSmsAnnounced = false;
 
 /**
- * `SHOP_FAKE_SMS=1` (CR-3-i): register the in-memory SMS sender in this
+ * `SHOP_FAKE_SMS=1`: register the in-memory SMS sender in this
  * process's own module graph, so `POST /api/v1/auth/sms-codes` succeeds and
  * the code is only ever in Redis. Logged at `warn` once per process — a box
  * that has it on by mistake says so at boot, not when a shopper complains.
@@ -84,7 +84,7 @@ export function resetProcessOverrides(): void {
 /**
  * The web process's pool options. Acquire and idle-in-transaction timeouts
  * come from `createDb`'s defaults (`DB_POOL_ACQUIRE_TIMEOUT_MS`,
- * `DB_IDLE_IN_TX_TIMEOUT_MS`; CR-53-k2). A connection the server ends while it
+ * `DB_IDLE_IN_TX_TIMEOUT_MS`). A connection the server ends while it
  * sits in the pool is logged, as the worker does, instead of vanishing.
  */
 export function webDbOptions(env: Env, logger: Pick<Logger, 'warn'>): DbOptions {

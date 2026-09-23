@@ -39,7 +39,7 @@ describe('the panel registry', () => {
   /**
    * The keys owed a panel: the 33 registered components minus the three
    * render-only ones (`newVip`, `presale`, `swipers`), which have no editor UI
-   * in the old admin either and deliberately fall through to `DiyRawPanel`.
+   * by design and deliberately fall through to `DiyRawPanel`.
    * Asserting the set rather than a hand-written list is what makes a new
    * component key fail here instead of silently shipping without a panel.
    */
@@ -328,10 +328,9 @@ describe('the swiperBg panel', () => {
 });
 
 /**
- * 优品推荐's 商品标签 source, which CR-3-g2 turned from an id box into a picker
- * once the catalog merged `catalog.adminLabelList`.
+ * 优品推荐's 商品标签 source, a picker over `catalog.adminLabelList`.
  *
- * The rows keep the legacy shape — `list` of `{id, label_name}` with
+ * The rows keep the stored shape — `list` of `{id, label_name}` with
  * `activeValue` the same ids in the same order — because that is what the
  * renderer reads. The data source here is the stub the provider falls back to,
  * which is the point of the port: the field is tested without the network.
@@ -368,7 +367,7 @@ describe('the goodRecommend panel, 商品标签 source', () => {
 
     const picked = value.goodsLabel as { activeValue: unknown[]; list: { id: unknown }[] };
     expect(picked.list).toEqual([{ id: 2, label_name: '示例标签 2' }]);
-    // The id goes back as a number, the way the legacy API and page store it.
+    // The id goes back as a number, the way stored pages carry it.
     expect(picked.activeValue).toEqual([2]);
     expect(diyComponentSchemas.goodRecommend.safeParse(value).success).toBe(true);
 
@@ -392,7 +391,7 @@ describe('the goodRecommend panel, 商品标签 source', () => {
     expect(cleared.activeValue).toEqual([]);
   });
 
-  it('draws a legacy node read-only without writing, ids and all', () => {
+  it('draws a stored node read-only without writing, ids and all', () => {
     const node = labelSourceNode({
       title: '商品标签',
       activeValue: [3, 5],
@@ -419,15 +418,13 @@ describe('the goodRecommend panel, 商品标签 source', () => {
 });
 
 /**
- * 图片魔方's free-draw layout, which CR-3-g2 asked to either rebuild or leave
- * alone with a note. It is left alone, because it is not reachable:
- * `styleConfig.tabVal` is a 0-based index into `c_button_style.vue:132-199`,
- * whose eleventh and last live entry is index **10** (样式十一, one cell); the
- * 16-cell free-draw grid is index 11 and is commented out there, so the shipped
- * legacy admin cannot select it either. See `_fields/cube.tsx`.
+ * 图片魔方's free-draw layout, which no layout option selects:
+ * `styleConfig.tabVal` is a 0-based index into the eleven layouts, whose last
+ * is index **10** (样式十一, one cell); a 16-cell free-draw grid would be index
+ * 11. See `_fields/cube.tsx`.
  *
- * What still has to hold is that a page saved while it *was* live keeps its
- * areas: the panel must never read or write `picStyle.docPicList`.
+ * What still has to hold is that a stored page carrying free-draw areas keeps
+ * them: the panel must never read or write `picStyle.docPicList`.
  */
 describe('the pictureCube panel and the unreachable free-draw layout', () => {
   const panel = diyPanels.find((p) => p.key === 'pictureCube')!;
@@ -466,7 +463,7 @@ describe('the pictureCube panel and the unreachable free-draw layout', () => {
     );
     expect(onChange).not.toHaveBeenCalled();
     expect(node).toEqual(before);
-    // Eleven layouts, exactly what the old admin offers — no 16-cell entry.
+    // Eleven layouts — no 16-cell entry.
     expect(screen.queryByText(/16 格/)).not.toBeInTheDocument();
   });
 
@@ -576,13 +573,13 @@ describe('the menus panel, for the c_menu_list family', () => {
 /**
  * The tabs-plus-style family — a panel whose sections are chosen by indices in
  * the node and which ends in 通用样式. 会员中心 is the extreme case: five indices
- * over about eighty keys, 46 of which CR-3-g2 added to the factory default.
+ * over about eighty keys.
  */
 describe('the member panel, for the tabs-and-style family', () => {
   const panel = diyPanels.find((p) => p.key === 'member')!;
 
-  /** A node as the old admin saves it, with the groups `patchConfig` injects. */
-  const legacyNode = (overrides: Record<string, unknown> = {}): DiyComponentValue =>
+  /** A fully populated stored node, carrying every group the panel can draw. */
+  const storedNode = (overrides: Record<string, unknown> = {}): DiyComponentValue =>
     ({
       ...panel.createDefault(),
       name: 'member',
@@ -621,7 +618,7 @@ describe('the member panel, for the tabs-and-style family', () => {
   );
 
   it('swaps the 会员卡 rows when memberStyleConfig changes', () => {
-    const style2 = legacyNode({
+    const style2 = storedNode({
       memberStyleConfig: { title: '会员样式', tabVal: 1, tabList: [{ name: '样式一' }] },
     });
     const { unmount } = renderAdmin(host(style2, vi.fn()));
@@ -629,7 +626,7 @@ describe('the member panel, for the tabs-and-style family', () => {
     expect(screen.queryByDisplayValue('开通会员，尊享更多权益')).not.toBeInTheDocument();
     unmount();
 
-    const style3 = legacyNode({
+    const style3 = storedNode({
       memberStyleConfig: { title: '会员样式', tabVal: 2, tabList: [{ name: '样式一' }] },
     });
     renderAdmin(host(style3, vi.fn()));
@@ -638,12 +635,12 @@ describe('the member panel, for the tabs-and-style family', () => {
   });
 
   it('shows 模块样式 only for 样式四, the layout that has modules', () => {
-    const plain = legacyNode({ setUp: { tabVal: 1 } });
+    const plain = storedNode({ setUp: { tabVal: 1 } });
     const { unmount } = renderAdmin(host(plain, vi.fn()));
     expect(screen.queryByText('模块样式')).not.toBeInTheDocument();
     unmount();
 
-    const layout4 = legacyNode({
+    const layout4 = storedNode({
       setUp: { tabVal: 1 },
       styleConfig: { title: '选择风格', tabVal: 3, tabList: [{ name: '样式一' }] },
     });
@@ -652,8 +649,8 @@ describe('the member panel, for the tabs-and-style family', () => {
   });
 
   it('draws no row for a group the node does not carry', () => {
-    // Since CR-3-g2 the factory default carries all 59 groups, so the node that
-    // proves the rule has to be an older one: a 会员中心 saved before the `ms2*`
+    // The factory default carries all 59 groups, so the node that proves the
+    // rule has to be an older one: a 会员中心 saved before the `ms2*`
     // family existed. The panel must leave it without those rows rather than
     // inventing the keys to have something to render.
     const { ms2TitleType: _a, assetMode: _b, ...older } = panel.createDefault();
@@ -664,7 +661,7 @@ describe('the member panel, for the tabs-and-style family', () => {
 
   it('writes one key when a field changes and keeps the other forty', async () => {
     const user = userEvent.setup();
-    let value = legacyNode({
+    let value = storedNode({
       memberStyleConfig: { title: '会员样式', tabVal: 1, tabList: [{ name: '样式一' }] },
     });
     const before = structuredClone(value);
@@ -698,8 +695,8 @@ describe('the member panel, for the tabs-and-style family', () => {
 
     // The 状态 switches are the per-row ones `c_menu_list` draws. On the factory
     // default (`styleConfig` 样式一, `memberStyleConfig` 样式一, `assetMode`
-    // 数据展示) the 内容设置 tab draws exactly two of the row lists CR-3-g2 put
-    // in the default: 操作内容 and the 会员卡's own two rows.
+    // 数据展示) the 内容设置 tab draws exactly two of the row lists in the
+    // default: 操作内容 and the 会员卡's own two rows.
     const rows = (key: string): number =>
       (((panel.createDefault()[key] as { list?: unknown[] } | undefined)?.list ?? []) as unknown[])
         .length;
@@ -767,7 +764,7 @@ describe('every registered panel', () => {
  * Open every node of a real page, change nothing, and the page is the page.
  *
  * This is the guarantee the whole stream rests on: the saved JSON is a wire
- * contract with a uni-app renderer nobody is rewriting, so a panel that
+ * contract with the uni-app renderer, so a panel that
  * normalises a value on the way in silently rewrites a customer's storefront.
  * The store is not involved — a panel only ever changes a page through
  * `onChange`, so "no `onChange` and no mutation" is exactly "save is
@@ -854,37 +851,31 @@ describe('the production fixtures', () => {
 });
 
 // ---------------------------------------------------------------------------
-// CR-3-g2 — the factory defaults carry every group their panel can draw
+// the factory defaults carry every group their panel can draw
 // ---------------------------------------------------------------------------
 
 /**
- * Thirty-one legacy panels run a `patchConfig(data)` (or a `defaultConfig`
- * merge) on open that `$set`s every group the node is missing, so in the old
- * admin **opening a page and saving it changed the stored JSON**. The panels
- * here never do that — a row draws only when its key is present — which is
- * what keeps the round-trip suite above meaningful.
+ * A panel never writes a group into a node on open — a row draws only when its
+ * key is present — so opening a page and saving it never changes the stored
+ * JSON, which is what keeps the round-trip suite above meaningful.
  *
- * The price is that whatever the legacy panel injected and the factory default
- * does not carry has no editor on a freshly dragged component. CR-3-g2
- * measured that gap and it is now closed in `defaults/`: the table below is the
- * complete list of keys each legacy `patchConfig` can inject, read off the
- * `.vue`, and every one of them must be in the default.
+ * The price is that a group the factory default does not carry has no editor
+ * on a freshly dragged component. The table below lists, per component, the
+ * groups its panel draws beyond the common ones, and every one of them must be
+ * in the default.
  *
  * Two keys are deliberately excluded, and the assertions say so rather than
  * quietly dropping them:
  *
- * - **`c_common_style`** — injected as a *key* (`{color, color2, lr, type}`) by
- *   `c_video`, `c_picture_cube` and `c_home_coupon`. No uni-app renderer reads
- *   it; it is debris from an older editor.
- * - **`timestamp`** — in `c_product_info`'s `defaultConfig`, but the editor
- *   store owns it (`createDefault()` returns the body only).
+ * - **`c_common_style`** — a *key* (`{color, color2, lr, type}`) some stored
+ *   视频, 图片魔方 and 优惠券 nodes carry. No uni-app renderer reads it.
+ * - **`timestamp`** — the editor store owns it (`createDefault()` returns the
+ *   body only).
  *
- * `customComponents` is not in any list: `c_custom_component.vue`'s
- * `patchConfig` never creates it, only the inner designer's save does, and that
- * designer is out of scope (CR-2-g2).
+ * `customComponents` is not in any list: only an inner-layout designer would
+ * create it, and this editor has none.
  */
-const LEGACY_INJECTED_GROUPS: Readonly<Record<string, readonly string[]>> = {
-  // c_member.vue:490-1321
+const PANEL_DRAWN_GROUPS: Readonly<Record<string, readonly string[]>> = {
   member: [
     'assetConfig',
     'assetIconColor',
@@ -946,7 +937,6 @@ const LEGACY_INJECTED_GROUPS: Readonly<Record<string, readonly string[]>> = {
     'userInfoConfig',
     'zIndexConfig',
   ],
-  // c_custom_component.vue:147-330
   customComponent: [
     'borderConfig',
     'borderDataConfig',
@@ -965,9 +955,7 @@ const LEGACY_INJECTED_GROUPS: Readonly<Record<string, readonly string[]>> = {
     'shadowConfig',
     'shadowDataConfig',
   ],
-  // c_home_menu.vue:225-300
   menus: ['bgColor', 'customBtnConfig', 'fillet', 'headerStyle', 'marginConfig', 'paddingConfig'],
-  // c_product_info.vue:266-274 (patchConfig + the defaultConfig merge)
   productInfo: [
     'borderConfig',
     'cname',
@@ -987,18 +975,14 @@ const LEGACY_INJECTED_GROUPS: Readonly<Record<string, readonly string[]>> = {
     'titleConfig',
     'zIndexConfig',
   ],
-  // c_home_product.vue:288-316
   promotionList: ['marginConfig', 'paddingConfig'],
-  // c_picture_cube.vue:131-157
   pictureCube: ['marginConfig', 'paddingConfig'],
-  // c_video.vue:111-135
   videos: ['marginConfig', 'paddingConfig'],
-  // c_new_list.vue:201-228
   articleList: ['marginConfig', 'paddingConfig'],
 };
 
-describe('CR-3-g2 — factory defaults carry every group the legacy panel injects', () => {
-  const entries = Object.entries(LEGACY_INJECTED_GROUPS);
+describe('factory defaults carry every group the panel draws', () => {
+  const entries = Object.entries(PANEL_DRAWN_GROUPS);
 
   it.each(entries)('%s', (key, groups) => {
     const panel = diyPanels.find((p) => p.key === key);
@@ -1017,7 +1001,7 @@ describe('CR-3-g2 — factory defaults carry every group the legacy panel inject
     expect(result.error?.issues ?? []).toEqual([]);
   });
 
-  it('keeps the c_common_style debris and the store-owned timestamp out', () => {
+  it('keeps the unread c_common_style key and the store-owned timestamp out', () => {
     for (const key of ['videos', 'pictureCube']) {
       const node = diyPanels.find((p) => p.key === key)!.createDefault() as Record<string, unknown>;
       expect(node).not.toHaveProperty('c_common_style');
@@ -1035,9 +1019,9 @@ describe('CR-3-g2 — factory defaults carry every group the legacy panel inject
   });
 
   /**
-   * The four-sided spacing pairs are *derived* from the older scalar sliders
-   * (`c_video.vue:111-135` and its copies), and the scalars stay in the node
-   * because the uni renderer still falls back to them. Both must agree, or the
+   * The four-sided spacing pairs are *derived* from the older scalar sliders,
+   * and the scalars stay in the node because the uni-app renderer still falls
+   * back to them. Both must agree, or the
    * editor and the renderer disagree about the same node.
    */
   it.each(['videos', 'articleList'])('%s keeps the scalar spacing in step with the pair', (key) => {

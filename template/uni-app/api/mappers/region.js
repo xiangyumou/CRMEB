@@ -3,7 +3,7 @@
 //
 // Contract: next/packages/contracts/src/shipping/shipping.city.contract.ts
 //
-// The legacy payload was a tree of `{v, n, c}` — value, name, children — and the
+// The picker wants a tree of `{v, n, c}` — value, name, children — and the
 // picker indexes into it by position on every `columnchange`, so the nesting and the
 // key names both have to survive. `level` is dropped: depth is already the position
 // in the tree, and nothing reads it.
@@ -13,11 +13,11 @@
 
 import { toId, mapList, text } from './_shared.js';
 
-function toLegacyCityNode(dto) {
+function toPageCityNode(dto) {
   const node = {
     v: toId(dto && dto.id),
     n: text(dto && dto.name),
-    c: mapList(dto && dto.children, toLegacyCityNode),
+    c: mapList(dto && dto.children, toPageCityNode),
   };
   // `city_id` is submitted as the *city* (level 1) id, and the picker reads `.c`
   // before it knows the depth, so an empty array is the only safe leaf.
@@ -25,8 +25,8 @@ function toLegacyCityNode(dto) {
 }
 
 /** `cityTree` → the bare array the picker assigns to `district`. */
-export function toLegacyCityTree(dto) {
-  const items = mapList(dto && dto.items, toLegacyCityNode);
+export function toPageCityTree(dto) {
+  const items = mapList(dto && dto.items, toPageCityNode);
   // The picker does `district[0].c` without a guard, so an empty tree would throw.
   return items;
 }

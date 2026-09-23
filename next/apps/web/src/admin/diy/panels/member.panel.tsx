@@ -33,7 +33,7 @@ import type { DiyIconStyleValue } from './_fields';
 import { DiyIconStyleField } from './_fields';
 
 /**
- * 会员中心 — ports `c_member.vue`, the panel with the largest key set (about
+ * 会员中心, the panel with the largest key set (about
  * eighty) and five indices that rearrange it:
  *
  * - `styleConfig.tabVal` — the card layout, 样式一…样式五. `0` / `2` / `4` have an
@@ -47,31 +47,26 @@ import { DiyIconStyleField } from './_fields';
  * - `ms2TitleType.tabVal` / `ms3BgMode.tabVal` / `ms4BgMode.tabVal` — text or
  *   image, colour or image.
  *
- * Three legacy behaviours are deliberately **not** reproduced:
+ * Three deliberate choices:
  *
- * - **`patchConfig` writes 59 groups into the node on open** (`:490-1321`).
- *   Panels here never add keys, so a row whose group the node does not have
- *   simply does not draw — exactly what the legacy panel rendered before its
- *   own patch ran. The 46 groups the factory default used to be missing were
- *   put into `member.default.ts` instead (CR-3-g2), which is where they belong:
- *   a fresh 会员中心 is now fully configurable without any panel rewriting a
- *   node on open, and an older node keeps exactly the groups it was saved with.
- * - **The `styleConfig` watcher rewrites stored colours** (`:36-60`): moving to
- *   样式四 / 样式五 swaps `#fff` for `#333` in `nameColor`, `numColor`,
- *   `dataNumColor`, `dataTitleColor` and both `componentBgConfig` stops, and
- *   moving away swaps them back. It is a guess at what the operator wanted that
- *   silently discards colours they picked, and it makes picking a layout a
- *   destructive edit. The layout is written; the colours are left alone.
- * - **The 模块样式 block is dead code** (`:296-305`): it splices itself in front
- *   of an `assetConfigText` row that the style list never contains, so
- *   `findIndex` returns `-1` and `moduleStyleText` / `moduleBgColor` /
- *   `moduleTextColor` / `moduleRadius` are unreachable in the old admin even
- *   though `member.vue` reads them. They are rendered here, under 模块样式, for
- *   样式四 — the only layout that has the modules they style.
+ * - **Opening a node never writes to it.** A row whose group the node does not
+ *   have simply does not draw. `member.default.ts` carries every group, so a
+ *   fresh 会员中心 is fully configurable, and an older node keeps exactly the
+ *   groups it was saved with.
+ * - **Picking a layout never rewrites stored colours.** Swapping `#fff` for
+ *   `#333` in `nameColor`, `numColor`, `dataNumColor`, `dataTitleColor` and both
+ *   `componentBgConfig` stops on a move to 样式四 / 样式五 would be a guess at
+ *   what the operator wanted that silently discards colours they picked, and it
+ *   would make picking a layout a destructive edit. The layout is written; the
+ *   colours are left alone.
+ * - **模块样式 is editable.** `moduleStyleText` / `moduleBgColor` /
+ *   `moduleTextColor` / `moduleRadius` are read by the storefront renderer, so
+ *   they are rendered here, under 模块样式, for 样式四 — the only layout that
+ *   has the modules they style.
  *
- * `logoConfig` and `titleImg` are in the factory default but have no row in
- * `c_member.vue` (`member.default.ts` inherited them from 用户信息). No row here
- * either; the value round-trips.
+ * `logoConfig` and `titleImg` are in the factory default (inherited from
+ * 用户信息) but are not operator settings of 会员中心. No row here; the value
+ * round-trips.
  */
 export default defineDiyPanel<MemberComponent>({
   key: 'member',
@@ -95,8 +90,7 @@ export default defineDiyPanel<MemberComponent>({
     const set = (key: string, next: unknown): void =>
       onChange({ ...value, [key]: next } as MemberComponent);
 
-    // Every row is conditional on its key being present, like the legacy
-    // `v-if="configObj.x"`, so a node that never had the group keeps not having
+    // Every row is conditional on its key being present, so a node that never had the group keeps not having
     // it rather than gaining one the moment the panel opens.
     const colour = (key: string) =>
       value[key] ? (
@@ -130,7 +124,7 @@ export default defineDiyPanel<MemberComponent>({
           disabled={off}
         />
       ) : null;
-    /** `c_input_item` whose title is 按钮链接 — the legacy link picker (`:12`). */
+    /** `c_input_item` whose title is 按钮链接 — a link picker. */
     const link = (key: string) => {
       const config = value[key] as DiyInput | undefined;
       if (!config) return null;
@@ -191,7 +185,7 @@ export default defineDiyPanel<MemberComponent>({
 
     const iconStyle = value.iconStyleConfig as DiyIconStyleValue | undefined;
     // `c_icon_style` is spliced in only for the layouts with a menu, and only
-    // while that menu is in 图标 mode (`:274-285`).
+    // while that menu is in 图标 mode.
     const iconMode =
       (style === 0 || style === 2 || style === 4) &&
       (listStyle('menuConfig') === 1 || listStyle('shortcutConfig') === 1);
@@ -312,7 +306,7 @@ export default defineDiyPanel<MemberComponent>({
             </>
           ) : null}
 
-          {/* 样式四 of the card is the one variant with no radius row (`:262-272`). */}
+          {/* 样式四 of the card is the one variant with no radius row. */}
           {memberStyle === 1 || memberStyle === 2 || style === 3 ? fillet('cardBgRadius') : null}
         </DiySection>
 

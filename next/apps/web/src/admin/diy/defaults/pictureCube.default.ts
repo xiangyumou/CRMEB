@@ -3,10 +3,9 @@ import type { PictureCubeComponent } from '@shop/contracts/diy/schema/pictureCub
 /**
  * Factory default for `pictureCube` — 图片魔方.
  *
- * Copied from `template/admin/src/components/mobilePage/picture_cube.vue`,
- * the object the legacy editor dropped into the page. Panel labels and all:
- * the renderer reads some of them, and a page saved without them is not the
- * page the storefront expects.
+ * The component exactly as a freshly dropped one is saved. Panel labels and
+ * all: the renderer reads some of them, and a page saved without them is not
+ * the page the storefront expects.
  *
  * `timestamp` is assigned by the store when the component is dropped.
  */
@@ -259,10 +258,10 @@ export const pictureCubeDefault = {
     ],
   },
   /**
-   * CR-3-g2: `c_picture_cube.vue:131-157` creates both groups on open. This
-   * default carries none of the older scalar sliders, so every side falls back
-   * to 0. The `c_common_style` key the same `patchConfig` injects is debris no
-   * renderer reads and is deliberately not added.
+   * Both spacing groups, because the panel draws a row only when the node
+   * carries its key. This default carries none of the older scalar sliders, so
+   * every side is 0. A stray `c_common_style` key some stored pages carry is
+   * read by no renderer and is deliberately not added.
    */
   paddingConfig: {
     isAll: false,

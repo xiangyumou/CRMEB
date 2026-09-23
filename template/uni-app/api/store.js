@@ -2,25 +2,25 @@
 
 import request from '../utils/request.js';
 import {
-  toLegacyProductDetail,
-  toLegacyProductList,
-  toLegacyCategoryTree,
-  toLegacyAttr,
-  toLegacyRealPrice,
-  toLegacyReplyList,
-  toLegacyReplyConfig,
-  toLegacyHotKeywords,
-  toLegacyCollectList,
-  toLegacyVisitList,
-  toLegacyFavoriteResult,
-  toLegacyCollectAllResult,
-  fromLegacyIdList,
+  toPageProductDetail,
+  toPageProductList,
+  toPageCategoryTree,
+  toPageAttr,
+  toPageRealPrice,
+  toPageReplyList,
+  toPageReplyConfig,
+  toPageHotKeywords,
+  toPageCollectList,
+  toPageVisitList,
+  toPageFavoriteResult,
+  toPageCollectAllResult,
+  fromPageIdList,
 } from './mappers/catalog.js';
-import { toLegacyPresaleDetail } from './mappers/activity.js';
-import { toLegacyCartAddResult, fromLegacyCartAddInput } from './mappers/cart.js';
+import { toPagePresaleDetail } from './mappers/activity.js';
+import { toPageCartAddResult, fromPageCartAddInput } from './mappers/cart.js';
 import { buyNowTicket } from './mappers/order.js';
-import { fromLegacyPage } from './mappers/_shared.js';
-import { fromLegacyMiniCodeQuery, toLegacyMiniCode } from './mappers/wechat.js';
+import { fromPagePaging } from './mappers/_shared.js';
+import { fromPageMiniCodeQuery, toPageMiniCode } from './mappers/wechat.js';
 import store from '../store';
 
 /**
@@ -30,7 +30,7 @@ import store from '../store';
 export function getProductDetail(id) {
   return request.get(`/api/v1/catalog/products/${id}`, {}, {
     noAuth: true,
-    map: toLegacyProductDetail,
+    map: toPageProductDetail,
   });
 }
 
@@ -39,16 +39,16 @@ export function getProductDetail(id) {
  * @param object data {page, limit, keyword, cid, sid, priceOrder, news, …}
  */
 export function getProductslist(data) {
-  return request.get('/api/v1/catalog/products', fromLegacyProductQuery(data), {
+  return request.get('/api/v1/catalog/products', fromPageProductQuery(data), {
     noAuth: true,
-    map: toLegacyProductList,
+    map: toPageProductList,
   });
 }
 
-/** Legacy 商品列表筛选 → the contract's query. */
-function fromLegacyProductQuery(data) {
+/** The page's 商品列表筛选 → the contract's query. */
+function fromPageProductQuery(data) {
   const src = data || {};
-  const query = fromLegacyPage(src);
+  const query = fromPagePaging(src);
   if (src.keyword) query.keyword = String(src.keyword);
   if (src.cid) query.categoryId = String(src.cid);
   if (src.sid) query.categoryId = String(src.sid);
@@ -74,7 +74,7 @@ export function getProductHot(page, limit) {
   return request.get(
     '/api/v1/catalog/products',
     { page: page === undefined ? 1 : page, pageSize: limit === undefined ? 4 : limit, feature: 'hot' },
-    { noAuth: true, map: toLegacyProductList },
+    { noAuth: true, map: toPageProductList },
   );
 }
 
@@ -84,19 +84,19 @@ export function getProductHot(page, limit) {
 export function getCategoryList() {
   return request.get('/api/v1/catalog/categories', {}, {
     noAuth: true,
-    map: toLegacyCategoryTree,
+    map: toPageCategoryTree,
   });
 }
 
 /**
  * 获取首页的属性（规格）
  * @param int id 商品 id
- * @param int type 旧的活动类型，新接口只有普通商品
+ * @param int type 页面传的活动类型，路由只有普通商品
  */
 export function getAttr(id, type) {
   return request.get(`/api/v1/catalog/products/${id}/skus`, {}, {
     noAuth: true,
-    map: toLegacyAttr,
+    map: toPageAttr,
   });
 }
 
@@ -108,7 +108,7 @@ export function getAttr(id, type) {
 export function realPrice(id, unique) {
   return request.get(`/api/v1/catalog/products/${id}/skus`, {}, {
     noAuth: true,
-    map: (dto) => toLegacyRealPrice(dto, unique),
+    map: (dto) => toPageRealPrice(dto, unique),
   });
 }
 
@@ -119,16 +119,16 @@ export function realPrice(id, unique) {
  */
 export function getReplyList(id, data) {
   const src = data || {};
-  const query = fromLegacyPage(src);
-  if (src.type !== undefined && src.type !== '') query.rating = legacyRating(src.type);
+  const query = fromPagePaging(src);
+  if (src.type !== undefined && src.type !== '') query.rating = pageRating(src.type);
   return request.get(`/api/v1/catalog/products/${id}/reviews`, query, {
     noAuth: true,
-    map: toLegacyReplyList,
+    map: toPageReplyList,
   });
 }
 
-/** 旧的评价筛选：0 全部 1 好评 2 中评 3 差评 4 有图 */
-function legacyRating(type) {
+/** 页面的评价筛选：0 全部 1 好评 2 中评 3 差评 4 有图 */
+function pageRating(type) {
   switch (Number(type)) {
     case 1:
       return 'good';
@@ -150,7 +150,7 @@ function legacyRating(type) {
 export function getReplyConfig(id) {
   return request.get(`/api/v1/catalog/products/${id}/review-summary`, {}, {
     noAuth: true,
-    map: toLegacyReplyConfig,
+    map: toPageReplyConfig,
   });
 }
 
@@ -160,7 +160,7 @@ export function getReplyConfig(id) {
 export function getSearchKeyword() {
   return request.get('/api/v1/catalog/search/hot-keywords', {}, {
     noAuth: true,
-    map: toLegacyHotKeywords,
+    map: toPageHotKeywords,
   });
 }
 
@@ -170,7 +170,7 @@ export function getSearchKeyword() {
  */
 export function collectAdd(id) {
   return request.post('/api/v1/me/favorites', { productId: String(id) }, {
-    map: toLegacyFavoriteResult,
+    map: toPageFavoriteResult,
     msg: '收藏成功',
   });
 }
@@ -188,12 +188,12 @@ export function collectDel(id) {
  * @param object id 产品编号 join(',') 切割成字符串
  */
 export function collectAll(id) {
-  // One request since CR-2-h; it used to be one per product, which is N chances
-  // to half-succeed. The route is idempotent and partial-tolerant: an id whose
-  // product went off shelf comes back `favorited: false` instead of failing the
-  // rest, and the page only ever read "it worked".
-  return request.post('/api/v1/me/favorites/batch', { productIds: fromLegacyIdList(id) }, {
-    map: toLegacyCollectAllResult,
+  // One request, not one per product, which would be N chances to half-succeed.
+  // The route is idempotent and partial-tolerant: an id whose product went off
+  // shelf comes back `favorited: false` instead of failing the rest, and the page
+  // only ever read "it worked".
+  return request.post('/api/v1/me/favorites/batch', { productIds: fromPageIdList(id) }, {
+    map: toPageCollectAllResult,
     msg: '收藏成功',
   });
 }
@@ -203,7 +203,7 @@ export function collectAll(id) {
  * @param object data {page, limit}
  */
 export function getCollectUserList(data) {
-  return request.get('/api/v1/me/favorites', fromLegacyPage(data), { map: toLegacyCollectList });
+  return request.get('/api/v1/me/favorites', fromPagePaging(data), { map: toPageCollectList });
 }
 
 /**
@@ -211,7 +211,7 @@ export function getCollectUserList(data) {
  * @param object data {page, limit}
  */
 export function getVisitList(data) {
-  return request.get('/api/v1/me/history', fromLegacyPage(data), { map: toLegacyVisitList });
+  return request.get('/api/v1/me/history', fromPagePaging(data), { map: toPageVisitList });
 }
 
 /**
@@ -222,7 +222,7 @@ export function deleteVisitList(data) {
   const src = data || {};
   return request.post(
     '/api/v1/me/history/deletions',
-    { productIds: fromLegacyIdList(src.ids !== undefined ? src.ids : src) },
+    { productIds: fromPageIdList(src.ids !== undefined ? src.ids : src) },
     { msg: '删除成功' },
   );
 }
@@ -235,17 +235,17 @@ export function deleteVisitList(data) {
 const GROOM_FEATURE = { 1: 'best', 2: 'hot', 3: 'new', 4: 'benefit' };
 
 export function getGroomList(type, data) {
-  const query = fromLegacyPage(data);
+  const query = fromPagePaging(data);
   query.feature = GROOM_FEATURE[Number(type)] || 'recommended';
   return request.get('/api/v1/catalog/products', query, {
     noAuth: true,
     // The 推荐位 page reads `{banner, list}`; there is no banner in the new DTO.
-    map: (dto) => ({ banner: [], list: toLegacyProductList(dto) }),
+    map: (dto) => ({ banner: [], list: toPageProductList(dto) }),
   });
 }
 
 /**
- * 预售详情。预售现在是 D 域的一个活动，不是商品上的几个字段，所以这里的 id 是**活动
+ * 预售详情。预售是营销域的一个活动，不是商品上的几个字段，所以这里的 id 是**活动
  * id**，而返回值由 `mappers/activity.js` 组装成商品详情页认得的
  * `{storeInfo, productAttr, productValue}`。
  *
@@ -254,12 +254,12 @@ export function getGroomList(type, data) {
 export function getPresellProductDetail(id) {
   return request.get(`/api/v1/presale/activities/${id}`, {}, {
     noAuth: true,
-    map: toLegacyPresaleDetail,
+    map: toPagePresaleDetail,
   });
 }
 
 // ---------------------------------------------------------------------------
-// 商品海报的小程序码 — E4 的 `GET /api/v1/wechat/mini-qrcodes`（CR-6-h2）
+// 商品海报的小程序码 — `GET /api/v1/wechat/mini-qrcodes`
 // ---------------------------------------------------------------------------
 
 /**
@@ -270,8 +270,8 @@ export function getPresellProductDetail(id) {
 export function getProductCode(id) {
   return request.get(
     '/api/v1/wechat/mini-qrcodes',
-    fromLegacyMiniCodeQuery('product', id, store.state.app.uid),
-    { map: toLegacyMiniCode },
+    fromPageMiniCodeQuery('product', id, store.state.app.uid),
+    { map: toPageMiniCode },
   );
 }
 
@@ -281,23 +281,25 @@ export function getProductCode(id) {
 
 /**
  * 购车添加
- * @param object data {productId, cartNum, uniqueId, new, combinationId, advanceId, pinkId}
+ * @param object data {productId, cartNum, uniqueId, new, combinationId,
+ * advanceId, pinkId}
  */
 export function postCartAdd(data) {
   const src = data || {};
   // `new: 1` is 立即购买 (`goods_combination_details` spells the same flag `is_new`).
-  // Nothing is written to the cart any more; the confirm page gets a ticket it can turn
-  // into a `buy-now` checkout preview. 拼团 (`combinationId`, plus `pinkId` when joining
-  // an existing team) and 预售 (`advanceId`) ride along inside the ticket, because the
-  // confirm page forwards nothing but `cartId` to the preview.
+  // Nothing is written to the cart any more; the confirm page gets a ticket it
+  // can turn into a `buy-now` checkout preview. 拼团 (`combinationId`, plus
+  // `pinkId` when joining an existing team) and 预售 (`advanceId`) ride along
+  // inside the ticket, because the confirm page forwards nothing but `cartId` to
+  // the preview.
   if (src.new || src.is_new) {
     const activityId = src.combinationId || src.advanceId || '';
     const kind = src.combinationId ? 'groupbuy' : src.advanceId ? 'presale' : 'normal';
     const ticket = buyNowTicket(src.uniqueId || '', src.cartNum, kind, activityId, src.pinkId);
     return Promise.resolve({ data: { cartId: ticket }, msg: '', status: 200 });
   }
-  return request.post('/api/v1/cart/items', fromLegacyCartAddInput(src), {
-    map: toLegacyCartAddResult,
+  return request.post('/api/v1/cart/items', fromPageCartAddInput(src), {
+    map: toPageCartAddResult,
     msg: '添加成功',
   });
 }
@@ -313,16 +315,16 @@ export function postCartNum(data) {
     return request.post(
       '/api/v1/cart/items',
       { skuId: String(src.unique || ''), quantity },
-      { map: toLegacyCartAddResult, msg: '添加成功' },
+      { map: toPageCartAddResult, msg: '添加成功' },
     );
   }
-  // Decrement by variant. Before CR-2-h this had to list the whole cart to find
-  // a row id first — one extra round trip on the hottest screen in the app, and
-  // a read-then-write besides. `/cart/items/decrements` is one conditional
+  // Decrement by variant, without listing the whole cart to find a row id first —
+  // that would be an extra round trip on the hottest screen in the app, and a
+  // read-then-write besides. `/cart/items/decrements` is one conditional
   // statement and removes the row when it reaches zero.
   return request.post(
     '/api/v1/cart/items/decrements',
     { skuId: String(src.unique || ''), quantity },
-    { map: toLegacyCartAddResult, msg: '修改成功' },
+    { map: toPageCartAddResult, msg: '修改成功' },
   );
 }

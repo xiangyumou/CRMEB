@@ -588,7 +588,7 @@
 				}
 				// #endif
 			},
-			// 旧接口 `checkShipping` 已下线：新的结算预览只有快递配送一种方式。
+			// 没有 `checkShipping`：结算预览只有快递配送一种方式。
 			checkShipping() {
 				this.is_shipping = true;
 				this.shippingType = 0;

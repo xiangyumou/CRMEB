@@ -7,7 +7,7 @@ import { handle } from '../../../src/server';
  *
  * The directory mirrors the URL because App Router derives one from the other,
  * so an admin route lives under `app/admin-api/<resource>/`, not under a
- * folder named after the domain. See `docs/rewrite/cr/CR-1-golden.md`.
+ * folder named after the domain.
  *
  * A route file does three things and no more: name the contract, call one
  * service function, and (for a write) say what was acted on for the audit log.

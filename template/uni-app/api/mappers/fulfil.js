@@ -1,4 +1,4 @@
-// 物流 / 发票 DTOs → the legacy view models.
+// 物流 / 发票 DTOs → the page view models.
 //
 // Contracts:
 //   next/packages/contracts/src/order/order.fulfil.contract.ts   (shipments, tracking, 收货)
@@ -6,12 +6,12 @@
 //
 // Two things changed shape here and the mappers exist to hide it:
 //
-//  1. **An order can have several parcels.** Legacy put one `delivery_id` /
-//     `delivery_name` pair on the order row; the new model has a `shipments`
+//  1. **An order can have several parcels.** The pages expect one `delivery_id` /
+//     `delivery_name` pair on the order row; the API has a `shipments`
 //     collection and the trace feed hangs off a shipment, not the order. The
-//     物流 page only ever renders one parcel, so `toLegacyExpressView` picks the
+//     物流 page only ever renders one parcel, so `toPageExpressView` picks the
 //     latest dispatched one and flattens it back onto the order.
-//  2. **Invoices are manual and have no address book.** B2 froze the header
+//  2. **Invoices are manual and have no address book.** The header is frozen
 //     onto the request (`order.invoice.contract.ts`), so an invoice is a
 //     request with a status rather than a row in 抬头管理.
 
@@ -24,16 +24,16 @@ import {
   mapList,
   pagedList,
   unixSeconds,
-  legacyDateTime,
+  pageDateTime,
 } from './_shared.js';
-import { toLegacyOrderDetail } from './order.js';
+import { toPageOrderDetail } from './order.js';
 
 // ---------------------------------------------------------------------------
 // shipments
 // ---------------------------------------------------------------------------
 
-/** `shipmentDeliveryMode` → the legacy `delivery_type` string the pages compare with. */
-export function legacyDeliveryType(mode) {
+/** `shipmentDeliveryMode` → the `delivery_type` string the pages compare with. */
+export function pageDeliveryType(mode) {
   if (mode === 'merchant_delivery') return 'send';
   if (mode === 'virtual') return 'fictitious';
   if (mode === 'express') return 'express';
@@ -41,7 +41,7 @@ export function legacyDeliveryType(mode) {
 }
 
 /** One `shipmentLine` → a `cart_info`-shaped row, so 包裹 lists reuse the goods component. */
-export function toLegacyShipmentLine(dto) {
+export function toPageShipmentLine(dto) {
   if (!dto) return {};
   const spec = text(dto.specText).split('|').join(',');
   return {
@@ -60,15 +60,15 @@ export function toLegacyShipmentLine(dto) {
   };
 }
 
-/** `shipment` → the flat 发货信息 the old order row carried. */
-export function toLegacyShipment(dto) {
+/** `shipment` → the flat 发货信息 the pages read off the order row. */
+export function toPageShipment(dto) {
   if (!dto) return {};
   return {
     id: toId(dto.id),
     shipment_id: text(dto.id),
     order_id: text(dto.orderId),
     delivery_sn: text(dto.shipmentNo),
-    delivery_type: legacyDeliveryType(dto.deliveryMode),
+    delivery_type: pageDeliveryType(dto.deliveryMode),
     status: text(dto.status),
     is_cancel: dto.status === 'cancelled' ? 1 : 0,
     delivery_id: text(dto.trackingNo),
@@ -80,14 +80,14 @@ export function toLegacyShipment(dto) {
     fictitious_content: text(dto.virtualContent),
     remark: text(dto.remark),
     delivery_time: unixSeconds(dto.dispatchedAt, 0),
-    _delivery_time: legacyDateTime(dto.dispatchedAt),
+    _delivery_time: pageDateTime(dto.dispatchedAt),
     receive_time: unixSeconds(dto.deliveredAt, 0),
-    cartInfo: mapList(dto.lines, toLegacyShipmentLine),
+    cartInfo: mapList(dto.lines, toPageShipmentLine),
   };
 }
 
-export function toLegacyShipmentList(dto) {
-  return mapList(dto && dto.items, toLegacyShipment);
+export function toPageShipmentList(dto) {
+  return mapList(dto && dto.items, toPageShipment);
 }
 
 /**
@@ -103,17 +103,17 @@ export function pickShipment(dto) {
   return items[items.length - 1];
 }
 
-/** kdniao's `deliverystatus`, which the old payload carried and a few pages still read. */
+/** kdniao's `deliverystatus`, which a few pages read. */
 const DELIVERY_STATE = { unknown: 0, in_transit: 1, delivering: 2, delivered: 3, exception: 5 };
 
 /** One trace step → `{time, status}`, the two keys the 物流 timeline renders. */
-export function toLegacyTrace(dto) {
+export function toPageTrace(dto) {
   if (!dto) return { time: '', status: '' };
-  return { time: legacyDateTime(dto.at), status: text(dto.context) };
+  return { time: pageDateTime(dto.at), status: text(dto.context) };
 }
 
-/** `shipmentTracking` → the legacy `express` blob (`{status, msg, result}`). */
-export function toLegacyTracking(dto) {
+/** `shipmentTracking` → the page's `express` blob (`{status, msg, result}`). */
+export function toPageTracking(dto) {
   if (!dto) {
     return { status: 0, msg: '', result: { number: '', type: '', expName: '', list: [], deliverystatus: 0, issign: 0 } };
   }
@@ -128,11 +128,11 @@ export function toLegacyTracking(dto) {
       logo: '',
       courier: '',
       courierPhone: '',
-      updateTime: legacyDateTime(dto.queriedAt),
+      updateTime: pageDateTime(dto.queriedAt),
       takeTime: '',
       deliverystatus: DELIVERY_STATE[dto.state] === undefined ? 0 : DELIVERY_STATE[dto.state],
       issign: dto.state === 'delivered' ? 1 : 0,
-      list: mapList(dto.traces, toLegacyTrace),
+      list: mapList(dto.traces, toPageTrace),
     },
   };
 }
@@ -140,12 +140,12 @@ export function toLegacyTracking(dto) {
 /**
  * `{order, express}` — what `express()` / `adminExpress()` resolve with.
  *
- * `orderView` is already a legacy order (the caller maps it with the storefront or
+ * `orderView` is already a page-shaped order (the caller maps it with the storefront or
  * the staff mapper), so this only flattens the parcel back onto it.
  */
-export function toLegacyExpressView(orderView, shipmentDto, trackingDto) {
+export function toPageExpressView(orderView, shipmentDto, trackingDto) {
   const order = Object.assign({}, orderView || {});
-  const parcel = shipmentDto ? toLegacyShipment(shipmentDto) : null;
+  const parcel = shipmentDto ? toPageShipment(shipmentDto) : null;
   if (parcel) {
     order.delivery_id = parcel.delivery_id;
     order.delivery_name = parcel.delivery_name;
@@ -153,20 +153,20 @@ export function toLegacyExpressView(orderView, shipmentDto, trackingDto) {
     order.delivery_time = parcel.delivery_time;
   }
   if (!list(order.cartInfo).length && parcel) order.cartInfo = parcel.cartInfo;
-  return { order, express: toLegacyTracking(trackingDto), shipment: parcel };
+  return { order, express: toPageTracking(trackingDto), shipment: parcel };
 }
 
 /** `GET /api/v1/orders/:id` → the order half of the 物流 view. */
-export function toLegacyExpressOrder(dto) {
-  return toLegacyOrderDetail(dto);
+export function toPageExpressOrder(dto) {
+  return toPageOrderDetail(dto);
 }
 
 // ---------------------------------------------------------------------------
 // invoices
 // ---------------------------------------------------------------------------
 
-/** Legacy `header_type`: 1 个人 / 2 企业. `type`: 1 普通 / 2 专用. */
-export function toLegacyInvoice(dto) {
+/** The page's `header_type`: 1 个人 / 2 企业. `type`: 1 普通 / 2 专用. */
+export function toPageInvoice(dto) {
   if (!dto) return {};
   return {
     id: toId(dto.id),
@@ -191,25 +191,25 @@ export function toLegacyInvoice(dto) {
     unique_num: text(dto.invoiceNumber),
     red_invoice_num: '',
     remark: text(dto.remark),
-    add_time: legacyDateTime(dto.createdAt),
-    invoice_time: legacyDateTime(dto.issuedAt),
+    add_time: pageDateTime(dto.createdAt),
+    invoice_time: pageDateTime(dto.issuedAt),
     is_default: 0,
     // The 发票记录 row renders the order underneath. `orderSummary` is the order's
-    // first line, read through the order domain rather than copied onto the invoice
-    // (CR-4-h §7), so it cannot drift away from the order it describes. `cartInfo` is
-    // the one row the template reads; an order with no lines keeps the old fallback.
+    // first line, read through the order domain rather than copied onto the invoice,
+    // so it cannot drift away from the order it describes. `cartInfo` is the one
+    // row the template reads; an order with no lines falls back to an empty row.
     order: {
       order_id: text(dto.orderId),
       order_no: text(dto.orderNo),
       pay_price: money(dto.amount),
       total_num: dto.orderSummary ? dto.orderSummary.totalQuantity : 0,
-      cartInfo: dto.orderSummary ? [toLegacyInvoiceLine(dto.orderSummary)] : [],
+      cartInfo: dto.orderSummary ? [toPageInvoiceLine(dto.orderSummary)] : [],
     },
   };
 }
 
 /** `orderSummary` → the single `cartInfo` row 发票记录 draws. */
-function toLegacyInvoiceLine(summary) {
+function toPageInvoiceLine(summary) {
   return {
     cart_num: summary.quantity,
     productInfo: {
@@ -221,16 +221,16 @@ function toLegacyInvoiceLine(summary) {
 }
 
 /** `GET /api/v1/invoices` → the bare array the 发票记录 list pages through. */
-export function toLegacyInvoiceList(dto) {
-  return mapList(dto && dto.items, toLegacyInvoice);
+export function toPageInvoiceList(dto) {
+  return mapList(dto && dto.items, toPageInvoice);
 }
 
-export function toLegacyInvoicePage(dto) {
-  return pagedList(dto, toLegacyInvoice);
+export function toPageInvoicePage(dto) {
+  return pagedList(dto, toPageInvoice);
 }
 
-/** Legacy 抬头 fields → `POST /api/v1/orders/:id/invoice`. */
-export function fromLegacyInvoiceRequest(data) {
+/** The page's 抬头 fields → `POST /api/v1/orders/:id/invoice`. */
+export function fromPageInvoiceRequest(data) {
   const src = data || {};
   const body = {
     headerType: toInt(src.header_type, 1) === 2 ? 'company' : 'personal',

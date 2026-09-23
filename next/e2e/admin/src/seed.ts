@@ -25,7 +25,7 @@ import { ctxFor } from './stack';
  *  2. **Nothing points at a real endpoint.** `payment.apiBaseUrl` is written to
  *     a black hole, so even a future code path that reached for the gateway
  *     despite the missing credentials would fail on a closed local port rather
- *     than talk to WeChat (`K-hardening.md`, Rules). Nothing here configures
+ *     than talk to WeChat. Nothing here configures
  *     SMS or Aliyun at all.
  */
 
@@ -41,7 +41,7 @@ function userActor(id: number): Actor {
   return { kind: 'user', id, permissions: [], isSuper: false };
 }
 
-// The dashboard's product tiles really load this image (F3's ranking), so it
+// The dashboard's product tiles (the ranking) really load this image, so it
 // must resolve offline with no console error: a 1×1 PNG inline, never a fake host.
 const E2E_IMAGE_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';

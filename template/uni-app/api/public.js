@@ -1,30 +1,27 @@
 // 微信授权 / 站点公共配置
 //
-// Streams E1/E4 (storefront auth), E2 (WeChat OA and mini-program) and F1/F4 (public
-// site config, attachments). Every call is live; docs/rewrite/status/h.md and h3.md
-// have the per-call tables.
+// Storefront auth, WeChat (公众号 and 小程序), the public site config and attachments.
 
 import request from '../utils/request.js';
 import wechat from '../libs/wechat.js';
-import { toLegacyCategoryVersion } from './mappers/catalog.js';
-import { toLegacySession, toLegacyWechatLogin } from './mappers/user.js';
-import { toLegacyJssdkConfig } from './mappers/wechat.js';
-import { toLegacyBasicConfig, toLegacyLogo, toLegacyShare } from './mappers/system.js';
-import { toLegacyNavigation } from './mappers/diy.js';
+import { toPageCategoryVersion } from './mappers/catalog.js';
+import { toPageSession, toPageWechatLogin } from './mappers/user.js';
+import { toPageJssdkConfig } from './mappers/wechat.js';
+import { toPageBasicConfig, toPageLogo, toPageShare } from './mappers/system.js';
+import { toPageNavigation } from './mappers/diy.js';
 import { fromSiteConfig, toDataUrls } from './api.js';
 
 /**
  * 商品分类版本号
  *
- * Two fields since CR-3-h. This used to fetch the whole tree — tens of kilobytes
- * on mobile data — and throw it away to learn one string, on every cold start,
- * from three call sites. The route also sends the version as an `ETag`;
- * `If-None-Match` on the tree route itself is CR-1-s.
+ * Two fields, not the whole tree: three call sites ask on every cold start, and
+ * the tree is tens of kilobytes on mobile data. The route also sends the version
+ * as an `ETag`.
  */
 export function getCategoryVersion() {
   return request.get('/api/v1/catalog/categories/version', {}, {
     noAuth: true,
-    map: toLegacyCategoryVersion,
+    map: toPageCategoryVersion,
   });
 }
 
@@ -34,24 +31,21 @@ export function getCategoryVersion() {
 export function getWechatConfig() {
   return request.get('/api/v1/wechat/jssdk-config', { url: wechat.signLink() }, {
     noAuth: true,
-    map: toLegacyJssdkConfig,
+    map: toPageJssdkConfig,
   });
 }
 
 // ---------------------------------------------------------------------------
 // 微信身份
 //
-// One generation of auth, not two. The legacy system carried `mp_auth` /
-// `wechat/auth_login` **and** `routine/auth_*` / `v2/wechat/auth_*` side by side, each
-// with its own token format and its own notion of "bound", and the uni-app picked
-// between them at runtime — which is why there were four exports below for two
-// operations. There are two routes now: 公众号 and 小程序, each answering
-// `{status, session, bindToken}`.
+// Two routes, 公众号 and 小程序, each answering `{status, session, bindToken}` with one
+// token format and one notion of "bound". The four exports below are the names the
+// pages call for those two operations.
 //
 // `status: 'phone-required'` means the openid resolved but nothing is bound to it yet;
 // `bindToken` stands in for the openid for a few minutes so finishing the sign-in does
-// not have to redeem the single-use WeChat `code` again. The legacy 「请重新授权」 loop
-// came from exactly that.
+// not have to redeem the single-use WeChat `code` again — redeeming it twice is what
+// sends a shopper round a 「请重新授权」 loop.
 // ---------------------------------------------------------------------------
 
 /**
@@ -61,7 +55,7 @@ export function wechatAuthLogin(data) {
   const src = data || {};
   return request.post('/api/v1/auth/sessions/wechat-oa', { code: String(src.code || '') }, {
     noAuth: true,
-    map: toLegacyWechatLogin,
+    map: toPageWechatLogin,
   });
 }
 
@@ -75,8 +69,8 @@ export function wechatAuthV2(code) {
 /**
  * 小程序 code 换登录态。
  *
- * 旧版分两步：`authType` 先探测「这个 openid 要不要绑手机号」，再由 `authLogin` 用探
- * 测拿到的 key 真正换 token。新合约一步给完 —— 已绑定就直接是 `signed-in`，没绑定就是
+ * 页面分两步调：`authType` 探测「这个 openid 要不要绑手机号」，`authLogin` 再换
+ * token。路由一步给完 —— 已绑定就直接是 `signed-in`，没绑定就是
  * `phone-required` 加一个 `bindToken`。`authType` 就是那一步。
  */
 export function authType(data) {
@@ -84,7 +78,7 @@ export function authType(data) {
   return request
     .post('/api/v1/auth/sessions/wechat-mini', { code: String(src.code || '') }, {
       noAuth: true,
-      map: toLegacyWechatLogin,
+      map: toPageWechatLogin,
     })
     .then((res) => {
       lastMiniLogin = res.data;
@@ -136,7 +130,7 @@ export function wechatBindingPhone(data) {
       phone: String(src.phone || ''),
       code: String(src.captcha || src.code || ''),
     },
-    { noAuth: true, map: toLegacyWechatLogin },
+    { noAuth: true, map: toPageWechatLogin },
   );
 }
 
@@ -144,10 +138,9 @@ export function wechatBindingPhone(data) {
  * 小程序授权手机号登录。
  *
  * `phoneCode` is what `getPhoneNumber`'s callback gives in the current API — a code
- * redeemed server-side. The old `encryptedData` + `iv` path is deliberately not
- * ported: decrypting it client-side needed `session_key` to leave the server, which
- * is the one thing WeChat's own docs say never to do. The two call sites now pass
- * `e.detail.code`.
+ * redeemed server-side. The `encryptedData` + `iv` path is deliberately unsupported:
+ * decrypting it client-side needs `session_key` to leave the server, which is the one
+ * thing WeChat's own docs say never to do. The two call sites pass `e.detail.code`.
  */
 export function routineBindingPhone(data) {
   const src = data || {};
@@ -157,7 +150,7 @@ export function routineBindingPhone(data) {
       bindToken: String(src.key || src.bindToken || ''),
       phoneCode: String(src.phoneCode || ''),
     },
-    { noAuth: true, map: toLegacyWechatLogin },
+    { noAuth: true, map: toPageWechatLogin },
   );
 }
 
@@ -174,7 +167,7 @@ export function phoneLogin(data) {
   return request.post(
     '/api/v1/auth/sessions/sms',
     { phone: String(src.phone || ''), code: String(src.captcha || src.code || '') },
-    { noAuth: true, map: toLegacySession },
+    { noAuth: true, map: toPageSession },
   );
 }
 
@@ -182,31 +175,31 @@ export function phoneLogin(data) {
 // route it stood for — hand me a token for a user I name — is the shape the whole
 // contract is built to refuse.
 
-// 站点公开配置 — F4 的 `GET /api/v1/site/config`，整个会话只读一次（`siteConfig()`，
-// 在 `api/api.js`），每个旧函数取自己那一片（CR-7-h2 §1）。
+// 站点公开配置 — `GET /api/v1/site/config`，整个会话只读一次（`siteConfig()`，
+// 在 `api/api.js`），每个函数取自己那一片。
 
 /** App.vue 缓存成 `BASIC_CONFIG`；收银台读 `pay_weixin_open`。 */
 export function basicConfig() {
-  return fromSiteConfig(toLegacyBasicConfig);
+  return fromSiteConfig(toPageBasicConfig);
 }
 
 /** 登录页（`type == 2`）和授权弹窗的 logo，`res.data.logo_url`。 */
 export function getLogo(type) {
-  return fromSiteConfig((dto) => toLegacyLogo(dto, type));
+  return fromSiteConfig((dto) => toPageLogo(dto, type));
 }
 
 /** 默认分享卡片 `{title, synopsis, img}`。 */
 export function getShare() {
-  return fromSiteConfig(toLegacyShare);
+  return fromSiteConfig(toPageShare);
 }
 
-// 「当前访客是否已关注公众号」 (`getSubscribe`) is gone: answering it means reading the
+// There is no 「当前访客是否已关注公众号」 (`getSubscribe`): answering it means reading the
 // OA's follower list for a person, and the storefront surface deliberately exposes
-// nothing about who is on the other end. `diyComponents/follow.vue` now always renders
-// the 未关注 state, which is what it already did whenever the call failed.
+// nothing about who is on the other end. `diyComponents/follow.vue` always renders
+// the 未关注 state.
 
 // ---------------------------------------------------------------------------
-// 底部导航（装修）— F4 的 `GET /api/v1/diy/navigation`（CR-3-h2 §2）
+// 底部导航（装修）— `GET /api/v1/diy/navigation`
 // ---------------------------------------------------------------------------
 
 /**
@@ -215,20 +208,19 @@ export function getShare() {
  * 就是这个组件本身，mapper 把它取出来。`null`（还没发布首页）= 用原生 tabBar。
  */
 export function getNavigation() {
-  return request.get('/api/v1/diy/navigation', {}, { noAuth: true, map: toLegacyNavigation });
+  return request.get('/api/v1/diy/navigation', {}, { noAuth: true, map: toPageNavigation });
 }
 
 // ---------------------------------------------------------------------------
-// 海报用的图片转 base64 — F4 的 `POST /api/v1/attachments/base64`（CR-7-h2 §2）
+// 海报用的图片转 base64 — `POST /api/v1/attachments/base64`
 // ---------------------------------------------------------------------------
 
 /**
- * 旧路由一次收 `{image, code}` 两张，回两张；新路由一次一张 `{url}`，只收本店附件
- * （F4 的 SSRF 规则），`auth: 'user'`。所以这里发两次，拼回 `{image, code}`。
+ * 页面一次要 `{image, code}` 两张；路由一次一张 `{url}`，只收本店附件
+ * （防 SSRF），`auth: 'user'`。所以这里发两次，拼回 `{image, code}`。
  *
  * 商品图是海报的主体，它失败就整体失败（调用方各自 `catch`）。二维码是可选的：
- * 没有就不发；转不了（比如它根本不是本店附件）就原样交回，海报照旧画——这正是
- * 以前没有这条路由时的样子。
+ * 没有就不发；转不了（比如它根本不是本店附件）就原样交回，海报照旧画。
  */
 export function imageBase64(image, code) {
   return toDataUrls(image, code);

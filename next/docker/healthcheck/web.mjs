@@ -5,8 +5,8 @@
 // nothing else. `apps/web/src/server/health.ts` explains why — a healthcheck
 // that opens a PostgreSQL connection restarts the container when the database
 // blips, turning a degradation into an outage. The deep check that gates a
-// release lives in `deploy/next/lib/readiness.sh`, which the orchestrator does
-// not act on.
+// release lives in `deploy/next/lib/readiness.sh`, and nothing restarts a
+// container on its answer.
 //
 // Zero dependencies on purpose: the runtime image holds only the Next
 // standalone trace, so anything this script imports has to come from node

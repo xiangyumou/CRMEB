@@ -3,10 +3,9 @@ import type { SwiperBgComponent } from '@shop/contracts/diy/schema/swiperBg.sche
 /**
  * Factory default for `swiperBg` — 轮播图.
  *
- * Copied from `template/admin/src/components/mobilePage/banner.vue`,
- * the object the legacy editor dropped into the page. Panel labels and all:
- * the renderer reads some of them, and a page saved without them is not the
- * page the storefront expects.
+ * The component exactly as a freshly dropped one is saved. Panel labels and
+ * all: the renderer reads some of them, and a page saved without them is not
+ * the page the storefront expects.
  *
  * `timestamp` is assigned by the store when the component is dropped.
  */

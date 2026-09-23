@@ -3,7 +3,7 @@ import { foldProductViews } from '@shop/core/catalog';
 import { defineJob } from '../define-job';
 
 /**
- * Folds new `product_events` views into `products.views` (CR-41-k2).
+ * Folds new `product_events` views into `products.views`.
  *
  * Every minute, staggered off the minute. The detail page no longer bumps the
  * counter on the product row, so this is what keeps the admin list's 浏览量

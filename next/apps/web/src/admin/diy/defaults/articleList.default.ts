@@ -3,10 +3,9 @@ import type { ArticleListComponent } from '@shop/contracts/diy/schema/articleLis
 /**
  * Factory default for `articleList` — 文章列表.
  *
- * Copied from `template/admin/src/components/mobilePage/home_new_list.vue`,
- * the object the legacy editor dropped into the page. Panel labels and all:
- * the renderer reads some of them, and a page saved without them is not the
- * page the storefront expects.
+ * The component exactly as a freshly dropped one is saved. Panel labels and
+ * all: the renderer reads some of them, and a page saved without them is not
+ * the page the storefront expects.
  *
  * `timestamp` is assigned by the store when the component is dropped.
  */
@@ -440,8 +439,8 @@ export const articleListDefault = {
     ],
   },
   /**
-   * CR-3-g2: `c_new_list.vue:201-228` creates both groups on open. The padding
-   * sides come from `topConfig` / `prConfig` / `bottomConfig` / `prConfig`
+   * Both spacing groups, because the panel draws a row only when the node
+   * carries its key. The padding sides come from `topConfig` / `prConfig` / `bottomConfig` / `prConfig`
    * (0 / 10 / 0 / 10 here) and the top margin from `mbConfig` (0). The scalars
    * stay and are kept in step, as `userInfor.default.ts` does.
    */

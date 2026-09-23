@@ -38,9 +38,9 @@ type FormKey = Extract<keyof WechatAutoReplyForm, string>;
  * 自动回复 — what the account says back, in one screen.
  *
  * The three triggers (关注 / 关键词 / 兜底) share a table because they are one
- * decision. The legacy admin split them across three controllers and three
- * half-identical forms, which is how a shop ends up with a subscribe greeting
- * nobody can find and two keyword replies fighting over 优惠券.
+ * decision. Three controllers and three half-identical forms is how a shop ends
+ * up with a subscribe greeting nobody can find and two keyword replies fighting
+ * over 优惠券.
  *
  * The singletons are enforced by the database, not by this screen: a second
  * 关注时回复 comes back as `WECHAT_OA_REPLY_DUPLICATE` and lands on the form

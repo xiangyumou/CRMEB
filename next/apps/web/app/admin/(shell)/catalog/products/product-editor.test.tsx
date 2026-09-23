@@ -198,8 +198,8 @@ describe('商品编辑器', () => {
   });
 
   /**
-   * 运费模板 is a select over F2's options route, not a typed id (A's decision
-   * 11, now closed). The 计费方式 is part of the label because two templates can
+   * 运费模板 is a select over the shipping options route, not a typed id. The
+   * 计费方式 is part of the label because two templates can
    * share a name and charge differently, and picking the wrong one is a
    * freight bug nobody notices until a customer complains.
    */

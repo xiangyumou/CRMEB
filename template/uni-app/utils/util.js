@@ -17,7 +17,7 @@ import {
 import store from "../store";
 import i18n from "./lang.js";
 import { pathToBase64 } from "@/plugin/image-tools/index.js";
-import { toLegacyUpload, uploadPurposeFor } from "../api/mappers/system.js";
+import { toPageUpload, uploadPurposeFor } from "../api/mappers/system.js";
 
 /**
  * `POST /api/v1/uploads?purpose=…`
@@ -54,7 +54,7 @@ function uploadTo(opt, filePath, successCallback, errorCallback) {
           body = {};
         }
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          const value = { data: toLegacyUpload(body), msg: "", status: 200 };
+          const value = { data: toPageUpload(body), msg: "", status: 200 };
           successCallback && successCallback(value);
           return resolve(value);
         }
@@ -104,9 +104,9 @@ export default {
       icon = opt.icon || "none",
       endtime = opt.endtime || 2000,
       success = opt.success;
-    // Pages toast a rejected request as `Tips({ title: err })`, written when
-    // rejections were strings; `utils/request.js` rejects with an object that
-    // carries `msg`, which showToast rendered as nothing (H4).
+    // Pages toast a rejected request as `Tips({ title: err })`, and
+    // `utils/request.js` rejects with an object that carries `msg`; showToast
+    // would render the object as nothing.
     if (title && typeof title === "object") title = title.msg || title.message || "";
     if (title)
       uni.showToast({

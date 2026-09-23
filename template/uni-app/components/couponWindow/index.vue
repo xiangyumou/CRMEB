@@ -1,7 +1,7 @@
 <template>
 	<view :style="colorStyle">
 		<view class='coupon-window' :class='window==true?"on":""'>
-			<image class="co-bag" :src="'/static/images/legacy/co-bag.png'" mode=""></image>
+			<image class="co-bag" :src="'/static/images/common/co-bag.png'" mode=""></image>
 			<view class='couponWinList'>
 				<view class='item acea-row row-between-wrapper' v-for="(item,index) in couponList" :key="index">
 					<view class='money font-color'>{{$t(`￥`)}}<text class='num'>{{item.coupon_price}}</text></view>

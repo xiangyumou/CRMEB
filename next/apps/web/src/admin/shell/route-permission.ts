@@ -2,7 +2,7 @@ import type { PermissionInput } from '../session/permissions';
 import type { MenuNode } from '../menu/types';
 
 /**
- * Which atoms a URL needs, read off the menu registry (CR-16-k).
+ * Which atoms a URL needs, read off the menu registry.
  *
  * `RequirePermission` existed and no page used it, so a role-restricted admin
  * who followed a link to a page outside their role got the page's chrome and a

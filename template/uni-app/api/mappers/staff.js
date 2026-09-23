@@ -1,24 +1,23 @@
-// 商家管理（店员端）DTOs → the legacy admin view models.
+// 商家管理（店员端）DTOs → the 商家管理 view models.
 //
 // Contract: next/packages/contracts/src/order/order.staff.contract.ts
 //
-// The staff pages use a *different* `_status` from the storefront ones, and both names
-// survive here because both are read by pages this stream does not rewrite:
+// The staff pages use a *different* `_status` from the storefront ones, and both are
+// mapped here:
 //
-//   * the 订单列表 row reads `_status` as an **integer** (the old
-//     `StoreOrderPresentationServices::tidyOrder` scale: 1 未支付, 2 待发货, 3 退款中,
+//   * the 订单列表 row reads `_status` as an **integer** (1 未支付, 2 待发货, 3 退款中,
 //     4 待收货, 5 待评价, 6 已完成, 7 已退款, 8 部分发货);
 //   * the 订单详情 reads `_status` as the storefront **object** (`{_type, _title}`),
 //     because that page is shared with the shopper's detail component.
 //
-// Split shipment (`_status` 9/10/11) cannot occur: B2 removed order splitting, so the
-// parent/child cascade those three values described has no successor.
+// Split shipment (`_status` 9/10/11) cannot occur: an order is never split into
+// parent and child orders.
 
 import {
   toId,
   toInt,
   money,
-  legacyDateTime,
+  pageDateTime,
   moneyNumber,
   text,
   flag,
@@ -26,16 +25,16 @@ import {
   mapList,
   unixSeconds,
   pagedList,
-  fromLegacyPage,
+  fromPagePaging,
 } from './_shared.js';
 import {
-  toLegacyOrderListItem,
-  toLegacyOrderDetail,
-  toLegacyOrderItem,
-  toLegacyStatus,
+  toPageOrderListItem,
+  toPageOrderDetail,
+  toPageOrderItem,
+  toPageStatus,
 } from './order.js';
-import { toLegacyRefund } from './refund.js';
-import { toLegacyShipment } from './fulfil.js';
+import { toPageRefund } from './refund.js';
+import { toPageShipment } from './fulfil.js';
 
 // ---------------------------------------------------------------------------
 // 店员身份 / 统计
@@ -55,7 +54,7 @@ import { toLegacyShipment } from './fulfil.js';
  * `abilities` on this identity; an identity that does not say reads as off,
  * which is each switch's own default.
  */
-export function toLegacyStaffIdentity(dto) {
+export function toPageStaffIdentity(dto) {
   if (!dto) return { is_staff: 0, uid: 0, nickname: '', refund_review: 0, adjust_price: 0 };
   const abilities = dto.abilities || {};
   return {
@@ -68,7 +67,7 @@ export function toLegacyStaffIdentity(dto) {
 }
 
 /** `GET /api/v1/staff/statistics` → the 首页 counters (`census`). */
-export function toLegacyStaffStatistics(dto) {
+export function toPageStaffStatistics(dto) {
   if (!dto) {
     return {
       todayPrice: '0.00',
@@ -103,13 +102,12 @@ export function toLegacyStaffStatistics(dto) {
 }
 
 // ---------------------------------------------------------------------------
-// 统计明细 (CR-4-h §1)
+// 统计明细
 // ---------------------------------------------------------------------------
 //
-// `GET /api/v1/staff/statistics/series` answers one row per Asia/Shanghai day, and the
-// two legacy endpoints that fed 统计明细 (`admin/order/statistics` for the table,
-// `admin/order/time` for the chart) are both derived from it here. They used to count
-// differently and could disagree about the same day; now they cannot.
+// `GET /api/v1/staff/statistics/series` answers one row per Asia/Shanghai day, and both
+// halves of 统计明细 (the table and the chart) are derived from it here, so they
+// cannot disagree about the same day.
 //
 // The pages still speak in **epoch seconds**, so the conversion lives here. Every
 // function below is pure: the phone's own clock and timezone never enter, because a
@@ -137,7 +135,7 @@ export function shiftShopDay(day, days) {
  * An absent end is left out rather than guessed, so the *server's* idea of 今天 fills
  * it in — the only clock that agrees with the numbers in the header.
  */
-export function fromLegacyStatisticsRange(where) {
+export function fromPageStatisticsRange(where) {
   const src = where || {};
   const query = { granularity: 'day' };
   const from = shopDayFromUnix(src.start);
@@ -150,8 +148,7 @@ export function fromLegacyStatisticsRange(where) {
 /**
  * The window immediately before the one the series came back with, same length.
  *
- * This is legacy's 同比上个时间区间 (`StoreOrderController::time` computed `$front =
- * $start - ($stop - $start)`), and it is derived from the **response** rather than from
+ * This is the page's 同比上个时间区间 (`from - (to - from)`), and it is derived from the **response** rather than from
  * the request because the request may have named neither end.
  */
 export function precedingStatisticsRange(dto) {
@@ -167,11 +164,11 @@ export function precedingStatisticsRange(dto) {
  * The 详细数据 table: `[{time, count, price}]`, newest day first.
  *
  * Two deliberate differences from the raw series. Days with no orders are dropped —
- * legacy's `GROUP BY` never produced them and a table of zeroes is noise — and the page
+ * a table of zeroes is noise — and the page
  * number is applied here rather than by the server, because the whole window is at most
  * 92 rows and paging it server-side would mean a request per scroll.
  */
-export function toLegacyStatisticsRows(dto, where) {
+export function toPageStatisticsRows(dto, where) {
   const src = where || {};
   const page = toInt(src.page, 1) || 1;
   const limit = toInt(src.limit, 15) || 15;
@@ -179,7 +176,7 @@ export function toLegacyStatisticsRows(dto, where) {
     .filter((item) => toInt(item.orderCount, 0) > 0)
     .reverse();
   return busy.slice((page - 1) * limit, page * limit).map((item) => ({
-    // Legacy formatted the label as `%m-%d`; the full date is one field over.
+    // The label is `MM-DD`; the full date is one field over.
     time: String(item.date || '').slice(5),
     date: text(item.date),
     count: toInt(item.orderCount, 0),
@@ -191,12 +188,11 @@ export function toLegacyStatisticsRows(dto, where) {
  * The chart above the table: `{chart, time, growth_rate, increase_time,
  * increase_time_status}`.
  *
- * `type` is legacy's 1 = 营业额, 2 = 订单量. The growth figures compare the window with
- * the one immediately before it, exactly as `StoreOrderController::time` did, including
- * its rule for a previous window of zero — a rise from nothing has no percentage, so the
+ * `type` is the page's 1 = 营业额, 2 = 订单量. The growth figures compare the window with
+ * the one immediately before it, with one rule for a previous window of zero — a rise from nothing has no percentage, so the
  * absolute increase is shown as one.
  */
-export function toLegacyStatisticsChart(dto, previous, type) {
+export function toPageStatisticsChart(dto, previous, type) {
   const isPrice = toInt(type, 1) !== 2;
   const total = (source) =>
     list(source && source.items).reduce(
@@ -232,7 +228,7 @@ export function toLegacyStatisticsChart(dto, previous, type) {
 // ---------------------------------------------------------------------------
 
 /** The integer `_status` the 订单列表 branches on. */
-export function legacyStaffStatus(dto) {
+export function pageStaffStatus(dto) {
   if (!dto) return 1;
   if (dto.status === 'pending_payment' || dto.status === 'cancelled') return 1;
   if (dto.refundStatus === 'requested') return 3;
@@ -255,9 +251,9 @@ const STAFF_STATUS_NAME = {
   8: '部分发货',
 };
 
-/** `status_name` is an object in the old payload: `{status_name, pics}`. */
-export function toLegacyStaffStatusName(dto) {
-  const code = legacyStaffStatus(dto);
+/** `status_name` is an object on the page: `{status_name, pics}`. */
+export function toPageStaffStatusName(dto) {
+  const code = pageStaffStatus(dto);
   const cancelled = dto && dto.status === 'cancelled';
   return {
     status_name: cancelled ? '已取消' : STAFF_STATUS_NAME[code] || '未知状态',
@@ -265,7 +261,7 @@ export function toLegacyStaffStatusName(dto) {
   };
 }
 
-/** Flags for the staff UI branches the rewrite dropped. */
+/** Flags for the staff UI branches the shop does not run. */
 const RETIRED_STAFF_FLAGS = {
   // 门店自提 is retired, so every order is 快递配送 (`shipping_type` 1).
   shipping_type: 1,
@@ -295,19 +291,19 @@ function payTypeName(dto) {
 }
 
 /** `staffOrderListItem` → one 商家订单列表 row. */
-export function toLegacyStaffOrderListItem(dto) {
+export function toPageStaffOrderListItem(dto) {
   if (!dto) return {};
-  const base = toLegacyOrderListItem(dto);
+  const base = toPageOrderListItem(dto);
   const items = list(dto.items);
   const user = dto.user || {};
   return Object.assign({}, base, RETIRED_STAFF_FLAGS, {
     // The staff console routes on `order_id` against `/api/v1/staff/orders/:id`,
-    // which is **not** widened by CR-1-h — a staff member sees every shop order,
+    // which takes only the id — a staff member sees every shop order,
     // so the order-number lookup's "scoped to the owner" rule has nothing to
     // scope to. The shopper's mapper puts the number here; staff get the id back.
     order_id: base.id === 0 ? '' : String(base.id),
-    _status: legacyStaffStatus(dto),
-    status_name: toLegacyStaffStatusName(dto),
+    _status: pageStaffStatus(dto),
+    status_name: toPageStaffStatusName(dto),
     // 商品预览：the row renders `_info[].cart_info`, and `cart_id.length > 1` decides
     // whether it scrolls horizontally.
     _info: base.cartInfo.map((cart) => ({ cart_info: cart })),
@@ -331,8 +327,8 @@ export function toLegacyStaffOrderListItem(dto) {
 }
 
 /** The 商家订单列表 pages through a bare array (`res.data.length < limit` stops them). */
-export function toLegacyStaffOrderList(dto) {
-  return mapList(dto && dto.items, toLegacyStaffOrderListItem);
+export function toPageStaffOrderList(dto) {
+  return mapList(dto && dto.items, toPageStaffOrderListItem);
 }
 
 /**
@@ -341,18 +337,18 @@ export function toLegacyStaffOrderList(dto) {
  * `_status` is the **object** form here, because the detail page and its components are
  * shared with the shopper's 订单详情.
  */
-export function toLegacyStaffOrderDetail(dto) {
+export function toPageStaffOrderDetail(dto) {
   if (!dto) return {};
-  const row = toLegacyStaffOrderListItem(dto);
-  const detail = toLegacyOrderDetail(dto);
-  const parcels = mapList(dto.shipments, toLegacyShipment);
+  const row = toPageStaffOrderListItem(dto);
+  const detail = toPageOrderDetail(dto);
+  const parcels = mapList(dto.shipments, toPageShipment);
   const latest = parcels.length ? parcels[parcels.length - 1] : null;
   return Object.assign({}, row, detail, {
     // `detail` is the shopper's mapper, which puts the order *number* in
     // `order_id`; the staff routes take the id. See the list mapper above.
     order_id: row.order_id,
-    _status: toLegacyStatus(dto),
-    _staff_status: legacyStaffStatus(dto),
+    _status: toPageStatus(dto),
+    _staff_status: pageStaffStatus(dto),
     status_name: row.status_name,
     _info: row._info,
     cart_id: row.cart_id,
@@ -369,12 +365,12 @@ export function toLegacyStaffOrderDetail(dto) {
     refund_ids: mapList(dto.refundIds, (id) => text(id)),
     // 拆单 is gone; the pages guard on `split.length`, so an empty list disables it.
     split: [],
-    cartInfo: mapList(dto.items, toLegacyOrderItem),
+    cartInfo: mapList(dto.items, toPageOrderItem),
   });
 }
 
 /** `GET /api/v1/staff/orders/:id/status-logs` → the 订单记录 timeline. */
-export function toLegacyOrderTimeline(dto) {
+export function toPageOrderTimeline(dto) {
   return mapList(dto && dto.items, (entry) => ({
     id: toId(entry.id),
     change_type: text(entry.changeType),
@@ -387,7 +383,7 @@ export function toLegacyOrderTimeline(dto) {
   }));
 }
 
-/** Legacy 订单列表 filters → `GET /api/v1/staff/orders` query. */
+/** The page's 订单列表 filters → `GET /api/v1/staff/orders` query. */
 const STAFF_TAB = {
   0: { status: 'pending_payment' },
   1: { status: 'paid', fulfillmentStatus: 'unfulfilled' },
@@ -396,7 +392,7 @@ const STAFF_TAB = {
   4: { status: 'completed' },
 };
 
-export function fromLegacyStaffOrderQuery(where) {
+export function fromPageStaffOrderQuery(where) {
   const src = where || {};
   const query = {};
   if (src.page !== undefined) query.page = toInt(src.page, 1);
@@ -437,7 +433,7 @@ function instantOf(text_) {
 }
 
 /** `GET /api/v1/staff/express-companies` → the 发货 picker rows. */
-export function toLegacyExpressCompanies(dto) {
+export function toPageExpressCompanies(dto) {
   return mapList(dto && dto.items, (row) => ({
     id: text(row.id),
     code: text(row.code),
@@ -451,11 +447,11 @@ const DELIVERY_MODE = { 1: 'express', 2: 'merchant_delivery', 3: 'virtual' };
 /**
  * The 发货 form → `POST /api/v1/staff/orders/:id/shipments`.
  *
- * The form posts the legacy `delivery_type` integer (1 快递 / 2 送货 / 3 虚拟) plus the
+ * The form posts a `delivery_type` integer (1 快递 / 2 送货 / 3 虚拟) plus the
  * fields that mode needs. `delivery_company_id` is added at the call site, because the
- * contract keys the company by id and the old payload only carried its code.
+ * contract keys the company by id and the form only carries its code.
  */
-export function fromLegacyShipInput(data) {
+export function fromPageShipInput(data) {
   const src = data || {};
   const mode = DELIVERY_MODE[String(src.type || src.delivery_type)] || 'express';
   const body = { deliveryMode: mode, lines: [] };
@@ -475,11 +471,11 @@ export function fromLegacyShipInput(data) {
 /**
  * 一键改价 → `POST /api/v1/staff/orders/:id/price`.
  *
- * Legacy posted the **new total**, which is the defect B2 removed: the server now takes
- * a discount and re-splits the line shares itself. The call site passes the current
+ * The page types the **new total**, but the server takes a discount (a new total
+ * would race any other change to the order) and re-splits the line shares itself. The call site passes the current
  * `pay_price` alongside the typed total so the difference can be computed here.
  */
-export function fromLegacyPriceInput(data) {
+export function fromPagePriceInput(data) {
   const src = data || {};
   const current = Number(src.pay_price);
   const wanted = Number(src.price);
@@ -492,18 +488,18 @@ export function fromLegacyPriceInput(data) {
 }
 
 /** 订单备注 → `POST /api/v1/staff/orders/:id/remark`. */
-export function fromLegacyRemarkInput(data) {
+export function fromPageRemarkInput(data) {
   const src = data || {};
   return { adminRemark: String(src.remark === undefined ? '' : src.remark) };
 }
 
 /**
- * The 售后备注 body (CR-4-h §2).
+ * The 售后备注 body.
  *
  * `remark`, not `adminRemark`: the staff route appends a log entry rather than writing
  * the console's column, and the two are deliberately not the same field.
  */
-export function fromLegacyRefundRemarkInput(data) {
+export function fromPageRefundRemarkInput(data) {
   const src = data || {};
   return { remark: String(src.remark === undefined ? '' : src.remark) };
 }
@@ -513,7 +509,7 @@ export function fromLegacyRefundRemarkInput(data) {
 // ---------------------------------------------------------------------------
 
 /** `adminRefundDetail` → the 售后详情 the staff pages read. */
-export function toLegacyStaffRefund(dto) {
+export function toPageStaffRefund(dto) {
   if (!dto) return {};
   const cartInfo = mapList(dto.items, (item) => ({
     id: toId(item.orderItemId),
@@ -529,7 +525,7 @@ export function toLegacyStaffRefund(dto) {
         : {}),
     },
   }));
-  return Object.assign({}, toLegacyRefund(dto), {
+  return Object.assign({}, toPageRefund(dto), {
     uid: dto.userId === undefined ? 0 : toId(dto.userId),
     nickname: text(dto.userNickname),
     store_order_sn: text(dto.orderNo),
@@ -552,14 +548,14 @@ export function toLegacyStaffRefund(dto) {
 }
 
 /** The 售后列表 pages through a bare array, like the order list. */
-export function toLegacyStaffRefundList(dto) {
-  return mapList(dto && dto.items, toLegacyStaffRefund);
+export function toPageStaffRefundList(dto) {
+  return mapList(dto && dto.items, toPageStaffRefund);
 }
 
-/** Legacy 售后列表 filters → `GET /api/v1/staff/refunds` query. */
+/** The page's 售后列表 filters → `GET /api/v1/staff/refunds` query. */
 const REFUND_TAB = { 0: 'applied', 1: 'approved', 2: 'succeeded', 3: 'rejected' };
 
-export function fromLegacyStaffRefundQuery(where) {
+export function fromPageStaffRefundQuery(where) {
   const src = where || {};
   const query = {};
   if (src.page !== undefined) query.page = toInt(src.page, 1);
@@ -574,10 +570,10 @@ export function fromLegacyStaffRefundQuery(where) {
 /**
  * 同意 / 拒绝退款 → `POST /api/v1/staff/refunds/:id/review`.
  *
- * Legacy's 直接退款 (an operator typing any amount) has no successor: C owns the money
- * and refunds exactly what was applied for. See docs/rewrite/cr/CR-4-h.md.
+ * There is no 直接退款 (an operator typing any amount): the payment domain refunds
+ * exactly what was applied for.
  */
-export function fromLegacyRefundReviewInput(data) {
+export function fromPageRefundReviewInput(data) {
   const src = data || {};
   const reject = toInt(src.type, 1) === 2;
   const body = { decision: reject ? 'reject' : 'approve' };
@@ -587,22 +583,21 @@ export function fromLegacyRefundReviewInput(data) {
 }
 
 // ---------------------------------------------------------------------------
-// 商品管理 (A2 — next/packages/contracts/src/catalog/catalog.staff.contract.ts)
+// 商品管理 (next/packages/contracts/src/catalog/catalog.staff.contract.ts)
 // ---------------------------------------------------------------------------
 
 /**
- * 商品管理 的四个 tab。旧代码用 `type` 1/2/4/5（3 从来没用过），新契约用名字。
+ * 商品管理 的四个 tab。页面用 `type` 1/2/4/5（没有 3），契约用名字。
  *
- * `2` (仓库中) 在新模型里同时覆盖 `off_shelf` 和 `draft`：旧表只有一个 `is_show`，
- * 重写把「从没上架过」和「被下架了」拆成两个状态，草稿如果只在 `全部` 里出现，手机
- * 就能看见一件永远点不动的商品（a2.md 决定 2）。
+ * `2` (仓库中) 同时覆盖 `off_shelf` 和 `draft`：「从没上架过」和「被下架了」是两个
+ * 状态，草稿如果只在 `全部` 里出现，手机就能看见一件永远点不动的商品。
  */
 const STAFF_PRODUCT_STATE = { 1: 'on-sale', 2: 'in-stock', 4: 'sold-out', 5: 'low-stock' };
 
 /** 商品列表查询：`{page, limit, store_name, type}` → `{page, pageSize, keyword, state}`。 */
-export function fromLegacyStaffProductQuery(where) {
+export function fromPageStaffProductQuery(where) {
   const src = where || {};
-  const out = fromLegacyPage(src);
+  const out = fromPagePaging(src);
   const keyword = text(src.store_name !== undefined ? src.store_name : src.keyword).trim();
   if (keyword) out.keyword = keyword;
   const state = STAFF_PRODUCT_STATE[toInt(src.type, 0)];
@@ -611,8 +606,8 @@ export function fromLegacyStaffProductQuery(where) {
 }
 
 /**
- * `kind` → 旧的 `virtual_type`。页面只问 `virtual_type != 0`（「仅普通商品可在此处修改
- * 价格/库存」），所以这里只要「实物是 0，其余都不是 0」这一点成立；名字仍按旧表的
+ * `kind` → 页面的 `virtual_type`。页面只问 `virtual_type != 0`（「仅普通商品可在此处修改
+ * 价格/库存」），所以这里只要「实物是 0，其余都不是 0」这一点成立；取值仍按
  * 1 卡密 / 2 优惠券 / 3 虚拟 对上，免得别处再读到时对不上号。
  */
 const STAFF_PRODUCT_KIND = {
@@ -627,12 +622,12 @@ const STAFF_PRODUCT_KIND = {
  *
  * `attr_value` 是这里唯一一个凭空造出来的字段：单规格商品的「修改价格/库存」抽屉
  * (`pages/admin/goods/components/editPrice`) 整块挂在 `v-if="goodsInfo.attr_value"`
- * 上，而列表路由按设计不返回 SKU（a2.md：列表行只带列表页渲染的东西）。所以列表行带
+ * 上，而列表路由按设计不返回 SKU（列表行只带列表页渲染的东西）。所以列表行带
  * 一个用行上已有的售价和库存填好的草稿，成本价和划线价留空——空字段不会进 PATCH
  * 体，服务端「缺省即不动」，所以留空就是「不改」。真正的 SKU id 由
  * `api/admin.js` 的 `postUpdateAttrs` 在保存时现取。
  */
-export function toLegacyStaffProduct(dto) {
+export function toPageStaffProduct(dto) {
   if (!dto) return {};
   const price = money(dto.price);
   const stock = toInt(dto.stock, 0);
@@ -655,12 +650,12 @@ export function toLegacyStaffProduct(dto) {
 }
 
 /** 商品列表：页面读 `res.data.list`，并用 `list.length < limit` 判断没有更多了。 */
-export function toLegacyStaffProductList(dto) {
-  return pagedList(dto, toLegacyStaffProduct);
+export function toPageStaffProductList(dto) {
+  return pagedList(dto, toPageStaffProduct);
 }
 
 /** 批量打标签 `{label_list, ids}` → `{productIds, labelIds}`。空 `labelIds` 是「清空」。 */
-export function fromLegacyLabelAssignment(data) {
+export function fromPageLabelAssignment(data) {
   const src = data || {};
   return {
     productIds: idArray(src.ids),
@@ -668,8 +663,8 @@ export function fromLegacyLabelAssignment(data) {
   };
 }
 
-/** 批量改分类 `{cate_id, ids}` → `{productIds, categoryIds}`（复数，a2.md 决定 3）。 */
-export function fromLegacyCategoryAssignment(data) {
+/** 批量改分类 `{cate_id, ids}` → `{productIds, categoryIds}`（复数）。 */
+export function fromPageCategoryAssignment(data) {
   const src = data || {};
   return {
     productIds: idArray(src.ids),
@@ -685,7 +680,7 @@ function idArray(value) {
 }
 
 /** 商品标签抽屉读 `[{cate_name, list:[{id,name}]}]`，未分类的那组 `categoryName` 是「未分类」。 */
-export function toLegacyProductLabels(dto) {
+export function toPageProductLabels(dto) {
   return mapList(dto && dto.items, (group) => ({
     cate_id: group && group.categoryId !== null ? toId(group && group.categoryId) : 0,
     cate_name: text(group && group.categoryName),
@@ -697,26 +692,26 @@ export function toLegacyProductLabels(dto) {
 }
 
 /** 分类抽屉读 `title` 和 `children`，只渲染两级（三级在契约里有，这里原样带下去）。 */
-function toLegacyCategoryNode(node) {
+function toPageCategoryNode(node) {
   if (!node) return { id: 0, title: '', children: [] };
   return {
     id: toId(node.id),
     title: text(node.name),
-    children: mapList(node.children, toLegacyCategoryNode),
+    children: mapList(node.children, toPageCategoryNode),
   };
 }
 
-export function toLegacyProductCategories(dto) {
-  return mapList(dto && dto.items, toLegacyCategoryNode);
+export function toPageProductCategories(dto) {
+  return mapList(dto && dto.items, toPageCategoryNode);
 }
 
 /**
  * `staffSku` → 一行 商品规格。
  *
  * `id` 和 `unique` 是同一个 SKU id 的两种读法：`specs.vue` 的 checkbox 按 `id` 比，
- * 保存时送的却是 `unique`（旧表 `eb_store_product_attr_value.unique` 是一串哈希）。
+ * 保存时送的却是 `unique`。
  */
-export function toLegacyStaffSku(dto) {
+export function toPageStaffSku(dto) {
   if (!dto) return {};
   return {
     id: toId(dto.id),
@@ -736,8 +731,8 @@ export function toLegacyStaffSku(dto) {
   };
 }
 
-export function toLegacyStaffSkus(dto) {
-  return mapList(dto && dto.items, toLegacyStaffSku);
+export function toPageStaffSkus(dto) {
+  return mapList(dto && dto.items, toPageStaffSku);
 }
 
 /** 只有填了的字段才进 PATCH 体：空串 / undefined 一律不送，服务端就不动那一列。 */
@@ -750,11 +745,10 @@ function patchField(body, key, value, convert) {
  * 修改价格/库存 `{attr_value: [{unique, price, cost, ot_price, stock}]}` →
  * `{items: [{id, price?, cost?, originalPrice?, stock?}]}`。
  *
- * 这是一个 **patch**：旧的 `postUpdateAttrs` 整行重写，所以在两分钟前打开的页面上改
- * 一次价格，会把那个页面当时显示的库存写回去，把这期间卖掉的订单悄悄「取消销售」。
- * 缺省即不动（a2.md 决定 5）。`id` 由调用方（`api/admin.js`）补齐。
+ * 这是一个 **patch**：如果整行重写，在两分钟前打开的页面上改一次价格，会把那个页面
+ * 当时显示的库存写回去，把这期间卖掉的订单悄悄「取消销售」。缺省即不动。`id` 由调用方（`api/admin.js`）补齐。
  */
-export function fromLegacySkuPatch(row, fallbackId) {
+export function fromPageSkuPatch(row, fallbackId) {
   const src = row || {};
   const body = { id: text(src.unique !== undefined && src.unique !== '' ? src.unique : fallbackId) };
   patchField(body, 'price', src.price, money);
@@ -768,7 +762,7 @@ export function fromLegacySkuPatch(row, fallbackId) {
 }
 
 /** 运费模板选项：picker 用 `range-key="name"`，选中后读 `.id`。 */
-export function toLegacyTemplateOptions(dto) {
+export function toPageTemplateOptions(dto) {
   return mapList(dto && dto.items, (item) => ({
     id: toId(item && item.id),
     name: text(item && item.name),
@@ -777,11 +771,11 @@ export function toLegacyTemplateOptions(dto) {
 }
 
 /**
- * 旧的 `freight`：1 包邮 / 2 固定邮费 / 3 运费模板。表单只给了 2 和 3 两个单选。
+ * 页面的 `freight`：1 包邮 / 2 固定邮费 / 3 运费模板。表单只给了 2 和 3 两个单选。
  * 固定邮费填 0 就是包邮，所以 0 收敛到 `free`——契约里 `fixed` 必须带
  * `fixedFreight`，而 `free` 带了反而会 422。
  */
-export function fromLegacyStaffProductForm(data) {
+export function fromPageStaffProductForm(data) {
   const src = data || {};
   const attr = src.attr || {};
   const sliders = list(src.slider_image).map(text).filter(Boolean).slice(0, 9);
@@ -819,19 +813,19 @@ export function fromLegacyStaffProductForm(data) {
 }
 
 // ---------------------------------------------------------------------------
-// 用户管理 (E4 — next/packages/contracts/src/user/user.staff.contract.ts)
+// 用户管理 (next/packages/contracts/src/user/user.staff.contract.ts)
 // ---------------------------------------------------------------------------
 
 /** 用户列表查询：`{page, limit, nickname, group_id, label_id}`。 */
-export function fromLegacyStaffUserQuery(where) {
+export function fromPageStaffUserQuery(where) {
   const src = where || {};
-  const out = fromLegacyPage(src);
+  const out = fromPagePaging(src);
   const keyword = text(src.nickname !== undefined ? src.nickname : src.keyword).trim();
   if (keyword) out.keyword = keyword;
   const groupId = text(src.group_id).trim();
   if (groupId && groupId !== '0') out.groupId = groupId;
-  // 筛选抽屉多选标签后把 id 用逗号拼起来，路由只收一个 `labelId`（E4）。取第一个，
-  // 多选的其余项在服务端落地前只能靠用户再筛一次；status/h3.md 记了这一条。
+  // 筛选抽屉多选标签后把 id 用逗号拼起来，路由只收一个 `labelId`。取第一个，
+  // 多选的其余项只能靠用户再筛一次。
   const labelId = text(src.label_id).trim().split(',')[0];
   if (labelId && labelId !== '0') out.labelId = labelId;
   return out;
@@ -840,14 +834,14 @@ export function fromLegacyStaffUserQuery(where) {
 /**
  * `staffUserListItem` → 用户列表行 / 用户详情。
  *
- * 契约有意做薄（E4：「一个店员该看到一个客户的多少」）：没有真实姓名、生日、身份证、
+ * 契约有意做薄（「一个店员该看到一个客户的多少」）：没有真实姓名、生日、身份证、
  * 地址，手机号永远是打码的 `138****8000`。页面上那几个字段都挂着 `v-if`，所以缺了
  * 就是不渲染，正是想要的效果。`coupon_num` 是详情页唯一一个没有 `v-if` 的：契约里
- * 没有这个数，所以按 E4 对「未知」的写法渲染成 `--`。CR-1-h3 给了「查看优惠券」一条
- * 读路由（`getUserCoupon({uid})`，列表本身），但没有把张数加进 E4 的用户详情——那要
- * 用户域去数优惠券域的表，不是一次批量查询（见 docs/rewrite/status/w5t.md §1）。
+ * 没有这个数，所以按「未知」的写法渲染成 `--`。「查看优惠券」有一条读路由
+ * （`getUserCoupon({uid})`，列表本身），但用户详情不带张数——那要用户域去数优惠券域
+ * 的表，不是一次批量查询。
  */
-export function toLegacyStaffUser(dto) {
+export function toPageStaffUser(dto) {
   if (!dto) return {};
   const groups = list(dto.groups);
   return {
@@ -866,17 +860,17 @@ export function toLegacyStaffUser(dto) {
     })),
     order_total_count: dto.orderCount === null || dto.orderCount === undefined ? '--' : toInt(dto.orderCount, 0),
     order_total_price: dto.spendTotal === null || dto.spendTotal === undefined ? '--' : money(dto.spendTotal),
-    _add_time: legacyDateTime(dto.createdAt),
+    _add_time: pageDateTime(dto.createdAt),
     coupon_num: '--',
   };
 }
 
-export function toLegacyStaffUserList(dto) {
-  return pagedList(dto, toLegacyStaffUser);
+export function toPageStaffUserList(dto) {
+  return pagedList(dto, toPageStaffUser);
 }
 
 /** 分组选择器 `range-key="group_name"`，选中后读 `.id`。 */
-export function toLegacyUserGroups(dto) {
+export function toPageUserGroups(dto) {
   return mapList(dto && dto.items, (item) => ({
     id: toId(item && item.id),
     group_name: text(item && item.name),
@@ -886,11 +880,11 @@ export function toLegacyUserGroups(dto) {
 /**
  * 标签抽屉 / 筛选抽屉读 `[{name, label:[{id, label_name, assigned}]}]`。
  *
- * 契约把「全部标签」和「这个客户有哪些」放在一个响应里（`assigned`），旧组件自己用
+ * 契约把「全部标签」和「这个客户有哪些」放在一个响应里（`assigned`），组件自己用
  * `inArray(label.id, this.dataLabel)` 记账。两边都留着：批量打标签时抽屉是从空集开始
  * 的，直接照搬某一个客户的 `assigned` 会把别人的标签预先勾上。
  */
-export function toLegacyUserLabels(dto, opts) {
+export function toPageUserLabels(dto, opts) {
   // `catalogue`：只要「全部标签」时（筛选抽屉、批量抽屉借任意一个客户读目录），
   // `assigned` 一律 false，借来的那个客户的标签不会出现在界面上。
   const catalogue = !!(opts && opts.catalogue);
@@ -908,17 +902,17 @@ export function toLegacyUserLabels(dto, opts) {
 /**
  * 设置分组的 body。
  *
- * `null` 必须原样送过去：路由用 `{groupId: null}` 表示「清空分组（未分组）」，而旧
- * 包装器写的是 `String(groupId)`，把 null 变成字符串 `"null"`，必然 422（E4 第 3 条）。
+ * `null` 必须原样送过去：路由用 `{groupId: null}` 表示「清空分组（未分组）」；
+ * `String(groupId)` 会把 null 变成字符串 `"null"`，必然 422。
  */
-export function fromLegacyUserGroupInput(groupId) {
+export function fromPageUserGroupInput(groupId) {
   if (groupId === null || groupId === undefined || groupId === '' || Number(groupId) === 0) {
     return { groupId: null };
   }
   return { groupId: text(groupId) };
 }
 
-/** 设置标签的 body：`{labelIds: string[]}`，调用处本来就传数组（E4 第 1 条）。 */
-export function fromLegacyUserLabelInput(labelId) {
+/** 设置标签的 body：`{labelIds: string[]}`，调用处本来就传数组。 */
+export function fromPageUserLabelInput(labelId) {
   return { labelIds: idArray(labelId) };
 }

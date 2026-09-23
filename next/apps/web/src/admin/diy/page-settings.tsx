@@ -9,11 +9,10 @@ import { useDiyEditor } from './editor-context';
 /**
  * 页面设置 — the right-hand pane when the page itself is selected.
  *
- * The legacy editor called this 页面设置 too (`diyIndex.vue:185`) and it held the
- * same four things: the page's internal name, the title bar text, a background
- * colour and a background image with a repeat mode. `bg_tab_val` was an integer
- * there; the contract names it (`full` / `repeat` / `fixed`) because nobody
- * should have to remember that 2 meant 满屏.
+ * Four things: the page's internal name, the title bar text, a background
+ * colour and a background image with a repeat mode. The contract names the
+ * repeat mode (`full` / `repeat` / `fixed`) rather than storing an integer,
+ * because nobody should have to remember that 2 means 满屏.
  */
 
 const MODE_OPTIONS: { value: DiyBackgroundMode; label: string }[] = [

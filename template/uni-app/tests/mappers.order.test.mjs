@@ -1,25 +1,25 @@
 import { example, exampleBody, assertRenderable } from './helpers.mjs';
 import {
-  legacyStatusType,
-  toLegacyStatus,
-  toLegacyOrderItem,
-  toLegacyReceiver,
-  toLegacyOrderListItem,
-  toLegacyOrderList,
-  toLegacyOrderPage,
-  toLegacyOrderDetail,
-  toLegacyOrderCounts,
-  fromLegacyOrderListQuery,
+  pageStatusType,
+  toPageStatus,
+  toPageOrderItem,
+  toPageReceiver,
+  toPageOrderListItem,
+  toPageOrderList,
+  toPageOrderPage,
+  toPageOrderDetail,
+  toPageOrderCounts,
+  fromPageOrderListQuery,
   buyNowTicket,
   parseBuyNowTicket,
-  fromLegacyCheckoutInput,
-  toLegacyOrderConfirm,
-  toLegacyCheckoutLine,
-  toLegacyOrderComputed,
-  fromLegacyOrderCreateInput,
-  toLegacyOrderCreateResult,
-  toLegacyCashierOrder,
-  toLegacyOrderProduct,
+  fromPageCheckoutInput,
+  toPageOrderConfirm,
+  toPageCheckoutLine,
+  toPageOrderComputed,
+  fromPageOrderCreateInput,
+  toPageOrderCreateResult,
+  toPageCashierOrder,
+  toPageOrderProduct,
   activityDiscountCents,
   orderActivityDiscountCents,
 } from '../api/mappers/order.js';
@@ -30,46 +30,46 @@ const PREVIEW = example('POST /api/v1/checkout/preview');
 
 const withStatus = (over) => ({ ...ORDER, ...over });
 
-describe('legacyStatusType — the single value every order page switches on', () => {
+describe('pageStatusType — the single value every order page switches on', () => {
   it('maps the whole lifecycle', () => {
-    expect(legacyStatusType(withStatus({ status: 'pending_payment' }))).toBe(0);
-    expect(legacyStatusType(withStatus({ status: 'paid', fulfillmentStatus: 'unfulfilled' }))).toBe(1);
-    expect(legacyStatusType(withStatus({ status: 'paid', fulfillmentStatus: 'fulfilled' }))).toBe(2);
-    expect(legacyStatusType(withStatus({ status: 'shipped' }))).toBe(2);
-    expect(legacyStatusType(withStatus({ status: 'received' }))).toBe(3);
-    expect(legacyStatusType(withStatus({ status: 'completed' }))).toBe(4);
+    expect(pageStatusType(withStatus({ status: 'pending_payment' }))).toBe(0);
+    expect(pageStatusType(withStatus({ status: 'paid', fulfillmentStatus: 'unfulfilled' }))).toBe(1);
+    expect(pageStatusType(withStatus({ status: 'paid', fulfillmentStatus: 'fulfilled' }))).toBe(2);
+    expect(pageStatusType(withStatus({ status: 'shipped' }))).toBe(2);
+    expect(pageStatusType(withStatus({ status: 'received' }))).toBe(3);
+    expect(pageStatusType(withStatus({ status: 'completed' }))).toBe(4);
   });
 
   it('lets a refund win over the order status', () => {
-    expect(legacyStatusType(withStatus({ status: 'paid', refundStatus: 'requested' }))).toBe(-1);
-    expect(legacyStatusType(withStatus({ status: 'paid', refundStatus: 'partially_refunded' }))).toBe(-1);
-    expect(legacyStatusType(withStatus({ status: 'paid', refundStatus: 'refunded' }))).toBe(-2);
+    expect(pageStatusType(withStatus({ status: 'paid', refundStatus: 'requested' }))).toBe(-1);
+    expect(pageStatusType(withStatus({ status: 'paid', refundStatus: 'partially_refunded' }))).toBe(-1);
+    expect(pageStatusType(withStatus({ status: 'paid', refundStatus: 'refunded' }))).toBe(-2);
   });
 
   it('shows a cancelled order as finished, with is_cancel set', () => {
     const cancelled = withStatus({ status: 'cancelled', cancelReason: '超时未支付' });
-    expect(legacyStatusType(cancelled)).toBe(4);
-    expect(toLegacyOrderListItem(cancelled)).toMatchObject({ is_cancel: 1, paid: 0 });
-    expect(toLegacyStatus(cancelled)).toMatchObject({ _title: '已取消', _msg: '超时未支付' });
+    expect(pageStatusType(cancelled)).toBe(4);
+    expect(toPageOrderListItem(cancelled)).toMatchObject({ is_cancel: 1, paid: 0 });
+    expect(toPageStatus(cancelled)).toMatchObject({ _title: '已取消', _msg: '超时未支付' });
   });
 
   it('never produces 9 — offline payment is retired', () => {
     for (const status of ['pending_payment', 'paid', 'shipped', 'received', 'completed', 'cancelled'])
-      expect(legacyStatusType(withStatus({ status }))).not.toBe(9);
+      expect(pageStatusType(withStatus({ status }))).not.toBe(9);
   });
 
   it('defaults to 待付款 for an unknown dto', () => {
-    expect(legacyStatusType(null)).toBe(0);
-    expect(toLegacyStatus(null)._type).toBe(0);
+    expect(pageStatusType(null)).toBe(0);
+    expect(toPageStatus(null)._type).toBe(0);
   });
 
   it('always says 微信支付, the only channel left', () => {
-    expect(toLegacyStatus(ORDER)._payType).toBe('微信支付');
+    expect(toPageStatus(ORDER)._payType).toBe('微信支付');
   });
 });
 
-describe('toLegacyOrderItem', () => {
-  const item = toLegacyOrderItem(ORDER.items[0]);
+describe('toPageOrderItem', () => {
+  const item = toPageOrderItem(ORDER.items[0]);
 
   it('maps a cartInfo row', () => {
     expect(item).toMatchObject({
@@ -86,22 +86,22 @@ describe('toLegacyOrderItem', () => {
     assertRenderable(item);
   });
 
-  it('carries attrInfo on every line — a zero-spec line too, with an empty suk (CR-4-i §8)', () => {
+  it('carries attrInfo on every line — a zero-spec line too, with an empty suk', () => {
     expect(item.productInfo.attrInfo).toMatchObject({ unique: '21', suk: '混合装,1000g' });
     // 评价 and 物流 read `attrInfo.price` unguarded; a zero-spec line threw there.
-    const plain = toLegacyOrderItem({ ...ORDER.items[0], specText: '' });
+    const plain = toPageOrderItem({ ...ORDER.items[0], specText: '' });
     expect(plain.productInfo.attrInfo).toMatchObject({ unique: '21', suk: '', price: item.productInfo.attrInfo.price });
     assertRenderable(plain);
   });
 
   it('survives a missing dto', () => {
-    expect(toLegacyOrderItem(null)).toEqual({});
+    expect(toPageOrderItem(null)).toEqual({});
   });
 });
 
-describe('toLegacyReceiver', () => {
+describe('toPageReceiver', () => {
   it('flattens the address into the trio the page prints', () => {
-    expect(toLegacyReceiver(ORDER.receiver)).toMatchObject({
+    expect(toPageReceiver(ORDER.receiver)).toMatchObject({
       real_name: '张三',
       user_phone: '13800138000',
       user_address: '浙江省 杭州市 西湖区 文三路 100 号 3 单元 501',
@@ -110,7 +110,7 @@ describe('toLegacyReceiver', () => {
   });
 
   it('answers an empty address rather than undefined', () => {
-    expect(toLegacyReceiver(null)).toEqual({
+    expect(toPageReceiver(null)).toEqual({
       real_name: '',
       user_phone: '',
       user_address: '',
@@ -119,11 +119,11 @@ describe('toLegacyReceiver', () => {
   });
 });
 
-describe('toLegacyOrderListItem', () => {
-  const row = toLegacyOrderListItem(LIST.items[0]);
+describe('toPageOrderListItem', () => {
+  const row = toPageOrderListItem(LIST.items[0]);
 
-  it('carries the order number in order_id, which is now routable too (CR-1-h)', () => {
-    // CR-1-h was accepted: `/api/v1/orders/:id` takes the surrogate id or the
+  it('carries the order number in order_id, which is routable too', () => {
+    // `/api/v1/orders/:id` takes the surrogate id or the
     // 24-digit number, so the one field the pages both print and route on can
     // be the number the buyer recognises.
     expect(row.order_id).toBe('202602011000000010123456');
@@ -165,27 +165,27 @@ describe('toLegacyOrderListItem', () => {
     });
   });
 
-  it('CR-4-i §14 — every order is 快递配送, so a paid, unshipped row reads 待发货', () => {
+  it('every order is 快递配送, so a paid, unshipped row reads 待发货', () => {
     // order_list: `_status._type == 1 && shipping_type == 1` → 待发货.
-    const paid = toLegacyOrderListItem(withStatus({ status: 'paid', fulfillmentStatus: 'unfulfilled' }));
+    const paid = toPageOrderListItem(withStatus({ status: 'paid', fulfillmentStatus: 'unfulfilled' }));
     expect(paid.shipping_type).toBe(1);
     expect(paid._status._type).toBe(1);
   });
 
   it('tells the page when a refund is still possible', () => {
-    expect(toLegacyOrderListItem(withStatus({ status: 'shipped' })).is_refund_available).toBe(true);
-    expect(toLegacyOrderListItem(withStatus({ status: 'pending_payment' })).is_refund_available).toBe(false);
+    expect(toPageOrderListItem(withStatus({ status: 'shipped' })).is_refund_available).toBe(true);
+    expect(toPageOrderListItem(withStatus({ status: 'pending_payment' })).is_refund_available).toBe(false);
   });
 
   it('maps the list and the counted page', () => {
-    expect(toLegacyOrderList(LIST)).toHaveLength(1);
-    expect(toLegacyOrderPage(LIST)).toMatchObject({ count: 1 });
-    expect(toLegacyOrderList(null)).toEqual([]);
+    expect(toPageOrderList(LIST)).toHaveLength(1);
+    expect(toPageOrderPage(LIST)).toMatchObject({ count: 1 });
+    expect(toPageOrderList(null)).toEqual([]);
   });
 });
 
-describe('toLegacyOrderDetail', () => {
-  const detail = toLegacyOrderDetail(ORDER);
+describe('toPageOrderDetail', () => {
+  const detail = toPageOrderDetail(ORDER);
 
   it('folds the receiver into the order row', () => {
     expect(detail).toMatchObject({
@@ -197,12 +197,12 @@ describe('toLegacyOrderDetail', () => {
     assertRenderable(detail);
   });
 
-  it('gives order_details the retired 代付 / 拆单 fields it reads unguarded (CR-4-i §7)', () => {
+  it('gives order_details the retired 代付 / 拆单 fields it reads unguarded', () => {
     // `orderInfo.help_info.help_status` and `split.length`: a null here threw on render.
     expect(detail.help_info).toEqual({});
     expect(detail.split).toEqual([]);
     // Fresh per order, so a page that writes into one cannot leak into another.
-    const other = toLegacyOrderDetail(ORDER);
+    const other = toPageOrderDetail(ORDER);
     expect(other.help_info).not.toBe(detail.help_info);
     expect(other.split).not.toBe(detail.split);
   });
@@ -212,13 +212,13 @@ describe('toLegacyOrderDetail', () => {
   });
 
   it('survives a missing dto', () => {
-    expect(toLegacyOrderDetail(null)).toEqual({});
+    expect(toPageOrderDetail(null)).toEqual({});
   });
 });
 
-describe('toLegacyOrderCounts', () => {
+describe('toPageOrderCounts', () => {
   it('renames the tab badges', () => {
-    expect(toLegacyOrderCounts(example('GET /api/v1/orders/counts'))).toMatchObject({
+    expect(toPageOrderCounts(example('GET /api/v1/orders/counts'))).toMatchObject({
       order_count: 12,
       unpaid_count: 1,
       unshipped_count: 2,
@@ -230,27 +230,27 @@ describe('toLegacyOrderCounts', () => {
   });
 
   it('zeroes the retired wallet figures the 个人中心 header showed', () => {
-    const out = toLegacyOrderCounts(example('GET /api/v1/orders/counts'));
+    const out = toPageOrderCounts(example('GET /api/v1/orders/counts'));
     expect(out).toMatchObject({ sum_price: '0.00', integral_count: 0, coupon_count: 0 });
   });
 });
 
-describe('fromLegacyOrderListQuery', () => {
-  it('maps every legacy tab index onto a tab name', () => {
-    expect(fromLegacyOrderListQuery({ type: 0 }).tab).toBe('unpaid');
-    expect(fromLegacyOrderListQuery({ type: 1 }).tab).toBe('unshipped');
-    expect(fromLegacyOrderListQuery({ type: 2 }).tab).toBe('unreceived');
-    expect(fromLegacyOrderListQuery({ type: 3 }).tab).toBe('finished');
-    expect(fromLegacyOrderListQuery({ type: -1 }).tab).toBe('refunding');
-    // CR-4-i §14: the 全部 tab is `orderStatus 9`.
-    expect(fromLegacyOrderListQuery({ type: 9 }).tab).toBe('all');
-    expect(fromLegacyOrderListQuery({ type: '' }).tab).toBe('all');
-    expect(fromLegacyOrderListQuery({}).tab).toBe('all');
-    expect(fromLegacyOrderListQuery({ type: 'nonsense' }).tab).toBe('all');
+describe('fromPageOrderListQuery', () => {
+  it('maps every page tab index onto a tab name', () => {
+    expect(fromPageOrderListQuery({ type: 0 }).tab).toBe('unpaid');
+    expect(fromPageOrderListQuery({ type: 1 }).tab).toBe('unshipped');
+    expect(fromPageOrderListQuery({ type: 2 }).tab).toBe('unreceived');
+    expect(fromPageOrderListQuery({ type: 3 }).tab).toBe('finished');
+    expect(fromPageOrderListQuery({ type: -1 }).tab).toBe('refunding');
+    // The 全部 tab is `orderStatus 9`.
+    expect(fromPageOrderListQuery({ type: 9 }).tab).toBe('all');
+    expect(fromPageOrderListQuery({ type: '' }).tab).toBe('all');
+    expect(fromPageOrderListQuery({}).tab).toBe('all');
+    expect(fromPageOrderListQuery({ type: 'nonsense' }).tab).toBe('all');
   });
 
   it('renames limit to pageSize and passes the keyword through', () => {
-    expect(fromLegacyOrderListQuery({ type: 0, page: 2, limit: 10, search: '苹果' }))
+    expect(fromPageOrderListQuery({ type: 0, page: 2, limit: 10, search: '苹果' }))
       .toEqual({ page: 2, pageSize: 10, tab: 'unpaid', keyword: '苹果' });
   });
 });
@@ -294,7 +294,7 @@ describe('the buy-now ticket', () => {
 
   it('makes orderConfirm ask for a buy-now preview instead of a cart one', () => {
     // `checkoutInput` nests the variant; a flat {skuId, quantity} fails the refine.
-    expect(fromLegacyCheckoutInput({ cartId: 'buynow:21:2' })).toEqual({
+    expect(fromPageCheckoutInput({ cartId: 'buynow:21:2' })).toEqual({
       kind: 'normal',
       source: 'buy-now',
       item: { skuId: '21', quantity: 2 },
@@ -302,7 +302,7 @@ describe('the buy-now ticket', () => {
   });
 
   it('turns a 开团 ticket into kind groupbuy with no groupId', () => {
-    expect(fromLegacyCheckoutInput({ cartId: 'buynow:21:1:groupbuy:1' })).toEqual({
+    expect(fromPageCheckoutInput({ cartId: 'buynow:21:1:groupbuy:1' })).toEqual({
       kind: 'groupbuy',
       source: 'buy-now',
       item: { skuId: '21', quantity: 1 },
@@ -311,21 +311,21 @@ describe('the buy-now ticket', () => {
   });
 
   it('takes the team from the ticket or from the confirm page query, either way', () => {
-    expect(fromLegacyCheckoutInput({ cartId: 'buynow:21:1:groupbuy:1:501' }).kindMeta).toEqual({
+    expect(fromPageCheckoutInput({ cartId: 'buynow:21:1:groupbuy:1:501' }).kindMeta).toEqual({
       activityId: '1',
       groupId: '501',
     });
     expect(
-      fromLegacyCheckoutInput({ cartId: 'buynow:21:1:groupbuy:1', pinkId: 501 }).kindMeta,
+      fromPageCheckoutInput({ cartId: 'buynow:21:1:groupbuy:1', pinkId: 501 }).kindMeta,
     ).toEqual({ activityId: '1', groupId: '501' });
     // `pinkId` is parseInt'ed to 0 on the 开团 path and must not become a team id
-    expect(fromLegacyCheckoutInput({ cartId: 'buynow:21:1:groupbuy:1', pinkId: 0 }).kindMeta).toEqual(
+    expect(fromPageCheckoutInput({ cartId: 'buynow:21:1:groupbuy:1', pinkId: 0 }).kindMeta).toEqual(
       { activityId: '1' },
     );
   });
 
   it('never puts a groupId on a 预售 order', () => {
-    expect(fromLegacyCheckoutInput({ cartId: 'buynow:31:3:presale:2', pinkId: 7 })).toEqual({
+    expect(fromPageCheckoutInput({ cartId: 'buynow:31:3:presale:2', pinkId: 7 })).toEqual({
       kind: 'presale',
       source: 'buy-now',
       item: { skuId: '31', quantity: 3 },
@@ -334,9 +334,9 @@ describe('the buy-now ticket', () => {
   });
 });
 
-describe('fromLegacyCheckoutInput', () => {
+describe('fromPageCheckoutInput', () => {
   it('splits the comma-joined cart ids the page passes', () => {
-    expect(fromLegacyCheckoutInput({ cartId: '5001,5002', addressId: 301, couponId: 9001 })).toEqual({
+    expect(fromPageCheckoutInput({ cartId: '5001,5002', addressId: 301, couponId: 9001 })).toEqual({
       kind: 'normal',
       source: 'cart',
       cartItemIds: ['5001', '5002'],
@@ -346,13 +346,13 @@ describe('fromLegacyCheckoutInput', () => {
   });
 
   it('accepts an array and an empty selection', () => {
-    expect(fromLegacyCheckoutInput({ cartId: ['5001'] }).cartItemIds).toEqual(['5001']);
-    expect(fromLegacyCheckoutInput({}).cartItemIds).toEqual([]);
+    expect(fromPageCheckoutInput({ cartId: ['5001'] }).cartItemIds).toEqual(['5001']);
+    expect(fromPageCheckoutInput({}).cartItemIds).toEqual([]);
   });
 });
 
-describe('toLegacyOrderConfirm', () => {
-  const confirm = toLegacyOrderConfirm(PREVIEW);
+describe('toPageOrderConfirm', () => {
+  const confirm = toPageOrderConfirm(PREVIEW);
 
   it('fills cartInfo, priceGroup and addressInfo', () => {
     expect(confirm.cartInfo).toHaveLength(1);
@@ -386,7 +386,7 @@ describe('toLegacyOrderConfirm', () => {
   });
 
   it('maps a checkout line', () => {
-    expect(toLegacyCheckoutLine(PREVIEW.lines[0])).toMatchObject({
+    expect(toPageCheckoutLine(PREVIEW.lines[0])).toMatchObject({
       id: 5001,
       item_key: 'sku-21',
       product_id: 11,
@@ -395,11 +395,11 @@ describe('toLegacyOrderConfirm', () => {
       truePrice: '60.00',
       sum_price: '110.00',
     });
-    expect(toLegacyCheckoutLine(null)).toEqual({});
+    expect(toPageCheckoutLine(null)).toEqual({});
   });
 
   it('answers postOrderComputed with only the recomputed prices', () => {
-    expect(toLegacyOrderComputed(PREVIEW).result).toMatchObject({
+    expect(toPageOrderComputed(PREVIEW).result).toMatchObject({
       pay_price: '118.00',
       total_price: '120.00',
       pay_postage: '8.00',
@@ -410,22 +410,22 @@ describe('toLegacyOrderConfirm', () => {
   });
 
   it('survives a missing dto', () => {
-    expect(toLegacyOrderConfirm(null)).toEqual({});
+    expect(toPageOrderConfirm(null)).toEqual({});
   });
 
-  it('CR-4-i §9 — 配送运费 has a freight discount to add, so it is never ¥NaN', () => {
+  it('配送运费 has a freight discount to add, so it is never ¥NaN', () => {
     // The template renders `storePostage + storePostageDiscount`.
-    const confirm = toLegacyOrderConfirm(PREVIEW);
+    const confirm = toPageOrderConfirm(PREVIEW);
     expect(confirm.priceGroup.storePostageDiscount).toBe('0.00');
     expect(Number(confirm.priceGroup.storePostage) + Number(confirm.priceGroup.storePostageDiscount)).toBe(8);
     // `computedPrice()` copies it from the recomputed result onto priceGroup.
-    expect(toLegacyOrderComputed(PREVIEW).result.storePostageDiscount).toBe('0.00');
+    expect(toPageOrderComputed(PREVIEW).result.storePostageDiscount).toBe('0.00');
   });
 });
 
 describe('order creation', () => {
   it('builds the body the contract example shows', () => {
-    const body = fromLegacyOrderCreateInput('ck-20260201-7f3a9b21', {
+    const body = fromPageOrderCreateInput('ck-20260201-7f3a9b21', {
       cartId: '5001',
       addressId: '301',
       couponId: '9001',
@@ -435,14 +435,14 @@ describe('order creation', () => {
     expect(body).toEqual(exampleBody('POST /api/v1/orders'));
   });
 
-  it('CR-4-i §10 — a product without a custom form sends no customForm (the page passes [])', () => {
-    const body = fromLegacyOrderCreateInput('ck-20260201-7f3a9b21', { cartId: '5001', custom_form: [] });
+  it('a product without a custom form sends no customForm (the page passes [])', () => {
+    const body = fromPageOrderCreateInput('ck-20260201-7f3a9b21', { cartId: '5001', custom_form: [] });
     expect(body).not.toHaveProperty('customForm');
     expect(body.cartItemIds).toEqual(['5001']);
   });
 
-  it('CR-4-i §10 — the page`s field list becomes the contract`s { key: answer } record', () => {
-    const body = fromLegacyOrderCreateInput('ck-20260201-7f3a9b21', {
+  it('the page`s field list becomes the contract`s { key: answer } record', () => {
+    const body = fromPageOrderCreateInput('ck-20260201-7f3a9b21', {
       cartId: '5001',
       custom_form: [
         { key: 'name', label: '姓名', type: 'text', value: '张三' },
@@ -454,26 +454,26 @@ describe('order creation', () => {
     });
     expect(body.customForm).toEqual({ name: '张三', size: 'L' });
     // A record the page already built passes as is.
-    expect(fromLegacyOrderCreateInput('ck-20260201-7f3a9b21', { cartId: '1', custom_form: { a: 1 } }).customForm).toEqual({
+    expect(fromPageOrderCreateInput('ck-20260201-7f3a9b21', { cartId: '1', custom_form: { a: 1 } }).customForm).toEqual({
       a: 1,
     });
   });
 
-  it('maps the created order into the legacy cashier hand-off', () => {
-    const out = toLegacyOrderCreateResult(example('POST /api/v1/orders'));
+  it('maps the created order into the cashier hand-off', () => {
+    const out = toPageOrderCreateResult(example('POST /api/v1/orders'));
     expect(out.status).toBe('ORDER_CREATE');
     expect(out.result).toMatchObject({
       orderId: '9001',
       order_no: '202602011000000010123456',
       pay_price: '118.00',
     });
-    expect(toLegacyOrderCreateResult(null).status).toBe('ORDER_CREATE_ERROR');
+    expect(toPageOrderCreateResult(null).status).toBe('ORDER_CREATE_ERROR');
   });
 });
 
-describe('toLegacyCashierOrder / toLegacyOrderProduct', () => {
+describe('toPageCashierOrder / toPageOrderProduct', () => {
   it('gives the cashier the handful of fields it reads', () => {
-    expect(toLegacyCashierOrder(ORDER)).toMatchObject({
+    expect(toPageCashierOrder(ORDER)).toMatchObject({
       oid: 9001,
       order_id: '202602011000000010123456',
       pay_price: '118.00',
@@ -481,19 +481,19 @@ describe('toLegacyCashierOrder / toLegacyOrderProduct', () => {
       yue_pay_status: 0,
       status: 0,
     });
-    expect(toLegacyCashierOrder(null)).toEqual({});
+    expect(toPageCashierOrder(null)).toEqual({});
   });
 
   it('picks one order line for the 评价 page', () => {
-    expect(toLegacyOrderProduct(ORDER, '7001')).toMatchObject({ cart_num: 2, unique: '7001' });
-    expect(toLegacyOrderProduct(ORDER, 'nope')).toEqual({ cart_num: 0, productInfo: {} });
-    expect(toLegacyOrderProduct(null, '7001')).toEqual({ cart_num: 0, productInfo: {} });
+    expect(toPageOrderProduct(ORDER, '7001')).toMatchObject({ cart_num: 2, unique: '7001' });
+    expect(toPageOrderProduct(ORDER, 'nope')).toEqual({ cart_num: 0, productInfo: {} });
+    expect(toPageOrderProduct(null, '7001')).toEqual({ cart_num: 0, productInfo: {} });
   });
 });
 
-// 预售 / 拼团: B1 keeps the catalogue price on the line and prices the activity
+// 预售 / 拼团: checkout keeps the catalogue price on the line and prices the activity
 // as a `*:activity-price` adjustment folded into `couponDiscount`. These are the
-// shapes the real stack answered for a ¥88 SKU in a ¥78 预售 (H4 §3 probe).
+// shapes the real stack answered for a ¥88 SKU in a ¥78 预售.
 describe('活动价 — the activity price is what the pages print', () => {
   const line = {
     ...PREVIEW.lines[0],
@@ -516,7 +516,7 @@ describe('活动价 — the activity price is what the pages print', () => {
     userCouponId: null,
     totalQuantity: 1,
   };
-  // What the server writes for a 预售 line since CR-2-h4: the catalogue price,
+  // What the server writes for a 预售 line: the catalogue price,
   // and the activity named among the line's adjustments.
   const ACTIVITY = { source: 'presale:activity-price', label: '预售价（E2E 预售活动）', amount: '-10.00' };
   const orderItem = {
@@ -555,12 +555,12 @@ describe('活动价 — the activity price is what the pages print', () => {
   });
 
   it('confirm page: ¥78 unit price, ¥78 商品总价, no phantom coupon, ¥88 struck through', () => {
-    const legacy = toLegacyOrderConfirm(presalePreview);
-    expect(legacy.cartInfo[0]).toMatchObject({ truePrice: '78.00', costPrice: '88.00', sum_price: '78.00' });
-    expect(legacy.cartInfo[0].productInfo.price).toBe('78.00');
-    expect(legacy.priceGroup).toMatchObject({ totalPrice: '78.00', costPrice: '78.00', payPrice: '78.00' });
-    expect(legacy.couponPrice).toBe('0.00');
-    expect(toLegacyOrderComputed(presalePreview).result).toMatchObject({
+    const view = toPageOrderConfirm(presalePreview);
+    expect(view.cartInfo[0]).toMatchObject({ truePrice: '78.00', costPrice: '88.00', sum_price: '78.00' });
+    expect(view.cartInfo[0].productInfo.price).toBe('78.00');
+    expect(view.priceGroup).toMatchObject({ totalPrice: '78.00', costPrice: '78.00', payPrice: '78.00' });
+    expect(view.couponPrice).toBe('0.00');
+    expect(toPageOrderComputed(presalePreview).result).toMatchObject({
       total_price: '78.00',
       coupon_price: '0.00',
       pay_price: '78.00',
@@ -568,40 +568,40 @@ describe('活动价 — the activity price is what the pages print', () => {
   });
 
   it('confirm page: a stacked coupon stays a coupon', () => {
-    const legacy = toLegacyOrderConfirm({
+    const view = toPageOrderConfirm({
       ...presalePreview,
       couponDiscount: '15.00',
       adjustments: [...presalePreview.adjustments, { source: 'coupon:full-reduction', label: '减 5', amount: '-5.00' }],
       payableAmount: '73.00',
       userCouponId: '9001',
     });
-    expect(legacy.cartInfo[0].truePrice).toBe('78.00');
-    expect(legacy.priceGroup.totalPrice).toBe('78.00');
-    expect(legacy.couponPrice).toBe('5.00');
+    expect(view.cartInfo[0].truePrice).toBe('78.00');
+    expect(view.priceGroup.totalPrice).toBe('78.00');
+    expect(view.couponPrice).toBe('5.00');
   });
 
   it('confirm page: the activity price spreads over the quantity', () => {
-    const legacy = toLegacyOrderConfirm({
+    const view = toPageOrderConfirm({
       ...presalePreview,
       lines: [{ ...line, quantity: 2, subtotal: '176.00', discountAmount: '20.00', totalAmount: '156.00' }],
       itemsAmount: '176.00',
       couponDiscount: '20.00',
       adjustments: [{ source: 'presale:activity-price', label: '预售价', amount: '-20.00' }],
     });
-    expect(legacy.cartInfo[0].truePrice).toBe('78.00');
-    expect(legacy.priceGroup.totalPrice).toBe('156.00');
+    expect(view.cartInfo[0].truePrice).toBe('78.00');
+    expect(view.priceGroup.totalPrice).toBe('156.00');
   });
 
   it('a normal preview is untouched', () => {
-    const legacy = toLegacyOrderConfirm(PREVIEW);
-    expect(legacy.priceGroup.totalPrice).toBe(PREVIEW.itemsAmount);
-    expect(legacy.couponPrice).toBe(PREVIEW.couponDiscount);
-    expect(legacy.cartInfo[0].truePrice).toBe(PREVIEW.lines[0].unitPrice);
+    const view = toPageOrderConfirm(PREVIEW);
+    expect(view.priceGroup.totalPrice).toBe(PREVIEW.itemsAmount);
+    expect(view.couponPrice).toBe(PREVIEW.couponDiscount);
+    expect(view.cartInfo[0].truePrice).toBe(PREVIEW.lines[0].unitPrice);
   });
 
   it('order detail: an activity order without a coupon prints the activity price', () => {
     expect(orderActivityDiscountCents(presaleOrder)).toBe(1000);
-    const detail = toLegacyOrderDetail(presaleOrder);
+    const detail = toPageOrderDetail(presaleOrder);
     expect(detail).toMatchObject({ total_price: '78.00', coupon_price: '0.00', pay_price: '78.00' });
     expect(detail.cartInfo[0]).toMatchObject({ truePrice: '78.00', sum_price: '78.00' });
     expect(detail.cartInfo[0].productInfo.price).toBe('78.00');
@@ -612,35 +612,35 @@ describe('活动价 — the activity price is what the pages print', () => {
   it('order detail: a normal order is untouched', () => {
     expect(ORDER.items[0].adjustments.map((a) => a.source)).toEqual(['coupon:full-reduction']);
     expect(orderActivityDiscountCents(ORDER)).toBe(0);
-    expect(toLegacyOrderDetail(ORDER).cartInfo[0].truePrice).toBe(ORDER.items[0].unitPrice);
-    expect(toLegacyOrderDetail(ORDER).coupon_price).toBe(ORDER.couponDiscount);
+    expect(toPageOrderDetail(ORDER).cartInfo[0].truePrice).toBe(ORDER.items[0].unitPrice);
+    expect(toPageOrderDetail(ORDER).coupon_price).toBe(ORDER.couponDiscount);
   });
 
-  it('CR-2-h4: the 订单列表 prints the activity price too — a list row reads its lines', () => {
+  it('the 订单列表 prints the activity price too — a list row reads its lines', () => {
     const { userCouponId, ...row } = presaleOrder;
     expect(userCouponId).toBeNull();
     expect(orderActivityDiscountCents(row)).toBe(1000);
-    expect(toLegacyOrderListItem(row, 3)).toMatchObject({ total_price: '78.00', coupon_price: '0.00' });
-    expect(toLegacyOrderListItem(row, 3).cartInfo[0].truePrice).toBe('78.00');
-    expect(toLegacyOrderList({ items: [row, row] })[1].cartInfo[0].truePrice).toBe('78.00');
+    expect(toPageOrderListItem(row, 3)).toMatchObject({ total_price: '78.00', coupon_price: '0.00' });
+    expect(toPageOrderListItem(row, 3).cartInfo[0].truePrice).toBe('78.00');
+    expect(toPageOrderList({ items: [row, row] })[1].cartInfo[0].truePrice).toBe('78.00');
   });
 
-  it('a line written before CR-2-h4 (no adjustments): only a coupon-free detail can be derived', () => {
+  it('a line with no recorded adjustments: only a coupon-free detail can be derived', () => {
     const older = { ...presaleOrder, items: [{ ...orderItem, adjustments: [] }] };
     expect(orderActivityDiscountCents(older)).toBe(1000);
-    expect(toLegacyOrderDetail(older).cartInfo[0].truePrice).toBe('78.00');
+    expect(toPageOrderDetail(older).cartInfo[0].truePrice).toBe('78.00');
     expect(orderActivityDiscountCents({ ...older, userCouponId: '9001' })).toBe(0);
     const { userCouponId, ...row } = older;
     expect(userCouponId).toBeNull();
     expect(orderActivityDiscountCents(row)).toBe(0);
-    expect(toLegacyOrderListItem(row, 3).cartInfo[0].truePrice).toBe('88.00');
+    expect(toPageOrderListItem(row, 3).cartInfo[0].truePrice).toBe('88.00');
   });
 
-  // CR-2-h4: each order line carries what every checkout rule took off it, so
+  // Each order line carries what every checkout rule took off it, so
   // once a coupon stacks on a 预售 the ¥10 activity and the ¥5 coupon are still
   // two entries, and the page prints ¥78 and a ¥5 优惠券.
-  it('CR-2-h4: a 预售 order with a stacked coupon still prints ¥78', () => {
-    const detail = toLegacyOrderDetail({
+  it('a 预售 order with a stacked coupon still prints ¥78', () => {
+    const detail = toPageOrderDetail({
       ...presaleOrder,
       items: [
         {

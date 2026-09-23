@@ -96,7 +96,7 @@ describe('status handling', () => {
     });
   });
 
-  it('does not hang on 402 — the old client never settled that promise', async () => {
+  it('does not hang on 402 — the promise always settles', async () => {
     respond({ statusCode: 402, data: { code: 'PAYMENT_REQUIRED', message: '需要支付' } });
     await expect(request.post('/api/v1/x', {})).rejects.toMatchObject({ status: 402 });
   });
@@ -193,7 +193,7 @@ describe('headers', () => {
     expect(seen[0].header).not.toBe(seen[1].header);
   });
 
-  it('drops the legacy Cb-lang and Form-type headers', async () => {
+  it('sends no Cb-lang or Form-type headers', async () => {
     const seen = respond({ statusCode: 200, data: {} });
     await request.get('/api/v1/me');
     expect(Object.keys(seen[0].header)).not.toContain('Cb-lang');

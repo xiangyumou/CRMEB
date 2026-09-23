@@ -3,7 +3,7 @@ import type { NextConfig } from 'next';
 /**
  * How many workers `next build` may start. Next sizes its pool from
  * `os.cpus()`, which on a many-core box under a memory cap gets the build
- * OOM-killed (stream I saw it). `NEXT_BUILD_CPUS` overrides; anything that is
+ * OOM-killed. `NEXT_BUILD_CPUS` overrides; anything that is
  * not a positive integer means the small default.
  */
 function buildCpus(value: string | undefined): number {
@@ -24,9 +24,8 @@ const nextConfig: NextConfig = {
   // The workspace root is `next/`, not `apps/web`; tell Next so the standalone
   // trace picks up the pnpm virtual store correctly.
   outputFileTracingRoot: new URL('../..', import.meta.url).pathname,
-  // `next dev` otherwise writes AGENTS.md / CLAUDE.md into this package. The
-  // rewrite's conventions live in docs/rewrite/, and an unexpected CLAUDE.md
-  // inside a worktree would compete with them.
+  // `next dev` otherwise writes AGENTS.md / CLAUDE.md into this package, and an
+  // unexpected CLAUDE.md inside a worktree would compete with the repo's own.
   agentRules: false,
   typescript: {
     // `pnpm --filter @shop/web typecheck` is the gate; don't pay for it twice.

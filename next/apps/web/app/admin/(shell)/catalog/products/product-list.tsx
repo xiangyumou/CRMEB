@@ -51,7 +51,7 @@ function isTab(value: string | undefined): value is AdminProductTab {
 /**
  * 商品列表.
  *
- * The seven legacy tabs survive, but as one `tab` query key rather than a
+ * Seven tabs, as one `tab` query key rather than a
  * `type` integer whose meaning changed between screens. Three of them
  * (`sold_out`, `stock_warning`, `deleted`) are *derived* server-side rather
  * than stored, so a product cannot be "sold out" in the list and in stock on
@@ -187,7 +187,7 @@ export function ProductListPage() {
             align: 'right' as const,
             render: (_value: unknown, row: AdminProductListItem) => (
               // Real sales and the number the storefront shows are two
-              // different things, and legacy conflated them in one column.
+              // different things, so they are never one number.
               <Tooltip title={`真实销量 ${row.sales}，前台虚拟加量 ${row.displaySalesBoost}`}>
                 <span>
                   {row.sales}

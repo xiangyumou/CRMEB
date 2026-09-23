@@ -16,13 +16,13 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 热区 — ports `c_hotspot.vue`, whose 内容设置 tab is a single `c_one_pictrue`.
+ * 热区, whose 内容设置 tab is a single `c_one_pictrue`.
  *
  * A hot area is `{number, starX, starY, areaWidth, areaHeight, link}` in **rpx**,
- * read verbatim by `hotspot.vue:12-19` as `top/left/width/height`. The legacy
- * editor draws the rectangles on the image (`OperationFloorModal`); here they
- * are typed. Same four numbers, same key names, same units — an area drawn in
- * the old admin opens here and saves back identically.
+ * read verbatim by the storefront's `hotspot.vue` as `top/left/width/height`.
+ * The areas are typed as numbers rather than drawn on the image. Same four
+ * numbers, same key names, same units — a stored area opens here and saves
+ * back identically.
  *
  * `number` is the row's identity (`:key="item.number"` in the renderer), so a
  * new row gets the next free one rather than the row count, which would repeat

@@ -18,7 +18,7 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 用户信息 — ports `c_userInfor.vue`: the member card at the top of 个人中心.
+ * 用户信息: the member card at the top of 个人中心.
  *
  * One index on the style tab, `toneConfig.tabVal`, which unlocks the two
  * progress-bar colours.

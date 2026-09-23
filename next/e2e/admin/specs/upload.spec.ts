@@ -57,8 +57,7 @@ test('a PNG that claims to be a JPEG is refused rather than silently corrected',
 test('the scan-token route refuses a token that was never issued', async ({ request }) => {
   // Public by necessity — the phone holding the QR code has no session — so
   // it is the one upload entry point an attacker can reach. An unknown token
-  // must be refused before anything is stored. (`K-SEC-U6`; the missing rate
-  // limit on this route is CR-12-k.)
+  // must be refused before anything is stored.
   const response = await request.post('/api/v1/attachments/scan-uploads/nope-not-a-real-token', {
     multipart: { file: PNG },
   });

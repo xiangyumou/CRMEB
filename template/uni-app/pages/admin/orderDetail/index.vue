@@ -800,7 +800,7 @@ export default {
             });
           });
       } else if (that.status == 2) {
-        // 审核只有同意和拒绝：退款金额是买家申请时定下的（CR-4-h §3）。
+        // 审核只有同意和拒绝：退款金额是买家申请时定下的。
         if (this.isRefund || opt.type == 1) {
           data.type = opt.type;
           this.objOrderRefund(data);

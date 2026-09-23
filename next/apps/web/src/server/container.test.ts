@@ -5,7 +5,7 @@ import { applyProcessOverrides, resetProcessOverrides, webDbOptions } from './co
 import type { Env } from './env';
 
 /**
- * `SHOP_FAKE_SMS=1` at boot (CR-3-i): what `buildContainer()` does with it,
+ * `SHOP_FAKE_SMS=1` at boot: what `buildContainer()` does with it,
  * without a database. The HTTP half — a code really lands in Redis — is
  * `fake-sms.int.test.ts`.
  */

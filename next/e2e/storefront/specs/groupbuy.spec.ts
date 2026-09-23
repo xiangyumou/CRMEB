@@ -24,7 +24,7 @@ import { payAtCashier, submitOrder } from '../src/product-flows';
  *
  * 立即开团 needs the SKU's `product_stock` and a selected SKU even for a
  * zero-spec product, and 提交订单 needs the cart, a real idempotency key and
- * a `customForm` record — CR-4-i §8 and §10, closed by H4.
+ * a `customForm` record.
  */
 
 test('two shoppers complete a group-buy team', async ({

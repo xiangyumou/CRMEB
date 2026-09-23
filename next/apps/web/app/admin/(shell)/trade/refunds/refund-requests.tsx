@@ -68,7 +68,7 @@ import { REFUND_KIND, REFUND_RETURN_STAGE, REFUND_STATUS, optionsOf } from '../t
  * The return address shown to the buyer comes from 售后设置, not from this
  * form: `refunds` has nowhere to store a per-request address yet, and an
  * approval that recorded one in the timeline while the buyer's screen showed
- * another would be worse than one source of truth. `CR-5-c` asks for the column.
+ * another would be worse than one source of truth.
  */
 export function RefundRequestsPage() {
   const [detailId, setDetailId] = useState<string | null>(null);

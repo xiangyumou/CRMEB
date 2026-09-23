@@ -7,8 +7,8 @@ import workerConfig from '../../apps/worker/tsup.config';
  * It extends `apps/worker/tsup.config.ts` rather than restating it: the
  * externals list there is a considered decision (`pg`/`ioredis` load native
  * bits, `bullmq` reads its Lua scripts off disk) and a second copy would drift
- * the first time one of them changes. Stream J2 does not own `apps/worker`, so
- * importing is also the only way to stay in sync without editing it.
+ * the first time one of them changes. Importing keeps the image's bundle in
+ * step with the app's own build.
  *
  * Three entries, one image:
  *

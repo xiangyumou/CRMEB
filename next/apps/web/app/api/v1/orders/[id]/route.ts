@@ -7,7 +7,7 @@ export const GET = handle(orderGetDetail, (ctx, { params }) => order.detail(ctx,
 
 /**
  * 删除订单 — the buyer's list stops showing a finished order, and the shop keeps
- * every row of it (CR-4-h §6). `DELETE` is the verb the tap means, not what it
+ * every row of it. `DELETE` is the verb the tap means, not what it
  * does; the audit trail records who asked.
  */
 export const DELETE = handle(orderHide, (ctx, { params }) => {

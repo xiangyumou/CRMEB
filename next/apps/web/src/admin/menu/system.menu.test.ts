@@ -27,7 +27,7 @@ function visibleKeys(permissions: string[], isSuper = false): string[] {
   );
 }
 
-describe('F1 sider entries', () => {
+describe('system sider entries', () => {
   it('shows an admin with no grants at all nothing', () => {
     // 个人资料 needs no atom but is `hidden`, so it is reachable from the avatar
     // menu and from the breadcrumb without occupying a sider row.

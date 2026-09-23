@@ -5,9 +5,9 @@ import { PNG } from '../src/files';
  * A product created in the admin, then read from the storefront.
  *
  * The chain is the assertion: the form's shape, the asset picker, the write
- * path, and the public read all have to agree, and each of them belongs to a
- * different stream. An integration test can prove any one of them; only this
- * can prove they were built against the same idea of a product.
+ * path, and the public read all have to agree, and each of them lives in a
+ * different layer. An integration test can prove any one of them; only this
+ * can prove they share the same idea of a product.
  */
 
 const NAME = `E2E 全流程商品 ${Date.now()}`;

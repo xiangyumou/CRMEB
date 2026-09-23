@@ -1,11 +1,11 @@
-// order DTOs → the legacy 订单 view models.
+// order DTOs → the 订单 view models.
 //
 // Contract: next/packages/contracts/src/order/order.checkout.contract.ts
 //
-// The pages branch almost entirely on `_status._type`, which the old backend computed
-// server-side. Its values are unchanged:
+// The pages branch almost entirely on `_status._type`, which is derived here from the
+// order's state:
 //   0 待付款 · 1 待发货 · 2 待收货 · 3 待评价 · 4 已完成 · -1 退款中 · -2 已退款 · 9 线下待付款
-// `9` can no longer occur — offline payment is retired.
+// `9` cannot occur — offline payment is retired.
 
 import {
   toId,
@@ -17,14 +17,14 @@ import {
   list,
   mapList,
   pagedList,
-  legacyDateTime,
-  legacyMinute,
-  legacyDate,
-  legacyTime,
+  pageDateTime,
+  pageMinute,
+  pageDate,
+  pageTime,
   unixSeconds,
 } from './_shared.js';
 
-/** Flags for features the rewrite dropped; pages read them to hide a branch. */
+/** Flags for features the shop does not run; pages read them to hide a branch. */
 const RETIRED_ORDER_FLAGS = {
   seckill_id: 0,
   bargain_id: 0,
@@ -40,7 +40,7 @@ const RETIRED_ORDER_FLAGS = {
   pid: 0,
   // 门店自提 is retired, so every order is 快递配送 (`shipping_type` 1) — the
   // value the list's 待发货 label and the detail's address block branch on;
-  // 0 rendered no status at all on a paid, unshipped row (CR-4-i §14).
+  // 0 rendered no status at all on a paid, unshipped row.
   shipping_type: 1,
   store_id: 0,
   virtual_type: 0,
@@ -53,7 +53,7 @@ const RETIRED_ORDER_FLAGS = {
 };
 
 /** `orders.status` + fulfilment + refund → the single `_type` the pages switch on. */
-export function legacyStatusType(dto) {
+export function pageStatusType(dto) {
   if (!dto) return 0;
   if (dto.refundStatus === 'refunded') return -2;
   if (dto.refundStatus === 'requested' || dto.refundStatus === 'partially_refunded') return -1;
@@ -88,8 +88,8 @@ const STATUS_TITLES = {
 };
 
 /** The `_status` object. `refund_*` fields are filled by the refund mapper when needed. */
-export function toLegacyStatus(dto) {
-  const type = legacyStatusType(dto);
+export function toPageStatus(dto) {
+  const type = pageStatusType(dto);
   const [title, msg] = STATUS_TITLES[type] || STATUS_TITLES[0];
   const cancelled = dto && dto.status === 'cancelled';
   return {
@@ -109,12 +109,12 @@ export function toLegacyStatus(dto) {
 // 活动价 (预售 / 拼团)
 // ---------------------------------------------------------------------------
 //
-// An activity order keeps the catalogue price on its line: B1 prices the
+// An activity order keeps the catalogue price on its line: checkout prices the
 // activity as a `PricingContributor` adjustment (`presale:activity-price`,
 // `groupbuy:activity-price`) that folds into `couponDiscount` and the line's
-// `discountAmount`. The legacy pages print the unit price and 商品总价 straight
-// from the payload, so without the helpers below a ¥78 预售 printed as ¥88 with a
-// ¥10 "优惠券" nobody applied. The activity is always a single buy-now line.
+// `discountAmount`. The pages print the unit price and 商品总价 straight
+// from the payload, so without the helpers below a ¥78 预售 would print as ¥88 with
+// a ¥10 "优惠券" nobody applied. The activity is always a single buy-now line.
 
 const ACTIVITY_PRICE_SOURCE = /:activity-price$/;
 
@@ -134,7 +134,7 @@ export function activityDiscountCents(adjustments) {
   );
 }
 
-/** Whether any line of an order read carries its checkout adjustments (CR-2-h4). */
+/** Whether any line of an order read carries its checkout adjustments. */
 function hasRecordedAdjustments(dto) {
   return list(dto && dto.items).some((item) => list(item && item.adjustments).length > 0);
 }
@@ -142,7 +142,7 @@ function hasRecordedAdjustments(dto) {
 /**
  * The activity discount an order read implies, in cents.
  *
- * Every order line carries what each checkout rule took off it (CR-2-h4), so
+ * Every order line carries what each checkout rule took off it, so
  * the activity entries are summed straight off the lines — on the 订单列表 as on
  * 订单详情, with or without a coupon stacked. A line written before that
  * carries none; for such an order with no coupon, `couponDiscount` *is* the
@@ -173,9 +173,9 @@ function discountOf(opts) {
   return typeof value === 'number' && value > 0 ? value : 0;
 }
 
-export function toLegacyOrderItem(dto, opts) {
+export function toPageOrderItem(dto, opts) {
   if (!dto) return {};
-  // The line's own adjustments when it has them (CR-2-h4); else what the order implies.
+  // The line's own adjustments when it has them; else what the order implies.
   const activityDiscount = list(dto.adjustments).length
     ? activityDiscountCents(dto.adjustments)
     : discountOf(opts);
@@ -213,15 +213,14 @@ export function toLegacyOrderItem(dto, opts) {
       is_virtual: dto.productKind && dto.productKind !== 'physical' ? 1 : 0,
       store_mention: 1,
       // Always present: 评价 (`goods_comment_con`) and 物流 (`goods_logistics`)
-      // read `attrInfo.price` unguarded. A zero-spec line has `suk: ''`
-      // (CR-4-i §8).
+      // read `attrInfo.price` unguarded. A zero-spec line has `suk: ''`.
       attrInfo,
     },
   };
 }
 
 /** `orderReceiver` → the flat `real_name` / `user_phone` / `user_address` trio. */
-export function toLegacyReceiver(dto) {
+export function toPageReceiver(dto) {
   if (!dto) {
     return { real_name: '', user_phone: '', user_address: '', user_address_id: 0 };
   }
@@ -240,7 +239,7 @@ export function toLegacyReceiver(dto) {
 }
 
 /** `orderListItem` → one 订单列表 row. */
-export function toLegacyOrderListItem(dto) {
+export function toPageOrderListItem(dto) {
   if (!dto) return {};
   const act = orderActivityDiscountCents(dto);
   // Lines that carry their adjustments price themselves; only an older,
@@ -249,8 +248,8 @@ export function toLegacyOrderListItem(dto) {
   return {
     ...RETIRED_ORDER_FLAGS,
     id: toId(dto.id),
-    // Pages both *print* `order_id` (订单号：…) and *route* on it. CR-1-h was
-    // accepted, so every storefront order route now takes the surrogate id or
+    // Pages both *print* `order_id` (订单号：…) and *route* on it. Every
+    // storefront order route takes the surrogate id or
     // the 24-digit order number, and `order_id` can be the number the buyer
     // actually recognises — the one on the WeChat payment record and the one a
     // 客服 agent pastes into a deep link.
@@ -259,9 +258,9 @@ export function toLegacyOrderListItem(dto) {
     trade_no: text(dto.orderNo),
     uid: 0,
     type: dto.kind === 'groupbuy' ? 1 : dto.kind === 'presale' ? 2 : 0,
-    status: legacyRawStatus(dto),
+    status: pageRawStatus(dto),
     paid: dto.status === 'pending_payment' || dto.status === 'cancelled' ? 0 : 1,
-    refund_status: legacyRefundStatus(dto.refundStatus),
+    refund_status: pageRefundStatus(dto.refundStatus),
     is_cancel: dto.status === 'cancelled' ? 1 : 0,
     is_all_refund: dto.refundStatus === 'refunded',
     is_apply_refund: dto.refundStatus === 'requested',
@@ -274,25 +273,25 @@ export function toLegacyOrderListItem(dto) {
     pay_postage: money(dto.freightAmount),
     coupon_price: act ? fromCents(cents(dto.couponDiscount) - act) : money(dto.couponDiscount),
     add_time: unixSeconds(dto.createdAt),
-    _add_time: legacyMinute(dto.createdAt),
-    add_time_y: legacyDate(dto.createdAt),
-    add_time_h: legacyTime(dto.createdAt),
+    _add_time: pageMinute(dto.createdAt),
+    add_time_y: pageDate(dto.createdAt),
+    add_time_h: pageTime(dto.createdAt),
     pay_expires_at: unixSeconds(dto.payExpiresAt, 0),
-    _status: toLegacyStatus(dto),
-    cartInfo: list(dto.items).map((item) => toLegacyOrderItem(item, { activityDiscount: lineFallback })),
+    _status: toPageStatus(dto),
+    cartInfo: list(dto.items).map((item) => toPageOrderItem(item, { activityDiscount: lineFallback })),
     nickname: '',
     avatar: '',
     gift_user_info: null,
     // 好友代付 and 拆单 are retired, but `order_details` reads
     // `orderInfo.help_info.help_status` and `split.length` unguarded: an
-    // empty object and an empty list, fresh per order (CR-4-i §7).
+    // empty object and an empty list, fresh per order.
     help_info: {},
     split: [],
   };
 }
 
-function legacyRawStatus(dto) {
-  // legacy `orders.status`: 0 待发货, 1 待收货, 2 待评价, 3 已完成, -1/-2 退款
+function pageRawStatus(dto) {
+  // the page's raw `status`: 0 待发货, 1 待收货, 2 待评价, 3 已完成, -1/-2 退款
   switch (dto.status) {
     case 'shipped':
       return 1;
@@ -305,30 +304,30 @@ function legacyRawStatus(dto) {
   }
 }
 
-function legacyRefundStatus(refundStatus) {
-  // legacy `refund_status`: 0 未退款, 1 申请中, 2 已退款
+function pageRefundStatus(refundStatus) {
+  // the page's `refund_status`: 0 未退款, 1 申请中, 2 已退款
   if (refundStatus === 'requested') return 1;
   if (refundStatus === 'refunded' || refundStatus === 'partially_refunded') return 2;
   return 0;
 }
 
 // A list row's lines carry their adjustments, so the 订单列表 prints the
-// activity price too (CR-2-h4). `mapList` passes the index as the second
-// argument; `toLegacyOrderListItem` takes none.
-export function toLegacyOrderList(dto) {
-  return mapList(dto && dto.items, toLegacyOrderListItem);
+// activity price too. `mapList` passes the index as the second
+// argument; `toPageOrderListItem` takes none.
+export function toPageOrderList(dto) {
+  return mapList(dto && dto.items, toPageOrderListItem);
 }
 
-export function toLegacyOrderPage(dto) {
-  return pagedList(dto, toLegacyOrderListItem);
+export function toPageOrderPage(dto) {
+  return pagedList(dto, toPageOrderListItem);
 }
 
 /** `orderDetail` → the 订单详情 payload. */
-export function toLegacyOrderDetail(dto) {
+export function toPageOrderDetail(dto) {
   if (!dto) return {};
   return {
-    ...toLegacyOrderListItem(dto),
-    ...toLegacyReceiver(dto.receiver),
+    ...toPageOrderListItem(dto),
+    ...toPageReceiver(dto.receiver),
     mark: text(dto.buyerRemark),
     remark: '',
     custom_form: dto.customForm ? Object.keys(dto.customForm).map((k) => [k, dto.customForm[k]]) : [],
@@ -349,7 +348,7 @@ export function toLegacyOrderDetail(dto) {
 }
 
 /** `GET /api/v1/orders/counts` → `orderData`, the tab badges. */
-export function toLegacyOrderCounts(dto) {
+export function toPageOrderCounts(dto) {
   if (!dto) return {};
   return {
     order_count: toInt(dto.all, 0),
@@ -360,15 +359,15 @@ export function toLegacyOrderCounts(dto) {
     complete_count: toInt(dto.finished, 0),
     refund_count: toInt(dto.refunding, 0),
     cancel_count: toInt(dto.cancelled, 0),
-    // Retired wallet figures the 个人中心 header used to show.
+    // Retired wallet figures the 个人中心 header reads.
     sum_price: '0.00',
     integral_count: 0,
     coupon_count: 0,
   };
 }
 
-/** Legacy 订单列表 `{type, page, limit}` → `GET /api/v1/orders` query. */
-const TAB_BY_LEGACY_TYPE = {
+/** The page's 订单列表 `{type, page, limit}` → `GET /api/v1/orders` query. */
+const TAB_BY_PAGE_TYPE = {
   '': 'all',
   '-3': 'all',
   0: 'unpaid',
@@ -378,17 +377,17 @@ const TAB_BY_LEGACY_TYPE = {
   4: 'finished',
   '-1': 'refunding',
   '-2': 'refunding',
-  // 9 is the order list's 全部 tab (`orderStatus: 9`), not 待付款 (CR-4-i §14).
+  // 9 is the order list's 全部 tab (`orderStatus: 9`), not 待付款.
   9: 'all',
 };
 
-export function fromLegacyOrderListQuery(data) {
+export function fromPageOrderListQuery(data) {
   const src = data || {};
   const query = {};
   if (src.page !== undefined) query.page = toInt(src.page, 1);
   if (src.limit !== undefined) query.pageSize = toInt(src.limit, 20);
   const raw = src.type === undefined || src.type === null ? '' : String(src.type);
-  query.tab = TAB_BY_LEGACY_TYPE[raw] || 'all';
+  query.tab = TAB_BY_PAGE_TYPE[raw] || 'all';
   if (src.search) query.keyword = String(src.search);
   return query;
 }
@@ -398,16 +397,15 @@ export function fromLegacyOrderListQuery(data) {
 // ---------------------------------------------------------------------------
 
 /**
- * A "buy now" purchase used to be written into the cart as a hidden row so the confirm
- * page could refer to it by `cartId`. Nothing is written any more, so `postCartAdd` with
- * `new: 1` hands the page this ticket instead and `orderConfirm` unpacks it into a
+ * A "buy now" purchase is not written into the cart, so the confirm page has no
+ * `cartId` to refer to. `postCartAdd` with `new: 1` hands the page this ticket instead and `orderConfirm` unpacks it into a
  * `buy-now` preview.
  *
  * Format: `buynow:<skuId>:<quantity>[:<kind>:<activityId>[:<groupId>]]`.
  *
  * 拼团 and 预售 travel in the ticket rather than in the page state, because the confirm
  * page only forwards `cartId` to the **preview** (`getConfirm` sends
- * `{cartId, new, addressId, shipping_type}` and nothing else), and B1 needs `kind` on
+ * `{cartId, new, addressId, shipping_type}` and nothing else), and checkout needs `kind` on
  * both the preview and the create — the `OrderKindHandler` reserves the activity stock.
  * A colon can never appear inside an id, so the join is unambiguous.
  */
@@ -430,8 +428,8 @@ export function parseBuyNowTicket(value) {
   };
 }
 
-/** Legacy `orderConfirm`/`order/computed` input → `POST /api/v1/checkout/preview` body. */
-export function fromLegacyCheckoutInput(data) {
+/** The page's `orderConfirm` / `postOrderComputed` input → `POST /api/v1/checkout/preview` body. */
+export function fromPageCheckoutInput(data) {
   const src = data || {};
   const ticket = parseBuyNowTicket(src.cartId);
   const body = { kind: 'normal' };
@@ -471,23 +469,23 @@ function splitIds(value) {
 /**
  * `checkoutPreview` → the 确认订单 payload.
  *
- * Everything the page reads that the rewrite retired (积分抵扣, 余额支付, 线下支付,
+ * Everything the page reads that the shop does not run (积分抵扣, 余额支付, 线下支付,
  * 支付宝, 好友代付, 到店自提, 发票, 秒杀) is answered with a falsy constant so the
  * corresponding block never renders.
  */
-export function toLegacyOrderConfirm(dto) {
+export function toPageOrderConfirm(dto) {
   if (!dto) return {};
-  const receiver = toLegacyReceiver(dto.receiver);
+  const receiver = toPageReceiver(dto.receiver);
   const lines = list(dto.lines);
   const act = lines.length === 1 ? activityDiscountCents(dto.adjustments) : 0;
   const itemsAmount = act ? fromCents(cents(dto.itemsAmount) - act) : money(dto.itemsAmount);
   return {
-    cartInfo: lines.map((line) => toLegacyCheckoutLine(line, { activityDiscount: act })),
+    cartInfo: lines.map((line) => toPageCheckoutLine(line, { activityDiscount: act })),
     priceGroup: {
       totalPrice: itemsAmount,
       storePostage: money(dto.freightAmount),
       // 配送运费 renders `storePostage + storePostageDiscount`; there is no
-      // freight discount in the rewrite, and undefined made it ¥NaN (CR-4-i §9).
+      // freight discount, and undefined would make it ¥NaN.
       storePostageDiscount: '0.00',
       storeFreePostage: '0.00',
       costPrice: itemsAmount,
@@ -546,7 +544,7 @@ export function toLegacyOrderConfirm(dto) {
 }
 
 /** `checkoutLine` → a `cartInfo` row on the 确认订单 page. */
-export function toLegacyCheckoutLine(dto, opts) {
+export function toPageCheckoutLine(dto, opts) {
   if (!dto) return {};
   const hasSpec = !!text(dto.specText);
   const act = discountOf(opts);
@@ -585,34 +583,34 @@ export function toLegacyCheckoutLine(dto, opts) {
 }
 
 /** `postOrderComputed` only reads `data.result`; it is the recomputed price group. */
-export function toLegacyOrderComputed(dto) {
-  const legacy = toLegacyOrderConfirm(dto);
+export function toPageOrderComputed(dto) {
+  const confirm = toPageOrderConfirm(dto);
   return {
     result: {
       pay_price: money(dto && dto.payableAmount),
-      total_price: legacy.priceGroup ? legacy.priceGroup.totalPrice : '0.00',
+      total_price: confirm.priceGroup ? confirm.priceGroup.totalPrice : '0.00',
       pay_postage: money(dto && dto.freightAmount),
-      // `computedPrice()` copies this onto `priceGroup` (CR-4-i §9).
+      // `computedPrice()` copies this onto `priceGroup`.
       storePostageDiscount: '0.00',
-      coupon_price: legacy.couponPrice === undefined ? '0.00' : legacy.couponPrice,
+      coupon_price: confirm.couponPrice === undefined ? '0.00' : confirm.couponPrice,
       deduction_price: '0.00',
       use_integral: 0,
-      priceGroup: legacy.priceGroup,
+      priceGroup: confirm.priceGroup,
     },
     status: 'NONE',
   };
 }
 
-/** Legacy `orderCreate(key, data)` → `POST /api/v1/orders` body. */
-export function fromLegacyOrderCreateInput(key, data) {
+/** The page's `orderCreate(key, data)` → `POST /api/v1/orders` body. */
+export function fromPageOrderCreateInput(key, data) {
   const src = data || {};
-  const body = fromLegacyCheckoutInput(src);
+  const body = fromPageCheckoutInput(src);
   body.idempotencyKey = String(key || src.orderKey || '');
   if (src.mark) body.buyerRemark = String(src.mark);
   if (src.payPrice !== undefined && src.payPrice !== null && src.payPrice !== '') {
     body.expectedPayableAmount = money(src.payPrice);
   }
-  const customForm = fromLegacyCustomForm(src.custom_form);
+  const customForm = fromPageCustomForm(src.custom_form);
   if (customForm) body.customForm = customForm;
   return body;
 }
@@ -620,12 +618,12 @@ export function fromLegacyOrderCreateInput(key, data) {
 /**
  * The confirm page's `custom_form` → the contract's `customForm` record.
  *
- * The page sends back the field list `toLegacyOrderConfirm` gave it, each
+ * The page sends back the field list `toPageOrderConfirm` gave it, each
  * field carrying the shopper's `value`; the contract takes `{ [key]: answer }`.
  * An empty list — a product with no custom form — is no `customForm` at all:
- * `[]` was forwarded as is, and the contract refused the order (CR-4-i §10).
+ * `[]` was forwarded as is, and the contract refused the order.
  */
-function fromLegacyCustomForm(value) {
+function fromPageCustomForm(value) {
   if (Array.isArray(value)) {
     const out = {};
     for (const field of value) {
@@ -642,7 +640,7 @@ function fromLegacyCustomForm(value) {
 }
 
 /** `orderCreate` resolves to `{status, result: {orderId, …}}`. */
-export function toLegacyOrderCreateResult(dto) {
+export function toPageOrderCreateResult(dto) {
   if (!dto) return { status: 'ORDER_CREATE_ERROR', result: {} };
   return {
     status: dto.status === 'pending_payment' ? 'ORDER_CREATE' : 'PAY_DEFICIENCY',
@@ -657,11 +655,11 @@ export function toLegacyOrderCreateResult(dto) {
 }
 
 /** `getCashierOrder` — the 收银台 reads a handful of fields off the order. */
-export function toLegacyCashierOrder(dto) {
+export function toPageCashierOrder(dto) {
   if (!dto) return {};
   return {
     oid: toId(dto.id),
-    // Routable either way since CR-1-h; the cashier prints it next to the total.
+    // Routable either way; the cashier prints it next to the total.
     order_id: text(dto.orderNo),
     pay_price: money(dto.payableAmount),
     pay_postage: money(dto.freightAmount),
@@ -674,16 +672,16 @@ export function toLegacyCashierOrder(dto) {
     offline_pay_status: 0,
     friend_pay_status: 0,
     now_money: '0.00',
-    status: legacyStatusType(dto),
+    status: pageStatusType(dto),
   };
 }
 
 /** `orderProduct(unique)` — the 评价 page wants one line plus its quantity. */
-export function toLegacyOrderProduct(dto, orderItemId) {
+export function toPageOrderProduct(dto, orderItemId) {
   const line = list(dto && dto.items).find((i) => String(i.id) === String(orderItemId)) || null;
   if (!line) return { cart_num: 0, productInfo: {} };
-  const legacy = toLegacyOrderItem(line);
-  return { cart_num: legacy.cart_num, productInfo: legacy.productInfo, unique: legacy.unique };
+  const item = toPageOrderItem(line);
+  return { cart_num: item.cart_num, productInfo: item.productInfo, unique: item.unique };
 }
 
 export { moneyNumber, flag };

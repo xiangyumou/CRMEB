@@ -13,8 +13,7 @@ import { clientIp } from '../../../../../../src/server/request-meta';
  *
  * The body is handed over as a reader, not read here: `scanUpload` spends the
  * per-address and per-code budgets and checks the code first, so a stranger
- * cannot make the server parse multipart bodies as fast as it can send them
- * (CR-12-k).
+ * cannot make the server parse multipart bodies as fast as it can send them.
  */
 export const POST = handle(storageScanUpload, async (ctx, { params }) =>
   storage.scanUpload(ctx, params, () => storage.readFilePart(ctx.request), {

@@ -51,9 +51,9 @@ import {
  *  - **还在拼 counts teams, not orders.** A campaign with teams still forming
  *    cannot be deleted: the server answers `GROUPBUY_ACTIVITY_IN_USE` rather
  *    than leaving shoppers in a team whose campaign is gone;
- *  - **editing never resets the counters.** Legacy's `saveCombination` deleted
- *    and re-inserted the per-SKU rows on every save, so each edit zeroed 已售
- *    and un-sold the campaign's stock. Here the editor first *reads* the
+ *  - **editing never resets the counters.** Deleting and re-inserting the
+ *    per-SKU rows on every save would zero 已售 and un-sell the campaign's
+ *    stock on each edit. Here the editor first *reads* the
  *    activity — SKUs, 轮播图, 成本价 and all — and sends it back whole, so a
  *    price change is a price change and `sales` survives it.
  */

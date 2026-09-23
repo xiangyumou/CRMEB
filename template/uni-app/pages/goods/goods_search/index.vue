@@ -36,7 +36,7 @@
 			</view>
 			<view class='noCommodity'>
 				<view class='pictrue' v-if="bastList.length == 0">
-					<image :src="'/static/images/legacy/noSearch.png'"></image>
+					<image :src="'/static/images/common/noSearch.png'"></image>
 				</view>
 				<recommend :hostProduct='hostProduct' v-if="bastList.length == 0 && page > 1"></recommend>
 			</view>

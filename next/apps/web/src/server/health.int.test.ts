@@ -8,7 +8,7 @@ import type { Env } from './env';
 import { EXPECTED_MIGRATIONS } from './health';
 
 /**
- * `/api/v1/readyz` against a real PostgreSQL and Redis (CR-1-j2).
+ * `/api/v1/readyz` against a real PostgreSQL and Redis.
  *
  * The point of the endpoint is that it tells the truth about the things a
  * release is gated on, and that it says nothing else — so both halves are
@@ -116,7 +116,7 @@ describe('GET /api/v1/readyz', () => {
     });
   });
 
-  it('reports the effects backlog as a detail, never as a failing check (CR-40-k2)', async () => {
+  it('reports the effects backlog as a detail, never as a failing check', async () => {
     await harness.db.truncateAll();
     const empty = await readyzResponse();
     expect(empty.status).toBe(200);
@@ -185,7 +185,7 @@ describe('GET /api/v1/readyz', () => {
     });
   });
 
-  it('logs its 503 at info, not error (CR-1-j3)', async () => {
+  it('logs its 503 at info, not error', async () => {
     // The readiness gate polls this endpoint on every deploy, so a stack that
     // takes forty seconds to come up answers 503 forty times on its way to
     // serving. At `error` those forty lines describe nothing wrong and bury the

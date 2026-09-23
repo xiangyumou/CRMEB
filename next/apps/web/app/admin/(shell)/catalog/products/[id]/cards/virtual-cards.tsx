@@ -26,8 +26,8 @@ import { VIRTUAL_CARD_STATE, options } from '../../../catalog-enums';
  * The card pool **is** the stock: importing cards raises
  * `product_skus.stock` in the same transaction, voiding an unclaimed card
  * lowers it, and the product editor refuses a hand-typed stock for a card
- * product. Legacy kept the two apart, let them drift, and sold cards that did
- * not exist.
+ * product. Kept apart, the two drift, and the shop sells cards that do not
+ * exist.
  *
  * Card numbers are readable here and nowhere else in the admin, under their own
  * `catalog:card:read` atom — the rows are redeemable secrets, and seeing a card

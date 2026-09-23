@@ -1,12 +1,12 @@
 /**
  * 页面装修 (DIY) — the admin editor.
  *
- * Two audiences read this file. Stream G2 builds config panels and needs the
- * frozen panel API, the shared field editors and the data-source port; nothing
- * else in here concerns it. Everyone else wants the two screens.
+ * Two audiences read this file. A config panel needs the stable panel API, the
+ * shared field editors and the data-source port; nothing else in here concerns
+ * it. Everyone else wants the two screens.
  */
 
-// ── the frozen panel API (stream G2 builds against this) ────────────────────
+// ── the stable panel API (every config panel builds against this) ─────────
 export {
   bindDiyPanel,
   createDiyPanelRegistry,

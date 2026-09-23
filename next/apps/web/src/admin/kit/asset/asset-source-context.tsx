@@ -11,7 +11,7 @@ let fallback: AssetSource | null = null;
 
 /**
  * The material library the kit talks to. Defaults to the in-memory stub so the
- * picker works before stream F1 lands; wrap the shell in
+ * picker works without a server; wrap the shell in
  * `<AssetSourceProvider source={realSource}>` to swap it.
  */
 export function useAssetSource(): AssetSource {

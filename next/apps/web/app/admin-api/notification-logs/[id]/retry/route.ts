@@ -7,7 +7,7 @@ export const POST = handle(notificationAdminLogRetry, async (ctx, { params }) =>
   const result = await notificationAdmin.retryLog(ctx, params);
   // The message, not the template: a retry is an act on one customer's
   // undelivered notification, and "which one did we send again" is the
-  // question the log is read for (CR-17-k).
+  // question the log is read for.
   ctx.audit(`notification-log:${params.id}`);
   return result;
 });

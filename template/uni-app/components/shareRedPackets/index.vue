@@ -1,7 +1,7 @@
 <template>
 	<view v-if="sharePacket.isState" class='sharing-packets' :class='sharePacket.isState && showAnimate ? "":"right"'>
 		<view class='sharing-con' @click='goShare'>
-			<image :src="'/static/images/legacy/red-packets.png'" />
+			<image :src="'/static/images/common/red-packets.png'" />
 			<view class='text font-color'>
 				<view>{{$t(`最高返佣`)}}</view>
 				<view class='money'><text class='label'>{{$t(`￥`)}}</text>{{sharePacket.priceName}}</view>

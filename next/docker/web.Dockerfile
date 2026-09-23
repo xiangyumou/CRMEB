@@ -7,13 +7,13 @@
 #
 # The build context is `next/` (the pnpm workspace root), filtered by the
 # adjacent `web.Dockerfile.dockerignore`. A per-Dockerfile ignore file is used
-# rather than `next/.dockerignore` because the workspace root's dotfiles belong
-# to the orchestrator (docs/rewrite/OWNERSHIP.md).
+# rather than `next/.dockerignore` so each image states its own context filter
+# next to its Dockerfile.
 #
 # Why the whole workspace is copied before `pnpm install`, rather than the usual
-# manifests-only layer: the package list changes every time a stream adds a
-# package, and a hardcoded list of `COPY packages/<name>/package.json` lines is
-# a merge conflict waiting for every stream at once. The pnpm store cache mount
+# manifests-only layer: a hardcoded list of `COPY packages/<name>/package.json`
+# lines has to be edited every time a package is added, and a forgotten line
+# fails only inside the image build. The pnpm store cache mount
 # gives back most of what the finer-grained layer would have saved.
 
 ARG NODE_IMAGE=node:24-slim
@@ -74,8 +74,7 @@ COPY --chown=node:node docker/healthcheck/web.mjs /app/healthcheck.mjs
 
 # The uploads root is a volume in `deploy/next/compose.yml`. Creating it here,
 # owned by the runtime user, is what makes a *named* volume inherit that
-# ownership on first mount — the old stack needed a manual `chown -R 33:33` on
-# the host for exactly this reason (deploy/production/README.md).
+# ownership on first mount, with no manual `chown` on the host.
 RUN mkdir -p /data/uploads && chown -R node:node /data
 
 # uid 1000, shipped by the base image. Never root: an upload path bug in a

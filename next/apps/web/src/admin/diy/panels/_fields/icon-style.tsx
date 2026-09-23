@@ -7,14 +7,13 @@ import type { DiyFieldProps } from '../../panel-api';
  * `c_icon_style` — the style block for a menu list switched to 图标 mode.
  *
  * The widget is a bag of independent sub-groups and every row is a `v-if` on
- * the sub-group being present (`c_icon_style.vue:6-75`): 导航组 carries
+ * the sub-group being present: 导航组 carries
  * `color` / `size` / `position` / `rotate`, 会员中心 carries
  * `color` / `size` / `padding` / `rotate`. Rather than two near-copies, this
  * draws whichever of the six the node has, in the file's order.
  *
- * `position`'s legacy labels are icon glyphs from an admin font that did not
- * come across, so the three alignments are spelled out. The stored index is
- * unchanged.
+ * `position`'s three alignments are spelled out in words rather than drawn as
+ * icon glyphs. The stored value is the index.
  */
 
 export interface DiyIconStyleValue {

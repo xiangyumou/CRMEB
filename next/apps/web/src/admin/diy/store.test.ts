@@ -98,7 +98,7 @@ describe('loading a page', () => {
 
 describe('serialising', () => {
   it('reproduces an untouched page byte for byte', () => {
-    // A home page grows a `pageFoot` on save (legacy parity), so the page that
+    // A home page grows a `pageFoot` on save, so the page that
     // has to come back unchanged is one that already carries its footer.
     const saved = content('titles', 'guide', 'news', 'pageFoot');
     const state = createDiyEditorState(detail({ content: saved }));
@@ -120,7 +120,7 @@ describe('serialising', () => {
       'guide',
       'pageFoot',
     ]);
-    // Key, `timestamp` and `id` all agree, which is what `mobildConfig.js` did.
+    // Key, `timestamp` and `id` all agree, which is what the renderer expects.
     let previous = 0;
     for (const entry of entries) {
       const node = entry.node as { timestamp?: number; id?: string };

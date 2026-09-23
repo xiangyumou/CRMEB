@@ -9,12 +9,11 @@ import { DiyLinkField, DiySortableListField } from './media-fields';
 import { DiyFieldRow } from './section';
 
 /**
- * Six `mobileConfigRight/c_*` widgets that the barrel's first seventeen editors
- * had no counterpart for, composed here from antd and from the editors that do
- * exist. Promoted into `fields/` by CR-1-g2.
+ * Six field kinds the barrel's first seventeen editors have no counterpart
+ * for, composed here from antd and from the editors that do exist.
  *
- * None of them forks an existing editor: each is a widget the legacy admin has
- * and the barrel did not, and each follows the same rule as the rest —
+ * None of them forks an existing editor, and each follows the same rule as the
+ * rest —
  * **patch the config object, never rebuild it**, so sibling keys survive.
  */
 
@@ -30,9 +29,9 @@ export interface DiyCheckboxFieldProps extends DiyFieldProps<DiyListBox> {
 /**
  * `c_checkbox` — 展示信息 and friends.
  *
- * The odd one out among the legacy widgets: the selection lives in `type` as an
- * **array of ids** while `list` holds `{id, name}` labels, and `c_checkbox.vue`
- * caps it at `maxList` (3 for `showContent`). Ids stay exactly as stored —
+ * The odd one out among the field kinds: the selection lives in `type` as an
+ * **array of ids** while `list` holds `{id, name}` labels, capped at `maxList`
+ * (3 for `showContent`). Ids stay exactly as stored —
  * production has both numbers and strings in the same array.
  */
 export function DiyCheckboxField({
@@ -75,8 +74,8 @@ export interface DiyNumberFieldProps extends DiyFieldProps<DiySlider> {
 /**
  * `c_input_number` — a bare number box rather than `c_slider`'s track.
  *
- * The legacy widget defaults the bounds to `min || 1` / `max || 100`
- * (`c_input_number.vue:19-20`) but never writes them back, so neither does this.
+ * The bounds default to `min || 1` / `max || 100` but are never written back,
+ * so a stored node keeps exactly the keys it had.
  */
 export function DiyNumberField({ value, onChange, disabled = false, label }: DiyNumberFieldProps) {
   const config = value ?? {};
@@ -107,8 +106,8 @@ export interface DiyEnableFieldProps extends DiyFieldProps<DiyGroup> {
 /**
  * `c_header_switch` — a switch stored as `{title, enable}`.
  *
- * Distinct from the frozen `DiySwitchField`, which edits `{title, val}`. Two
- * different legacy widgets, two different keys; coercing one into the other
+ * Distinct from the shared `DiySwitchField`, which edits `{title, val}`. Two
+ * different field kinds, two different keys; coercing one into the other
  * would write a key the renderer does not read.
  */
 export function DiyEnableField({ value, onChange, disabled = false, label }: DiyEnableFieldProps) {
@@ -133,9 +132,8 @@ export interface DiyTextConfigFieldProps extends DiyFieldProps<DiyGroup> {
 /**
  * `c_text_config` — an on/off corner label with optional link.
  *
- * `link` is rendered only when the node already has the key
- * (`c_text_config.vue:17`, `v-if="configData.link !== undefined"`), so a node
- * saved without one does not gain it.
+ * `link` is rendered only when the node already has the key, so a node saved
+ * without one does not gain it.
  */
 export function DiyTextConfigField({
   value,
@@ -226,8 +224,7 @@ export interface DiyDateRangeFieldProps extends DiyFieldProps<DiyGroup> {
 /**
  * `c_datetime_picker` — a date range stored in `val` as two strings.
  *
- * The legacy picker is `value-format="yyyy/MM/dd"` (`c_datetime_picker.vue:14`),
- * so the stored strings are `2024/01/31`, not ISO. That format is what the
+ * The stored strings are `2024/01/31` (`yyyy/MM/dd`), not ISO. That format is what the
  * coupon query on the storefront parses, so it is reproduced exactly; clearing
  * the range stores `[]`, which is also what the factory default carries.
  */

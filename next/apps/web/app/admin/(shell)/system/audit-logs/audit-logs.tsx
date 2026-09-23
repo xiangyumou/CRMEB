@@ -28,7 +28,7 @@ const METHOD_COLOUR: Record<string, string> = {
  * Only writes are recorded (`handle()` skips GET), and the stored payload has
  * already been redacted — a password field never reaches this table. Two kinds
  * of actor write here: console admins, and 店员 on the storefront's staff
- * surface (CR-13-k2); every admin sign-in attempt is a row too (CR-12-k2).
+ * surface; every admin sign-in attempt is a row too.
  */
 export function AuditLogsPage() {
   const [viewing, setViewing] = useState<AuditLogItem | null>(null);

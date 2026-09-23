@@ -3,10 +3,9 @@ import type { MemberComponent } from '@shop/contracts/diy/schema/member.schema';
 /**
  * Factory default for `member` — 会员中心.
  *
- * Copied from `template/admin/src/components/mobilePage/home_member.vue`,
- * the object the legacy editor dropped into the page. Panel labels and all:
- * the renderer reads some of them, and a page saved without them is not the
- * page the storefront expects.
+ * The component exactly as a freshly dropped one is saved. Panel labels and
+ * all: the renderer reads some of them, and a page saved without them is not
+ * the page the storefront expects.
  *
  * `timestamp` is assigned by the store when the component is dropped.
  */
@@ -422,19 +421,18 @@ export const memberDefault = {
     max: 32,
   },
   /**
-   * CR-3-g2 — the 46 groups `c_member.vue:490-1321` injects on open.
+   * The 46 groups the 会员中心 panel edits.
    *
-   * 会员中心 is the headline case of the CR: without these a freshly dragged
-   * 会员中心 offered 操作内容, 数据内容, four 图文 keys and 通用样式 and nothing
-   * else, because a panel here draws a row only when the node carries its key.
-   * Every value below is the legacy `patchConfig`'s own literal, replayed in
-   * the order the legacy `$set` calls run, so a node created here and one the
-   * old admin opened and saved carry the same groups with the same values.
+   * Without these a freshly dragged 会员中心 would offer 操作内容, 数据内容,
+   * four 图文 keys and 通用样式 and nothing else, because a panel draws a row
+   * only when the node carries its key. The values, and their order, are the
+   * ones saved 会员中心 pages already carry, so a node created here and a
+   * stored one hold the same groups with the same values.
    *
    * `memberStyleConfig`, `checkboxInfo`, `menuConfig`, `paddingConfig`,
    * `marginConfig`, `zIndexConfig`, `componentBgConfig`, `borderConfig`,
-   * `shadowConfig` and the four `asset*` keys are not repeated: the default
-   * already carried them, and `patchConfig` leaves an existing key alone.
+   * `shadowConfig` and the four `asset*` keys are defined above and not
+   * repeated here.
    */
   nameColor: {
     title: '昵称颜色',

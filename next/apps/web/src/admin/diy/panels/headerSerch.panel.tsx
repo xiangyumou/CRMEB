@@ -22,17 +22,15 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 搜索框 — ports `c_search_box.vue`.
+ * 搜索框.
  *
- * Two indices drive the whole panel and the Vue file recomputes `rCom` from
- * them in four `watch`ers. Stated once:
+ * Two indices drive the whole panel:
  *
- * - `styleConfig.tabVal` — `0` 搜索, `1` 标题. `2` exists in `getRComContent`
- *   as an empty branch (`c_search_box.vue:238`) and draws nothing at all; the
- *   `tabList` has only two entries, so it is unreachable from the UI.
+ * - `styleConfig.tabVal` — `0` 搜索, `1` 标题. The `tabList` has only two
+ *   entries, so no other value is reachable from the UI.
  * - `styleTypeConfig.tabVal` — `0` 标题, `1` logo, anything else 固定定位.
  *
- * `searchBoxColor` has no control: `oneStyle` (`:151`) lists `tipColor` and
+ * `searchBoxColor` has no control; the style rows are `tipColor` and
  * `hotWordsColor` only. Left untouched rather than "fixed", because the
  * renderer still reads it and an operator's saved colour is not ours to change.
  */

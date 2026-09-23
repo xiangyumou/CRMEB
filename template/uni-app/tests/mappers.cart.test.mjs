@@ -1,20 +1,20 @@
 import { example, exampleBody, assertRenderable } from './helpers.mjs';
 import {
-  toLegacyCartItem,
-  toLegacyCartList,
-  toLegacyCartArray,
-  toLegacyCartCount,
-  toLegacyCartAddResult,
-  fromLegacyCartAddInput,
-  fromLegacyCartQuery,
-  toLegacyRebuyResult,
+  toPageCartItem,
+  toPageCartList,
+  toPageCartArray,
+  toPageCartCount,
+  toPageCartAddResult,
+  fromPageCartAddInput,
+  fromPageCartQuery,
+  toPageRebuyResult,
 } from '../api/mappers/cart.js';
 
 const CART = example('GET /api/v1/cart');
 const ROW = CART.items[0];
 
-describe('toLegacyCartItem', () => {
-  const row = toLegacyCartItem(ROW);
+describe('toPageCartItem', () => {
+  const row = toPageCartItem(ROW);
 
   it('maps the fields pages/order_addcart reads', () => {
     expect(row).toMatchObject({
@@ -43,96 +43,96 @@ describe('toLegacyCartItem', () => {
     expect(Object.prototype.hasOwnProperty.call(row.productInfo, 'attrInfo')).toBe(true);
     expect(row.productInfo.attrInfo).toMatchObject({ unique: '21', suk: '混合装,1000g' });
 
-    const plain = toLegacyCartItem({ ...ROW, specText: '' });
+    const plain = toPageCartItem({ ...ROW, specText: '' });
     expect(Object.prototype.hasOwnProperty.call(plain.productInfo, 'attrInfo')).toBe(false);
   });
 
   it('greys out an unavailable row and explains why', () => {
-    const gone = toLegacyCartItem({ ...ROW, available: false, state: 'off_shelf' });
+    const gone = toPageCartItem({ ...ROW, available: false, state: 'off_shelf' });
     expect(gone).toMatchObject({ is_valid: 0, attrStatus: false, invalid_reason: '商品已下架' });
-    expect(toLegacyCartItem({ ...ROW, available: false, state: 'out_of_stock' }).invalid_reason)
+    expect(toPageCartItem({ ...ROW, available: false, state: 'out_of_stock' }).invalid_reason)
       .toBe('库存不足');
   });
 
   it('survives a missing dto', () => {
-    expect(toLegacyCartItem(null)).toEqual({});
+    expect(toPageCartItem(null)).toEqual({});
   });
 });
 
-describe('toLegacyCartList / toLegacyCartArray', () => {
+describe('toPageCartList / toPageCartArray', () => {
   it('splits the rows into valid and invalid', () => {
-    const out = toLegacyCartList(CART);
+    const out = toPageCartList(CART);
     expect(out.valid).toHaveLength(1);
     expect(out.invalid).toHaveLength(0);
     expect(out.count).toBe(1);
     expect(out.deduction).toBeNull();
 
-    const mixed = toLegacyCartList({ ...CART, items: [ROW, { ...ROW, id: '5002', available: false }] });
+    const mixed = toPageCartList({ ...CART, items: [ROW, { ...ROW, id: '5002', available: false }] });
     expect(mixed.valid.map((r) => r.id)).toEqual([5001]);
     expect(mixed.invalid.map((r) => r.id)).toEqual([5002]);
   });
 
   it('returns a flat array for vcartList and never explodes on a missing payload', () => {
-    expect(toLegacyCartArray(CART)).toHaveLength(1);
-    expect(toLegacyCartArray(null)).toEqual([]);
-    expect(toLegacyCartList(null)).toMatchObject({ valid: [], invalid: [], count: 0 });
+    expect(toPageCartArray(CART)).toHaveLength(1);
+    expect(toPageCartArray(null)).toEqual([]);
+    expect(toPageCartList(null)).toMatchObject({ valid: [], invalid: [], count: 0 });
   });
 });
 
-describe('toLegacyCartCount', () => {
+describe('toPageCartCount', () => {
   const COUNT = example('GET /api/v1/cart/count');
 
   it('answers rows or quantity depending on numType', () => {
-    expect(toLegacyCartCount(COUNT, false).count).toBe(3);
-    expect(toLegacyCartCount(COUNT, true).count).toBe(5);
+    expect(toPageCartCount(COUNT, false).count).toBe(3);
+    expect(toPageCartCount(COUNT, true).count).toBe(5);
   });
 
   it('fills ids to the row count — every call site only reads ids.length', () => {
-    expect(toLegacyCartCount(COUNT, false).ids).toHaveLength(3);
+    expect(toPageCartCount(COUNT, false).ids).toHaveLength(3);
   });
 
   it('carries the availability split', () => {
-    expect(toLegacyCartCount(COUNT, false)).toMatchObject({ valid_count: 2, invalid_count: 1 });
-    expect(toLegacyCartCount(null, false)).toMatchObject({ count: 0, ids: [] });
+    expect(toPageCartCount(COUNT, false)).toMatchObject({ valid_count: 2, invalid_count: 1 });
+    expect(toPageCartCount(null, false)).toMatchObject({ count: 0, ids: [] });
   });
 });
 
-describe('toLegacyCartAddResult / toLegacyRebuyResult', () => {
+describe('toPageCartAddResult / toPageRebuyResult', () => {
   it('returns the new row id', () => {
-    expect(toLegacyCartAddResult(example('POST /api/v1/cart/items'))).toEqual({ cartId: 5001, count: 3 });
-    expect(toLegacyCartAddResult(null)).toEqual({ cartId: 0, count: 0 });
+    expect(toPageCartAddResult(example('POST /api/v1/cart/items'))).toEqual({ cartId: 5001, count: 3 });
+    expect(toPageCartAddResult(null)).toEqual({ cartId: 0, count: 0 });
   });
 
-  it('reads the same shape off a decrement, including the removed row (CR-2-h)', () => {
+  it('reads the same shape off a decrement, including the removed row', () => {
     // `/cart/items/decrements` answers with `cartMutationResult`, so the minus
     // button on the product page needs no new mapper.
-    expect(toLegacyCartAddResult(example('POST /api/v1/cart/items/decrements')))
+    expect(toPageCartAddResult(example('POST /api/v1/cart/items/decrements')))
       .toEqual({ cartId: 5001, count: 3 });
-    expect(toLegacyCartAddResult({ item: null, cart: { items: 2 } }))
+    expect(toPageCartAddResult({ item: null, cart: { items: 2 } }))
       .toEqual({ cartId: 0, count: 2 });
   });
 
   it('keeps the cateId the 再次购买 page navigates with', () => {
-    const out = toLegacyRebuyResult(example('POST /api/v1/cart/rebuys'));
+    const out = toPageRebuyResult(example('POST /api/v1/cart/rebuys'));
     expect(out).toEqual({ cateId: 0, added: 1, skipped: [22] });
   });
 });
 
-describe('the fromLegacy direction', () => {
+describe('the fromPage direction', () => {
   it('builds the POST body the contract example shows', () => {
-    expect(fromLegacyCartAddInput({ uniqueId: '21', cartNum: 2 }))
+    expect(fromPageCartAddInput({ uniqueId: '21', cartNum: 2 }))
       .toEqual(exampleBody('POST /api/v1/cart/items'));
   });
 
-  it('accepts either legacy spelling and defaults the quantity', () => {
-    expect(fromLegacyCartAddInput({ unique: '21', num: 3 })).toEqual({ skuId: '21', quantity: 3 });
-    expect(fromLegacyCartAddInput({})).toEqual({ skuId: '', quantity: 1 });
+  it('accepts either page spelling and defaults the quantity', () => {
+    expect(fromPageCartAddInput({ unique: '21', num: 3 })).toEqual({ skuId: '21', quantity: 3 });
+    expect(fromPageCartAddInput({})).toEqual({ skuId: '', quantity: 1 });
   });
 
   it('turns status 1/0 into the filter the route takes', () => {
-    expect(fromLegacyCartQuery({ page: 1, limit: 20, status: 1 }))
+    expect(fromPageCartQuery({ page: 1, limit: 20, status: 1 }))
       .toEqual({ page: 1, pageSize: 20, filter: 'available' });
-    expect(fromLegacyCartQuery({ status: 0 })).toEqual({ filter: 'unavailable' });
-    expect(fromLegacyCartQuery({})).toEqual({});
+    expect(fromPageCartQuery({ status: 0 })).toEqual({ filter: 'unavailable' });
+    expect(fromPageCartQuery({})).toEqual({});
   });
 });

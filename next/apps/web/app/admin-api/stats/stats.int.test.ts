@@ -26,7 +26,7 @@ import type { Env } from '../../../src/server/env';
  *   an audit log that fills up with page views is one nobody reads.
  *
  * `VALIDATE_RESPONSES` is on, as in CI, so each 200 below is also an assertion
- * that the service's output satisfies the frozen response schema.
+ * that the service's output satisfies the response schema.
  */
 
 let harness: TestCtx;
@@ -212,13 +212,13 @@ describe('/admin-api/stats', () => {
   });
 
   /**
-   * The home page's three statistics tiles are not a route of this stream's:
-   * they are contributed to F1's `/admin-api/dashboard/header` by importing
-   * `@shop/core/stats`, which happens as a module side effect through
-   * `@shop/core/domains`. That is exactly the kind of registration that
-   * disappears silently — a bundler dropping an unused namespace import is
-   * enough (see `cdc04601d`) — so it is asserted end to end, through the real
-   * route, rather than by poking the registry.
+   * The home page's three statistics tiles are not a route of this domain's: they
+   * are contributed to the system domain's `/admin-api/dashboard/header` by
+   * importing `@shop/core/stats`, which happens as a module side effect through
+   * `@shop/core/domains`. That is exactly the kind of registration that disappears
+   * silently — a bundler dropping an unused namespace import is enough — so it is
+   * asserted end to end, through the real route, rather than by poking the
+   * registry.
    */
   it('contributes the three home-page tiles to the dashboard header', async () => {
     const headers = await adminCookie(['system:dashboard:read', 'stats:trade:read']);
@@ -249,7 +249,7 @@ describe('/admin-api/stats', () => {
     }
     expect(
       (await harness.ctx.db.select().from(auditLogs)).filter(
-        // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+        // Sign-ins are audited too; this test is about the operation.
         (row) => row.routeId !== 'auth.adminLogin',
       ),
     ).toEqual([]);

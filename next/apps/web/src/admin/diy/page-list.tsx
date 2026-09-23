@@ -36,9 +36,8 @@ import { Can } from '../session';
 /**
  * 页面装修 list.
  *
- * The legacy screen was four tabs over four tables (首页 / 分类 / 商品详情 /
- * 个人中心 / 微页面); this is one table with a 类型 filter, because they were the
- * same rows with the same columns and the same actions all along.
+ * One table with a 类型 filter (首页 / 分类 / 商品详情 / 个人中心 / 微页面),
+ * because every kind has the same columns and the same actions.
  */
 
 const KIND_LABELS: StatusMap<DiyPageSummary['kind']> = {

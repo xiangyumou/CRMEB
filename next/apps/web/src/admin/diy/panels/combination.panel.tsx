@@ -21,9 +21,7 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 拼团 — ports `c_home_pink.vue`, five indices and 26 `rCom` permutations.
- *
- * The permutations collapse to five independent rules:
+ * 拼团, five indices and five independent rules:
  *
  * - `styleConfig.tabVal` — `0` 颜色背景 keeps the header on a colour, so it owns
  *   `headerBgColor`, `imgColorConfig`, `headerBntColor2` and `tipsColor2`;
@@ -38,7 +36,7 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
  *   label colours.
  *
  * The products are not picked here. 拼团 shows the live 拼团 list capped by
- * `numberConfig`, which is why the Vue file has no `c_goods` anywhere.
+ * `numberConfig`, so there is no product picker.
  */
 export default defineDiyPanel<CombinationComponent>({
   key: 'combination',

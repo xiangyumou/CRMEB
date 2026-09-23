@@ -19,10 +19,9 @@ import { DiyGridItemStyleField, DiyHeaderStyleField, DiyIconStyleField } from '.
 import type { DiyIconStyleValue } from './_fields';
 
 /**
- * 导航组 — ports `c_home_menu.vue`, the most conditional panel in the set.
+ * 导航组, the most conditional panel in the set.
  *
- * Four indices, from `generateContentConfig` / `generateStyleConfig` /
- * `updateContentConfig` (`c_home_menu.vue:280-345`):
+ * Four indices:
  *
  * - `menuStyleConfig.tabVal` — `0` 排列展示 (offers 单行显示), `1` 宫格展示
  *   (offers 宫格样式 and 宫格项样式), `2` 列表展示 (offers neither).
@@ -30,12 +29,10 @@ import type { DiyIconStyleValue } from './_fields';
  * - `headerConfig.enable` — gates the two corner texts and the header style.
  * - `toneConfig.tabVal` — the indicator colours, and only when 分页滑动 is on.
  *
- * **`iconStyleConfig` is rendered here although the legacy panel never shows
- * it.** `updateContentConfig` computes `middleStyle = iconStyle` when the list
- * is in 图标 mode and then overwrites it on the very next line
- * (`:328-331`), so the block is dead code. `menus.vue:522` reads
- * `iconStyleConfig.position`, and `c_menu_list` lets an operator switch to
- * 图标, which leaves them with icons they cannot style. Every key written here
+ * **`iconStyleConfig` is rendered when the list is in 图标 mode.** The
+ * storefront's `menus.vue` reads `iconStyleConfig.position`, and `c_menu_list`
+ * lets an operator switch to 图标; without this block they would have icons
+ * they cannot style. Every key written here
  * is one the factory default already defines.
  */
 export default defineDiyPanel<MenusComponent>({

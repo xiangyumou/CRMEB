@@ -19,26 +19,24 @@ import { DiyUploadField } from './media-fields';
 import { DiySection } from './section';
 
 /**
- * 通用样式 — a faithful port of
- * `template/admin/src/components/mobileConfigRight/c_common_style.vue`.
+ * 通用样式 — the shared style block.
  *
  * Composed entirely from the other field editors in this directory; nothing
- * here forks or reimplements one. It exists because the legacy editor renders
- * exactly this block, in exactly this order, at the bottom of the 样式设置 tab of
- * 32 of the 33 config panels, and repeating twelve fields in every panel is how
- * the order drifts.
+ * here forks or reimplements one. It exists because exactly this block, in
+ * exactly this order, sits at the bottom of the 样式设置 tab of 32 of the 33
+ * config panels, and repeating twelve fields in every panel is how the order
+ * drifts.
  *
- * Three details copied verbatim from the Vue file:
+ * Three details the stored pages depend on:
  *
  * - every row is conditional on the key being **present in the node**
  *   (`v-if="configObj.moduleColor"`), never on a default. A page saved by an
- *   older build has no `componentBgConfig`, and the legacy panel simply did not
- *   draw it rather than inventing one — writing a fresh group in would change
- *   bytes the renderer reads.
- * - `zIndexConfig` is commented out at `c_common_style.vue:5`. It stays out
- *   here too, so the value survives untouched instead of becoming editable in
- *   a place the old admin never offered.
- * - `marginConfig` really is rendered **before** `paddingConfig` (`:27-28`).
+ *   older build has no `componentBgConfig`, and the panel does not draw it
+ *   rather than inventing one — writing a fresh group in would change bytes
+ *   the renderer reads.
+ * - `zIndexConfig` is not offered: the value survives untouched, but it is
+ *   not an operator setting.
+ * - `marginConfig` really is rendered **before** `paddingConfig`.
  */
 
 export interface DiyCommonStyleSectionProps<T extends DiyComponentValue> {
@@ -92,14 +90,12 @@ const DATA_KEYS: StyleKeys = {
 };
 
 /**
- * 数据样式 — a faithful port of `c_data_style.vue`, the second style block that
- * only 超级组件 (`customComponent`) has. Same nine editors, the `…DataConfig`
- * keys, and no colour rows.
+ * 数据样式 — the second style block, which only 超级组件 (`customComponent`)
+ * has. Same nine editors, the `…DataConfig` keys, and no colour rows.
  *
- * The legacy panel *creates* these six groups on open
- * (`c_custom_component.vue:patchConfig`) because the factory default has none
- * of them. This block does not: it draws what the node carries, so opening a
- * page and saving it cannot add eight objects the renderer never had.
+ * The factory default (`customComponent.default.ts`) carries these six groups.
+ * This block never creates them: it draws what the node carries, so opening a
+ * stored page and saving it cannot add objects the renderer never had.
  */
 export function DiyDataStyleSection<T extends DiyComponentValue>(
   props: DiyCommonStyleSectionProps<T>,

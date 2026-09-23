@@ -3,12 +3,12 @@ import type { ConsoleMessage, Page } from '@playwright/test';
 import { test, expect, cjk } from '../src/fixtures';
 
 /**
- * The smoke P0-B deferred to this stream (`status/p0b.md`, last section):
- * "登录页渲染 + 用 mock 的 me 渲染外壳，以及 kit 演示页各 tab 的控制台零报错".
+ * The browser smoke: the login page renders, the shell renders for a real
+ * session, and every tab of the kit demo page leaves the console clean.
  *
- * P0-B verified those three pages with `curl`, which proves the server did not
- * throw; it cannot prove the browser did not. This is the part that needed a
- * browser, and it is why the suite runs a *production* build — `next dev`
+ * `curl` can prove the server did not throw; it cannot prove the browser did
+ * not. That is why this runs in a browser, and why the suite runs a
+ * *production* build — `next dev`
  * would fill the console with React's development warnings and the assertion
  * would have to be watered down until it asserted nothing.
  */
@@ -47,8 +47,8 @@ test('the login page renders in a browser, with nothing in the console', async (
   await expect(page.getByLabel('账号')).toBeVisible();
   await expect(page.getByLabel('密码')).toBeVisible();
   await expect(page.getByRole('button', { name: cjk('登录') })).toBeEnabled();
-  // The slider slot is empty until a stream registers one (E1 owns it), and
-  // an unregistered captcha must not render a dead field.
+  // The slider slot is empty until a captcha provider registers one, and an
+  // unregistered captcha must not render a dead field.
   await expect(page.getByLabel('安全验证')).toHaveCount(0);
 
   expect(errors, errors.join('\n')).toEqual([]);
@@ -66,7 +66,7 @@ test('the shell renders for a real session, with nothing in the console', async 
   await page.getByRole('button', { name: cjk('登录') }).click();
 
   await expect(page).toHaveURL(/\/admin$/);
-  // The three pieces of chrome P0-B built and could not see: the sider, the
+  // The three pieces of chrome only a browser can see: the sider, the
   // bell (which opens an SSE stream and must stay quiet when it 404s), and
   // the account menu.
   await expect(page.getByRole('link', { name: '商城管理后台' })).toBeVisible();

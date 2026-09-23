@@ -14,18 +14,17 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 优惠券 — ports `c_home_coupon.vue`.
+ * 优惠券.
  *
  * The coupons themselves are not picked here: the component shows whatever the
- * storefront's live coupon list returns, capped by `numberConfig.val`. That is
- * `c_home_coupon.vue:62-68`, whose whole 内容设置 tab is a title and a slider,
- * and it matches `coupon.vue` in the renderer, which fetches on mount.
+ * storefront's live coupon list returns, capped by `numberConfig.val`, so the
+ * whole 内容设置 tab is a title and a slider. It matches the storefront's
+ * `coupon.vue`, which fetches on mount.
  *
- * Which colour rows appear depends on the style **and** the tone
- * (`getRComStyle`, `:186-215`): 风格三 has no button and no card background of
- * its own, 风格二 has a button but no card background. `spacingConfig` and
- * `moduleColor2` are declared in the Vue file but never reach `rCom`, so they
- * get no control here either and survive untouched.
+ * Which colour rows appear depends on the style **and** the tone: 风格三 has no
+ * button and no card background of its own, 风格二 has a button but no card
+ * background. `spacingConfig` and `moduleColor2` are not operator settings, so
+ * they get no control and survive untouched.
  */
 export default defineDiyPanel<CouponComponent>({
   key: 'coupon',

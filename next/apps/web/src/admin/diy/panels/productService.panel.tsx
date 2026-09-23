@@ -17,12 +17,11 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 商品服务 — ports `c_product_service.vue`: the 活动 / 选择 / 参数 / 服务 rows of a
+ * 商品服务: the 活动 / 选择 / 参数 / 服务 rows of a
  * product page, which of them show, and their colours.
  *
- * `componentBgColor` is pushed into the style branch by `c_product_service.vue`
- * but is not in the factory default, so the row draws only for a node that has
- * one; `c_common_style` covers the background for everything else.
+ * `componentBgColor` is not in the factory default, so its row draws only for
+ * a node that has one; `c_common_style` covers the background for everything else.
  */
 export default defineDiyPanel<ProductServiceComponent>({
   key: 'productService',

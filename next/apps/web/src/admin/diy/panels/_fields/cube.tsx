@@ -10,45 +10,33 @@ import type { DiyFieldProps } from '../../panel-api';
  * `c_button_style` + `c_pictrue` for 图片魔方 (`pictureCube`) — the layout picker
  * and the cells it creates.
  *
- * **The counts are the contract.** `c_button_style.vue:132-200` holds eleven
- * cube layouts, each with a `count`, and picking one writes both the index into
- * `styleConfig.tabVal` and that `count` into `styleConfig.count`
- * (`c_button_style.vue:256-257`). `c_pictrue` then grows `picStyle.picList` to
- * `count` cells and never shrinks it (`:347-351`), so a cell filled under a
- * wider layout survives a narrower one. Both behaviours are reproduced,
- * including the growth-only rule — shrinking would drop an operator's images
- * the moment they previewed a different layout.
+ * **The counts are the contract.** There are eleven cube layouts, each with a
+ * `count`, and picking one writes both the index into `styleConfig.tabVal`
+ * and that `count` into `styleConfig.count`. `picStyle.picList` then grows to
+ * `count` cells and never shrinks, so a cell filled under a wider layout
+ * survives a narrower one. Shrinking would drop an operator's images the
+ * moment they previewed a different layout.
  *
- * The legacy picker shows eleven thumbnails from `admin/src/assets/images/`.
- * Those are admin assets that did not come across, so the layouts are named
- * 样式一…样式十一 with their cell counts. The stored value is identical.
+ * The layouts are named 样式一…样式十一 with their cell counts rather than
+ * drawn as thumbnails. The stored value is the same either way.
  *
- * Each cell is `{image, link}` and that is what the renderer reads
- * (`pictureCube.vue:374`). `menuConfig` is the legacy panel's own bookkeeping —
- * it mirrors whichever cell is selected into a one-row `c_menu_list` so the
- * canvas and the row editor stay in step — and the renderer never reads it, so
- * editing the cells here leaves it untouched rather than writing a mirror of a
- * selection this panel does not have.
+ * Each cell is `{image, link}` and that is what the storefront renderer reads
+ * (`subpackage/diyComponents/pictureCube.vue`). `menuConfig` on a stored node
+ * mirrors whichever cell was selected into a one-row `c_menu_list`; the
+ * renderer never reads it, so editing the cells here leaves it untouched
+ * rather than writing a mirror of a selection this panel does not have.
  *
- * **The free-draw canvas is not 样式十一, and nothing can select it.** CR-3-g2
- * read `c_pictrue.vue:178` (`v-if="style === 11"`) as 样式十一's editor, but
- * `style` is `styleConfig.tabVal`, a **0-based** index into the list above.
- * That list has eleven live entries, `cube2` … `cube12`, so its last index is
- * 10 — 样式十一 is the one-cell `cube12` layout, edited here like any other.
- * Index 11 is `cube1`, the 16-cell free-draw grid at
- * `c_button_style.vue:199-204`, and it is **commented out**: the shipped legacy
- * admin cannot select it either, so `docPicList` only ever reached a page saved
- * while that entry was still live.
- *
- * So there is no reachable canvas to port and no selectable style to hide.
- * `CUBE_OPTIONS` offers exactly the eleven layouts the old admin offers,
- * `picStyle.docPicList` is never read or written here so such a page saves back
- * byte-identical, and the storefront still draws the areas it carries
- * (`pictureCube.vue:330-331`, `v-else-if="style == 11"` + `v-if="docPicList.length"`).
- * Recorded in `docs/rewrite/status/g3.md`.
+ * **There is no free-draw canvas, and nothing can select one.** `style` is
+ * `styleConfig.tabVal`, a **0-based** index into the eleven layouts, so its
+ * last index is 10 — 样式十一 is the one-cell layout, edited here like any
+ * other. Index 11 would be a 16-cell free-draw grid (`picStyle.docPicList`)
+ * that no layout option selects. A stored page that carries `docPicList` is
+ * never read or written here, so it saves back byte-identical, and the
+ * storefront still draws the areas it carries (`style == 11` with a non-empty
+ * `docPicList`).
  */
 
-/** Cell count per layout, from `c_button_style.vue`'s `pictureCube` list. */
+/** Cell count per layout. */
 const CUBE_COUNTS = [2, 2, 3, 3, 3, 3, 3, 4, 5, 4, 1] as const;
 
 const CUBE_NAMES = [

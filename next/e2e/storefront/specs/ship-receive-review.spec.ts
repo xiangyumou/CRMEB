@@ -20,9 +20,8 @@ import { uniField } from '../src/uni';
  * links the order-detail page follows — receipt confirmed through the real
  * receipt route in between — and write the review against the multi-spec
  * product's line. The third makes the whole motion through the order-detail
- * page (确认收货, then 评价) on a zero-spec line: the two defects that once
- * stopped it (CR-4-i §7, the page throwing on `help_info`; §8, a zero-spec
- * line crashing the review page) are closed.
+ * page (确认收货, then 评价) on a zero-spec line, which proves the page copes
+ * with a missing `help_info` and the review page with a zero-spec line.
  */
 
 const TRACKING_NO = 'SF9988776655';

@@ -86,8 +86,8 @@ describe('syncRepeatables', () => {
     await syncRepeatables(queue, indexJobs(allJobs), logger);
     const names = (await queue.getJobSchedulers()).map((s) => s.name ?? s.key).sort();
     // Every scheduled job this worker ships with really got a scheduler, and
-    // nothing was registered twice. Not a literal list: every domain stream
-    // adds jobs, and this file belongs to P0-A (`docs/rewrite/cr/CR-3-golden.md`).
+    // nothing was registered twice. Not a literal list: every domain adds jobs,
+    // and a literal list would make each of them edit this file.
     const scheduled = allJobs
       .filter((definition) => definition.repeat && !definition.disabled)
       .map((definition) => definition.name)

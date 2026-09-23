@@ -6,8 +6,8 @@ import { handle } from '../../../../../src/server';
  * `/api/v1/payments/:outTradeNo` — what the client polls after 拉起支付.
  *
  * Answers from the database only. A poll loop must never be able to make the
- * shop call WeChat: that is what turned a stuck client into a rate-limit
- * incident in the legacy system. The gateway is asked by the reconciliation
+ * shop call WeChat, or a stuck client becomes a rate-limit incident. The
+ * gateway is asked by the reconciliation
  * sweep, on its own schedule.
  */
 export const GET = handle(paymentStatus, (ctx, { params }) =>

@@ -73,7 +73,7 @@ test('a role with one atom sees one corner of the admin, and 403s everywhere els
   }
 
   // A link to a screen outside the role is a 403 inside the chrome, not an
-  // empty table and a toast per failed fetch (CR-16-k).
+  // empty table and a toast per failed fetch.
   await narrowPage.goto('/admin/system/admins');
   await expect(narrowPage.getByText('抱歉，你没有权限访问该页面。')).toBeVisible();
   await expect(narrowPage.getByRole('menu')).toBeVisible();
@@ -81,7 +81,7 @@ test('a role with one atom sees one corner of the admin, and 403s everywhere els
   await narrowPage.goto('/admin/orders');
   await expect(narrowPage.getByText('抱歉，你没有权限访问该页面。')).toHaveCount(0);
 
-  // 个人资料 in the avatar menu opens a page that exists, for any role (CR-16-k).
+  // 个人资料 in the avatar menu opens a page that exists, for any role.
   await narrowPage.getByTestId('user-menu').click();
   await narrowPage.getByRole('menuitem', { name: '个人资料' }).click();
   await expect(narrowPage).toHaveURL(/\/admin\/system\/profile$/);

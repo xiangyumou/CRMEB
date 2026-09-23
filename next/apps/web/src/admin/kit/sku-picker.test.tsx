@@ -22,8 +22,8 @@ import { SkuPicker, type PickedSku } from './sku-picker';
 /**
  * 选择商品规格 — search, expand, tick, confirm.
  *
- * The picker is the answer to every "商品 ID" box the activity forms used to
- * show. What matters is that it reads A's own routes (so the rows are the
+ * The picker is the answer to a "商品 ID" box on an activity form. What
+ * matters is that it reads the catalog's own routes (so the rows are the
  * product page's rows) and that what it hands back carries the *product* id
  * alongside the SKU id — a SKU id alone is exactly the mistake the picker
  * exists to make impossible.
@@ -74,7 +74,7 @@ describe('SkuPicker', () => {
 
     renderAdmin(<SkuPicker open onClose={() => {}} onSelect={onSelect} />);
 
-    // The search hits A's admin list route with the typed keyword.
+    // The search hits the catalog's admin list route with the typed keyword.
     await user.type(screen.getByPlaceholderText('搜索商品名称'), '挂耳');
     await user.click(screen.getByRole('button', { name: zhName('搜索') }));
     await waitFor(() =>

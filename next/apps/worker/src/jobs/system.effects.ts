@@ -13,7 +13,7 @@ import { defineJob } from '../define-job';
  * `FOR UPDATE SKIP LOCKED` already handles.
  *
  * A run claims a batch, and keeps claiming while each batch comes back full,
- * for at most `budgetMs` (CR-40-k2). One batch per tick capped a worker at
+ * for at most `budgetMs`. One batch per tick capped a worker at
  * 10 effects/s however long the queue was — about 1.7 paid orders/s — and the
  * load smoke left thousands pending. The budget stays under the 5 s repeat,
  * so a run always returns and a redeploy never waits on an unbounded drain.

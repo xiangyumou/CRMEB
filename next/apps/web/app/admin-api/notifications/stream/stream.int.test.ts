@@ -10,7 +10,7 @@ import { serveAdminNotificationStream, type AdminNotificationStreamOptions } fro
 import { GET } from './route';
 
 /**
- * The bell's SSE stream against a real Redis (CR-15-k2).
+ * The bell's SSE stream against a real Redis.
  *
  * 1. It re-checks the session on every keep-alive tick and closes once the
  *    session is revoked — a password change used to leave an open stream
@@ -146,7 +146,7 @@ async function subscriberConnections(): Promise<number> {
   return list.split('\n').filter((line) => /\bsub=[1-9]/.test(line)).length;
 }
 
-describe('the admin notification stream (CR-15-k2)', () => {
+describe('the admin notification stream', () => {
   it('forwards a push as a named event, and keeps the stream alive while the session resolves', async () => {
     const { adminId, token } = await signIn();
     const stream = await open(token);

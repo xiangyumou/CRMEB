@@ -60,7 +60,7 @@
 					</block>
 					<view class='noCommodity' v-if="presellList.length == 0">
 						<view class='emptyBox'>
-							<image :src="'/static/images/legacy/no-thing.png'"></image>
+							<image :src="'/static/images/common/no-thing.png'"></image>
 							<view class="tips">{{$t(`暂无商品，去看点别的吧`)}}</view>
 						</view>
 					</view>
@@ -209,7 +209,7 @@
 				that.getPresellProductList();
 			},
 			goDetails(item) {
-				// 预售详情, keyed by the activity id (CR-2-i): it reads the presale price and
+				// 预售详情, keyed by the activity id: it reads the presale price and
 				// buys with `advanceId`, which the plain product page cannot.
 				uni.navigateTo({
 					url: '/pages/activity/presell_details/index?id=' + item.id

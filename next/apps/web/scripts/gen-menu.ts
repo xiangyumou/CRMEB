@@ -2,7 +2,7 @@
  * Aggregates every `src/admin/menu/<domain>.menu.ts` into `menu.gen.ts`.
  *
  * Domains add a file; nothing shared is edited; the output is gitignored
- * (`*.gen.ts`), so parallel streams never conflict over it.
+ * (`*.gen.ts`), so two domains never conflict over it.
  *
  * Run by `pnpm --filter @shop/web gen` (and transitively by typecheck / lint /
  * test / build through turbo).

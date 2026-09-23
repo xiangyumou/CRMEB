@@ -1,9 +1,9 @@
 # Build context filter for `edge/Dockerfile` (context: the repository root).
 #
-# The root `.dockerignore` excludes `template/`, which is exactly where the H5
-# build output lives. BuildKit prefers this per-Dockerfile file, so the edge
-# build gets its own view of the context without touching a root dotfile that
-# belongs to the orchestrator and to the legacy PHP image.
+# The build context is the repository root, and the H5 build output lives under
+# `template/`. BuildKit prefers this per-Dockerfile file over the root
+# `.dockerignore`, so the edge build gets its own view of the context: the edge
+# config and the H5 build, nothing else.
 #
 # Everything is excluded, then the two things the edge needs are allowed back.
 

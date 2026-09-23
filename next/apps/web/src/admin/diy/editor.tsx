@@ -50,9 +50,8 @@ import {
  * 页面装修 editor — the three-pane shell.
  *
  * Palette on the left, the page on a phone-width canvas in the middle, the
- * selected component's config panel on the right. Same arrangement as the
- * legacy `diyIndex.vue`, because operators already know it and there is nothing
- * wrong with it.
+ * selected component's config panel on the right — the arrangement operators
+ * of this kind of page builder already know.
  *
  * Saving sends the whole component map with the version the editor loaded. A
  * page that moved underneath comes back `DIY_VERSION_CONFLICT` rather than
@@ -294,10 +293,9 @@ function Pane({ title, children }: { title: string; children: ReactNode }) {
 /**
  * Where the storefront serves this page.
  *
- * The uni-app routes are fixed strings in `template/uni-app/pages.json`; the
- * micro-page one is what `list.vue:341` built its QR code from. The origin is
- * the admin's own, which is right when the H5 build is served from the same
- * host and is the only thing this stream can know without owning a config key.
+ * The uni-app routes are fixed strings in `template/uni-app/pages.json`. The
+ * origin is the admin's own, which is right because the edge serves the H5
+ * build from the same host.
  */
 export function storefrontPreviewPath(kind: string, pageId: string): string {
   switch (kind) {

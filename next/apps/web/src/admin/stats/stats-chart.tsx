@@ -27,7 +27,7 @@ import { formatAxis, formatFigure } from './format';
  *
  * Two y-axes at most: one per *format*. A 营业额 in tens of thousands and a
  * 订单数 in dozens on one axis makes the order count a flat line at zero, which
- * is how the legacy pages managed to draw a chart nobody read.
+ * is how a chart ends up nobody reads.
  */
 
 const PALETTE = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#13c2c2', '#722ed1'];

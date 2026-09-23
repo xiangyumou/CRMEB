@@ -15,9 +15,9 @@ import type { Env } from '../../../../../src/server/env';
 /**
  * `POST /api/v1/user-coupons/applicable` as HTTP — the 确认订单 coupon picker.
  *
- * CR-1-h4: the confirm page holds no category ids for its lines, so a 品类券
- * came back greyed out for a cart in its category. The server now looks each
- * line's categories up from `productId` and ignores any the body sends. What
+ * The confirm page holds no category ids for its lines, so a 品类券 would come
+ * back greyed out for a cart in its category. The server looks each line's
+ * categories up from `productId` and ignores any the body sends. What
  * is proved here is the wire: a body with no `categoryIds` is accepted, the
  * 品类券 is usable, and a body that *claims* a category does not make it so.
  * The container validates responses against the contract, as CI does.
@@ -172,7 +172,7 @@ async function categoryCoupon(userId: number, categoryId: number): Promise<numbe
 // the picker
 // ---------------------------------------------------------------------------
 
-describe('POST /api/v1/user-coupons/applicable — CR-1-h4', () => {
+describe('POST /api/v1/user-coupons/applicable — categories from the server', () => {
   it('offers a 品类券 for a cart in its category, with no categoryIds in the body', async () => {
     const { userId, headers } = await shopper();
     const [inCategory, elsewhere] = [await product(), await product()];

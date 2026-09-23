@@ -13,8 +13,8 @@ import { useInvalidateRoutes, useRouteMutation, useRouteQuery } from '@/admin/ap
 /**
  * 扫码上传 — put a photo from your phone into the library.
  *
- * The old system kept **one global token** in a cache key, so whoever scanned
- * any QR code uploaded into whoever had asked for one last. Here the token is
+ * One **global token** in a cache key would let whoever scanned any QR code
+ * upload into whoever had asked for one last. Here the token is
  * minted per admin, is single-use and expires in minutes; the attachment it
  * produces is owned by the admin who minted it.
  *

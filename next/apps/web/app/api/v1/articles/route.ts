@@ -5,8 +5,8 @@ import { handle } from '../../../../src/server';
 /**
  * `/api/v1/articles` — published articles only.
  *
- * `categoryId` and `feature=hot|banner` replace four legacy routes that were
- * the same query with one `where` swapped, none of which filtered on status.
+ * `categoryId` and `feature=hot|banner` are filters on one query rather than
+ * four routes with one `where` swapped, and every one filters on status.
  */
 export const GET = handle(articleListPublic, (ctx, { query }) => articles.publicList(ctx, query));
 

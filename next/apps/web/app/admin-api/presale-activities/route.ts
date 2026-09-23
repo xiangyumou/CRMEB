@@ -8,9 +8,9 @@ import { handle } from '../../../src/server';
 /**
  * `/admin-api/presale-activities` — 预售活动 list and create.
  *
- * The URL segment is `presale-activities`, not legacy's `advance`: the legacy
- * word is a transliteration of nothing and the URL is what an operator's
- * browser history shows (status/d.md, decision 1).
+ * The URL segment is `presale-activities`, not `advance`: that word is a
+ * transliteration of nothing and the URL is what an operator's browser
+ * history shows.
  *
  * A route file does three things and no more: name the contract, call one
  * service function, and (for a write) say what was acted on for the audit log.

@@ -3,10 +3,8 @@ import { defineMenu } from './types';
 /**
  * 统计.
  *
- * The four pages the legacy admin had twenty routes for. 资金流水 / 账单记录
- * and 余额统计 are not here: balance, recharge, commission, points and paid
- * membership are out of scope shop-wide, and 余额统计 was a menu entry
- * pointing at a route group with nothing in it.
+ * Four pages. 资金流水 / 账单记录 and 余额统计 are not here: balance,
+ * recharge, commission, points and paid membership are out of scope shop-wide.
  *
  * `permission` here only decides what the sider shows; the server re-checks
  * the atom declared on each route. Both lists come from `statsPermissions` in

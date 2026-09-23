@@ -63,13 +63,13 @@ interface ProductRow {
  * 选择商品规格 — search products, expand one, tick its SKUs.
  *
  * Built out of kit primitives and the generated contracts client only: it
- * reads A's own `/admin-api/catalog/products` (keyword search) and
+ * reads the catalog's own `/admin-api/catalog/products` (keyword search) and
  * `/admin-api/catalog/products/:id` (the SKU rows), so it shows exactly what
  * the product page shows and cannot drift into a second definition of "a
  * sellable SKU". No domain import, no second copy of the catalog's rules.
  *
- * Why a picker at all: every activity form used to take a typed-in SKU id
- * (D's `SkuRow`, D2's 规格 list, A's own 推荐商品). A mistyped id is a 422 at
+ * Why a picker at all: the alternative is a typed-in SKU id on every activity
+ * form (规格 lists, 推荐商品). A mistyped id is a 422 at
  * best and a *valid id of the wrong product* at worst — priced wrong, in
  * stock, and nobody notices until the sale.
  */

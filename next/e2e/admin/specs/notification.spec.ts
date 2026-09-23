@@ -30,10 +30,10 @@ import type { Stack } from '../src/stack';
  * it: the inbox API behind the bell, the send log, the template screen, and
  * the SSE stream.
  *
- * Two things this spec found were `test.fail`, both CR-32-k2 (now fixed): the
- * bell never showed a pushed notification (the stream names its events, the
- * hook listened for unnamed ones only), and nothing in the admin UI read the
- * durable inbox.
+ * The bell is asserted both ways: a pushed notification moves it (the stream
+ * names its events, so the hook must listen for the named one), and a
+ * notification written while nobody was looking is on it at load (the bell
+ * reads the durable inbox).
  */
 
 const EVENT = 'admin_refund_applied';
@@ -286,8 +286,8 @@ test('the stream refuses a caller with no session, and pushes to one with a sess
 const badge = (count: number): string => (count > 99 ? '99+' : String(count));
 
 test('the bell shows a pushed notification', async ({ adminPage, adminApi, shop }) => {
-  // CR-32-k2 (fixed): the route sends `event: notification`, and the hook now
-  // listens for that named event instead of `onmessage` only.
+  // The route sends `event: notification`, and the hook listens for that named
+  // event; `onmessage` alone would never fire.
   const before = await unread(adminApi);
 
   // Reload so the bell's own EventSource is opened while we are watching for it.
@@ -306,7 +306,7 @@ test('the bell shows a pushed notification', async ({ adminPage, adminApi, shop 
 });
 
 test('the bell shows the unread inbox on load', async ({ adminPage, adminApi, shop }) => {
-  // CR-32-k2 (fixed): the bell reads `/admin-api/notifications?unreadOnly` and
+  // The bell reads `/admin-api/notifications?unreadOnly` and
   // `/unread-count` on load, so a notification written while nobody was
   // looking is on the badge when the operator arrives.
   await notifyAndDispatch(shop, refundApplied());

@@ -31,8 +31,8 @@
 					</view>
 				</view>
 				<!--
-					退款金额由买家的申请决定，店员只能同意或拒绝（CR-4-h §3 判定：不保留「直接退款」）。
-					原先这里是一个可编辑的输入框，但新合约的审核路由根本不收金额，改成只读展示。
+					退款金额由买家的申请决定，店员只能同意或拒绝，没有「直接退款」。
+					审核路由不收金额，所以这里只读展示。
 				-->
 				<view class="item acea-row row-between-wrapper" v-if="(orderInfo.refund_status === 1 || status == 2) && isRefund == 1">
 					<view>{{$t(`退款金额`)}}({{$t(`￥`)}})</view>

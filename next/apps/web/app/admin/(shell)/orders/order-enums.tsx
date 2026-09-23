@@ -37,9 +37,9 @@ export const ORDER_STATUS: StatusMap<OrderStatus> = {
 };
 
 /**
- * The spelling is the database's (`orders_fulfillment_status`), not the
- * brief's prose `unshipped / partially_shipped / shipped` — the enum is frozen
- * and renaming it would be a migration. Recorded in `docs/rewrite/status/b2.md`.
+ * The spelling is the database's (`orders_fulfillment_status`), not
+ * `unshipped / partially_shipped / shipped` — renaming the enum would be a
+ * migration.
  */
 export const FULFILLMENT_STATUS: StatusMap<OrderFulfillmentStatus> = {
   unfulfilled: { label: '未发货', color: 'default' },

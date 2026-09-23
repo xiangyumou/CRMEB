@@ -7,7 +7,7 @@ import { handle } from '../../../../src/server';
  *
  * `handle()` validates every response against its contract, so a route cannot
  * answer with a binary stream; the kit turns `content` into a download on the
- * client. Settled as CR-2-b2.
+ * client.
  */
 export const GET = handle(orderAdminExport, async (ctx, { query }) => {
   const result = await orderConsole.adminExport(ctx, query);

@@ -2,7 +2,7 @@ import { catalogFavoriteAddBatch } from '@shop/contracts/catalog/catalog.storefr
 import * as catalog from '@shop/core/catalog';
 import { handle } from '../../../../../../src/server';
 
-/** `/api/v1/me/favorites/batch` — 批量收藏 (CR-2-h). */
+/** `/api/v1/me/favorites/batch` — 批量收藏. */
 export const POST = handle(catalogFavoriteAddBatch, (ctx, { body }) =>
   catalog.favoriteAddBatch(ctx, body),
 );

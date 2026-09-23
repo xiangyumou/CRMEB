@@ -17,11 +17,11 @@ import {
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
 /**
- * 悬浮按钮 — ports `c_home_service.vue`, the smallest panel in the set: one
+ * 悬浮按钮, the smallest panel in the set: one
  * index (`setUp.tabVal`) and five rows.
  *
  * The link row is not part of `c_upload_img` in general. That widget carries a
- * hard-coded special case (`c_upload_img.vue:22`)
+ * hard-coded special case
  *
  *     defaults.name == 'customerService' && defaults.buttonConfig.tabVal == 0
  *
@@ -29,7 +29,7 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
  * button is a 页面链接 rather than the 客服入口. The condition lives here instead,
  * where it is readable, and `DiyUploadField` stays the generic one it is.
  *
- * `zIndexConfig` is in the default and gets no control (see g2.md, decision 2).
+ * `zIndexConfig` is in the default and gets no control; it is kept as saved.
  */
 export default defineDiyPanel<CustomerServiceComponent>({
   key: 'customerService',

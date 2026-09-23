@@ -2,7 +2,7 @@
  * Aggregates `src/jobs/*.ts` into the gitignored `src/jobs.gen.ts`.
  *
  * Same shape as the contracts aggregation: a domain drops a file in and it is
- * picked up, so parallel streams never edit a shared index.
+ * picked up, so no two domains edit a shared index.
  *
  * Run: `pnpm --filter @shop/worker gen`
  */

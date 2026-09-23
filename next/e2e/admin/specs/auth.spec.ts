@@ -21,7 +21,7 @@ test('a wrong password is refused, and says nothing about the account', async ({
   const wrongPassword = (await alert.textContent())?.trim();
 
   // The same form, an account that does not exist: the operator must not be
-  // able to tell the two apart. (`K-SEC-A3` in AUDIT.md.)
+  // able to tell the two apart.
   await page.getByLabel('账号').fill('nobody-by-that-name');
   await page.getByLabel('密码').fill('definitely-not-the-password');
   await page.getByRole('button', { name: cjk('登录') }).click();
@@ -117,7 +117,7 @@ test('the sixth attempt in the window is refused for being the sixth', async ({
 test('a cookie session without a same-site marker cannot mutate', async ({ adminApi, shop }) => {
   // `adminApi` is logged in. Repeat one of its own mutations from an origin
   // the server does not know, and it must be refused — the browser's SameSite
-  // is a second lock, not the only one. (`K-SEC-A8`.)
+  // is a second lock, not the only one.
   const ok = await adminApi.put('/admin-api/system/config/sms', {
     data: { values: { provider: 'none' } },
   });

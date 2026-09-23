@@ -4,8 +4,8 @@ import type { ComponentType } from 'react';
 import type { z } from 'zod';
 
 /**
- * The contract between the DIY editor shell (stream G1) and the ~60 config
- * panels (stream G2). **Frozen.** Changing anything here is a CR.
+ * The contract between the DIY editor shell and the ~60 config panels.
+ * **Stable.** Changing anything here changes every panel at once.
  *
  * A panel is a controlled component over one node of the saved page. It is
  * handed the node, a setter and a context; it owns nothing else. In particular
@@ -107,7 +107,7 @@ export interface DiyPanelRegistry {
  * Builds the lookup the editor shell uses.
  *
  * Deliberately explicit rather than a `pnpm gen` glob: the shell must boot with
- * an incomplete set while G2 is still writing panels, and an unregistered key
+ * an incomplete set, and an unregistered key
  * has to degrade to the raw fallback editor instead of failing the build.
  */
 export function createDiyPanelRegistry(
@@ -144,8 +144,8 @@ export interface DiyBinder<T extends DiyComponentValue> {
   /** Shallow-merges a patch into the node. */
   patch(next: Partial<T>): void;
   /**
-   * The selected 展示设置 / 样式设置 tab, read from `setUp.tabVal` exactly as the
-   * legacy panels do. `0` when the node has no `setUp`.
+   * The selected 展示设置 / 样式设置 tab, read from `setUp.tabVal` exactly as
+   * stored pages carry it. `0` when the node has no `setUp`.
    */
   tab: number;
   setTab(next: number): void;

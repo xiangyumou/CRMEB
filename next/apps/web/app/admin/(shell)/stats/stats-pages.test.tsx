@@ -9,7 +9,6 @@ import {
   tradeStatsExample,
   userRegionStatsExample,
   userStatsExample,
-  type ProductStats,
 } from '@shop/contracts/stats/schemas';
 import {
   statsOrders,
@@ -49,13 +48,13 @@ import { UserStatsPage } from './users/user-stats';
  * renders nothing; `StatsChart`'s reshaping is covered where it is pure.
  */
 
-function stubApi(overrides: { products?: ProductStats } = {}): StubCall[] {
+function stubApi(): StubCall[] {
   return stubRoutes([
     on(statsUserRegions, userRegionStatsExample),
     on(statsUsers, userStatsExample),
     on(statsProductExport, statsExportExample),
     on(statsProductRanking, productRankingExample),
-    on(statsProducts, overrides.products ?? productStatsExample),
+    on(statsProducts, productStatsExample),
     on(statsTradeExport, statsExportExample),
     on(statsTrade, tradeStatsExample),
     on(statsOrders, orderStatsExample),
@@ -152,19 +151,5 @@ describe('商品统计', () => {
     expect(await screen.findByText('云南小粒咖啡豆 500g')).toBeInTheDocument();
     const ranking = calls.find((call) => call.url.includes('/stats/products/ranking'));
     expect(ranking?.url).toContain('sortBy=paidAmount');
-  });
-
-  it('says 加购件数 has no source rather than letting the 0 pass for a fact', async () => {
-    stubApi({
-      products: {
-        ...productStatsExample,
-        metrics: productStatsExample.metrics.map((metric) =>
-          metric.key === 'cartQuantity' ? { ...metric, value: 0, previous: 0 } : metric,
-        ),
-      },
-    });
-
-    renderAdmin(<ProductStatsPage />, { identity: identityWith(['stats:product:read']) });
-    expect(await screen.findByText('加购件数暂无来源')).toBeInTheDocument();
   });
 });

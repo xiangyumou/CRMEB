@@ -10,10 +10,9 @@ import type { DiyFieldProps } from '../../panel-api';
 /**
  * `c_page_ueditor` — the 富文本 body, HTML stored in `richText.val`.
  *
- * The legacy widget is wangEditor; the new admin already has a rich text field
- * (Tiptap, lazy-loaded, images through the asset picker) and it is the same
- * contract, HTML in and HTML out, so this is a thin adapter rather than a
- * second editor. What lands in `val` is a serialised HTML string either way.
+ * The admin already has a rich text field (Tiptap, lazy-loaded, images through
+ * the asset picker) and it is the same contract, HTML in and HTML out, so this
+ * is a thin adapter rather than a second editor. What lands in `val` is a serialised HTML string either way.
  *
  * Tiptap will normalise markup wangEditor produced — tags it has no node for
  * are dropped on the way in. That only happens when an operator opens the

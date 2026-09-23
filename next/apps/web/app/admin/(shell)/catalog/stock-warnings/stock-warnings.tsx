@@ -16,9 +16,9 @@ import { PRODUCT_STATUS } from '../catalog-enums';
  * 库存预警 — one row per SKU, not per product.
  *
  * A product whose total stock looks healthy can still be out of the one size
- * everybody buys, which is exactly the case the legacy product-level warning
- * missed. The threshold comes from `catalog.stockWarningThreshold`; the filter
- * below overrides it for one look without changing the setting.
+ * everybody buys, which is exactly the case a product-level warning misses. The
+ * threshold comes from `catalog.stockWarningThreshold`; the filter below
+ * overrides it for one look without changing the setting.
  */
 export function StockWarningsPage() {
   return (

@@ -1,24 +1,24 @@
-// 用户资料 / 收货地址 / 登录态 / 注销申请 DTOs → the legacy 个人中心 view models.
+// 用户资料 / 收货地址 / 登录态 / 注销申请 DTOs → the 个人中心 view models.
 //
 // Contracts: next/packages/contracts/src/user/user.storefront.contract.ts
 //            next/packages/contracts/src/auth/auth.storefront.contract.ts
 //
-// Three things the new model changed that the mappers have to bridge:
+// Three things about the API the mappers have to bridge:
 //
-//  * **The profile is only the profile.** Legacy's `/user` answered with the shopper,
-//    their order counters, their wallet, their 分销 figures and the site's invoice
-//    switches in one payload. `GET /api/v1/profile` is the shopper; the counters come
+//  * **The profile is only the profile.** The pages want the shopper, their order
+//    counters, their wallet, their 分销 figures and the site's invoice switches in one
+//    payload. `GET /api/v1/profile` is the shopper; the counters come
 //    from `GET /api/v1/orders/counts`, which `getUserInfo` composes in.
 //  * **A session is a resource.** `POST /auth/sessions/{password,sms,…}` answers with
 //    `{token, expiresAt, user}` — an ISO instant, not the unix seconds the pages
-//    subtract `$Cache.time()` from — so `toLegacySession` converts it.
+//    subtract `$Cache.time()` from — so `toPageSession` converts it.
 //  * **An address never carries a user id.** Nothing to map, but it is why
-//    `fromLegacyAddressForm` drops `uid` if a page ever sends one.
+//    `fromPageAddressForm` drops `uid` if a page ever sends one.
 //
 // Retired next to a shopper: 余额, 积分, 会员等级/SVIP, 分销/推广, 签到, 多账号切换.
 // They are pinned to falsy constants here so the pages that render them stay dead.
 
-import { toId, toInt, text, mapList, unixSeconds, legacyDate } from './_shared.js';
+import { toId, toInt, text, mapList, unixSeconds, pageDate } from './_shared.js';
 
 /** The falsy bag every 个人中心 screen reads through. */
 const RETIRED = {
@@ -42,9 +42,9 @@ const RETIRED = {
   // 签到
   sign_num: 0,
   integralTotal: 0,
-  // 多账号切换：v1/v2 两套登录态并存的遗物，新模型里一个 token 就是一个账号。
+  // 多账号切换：一个 token 就是一个账号。
   switchUserInfo: [],
-  // 新人礼：没有继任者
+  // 新人礼：没有
   new_user: 0,
 };
 
@@ -62,13 +62,13 @@ const NO_ORDER_COUNTS = {
 };
 
 /**
- * `userProfile` (+ `orderCounts`) → the legacy `userInfo`.
+ * `userProfile` (+ `orderCounts`) → the page's `userInfo`.
  *
- * `record_phone` was the number an order was placed with and `phone` the bound one;
- * they are the same number now. `invioce_func` / `special_invoice` are `true` because
- * B2's invoice routes are live and both 普票 and 专票 are in `invoiceRequestForm`.
+ * `record_phone` (the number an order was placed with) and `phone` (the bound one)
+ * are the same number. `invioce_func` / `special_invoice` are `true` because
+ * the invoice routes are live and both 普票 and 专票 are in `invoiceRequestForm`.
  */
-export function toLegacyProfile(dto, counts) {
+export function toPageProfile(dto, counts) {
   if (!dto) return {};
   const phone = text(dto.phone);
   return {
@@ -80,7 +80,7 @@ export function toLegacyProfile(dto, counts) {
     phone,
     record_phone: phone,
     real_name: text(dto.realName),
-    birthday: legacyDate(dto.birthday),
+    birthday: pageDate(dto.birthday),
     // 个人中心 shows 「已绑定微信」 off this.
     user_type: text(dto.registerSource) || 'h5',
     is_bind_wechat: (dto.boundWechat || []).length > 0,
@@ -97,8 +97,8 @@ export function toLegacyProfile(dto, counts) {
  * `orderCounts` → `userInfo.orderStatusNum`.
  *
  * The 个人中心 badges read `unpaid_count` / `unshipped_count` / `received_count` /
- * `evaluated_count` / `refunding_count`, and 待评价 has no counter of its own in the
- * new model — 已完成 is the closest true thing, which is what legacy showed too.
+ * `evaluated_count` / `refunding_count`, and 待评价 has no counter of its own —
+ * 已完成 is the closest true thing.
  */
 export function orderCountsOf(dto) {
   if (!dto) return { ...NO_ORDER_COUNTS };
@@ -116,12 +116,12 @@ export function orderCountsOf(dto) {
 }
 
 /**
- * Legacy `userEdit(value)` → `PUT /api/v1/profile` body.
+ * The page's `userEdit(value)` → `PUT /api/v1/profile` body.
  *
  * Only what `userProfileForm` accepts. The phone is not here on purpose: changing it
  * needs an SMS code and goes through `PUT /api/v1/auth/phone`.
  */
-export function fromLegacyProfileForm(data) {
+export function fromPageProfileForm(data) {
   const src = data || {};
   const body = {};
   if (src.nickname !== undefined && src.nickname !== null && src.nickname !== '') {
@@ -141,7 +141,7 @@ export function fromLegacyProfileForm(data) {
 // ---------------------------------------------------------------------------
 
 /** `userAddress` → the flat row every address screen renders. */
-export function toLegacyAddress(dto) {
+export function toPageAddress(dto) {
   if (!dto) return {};
   return {
     id: toId(dto.id),
@@ -151,7 +151,7 @@ export function toLegacyAddress(dto) {
     city: text(dto.cityName),
     district: text(dto.districtName),
     // The picker round-trips the city node's `v`; province / district ids are not
-    // in the legacy form at all.
+    // in the page's form at all.
     province_id: dto.provinceId === null || dto.provinceId === undefined ? 0 : toId(dto.provinceId),
     city_id: dto.cityId === null || dto.cityId === undefined ? 0 : toId(dto.cityId),
     district_id: dto.districtId === null || dto.districtId === undefined ? 0 : toId(dto.districtId),
@@ -165,23 +165,23 @@ export function toLegacyAddress(dto) {
 }
 
 /** `pagedUserAddresses` → the bare array both address screens page through. */
-export function toLegacyAddressList(dto) {
-  return mapList(dto && dto.items, toLegacyAddress);
+export function toPageAddressList(dto) {
+  return mapList(dto && dto.items, toPageAddress);
 }
 
 /** `{address: userAddress | null}` → `{}` when there is none, which is what the page tests. */
-export function toLegacyDefaultAddress(dto) {
-  return dto && dto.address ? toLegacyAddress(dto.address) : {};
+export function toPageDefaultAddress(dto) {
+  return dto && dto.address ? toPageAddress(dto.address) : {};
 }
 
 /**
- * Legacy `editAddress(value)` → `userAddressForm`.
+ * The page's `editAddress(value)` → `userAddressForm`.
  *
  * The page nests the division under `value.address` and puts everything else flat,
  * and the division *names* are what the form requires — see the note on
  * `userAddressForm` about hand-typed 海外 addresses with no division id.
  */
-export function fromLegacyAddressForm(data) {
+export function fromPageAddressForm(data) {
   const src = data || {};
   const region = src.address || {};
   const body = {
@@ -218,7 +218,7 @@ export function fromLegacyAddressForm(data) {
  * `expiresAt` has to arrive as unix seconds. The profile rides along, which is why
  * `uid` is available without a second read.
  */
-export function toLegacySession(dto) {
+export function toPageSession(dto) {
   if (!dto) return {};
   const session = dto.session ? dto.session : dto;
   const user = session.user || null;
@@ -229,7 +229,7 @@ export function toLegacySession(dto) {
     // `smsLoginResult.registered` / `wechatLoginResult.registered` — the client shows
     // 欢迎加入 once on a true.
     new_user: dto.registered ? 1 : 0,
-    userInfo: user ? toLegacyProfile(user) : {},
+    userInfo: user ? toPageProfile(user) : {},
   };
 }
 
@@ -240,12 +240,12 @@ export function toLegacySession(dto) {
  * a phone number, and `bindToken` stands in for the openid so the second call does
  * not have to redeem the single-use WeChat `code` again.
  */
-export function toLegacyWechatLogin(dto) {
+export function toPageWechatLogin(dto) {
   if (!dto) return {};
-  const base = toLegacySession(dto);
+  const base = toPageSession(dto);
   return {
     ...base,
-    // legacy spelled it `is_bind` / `key`: "we know who you are, now give us a phone"
+    // the pages spell it `is_bind` / `key`: "we know who you are, now give us a phone"
     status: text(dto.status),
     is_phone_required: dto.status === 'phone-required',
     is_bind: dto.status === 'phone-required' ? 1 : 0,
@@ -262,11 +262,11 @@ export function toLegacyWechatLogin(dto) {
 /**
  * `cancellationRequest` → the 注销 page's view model.
  *
- * Legacy flipped `is_del = 1` the moment the button was tapped. It is a reviewed
- * request now, so the page has a status to show — and `cancelUser` resolving no
- * longer means the account is gone.
+ * Not a flag flipped the moment the button is tapped: it is a reviewed request, so
+ * the page has a status to show — and `cancelUser` resolving does not mean the
+ * account is gone.
  */
-export function toLegacyCancellation(dto) {
+export function toPageCancellation(dto) {
   const request = dto && dto.request !== undefined ? dto.request : dto;
   if (!request) return {};
   return {
@@ -276,7 +276,7 @@ export function toLegacyCancellation(dto) {
     phone: text(request.phone),
     reason: text(request.reason),
     status: text(request.status),
-    // the page shows 审核中 / 已通过 / 已驳回 off a number in legacy
+    // the page shows 审核中 / 已通过 / 已驳回 off a number
     status_num: CANCELLATION_STATUS[request.status] === undefined ? 0 : CANCELLATION_STATUS[request.status],
     remark: text(request.reviewRemark),
     review_time: unixSeconds(request.reviewedAt),
@@ -291,10 +291,10 @@ const CANCELLATION_STATUS = { pending: 0, approved: 1, rejected: -1, withdrawn: 
 // ---------------------------------------------------------------------------
 
 /**
- * Legacy `type` → `smsScene`.
+ * The page's `type` → `smsScene`.
  *
  * The scene is part of the Redis key, so a code minted for 注销 cannot be replayed
- * against 登录 — which the legacy single-key-per-phone design allowed.
+ * against 登录 — which one key per phone would allow.
  */
 const SMS_SCENE = {
   login: 'login',
@@ -308,37 +308,37 @@ const SMS_SCENE = {
   'change-phone': 'change-phone',
 };
 
-export function fromLegacySmsScene(type) {
+export function fromPageSmsScene(type) {
   return SMS_SCENE[String(type === undefined || type === null ? '' : type)] || 'login';
 }
 
 /**
- * Legacy `registerVerify({phone, type, key, captchaType, captchaVerification})` →
+ * The page's `registerVerify({phone, type, key, captchaType, captchaVerification})` →
  * `sendSmsCodeBody`.
  *
  * Only two of those five survive. `key` was the id of a server-rendered image captcha;
- * `captchaType` / `captchaVerification` were the 行为验证码's question and its answer.
- * Neither has a successor — E4 decided against a behaviour captcha and bounds the SMS
- * spend with per-phone and per-address budgets plus a resend cooldown instead
- * (docs/rewrite/status/e4.md §2) — so the body is exactly `{phone, scene}`.
+ * `captchaType` / `captchaVerification` are a 行为验证码's question and its answer.
+ * There is no behaviour captcha — the SMS spend is bounded with per-phone and
+ * per-address budgets plus a resend cooldown instead — so the body is exactly
+ * `{phone, scene}`.
  */
-export function fromLegacySmsCodeInput(data) {
+export function fromPageSmsCodeInput(data) {
   const src = data || {};
-  return { phone: text(src.phone), scene: fromLegacySmsScene(src.type) };
+  return { phone: text(src.phone), scene: fromPageSmsScene(src.type) };
 }
 
 /** `sendSmsCodeResult` → what the 倒计时 reads. */
-export function toLegacySmsCodeResult(dto) {
+export function toPageSmsCodeResult(dto) {
   if (!dto) return {};
   return {
     expires_in: toInt(dto.expiresInSec, 0),
     resend_after: toInt(dto.resendAfterSec, 0),
-    // the pages only ever show a toast; `key` kept so the old call sites stay valid
+    // the pages only ever show a toast; `key` kept so every call site stays valid
     key: '',
   };
 }
 
 /** Everything that is just `{ok: true}` still has to resolve with an object. */
-export function toLegacyOk(dto) {
+export function toPageOk(dto) {
   return { status: dto && dto.ok ? 1 : 0 };
 }

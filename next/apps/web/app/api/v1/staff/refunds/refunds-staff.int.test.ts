@@ -14,11 +14,11 @@ import { setContainer, type Container } from '../../../../../src/server/containe
 import type { Env } from '../../../../../src/server/env';
 
 /**
- * 移动端商家管理 — 售后 as HTTP (CR-14-k).
+ * 移动端商家管理 — 售后 as HTTP.
  *
- * Before CR-14-k every one of these four routes answered 403 to every staff
- * member: they forwarded into the admin refund services, which demand an admin
- * atom that `handle()`'s staff actor (`permissions: []`) can never hold. The
+ * These four routes must not forward into the admin refund services, which
+ * demand an admin atom that `handle()`'s staff actor (`permissions: []`) can
+ * never hold, so every staff member would get a 403. The
  * behaviour is pinned in `packages/core/src/refund/refund.permissions.int.test.ts`
  * and `packages/core/src/order/order.staff.int.test.ts`; what is proved here is
  * the whole path — `auth: 'staff'`, the port, the refund domain's staff entry
@@ -176,7 +176,7 @@ const statusOf = async (refundId: number) =>
 
 // ---------------------------------------------------------------------------
 
-describe('GET /api/v1/staff/me — abilities (CR-1-r6)', () => {
+describe('GET /api/v1/staff/me — abilities', () => {
   it('tells the phone whether 退款审核 is on, and a shopper never', async () => {
     const { GET } = await import('../me/route');
     const off = await staff();

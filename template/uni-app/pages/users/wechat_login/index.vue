@@ -409,7 +409,7 @@ export default {
         title: this.$t(`正在登录中`),
       });
       // `e.detail.code` 是 getPhoneNumber 现在给的、由服务端兑换的 code；
-      // 旧的 encryptedData + iv 客户端解密需要 session_key 离开服务端，已不再支持。
+      // 不支持 encryptedData + iv 客户端解密：那需要 session_key 离开服务端。
       this.getUserPhoneNumber(e.detail.code);
     },
     // 小程序获取手机号码回调

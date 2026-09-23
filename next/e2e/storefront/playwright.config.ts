@@ -5,7 +5,7 @@ import { DEVICE } from './src/device';
 import { BASE_URL, REUSE } from './src/stack-file';
 
 /**
- * Storefront end-to-end suite (`docs/rewrite/briefs/I-storefront-e2e.md`).
+ * Storefront end-to-end suite: the uni-app H5 build in a mobile browser.
  *
  * One command, from `next/`:
  *

@@ -17,10 +17,9 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 import { DiyChildRowsField } from './_fields';
 
 /**
- * 新闻公告 — ports `c_news_roll.vue`.
+ * 新闻公告.
  *
- * The Vue file states the same rule five times, once per `watch`er, in 450
- * lines of nested `if`. Reduced to its four indices:
+ * Four indices decide every row:
  *
  * - `styleConfig.tabVal` — `0` 样式一 scrolls, so it offers 滚动方式; 样式二 does
  *   not scroll and instead offers the header link.
@@ -29,8 +28,8 @@ import { DiyChildRowsField } from './_fields';
  * - `buttonConfig.tabVal` — `0` 显示 shows the button and its colour.
  * - `toneConfig.tabVal` — the title background and text colours, 样式一 only.
  *
- * `textConfig` (右侧文字) and `newsColor` never reach `rCom` in the Vue file and
- * get no control here either.
+ * `textConfig` (右侧文字) and `newsColor` are not operator settings and get no
+ * control.
  */
 export default defineDiyPanel<NewsComponent>({
   key: 'news',

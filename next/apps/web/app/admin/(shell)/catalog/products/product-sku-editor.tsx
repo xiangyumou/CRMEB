@@ -87,8 +87,8 @@ export interface SpecEditorProps {
  * 蓝 and the duplicate is swallowed by the control instead of coming back as a
  * 422. A value's own picture (`imageUrl`) is preserved across edits but not
  * editable here — the picture buyers actually see is the one on the SKU row
- * below, and two places to set it is how legacy ended up with a red shirt
- * showing a blue thumbnail.
+ * below, and two places to set it is how a red shirt ends up showing a blue
+ * thumbnail.
  */
 export function SpecEditor({ value, onChange, disabled = false }: SpecEditorProps) {
   const specs = value ?? EMPTY_SPECS;

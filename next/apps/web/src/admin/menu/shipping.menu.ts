@@ -5,7 +5,7 @@ import { defineMenu } from './types';
  *
  * The 地区 (city) tree deliberately has no menu entry: it is immutable seed
  * data with no editor, reached only by the region picker inside the 运费模板
- * form. The legacy 城市管理 screen has no successor (see
+ * form. There is no 城市管理 screen (see
  * `contracts/src/shipping/shipping.city.contract.ts`).
  */
 export default defineMenu({

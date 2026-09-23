@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Container healthcheck for the `worker` image.
 //
-// The worker has no HTTP surface, so the old stack's trick — a real request
-// through the pool — is not available. What it does have is the heartbeat
+// The worker has no HTTP surface, so the usual probe — a real request through
+// the pool — is not available. What it does have is the heartbeat
 // `apps/worker/src/main.ts` refreshes every `HEARTBEAT_INTERVAL_MS` from the
 // same event loop that runs the jobs, with a TTL of four intervals, and which
 // it deletes *before* draining on SIGTERM.

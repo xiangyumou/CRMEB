@@ -205,14 +205,14 @@ describe('/admin-api/attachments', () => {
     await POST(upload('/admin-api/attachments', png(), headers));
 
     const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
-      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      // Sign-ins are audited too; this test is about the operation.
       (row) => row.routeId !== 'auth.adminLogin',
     );
     expect(audit).toHaveLength(1);
     expect(audit[0]).toMatchObject({ routeId: 'storage.attachmentUpload', method: 'POST' });
   });
 
-  describe('refuses what the old uploader accepted', () => {
+  describe('refuses what a naive uploader would accept', () => {
     const cases: Array<[string, { bytes: Uint8Array; name: string; type: string }]> = [
       [
         'a PHP web shell renamed to .png',
@@ -373,7 +373,7 @@ describe('scan-to-upload', () => {
       upload(`/api/v1/attachments/scan-uploads/${token.token}`, png(1)),
       { params: { token: token.token } },
     );
-    // The old system kept one global token and would have taken this too.
+    // One global token would have taken this too.
     expect(second.status).toBeGreaterThanOrEqual(400);
     expect((await second.json()).code).toBe('STORAGE_SCAN_TOKEN_INVALID');
 
@@ -384,7 +384,7 @@ describe('scan-to-upload', () => {
     expect((await polled.json()).state).toBe('used');
   });
 
-  it('throttles the public endpoint per client address, before the code is looked at (CR-12-k)', async () => {
+  it('throttles the public endpoint per client address, before the code is looked at', async () => {
     const { POST: scanUpload } =
       await import('../../api/v1/attachments/scan-uploads/[token]/route');
     const from = (ip: string, n: number) => {
@@ -403,7 +403,7 @@ describe('scan-to-upload', () => {
     expect(limited.status).toBe(429);
     expect((await limited.json()).code).toBe('STORAGE_UPLOAD_RATE_LIMITED');
 
-    // A client-written X-Forwarded-For buys no fresh bucket (CR-14-k2)…
+    // A client-written X-Forwarded-For buys no fresh bucket…
     const spoofed = await scanUpload(
       upload('/api/v1/attachments/scan-uploads/made-up-token-spoofed0', png(), {
         'x-real-ip': '203.0.113.20',

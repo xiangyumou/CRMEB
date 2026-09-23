@@ -32,9 +32,9 @@ import {
  * 订单列表.
  *
  * The tab bar is a *preset over the filters*, not a separate query parameter.
- * Legacy packed 待发货 / 待收货 / 已完成 into one `status` integer that mixed
- * four different columns together, which is why 已退款 and 待收货 could never
- * be asked for at once; here each tab just sets the filters it means and the
+ * Packing 待发货 / 待收货 / 已完成 into one `status` integer would mix four
+ * different columns together, and 已退款 and 待收货 could never be asked for
+ * at once; here each tab just sets the filters it means and the
  * filter bar underneath stays usable on top of it.
  */
 
@@ -258,8 +258,8 @@ function WorkQueue(props: {
  * 导出.
  *
  * The response is CSV *text* in the JSON envelope — `handle()` validates every
- * response against its contract, so a route cannot answer with a binary stream
- * (CR-2-b2). The download is assembled here, with a BOM so Excel reads UTF-8.
+ * response against its contract, so a route cannot answer with a binary stream.
+ * The download is assembled here, with a BOM so Excel reads UTF-8.
  */
 function ExportButton({ preset }: { preset: Record<string, unknown> }) {
   const [busy, setBusy] = useState(false);

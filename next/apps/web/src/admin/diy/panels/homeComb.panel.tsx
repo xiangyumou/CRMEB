@@ -21,21 +21,20 @@ import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 import { DiyTabListField } from './_fields';
 
 /**
- * 组合组件 — ports `c_home_comb.vue`: the page header, search box, category tabs
+ * 组合组件: the page header, search box, category tabs
  * and banner as one block.
  *
- * Four indices (`getRComContent` / `getRComStyle`, `:305-345`):
+ * Four indices:
  *
  * - `classConfig.tabVal` — `0` 显示 shows the category tabs and, in 样式设置, the
  *   tab spacing and colour. `1` 隐藏 removes both.
  * - `searchBox.tabVal` — `0` 文字 uses `titleConfig`, otherwise the two logos.
  * - `toneConfig.tabVal` — the indicator colours.
- * - `searchConfig.tabVal` has a watcher but changes nothing; it is read by
- *   `homeComb.vue` for the sticky header.
+ * - `searchConfig.tabVal` changes no row here; the storefront's
+ *   `homeComb.vue` reads it for the sticky header.
  *
- * `searchFix` and the single-logo `logoContent` are declared in the Vue file and
- * never reach `rCom`: `getRComContent` unconditionally picks `logoUpContent`,
- * which is both logos (`:307`). Ported as-is.
+ * `searchFix` and the single-logo `logoContent` get no row: the logo row is
+ * always `logoUpContent`, which is both logos.
  */
 export default defineDiyPanel<HomeCombComponent>({
   key: 'homeComb',

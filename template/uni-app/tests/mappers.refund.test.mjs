@@ -1,50 +1,50 @@
 import { example, exampleBody, assertRenderable } from './helpers.mjs';
 import {
-  legacyRefundType,
-  toLegacyRefundLine,
-  toLegacyRefund,
-  toLegacyRefundList,
-  toLegacyRefundReasons,
-  toLegacyApplicableItems,
-  fromLegacyRefundApplyInput,
-  fromLegacyReturnShipmentInput,
-  fromLegacyRefundState,
+  pageRefundType,
+  toPageRefundLine,
+  toPageRefund,
+  toPageRefundList,
+  toPageRefundReasons,
+  toPageApplicableItems,
+  fromPageRefundApplyInput,
+  fromPageReturnShipmentInput,
+  fromPageRefundState,
 } from '../api/mappers/refund.js';
 
 const REFUND = example('GET /api/v1/refunds/:id');
 const APPLICABLE = example('GET /api/v1/refunds/applicable-items/:orderId');
 
-describe('legacyRefundType — CR-4-i §13: the numbers the pages stamp (1–6)', () => {
-  it('maps every status onto the legacy refund_type the pages branch on', () => {
-    expect(legacyRefundType('applied')).toBe(1);
-    expect(legacyRefundType('applied', null, 'refund_only')).toBe(1);
-    expect(legacyRefundType('applied', null, 'return_and_refund')).toBe(2);
-    expect(legacyRefundType('rejected')).toBe(3);
-    expect(legacyRefundType('approved')).toBe(4);
-    expect(legacyRefundType('returned')).toBe(5);
-    expect(legacyRefundType('refunding')).toBe(5);
-    expect(legacyRefundType('succeeded')).toBe(6);
-    expect(legacyRefundType('cancelled')).toBe(0);
-    expect(legacyRefundType('closed')).toBe(0);
+describe('pageRefundType — the numbers the pages stamp (1–6)', () => {
+  it('maps every status onto the refund_type the pages branch on', () => {
+    expect(pageRefundType('applied')).toBe(1);
+    expect(pageRefundType('applied', null, 'refund_only')).toBe(1);
+    expect(pageRefundType('applied', null, 'return_and_refund')).toBe(2);
+    expect(pageRefundType('rejected')).toBe(3);
+    expect(pageRefundType('approved')).toBe(4);
+    expect(pageRefundType('returned')).toBe(5);
+    expect(pageRefundType('refunding')).toBe(5);
+    expect(pageRefundType('succeeded')).toBe(6);
+    expect(pageRefundType('cancelled')).toBe(0);
+    expect(pageRefundType('closed')).toBe(0);
   });
 
   it('moves an approved refund to 退货待收货 once the buyer has shipped it back', () => {
-    expect(legacyRefundType('approved', 'awaiting_shipment')).toBe(4);
-    expect(legacyRefundType('approved', 'shipped_back')).toBe(5);
+    expect(pageRefundType('approved', 'awaiting_shipment')).toBe(4);
+    expect(pageRefundType('approved', 'shipped_back')).toBe(5);
   });
 
   it('stamps nothing for an unknown status', () => {
-    expect(legacyRefundType('who-knows')).toBe(0);
-    expect(legacyRefundType(undefined)).toBe(0);
+    expect(pageRefundType('who-knows')).toBe(0);
+    expect(pageRefundType(undefined)).toBe(0);
   });
 
   it('a succeeded refund gets user_return_list`s 已退款 stamp (refund_type 6)', () => {
-    expect(toLegacyRefund({ ...REFUND, status: 'succeeded' }).refund_type).toBe(6);
+    expect(toPageRefund({ ...REFUND, status: 'succeeded' }).refund_type).toBe(6);
   });
 });
 
-describe('toLegacyRefund', () => {
-  const refund = toLegacyRefund(REFUND);
+describe('toPageRefund', () => {
+  const refund = toPageRefund(REFUND);
 
   it('maps the fields the 退款详情 page reads', () => {
     expect(refund).toMatchObject({
@@ -90,28 +90,28 @@ describe('toLegacyRefund', () => {
   });
 
   it('maps a line', () => {
-    expect(toLegacyRefundLine(REFUND.items[0])).toMatchObject({
+    expect(toPageRefundLine(REFUND.items[0])).toMatchObject({
       id: 7001,
       unique: '7001',
       cart_num: 1,
       truePrice: '99.00',
     });
-    expect(toLegacyRefundLine(null)).toEqual({});
+    expect(toPageRefundLine(null)).toEqual({});
   });
 
   it('survives a missing dto', () => {
-    expect(toLegacyRefund(null)).toEqual({});
+    expect(toPageRefund(null)).toEqual({});
   });
 });
 
-describe('toLegacyRefundList / toLegacyRefundReasons', () => {
+describe('toPageRefundList / toPageRefundReasons', () => {
   it('returns the counted page', () => {
-    expect(toLegacyRefundList(example('GET /api/v1/refunds'))).toMatchObject({ page: 1 });
-    expect(toLegacyRefundList(null)).toMatchObject({ list: [], count: 0 });
+    expect(toPageRefundList(example('GET /api/v1/refunds'))).toMatchObject({ page: 1 });
+    expect(toPageRefundList(null)).toMatchObject({ list: [], count: 0 });
   });
 
   it('flattens the reasons to strings for the picker', () => {
-    expect(toLegacyRefundReasons(example('GET /api/v1/refund-reasons'))).toEqual([
+    expect(toPageRefundReasons(example('GET /api/v1/refund-reasons'))).toEqual([
       '不想要了',
       '商品破损',
       '与描述不符',
@@ -119,12 +119,12 @@ describe('toLegacyRefundList / toLegacyRefundReasons', () => {
       '质量问题',
       '其他',
     ]);
-    expect(toLegacyRefundReasons(null)).toEqual([]);
+    expect(toPageRefundReasons(null)).toEqual([]);
   });
 });
 
-describe('toLegacyApplicableItems', () => {
-  const out = toLegacyApplicableItems(APPLICABLE);
+describe('toPageApplicableItems', () => {
+  const out = toPageApplicableItems(APPLICABLE);
 
   it('carries the order totals the 申请退款 header shows', () => {
     expect(out).toMatchObject({
@@ -153,13 +153,13 @@ describe('toLegacyApplicableItems', () => {
   });
 
   it('survives a missing dto', () => {
-    expect(toLegacyApplicableItems(null)).toMatchObject({ cartInfo: [], order_id: '' });
+    expect(toPageApplicableItems(null)).toMatchObject({ cartInfo: [], order_id: '' });
   });
 });
 
-describe('the fromLegacy direction', () => {
+describe('the fromPage direction', () => {
   it('builds the apply body from the page state', () => {
-    const body = fromLegacyRefundApplyInput('3001', {
+    const body = fromPageRefundApplyInput('3001', {
       refund_type: 2,
       cart_ids: [{ cart_id: 7001, cart_num: 1 }],
       text: '商品破损',
@@ -178,33 +178,33 @@ describe('the fromLegacy direction', () => {
     });
   });
 
-  it('is a refund_only application when the legacy refund_type is 1', () => {
-    expect(fromLegacyRefundApplyInput('3001', { refund_type: 1, cart_ids: ['7001'] })).toMatchObject({
+  it('is a refund_only application when the page refund_type is 1', () => {
+    expect(fromPageRefundApplyInput('3001', { refund_type: 1, cart_ids: ['7001'] })).toMatchObject({
       kind: 'refund_only',
       lines: [{ orderItemId: '7001', quantity: 1 }],
     });
   });
 
   it('matches the shape the contract example posts', () => {
-    const body = fromLegacyRefundApplyInput('3001', { cart_ids: [] });
+    const body = fromPageRefundApplyInput('3001', { cart_ids: [] });
     expect(Object.keys(body).sort()).toEqual(Object.keys(exampleBody('POST /api/v1/refunds')).sort());
   });
 
   it('renames the return-shipment fields', () => {
     expect(
-      fromLegacyReturnShipmentInput({ delivery_code: 'SF', delivery_id: 'SF123', delivery_phone: '138' }),
+      fromPageReturnShipmentInput({ delivery_code: 'SF', delivery_id: 'SF123', delivery_phone: '138' }),
     ).toEqual({ expressCompanyId: 'SF', trackingNo: 'SF123', phone: '138' });
-    expect(fromLegacyReturnShipmentInput(null)).toEqual({
+    expect(fromPageReturnShipmentInput(null)).toEqual({
       expressCompanyId: '',
       trackingNo: '',
       phone: '',
     });
   });
 
-  it('CR-4-i §12 — maps the 售后 tab index (全部 · 申请中 · 已退款) onto a state', () => {
-    expect(fromLegacyRefundState(0)).toBe('all');
-    expect(fromLegacyRefundState(1)).toBe('open');
-    expect(fromLegacyRefundState(2)).toBe('succeeded');
-    expect(fromLegacyRefundState(undefined)).toBe('all');
+  it('maps the 售后 tab index (全部 · 申请中 · 已退款) onto a state', () => {
+    expect(fromPageRefundState(0)).toBe('all');
+    expect(fromPageRefundState(1)).toBe('open');
+    expect(fromPageRefundState(2)).toBe('succeeded');
+    expect(fromPageRefundState(undefined)).toBe('all');
   });
 });

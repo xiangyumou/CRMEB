@@ -20,10 +20,10 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { example } from './helpers.mjs';
 import {
-  toLegacyStaffIdentity,
-  toLegacyStaffOrderDetail,
-  toLegacyStaffOrderList,
-  toLegacyStaffRefundList,
+  toPageStaffIdentity,
+  toPageStaffOrderDetail,
+  toPageStaffOrderList,
+  toPageStaffRefundList,
 } from '../api/mappers/staff.js';
 
 const require = createRequire(import.meta.url);
@@ -103,7 +103,7 @@ async function open(rel, api, query = {}) {
 /** `getStaffIdentity()` as the page sees it, for a staff member with `abilities`. */
 function identityWith(abilities) {
   const dto = { ...example('GET /api/v1/staff/me'), abilities };
-  return () => Promise.resolve({ data: toLegacyStaffIdentity(dto) });
+  return () => Promise.resolve({ data: toPageStaffIdentity(dto) });
 }
 
 const OFF = { refundReview: false, adjustPrice: false };
@@ -114,12 +114,12 @@ const OFF = { refundReview: false, adjustPrice: false };
 
 describe('一键改价 follows abilities.adjustPrice', () => {
   // An order that could be repriced: unpaid and not cancelled.
-  const orders = toLegacyStaffOrderList(example('GET /api/v1/staff/orders')).map((row) => ({
+  const orders = toPageStaffOrderList(example('GET /api/v1/staff/orders')).map((row) => ({
     ...row,
     _status: 1,
     is_cancel: 0,
   }));
-  const detail = toLegacyStaffOrderDetail(example('GET /api/v1/staff/orders/:id'));
+  const detail = toPageStaffOrderDetail(example('GET /api/v1/staff/orders/:id'));
   const unpaidDetail = { ...detail, _status: { ...detail._status, _type: 0 } };
 
   const listApi = (abilities) => ({
@@ -185,7 +185,7 @@ describe('一键改价 follows abilities.adjustPrice', () => {
 
 describe('退款审核 follows abilities.refundReview', () => {
   // A 仅退款 request awaiting review.
-  const refunds = toLegacyStaffRefundList(example('GET /api/v1/staff/refunds')).map((row) => ({
+  const refunds = toPageStaffRefundList(example('GET /api/v1/staff/refunds')).map((row) => ({
     ...row,
     refund_type: 1,
   }));

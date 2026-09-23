@@ -3,10 +3,9 @@ import type { ProductInfoComponent } from '@shop/contracts/diy/schema/productInf
 /**
  * Factory default for `productInfo` — 商品信息.
  *
- * Copied from `template/admin/src/components/mobilePage/home_product_info.vue`,
- * the object the legacy editor dropped into the page. Panel labels and all:
- * the renderer reads some of them, and a page saved without them is not the
- * page the storefront expects.
+ * The component exactly as a freshly dropped one is saved. Panel labels and
+ * all: the renderer reads some of them, and a page saved without them is not
+ * the page the storefront expects.
  *
  * `timestamp` is assigned by the store when the component is dropped.
  */
@@ -514,10 +513,9 @@ export const productInfoDefault = {
     ],
   },
   /**
-   * CR-3-g2 — the two groups `c_product_info.vue:266-274` merges in from its
-   * own `defaultConfig` when a node is opened. 价格设置 and 数据设置 are the
-   * only two of that object's keys the default did not already carry; its
-   * `timestamp` is deliberately left out, because the store owns it.
+   * 价格设置 and 数据设置, the two groups the panel's 价格 and 数据 rows edit;
+   * a panel draws a row only when the node carries its key. No `timestamp`:
+   * the store owns it.
    */
   priceSettings: {
     title: '价格设置',

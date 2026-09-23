@@ -20,8 +20,8 @@ import { Can } from '@/admin/session/can';
  * 用户分组 — a short operator-maintained list.
  *
  * Deleting a group drops its memberships and leaves the customers alone, which
- * the confirmation says out loud: the legacy screen deleted silently and
- * operators assumed the customers went with it.
+ * the confirmation says out loud: deleted silently, operators would assume the
+ * customers went with it.
  */
 export function UserGroupsPage() {
   const modal = useFormModal<UserGroup>();

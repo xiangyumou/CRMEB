@@ -14,10 +14,9 @@ import type { DiyFieldProps } from '../../panel-api';
  */
 
 /**
- * The legacy label API returns `id` as a JSON number and the page stores it as
- * one; the contract types it as a string. Numeric ids go back to numbers so a
- * node written here matches one written by the old admin, and anything else is
- * stored verbatim rather than coerced.
+ * Stored pages carry a label `id` as a JSON number; the contract types it as a
+ * string. Numeric ids go back to numbers so a node written here matches the
+ * stored ones, and anything else is stored verbatim rather than coerced.
  */
 const labelId = (value: string): string | number =>
   /^[0-9]+$/.test(value) ? Number(value) : value;
@@ -63,11 +62,11 @@ export interface DiyClassListFieldProps extends DiyFieldProps<DiyGroup> {
 /**
  * `c_classify` over `classVal` rather than `activeValue`.
  *
- * One widget, two key names: `c_classify.vue:49-63` writes `activeValue` when
- * the node has one and `classVal` when it does not, and 优品推荐 is the component
- * with a `classVal`. The frozen `DiyCategoryPickerField` knows only
+ * One field kind, two key names: `activeValue` when the node has one and
+ * `classVal` when it does not, and 优品推荐 is the component
+ * with a `classVal`. The shared `DiyCategoryPickerField` knows only
  * `activeValue`, so this adapts around it instead of forking it — the tree, the
- * data source and the multi-select behaviour are all still the frozen editor's.
+ * data source and the multi-select behaviour are all still the shared editor's.
  */
 export function DiyClassListField({
   value,
@@ -106,15 +105,13 @@ export interface DiyGoodsLabelFieldProps extends DiyFieldProps<DiyGroup> {
 /**
  * `c_goods_label` — 商品标签, stored as `{activeValue: id[], list: [{id, label_name}]}`.
  *
- * The legacy widget opens `storeLabelList`, which pages the label API. Since
- * CR-3-g2 the port has a `labels` kind over `catalog.adminLabelList`, so this
- * is an ordinary picker again: add through the modal, remove through the tag's
+ * The data-source port has a `labels` kind over `catalog.adminLabelList`, so
+ * this is an ordinary picker: add through the modal, remove through the tag's
  * close button.
  *
- * Both directions keep the two keys in step exactly as `closeStoreLabel` does —
- * write `list`, then recompute `activeValue` from it — and the row keeps the
- * legacy `label_name` key rather than the DTO's `name`, because the renderer
- * reads `label_name`.
+ * Both directions keep the two keys in step — write `list`, then recompute
+ * `activeValue` from it — and the row keeps the stored `label_name` key rather
+ * than the DTO's `name`, because the renderer reads `label_name`.
  */
 export function DiyGoodsLabelField({
   value,

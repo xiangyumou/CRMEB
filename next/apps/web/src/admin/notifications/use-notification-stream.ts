@@ -46,7 +46,7 @@ export interface NotificationStream {
 /**
  * The header bell's state: the durable inbox, plus live pushes over SSE.
  *
- * - **Seeded from the inbox** (CR-32-k2). On mount, and again whenever the
+ * - **Seeded from the inbox**. On mount, and again whenever the
  *   stream re-opens after a drop, the hook reads the unread rows
  *   (`GET /admin-api/notifications?unreadOnly=true`) and the unread count. A
  *   notification written while the operator was on another tab, or before they

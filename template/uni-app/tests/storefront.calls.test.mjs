@@ -1,4 +1,4 @@
-// The call-level halves of CR-4-i (H4): an `api/*.js` function, called with
+// Call-level checks: an `api/*.js` function, called with
 // exactly what the page passes, lands on the right contract route with the
 // right query or body. A fake `uni.request` answers every call from the
 // contracts' own examples and 404s anything no contract declares.
@@ -68,7 +68,7 @@ beforeAll(async () => {
 
 beforeEach(() => installUni());
 
-describe('CR-4-i §6 — a micro page reads its own page, not the home page', () => {
+describe('a micro page reads its own page, not the home page', () => {
   it("getThemeInfo('home', {theme_id}) — what pages/annex/special calls — reads /diy/pages/:id", async () => {
     await api.getThemeInfo('home', { theme_id: 42 });
     expect(calls.map((c) => c.url)).toEqual(['https://shop.test/api/v1/diy/pages/42']);
@@ -84,7 +84,7 @@ describe('CR-4-i §6 — a micro page reads its own page, not the home page', ()
   });
 });
 
-describe('CR-4-i §10 — 确认订单 → 提交订单 carries the cart and a real idempotency key', () => {
+describe('确认订单 → 提交订单 carries the cart and a real idempotency key', () => {
   const KEY = /^[A-Za-z0-9_-]{8,64}$/;
 
   it('orderConfirm hands the page an orderKey the orders contract accepts', async () => {
@@ -143,7 +143,7 @@ describe('the poster — an image that already is a data: URL is not sent to be 
 });
 
 describe('一键换色 — the presell list never fails on a shop with no theme', () => {
-  it('a 404 from /diy/theme resolves legacy`s default palette', async () => {
+  it('a 404 from /diy/theme resolves the default palette', async () => {
     const saved = globalThis.uni.request;
     globalThis.uni.request = (options) =>
       options.success({ statusCode: 404, data: { code: 'DIY_THEME_NOT_FOUND', message: '主题不存在' } });

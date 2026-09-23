@@ -1,6 +1,6 @@
 # 后台组件套件（admin kit）
 
-约 150 个后台页面都由这里的组件拼出来。**页面里不要写 `fetch`，不要自己拼 antd 表格/表单，不要复制一份私有版本**；缺东西就提 CR（`docs/rewrite/cr/`），先在本地加适配层继续。
+约 150 个后台页面都由这里的组件拼出来。**页面里不要写 `fetch`，不要自己拼 antd 表格/表单，不要复制一份私有版本**；缺东西就在 kit 里补，补好之前先在本地加适配层继续。
 
 可运行的示例在 `/admin/dev/kit`（源码 `app/admin/(shell)/dev/kit/`），每个组件都有一屏。
 
@@ -220,9 +220,9 @@ scrollX / size / expandable / emptyText / title / bordered / onData
 
 ### ModalForm / DrawerForm
 
-替代老后台的 `$modalForm`。props 同 `ZodForm` 的 schema/fields/initialValues，外加 `route` `toInput` `invalidate` `successMessage` `onSuccess` `width` `columns`。提交中禁用、成功后自动关闭并失效列表。配 `useFormModal<T>()` 拿 `{ open, record, show(record?), close, props }`。
+弹窗表单。props 同 `ZodForm` 的 schema/fields/initialValues，外加 `route` `toInput` `invalidate` `successMessage` `onSuccess` `width` `columns`。提交中禁用、成功后自动关闭并失效列表。配 `useFormModal<T>()` 拿 `{ open, record, show(record?), close, props }`。
 
-#### 编辑表单必须先把整条记录读回来（CR-3-d2）
+#### 编辑表单必须先把整条记录读回来
 
 **列表行不是记录。** 列表路由只回列上看得见的字段，更新路由收的是整条记录：拿列表行当
 `initialValues` 打开表单，列表没带的字段就按 schema 默认值提交回去——预售活动上这意味着
@@ -268,13 +268,13 @@ interface AssetSource {
 }
 ```
 
-现在默认用内存桩 `createStubAssetSource()`。**F1（system/storage）落地真实实现后，在 shell 外面包一层 `<AssetSourceProvider source={real}>` 即可，kit 不用改。**
+默认是内存桩 `createStubAssetSource()`。真实素材库由 `@/admin/storage` 的 `StorageAssetSourceProvider` 在 shell 布局里包一层 `<AssetSourceProvider source={real}>` 接上，kit 不用改。
 
 另有 `useAssetPicker()` 返回 `{ pick(options): Promise<AssetItem[]>, holder }`，给富文本工具栏这类拿不到弹窗状态的地方用。
 
 ### LinkPicker
 
-选商城内部链接：商城页面（按分组）/ 商品 / 分类 / 文章 / 自定义 URL，返回 `{ type, label, url }`。同样对着 `LinkSource` 接口编程，现在是内存桩，A/F2/G1 落地后用 `<LinkSourceProvider>` 换掉。表单里用 `kind: 'link'`。
+选商城内部链接：商城页面（按分组）/ 商品 / 分类 / 文章 / 自定义 URL，返回 `{ type, label, url }`。同样对着 `LinkSource` 接口编程，默认是内存桩，用到的页面（如 DIY 编辑器）用 `<LinkSourceProvider>` 换成真实来源。表单里用 `kind: 'link'`。
 
 ### ConfigGroupForm
 

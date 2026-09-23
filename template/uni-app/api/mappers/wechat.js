@@ -11,7 +11,7 @@ import { text, list } from './_shared.js';
  * `timestamp`, `nonceStr` and `signature` under exactly those names — and a
  * `timestamp` that is a string, because that is what the signature was computed over.
  */
-export function toLegacyJssdkConfig(dto) {
+export function toPageJssdkConfig(dto) {
   if (!dto) return {};
   return {
     appId: text(dto.appId),
@@ -28,17 +28,17 @@ export function toLegacyJssdkConfig(dto) {
  * simply skips the prompt, which is why `utils/SubscribeMessage.js` resolves without
  * asking rather than calling `requestSubscribeMessage` with `tmplIds: []` (it throws).
  */
-export function toLegacySubscribeTemplates(dto) {
+export function toPageSubscribeTemplates(dto) {
   return list(dto && dto.templateIds)
     .map((id) => text(id))
     .filter(Boolean);
 }
 
 // ---------------------------------------------------------------------------
-// 小程序码 (E4 — GET /api/v1/wechat/mini-qrcodes)
+// 小程序码 (GET /api/v1/wechat/mini-qrcodes)
 // ---------------------------------------------------------------------------
 
-/** 路由只收这四个 `page`（E4）；旧调用的三种用途各对应一个。 */
+/** 路由只收这四个 `page`；页面的三种用途各对应一个。 */
 export const MINI_CODE_PAGES = {
   product: 'pages/goods_details/index',
   groupbuy: 'pages/activity/goods_combination_details/index',
@@ -46,17 +46,17 @@ export const MINI_CODE_PAGES = {
   home: 'pages/index/index',
 };
 
-/** WeChat 的 scene 上限是 32 字节，E4 在路由上按 32 个 ASCII 字符校验。 */
+/** WeChat 的 scene 上限是 32 字节，路由按 32 个 ASCII 字符校验。 */
 const SCENE_MAX = 32;
 
 /**
- * 旧的「给我这个商品 / 这个拼团 / 我自己的推广码」→ `{page, scene}`。
+ * 页面的「给我这个商品 / 这个拼团 / 我自己的推广码」→ `{page, scene}`。
  *
  * scene 的写法照目标页 `onLoad` 里 `getUrlParams(decodeURIComponent(options.scene))`
  * 读的键：商品详情和拼团详情读 `id` 和推广人 `pid`，首页读 `spid`。没登录（uid 为 0）
  * 就不带推广人；id 长到装不下推广人时也只丢推广人，保住页面能打开。
  */
-export function fromLegacyMiniCodeQuery(kind, id, uid) {
+export function fromPageMiniCodeQuery(kind, id, uid) {
   const page = MINI_CODE_PAGES[kind] || MINI_CODE_PAGES.home;
   const spreader = /^[1-9]\d*$/.test(text(uid)) ? text(uid) : '';
   if (page === MINI_CODE_PAGES.home) {
@@ -71,7 +71,7 @@ export function fromLegacyMiniCodeQuery(kind, id, uid) {
  * `{url}` → 页面读的两种名字：海报 mixin 和两个详情页读 `res.data.code`，
  * poster-poster 读 `res.data.url`。
  */
-export function toLegacyMiniCode(dto) {
+export function toPageMiniCode(dto) {
   const url = text(dto && dto.url);
   return { code: url, url };
 }

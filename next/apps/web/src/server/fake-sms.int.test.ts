@@ -5,7 +5,7 @@ import { buildContainer, resetProcessOverrides, setContainer, type Container } f
 import type { Env } from './env';
 
 /**
- * `SHOP_FAKE_SMS=1` through the real boot path (CR-3-i).
+ * `SHOP_FAKE_SMS=1` through the real boot path.
  *
  * The storefront e2e suite runs `next start` in another process, so it cannot
  * `registerSmsSender()` the way an integration test does; it sets this flag
@@ -89,7 +89,7 @@ async function sendCode(): Promise<Response> {
   return POST(json('/api/v1/auth/sms-codes', { phone: PHONE, scene: 'login' }));
 }
 
-describe('SHOP_FAKE_SMS=1 (CR-3-i)', () => {
+describe('SHOP_FAKE_SMS=1', () => {
   it('without the flag a shop with no SMS provider refuses to send', async () => {
     boot(undefined);
     expect(getSmsSenderOverride()).toBeUndefined();

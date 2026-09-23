@@ -151,8 +151,8 @@ async function shopper(): Promise<{ userId: number; headers: Record<string, stri
     detail: '文三路 100 号',
     isDefault: true,
   });
-  // E1 owns the real `UserLookup`; until it lands, the fake is what lets a
-  // storefront session resolve at all.
+  // A fake `UserLookup` is enough for a storefront session to resolve without
+  // loading the user domain.
   registerUserLookup(fakeUserLookup([{ id: user!.id }]));
   const issued = await new UserSessionService().issue(harness.ctx, {
     userId: user!.id,
@@ -320,7 +320,7 @@ describe('POST /admin-api/orders/:id/shipments', () => {
     expect((await orderById(placed.orderId)).status).toBe('shipped');
 
     const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
-      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      // Sign-ins are audited too; this test is about the operation.
       (row) => row.routeId !== 'auth.adminLogin',
     );
     expect(audit).toHaveLength(1);
@@ -350,7 +350,7 @@ describe('POST /admin-api/orders/:id/shipments', () => {
     expect(response.status).toBe(403);
     expect(
       (await harness.ctx.db.select().from(auditLogs)).filter(
-        // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+        // Sign-ins are audited too; this test is about the operation.
         (row) => row.routeId !== 'auth.adminLogin',
       ),
     ).toHaveLength(0);

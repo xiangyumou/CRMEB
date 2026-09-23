@@ -235,7 +235,7 @@ function groupBySection(
 }
 
 /**
- * A deployment fact, shown and not edited (N1 / CR-1-e2).
+ * A deployment fact, shown and not edited.
  *
  * No `name`, deliberately: the field never joins the form's values, so it
  * cannot be submitted even by a `buildConfigPayload` that forgot to skip it,

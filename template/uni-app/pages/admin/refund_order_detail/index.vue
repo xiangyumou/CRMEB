@@ -243,7 +243,7 @@
 			<view class="footer acea-row row-right row-middle" v-if="goname != 'looks'">
 				<view class="more"></view>
 				<view class="btn cancel" @click="modify('1')">订单备注</view>
-				<!-- 审核与确认收货只在店铺开启「店员审核售后」时出现（R6 §4） -->
+				<!-- 审核与确认收货只在店铺开启「店员审核售后」时出现 -->
 				<view class="btn delivery" v-if="canReview && orderInfo.refund_type == 1" @click="modify('2',1)">退款审核</view>
 				<view class="btn delivery" v-if="canReview && orderInfo.refund_type == 2" @click="modify('2',0)">退款审核</view>
 				<view class="btn" v-if="orderInfo.refund_type == 5" @click="goLogistics(orderInfo)">查看物流</view>
@@ -314,7 +314,7 @@
 				// #endif
 				getHeight: this.$util.getWXStatusHeight(),
 				userInfo: {},
-				// order-staff.allowStaffRefundReview，默认关闭（R6 §4）
+				// order-staff.allowStaffRefundReview，默认关闭
 				canReview: false,
 			};
 		},
@@ -482,7 +482,7 @@
 						}
 					);
 				} else if (that.status == 2) {
-					// 退款金额由买家的申请决定（CR-4-h §3）。
+					// 退款金额由买家的申请决定。
 					if (this.isRefund) {
 						data.type = opt.type;
 						this.objOrderRefund(data);

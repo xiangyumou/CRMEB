@@ -33,7 +33,7 @@ export interface MenuNode {
  * Declares menu entries for a domain. Put them in
  * `src/admin/menu/<domain>.menu.ts` and default-export the result; `pnpm gen`
  * aggregates every such file into `menu.gen.ts`, so no shared index is edited
- * and parallel streams never conflict.
+ * and two domains never conflict.
  *
  * ```ts
  * export default defineMenu({

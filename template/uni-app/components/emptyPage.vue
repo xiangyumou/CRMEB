@@ -1,6 +1,6 @@
 <template>
 	<view class="empty-box">
-		<image :src="'/static/images/legacy/empty-box.png'"></image>
+		<image :src="'/static/images/common/empty-box.png'"></image>
 		<view class="txt">{{title || $t(`暂无记录`)}}</view>
 	</view>
 </template>

@@ -34,10 +34,9 @@ import { ARTICLE_STATUS } from '../cms-enums';
 /**
  * 文章管理.
  *
- * The whole article is one form, including the promoted product: the legacy
- * screen had two extra routes (`cms/relation` and `cms/unrelation`) driven by
- * buttons in the list, which wrote `product_id` without passing through any of
- * the article's own validation. There is one save path here, and one audit
+ * The whole article is one form, including the promoted product: separate
+ * link/unlink buttons in the list would write `product_id` without passing
+ * through any of the article's own validation. There is one save path here, and one audit
  * entry per save.
  *
  * 状态 is three-valued on purpose. 草稿 is what an unfinished article is, and

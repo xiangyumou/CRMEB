@@ -324,7 +324,7 @@ export function ShipPanel({
   );
 }
 
-/** The courier feed. `available: false` while stream F2 has registered no provider. */
+/** The courier feed. `available: false` while no tracking provider is registered. */
 function TrackingLink({ shipmentId }: { shipmentId: string }) {
   const [open, setOpen] = useState(false);
   const tracking = useRouteQuery(

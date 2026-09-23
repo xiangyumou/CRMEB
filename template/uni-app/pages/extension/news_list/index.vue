@@ -75,7 +75,7 @@
 		</view>
 		<view class='noCommodity' v-if="articleList.length == 0 && (page != 1 || active== 0)">
 			<view class='emptyBox'>
-				<image :src="'/static/images/legacy/empty-box.png'"></image>
+				<image :src="'/static/images/common/empty-box.png'"></image>
 			</view>
 		</view>
 		<!-- #ifndef MP -->

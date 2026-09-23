@@ -308,7 +308,7 @@
 				if (userInfo === undefined) return that.$util.Tips({
 					title: that.$t(`切换的账号不存在`)
 				});
-				// 多账号切换没有继任者：一个 token 就是一个账号，换账号就是重新登录。
+				// 没有多账号切换：一个 token 就是一个账号，换账号就是重新登录。
 				that.$store.commit("LOGOUT");
 				uni.showLoading({
 					title: that.$t(`正在切换中`)

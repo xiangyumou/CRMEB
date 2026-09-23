@@ -5,7 +5,7 @@ import { defineJob } from '../define-job';
 /**
  * Asks the gateway about every attempt that has sat in a non-final state.
  *
- * The one job in this stream that exists purely because *a notification can be
+ * The one payment job that exists purely because *a notification can be
  * lost*. A deploy, a network blip or one 500 is enough, and WeChat gives up
  * retrying after a day — after which a shop that only learns about money from
  * callbacks has a paid order it thinks is unpaid, and a buyer whose goods never

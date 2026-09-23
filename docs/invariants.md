@@ -1431,7 +1431,7 @@ Read and write are separate atoms: a caller holding only `system:config:read` is
 
 An entry whose atom the role does not hold is absent from the sider, and a role holding nothing sees no entries at all; a super admin sees every one.
 
-- `apps/web/src/admin/menu/system.menu.test.ts::F1 sider entries > never shows an entry whose atom the role does not hold`
+- `apps/web/src/admin/menu/system.menu.test.ts::system sider entries > never shows an entry whose atom the role does not hold`
 - `apps/web/src/admin/shell/route-permission.test.tsx::RouteGuard > renders the 403 inside the chrome for a page outside the role`
 - `apps/web/src/admin/shell/route-permission.test.tsx::requiredPermissions > covers every page under the shell but the 403 page — a new page needs a menu entry`
 
@@ -1497,10 +1497,10 @@ A write is audited with its actor, route and target; every credential-named fiel
 - `apps/web/app/admin-api/admins/system.int.test.ts::/admin-api/admins > creates with 201 and writes an audit row without the password in it`
 - `apps/web/app/admin-api/admins/system.int.test.ts::/admin-api/audit-logs > does not record a read`
 - `packages/core/src/auth/audit.redact.test.ts::K-SEC-U12 — what the operation log keeps of a request body > redacts the same credential one level down, as the config form sends it`
-- `apps/web/src/server/handle.int.test.ts::what the operation log keeps of a config save (CR-9-k) > leaves no part of the payment keys in audit_logs`
+- `apps/web/src/server/handle.int.test.ts::what the operation log keeps of a config save > leaves no part of the payment keys in audit_logs`
 - `packages/core/src/auth/admin-login.trail.int.test.ts::K-SEC-A4 — what a password-guessing run leaves behind > leaves a readable trail of the failed attempts, without the password`
-- `apps/web/app/api/v1/staff/products/catalog-staff.int.test.ts::/api/v1/staff/products/:id/skus > records the reprice in the operation log, naming the 店员 and the product (CR-13-k2)`
-- `apps/web/src/server/handle.int.test.ts::the 操作日志 reader lists both kinds of actor (CR-13-k2) > returns admin and staff rows, each naming its actor, and filters by kind`
+- `apps/web/app/api/v1/staff/products/catalog-staff.int.test.ts::/api/v1/staff/products/:id/skus > records the reprice in the operation log, naming the 店员 and the product`
+- `apps/web/src/server/handle.int.test.ts::the 操作日志 reader lists both kinds of actor > returns admin and staff rows, each naming its actor, and filters by kind`
 
 ### SYS-013
 
@@ -1558,7 +1558,7 @@ An upload is refused when the bytes are a server script (`<?php`), HTML, an SVG 
 
 Those refusals hold over HTTP, for admins and for shoppers, and write no row and no object.
 
-- `apps/web/app/admin-api/attachments/storage.int.test.ts::/admin-api/attachments > refuses what the old uploader accepted > refuses <each of five>`
+- `apps/web/app/admin-api/attachments/storage.int.test.ts::/admin-api/attachments > refuses what a naive uploader would accept > refuses <each of five>`
 - `apps/web/app/admin-api/attachments/storage.int.test.ts::/api/v1/uploads > refuses an executable from a shopper too`
 
 ### STOR-003

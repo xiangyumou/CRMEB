@@ -2,7 +2,7 @@ import { notificationMyList } from '@shop/contracts/notification/notification.st
 import { notificationInbox } from '@shop/core/notification';
 import { handle } from '../../../../src/server';
 
-/** 站内信. Reading the list never marks anything read — the legacy list did. */
+/** 站内信. Reading the list never marks anything read. */
 export const GET = handle(notificationMyList, (ctx, { query }) =>
   notificationInbox.list(ctx, 'user', query),
 );

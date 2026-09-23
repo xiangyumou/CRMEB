@@ -1,7 +1,7 @@
 import { isIP } from 'node:net';
 
 /**
- * The caller's address, as the edge saw it (CR-14-k2).
+ * The caller's address, as the edge saw it.
  *
  * The trust boundary is the edge (`next/docker/edge/nginx.conf`): nginx's
  * realip module takes the client address from `X-Forwarded-For` **only** when

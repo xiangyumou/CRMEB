@@ -19,11 +19,11 @@ import path from 'node:path';
  *
  * ## One checkout, one stack
  *
- * The same rule as `@shop/e2e-admin` (R5): several checkouts (worktrees) run
- * this suite on one machine at once. With fixed ports 3220–3222, one fixed
- * stack file and `reuseExistingServer` on outside CI, the second run's
- * Playwright found the first run's edge answering, reused it, and drove its
- * specs against the *other* checkout's H5 bundle, build and database. So:
+ * The same rule as `@shop/e2e-admin`: several checkouts (worktrees) may run
+ * this suite on one machine at once. With fixed ports, one fixed stack file
+ * and `reuseExistingServer` on, the second run's Playwright would find the
+ * first run's edge answering, reuse it, and drive its specs against the
+ * *other* checkout's H5 bundle, build and database. So:
  *
  * - the default ports and stack file are derived from the checkout's path
  *   (`CHECKOUT_ID` below), so two checkouts never share them by default;

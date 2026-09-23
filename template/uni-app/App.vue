@@ -202,9 +202,9 @@ export default {
     // 		});
     // }
     // #endif
-    // The legacy H5 build fetched `/api/get_script` here and injected the
-    // body as <script> tags (the shop's custom 统计 / chat snippet). That
-    // feature is not ported, and the rewrite has no such route (CR-4-i §4).
+    // No custom script is fetched and injected here: there is no route for a
+    // shop's own 统计 / chat snippet, and appending a response as <script> tags
+    // would run whatever came back.
     getCrmebCopyRight().then((res) => {
       uni.setStorageSync("copyRight", res.data);
     });

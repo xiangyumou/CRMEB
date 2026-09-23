@@ -4,7 +4,7 @@ import type { z } from 'zod';
 /**
  * A job is declared next to its domain (`src/jobs/<domain>.<what>.ts`) and
  * picked up by `pnpm gen`, exactly like a contract or a permission atom. No
- * shared registry file to edit, so ten streams add jobs without conflicting.
+ * shared registry file to edit, so domains add jobs without conflicting.
  *
  *     export default defineJob({
  *       name: 'order.autoCancel',

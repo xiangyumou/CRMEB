@@ -10,7 +10,7 @@ import { formatFigure, StatsPageFrame, useStatsRange } from '@/admin/stats';
 
 type RegionSort = UserRegionQuery['sortBy'];
 // The contract exports the row *schema* but not its type; deriving it here
-// keeps the frozen contract untouched.
+// keeps the contract untouched.
 type UserRegionRow = UserRegionStats['rows'][number];
 
 const SORTS: { value: RegionSort; label: string }[] = [

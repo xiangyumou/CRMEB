@@ -47,13 +47,12 @@ import { rejectAdd } from './store';
 /**
  * The left-hand palette.
  *
- * Grouping and the per-page-kind filter are `diyIndex.vue:1030` verbatim:
- * 基础 / 营销 / 工具 are always offered, 商品组件 only off the home and personal
+ * Grouping and the per-page-kind filter: 基础 / 营销 / 工具 are always offered, 商品组件 only off the home and personal
  * centre pages (with 商品信息 hoisted to the top of its group), 用户组件 only off
  * the home and product-detail pages.
  *
- * Adding is a click, not a drag. The legacy editor supported both and the click
- * path is the one that works with a keyboard, a screen reader and a trackpad;
+ * Adding is a click, not a drag: the click path is the one that works with a
+ * keyboard, a screen reader and a trackpad;
  * ordering afterwards is what the canvas's drag handles are for.
  */
 
@@ -67,7 +66,7 @@ const GROUP_TITLES: Record<PaletteGroup, string> = {
   tool: '工具组件',
 };
 
-/** `type` from each component's legacy `mobilePage/*.vue`, plus an icon. */
+/** Each component's palette group, plus an icon. */
 const PALETTE: Record<string, { group: PaletteGroup; icon: ReactNode }> = {
   swiperBg: { group: 'basis', icon: <PictureOutlined /> },
   homeComb: { group: 'basis', icon: <SearchOutlined /> },
@@ -110,7 +109,7 @@ export function componentLabel(key: string): string {
   return typeof cname === 'string' ? cname : key;
 }
 
-/** The one-line blurb the legacy defaults carry under `desc`. */
+/** The one-line blurb the factory defaults carry under `desc`. */
 function componentDescription(key: string): string | undefined {
   const preset = diyComponentDefaults[key as DiyComponentWithDefault] as
     { desc?: unknown } | undefined;
@@ -133,7 +132,7 @@ export function paletteGroupsFor(kind: DiyPageKind): { group: PaletteGroup; keys
     const group = entry?.group ?? 'tool';
     if (group === 'goods' && !wantsGoods) continue;
     if (group === 'user' && !wantsUser) continue;
-    // 商品信息 leads its group — `diyIndex.vue:1055`.
+    // 商品信息 leads its group.
     if (key === 'productInfo') buckets[group].unshift(key);
     else buckets[group].push(key);
   }

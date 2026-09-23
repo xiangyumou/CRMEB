@@ -1,4 +1,4 @@
-// diy DTOs → the legacy 装修 payload `pages/index`, `pages/annex/special` and
+// diy DTOs → the 装修 payload `pages/index`, `pages/annex/special` and
 // `subpackage/diyComponents/pageDesign.vue` render.
 //
 // Contract: next/packages/contracts/src/diy/storefront.contract.ts
@@ -9,7 +9,7 @@
 import { toId, text } from './_shared.js';
 
 /** `diyStorefrontPage` → `{title, value, is_bg_color, color_picker, …}`. */
-export function toLegacyDiyPage(dto) {
+export function toPageDiyPage(dto) {
   if (!dto) return {};
   const bg = dto.background || {};
   return {
@@ -30,20 +30,20 @@ export function toLegacyDiyPage(dto) {
 }
 
 /** `GET /api/v1/diy/version` → `{version}`; pages compare it with the cached one. */
-export function toLegacyDiyVersion(dto) {
+export function toPageDiyVersion(dto) {
   return { version: text(dto && dto.version) };
 }
 
 /**
  * `GET /api/v1/diy/theme` → the token bag `mixins/color.js` feeds into CSS variables.
- * The legacy payload nested them under `status`; the renderer only reads the map.
+ * The renderer only reads the map.
  */
 /**
- * Legacy 一键换色's five palettes, keyed by their main colour. `status` is what
+ * 一键换色's five palettes, keyed by their main colour. `status` is what
  * `colorChange('color_change')` answered and the one caller (`presell/index`)
  * switches on to pick its banner: 1 蓝 · 2 绿 · 3 红 (the default) · 4 粉 · 5 橙.
  */
-const LEGACY_COLOR_STATUS = {
+const PALETTE_COLOR_STATUS = {
   '#1db0fc': 1,
   '#42ca4d': 2,
   '#e93323': 3,
@@ -51,26 +51,26 @@ const LEGACY_COLOR_STATUS = {
   '#fe5c2d': 5,
 };
 
-export function legacyColorStatus(tokens) {
+export function pageColorStatus(tokens) {
   const main = text(tokens && tokens.theme).trim().toLowerCase();
-  return LEGACY_COLOR_STATUS[main] || 3;
+  return PALETTE_COLOR_STATUS[main] || 3;
 }
 
-export function toLegacyTheme(dto) {
+export function toPageTheme(dto) {
   const tokens = (dto && dto.tokens) || {};
   return {
     id: toId(dto && dto.id),
     name: text(dto && dto.name),
-    // A number, as legacy answered: the object that stood here sent the
-    // presell list to its `default:` branch, which threw (H4).
-    status: legacyColorStatus(tokens),
+    // A number: an object here sends the presell list to its `default:`
+    // branch, which throws.
+    status: pageColorStatus(tokens),
     tokens,
     version: text(dto && dto.version),
   };
 }
 
 // ---------------------------------------------------------------------------
-// 底部导航、版式 (F4 — CR-3-h2 §2/§3)
+// 底部导航、版式
 // ---------------------------------------------------------------------------
 
 /**
@@ -98,27 +98,27 @@ const NATIVE_TAB_BAR = {
 
 /**
  * `GET /api/v1/diy/navigation` → the saved `pageFoot` component itself, which is what
- * `setNavigationInfo` and `goods_cate1`'s `newData` take (F4 returns it verbatim
- * under `navigation`). `navigation: null` — no published home page — means "use
+ * `setNavigationInfo` and `goods_cate1`'s `newData` take (the route returns it
+ * verbatim under `navigation`). `navigation: null` — no published home page — means "use
  * the native tab bar", spelled as a component that says so.
  */
-export function toLegacyNavigation(dto) {
+export function toPageNavigation(dto) {
   const nav = dto && dto.navigation;
   return nav && typeof nav === 'object' ? nav : NATIVE_TAB_BAR;
 }
 
 /** `GET /api/v1/diy/layouts/:type` → `{status}`; `goods_cate` tests `status == 2 || 3`. */
-export function toLegacyLayout(dto) {
+export function toPageLayout(dto) {
   return { status: toId(dto && dto.status) || 1 };
 }
 
 /**
  * `GET /api/v1/diy/layouts/user` → what `pages/user` reads off `getMenuList()`:
  * `diy_data.value` is the 个人中心 版式 (`member_style`), and `routine_my_menus` is
- * walked but no longer rendered — the tiles are components on the 个人中心 DIY page
- * (`getThemeInfo('user')`) now — so it is an empty list.
+ * walked but not rendered — the tiles are components on the 个人中心 DIY page
+ * (`getThemeInfo('user')`) — so it is an empty list.
  */
-export function toLegacyUserMenus(dto) {
+export function toPageUserMenus(dto) {
   return {
     diy_data: {
       value: toId(dto && dto.status) || 1,

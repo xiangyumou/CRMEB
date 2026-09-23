@@ -36,7 +36,7 @@
 			</view>
 			<view class='noCommodity' v-if="addressList.length < 1 && page > 1">
 				<view class='pictrue'>
-					<image :src="'/static/images/legacy/noAddress.png'"></image>
+					<image :src="'/static/images/common/noAddress.png'"></image>
 				</view>
 			</view>
 			<view style='height:120rpx;'></view>

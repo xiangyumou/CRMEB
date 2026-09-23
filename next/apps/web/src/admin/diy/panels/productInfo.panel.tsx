@@ -22,8 +22,7 @@ import {
 import { bindDiyPanel, defineDiyPanel, type DiyFieldProps } from '../panel-api';
 
 /**
- * 商品信息 — ports `c_product_info.vue` and the five one-off widgets it is the
- * only user of: `c_product_info_list`, `c_indicator_settings`,
+ * 商品信息, and the five one-off widgets it is the only user of: `c_product_info_list`, `c_indicator_settings`,
  * `c_title_settings`, `c_spec_settings` and `c_data_settings`. They stay local
  * to this file rather than joining `_fields/`, which is for widgets more than
  * one panel needs.
@@ -31,20 +30,17 @@ import { bindDiyPanel, defineDiyPanel, type DiyFieldProps } from '../panel-api';
  * Two shapes worth naming:
  *
  * - The 色调 rows in `titleConfig`, `specSettings` and `priceSettings` store
- *   `tabList[].val`, **not** the tab index (`c_title_settings.vue:11`,
- *   `:label="item.val"`). They happen to coincide today, 0 and 1, and writing
+ *   `tabList[].val`, **not** the tab index. They happen to coincide today, 0 and 1, and writing
  *   the index instead would be a silent divergence the day a third option is
  *   added. The `val` is what is written.
  * - `sortList.list` is both the order and the visibility of the product page's
  *   sections: dragging reorders, the switch is `show`, and the per-section
  *   checkboxes are `checkList` over `checkBoxList`.
  *
- * `priceSettings` and `dataSettings` come from the legacy panel's own
- * `defaultConfig`, merged into the node when it opens
- * (`c_product_info.vue:266-274`). This panel adds nothing, so those two
- * sections draw for a node that has them and are silent for one that does not;
- * CR-3-g2 put them in `productInfo.default.ts`, so a fresh node has them and an
- * older one is left exactly as it was saved.
+ * This panel adds nothing to a node, so the `priceSettings` and `dataSettings`
+ * sections draw for a node that has them and are silent for one that does not.
+ * `productInfo.default.ts` carries both, so a fresh node has them and an older
+ * one is left exactly as it was saved.
  */
 
 /** 色调 rows whose stored value is `tabList[].val`, not the index. */
@@ -145,7 +141,7 @@ function TitleSettings({ value, onChange, disabled }: DiyFieldProps<DiyGroup>) {
 /**
  * `c_spec_settings` — the spec picker's colours.
  *
- * The last three only show for 样式二/三/四 (`c_spec_settings.vue:55-58`), which
+ * The last three only show for 样式二/三/四, which
  * is why this one needs the component's `specStyle` as well as its own config.
  */
 function SpecSettings({
@@ -266,7 +262,7 @@ export default defineDiyPanel<ProductInfoComponent>({
     const patch = (key: string, next: unknown): void =>
       onChange({ ...value, [key]: next } as ProductInfoComponent);
     // Optional on the node — an older save may not carry them — so the schema
-    // types them loosely; see the note above and CR-3-g2.
+    // types them loosely; see the note above.
     const priceSettings = value.priceSettings as DiyGroup | undefined;
     const dataSettings = value.dataSettings as DiyGroup | undefined;
 

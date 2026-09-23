@@ -6,9 +6,8 @@ import type { ReactNode } from 'react';
 /**
  * The layout primitives every config panel is built from.
  *
- * The legacy panels are a flat list of `mobileConfigRight/c_*` widgets with
- * `c_title` acting as a separator. Same idea here, minus the flat list: a
- * section is a real element, so it can be hidden as a unit.
+ * A panel is a list of field rows grouped under titled sections. A section is
+ * a real element, so it can be hidden as a unit.
  */
 
 export interface DiySectionProps {
@@ -78,7 +77,7 @@ export function DiyFieldRow({ label, stacked = false, help, children }: DiyField
 export interface DiySetUpTabsProps {
   value: number;
   onChange: (next: number) => void;
-  /** Defaults to the legacy pair 展示设置 / 样式设置. */
+  /** Defaults to the pair 展示设置 / 样式设置. */
   options?: readonly string[] | undefined;
   disabled?: boolean | undefined;
 }
@@ -86,7 +85,7 @@ export interface DiySetUpTabsProps {
 /**
  * The 展示设置 / 样式设置 switch at the top of every panel. Backed by
  * `setUp.tabVal` in the saved node, which is why it is persisted state and not
- * component state — the legacy editor stored it too, and the fixtures have it.
+ * component state — stored pages carry it, and the fixtures have it.
  */
 export function DiySetUpTabs({
   value,

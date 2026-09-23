@@ -6,7 +6,7 @@ import { clientPlatform, surfaceOf } from '@shop/contracts/conventions';
 // is what CONVENTIONS requires of anything a shopper can see.
 import '@shop/contracts/locale';
 // Side-effect import: installs every domain — its ports, its order-state
-// machine and its effect handlers (CR-8-c). A route module only imports the
+// machine and its effect handlers. A route module only imports the
 // domain it serves, so without this a checkout would run on the fallback
 // catalogue adapter and `refund.execute` would be parked as `unknown` by the
 // first dispatcher pass after boot. `handle()` is on the path of every request,
@@ -62,8 +62,7 @@ export interface RequestCtx extends Ctx {
   clearCookie(name: string): void;
   setHeader(name: string, value: string): void;
   /**
-   * Sets the `ETag` and reports whether the caller already has this version
-   * (CR-1-s):
+   * Sets the `ETag` and reports whether the caller already has this version:
    *
    *     if (ctx.etag(page.version)) ctx.notModified();
    *
@@ -244,8 +243,8 @@ export function handle<
     const finish = (status: number, body: unknown): Response => {
       for (const cookie of cookies) headers.append('set-cookie', cookie);
       // A status the route declares as an ordinary answer is logged as one
-      // (CR-1-j3: `/readyz`'s 503 during a rolling start is "not yet", not a
-      // fault, and at `error` it buried the one line that was).
+      // (`/readyz`'s 503 during a rolling start is "not yet", not a fault, and
+      // at `error` it would bury the one line that was).
       const level = expectedStatuses.has(status)
         ? 'info'
         : status >= 500
@@ -342,7 +341,7 @@ export function handle<
         if (anyRoute.auth === 'staff') {
           const check = getStaffCheck();
           if (!check) {
-            container.logger.error('StaffCheck 未注册（stream B2 未加载）');
+            container.logger.error('StaffCheck 未注册（order 模块未加载）');
             return fail(new DomainError('FORBIDDEN'));
           }
           if (!(await check.isStaff(container.db, session.userId))) {
@@ -455,8 +454,7 @@ export function handle<
 
       // -- 7. audit ----------------------------------------------------------
       // Every successful write by a console admin, and every successful write
-      // by a 店员 on the staff surface (CR-13-k2: `ctx.audit` on a staff route
-      // used to record nothing).
+      // by a 店员 on the staff surface.
       if (MUTATING.has(request.method) && audited(surface, anyRoute.auth, actor)) {
         await writeAudit(container, {
           actor,

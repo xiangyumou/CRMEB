@@ -9,8 +9,8 @@ import { serveAdminNotificationStream } from './_stream';
  * `handle()` validates a response against a zod schema and serialises it as
  * JSON. An SSE response is a `text/event-stream` body that never ends, so it
  * cannot be modelled by a `RouteDef` and cannot go through `handle` — the same
- * reason P0-b's hook uses a raw `EventSource` instead of `callRoute`. It is one
- * of exactly three bare handlers in this stream's scope, and it repeats only
+ * reason the bell's hook uses a raw `EventSource` instead of `callRoute`. It is
+ * one of very few bare handlers, and it repeats only
  * the cookie lookup, not the authorisation rules.
  *
  * ## What it does not do
@@ -33,7 +33,7 @@ const KEEPALIVE_MS = 25_000;
 /**
  * The session is re-checked on every keep-alive tick and the stream closes
  * when it no longer resolves; every stream in the process shares one Redis
- * subscriber, and an admin may hold at most `MAX_STREAMS_PER_ADMIN` (CR-15-k2).
+ * subscriber, and an admin may hold at most `MAX_STREAMS_PER_ADMIN`.
  * The stream lives in `_stream.ts` so a test can shorten the tick.
  */
 export async function GET(request: Request): Promise<Response> {

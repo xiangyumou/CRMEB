@@ -10,11 +10,10 @@ import { DiyFieldRow } from './section';
  * Box-model field editors: padding/margin and corner radii.
  *
  * Both store four sides in a `valList` plus an "all sides the same" flag, and
- * both are read by the renderer in the order **top, right, bottom, left** —
- * see `banner.vue:14-20`, which builds `border-radius` as
- * `valList[0] valList[1] valList[3] valList[2]`. That is not a typo in the old
- * code; CSS takes top-left, top-right, bottom-right, bottom-left, so the stored
- * order really is T R B L.
+ * both are read by the renderer in the order **top, right, bottom, left** — the
+ * renderer builds `border-radius` as `valList[0] valList[1] valList[3]
+ * valList[2]`. That is not a typo: CSS takes top-left, top-right,
+ * bottom-right, bottom-left, so the stored order really is T R B L.
  */
 
 const SIDES = ['上', '右', '下', '左'] as const;

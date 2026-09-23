@@ -8,7 +8,7 @@ import { menuRegistry } from '../menu/menu.gen';
 import { isCoveredByMenu, requiredPermissions } from './route-permission';
 
 /**
- * CR-16-k: the shell guards every page by the atom its menu entry declares,
+ * The shell guards every page by the atom its menu entry declares,
  * and the avatar menu's 个人资料 goes to a page that exists.
  */
 

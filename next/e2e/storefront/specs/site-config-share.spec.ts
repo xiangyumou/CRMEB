@@ -5,9 +5,8 @@ import { SITE } from '../src/site';
 /**
  * Journey 8 — Site config / share.
  *
- * `GET /api/v1/site/config` (F4, `docs/rewrite/status/f4.md` §6) is the one
- * read behind every "the shop's own …" on the storefront; H3 bound the five
- * legacy `/site/*` readers to it (`api/api.js` `siteConfig()`). `src/seed.ts`
+ * `GET /api/v1/site/config` is the one read behind every "the shop's own …"
+ * on the storefront (`api/api.js` `siteConfig()`). `src/seed.ts`
  * writes a name, a login logo and a copyright image that differ from every
  * bundled default (`src/site.ts`), so a page that ignored the config would
  * show CRMEB's own instead, and the journey would say so.
@@ -41,7 +40,7 @@ test("a product's share panel opens with a poster action, independent of site co
 }) => {
   // The share panel is reachable from the product page itself, before it is
   // ever added to the cart — no need to actually buy anything for this. With
-  // no published product page this is the built-in default (W5T, CR-7-i):
+  // no published product page this is the built-in default:
   // its bottom bar carries the 分享 entry.
   await shopperPage.goto(`/pages/goods_details/index?id=${shop.fixtures.postageProductId}`);
   await expect(shopperPage.getByText('E2E 运费商品').first()).toBeVisible();

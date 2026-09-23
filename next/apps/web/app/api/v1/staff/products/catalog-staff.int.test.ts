@@ -22,17 +22,17 @@ import { setContainer, type Container } from '../../../../../src/server/containe
 import type { Env } from '../../../../../src/server/env';
 
 /**
- * 移动端商家管理 — 商品管理 as HTTP (CR-4-h2).
+ * 移动端商家管理 — 商品管理 as HTTP.
  *
  * The behaviour of every one of these ten calls is pinned in
  * `packages/core/src/catalog/catalog.staff.int.test.ts`. What is proved here is
  * only what a route file can get wrong: the contract bound to the wrong method
- * or path, and — the reason the brief asks for one test per route — `auth:
- * 'staff'` failing *open*. Every route gets the same pair: a signed-in shopper
+ * or path, and — the reason there is one test per route — `auth: 'staff'`
+ * failing *open*. Every route gets the same pair: a signed-in shopper
  * who is not on the `orderStaff` list is a 403, the same shopper added to the
  * list is served.
  *
- * "Not on the list" is a 403 and not an empty list, exactly as B2's
+ * "Not on the list" is a 403 and not an empty list, exactly as
  * `/api/v1/staff/orders` behaves; there is no per-route permission because
  * staff is a config list, not a role.
  */
@@ -296,8 +296,8 @@ describe('POST /api/v1/staff/products', () => {
     expect(detail.status).toBe(200);
     expect(await detail.json()).toMatchObject({ name: '手冲挂耳咖啡' });
 
-    // A staff write is an audit row since CR-13-k2 (`actor_kind = 'staff'`,
-    // the 店员's user id); it used to be a no-op.
+    // A staff write is an audit row (`actor_kind = 'staff'`, the 店员's user
+    // id).
     const audit = await harness.ctx.db.select().from(auditLogs);
     expect(audit).toHaveLength(1);
     expect(audit[0]).toMatchObject({
@@ -598,7 +598,7 @@ describe('/api/v1/staff/products/:id/skus', () => {
     expect(row!.stock).toBe(50);
   });
 
-  it('records the reprice in the operation log, naming the 店员 and the product (CR-13-k2)', async () => {
+  it('records the reprice in the operation log, naming the 店员 and the product', async () => {
     const seeded = await seedProduct();
     const { userId, headers } = await shopper();
     await promote(userId);
@@ -661,7 +661,7 @@ describe('GET /api/v1/staff/shipping-templates', () => {
     expect((await GET(get('/api/v1/staff/shipping-templates', headers))).status).toBe(403);
   });
 
-  it('serves F2’s own options list', async () => {
+  it('serves the shipping domain’s own options list', async () => {
     const headers = await staff();
     await harness.ctx.db
       .insert(shippingTemplates)

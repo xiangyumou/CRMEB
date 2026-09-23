@@ -159,7 +159,7 @@ describe('/admin-api/admins', () => {
     expect(await response.json()).toMatchObject({ admin: { account: 'editor' } });
 
     const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
-      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      // Sign-ins are audited too; this test is about the operation.
       (row) => row.routeId !== 'auth.adminLogin',
     );
     expect(audit).toHaveLength(1);
@@ -418,7 +418,7 @@ describe('/admin-api/audit-logs', () => {
 
     const { GET } = await import('../audit-logs/route');
     const page = await (await GET(get('/admin-api/audit-logs?page=1&pageSize=20', headers))).json();
-    // The sign-in that opened the session is listed too (CR-12-k2).
+    // The sign-in that opened the session is listed too.
     expect(page.total).toBe(3);
     expect(page.items.map((item: { routeId: string }) => item.routeId)).toEqual([
       'system.adminCreate',
@@ -434,7 +434,7 @@ describe('/admin-api/audit-logs', () => {
     await GET(get('/admin-api/admins?page=1&pageSize=20', headers));
     expect(
       (await harness.ctx.db.select().from(auditLogs)).filter(
-        // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+        // Sign-ins are audited too; this test is about the operation.
         (row) => row.routeId !== 'auth.adminLogin',
       ),
     ).toHaveLength(0);

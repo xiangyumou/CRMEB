@@ -19,9 +19,9 @@ import { DiyFieldRow } from './section';
  *
  * They read through `DiyDataSource`, never through a route. The editor installs
  * `createCatalogDiyDataSource`, which answers 商品, 商品分类 and 商品标签 from the
- * catalog contracts and leaves 文章 / 优惠券 / 拼团 on the stub until streams F2
- * and D ship their lists — so every picker renders either way and no panel
- * changes when one arrives. What the page stores is the id list; resolving ids
+ * catalog contracts and leaves 文章 / 优惠券 / 拼团 on the stub — so every
+ * picker renders either way and no panel changes when a real source is wired
+ * in. What the page stores is the id list; resolving ids
  * back to names is the picker's job on open, not the payload's.
  */
 
@@ -118,14 +118,14 @@ export interface DiyRecordPickerFieldProps extends DiyFieldProps<{
   kind: DiyPickerKind;
   label?: string | undefined;
   max?: number | undefined;
-  /** Key the id is stored under inside each row. Legacy pages use `id`. */
+  /** Key the id is stored under inside each row. Stored pages use `id`. */
   idKey?: string | undefined;
 }
 
 /**
  * The `{ list: [...] }` config a component uses for "指定数据".
  *
- * Rows are kept whole: the legacy payload stores the product's name, image and
+ * Rows are kept whole: the stored payload carries the product's name, image and
  * price alongside its id so the renderer can paint before the API answers, and
  * dropping those would change what the storefront shows.
  */

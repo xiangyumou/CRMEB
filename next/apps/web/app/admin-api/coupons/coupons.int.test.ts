@@ -133,8 +133,8 @@ async function userSession(): Promise<{ userId: number; headers: Record<string, 
     .insert(users)
     .values({ account: 'shopper' })
     .returning({ id: users.id });
-  // E1 owns the real `UserLookup`; until it lands, the fake is what lets a
-  // storefront session resolve at all.
+  // A fake `UserLookup` is enough for a storefront session to resolve without
+  // loading the user domain.
   registerUserLookup(fakeUserLookup([{ id: user!.id }]));
   const issued = await new UserSessionService().issue(harness.ctx, {
     userId: user!.id,
@@ -199,7 +199,7 @@ describe('/admin-api/coupons', () => {
     expect(created).toMatchObject({ name: '满 100 减 10', remainingCount: 100 });
 
     const audit = (await harness.ctx.db.select().from(auditLogs)).filter(
-      // Sign-ins are audited too (CR-12-k2); this test is about the operation.
+      // Sign-ins are audited too; this test is about the operation.
       (row) => row.routeId !== 'auth.adminLogin',
     );
     expect(audit).toHaveLength(1);

@@ -177,8 +177,8 @@ export function GroupbuyGroupsPage() {
  *
  * The member table is the whole point: it shows everyone who ever joined,
  * including the ones who left. A refunded member keeps their row with 已退款 —
- * legacy deleted the participation row on refund, which is why a failed team's
- * history was unrecoverable and 团长 could appear to be somebody else.
+ * deleting the participation row on refund would make a failed team's history
+ * unrecoverable and let 团长 appear to be somebody else.
  */
 function GroupDrawer({ id, onClose }: { id: string | null; onClose: () => void }) {
   const detail = useRouteQuery(

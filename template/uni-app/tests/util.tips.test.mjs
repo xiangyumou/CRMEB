@@ -1,6 +1,6 @@
 // `utils/util.js` `Tips` — every page's toast. Pages toast a rejected request
 // as `Tips({ title: err })`; `utils/request.js` rejects with an object whose
-// `msg` is the server's message (H4, found on the SMS login journey).
+// `msg` is the server's message.
 //
 // `utils/util.js` holds uni-app conditional-compilation blocks (`// #ifdef MP`)
 // that only the uni build resolves, so the module cannot be imported here: the

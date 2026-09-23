@@ -26,9 +26,8 @@ import { Can } from '../session';
 /**
  * 页面链接 — the registry `<LinkPicker>` offers under 商城页面.
  *
- * The legacy screen (`devise/links.vue`) was read-only: the rows came from a
- * seeded table nobody could edit, so a shop that added a page had no way to
- * make it linkable. The routes here take writes, and this screen uses them.
+ * The rows are editable, not a fixed seed: a shop that adds a page must be able
+ * to make it linkable.
  */
 
 export function DiyLinkList() {

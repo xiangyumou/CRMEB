@@ -6,7 +6,7 @@ import { handle } from '../../../src/server';
  * `/admin-api/payment-exceptions` — 异常支付.
  *
  * Money that arrived but could not be booked against an order. Every row here
- * is a thing the legacy system logged and forgot.
+ * is a thing that would otherwise be logged and forgotten.
  */
 export const GET = handle(paymentAdminExceptionList, (ctx, { query }) =>
   payment.adminListExceptions(ctx, query),

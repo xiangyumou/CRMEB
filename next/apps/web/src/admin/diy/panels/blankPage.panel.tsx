@@ -9,7 +9,7 @@ import { blankPageDefault } from '../defaults/blankPage.default';
 import { DiyCommonStyleSection, DiySection, DiySetUpTabs, DiySliderField } from '../fields';
 import { bindDiyPanel, defineDiyPanel } from '../panel-api';
 
-/** 辅助空白 — ports `c_auxiliary_box.vue`: one height slider and 通用样式. */
+/** 辅助空白: one height slider and 通用样式. */
 export default defineDiyPanel<BlankPageComponent>({
   key: 'blankPage',
   schema: blankPageSchema,

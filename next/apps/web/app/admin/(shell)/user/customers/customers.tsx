@@ -43,7 +43,7 @@ import { REGISTER_SOURCE, USER_STATUS } from '../user-enums';
  *
  *  - the list shows a **masked** number (`138****8000`). An operator browsing
  *    ten thousand customers has no business reading every number, and a
- *    screenshot of the legacy table was a leak. The unmasked one is on the
+ *    screenshot of an unmasked table is a leak. The unmasked one is on the
  *    detail route, which carries its own permission;
  *  - 禁用 and 重置密码 sit behind their own permission atoms, not 编辑's,
  *    because they end every live session of a paying customer while renaming a
@@ -52,10 +52,10 @@ import { REGISTER_SOURCE, USER_STATUS } from '../user-enums';
  *    added on the next page is selectable here without a deploy.
  */
 export function CustomersPage() {
-  // The edit form loads the whole customer first (CR-3-d2). 真实姓名 / 生日 /
+  // The edit form loads the whole customer first. 真实姓名 / 生日 /
   // 管理员备注 are on the detail and not on the list row, so a form seeded from
-  // the row opened those three blank — and an empty antd box submits `''`,
-  // which the service happily wrote over whatever was stored.
+  // the row would open those three blank — and an empty antd box submits `''`,
+  // which the service would write over whatever was stored.
   const edit = useFormModal<AdminUserListItem, typeof userAdminDetail>({
     detail: { route: userAdminDetail, params: (row) => ({ id: row.id }), select: editValuesOf },
   });

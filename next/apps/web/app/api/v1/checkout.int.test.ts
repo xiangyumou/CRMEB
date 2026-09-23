@@ -117,8 +117,8 @@ async function shopper(): Promise<{ userId: number; headers: Record<string, stri
     detail: '文三路 100 号',
     isDefault: true,
   });
-  // E1 owns the real `UserLookup`; until it lands, the fake is what lets a
-  // storefront session resolve at all.
+  // A fake `UserLookup` is enough for a storefront session to resolve without
+  // loading the user domain.
   registerUserLookup(fakeUserLookup([{ id: user!.id }]));
   const issued = await new UserSessionService().issue(harness.ctx, {
     userId: user!.id,
@@ -391,9 +391,9 @@ describe('/api/v1/checkout and /api/v1/orders', () => {
   });
 
   /**
-   * ORDER-004. Legacy checked this over real HTTP because the refusal has to
-   * happen *before* any write: an order that got as far as taking stock and
-   * then failed on the coupon used to leave the stock decremented.
+   * ORDER-004. Checked over real HTTP because the refusal has to happen
+   * *before* any write: an order that got as far as taking stock and then
+   * failed on the coupon would leave the stock decremented.
    */
   it('refuses a coupon that was already spent, and writes nothing', async () => {
     const { headers, userId, item } = await cartWithOneItem();

@@ -6,10 +6,9 @@ import { createContext, useContext, type ReactNode } from 'react';
  * Everything a config panel needs from other domains.
  *
  * Panels never call a route. The shell installs one implementation here and the
- * panels programme against the interface, which is what lets stream G2 build
- * all sixty panels before the catalog (A), CMS (F2) and coupon streams have
- * shipped their list endpoints. Exactly the arrangement the kit uses for
- * `AssetSource` and `LinkSource`.
+ * panels programme against the interface, so a panel never depends on another
+ * domain's routes and every panel runs against a stub in tests. Exactly the
+ * arrangement the kit uses for `AssetSource` and `LinkSource`.
  */
 
 export interface DiyPickerItem {
@@ -43,16 +42,13 @@ export interface DiyTreeNode {
 /**
  * The record types a DIY component can point at or embed.
  *
- * `labels` (商品标签) was added by CR-3-g2, once the catalog stream merged
- * `catalog.adminLabelList`. **`brand` was not**: 品牌 (`eb_store_brand`) is not
- * in the frozen schema, so there is no table, no route and nothing to page
- * through. Exactly two legacy rows used the `c_brand` widget and neither gets a
- * picker here:
+ * `labels` (商品标签) pages `catalog.adminLabelList`. **There is no `brand`**:
+ * the shop has no 品牌 table, so there is no route and nothing to page
+ * through. Two stored keys can still name brands, and neither gets a picker:
  *
- * - `c_home_goods_list.vue:77-81` — 商品列表's `brandList`, in the 筛选商品
- *   branch. The key is in neither `goodList.default.ts` nor `goodList.schema.ts`,
- *   so the row was already unreachable; an older node carrying one keeps it.
- * - `c_promotion.vue:75` — the per-tab `brandConfig.brandVal` of 商品选项卡.
+ * - 商品列表's `brandList`, in the 筛选商品 branch. The key is in neither
+ *   `goodList.default.ts` nor `goodList.schema.ts`; a node carrying one keeps it.
+ * - the per-tab `brandConfig.brandVal` of 商品选项卡.
  *   `_fields/promotion-tabs.tsx` shows it read-only rather than dropping it, and
  *   still draws the 品牌 source branch when a tab says that is what it is.
  */

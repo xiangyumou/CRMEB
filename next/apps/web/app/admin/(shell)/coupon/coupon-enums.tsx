@@ -71,8 +71,7 @@ const options = <K extends string>(map: StatusMap<K>) =>
  * a mode does not use, which is what stops an operator filling in both a fixed
  * window and a day count and being 422'd for it.
  *
- * Product and category pickers are id lists until stream A ships the catalog
- * pickers; see `docs/rewrite/status/golden.md`.
+ * Products and categories are entered as id lists.
  */
 export const couponFields: FieldSpec<Extract<keyof CouponTemplateForm, string>>[] = [
   { kind: 'text', name: 'name', label: '名称', span: 12, placeholder: '满 100 减 10' },
@@ -103,7 +102,7 @@ export const couponFields: FieldSpec<Extract<keyof CouponTemplateForm, string>>[
     mode: 'tags',
     options: [],
     visibleWhen: (values) => values.scope === 'products',
-    help: '输入商品 ID 回车确认；商品选择器待 A 流上线后替换',
+    help: '输入商品 ID 回车确认',
   },
   {
     kind: 'select',
@@ -113,7 +112,7 @@ export const couponFields: FieldSpec<Extract<keyof CouponTemplateForm, string>>[
     mode: 'tags',
     options: [],
     visibleWhen: (values) => values.scope === 'categories',
-    help: '输入分类 ID 回车确认；分类选择器待 A 流上线后替换',
+    help: '输入分类 ID 回车确认',
   },
 
   {

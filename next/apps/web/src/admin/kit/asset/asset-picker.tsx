@@ -55,7 +55,7 @@ function toTreeData(
  * upload, single or multiple selection. Returns contract `asset` objects.
  *
  * Talks to an `AssetSource`, not to routes directly, so it works today against
- * the in-memory stub and unchanged against F1's real storage API.
+ * the in-memory stub and unchanged against the real storage API.
  */
 export function AssetPicker({
   open,

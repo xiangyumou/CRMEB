@@ -1,7 +1,8 @@
 /**
  * Factory defaults for every component the editor can create.
  *
- * Generated once from the legacy Vue editor; hand-maintained from here on.
+ * Hand-maintained: each default is the component exactly as the editor first
+ * saves it.
  * A panel reaches its own default through `createDefault` — this map is for
  * the palette and for `resetComponent`.
  */
