@@ -296,4 +296,39 @@ export const CONFIG_VALUE_TRANSFORMS: ReadonlyMap<string, (raw: string) => unkno
   // has no claimant now — activity-order expiry left with seckill and bargain —
   // and a transform for a key nobody migrates is a trap: whatever field claims
   // the key next would silently receive it multiplied by sixty.
+
+  // The radio settings stored the legacy form's option *code*, and the new
+  // schemas are named enums, so every claimed enum or array field needs a
+  // decoder here (the codes are the ones `eb_system_config.parameter` lists).
+  // Found by the first ETL drill against a production dump copy: the synthetic
+  // fixture had none of these rows. `config.test.ts` fails if a claimed enum or
+  // array field is added without one.
+  // upload_type: 1 本地, 2 七牛, 3 阿里云 OSS, 4 腾讯 COS (5+ other vendors).
+  // Every cloud vendor is S3-compatible and its keys ride along as aliases.
+  ['upload_type', (raw) => (raw.trim() === '' || raw.trim() === '1' ? 'local' : 's3')],
+  // sms_type: 0 一号通 (retired), 1 阿里云, 2 腾讯云.
+  ['sms_type', (raw) => ({ '1': 'aliyun', '2': 'tencent' })[raw.trim()] ?? 'none'],
+  // logistics_type: 1 一号通 (retired), 2 阿里云物流查询 (云市场).
+  ['logistics_type', (raw) => (raw.trim() === '2' ? 'aliyun-market' : 'none')],
+  // routine_encode / wechat_encode: 0 明文, 1 兼容, 2 安全.
+  ['routine_encode', (raw) => messageMode(raw)],
+  ['wechat_encode', (raw) => messageMode(raw)],
+  // routine_contact_type: 0 跟随系统, 1 小程序客服. 跟随系统 meant the shop's
+  // 自建客服 / 电话 / 链接 setting, and 自建客服 and 链接 are not ported, so it
+  // lands on the new default, the mini-program's own chat; the operator can
+  // switch to 拨打电话 on 小程序设置.
+  ['routine_contact_type', () => 'mini-program'],
+  // order_notice_admin_uids: "12,34" — user ids, comma-separated.
+  [
+    'order_notice_admin_uids',
+    (raw) =>
+      raw
+        .split(/[,，\s]+/)
+        .map((part) => Number(part))
+        .filter((id) => Number.isSafeInteger(id) && id > 0),
+  ],
 ]);
+
+function messageMode(raw: string): 'plain' | 'compatible' | 'safe' {
+  return ({ '1': 'compatible', '2': 'safe' } as const)[raw.trim() as '1' | '2'] ?? 'plain';
+}

@@ -164,7 +164,9 @@ const storage = defineGroup({
       );
     }
     if (unreadable > 0) {
-      context.notes.push(`storage: ${String(unreadable)} 个附件的文件存在但读不出来，已丢弃`);
+      context.notes.push(
+        `storage: ${String(unreadable)} 个附件在 --uploads-root 下找不到或读不出来，已丢弃并计数`,
+      );
     }
     return kept;
   },

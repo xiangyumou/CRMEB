@@ -11,6 +11,7 @@ import {
   mapConfig,
   type LegacySystemConfigRow,
 } from './config';
+import { CONFIG_VALUE_TRANSFORMS } from './mappers/system';
 
 const NOW = new Date('2026-09-23T00:00:00Z');
 
@@ -519,7 +520,7 @@ describe('物流查询服务 (CR-2-f2)', () => {
   it('no legacy logistics_type value can land on 快递100', () => {
     // The option is gone from `logisticsConfig.provider`, and the reason it
     // could go without a data decision is that nothing migrates onto it: the
-    // legacy column carries `1` (阿里云云市场). This pins that — every spelling
+    // legacy column carries `2` (阿里云云市场; `1` was 一号通). This pins that — every spelling
     // the old form could have written is checked against the *live* registry,
     // so re-adding the value to the enum without re-reading this test fails.
     const logistics = allConfigGroups().find((group) => group.group === 'logistics');
@@ -538,5 +539,67 @@ describe('物流查询服务 (CR-2-f2)', () => {
   it('the group no longer carries the 快递100-only 客户编号 field', () => {
     const logistics = allConfigGroups().find((group) => group.group === 'logistics');
     expect(Object.keys(logistics?.schema.shape ?? {})).not.toContain('customer');
+  });
+});
+
+describe('legacy radio codes decode onto the named enums (first production-dump drill)', () => {
+  // The dump's own shape: JSON-encoded, the option *code* the legacy form wrote.
+  const valueOf = (legacyKey: string, raw: string, group: string, key: string): unknown => {
+    const { values, report } = mapConfig([row(legacyKey, raw)], { now: NOW });
+    expect(report.invalid).toEqual([]);
+    return values.find((v) => v.group === group && v.key === key)?.value;
+  };
+
+  it.each([
+    ['upload_type', '"1"', 'storage', 'driver', 'local'],
+    ['upload_type', '"3"', 'storage', 'driver', 's3'],
+    ['sms_type', '"0"', 'sms', 'provider', 'none'],
+    ['sms_type', '1', 'sms', 'provider', 'aliyun'],
+    ['sms_type', '2', 'sms', 'provider', 'tencent'],
+    ['logistics_type', '1', 'logistics', 'provider', 'none'],
+    ['logistics_type', '2', 'logistics', 'provider', 'aliyun-market'],
+    ['routine_encode', '0', 'wechat', 'miniMessageMode', 'plain'],
+    ['wechat_encode', '1', 'wechat-oa', 'messageMode', 'compatible'],
+    ['wechat_encode', '"2"', 'wechat-oa', 'messageMode', 'safe'],
+    ['routine_contact_type', '0', 'wechat-mini', 'contactType', 'mini-program'],
+    ['routine_contact_type', '1', 'wechat-mini', 'contactType', 'mini-program'],
+  ])('%s = %s → %s.%s = %s', (legacyKey, raw, group, key, expected) => {
+    expect(valueOf(legacyKey, raw, group, key)).toBe(expected);
+  });
+
+  it('order_notice_admin_uids: a comma list becomes user ids, an empty one none', () => {
+    expect(valueOf('order_notice_admin_uids', '"12,34"', 'order-staff', 'staffUserIds')).toEqual([
+      12, 34,
+    ]);
+    expect(valueOf('order_notice_admin_uids', '""', 'order-staff', 'staffUserIds')).toEqual([]);
+  });
+
+  it('every claimed enum or array field has a decoder', () => {
+    // A string can satisfy a string field and a "0"/"1" a boolean one (coerce),
+    // but a legacy code can never satisfy a named enum or a list by itself.
+    const typeOf = (schema: unknown): string | undefined => {
+      let node = schema as { _zod?: { def: Record<string, unknown> } } | undefined;
+      while (
+        node?._zod &&
+        ['default', 'optional', 'nullable', 'catch'].includes(String(node._zod.def['type']))
+      ) {
+        node = node._zod.def['innerType'] as typeof node;
+      }
+      return node?._zod?.def['type'] as string | undefined;
+    };
+    const missing: string[] = [];
+    for (const group of allConfigGroups()) {
+      const shape = (group.schema as unknown as { shape: Record<string, unknown> }).shape;
+      for (const [field, legacy] of Object.entries(group.legacyKeys ?? {})) {
+        if (!['enum', 'array'].includes(typeOf(shape[field]) ?? '')) continue;
+        for (const legacyKey of [legacy].flat().filter((k): k is string => k !== undefined)) {
+          const decoder =
+            CONFIG_VALUE_TRANSFORMS.get(`${group.group}.${field}`) ??
+            CONFIG_VALUE_TRANSFORMS.get(legacyKey);
+          if (!decoder) missing.push(`${group.group}.${field} ← ${legacyKey}`);
+        }
+      }
+    }
+    expect(missing).toEqual([]);
   });
 });

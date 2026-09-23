@@ -170,6 +170,10 @@ export const DROPPED_CONFIG_KEYS: readonly DroppedConfigKey[] = [
 
   // --- developer tooling, not ported ---------------------------------------
   { key: 'model_checkbox', reason: RETIRED_FEATURE('CRUD 代码生成器') },
+  // Written by the admin's 商业授权 check against authorize.crmeb.net, so a
+  // shop that ran it has the key and `crmeb.sql` does not; found by the first
+  // ETL drill against a production dump copy.
+  { key: 'cert_crmeb', reason: RETIRED_FEATURE('CRMEB 商业授权校验') },
   { key: 'param_filter_data', reason: RETIRED_FEATURE('参数过滤器（开发工具）') },
   { key: 'param_filter_type', reason: RETIRED_FEATURE('参数过滤器（开发工具）') },
   { key: 'queue_open', reason: DERIVED + '：BullMQ 永远开着，没有"关掉队列"这一档' },

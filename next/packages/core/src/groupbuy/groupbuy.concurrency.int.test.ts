@@ -798,8 +798,12 @@ describe('a join into a team that fails a moment before (CR-2-r1)', () => {
       },
     );
 
+    // The refusal is observed before waiting on the holder: the join can reject
+    // in the same turn the holder commits, and an unobserved rejection fails
+    // the run even though the assertion below would have passed.
+    const refused = expect(join).rejects.toMatchObject({ code: 'GROUPBUY_GROUP_NOT_JOINABLE' });
     await holder;
-    await expect(join).rejects.toMatchObject({ code: 'GROUPBUY_GROUP_NOT_JOINABLE' });
+    await refused;
     const rows = await members(opened.groupId);
     expect(rows.map((row) => row.userId)).toEqual([leader]);
     expect(await readLedgers(fixture)).toEqual(before);
