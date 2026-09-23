@@ -30,7 +30,7 @@ const GROUPS = [paymentConfig, wechatConfig] as const;
  */
 const FORBIDDEN = /verif|ssl|tls|certificate_?authority|ca_?bundle|ca_?path|insecure|allow_?self/i;
 
-describe('TLS-001 — no TLS toggle, in any group this domain owns', () => {
+describe('TLS-001 — no TLS toggle, in any group this stream owns', () => {
   for (const group of GROUPS) {
     it(`has no verification switch in \`${group.group}\``, () => {
       const offenders = Object.keys(group.schema.shape).filter((key) => FORBIDDEN.test(key));
