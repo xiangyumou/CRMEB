@@ -64,6 +64,23 @@ export async function findTemplate(db: DbOrTx, id: number): Promise<TemplateRow 
   return rows[0] ?? null;
 }
 
+/**
+ * A template's status whatever its deletion state, or null if there is no such
+ * row. A soft-deleted template's wallet coupons are still spendable, and their
+ * scope is still read from it (`templateTerms`), so a scope lookup must see it.
+ */
+export async function templateStatus(
+  db: DbOrTx,
+  id: number,
+): Promise<'draft' | 'active' | 'disabled' | null> {
+  const rows = await db
+    .select({ status: couponTemplates.status })
+    .from(couponTemplates)
+    .where(eq(couponTemplates.id, id))
+    .limit(1);
+  return rows[0]?.status ?? null;
+}
+
 export interface TemplateListFilter {
   keyword?: string | undefined;
   status?: readonly ('draft' | 'active' | 'disabled')[] | undefined;

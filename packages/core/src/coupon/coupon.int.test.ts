@@ -10,6 +10,7 @@ import { DomainError } from '../kernel/errors';
 import { Money } from '../kernel/money';
 import type { Actor, Ctx } from '../kernel/context';
 import { withTx } from '../kernel/tx';
+import { productList } from '../catalog';
 import * as service from './coupon.service';
 import { disableClosedCampaigns, expireOverdueCoupons } from './coupon.jobs';
 
@@ -614,6 +615,64 @@ describe('listClaimable', () => {
       productId: String(bare),
     });
     expect(forBare.items.map((item) => item.templateId)).toEqual([shopWide]);
+  });
+
+  it('COUPON-009 — the 商品列表 for a coupon lists exactly the products the checkout would apply it to', async () => {
+    const onShelf = async () => {
+      const id = await makeProduct();
+      await harness.ctx.db.update(products).set({ status: 'on_shelf' }).where(eq(products.id, id));
+      return id;
+    };
+    const [named, filed, bare] = [await onShelf(), await onShelf(), await onShelf()];
+    const category = await makeCategory([filed]);
+    const create = async (over: Partial<CouponTemplateForm>) =>
+      (await service.adminCreate(harness.ctx, form({ minSpend: '0.00', ...over }))).id;
+    const shopWide = await create({});
+    const naming = await create({ scope: 'products', productIds: [String(named)] });
+    const byCategory = await create({ scope: 'categories', categoryIds: [String(category)] });
+    // Coupons already in wallets stay spendable after the campaign is switched off.
+    const disabled = await create({
+      status: 'disabled',
+      scope: 'products',
+      productIds: [String(bare)],
+    });
+    const draft = await create({ status: 'draft', scope: 'products', productIds: [String(named)] });
+
+    const listFor = async (couponId: string) =>
+      (await productList(harness.ctx, { page: 1, pageSize: 20, couponId } as never)).items
+        .map((item) => Number(item.id))
+        .sort((a, b) => a - b);
+    const all = [named, filed, bare].sort((a, b) => a - b);
+
+    expect(await listFor(shopWide)).toEqual(all);
+    expect(await listFor(naming)).toEqual([named]);
+    expect(await listFor(byCategory)).toEqual([filed]);
+    expect(await listFor(disabled)).toEqual([bare]);
+    // Never issued, so not the storefront's to show; and an unknown id is no coupon at all.
+    expect(await listFor(draft)).toEqual([]);
+    expect(await listFor('999999')).toEqual([]);
+
+    // The agreement: the checkout picker covers each product with exactly the
+    // coupons whose list it appears in.
+    const userId = await makeUser();
+    const templateOf = new Map<string, string>();
+    for (const id of [shopWide, naming, byCategory]) {
+      const claimed = await service.claim(asUser(userId), { id });
+      templateOf.set(claimed.coupon.id, id);
+    }
+    for (const productId of all) {
+      const picker = await service.listApplicable(asUser(userId), {
+        lines: [{ productId: String(productId), amount: '100.00' }],
+      });
+      const covering = picker.items
+        .filter((item) => item.eligibleLineIndexes.length > 0)
+        .map((item) => templateOf.get(item.coupon.id)!);
+      const listing: string[] = [];
+      for (const id of [shopWide, naming, byCategory]) {
+        if ((await listFor(id)).includes(productId)) listing.push(id);
+      }
+      expect(covering.sort()).toEqual(listing.sort());
+    }
   });
 
   it('advertises new-user coupons but never marks them claimable', async () => {

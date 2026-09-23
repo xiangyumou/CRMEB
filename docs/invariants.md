@@ -657,9 +657,10 @@ Two simultaneous claims by one user leave exactly one success, the loser refused
 
 ### COUPON-009
 
-A coupon offered on a product page covers that product at checkout: `coupon.claimableList` narrowed by `productId` lists, among the claimable templates, exactly those whose scope the checkout's `eligibleLineIndexes` applies to the product — shop-wide, naming the product, or naming one of the categories it is filed under (its direct `product_categories_map` rows, the same ones the checkout reads).
+The storefront's coupon-to-product links agree with the checkout's scope rule (`eligibleLineIndexes`: shop-wide, naming the product, or naming one of the categories it is filed under — its direct `product_categories_map` rows, the ones the checkout reads). `coupon.claimableList` narrowed by `productId` lists, among the claimable templates, exactly those that cover the product; `catalog.productList` narrowed by `couponId` (a template id) lists exactly the sellable products the template covers — nothing for an unknown or draft template, and still the scope of a disabled one, whose coupons stay spendable.
 
 - `packages/core/src/coupon/coupon.int.test.ts::listClaimable > COUPON-009 — narrowed to a product, lists exactly the coupons the checkout would apply to it`
+- `packages/core/src/coupon/coupon.int.test.ts::listClaimable > COUPON-009 — the 商品列表 for a coupon lists exactly the products the checkout would apply it to`
 
 ### AUTH-005
 

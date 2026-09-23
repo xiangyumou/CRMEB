@@ -418,6 +418,33 @@ export async function listClaimable(
   return { items, total, page: query.page, pageSize: query.pageSize };
 }
 
+/** Which products a coupon template covers: `eligibleLineIndexes`'s input, without the amounts. */
+export interface CouponProductScope {
+  scope: 'all_products' | 'categories' | 'products';
+  /** Non-empty only for `scope = 'products'`. */
+  productIds: number[];
+  /** Non-empty only for `scope = 'categories'`, matched against a product's direct categories. */
+  categoryIds: number[];
+}
+
+/**
+ * The product scope of template `templateId`, for the 商品列表's `couponId` filter
+ * (我的优惠券「去使用」) — the same terms `quote` applies at checkout.
+ *
+ * Null for an unknown template and for a draft, which was never issued, so no
+ * shopper holds one and its scope is not the storefront's to show. A disabled or
+ * deleted template still answers: coupons already in wallets stay spendable.
+ */
+export async function productScope(
+  ctx: Ctx,
+  templateId: number,
+): Promise<CouponProductScope | null> {
+  const status = await repo.templateStatus(ctx.db, templateId);
+  if (status === null || status === 'draft') return null;
+  const terms = await repo.templateTerms(ctx.db, templateId);
+  return { scope: terms.scope, productIds: terms.productIds, categoryIds: terms.categoryIds };
+}
+
 /**
  * New-user coupons, for the registration banner.
  *
