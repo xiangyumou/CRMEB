@@ -158,6 +158,7 @@ export const checkoutPreviewRoute = defineRoute({
           { source: 'presale:activity-price', label: '预售价（秋季新品）', amount: '-10.00' },
         ],
         payableAmount: '50.00',
+        shipAfterDays: 15,
         userCouponId: null,
       },
     },

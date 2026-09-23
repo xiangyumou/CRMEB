@@ -48,6 +48,7 @@ export function previewFixture(overrides: Partial<Preview> = {}): Preview {
     payableAmount: '126.00',
     userCouponId: null,
     payWindowMinutes: 30,
+    shipAfterDays: null,
     customFormFields: [],
     ...overrides,
   };

@@ -260,6 +260,12 @@ export const checkoutPreview = z.object({
   userCouponId: id.nullable(),
   /** Minutes the shopper will have to pay once the order exists. */
   payWindowMinutes: z.number().int().min(1),
+  /**
+   * 预售: the order ships within this many days of being paid in full (付款后 N 天内发货;
+   * `0` = as soon as it can). The campaign's current setting — the promise is stamped at
+   * payment. `null` for every other kind.
+   */
+  shipAfterDays: z.number().int().min(0).nullable(),
   /** Answers the buyer must fill in, copied from `products.custom_form`. */
   customFormFields: z
     .array(
@@ -297,6 +303,7 @@ export const checkoutPreviewExample = {
   payableAmount: '118.00',
   userCouponId: '9001',
   payWindowMinutes: 30,
+  shipAfterDays: null,
   customFormFields: [],
 } satisfies CheckoutPreview;
 

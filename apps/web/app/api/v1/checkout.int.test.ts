@@ -334,6 +334,7 @@ describe('/api/v1/checkout and /api/v1/orders', () => {
       payableAmount: '120.00',
       addressRequired: true,
       payWindowMinutes: 30,
+      shipAfterDays: null,
     });
     expect(await harness.ctx.db.select().from(cartItems)).toHaveLength(1);
 
