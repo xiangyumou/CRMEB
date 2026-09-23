@@ -31,9 +31,9 @@ import {
  * There is no "join a group" endpoint. Joining *is* placing an order, so the
  * storefront calls the order domain's `POST /api/v1/orders` with
  * `kind: 'groupbuy'` and `kindMeta: { activityId, groupId? }`, and everything
- * here hangs off the frozen seams in `order/ports.ts`. A second checkout path
- * would be a second copy of stock, coupons, freight and idempotency, and two
- * copies drift apart on stock.
+ * here hangs off the seams in `order/ports.ts`. A second checkout path would be
+ * a second copy of stock, coupons, freight and idempotency, and two copies
+ * drift apart on stock.
  *
  * The one rule that decides the whole design: **a seat is taken when the order
  * is paid, not when it is placed.** An unpaid order holds activity stock (so a

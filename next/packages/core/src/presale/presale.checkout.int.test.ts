@@ -14,7 +14,7 @@ import * as checkout from '../order/index';
 import * as repo from './presale.repo';
 
 /**
- * 预售 through the real checkout, end to end (CR-1-d).
+ * 预售 through the real checkout, end to end.
  *
  * The other presale tests drive `presaleKindHandler` directly, which is the
  * right level for stock, stages and ledgers. This one exists for the seam
@@ -23,8 +23,8 @@ import * as repo from './presale.repo';
  * `checkout.preview` and the shopper has to be quoted 预售价 rather than the
  * catalogue price.
  *
- * Every domain is registered the way the web process registers them, because
- * a presale checkout needs stream A's catalogue and stock ports as much as it
+ * Every domain is registered the way the web process registers them, because a
+ * presale checkout needs the catalog's catalogue and stock ports as much as it
  * needs this one.
  */
 
@@ -50,8 +50,8 @@ beforeEach(async () => {
   resetOrderPorts();
   registerAllDomains();
   // `resetOrderPorts()` clears the freight port too, and shipping registers it
-  // as a module side effect — which has already run. B1 has no fallback since
-  // F2 landed, so a checkout without this throws rather than quoting zero.
+  // as a module side effect — which has already run. The checkout has no
+  // fallback, so without this it throws rather than quoting zero.
   registerShippingFreightPort();
 });
 
@@ -161,7 +161,7 @@ describe('确认订单', () => {
 
     // The goods line still shows what the SKU costs; the campaign takes the
     // difference off as a named discount, which is how every goods-level
-    // reduction reaches `orders.coupon_discount` (CR-3-b1).
+    // reduction reaches `orders.coupon_discount`.
     expect(preview.itemsAmount).toBe('176.00');
     expect(preview.payableAmount).toBe('118.00');
     expect(preview.couponDiscount).toBe('58.00');
@@ -288,8 +288,9 @@ describe('提交订单', () => {
   });
 
   it('refuses a presale order whose price never reached it', async () => {
-    // The guard that makes CR-1-d fail closed rather than fail quietly: if the
-    // contributor stops firing, the shopper is not billed the catalogue price.
+    // The guard that makes the campaign price fail closed rather than fail
+    // quietly: if the contributor stops firing, the shopper is not billed the
+    // catalogue price.
     const fixture = await seed({ stock: 10 });
     // The registry replaces by name, so a no-op under the same name is exactly
     // "the contributor stopped firing".

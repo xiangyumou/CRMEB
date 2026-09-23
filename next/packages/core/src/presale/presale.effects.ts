@@ -6,11 +6,11 @@ import { refundSystemInitiated } from '../refund';
 /**
  * What the presale domain does *after* the transaction commits.
  *
- * CONVENTIONS: "Anything that calls a third party happens after commit, via the
- * effects ledger — never inside the transaction." Legacy sent the 预售发货提醒
- * from inside the order-paid path, so a WeChat timeout could roll back a
- * payment that had genuinely landed. Here there is no flag and no exception:
- * every notification is an effect, always.
+ * Anything that calls a third party happens after commit, via the effects
+ * ledger — never inside the transaction. A 预售发货提醒 sent from inside the
+ * order-paid path would let a WeChat timeout roll back a payment that had
+ * genuinely landed, so there is no flag and no exception: every notification is
+ * an effect, always.
  *
  * Five event types, all recorded in `presale.order.ts` and `presale.jobs.ts`:
  *
@@ -22,25 +22,24 @@ import { refundSystemInitiated } from '../refund';
  * | `presale` | `presale.opened`   | a campaign's sale window opened                 |
  * | `presale` | `presale.closed`   | a campaign's sale window closed                 |
  *
- * Four of the five are notifications with no transport yet (stream E2 owns
- * 订阅消息 / 公众号模板消息). `presale.refund` is the exception: it moves
- * money, through the refund domain's own entry point.
+ * Four of the five are notifications with no message yet (the notification
+ * domain owns 订阅消息 / 公众号模板消息 and maps no template to them).
+ * `presale.refund` is the exception: it moves money, through the refund
+ * domain's own entry point.
  */
 
 // ---------------------------------------------------------------------------
-// CR-3-d: the system-initiated refund
+// the system-initiated refund
 // ---------------------------------------------------------------------------
 
 /**
  * How a presale gives the money back.
  *
- * CR-3-d was accepted and `refund/index.ts` now exports
- * `refundSystemInitiated`, so this is no longer a stand-in for a missing
- * export — it is an ordinary seam, declared the way stream D declared group
- * buy's. It stays because a unit test that wants to watch the effect handler
- * should not have to stand up a paid order, a payment attempt and a refundable
- * line; `registerAutoRefundPort` lets it substitute a spy, and the default is
- * the real thing.
+ * The default is `refundSystemInitiated` from `refund/index.ts`, declared the
+ * same way as group buy's. The port exists because a unit test that wants to
+ * watch the effect handler should not have to stand up a paid order, a payment
+ * attempt and a refundable line; `registerAutoRefundPort` lets it substitute a
+ * spy.
  *
  * What it is *not* is an extension point: the only registration outside a test
  * is the default below, and anything that opens a `refunds` row still goes
@@ -129,8 +128,8 @@ async function handleRefundEffect(ctx: Ctx, effect: Effect): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * The four notification effects have no transport yet: stream E2 owns 订阅消息
- * / 公众号模板消息 and will register them against its own template mapping.
+ * The four notification effects have no message of their own: the notification
+ * domain owns 订阅消息 / 公众号模板消息 and maps no template to them.
  *
  * They are registered here as logging no-ops rather than left unregistered,
  * because an unhandled effect retries eight times and then parks as `unknown`,

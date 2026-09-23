@@ -7,7 +7,7 @@
  * table.
  *
  * Almost nothing here is called by another domain. Group buy does not *ask* for
- * anything: it attaches to the order aggregate through the frozen seams in
+ * anything: it attaches to the order aggregate through the seams in
  * `order/ports.ts` and is invoked, never invoking. The exceptions are the two
  * jobs the worker runs and, in the other direction, the one call this domain
  * makes into another — `refund.refundSystemInitiated`, for the money a failed

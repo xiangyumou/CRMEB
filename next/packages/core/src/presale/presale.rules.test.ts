@@ -18,9 +18,9 @@ import {
 /**
  * The presale rules, without a database.
  *
- * Everything here is a decision legacy made in two places with two different
- * answers, so each test names the defect it pins down rather than restating
- * the code.
+ * Each of these decisions is easy to make in two places with two different
+ * answers, so each test names the defect it pins down rather than restating the
+ * code.
  */
 
 const AT = new Date('2026-06-01T00:00:00.000Z');
@@ -89,8 +89,7 @@ describe('the shape of a presale order', () => {
   });
 
   it('caps the quantity at `perOrderQuantity` inclusively', () => {
-    // Legacy compared with `>` in the controller and `>=` in the service; one
-    // of the two was wrong and 限购 5 sometimes meant 4.
+    // `>` in one place and `>=` in another would make 限购 5 sometimes mean 4.
     expect(() =>
       assertOrderShape({ perOrderQuantity: 5 }, [{ skuId: 1, quantity: 5 }]),
     ).not.toThrow();
@@ -103,7 +102,7 @@ describe('the shape of a presale order', () => {
   });
 });
 
-describe('the price guard (CR-1-d)', () => {
+describe('the price guard', () => {
   const prices = new Map([
     [31, '128.00'],
     [32, '148.00'],

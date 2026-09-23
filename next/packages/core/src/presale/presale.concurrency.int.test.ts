@@ -26,9 +26,9 @@ import { registerPresaleDomain } from './index';
 import '../catalog/index';
 
 /**
- * The races. STOCK-004, QUEUE-008 and REFUND-002 from
- * `docs/rewrite/invariants.md` are the ones the brief makes mandatory; the rest
- * are here because every conditional state change in the domain owes one.
+ * The races. STOCK-004, QUEUE-008 and REFUND-002 are from `docs/invariants.md`;
+ * the rest are here because every conditional state change in the domain owes
+ * one.
  *
  * Two things make these real rather than decorative:
  *
@@ -42,9 +42,9 @@ import '../catalog/index';
  * `.won`: the default "truthy" treats `{ affected: 0, won: false }` as a win
  * and the test silently proves nothing.
  *
- * Every checkout here drives stream A's `StockPort` alongside the presale
- * seams, exactly as B1 does, because the invariant being proved is about all
- * four counters and not just this domain's two.
+ * Every checkout here drives the catalog's `StockPort` alongside the presale
+ * seams, exactly as the checkout does, because the invariant being proved is
+ * about all four counters and not just this domain's two.
  */
 
 let harness: TestCtx;
@@ -250,11 +250,12 @@ async function makeOrderRow(args: {
 }
 
 /**
- * One checkout, as B1 assembles it: the SKU reservation and the presale seams
- * in the same transaction, so a refusal from either rolls the other back.
+ * One checkout, as the order domain assembles it: the SKU reservation and the
+ * presale seams in the same transaction, so a refusal from either rolls the
+ * other back.
  *
- * Throws on refusal, which is what B1 does; `runConcurrently` collects those as
- * rejections.
+ * Throws on refusal, which is what the checkout does; `runConcurrently`
+ * collects those as rejections.
  */
 async function checkout(args: {
   ctx: Ctx;
@@ -297,13 +298,15 @@ async function checkout(args: {
 }
 
 /**
- * The paid transition: the order row, stream A's commit, then the hooks.
+ * The paid transition: the order row, the catalog's stock commit, then the
+ * hooks.
  *
  * The order row moves with a *conditional* update carrying the status we
- * believe we are leaving, which is how B1 does it and the only shape that
- * survives this file. A `SELECT status` followed by an `UPDATE` would let all
- * six callers read `pending_payment` at the same instant and every assertion
- * below would be measuring the driver's bug rather than the domain's guard.
+ * believe we are leaving, which is how the order domain does it and the only
+ * shape that survives this file. A `SELECT status` followed by an `UPDATE`
+ * would let all six callers read `pending_payment` at the same instant and
+ * every assertion below would be measuring the driver's bug rather than the
+ * domain's guard.
  */
 async function pay(ctx: Ctx, orderId: number): Promise<{ won: boolean }> {
   const at = ctx.clock.now();

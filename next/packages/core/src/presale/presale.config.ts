@@ -23,12 +23,12 @@ export const presaleConfig = defineConfigGroup({
     /**
      * How far back the "window opened" half of the sweep looks.
      *
-     * The frozen schema has no `scheduled` status, so opening a campaign
-     * changes no row — the storefront list already filters on
-     * `start_at <= now < end_at`. What the open half does is record the event
-     * exactly once, and the effects ledger's `UNIQUE (scope, scope_id,
-     * event_type)` is what makes it exactly once. This window is only there so
-     * the query stays bounded: a campaign that started a month ago is not news.
+     * The schema has no `scheduled` status, so opening a campaign changes no
+     * row — the storefront list already filters on `start_at <= now < end_at`.
+     * What the open half does is record the event exactly once, and the effects
+     * ledger's `UNIQUE (scope, scope_id, event_type)` is what makes it exactly
+     * once. This window is only there so the query stays bounded: a campaign
+     * that started a month ago is not news.
      */
     windowOpenLookbackHours: z.number().int().min(1).max(720).default(24),
   }),

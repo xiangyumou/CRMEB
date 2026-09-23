@@ -6,8 +6,7 @@ import { definePermissions } from '../auth/permissions';
  * `order:read` is separate from `activity:read` because the two screens answer
  * to different people: 预售活动 is 运营's, 预售订单 is 客服's, and an assistant
  * who may look at what shoppers ordered has no business editing the price they
- * ordered at. Legacy had one 预售 menu node and one implicit permission behind
- * it.
+ * ordered at.
  *
  * The atom string is `presale:<resource>:<action>`; `definePermissions` adds the
  * domain prefix, so the keys here omit it.
