@@ -172,3 +172,72 @@ describe('发货信息管理 (wxa/sec/order)', () => {
     expect(managed['is_trade_managed']).toBe(false);
   });
 });
+
+describe('内容安全 (msg_sec_check, media_check_async)', () => {
+  async function post(path: string, body: unknown): Promise<Record<string, unknown>> {
+    const token = await miniToken();
+    const response = await fetch(`${oa.url}${path}?access_token=${encodeURIComponent(token)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return (await response.json()) as Record<string, unknown>;
+  }
+
+  const text = (content: string, openid = 'o-user') => ({ content, version: 2, scene: 2, openid });
+
+  it('answers pass, review and risky by the configured words', async () => {
+    expect((await post('/wxa/msg_sec_check', text('很好用')))['result']).toEqual({
+      suggest: 'pass',
+      label: 100,
+    });
+    expect((await post('/wxa/msg_sec_check', text('有点待定测试')))['result']).toEqual({
+      suggest: 'review',
+      label: 21000,
+    });
+    expect((await post('/wxa/msg_sec_check', text('违规测试内容')))['result']).toEqual({
+      suggest: 'risky',
+      label: 20002,
+    });
+    oa.behaviour.secCheckRiskyWords = ['别的词'];
+    expect((await post('/wxa/msg_sec_check', text('违规测试内容')))['result']).toMatchObject({
+      suggest: 'pass',
+    });
+  });
+
+  it('requires an openid, and refuses every call while failSecCheck is set', async () => {
+    expect((await post('/wxa/msg_sec_check', text('x', '')))['errcode']).toBe(40003);
+    oa.behaviour.failSecCheck = { errcode: -1, errmsg: 'system error' };
+    expect((await post('/wxa/msg_sec_check', text('x')))['errcode']).toBe(-1);
+    expect((await post('/wxa/msg_sec_check', text('x')))['errcode']).toBe(-1);
+  });
+
+  it('records a media check, answers a unique trace id, and builds its verdict push', async () => {
+    const body = {
+      media_url: 'https://shop.example.com/a.png',
+      media_type: 2,
+      version: 2,
+      scene: 1,
+      openid: 'o-user',
+    };
+    const first = await post('/wxa/media_check_async', body);
+    const second = await post('/wxa/media_check_async', body);
+    expect(first['errcode']).toBe(0);
+    expect(first['trace_id']).not.toBe(second['trace_id']);
+    expect(oa.mediaChecks.map((check) => check.traceId)).toEqual([
+      first['trace_id'],
+      second['trace_id'],
+    ]);
+    const push = oa.mediaCheckPush(String(first['trace_id']), 'risky');
+    expect(push).toMatchObject({
+      Event: 'wxa_media_check',
+      appid: oa.miniAppId,
+      FromUserName: 'o-user',
+      trace_id: first['trace_id'],
+      result: { suggest: 'risky', label: 20002 },
+    });
+
+    oa.behaviour.failMediaCheck = { errcode: 45009, errmsg: 'reach max api daily quota limit' };
+    expect((await post('/wxa/media_check_async', body))['errcode']).toBe(45009);
+  });
+});

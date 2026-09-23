@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
@@ -59,6 +60,17 @@ import type { AddressInfo } from 'node:net';
  * `get_order` reports `order_state` (seed or move it with `setTradeOrderState`;
  * an unknown payment is `10060001`), `set_msg_jump_path` stores `msgJumpPath`,
  * and `is_trade_managed` answers `behaviour.tradeManaged` for our appid.
+ *
+ * ## Content security (内容安全)
+ *
+ * `wxa/msg_sec_check` (version 2) answers `risky` (label 20002) for text
+ * containing one of `behaviour.secCheckRiskyWords`, `review` (label 21000) for
+ * one of `behaviour.secCheckReviewWords`, and `pass` (label 100) otherwise; an
+ * openid is required (`40003`). `wxa/media_check_async` records the request in
+ * `mediaChecks` and answers a fresh `trace_id`; the verdict arrives later as
+ * the `wxa_media_check` push, which `mediaCheckPush(traceId, suggest)` builds
+ * (feed it through `buildMiniPush`). `behaviour.failSecCheck` /
+ * `behaviour.failMediaCheck` refuse every call while set: WeChat being down.
  */
 
 export interface FakeOaCall {
@@ -96,6 +108,22 @@ export interface FakeOaBehaviour {
   failShipping: { errcode: number; errmsg: string } | null;
   /** What `is_trade_managed` answers. */
   tradeManaged: boolean;
+  /** Text containing any of these is `risky`. Default `['违规测试']`. */
+  secCheckRiskyWords: string[];
+  /** Text containing any of these (and no risky word) is `review`. Default `['待定测试']`. */
+  secCheckReviewWords: string[];
+  /** While set, every `wxa/msg_sec_check` is refused with this. */
+  failSecCheck: { errcode: number; errmsg: string } | null;
+  /** While set, every `wxa/media_check_async` is refused with this. */
+  failMediaCheck: { errcode: number; errmsg: string } | null;
+}
+
+/** One `media_check_async` WeChat accepted. */
+export interface FakeMediaCheck {
+  traceId: string;
+  mediaUrl: string;
+  openid: string;
+  scene: number;
 }
 
 /** One payment as 发货信息管理 sees it. */
@@ -156,6 +184,17 @@ export interface FakeOaServer {
   setTradeOrderState(transactionId: string, orderState: number): void;
   /** What `set_msg_jump_path` last stored, or `null`. */
   readonly msgJumpPath: string | null;
+  /** Every accepted `media_check_async`, in order. */
+  mediaChecks: FakeMediaCheck[];
+  /**
+   * The decrypted `wxa_media_check` push WeChat would send for one trace id
+   * (version 2, JSON). Wrap it with `buildMiniPush` to deliver it.
+   */
+  mediaCheckPush(
+    traceId: string,
+    suggest: 'pass' | 'review' | 'risky',
+    options?: { label?: number; createTime?: number },
+  ): Record<string, unknown>;
   callsTo(path: string): FakeOaCall[];
   reset(): void;
   close(): Promise<void>;
@@ -175,6 +214,9 @@ const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
   'base64',
 );
+
+const DEFAULT_RISKY_WORDS = ['违规测试'] as const;
+const DEFAULT_REVIEW_WORDS = ['待定测试'] as const;
 
 /** WeChat's own cap on the `scene` string. */
 const SCENE_MAX_BYTES = 32;
@@ -199,9 +241,17 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
     failWxaCode: null,
     failShipping: null,
     tradeManaged: true,
+    secCheckRiskyWords: [...DEFAULT_RISKY_WORDS],
+    secCheckReviewWords: [...DEFAULT_REVIEW_WORDS],
+    failSecCheck: null,
+    failMediaCheck: null,
   };
   const tradeOrders = new Map<string, FakeTradeOrder>();
   let msgJumpPath: string | null = null;
+  const mediaChecks: FakeMediaCheck[] = [];
+  // Never reset: trace ids are unique in the shop's database across tests.
+  let traceSeq = 0;
+  const traceRun = randomBytes(4).toString('hex');
   let publishedMenu: unknown = null;
   let issued = 0;
   let messageSeq = 0;
@@ -488,6 +538,54 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
           json(res, { errcode: 0, errmsg: 'ok' });
           return;
         }
+        case '/wxa/msg_sec_check': {
+          if (behaviour.failSecCheck) {
+            json(res, behaviour.failSecCheck);
+            return;
+          }
+          const openid = String(body['openid'] ?? '');
+          const content = String(body['content'] ?? '');
+          if (body['version'] !== 2 || openid === '' || content === '') {
+            json(res, { errcode: openid === '' ? 40003 : 47001, errmsg: 'invalid args' });
+            return;
+          }
+          const verdict = behaviour.secCheckRiskyWords.some((word) => content.includes(word))
+            ? { suggest: 'risky', label: 20002 }
+            : behaviour.secCheckReviewWords.some((word) => content.includes(word))
+              ? { suggest: 'review', label: 21000 }
+              : { suggest: 'pass', label: 100 };
+          traceSeq += 1;
+          json(res, {
+            errcode: 0,
+            errmsg: 'ok',
+            result: verdict,
+            detail: [{ strategy: 'content_model', errcode: 0, ...verdict, prob: 90 }],
+            trace_id: `fake-msg-${traceRun}-${traceSeq}`,
+          });
+          return;
+        }
+        case '/wxa/media_check_async': {
+          if (behaviour.failMediaCheck) {
+            json(res, behaviour.failMediaCheck);
+            return;
+          }
+          const openid = String(body['openid'] ?? '');
+          const mediaUrl = String(body['media_url'] ?? '');
+          if (
+            body['version'] !== 2 ||
+            openid === '' ||
+            !/^https?:\/\//.test(mediaUrl) ||
+            (body['media_type'] !== 1 && body['media_type'] !== 2)
+          ) {
+            json(res, { errcode: openid === '' ? 40003 : 47001, errmsg: 'invalid args' });
+            return;
+          }
+          traceSeq += 1;
+          const traceId = `fake-media-${traceRun}-${traceSeq}`;
+          mediaChecks.push({ traceId, mediaUrl, openid, scene: Number(body['scene'] ?? 0) });
+          json(res, { errcode: 0, errmsg: 'ok', trace_id: traceId });
+          return;
+        }
         case '/wxa/sec/order/is_trade_managed': {
           if (body['appid'] !== MINI_APP_ID) {
             json(res, { errcode: 40013, errmsg: 'invalid appid' });
@@ -645,6 +743,26 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
     get msgJumpPath() {
       return msgJumpPath;
     },
+    mediaChecks,
+    mediaCheckPush(traceId, suggest, options = {}) {
+      const check = mediaChecks.find((item) => item.traceId === traceId);
+      const label =
+        options.label ?? (suggest === 'risky' ? 20002 : suggest === 'review' ? 21000 : 100);
+      return {
+        ToUserName: 'gh_fakemini00001',
+        FromUserName: check?.openid ?? '',
+        CreateTime: options.createTime ?? Math.floor(Date.now() / 1000),
+        MsgType: 'event',
+        Event: 'wxa_media_check',
+        appid: MINI_APP_ID,
+        trace_id: traceId,
+        version: 2,
+        detail: [{ strategy: 'content_model', errcode: 0, suggest, label, prob: 90 }],
+        errcode: 0,
+        errmsg: 'ok',
+        result: { suggest, label },
+      };
+    },
     callsTo(path) {
       return calls.filter((call) => call.path === path);
     },
@@ -664,6 +782,11 @@ export async function startFakeOaServer(options: { port?: number } = {}): Promis
       behaviour.failWxaCode = null;
       behaviour.failShipping = null;
       behaviour.tradeManaged = true;
+      behaviour.secCheckRiskyWords = [...DEFAULT_RISKY_WORDS];
+      behaviour.secCheckReviewWords = [...DEFAULT_REVIEW_WORDS];
+      behaviour.failSecCheck = null;
+      behaviour.failMediaCheck = null;
+      mediaChecks.length = 0;
       tradeOrders.clear();
       msgJumpPath = null;
     },

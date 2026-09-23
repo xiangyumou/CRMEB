@@ -893,6 +893,56 @@ WeChat's shipping reminder and its 已纳入发货信息管理 notice reach oper
 - `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > says so when the mini program is not configured, and when WeChat refuses — WXSHIP-007`
 - `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > is an admin’s, not a shopper’s — WXSHIP-007`
 
+## 内容安全 (WeChat content security)
+
+The policy table and the reasons are in `docs/mini/wechat-compliance.md` C09 and at the top of `packages/core/src/wechat/wechat.sec-check.ts`.
+
+### CONTENT-001
+
+Review text a customer submits is checked by WeChat's `msgSecCheck` (scene 2, the author's mini-program openid) before it is saved, and is **never refused** for what it says: `risky`, `review`, or no answer at all (an errcode, or the call never arriving) saves it 待审核 with the reason in `moderation_reason`, and the answer is `moderation: 'pending'`, not an error. A held review is not public until an admin publishes it through 评价管理, and an admin may delete it instead. A `pass` publishes as configured. An account without a mini-program identity, or any account while 内容安全 is off, is not checked.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > publishes a review WeChat passes, checked as a comment for the author — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > saves a risky review 待审核 with a neutral answer, not an error — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds a review WeChat wants a person to look at — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds the review when WeChat cannot answer, rather than publishing it unchecked — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds the review when the call never arrives — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > publishes a held review once an admin approves it — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > lets an admin delete a held review — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > does not check an account without a mini-program identity, or while switched off — CONTENT-001`
+
+### CONTENT-002
+
+A changed nickname is refused (`USER_NICKNAME_REJECTED`) only when WeChat says `risky`, and the old one stays; `review` and WeChat being unavailable save it. An unchanged nickname is not sent to WeChat.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::nicknames and invoice titles are refused only when risky > refuses a risky nickname and keeps the old one — CONTENT-002`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::nicknames and invoice titles are refused only when risky > saves a nickname when WeChat cannot answer, and does not re-check an unchanged one — CONTENT-002`
+
+### CONTENT-003
+
+An invoice-title name — in the 抬头 book (create and update) and on an order's invoice request — is refused (`USER_INVOICE_TITLE_REJECTED`, `ORDER_INVOICE_TITLE_REJECTED`) only when WeChat says `risky`; WeChat being unavailable saves it.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::nicknames and invoice titles are refused only when risky > refuses a risky 抬头 in the book, and saves one when WeChat is down — CONTENT-003`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::nicknames and invoice titles are refused only when risky > refuses a risky 抬头 on an invoice request, and takes one when WeChat is down — CONTENT-003`
+
+### CONTENT-004
+
+Every distinct review picture is submitted to `mediaCheckAsync` (scene 2) after the review commits, through the ledger, as an absolute https address. A `risky` `wxa_media_check` verdict takes that picture off the review and nothing else; the verdict is stored with a conditional update on `submitted`, so a repeated or concurrent push acts once. A `pass` keeps the picture. A submission WeChat refuses is retried and the picture stays visible meanwhile; an account without a mini-program identity is `skipped`.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > sends each review picture once, as an absolute https address — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > takes a risky picture off the review, and a repeated verdict does nothing more — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > keeps a picture WeChat passes — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > keeps the picture and retries while WeChat refuses the submission — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > skips the picture check for an account without a mini-program identity — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > acts once when two different verdict pushes for one picture race — CONTENT-004`
+
+### CONTENT-005
+
+A newly stored avatar (not the current one, not the default) is submitted to `mediaCheckAsync` (scene 1). A `risky` verdict resets the avatar to the default only if the account still shows that picture, and then — only then — sends the in-app notice `user_avatar_rejected`.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > resets a risky avatar and tells the customer — CONTENT-005`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > leaves an avatar the customer has since replaced — CONTENT-005`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > does not check an avatar that did not change — CONTENT-005`
+
 ## Refunds
 
 ### REFUND-001

@@ -5,7 +5,7 @@ import { registerWechatIdentityPort } from './wechat-identity.port';
 import { registerAppConfigSource } from '../system';
 import { storefrontAuthConfig } from './storefront-auth.config';
 import { registerMediaRiskHandler } from '../wechat';
-import { registerUserNotificationEvents, resetRiskyAvatar } from './user.service';
+import { resetRiskyAvatar } from './user-avatar-check';
 
 /**
  * The `user` domain's public surface: storefront customers, their addresses,
@@ -61,9 +61,8 @@ import { registerUserNotificationEvents, resetRiskyAvatar } from './user.service
 
 export function registerUserDomain(): void {
   registerUserPorts();
-  // 内容安全 (C09): a WeChat `risky` verdict on an avatar puts the default back
-  // and tells the customer.
-  registerUserNotificationEvents();
+  // 内容安全 (C09): a WeChat `risky` verdict on an avatar puts the default back;
+  // `notification` listens (`onAvatarRejected`) and tells the customer.
   registerMediaRiskHandler('avatar', resetRiskyAvatar);
   // `GET /api/v1/app/config` says up front whether a first WeChat sign-in will
   // ask for a phone. The setting is ours (`storefront-auth`) and `system` may
@@ -210,5 +209,12 @@ export {
   type UserOrderStats,
   type UserOrderStatsPort,
 } from './user-order-stats.port';
+
+export {
+  AVATAR_REJECTED_EVENT,
+  onAvatarRejected,
+  type AvatarRejectedEvent,
+  type AvatarRejectedListener,
+} from './user-avatar-check';
 
 export { maskPhone } from './user.rules';

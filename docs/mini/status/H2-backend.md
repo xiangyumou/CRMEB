@@ -33,16 +33,37 @@ route-catalogue adoption (after R0 merges) → merge checklist.
    - `payment/payment.mini-trade.ts`: dispatch hook → effect `wechat.uploadShipping`
      (mini-paid + switch on; unified/split frozen in payload), correction once, push handlers
      (settlement → received, reminders → admin notices), receipt verifier (`get_order`).
-   - Migration `0005`: `wechat_trade_orders`, `express_companies.wechat_delivery_id`.
+   - Migration `0006_mini_shipping_management`: `wechat_trade_orders`,
+     `express_companies.wechat_delivery_id`.
    - Routes: `/api/v1/webhooks/wechat-mini`, `/api/v1/orders/:id/wechat-receipt`,
      `/admin-api/wechat-mini-trade` (+ `/sync`, button on 系统设置 → 小程序发货信息管理);
      `order.confirmReceipt` body `{ via: 'wechat-component' }`.
    - WXSHIP-001…007; C07 updated (deviation: separate wechat-receipt endpoint; sync is manual).
 
+5. 内容安全 (C09, policy of 2026-09-23)
+   - `wechat/wechat.sec-check.ts` (+ `.repo.ts`, `.config.ts` group `content-security`):
+     port + driver for `msg_sec_check` / `media_check_async`; `checkText`, `requestMediaCheck`,
+     `wxa_media_check` handler; migration `0007_content_security` (`content_security_checks`,
+     `product_reviews.moderation_reason`).
+   - Review text: risky / review / unavailable → saved 待审核 with a reason, response
+     `moderation: 'pending'`, never an error; admin approves/deletes in the existing 评价管理
+     (reason shown under the status tag).
+   - Nickname / 抬头 book / order invoice request: `risky` → 422 (`USER_NICKNAME_REJECTED`,
+     `USER_INVOICE_TITLE_REJECTED`, `ORDER_INVOICE_TITLE_REJECTED`); unavailable → saved.
+   - Pictures async: review image risky → removed from the review; avatar risky → reset +
+     in-app `user_avatar_rejected` (sent by `notification` via `user.onAvatarRejected`, to
+     avoid a user → notification → order → user import cycle).
+   - Fake OA: `msg_sec_check` (risky word 违规测试, review word 待定测试), `media_check_async`,
+     `mediaCheckPush`, `failSecCheck` / `failMediaCheck`. CONTENT-001…005; C09 rewritten.
+
+Merged storefront/mini at 84f28a645+ (F1 decor, I1 guards): our migrations renumbered to
+0005–0007 after `0004_decor`, `EXPECTED_MIGRATIONS = 8`; `/api/v1/pages` routes read
+`ctx.clientVersion`.
+
 ## In progress
 
-- 6: content security (review text risky → pending moderation, per 2026-09-23 policy).
+- 4: route catalogue adoption.
 
 ## Next
 
-- 4 route catalogue (merge storefront/mini @6b4f48b96; jump path via `toMiniPath`), checklist.
+- Final checklist and report.

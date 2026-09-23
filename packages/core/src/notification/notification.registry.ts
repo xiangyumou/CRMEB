@@ -240,6 +240,19 @@ export function registerBuiltInNotificationEvents(): void {
       defaults: { title: '退款已到账', body: '退款单 {{refundNo}} 的 ¥{{amount}} 已原路退回。' },
       link: '/refunds/{{refundId}}',
     },
+    {
+      // 内容安全 (C09): sent by the user domain's `onAvatarRejected`.
+      code: 'user_avatar_rejected',
+      name: '头像未通过审核提醒',
+      description: '用户上传的头像未通过微信内容安全检测、已恢复为默认头像时发送',
+      audience: 'user',
+      variables: [],
+      channels: ['inApp'],
+      defaults: {
+        title: '头像未通过审核',
+        body: '您上传的头像未通过内容安全审核，已恢复为默认头像，请重新上传。',
+      },
+    },
 
     // -- admin --------------------------------------------------------------
     {
