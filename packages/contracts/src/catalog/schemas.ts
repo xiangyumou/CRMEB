@@ -652,6 +652,13 @@ export const adminProductListQuery = pageQuery
     keyword: z.string().max(64).optional(),
     categoryId: id.optional(),
     labelId: id.optional(),
+    /**
+     * Exactly these products, in this order: how the DIY editor turns the ids
+     * a saved page stores back into rows. The tab still applies, so under the
+     * default `all` a deleted product is simply absent. The order is the
+     * list's, so `sortBy` does not apply.
+     */
+    ids: idList.optional(),
     kind: productKind.optional(),
     priceFrom: money.optional(),
     priceTo: money.optional(),
