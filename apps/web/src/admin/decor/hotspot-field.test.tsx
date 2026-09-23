@@ -67,8 +67,17 @@ describe('the 热区 field', () => {
     drag(stubStage(), [330, 120], [150, 30]);
     const [spot] = onValue.mock.lastCall?.[0] as Hotspot[];
     expect(spot).toMatchObject({ x: 50, y: 20, w: 50, h: 60, label: '' });
-    // What the field makes, the schema accepts.
-    expect(hotspotImageProps.safeParse({ image: IMAGE, hotspots: [spot] }).success).toBe(true);
+    // No link is made up: the box waits for one, and until then publishing is refused.
+    expect(spot).not.toHaveProperty('link');
+    expect(screen.getByText('还没有选择跳转链接，选好之前页面不能发布')).toBeInTheDocument();
+    const parsed = hotspotImageProps.safeParse({ image: IMAGE, hotspots: [spot] });
+    expect(parsed.error?.issues.map((issue) => [issue.path.join('.'), issue.message])).toEqual([
+      ['hotspots.0.link', '请选择跳转链接'],
+    ]);
+    // With a link picked, the schema accepts what the field made.
+    expect(
+      hotspotImageProps.safeParse({ image: IMAGE, hotspots: [{ ...spot, link }] }).success,
+    ).toBe(true);
     // The new area is selected for editing.
     expect(screen.getByRole('button', { name: '热区 1' })).toHaveAttribute('aria-pressed', 'true');
   });

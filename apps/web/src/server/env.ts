@@ -48,6 +48,16 @@ export const envSchema = z.object({
   APP_VERSION: z.string().default('dev'),
 
   /**
+   * The storefront H5 build's page for previewing a decor draft, as a URL
+   * template: `{id}`, `{previewToken}` and `{kind}` are filled in. Set on a
+   * dev or e2e stack that serves the Taro H5 build, e.g.
+   * `http://localhost:10086/#/packages/page/index?id={id}&previewToken={previewToken}`.
+   * Unset or empty (production): the editor's preview explains the
+   * mini-program 体验版 instead of framing a page.
+   */
+  DECOR_PREVIEW_URL: z.string().optional(),
+
+  /**
    * `'1'` swaps the SMS provider for the in-memory `fakeSmsSender()`:
    * a verification code is minted and stored in Redis exactly as usual, and is
    * never delivered. It exists for an out-of-process test server — the

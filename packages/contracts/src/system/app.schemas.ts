@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { instant } from '../_conventions/common';
+import { linkTarget } from '../decor/link';
 import { sitePublicConfig, sitePublicConfigExample } from './schemas';
 
 /**
@@ -54,6 +56,12 @@ export const appAppearance = z.object({
     primaryColor: hexColor,
     /** Text and icons drawn on top of `primaryColor` (buttons, badges). */
     primaryContrastColor: hexColor,
+    /**
+     * 辅助色 (design.md §3.2): gradient starts, the 加入购物车 button beside the
+     * primary one. `null` = none set, which the client reads as "the primary
+     * colour" (a one-colour scheme); `deriveTheme` does exactly that.
+     */
+    accentColor: hexColor.nullable(),
     priceColor: hexColor,
     radius: radiusScale,
   }),
@@ -70,6 +78,45 @@ export type AppAppearance = z.infer<typeof appAppearance>;
 /** Template ids, deduplicated, in the operator's order; `[]` when none are set. */
 const templateIds = z.array(z.string());
 
+/**
+ * The taps that ask for subscribe messages (wechat-compliance.md C08). The
+ * mini-program calls `subscribe(scene)` with one of these inside the tap
+ * handler; `subscribeScenes` says which template ids that asks for.
+ */
+export const appSubscribeScene = z.enum([
+  'checkout',
+  'groupbuyCheckout',
+  'presaleCheckout',
+  'refundApply',
+  'returnShipment',
+]);
+export type AppSubscribeScene = z.infer<typeof appSubscribeScene>;
+
+/** `wx.requestSubscribeMessage` takes at most this many template ids per call. */
+export const MAX_SUBSCRIBE_TEMPLATES = 3;
+
+/** One scene's ids: non-empty, deduplicated, at most three, in the order to ask. */
+const sceneTemplateIds = z.array(z.string().min(1)).max(MAX_SUBSCRIBE_TEMPLATES);
+
+/**
+ * The splash for the mini-program. The same switch, picture and seconds as
+ * `site/config`'s, but the tap target is a `LinkTarget` (decor contracts), not
+ * a legacy uni-app path: the mini-program resolves it through the route
+ * catalogue like any decorated link. `null` = the splash is not tappable.
+ */
+export const appSplashAd = sitePublicConfig.shape.splashAd.extend({
+  link: linkTarget.nullable(),
+});
+export type AppSplashAd = z.infer<typeof appSplashAd>;
+
+/** A bare host name, lower-case: `shop.example.com`, never a scheme, port or path. */
+export const webviewDomain = z
+  .string()
+  .regex(
+    /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/,
+    '业务域名只填主机名，例如 shop.example.com',
+  );
+
 export const appPublicConfig = z.object({
   name: sitePublicConfig.shape.name,
   logo: sitePublicConfig.shape.logo,
@@ -83,12 +130,16 @@ export const appPublicConfig = z.object({
    */
   auth: sitePublicConfig.shape.auth.extend({ wechatRequiresPhone: z.boolean() }),
   payments: sitePublicConfig.shape.payments,
-  splashAd: sitePublicConfig.shape.splashAd,
+  splashAd: appSplashAd,
   /**
    * Subscribe-message template ids per scene, for `wx.requestSubscribeMessage`
    * — the same values `GET /api/v1/wechat/subscribe-templates?scene=` answers,
    * all four at once. Keys are the scenes in camelCase: `order-create` →
    * `orderCreate`.
+   *
+   * @deprecated for the mini-program: read `subscribeScenes`, which is built
+   * from these on the server. Kept because the lists are the settings as the
+   * operator grouped them, and a client already in the field reads them.
    */
   subscribeTemplates: z.object({
     orderCreate: templateIds,
@@ -96,9 +147,35 @@ export const appPublicConfig = z.object({
     orderShip: templateIds,
     refund: templateIds,
   }),
+  /**
+   * What each tap asks for (C08), at most three ids each, built on the server
+   * from `subscribeTemplates` so no client keeps the mapping. A scene with no
+   * ids is `[]`: the client then skips the prompt.
+   */
+  subscribeScenes: z.object({
+    checkout: sceneTemplateIds,
+    groupbuyCheckout: sceneTemplateIds,
+    presaleCheckout: sceneTemplateIds,
+    refundApply: sceneTemplateIds,
+    returnShipment: sceneTemplateIds,
+  }),
+  /**
+   * The shop's 业务域名 (C12): a `web-view` may open an https page on one of
+   * these hosts. `mp.weixin.qq.com` (the linked OA's articles) is always
+   * allowed and is not listed. Lower-case, deduplicated; `[]` when none.
+   */
+  webviewDomains: z.array(webviewDomain),
   appearance: appAppearance,
   /** Moves whenever any source group is saved; also the weak `ETag`. */
   version: z.string(),
+  /**
+   * The server's clock when this answer was sent, for countdown drift
+   * (design.md §4.4). **Not part of `version`/the `ETag`**: it changes on
+   * every request, so it is added after the cache and a 304 stays a 304. A
+   * 304 has no body, so the same instant also goes out as the
+   * `X-Server-Time` header on every answer, 200 and 304 alike.
+   */
+  serverTime: instant,
 });
 export type AppPublicConfig = z.infer<typeof appPublicConfig>;
 
@@ -107,6 +184,7 @@ export const appAppearanceDefaults: AppAppearance = {
   theme: {
     primaryColor: '#E93323',
     primaryContrastColor: '#FFFFFF',
+    accentColor: null,
     priceColor: '#E93323',
     radius: 'medium',
   },
@@ -130,17 +208,41 @@ export const appPublicConfigExample: AppPublicConfig = {
   support: { kind: 'mini-program', phone: '400-000-0000', qrcodeUrl: null },
   auth: { wechatOa: false, wechatMini: true, phone: true, wechatRequiresPhone: true },
   payments: { wechat: true },
-  splashAd: sitePublicConfigExample.splashAd,
+  splashAd: {
+    ...sitePublicConfigExample.splashAd,
+    link: { kind: 'product', id: '12' },
+  },
   subscribeTemplates: {
     orderCreate: [],
     orderPay: ['kL9x2fP0bQ-order-paid-3a7c'],
     orderShip: ['kL9x2fP0bQ-shipped-51de', 'kL9x2fP0bQ-delivered-9b02'],
     refund: ['kL9x2fP0bQ-refund-e4f1'],
   },
+  subscribeScenes: {
+    checkout: [
+      'kL9x2fP0bQ-shipped-51de',
+      'kL9x2fP0bQ-delivered-9b02',
+      'kL9x2fP0bQ-order-paid-3a7c',
+    ],
+    groupbuyCheckout: [
+      'kL9x2fP0bQ-shipped-51de',
+      'kL9x2fP0bQ-delivered-9b02',
+      'kL9x2fP0bQ-order-paid-3a7c',
+    ],
+    presaleCheckout: [
+      'kL9x2fP0bQ-shipped-51de',
+      'kL9x2fP0bQ-delivered-9b02',
+      'kL9x2fP0bQ-order-paid-3a7c',
+    ],
+    refundApply: ['kL9x2fP0bQ-refund-e4f1'],
+    returnShipment: ['kL9x2fP0bQ-refund-e4f1'],
+  },
+  webviewDomains: ['shop.example.com'],
   appearance: {
     theme: {
       primaryColor: '#1677FF',
       primaryContrastColor: '#FFFFFF',
+      accentColor: '#FF7E00',
       priceColor: '#FF4D4F',
       radius: 'large',
     },
@@ -162,4 +264,5 @@ export const appPublicConfigExample: AppPublicConfig = {
     },
   },
   version: '1758500000000',
+  serverTime: '2026-09-24T08:00:00.000+08:00',
 };

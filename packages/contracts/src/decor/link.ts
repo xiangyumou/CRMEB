@@ -38,25 +38,32 @@ export const linkableRoute = storefrontRoute.refine(
 );
 
 export const linkTarget = z
-  .discriminatedUnion('kind', [
-    z.object({ kind: z.literal('product'), id }),
-    z.object({ kind: z.literal('category'), id }),
-    z.object({ kind: z.literal('article'), id }),
-    /** A decorated micro page (a `decor_documents` row of kind `custom`). */
-    z.object({ kind: z.literal('page'), id }),
-    z.object({ kind: z.literal('route'), to: linkableRoute }),
-    /**
-     * A web page in `<web-view>`. The mini-program can open only verified
-     * business domains; the client checks the host (C12) and copies any other
-     * link instead of opening it.
-     */
-    z.object({ kind: z.literal('webview'), url: z.url({ protocol: /^https$/ }).max(2048) }),
-    z.object({
-      kind: z.literal('miniprogram'),
-      appId: z.string().regex(/^wx[0-9a-f]{16}$/, '小程序 AppID 形如 wx 加 16 位十六进制'),
-      path: z.string().max(256).optional(),
-    }),
-  ])
+  .discriminatedUnion(
+    'kind',
+    [
+      z.object({ kind: z.literal('product'), id }),
+      z.object({ kind: z.literal('category'), id }),
+      z.object({ kind: z.literal('article'), id }),
+      /** A decorated micro page (a `decor_documents` row of kind `custom`). */
+      z.object({ kind: z.literal('page'), id }),
+      z.object({ kind: z.literal('route'), to: linkableRoute }),
+      /**
+       * A web page in `<web-view>`. The mini-program can open only verified
+       * business domains; the client checks the host (C12) and copies any other
+       * link instead of opening it.
+       */
+      z.object({ kind: z.literal('webview'), url: z.url({ protocol: /^https$/ }).max(2048) }),
+      z.object({
+        kind: z.literal('miniprogram'),
+        appId: z.string().regex(/^wx[0-9a-f]{16}$/, '小程序 AppID 形如 wx 加 16 位十六进制'),
+        path: z.string().max(256).optional(),
+      }),
+    ],
+    {
+      // A required link left unpicked (a new 热区) reads as what to do, not as a type error.
+      error: (issue) => (issue.input === undefined ? '请选择跳转链接' : undefined),
+    },
+  )
   .meta(ui({ label: '链接', field: 'link' }));
 
 export type LinkTarget = z.infer<typeof linkTarget>;

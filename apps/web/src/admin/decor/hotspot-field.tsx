@@ -24,7 +24,6 @@ export type LinkControl = (props: RenderProps<LinkTarget | undefined>) => ReactN
 export const MAX_HOTSPOTS = 20;
 /** Smaller than this (in %) a drag is taken as a tap, not a new area. */
 const MIN_SIZE = 2;
-const NEW_LINK: LinkTarget = { kind: 'route', to: { route: 'home', params: {} } };
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -124,7 +123,10 @@ export function HotspotEditor({
       setSelected(null);
       return;
     }
-    onChange([...spots, { ...box, label: '', link: NEW_LINK }]);
+    // No link until the operator picks one: a made-up default (the home page)
+    // would publish a tap that goes somewhere nobody chose. The publish check
+    // refuses the missing link (请选择跳转链接), and the box says so meanwhile.
+    onChange([...spots, { ...box, label: '' } as Hotspot]);
     setSelected(spots.length);
   };
 
@@ -216,6 +218,11 @@ export function HotspotEditor({
                 if (link) update(selected, { ...current, link });
               },
             })}
+            {current.link ? null : (
+              <Typography.Text type="warning" style={{ fontSize: 12 }}>
+                还没有选择跳转链接，选好之前页面不能发布
+              </Typography.Text>
+            )}
             <Button
               danger
               size="small"

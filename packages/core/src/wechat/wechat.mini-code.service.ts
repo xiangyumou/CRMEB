@@ -12,7 +12,7 @@ import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { enforce, fixedWindow } from '../kernel/rate-limit';
 import { isRejected, resolveStorage, sniffFileType } from '../storage';
-import { wechatMiniConfig } from '../system';
+import { wechatMiniConfig, type MiniCodeEnvVersion } from '../system';
 import { getWechatClient } from './wechat.client';
 import { wechatConfig } from './wechat.config';
 import * as repo from './wechat.mini-code.repo';
@@ -35,6 +35,17 @@ import * as repo from './wechat.mini-code.repo';
  *     assumed a file would cache a 43-byte "invalid page" as a PNG for ever.
  *     `callBytes` tells the two apart and this service turns the second into
  *     `WECHAT_MINI_CODE_FAILED` (502) carrying WeChat's number.
+ *
+ * **Which version a code opens** is `wechat-mini.codeEnvVersion` (`env_version`:
+ * `release`, the default, or `trial` / `develop` for a staging install that
+ * previews unreleased pages on 体验版). WeChat's answer depends on it, so it is
+ * part of the cache key: a code minted for `trial` is never served once the
+ * setting says `release`, and back. The table's unique key stays `(page,
+ * scene)` — the previous image, which a rollback runs, inserts with
+ * `ON CONFLICT (page, scene)` and needs exactly that index — so a non-release
+ * code is cached under the page `<env>:<page>` (`cachePage`). No real page
+ * contains a colon, so the two never collide, and a rolled-back image simply
+ * never looks those rows up.
  */
 
 /** WeChat's own limit on `scene`, in bytes. */
@@ -76,6 +87,11 @@ async function spendMint(ctx: Ctx): Promise<void> {
       nowMs: ctx.clock.now().getTime(),
     }),
   );
+}
+
+/** The page column a code is cached under: the page itself for `release`, `<env>:<page>` otherwise. */
+export function cachePage(page: string, env: MiniCodeEnvVersion): string {
+  return env === 'release' ? page : `${env}:${page}`;
 }
 
 async function miniConfigured(ctx: Ctx): Promise<boolean> {
@@ -144,7 +160,9 @@ async function mintOrReuse(
   key: { page: string; scene: string },
 ): Promise<MiniCodeResult> {
   const { scene } = key;
-  const cached = await repo.findByPageScene(ctx.db, key);
+  const env = (await ctx.config.get(wechatMiniConfig)).codeEnvVersion;
+  const cacheKey = { page: cachePage(key.page, env), scene };
+  const cached = await repo.findByPageScene(ctx.db, cacheKey);
   if (cached) return { url: cached.url };
 
   if (!(await miniConfigured(ctx))) throw new DomainError('AUTH_WECHAT_NOT_CONFIGURED');
@@ -156,7 +174,7 @@ async function mintOrReuse(
     // `check_path: false` — the page is on this system's own allow-list and a
     // shop generating a poster before the version carrying that page is
     // published is a normal Tuesday, not an error worth failing the share on.
-    body: { page: key.page, scene, check_path: false, env_version: 'release' },
+    body: { page: key.page, scene, check_path: false, env_version: env },
   });
 
   if (!result.ok) {
@@ -188,7 +206,7 @@ async function mintOrReuse(
   });
 
   const written = await repo.insertIgnoringConflict(ctx.db, {
-    ...key,
+    ...cacheKey,
     storageKey: stored.key,
     url: storage.url(stored.key),
   });

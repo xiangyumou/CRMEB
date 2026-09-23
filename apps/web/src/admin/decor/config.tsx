@@ -1,62 +1,40 @@
 'use client';
 
-import type { Config, Data } from '@puckeditor/core';
-import { BLOCK_COMPONENTS } from '@shop/storefront-blocks/admin';
+import type { Config, Data, Permissions } from '@puckeditor/core';
+import { decorBlocks } from '@shop/contracts/decor/all-blocks';
 import {
-  BLOCKS,
   IMAGE_CUBE_LAYOUTS,
-  carouselSlide,
-  decorBlocks,
-  imageCubeCell,
-  pageRootProps,
-  type BlockType,
-  type ImageCubeProps,
-  type PageRootProps,
-  type ProductSource,
-  type ProductSummary,
-} from '@shop/storefront-blocks/schema';
+  type DocumentKind,
+  type ImageCubeLayout,
+} from '@shop/contracts/decor/constants';
+import { imageCubeCell } from '@shop/contracts/decor/blocks/image-cube';
+import { pageRootProps } from '@shop/contracts/decor/document';
+import type { AnyBlockDefinition, BlockRegistry } from '@shop/contracts/decor/registry';
+import type { DataNeed } from '@shop/contracts/decor/sources';
+import { BLOCK_COMPONENTS } from '@shop/storefront-blocks/admin';
+import { Component, useMemo, type ComponentType, type ErrorInfo, type ReactNode } from 'react';
+
+import { useCanvasSlots } from './canvas-data';
+import { withImagePlaceholders } from './canvas-images';
+import { UNKNOWN_BLOCK, type UnknownBlockProps } from './document';
 import {
-  Component,
-  createContext,
-  useContext,
-  type ErrorInfo,
-  type ReactElement,
-  type ReactNode,
-} from 'react';
-
-import { z } from 'zod';
-
-import { defaultsOf, zodToPuckFields, type CustomFieldRenderers } from './zod-to-puck';
+  defaultsOf,
+  initialPropsOf,
+  zodToPuckFields,
+  type CustomFieldRenderers,
+} from './zod-to-puck';
 
 /**
- * The Puck `Config` for the DIY v2 blocks: one component per `BLOCKS` entry,
- * fields generated from its zod schema, rendered by the *storefront's own*
- * block through the DOM shim (`@shop/storefront-blocks/admin`). Nothing about
- * a block is written twice for the editor.
+ * The Puck `Config` for the DIY v2 blocks, built from the contracts' block
+ * registry: one component per registered block, its fields generated from
+ * the block's zod schema, rendered by the *storefront's own* component
+ * (`@shop/storefront-blocks/admin`, Taro swapped for a DOM shim) with the data
+ * its `defineBlock({ data })` asks for. Nothing about a block is written twice
+ * for the editor: a block registered in the contracts appears in the palette
+ * as soon as it exists, and in the canvas as soon as its component does.
  */
 
-// ─── data the canvas needs ───────────────────────────────────────────────────
-
-/**
- * Where the canvas gets the data a block does not carry: a product grid holds
- * a *source* (ids or a category), and the storefront gets the products from
- * the page resolver. In the editor the page supplies this.
- */
-export interface DecorCanvasData {
-  products(source: ProductSource): readonly ProductSummary[] | undefined;
-}
-
-const DecorCanvasDataContext = createContext<DecorCanvasData>({ products: () => undefined });
-
-export function DecorCanvasDataProvider({
-  value,
-  children,
-}: {
-  value: DecorCanvasData;
-  children: ReactNode;
-}) {
-  return <DecorCanvasDataContext value={value}>{children}</DecorCanvasDataContext>;
-}
+export type DecorData = Data;
 
 // ─── rendering ───────────────────────────────────────────────────────────────
 
@@ -88,132 +66,206 @@ class BlockBoundary extends Component<
 
   override render(): ReactNode {
     if (this.state.failed) {
-      return (
-        <div style={{ padding: 12, color: '#999', fontSize: 12, background: '#fafafa' }}>
-          {this.props.label}：当前配置无法预览
-        </div>
-      );
+      return <CanvasNotice>{this.props.label}：当前配置无法预览</CanvasNotice>;
     }
     return this.props.children;
   }
 }
 
+function CanvasNotice({
+  children,
+  tone = 'muted',
+}: {
+  children: ReactNode;
+  tone?: 'muted' | 'warn';
+}) {
+  return (
+    <div
+      style={{
+        margin: '8px 12px',
+        padding: '14px 12px',
+        borderRadius: 8,
+        fontSize: 12,
+        lineHeight: 1.6,
+        textAlign: 'center',
+        color: tone === 'warn' ? '#ad6800' : '#8c8c8c',
+        background: tone === 'warn' ? '#fffbe6' : '#fafafa',
+        border: `1px dashed ${tone === 'warn' ? '#ffe58f' : '#d9d9d9'}`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 /** Puck adds `id`, `puck` and `editMode` to a component's props; the block wants its own only. */
-function ownProps<P>(props: Record<string, unknown>): P {
+export function ownProps(props: Record<string, unknown>): Record<string, unknown> {
   const { id: _id, puck: _puck, editMode: _editMode, ...own } = props;
-  return own as P;
+  return own;
 }
 
-/**
- * What a block's `data` asks the resolver for, answered from the canvas data
- * instead: products for each `products` need (a 商品列表's `products`, a
- * 商品选项卡's `tab0`…). Other kinds have no canvas source yet and stay
- * empty, which the blocks draw as empty.
- */
-function useCanvasBlockData(type: BlockType, props: unknown): Record<string, unknown> | undefined {
-  const canvas = useContext(DecorCanvasDataContext);
-  const needs = decorBlocks.get(type)?.data?.(props as never);
-  if (!needs) return undefined;
-  const out: Record<string, unknown> = {};
-  for (const [slot, need] of Object.entries(needs)) {
-    if (need.kind === 'products') out[slot] = [...(canvas.products(need.source) ?? [])];
+type AnyBlockComponent = ComponentType<{ props: any; data?: any }>;
+
+const COMPONENTS = BLOCK_COMPONENTS as unknown as Readonly<Record<string, AnyBlockComponent>>;
+
+function BlockCanvas({
+  definition,
+  props,
+}: {
+  definition: AnyBlockDefinition;
+  props: Record<string, unknown>;
+}) {
+  // The storefront renders parsed props (defaults filled); half-edited props
+  // that do not parse are drawn as they are and the boundary catches a crash.
+  const parsed = useMemo(() => {
+    const result = definition.props.safeParse(props);
+    return result.success ? (result.data as Record<string, unknown>) : props;
+  }, [definition, props]);
+  const drawn = useMemo(
+    () => withImagePlaceholders(definition.props, parsed),
+    [definition, parsed],
+  );
+  const needs = useMemo((): Record<string, DataNeed> => {
+    if (!definition.data) return {};
+    try {
+      return (definition.data as (props: unknown) => Record<string, DataNeed>)(parsed);
+    } catch {
+      return {};
+    }
+  }, [definition, parsed]);
+  const slots = useCanvasSlots(needs);
+  const Block = COMPONENTS[definition.type];
+  if (!Block) {
+    return (
+      <CanvasNotice>
+        {definition.meta.label}
+        <br />
+        画布暂无此组件的预览，可在「预览」或小程序体验版中查看
+      </CanvasNotice>
+    );
   }
-  return out;
+  return (
+    <BlockBoundary label={definition.meta.label} watch={props}>
+      <Block props={drawn} data={slots} />
+    </BlockBoundary>
+  );
 }
 
-function CanvasBlock({ type, props }: { type: BlockType; props: unknown }) {
-  const Block = BLOCK_COMPONENTS[type];
-  const data = useCanvasBlockData(type, props);
-  return <Block props={props} data={data} />;
+function UnknownBlock({ reason }: Partial<UnknownBlockProps>) {
+  return (
+    <CanvasNotice tone="warn">
+      {reason ?? '无法编辑的组件'}
+      <br />
+      原样保留，可移动或删除；含有此组件的页面无法发布
+    </CanvasNotice>
+  );
 }
 
 // ─── defaults for a newly inserted block ─────────────────────────────────────
 
-function cellsFor(layout: keyof typeof IMAGE_CUBE_LAYOUTS): unknown[] {
-  return Array.from({ length: IMAGE_CUBE_LAYOUTS[layout].cells }, () => defaultsOf(imageCubeCell));
-}
-
 /**
- * The props a block starts with when dropped on the page. Schema defaults,
- * plus the minimum item count an array needs; images start empty, so the
- * document is invalid until the operator picks them — by design.
+ * The props a block starts with when dropped on the page: the schema's
+ * defaults and the minimum list items (`initialPropsOf`). An image cube also
+ * starts with as many cells as its default layout shows.
  */
-export function newBlockProps(type: BlockType): Record<string, unknown> {
-  const schema = BLOCKS[type].props as z.ZodObject;
-  const base = defaultsOf(schema) as Record<string, unknown>;
-  switch (type) {
-    case 'carousel':
-      return { ...base, slides: [defaultsOf(carouselSlide)] };
-    case 'imageCube':
-      return { ...base, cells: cellsFor((base as ImageCubeProps).layout) };
-    default:
-      return { ...base, ...minimumItems(schema, base) };
-  }
-}
-
-/** A top-level array with `.min(n)` and nothing in it starts with n default items. */
-function minimumItems(
-  schema: z.ZodObject,
-  base: Record<string, unknown>,
-): Record<string, unknown[]> {
-  const out: Record<string, unknown[]> = {};
-  for (const [key, field] of Object.entries(schema.shape)) {
-    if (!(field instanceof z.ZodArray)) continue;
-    const checks = (field._zod.def.checks ?? []) as unknown as readonly {
-      _zod: { def: { check: string; minimum?: number } };
-    }[];
-    const minimum = Math.max(
-      0,
-      ...checks.map((check) =>
-        check._zod.def.check === 'min_length' ? (check._zod.def.minimum ?? 0) : 0,
-      ),
+export function newBlockProps(definition: AnyBlockDefinition): Record<string, unknown> {
+  const props = initialPropsOf(definition.props);
+  if (definition.type === 'imageCube') {
+    const layout = props.layout as ImageCubeLayout;
+    props.cells = Array.from({ length: IMAGE_CUBE_LAYOUTS[layout].cells }, () =>
+      defaultsOf(imageCubeCell),
     );
-    const current = Array.isArray(base[key]) ? base[key] : [];
-    if (current.length >= minimum) continue;
-    out[key] = Array.from({ length: minimum }, () => defaultsOf(field.element as z.ZodType));
   }
-  return out;
+  return props;
 }
 
 // ─── the config ──────────────────────────────────────────────────────────────
 
-function blockRender(type: BlockType): (props: Record<string, unknown>) => ReactElement {
-  const label = BLOCKS[type].label;
-  return function DecorBlock(props) {
-    const own = ownProps<unknown>(props);
-    return (
-      <BlockBoundary label={label} watch={own}>
-        <CanvasBlock type={type} props={own} />
-      </BlockBoundary>
-    );
-  };
+/** A stored block this build cannot edit may move and go, but not be copied or edited. */
+const UNKNOWN_PERMISSIONS: Partial<Permissions> = { duplicate: false, edit: false };
+
+export interface DecorConfigOptions {
+  /** The page being edited: the palette offers the blocks allowed on it (`meta.pages`). */
+  kind: DocumentKind;
+  custom: CustomFieldRenderers;
+  registry?: BlockRegistry | undefined;
 }
 
-export type DecorData = Data;
-
-export function buildDecorConfig(custom: CustomFieldRenderers): Config {
+export function buildDecorConfig({
+  kind,
+  custom,
+  registry = decorBlocks,
+}: DecorConfigOptions): Config {
   const components: Config['components'] = {};
-  for (const type of Object.keys(BLOCKS) as BlockType[]) {
-    components[type] = {
-      label: BLOCKS[type].label,
-      fields: zodToPuckFields(BLOCKS[type].props, custom),
-      defaultProps: newBlockProps(type),
-      render: blockRender(type),
+  for (const definition of registry.list()) {
+    components[definition.type] = {
+      label: definition.meta.label,
+      fields: zodToPuckFields(definition.props, custom),
+      defaultProps: newBlockProps(definition),
+      render: function DecorBlock(props: Record<string, unknown>) {
+        return <BlockCanvas definition={definition} props={ownProps(props)} />;
+      },
     };
   }
+  components[UNKNOWN_BLOCK] = {
+    label: '无法编辑的组件',
+    fields: {},
+    permissions: UNKNOWN_PERMISSIONS,
+    render: function DecorUnknownBlock(props: Record<string, unknown>) {
+      return <UnknownBlock {...(props as Partial<UnknownBlockProps>)} />;
+    },
+  };
+  const allowed = registry
+    .list()
+    .filter((definition) => definition.meta.pages.includes(kind))
+    .map((definition) => definition.type);
+
   return {
+    categories: {
+      blocks: { title: '组件', components: allowed, defaultExpanded: true },
+      // Blocks not allowed on this kind of page, and the placeholder for
+      // unknown ones: registered (a stored page may hold them) but not offered.
+      other: { visible: false },
+    },
     components,
     root: {
       fields: zodToPuckFields(pageRootProps, custom),
-      defaultProps: defaultsOf(pageRootProps) as PageRootProps,
+      defaultProps: defaultsOf(pageRootProps) as Record<string, unknown>,
       render: function PageRoot({
         children,
         background,
+        title,
       }: {
         children?: ReactNode;
         background?: string;
+        title?: string;
       }) {
-        return <div style={{ background, minHeight: '100vh' }}>{children}</div>;
+        return (
+          <div style={{ background, minHeight: '100vh' }}>
+            {/* The mini-program's navigation bar, which shows the page title. */}
+            <div
+              data-decor-navbar=""
+              style={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 10,
+                height: 44,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#ffffff',
+                color: '#1f1f1f',
+                fontSize: 16,
+                fontWeight: 500,
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                borderBottom: '1px solid #f0f0f0',
+              }}
+            >
+              {title}
+            </div>
+            {children}
+          </div>
+        );
       },
     },
   };

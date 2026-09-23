@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { linkTarget } from '@shop/contracts/decor/link';
 import type { Ctx } from '../kernel/context';
 import { defineConfigGroup } from '../kernel/config-registry';
 
@@ -92,6 +93,14 @@ export const siteConfig = defineConfigGroup({
     splashEnabled: z.boolean().default(false),
     splashImage: z.string().max(512).default(''),
     splashLink: z.string().max(255).default(''),
+    /**
+     * The same tap for the mini-program, as a `LinkTarget` (decor contracts):
+     * `GET /api/v1/app/config` serves it. `null` falls back to `splashLink`
+     * when that is an https URL (a `webview` link) and to "not tappable"
+     * otherwise — a legacy uni-app path means nothing to the mini-program.
+     * The legacy uni-app keeps reading `splashLink` through `site/config`.
+     */
+    splashLinkTarget: linkTarget.nullable().default(null),
     /** How long the splash stays up before it falls through to the home page. */
     splashSeconds: z.number().int().min(1).max(30).default(3),
 
@@ -180,12 +189,20 @@ export const siteConfig = defineConfigGroup({
       visibleWhen: { key: 'splashEnabled', equals: true },
       order: 62,
     },
+    splashLinkTarget: {
+      label: '点击跳转（小程序）',
+      type: 'json',
+      section: '开屏广告',
+      help: '例如 {"kind":"product","id":"12"}；留空时，上面的跳转地址是 https 链接则在小程序内以网页打开，否则不可点击',
+      visibleWhen: { key: 'splashEnabled', equals: true },
+      order: 63,
+    },
     splashSeconds: {
       label: '停留秒数',
       type: 'number',
       section: '开屏广告',
       visibleWhen: { key: 'splashEnabled', equals: true },
-      order: 63,
+      order: 64,
     },
 
     // Shown, but nobody's here to change. Leaving them off the screen entirely
