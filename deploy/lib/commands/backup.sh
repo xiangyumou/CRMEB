@@ -1,26 +1,36 @@
 #!/usr/bin/env bash
 # Dump the database, then prove the dump is restorable.
 #
-#   deploy/backup.sh [--out <file.sql.gz>] [--no-verify]
-#   deploy/backup.sh --verify-only <file.sql.gz>
+#   shop backup [--out <file.sql.gz>] [--no-verify]
+#   shop backup --verify-only <file.sql.gz>
 #
 # "The dump exists" and "the dump is usable" are different claims, and only the
-# second one is worth stopping a maintenance window for. So the default path
-# restores the dump into a throwaway PostgreSQL with **no network at all** and
-# compares the row count of every table in `public` against the live database.
-# A dump that restores but disagrees about its contents is a dump that would
-# have been discovered during the recovery, which is the worst possible moment.
+# second one is worth a release waiting for. So the default path restores the
+# dump into a throwaway PostgreSQL with **no network at all** and compares the
+# row count of every table in `public`:
 #
-# `--no-verify` exists for a scheduled dump on a host with no spare disk; a
-# release never uses it, and upgrade.sh does not pass it. `--verify-only` runs
-# the same proof against a dump that already exists and takes none — for
-# checking last night's backup, or the one a recovery is about to depend on.
+#   - against the rows the dump itself carries, always: every row it holds
+#     must come back;
+#   - against the live database, when nothing is writing to it (`web` and
+#     `worker` stopped, as during a release that migrates): the dump must hold
+#     every row there is.
+#
+# While the writers run, the live counts move under the comparison, so the
+# second check becomes "the dump has every table the live database has".
+# `pg_dump` reads one consistent snapshot either way, which is what makes a
+# dump taken beside live traffic a valid rollback point.
+#
+# `--no-verify` exists for a scheduled dump on a host with no spare memory; a
+# release never uses it. `--verify-only` runs the proof against a dump that
+# already exists and takes none — for checking last night's backup, or the one
+# a recovery is about to depend on. It compares against the live database, so
+# run it while nothing is writing, or expect the counts to disagree.
 #
 # Exit codes: 0 verified · 1 the dump failed or does not verify · 2 misuse.
 set -Eeuo pipefail
 
-# shellcheck source=lib/common.sh
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+# shellcheck source=../common.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../common.sh"
 
 out=''
 verify=1
@@ -39,7 +49,7 @@ while [ "$#" -gt 0 ]; do
     --out=*) out="${1#*=}" ;;
     --no-verify) verify=0 ;;
     -h | --help)
-      sed -n '2,15p' "$0"
+      sed -n '2,30p' "$0"
       exit 0
       ;;
     *)
@@ -52,9 +62,7 @@ done
 
 require_settings
 
-backup_dir="${NEXT_BACKUP_DIR:-$(setting NEXT_BACKUP_DIR)}"
-backup_dir="${backup_dir:-$deploy_root/data/backups}"
-case "$backup_dir" in /*) ;; *) backup_dir="$deploy_root/${backup_dir#./}" ;; esac
+backup_dir="$(backup_dir)"
 mkdir -p "$backup_dir"
 chmod 700 "$backup_dir"
 
@@ -76,6 +84,13 @@ row_census_sql="select table_name || '|' || (xpath('/row/c/text()', query_to_xml
 
 compose ps -q postgres >/dev/null 2>&1 ||
   die 'postgres is not running; there is nothing to dump or to compare against'
+
+# Whether anything can write while the dump is taken decides what it can be
+# compared against (see the top of this file).
+writers_live=0
+for service in web worker; do
+  [ -z "$(compose ps -q --status running "$service" 2>/dev/null || true)" ] || writers_live=1
+done
 
 if [ -n "$verify_only" ]; then
   test -s "$backup" || die "the dump is missing or empty: $backup"
@@ -148,24 +163,69 @@ done
 
 restored_census="$(mktemp)"
 live_census="$(mktemp)"
+dump_census="$(mktemp)"
 # shellcheck disable=SC2064  # expand the paths now: they are what must be removed.
-trap "cleanup; rm -f '$restored_census' '$live_census'" EXIT
+trap "cleanup; rm -f '$restored_census' '$live_census' '$dump_census'" EXIT
 
 if ! gzip -dc "$backup" | docker exec -i "$check_container" \
   psql -v ON_ERROR_STOP=1 -q -U postgres -d restorecheck >/dev/null; then
   die "the backup could not be restored: $backup"
 fi
 
-psql_q "$row_census_sql" >"$live_census" || die 'could not census the live database'
-docker exec "$check_container" psql -qtAX -U postgres -d restorecheck -c "$row_census_sql" \
-  >"$restored_census" || die 'could not census the restored database'
+# Sorted bytewise on both sides: PostgreSQL orders by its own collation, and
+# `sort` by the locale this shell happens to run in.
+psql_q "$row_census_sql" | LC_ALL=C sort >"$live_census" ||
+  die 'could not census the live database'
+docker exec "$check_container" psql -qtAX -U postgres -d restorecheck -c "$row_census_sql" |
+  LC_ALL=C sort >"$restored_census" || die 'could not census the restored database'
 
-if ! diff -u "$live_census" "$restored_census" >/dev/null; then
-  warn 'the restored database does not match the live one:'
-  diff -u "$live_census" "$restored_census" >&2 || true
-  die "the backup is not a faithful copy: $backup"
+census_differs() {
+  local what="$1" expected="$2"
+  diff -u "$expected" "$restored_census" >/dev/null && return 1
+  warn "the restored database does not match $what:"
+  diff -u "$expected" "$restored_census" >&2 || true
+  return 0
+}
+
+if [ -n "$verify_only" ] || [ "$writers_live" -eq 0 ]; then
+  # Nothing is writing (or this is somebody's existing dump, which only the
+  # live database can vouch for): the dump must hold exactly what is there.
+  if census_differs 'the live one' "$live_census"; then
+    die "the backup is not a faithful copy: $backup"
+  fi
 fi
 
-tables="$(wc -l <"$live_census")"
-say "backup verified: $tables table(s) restored with matching row counts"
+if [ -z "$verify_only" ]; then
+  # Every row the dump carries, counted off its own COPY blocks: in COPY's
+  # text format a row is exactly one line, and an empty table still gets a
+  # block. This is the check that holds while the writers run.
+  gzip -dc "$backup" | awk '
+    /^COPY public\./ {
+      name = $2
+      sub(/^public\./, "", name)
+      if (name ~ /^".*"$/) { name = substr(name, 2, length(name) - 2); gsub(/""/, "\"", name) }
+      rows = 0
+      copying = 1
+      next
+    }
+    copying && $0 == "\\." { print name "|" rows; copying = 0; next }
+    copying { rows++ }
+  ' | LC_ALL=C sort >"$dump_census"
+  if census_differs 'the rows the dump carries' "$dump_census"; then
+    die "the backup did not restore everything it holds: $backup"
+  fi
+  if [ "$writers_live" -eq 1 ] &&
+    ! diff <(cut -d'|' -f1 "$live_census") <(cut -d'|' -f1 "$restored_census") >/dev/null; then
+    warn 'the restored database does not have the tables the live one has:'
+    diff <(cut -d'|' -f1 "$live_census") <(cut -d'|' -f1 "$restored_census") >&2 || true
+    die "the backup is not a faithful copy: $backup"
+  fi
+fi
+
+tables="$(wc -l <"$restored_census")"
+if [ -z "$verify_only" ] && [ "$writers_live" -eq 1 ]; then
+  say "backup verified: $tables table(s) restored with matching row counts (writers running: counted against the dump's own snapshot)"
+else
+  say "backup verified: $tables table(s) restored with matching row counts"
+fi
 printf '%s\n' "$backup"

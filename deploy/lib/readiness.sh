@@ -1,6 +1,6 @@
 # shellcheck shell=bash
-# The readiness gate. Sourced by upgrade.sh and rollback.sh; also runnable on
-# its own through `deploy/readyz.sh`.
+# The readiness gate. Sourced by `shop upgrade` and `shop rollback`, which end
+# on it, and by `shop status`, which runs it on its own.
 #
 # `/healthz` at the edge is shallow by design: nginx answering for itself, so a
 # slow app cannot take the edge's own liveness probe down with it. A *container*

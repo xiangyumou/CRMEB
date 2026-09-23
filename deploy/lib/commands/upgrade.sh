@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deploy a release, and end on the previous images if it does not come up.
 #
-#   deploy/upgrade.sh \
+#   shop upgrade \
 #     --web    ghcr.io/…/crmeb-next-web@sha256:… \
 #     --worker ghcr.io/…/crmeb-next-worker@sha256:… \
 #     --edge   ghcr.io/…/crmeb-next-edge@sha256:… \
@@ -11,32 +11,55 @@
 #
 #   1. all three candidates are fixed digests (a moving tag is refused), and
 #      the running images are recorded as the rollback target;
-#   2. the candidates are pulled *before* a writer is stopped, so a registry
+#   2. the candidates are pulled *before* anything is stopped, so a registry
 #      problem is not discovered mid-window;
-#   3. the application services are stopped — a migration never runs against
-#      live writers;
-#   4. `backup.sh` dumps and proves the dump restorable;
-#   5. the migrations and the reference seed run as a one-shot;
-#   6. the stack starts on the candidates and has to pass the readiness gate;
-#   7. **any failure from step 5 on rolls the images back to what was
-#      running**, and the script says whether the schema had already moved.
+#   3. the candidate worker image is asked, read-only, whether the database
+#      has migrations it has not applied (`db/src/pending.mjs`);
+#   4. then one of two paths:
+#
+#      - **migrations pending** (or the question could not be answered, or
+#        this is the first deploy): `web`, `worker` and `edge` are stopped — a
+#        migration never runs against live writers — a dump is taken and
+#        proved restorable, the migrations and the reference seed run as the
+#        `migrate` one-shot, and the stack starts on the candidates;
+#      - **nothing to migrate**: nothing is stopped. The dump is still taken
+#        and proved (`pg_dump` reads one consistent snapshot, and that dump is
+#        the way back), the reference seed runs beside the live stack, and
+#        `up -d` recreates only the services whose image or configuration
+#        changed. A release that changes only the Compose files — a label, a
+#        redirect — goes through here too, and changes only what they change;
+#
+#   5. the stack has to pass the readiness gate;
+#   6. **any failure after the candidates are pinned rolls the images back to
+#      what was running**, and the script says whether the schema had moved.
+#
+# Why the seed may run beside live writers: every statement in it is an upsert
+# on a natural key, inside one transaction, and it touches only reference
+# tables (cities, express companies, agreement and notification shells). It
+# never deletes or truncates. Readers do not wait on it; a write to one of the
+# same rows waits for its commit, a few seconds at most.
 #
 # Why an automatic rollback rather than stopping in maintenance mode: the
 # migrations are additive (CI refuses one that is not), so the previous image
 # tolerates the new schema, and an unattended failure is better ending on a
-# stack that serves than on a stack that is down. When the migration had already run, the script says so in as
-# many words and names the dump, because *data* recovery is a separate,
-# deliberate operation and this script never performs one.
+# stack that serves than on a stack that is down. When the migration had
+# already run, the script says so in as many words and names the dump, because
+# *data* recovery is a separate, deliberate operation and this script never
+# performs one.
+#
+# `--skip-migration` runs neither the migrations nor the seed, and so stops
+# nothing. `--dry-run` goes as far as step 3, reports the path the release
+# would take, and changes nothing.
 #
 # Exit codes: 0 deployed · 1 failed, rolled back to the previous images ·
 #             2 misuse · 3 failed AND the rollback failed — needs a human.
 set -Eeuo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=lib/common.sh
-. "$here/lib/common.sh"
-# shellcheck source=lib/readiness.sh
-. "$here/lib/readiness.sh"
+# shellcheck source=../common.sh
+. "$here/../common.sh"
+# shellcheck source=../readiness.sh
+. "$here/../readiness.sh"
 
 web_candidate=''
 worker_candidate=''
@@ -72,7 +95,7 @@ while [ "$#" -gt 0 ]; do
     --skip-migration) skip_migration=1 ;;
     --first-deploy) first_deploy=1 ;;
     -h | --help)
-      sed -n '2,10p' "$0"
+      sed -n '2,55p' "$0"
       exit 0
       ;;
     *)
@@ -131,14 +154,49 @@ for candidate in "$web_candidate" "$worker_candidate" "$edge_candidate"; do
 done
 say 'all candidates are present locally'
 
+# --- 3. is there anything to migrate? ----------------------------------------
+# Asked of the *candidate*: it is the candidate's migrations that would run.
+# The one-shot is given the candidate image through the environment, which
+# Compose prefers over the settings file, so nothing is pinned to ask.
+pending=''
+pending_names=''
+path='stopped'
+if [ "$first_deploy" -eq 1 ]; then
+  say 'first deploy: the stack is not running, so there is nothing to keep serving'
+elif [ "$skip_migration" -eq 1 ]; then
+  path='online'
+  say 'skipping the migrations and the seed as requested: nothing needs to stop'
+else
+  asked="$(mktemp)"
+  answer="$(NEXT_WORKER_IMAGE="$worker_candidate" \
+    compose --profile migrate run --rm --no-deps -T migrate node /app/db/src/pending.mjs 2>"$asked")" ||
+    answer=''
+  pending="$(printf '%s\n' "$answer" | sed -n 's/^pending=//p' | tail -n1)"
+  if ! [[ "$pending" =~ ^[0-9]+$ ]]; then
+    pending='unknown'
+    warn 'could not ask the candidate whether anything is left to migrate; taking the stopping path'
+    tail -n 5 "$asked" | sed 's/^/  /' >&2
+  elif [ "$pending" -eq 0 ]; then
+    path='online'
+    say 'nothing to migrate: the release will not stop anything'
+  else
+    pending_names="$(printf '%s\n' "$answer" | sed -n 's/^migration=//p' | paste -sd ' ' -)"
+    say "$pending migration(s) to apply: $pending_names"
+  fi
+  rm -f "$asked"
+fi
+
 if [ "$dry_run" -eq 1 ]; then
+  if [ "$path" = 'online' ]; then
+    say 'dry run: the release would stop nothing'
+  else
+    say 'dry run: the release would stop web, worker and edge to migrate'
+  fi
   say 'dry run: nothing was stopped, no backup was taken, no migration ran'
   exit 0
 fi
 
-backup_dir="${NEXT_BACKUP_DIR:-$(setting NEXT_BACKUP_DIR)}"
-backup_dir="${backup_dir:-$deploy_root/data/backups}"
-case "$backup_dir" in /*) ;; *) backup_dir="$deploy_root/${backup_dir#./}" ;; esac
+backup_dir="$(backup_dir)"
 mkdir -p "$backup_dir"
 chmod 700 "$backup_dir"
 
@@ -148,9 +206,14 @@ settings_backup="$backup_dir/deployment.env.$stamp"
 cp -p "$settings" "$settings_backup"
 chmod 600 "$settings_backup"
 
+previous_revision=''
+[ ! -s "$deploy_root/REVISION" ] || previous_revision="$(head -n1 "$deploy_root/REVISION")"
+
 {
   printf 'stamp=%s\n' "$stamp"
   printf 'settings_backup=%s\n' "$settings_backup"
+  printf 'previous_revision=%s\n' "$previous_revision"
+  printf 'app_version=%s\n' "$app_version"
   for service in $APP_SERVICES; do
     printf 'previous_%s=%s\n' "$service" "${previous_ref[$service]}"
     printf 'previous_%s_id=%s\n' "$service" "${previous_id[$service]}"
@@ -158,11 +221,14 @@ chmod 600 "$settings_backup"
   printf 'candidate_web=%s\n' "$web_candidate"
   printf 'candidate_worker=%s\n' "$worker_candidate"
   printf 'candidate_edge=%s\n' "$edge_candidate"
+  printf 'pending=%s\n' "${pending:-not asked}"
+  printf 'path=%s\n' "$path"
 } >"$manifest"
 chmod 600 "$manifest"
 say "manifest: $manifest"
 
 migrated=0
+seeded=0
 backup_file=''
 
 # --- the rollback path -------------------------------------------------------
@@ -201,6 +267,13 @@ roll_back() {
     warn 'so this serves; it is not a state to leave a release in.'
     warn "  verified dump: ${backup_file:-<none>}"
     warn "  restore it deliberately — no script here does it for you."
+  else
+    warn ''
+    warn 'No migration ran: the schema did not move.'
+    if [ "$seeded" -eq 1 ]; then
+      warn 'The reference seed ran. It only upserts reference rows, which the previous'
+      warn 'images read as before.'
+    fi
   fi
   printf 'outcome=rolled-back\nreason=%s\nmigrated=%s\n' "$reason" "$migrated" >>"$manifest"
   return "$failed"
@@ -215,45 +288,76 @@ fail() {
   exit 3
 }
 
-# --- 3. stop the writers -----------------------------------------------------
-say 'stopping the application services'
-# shellcheck disable=SC2086  # deliberate word splitting: a list of services.
-compose stop $APP_SERVICES >/dev/null
+pin_candidates() {
+  set_setting NEXT_WEB_IMAGE "$web_candidate"
+  set_setting NEXT_WORKER_IMAGE "$worker_candidate"
+  set_setting NEXT_EDGE_IMAGE "$edge_candidate"
+  [ -z "$app_version" ] || set_setting APP_VERSION "$app_version"
+}
 
-# --- 4. back up --------------------------------------------------------------
-if [ "$first_deploy" -eq 1 ]; then
-  say 'first deploy: no database to back up yet'
-  compose up -d --wait --wait-timeout 180 postgres redis >/dev/null ||
-    die 'postgres/redis did not come up'
-else
+take_backup() {
   say 'backing up the database'
-  backup_file="$("$here"/backup.sh --out "$backup_dir/pre-upgrade-$stamp.sql.gz" | tail -n1)" || {
-    warn 'the backup could not be taken or verified; nothing was migrated'
-    cp -p "$settings_backup" "$settings"
-    compose up -d --wait --wait-timeout 240 >/dev/null 2>&1 || true
-    exit 1
-  }
+  backup_file="$(bash "$here/backup.sh" --out "$backup_dir/pre-upgrade-$stamp.sql.gz" | tail -n1)" ||
+    return 1
   printf 'backup=%s\n' "$backup_file" >>"$manifest"
   say "backup: $backup_file"
-fi
+}
 
-# --- 5. pin the candidates and migrate ---------------------------------------
-set_setting NEXT_WEB_IMAGE "$web_candidate"
-set_setting NEXT_WORKER_IMAGE "$worker_candidate"
-set_setting NEXT_EDGE_IMAGE "$edge_candidate"
-[ -z "$app_version" ] || set_setting APP_VERSION "$app_version"
+if [ "$path" = 'stopped' ]; then
+  # --- 4a. stop the writers, back up, migrate ---------------------------------
+  say 'stopping the application services'
+  # shellcheck disable=SC2086  # deliberate word splitting: a list of services.
+  compose stop $APP_SERVICES >/dev/null
 
-if [ "$skip_migration" -eq 0 ]; then
-  say 'running the migrations and the reference seed'
-  migrated=1
-  compose --profile migrate run --rm --no-deps -T migrate ||
-    fail 'the migration failed'
+  if [ "$first_deploy" -eq 1 ]; then
+    say 'first deploy: no database to back up yet'
+    compose up -d --wait --wait-timeout 180 postgres redis >/dev/null ||
+      die 'postgres/redis did not come up'
+  else
+    take_backup || {
+      warn 'the backup could not be taken or verified; nothing was migrated'
+      cp -p "$settings_backup" "$settings"
+      compose up -d --wait --wait-timeout 240 >/dev/null 2>&1 || true
+      printf 'outcome=aborted\nreason=the backup could not be taken or verified\n' >>"$manifest"
+      exit 1
+    }
+  fi
+
+  pin_candidates
+
+  if [ "$skip_migration" -eq 0 ]; then
+    say 'running the migrations and the reference seed'
+    migrated=1
+    seeded=1
+    compose --profile migrate run --rm --no-deps -T migrate ||
+      fail 'the migration failed'
+  else
+    say 'skipping the migrations as requested'
+  fi
 else
-  say 'skipping the migrations as requested'
+  # --- 4b. nothing to migrate: back up beside the live stack, seed ------------
+  take_backup || {
+    warn 'the backup could not be taken or verified; nothing was changed'
+    printf 'outcome=aborted\nreason=the backup could not be taken or verified\n' >>"$manifest"
+    exit 1
+  }
+
+  pin_candidates
+
+  if [ "$skip_migration" -eq 0 ]; then
+    say 'running the reference seed beside the live stack'
+    seeded=1
+    compose --profile migrate run --rm --no-deps -T migrate node /app/db/src/seed/index.mjs ||
+      fail 'the reference seed failed'
+  fi
 fi
 
-# --- 6. start and prove it -----------------------------------------------------
-say 'starting the stack on the candidates'
+# --- 5. start and prove it -----------------------------------------------------
+if [ "$path" = 'stopped' ]; then
+  say 'starting the stack on the candidates'
+else
+  say 'applying the release: Compose recreates only what changed'
+fi
 compose up -d --wait --wait-timeout 300 >/dev/null ||
   fail 'the stack did not become healthy'
 
@@ -276,6 +380,11 @@ say 'upgrade complete'
 say "  web:    $web_candidate"
 say "  worker: $worker_candidate"
 say "  edge:   $edge_candidate"
+if [ "$path" = 'online' ]; then
+  say '  path:   nothing was stopped'
+else
+  say '  path:   stopped to migrate'
+fi
 say "  rollback target: ${previous_ref[web]:-<none>} / ${previous_ref[worker]:-<none>} / ${previous_ref[edge]:-<none>}"
 say "  manifest: $manifest"
 [ -z "$backup_file" ] || say "  backup:   $backup_file"

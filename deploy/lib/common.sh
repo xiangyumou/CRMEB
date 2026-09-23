@@ -1,6 +1,5 @@
 # shellcheck shell=bash
-# Shared by backup.sh, upgrade.sh, rollback.sh and readyz.sh. Not executable
-# on its own.
+# Shared by `shop` and its commands (lib/commands/). Not executable on its own.
 #
 # No `set` here: the caller sets `-Eeuo pipefail` and owns its own traps.
 #
@@ -101,6 +100,15 @@ compose() {
 # key to a log; callers use this for image references and non-secret values.
 setting() {
   sed -n "s/^$1=//p" "$settings" | tail -n1
+}
+
+# Where dumps, upgrade manifests and settings backups go: `NEXT_BACKUP_DIR`
+# from the environment or the settings, relative to the deploy directory.
+backup_dir() {
+  local dir="${NEXT_BACKUP_DIR:-$(setting NEXT_BACKUP_DIR)}"
+  dir="${dir:-$deploy_root/data/backups}"
+  case "$dir" in /*) ;; *) dir="$deploy_root/${dir#./}" ;; esac
+  printf '%s\n' "$dir"
 }
 
 # Rewrites one key in place, preserving mode. Used only for image digests.
