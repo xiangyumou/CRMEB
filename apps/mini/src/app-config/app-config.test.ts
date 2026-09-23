@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { subscribe } from '@/platform';
 import { appConfigFixture } from '@/test/app-config-fixture';
 import { serveApi } from '@/test/fake-api';
 import { taroFake } from '@/test/taro-fake/taro';
 import { useThemeStore } from '@/theme/store';
-import { APP_CONFIG_KEY, loadAppConfig, templatesByScene, useAppConfigStore } from './app-config';
+import { APP_CONFIG_KEY, loadAppConfig, useAppConfigStore } from './app-config';
 
 const config = appConfigFixture;
 
@@ -59,14 +60,12 @@ describe('app config', () => {
     expect(seen).toHaveLength(1);
   });
 
-  it('maps templates to scenes, shipping first for an order', () => {
-    const scenes = templatesByScene({
-      orderCreate: ['c'],
-      orderPay: ['p'],
-      orderShip: ['s1', 's2'],
-      refund: ['r'],
+  it('hands the server-built subscribe scenes to subscribe()', async () => {
+    serveApi({ 'GET /api/v1/app/config': () => ({ body: config }) });
+    await loadAppConfig();
+    await subscribe('refundApply');
+    expect(taroFake.calls.find((call) => call.api === 'requestSubscribeMessage')).toMatchObject({
+      args: { tmplIds: config.subscribeScenes.refundApply },
     });
-    expect(scenes.checkout).toEqual(['s1', 's2', 'p', 'c']);
-    expect(scenes.refundApply).toEqual(['r']);
   });
 });

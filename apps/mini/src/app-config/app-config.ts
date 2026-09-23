@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { isApiError, type ResponseOf } from '@shop/api-client';
 import { api } from '@/data/api';
 import { assetUrl } from '@/lib/asset-url';
-import { setShareDefaults, setSubscribeTemplates, storage, type SubscribeScene } from '@/platform';
+import { setShareDefaults, setSubscribeTemplates, storage } from '@/platform';
 import { useThemeStore } from '@/theme/store';
 
 /**
@@ -30,30 +30,11 @@ export function useAppConfig(): AppConfig | null {
   return useAppConfigStore((state) => state.config);
 }
 
-/**
- * Which `subscribeTemplates` a scene asks for (C08; at most three are sent, in this order).
- * An order's checkout asks for shipping first, the message the shopper wants most. The backend
- * groups templates by message, not by the page that asks, so the mapping lives here until
- * `app/config` carries per-scene lists (reported gap).
- */
-export function templatesByScene(
-  templates: AppConfig['subscribeTemplates'],
-): Record<SubscribeScene, string[]> {
-  const order = [...templates.orderShip, ...templates.orderPay, ...templates.orderCreate];
-  return {
-    checkout: order,
-    groupbuyCheckout: order,
-    presaleCheckout: order,
-    refundApply: [...templates.refund],
-    returnShipment: [...templates.refund],
-  };
-}
-
 /** Hand a config to everything that reads it. */
 export function applyAppConfig(config: AppConfig, source: 'cache' | 'network'): void {
   useAppConfigStore.setState({ config, source });
   useThemeStore.getState().applyAppearance(config.appearance);
-  setSubscribeTemplates(templatesByScene(config.subscribeTemplates));
+  setSubscribeTemplates(config.subscribeScenes);
   const title = config.share.title || config.name;
   const imageUrl = assetUrl(config.share.image);
   setShareDefaults({ ...(title ? { title } : {}), ...(imageUrl ? { imageUrl } : {}) });
@@ -65,7 +46,7 @@ function readCache(): AppConfig | null {
   try {
     const parsed = JSON.parse(raw) as Partial<AppConfig>;
     // A copy from an older build that lacks what this one reads is no copy.
-    return typeof parsed.version === 'string' && parsed.appearance && parsed.subscribeTemplates
+    return typeof parsed.version === 'string' && parsed.appearance && parsed.subscribeScenes
       ? (parsed as AppConfig)
       : null;
   } catch {
