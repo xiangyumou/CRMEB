@@ -370,8 +370,8 @@ In order, refusing to continue when a step cannot be proven, it:
      reference seed beside the live stack; and recreates only the services whose image or
      configuration changed, one at a time, `web` first and the edge last. The edge finds the new
      `web` by name through Docker's DNS, so the storefront keeps answering throughout and the app
-     is out of reach only while `web` restarts: 1.4 s in the drill, against 11 s for a release that
-     migrates;
+     is out of reach only while `web` restarts: 1.4 to 1.7 s in the drill, against 11 to 13 s for a
+     release that migrates;
 5. runs the readiness gate.
 
 If anything after the candidates are pinned fails, it puts the previous images back and says
