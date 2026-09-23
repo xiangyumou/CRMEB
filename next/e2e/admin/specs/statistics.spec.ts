@@ -9,7 +9,7 @@ import { makePaidOrder } from '../src/seed';
 import { stack, type Stack } from '../src/stack';
 
 /**
- * 统计 (F3) — the figures on the screen are the definitions in
+ * 统计 — the figures on the screen are the definitions in
  * `packages/core/src/stats/DEFINITIONS.md`, computed here independently from
  * the same tables, and the product export is a file Excel can open safely.
  *

@@ -6,9 +6,8 @@ import { fileURLToPath } from 'node:url';
 /**
  * The H5 bundle `edge.ts` serves.
  *
- * `template/uni-app` is not this package's to change, but it is this
- * package's to *build*: nothing else in the rewrite needs an H5 build, so no
- * other stream's harness builds one. `pnpm run build:h5` (vue-cli-service
+ * The uni-app is its own npm project, but this suite is the one harness that
+ * needs an H5 build, so it builds one itself. `pnpm run build:h5` (vue-cli-service
  * `uni-build`) always writes to `dist/dev/h5` — there is no `NODE_ENV`
  * switch in its script, so that is the one output directory this ever reads.
  *
@@ -20,9 +19,9 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /**
  * The uni-app source tree to build and serve. `SHOP_E2E_UNIAPP_DIR` points
- * the suite at another checkout — a stream fixing the storefront runs these
- * journeys against its own worktree's `template/uni-app` without touching
- * this one (see `docs/rewrite/status/i.md`, "Running against another tree").
+ * the suite at another checkout, so a storefront fix in another worktree can
+ * run these journeys against its own `template/uni-app` without touching
+ * this one.
  */
 export const UNI_APP_DIR = process.env.SHOP_E2E_UNIAPP_DIR
   ? path.resolve(process.env.SHOP_E2E_UNIAPP_DIR)

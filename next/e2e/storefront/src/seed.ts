@@ -119,7 +119,7 @@ export interface SeedResult {
   };
 }
 
-/** A page seeded from one of the production `eb_diy` fixtures. */
+/** A page seeded from one of the production DIY fixtures. */
 export interface SeededDiyPage {
   fixture: string;
   id: number;
@@ -534,12 +534,11 @@ export async function seedE2E(options: {
       isEnabled: true,
     });
 
-    // The six production `eb_diy` fixtures. Three are pages: prod-6 is the
-    // home page (journeys 1 and 8), prod-7 and prod-8 are published as micro
-    // pages so journey 1 can render their components too. The other three
-    // are the settings rows the legacy editor kept beside the pages — prod-3
-    // and prod-4 are the 分类页 / 个人中心 版式 picks `diyConfig` holds now;
-    // prod-2 (一键换色) has no counterpart the storefront reads yet (CR-4-i §1).
+    // The six DIY fixtures captured from a production shop. Three are pages:
+    // prod-6 is the home page (journeys 1 and 8), prod-7 and prod-8 are
+    // published as micro pages so journey 1 can render their components too.
+    // The other three are settings: prod-3 and prod-4 are the 分类页 /
+    // 个人中心 版式 picks `diyConfig` holds; prod-2 (一键换色) is not seeded.
     const diyPages: SeededDiyPage[] = [];
     for (const [fixture, kind, name] of [
       ['prod-6.json', 'home', '首页'],

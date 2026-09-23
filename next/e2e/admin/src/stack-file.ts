@@ -19,9 +19,9 @@ import path from 'node:path';
  *
  * Several checkouts of this repository (worktrees) run the suite on the same
  * machine at the same time. With one fixed port and one fixed stack file they
- * used to find each other: the second run's Playwright saw a server already
- * answering on the port, reused it, and ran its specs against the *first*
- * checkout's build and database — green or red for reasons that had nothing
+ * would find each other: the second run's Playwright would see a server
+ * already answering on the port, reuse it, and run its specs against the
+ * *first* checkout's build and database — green or red for reasons that had nothing
  * to do with its own code. So:
  *
  * - the default port and stack file are derived from the checkout's path

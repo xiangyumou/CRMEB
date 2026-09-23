@@ -7,7 +7,7 @@ import { test, expect, cjk, dialog, toast } from '../src/fixtures';
 import { stack } from '../src/stack';
 
 /**
- * 公众号自定义菜单 (E3) — save is a draft, 发布 is the only thing that reaches
+ * 公众号自定义菜单 — save is a draft, 发布 is the only thing that reaches
  * WeChat, and a refusal from WeChat is something the operator can read.
  *
  * WeChat here is `@shop/testing`'s fake OA server on a local port. The seed
@@ -147,7 +147,7 @@ test('WeChat refusing the live menu is shown on the page, with its errcode', asy
   expect(((await refused.json()) as { code: string }).code).toBe('WECHAT_OA_API_FAILED');
 
   // The toast goes in three seconds; the alert is what stays. 发布 re-reads
-  // `/current` on a refusal too (CR-33-k2), so it appears without a reload…
+  // `/current` on a refusal too, so it appears without a reload…
   const alert = adminPage.getByRole('alert').filter({ hasText: '上次发布失败' });
   await expect(alert).toBeVisible();
   await expect(alert).toContainText('40016');
@@ -161,7 +161,7 @@ test('WeChat refusing the live menu is shown on the page, with its errcode', asy
 });
 
 test('WeChat refusing a new draft is shown on the page too', async ({ adminPage }) => {
-  // CR-33-k2: `publish_error` is written to the draft's row, and the alert reads
+  // `publish_error` is written to the draft's row, and the alert reads
   // `/wechat-menus/current` — the *live* menu. So the refusal is shown on the
   // draft's own row in the 状态 column, where 发布 was pressed.
 

@@ -44,12 +44,12 @@ test('an express shipment needs a courier and a tracking number', async ({ admin
   await expect(modal.getByText('快递发货需要物流公司和运单号')).toBeVisible();
 });
 
-// CR-15-k found here: every `dedupeKey` is `name:id`, and BullMQ 6 refuses a
-// custom job id with one colon in it, so this shipment used to commit and then
-// answer 500 from the enqueue that follows it. `queue-bullmq.ts` now maps the
-// port's opaque key onto a BullMQ id (`toJobId`); this journey is the proof that
-// the fix holds at the HTTP boundary, on a real Redis, which no unit or
-// integration suite reaches (they all run on `memoryQueue()`).
+// Every `dedupeKey` is `name:id`, and BullMQ 6 refuses a custom job id with one
+// colon in it, so a shipment would commit and then answer 500 from the enqueue
+// that follows it. `queue-bullmq.ts` maps the port's opaque key onto a BullMQ id
+// (`toJobId`); this journey proves that holds at the HTTP boundary, on a real
+// Redis, which no unit or integration suite reaches (they all run on
+// `memoryQueue()`).
 test('ship it, then confirm receipt', async ({ adminPage, adminApi, shop }) => {
   const orderId = shop.fixtures.shippableOrderId;
   await adminPage.goto(`/admin/orders/${orderId}`);
@@ -92,7 +92,7 @@ test('an order that is already shipped cannot be shipped again', async ({
   const orderId = shop.fixtures.shippableOrderId!;
   // The journey above ships this order through the screen. When this test runs
   // on its own it ships it the same way — through the 发货 dialog, never a
-  // service call — so the precondition is itself the screen's doing (CR-15-k).
+  // service call — so the precondition is itself the screen's doing.
   await adminPage.goto(`/admin/orders/${orderId}`);
   const before = await (await adminApi.get(`/admin-api/orders/${orderId}`)).json();
   if (before.fulfillmentStatus !== 'fulfilled') await shipThroughScreen(adminPage);

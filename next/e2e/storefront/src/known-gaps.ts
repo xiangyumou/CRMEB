@@ -1,20 +1,16 @@
 /**
- * Failed requests the storefront is *known* to make today, each with the CR or
- * the CONTRACT-PENDING marker that owns it.
+ * Failed requests the storefront is *known* to make, each with the issue that
+ * owns it.
  *
  * Journey 1 asserts "no console error, no failed request" on the pages it
- * renders. Every H5 page load currently makes a couple of requests nothing in
- * the rewrite answers — each filed with the stream that owns the call. Failing journey 1 on those would say nothing new, and
- * would hide the next *unknown* failure behind them; letting everything
- * through would make the assertion worthless. So the list is explicit, each
- * line names its owner, and anything not on it fails the journey.
- *
- * When the owner fixes one, its line here goes — `docs/rewrite/status/i.md`
- * tracks the same list.
+ * renders. A known failure that fails journey 1 would say nothing new and
+ * would hide the next *unknown* failure behind it; letting everything through
+ * would make the assertion worthless. So the list is explicit, each line names
+ * its owner, and anything not on it fails the journey. When the owner fixes
+ * one, its line here goes.
  */
 export const KNOWN_FAILED_REQUESTS: ReadonlyArray<{ pattern: RegExp; owner: string }> = [
-  // Empty. CR-4-i §4 (`/api/get_script`) and §5 (`/statics/images/*`) were
-  // closed by H4; see `docs/rewrite/status/h4.md`.
+  // Empty.
 ];
 
 /**
@@ -22,8 +18,7 @@ export const KNOWN_FAILED_REQUESTS: ReadonlyArray<{ pattern: RegExp; owner: stri
  * today, each with its owner — same rules as `KNOWN_FAILED_REQUESTS`.
  */
 export const KNOWN_CONSOLE_ERRORS: ReadonlyArray<{ pattern: RegExp; owner: string }> = [
-  // Empty. CR-4-i §4 (the HTML 404 appended as a script) and §3 (the 首页
-  // coupon popup's `data.list.length`) were closed by H4.
+  // Empty.
 ];
 
 /**

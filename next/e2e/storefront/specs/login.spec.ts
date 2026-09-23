@@ -18,7 +18,7 @@ import { uniField } from '../src/uni';
  * one of the two identifiers the form itself validates.
  *
  * The SMS half runs against the real, out-of-process `next start` server:
- * `SHOP_FAKE_SMS=1` (passed by `scripts/serve.ts`, CR-3-i, landed with W5T)
+ * `SHOP_FAKE_SMS=1` (passed by `scripts/serve.ts`)
  * registers the fake sender in web's own module graph, and the code is read
  * back from Redis under the key `issueCode()` writes (`codeKey`). The page's
  * 获取验证码 refuses until the terms are ticked, so the box is ticked first.

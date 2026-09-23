@@ -62,7 +62,7 @@ export async function submitOrder(page: Page): Promise<void> {
  *
  * The cashier's non-WeChat-browser path (`WECHAT_H5_PAY`) `uni.reLaunch`es
  * to `order_pay_status` and *then*, 1.5s later, does `location.href = h5_url`
- * — the fake gateway's own `/h5-cashier` (`@shop/testing`, CR-5-i), which
+ * — the fake gateway's own `/h5-cashier` (`@shop/testing`), which
  * sends the browser straight back and settles nothing, as WeChat's cashier
  * does when the shopper gives up. So the payment is settled here: capturing
  * `outTradeNo` from the `POST /orders/:id/payments` response (which only
@@ -162,7 +162,7 @@ export async function emptyCart(api: APIRequestContext): Promise<void> {
   );
 }
 
-/** Puts one SKU in the cart through the real cart API — the product page's own add is CR-2-h3. */
+/** Puts one SKU in the cart through the real cart API; the product page's own 加入购物车 has its own test. */
 export async function arrangeCartItem(
   api: APIRequestContext,
   skuId: number,
@@ -176,7 +176,7 @@ export async function arrangeCartItem(
 }
 
 /**
- * No component on the page prints an object as text (CR-7-i).
+ * No component on the page prints an object as text.
  *
  * Vue renders `{{ obj }}` as `JSON.stringify(obj, null, 2)`, so a component
  * bound to an object where it expects a string shows up as `{ "key": …`

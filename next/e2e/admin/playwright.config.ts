@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { BASE_URL, REUSE } from './src/stack-file';
 
 /**
- * Admin end-to-end suite (`K-hardening.md` §3).
+ * Admin end-to-end suite.
  *
  * One command, from `next/`:
  *
@@ -24,7 +24,7 @@ import { BASE_URL, REUSE } from './src/stack-file';
  * `workers: 1` is deliberate. Every worker would share the one database and the
  * one Redis, so parallel specs would see each other's orders, coupons and
  * audit rows. The suite is an authorisation and money check, not a load test;
- * see `K-hardening.md` §4 for the one that is allowed to be parallel.
+ * `next/load` is the one that is allowed to be parallel.
  */
 export default defineConfig({
   testDir: './specs',
@@ -54,7 +54,7 @@ export default defineConfig({
     {
       // Chromium only, on purpose: these specs assert authorisation, audit
       // rows and masked secrets, not browser compatibility. A second engine
-      // would double the runtime and assert nothing new. (CR-4-k §3.)
+      // would double the runtime and assert nothing new.
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },

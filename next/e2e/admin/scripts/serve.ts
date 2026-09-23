@@ -23,7 +23,7 @@
  *
  * Nothing here talks to WeChat, an SMS gateway or Aliyun. The payment and
  * notification configuration the seed writes is fixture data pointing at
- * nothing, and the specs never trigger a real send (`K-hardening.md`, Rules).
+ * nothing, and the specs never trigger a real send.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtemp, writeFile } from 'node:fs/promises';
@@ -146,7 +146,7 @@ async function main(): Promise<void> {
         // explicit NODE_ENV, and the bundle it serves was built as production.
         //
         // That flag is therefore the one production behaviour this suite does
-        // not exercise. In production the edge terminates TLS (stream J), and
+        // not exercise. In production the front proxy terminates TLS, and
         // `handle.int.test.ts` asserts the attribute directly.
         NODE_ENV: 'test',
         DATABASE_URL: databaseUrl,

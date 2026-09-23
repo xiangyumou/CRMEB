@@ -187,9 +187,8 @@ async function main(): Promise<void> {
     VALIDATE_RESPONSES: '1',
     LOG_LEVEL: process.env.SHOP_E2E_LOG_LEVEL ?? 'warn',
     APP_VERSION: 'e2e',
-    // CR-3-i, as decided: `web` registers the in-memory fake SMS sender in
-    // its own module graph when this is set (W5T). Harmless before that
-    // lands; journey 5's SMS half is `fixme` until the orchestrator lifts it.
+    // `web` registers the in-memory fake SMS sender in its own module graph
+    // when this is set, so the SMS sign-in journey never reaches a provider.
     SHOP_FAKE_SMS: '1',
   };
 

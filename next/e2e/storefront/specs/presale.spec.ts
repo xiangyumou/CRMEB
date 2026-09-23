@@ -11,8 +11,8 @@ import { payAtCashier, submitOrder } from '../src/product-flows';
  * The seeded activity product (`src/seed.ts`, "E2E 活动商品") sells at ¥88.00;
  * its presale activity (`shop.fixtures.presaleActivityId`, full payment,
  * free freight) sells the same SKU at ¥78.00. The shopper goes the way a
- * phone does — the 预售 list, the activity's own `presell_details` page
- * (registered by W5T, CR-2-i), 立即购买, the confirm page, 提交订单, the
+ * phone does — the 预售 list, the activity's own `presell_details` page,
+ * 立即购买, the confirm page, 提交订单, the
  * cashier — and every step that names a price names ¥78.00. The order itself
  * is read back from the real create response and the real order route, so
  * what is proven is the domain's price, not only the screen's.
@@ -20,7 +20,7 @@ import { payAtCashier, submitOrder } from '../src/product-flows';
  * The domain keeps ¥88.00 as the line's unit price and books the presale as a
  * −¥10.00 adjustment; the uni-app mappers turn that back into the ¥78.00 the
  * pages print (`api/mappers/order.js`, 活动价). Each order line carries
- * its own `adjustments` (CR-2-h4), the activity and the coupon apart, so the
+ * its own `adjustments`, the activity and the coupon apart, so the
  * second journey stacks a coupon on the presale and the order pages still
  * print ¥78.00 for the goods and the coupon on its own row.
  */
@@ -81,8 +81,8 @@ test('presale price is what the order shows, not the catalogue price', async ({
   };
   expect(order.kind).toBe('presale');
   expect(order.items).toHaveLength(1);
-  // B1 prices an activity as a `presale:activity-price` adjustment (CR-1-d,
-  // CR-3-b1): the line keeps the catalogue unit price and the ¥10 lands in its
+  // Pricing books an activity as a `presale:activity-price` adjustment: the
+  // line keeps the catalogue unit price and the ¥10 lands in its
   // discount, so the line *total* is the presale price.
   expect(order.items[0]).toMatchObject({
     unitPrice: CATALOGUE_PRICE,
@@ -115,12 +115,11 @@ test('presale price is what the order shows, not the catalogue price', async ({
 });
 
 /**
- * CR-2-h4. A presale with a ¥5 coupon stacked: `couponDiscount` is ¥15, and
- * before the order lines carried their adjustments the ¥10 activity and the
- * ¥5 coupon could not be told apart, so the order pages printed ¥88.00.
+ * A presale with a ¥5 coupon stacked: `couponDiscount` is ¥15, and only the
+ * per-line adjustments tell the ¥10 activity and the ¥5 coupon apart; without
+ * them the order pages would print ¥88.00.
  *
- * The confirm page picks no coupon for an activity (the legacy app never
- * did), so the order is created through the real checkout API with the
+ * The confirm page never picks a coupon for an activity, so the order is created through the real checkout API with the
  * coupon named; the pages are the real order pages. The coupon is scoped to
  * the activity product while it exists, and revoked with the order cancelled
  * afterwards, so no other journey's totals see it.

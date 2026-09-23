@@ -1,6 +1,6 @@
 # `@shop/e2e-storefront` — 商城端到端套件
 
-`docs/rewrite/briefs/I-storefront-e2e.md`。一条命令，从 `next/` 跑：
+商城（uni-app H5）的浏览器端到端测试。一条命令，从 `next/` 跑：
 
 ```
 pnpm --filter @shop/e2e-storefront test
@@ -28,19 +28,10 @@ pnpm --filter @shop/e2e-storefront test
 | `SHOP_E2E_REUSE=1 pnpm …`                                          | 复用本检出端口上已经在跑的栈。默认**不**复用，见下节             |
 | `SHOP_TEST_PG_URL=… SHOP_TEST_REDIS_URL=… pnpm …`                  | 用现成的 PG/Redis，不起容器                                      |
 | `SHOP_E2E_BUILD=1 pnpm …`                                          | 强制重新 `next build`                                            |
-| `SHOP_E2E_RUN_BLOCKED=1 pnpm …`                                    | 连 `src/blocked.ts` 登记为受阻的旅程也照跑                       |
 
 ## 多个检出（worktree）同时跑
 
-以前的做法是：
-
-- 端口固定为 3220（edge）、3221（web）、3222（网关）
-- 交接文件固定为 `$TMPDIR/shop-e2e-storefront.json`
-- 非 CI 环境下默认开启 `reuseExistingServer`
-
-这样第二个 worktree 的 Playwright 发现 3220 上已经有服务，就会直接复用，结果是用**别人的 H5 包、构建和数据库**跑自己的 spec，测出来是红是绿都和自己的代码无关。
-
-现在的规则和 `@shop/e2e-admin` 一致（见 `src/stack-file.ts`）：
+端口和交接文件按检出派生，且默认不复用已在跑的栈，规则和 `@shop/e2e-admin` 一致（见 `src/stack-file.ts`）。否则第二个 worktree 的 Playwright 发现端口上已经有服务就会直接复用，用**别人的 H5 包、构建和数据库**跑自己的 spec，测出来是红是绿都和自己的代码无关。
 
 | 变量                        | 默认                                             | 说明                                                                                                                    |
 | --------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |

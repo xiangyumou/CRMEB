@@ -44,7 +44,7 @@ export interface Fixtures {
    * Every request `page` made that failed — `METHOD /path STATUS`, or
    * `METHOD /path FAILED <reason>` for a transport error. Journey 1's
    * "renders without console error and without failed requests" and the
-   * per-journey log the brief asks CI to keep (attached to every test as
+   * per-journey log CI keeps (attached to every test as
    * `page-health.txt`) both read these two arrays.
    */
   failedRequests: string[];

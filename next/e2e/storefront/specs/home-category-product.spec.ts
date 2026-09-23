@@ -12,7 +12,7 @@ import { POSTAGE_PRODUCT_DESCRIPTION } from '../src/site';
  * real production fixture, the category list (whichever of the three
  * `goods_cate1/2/3` layouts `getThemeInfo('category')` picks — the assertion
  * below is deliberately text-only, not markup-specific, because the layout
- * itself is a decision this stream does not own), and a product detail page
+ * itself is the operator's choice), and a product detail page
  * for both a multi-spec product and a fixed-postage one.
  *
  * "Renders every fixture component" is checked by id, not by eye: the DIY
@@ -123,7 +123,7 @@ test("a fixed-postage product shows its own name and price, not the freight prod
   // assertion, not this one's.
   await expect(shopperPage.getByText('39.00', { exact: false }).first()).toBeVisible();
   // The default page's 图文详情 (`productDesc`) renders the product's own
-  // description, and no component prints the product as raw JSON (CR-7-i).
+  // description, and no component prints the product as raw JSON.
   await expect(shopperPage.getByText(POSTAGE_PRODUCT_DESCRIPTION).first()).toBeVisible();
   await expectNoRawJson(shopperPage);
 });

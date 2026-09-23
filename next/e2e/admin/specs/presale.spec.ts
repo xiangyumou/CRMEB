@@ -3,14 +3,14 @@ import type { APIRequestContext, Locator, Page } from '@playwright/test';
 import { test, expect, cjk, dialog, toast } from '../src/fixtures';
 
 /**
- * 预售 (D2) — an activity made on the admin screen, read back through the
+ * 预售 — an activity made on the admin screen, read back through the
  * storefront API a shopper's app calls.
  *
  * What only this suite can see: that the form's 规格 rows, dates and money
  * fields reach the server in the shape the contract wants (the component test
  * stubs `fetch`), that the storefront then sells at the *presale* price, that
- * an edit through the dialog keeps those prices (CR-3-d2 — the dialog used to
- * open on the list row, which carries no 规格, and saving deleted them all),
+ * an edit through the dialog keeps those prices (the list row carries no 规格,
+ * so a dialog opened on it and saved would delete them all),
  * and that 暂停 takes the campaign off sale at once.
  *
  * The seeded product (`E2E 订单用商品`, one SKU at ¥99.00) is the one on sale.
@@ -117,7 +117,7 @@ test('an activity made on the screen is on sale in the storefront at the presale
   ]);
 });
 
-test('editing the title through the dialog keeps every presale price (CR-3-d2)', async ({
+test('editing the title through the dialog keeps every presale price', async ({
   adminPage,
   adminApi,
   request,
@@ -168,8 +168,8 @@ test('暂停 takes the campaign off sale at once', async ({ adminPage, adminApi,
 });
 
 test('a draft is not on the storefront, not even by id', async ({ adminApi, request, shop }) => {
-  // CR-34-k2 (fixed): the list filters on status and window, and `detail` now
-  // answers 404 for a draft too — ids are sequential, and the form promises
+  // The list filters on status and window, and `detail` answers 404 for a
+  // draft too — ids are sequential, and the form promises
   // 「草稿不会出现在前台」 and the error 「不存在或已下架」.
 
   // Arranged through the API: making an activity on the screen is the first

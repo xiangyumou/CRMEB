@@ -18,7 +18,7 @@ import { uniField } from '../src/uni';
  *
  * The first test opens the refund form by the exact link the order-detail
  * page's 申请退款 builds; the way in through the order-detail page itself
- * (once broken by CR-4-i §7) is its own test.
+ * is its own test.
  */
 
 test('a shopper applies for a refund, it is approved, and the money moves', async ({
@@ -55,7 +55,7 @@ test('a shopper applies for a refund, it is approved, and the money moves', asyn
   await shopperPage.waitForURL(/user_return_list/, { timeout: 15_000 });
   const row = shopperPage.locator(`[data-testid="refund-row"][data-refund-id="${refundBody.id}"]`);
   await expect(row).toContainText('E2E 运费商品', { timeout: 15_000 });
-  // 申请中 (legacy `refund_type` 1).
+  // 申请中 (the page's `refund_type` 1).
   await expect(row.getByTestId('refund-stamp')).toHaveAttribute('data-refund-type', '1');
 
   const approve = await adminApi.post(`/admin-api/refunds/${refundBody.id}/approve`, {
@@ -77,7 +77,7 @@ test('a shopper applies for a refund, it is approved, and the money moves', asyn
   await shopperPage.goto('/pages/users/user_return_list/index');
   await expect(row).toContainText('E2E 运费商品', { timeout: 15_000 });
   await expect(row).toContainText('39.00');
-  // 已退款 (legacy `refund_type` 6).
+  // 已退款 (the page's `refund_type` 6).
   await expect(row.getByTestId('refund-stamp')).toHaveAttribute('data-refund-type', '6');
 });
 

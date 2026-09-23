@@ -3,7 +3,7 @@
  *
  * Held as base64 in the source rather than as binaries on disk: a repository
  * that carries a real `.svg` "for testing" eventually has it served, and the
- * point of `K-SEC-U1` is that such a file never gets in. These are the
+ * point of the upload checks is that such a file never gets in. These are the
  * smallest possible things of each shape.
  */
 
