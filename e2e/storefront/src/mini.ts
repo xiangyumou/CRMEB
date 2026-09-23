@@ -31,6 +31,19 @@ export interface EmulatedWechatUser {
   phone: string;
   /** What the shopper does with the payment sheet. Default `pay`. */
   payment?: 'pay' | 'cancel' | 'fail';
+  /**
+   * What 从微信导入 (`chooseInvoiceTitle`) hands over, in WeChat's shape (`type` '0' is a
+   * company, '1' a person); `null` = the shopper cancels. Default: a fixed company title.
+   */
+  invoiceTitle?: {
+    type: '0' | '1';
+    title: string;
+    taxNumber: string;
+    companyAddress: string;
+    telephone: string;
+    bankName: string;
+    bankAccount: string;
+  } | null;
 }
 
 /** A WeChat user this run has never seen: a new openid and a number nobody registered. */

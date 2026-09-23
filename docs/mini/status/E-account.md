@@ -48,13 +48,21 @@ Updated at every commit so the work can resume after an interruption.
   on pull-down; 「N 条未读消息」 row). **Swap to B's `features/decor/decor-page.tsx` and delete
   `features/decor-lite/` once B merges.** Tests.
 
+- e2e `specs-mini/account.spec.ts` (7 tests): risky nickname → field error; address add / edit /
+  pick at checkout / delete; 收藏 list (favourite arranged via API, the button is B's product
+  page); a 支付成功 message opens its order; invoice title imported from WeChat; 我的评价 shows a
+  held review; 注销 signs out (token dead on the server too). `EmulatedWechatUser` (app and e2e)
+  now types `invoiceTitle`.
+- `docs/mini/pages.md` form changes for the E pages.
+
 ## In progress
 
-- e2e specs in `e2e/storefront/specs-mini`.
+- Merging storefront/mini (B merged): swap `decor-lite` for B's `DecorPage`, reconcile the
+  checkout address picking with B's checkout, rerun the address e2e (it drove the S4 stub).
 
 ## Next
 
-6. `docs/mini/pages.md`; screenshots in `docs/mini/status/E-screens/`; checklist; sizes.
+6. Screenshots in `docs/mini/status/E-screens/` (retake after the merge); checklist; sizes.
 
 ## Backend gaps found
 

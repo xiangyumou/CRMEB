@@ -26,7 +26,7 @@ export function chooseInvoiceTitle(): Promise<ChosenInvoiceTitle | null> {
   if (process.env.TARO_APP_PLATFORM_EMULATION !== 'mp') {
     return Promise.reject(new PlatformUnsupportedError('从微信导入发票抬头', 'h5-preview'));
   }
-  const user = emulatedUser() as { invoiceTitle?: WechatInvoiceTitle | null };
-  const raw = user.invoiceTitle === undefined ? DEFAULT_TITLE : user.invoiceTitle;
+  const { invoiceTitle } = emulatedUser();
+  const raw = invoiceTitle === undefined ? DEFAULT_TITLE : invoiceTitle;
   return Promise.resolve(raw ? fromWechatInvoiceTitle(raw) : null);
 }
