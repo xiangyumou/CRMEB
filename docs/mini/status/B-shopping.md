@@ -11,26 +11,34 @@ Updated at every commit so the work can resume after an interruption.
   `platform/chrome.ts` (`navBarMetrics`, `openMiniProgram`). `data/visits.ts` (`useRecordVisit`).
 - 首页 (custom bar + search entry, 404 `DECOR_HOME_NOT_SET` empty state, pull-to-refresh, share,
   refetch on sign-in change) and 微页面 (`packages/page`), with tests.
+- Merged `storefront/mini` (H2 + G1). `DecorPage` passes `personal` and answers the block
+  intents: 联系客服 is wrapped in `ContactArea` (`ui/contact-button.tsx`: native
+  `open-type="contact"` button, a call, or a note), 登录 goes through `requireLogin(route)`.
+  The Taro fake gained `RichText`.
+- 分类 (level-1 rail, banner, level-2 grid, product list with 加购), `features/product/sku-select`
+  - `SkuSheet`, `features/cart/quick-add` (`useQuickAdd`).
 
 ## In progress
 
-- Merge `storefront/mini` (H2): cart quantity through `cart.updateItemPut`; `X-Client-Version`.
+- Tests for 分类 and `useQuickAdd`.
 
 ## Next
 
-1. 分类 (tab).
-2. 商品列表, 搜索, 精品推荐, 商品评价 (`goods` sub-package).
-3. 商品详情 (fixed design, SkuSheet, coupons, favourite, share, activity entries).
-4. 购物车 (tab).
-5. 下单 / 收银台 / 支付结果.
-6. Vitest per page, e2e page objects and specs in `e2e/storefront/specs-mini`.
-7. `docs/mini/pages.md` for page-form changes; guard allow-lists; sizes; 375px screenshots in
+1. 商品列表, 搜索, 精品推荐, 商品评价 (`goods` sub-package).
+2. 商品详情 (fixed design, SkuSheet, coupons, favourite, share, activity entries).
+3. 购物车 (tab; quantity through `cart.updateItemPut`).
+4. 下单 / 收银台 / 支付结果.
+5. Vitest per page, e2e page objects and specs in `e2e/storefront/specs-mini` (seed a decor v2
+   home).
+6. `docs/mini/pages.md` for page-form changes; guard allow-lists; sizes; 375px screenshots in
    `docs/mini/status/B-screens/`.
 
 ## Backend gaps found (not changed; for a later backend task)
 
-- `cart.updateItem` is `PATCH`, which `wx.request` cannot send; H2's `PUT` alias
-  (`cart.updateItemPut`) is not merged yet.
+- (Resolved by H2) `cart.updateItem` is `PATCH`, which `wx.request` cannot send; the mini app uses
+  the `PUT` alias `cart.updateItemPut`.
+- `X-Client-Version` is sent, but as `0.0.0` until a release version is wired (I1); decor
+  visibility by client version cannot tell builds apart until then.
 - `groupbuy.list` / `presale.list` take no `productId` filter; `catalog.productDetail` does not
   say which activities a product is in.
 - `coupon.claimableList` takes no `productId` filter.

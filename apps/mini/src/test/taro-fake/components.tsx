@@ -215,3 +215,43 @@ export function NavigationBar(props: {
 }) {
   return <div data-testid="navigation-bar" data-title={props.title} hidden />;
 }
+
+/** A `<rich-text>` node, as WeChat takes it. */
+type RichTextFakeNode =
+  | { type: 'text'; text: string }
+  | {
+      type?: 'node' | undefined;
+      name: string;
+      attrs?: Record<string, string> | undefined;
+      children?: RichTextFakeNode[] | undefined;
+    };
+
+/**
+ * `<rich-text>`: text nodes stay text and images become `<img>` (their `alt`, when given, is the
+ * name); every other tag is a plain container. Nothing here is styled or sanitised: tests read
+ * what the shopper would read, not how it looks.
+ */
+function richTextNodes(nodes: readonly RichTextFakeNode[], path: string): ReactNode[] {
+  return nodes.map((node, index) => {
+    const key = `${path}.${index}`;
+    if (node.type === 'text') return node.text;
+    if (node.name === 'img')
+      return <img key={key} src={node.attrs?.src} alt={node.attrs?.alt ?? ''} />;
+    return <span key={key}>{richTextNodes(node.children ?? [], key)}</span>;
+  });
+}
+
+export function RichText(
+  props: BaseProps & {
+    nodes?: readonly RichTextFakeNode[] | string | undefined;
+    userSelect?: boolean | undefined;
+    space?: string | undefined;
+  },
+) {
+  const { nodes } = props;
+  return (
+    <div {...common(props)} data-rich-text="">
+      {typeof nodes === 'string' ? nodes : richTextNodes(nodes ?? [], 'n')}
+    </div>
+  );
+}
