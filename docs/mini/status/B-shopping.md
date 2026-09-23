@@ -72,12 +72,14 @@ Updated at every commit so the work can resume after an interruption.
 
 ## In progress
 
-- Final checks (turbo gen/typecheck/lint/test:unit/build, e2e mini, prettier, guards) and the
-  report.
+- Nothing. Final checks passed on 2026-09-24: `pnpm turbo run gen typecheck lint test:unit
+build`, `pnpm --filter @shop/e2e-storefront test:mini` (11 / 11), `pnpm exec prettier --check .`,
+  `pnpm guards` (15 checks, 0 failures). Main package 639.2 KB of the 1536 KB budget; total
+  855.7 KB.
 
 ## Next
 
-- Nothing planned beyond the report.
+- Nothing planned; waiting for review and the merge into `storefront/mini`.
 
 ## Backend gaps found (not changed; for a later backend task)
 
