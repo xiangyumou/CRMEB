@@ -139,6 +139,8 @@ export function orderFixture(overrides: Partial<Order> = {}): Order {
         refundedQuantity: 0,
         shippedQuantity: 0,
         adjustments: [],
+        reviewed: false,
+        reviewable: false,
       },
     ],
     receiver: receiverFixture,
@@ -151,6 +153,7 @@ export function orderFixture(overrides: Partial<Order> = {}): Order {
     completedAt: null,
     cancelledAt: null,
     cancelReason: null,
+    groupbuyTeamId: null,
     ...overrides,
   };
 }
