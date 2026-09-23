@@ -120,6 +120,14 @@ echo <commit> > REVISION
 
 Then run `upgrade.sh` from that directory with the digests from the job summary.
 
+A host whose checkout predates the current layout keeps these files in `deploy/next/`. Before the
+first upgrade from this layout, move them up once, then remove the old directory:
+
+```sh
+mv deploy/next/deployment.env deploy/next/data deploy/
+rm -r deploy/next
+```
+
 A tag is not a release. `upgrade.sh` refuses anything that is not `repo@sha256:<64 hex>`: a tag
 can be repointed between the run that passed and the deploy, and then the build that passed can
 no longer be named. A rollback target has to be nameable.

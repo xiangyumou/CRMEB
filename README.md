@@ -33,7 +33,7 @@ What it does:
 | PostgreSQL 17  | The only database. Schema and migrations in Drizzle.                                                                                               |
 | Redis 7        | Admin sessions, the config cache, rate limits, the job queue, pub/sub for live admin notifications.                                                |
 | `apps/uni-app` | The mobile client (uni-app, Vue 2): the H5 storefront and the WeChat mini-program, built from one tree.                                            |
-| edge           | nginx in front of everything: serves the H5 build at `/`, proxies `/admin`, `/admin-api` and `/api` to `web`, and serves `/uploads/`.              |
+| edge           | nginx in front of everything: serves the H5 build at `/`, proxies `/admin`, `/admin-api`, `/api` and `/scan-upload` to `web`, serves `/uploads/`.  |
 
 Everything but the uni-app is strict TypeScript on Node 24 and pnpm. Every endpoint is declared
 once, as a zod contract in `packages/contracts`; the OpenAPI document, the typed admin client, the
@@ -140,8 +140,7 @@ pnpm --filter @shop/e2e-storefront test
 (cd apps/uni-app && npm test && npm run build:h5)
 ```
 
-CI (`.github/workflows/ci.yml`) runs all of these except the uni-app's `npm test`, plus
-shellcheck, the deploy drill and, on a push, the build of the three production images.
+CI (`.github/workflows/ci.yml`) runs all of these, plus shellcheck, the deploy drill and, on a push, the build of the three production images.
 
 ## Deployment
 

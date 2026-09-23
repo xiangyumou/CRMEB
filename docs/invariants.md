@@ -1355,17 +1355,31 @@ No tracked file under `deploy/` or `docker/` carries a credential, and `deployme
 
 ## Release publishing
 
+### REL-001
+
+A release is published under the tag `sha-<commit>` and reported by the digest the registry holds for it, which is what a deploy names.
+
+- `.github/scripts/publish-release.test.sh::a first publish creates sha-<sha> and reports its digest`
+
+### REL-002
+
+Publishing the same commit again is a no-op that reports the same digest, so a re-run workflow cannot change what a release is.
+
+- `.github/scripts/publish-release.test.sh::republishing the same commit is a no-op with the same digest`
+
 ### REL-003
 
 A candidate whose content differs from an existing tag fails the publish and names the digest it found, instead of silently republishing. The workflow publishes through `publish-release.sh`, and the script keeps its `refusing a conflicting release` abort.
 
 - `guards/src/checks/pipeline.test.ts::readPipeline > REL-003 and REL-004 — fails when the script stops refusing`
+- `.github/scripts/publish-release.test.sh::a conflicting candidate fails the publish and moves no tag`
 
 ### REL-004
 
 A registry query that cannot tell whether a tag exists aborts instead of being read as "absent". The workflow publishes through `publish-release.sh`, and the script keeps its `refusing to guess` abort.
 
 - `guards/src/checks/pipeline.test.ts::readPipeline > REL-003 and REL-004 — fails when the script stops refusing`
+- `.github/scripts/publish-release.test.sh::an unanswerable registry query aborts instead of guessing`
 
 ### REL-006
 

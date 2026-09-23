@@ -25,7 +25,7 @@
 | PostgreSQL 17  | 唯一的数据库。schema 与迁移由 Drizzle 管理。                                                                                           |
 | Redis 7        | 后台会话、配置缓存、限流、任务队列、后台实时通知的 pub/sub。                                                                           |
 | `apps/uni-app` | 移动端（uni-app，Vue 2）：H5 商城与微信小程序，同一套代码构建。                                                                        |
-| edge           | 最前面的 nginx：在 `/` 提供 H5 构建产物，把 `/admin`、`/admin-api`、`/api` 转发给 `web`，并提供 `/uploads/`。                          |
+| edge           | 最前面的 nginx：在 `/` 提供 H5 构建产物，把 `/admin`、`/admin-api`、`/api`、`/scan-upload` 转发给 `web`，并提供 `/uploads/`。          |
 
 除 uni-app 外全部是严格模式的 TypeScript，运行在 Node 24 上，用 pnpm 管理。每个接口只声明一次，即 `packages/contracts` 里的 zod 契约；OpenAPI 文档、类型化的后台客户端、mock server 和守卫都由它派生。详见 [docs/architecture.md](docs/architecture.md)。
 
@@ -122,7 +122,7 @@ pnpm --filter @shop/e2e-storefront test
 (cd apps/uni-app && npm test && npm run build:h5)
 ```
 
-CI（`.github/workflows/ci.yml`）跑除 uni-app 的 `npm test` 以外的全部内容，另加 shellcheck、部署演练，以及在 push 时构建三个生产镜像。
+CI（`.github/workflows/ci.yml`）跑上面的全部内容，另加 shellcheck、部署演练，以及在 push 时构建三个生产镜像。
 
 ## 部署
 

@@ -236,6 +236,12 @@ jobs:
         working-directory: apps/uni-app
         run: npm ci
 
+      # The uni-app's API layer, mappers, store and utils. Its vitest is the
+      # workspace's, from packages/contracts, which the install above provides.
+      - name: uni-app unit tests
+        working-directory: apps/uni-app
+        run: npm test
+
       # Chromium only, mobile emulation: the journeys assert what a shopper on
       # a phone browser sees, not cross-browser rendering.
       - name: Install the browser
