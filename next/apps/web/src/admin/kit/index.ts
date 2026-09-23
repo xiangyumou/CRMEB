@@ -105,7 +105,6 @@ export type { PickedSku, SkuPickerProps } from './sku-picker';
 // ── Storefront links ────────────────────────────────────────────────────────
 export { LinkPicker, LinkSourceProvider, useLinkSource } from './link/link-picker';
 export type { LinkPickerProps } from './link/link-picker';
-export { createStubLinkSource } from './link/stub-source';
 export type {
   LinkPage,
   LinkPageGroup,
