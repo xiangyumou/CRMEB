@@ -14,10 +14,14 @@ mini citations in `docs/invariants.md`, the mini sections of `architecture.md` /
   page, other → copied).
 - `specs-mini/login.spec.ts`: silent sign-in, SMS sign-up (wrong code counted, code stays usable),
   401 renewal with read replay, 401 renewal with a write replayed once.
+- `specs-mini/share.spec.ts`: a 小程序码 for product, 拼团, 预售, 领券中心 (`_`) and a 微页面 opens
+  its page from the `(page, scene)` the server cached (SHARE-001).
+- `specs-mini/reviews.spec.ts`: a held review appears only once the merchant publishes it
+  (CONTENT-001); a clean one appears at once and leaves when hidden.
 
 ## In progress
 
-- Share-scene and review-moderation specs; the coverage matrix; invariants; docs; CI comments.
+- The coverage matrix; invariants; docs; CI comments.
 
 ## Pending
 
