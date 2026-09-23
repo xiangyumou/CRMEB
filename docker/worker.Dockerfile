@@ -3,10 +3,11 @@
 # The `worker` image: the BullMQ worker, and — under a different command — the
 # `migrate` one-shot.
 #
-#   docker build -f docker/worker.Dockerfile -t crmeb-next-worker ./next
+#   docker build -f docker/worker.Dockerfile -t crmeb-next-worker .
 #
 #   worker:   node /app/main.mjs                (the default CMD)
 #   migrate:  node /app/db/src/migrate.mjs && node /app/db/src/seed/index.mjs
+#   pending:  node /app/db/src/pending.mjs      (read-only; `shop upgrade` asks it first)
 #
 # `.mjs`, not `.js`: the bundle is ESM and `/app` has no `package.json` of its
 # own, so the extension is what tells node how to read it.
