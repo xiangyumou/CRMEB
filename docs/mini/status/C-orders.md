@@ -34,10 +34,21 @@ order/after-sales specs in `e2e/storefront/specs-mini`.
   `FONTCONFIG_FILE` pointing at a CJK font.
 - Merged storefront/mini with H2, then again with G1.
 
+- Merged storefront/mini again (F2 + H3); pages.md conflict resolved to the real route ids.
+- `apps/mini/scripts/size-report.mjs`: the AppSecret-shaped token check skips Taro's hashed
+  `sub-common/<32 hex>` chunk names (it failed every order/aftersale page once they shared code).
+
 ## In progress
 
-- Full checklist, then the final report.
+- Nothing; checklist run for the final report.
 
-## Next
+## Next / open
 
-- Final report.
+- Backend gaps: `order.detail` has no group-buy team id (no 查看拼团 link); no per-line
+  "reviewed" flag (the review page counts CATALOG_REVIEW_ALREADY_WRITTEN as done); the
+  express-company picker gets all ~1100 companies in one answer (search is client-side).
+- Not done: C07's `App.onShow` `referrerInfo.extraData` fallback for the receipt component;
+  gift coupons (`coupon.orderGiftCoupons`) on the order detail.
+- B's pay-result page does not invalidate `order.*` reads after paying (the detail pages now
+  refetch on mount, which covers this stream's pages).
+- The e2e seed's express companies now carry WeChat delivery codes; the upload refuses without.
