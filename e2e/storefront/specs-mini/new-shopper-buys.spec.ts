@@ -1,24 +1,46 @@
-import { addressCreate } from '@shop/core/user';
 import { userSessions } from '@shop/db/schema/auth';
 import { paymentAttempts } from '@shop/db/schema/payment';
 import { users } from '@shop/db/schema/user';
 import { wechatIdentities } from '@shop/db/schema/wechat';
 import { eq } from 'drizzle-orm';
 
-import { miniRoute, sessionToken, test, expect } from '../src/mini';
-import { userActor } from '../src/seed';
+import {
+  SHENZHEN_WECHAT_ADDRESS,
+  miniRoute,
+  newWechatUser,
+  sessionToken,
+  test as base,
+  expect,
+} from '../src/mini';
+import {
+  CashierPage,
+  CheckoutPage,
+  PayResultPage,
+  ProductPage,
+} from '../src/mini-pages/shopping-pages';
+import { shown } from '../src/mini-pages/shown';
+
+// This shopper's WeChat hands over a 深圳 address at 导入微信地址.
+const test = base.extend({
+  // eslint-disable-next-line no-empty-pattern
+  wechatUser: async ({}, use) => {
+    await use(newWechatUser({ address: SHENZHEN_WECHAT_ADDRESS }));
+  },
+});
 
 /**
  * The mini-program's first journey, end to end: a WeChat user who has never
- * opened the shop lands on a product from a shared link, is signed in
- * silently, shares their phone number to finish signing up, buys the product
- * and pays.
+ * opened the shop lands on a product from a shared link and browses it as a
+ * guest. 立即购买 needs an account: the login page, where the shopper shares
+ * their phone number to finish signing up, then back to the product, the
+ * 规格 sheet, 确认订单 with an address imported from WeChat, and payment.
  *
  * Every step is the real server. Only what WeChat itself does on a phone is
  * the harness's: the `wx.login` and `getPhoneNumber` codes (redeemed by the
- * server against the fake `api.weixin.qq.com`) and the shopper confirming
- * the payment sheet (the fake WeChat Pay gateway settles the transaction the
- * server placed and posts the signed notification to the real webhook).
+ * server against the fake `api.weixin.qq.com`), `wx.chooseAddress`, and the
+ * shopper confirming the payment sheet (the fake WeChat Pay gateway settles
+ * the transaction the server placed and posts the signed notification to the
+ * real webhook).
  *
  * The postage product costs ¥39 plus ¥6 freight to the seeded 深圳 division,
  * so one unit is ¥45.00; a checkout that dropped the freight shows ¥39.00.
@@ -33,16 +55,20 @@ test('a new WeChat user signs in, binds a phone, buys a product and pays', async
 }) => {
   const productId = shop.fixtures.postageProductId;
 
-  // A shared product link opens the app straight on 商品详情.
+  // A shared product link opens the app straight on 商品详情; a guest can look.
   await page.goto(miniRoute('pages/product/index', { id: productId }));
-  await expect(page.getByText('E2E 运费商品')).toBeVisible();
+  const product = new ProductPage(page);
+  await expect(product.name()).toHaveText('E2E 运费商品');
 
-  // The silent wx.login found no account for this openid: the shop wants a
-  // phone number first, and says so where 立即购买 will be.
-  await expect(page.getByText('登录后即可购买')).toBeVisible();
-  await page.getByText('手机号快速登录', { exact: true }).click();
-  const buy = page.getByText('立即购买', { exact: true });
-  await expect(buy).toBeVisible();
+  // The silent wx.login found no account for this openid: 立即购买 opens the login page.
+  await product.barButton('立即购买').click();
+  await expect(page).toHaveURL(/pages\/login\/index\?redirect=/);
+  await shown(page).getByRole('checkbox', { name: '我已阅读并同意用户协议和隐私政策' }).click();
+  await shown(page).getByText('手机号快速登录', { exact: true }).click();
+
+  // Signed up: back on the product, which the login page replaced itself with.
+  await expect(page).toHaveURL(/pages\/product\/index\?id=/);
+  await expect(product.name()).toHaveText('E2E 运费商品');
 
   // The account exists now, made by the phone step, from the mini-program.
   const [user] = await shop.db
@@ -62,33 +88,28 @@ test('a new WeChat user signs in, binds a phone, buys a product and pays', async
     .where(eq(userSessions.userId, user!.id));
   expect(sessions.map((session) => session.platform)).toEqual(['wechat-mini']);
 
-  // 导入微信地址 is not built yet (stream A); the new shopper's address is
-  // arranged the way the admin suite arranges what a journey is not about.
-  await addressCreate(shop.ctx.as(userActor(user!.id)), {
-    receiverName: '小程序新客',
-    receiverPhone: wechatUser.phone,
-    ...shop.fixtures.division,
-    provinceName: '广东省',
-    cityName: '深圳市',
-    districtName: '南山区',
-    detail: '科技园路 3 号',
-    isDefault: true,
-  });
+  // 立即购买 → the 规格 sheet → 确认订单.
+  await product.barButton('立即购买').click();
+  await expect(product.sheet()).toBeVisible();
+  await product.sheetButton('立即购买').click();
+  const checkout = new CheckoutPage(page);
+  await checkout.expectShown();
 
-  await buy.click();
-  await expect(page.getByText('小程序新客')).toBeVisible();
-  await expect(page.getByText('实付 ¥45.00')).toBeVisible();
-  await page.getByText('提交订单', { exact: true }).click();
+  // No address yet: 导入微信地址 saves WeChat's, and freight is priced to it.
+  await checkout.importWechatAddress();
+  await expect(checkout.address()).toContainText('小程序新客');
+  await expect(checkout.bar()).toContainText('45.00');
+  await checkout.submit();
 
   // 收银台 replaces 确认订单, so 返回 cannot resubmit.
-  await expect(page).toHaveURL(/packages\/order\/cashier\/index\?orderId=\d+/);
+  const cashier = new CashierPage(page);
+  await cashier.expectShown();
   const orderId = new URL(page.url().replace('/#/', '/')).searchParams.get('orderId')!;
-  await expect(page.getByText('¥45.00')).toBeVisible();
-  await page.getByText('微信支付', { exact: true }).click();
+  await expect(cashier.amount()).toContainText('45.00');
+  await cashier.pay();
 
   // requestPayment "succeeded"; the page believes the server, not the sheet.
-  await expect(page).toHaveURL(/packages\/order\/pay-result\/index\?orderId=\d+&outTradeNo=/);
-  await expect(page.getByText('支付成功')).toBeVisible();
+  await new PayResultPage(page).expectPaid();
 
   // The order is paid, as the shopper's own API sees it.
   const api = await playwright.request.newContext({

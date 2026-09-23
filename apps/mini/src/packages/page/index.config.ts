@@ -1,1 +1,7 @@
-export default definePageConfig({ navigationBarTitleText: '微页面', enablePageMeta: true });
+export default definePageConfig({
+  navigationBarTitleText: '',
+  enablePageMeta: true,
+  enablePullDownRefresh: true,
+  enableShareAppMessage: true,
+  enableShareTimeline: true,
+});

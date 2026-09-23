@@ -31,7 +31,7 @@ export interface ProductCardProps {
   product: ProductCardData;
   /** `grid` (two columns), `list` (picture left), `mini` (a narrow card in a sideways row). */
   layout?: ProductCardLayout | undefined;
-  /** An activity's corner tag: 「拼团」「预售」「秒杀」. */
+  /** An activity's corner tag: 「拼团」「预售」「限时活动」. */
   activity?: string | undefined;
   /** The activity price, shown instead of `product.price` (the list price is then struck). */
   activityPrice?: string | undefined;

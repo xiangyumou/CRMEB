@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { expect } from '../fixtures';
 import { miniRoute, sessionToken, type EmulatedWechatUser } from '../mini';
 import { userActor } from '../seed';
+import { CashierPage, PayResultPage } from './shopping-pages';
 import { openFresh, shown } from './shown';
 import type { Stack } from '../stack';
 
@@ -87,10 +88,10 @@ export async function placeOrder(
 
 /** 收银台's 微信支付, the emulated shopper confirming the sheet; waits for 支付成功. */
 export async function payAtMiniCashier(page: Page): Promise<void> {
-  await expect(page).toHaveURL(/packages\/order\/cashier\/index\?orderId=\d+/);
-  await shown(page).getByText('微信支付', { exact: true }).click();
-  await expect(page).toHaveURL(/packages\/order\/pay-result\/index\?orderId=\d+&outTradeNo=/);
-  await expect(shown(page).getByText('支付成功')).toBeVisible();
+  const cashier = new CashierPage(page);
+  await cashier.expectShown();
+  await cashier.pay();
+  await new PayResultPage(page).expectPaid();
 }
 
 /** An order the shopper paid in the app (a `wechat_mini` payment, so WeChat hears of the shipment). */
