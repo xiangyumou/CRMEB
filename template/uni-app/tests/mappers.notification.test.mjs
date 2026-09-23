@@ -9,7 +9,13 @@ import {
   toLegacyMessageList,
   toLegacyMarkRead,
 } from '../api/mappers/notification.js';
-import { toLegacyJssdkConfig, toLegacySubscribeTemplates } from '../api/mappers/wechat.js';
+import {
+  toLegacyJssdkConfig,
+  toLegacySubscribeTemplates,
+  fromLegacyMiniCodeQuery,
+  toLegacyMiniCode,
+  MINI_CODE_PAGES,
+} from '../api/mappers/wechat.js';
 
 describe('notification — 站内信', () => {
   it('gives the 消息中心 the {list, count} it concats onto', () => {
@@ -78,5 +84,48 @@ describe('wechat — JS-SDK 与订阅消息', () => {
     expect(toLegacySubscribeTemplates(null)).toEqual([]);
     // a null in the array would make requestSubscribeMessage reject the whole call
     expect(toLegacySubscribeTemplates({ templateIds: ['a', null, ''] })).toEqual(['a']);
+  });
+});
+
+describe('小程序码 (E4 — GET /api/v1/wechat/mini-qrcodes)', () => {
+  const SCENE = /^[0-9a-zA-Z!#$&'()*+,/:;=?@\-._~]{1,32}$/;
+
+  it('asks for the product page with the id and the spreader the page reads back', () => {
+    const query = fromLegacyMiniCodeQuery('product', 1024, 7);
+    expect(query).toEqual({ page: 'pages/goods_details/index', scene: 'id=1024&pid=7' });
+    expect(query.scene).toMatch(SCENE);
+    // the contract's own example is the signed-out form
+    expect(fromLegacyMiniCodeQuery('product', 1024, 0).scene).toBe('id=1024');
+  });
+
+  it('points 拼团 at its detail page and the personal code at the home page', () => {
+    expect(fromLegacyMiniCodeQuery('groupbuy', '12', '5')).toEqual({
+      page: 'pages/activity/goods_combination_details/index',
+      scene: 'id=12&pid=5',
+    });
+    expect(fromLegacyMiniCodeQuery('home', '', 5)).toEqual({ page: 'pages/index/index', scene: 'spid=5' });
+    expect(fromLegacyMiniCodeQuery('home', '', undefined).scene).toBe('home');
+  });
+
+  it('only ever asks for one of the four pages the route accepts', () => {
+    const allowed = [
+      'pages/index/index',
+      'pages/goods_details/index',
+      'pages/activity/goods_combination_details/index',
+      'pages/activity/presell_details/index',
+    ];
+    for (const page of Object.values(MINI_CODE_PAGES)) expect(allowed).toContain(page);
+  });
+
+  it('drops the spreader rather than overflow the 32-character scene', () => {
+    const scene = fromLegacyMiniCodeQuery('product', '12345678901234567890', '98765432109876').scene;
+    expect(scene).toBe('id=12345678901234567890');
+    expect(scene).toMatch(SCENE);
+  });
+
+  it('answers under both names the pages read', () => {
+    const url = '/uploads/wechat-mini-code/2026/09/4f1c8a2d7e6b5039.png';
+    expect(toLegacyMiniCode(example('GET /api/v1/wechat/mini-qrcodes'))).toEqual({ code: url, url });
+    expect(toLegacyMiniCode(null)).toEqual({ code: '', url: '' });
   });
 });

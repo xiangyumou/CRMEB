@@ -1,15 +1,17 @@
 // 微信授权 / 站点公共配置
 //
-// Almost everything here belongs to streams E1 (storefront auth), E2 (WeChat OA and
-// mini-program) and F1 (public site config), whose contracts are not written yet.
-// Each call is pointed at the path the conventions and the reference map imply and
-// marked CONTRACT-PENDING; docs/rewrite/status/h.md tracks them.
+// Streams E1/E4 (storefront auth), E2 (WeChat OA and mini-program) and F1/F4 (public
+// site config, attachments). Every call is live; docs/rewrite/status/h.md and h3.md
+// have the per-call tables.
 
 import request from '../utils/request.js';
 import wechat from '../libs/wechat.js';
 import { toLegacyCategoryVersion } from './mappers/catalog.js';
 import { toLegacySession, toLegacyWechatLogin } from './mappers/user.js';
 import { toLegacyJssdkConfig } from './mappers/wechat.js';
+import { toLegacyBasicConfig, toLegacyLogo, toLegacyShare } from './mappers/system.js';
+import { toLegacyNavigation } from './mappers/diy.js';
+import { fromSiteConfig, toDataUrls } from './api.js';
 
 /**
  * 商品分类版本号
@@ -180,17 +182,22 @@ export function phoneLogin(data) {
 // route it stood for — hand me a token for a user I name — is the shape the whole
 // contract is built to refuse.
 
-// CONTRACT-PENDING(F1) — 站点公开配置；见 docs/rewrite/cr/CR-7-h2.md。
+// 站点公开配置 — F4 的 `GET /api/v1/site/config`，整个会话只读一次（`siteConfig()`，
+// 在 `api/api.js`），每个旧函数取自己那一片（CR-7-h2 §1）。
+
+/** App.vue 缓存成 `BASIC_CONFIG`；收银台读 `pay_weixin_open`。 */
 export function basicConfig() {
-  return request.get('/api/v1/site/config', {}, { noAuth: true });
+  return fromSiteConfig(toLegacyBasicConfig);
 }
 
-export function getLogo() {
-  return request.get('/api/v1/site/logo', {}, { noAuth: true });
+/** 登录页（`type == 2`）和授权弹窗的 logo，`res.data.logo_url`。 */
+export function getLogo(type) {
+  return fromSiteConfig((dto) => toLegacyLogo(dto, type));
 }
 
+/** 默认分享卡片 `{title, synopsis, img}`。 */
 export function getShare() {
-  return request.get('/api/v1/site/share', {}, { noAuth: true });
+  return fromSiteConfig(toLegacyShare);
 }
 
 // 「当前访客是否已关注公众号」 (`getSubscribe`) is gone: answering it means reading the
@@ -199,16 +206,30 @@ export function getShare() {
 // the 未关注 state, which is what it already did whenever the call failed.
 
 // ---------------------------------------------------------------------------
-// CONTRACT-PENDING(G1) — 底部导航（装修）。G1 的前台只有首页 / 指定页 / 主题 / 版本号
-// 四条路由，底部导航不在其中；见 docs/rewrite/cr/CR-3-h2.md。
+// 底部导航（装修）— F4 的 `GET /api/v1/diy/navigation`（CR-3-h2 §2）
 // ---------------------------------------------------------------------------
 
-export function getNavigation(data) {
-  return request.get('/api/v1/diy/navigation', data, { noAuth: true });
+/**
+ * 应答 `{navigation, version}`，`navigation` 是原样保存的 `pageFoot` 组件；两个读者
+ * （`components/pageFooter` 的 `setNavigationInfo`、`goods_cate1` 的 `newData`）要的
+ * 就是这个组件本身，mapper 把它取出来。`null`（还没发布首页）= 用原生 tabBar。
+ */
+export function getNavigation() {
+  return request.get('/api/v1/diy/navigation', {}, { noAuth: true, map: toLegacyNavigation });
 }
 
-// CONTRACT-PENDING(F1) — 海报用的图片转 base64（服务端代抓，只允许本店附件，见
-// docs/rewrite/cr/CR-7-h2.md 的 SSRF 说明）。
+// ---------------------------------------------------------------------------
+// 海报用的图片转 base64 — F4 的 `POST /api/v1/attachments/base64`（CR-7-h2 §2）
+// ---------------------------------------------------------------------------
+
+/**
+ * 旧路由一次收 `{image, code}` 两张，回两张；新路由一次一张 `{url}`，只收本店附件
+ * （F4 的 SSRF 规则），`auth: 'user'`。所以这里发两次，拼回 `{image, code}`。
+ *
+ * 商品图是海报的主体，它失败就整体失败（调用方各自 `catch`）。二维码是可选的：
+ * 没有就不发；转不了（比如它根本不是本店附件）就原样交回，海报照旧画——这正是
+ * 以前没有这条路由时的样子。
+ */
 export function imageBase64(image, code) {
-  return request.post('/api/v1/site/image-data-urls', { image, code }, { noAuth: true });
+  return toDataUrls(image, code);
 }

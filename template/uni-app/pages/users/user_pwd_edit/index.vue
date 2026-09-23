@@ -27,16 +27,13 @@
 		<!-- #ifdef MP -->
 		<!-- <authorize @onLoadFun="onLoadFun" :isAuto="isAuto" :isShowAuth="isShowAuth" @authColse="authColse"></authorize> -->
 		<!-- #endif -->
-		<Verify @success="success" :captchaType="captchaType" :imgSize="{ width: '330px', height: '155px' }"
-			ref="verify"></Verify>
 	</view>
 </template>
 
 <script>
 	import sendVerifyCode from "@/mixins/SendVerifyCode";
 	import {
-		phoneRegisterReset,
-		verifyCode
+		phoneRegisterReset
 	} from '@/api/api.js';
 	import {
 		getUserInfo,
@@ -52,14 +49,12 @@
 	import authorize from '@/components/Authorize';
 	// #endif
 	import colors from '@/mixins/color.js';
-	import Verify from '../components/verify/index.vue';
 	export default {
 		mixins: [sendVerifyCode, colors],
 		components: {
 			// #ifdef MP
 			authorize,
 			// #endif
-			Verify
 		},
 		data() {
 			return {
@@ -70,7 +65,6 @@
 				qr_password: '',
 				isAuto: false, //没有授权的不会自动授权
 				isShowAuth: false, //是否隐藏授权
-				key: '',
 			};
 		},
 		computed: mapGetters(['isLogin']),
@@ -87,9 +81,6 @@
 		onLoad() {
 			if (this.isLogin) {
 				this.getUserInfo();
-				verifyCode().then(res => {
-					this.$set(this, 'key', res.data.key)
-				});
 			} else {
 				toLogin()
 			}
@@ -126,18 +117,9 @@
 				if (!that.userInfo.phone) return that.$util.Tips({
 					title: that.$t(`手机号码不存在,无法发送验证码！`)
 				});
-				this.$refs.verify.show()
-
-			},
-			async success(data) {
-				let that = this;
-				this.$refs.verify.hide()
 				await registerVerify({
 					phone: that.userInfo.phone,
-					type: 'reset',
-					key: that.key,
-					captchaType: this.captchaType,
-					captchaVerification: data.captchaVerification
+					type: 'reset'
 				}).then(res => {
 					this.sendCode()
 					that.$util.Tips({

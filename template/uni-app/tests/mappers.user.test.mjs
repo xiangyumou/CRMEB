@@ -215,14 +215,16 @@ describe('auth — 短信验证码', () => {
     expect(fromLegacySmsScene(undefined)).toBe('login');
   });
 
-  it('drops the dead image-captcha key and forwards the slider answer', () => {
+  // 图形验证码的 `key` 和行为验证码的 `captchaVerification` 都没有继任者（E4 裁掉了
+  // 行为验证码），两个字段都不再往上送。
+  it('drops both of the dead captcha fields', () => {
     expect(fromLegacySmsCodeInput({ phone: '13800138000', type: 'reset', key: 'abc' })).toEqual({
       phone: '13800138000',
       scene: 'reset-password',
     });
     expect(
       fromLegacySmsCodeInput({ phone: '13800138000', type: 'login', captchaVerification: 'tok' }),
-    ).toEqual({ phone: '13800138000', scene: 'login', captchaToken: 'tok' });
+    ).toEqual({ phone: '13800138000', scene: 'login' });
   });
 
   it('answers the 倒计时 with the resend window', () => {

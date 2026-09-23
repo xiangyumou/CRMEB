@@ -44,7 +44,6 @@ import {
 	getUserLabel,
 	postUserSetLabel
 } from "@/api/admin";
-import { handleError } from "vue";
 export default {
 	components: {
 		emptyPage
@@ -103,7 +102,7 @@ export default {
 			this.goodsInfo = JSON.parse(JSON.stringify(data));
 			this.num = num;
 			this.ids = ids;
-			getUserLabel(0).then(res=>{
+			getUserLabel(num ? '' : data.uid).then(res=>{
 				res.data.map(el => {
 				  if (el.label && el.label.length) {
 				    this.isStore = true;

@@ -48,8 +48,6 @@
 				{{$t(`与`)}}<text class="main-color" @click.stop="privacy(3)">{{$t(`《隐私协议》`)}}</text>
 			</checkbox-group>
 		</view>
-		<Verify @success="success" :captchaType="'clickWord'" :imgSize="{ width: '330px', height: '155px' }"
-			ref="verify"></Verify>
 		<editUserModal :isShow="isShow" @closeEdit="closeEdit" @editSuccess="editSuccess">
 		</editUserModal>
 		<!-- #ifdef MP -->
@@ -69,7 +67,6 @@
 	import privacyAgreementPopup from '@/components/privacyAgreementPopup/index.vue'
 	import {
 		bindingUserPhone,
-		verifyCode,
 		registerVerify,
 		updatePhone
 	} from '@/api/api.js';
@@ -84,12 +81,10 @@
 		wechatBindingPhone
 	} from '@/api/public.js'
 	import Routine from '@/libs/routine';
-	import Verify from '../components/verify/index.vue';
 	import Cache from '@/utils/cache';
 	export default {
 		mixins: [sendVerifyCode, colors],
 		components: {
-			Verify,
 			editUserModal,
 			privacyAgreementPopup
 		},
@@ -281,23 +276,6 @@
 					}
 				});
 			},
-			success(data) {
-				this.$refs.verify.hide()
-				let that = this;
-				verifyCode().then(res => {
-					registerVerify(that.phone, 'reset', res.data.key, this.captchaType, data.captchaVerification)
-						.then(res => {
-							that.$util.Tips({
-								title: res.msg
-							});
-							that.sendCode();
-						}).catch(err => {
-							return that.$util.Tips({
-								title: err
-							});
-						});
-				});
-			},
 			/**
 			 * 发送验证码
 			 *
@@ -310,8 +288,17 @@
 				if (!(/^1(3|4|5|7|8|9|6)\d{9}$/i.test(that.phone))) return that.$util.Tips({
 					title: that.$t(`请输入正确的手机号码`)
 				});
-				this.$refs.verify.show();
-				return;
+				registerVerify(that.phone, 'reset')
+					.then(res => {
+						that.$util.Tips({
+							title: res.msg
+						});
+						that.sendCode();
+					}).catch(err => {
+						return that.$util.Tips({
+							title: err
+						});
+					});
 			},
 			ChangeIsDefault() {
 				this.$set(this, 'protocol', !this.protocol);

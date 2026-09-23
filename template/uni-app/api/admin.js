@@ -13,7 +13,8 @@
 //    which is the default in the new client; `auth: 'staff'` is checked server-side
 //    against the `orderStaff` config group.
 //  * **商品管理 and 用户管理 are not B2's.** B2's contract hands those nineteen screens
-//    to streams A and E1, so they stay CONTRACT-PENDING against those streams.
+//    to streams A and E1; A2 and E4 shipped them as `/api/v1/staff/*` and H3 bound
+//    them here. Their reshaping lives in `api/mappers/staff.js` too.
 
 import request from '../utils/request.js';
 import {
@@ -36,8 +37,32 @@ import {
   fromLegacyRemarkInput,
   fromLegacyRefundRemarkInput,
   fromLegacyRefundReviewInput,
+  fromLegacyStaffProductQuery,
+  toLegacyStaffProduct,
+  toLegacyStaffProductList,
+  toLegacyProductLabels,
+  toLegacyProductCategories,
+  fromLegacyLabelAssignment,
+  fromLegacyCategoryAssignment,
+  toLegacyStaffSkus,
+  fromLegacySkuPatch,
+  toLegacyTemplateOptions,
+  fromLegacyStaffProductForm,
+  fromLegacyStaffUserQuery,
+  toLegacyStaffUser,
+  toLegacyStaffUserList,
+  toLegacyUserGroups,
+  toLegacyUserLabels,
+  fromLegacyUserGroupInput,
+  fromLegacyUserLabelInput,
 } from './mappers/staff.js';
 import { toLegacyShipment } from './mappers/fulfil.js';
+import {
+  fromLegacyStaffCouponQuery,
+  toLegacyStaffCoupons,
+  fromLegacyCouponGrant,
+  couponGrantMessage,
+} from './mappers/coupon.js';
 
 /** Local helper: the 审核 toast depends on the decision the page made. */
 function asInt(value) {
@@ -242,153 +267,270 @@ export function setAdminRefundRemark(data) {
 }
 
 // ---------------------------------------------------------------------------
-// CONTRACT-PENDING(A) — 商品管理. B2's contract hands these screens to stream A; the
-// capability exists under `/admin-api/catalog/*` but only for an admin session, and a
-// 店员 has a shopper session with a role on it. See docs/rewrite/cr/CR-4-h2.md.
+// 商品管理 — A2 的十条 `/api/v1/staff/*` 路由（CR-4-h2 全盘接受）。
+//
+// 契约 next/packages/contracts/src/catalog/catalog.staff.contract.ts，字段表在
+// docs/rewrite/status/a2.md §1。都是 `auth: 'staff'`：店员不是角色，是 B2 的
+// `orderStaff` 名单，在名单上就行，不在就是 403。
+//
+// 三处批量操作页面送的是**数组**，而路由按设计是单条（一个商品一个 `:id`），所以
+// 扇出在这里做，页面不动：下架多选、以及下面 用户管理 的分组/标签/发券。
 // ---------------------------------------------------------------------------
 
 /**
  * 商品列表
  */
 export function adminProductList(data) {
-  return request.get('/api/v1/staff/products', data);
+  return request.get('/api/v1/staff/products', fromLegacyStaffProductQuery(data), {
+    map: toLegacyStaffProductList,
+  });
 }
 
 /**
  * 商品上下架
+ *
+ * 列表底部的批量下架/上架送的是 `{id: [...], is_show}`，单行的开关送的是
+ * `{id, is_show}`。路由一次只翻一个商品，所以多选在这里扇出；页面只读 `res.msg`。
  */
 export function productSetShow(data) {
   const src = data || {};
-  return request.post(`/api/v1/staff/products/${src.id}/visibility`, src, { msg: '操作成功' });
+  const ids = (Array.isArray(src.id) ? src.id : [src.id])
+    .map((value) => String(value === undefined || value === null ? '' : value).trim())
+    .filter((value) => value !== '');
+  const visible = Number(src.is_show) === 1;
+  return Promise.all(
+    ids.map((id) =>
+      request.post(`/api/v1/staff/products/${id}/visibility`, { visible }),
+    ),
+  ).then((results) => ({
+    data: results.map((res) => toLegacyStaffProduct(res.data)),
+    msg: '操作成功',
+    status: 200,
+  }));
 }
 
 /**
  * 商品标签
  */
 export function getProductLabel() {
-  return request.get('/api/v1/staff/product-labels', {});
+  return request.get('/api/v1/staff/product-labels', {}, { map: toLegacyProductLabels });
 }
 
 /**
  * 商品分类
  */
 export function getProductCate() {
-  return request.get('/api/v1/staff/product-categories', {});
+  return request.get('/api/v1/staff/product-categories', {}, { map: toLegacyProductCategories });
 }
 
 /**
  * 批量修改商品标签
  */
 export function postBatchProcess(data) {
-  return request.post('/api/v1/staff/products/label-assignments', data, { msg: '操作成功' });
+  return request.post(
+    '/api/v1/staff/products/label-assignments',
+    fromLegacyLabelAssignment(data),
+    { msg: '操作成功' },
+  );
 }
 
 /**
  * 批量修改商品分类
  */
 export function postManageSaveCate(data) {
-  return request.post('/api/v1/staff/products/category-assignments', data, { msg: '操作成功' });
+  return request.post(
+    '/api/v1/staff/products/category-assignments',
+    fromLegacyCategoryAssignment(data),
+    { msg: '操作成功' },
+  );
 }
 
 /**
  * 商品规格
  */
 export function getManageProductAttr(id) {
-  return request.get(`/api/v1/staff/products/${id}/skus`, {});
+  return request.get(`/api/v1/staff/products/${id}/skus`, {}, { map: toLegacyStaffSkus });
 }
 
 /**
  * 商品规格保存
+ *
+ * 多规格页 (`specs.vue`) 每行都带着 `unique`，直接转成 patch。单规格的抽屉
+ * (`components/editPrice`) 开在列表行上，而列表路由不返回 SKU —— 那一行没有
+ * `unique`。这时先读一次 `GET …/skus` 拿到唯一那条 SKU 的 id，再 PUT：多一次往返，
+ * 换掉「让页面自己去猜一个 SKU id」这种只会在生产上出错的做法。
  */
 export function postUpdateAttrs(id, data) {
-  return request.put(`/api/v1/staff/products/${id}/skus`, data, { msg: '保存成功' });
+  const rows = Array.isArray(data && data.attr_value) ? data.attr_value : [];
+  const needsId = rows.some((row) => !row || row.unique === undefined || row.unique === '');
+  const skus = needsId
+    ? request.get(`/api/v1/staff/products/${id}/skus`, {}).then((res) => {
+        const items = (res.data && res.data.items) || [];
+        return items.length ? String(items[0].id) : '';
+      })
+    : Promise.resolve('');
+  return skus.then((fallbackId) =>
+    request.put(
+      `/api/v1/staff/products/${id}/skus`,
+      { items: rows.map((row) => fromLegacySkuPatch(row, fallbackId)) },
+      { map: toLegacyStaffSkus, msg: '保存成功' },
+    ),
+  );
 }
 
 /**
  * 运费模板选项
  */
 export function getTemplateOption() {
-  return request.get('/api/v1/staff/shipping-templates', {});
+  return request.get('/api/v1/staff/shipping-templates', {}, { map: toLegacyTemplateOptions });
 }
 
 /**
  * 创建商品
  */
 export function productCreate(data) {
-  return request.post('/api/v1/staff/products', data, { msg: '保存成功' });
+  return request.post('/api/v1/staff/products', fromLegacyStaffProductForm(data), {
+    map: toLegacyStaffProduct,
+    msg: '保存成功',
+  });
 }
 
 // ---------------------------------------------------------------------------
-// CONTRACT-PENDING(E1) — 用户管理. B2's contract hands these screens to stream E1;
-// same shape as 商品管理 — `/admin-api/users*` does it all, for an admin.
-// See docs/rewrite/cr/CR-2-h2.md §3, which also asks how much of a customer a
-// 店员 should be shown.
+// 用户管理 — E4 的六条 `/api/v1/staff/*` 路由（CR-2-h2 §3）。
+//
+// 契约 next/packages/contracts/src/user/user.staff.contract.ts，字段表在
+// docs/rewrite/status/e4.md。契约有意比控制台薄：手机号永远打码，没有真实姓名 /
+// 生日 / 身份证 / 地址——「一个店员该看到一个客户的多少」。
+//
+// 这一节原来的三个包装器是照着 CR-2-h2 的草图写的，跟真正落地的契约对不上，E4 把
+// 三处都点了名，都在下面改掉了。
 // ---------------------------------------------------------------------------
 
 /**
  * 用户列表
  */
 export function getUserList(data) {
-  return request.get('/api/v1/staff/users', data);
+  return request.get('/api/v1/staff/users', fromLegacyStaffUserQuery(data), {
+    map: toLegacyStaffUserList,
+  });
 }
 
 /**
  * 用户详情
  */
 export function getUserInfo(uid) {
-  return request.get(`/api/v1/staff/users/${uid}`, {});
+  return request.get(`/api/v1/staff/users/${uid}`, {}, { map: toLegacyStaffUser });
 }
 
 /**
  * 用户分组列表
  */
 export function getGroupList() {
-  return request.get('/api/v1/staff/user-groups', {});
+  return request.get('/api/v1/staff/user-groups', {}, { map: toLegacyUserGroups });
 }
 
 /**
  * 设置用户分组
+ *
+ * 列表页底部的批量「修改分组」送的是 uid 数组，路由一次只改一个人，所以扇出在这里。
+ * `groupId` 为 null（未分组）原样送，不再被 `String()` 变成 `"null"`。
  */
 export function postUserSetGroup(uid, groupId) {
-  return request.post(`/api/v1/staff/users/${uid}/group`, { groupId: String(groupId) }, {
-    msg: '设置成功',
-  });
+  const body = fromLegacyUserGroupInput(groupId);
+  return fanOutByUid(uid, (id) => request.post(`/api/v1/staff/users/${id}/group`, body), '设置成功');
 }
 
 /**
  * 用户标签
+ *
+ * 一次请求同时给出「全部标签」和「这个客户有哪些」（`assigned`），所以路由上的 `uid`
+ * 必须是真实客户 id（`/^[1-9]\d*$/`）——旧代码传字面量 `0`，那是一个 422（E4 第 2 条）。
+ *
+ * 两处调用只要「全部标签」：筛选抽屉，和批量打标签的抽屉（它从空集开始）。没有单独的
+ * 目录路由，所以不带 uid 调用时先取任意一个客户（`pageSize: 1`，不带筛选——当前筛选
+ * 结果为空时筛选抽屉照样要有标签可选），再读它的标签并把 `assigned` 清掉。店里一个客
+ * 户都没有时标签没有可打的对象，返回空目录。
  */
 export function getUserLabel(uid) {
-  return request.get(`/api/v1/staff/users/${uid}/labels`, {});
+  const id = uid === undefined || uid === null ? '' : String(uid).trim();
+  if (/^[1-9]\d*$/.test(id)) {
+    return request.get(`/api/v1/staff/users/${id}/labels`, {}, { map: toLegacyUserLabels });
+  }
+  return request.get('/api/v1/staff/users', { page: 1, pageSize: 1 }).then((res) => {
+    const first = res.data && Array.isArray(res.data.items) ? res.data.items[0] : null;
+    if (!first) return { data: [], msg: '', status: 200 };
+    return request.get(`/api/v1/staff/users/${first.id}/labels`, {}, {
+      map: (dto) => toLegacyUserLabels(dto, { catalogue: true }),
+    });
+  });
 }
 
 /**
  * 设置用户标签
+ *
+ * body 是 `{labelIds: string[]}`；调用处本来就传数组，旧包装器却写 `String(labelId)`，
+ * 把它拼成 `"[object Object],[object Object]"`（E4 第 1 条）。批量同样扇出。
  */
 export function postUserSetLabel(uid, labelId) {
-  return request.post(`/api/v1/staff/users/${uid}/labels`, { labelId: String(labelId) }, {
-    msg: '设置成功',
-  });
+  const body = fromLegacyUserLabelInput(labelId);
+  return fanOutByUid(uid, (id) => request.post(`/api/v1/staff/users/${id}/labels`, body), '设置成功');
+}
+
+/**
+ * 批量操作的扇出：页面在「全选 → 操作」时送 uid 数组，路由按设计一次只动一个人。
+ * 页面只读 `res.msg`，所以这里把每一次的返回按顺序收齐，msg 由调用方给。
+ */
+function fanOutByUid(uid, call, msg) {
+  const ids = (Array.isArray(uid) ? uid : [uid])
+    .map((value) => String(value === undefined || value === null ? '' : value).trim())
+    .filter((value) => value !== '');
+  return Promise.all(ids.map(call)).then((results) => ({
+    data: results.map((res) => toLegacyStaffUser(res.data)),
+    msg,
+    status: 200,
+  }));
 }
 
 // ---------------------------------------------------------------------------
-// CONTRACT-PENDING(B1) — 赠送优惠券. The coupon domain grants from the console
-// (`POST /admin-api/coupons/:id/grants`) and nowhere else; see
-// docs/rewrite/cr/CR-5-h2.md.
+// 赠送优惠券 — B3 的 `GET /api/v1/staff/coupons` 和 `POST /api/v1/staff/coupon-grants`
+// （CR-5-h2 §2，契约 next/packages/contracts/src/coupon/coupon.staff.contract.ts）。
 // ---------------------------------------------------------------------------
 
 /**
  * 可赠送的优惠券
+ *
+ * 抽屉还有第二种用法：详情页的「查看优惠券」（`num == 2`）带着 `uid` 来问「这位客户
+ * 手里有哪些券」。店员端没有这条读路由（docs/rewrite/cr/CR-1-h3.md），所以带 uid 时
+ * 不上网，直接以一句说明拒绝：抽屉 toast 这句话、显示空态，而不是把「店里可发的券」
+ * 冒充成「客户持有的券」。
  */
 export function getUserCoupon(data) {
-  return request.get('/api/v1/staff/coupons', data);
+  const uid = data && data.uid !== undefined && data.uid !== null ? String(data.uid).trim() : '';
+  if (uid && uid !== '0') {
+    const message = '店员端暂不能查看客户持有的优惠券';
+    return Promise.reject({ status: 0, code: 'NOT_SUPPORTED', message, msg: message });
+  }
+  return request.get('/api/v1/staff/coupons', fromLegacyStaffCouponQuery(data), {
+    map: toLegacyStaffCoupons,
+  });
 }
 
 /**
  * 赠送优惠券
+ *
+ * 旧的嵌套路径 `POST /api/v1/staff/users/:uid/coupons` 没有落地，B3 给的是扁平的
+ * `POST /api/v1/staff/coupon-grants`，body `{userId, couponId}`，一次一位客户。页面送
+ * uid 数组（单人时是一个元素的数组），扇出在这里；已达上限的客户是 200 +
+ * `skippedUserIds`，toast 要把它说出来。
  */
 export function postUserSetCoupon(uid, couponId) {
-  return request.post(`/api/v1/staff/users/${uid}/coupons`, { couponId: String(couponId) }, {
-    msg: '赠送成功',
+  const ids = (Array.isArray(uid) ? uid : [uid])
+    .map((value) => String(value === undefined || value === null ? '' : value).trim())
+    .filter((value) => value !== '');
+  return Promise.all(
+    ids.map((id) => request.post('/api/v1/staff/coupon-grants', fromLegacyCouponGrant(id, couponId))),
+  ).then((results) => {
+    const payloads = results.map((res) => res.data);
+    return { data: payloads, msg: couponGrantMessage(payloads), status: 200 };
   });
 }

@@ -30,12 +30,6 @@
 						<input type="password" :placeholder="$t(`填写您的新密码`)" v-model="password" />
 					</div>
 				</div>
-				<div class="item" v-if="isShowCode">
-					<div class="align-left">
-						<input type="text" :placeholder="$t(`填写验证码`)" class="codeIput" v-model="codeVal" />
-						<div class="code" @click="again"><img :src="codeUrl" /></div>
-					</div>
-				</div>
 			</div>
 			<div class="logon" @click="registerReset">{{$t(`确认`)}}</div>
 			<div class="tip">
@@ -50,12 +44,11 @@
 	import sendVerifyCode from "@/mixins/SendVerifyCode";
 	import {
 		registerVerify,
-		registerReset,
-		getCodeApi
+		registerReset
 	} from "@/api/user";
-	// import { validatorDefaultCatch } from "@/utils/dialog";
-	// import attrs, { required, alpha_num, chs_phone } from "@utils/validate";
-	// import { VUE_APP_API_URL } from "@utils";
+	// 图形验证码（`getCodeApi` / `again()` 那套 `VUE_APP_API_URL + "/captcha"` 的图片）
+	// 没有继任者，行为验证码也被 E4 裁掉了；这页的 `isShowCode` 一直是 false，那段输入框
+	// 从来没渲染过。整块连同 `keyCode / codeUrl / codeVal` 一起删掉。
 
 	export default {
 		name: "RetrievePassword",
@@ -64,34 +57,12 @@
 				account: "",
 				password: "",
 				captcha: "",
-				keyCode: "",
-				codeUrl: "",
-				codeVal: "",
-				isShowCode: false
 			};
 		},
 		mixins: [sendVerifyCode],
-		mounted: function() {
-			this.getCode();
-		},
 		methods: {
 			back() {
 				uni.navigateBack();
-			},
-			again() {
-				this.codeUrl =
-					VUE_APP_API_URL + "/captcha?" + this.keyCode + Date.parse(new Date());
-			},
-			getCode() {
-				getCodeApi()
-					.then(res => {
-						this.keyCode = res.data.key;
-					})
-					.catch(res => {
-						this.$util.Tips({
-							title: res.msg.msg || this.$t(`加载失败`)
-						})
-					});
 			},
 			async registerReset() {
 				var that = this;
@@ -107,8 +78,7 @@
 				registerReset({
 						account: that.account,
 						captcha: that.captcha,
-						password: that.password,
-						code: that.codeVal
+						password: that.password
 					})
 					.then(res => {
 						that.$util.Tips({
@@ -134,9 +104,7 @@
 				if (that.formItem == 2) that.type = "register";
 				await registerVerify({
 						phone: that.account,
-						type: that.type,
-						key: that.keyCode,
-						code: that.codeVal
+						type: that.type
 					})
 					.then(res => {
 						this.$util.Tips({

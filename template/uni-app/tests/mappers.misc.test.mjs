@@ -27,6 +27,12 @@ import {
   toLegacyApplicableCoupons,
   fromLegacyApplicableInput,
   fromLegacyCouponState,
+  toLegacyGiftCoupons,
+  fromLegacyStaffCouponQuery,
+  toLegacyStaffCoupon,
+  toLegacyStaffCoupons,
+  fromLegacyCouponGrant,
+  couponGrantMessage,
 } from '../api/mappers/coupon.js';
 import {
   paymentChannelFor,
@@ -34,12 +40,27 @@ import {
   payResultMessage,
   toLegacyPayStatus,
 } from '../api/mappers/payment.js';
-import { toLegacyDiyPage, toLegacyDiyVersion, toLegacyTheme } from '../api/mappers/diy.js';
+import {
+  toLegacyDiyPage,
+  toLegacyDiyVersion,
+  toLegacyTheme,
+  toLegacyNavigation,
+  toLegacyLayout,
+  toLegacyUserMenus,
+} from '../api/mappers/diy.js';
 import {
   toLegacyAgreement,
   fromLegacyAgreementKey,
   toLegacyUpload,
   uploadPurposeFor,
+  toLegacyBasicConfig,
+  toLegacyLogo,
+  toLegacyShare,
+  toLegacyCopyright,
+  toLegacyCustomerService,
+  toLegacySplashAd,
+  fromLegacyBase64Input,
+  toLegacyBase64,
 } from '../api/mappers/system.js';
 
 describe('_shared', () => {
@@ -196,6 +217,74 @@ describe('coupon', () => {
   });
 });
 
+describe('coupon — 订单赠券 and the staff drawer (B3)', () => {
+  it('maps the gift coupons to the 支付成功 sheet, 有效期 as two dates', () => {
+    const rows = toLegacyGiftCoupons(example('GET /api/v1/orders/:id/gift-coupons'));
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      id: 9001,
+      coupon_title: '满 100 减 10',
+      coupon_price: '10.00',
+      use_min_price: '100.00',
+      // the sheet renders `add_time + '-' + end_time`
+      add_time: '2026-01-01',
+      end_time: '2026-12-31',
+    });
+    assertRenderable(rows);
+    expect(toLegacyGiftCoupons({ items: [] })).toEqual([]);
+  });
+
+  it('turns the drawer’s search into the staff query, one page of 100', () => {
+    expect(fromLegacyStaffCouponQuery({ coupon_title: '', uid: 0 })).toEqual({ page: 1, pageSize: 100 });
+    expect(fromLegacyStaffCouponQuery({ coupon_title: ' 满 100 ' })).toEqual({
+      page: 1,
+      pageSize: 100,
+      keyword: '满 100',
+    });
+  });
+
+  it('maps a grantable coupon to the drawer row', () => {
+    const rows = toLegacyStaffCoupons(example('GET /api/v1/staff/coupons'));
+    expect(rows[0]).toMatchObject({
+      id: 1,
+      coupon_title: '满 100 减 10',
+      coupon_price: '10.00',
+      use_min_price: '100.00',
+      type: 0,
+      coupon_time: 0,
+      remain_count: 873,
+    });
+    // a fixed window: the drawer formats unix seconds itself
+    expect(rows[0].start_use_time).toBeGreaterThan(0);
+    expect(rows[0].end_use_time).toBeGreaterThan(rows[0].start_use_time);
+    assertRenderable(rows);
+    const byDays = toLegacyStaffCoupon({
+      ...example('GET /api/v1/staff/coupons').items[0],
+      validityMode: 'days_after_claim',
+      validFrom: null,
+      validTo: null,
+      validDays: 30,
+      scope: 'products',
+    });
+    expect(byDays).toMatchObject({ coupon_time: 30, start_use_time: 0, end_use_time: 0, type: 2 });
+  });
+
+  it('sends one customer and one coupon per grant', () => {
+    expect(fromLegacyCouponGrant(101, 1)).toEqual(exampleBody('POST /api/v1/staff/coupon-grants'));
+  });
+
+  it('says so when a customer was skipped at the per-user limit', () => {
+    expect(couponGrantMessage([example('POST /api/v1/staff/coupon-grants')])).toBe('赠送成功');
+    expect(couponGrantMessage([{ granted: 0, skippedUserIds: ['101'] }])).toBe('客户已达该券的领取上限');
+    expect(
+      couponGrantMessage([
+        { granted: 1, skippedUserIds: [] },
+        { granted: 0, skippedUserIds: ['102'] },
+      ]),
+    ).toBe('已赠送 1 人，1 人已达领取上限');
+  });
+});
+
 describe('payment', () => {
   const PAY = example('POST /api/v1/orders/:id/payments');
 
@@ -322,5 +411,127 @@ describe('system / storage', () => {
     // A typo is not passed through — the server would answer 422 and the page
     // has nothing to say about it.
     expect(uploadPurposeFor('stafff')).toBe('review');
+  });
+});
+
+describe('站点公开配置 — one GET /api/v1/site/config, six readers (F4)', () => {
+  const SITE = example('GET /api/v1/site/config');
+
+  it('BASIC_CONFIG: name, login logo, 备案 footer, pay flags', () => {
+    const basic = toLegacyBasicConfig(SITE);
+    expect(basic).toMatchObject({
+      site_name: 'CRMEB 商城',
+      wap_login_logo: '/uploads/site/2026/09/7ab319.png',
+      record_No: '京ICP备00000000号',
+      icp_url: 'https://beian.miit.gov.cn/',
+      network_security: '',
+      network_security_url: '',
+      pay_weixin_open: 1,
+      // WeChat Pay v3 is the only gateway (f4.md deviation 3)
+      ali_pay_status: 0,
+      yue_pay_status: 0,
+      special_invoice_status: '1',
+      site_func: ['combination'],
+    });
+    // no source in the contract (CR-3-h3): absent, as they were before the route
+    for (const flag of ['wechat_status', 'wechat_auth_switch', 'phone_auth_switch']) {
+      expect(basic).not.toHaveProperty(flag);
+    }
+    assertRenderable(basic);
+    expect(toLegacyBasicConfig({ ...SITE, payments: { wechat: false } }).pay_weixin_open).toBe(0);
+  });
+
+  it('getLogo picks the 登录页 logo for type 2 and falls back either way', () => {
+    expect(toLegacyLogo(SITE, 2)).toEqual({ logo_url: '/uploads/site/2026/09/7ab319.png' });
+    expect(toLegacyLogo(SITE)).toEqual({ logo_url: '/uploads/site/2026/09/2f8c1d.png' });
+    expect(toLegacyLogo({ logo: { main: null, login: 'l.png' } })).toEqual({ logo_url: 'l.png' });
+    expect(toLegacyLogo(null, 2)).toEqual({ logo_url: '' });
+  });
+
+  it('getShare is the share card', () => {
+    expect(toLegacyShare(SITE)).toEqual({
+      title: '示例商城',
+      synopsis: '好货不贵',
+      img: '/uploads/site/2026/09/5c0de1.png',
+    });
+  });
+
+  it('getCrmebCopyRight carries the 版权 line and both spellings of the site name', () => {
+    expect(toLegacyCopyright(SITE)).toMatchObject({
+      copyrightContext: '© 2026 示例科技有限公司',
+      copyrightImage: '',
+      copyrightLink: 'https://example.test',
+      site_name: 'CRMEB 商城',
+      siteName: 'CRMEB 商城',
+      siteLogo: '/uploads/site/2026/09/2f8c1d.png',
+    });
+  });
+
+  it('getCustomerType answers `customer_qrcode`, empty when none is set', () => {
+    expect(toLegacyCustomerService(SITE)).toEqual({
+      customer_type: 'phone',
+      customer_phone: '400-000-0000',
+      customer_qrcode: '',
+    });
+    expect(toLegacyCustomerService({ support: { kind: 'none', qrcodeUrl: 'q.png' } }).customer_qrcode).toBe(
+      'q.png',
+    );
+  });
+
+  it('getOpenAdv is a one-slide pic splash, or status 0', () => {
+    expect(toLegacySplashAd(SITE)).toEqual({
+      status: 1,
+      type: 'pic',
+      value: [{ img: '/uploads/site/2026/09/a91f22.png', link: '/pages/goods_details/index?id=12' }],
+      time: 3,
+      video_link: '',
+    });
+    expect(toLegacySplashAd({ splashAd: { enabled: false, imageUrl: 'a.png', seconds: 3 } })).toMatchObject({
+      status: 0,
+      value: [],
+    });
+    // enabled with no image is nothing to show
+    expect(toLegacySplashAd({ splashAd: { enabled: true, imageUrl: null, seconds: 3 } }).status).toBe(0);
+  });
+});
+
+describe('图片转 base64 (F4 — POST /api/v1/attachments/base64)', () => {
+  it('sends one url per call and reads back the data URL', () => {
+    expect(fromLegacyBase64Input(' /uploads/attachment/2026/09/2f7c1a9b.png ')).toEqual(
+      exampleBody('POST /api/v1/attachments/base64'),
+    );
+    expect(toLegacyBase64(example('POST /api/v1/attachments/base64'))).toMatch(/^data:image\/png;base64,/);
+    expect(toLegacyBase64(null)).toBe('');
+  });
+});
+
+describe('底部导航 and 版式 (F4)', () => {
+  it('hands the renderer the saved pageFoot component itself', () => {
+    const res = example('GET /api/v1/diy/navigation');
+    expect(toLegacyNavigation(res)).toBe(res.navigation);
+  });
+
+  it('turns `navigation: null` into a component that asks for the native tab bar', () => {
+    const nav = toLegacyNavigation({ navigation: null, version: '0' });
+    expect(nav.effectConfig.tabVal).toBe(0);
+    // every style pageFooter computes resolves on it
+    expect(nav.bgColor.color[0].item).toBeTruthy();
+    expect(nav.fillet.valList).toHaveLength(4);
+    expect(nav.menuList).toEqual([]);
+  });
+
+  it('reads the 版式 number for 分类 and 个人中心', () => {
+    expect(toLegacyLayout(example('GET /api/v1/diy/layouts/:type'))).toEqual({ status: 1 });
+    expect(toLegacyLayout({ status: 3 })).toEqual({ status: 3 });
+    expect(toLegacyUserMenus({ status: 2 })).toEqual({
+      diy_data: { value: 2, my_banner_status: 0, my_menus_status: 0, business_status: 0 },
+      routine_my_menus: [],
+    });
+  });
+
+  it('maps the 个人中心 DIY page like any other page', () => {
+    const page = toLegacyDiyPage(example('GET /api/v1/diy/pages/user-center'));
+    expect(page).toMatchObject({ id: 4, type: 'user_center', title: '我的' });
+    expect(page.value).toHaveProperty('1716451200000');
   });
 });

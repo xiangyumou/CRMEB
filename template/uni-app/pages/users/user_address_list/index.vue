@@ -71,8 +71,7 @@
 		getAddressList,
 		setAddressDefault,
 		delAddress,
-		editAddress,
-		postAddress
+		editAddress
 	} from '@/api/user.js';
 	import {
 		toLogin

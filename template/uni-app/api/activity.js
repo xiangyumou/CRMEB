@@ -20,7 +20,10 @@ import {
   toLegacyGroupbuyBanners,
   toLegacyGroupbuyPoster,
   toLegacyPresaleList,
+  toLegacyGroupbuySummary,
 } from './mappers/activity.js';
+import { fromLegacyMiniCodeQuery, toLegacyMiniCode } from './mappers/wechat.js';
+import store from '../store';
 import { fromLegacyPage } from './mappers/_shared.js';
 
 /**
@@ -133,24 +136,26 @@ export function getPresellList(data) {
 }
 
 // ---------------------------------------------------------------------------
-// CONTRACT-PENDING — 待其他 stream 的合约落地
+// 拼团人气条和拼团小程序码（B3 / E4，第三轮绑定）
 // ---------------------------------------------------------------------------
 
-// CONTRACT-PENDING(D) — 拼团人气条：全店「N 人参与」和一排头像。开团数据只挂在单个活动
-// 下 (`/groupbuy/activities/:id/groups`)，没有全店汇总；见 docs/rewrite/cr/CR-1-h2.md。
 /**
  * 正在进行的拼团（首屏人气条）。`api/api.js` 的 `pink` 就是这一个。
+ * B3 的 `GET /api/v1/groupbuy/summary`，`auth: 'public'`（CR-1-h2）。
  */
 export function getPink() {
-  return request.get('/api/v1/groupbuy/summary', {}, { noAuth: true });
+  return request.get('/api/v1/groupbuy/summary', {}, { noAuth: true, map: toLegacyGroupbuySummary });
 }
 
-// CONTRACT-PENDING(E2) — 小程序码。前台没有生成小程序码的路由（后台的
-// `/admin-api/wechat-qrcodes` 是公众号带参二维码）；见 docs/rewrite/cr/CR-6-h2.md。
 /**
- * 拼团小程序码
- * @param object|int data 团单 id
+ * 拼团小程序码 — E4 的 `GET /api/v1/wechat/mini-qrcodes`（CR-6-h2），`auth: 'user'`。
+ * 扫码落到拼团详情，scene 带推广人（当前用户）。
+ * @param object|int data 拼团活动 id
  */
 export function scombinationCode(data) {
-  return request.get('/api/v1/wechat/mini-qrcodes', { scene: 'groupbuy', id: idOf(data) });
+  return request.get(
+    '/api/v1/wechat/mini-qrcodes',
+    fromLegacyMiniCodeQuery('groupbuy', idOf(data), store.state.app.uid),
+    { map: toLegacyMiniCode },
+  );
 }

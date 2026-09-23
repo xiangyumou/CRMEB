@@ -42,13 +42,6 @@
 						</button>
 					</view>
 				</view>
-				<!-- 	<view class="item" v-if="isShowCode">
-					<view class="acea-row row-middle">
-						<image src="../static/code_2.png" style="width: 28rpx; height: 32rpx;"></image>
-						<input type="text" :placeholder="$t(`填写验证码`)" class="codeIput" v-model="codeVal" />
-						<view class="code" @click="again"><img :src="codeUrl" /></view>
-					</view>
-				</view> -->
 			</view>
 			<view class="logon" @click="loginMobile" v-if="current !== 0">{{ $t(`登录`) }}</view>
 			<view class="logon" @click="submit" v-if="current === 0">{{ $t(`登录`) }}</view>
@@ -72,27 +65,23 @@
 				<a href="https://www.crmeb.com">Copyright ©2024 CRMEB. All Rights</a>
 			</view>
 		</view>
-		<Verify @success="success" :captchaType="captchaType" :imgSize="{ width: '330px', height: '155px' }" ref="verify"></Verify>
 	</view>
 </template>
 <script>
 import dayjs from '@/plugin/dayjs/dayjs.min.js';
 import sendVerifyCode from '@/mixins/SendVerifyCode';
-import { loginH5, loginMobile, registerVerify, register, getCodeApi, getUserInfo } from '@/api/user';
-import attrs, { required, alpha_num, chs_phone } from '@/utils/validate';
+import { loginH5, loginMobile, registerVerify, register, getUserInfo } from '@/api/user';
 import { getLogo } from '@/api/public';
 // import cookie from "@/utils/store/cookie";
-import { VUE_APP_API_URL } from '@/utils';
+// `@/utils/validate` 的 `attrs / required / alpha_num / chs_phone` 从来没有被提交过，
+// `@/utils` 也只导出 `VUE_APP_WS_URL`，没有 `VUE_APP_API_URL`。本页的校验一直是下面
+// 那几个手机号正则自己做的，两行 import 只会在打包时留下 “export not found” 警告。
 const BACK_URL = 'login_back_url';
 import colors from '@/mixins/color.js';
-import Verify from '../components/verify/index.vue';
 import Cache from '@/utils/cache';
 
 export default {
 	name: 'Login',
-	components: {
-		Verify
-	},
 	mixins: [sendVerifyCode, colors],
 	data: function () {
 		return {
@@ -107,17 +96,12 @@ export default {
 			formItem: 1,
 			type: 'login',
 			logoUrl: '',
-			keyCode: '',
-			codeUrl: '',
-			codeVal: '',
-			isShowCode: false,
 			appLoginStatus: false, // 微信登录强制绑定手机号码状态
 			appUserInfo: null, // 微信登录保存的用户信息
 			appleLoginStatus: false, // 苹果登录强制绑定手机号码状态
 			appleUserInfo: null,
 			appleShow: false, // 苹果登录版本必须要求ios13以上的
 			keyLock: true,
-			captchaType: 'clickWord',
 			configData: Cache.get('BASIC_CONFIG')
 		};
 	},
@@ -302,22 +286,8 @@ export default {
 					});
 				});
 		},
-		again() {
-			this.codeUrl = VUE_APP_API_URL + '/sms_captcha?' + 'key=' + this.keyCode + Date.parse(new Date());
-		},
-		success(data) {
-			this.$refs.verify.hide();
-			getCodeApi()
-				.then((res) => {
-					this.keyCode = res.data.key;
-					this.getCode(data);
-				})
-				.catch((res) => {
-					this.$util.Tips({
-						title: res
-					});
-				});
-		},
+		// 行为验证码已随 `pages/users/components/verify/**` 一起删除，
+		// 点“获取验证码”直接走短信接口。
 		code() {
 			let that = this;
 			if (!that.protocol) {
@@ -334,7 +304,7 @@ export default {
 				return that.$util.Tips({
 					title: that.$t(`请输入正确的手机号码`)
 				});
-			this.$refs.verify.show();
+			this.getCode();
 		},
 		async getLogoImage() {
 			let that = this;
@@ -461,7 +431,7 @@ export default {
 					});
 				});
 		},
-		async getCode(data) {
+		async getCode() {
 			let that = this;
 			if (!that.protocol) {
 				this.inAnimation = true;
@@ -481,10 +451,7 @@ export default {
 
 			await registerVerify({
 				phone: that.account,
-				type: that.type,
-				key: that.keyCode,
-				captchaType: this.captchaType,
-				captchaVerification: data.captchaVerification
+				type: that.type
 			})
 				.then((res) => {
 					this.sendCode();

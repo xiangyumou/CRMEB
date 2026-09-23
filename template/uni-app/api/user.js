@@ -38,6 +38,10 @@ import {
   toLegacyMarkRead,
 } from './mappers/notification.js';
 import { fromLegacyPage } from './mappers/_shared.js';
+import { fromLegacyMiniCodeQuery, toLegacyMiniCode } from './mappers/wechat.js';
+import { toLegacyUserMenus } from './mappers/diy.js';
+import { toDataUrls, diyLayout } from './api.js';
+import store from '../store';
 import { listTitles, findTitle, saveTitle, deleteTitle } from '../libs/invoiceTitles.js';
 
 /**
@@ -140,7 +144,6 @@ export function withdrawUserCancellation() {
 export function loginH5(data) {
   const src = data || {};
   const body = { account: String(src.account || ''), password: String(src.password || '') };
-  if (src.captchaVerification) body.captchaToken = String(src.captchaVerification);
   return request.post('/api/v1/auth/sessions/password', body, {
     noAuth: true,
     map: toLegacySession,
@@ -167,9 +170,9 @@ export function loginMobile(data) {
  * 验证码 key.
  *
  * The legacy image captcha was a server-rendered PNG keyed by this string, and the key
- * was then quoted back on `registerVerify`. Nothing renders it any more — the slider is
- * the only captcha left — so this resolves locally with an empty key and makes no
- * request. The call sites keep working unchanged.
+ * was then quoted back on `registerVerify`. Neither captcha is left — the image one had
+ * no successor and the 行为验证码 was ruled out by E4 — so this resolves locally with an
+ * empty key and makes no request. The remaining call sites keep working unchanged.
  */
 export function getCodeApi() {
   return local({ key: '' });
@@ -328,10 +331,9 @@ export function setAddressDefault(id) {
 }
 
 // ---------------------------------------------------------------------------
-// CONTRACT-PENDING(E1) — 小程序一键绑定手机号（已登录用户）。`POST /api/v1/auth/phone`
-// 只收「手机号 + 短信验证码」，而这个按钮拿到的是 `getPhoneNumber` 的 code；
-// `POST /auth/sessions/wechat-mini/phone` 又是「登录」而不是「给当前账号绑一个号」。
-// 见 docs/rewrite/cr/CR-2-h2.md。
+// 小程序一键绑定手机号（已登录用户）— E4 的 `POST /api/v1/auth/phone/wechat-mini`
+// （CR-2-h2 §2）。body `{phoneCode}` 是 `getPhoneNumber` 给的 code，由服务端兑换；
+// 应答 `{ok: true}`，页面只 toast `res.msg` 再重读用户信息。
 // ---------------------------------------------------------------------------
 
 /**
@@ -346,16 +348,18 @@ export function mpBindingPhone(data) {
 }
 
 // ---------------------------------------------------------------------------
-// CONTRACT-PENDING(G1) — 用户中心装修。`diy_data` (个人中心版式、我的横幅、商家入口)
-// 和 `routine_my_menus` (我的菜单) 是装修数据，G1 的前台只有首页 / 指定页 / 主题 /
-// 版本号四条路由，没有「个人中心」这一页；见 docs/rewrite/cr/CR-3-h2.md。
+// 个人中心的版式 — F4 的 `GET /api/v1/diy/layouts/user`（CR-3-h2 §3）
+//
+// `pages/user` 从这里只读 `diy_data.value`（`member_style`，1–5，决定小程序顶栏配色
+// 和订单图标那一套）；菜单格子如今是个人中心装修页上的组件，那一页由
+// `getThemeInfo('user')` 读 `GET /api/v1/diy/pages/user-center`（`api/api.js`）。
 // ---------------------------------------------------------------------------
 
 /**
- * 用户中心菜单
+ * 用户中心菜单（版式）
  */
 export function getMenuList() {
-  return request.get('/api/v1/diy/pages/user-center', {}, { noAuth: true });
+  return diyLayout('user', toLegacyUserMenus);
 }
 
 // ---------------------------------------------------------------------------
@@ -409,26 +413,31 @@ export function getMsgUnreadCount() {
 }
 
 // ---------------------------------------------------------------------------
-// CONTRACT-PENDING(E2) — 小程序码。前台没有生成小程序码的路由（后台的
-// `/admin-api/wechat-qrcodes` 是公众号带参二维码）；见 docs/rewrite/cr/CR-6-h2.md。
+// 小程序码 — E4 的 `GET /api/v1/wechat/mini-qrcodes`（CR-6-h2）
 // ---------------------------------------------------------------------------
 
 /**
- * 获取小程序二维码
+ * 获取小程序二维码：当前用户的推广码，扫码落到首页并记下推广人（`spid`）。
+ * 唯一的调用方 poster-poster 不传参数、读 `res.data.url`。
  */
-export function routineCode(data) {
-  return request.get('/api/v1/wechat/mini-qrcodes', data);
+export function routineCode() {
+  return request.get(
+    '/api/v1/wechat/mini-qrcodes',
+    fromLegacyMiniCodeQuery('home', '', store.state.app.uid),
+    { map: toLegacyMiniCode },
+  );
 }
 
 // ---------------------------------------------------------------------------
 
-// CONTRACT-PENDING(F1) — 海报用的图片转 base64；和 `api/public.js` 的 `imageBase64`
-// 是同一条路由的两个名字，见 docs/rewrite/cr/CR-7-h2.md。
 /**
- * 图片链接转 base64
+ * 图片链接转 base64 — 和 `api/public.js` 的 `imageBase64` 是同一件事的两个名字
+ * （F4 的 `POST /api/v1/attachments/base64`，一次一张，拼回 `{image, code}`）。
+ * poster-poster 送 `{image, code}`，`code` 是它的小程序码 URL。
  */
 export function imgToBase(data) {
-  return request.post('/api/v1/site/image-data-urls', data);
+  const src = data || {};
+  return toDataUrls(src.image, src.code);
 }
 
 // ---------------------------------------------------------------------------

@@ -13,8 +13,7 @@ export default {
 		return {
 			disabled: false,
 			text: this.$t('验证码'),
-			runTime: undefined,
-			captchaType: 'clickWord'
+			runTime: undefined
 		};
 	},
 	methods: {

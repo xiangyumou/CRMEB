@@ -15,6 +15,7 @@ import {
   toLegacyPresaleCard,
   toLegacyPresaleList,
   toLegacyPresaleDetail,
+  toLegacyGroupbuySummary,
 } from '../api/mappers/activity.js';
 
 const ACTIVITY = 'GET /api/v1/groupbuy/activities/:id';
@@ -269,5 +270,28 @@ describe('presale — 预售', () => {
     expect(toLegacyGroupbuyGroup(null)).toEqual({});
     expect(toLegacyOpenGroup(null)).toEqual({});
     expect(toLegacyGroupbuyPoster(null)).toEqual({});
+  });
+});
+
+describe('拼团人气条 (B3 — GET /api/v1/groupbuy/summary)', () => {
+  it('gives both 人气条 readers `avatars` and `pink_count`', () => {
+    const summary = toLegacyGroupbuySummary(example('GET /api/v1/groupbuy/summary'));
+    expect(summary).toEqual({
+      avatars: [
+        'https://cdn.example.com/avatar/1.png',
+        'https://cdn.example.com/avatar/2.png',
+        'https://cdn.example.com/avatar/3.png',
+      ],
+      pink_count: 1286,
+    });
+    assertRenderable(summary);
+  });
+
+  it('is a quiet zero for a shop with no live team', () => {
+    expect(toLegacyGroupbuySummary({ participants: 0, avatars: [] })).toEqual({
+      avatars: [],
+      pink_count: 0,
+    });
+    expect(toLegacyGroupbuySummary(null)).toEqual({ avatars: [], pink_count: 0 });
   });
 });

@@ -206,12 +206,9 @@
 
 <script>
 import commonWrapper from "./commonWrapper.vue";
-import { newcomerList } from "@/api/api.js";
-import { mapGetters } from "vuex";
 import { HTTP_REQUEST_URL } from "@/config/app";
 export default {
   components: { commonWrapper },
-  computed: mapGetters(["isLogin"]),
   props: {
     dataConfig: {
       type: Object,
@@ -230,9 +227,8 @@ export default {
       newcomer_integral: "",
     };
   },
-  created() {
-    this.getList();
-  },
+  // 新人专享已下线：`newcomerList` 从来没有继任路由，两个列表永远是空的，
+  // 外层 `v-if="couponList.length || productList.length"` 因此整块不渲染。
   computed: {
     totalPrice() {
       return this.couponList.reduce((total, item) => {
@@ -371,16 +367,6 @@ export default {
       };
     },
   },
-  watch: {
-    isLogin: {
-      handler: function (newV, oldV) {
-        if (newV) {
-          this.getList();
-        }
-      },
-      deep: true,
-    },
-  },
   methods: {
     goDetail(item) {
       uni.navigateTo({
@@ -396,28 +382,6 @@ export default {
       uni.switchTab({
         url: `/pages/users/user_coupon/index`,
       });
-    },
-    getList() {
-      let limit = this.$config.LIMIT;
-      newcomerList({
-        page: 1,
-        limit: limit,
-      })
-        .then((res) => {
-          let newcomer_integral = res.data.newcomer_integral;
-          this.couponList = res.data.newcomer_coupon;
-          this.productList = res.data.newcomer_products;
-          if (Array.isArray(newcomer_integral)) {
-            this.newcomer_integral = 0;
-          } else {
-            this.newcomer_integral = newcomer_integral;
-          }
-        })
-        .catch((err) => {
-          return this.$util.Tips({
-            title: err.msg,
-          });
-        });
     },
   },
 };

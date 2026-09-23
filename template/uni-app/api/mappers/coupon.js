@@ -6,7 +6,7 @@
 //   * a *template* (可领取) — `id` is the template id and `is_use` means "already taken"
 //   * a *user coupon* (我的) — `id` is the issued coupon and `_type` is its state
 
-import { toId, toInt, money, text, mapList, unixSeconds, legacyDate } from './_shared.js';
+import { toId, toInt, money, text, list, mapList, unixSeconds, legacyDate } from './_shared.js';
 
 /** legacy `type`: 0 通用, 1 品类, 2 商品 */
 function legacyScope(scope) {
@@ -144,4 +144,84 @@ export function fromLegacyCouponState(types) {
   if (n === 2) return 'used';
   if (n === 3) return 'expired';
   return 'all';
+}
+
+// ---------------------------------------------------------------------------
+// 支付成功页的「恭喜获得优惠券」 (B3 — GET /api/v1/orders/:id/gift-coupons)
+// ---------------------------------------------------------------------------
+
+/**
+ * 订单赠券 → 支付成功页的弹层。条目就是 我的优惠券 的 `userCoupon`，只有一处不同：
+ * 弹层把 `add_time` 当作有效期的起点拼在 `end_time` 前面（「有效期:2026-01-01-2026-12-31」），
+ * 所以这里给日期串，而不是 我的优惠券 用的 unix 秒。
+ */
+export function toLegacyGiftCoupons(dto) {
+  return mapList(dto && dto.items, (item) => ({
+    ...toLegacyUserCoupon(item),
+    add_time: legacyDate(item && item.validFrom),
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// 店员赠送优惠券 (B3 — coupon.staff.contract.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * 抽屉的查询 `{coupon_title}` → `{keyword, page, pageSize}`。抽屉不翻页，一次取满
+ * `pageSize` 的上限 100；店里在售的券超过一百张时，搜索框就是翻页。
+ */
+export function fromLegacyStaffCouponQuery(data) {
+  const src = data || {};
+  const out = { page: 1, pageSize: 100 };
+  const keyword = text(src.coupon_title !== undefined ? src.coupon_title : src.keyword).trim();
+  if (keyword) out.keyword = keyword.slice(0, 50);
+  return out;
+}
+
+/**
+ * `staffCoupon` → 赠券抽屉的一行。`coupon_time` 非零时抽屉显示「有效期：N 天」，
+ * 否则用 `start_use_time` / `end_use_time`（unix 秒，抽屉自己 `*1000`）拼日期。
+ */
+export function toLegacyStaffCoupon(dto) {
+  if (!dto) return {};
+  const byDays = dto.validityMode === 'days_after_claim';
+  return {
+    id: toId(dto.id),
+    coupon_title: text(dto.name),
+    coupon_price: money(dto.discountAmount),
+    use_min_price: money(dto.minSpend),
+    type: legacyScope(dto.scope),
+    coupon_time: byDays ? toInt(dto.validDays, 0) : 0,
+    start_use_time: byDays ? 0 : unixSeconds(dto.validFrom, 0),
+    end_use_time: byDays ? 0 : unixSeconds(dto.validTo, 0),
+    // 售罄的券也列出来（B3：让店员看得到为什么发不出去），抽屉目前不读这两个字段
+    remain_count: dto.isUnlimitedSupply ? -1 : toInt(dto.remainingCount, 0),
+    is_unlimited: dto.isUnlimitedSupply ? 1 : 0,
+  };
+}
+
+/** 抽屉读 `res.data` 为裸数组。 */
+export function toLegacyStaffCoupons(dto) {
+  return mapList(dto && dto.items, toLegacyStaffCoupon);
+}
+
+/** 一位客户一张券：`{userId, couponId}`（B3，单数，扇出在 api/admin.js）。 */
+export function fromLegacyCouponGrant(uid, couponId) {
+  return { userId: text(uid).trim(), couponId: text(couponId).trim() };
+}
+
+/**
+ * 扇出后的若干个 `{granted, skippedUserIds}` → 抽屉 toast 的那句话。已达领取上限的
+ * 客户是 200 + `skippedUserIds`，不是错误（B3），所以要说出来，不能一律「赠送成功」。
+ */
+export function couponGrantMessage(results) {
+  let granted = 0;
+  let skipped = 0;
+  list(results).forEach((res) => {
+    granted += toInt(res && res.granted, 0);
+    skipped += list(res && res.skippedUserIds).length;
+  });
+  if (!skipped) return '赠送成功';
+  if (!granted) return '客户已达该券的领取上限';
+  return `已赠送 ${granted} 人，${skipped} 人已达领取上限`;
 }

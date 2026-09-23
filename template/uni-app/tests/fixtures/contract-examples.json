@@ -9,6 +9,15 @@
       "ok": true
     }
   },
+  "POST /api/v1/auth/phone/wechat-mini": {
+    "name": "ok",
+    "body": {
+      "phoneCode": "mp-phone-code-abc"
+    },
+    "response": {
+      "ok": true
+    }
+  },
   "PUT /api/v1/auth/password": {
     "name": "with-old-password",
     "body": {
@@ -632,6 +641,248 @@
       "createdAt": "2026-03-01T20:11:00+08:00"
     }
   },
+  "POST /api/v1/staff/products/category-assignments": {
+    "name": "two-products",
+    "body": {
+      "productIds": [
+        "1",
+        "2"
+      ],
+      "categoryIds": [
+        "17"
+      ]
+    },
+    "response": {
+      "updated": 2
+    }
+  },
+  "POST /api/v1/staff/products/label-assignments": {
+    "name": "two-products",
+    "body": {
+      "productIds": [
+        "1",
+        "2"
+      ],
+      "labelIds": [
+        "3"
+      ]
+    },
+    "response": {
+      "updated": 2
+    }
+  },
+  "GET /api/v1/staff/product-categories": {
+    "name": "ok",
+    "response": {
+      "items": [
+        {
+          "id": "17",
+          "name": "男装",
+          "children": [
+            {
+              "id": "18",
+              "name": "上衣",
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "POST /api/v1/staff/products": {
+    "name": "single-spec",
+    "body": {
+      "name": "手冲挂耳咖啡",
+      "imageUrl": "https://cdn.example.com/p/44.png",
+      "sliderImages": [
+        "https://cdn.example.com/p/44.png"
+      ],
+      "categoryIds": [
+        "17"
+      ],
+      "unitName": "盒",
+      "descriptionHtml": "<p><img src=\"https://cdn.example.com/p/44-detail.png\" /></p>",
+      "visible": true,
+      "freightMode": "free",
+      "sku": {
+        "price": "49.00",
+        "cost": "18.00",
+        "originalPrice": "69.00",
+        "stock": 200
+      }
+    },
+    "response": {
+      "id": "44",
+      "name": "手冲挂耳咖啡",
+      "imageUrl": "https://cdn.example.com/p/44.png",
+      "price": "49.00",
+      "stock": 200,
+      "sales": 0,
+      "visible": true,
+      "specMode": false,
+      "kind": "physical",
+      "unitName": "盒",
+      "categoryIds": [
+        "17"
+      ],
+      "labelIds": []
+    }
+  },
+  "GET /api/v1/staff/product-labels": {
+    "name": "ok",
+    "response": {
+      "items": [
+        {
+          "categoryId": "2",
+          "categoryName": "促销",
+          "labels": [
+            {
+              "id": "3",
+              "name": "新品"
+            }
+          ]
+        },
+        {
+          "categoryId": null,
+          "categoryName": "未分类",
+          "labels": [
+            {
+              "id": "9",
+              "name": "清仓"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "GET /api/v1/staff/products": {
+    "name": "on-sale",
+    "query": {
+      "page": 1,
+      "pageSize": 20,
+      "state": "on-sale"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "1",
+          "name": "经典白T恤",
+          "imageUrl": "https://cdn.example.com/p/1.png",
+          "price": "59.00",
+          "stock": 120,
+          "sales": 33,
+          "visible": true,
+          "specMode": true,
+          "kind": "physical",
+          "unitName": "件",
+          "categoryIds": [
+            "17"
+          ],
+          "labelIds": [
+            "3"
+          ]
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "POST /api/v1/staff/products/:id/visibility": {
+    "name": "off-shelf",
+    "params": {
+      "id": "1"
+    },
+    "body": {
+      "visible": false
+    },
+    "response": {
+      "id": "1",
+      "name": "经典白T恤",
+      "imageUrl": "https://cdn.example.com/p/1.png",
+      "price": "59.00",
+      "stock": 120,
+      "sales": 33,
+      "visible": false,
+      "specMode": true,
+      "kind": "physical",
+      "unitName": "件",
+      "categoryIds": [
+        "17"
+      ],
+      "labelIds": [
+        "3"
+      ]
+    }
+  },
+  "PUT /api/v1/staff/products/:id/skus": {
+    "name": "reprice-one",
+    "params": {
+      "id": "1"
+    },
+    "body": {
+      "items": [
+        {
+          "id": "1001",
+          "price": "55.00"
+        }
+      ]
+    },
+    "response": {
+      "items": [
+        {
+          "id": "1001",
+          "skuCode": "SKU7K3M9QX2",
+          "specText": "白|M",
+          "imageUrl": "https://cdn.example.com/p/1-white.png",
+          "price": "55.00",
+          "originalPrice": "89.00",
+          "cost": "22.00",
+          "stock": 60,
+          "sales": 18,
+          "weight": "0.25",
+          "volume": null,
+          "isVisible": true
+        }
+      ]
+    }
+  },
+  "GET /api/v1/staff/products/:id/skus": {
+    "name": "ok",
+    "params": {
+      "id": "1"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "1001",
+          "skuCode": "SKU7K3M9QX2",
+          "specText": "白|M",
+          "imageUrl": "https://cdn.example.com/p/1-white.png",
+          "price": "59.00",
+          "originalPrice": "89.00",
+          "cost": "22.00",
+          "stock": 60,
+          "sales": 18,
+          "weight": "0.25",
+          "volume": null,
+          "isVisible": true
+        }
+      ]
+    }
+  },
+  "GET /api/v1/staff/shipping-templates": {
+    "name": "ok",
+    "response": {
+      "items": [
+        {
+          "id": "1",
+          "name": "全国包邮（满 5 件）",
+          "chargeMode": "quantity"
+        }
+      ]
+    }
+  },
   "GET /api/v1/catalog/categories": {
     "name": "tree",
     "response": {
@@ -1172,6 +1423,83 @@
       "pageSize": 10
     }
   },
+  "GET /api/v1/orders/:id/gift-coupons": {
+    "name": "two-gift-coupons",
+    "params": {
+      "id": "5001"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "9001",
+          "templateId": "1",
+          "title": "满 100 减 10",
+          "discountAmount": "10.00",
+          "minSpend": "100.00",
+          "scope": "all_products",
+          "status": "unused",
+          "sourceKind": "gift_order",
+          "validFrom": "2026-01-01T00:00:00+08:00",
+          "validTo": "2026-12-31T23:59:59+08:00",
+          "usedAt": null,
+          "createdAt": "2026-01-02T09:30:00+08:00"
+        },
+        {
+          "id": "9002",
+          "templateId": "2",
+          "title": "满 200 减 30",
+          "discountAmount": "30.00",
+          "minSpend": "200.00",
+          "scope": "all_products",
+          "status": "unused",
+          "sourceKind": "gift_order",
+          "validFrom": "2026-01-01T00:00:00+08:00",
+          "validTo": "2026-12-31T23:59:59+08:00",
+          "usedAt": null,
+          "createdAt": "2026-01-02T09:30:00+08:00"
+        }
+      ]
+    }
+  },
+  "POST /api/v1/staff/coupon-grants": {
+    "name": "granted",
+    "body": {
+      "userId": "101",
+      "couponId": "1"
+    },
+    "response": {
+      "granted": 1,
+      "skippedUserIds": []
+    }
+  },
+  "GET /api/v1/staff/coupons": {
+    "name": "first-page",
+    "query": {
+      "page": 1,
+      "pageSize": 20
+    },
+    "response": {
+      "items": [
+        {
+          "id": "1",
+          "name": "满 100 减 10",
+          "discountAmount": "10.00",
+          "minSpend": "100.00",
+          "scope": "all_products",
+          "validityMode": "fixed_window",
+          "validFrom": "2026-01-01T00:00:00+08:00",
+          "validTo": "2026-12-31T23:59:59+08:00",
+          "validDays": null,
+          "isUnlimitedSupply": false,
+          "remainingCount": 873,
+          "perUserLimit": 1
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
   "POST /api/v1/user-coupons/applicable": {
     "name": "one-usable-one-not",
     "body": {
@@ -1379,6 +1707,40 @@
       "version": "1716451200000"
     }
   },
+  "GET /api/v1/diy/layouts/:type": {
+    "name": "category",
+    "params": {
+      "type": "category"
+    },
+    "response": {
+      "status": 1
+    }
+  },
+  "GET /api/v1/diy/navigation": {
+    "name": "decorated",
+    "response": {
+      "navigation": {
+        "name": "pageFoot",
+        "effectConfig": {
+          "tabVal": 1
+        },
+        "navStyleConfig": {
+          "tabVal": 0
+        },
+        "menuList": [
+          {
+            "name": "首页",
+            "link": "/pages/index/index",
+            "imgList": [
+              "/uploads/tab-home-on.png",
+              "/uploads/tab-home.png"
+            ]
+          }
+        ]
+      },
+      "version": "1716451200000"
+    }
+  },
   "GET /api/v1/diy/pages/:id": {
     "name": "ok",
     "params": {
@@ -1425,6 +1787,34 @@
       "tokens": {
         "theme": "#E93323",
         "accent": "#FF7E00"
+      },
+      "version": "1716451200000"
+    }
+  },
+  "GET /api/v1/diy/pages/user-center": {
+    "name": "ok",
+    "response": {
+      "id": "4",
+      "name": "个人中心",
+      "kind": "user_center",
+      "title": "我的",
+      "content": {
+        "1716451200000": {
+          "name": "titles",
+          "cname": "标题",
+          "timestamp": 1716451200000,
+          "setUp": {
+            "tabVal": 0
+          },
+          "titleConfig": {
+            "title": "标题内容",
+            "val": "为你推荐"
+          }
+        }
+      },
+      "schemaVersion": 1,
+      "background": {
+        "color": "#F5F5F5"
       },
       "version": "1716451200000"
     }
@@ -1631,6 +2021,17 @@
       "page": "pages/activity/groupbuy_status/index?groupId=501"
     }
   },
+  "GET /api/v1/groupbuy/summary": {
+    "name": "busy-shop",
+    "response": {
+      "participants": 1286,
+      "avatars": [
+        "https://cdn.example.com/avatar/1.png",
+        "https://cdn.example.com/avatar/2.png",
+        "https://cdn.example.com/avatar/3.png"
+      ]
+    }
+  },
   "POST /api/v1/groupbuy/groups/:id/withdrawal": {
     "name": "nobody-had-paid",
     "params": {
@@ -1660,6 +2061,20 @@
       "status": "ok",
       "time": "2026-01-01T12:00:00+08:00",
       "version": "dev"
+    }
+  },
+  "GET /api/v1/readyz": {
+    "name": "ready",
+    "response": {
+      "status": "ok",
+      "time": "2026-01-01T12:00:00+08:00",
+      "version": "dev",
+      "checks": {
+        "database": "ok",
+        "redis": "ok",
+        "migrations": "ok",
+        "worker": "ok"
+      }
     }
   },
   "DELETE /api/v1/my-messages/:id": {
@@ -3734,6 +4149,15 @@
       "height": 1440
     }
   },
+  "POST /api/v1/attachments/base64": {
+    "name": "own-attachment",
+    "body": {
+      "url": "/uploads/attachment/2026/09/2f7c1a9b.png"
+    },
+    "response": {
+      "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+    }
+  },
   "GET /api/v1/agreements/:key": {
     "name": "user",
     "params": {
@@ -3744,6 +4168,229 @@
       "title": "用户服务协议",
       "content": "<p>欢迎使用本商城……</p>",
       "updatedAt": "2026-09-20T18:30:00+08:00"
+    }
+  },
+  "GET /api/v1/site/config": {
+    "name": "ok",
+    "response": {
+      "name": "CRMEB 商城",
+      "logo": {
+        "main": "/uploads/site/2026/09/2f8c1d.png",
+        "login": "/uploads/site/2026/09/7ab319.png",
+        "square": null,
+        "favicon": null
+      },
+      "copyright": {
+        "text": "© 2026 示例科技有限公司",
+        "link": "https://example.test",
+        "imageUrl": null
+      },
+      "share": {
+        "title": "示例商城",
+        "synopsis": "好货不贵",
+        "image": "/uploads/site/2026/09/5c0de1.png"
+      },
+      "filing": {
+        "icpNumber": "京ICP备00000000号",
+        "icpUrl": "https://beian.miit.gov.cn/",
+        "publicSecurityNumber": "",
+        "publicSecurityUrl": ""
+      },
+      "payments": {
+        "wechat": true
+      },
+      "support": {
+        "kind": "phone",
+        "phone": "400-000-0000",
+        "qrcodeUrl": null
+      },
+      "splashAd": {
+        "enabled": true,
+        "imageUrl": "/uploads/site/2026/09/a91f22.png",
+        "link": "/pages/goods_details/index?id=12",
+        "seconds": 3
+      },
+      "version": "1758500000000"
+    }
+  },
+  "GET /api/v1/staff/users/:uid": {
+    "name": "ok",
+    "params": {
+      "uid": "1001"
+    },
+    "response": {
+      "id": "1001",
+      "nickname": "小明",
+      "avatarUrl": "https://cdn.example.com/2026/09/a1b2c3d4.png",
+      "phone": "138****8000",
+      "status": "active",
+      "groups": [
+        {
+          "id": "3",
+          "name": "高价值客户"
+        }
+      ],
+      "labels": [
+        {
+          "id": "7",
+          "name": "母婴"
+        }
+      ],
+      "orderCount": 12,
+      "spendTotal": "3980.00",
+      "createdAt": "2026-01-05T10:00:00+08:00"
+    }
+  },
+  "GET /api/v1/staff/user-groups": {
+    "name": "ok",
+    "response": {
+      "items": [
+        {
+          "id": "3",
+          "name": "高价值客户"
+        },
+        {
+          "id": "4",
+          "name": "新客"
+        }
+      ]
+    }
+  },
+  "GET /api/v1/staff/users/:uid/labels": {
+    "name": "ok",
+    "params": {
+      "uid": "1001"
+    },
+    "response": {
+      "categories": [
+        {
+          "categoryId": "2",
+          "categoryName": "消费偏好",
+          "labels": [
+            {
+              "id": "7",
+              "name": "母婴",
+              "assigned": true
+            },
+            {
+              "id": "8",
+              "name": "数码",
+              "assigned": false
+            }
+          ]
+        },
+        {
+          "categoryId": null,
+          "categoryName": null,
+          "labels": [
+            {
+              "id": "9",
+              "name": "未分类标签",
+              "assigned": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "GET /api/v1/staff/users": {
+    "name": "ok",
+    "query": {
+      "page": 1,
+      "pageSize": 20
+    },
+    "response": {
+      "items": [
+        {
+          "id": "1001",
+          "nickname": "小明",
+          "avatarUrl": "https://cdn.example.com/2026/09/a1b2c3d4.png",
+          "phone": "138****8000",
+          "status": "active",
+          "groups": [
+            {
+              "id": "3",
+              "name": "高价值客户"
+            }
+          ],
+          "labels": [
+            {
+              "id": "7",
+              "name": "母婴"
+            }
+          ],
+          "orderCount": 12,
+          "spendTotal": "3980.00",
+          "createdAt": "2026-01-05T10:00:00+08:00"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "pageSize": 20
+    }
+  },
+  "POST /api/v1/staff/users/:uid/group": {
+    "name": "ok",
+    "params": {
+      "uid": "1001"
+    },
+    "body": {
+      "groupId": "3"
+    },
+    "response": {
+      "id": "1001",
+      "nickname": "小明",
+      "avatarUrl": "https://cdn.example.com/2026/09/a1b2c3d4.png",
+      "phone": "138****8000",
+      "status": "active",
+      "groups": [
+        {
+          "id": "3",
+          "name": "高价值客户"
+        }
+      ],
+      "labels": [
+        {
+          "id": "7",
+          "name": "母婴"
+        }
+      ],
+      "orderCount": 12,
+      "spendTotal": "3980.00",
+      "createdAt": "2026-01-05T10:00:00+08:00"
+    }
+  },
+  "POST /api/v1/staff/users/:uid/labels": {
+    "name": "ok",
+    "params": {
+      "uid": "1001"
+    },
+    "body": {
+      "labelIds": [
+        "7"
+      ]
+    },
+    "response": {
+      "id": "1001",
+      "nickname": "小明",
+      "avatarUrl": "https://cdn.example.com/2026/09/a1b2c3d4.png",
+      "phone": "138****8000",
+      "status": "active",
+      "groups": [
+        {
+          "id": "3",
+          "name": "高价值客户"
+        }
+      ],
+      "labels": [
+        {
+          "id": "7",
+          "name": "母婴"
+        }
+      ],
+      "orderCount": 12,
+      "spendTotal": "3980.00",
+      "createdAt": "2026-01-05T10:00:00+08:00"
     }
   },
   "POST /api/v1/addresses": {
@@ -3955,6 +4602,12 @@
       "createdAt": "2026-01-05T10:00:00+08:00"
     }
   },
+  "POST /api/v1/visits": {
+    "name": "signed-in",
+    "body": {
+      "path": "/pages/goods_details/index"
+    }
+  },
   "POST /api/v1/account-cancellations": {
     "name": "ok",
     "body": {
@@ -4048,5 +4701,15 @@
       "echostr": "5935446184556592210"
     },
     "response": "5935446184556592210"
+  },
+  "GET /api/v1/wechat/mini-qrcodes": {
+    "name": "product-poster",
+    "query": {
+      "page": "pages/goods_details/index",
+      "scene": "id=1024"
+    },
+    "response": {
+      "url": "/uploads/wechat-mini-code/2026/09/4f1c8a2d7e6b5039.png"
+    }
   }
 }

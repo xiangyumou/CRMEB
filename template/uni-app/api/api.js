@@ -1,7 +1,7 @@
 // 优惠券 / 装修 / 站点配置 / 文章 / 注册登录辅助
 //
-// Split by owning stream: the coupon and diy calls below are live against merged
-// contracts; everything marked CONTRACT-PENDING is listed in docs/rewrite/status/h.md.
+// Split by owning stream; every call below is live against a merged contract
+// (docs/rewrite/status/h.md, h3.md).
 
 import request from '../utils/request.js';
 import {
@@ -11,7 +11,19 @@ import {
   toLegacyClaimResult,
   fromLegacyCouponState,
 } from './mappers/coupon.js';
-import { toLegacyDiyPage, toLegacyDiyVersion, toLegacyTheme } from './mappers/diy.js';
+import {
+  toLegacyDiyPage,
+  toLegacyDiyVersion,
+  toLegacyTheme,
+  toLegacyLayout,
+} from './mappers/diy.js';
+import {
+  toLegacyCopyright,
+  toLegacyCustomerService,
+  toLegacySplashAd,
+  fromLegacyBase64Input,
+  toLegacyBase64,
+} from './mappers/system.js';
 import { toLegacyProductList } from './mappers/catalog.js';
 import {
   toLegacyArticleList,
@@ -27,7 +39,7 @@ import {
   toLegacySmsCodeResult,
 } from './mappers/user.js';
 import { toLegacySubscribeTemplates } from './mappers/wechat.js';
-import { fromLegacyPage } from './mappers/_shared.js';
+import { fromLegacyPage, text } from './mappers/_shared.js';
 
 // ---------------------------------------------------------------------------
 // 优惠券
@@ -88,6 +100,15 @@ export function getUserCoupons(types, data) {
 // ---------------------------------------------------------------------------
 
 /**
+ * `GET /api/v1/diy/layouts/:type`（`category | user`）→ 版式数字 1 / 2 / 3（F4）。
+ * 分类页的版式由 `getThemeInfo('category')` 读，个人中心的由 `api/user.js` 的
+ * `getMenuList()` 读。
+ */
+export function diyLayout(type, map) {
+  return request.get(`/api/v1/diy/layouts/${type}`, {}, { noAuth: true, map });
+}
+
+/**
  * 获取装修数据
  * @param string type 'home' | 'category' | 'user' …
  * @param object data {theme_id} 预览用
@@ -103,9 +124,20 @@ export function getThemeInfo(type, data) {
       map: toLegacyDiyPage,
     });
   }
-  // CONTRACT-PENDING(G1) — 分类 / 个人中心 的版式开关 (`res.data.status`) 还没有路由；
-  // 见 docs/rewrite/cr/CR-3-h2.md §3。两页拿不到就各自保持默认版式。
-  return request.get(`/api/v1/diy/layouts/${type}`, {}, { noAuth: true });
+  // 个人中心是一整页装修（`pages/user` 把它交给 PageDesign，读 `.value`），F4 的
+  // `GET /api/v1/diy/pages/user-center`（CR-3-h2 §1）。它的「版式」数字在
+  // `getMenuList()` 里（`api/user.js`）。
+  if (type === 'user') {
+    return request.get('/api/v1/diy/pages/user-center', {}, { noAuth: true, map: toLegacyDiyPage });
+  }
+  // 分类页的版式开关：`goods_cate` 读 `res.data.status`，1 / 2 / 3（CR-3-h2 §3）。
+  if (type === 'category') {
+    return diyLayout('category', toLegacyLayout);
+  }
+  // 其余（今天只有商品详情的 `'detail'`）没有按类型读装修页的路由：路由只收
+  // `category | user`，带别的值是 422。不上网，给一页空装修——和以前那个 422 之后
+  // 页面停在的状态相同。docs/rewrite/cr/CR-2-h3.md 向装修域要这条读路由。
+  return Promise.resolve({ data: {}, msg: '', status: 200 });
 }
 
 // ---------------------------------------------------------------------------
@@ -170,10 +202,6 @@ export function searchList(data) {
 export function clearSearch() {
   return request.delete('/api/v1/me/search-history', {}, { msg: '清除成功' });
 }
-
-// ---------------------------------------------------------------------------
-// CONTRACT-PENDING — 待其他 stream 的合约落地
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // 资讯（F2 / cms）
@@ -261,20 +289,65 @@ export function getThemeUser() {
 }
 
 // ---------------------------------------------------------------------------
-// CONTRACT-PENDING(F1) — 站点公开配置：版权、客服入口、开屏广告。后台写得下
-// (`/admin-api/system/config/:group`)，前台读不出来；见 docs/rewrite/cr/CR-7-h2.md。
+// 站点公开配置 — F4 的 `GET /api/v1/site/config`（CR-7-h2 §1）
+//
+// 一个公开路由，六个旧读者（这里三个，`api/public.js` 三个）。整个会话只读一次：
+// `siteConfig()` 缓存那一次请求的 promise，每个旧函数用 `api/mappers/system.js` 里
+// 各自的 mapper 取自己那一片，页面拿到的还是原来的字段名。失败不缓存，下一次调用
+// 重试。
 // ---------------------------------------------------------------------------
 
+let siteConfigRead = null;
+
+/** The one `GET /api/v1/site/config` per session, shared by every reader below. */
+export function siteConfig() {
+  if (!siteConfigRead) {
+    siteConfigRead = request.get('/api/v1/site/config', {}, { noAuth: true }).catch((err) => {
+      siteConfigRead = null;
+      throw err;
+    });
+  }
+  return siteConfigRead;
+}
+
+/** Tests only: forget the cached read. */
+export function resetSiteConfig() {
+  siteConfigRead = null;
+}
+
+/** A legacy reader of one slice of the site config, in the usual envelope. */
+export function fromSiteConfig(select) {
+  return siteConfig().then((res) => ({ data: select(res.data), msg: '', status: 200 }));
+}
+
+/** 版权文字 / 版权图片（首页、个人中心、登录页、隐私弹窗） */
 export function getCrmebCopyRight() {
-  return request.get('/api/v1/site/copyright', {}, { noAuth: true });
+  return fromSiteConfig(toLegacyCopyright);
 }
 
+/** 客服入口：每个读者只要 `customer_qrcode` */
 export function getCustomerType() {
-  return request.get('/api/v1/site/customer-service', {}, { noAuth: true });
+  return fromSiteConfig(toLegacyCustomerService);
 }
 
+/** 开屏广告（`pages/guide`） */
 export function getOpenAdv() {
-  return request.get('/api/v1/site/splash-ad', {}, { noAuth: true });
+  return fromSiteConfig(toLegacySplashAd);
+}
+
+/**
+ * 海报图片转 base64 的两次请求，`api/public.js` 的 `imageBase64` 和 `api/user.js` 的
+ * `imgToBase` 共用（F4 的 `POST /api/v1/attachments/base64`，一次一张 `{url}`）。
+ * 商品图失败就整体失败；二维码可选，转不了就原样交回。
+ */
+export function toDataUrls(image, code) {
+  const one = (url) =>
+    request.post('/api/v1/attachments/base64', fromLegacyBase64Input(url), { map: toLegacyBase64 });
+  const codeUrl = text(code).trim();
+  return Promise.all([
+    one(image),
+    codeUrl ? one(codeUrl).catch(() => ({ data: codeUrl })) : Promise.resolve({ data: '' }),
+  ]).then(([img, qr]) => ({ data: { image: img.data, code: qr.data }, msg: '', status: 200 }));
 }
 
 // ---------------------------------------------------------------------------
@@ -317,18 +390,12 @@ export function getTempIds() {
 // 不再复制一遍实现，直接转出 `api/activity.js` 的那一个（它带着 CR-1-h2 的 marker）。
 export { getPink as pink } from './activity.js';
 
-// ---------------------------------------------------------------------------
-// CONTRACT-PENDING(E1) — 滑块/点选验证码。`pages/users/components/verify/**` 是一整套
-// 行为验证码前端，前台没有出题和核验的路由；见 docs/rewrite/cr/CR-2-h2.md。
-// ---------------------------------------------------------------------------
-
-export function getAjcaptcha(data) {
-  return request.get('/api/v1/auth/captcha', data, { noAuth: true });
-}
-
-export function ajcaptchaCheck(data) {
-  return request.post('/api/v1/auth/captcha/verifications', data, { noAuth: true });
-}
+// 行为验证码（滑块 / 点选）没有继任者，`getAjcaptcha` / `ajcaptchaCheck` 和
+// `pages/users/components/verify/**` 一起删掉了。E4 的裁决（docs/rewrite/status/e4.md
+// §2）：旧滑块是客户端自己出题自己判卷，挡不住任何人，却给每个登录页加了一次往返；
+// 短信开销由「每手机号每小时 / 每天」「每来源地址每天」的预算和一个重发冷却兜住，解不
+// 解谜题都一样。服务端留了 `registerCaptchaVerifier` 这个缝，真要接第三方验证码时
+// 只改那一处。各页的「获取验证码」按钮现在直接发短信，验证码输入框不变。
 
 // ---------------------------------------------------------------------------
 // 短信验证码 / 手机号
@@ -343,13 +410,12 @@ export function verifyCode() {
 
 /**
  * 发送短信验证码（位置参数版本，`pages/users/user_phone` 这样调）
+ *
+ * 第三、四、五个参数（图形验证码 key、行为验证码类型和答案）都没有继任者，签名里
+ * 不再留占位符；调用处也已经不传了。
  */
-export function registerVerify(phone, reset, key, captchaType, captchaVerification) {
-  return sendSmsCode({
-    phone,
-    type: reset === undefined ? 'reset' : reset,
-    captchaVerification,
-  });
+export function registerVerify(phone, reset) {
+  return sendSmsCode({ phone, type: reset === undefined ? 'reset' : reset });
 }
 
 /**

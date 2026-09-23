@@ -316,16 +316,15 @@ export function fromLegacySmsScene(type) {
  * Legacy `registerVerify({phone, type, key, captchaType, captchaVerification})` →
  * `sendSmsCodeBody`.
  *
- * `key` was the id of a server-rendered image captcha and has no successor. The
- * slider's answer becomes `captchaToken`, which the route ignores while the slider is
- * switched off — see docs/rewrite/cr/CR-2-h2.md.
+ * Only two of those five survive. `key` was the id of a server-rendered image captcha;
+ * `captchaType` / `captchaVerification` were the 行为验证码's question and its answer.
+ * Neither has a successor — E4 decided against a behaviour captcha and bounds the SMS
+ * spend with per-phone and per-address budgets plus a resend cooldown instead
+ * (docs/rewrite/status/e4.md §2) — so the body is exactly `{phone, scene}`.
  */
 export function fromLegacySmsCodeInput(data) {
   const src = data || {};
-  const body = { phone: text(src.phone), scene: fromLegacySmsScene(src.type) };
-  const token = src.captchaVerification || src.captchaToken;
-  if (token) body.captchaToken = String(token);
-  return body;
+  return { phone: text(src.phone), scene: fromLegacySmsScene(src.type) };
 }
 
 /** `sendSmsCodeResult` → what the 倒计时 reads. */

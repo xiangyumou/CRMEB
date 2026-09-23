@@ -88,6 +88,19 @@ export function toLegacyGroupbuyBanners(dto) {
   }));
 }
 
+/**
+ * `GET /api/v1/groupbuy/summary` → the 人气条 on 拼团列表 and the DIY 拼团 block:
+ * `avatars` (a bare array of URLs, ≤ 8) and `pink_count` for 「N 人参与拼团」.
+ */
+export function toLegacyGroupbuySummary(dto) {
+  return {
+    avatars: list(dto && dto.avatars)
+      .map((url) => text(url))
+      .filter(Boolean),
+    pink_count: toInt(dto && dto.participants, 0),
+  };
+}
+
 /** `groupbuyOpenGroup` → one row of the 正在拼单 strip. */
 export function toLegacyOpenGroup(dto) {
   if (!dto) return {};

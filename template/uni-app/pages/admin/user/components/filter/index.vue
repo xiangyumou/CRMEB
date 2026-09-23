@@ -96,7 +96,7 @@
 				}
 			},
 			productLabel(){
-				getUserLabel(0).then(res=>{
+				getUserLabel().then(res=>{
 					this.labelList = res.data
 				}).catch(err=>{
 					this.$util.Tips({

@@ -44,7 +44,11 @@ import {
 } from './mappers/fulfil.js';
 import { toLegacyStaffOrderDetail } from './mappers/staff.js';
 import { fromLegacyPage } from './mappers/_shared.js';
-import { toLegacyApplicableCoupons, fromLegacyApplicableInput } from './mappers/coupon.js';
+import {
+  toLegacyApplicableCoupons,
+  fromLegacyApplicableInput,
+  toLegacyGiftCoupons,
+} from './mappers/coupon.js';
 import { fromLegacyCommentInput } from './mappers/catalog.js';
 import { clientPlatform } from '../config/app';
 
@@ -328,14 +332,13 @@ function expressView(readOrder, readShipments, readTracking) {
   });
 }
 
-// CONTRACT-PENDING(B1) — 下单后赠送的优惠券。支付成功页的「恭喜获得优惠券」弹层读它，
-// 合约里没有对应路由；见 docs/rewrite/cr/CR-5-h2.md §1。
 /**
- * 订单赠送的优惠券
- * @param string orderId
+ * 订单赠送的优惠券 — 支付成功页的「恭喜获得优惠券」弹层（B3，CR-5-h2 §1）。
+ * 没送券的订单是 `{items: []}` + 200，弹层 `v-if="couponList.length"` 不渲染。
+ * @param string orderId 订单 id 或订单号
  */
 export function orderCoupon(orderId) {
-  return request.get(`/api/v1/orders/${orderId}/gift-coupons`, {});
+  return request.get(`/api/v1/orders/${orderId}/gift-coupons`, {}, { map: toLegacyGiftCoupons });
 }
 
 // ---------------------------------------------------------------------------

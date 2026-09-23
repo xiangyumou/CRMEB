@@ -20,8 +20,6 @@
 				<button form-type="submit" class="confirmBnt bg-color">{{$t(`确认绑定`)}}</button>
 			</view>
 		</form>
-		<Verify @success="success" :captchaType="captchaType" :imgSize="{ width: '330px', height: '155px' }"
-			ref="verify"></Verify>
 	</view>
 	<view class="lottie-bg" v-else>
 		<view id="lottie">
@@ -42,18 +40,13 @@
 		BACK_URL
 	} from '@/config/cache';
 	import {
-		bindingPhone,
-		verifyCode
+		bindingPhone
 	} from '@/api/api.js';
 	import {
 		registerVerify
 	} from '@/api/user.js'
-	import Verify from '../components/verify/index.vue';
 	export default {
 		name: "Auth",
-		components: {
-			Verify
-		},
 		mixins: [sendVerifyCode],
 		data() {
 			return {
@@ -162,6 +155,7 @@
 			 * 发送验证码
 			 * 
 			 */
+			// 行为验证码已下线（E4），号码校验通过就直接发短信。
 			code() {
 				let that = this;
 				if (!that.phone) return that.$util.Tips({
@@ -170,26 +164,17 @@
 				if (!(/^1(3|4|5|7|8|9|6)\d{9}$/i.test(that.phone))) return that.$util.Tips({
 					title: that.$t(`请输入正确的手机号码`)
 				});
-				this.$refs.verify.show()
-			},
-			success(data) {
-				this.$refs.verify.hide()
-				verifyCode().then(res => {
-					registerVerify({
-						phone: that.phone,
-						type: 'reset',
-						key: res.data.key,
-						captchaType: this.captchaType,
-						captchaVerification: data.captchaVerification
-					}).then(res => {
-						this.sendCode()
-						that.$util.Tips({
-							title: res.msg
-						});
-					}).catch(err => {
-						return that.$util.Tips({
-							title: err
-						});
+				registerVerify({
+					phone: that.phone,
+					type: 'reset'
+				}).then(res => {
+					that.sendCode();
+					that.$util.Tips({
+						title: res.msg
+					});
+				}).catch(err => {
+					return that.$util.Tips({
+						title: err
 					});
 				});
 			},

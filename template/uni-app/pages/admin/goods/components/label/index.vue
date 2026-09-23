@@ -79,7 +79,6 @@
 <script>
 import emptyPage from "@/components/emptyPage.vue";
 import { getProductLabel, postBatchProcess } from "@/api/admin";
-import { handleError } from "vue";
 import baseDrawer from "@/components/tuiDrawer/tui-drawer.vue";
 
 export default {

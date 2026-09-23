@@ -20,15 +20,12 @@
 			</view>
 		</form>
 
-		<Verify @success="success" :captchaType="captchaType" :imgSize="{ width: '330px', height: '155px' }"
-			ref="verify"></Verify>
 
 	</view>
 </template>
 
 <script>
 	import sendVerifyCode from "@/mixins/SendVerifyCode";
-	import Verify from '../components/verify/index.vue';
 	import {
 		registerVerify,
 		bindingUserPhone,
@@ -51,7 +48,6 @@
 			// #ifdef MP
 			authorize,
 			// #endif
-			Verify
 		},
 		data() {
 			return {
@@ -165,24 +161,6 @@
 					})
 				}
 			},
-			success(data) {
-				this.$refs.verify.hide()
-				let that = this;
-				verifyCode().then(res => {
-					registerVerify(that.phone, 'reset', res.data.key, this.captchaType, data.captchaVerification)
-						.then(res => {
-							that.$util.Tips({
-								title: res.msg
-							});
-							that.sendCode();
-						}).catch(err => {
-							return that.$util.Tips({
-								title: err
-							});
-						});
-				});
-
-			},
 			/**
 			 * 发送验证码
 			 *
@@ -195,8 +173,17 @@
 				if (!(/^1(3|4|5|7|8|9|6)\d{9}$/i.test(that.phone))) return that.$util.Tips({
 					title: that.$t(`请输入正确的手机号码`)
 				});
-				this.$refs.verify.show();
-				return;
+				registerVerify(that.phone, 'reset')
+					.then(res => {
+						that.$util.Tips({
+							title: res.msg
+						});
+						that.sendCode();
+					}).catch(err => {
+						return that.$util.Tips({
+							title: err
+						});
+					});
 			}
 		}
 	}

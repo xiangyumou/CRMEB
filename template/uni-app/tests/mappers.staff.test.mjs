@@ -23,6 +23,24 @@ import {
   precedingStatisticsRange,
   toLegacyStatisticsRows,
   toLegacyStatisticsChart,
+  fromLegacyStaffProductQuery,
+  toLegacyStaffProduct,
+  toLegacyStaffProductList,
+  fromLegacyLabelAssignment,
+  fromLegacyCategoryAssignment,
+  toLegacyProductLabels,
+  toLegacyProductCategories,
+  toLegacyStaffSkus,
+  fromLegacySkuPatch,
+  toLegacyTemplateOptions,
+  fromLegacyStaffProductForm,
+  fromLegacyStaffUserQuery,
+  toLegacyStaffUser,
+  toLegacyStaffUserList,
+  toLegacyUserGroups,
+  toLegacyUserLabels,
+  fromLegacyUserGroupInput,
+  fromLegacyUserLabelInput,
 } from '../api/mappers/staff.js';
 
 const ORDERS = example('GET /api/v1/staff/orders');
@@ -448,5 +466,286 @@ describe('the 售后审核 direction', () => {
     expect(Object.keys(body)).toEqual(
       Object.keys(exampleBody('POST /api/v1/staff/refunds/:id/review')),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 商品管理 (A2)
+// ---------------------------------------------------------------------------
+
+describe('商品管理', () => {
+  const PRODUCTS = example('GET /api/v1/staff/products');
+  const SKUS = example('GET /api/v1/staff/products/:id/skus');
+
+  it('turns the four tabs into the state names and drops an empty keyword', () => {
+    expect(fromLegacyStaffProductQuery({ page: 2, limit: 20, store_name: '', type: '' })).toEqual({
+      page: 2,
+      pageSize: 20,
+    });
+    expect(fromLegacyStaffProductQuery({ page: 1, limit: 20, store_name: '白T', type: 1 })).toEqual({
+      page: 1,
+      pageSize: 20,
+      keyword: '白T',
+      state: 'on-sale',
+    });
+    // 仓库中 covers `off_shelf` **and** `draft` on the server (a2.md decision 2)
+    expect(fromLegacyStaffProductQuery({ type: 2 }).state).toBe('in-stock');
+    expect(fromLegacyStaffProductQuery({ type: 4 }).state).toBe('sold-out');
+    expect(fromLegacyStaffProductQuery({ type: 5 }).state).toBe('low-stock');
+  });
+
+  it('maps a list row to the snake_case the 商品管理 list renders', () => {
+    const row = toLegacyStaffProduct(PRODUCTS.items[0]);
+    expect(row).toMatchObject({
+      id: 1,
+      store_name: '经典白T恤',
+      image: 'https://cdn.example.com/p/1.png',
+      price: '59.00',
+      stock: 120,
+      sales: 33,
+      is_show: 1,
+      spec_type: 1,
+      // 普通商品; the 修改价格/库存 entry is disabled for anything else
+      virtual_type: 0,
+      unit_name: '件',
+      cate_id: '17',
+      label_list: '3',
+    });
+    assertRenderable(row);
+  });
+
+  it('gives a single-spec row the attr_value the 修改价格/库存 drawer mounts on', () => {
+    // the drawer is `v-if="goodsInfo.attr_value"` and the list route carries no SKU
+    const row = toLegacyStaffProduct({ ...PRODUCTS.items[0], specMode: false });
+    expect(row.spec_type).toBe(0);
+    // 成本价 / 划线价 stay empty: an empty field is left out of the patch, so it
+    // means "leave it alone" rather than "set it to zero"
+    expect(row.attr_value).toEqual({ price: '59.00', cost: '', ot_price: '', stock: 120 });
+  });
+
+  it('answers a missing payload with a renderable empty row', () => {
+    expect(toLegacyStaffProduct(null)).toEqual({});
+    expect(toLegacyStaffProductList(null)).toEqual({ list: [], count: 0, page: 1, limit: 20 });
+  });
+
+  it('pages the list the way the screen does', () => {
+    const page = toLegacyStaffProductList(PRODUCTS);
+    expect(page.count).toBe(1);
+    expect(page.limit).toBe(20);
+    expect(page.list[0].store_name).toBe('经典白T恤');
+  });
+
+  it('accepts an id, an array of ids or a comma string for both batch drawers', () => {
+    expect(fromLegacyLabelAssignment({ ids: ['1', '2'], label_list: ['3'] })).toEqual(
+      exampleBody('POST /api/v1/staff/products/label-assignments'),
+    );
+    // the single-product path sets `data.ids = this.goodsInfo.id`
+    expect(fromLegacyLabelAssignment({ ids: 1, label_list: '3,9' })).toEqual({
+      productIds: ['1'],
+      labelIds: ['3', '9'],
+    });
+    // an empty label set clears the labels, on purpose
+    expect(fromLegacyLabelAssignment({ ids: ['1'], label_list: [] })).toEqual({
+      productIds: ['1'],
+      labelIds: [],
+    });
+    expect(fromLegacyCategoryAssignment({ ids: ['1', '2'], cate_id: ['17'] })).toEqual(
+      exampleBody('POST /api/v1/staff/products/category-assignments'),
+    );
+  });
+
+  it('groups the labels the way the drawer renders them', () => {
+    const groups = toLegacyProductLabels(example('GET /api/v1/staff/product-labels'));
+    expect(groups).toEqual([
+      { cate_id: 2, cate_name: '促销', list: [{ id: 3, name: '新品' }] },
+      // the trailing null-category group
+      { cate_id: 0, cate_name: '未分类', list: [{ id: 9, name: '清仓' }] },
+    ]);
+    assertRenderable(groups);
+  });
+
+  it('renames the category tree to the drawer’s `title`', () => {
+    expect(toLegacyProductCategories(example('GET /api/v1/staff/product-categories'))).toEqual([
+      { id: 17, title: '男装', children: [{ id: 18, title: '上衣', children: [] }] },
+    ]);
+  });
+
+  it('gives a SKU row both `id` and `unique`', () => {
+    const rows = toLegacyStaffSkus(SKUS);
+    // `specs.vue` ticks by `id` and saves by `unique` — the same SKU id, twice
+    expect(rows[0]).toMatchObject({
+      id: 1001,
+      unique: '1001',
+      suk: '白|M',
+      price: '59.00',
+      ot_price: '89.00',
+      cost: '22.00',
+      stock: 60,
+    });
+    assertRenderable(rows);
+  });
+
+  it('sends only the fields the operator filled in', () => {
+    // 多规格 saves every row with its own `unique`
+    expect(fromLegacySkuPatch({ unique: '1001', price: '55.00', cost: '', ot_price: '', stock: '' }))
+      .toEqual(exampleBody('PUT /api/v1/staff/products/:id/skus').items[0]);
+    // 单规格 has no `unique` on the list row, so `api/admin.js` reads one first
+    expect(fromLegacySkuPatch({ price: '55.00', stock: 80 }, '1001')).toEqual({
+      id: '1001',
+      price: '55.00',
+      stock: 80,
+    });
+  });
+
+  it('flattens the 运费模板 options for the picker', () => {
+    expect(toLegacyTemplateOptions(example('GET /api/v1/staff/shipping-templates'))).toEqual([
+      { id: 1, name: '全国包邮（满 5 件）', type: 'quantity' },
+    ]);
+  });
+
+  it('builds the 添加商品 body out of the legacy form', () => {
+    const form = {
+      store_name: '手冲挂耳咖啡',
+      image: 'https://cdn.example.com/p/44.png',
+      slider_image: ['https://cdn.example.com/p/44.png'],
+      cate_id: ['17'],
+      unit_name: '盒',
+      content: '<p><img src="https://cdn.example.com/p/44-detail.png" /></p>',
+      is_show: 1,
+      // 固定邮费 0 is what the form ships with, and it means 包邮
+      freight: 2,
+      postage: 0,
+      temp_id: 0,
+      logistics: ['1', '2'],
+      attr: { price: '49.00', cost: '18.00', ot_price: '69.00', stock: 200 },
+    };
+    expect(fromLegacyStaffProductForm(form)).toEqual(
+      exampleBody('POST /api/v1/staff/products'),
+    );
+  });
+
+  it('carries the freight choice across, and nothing the mode does not want', () => {
+    const base = {
+      store_name: 'x',
+      image: 'i',
+      cate_id: '17',
+      unit_name: '件',
+      attr: { price: '1.00', stock: 1 },
+    };
+    const fixed = fromLegacyStaffProductForm({ ...base, freight: 2, postage: '6.00' });
+    expect(fixed.freightMode).toBe('fixed');
+    expect(fixed.fixedFreight).toBe('6.00');
+    expect(fixed.shippingTemplateId).toBeUndefined();
+
+    const template = fromLegacyStaffProductForm({ ...base, freight: 3, temp_id: 4 });
+    expect(template.freightMode).toBe('template');
+    expect(template.shippingTemplateId).toBe('4');
+    expect(template.fixedFreight).toBeUndefined();
+
+    // 门店自提 is retired shop-wide: `logistics` is not in the request at all
+    expect(fromLegacyStaffProductForm({ ...base, logistics: ['1', '2'] })).not.toHaveProperty(
+      'logistics',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 用户管理 (E4)
+// ---------------------------------------------------------------------------
+
+describe('用户管理', () => {
+  const USERS = example('GET /api/v1/staff/users');
+  const USER = example('GET /api/v1/staff/users/:uid');
+  const LABELS = example('GET /api/v1/staff/users/:uid/labels');
+
+  it('turns the list page’s query into the contract’s and drops the 全部 zeros', () => {
+    expect(
+      fromLegacyStaffUserQuery({ page: 1, limit: 20, nickname: '', group_id: 0, label_id: '' }),
+    ).toEqual({ page: 1, pageSize: 20 });
+    expect(
+      fromLegacyStaffUserQuery({ page: 2, limit: 20, nickname: ' 小明 ', group_id: 3, label_id: '7' }),
+    ).toEqual({ page: 2, pageSize: 20, keyword: '小明', groupId: '3', labelId: '7' });
+    // the filter drawer joins a multi-select with commas; the route takes one label
+    expect(fromLegacyStaffUserQuery({ label_id: '7,8' }).labelId).toBe('7');
+  });
+
+  it('maps the staff user item to the row and the detail the pages render', () => {
+    const row = toLegacyStaffUser(USER);
+    expect(row).toMatchObject({
+      uid: 1001,
+      nickname: '小明',
+      avatar: 'https://cdn.example.com/2026/09/a1b2c3d4.png',
+      // always masked — the staff screen never has the full number
+      phone: '138****8000',
+      status: 1,
+      group_id: 3,
+      group_name: '高价值客户',
+      label_id: [{ id: 7, label_name: '母婴' }],
+      order_total_count: 12,
+      order_total_price: '3980.00',
+      coupon_num: '--',
+    });
+    expect(row._add_time).toMatch(/^2026-01-05 10:00/);
+    // the thin contract: none of the console-only fields are invented
+    for (const field of ['real_name', 'birthday', 'card_id', 'addres']) {
+      expect(row).not.toHaveProperty(field);
+    }
+    assertRenderable(row);
+  });
+
+  it('renders unknown order stats as 「--」, never as a first-time buyer’s zero', () => {
+    const row = toLegacyStaffUser({ ...USER, orderCount: null, spendTotal: null, groups: [] });
+    expect(row.order_total_count).toBe('--');
+    expect(row.order_total_price).toBe('--');
+    expect(row.group_id).toBe(0);
+    expect(row.group_name).toBe('');
+  });
+
+  it('pages the list as {list, count}', () => {
+    const page = toLegacyStaffUserList(USERS);
+    expect(page.count).toBe(1);
+    expect(page.list[0].uid).toBe(1001);
+  });
+
+  it('gives the group picker its `group_name`', () => {
+    expect(toLegacyUserGroups(example('GET /api/v1/staff/user-groups'))).toEqual([
+      { id: 3, group_name: '高价值客户' },
+      { id: 4, group_name: '新客' },
+    ]);
+  });
+
+  it('groups the labels the way both drawers read them, 未分类 included', () => {
+    const groups = toLegacyUserLabels(LABELS);
+    expect(groups).toEqual([
+      {
+        id: 2,
+        name: '消费偏好',
+        label: [
+          { id: 7, label_name: '母婴', assigned: true },
+          { id: 8, label_name: '数码', assigned: false },
+        ],
+      },
+      { id: 0, name: '未分类', label: [{ id: 9, label_name: '未分类标签', assigned: false }] },
+    ]);
+  });
+
+  it('clears `assigned` when the labels were only borrowed for the catalogue', () => {
+    const groups = toLegacyUserLabels(LABELS, { catalogue: true });
+    for (const group of groups) for (const label of group.label) expect(label.assigned).toBe(false);
+  });
+
+  it('sends the group body the route accepts, null surviving as null', () => {
+    expect(fromLegacyUserGroupInput(3)).toEqual(exampleBody('POST /api/v1/staff/users/:uid/group'));
+    // the old wrapper sent the string "null" here, a 422 (e4.md item 3)
+    expect(fromLegacyUserGroupInput(null)).toEqual({ groupId: null });
+    expect(fromLegacyUserGroupInput(0)).toEqual({ groupId: null });
+  });
+
+  it('sends the label body as an array of id strings', () => {
+    expect(fromLegacyUserLabelInput([7])).toEqual(exampleBody('POST /api/v1/staff/users/:uid/labels'));
+    // the old wrapper turned the array into "[object Object],…" (e4.md item 1)
+    expect(fromLegacyUserLabelInput([7, '8'])).toEqual({ labelIds: ['7', '8'] });
+    // 取消 all labels is an empty array, not a missing field
+    expect(fromLegacyUserLabelInput([])).toEqual({ labelIds: [] });
   });
 });

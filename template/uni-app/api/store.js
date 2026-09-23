@@ -20,6 +20,8 @@ import { toLegacyPresaleDetail } from './mappers/activity.js';
 import { toLegacyCartAddResult, fromLegacyCartAddInput } from './mappers/cart.js';
 import { buyNowTicket } from './mappers/order.js';
 import { fromLegacyPage } from './mappers/_shared.js';
+import { fromLegacyMiniCodeQuery, toLegacyMiniCode } from './mappers/wechat.js';
+import store from '../store';
 
 /**
  * 获取产品详情
@@ -257,17 +259,20 @@ export function getPresellProductDetail(id) {
 }
 
 // ---------------------------------------------------------------------------
-// CONTRACT-PENDING — 待其他 stream 的合约落地
+// 商品海报的小程序码 — E4 的 `GET /api/v1/wechat/mini-qrcodes`（CR-6-h2）
 // ---------------------------------------------------------------------------
 
-// CONTRACT-PENDING(E2) — 商品海报的小程序码。前台只有 jssdk-config 和 subscribe-
-// templates 两条微信路由；见 docs/rewrite/cr/CR-6-h2.md。
 /**
- * 产品分享二维码
- * @param int id
+ * 产品分享二维码。路由是 `auth: 'user'`，所以不再 `noAuth`：海报只在小程序里、
+ * 登录后生成，scene 带当前用户作推广人。
+ * @param int id 商品 id
  */
 export function getProductCode(id) {
-  return request.get('/api/v1/wechat/mini-qrcodes', { scene: 'product', id }, { noAuth: true });
+  return request.get(
+    '/api/v1/wechat/mini-qrcodes',
+    fromLegacyMiniCodeQuery('product', id, store.state.app.uid),
+    { map: toLegacyMiniCode },
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -28,6 +28,8 @@ vi.mock('../config/app', () => ({
 vi.mock('../libs/login', () => ({ toLogin: vi.fn(), checkLogin: vi.fn(() => true) }));
 vi.mock('../store', () => ({ default: { state: { app: { token: 'mock-token' } }, commit: vi.fn() } }));
 vi.mock('../utils/lang.js', () => ({ default: { t: (k) => k } }));
+// api/public.js pulls in the JS-SDK wrapper, which needs the `@/` alias and a browser.
+vi.mock('../libs/wechat.js', () => ({ default: {} }));
 
 /** `uni.request` on top of `fetch`, which is the only uni API these calls need. */
 function installUniRequest() {
@@ -69,6 +71,7 @@ d('the api layer against the contract mock', () => {
   let activity;
   let user;
   let api;
+  let pub;
 
   beforeAll(async () => {
     installUniRequest();
@@ -78,6 +81,7 @@ d('the api layer against the contract mock', () => {
     activity = await import('../api/activity.js');
     user = await import('../api/user.js');
     api = await import('../api/api.js');
+    pub = await import('../api/public.js');
   });
 
   /** Every id the mock's examples use, so a detail call asks for something that exists. */
@@ -189,6 +193,226 @@ d('the api layer against the contract mock', () => {
       ['order-create', 'order-pay', 'order-ship', 'refund'],
     );
     for (const ids of Object.values(res.data)) expect(Array.isArray(ids)).toBe(true);
+  });
+
+  // 商品管理 — A2's ten routes, bound in the third pass. Two of them are fan-outs
+  // (批量下架 and the single-spec 保存) and the rest are a URL plus a mapper, which
+  // is exactly what a mocked `uni.request` cannot prove.
+
+  it('商品列表 maps to the {list, count} the 商品管理 pages through', async () => {
+    const res = await admin.adminProductList({ page: 1, limit: 20, type: 1, store_name: '' });
+    expect(res.status).toBe(200);
+    expect(res.data.list.length).toBeGreaterThan(0);
+    expect(res.data.list[0]).toHaveProperty('store_name');
+    // every row can mount the 修改价格/库存 drawer
+    expect(res.data.list[0].attr_value).toHaveProperty('price');
+  });
+
+  it('批量下架 fans one call out over the selected products', async () => {
+    const id = exampleId('GET /api/v1/staff/products', 'id');
+    const res = await admin.productSetShow({ id: [id, id], is_show: 0 });
+    expect(res.status).toBe(200);
+    expect(res.data).toHaveLength(2);
+    expect(res.data[0]).toHaveProperty('store_name');
+  });
+
+  it('商品标签 comes back grouped, 商品分类 as a `title` tree', async () => {
+    const labels = await admin.getProductLabel();
+    expect(labels.data[0]).toHaveProperty('cate_name');
+    expect(Array.isArray(labels.data[0].list)).toBe(true);
+    const cates = await admin.getProductCate();
+    expect(cates.data[0]).toHaveProperty('title');
+    expect(Array.isArray(cates.data[0].children)).toBe(true);
+  });
+
+  it('两个批量抽屉 post the plural bodies', async () => {
+    const id = exampleId('GET /api/v1/staff/products', 'id');
+    const labels = await admin.postBatchProcess({ ids: [id], label_list: ['3'] });
+    expect(labels.status).toBe(200);
+    const cates = await admin.postManageSaveCate({ ids: [id], cate_id: ['17'] });
+    expect(cates.status).toBe(200);
+  });
+
+  it('商品规格 carries both `id` and `unique`, and the patch round-trips', async () => {
+    const id = exampleId('GET /api/v1/staff/products', 'id');
+    const attrs = await admin.getManageProductAttr(id);
+    expect(attrs.data[0]).toHaveProperty('unique');
+    const saved = await admin.postUpdateAttrs(id, {
+      attr_value: [{ unique: attrs.data[0].unique, price: '55.00', cost: '', ot_price: '', stock: '' }],
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.data[0]).toHaveProperty('suk');
+  });
+
+  it('单规格保存 reads the SKU id first, then patches', async () => {
+    const id = exampleId('GET /api/v1/staff/products', 'id');
+    // the list row has no `unique`, which is the whole point of the extra read
+    const saved = await admin.postUpdateAttrs(id, {
+      attr_value: [{ price: '55.00', cost: '', ot_price: '', stock: 80 }],
+    });
+    expect(saved.status).toBe(200);
+  });
+
+  it('运费模板 and 添加商品 speak the contract’s own shapes', async () => {
+    const templates = await admin.getTemplateOption();
+    expect(templates.data[0]).toHaveProperty('name');
+    const created = await admin.productCreate({
+      store_name: '手冲挂耳咖啡',
+      image: 'https://cdn.example.com/p/44.png',
+      slider_image: ['https://cdn.example.com/p/44.png'],
+      cate_id: ['17'],
+      unit_name: '盒',
+      content: '<p></p>',
+      is_show: 1,
+      freight: 2,
+      postage: 0,
+      attr: { price: '49.00', cost: '18.00', ot_price: '69.00', stock: 200 },
+    });
+    expect(created.status).toBe(200);
+    expect(created.data).toHaveProperty('store_name');
+  });
+
+  // 用户管理 — E4's six routes. `getUserLabel()` with no uid borrows a customer to
+  // read the catalogue, and the two writes fan out over a batch selection.
+
+  it('用户列表 and 用户详情 map to the rows the 用户管理 pages render', async () => {
+    const list = await admin.getUserList({ page: 1, limit: 20, nickname: '', group_id: 0, label_id: '' });
+    expect(list.status).toBe(200);
+    expect(list.data.list[0]).toHaveProperty('nickname');
+    expect(list.data.list[0].phone).toMatch(/\*/);
+    const uid = exampleId('GET /api/v1/staff/users', 'id');
+    const detail = await admin.getUserInfo(uid);
+    expect(detail.data).toHaveProperty('label_id');
+    expect(detail.data).toHaveProperty('group_id');
+  });
+
+  it('用户分组 comes back with `group_name`, and 设置分组 fans out', async () => {
+    const groups = await admin.getGroupList();
+    expect(groups.data[0]).toHaveProperty('group_name');
+    const uid = exampleId('GET /api/v1/staff/users', 'id');
+    const res = await admin.postUserSetGroup([uid, uid], groups.data[0].id);
+    expect(res.status).toBe(200);
+    expect(res.msg).toBe('设置成功');
+    expect(res.data).toHaveLength(2);
+  });
+
+  it('用户标签 reads per customer, or as a catalogue with nothing assigned', async () => {
+    const uid = exampleId('GET /api/v1/staff/users', 'id');
+    const own = await admin.getUserLabel(uid);
+    expect(own.data[0].label[0]).toHaveProperty('label_name');
+    const catalogue = await admin.getUserLabel();
+    expect(catalogue.data.length).toBeGreaterThan(0);
+    for (const group of catalogue.data) for (const label of group.label) expect(label.assigned).toBe(false);
+    const saved = await admin.postUserSetLabel(uid, [own.data[0].label[0].id]);
+    expect(saved.status).toBe(200);
+    expect(saved.data[0]).toHaveProperty('label_id');
+  });
+
+  // 赠送优惠券 and 订单赠券 — B3's three routes.
+
+  it('赠券抽屉 lists grantable coupons and grants through coupon-grants', async () => {
+    const coupons = await admin.getUserCoupon({ coupon_title: '', uid: 0 });
+    expect(coupons.data[0]).toHaveProperty('coupon_title');
+    const uid = exampleId('GET /api/v1/staff/users', 'id');
+    const res = await admin.postUserSetCoupon([uid, uid], coupons.data[0].id);
+    expect(res.status).toBe(200);
+    expect(res.data).toHaveLength(2);
+    expect(res.msg).toBe('赠送成功');
+  });
+
+  it('查看优惠券 refuses without a request — there is no staff read of a customer’s coupons', async () => {
+    await expect(admin.getUserCoupon({ coupon_title: '', uid: 1001 })).rejects.toMatchObject({
+      msg: expect.any(String),
+    });
+  });
+
+  it('订单赠券 maps to the 支付成功 sheet', async () => {
+    const res = await order.orderCoupon('5001');
+    expect(res.status).toBe(200);
+    expect(res.data[0]).toHaveProperty('coupon_title');
+  });
+
+  // 人气条, the three 小程序码 callers and 一键绑定手机号 — B3 / E4.
+
+  it('拼团人气条 maps to {avatars, pink_count}', async () => {
+    const res = await activity.getPink();
+    expect(Array.isArray(res.data.avatars)).toBe(true);
+    expect(Number.isInteger(res.data.pink_count)).toBe(true);
+  });
+
+  it('the three 小程序码 calls answer `code` and `url`', async () => {
+    for (const res of [
+      await store.getProductCode(1024),
+      await activity.scombinationCode(12),
+      await user.routineCode(),
+    ]) {
+      expect(res.status).toBe(200);
+      expect(res.data.code).toBeTruthy();
+      expect(res.data.url).toBe(res.data.code);
+    }
+  });
+
+  it('一键绑定手机号 posts the phone code', async () => {
+    const res = await user.mpBindingPhone({ phoneCode: 'mp-phone-code-abc' });
+    expect(res.status).toBe(200);
+    expect(res.msg).toBe('绑定成功');
+  });
+
+  // 站点公开配置 — six legacy readers over one GET /api/v1/site/config (F4), the
+  // DIY reads that replaced CR-3-h2's three gaps, and the poster base64 re-point.
+
+  it('reads the site config once for all six readers', async () => {
+    api.resetSiteConfig();
+    const seen = [];
+    const original = globalThis.uni.request;
+    globalThis.uni.request = (options) => {
+      seen.push(options.url);
+      return original(options);
+    };
+    try {
+      const [basic, logo, share, copyright, service, splash] = await Promise.all([
+        pub.basicConfig(),
+        pub.getLogo(2),
+        pub.getShare(),
+        api.getCrmebCopyRight(),
+        api.getCustomerType(),
+        api.getOpenAdv(),
+      ]);
+      expect(basic.data.site_name).toBeTruthy();
+      expect(logo.data).toHaveProperty('logo_url');
+      expect(share.data).toHaveProperty('synopsis');
+      expect(copyright.data).toHaveProperty('copyrightContext');
+      expect(service.data).toHaveProperty('customer_qrcode');
+      expect(splash.data).toHaveProperty('status');
+    } finally {
+      globalThis.uni.request = original;
+    }
+    expect(seen.filter((url) => url.includes('/api/v1/site/config'))).toHaveLength(1);
+  });
+
+  it('底部导航 answers the pageFoot component, 版式 a number, 个人中心 a DIY page', async () => {
+    const nav = await pub.getNavigation();
+    expect(nav.data).toHaveProperty('effectConfig');
+    const category = await api.getThemeInfo('category');
+    expect([1, 2, 3]).toContain(category.data.status);
+    const menus = await user.getMenuList();
+    expect(menus.data.diy_data).toHaveProperty('value');
+    expect(menus.data.routine_my_menus).toEqual([]);
+    const center = await api.getThemeInfo('user');
+    expect(center.data).toHaveProperty('value');
+    // 商品详情 has no read route (CR-2-h3): an empty page, not a 422
+    const detail = await api.getThemeInfo('detail');
+    expect(detail.data).toEqual({});
+  });
+
+  it('海报 base64 posts one url per image and composes {image, code}', async () => {
+    const own = '/uploads/attachment/2026/09/2f7c1a9b.png';
+    const both = await pub.imageBase64(own, own);
+    expect(both.data.image).toMatch(/^data:image\//);
+    expect(both.data.code).toMatch(/^data:image\//);
+    const imageOnly = await user.imgToBase({ image: own, code: '' });
+    expect(imageOnly.data.image).toMatch(/^data:image\//);
+    expect(imageOnly.data.code).toBe('');
   });
 
   it('rejects a 404 with both message and msg', async () => {
