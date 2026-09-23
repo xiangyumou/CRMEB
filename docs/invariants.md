@@ -926,6 +926,8 @@ A notification is recorded inside the business transaction and sent after it com
 - `packages/core/src/notification/notification.int.test.ts::notify > writes an effect row inside the caller transaction and sends nothing yet`
 - `packages/core/src/notification/notification.int.test.ts::notify > is rolled back with the business change it belongs to`
 - `packages/core/src/notification/notification.int.test.ts::notify > drops an event nobody registered rather than failing the order`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::shopper notifications > tells each paid member 拼团失败 in the transaction that opened their refund`
+- `packages/core/src/presale/presale.int.test.ts::shopper notifications > tells a shopper whose payment the quota refused, in the transaction that opened the refund`
 
 ### NOTIF-002
 
@@ -933,6 +935,8 @@ The same event for the same aggregate notifies once, however many callers ask an
 
 - `packages/core/src/notification/notification.int.test.ts::notify > records the same event for the same aggregate once, twice for two aggregates`
 - `packages/core/src/notification/notification.int.test.ts::fan-out > delivers the same notification once when two dispatchers race it`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::shopper notifications > tells the leader 开团成功 and a joiner 参团成功, once each however often the effect runs`
+- `packages/core/src/presale/presale.int.test.ts::shopper notifications > tells the shopper the ship date their payment fixed, once, on every channel switched on`
 
 ### NOTIF-003
 
@@ -948,6 +952,10 @@ The events that can fire are compiled in, and a template row is seeded from the 
 
 - `packages/core/src/notification/notification.int.test.ts::fan-out > seeds the template from the registry and writes the in-app message`
 - `packages/core/src/notification/notification.int.test.ts::fan-out > does not send at all when the operator turned the event off`
+- `packages/core/src/notification/notification.int.test.ts::fan-out > sends in-app from a template shell the reference-data seed wrote with no channels`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::shopper notifications > lists the four events in 通知管理 with in-app on, over the empty shells the seed writes`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::shopper notifications > sends nothing for an event the operator switched off in 通知管理`
+- `packages/core/src/presale/presale.int.test.ts::shopper notifications > sends nothing for an event the operator switched off in 通知管理`
 
 ### NOTIF-005
 
