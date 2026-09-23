@@ -40,9 +40,14 @@ search → the rest of C's gaps → merge checklist.
    both unchanged and uncapped), so the no-parameter answer is now the first 50, not all
    ~1100. Response body unchanged. SHIP-003.
 
+5. The rest of C's "Backend gaps": there were exactly the three above. C's other open items
+   are client-side and need no backend: gift coupons (`coupon.orderGiftCoupons`,
+   `GET /api/v1/orders/:id/gift-coupons`, already exists), the C07 `referrerInfo` fallback,
+   and B's pay-result invalidation. Docs: pages.md §2.3 note and §5 rows, decor.md 角标 note.
+
 ## In progress
 
-- 5: the rest of C's gaps.
+- Merge checklist.
 
 ## Client follow-ups
 

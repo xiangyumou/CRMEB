@@ -78,7 +78,7 @@
 
 - **商品选项卡为什么一次解析全部选项卡**：解析器只在整页响应里回答块的 `data`，没有按块取数的接口，所以块为每个选项卡声明一个槽位（`productTabSlot(i)`），切换选项卡是本地状态，无需网络。每个槽位受数据源自身的 `limit`（≤ 20）限制，最多 5 个。以后如果选项卡变重，需要新增一个公开的「解析单个数据源」接口，再改为懒加载。
 - **意图**（`BlockIntent`）：块不直接调用平台能力。`contact` 和 `login` 通过 `onIntent` 交给宿主；联系客服在微信里必须是 `<button open-type="contact">`，宿主可以传 `renderIntent` 把该项包进自己的原生控件，这时块不再挂点击处理。
-- **个人中心的角标**：`orderCounts` 取自订单域的 `order.counts`（`aftersale` = 退款中）。`unreviewed`（待评价）目前没有计数来源，所以不显示角标。
+- **个人中心的角标**：`orderCounts` 取自订单域的 `order.counts`（`aftersale` = 退款中）。`unreviewed`（待评价）= `order.counts.unreviewed`（H4，ORDER-010：已收货或已完成、且至少有一行商品还能评价的订单）；schema 里仍是可选字段，旧服务端不返回时不显示角标。这个入口目前仍跳 `myReviews`，等「我的订单」有待评价 tab 后改跳 `orderList { tab: 'unreviewed' }`。
 
 ## 3. 校验：保存从宽，发布从严（DECOR-003）
 
