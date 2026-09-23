@@ -1,0 +1,79 @@
+import type { RefundableItem, RefundKind, RefundListItem } from '@shop/contracts/refund/schemas';
+
+/** `"12.30"` → 1230. Money strings from the API always have at most two decimals. */
+export function toCents(money: string): number {
+  const [whole = '0', fraction = ''] = money.trim().split('.');
+  const sign = whole.startsWith('-') ? -1 : 1;
+  return sign * (Math.abs(Number(whole)) * 100 + Number(fraction.padEnd(2, '0').slice(0, 2)));
+}
+
+export function fromCents(cents: number): string {
+  const sign = cents < 0 ? '-' : '';
+  const abs = Math.abs(Math.round(cents));
+  return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
+}
+
+/**
+ * What one line would give back for `quantity` units: all of its `refundableAmount` when every
+ * remaining unit goes, else that amount's share, rounded down. Only an estimate: the server
+ * computes the real amount (`refund.apply` takes no amount).
+ */
+export function lineEstimate(item: RefundableItem, quantity: number): number {
+  if (item.refundableQuantity <= 0 || quantity <= 0) return 0;
+  const all = toCents(item.refundableAmount);
+  if (quantity >= item.refundableQuantity) return all;
+  return Math.floor((all * quantity) / item.refundableQuantity);
+}
+
+export const KIND_TEXT: Record<RefundKind, string> = {
+  refund_only: '仅退款',
+  return_and_refund: '退货退款',
+};
+
+/** The shopper's words for where a request stands. */
+export function refundStatusText(
+  refund: Pick<RefundListItem, 'status' | 'kind' | 'returnStage'>,
+): string {
+  switch (refund.status) {
+    case 'applied':
+      return '待商家处理';
+    case 'approved':
+      if (refund.kind === 'return_and_refund') {
+        if (refund.returnStage === 'awaiting_shipment') return '待寄回商品';
+        if (refund.returnStage === 'shipped_back') return '待商家收货';
+      }
+      return '退款处理中';
+    case 'processing':
+    case 'unknown':
+      return '退款处理中';
+    case 'failed':
+      return '退款异常，商家处理中';
+    case 'succeeded':
+      return '退款成功';
+    case 'rejected':
+      return '商家已拒绝';
+    case 'cancelled':
+      return '已撤销';
+  }
+}
+
+/** 撤销申请: only before any money moved (`applied`, `approved`). */
+export function canCancel(refund: Pick<RefundListItem, 'status'>): boolean {
+  return refund.status === 'applied' || refund.status === 'approved';
+}
+
+/** 填写退货物流: an approved return still waiting for the parcel. */
+export function awaitsReturn(
+  refund: Pick<RefundListItem, 'status' | 'kind' | 'returnStage'>,
+): boolean {
+  return (
+    refund.status === 'approved' &&
+    refund.kind === 'return_and_refund' &&
+    refund.returnStage === 'awaiting_shipment'
+  );
+}
+
+/** 删除记录: only a finished request leaves the list. */
+export function canHide(refund: Pick<RefundListItem, 'status'>): boolean {
+  return ['rejected', 'succeeded', 'failed', 'cancelled'].includes(refund.status);
+}
