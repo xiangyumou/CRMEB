@@ -20,7 +20,8 @@ import type { z } from 'zod';
  *    definition and the specific one at the use site.
  * 3. **The control is inferred from the schema** — string → text, number →
  *    number (bounds from `.min()` / `.max()`), boolean → switch, enum or union
- *    of literals → select (`radio` when ≤ 3 choices), array of objects → list,
+ *    of literals → select (`radio` when ≤ 4 choices), array of objects → list,
+ *    array of an enum → multi-select (the enum's `options` label the choices),
  *    object → group. Set `field` only to override that, or for a *semantic*
  *    kind the inference cannot see: `color`, `image`, `link` and the data
  *    sources (`productSource`, `couponSource`, `groupbuySource`,

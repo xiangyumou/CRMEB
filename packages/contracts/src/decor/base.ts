@@ -86,8 +86,8 @@ export const blockVisibility = z
       .array(enumOf(Object.keys(PLATFORMS) as Platform[]))
       .max(3)
       .default([])
-      // `hidden` until the editor has a multi-select control (stream F2 un-hides it).
-      .meta(ui({ label: '仅在这些客户端显示（不选即全部）', options: PLATFORMS, hidden: true })),
+      // An array of an enum: the editor draws it as a multi-select (checkboxes).
+      .meta(ui({ label: '仅在这些客户端显示（不选即全部）', options: PLATFORMS })),
   })
   .meta(ui({ label: '显示', field: 'object', group: '显示' }));
 
