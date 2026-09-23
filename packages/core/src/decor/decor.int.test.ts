@@ -1013,6 +1013,23 @@ describe('the batch-1 blocks (G1)', () => {
     expect(idsIn(page, 0, 'products')).toEqual([a]);
   });
 
+  it('DECOR-003: a draft stored before a block’s upgrade opens migrated, so the editor can load it', async () => {
+    const { id } = await drafted('custom', []);
+    const v1 = { source: { mode: 'manual', ids: [] }, titleLines: 1, showTag: false };
+    await ctx.db
+      .update(decorDocuments)
+      .set({ draft: doc([{ id: 'old', type: 'productGrid', v: 1, props: v1 }]) })
+      .where(eq(decorDocuments.id, Number(id)));
+    const detail = await decor.getDocument(ctx, { id });
+    expect(detail.issues).toEqual([]);
+    expect(detail.draft.blocks[0]).toMatchObject({
+      id: 'old',
+      type: 'productGrid',
+      v: 2,
+      props: { ...v1, layout: 'grid2' },
+    });
+  });
+
   it('DECOR-017: rich text is stored sanitised, and served sanitised even when the row was not', async () => {
     const dirty =
       '<p onclick="steal()">须知</p><script>alert(1)</script><iframe src="https://x.example"></iframe>' +

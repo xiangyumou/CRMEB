@@ -1904,7 +1904,7 @@ A decorated link stores what it opens (`LinkTarget`), never a path: a catalogue 
 
 ### DECOR-003
 
-A draft save is lenient and a publish is strict. A draft whose envelope fails (schema version, block count, byte size) is refused outright; anything inside it that fails — invalid props, an unknown block type, a block type newer than this build, a block the page kind may not hold — is stored as it came and reported as an issue with its path, so an operator's half-finished work is never thrown away. Known blocks are stored migrated with their defaults filled in.
+A draft save is lenient and a publish is strict. A draft whose envelope fails (schema version, block count, byte size) is refused outright; anything inside it that fails — invalid props, an unknown block type, a block type newer than this build, a block the page kind may not hold — is stored as it came and reported as an issue with its path, so an operator's half-finished work is never thrown away. Known blocks are stored migrated with their defaults filled in, and a draft stored before a block's upgrade is read back migrated.
 
 - `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > keeps an unknown block type as it came, warns, and blocks publishing it`
 - `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > treats a known type stored at a newer version like an unknown one`
@@ -1917,6 +1917,7 @@ A draft save is lenient and a publish is strict. A draft whose envelope fails (s
 - `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: a new page starts empty and titled after its name; a new 个人中心 starts from the built-in one`
 - `packages/contracts/src/decor/blocks.test.ts::商品列表 (productGrid) v2 > migrates a stored v1 block to the two-column grid it always was`
 - `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > DECOR-003: a 商品网格 stored at v1 is served at v2 as the two-column grid it was, with its products`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > DECOR-003: a draft stored before a block’s upgrade opens migrated, so the editor can load it`
 - `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: lists, renames, duplicates and soft-deletes documents`
 
 ### DECOR-004
