@@ -29,7 +29,7 @@ import store from '../store';
  */
 export function getProductDetail(id) {
   return request.get(`/api/v1/catalog/products/${id}`, {}, {
-    noAuth: true,
+    optionalAuth: true,
     map: toPageProductDetail,
   });
 }

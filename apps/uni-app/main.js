@@ -89,13 +89,6 @@ if (typeof window.entryUrl === 'undefined' || window.entryUrl === '') {
 }
 
 
-// 添加统计脚本
-(function () {
-  var hm = document.createElement('script');
-  hm.src = 'https://cdn.oss.9gt.net/js/es.js?version=kyv6.0.0';
-  var s = document.getElementsByTagName('script')[0];
-  s.parentNode.insertBefore(hm, s);
-})();
 // #endif
 
 

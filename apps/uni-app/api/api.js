@@ -52,7 +52,7 @@ import { fromPagePaging, text } from './mappers/_shared.js';
  */
 export function getCoupons(data) {
   return request.get('/api/v1/coupons', fromPagePaging(data), {
-    noAuth: true,
+    optionalAuth: true,
     map: toPageCouponList,
   });
 }
@@ -62,7 +62,7 @@ export function getCoupons(data) {
  */
 export function getCouponV2() {
   return request.get('/api/v1/coupons', { page: 1, pageSize: 20 }, {
-    noAuth: true,
+    optionalAuth: true,
     map: toPageCouponPopup,
   });
 }
@@ -71,7 +71,7 @@ export function getCouponV2() {
  * 新用户优惠券弹窗
  */
 export function getCouponNewUser() {
-  return request.get('/api/v1/coupons/new-user', {}, { noAuth: true, map: toPageNewUserCouponPopup });
+  return request.get('/api/v1/coupons/new-user', {}, { optionalAuth: true, map: toPageNewUserCouponPopup });
 }
 
 /**
@@ -196,7 +196,7 @@ export function getThemeProduct(data) {
  */
 export function getThemeCoupon(data) {
   return request.get('/api/v1/coupons', fromPagePaging(data), {
-    noAuth: true,
+    optionalAuth: true,
     map: toPageCouponArray,
   });
 }

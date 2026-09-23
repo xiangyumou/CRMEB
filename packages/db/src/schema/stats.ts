@@ -72,7 +72,7 @@ export const userVisits = pgTable(
     path: varchar({ length: 255 }).notNull(),
     platform: ordersPlatform(),
     ip: varchar({ length: 45 }),
-    /** Coarse geo, resolved from the IP at write time. */
+    /** Coarse geo: the signed-in visitor's default-address province when the view was recorded; null for anonymous views. */
     province: varchar({ length: 64 }),
     /** How long the visitor stayed, in milliseconds. */
     stayMs: integer(),

@@ -47,7 +47,7 @@ export function getCombinationList(data) {
  */
 export function getCombinationDetail(id) {
   return Promise.all([
-    request.get(`/api/v1/groupbuy/activities/${id}`, {}, { noAuth: true }),
+    request.get(`/api/v1/groupbuy/activities/${id}`, {}, { optionalAuth: true }),
     request
       .get(`/api/v1/groupbuy/activities/${id}/groups`, { page: 1, pageSize: 20 }, { noAuth: true })
       .catch(() => ({ data: { items: [] } })),
@@ -68,12 +68,12 @@ export function getCombinationDetail(id) {
  * @param int id 团单 id
  */
 export function getCombinationPink(id) {
-  return request.get(`/api/v1/groupbuy/groups/${id}`, {}, { noAuth: true }).then((viewRes) => {
+  return request.get(`/api/v1/groupbuy/groups/${id}`, {}, { optionalAuth: true }).then((viewRes) => {
     const view = viewRes.data || {};
     return Promise.all([
       view.activityId
         ? request
-            .get(`/api/v1/groupbuy/activities/${view.activityId}`, {}, { noAuth: true })
+            .get(`/api/v1/groupbuy/activities/${view.activityId}`, {}, { optionalAuth: true })
             .catch(() => ({ data: null }))
         : Promise.resolve({ data: null }),
       request

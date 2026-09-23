@@ -4,7 +4,7 @@
 //            packages/contracts/src/auth/auth.storefront.contract.ts
 // Reshaping lives in `api/mappers/user.js`.
 //
-// Three notes that explain most of the diff against the old module:
+// Three notes on how this module's routes are shaped:
 //
 //  * **`/api/v1/profile`, not `/api/v1/me`.** Every route in the user contract is
 //    scoped to the caller and none of them takes a user id — which is what makes
