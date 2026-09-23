@@ -5,7 +5,7 @@ import { alias } from 'drizzle-orm/pg-core';
 
 /**
  * The only file in the shipping domain that touches Drizzle tables
- * (CONVENTIONS, "Import boundaries").
+ * (`docs/conventions.md`, "Import boundaries").
  *
  * A repo function is a statement, not a decision: every `if` about a row count
  * lives in a service. The freight tables get their own repo
@@ -49,8 +49,7 @@ export async function listCities(db: DbOrTx): Promise<CityNode[]> {
  * A cheap fingerprint of the tree: how many visible rows there are and the
  * largest id. Two aggregates over an index, run once per request, which is what
  * lets the built tree be cached in process without a cache-bust route ever
- * being needed (the legacy system had one because nothing invalidated its
- * cache).
+ * being needed.
  */
 export async function cityFingerprint(db: DbOrTx): Promise<{ count: number; maxId: number }> {
   const rows = await db
@@ -101,8 +100,8 @@ export async function existingCityIds(db: DbOrTx, ids: number[]): Promise<Set<nu
 // ---------------------------------------------------------------------------
 
 /**
- * The picker body, taken over from `order.fulfil.repo.ts::listExpressCompanies`
- * unchanged — enabled only, `sortOrder DESC, id ASC` (CR-1-b2).
+ * The picker body — enabled only, `sortOrder DESC, id ASC`, so the most used
+ * carriers come first.
  */
 export async function listEnabledExpressCompanies(db: DbOrTx): Promise<ExpressCompanyRow[]> {
   return db

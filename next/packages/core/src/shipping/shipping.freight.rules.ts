@@ -1,23 +1,20 @@
 /**
  * The freight algorithm, as pure functions.
  *
- * Ported from `crmeb/app/services/order/OrderFreightCalculator.php`
- * (`getOrderPriceGroup` / `computedPayPostage`), with two deliberate
- * differences recorded in `docs/rewrite/status/f2.md`:
+ * Two rules that an obvious implementation gets wrong:
  *
- *  - **the first-unit bug is fixed.** Legacy: when a group's quantity exceeds
- *    the template's first unit and the template has no continuation rule
- *    (`continue <= 0`), the postage came out as **zero** — buying more made
- *    delivery free. Here that case charges `firstPrice`.
- *  - **fixed postage is per unit** (`postage × cart_num`), which is what legacy
- *    actually did; B1's stand-in charged it once per product.
+ *  - **no continuation rule means the first price, not zero.** When a group's
+ *    quantity exceeds the template's first unit and the template has no
+ *    continuation rule (`additionalUnit <= 0`), zero postage would make buying
+ *    more make delivery free. That case charges `firstPrice`.
+ *  - **fixed postage is per unit** (`postage × quantity`), not once per
+ *    product.
  *
- * Everything else is ported as-is, including the part that looks like a bug and
- * is not: when several templates are in one order, the shop charges the *most
- * expensive arrangement* — one template pays its first-unit price and the
- * others pay continuation only, tried once per template that ties for the
- * highest first price, and the maximum wins. Two shops' worth of operators
- * priced their catalogues around that behaviour.
+ * And one that looks like a bug and is not: when several templates are in one
+ * order, the shop charges the *most expensive arrangement* — one template pays
+ * its first-unit price and the others pay continuation only, tried once per
+ * template that ties for the highest first price, and the maximum wins.
+ * Operators price their catalogues around that behaviour.
  *
  * Money is integer 分 throughout. Measurements are floats, because a template
  * charges by kilogram or cubic metre with two decimals and `numeric(12,2)` is
@@ -81,7 +78,7 @@ export interface FreightComputation {
 /**
  * How much of the template's charging unit one line contributes.
  *
- * `weight` and `volume` arrive already multiplied by the quantity (B1's
+ * `weight` and `volume` arrive already multiplied by the quantity (checkout's
  * `freightLineOf` does that), in grams and cubic centimetres, while a template
  * is written in kilograms and cubic metres. One conversion, in one place.
  */
@@ -127,8 +124,8 @@ export function isFreeByRule(
   for (const rule of template.freeRules) {
     const covered = cityPath.some((cityId) => rule.cityIds.has(cityId));
     if (!covered) continue;
-    // Legacy required *both* thresholds (`number >= free.number AND price >=
-    // free.price`); a NULL threshold is stored as "unused" and counts as met.
+    // A rule requires *both* thresholds (units and amount); a NULL threshold is
+    // stored as "unused" and counts as met.
     if (rule.minUnits !== null && units < rule.minUnits) continue;
     if (rule.minAmountFen !== null && amountFen < rule.minAmountFen) continue;
     return true;
@@ -139,7 +136,8 @@ export function isFreeByRule(
 /**
  * The group pays its first unit and every continuation after it.
  *
- * The `additionalUnit <= 0` branch is the fixed bug: legacy returned 0 here.
+ * The `additionalUnit <= 0` branch charges the first price: zero here would
+ * make a bigger cart ship free.
  */
 export function firstAndContinuation(region: FreightRegion, units: number): number {
   if (units <= region.firstUnit) return region.firstPriceFen;
@@ -171,12 +169,12 @@ interface Group {
  * Prices one cart against one address.
  *
  * `cityPath` is the address's division and its ancestors, most specific first.
- * An empty path is an address whose division is missing or unknown — a
- * migrated address whose city the ETL could not map (CR-3-j), or one saved
- * without a `cityId`. It is priced like an address in a province the template
- * does not list: at the fallback region, or free when the template has none
- * (CR-6-i). "No address yet" never reaches here: checkout quotes zero without
- * asking the port.
+ * An empty path is an address whose division is missing or unknown — one saved
+ * without a `cityId`, or naming a division the city table does not have. It is
+ * priced like an address in a province the template does not list: at the
+ * fallback region, or free when the template has none. Pricing it as free
+ * outright would make a missing city a way to skip postage. "No address yet"
+ * never reaches here: checkout quotes zero without asking the port.
  */
 export function computeFreight(input: {
   lines: readonly FreightInputLine[];
@@ -189,7 +187,7 @@ export function computeFreight(input: {
   const perLine = new Array<number>(input.lines.length).fill(0);
   const undeliverable: { skuId: number; templateId: number }[] = [];
 
-  // 1. fixed postage, charged per unit, exactly as legacy did.
+  // 1. fixed postage, charged per unit.
   for (const line of input.lines) {
     if (line.mode === 'fixed') perLine[line.index] = line.fixedFreightFen * line.quantity;
   }
@@ -240,7 +238,7 @@ export function computeFreight(input: {
     charged.push(group);
   }
 
-  // 4. the arrangement that costs the most wins (legacy `computedPayPostage`).
+  // 4. the arrangement that costs the most wins.
   if (charged.length > 0) {
     const maxFirst = Math.max(...charged.map((group) => group.region.firstPriceFen));
     let best: { total: number; leader: Group } | null = null;

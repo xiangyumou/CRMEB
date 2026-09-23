@@ -13,21 +13,19 @@ import * as cityRepo from './shipping.repo';
 import * as repo from './shipping.template.repo';
 
 /**
- * The `FreightPort` B1 quotes through.
+ * The `FreightPort` checkout quotes through.
  *
- * Until F2 registers this, `fallbackFreightQuote` in `order.pricing.ts` answers
- * every quote and every 运费模板 line costs nothing. Registration is a side
- * effect of importing `@shop/core/shipping` (see `index.ts`), which
+ * Until this is registered, `fallbackFreightQuote` in `order.pricing.ts`
+ * answers every quote and every 运费模板 line costs nothing. Registration is a
+ * side effect of importing `@shop/core/shipping` (see `index.ts`), which
  * `@shop/core/domains` does for the app and the worker.
  *
  * Two seams worth naming:
  *
  *  - **the line's freight mode.** `FreightLine` carries `freightMode` and
- *    `fixedFreightFen` (CR-1-f2, landed), so a free line and a fixed-postage
- *    line — both of which carry a `null` template id — are told apart from the
- *    argument. This port used to re-read the skus through the registered
- *    `CatalogPort` to find out, one extra query per quote on a table checkout
- *    had just read; that adapter is gone.
+ *    `fixedFreightFen`, so a free line and a fixed-postage line — both of which
+ *    carry a `null` template id — are told apart from the argument, without
+ *    re-reading skus checkout has just read.
  *  - **the address.** A region rule may name a province, a city or a district,
  *    so the address's division is expanded into its ancestor chain and the
  *    narrowest matching rule wins.
@@ -47,8 +45,8 @@ export const freightPort = {
 
     // Both reads go through `db`, one after the other: on checkout's `create`
     // it is a transaction — one connection, which a second pooled read on a
-    // cold config cache must not wait behind (CR-1-r1), and which cannot run
-    // two queries at once anyway.
+    // cold config cache must not wait behind, and which cannot run two queries
+    // at once anyway.
     const cityPath = await cityPathOf(db, input.addressCityId);
     const config = await ctx.config.getIn(db, orderConfig);
 

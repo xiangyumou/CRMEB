@@ -13,12 +13,11 @@ import * as repo from './shipping.repo';
 /**
  * 快递公司.
  *
- * Two surfaces over one table, which is the whole point of CR-1-b2:
+ * Two surfaces over one table:
  *
  *  - `pickerList` answers the 发货 form and the mobile staff console on the
- *    paths B2 already published, with the body B2 already published. It moved
- *    here from `order.fulfil.service.ts` unchanged — enabled rows only, most
- *    used first — so the two callers changed an import and nothing else.
+ *    order paths those clients already call — enabled rows only, most used
+ *    first — and costs only the order permission they already hold.
  *  - the `admin*` functions are the management screen, which sees disabled rows
  *    too and costs `shipping:express:*`.
  *
@@ -27,7 +26,7 @@ import * as repo from './shipping.repo';
  */
 
 // ---------------------------------------------------------------------------
-// the picker (paths frozen by CR-1-b2)
+// the picker (its paths and body are what the 发货 clients already call)
 // ---------------------------------------------------------------------------
 
 export async function pickerList(ctx: Ctx): Promise<{ items: ExpressCompany[] }> {

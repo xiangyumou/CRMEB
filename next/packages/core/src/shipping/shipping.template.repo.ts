@@ -19,10 +19,10 @@ import { and, asc, count, desc, eq, ilike, inArray, isNull, sql, type SQL } from
  * means: the operator submits the template as a whole.
  *
  * One deliberate cross-domain read: `countProductsPerTemplate` counts rows in
- * `products` (stream A's table). It is read-only, it is one `group by` over an
- * index that exists for it (`products_shipping_template_idx`), and the alternative
- * — a port on the catalogue just to answer "how many" — would be a seam nobody
- * else needs. Recorded in `docs/rewrite/status/f2.md`.
+ * `products` (the catalog's table). It is read-only, it is one `group by` over
+ * an index that exists for it (`products_shipping_template_idx`), and the
+ * alternative — a port on the catalogue just to answer "how many" — would be a
+ * seam nobody else needs.
  */
 
 export type TemplateRow = typeof shippingTemplates.$inferSelect;
