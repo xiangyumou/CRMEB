@@ -14,9 +14,13 @@ import {
  * all refuse, and the server sees an `h5` client.
  */
 
+/** `<taro-button-core>` has no implicit role; say it is a button (e2e finds it by role). */
+const BUTTON_ROLE = { role: 'button' };
+
 function PhoneNumberButton({ children, className, onResult }: PhoneNumberButtonProps) {
   return (
     <Button
+      {...BUTTON_ROLE}
       className={className ?? ''}
       onClick={() =>
         onResult({ ok: false, reason: 'failed', message: 'H5 预览不支持微信手机号授权' })
@@ -29,7 +33,11 @@ function PhoneNumberButton({ children, className, onResult }: PhoneNumberButtonP
 
 function AvatarButton({ children, className, onResult }: AvatarButtonProps) {
   return (
-    <Button className={className ?? ''} onClick={() => void generatedAvatar().then(onResult)}>
+    <Button
+      {...BUTTON_ROLE}
+      className={className ?? ''}
+      onClick={() => void generatedAvatar().then(onResult)}
+    >
       {children}
     </Button>
   );

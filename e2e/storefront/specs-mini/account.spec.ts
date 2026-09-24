@@ -38,11 +38,6 @@ function input(page: Page, placeholder: string) {
   return shown(page).locator(`input[placeholder="${placeholder}"]`);
 }
 
-/** A `ui/Button` of the page on top, by the name it gives assistive tech. */
-function labelled(page: Page, label: string) {
-  return shown(page).locator(`[aria-label="${label}"]`);
-}
-
 test('a nickname the content check rejects is a field error, and a fine one saves', async ({
   miniPage: page,
   wechatUser,
@@ -104,7 +99,7 @@ test('a shopper adds, edits, picks at checkout and deletes an address', async ({
   await expect(row).toContainText('科技园路 8 号');
 
   // 编辑.
-  await labelled(page, '编辑 张三 的地址').click();
+  await shown(page).getByRole('button', { name: '编辑 张三 的地址' }).click();
   await expect(input(page, '街道、楼牌号等')).toHaveValue('科技园路 8 号');
   await input(page, '街道、楼牌号等').fill('科技园路 9 号');
   await shown(page).getByText('保存', { exact: true }).click();
@@ -134,7 +129,7 @@ test('a shopper adds, edits, picks at checkout and deletes an address', async ({
 
   // 删除.
   await openFresh(page, miniRoute(ADDRESSES));
-  await labelled(page, '删除 张三 的地址').click();
+  await shown(page).getByRole('button', { name: '删除 张三 的地址' }).click();
   await dialogButton(page, '删除').click();
   await expect(shown(page).getByText('已删除')).toBeVisible();
   await expect(shown(page).getByText('张三', { exact: true })).toHaveCount(0);

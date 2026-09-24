@@ -105,9 +105,13 @@ async function control<T>(action: string, body: unknown): Promise<T> {
   return (await response.json()) as T;
 }
 
+/** `<taro-button-core>` has no implicit role; say it is a button (e2e finds it by role). */
+const BUTTON_ROLE = { role: 'button' };
+
 function PhoneNumberButton({ children, className, disabled, onResult }: PhoneNumberButtonProps) {
   return (
     <Button
+      {...BUTTON_ROLE}
       className={className ?? ''}
       disabled={disabled ?? false}
       onClick={() => {
@@ -130,7 +134,11 @@ function PhoneNumberButton({ children, className, disabled, onResult }: PhoneNum
 
 function AvatarButton({ children, className, onResult }: AvatarButtonProps) {
   return (
-    <Button className={className ?? ''} onClick={() => void generatedAvatar().then(onResult)}>
+    <Button
+      {...BUTTON_ROLE}
+      className={className ?? ''}
+      onClick={() => void generatedAvatar().then(onResult)}
+    >
       {children}
     </Button>
   );

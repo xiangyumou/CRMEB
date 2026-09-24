@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { Button, buttonClassName } from './button';
+import { Button, H5_BUTTON_ROLE, buttonClassName } from './button';
 
 describe('Button', () => {
   it('calls onClick and carries its look as classes', () => {
@@ -52,5 +52,18 @@ describe('Button', () => {
     expect(buttonClassName({ variant: 'danger', size: 'sm', disabled: true })).toBe(
       'shop-btn shop-btn--danger shop-btn--sm shop-btn--disabled',
     );
+  });
+
+  it('says it is a button on H5 only, where Taro draws no native one', async () => {
+    // WeChat's own <button> has the role: the weapp build adds nothing.
+    expect(H5_BUTTON_ROLE).toEqual({});
+    vi.stubEnv('TARO_ENV', 'h5');
+    try {
+      vi.resetModules();
+      const h5 = await import('./button');
+      expect(h5.H5_BUTTON_ROLE).toEqual({ role: 'button' });
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

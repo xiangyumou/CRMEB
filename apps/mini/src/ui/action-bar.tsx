@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Button as TaroButton, Text, View } from '@tarojs/components';
 import { cx } from '@/lib/cx';
+import { H5_BUTTON_ROLE } from './button';
 import { Icon, type IconName } from './icon';
 import { Pressable } from './pressable';
 import { Badge } from './tag';
@@ -48,6 +49,7 @@ export function ActionBar({ icons = [], children, className }: ActionBarProps) {
             key={item.label}
             className="shop-action-bar__item shop-action-bar__item--button"
             hoverClass="shop-pressed"
+            {...H5_BUTTON_ROLE}
             openType="contact"
             sessionFrom={item.contact.sessionFrom}
             ariaLabel={item.label}
