@@ -26,6 +26,27 @@ describe('手机号', () => {
     await waitFor(() => expect(taroFake.calls.some((c) => c.api === 'navigateBack')).toBe(true));
   });
 
+  it('says what a refused privacy sheet means, in Chinese, and binds nothing', async () => {
+    signIn();
+    taroFake.phoneNumberDetail = {
+      errMsg: 'getPhoneNumber:fail privacy permission is not authorized',
+    };
+    const seen = serveApi({
+      'GET /api/v1/profile': () => ({ body: { ...profileFixture, phone: null } }),
+    });
+    await renderPage(<PhonePage />);
+
+    fireEvent.click(await screen.findByText('使用微信手机号'));
+
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'showToast',
+        args: expect.objectContaining({ title: '未同意隐私保护指引，可改用其他手机号绑定' }),
+      }),
+    );
+    expect(seen.map((r) => r.key)).toEqual(['GET /api/v1/profile']);
+  });
+
   it('changes a bound number with an SMS code to the new one', async () => {
     signIn();
     const seen = serveApi({
