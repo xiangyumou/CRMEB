@@ -17,7 +17,7 @@ import type {
   Shipment,
 } from '@shop/contracts/order/order.fulfil.schemas';
 import type { DbOrTx } from '@shop/db';
-import { requireActorId, requireAdminId, type Ctx } from '../kernel/context';
+import { requireAdminId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
 import { Money } from '../kernel/money';
@@ -301,41 +301,23 @@ export async function adminShipments(
 // who is acting
 // ---------------------------------------------------------------------------
 
+/** The log fields a console action is attributed with, spread straight into `insertStatusLog`. */
 export interface ConsoleOperator {
-  operatorKind: 'admin' | 'user';
-  operatorAdminId?: number;
-  operatorUserId?: number;
+  operatorKind: 'admin';
+  operatorAdminId: number;
 }
 
 /**
- * Who the timeline names for a console action. Every route that reaches these
- * services today is `auth: 'admin'`; the `user` branch is what the mobile staff
- * console (deleted at the cutover) came in through, kept because `operator_kind`
- * still distinguishes the two and the historic log rows carry both.
+ * Who the timeline names for a console action: the signed-in operator. Every
+ * route that reaches these services is `auth: 'admin'`. (The mobile staff
+ * console came in as a `user` actor and was deleted at the cutover; the log
+ * rows it wrote keep `operator_kind = 'user'` and still read back.)
  */
 export function operatorOf(ctx: Ctx): ConsoleOperator {
   if (ctx.actor.kind === 'admin') {
     return { operatorKind: 'admin', operatorAdminId: requireAdminId(ctx) };
   }
-  if (ctx.actor.kind === 'user') {
-    return { operatorKind: 'user', operatorUserId: requireActorId(ctx) };
-  }
   throw new DomainError('UNAUTHENTICATED');
-}
-
-/** The three log fields, spread straight into `insertStatusLog`. */
-function logActor(operator: ConsoleOperator): {
-  operatorKind: 'admin' | 'user';
-  operatorAdminId?: number;
-  operatorUserId?: number;
-} {
-  return {
-    operatorKind: operator.operatorKind,
-    ...(operator.operatorAdminId === undefined
-      ? {}
-      : { operatorAdminId: operator.operatorAdminId }),
-    ...(operator.operatorUserId === undefined ? {} : { operatorUserId: operator.operatorUserId }),
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -357,7 +339,7 @@ export async function adminRemark(
       orderId,
       changeType: 'remark_updated',
       message: body.adminRemark.slice(0, 512),
-      ...logActor(operator),
+      ...operator,
     });
   });
 
@@ -431,7 +413,7 @@ export async function adminAdjustPrice(
       message: `改价 ${order.payableAmount} -> ${outcome.payableAmount.toString()}${
         body.reason ? ` (${body.reason})` : ''
       }`.slice(0, 512),
-      ...logActor(operator),
+      ...operator,
     });
 
     // The buyer has to be told the amount moved, or they pay the old one and
@@ -506,7 +488,7 @@ export async function adminUpdateAddress(
           0,
           512,
         ),
-      ...logActor(operator),
+      ...operator,
     });
   });
 

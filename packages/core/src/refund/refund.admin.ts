@@ -110,31 +110,18 @@ export async function adminApprove(
   input: { id: string } & RefundApproveBody,
 ): Promise<AdminRefundDetail> {
   requirePermission(ctx, refundPermissions['request:review']);
-  return approveAs(ctx, { kind: 'admin', id: requireAdminId(ctx) }, input);
+  return approveAs(ctx, requireAdminId(ctx), input);
 }
 
 /**
- * Who made a review decision.
- *
- * An operator is an `admins` row and is stamped on
- * `refunds.reviewed_by_admin_id`. The `staff` kind is what the mobile staff
- * console (deleted at the cutover) reviewed with: a `users` row, which that
- * column cannot hold, so such a decision was attributed on the log entry
- * (`operator_user_id`) alone. No caller passes it any more.
- * `reviewed_at` is set either way.
+ * A review decision is the operator's: an `admins` row, stamped on
+ * `refunds.reviewed_by_admin_id` and on the log entry (`operator_admin_id`).
+ * (The mobile staff console, which reviewed as a `users` row, was deleted at
+ * the cutover; its old log rows keep `operator_user_id`.)
  */
-type Reviewer = { kind: 'admin'; id: number } | { kind: 'staff'; id: number };
-
-const reviewerStamp = (reviewer: Reviewer) => ({
-  reviewedByAdminId: reviewer.kind === 'admin' ? reviewer.id : null,
-});
-
-const reviewerLog = (reviewer: Reviewer) =>
-  reviewer.kind === 'admin' ? { operatorAdminId: reviewer.id } : { operatorUserId: reviewer.id };
-
 async function approveAs(
   ctx: Ctx,
-  reviewer: Reviewer,
+  adminId: number,
   input: { id: string } & RefundApproveBody,
 ): Promise<AdminRefundDetail> {
   const id = Number(input.id);
@@ -152,7 +139,7 @@ async function approveAs(
         : {};
 
     const { won } = await repo.transitionRefund(tx, id, ['applied'], 'approved', {
-      ...reviewerStamp(reviewer),
+      reviewedByAdminId: adminId,
       reviewedAt: ctx.clock.now(),
       ...freeze,
       ...(input.remark === undefined ? {} : { adminRemark: input.remark }),
@@ -163,8 +150,8 @@ async function approveAs(
       refundId: id,
       fromStatus: row.status,
       toStatus: 'approved',
-      message: approvalMessage(row.kind, input.remark, freeze.returnAddress ?? null, reviewer),
-      ...reviewerLog(reviewer),
+      message: approvalMessage(row.kind, input.remark, freeze.returnAddress ?? null),
+      operatorAdminId: adminId,
     });
 
     if (row.kind === 'refund_only') {
@@ -253,10 +240,8 @@ function approvalMessage(
   kind: repo.RefundRow['kind'],
   remark: string | undefined,
   address: ReturnAddress | null,
-  reviewer: Reviewer,
 ): string {
-  const who = reviewer.kind === 'admin' ? '商家' : '店员';
-  const head = kind === 'return_and_refund' ? `${who}同意退货退款` : `${who}同意退款`;
+  const head = kind === 'return_and_refund' ? '商家同意退货退款' : '商家同意退款';
   const note = remark === undefined ? '' : `：${remark}`;
   const where =
     address === null ? '' : `（退货地址：${address.name} ${address.phone} ${address.address}）`;
@@ -268,12 +253,12 @@ export async function adminReject(
   input: { id: string } & RefundRejectBody,
 ): Promise<AdminRefundDetail> {
   requirePermission(ctx, refundPermissions['request:review']);
-  return rejectAs(ctx, { kind: 'admin', id: requireAdminId(ctx) }, input);
+  return rejectAs(ctx, requireAdminId(ctx), input);
 }
 
 async function rejectAs(
   ctx: Ctx,
-  reviewer: Reviewer,
+  adminId: number,
   input: { id: string } & RefundRejectBody,
 ): Promise<AdminRefundDetail> {
   const id = Number(input.id);
@@ -286,7 +271,7 @@ async function rejectAs(
     // contract makes it a required field. Both, because a rejection nobody can
     // explain later is the complaint that reaches the shop owner.
     const { won } = await repo.transitionRefund(tx, id, ['applied', 'approved'], 'rejected', {
-      ...reviewerStamp(reviewer),
+      reviewedByAdminId: adminId,
       reviewedAt: ctx.clock.now(),
       rejectReason: input.rejectReason,
     });
@@ -296,8 +281,8 @@ async function rejectAs(
       refundId: id,
       fromStatus: row.status,
       toStatus: 'rejected',
-      message: `${reviewer.kind === 'admin' ? '商家' : '店员'}拒绝：${input.rejectReason}`,
-      ...reviewerLog(reviewer),
+      message: `商家拒绝：${input.rejectReason}`,
+      operatorAdminId: adminId,
     });
     await refreshOrderRefundStatus(tx, row.orderId);
 

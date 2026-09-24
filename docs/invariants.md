@@ -860,12 +860,6 @@ A shop out of card keys leaves the order in 待发货 with nothing half-written,
 - `packages/core/src/order/order.console.int.test.ts::修改收货地址 > is refused once the order has been dispatched`
 - `packages/core/src/order/order.fulfil.concurrency.int.test.ts::the console under concurrency > lets 修改地址 lose to a dispatch that commits first`
 
-### CONSOLE-004
-
-A console action reachable from both the web admin and the phone records _which_ surface acted, through `order_status_logs.operator_kind`.
-
-- `packages/core/src/order/order.console.int.test.ts::备注 > records who wrote it, whichever console they used`
-
 ### INVOICE-001
 
 One open invoice per order, enforced by the partial unique index rather than by asking first: five simultaneous requests leave exactly one row, and a cancelled or rejected one frees the slot.
