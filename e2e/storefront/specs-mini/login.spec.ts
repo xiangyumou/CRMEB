@@ -189,8 +189,10 @@ test("SMOKE-004: 密码登录 under 其他方式 reaches an authenticated screen
 }) => {
   const owner = await passwordAccount(shop);
 
-  // The silent sign-in finds no account for this openid; 其他方式 offers the password.
+  // The silent sign-in finds no account for this openid (phone-required, a bindToken parked);
+  // 其他方式 offers the password.
   await page.goto(miniRoute('pages/login/index'));
+  await expect(shown(page).getByText('手机号快速登录', { exact: true })).toBeVisible();
   await shown(page).getByRole('button', { name: '密码登录' }).click();
   await shown(page).locator('input[placeholder="手机号或账号"]').fill(owner.phone);
   await shown(page).locator('input[placeholder="请输入密码"]').fill('not-the-password');
@@ -215,23 +217,49 @@ test("SMOKE-004: 密码登录 under 其他方式 reaches an authenticated screen
   const profile = await api.get('/api/v1/profile');
   expect(profile.status(), await profile.text()).toBe(200);
   expect(((await profile.json()) as { phone: string }).phone).toBe(owner.phone);
-  await api.dispose();
 
-  // A mini-program session of that account. The openid is not linked: auth.passwordLogin
-  // takes no bindToken (docs/mini/auth.md「密码登录」).
+  // A mini-program session of that account, and the parked openid is now linked to it: the
+  // password login carried the bindToken (AUTH-009, docs/mini/auth.md「密码登录」). The wrong
+  // password before it did not spend the token.
   const live = await shop.db
     .select({ platform: userSessions.platform })
     .from(userSessions)
     .where(and(eq(userSessions.userId, owner.id), isNull(userSessions.revokedAt)));
   expect(live).toEqual([{ platform: 'wechat-mini' }]);
   const linked = await shop.db
-    .select({ userId: wechatIdentities.userId })
+    .select({ userId: wechatIdentities.userId, platform: wechatIdentities.platform })
     .from(wechatIdentities)
     .where(eq(wechatIdentities.openid, wechatUser.openid));
-  expect(linked).toEqual([]);
+  expect(linked).toEqual([{ userId: owner.id, platform: 'mini' }]);
+
+  // The password session ends (expired, or 退出所有设备 elsewhere). The next read 401s and the
+  // renewal's fresh wx.login signs in to the same account, silently.
+  await arrangeCartLine(api, shop.fixtures.postageSkuId);
+  const revoked = await api.delete('/api/v1/auth/sessions');
+  expect(revoked.ok(), await revoked.text()).toBe(true);
+  await api.dispose();
+  const signIns = countSignIns(page);
+  const seen = recordApi(page);
+  await openTab(page, '购物车');
+  await expect(new CartPage(page).row('E2E 运费商品')).toBeVisible();
+  expect(signIns.count()).toBe(1);
+  expect(page.url()).not.toMatch(/pages\/login/);
+  const renewed = await sessionToken(page);
+  expect(renewed).not.toBe(token);
+  const again = await playwright.request.newContext({
+    baseURL: shop.baseUrl,
+    extraHTTPHeaders: { Authorization: `Bearer ${renewed}`, 'X-Client-Platform': 'wechat-mini' },
+  });
+  const renewedProfile = await again.get('/api/v1/profile');
+  expect(renewedProfile.status(), await renewedProfile.text()).toBe(200);
+  expect(((await renewedProfile.json()) as { phone: string }).phone).toBe(owner.phone);
+  await again.dispose();
 
   expect(consoleErrors).toEqual([]);
-  expect(failedRequests).toEqual(['POST /api/v1/auth/sessions/password 401']);
+  // The wrong password, then exactly the 401s the renewal answered.
+  const renewedAway = seen.filter((line) => line.endsWith(' 401'));
+  expect(renewedAway.length).toBeGreaterThan(0);
+  expect(failedRequests).toEqual(['POST /api/v1/auth/sessions/password 401', ...renewedAway]);
 });
 
 test.describe('the privacy sheet WeChat raises before 手机号快速登录', () => {

@@ -201,6 +201,12 @@ function throttleKeys(account: string, ip: string | null | undefined): string[] 
   return keys;
 }
 
+/**
+ * Account (or phone) and password. With `bindToken`, the password also
+ * finishes a parked WeChat sign-in by linking its openid to the account
+ * (AUTH-009); the throttle, the captcha, the password check and the session
+ * are exactly what they are without it.
+ */
 export async function passwordLogin(
   ctx: Ctx,
   body: PasswordLoginBody,
@@ -265,6 +271,7 @@ export async function passwordLogin(
   }
 
   for (const key of keys) await resetFixedWindow(ctx.redis, key);
+  if (body.bindToken) await linkPendingToAccount(ctx, user.id, body.bindToken);
   return issueSession(ctx, user, meta);
 }
 
@@ -818,6 +825,21 @@ async function linkIdentity(
   // `null` means one of the two unique indexes refused: this openid already
   // belongs to somebody, or this account already has an identity on this app.
   if (!row) throw new DomainError('AUTH_WECHAT_ALREADY_BOUND');
+}
+
+/**
+ * Finish a parked sign-in with the password of an existing account (AUTH-009).
+ *
+ * Called only after the password has been verified and the account found
+ * usable, so a wrong password never touches the token. The link is the one
+ * `completeWithPhone` makes for a registered number, and it fails the same
+ * way: a spent token is `AUTH_WECHAT_BIND_EXPIRED`, a taken openid (or an
+ * account that already has an identity on that app) `AUTH_WECHAT_ALREADY_BOUND`,
+ * and the token is not put back after a refused link.
+ */
+async function linkPendingToAccount(ctx: Ctx, userId: number, bindToken: string): Promise<void> {
+  const pending = await takePending(ctx, bindToken);
+  await ctx.withTx((tx) => linkIdentity(tx, ctx, userId, pending));
 }
 
 /** Finish a parked sign-in with a verified phone number. */

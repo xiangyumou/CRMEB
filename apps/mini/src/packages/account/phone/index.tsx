@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { useRouteMutation, useRouteQuery } from '@shop/api-client/react';
 import { maskPhone } from '@/lib/format';
-import { goBack, platform } from '@/platform';
+import { goBack, isPrivacyRefusal, platform } from '@/platform';
 import { LoginGate } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
 import { Button, buttonClassName } from '@/ui/button';
@@ -15,6 +15,8 @@ import { PHONE_PATTERN, SmsCodeField } from '@/ui/sms-code-field';
 import { SubmitBar, errorMessage } from '../shared/form';
 import { SMS_CODE_PATTERN, sendSmsCode } from '../shared/sms';
 import './index.scss';
+
+const PRIVACY_REFUSED = '未同意隐私保护指引，可改用其他手机号绑定';
 
 /**
  * 手机号 (`phone`, pages.md §2.6): with no number yet, 绑定 — WeChat's own number first
@@ -95,7 +97,9 @@ function PhoneForm({ current }: { current: string | null }) {
             onResult={(result) => {
               if (!result.ok) {
                 if (result.reason === 'unavailable') setMode('sms');
-                if (result.reason !== 'denied') toast.text(result.message);
+                // WeChat's own errMsg is English; 使用其他手机号 (an SMS code) still works.
+                if (isPrivacyRefusal(result.message)) toast.text(PRIVACY_REFUSED);
+                else if (result.reason !== 'denied') toast.text(result.message);
                 return;
               }
               bindWechat.mutateAsync({ body: { phoneCode: result.code } }).then(

@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react';
 import { Text, View } from '@tarojs/components';
 import type { StorefrontRoute } from '@shop/api-client/routes';
-import { navigate, platform } from '@/platform';
+import { isPrivacyRefusal, navigate, platform } from '@/platform';
 import { Button, buttonClassName } from '@/ui/button';
 import { Empty } from '@/ui/empty';
 import { toast } from '@/ui/feedback';
 import { bindPhone, startSession, useSession } from './session';
 import './login-card.scss';
+
+const PRIVACY_REFUSED = '未同意隐私保护指引，可改用短信验证码登录';
 
 export interface LoginCardProps {
   children: ReactNode;
@@ -35,7 +37,9 @@ export function LoginCard({ children, reason, redirect }: LoginCardProps) {
             className={buttonClassName({ variant: 'primary', size: 'lg', block: true })}
             onResult={(result) => {
               if (!result.ok) {
-                if (result.reason !== 'denied') toast.text(result.message);
+                // WeChat's own errMsg is English; the SMS login below still works (auth.md 隐私保护指引).
+                if (isPrivacyRefusal(result.message)) toast.text(PRIVACY_REFUSED);
+                else if (result.reason !== 'denied') toast.text(result.message);
                 return;
               }
               bindPhone(result.code).catch((error: unknown) => {
