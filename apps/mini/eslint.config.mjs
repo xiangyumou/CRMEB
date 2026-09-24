@@ -67,6 +67,11 @@ export default [
         exceptFrom: '/src/ui/',
         message: '页面不直接用 NutUI，经过 src/ui 的组件',
       },
+      {
+        source: '^@nutui/nutui-react-taro$',
+        message:
+          'NutUI 按组件引入（@nutui/nutui-react-taro/dist/es/packages/<组件>）：整包入口会把全部组件带进主包',
+      },
     ],
   }),
   {
