@@ -62,6 +62,21 @@ describe('支付结果', () => {
     );
   });
 
+  it('goes back to 订单详情 when 收银台 was opened from it, not to a second copy', async () => {
+    serve('paid');
+    taroFake.pageStack = [
+      { route: 'packages/order/list/index', options: {} },
+      { route: 'packages/order/detail/index', options: { id: '9' } },
+      { route: 'packages/order/pay-result/index', options: { orderId: '9', outTradeNo: 'P9' } },
+    ];
+    await renderPage(<PayResultPage />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看订单' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({ api: 'navigateBack', args: { delta: 1 } }),
+    );
+    expect(taroFake.calls.some((call) => call.api === 'redirectTo')).toBe(false);
+  });
+
   it('drops the order reads cached while the order was unpaid', async () => {
     serve('paid');
     const client = testQueryClient();

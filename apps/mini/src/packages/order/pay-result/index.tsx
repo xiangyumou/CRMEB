@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { useInvalidateRoutes, useRouteQuery } from '@shop/api-client/react';
-import { navigate, useRouteParams } from '@/platform';
+import { leaveFor, navigate, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
 import { Button } from '@/ui/button';
@@ -86,10 +86,11 @@ function PaymentStatus({ orderId, outTradeNo }: { orderId: string; outTradeNo: s
     { enabled: signedIn && paid && id !== '' },
   );
 
+  // Back to 订单详情 when 收银台 was opened from it (支付结果 replaced 收银台), rather than a
+  // second copy of the same order on the stack.
   const toOrder = () =>
-    void navigate(
+    void leaveFor(
       id ? { route: 'order', params: { id } } : { route: 'order', params: { outTradeNo } },
-      { replace: true },
     );
   const orderButton = (
     <Button variant="outline" onClick={toOrder}>

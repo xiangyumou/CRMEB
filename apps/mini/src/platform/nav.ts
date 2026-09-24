@@ -240,14 +240,26 @@ export function loginReturn(
   return toPath({ route: key, params }) === toPath(target) ? 'back' : 'replace';
 }
 
-/** Leaves the login page for `target` once signed in, as `loginReturn` decides. */
-export async function returnFromLogin(
+/**
+ * Leaves this page for `target` without stacking a second copy of it: back when the page under
+ * this one is `target` (same route, same params; `loginReturn` decides), else `target` in place
+ * of this page. 登录 once signed in; 收银台 and 支付结果's 查看订单, which were usually opened from
+ * that very 订单详情.
+ */
+export async function leaveFor(
   target: StorefrontRoute | { route: string; params?: object },
 ): Promise<void> {
   const stack: readonly StackPage[] =
     typeof Taro.getCurrentPages === 'function' ? Taro.getCurrentPages() : [];
   if (loginReturn(target, stack) === 'back') await Taro.navigateBack({ delta: 1 });
   else await navigate(target, { replace: true });
+}
+
+/** Leaves the login page for `target` once signed in, as `loginReturn` decides. */
+export async function returnFromLogin(
+  target: StorefrontRoute | { route: string; params?: object },
+): Promise<void> {
+  await leaveFor(target);
 }
 
 /** The route of a page path (`pages/product/index`), for launch options; `null` if unknown. */

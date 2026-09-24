@@ -22,6 +22,7 @@ export { onAppVisibility } from './lifecycle';
 export { openLinkTarget } from './link';
 export {
   goBack,
+  leaveFor,
   loginReturn,
   navigate,
   parseLoginRedirect,

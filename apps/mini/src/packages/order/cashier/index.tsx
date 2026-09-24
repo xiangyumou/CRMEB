@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { isApiError } from '@shop/api-client';
 import { useApiClient, useRouteQuery } from '@shop/api-client/react';
-import { navigate, platform, useRouteParams } from '@/platform';
+import { leaveFor, navigate, platform, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
 import { Button } from '@/ui/button';
@@ -45,8 +45,8 @@ function Cashier({ orderId }: { orderId: string }) {
   const order = useRouteQuery('order.detail', { params: { id: orderId } }, { enabled: signedIn });
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [expired, setExpired] = useState(false);
-  const toOrder = () =>
-    void navigate({ route: 'order', params: { id: orderId } }, { replace: true });
+  // Back to 订单详情 when that is where 去支付 was tapped, rather than a second copy of it.
+  const toOrder = () => void leaveFor({ route: 'order', params: { id: orderId } });
 
   if (order.isPending) return <CellSkeleton rows={3} />;
   if (order.isError) return <ErrorBlock error={order.error} onRetry={() => void order.refetch()} />;
