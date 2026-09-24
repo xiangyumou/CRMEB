@@ -321,14 +321,17 @@ B：删除加落地页；C：删表）不再采用。
 现在它们只服务已经下线的 uni-app 和旧装修，生产里没有要保住的数据，推迟只会多留一份死的 schema 定义。代价写在第 4 节：
 部署失败自动回到上一版镜像时，旧 H5 首页和旧后台装修会报错（其余功能照常），要完全回到部署前就用备份恢复。
 
-- [ ] 删 `packages/db/src/schema/diy.ts`（`diy_pages`、`themes`、`page_link_categories`、`page_links` 四张表和
+- [x] 删 `packages/db/src/schema/diy.ts`（`diy_pages`、`themes`、`page_link_categories`、`page_links` 四张表和
       `diy_pages_kind`、`diy_pages_status`、`themes_kind` 三个枚举），再 `pnpm --filter @shop/db db:generate`，
       生成 `packages/db/migrations/0008_*.sql`。删之前确认没有别的表引用它们（2026-09-24 核对：没有外键指向这四张表）。
-- [ ] 每条 `DROP TABLE` 前加一行 `-- destructive: approved — <理由>`（按语句标注，`migrations` 守卫 OPS-007 检查）。
+- [x] 每条 `DROP TABLE` 前加一行 `-- destructive: approved — <理由>`（按语句标注，`migrations` 守卫 OPS-007 检查）。
       理由写明：只有已删除的旧装修代码读这些表，生产没有要保留的数据，自动回退到上一版时旧装修会报错、已接受。
-- [ ] `apps/web/src/server/health.ts` 的 `EXPECTED_MIGRATIONS` 从 8 改为 9（`health.test.ts` 按迁移日志核对它）。
-- [ ] `packages/db/docs/SCHEMA.md`：`diy` 一行（第 37 行）、第 230 行的 `diy_pages_home_uq`、「6.9 `page_links` /
+- [x] `apps/web/src/server/health.ts` 的 `EXPECTED_MIGRATIONS` 从 8 改为 9（`health.test.ts` 按迁移日志核对它）。
+- [x] `packages/db/docs/SCHEMA.md`：`diy` 一行（第 37 行）、第 230 行的 `diy_pages_home_uq`、「6.9 `page_links` /
       `page_link_categories`」一节。
+      （C1 结果：生成的是 `packages/db/migrations/0008_drop_legacy_diy.sql`，四条 `DROP TABLE … CASCADE` 各带标注，
+      三条 `DROP TYPE` 不在守卫的检查范围内、未标注；`scripts/check-constraints.sql` 删了第 15 条「两个 DIY 首页」，
+      `schema/decor.ts` 的注释同步。SCHEMA.md 的表数 86→82，约束表删第 21 行、原第 22 行改为 21，6.9 节删除、原 6.10 改为 6.9。）
 - [ ] 协调者在本地用 `pnpm --filter @shop/db db:migrate` 对一个临时库跑一遍，再跑集成测试（第 1 节第 2 步里一起跑）。
 
 店员没有自己的表：`audit_logs.actor_kind = 'staff'` 的约束和已有的行保留，不迁移。

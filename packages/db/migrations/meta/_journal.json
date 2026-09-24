@@ -57,6 +57,13 @@
       "when": 1790178077508,
       "tag": "0007_content_security",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790226617361,
+      "tag": "0008_drop_legacy_diy",
+      "breakpoints": true
     }
   ]
 }
