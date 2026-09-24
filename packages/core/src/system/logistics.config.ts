@@ -40,7 +40,7 @@ export const logisticsConfig = defineConfigGroup({
     c.provider === 'none'
       ? { tone: 'off', text: '未启用' }
       : c.appCode === ''
-        ? { tone: 'incomplete', text: '缺查询密钥' }
+        ? { tone: 'incomplete', text: '缺 AppCode' }
         : { tone: 'on', text: '阿里云云市场' },
   ui: {
     provider: {
@@ -53,8 +53,9 @@ export const logisticsConfig = defineConfigGroup({
       order: 1,
     },
     appCode: {
-      label: '查询密钥',
+      label: 'AppCode',
       type: 'password',
+      help: '云市场「已购买的服务」里的 AppCode；AppKey 与 AppSecret 不用填。须购买接口地址为 wuliu.market.alicloudapi.com/kdi 的「全国快递物流查询」',
       secret: true,
       visibleWhen: TRACKING_ON,
       order: 2,

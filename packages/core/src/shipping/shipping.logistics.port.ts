@@ -211,7 +211,7 @@ export async function probeAliyunTracking(
       headers: { Authorization: `APPCODE ${appCode}` },
       signal: controller.signal,
     });
-    if (response.status === 401) return { reached: false, reason: '查询密钥（AppCode）无效' };
+    if (response.status === 401) return { reached: false, reason: 'AppCode 无效' };
     if (response.status === 403) {
       return { reached: false, reason: '没有可用的调用次数：云市场套餐未购买或已用完' };
     }

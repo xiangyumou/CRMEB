@@ -56,7 +56,7 @@ export function registerShippingConfigTest(): void {
         return t.result();
       }
       if (config.appCode.trim() === '') {
-        t.fail('检查配置', '没有填写「查询密钥」');
+        t.fail('检查配置', '没有填写「AppCode」');
         return t.result();
       }
       const lookup = input.parse(raw);

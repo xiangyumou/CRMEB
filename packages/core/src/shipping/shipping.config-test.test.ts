@@ -39,7 +39,7 @@ describe('logistics 「测试查询」', () => {
     expect(result.steps.at(-1)).toMatchObject({
       name: '查询物流轨迹',
       ok: false,
-      detail: '查询密钥（AppCode）无效',
+      detail: 'AppCode 无效',
     });
   });
 

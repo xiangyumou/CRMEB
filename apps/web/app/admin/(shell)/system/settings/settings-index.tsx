@@ -33,7 +33,7 @@ const groupHref = (group: string, field?: string): string =>
  * adds a group gets a card on this page and a working settings screen without
  * anybody editing this file, which is the point of the whole arrangement.
  *
- * Each card leads with the state of what is saved (腾讯云, 未启用, 缺查询密钥)
+ * Each card leads with the state of what is saved (腾讯云, 未启用, 缺 AppCode)
  * and the last test. The search box matches field labels as well as group
  * names, because an operator usually knows the setting they want, not which
  * group it is in.
