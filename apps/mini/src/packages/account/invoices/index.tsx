@@ -196,7 +196,12 @@ function RecordRow({ invoice }: { invoice: OrderInvoice }) {
       <View className="invoice-record__order">
         {invoice.orderSummary ? (
           <View className="invoice-record__thumb">
-            <Image src={assetUrl(invoice.orderSummary.productImageUrl)} ratio={1} radius="sm" />
+            <Image
+              src={assetUrl(invoice.orderSummary.productImageUrl)}
+              ratio={1}
+              radius="sm"
+              size="small"
+            />
           </View>
         ) : null}
         <View className="invoice-record__text">

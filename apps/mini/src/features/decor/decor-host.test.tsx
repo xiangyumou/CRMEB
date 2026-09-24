@@ -5,6 +5,7 @@ import {
   fixtureCoupons,
   fixtureFloatingContact,
   fixtureFollowOfficialAccount,
+  fixtureHotspotImage,
   fixtureNewcomerCoupon,
   fixtureNewUserCoupons,
   fixtureVideo,
@@ -19,6 +20,12 @@ import { taroFake } from '@/test/taro-fake/taro';
 import { useOverlayStore } from '@/ui/overlay-store';
 import { useDecorHost } from './decor-host';
 import { DecorPage, type ResolvedPage } from './decor-page';
+
+/**
+ * An upload's content hash, the part of its name the server generates. Built, not written out:
+ * the credentials guard flags any 32-hex literal.
+ */
+const HASH = '0123456789abcdef'.repeat(2);
 
 type Blocks = ResolvedPage['blocks'];
 
@@ -316,6 +323,26 @@ describe('DecorPage host (decor.md §2.4)', () => {
 
       act(() => useOverlayStore.getState().pop());
       expect(screen.getByTestId('native-video')).toBeTruthy();
+    });
+
+    it("loads a block picture's 750 px copy, and the original when the copy is missing", async () => {
+      const upload = `/uploads/decor/2026/09/${HASH}.jpg`;
+      await draw(
+        pageOf([
+          {
+            id: 'b-hotspot',
+            type: 'hotspotImage',
+            v: 1,
+            props: { ...fixtureHotspotImage, image: upload },
+            data: {},
+          },
+        ]),
+      );
+      const img = () =>
+        document.querySelector('[data-block="hotspotImage"] img') as HTMLImageElement;
+      expect(img().getAttribute('src')).toBe(upload.replace(/\.jpg$/, '.w750.jpg'));
+      fireEvent.error(img());
+      expect(img().getAttribute('src')).toBe(upload);
     });
 
     it('tells the blocks a shopper is signed in even when the page came without personal slots', async () => {

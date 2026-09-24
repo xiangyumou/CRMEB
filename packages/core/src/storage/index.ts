@@ -17,7 +17,9 @@
  * | `PUT /api/v1/profile` (user domain) | `isStoredImageUrl` — is this avatar one of ours |
  * | `POST /api/v1/catalog/reviews` (catalog domain) | `isStoredImageUrl` — is this review picture one of ours |
  * | `POST /api/v1/attachments/scan-uploads/:token` | `scanUpload` |
- * | worker `storage.cleanOrphans` | `cleanOrphanAttachments` |
+ * | worker `storage.cleanOrphans` | `cleanOrphanAttachments` (thumbnails included) |
+ * | worker `storage.generateImageVariants` | `generateImageVariants` — enqueued by every new image upload |
+ * | worker `storage.backfillImageVariants` | `backfillImageVariants` — run by an operator, never scheduled |
  * | any domain needing a file | `resolveStorage(ctx)` → the configured driver |
  *
  * **Other domains:** do not call `ctx.storage.put` directly if the file should
@@ -39,6 +41,7 @@ export {
   categoryDelete,
   categoryTree,
   categoryUpdate,
+  GENERATE_IMAGE_VARIANTS_JOB,
   isStoredImageUrl,
   resetStorageDriverCache,
   resolveStorage,
@@ -53,6 +56,16 @@ export {
 } from './storage.service';
 
 export { cleanOrphanAttachments, type SweepReport } from './storage.jobs';
+export {
+  backfillImageVariants,
+  generateImageVariants,
+  isAnimatedPng,
+  renderImageVariants,
+  type BackfillBatch,
+  type RenderedVariant,
+  type RenderOutcome,
+  type VariantReport,
+} from './image-variants';
 export { storagePermissions } from './permissions';
 export { storageConfig } from './storage.config';
 export { storageDashboardContributor } from './dashboard-tiles';

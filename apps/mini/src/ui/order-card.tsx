@@ -37,7 +37,7 @@ export function OrderItemRow({
     <View className="shop-order-row">
       {/* The wrapper sets the width: Image's ratio padding is a share of its parent's width. */}
       <View className="shop-order-row__image">
-        <Image src={item.skuImageUrl ?? item.productImageUrl} radius="sm" />
+        <Image src={item.skuImageUrl ?? item.productImageUrl} radius="sm" size="small" />
       </View>
       <View className="shop-order-row__info">
         <Text className="shop-order-row__name">{item.productName}</Text>

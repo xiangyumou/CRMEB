@@ -402,6 +402,31 @@ export async function liveImageUrlExists(db: DbOrTx, url: string): Promise<boole
   return rows.length > 0;
 }
 
+/**
+ * Live images above `afterId`, in id order: the image-variant backfill's
+ * cursor. Only the ids — each picture is re-read by `findAttachment` when its
+ * turn comes, so a row deleted meanwhile is skipped rather than processed.
+ */
+export async function listImageAttachmentIds(
+  db: DbOrTx,
+  afterId: number,
+  limit: number,
+): Promise<number[]> {
+  const rows = await db
+    .select({ id: attachments.id })
+    .from(attachments)
+    .where(
+      and(
+        sql`${attachments.id} > ${afterId}`,
+        eq(attachments.kind, 'image'),
+        isNull(attachments.deletedAt),
+      ),
+    )
+    .orderBy(asc(attachments.id))
+    .limit(limit);
+  return rows.map((row) => row.id);
+}
+
 export async function insertAttachment(
   db: DbOrTx,
   values: NewAttachmentValues,

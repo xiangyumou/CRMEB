@@ -100,7 +100,7 @@ function ArticleRow({ article }: { article: Article }) {
       </View>
       {article.coverImageUrl ? (
         <View className="article-row__cover">
-          <Image src={assetUrl(article.coverImageUrl)} ratio={4 / 3} radius="sm" />
+          <Image src={assetUrl(article.coverImageUrl)} ratio={4 / 3} radius="sm" size="small" />
         </View>
       ) : null}
     </Pressable>

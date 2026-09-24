@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
+import sharp from 'sharp';
 import { admins } from '@shop/db/schema/auth';
 import { users } from '@shop/db/schema/user';
 import { attachments } from '@shop/db/schema/storage';
@@ -8,6 +9,7 @@ import { registerStaffCheck, resetUserLookup } from '../auth/user-lookup';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { cleanOrphanAttachments } from './storage.jobs';
+import { backfillImageVariants, generateImageVariants } from './image-variants';
 import type { Transport } from './safe-fetch';
 import { storageConfig } from './storage.config';
 import { createScanTokenStore } from './scan-token';
@@ -25,6 +27,8 @@ import {
   categoryDelete,
   categoryTree,
   categoryUpdate,
+  GENERATE_IMAGE_VARIANTS_JOB,
+  isStoredImageUrl,
   resetStorageDriverCache,
   scanTokenCreate,
   scanTokenStatusGet,
@@ -706,5 +710,141 @@ describe('cleanOrphans', () => {
     harness.clock.set('2027-01-01T00:00:00.000Z');
     expect(await cleanOrphanAttachments(ctx)).toEqual({ examined: 0, removed: 0, failed: 0 });
     expect(await harness.ctx.db.select().from(attachments)).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+/** A real JPEG, noisy enough that a smaller copy really is smaller. */
+async function jpeg(width: number, height: number, salt = 0): Promise<IncomingFile> {
+  const raw = Buffer.alloc(width * height * 3);
+  for (let i = 0; i < raw.length; i += 1) raw[i] = ((i + salt) * 2654435761) >>> 24;
+  const bytes = await sharp(raw, { raw: { width, height, channels: 3 } })
+    .jpeg({ quality: 95 })
+    .toBuffer();
+  return { bytes: new Uint8Array(bytes), filename: 'photo.jpg', declaredMime: 'image/jpeg' };
+}
+
+async function storageKeyOf(attachmentId: string): Promise<string> {
+  const [row] = await harness.ctx.db
+    .select({ key: attachments.storageKey })
+    .from(attachments)
+    .where(eq(attachments.id, Number(attachmentId)));
+  return row!.key;
+}
+
+const variantKey = (key: string, width: 360 | 750) => key.replace(/\.(\w+)$/, `.w${width}.$1`);
+
+describe('image variants', () => {
+  it('a new image upload asks the worker for its thumbnails, after commit, once', async () => {
+    harness.queue.reset();
+    const ctx = as(adminActor(adminId));
+    const first = await attachmentUpload(ctx, { directory: 'product' }, await jpeg(1200, 800));
+    await attachmentUpload(ctx, { directory: 'product' }, await jpeg(1200, 800)); // deduped
+    await attachmentUpload(ctx, {}, file('%PDF-1.7\n', 'terms.pdf', 'application/pdf'));
+
+    expect(harness.queue.jobs).toEqual([
+      {
+        jobName: GENERATE_IMAGE_VARIANTS_JOB,
+        payload: { attachmentId: first.attachment.id },
+        options: { dedupeKey: `storage-variants:${first.attachment.id}` },
+      },
+    ]);
+  });
+
+  it('writes a 360 and a 750 px copy next to the original, and is idempotent', async () => {
+    const ctx = as(adminActor(adminId));
+    const uploaded = await attachmentUpload(ctx, { directory: 'product' }, await jpeg(1200, 800));
+    const key = await storageKeyOf(uploaded.attachment.id);
+
+    const report = await generateImageVariants(ctx, { attachmentId: uploaded.attachment.id });
+    expect(report.written).toEqual([360, 750]);
+    for (const width of [360, 750] as const) {
+      const meta = await sharp(await harness.ctx.storage.get(variantKey(key, width))).metadata();
+      expect(meta.width).toBe(width);
+      expect(meta.format).toBe('jpeg');
+    }
+    // The original is untouched, and a second run finds nothing to do.
+    expect((await sharp(await harness.ctx.storage.get(key)).metadata()).width).toBe(1200);
+    expect(await generateImageVariants(ctx, { attachmentId: uploaded.attachment.id })).toEqual({
+      attachmentId: uploaded.attachment.id,
+      written: [],
+      skipped: 'present',
+    });
+  });
+
+  it('fails soft: bytes it cannot decode leave the upload as it was, with no thumbnail', async () => {
+    const ctx = as(adminActor(adminId));
+    // A PNG header with nothing behind it: the sniffer accepts it, libvips cannot decode it.
+    const uploaded = await attachmentUpload(ctx, { directory: 'product' }, png(750, 390));
+    const key = await storageKeyOf(uploaded.attachment.id);
+
+    const report = await generateImageVariants(ctx, { attachmentId: uploaded.attachment.id });
+    expect(report).toMatchObject({ written: [], skipped: 'failed' });
+    expect(await harness.ctx.storage.exists(key)).toBe(true);
+    expect(await harness.ctx.storage.exists(variantKey(key, 360))).toBe(false);
+  });
+
+  it('CAT-018 — a thumbnail of a live image counts as ours, a thumbnail of anything else does not', async () => {
+    const ctx = as(adminActor(adminId));
+    const uploaded = await attachmentUpload(ctx, { directory: 'review' }, await jpeg(900, 900));
+    const url = uploaded.attachment.url;
+
+    expect(await isStoredImageUrl(ctx, url.replace(/\.jpg$/, '.w360.jpg'))).toBe(true);
+    expect(await isStoredImageUrl(ctx, url.replace(/\.jpg$/, '.w500.jpg'))).toBe(false);
+    expect(
+      await isStoredImageUrl(
+        ctx,
+        '/uploads/review/2026/09/ffffffffffffffffffffffffffffffff.w360.jpg',
+      ),
+    ).toBe(false);
+
+    await attachmentDeleteMany(ctx, { ids: [uploaded.attachment.id] });
+    expect(await isStoredImageUrl(ctx, url.replace(/\.jpg$/, '.w360.jpg'))).toBe(false);
+  });
+
+  it('the orphan sweep removes the thumbnails with their original', async () => {
+    const ctx = as(adminActor(adminId));
+    const uploaded = await attachmentUpload(ctx, { directory: 'product' }, await jpeg(1200, 800));
+    const key = await storageKeyOf(uploaded.attachment.id);
+    await generateImageVariants(ctx, { attachmentId: uploaded.attachment.id });
+    await attachmentDeleteMany(ctx, { ids: [uploaded.attachment.id] });
+
+    harness.clock.set('2026-10-05T08:00:00.000Z');
+    expect(await cleanOrphanAttachments(ctx)).toMatchObject({ removed: 1, failed: 0 });
+    for (const gone of [key, variantKey(key, 360), variantKey(key, 750)]) {
+      expect(await harness.ctx.storage.exists(gone)).toBe(false);
+    }
+  });
+
+  it('the backfill walks the library in id order, batch by batch, skipping the deleted', async () => {
+    const ctx = as(adminActor(adminId));
+    const ids: string[] = [];
+    for (let salt = 0; salt < 3; salt += 1) {
+      ids.push(
+        (await attachmentUpload(ctx, { directory: 'product' }, await jpeg(800, 600, salt)))
+          .attachment.id,
+      );
+    }
+    await attachmentDeleteMany(ctx, { ids: [ids[1]!] });
+
+    const first = await backfillImageVariants(ctx, { limit: 1 });
+    expect(first).toEqual({ examined: 1, written: 1, failed: 0, nextAfterId: ids[0] });
+    const second = await backfillImageVariants(ctx, { afterId: first.nextAfterId!, limit: 1 });
+    expect(second).toEqual({ examined: 1, written: 1, failed: 0, nextAfterId: ids[2] });
+    expect(await backfillImageVariants(ctx, { afterId: second.nextAfterId!, limit: 1 })).toEqual({
+      examined: 0,
+      written: 0,
+      failed: 0,
+      nextAfterId: null,
+    });
+
+    const deletedKey = await storageKeyOf(ids[1]!);
+    expect(await harness.ctx.storage.exists(variantKey(deletedKey, 360))).toBe(false);
+    // Run again over everything: nothing left to write.
+    expect(await backfillImageVariants(ctx, { limit: 10 })).toMatchObject({
+      examined: 2,
+      written: 0,
+    });
   });
 });

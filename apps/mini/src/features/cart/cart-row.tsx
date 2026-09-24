@@ -51,7 +51,7 @@ export function CartRow({ item, quantity, onSelect, onQuantity, onSpec }: CartRo
         className="cart-row__media"
         onClick={open}
       >
-        <Image src={item.skuImageUrl ?? item.productImageUrl} ratio={1} radius="sm" />
+        <Image src={item.skuImageUrl ?? item.productImageUrl} ratio={1} radius="sm" size="small" />
       </Pressable>
       <View className="cart-row__body">
         <Pressable label={item.productName} role="link" pressedTint={false} onClick={open}>

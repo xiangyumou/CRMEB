@@ -98,7 +98,13 @@ export function ActivitySkuSheet({
     >
       <View className="activity-sku__header">
         <View className="activity-sku__image">
-          <Image src={sku?.imageUrl ?? imageUrl} label={title} radius="sm" lazy={false} />
+          <Image
+            src={sku?.imageUrl ?? imageUrl}
+            label={title}
+            radius="sm"
+            lazy={false}
+            size="small"
+          />
         </View>
         <View className="activity-sku__summary">
           <Price value={sku?.price ?? skus[0]?.price ?? '0.00'} size="lg" />

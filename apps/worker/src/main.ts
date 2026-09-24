@@ -1,5 +1,6 @@
 import { Queue, Worker, type Job } from 'bullmq';
 import { buildWorkerContainer, type WorkerContainer } from './container';
+import { enqueueCommand } from './enqueue';
 import { HEARTBEAT_KEY } from './env';
 import { indexJobs, parsePayload, type AnyJobDefinition } from './define-job';
 import { allJobs } from './jobs.gen';
@@ -193,7 +194,10 @@ export async function syncRepeatables(
 // Only run when executed directly, so tests can import `start`.
 const isEntry = process.argv[1] !== undefined && import.meta.url === `file://${process.argv[1]}`;
 
-if (isEntry) {
+if (isEntry && process.argv[2] === 'enqueue') {
+  // `node main.mjs enqueue <job> [payload]`: an operator's one-off, not a worker.
+  process.exit(await enqueueCommand(process.argv.slice(3), allJobs));
+} else if (isEntry) {
   const { stop } = await start();
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.on(signal, () => {

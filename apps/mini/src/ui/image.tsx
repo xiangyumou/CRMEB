@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Image as TaroImage, View } from '@tarojs/components';
-import { assetUrl } from '@/lib/asset-url';
+import { assetUrl, imageUrl, type ImageSize } from '@/lib/asset-url';
 import { cx } from '@/lib/cx';
 import { Icon } from './icon';
 import './image.scss';
@@ -18,6 +18,11 @@ export interface ImageProps {
   radius?: 'none' | 'sm' | 'md' | undefined;
   /** Load when near the viewport (lists). Default on. */
   lazy?: boolean | undefined;
+  /**
+   * Which copy to load (`lib/asset-url`): `small` or `medium` for a list, card or thumbnail,
+   * `original` (default) where the picture is the point. A missing copy falls back to the original.
+   */
+  size?: ImageSize | undefined;
   className?: string | undefined;
 }
 
@@ -34,15 +39,21 @@ export function Image({
   fit = 'cover',
   radius = 'none',
   lazy = true,
+  size = 'original',
   className,
 }: ImageProps) {
-  const url = assetUrl(src ?? null);
+  const original = assetUrl(src ?? null);
+  const preferred = imageUrl(src ?? null, size);
   const [state, setState] = useState<'loading' | 'loaded' | 'error'>('loading');
-  const [shownUrl, setShownUrl] = useState(url);
-  if (shownUrl !== url) {
-    setShownUrl(url);
+  // The smaller copy failed (not generated yet, or never): show the original instead.
+  const [fellBack, setFellBack] = useState(false);
+  const [shownUrl, setShownUrl] = useState(original);
+  if (shownUrl !== original) {
+    setShownUrl(original);
     setState('loading');
+    setFellBack(false);
   }
+  const url = fellBack ? original : preferred;
   const failed = !url || state === 'error';
   return (
     <View
@@ -67,7 +78,7 @@ export function Image({
           lazyLoad={lazy}
           ariaHidden
           onLoad={() => setState('loaded')}
-          onError={() => setState('error')}
+          onError={() => (url !== original && !fellBack ? setFellBack(true) : setState('error'))}
         />
       )}
     </View>

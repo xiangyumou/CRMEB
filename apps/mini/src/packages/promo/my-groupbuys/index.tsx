@@ -92,7 +92,7 @@ function TeamCard({ item }: { item: MyTeam }) {
         onClick={() => void navigate(team)}
       >
         <View className="my-groupbuys__image">
-          <Image src={item.imageUrl} label={item.title} radius="sm" lazy />
+          <Image src={item.imageUrl} label={item.title} radius="sm" lazy size="small" />
         </View>
         <View className="my-groupbuys__body">
           <Text className="my-groupbuys__title">{item.title}</Text>

@@ -90,7 +90,7 @@ function LinkedProduct({ product }: { product: NonNullable<Article['product']> }
       onClick={() => void navigate({ route: 'product', params: { id: product.id } })}
     >
       <View className="article-product__image">
-        <Image src={assetUrl(product.imageUrl)} ratio={1} radius="sm" />
+        <Image src={assetUrl(product.imageUrl)} ratio={1} radius="sm" size="small" />
       </View>
       <View className="article-product__text">
         <Text className="article-product__name">{product.name}</Text>

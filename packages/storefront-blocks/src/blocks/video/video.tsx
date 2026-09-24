@@ -1,7 +1,8 @@
-import { Image, Text, Video as NativeVideo, View } from '@tarojs/components';
+import { Text, Video as NativeVideo, View } from '@tarojs/components';
 
 import type { VideoProps } from '@shop/contracts/decor/all-blocks';
 import type { VideoRatio } from '@shop/contracts/decor/constants';
+import { BlockImage } from '../shared/block-image';
 import { cx } from '../shared/css';
 import { BlockFrame } from '../shared/frame';
 import type { BlockProps } from '../shared/types';
@@ -30,7 +31,13 @@ export function Video({ props, host }: BlockProps<VideoProps>) {
         {still ? (
           <View className={styles.still} data-still="true">
             {props.poster ? (
-              <Image className={styles.poster} src={props.poster} mode="aspectFill" />
+              <BlockImage
+                className={styles.poster}
+                src={props.poster}
+                width={750}
+                resolve={host?.resolveImage}
+                mode="aspectFill"
+              />
             ) : null}
             <View className={styles.play}>
               <View className={styles.triangle} />
@@ -41,7 +48,9 @@ export function Video({ props, host }: BlockProps<VideoProps>) {
           <NativeVideo
             className={styles.player}
             src={props.src}
-            {...(props.poster ? { poster: props.poster } : {})}
+            {...(props.poster
+              ? { poster: host?.resolveImage ? host.resolveImage(props.poster) : props.poster }
+              : {})}
             controls
             autoplay={props.autoplay}
             muted={props.muted}

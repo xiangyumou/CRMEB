@@ -16,6 +16,11 @@ import type {
   UserUploadPurpose,
   UserUploadResult,
 } from '@shop/contracts/storage/schemas';
+import {
+  IMAGE_VARIANT_WIDTHS,
+  imageVariantUrl,
+  originalImageUrl,
+} from '@shop/contracts/storage/image-variants';
 import type { Tx } from '@shop/db';
 import { sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
@@ -493,7 +498,7 @@ async function storeFile(ctx: Ctx, args: StoreArgs): Promise<UploadResult> {
   const dimensions = sniffed.kind === 'image' ? probeImageDimensions(bytes) : null;
   const displayName = (args.name ?? args.file.filename ?? '未命名文件').slice(0, 255);
 
-  return ctx.withTx(async (tx: Tx) => {
+  const result = await ctx.withTx(async (tx: Tx): Promise<UploadResult> => {
     // Before anything is written: hold the destination folder still. A folder
     // delete takes `FOR UPDATE` on this row, so either it waits for us and then
     // sees our attachment (and refuses as not-empty), or it committed first and
@@ -550,6 +555,35 @@ async function storeFile(ctx: Ctx, args: StoreArgs): Promise<UploadResult> {
       throw error;
     }
   });
+
+  // After commit: the job reads the row, so it must not be able to run first.
+  if (!result.deduped) await requestImageVariants(ctx, result.attachment);
+  return result;
+}
+
+/** The worker job that writes an upload's thumbnails (`image-variants.ts`). */
+export const GENERATE_IMAGE_VARIANTS_JOB = 'storage.generateImageVariants';
+
+/**
+ * Asks the worker for the 360 / 750 px variants of a freshly stored picture.
+ * Fail soft: a queue that is down costs the thumbnails (the client falls back
+ * to the original, and the backfill can fill them in later), never the upload.
+ */
+async function requestImageVariants(ctx: Ctx, attachment: AttachmentItem): Promise<void> {
+  if (attachment.kind !== 'image') return;
+  if (imageVariantUrl(attachment.url, IMAGE_VARIANT_WIDTHS[0]) === null) return;
+  try {
+    await ctx.queue.enqueue(
+      GENERATE_IMAGE_VARIANTS_JOB,
+      { attachmentId: attachment.id },
+      { dedupeKey: `storage-variants:${attachment.id}` },
+    );
+  } catch (error) {
+    ctx.logger.warn(
+      { requestId: ctx.requestId, attachmentId: attachment.id, err: error },
+      'storage: 缩略图任务入队失败，列表将使用原图',
+    );
+  }
 }
 
 /**
@@ -736,13 +770,18 @@ export async function userUpload(
 
 /**
  * Whether `url` is exactly the URL of a live image in our own storage — what
- * `POST /api/v1/uploads` handed back, or any library image. For callers that
- * must only accept a picture we stored (the profile avatar, a review
- * picture), never one on somebody else's server.
+ * `POST /api/v1/uploads` handed back, or any library image — or of one of its
+ * thumbnails (`@shop/contracts/storage/image-variants`), which a client that
+ * displayed the thumbnail may send back. For callers that must only accept a
+ * picture we stored (the profile avatar, a review picture, after-sale
+ * evidence), never one on somebody else's server.
  */
 export async function isStoredImageUrl(ctx: Ctx, url: string): Promise<boolean> {
   if (url.length === 0 || url.length > 2048) return false;
-  return repo.liveImageUrlExists(ctx.db, url);
+  if (await repo.liveImageUrlExists(ctx.db, url)) return true;
+  // A thumbnail (`….w360.jpg`) is ours exactly when its original is.
+  const original = originalImageUrl(url);
+  return original !== null && repo.liveImageUrlExists(ctx.db, original);
 }
 
 // ---------------------------------------------------------------------------

@@ -44,6 +44,7 @@ const REACT_19_ONLY = {
 const CONTRACTS_RUNTIME = [
   '@shop/contracts/decor/link-route',
   '@shop/contracts/diy/removed',
+  '@shop/contracts/storage/image-variants',
   '@shop/contracts/system/theme',
 ];
 

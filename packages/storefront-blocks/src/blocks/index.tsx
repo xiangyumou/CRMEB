@@ -58,7 +58,13 @@ export { UserCard } from './user-card/user-card';
 export { Video } from './video/video';
 export { BlockFrame } from './shared/frame';
 export type { PersonalSlots } from './shared/personal';
-export type { BlockHost, BlockIntent, BlockProps } from './shared/types';
+export type {
+  BlockHost,
+  BlockImageWidth,
+  BlockIntent,
+  BlockProps,
+  ImageResolver,
+} from './shared/types';
 
 /**
  * Block type → component. A `Record` over `BlockType` (every registered

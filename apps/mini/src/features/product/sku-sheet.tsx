@@ -200,7 +200,7 @@ function Header({
           if (image) previewImages([image], image);
         }}
       >
-        <Image src={image} label={product.name} radius="sm" />
+        <Image src={image} label={product.name} radius="sm" size="small" />
       </Pressable>
       <View className="sku-sheet__summary">
         <Price value={sku?.price ?? product.price} size="lg" />

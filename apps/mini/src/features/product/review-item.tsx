@@ -36,7 +36,7 @@ export function ReviewItem({ review, clamp = false }: { review: Review; clamp?: 
     <View className="shop-review">
       <View className="shop-review__head">
         <View className="shop-review__avatar">
-          <Image src={assetUrl(review.authorAvatarUrl)} radius="none" />
+          <Image src={assetUrl(review.authorAvatarUrl)} radius="none" size="small" />
         </View>
         <View className="shop-review__who">
           <Text className="shop-review__name">{review.authorNickname || '匿名用户'}</Text>
@@ -63,7 +63,7 @@ export function ReviewItem({ review, clamp = false }: { review: Review; clamp?: 
               className="shop-review__image"
               onClick={() => previewImages(images, src)}
             >
-              <Image src={src} radius="sm" />
+              <Image src={src} radius="sm" size="small" />
             </Pressable>
           ))}
         </View>
