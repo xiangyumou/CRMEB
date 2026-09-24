@@ -10,7 +10,7 @@ it; [invariants.md](invariants.md) lists the business rules and the tests that p
                            │
                      edge (nginx)
         ┌──────────────────┼──────────────────────┐
-   / (H5 build)   /admin, /admin-api, /api    /uploads/ (read-only volume)
+   /, /admin, /admin-api, /api    /uploads/ (read-only volume)
                            │
                      web (Next.js)  ──────┐
                            │              │ enqueue, pub/sub
@@ -19,12 +19,12 @@ it; [invariants.md](invariants.md) lists the business rules and the tests that p
                      worker (BullMQ) ─────┘
 ```
 
-| Process   | Source                      | Job                                                                                                      |
-| --------- | --------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `edge`    | `docker/edge/`              | Serves the uni-app H5 build and `/uploads/`, proxies the application paths to `web`, answers `/healthz`. |
-| `web`     | `apps/web`                  | Every HTTP endpoint and the admin UI. Holds no state of its own.                                         |
-| `worker`  | `apps/worker`               | Scheduled and on-demand jobs, and the dispatcher of the effects ledger.                                  |
-| `migrate` | `packages/db`, worker image | A one-shot that `shop upgrade` runs to apply migrations (with the application stopped) and the seed.     |
+| Process   | Source                      | Job                                                                                                  |
+| --------- | --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `edge`    | `docker/edge/`              | Serves `/uploads/`, proxies the landing page and the application paths to `web`, answers `/healthz`. |
+| `web`     | `apps/web`                  | Every HTTP endpoint and the admin UI. Holds no state of its own.                                     |
+| `worker`  | `apps/worker`               | Scheduled and on-demand jobs, and the dispatcher of the effects ledger.                              |
+| `migrate` | `packages/db`, worker image | A one-shot that `shop upgrade` runs to apply migrations (with the application stopped) and the seed. |
 
 PostgreSQL holds all business state. Redis holds what may be rebuilt or lost with a bounded cost:
 admin sessions, the config cache, rate-limit counters, the BullMQ queue, the worker heartbeat,
@@ -71,8 +71,8 @@ into `src/errors.gen.ts`, and writes `openapi.json` from them. Everything else r
 - the admin UI calls a route through `useRouteQuery(route, …)` and `useRouteMutation(route)`
   (`apps/web/src/admin/api/hooks.ts`), typed from the route's own schemas;
 - the mock server in `@shop/testing` answers each route with its first example;
-- the guards compare the route list with the App Router tree, the permission atoms and the
-  uni-app's `api/` calls.
+- the guards compare the route list with the App Router tree and the permission atoms, and the
+  storefront part of `openapi.json` with the last released mini-program's (`api-compat`).
 
 With `VALIDATE_RESPONSES=1` (on in development and in every test run) `handle()` checks each
 response against its contract, so a service that drifts from the contract fails loudly.
@@ -132,7 +132,7 @@ One directory per domain under `packages/core/src/`, each with its schema in
 | `coupon`              | Coupon templates, claiming, user coupons, allocation at checkout.                                |
 | `groupbuy`, `presale` | The two promotion order kinds.                                                                   |
 | `decor`               | Page decoration v2: documents, revisions, the page resolver, preview tokens.                     |
-| `diy`, `cms`          | Legacy page designs and themes, for the uni-app only; articles and agreements.                   |
+| `cms`                 | Articles and agreements.                                                                         |
 | `notification`        | In-app notices, message templates, subscription messages, the live admin stream.                 |
 | `wechat`, `wechat-oa` | The WeChat client and WeChat Pay v3; the official account's menus, replies, QR codes, media.     |
 | `sms`                 | Verification codes and the SMS provider port.                                                    |
@@ -239,19 +239,14 @@ The admin is part of `apps/web`: pages under `app/admin/(shell)/<domain>/`, Ant 
 Data flows through `useRouteQuery` and `useRouteMutation`; `useCan()` from `src/admin/session`
 hides what the admin's atoms do not allow. `/admin/dev/kit` renders every kit component, and
 `apps/web/src/admin/kit/README.md` documents them. 店铺装修 (`src/admin/decor`) is the Puck
-editor of decor v2 (see [The mini-program](#the-mini-program)); the legacy designer
-(`src/admin/diy`) edits the uni-app's DIY pages until the cutover. Both take their component
-schemas from `@shop/contracts`, so the editor, the API and the client agree on each block's shape. The notification bell listens on
+editor of decor v2 (see [The mini-program](#the-mini-program)). It takes its block schemas from
+`@shop/contracts`, so the editor, the API and the client agree on each block's shape. The notification bell listens on
 `/admin-api/notifications/stream`, a server-sent event stream fed by Redis pub/sub.
 
-## The mobile clients
+## The mini-program
 
-Two clients call `/api/v1` until the cutover ([mini/cutover.md](mini/cutover.md)):
-`apps/mini`, the WeChat mini-program that replaces the uni-app, and `apps/uni-app`, which still
-ships and which the cutover deletes. [docs/mini/](mini/README.md) is the mini-program's own
-documentation.
-
-### The mini-program
+`apps/mini`, the WeChat mini-program, is the one client of `/api/v1`. [docs/mini/](mini/README.md)
+is its own documentation.
 
 `apps/mini` is Taro 4 on React 18, in the pnpm workspace. It is built from
 `@shop/api-client` (the typed `/api/v1` client over the build's transport, TanStack Query hooks,
@@ -302,8 +297,8 @@ Redis (`app:config:v2`, 60 s), versions it with a weak ETag, answers `304` for t
 version, and drops the cache whenever a config group it is built from is saved.
 `src/theme/` derives the page's colour tokens and the native tab bar's look from it.
 
-**Decoration (decor v2).** A page the merchant designs goes through five layers; the legacy `diy`
-domain, API and designer serve only the uni-app ([mini/decor.md](mini/decor.md)):
+**Decoration (decor v2).** A page the merchant designs goes through five layers
+([mini/decor.md](mini/decor.md)):
 
 1. **Admin editor**: `apps/web/src/admin/decor`, a Puck editor whose fields are generated from the
    block schemas (`zod-to-puck.ts`), with the blocks themselves as the canvas. It saves drafts,
@@ -348,21 +343,8 @@ each in one place:
 
 **Checked by** the `mini` guard (pages ⇄ `app.config.ts` ⇄ route catalogue, the platform seam,
 privacy declarations, share exports, retired URLs, no AppSecret or upload key), its unit tests,
-and `pnpm --filter @shop/e2e-storefront test:mini`; the rest only a real phone can show is in
+and `pnpm --filter @shop/e2e-storefront test`; the rest only a real phone can show is in
 [mini/device-check.md](mini/device-check.md).
-
-### The uni-app (legacy, removed at the cutover)
-
-`apps/uni-app` is the mobile client that still ships: uni-app on Vue 2, built as the H5 storefront
-(served by `edge` at `/`) and as the current WeChat mini-program. It is an npm project outside the
-pnpm workspace, and [mini/cutover.md](mini/cutover.md) deletes it with everything that exists only
-for it.
-
-Its pages read the field names they have always read. The modules in `api/` call `/api/v1`, and
-the pure functions in `api/mappers/` translate each response into those names, so a contract change
-is absorbed in one mapper rather than across pages. `utils/diyRegistry.js` lists the DIY components
-it can render; the `uniapp` guard checks it against the contracts' registry, and checks that every
-call in `api/` resolves to a route.
 
 ## Edge
 
@@ -372,23 +354,23 @@ call in `api/` resolves to a route.
 - `^/(admin|admin-api|api)(/|$)` and `/_next/static/` go to `web`;
   `/admin-api/notifications/stream` goes unbuffered, for SSE.
 - `^~ /uploads/` serves the uploads volume read-only; anything that could execute is refused.
-- Everything else is the uni-app's H5 build, with long cache on hashed assets and an `index.html`
-  fallback. At the cutover `/` becomes a landing page ([mini/cutover.md](mini/cutover.md)); the
-  mini-program's H5 builds are never served in production.
+- `/` is the landing page (`apps/web/app/page.tsx`: the shop's name and 小程序码), answered by
+  `web`; any other path redirects to it. The mini-program's H5 builds are never served in
+  production.
 - The client address is taken from `X-Forwarded-For` only when the peer is in
   `NEXT_EDGE_TRUSTED_PROXIES`; the app reads `X-Real-IP` and nothing else.
 
 ## Tests and checks
 
-| Layer             | Where                        | Runs against                                                                                                                                                           |
-| ----------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit              | `*.test.ts` next to the code | Nothing external.                                                                                                                                                      |
-| Integration       | `*.int.test.ts`              | PostgreSQL and Redis in Testcontainers; `runConcurrently` for every conditional update.                                                                                |
-| Contract examples | `packages/contracts`         | Every example parses against its route.                                                                                                                                |
-| Guards            | `guards/`                    | The whole tree: contracts vs routes, permissions, retired features, secrets, migrations, the uni-app, the mini-program, the invariant catalogue, the release pipeline. |
-| Admin e2e         | `e2e/admin`                  | The production build of `apps/web`, Playwright, fakes for every third party.                                                                                           |
-| Storefront e2e    | `e2e/storefront`             | The H5 build in mobile Chromium, through the edge, against the built app and worker; `test:mini` runs the mini-program's "模拟小程序" build the same way.              |
-| Deploy drill      | `deploy/rehearsal/drill.sh`  | The production Compose stack, built locally: first deploy, upgrades that stop nothing or must roll back, rollback, backup, and `ship.sh`.                              |
+| Layer             | Where                        | Runs against                                                                                                                                              |
+| ----------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit              | `*.test.ts` next to the code | Nothing external.                                                                                                                                         |
+| Integration       | `*.int.test.ts`              | PostgreSQL and Redis in Testcontainers; `runConcurrently` for every conditional update.                                                                   |
+| Contract examples | `packages/contracts`         | Every example parses against its route.                                                                                                                   |
+| Guards            | `guards/`                    | The whole tree: contracts vs routes, permissions, retired features, secrets, migrations, the mini-program, the invariant catalogue, the release pipeline. |
+| Admin e2e         | `e2e/admin`                  | The production build of `apps/web`, Playwright, fakes for every third party.                                                                              |
+| Storefront e2e    | `e2e/storefront`             | The mini-program's "模拟小程序" H5 build in mobile Chromium, through the edge, against the built app and worker.                                          |
+| Deploy drill      | `deploy/rehearsal/drill.sh`  | The production Compose stack, built locally: first deploy, upgrades that stop nothing or must roll back, rollback, backup, and `ship.sh`.                 |
 
 CI (`.github/workflows/ci.yml`) runs all of them, and a nightly soak repeats the concurrency
 suites 50 times with shuffled order.

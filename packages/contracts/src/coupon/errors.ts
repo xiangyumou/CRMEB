@@ -42,8 +42,6 @@ export const couponErrors = defineErrors({
 
   /** An admin grant named a user id that does not exist. `details` carries `{ userIds }`. */
   COUPON_GRANT_USER_UNKNOWN: { status: 422, message: '部分用户不存在，请检查后重试' },
-  /** A 店员 named their own account as the recipient of a staff grant. */
-  COUPON_GRANT_SELF: { status: 422, message: '不能给自己发放优惠券' },
 });
 
 export type CouponErrorCode = keyof typeof couponErrors;

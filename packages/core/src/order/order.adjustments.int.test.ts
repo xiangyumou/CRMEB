@@ -177,7 +177,7 @@ async function couponFor(userId: number, off: string): Promise<number> {
   return held!.id;
 }
 
-/** `unitPrice` less the activity entries over `quantity` — what the uni-app prints. */
+/** `unitPrice` less the activity entries over `quantity` — what the storefront prints. */
 function paidUnitPrice(item: OrderItem): string {
   const off = Money.sum(
     item.adjustments

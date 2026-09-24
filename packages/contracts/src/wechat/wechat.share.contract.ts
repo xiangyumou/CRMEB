@@ -11,10 +11,11 @@ import { miniCodeResult, shareMiniCodeQuery } from './schemas';
  * reads its params back with `decodeScene`. Only keys the catalogue marks
  * `miniCode` are accepted.
  *
- * Everything else is `GET /api/v1/wechat/mini-qrcodes`'s, which stays for the
- * legacy uni-app: the same `(page, scene)` cache in `wechat_mini_codes`, the
- * same budget of 30 **new** codes an hour per account, the same `auth: 'user'`
- * (every call may cost a WeChat request).
+ * A code is generated once per `(page, scene)` and cached in
+ * `wechat_mini_codes`; each account may mint 30 **new** codes an hour; and the
+ * route is `auth: 'user'` because every call may cost a WeChat request. (The
+ * old uni-app's `GET /api/v1/wechat/mini-qrcodes`, which took a raw page from
+ * an allow-list, was deleted at the cutover.)
  */
 export const shareMiniCode = defineRoute({
   id: 'wechat.shareMiniCode',

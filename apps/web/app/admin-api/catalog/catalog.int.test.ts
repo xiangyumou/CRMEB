@@ -431,24 +431,18 @@ describe('/api/v1/catalog', () => {
     expect(typeof body.version).toBe('string');
   });
 
-  it('answers a caller holding the current version with a 304, on both routes', async () => {
+  it('answers a caller holding the current version with a 304', async () => {
     const headers = await adminCookie();
     await makeCategory(headers);
 
     const { GET: tree } = await import('../../api/v1/catalog/categories/route');
-    const { GET: version } = await import('../../api/v1/catalog/categories/version/route');
     const tag = (await tree(get('/api/v1/catalog/categories'))).headers.get('etag')!;
     expect(tag).toMatch(/^"[^"]+"$/);
 
-    for (const [route, path] of [
-      [tree, '/api/v1/catalog/categories'],
-      [version, '/api/v1/catalog/categories/version'],
-    ] as const) {
-      const response = await route(get(path, { 'if-none-match': tag }));
-      expect(response.status, path).toBe(304);
-      expect(await response.text()).toBe('');
-      expect(response.headers.get('etag')).toBe(tag);
-    }
+    const response = await tree(get('/api/v1/catalog/categories', { 'if-none-match': tag }));
+    expect(response.status).toBe(304);
+    expect(await response.text()).toBe('');
+    expect(response.headers.get('etag')).toBe(tag);
 
     // The tree moved: the old tag gets the new tree.
     await makeCategory(headers);

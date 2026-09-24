@@ -126,19 +126,6 @@ export {
   adminProtectionUpdate,
 } from './catalog.taxonomy.service';
 
-/** 移动端商家管理 — 商品管理. Ten calls, `auth: 'staff'`, no new capability. */
-export {
-  staffAssignCategories,
-  staffAssignLabels,
-  staffProductCategories,
-  staffProductCreate,
-  staffProductLabels,
-  staffProductList,
-  staffProductSkus,
-  staffSetVisibility,
-  staffUpdateSkus,
-} from './catalog.staff.service';
-
 export {
   adminReviewBatchSetStatus,
   adminReviewCreate,
@@ -158,7 +145,6 @@ export type { AutoReviewResult } from './catalog.review.service';
 
 export {
   categoryTree,
-  categoryVersion,
   clearSearchHistory,
   favoriteAdd,
   favoriteAddBatch,
@@ -174,7 +160,6 @@ export {
   productSkus,
   pruneBrowseHistory,
   searchHistory,
-  skuPrice,
 } from './catalog.storefront.service';
 
 /**

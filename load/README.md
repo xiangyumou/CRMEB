@@ -43,7 +43,7 @@ the script runs through that package's `tsx`. For the same reason,
 
 The storefront is seeded through the core services: 3 parent and 6 leaf
 categories, 20 products with one SKU each (stock 1e6, free freight), a
-production-sized DIY home page (about 90 KB), WeChat Pay pointing at the
+a decorated 首页 (a search bar and two product grids), WeChat Pay pointing at the
 in-process fake gateway (real RSA and AEAD), and 16 shoppers who sign in over
 HTTP and add an address. A one-pass smoke of every flow must succeed first.
 Then the virtual users run a closed loop with no think time, picking flows by
@@ -51,7 +51,7 @@ weight:
 
 | flow             | weight | requests                                                                                                                                             |
 | ---------------- | -----: | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| DIY home         |     20 | `GET /api/v1/diy/pages/home`                                                                                                                         |
+| home             |     20 | `GET /api/v1/pages/home`                                                                                                                             |
 | category         |     20 | `GET /api/v1/catalog/categories`, then `GET /api/v1/catalog/products?categoryId`                                                                     |
 | product detail   |     25 | `GET /api/v1/catalog/products/:id`, signed in                                                                                                        |
 | cart add         |     15 | `POST /api/v1/cart/items`                                                                                                                            |
@@ -87,7 +87,8 @@ latency and throughput are optimistic for it.
   hard, so flat-and-high (about 370 of 512 MiB) is expected.
 - No N+1: category lists, cart add and product detail each issue a fixed
   number of statements per request, and auth issues exactly three.
-- The costliest statements by total time were the DIY home page read, the
+- The costliest statements by total time were the home page read (the legacy
+  DIY page then; this run predates the cutover), the
   `products.views` bump and the stock decrement. The stock decrement is the
   oversell guard and its cost is lock waiting on shared SKUs, by design.
 

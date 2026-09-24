@@ -2,7 +2,7 @@
 /**
  * `pnpm --filter @shop/testing mock -- --port 4010`
  *
- * Serves every registered contract from its examples. The uni-app and admin
+ * Serves every registered contract from its examples. The mini program and admin
  * clients develop against this before any handler exists.
  */
 import { allRoutes } from '@shop/contracts/routes';

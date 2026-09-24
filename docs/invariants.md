@@ -715,14 +715,6 @@ Token expiry and cross-user order read/write isolation through HTTP routes.
 - `packages/core/src/order/order.ref.int.test.ts::GET /api/v1/orders/:id > gives a stranger the same 404 for a number as for an id`
 - `packages/core/src/order/order.int.test.ts::hiding a finished order > answers a second tap, a stranger and an unknown id all with the same 404`
 
-### AUTH-004
-
-The staff console (mobile order management) admits exactly the shoppers on the order-staff roster; a shopper who is not on it is refused, and an empty roster closes it.
-
-- `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > 403s a shopper who is not on the list`
-- `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > lets somebody on the list in, and lets them ship`
-- `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > tells an ordinary shopper they are not staff rather than 403ing them`
-
 ### AUTH-006
 
 The mini-program sign-in counts only codes WeChat refused against a per-address budget (20 per 10 minutes); past it the address is refused with `RATE_LIMITED` without asking WeChat, a code WeChat accepted never counts, and another address is untouched.
@@ -1199,11 +1191,12 @@ Rendering cannot lose a message: an unknown placeholder renders empty rather tha
 
 ### NOTIF-006
 
-A customer event names the mini-program page it opens as a route-catalogue key and a `{{…}}` params template, and registration refuses a key the catalogue does not mark `notify`. The template is filled first and validated second: a valid result is stored on the in-app message as `data.route` and is the subscribe message's `page` (`toMiniPath`), overriding the deprecated hand-typed page; a result that does not validate sends no destination rather than a wrong one.
+A customer event names the mini-program page it opens as a route-catalogue key and a `{{…}}` params template, and registration refuses a key the catalogue does not mark `notify`, and a web `link` on a customer event. The template is filled first and validated second: a valid result is stored on the in-app message as `data.route` and is the subscribe message's `page` (`toMiniPath`) — there is no hand-typed page, and a customer event carries no web `link`; a result that does not validate sends no destination rather than a wrong one.
 
 - `packages/core/src/notification/notification.render.test.ts::renderRoute > fills the params in first, then validates the route — NOTIF-006`
 - `packages/core/src/notification/notification.render.test.ts::renderRoute > answers null rather than a wrong destination when a variable is missing — NOTIF-006`
 - `packages/core/src/notification/notification.render.test.ts::renderRoute > refuses at registration a route the catalogue does not let a message open — NOTIF-006`
+- `packages/core/src/notification/notification.render.test.ts::renderRoute > refuses at registration a web link on a customer event — NOTIF-006`
 - `packages/core/src/notification/notification.int.test.ts::fan-out > seeds the template from the registry and writes the in-app message — NOTIF-006`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::shopper notifications > tells every paid member 拼团成功 when the team fills, on every channel switched on — NOTIF-006`
 
@@ -1422,87 +1415,24 @@ A team shows strangers only a masked nickname and never an account id (decided 2
 - `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > answers null for no name at all`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the storefront surface > RISK-D-010 — shows a team to anybody with masked names, no account ids, and isMe from the session`
 
-## 页面装修 (DIY)
-
-### DIY-001
-
-A saved page survives parse → serialise byte for byte, including keys no schema in this build knows, for every production export. Validation hands back the caller's own object rather than zod's rebuilt one.
-
-- `packages/contracts/src/diy/schema/round-trip.test.ts::page value round trip > %s: parse -> serialise is byte-identical`
-- `packages/core/src/diy/diy.test.ts::validateDiyContent > hands back the caller’s own object, so the bytes never change`
-
-### DIY-002
-
-Retired components and links to removed storefront pages are filtered on **read**, never on write: the stored row keeps every node, and the storefront is served the page with those nodes stripped.
-
-- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity fixtures > covers every branch of the filter`
-- `packages/core/src/diy/diy.int.test.ts::the storefront read > serves the home page with the retired components stripped`
-
-### DIY-003
-
-Cleaning preserves key order and returns its input by identity when nothing is stripped, so a cleaned page still serialises byte for byte.
-
-- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity fixtures > keeps key order, so a cleaned page still serialises byte for byte`
-
-### DIY-004
-
-Two editors saving the same page do not overwrite each other: the version token covers both `updated_at` and the envelope's `version`, so a save from a stale editor fails with `DIY_VERSION_CONFLICT`.
-
-- `packages/core/src/diy/diy.int.test.ts::saving content > lets exactly one of several simultaneous saves win`
-
-### DIY-005
-
-The editor writes back a page it did not change, unchanged: timestamps and their derived `id`s are only rewritten once the page's order has actually moved.
-
-- `apps/web/src/admin/diy/store.test.ts::serialising > reproduces an untouched page byte for byte`
-- `apps/web/src/admin/diy/store.test.ts::serialising > rewrites timestamps and ids only once the order actually moves`
-
-### DIY-006
-
-Hiding a component never deletes it: `isHide` stays in the payload and the renderer skips it.
-
-- `apps/web/src/admin/diy/store.test.ts::editing > hides without deleting`
-
-### DIY-007
-
-A page kind that owns a footer always saves one (`pageFoot` on 首页, `bottomMenu` on 商品详情) and it always sorts last.
-
-- `apps/web/src/admin/diy/store.test.ts::serialising > appends the factory footer to a home page that has none`
-- `apps/web/src/admin/diy/store.test.ts::serialising > pushes the footer past the body when the body is restamped`
-
-### DIY-008
-
-PostgreSQL `jsonb` reorders the keys inside a node; the guarantee that survives storage is "every key and value is preserved", not the byte order. Pinned so nobody mistakes it for a bug in this code.
-
-- `packages/core/src/diy/diy.int.test.ts::saving content > is the database, not this code, that reorders the keys inside a node`
-
-### DIY-009
-
-超级组件 (`customComponent`) is renderable but not creatable: the palette does not offer it, because the shop has no designer for its inner layout and a freshly created 超级组件 could never be filled. Existing nodes keep their config panel and their `customComponents` tree round-trips untouched.
-
-- `packages/contracts/src/diy/schema/round-trip.test.ts::the registry > keeps customComponent renderable but out of the palette`
-
 ## Storefront end to end
 
 ### SMOKE-002
 
-The DIY home's product lists load on the real stack with no console error and no failed request — the uni-app's DIY home, and in the mini-program a 装修 v2 page's product list.
+A decorated page's blocks, product lists included, load in the mini-program on the real stack with no console error and no failed request.
 
-- `e2e/storefront/specs/home-category-product.spec.ts::the DIY home page renders every fixture component with no console error`
 - `e2e/storefront/specs-mini/decor.spec.ts::a page published in the admin shows each of its blocks in order, and follows the next publish`
 
 ### SMOKE-003
 
-The home page loads for a signed-in shopper: `GET /api/v1/diy/pages/home` on the uni-app's H5 build, `GET /api/v1/pages/home` in the mini-program.
+The mini-program's home page (`GET /api/v1/pages/home`) loads for a signed-in shopper.
 
-- `e2e/storefront/specs/home-category-product.spec.ts::the DIY home page renders every fixture component with no console error`
 - `e2e/storefront/specs-mini/shop-journey.spec.ts::a shopper goes from 首页 through 分类 and the cart to a paid order`
 
 ### SMOKE-004
 
-`GET /api/v1/profile` answers 200 after a sign-in: a password login on the uni-app's H5 build; in the mini-program, a password login (the login page's 其他方式) and the silent `wx.login` sign-in.
+`GET /api/v1/profile` answers 200 after a sign-in in the mini-program: a password login (the login page's 其他方式) and the silent `wx.login` sign-in.
 
-- `e2e/storefront/specs/login.spec.ts::password login reaches an authenticated screen`
 - `e2e/storefront/specs-mini/login.spec.ts::SMOKE-004: 密码登录 under 其他方式 reaches an authenticated screen, and a wrong password is its field's error`
 - `e2e/storefront/specs-mini/login.spec.ts::a WeChat user the shop knows is signed in on opening the app, with no login page`
 
@@ -1510,7 +1440,6 @@ The home page loads for a signed-in shopper: `GET /api/v1/diy/pages/home` on the
 
 An order is created `pending_payment`, paid through the cashier with the worker running, and read back `paid`.
 
-- `e2e/storefront/specs/cart-checkout-pay.spec.ts::a shopper pays an order at the cashier and the order is paid`
 - `e2e/storefront/specs-mini/new-shopper-buys.spec.ts::a new WeChat user signs in, binds a phone, buys a product and pays`
 
 ### SMOKE-006
@@ -1542,13 +1471,6 @@ The group-buy poster is drawn by the client: the server composes and uploads not
 - `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::answers a second shopper the same poster, still without an upload`
 - `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::answers an unknown team with the contract’s 404, not a 500`
 
-### SMOKE-010
-
-The storefront is served DIY data with the components and navigation entries the shop does not have removed whole, and every other node kept.
-
-- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity fixtures > covers every branch of the filter`
-- `packages/core/src/diy/diy.int.test.ts::the storefront read > serves the home page with the retired components stripped`
-
 ### SMOKE-011
 
 Presale expiry unlists only expired presale products.
@@ -1570,9 +1492,9 @@ A successful group updates leader and members once, without repeated notificatio
 
 ### CORE-002
 
-The shop has no 砍价, 秒杀, 抽奖, 直播, 分销, 积分, 签到, 付费会员, 充值, 余额支付, 支付宝, 线下支付, 核销, 门店自提, 自建客服 or the other features `pnpm guards`' `retired` check lists: no identifier or URL token for any of them exists in the application source, the uni-app API layer or the mini-program (with `@shop/api-client` and `@shop/storefront-blocks`), and every route file is described by a contract, so there is no unlisted surface for one to come back through.
+The shop has no 砍价, 秒杀, 抽奖, 直播, 分销, 积分, 签到, 付费会员, 充值, 余额支付, 支付宝, 线下支付, 核销, 门店自提, 自建客服 or the other features `pnpm guards`' `retired` check lists: no identifier or URL token for any of them exists in the application source or the mini-program (with `@shop/api-client` and `@shop/storefront-blocks`), and every route file is described by a contract, so there is no unlisted surface for one to come back through.
 
-- `guards/src/checks/retired.test.ts::the retired blacklist > finds no retired identifier in the workspace, the uni-app API layer or the mini-program`
+- `guards/src/checks/retired.test.ts::the retired blacklist > finds no retired identifier in the workspace or the mini-program`
 - `guards/src/checks/contracts.test.ts::contracts and route files > leaves no route file that no contract describes`
 
 ## Test strength and stability
@@ -1773,10 +1695,10 @@ Every contract has a route file that exports its method, and every route file is
 
 ### SHARE-001
 
-`GET /api/v1/share/mini-codes` accepts only route-catalogue keys marked `miniCode`, and the code it answers opens exactly `storefrontRouteDef(key).path` with `encodeScene(route)` as the scene, which `decodeScene` reads back. The params are validated against the key before anything is looked up or minted: params that do not fit (an `id` on `home`, none on `product`) are `VALIDATION_FAILED` with no WeChat call and no row. It shares `/wechat/mini-qrcodes`'s `(page, scene)` cache, so one pair is minted once whichever endpoint asked first.
+`GET /api/v1/share/mini-codes` accepts only route-catalogue keys marked `miniCode`, and the code it answers opens exactly `storefrontRouteDef(key).path` with `encodeScene(route)` as the scene, which `decodeScene` reads back. The params are validated against the key before anything is looked up or minted: params that do not fit (an `id` on `home`, none on `product`) are `VALIDATION_FAILED` with no WeChat call and no row. A pair is minted once and served from the `(page, scene)` cache afterwards.
 
 - `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > takes the page from the catalogue and the scene from encodeScene — SHARE-001`
-- `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > shares the (page, scene) cache with the legacy endpoint — SHARE-001`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::the (page, scene) cache > asks WeChat once for a pair and serves every later caller from the cache`
 - `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > refuses params that do not fit the key, without calling WeChat — SHARE-001`
 - `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > refuses a key the catalogue does not mark miniCode — SHARE-001`
 - `e2e/storefront/specs-mini/share.spec.ts::SHARE-001: a 小程序码 opens the product, activity, coupon or decor page it was made for`
@@ -1791,11 +1713,10 @@ A 拼团 poster points at the team page from the route catalogue, not at a hand-
 
 ### SHARE-003
 
-The version a 小程序码 opens (`env_version`) is `wechat-mini.codeEnvVersion` — `release` unless an operator picks `trial` or `develop` — for both the catalogue endpoint and the legacy one, and codes are cached per version: a code minted for one version is never served while the setting names another, and switching back reuses the earlier code without calling WeChat.
+The version a 小程序码 opens (`env_version`) is `wechat-mini.codeEnvVersion` — `release` unless an operator picks `trial` or `develop` — and codes are cached per version: a code minted for one version is never served while the setting names another, and switching back reuses the earlier code without calling WeChat.
 
 - `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > asks for release by default`
 - `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > asks for the configured version, and caches per version`
-- `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > keeps the legacy endpoint on the same rule`
 
 ### SYS-001
 
@@ -1874,14 +1795,13 @@ The last enabled super admin cannot be disabled or deleted, and nobody can lock 
 
 ### SYS-012
 
-A write is audited with its actor, route and target; every credential-named field and every field the config registry marks secret is stripped at any depth; a read is not audited, and the reader cannot undo the redaction. Staff-surface writes are audited with `actor_kind = 'staff'` and the 店员's user id, and every admin sign-in outcome is audited under `auth.adminLogin` without the body.
+A write is audited with its actor, route and target; every credential-named field and every field the config registry marks secret is stripped at any depth; a read is not audited, and the reader cannot undo the redaction. New rows are always `actor_kind = 'admin'`; the historic `actor_kind = 'staff'` rows (the mobile staff console, deleted at the cutover) stay readable and filterable, and every admin sign-in outcome is audited under `auth.adminLogin` without the body.
 
 - `apps/web/app/admin-api/admins/system.int.test.ts::/admin-api/admins > creates with 201 and writes an audit row without the password in it`
 - `apps/web/app/admin-api/admins/system.int.test.ts::/admin-api/audit-logs > does not record a read`
 - `packages/core/src/auth/audit.redact.test.ts::what the operation log keeps of a request body > redacts the same credential one level down, as the config form sends it`
 - `apps/web/src/server/handle.int.test.ts::what the operation log keeps of a config save > leaves no part of the payment keys in audit_logs`
 - `packages/core/src/auth/admin-login.trail.int.test.ts::what a password-guessing run leaves behind > leaves a readable trail of the failed attempts, without the password`
-- `apps/web/app/api/v1/staff/products/catalog-staff.int.test.ts::/api/v1/staff/products/:id/skus > records the reprice in the operation log, naming the 店员 and the product`
 - `apps/web/src/server/handle.int.test.ts::the 操作日志 reader lists both kinds of actor > returns admin and staff rows, each naming its actor, and filters by kind`
 
 ### SYS-013
@@ -1918,14 +1838,14 @@ The `storefront-appearance` group answers a fresh install with every field defau
 
 ### SYS-016
 
-A save to any group `GET /api/v1/app/config` is built from drops its cache and moves its `version` (the weak `ETag`) at once, a save to any other group does not, and a caller holding the current version gets a bodyless 304. The values it shares with `GET /api/v1/site/config` and with `GET /api/v1/wechat/subscribe-templates` are built by the same code and agree with them.
+A save to any group `GET /api/v1/app/config` is built from drops its cache and moves its `version` (the weak `ETag`) at once, a save to any other group does not, and a caller holding the current version gets a bodyless 304. The values it shares with `siteConfigGet` (`system/site.service.ts`; its route `GET /api/v1/site/config` was deleted at the cutover) and with `GET /api/v1/wechat/subscribe-templates` are built by the same code and agree with them.
 
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > is built from exactly the groups that drop its cache`
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > drops the cache and moves the version when <label> is saved`
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > leaves the cache alone when a group it does not read is saved`
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > carries the same subscribe ids as GET /wechat/subscribe-templates, all four scenes`
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > says whether a first WeChat sign-in will ask for a phone`
-- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > agrees with GET /site/config on every value the two share`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > agrees with siteConfigGet on every value the two share`
 - `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > answers a caller holding the current version with a bodyless 304`
 - `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > sends the new settings once the <label> group is saved`
 
@@ -1964,9 +1884,9 @@ The mini-program opens a `webview` link in its web-view only when the URL is htt
 
 ### SYS-020
 
-The mini-program's splash (`app/config.splashAd.link`) is a `LinkTarget`: the stored `site.splashLinkTarget`, else the legacy `splashLink` as a `webview` link when it is an https URL, else `null`; a legacy uni-app path is never guessed at, and `site/config` keeps serving the legacy string unchanged.
+The mini-program's splash (`app/config.splashAd.link`) is a `LinkTarget`: the stored `site.splashLinkTarget`, else the legacy `splashLink` as a `webview` link when it is an https URL, else `null`; a legacy uni-app path is never guessed at.
 
-- `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > serves the stored LinkTarget, while site/config keeps the legacy path`
+- `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > serves the stored LinkTarget ahead of the legacy path`
 - `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > falls back to an https legacy link as a web-view, and to none for a uni-app path`
 - `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > refuses a LinkTarget that does not parse, and writes nothing`
 

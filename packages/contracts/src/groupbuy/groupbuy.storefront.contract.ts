@@ -107,7 +107,7 @@ export const groupbuyBanners = defineRoute({
           { imageUrl: 'https://cdn.example.com/banner/groupbuy-1.jpg', link: null },
           {
             imageUrl: 'https://cdn.example.com/banner/groupbuy-2.jpg',
-            link: '/pages/activity/groupbuy/index',
+            link: '/packages/promo/groupbuy/index',
           },
         ],
       },

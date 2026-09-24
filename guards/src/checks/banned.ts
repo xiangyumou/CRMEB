@@ -9,8 +9,8 @@ import { rel, repoRoot } from '../lib/paths';
  *
  * ESLint already forbids `eval`, `new Function` and the ambient clock in core.
  * A guard repeats the ban for two reasons: lint is configuration and can be
- * turned off in a single line, and lint does not see `.vue` or the uni-app
- * tree. So the rule set is asserted *and* the source is read.
+ * turned off in a single line, and lint does not read plain `.js` / `.mjs`
+ * files. So the rule set is asserted *and* the source is read.
  */
 
 interface Ban {
@@ -66,7 +66,7 @@ const BANS: readonly Ban[] = [
     message: 'raw HTML injection is allowed only in the sanitised rich-text renderer',
     roots: ['apps/web/src', 'apps/web/app'],
     // The one sanitised renderer, named so the exception is auditable.
-    allow: [/\/kit\/(rich-text|form\/rich-text)/, /\/admin\/diy\/preview\//],
+    allow: [/\/kit\/(rich-text|form\/rich-text)/],
   },
 ];
 

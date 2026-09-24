@@ -5,7 +5,7 @@ import { shown } from '../src/mini-pages/shown';
 
 /**
  * `GET /api/v1/app/config`, the mini-program's first request and the one read behind every
- * "the shop's own …" in it (the uni-app's is `site/config`, journey 8). `src/seed.ts` writes a
+ * "the shop's own …" in it. `src/seed.ts` writes a
  * shop name and a login logo that differ from anything bundled (`src/site.ts`), so a page that
  * ignored the config would show something else.
  */

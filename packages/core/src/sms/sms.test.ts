@@ -169,7 +169,7 @@ describe('generateCode', () => {
 });
 
 /**
- * `resolveSender`'s rule, as the predicate `GET /api/v1/site/config` asks — the
+ * `resolveSender`'s rule, as the predicate `GET /api/v1/app/config` asks — the
  * same function `resolveSender` itself calls, so the two cannot disagree about
  * whether a code can be sent.
  */

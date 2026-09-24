@@ -468,7 +468,7 @@ export async function detail(ctx: Ctx, input: { id: string }): Promise<GroupbuyD
   // A shopper who is already in a live team is offered "看看我的团" instead of
   // "开团", so the page needs to know. `null` for an anonymous visitor: "cannot
   // join" and "we do not know you" are different answers.
-  const userId = ctx.actor.kind === 'user' || ctx.actor.kind === 'staff' ? ctx.actor.id : null;
+  const userId = ctx.actor.kind === 'user' ? ctx.actor.id : null;
   const myOpenGroupId =
     userId === null ? null : await repo.findMyOpenGroup(ctx.db, { activityId: id, userId, now });
 
@@ -629,7 +629,7 @@ async function buildGroupView(ctx: Ctx, groupId: number): Promise<GroupbuyGroupV
   if (!row) throw new DomainError('GROUPBUY_GROUP_NOT_FOUND');
   const now = ctx.clock.now();
   const paid = await repo.listPaidMembers(ctx.db, groupId);
-  const userId = ctx.actor.kind === 'user' || ctx.actor.kind === 'staff' ? ctx.actor.id : null;
+  const userId = ctx.actor.kind === 'user' ? ctx.actor.id : null;
   const mine = userId === null ? null : await repo.findMember(ctx.db, { groupId, userId });
 
   return {
@@ -840,7 +840,7 @@ function toMemberDto(row: repo.MemberRow): GroupbuyMember {
 }
 
 function requireShopper(ctx: Ctx): number {
-  if ((ctx.actor.kind !== 'user' && ctx.actor.kind !== 'staff') || ctx.actor.id === null) {
+  if (ctx.actor.kind !== 'user' || ctx.actor.id === null) {
     throw new DomainError('UNAUTHENTICATED');
   }
   return ctx.actor.id;

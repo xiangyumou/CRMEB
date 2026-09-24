@@ -30,8 +30,8 @@ import {
  */
 
 /**
- * Where test files live: the whole repository — the workspace, the uni-app,
- * and the mini-program with the packages it is built from (`apps/mini`,
+ * Where test files live: the whole repository — the workspace and the
+ * mini-program with the packages it is built from (`apps/mini`,
  * `packages/api-client`, `packages/storefront-blocks`, `e2e/storefront/specs-mini`).
  * One root rather than a list, so a new app's tests are read without an edit
  * here; `walk` skips `node_modules` and build output.

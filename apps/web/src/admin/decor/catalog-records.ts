@@ -18,9 +18,6 @@ import type { DecorRecord, DecorRecordPage, DecorRecordQuery, DecorTreeNode } fr
  *
  * There is no `brand` kind. The shop has no 品牌 table, so there is no route
  * to page and nothing to pick.
- *
- * Moved here from the legacy editor (`admin/diy/catalog-source.ts`), which
- * re-exports these until the cutover deletes it.
  */
 
 function flattenTree(

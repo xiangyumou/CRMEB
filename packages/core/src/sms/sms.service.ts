@@ -38,7 +38,7 @@ type SmsConfigValues = z.infer<typeof smsConfig.schema>;
 /**
  * Whether the `sms` group names a provider this build can send through.
  *
- * `resolveSender`'s rule, extracted so `GET /api/v1/site/config` can say
+ * `resolveSender`'s rule, extracted so `GET /api/v1/app/config` can say
  * whether 手机号登录 works without a second copy of it to drift: Aliyun with
  * its key id, key secret and sign name all filled in. `none` and Tencent
  * (declared, not implemented — see below) are not.

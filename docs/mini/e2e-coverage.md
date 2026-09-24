@@ -1,15 +1,15 @@
 # 小程序 e2e 覆盖矩阵
 
-切换（`docs/mini/cutover.md`）前，旧 uni-app 的每条 e2e 场景（`e2e/storefront/specs/`）、每条引用 e2e 的 SMOKE 规则、计划 §12 列出的必测旅程，都要在新小程序的 `e2e/storefront/specs-mini/` 里有对应的测试，或者在本文写明为什么没有。本文就是这张对照表。
+**旧套件已删除**（切换，`docs/mini/cutover.md` 2.2）：旧 uni-app 的 e2e（`e2e/storefront/specs/`）随 uni-app 一起删了，`e2e/storefront` 现在只跑小程序。第 1 节作为历史保留：切换前，旧套件的每条场景、每条引用 e2e 的 SMOKE 规则、计划 §12 列出的必测旅程，都要在 `e2e/storefront/specs-mini/` 里有对应的测试，或者在本文写明为什么没有。
 
-- 跑法：`pnpm --filter @shop/e2e-storefront test:mini`（`SHOP_E2E_CLIENT=mini`，Playwright 项目 `mini-h5`，跑 `specs-mini/` 下的全部文件）。栈和「模拟小程序」H5 构建见 `e2e/storefront/README.md`。
+- 跑法：`pnpm --filter @shop/e2e-storefront test`（Playwright 项目 `mini-h5`，跑 `specs-mini/` 下的全部文件）。栈和「模拟小程序」H5 构建见 `e2e/storefront/README.md`。
 - Page object 在 `e2e/storefront/src/mini-pages/`：`shopping-pages.ts`、`shopping-shopper.ts`、`order-pages.ts`、`order-shopper.ts`、`aftersale-pages.ts`、`promo-pages.ts`、`decor-pages.ts`（I2 新增：装修后台 API 和 微页面）、`shown.ts`。
 - `ui/Button` 在 H5 上带 `role="button"`（J3；weapp 输出不变），所以测试一律用 `getByRole('button', { name })` 找按钮，包括带 `ariaLabel` 的图标按钮（如 地址的 编辑 / 删除），不再用 `[aria-label=…]` 选择器绕开。
 - 引用写法：`文件::测试标题`，文件相对 `e2e/storefront/specs-mini/`。
 
 状态：**已覆盖**＝小程序测试断言了同一件事；**部分**＝主要行为覆盖，某个细节没有（写明哪个）；**已知失败**＝测试已写好，用 `test.fail` 标记，等应用修复；**待定**＝页面还没合入，测试等页面；**缺口**＝没有测试，原因写明。
 
-## 1. 旧 uni-app 场景 → 小程序
+## 1. 旧 uni-app 场景 → 小程序（历史，旧套件已删除）
 
 ### `login.spec.ts`
 
@@ -97,7 +97,7 @@ E 流的 `account.spec.ts`，全部在本分支通过：
 
 ## 2. SMOKE 规则 → 小程序
 
-`docs/invariants.md` 的 SMOKE 行在切换前**同时**引用旧测试和小程序测试；旧引用在切换时和旧套件一起删。
+`docs/invariants.md` 的 SMOKE 行在切换前**同时**引用旧测试和小程序测试；旧引用已在切换时和旧套件一起删掉（下表「旧引用」一列是历史）。
 
 | 规则      | 旧引用                                                      | 小程序引用                                                                                                                                                                                                                                                                             |
 | --------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

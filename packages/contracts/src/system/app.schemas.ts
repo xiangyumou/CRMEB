@@ -7,15 +7,14 @@ import { sitePublicConfig, sitePublicConfigExample } from './schemas';
  * `GET /api/v1/app/config` — everything the mini-program needs before its
  * first screen, in one payload.
  *
- * It is a sibling of `GET /api/v1/site/config`, not a replacement: the legacy
- * uni-app reads that one and keeps reading it unchanged. This one is shaped
- * for the new client — no H5 footer (`filing`, `copyright`), plus the three
- * things that client would otherwise fetch on launch one by one: the
- * subscribe-message template ids, the theme, and the tab bar.
+ * It replaced `GET /api/v1/site/config` (deleted at the cutover), reusing its
+ * schema pieces (`sitePublicConfig`) — no H5 footer (`filing`, `copyright`),
+ * plus the three things the client would otherwise fetch on launch one by one:
+ * the subscribe-message template ids, the theme, and the tab bar.
  *
  * Every value is a non-secret config field or a boolean derived from one; the
- * same "cannot leak any secret in any registered group" property that holds
- * for `site/config` is asserted for this payload too (SYS-014).
+ * "cannot leak any secret in any registered group" property is asserted for
+ * this payload (SYS-014).
  */
 
 /**
@@ -130,8 +129,8 @@ const sceneTemplateIds = z.array(z.string().min(1)).max(MAX_SUBSCRIBE_TEMPLATES)
 
 /**
  * The splash for the mini-program. The same switch, picture and seconds as
- * `site/config`'s, but the tap target is a `LinkTarget` (decor contracts), not
- * a legacy uni-app path: the mini-program resolves it through the route
+ * `sitePublicConfig`'s, but the tap target is a `LinkTarget` (decor contracts),
+ * not a legacy uni-app path: the mini-program resolves it through the route
  * catalogue like any decorated link. `null` = the splash is not tappable.
  */
 export const appSplashAd = sitePublicConfig.shape.splashAd.extend({
@@ -153,8 +152,8 @@ export const appPublicConfig = z.object({
   share: sitePublicConfig.shape.share,
   support: sitePublicConfig.shape.support,
   /**
-   * Which sign-in methods to offer — the same probes as `site/config`'s
-   * `auth` — plus `wechatRequiresPhone`: whether a first WeChat sign-in will
+   * Which sign-in methods to offer — the probes `registerSiteAuthMethod`
+   * installs — plus `wechatRequiresPhone`: whether a first WeChat sign-in will
    * answer `phone-required` (商城登录 → 微信登录强制绑定手机号). The client
    * still branches on the sign-in response; this only lets it say so up front.
    */

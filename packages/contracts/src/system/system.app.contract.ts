@@ -13,13 +13,9 @@ import {
  * the tab bar, decide which sign-in buttons to show and whether a splash comes
  * first.
  *
- * **Cheap to poll**, exactly like `GET /api/v1/site/config`: cached 60 s in
- * Redis, dropped the moment a source group is saved, and `version` is the weak
- * `ETag`, so a launch that already holds the current payload gets a bodyless
- * 304 for `If-None-Match`.
- *
- * `site/config` is left as it is for the legacy uni-app; the two share their
- * builders, so the values they both carry always agree.
+ * **Cheap to poll**: cached 60 s in Redis, dropped the moment a source group
+ * is saved, and `version` is the weak `ETag`, so a launch that already holds
+ * the current payload gets a bodyless 304 for `If-None-Match`.
  *
  * **`serverTime` is outside the `ETag`.** It is stamped per request after the
  * cache, so it never moves `version` and a caller holding the current version

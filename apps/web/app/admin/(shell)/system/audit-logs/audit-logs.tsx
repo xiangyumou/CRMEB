@@ -26,9 +26,10 @@ const METHOD_COLOUR: Record<string, string> = {
  * a mistake.
  *
  * Only writes are recorded (`handle()` skips GET), and the stored payload has
- * already been redacted — a password field never reaches this table. Two kinds
- * of actor write here: console admins, and 店员 on the storefront's staff
- * surface; every admin sign-in attempt is a row too.
+ * already been redacted — a password field never reaches this table. Console
+ * admins write here, and every admin sign-in attempt is a row too. Rows from
+ * before the cutover may also name a 店员 (the deleted mobile staff console);
+ * the 店员 filter stays so those still read back.
  */
 export function AuditLogsPage() {
   const [viewing, setViewing] = useState<AuditLogItem | null>(null);

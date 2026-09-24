@@ -98,7 +98,6 @@ export const siteConfig = defineConfigGroup({
      * `GET /api/v1/app/config` serves it. `null` falls back to `splashLink`
      * when that is an https URL (a `webview` link) and to "not tappable"
      * otherwise — a legacy uni-app path means nothing to the mini-program.
-     * The legacy uni-app keeps reading `splashLink` through `site/config`.
      */
     splashLinkTarget: linkTarget.nullable().default(null),
     /** How long the splash stays up before it falls through to the home page. */

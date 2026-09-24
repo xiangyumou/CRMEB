@@ -185,7 +185,7 @@ async function buildPublicPage(
 }
 
 function isSignedIn(ctx: Ctx): boolean {
-  return (ctx.actor.kind === 'user' || ctx.actor.kind === 'staff') && ctx.actor.id !== null;
+  return ctx.actor.kind === 'user' && ctx.actor.id !== null;
 }
 
 /** DECOR-016: may this caller see this block? */

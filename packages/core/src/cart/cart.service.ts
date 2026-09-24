@@ -1,7 +1,6 @@
 import type {
   CartAddBody,
   CartCount,
-  CartDecrementBody,
   CartItem,
   CartList,
   CartListQuery,
@@ -312,36 +311,6 @@ async function changeSku(
     cap: capFor(sku),
   });
   return survivor.id;
-}
-
-/**
- * 减少数量 by variant — the product detail page's minus button, which knows the
- * SKU it is looking at but not whether a cart row exists for it.
- *
- * Two conditional statements, in one transaction, and their order is the point:
- * the `UPDATE … WHERE quantity > n` takes the units off only if there are more
- * than `n` of them, and the `DELETE` then catches exactly the case where there
- * were not. Neither reads the quantity first, so two taps arriving together
- * take one unit each and the row is removed exactly once.
- */
-export async function decrementItem(
-  ctx: Ctx,
-  body: CartDecrementBody,
-): Promise<CartMutationResult> {
-  const userId = requireUserId(ctx);
-  const skuId = fromId(body.skuId);
-
-  const entries = await ctx.withTx(async (tx) => {
-    const subtracted = await repo.subtractUnits(tx, { userId, skuId, quantity: body.quantity });
-    if (!subtracted.won) {
-      const removed = await repo.removeBySku(tx, { userId, skuId });
-      if (!removed.won) throw new DomainError('CART_ITEM_NOT_FOUND');
-    }
-    return loadCart(ctx, tx, userId);
-  });
-
-  const entry = entries.find((candidate) => candidate.row.skuId === skuId);
-  return { item: entry ? toCartItem(entry) : null, cart: countOf(entries) };
 }
 
 export async function removeItem(ctx: Ctx, params: { id: string }): Promise<CartMutationResult> {

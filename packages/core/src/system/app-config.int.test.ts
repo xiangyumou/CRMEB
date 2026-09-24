@@ -27,7 +27,7 @@ import '../domains.gen';
  * SYS-015 — the appearance group answers with every field defaulted, serves
  *           what the operator saved, and refuses a colour that is not `#RRGGBB`.
  * SYS-016 — a save to any source group drops the cache and moves `version` at
- *           once, and the values it shares with `site/config` agree with it.
+ *           once, and the values it shares with `siteConfigGet` agree with it.
  */
 
 let harness: TestCtx;
@@ -298,7 +298,7 @@ describe('SYS-016 — one payload, always current', () => {
     expect((await appConfigGet(anonymous())).auth.wechatRequiresPhone).toBe(false);
   });
 
-  it('agrees with GET /site/config on every value the two share', async () => {
+  it('agrees with siteConfigGet on every value the two share', async () => {
     await save('site', {
       siteName: '示例商城',
       logo: '/uploads/a.png',
@@ -419,16 +419,13 @@ describe('SYS-019 — web-view domains', () => {
 describe('SYS-020 — the splash taps through a LinkTarget', () => {
   const on = { splashEnabled: true, splashImage: '/uploads/adv.png' };
 
-  it('serves the stored LinkTarget, while site/config keeps the legacy path', async () => {
+  it('serves the stored LinkTarget ahead of the legacy path', async () => {
     await save('site', {
       ...on,
       splashLink: '/pages/goods_details/index?id=12',
       splashLinkTarget: { kind: 'product', id: '12' },
     });
     expect((await appConfigGet(anonymous())).splashAd.link).toEqual({ kind: 'product', id: '12' });
-    expect((await siteConfigGet(anonymous())).splashAd.link).toBe(
-      '/pages/goods_details/index?id=12',
-    );
   });
 
   it('falls back to an https legacy link as a web-view, and to none for a uni-app path', async () => {

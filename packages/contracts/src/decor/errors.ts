@@ -1,6 +1,6 @@
 import { defineErrors } from '../_conventions/errors';
 
-/** Page decoration v2 (`decor`). The legacy `diy` domain keeps its own codes. */
+/** Page decoration v2 (`decor`). */
 export const decorErrors = defineErrors({
   DECOR_DOCUMENT_NOT_FOUND: { status: 404, message: '页面不存在' },
   DECOR_REVISION_NOT_FOUND: { status: 404, message: '该发布版本不存在' },

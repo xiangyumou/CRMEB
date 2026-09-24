@@ -113,7 +113,7 @@ export async function sendWechatMini(ctx: Ctx, input: SendContext): Promise<Chan
   const fields = renderFields(config.fields, input.data);
   if (Object.keys(fields).length === 0) return { kind: 'skipped', reason: 'no rendered fields' };
 
-  const page = subscribePage(input, config.page);
+  const page = subscribePage(input);
   const result = await getWechatClient(ctx).sendSubscribeMessage({
     touser: openid,
     templateId,
@@ -126,18 +126,14 @@ export async function sendWechatMini(ctx: Ctx, input: SendContext): Promise<Chan
 
 /**
  * The subscribe message's `page`: the event's catalogue route through
- * `toMiniPath` (docs/mini/pages.md §3.4). The operator's hand-typed
- * `wechatMini.page` is deprecated and read only for an event that has no route
- * of its own. A route that does not render (a missing variable) sends the
- * message without a page — WeChat then opens the home page — rather than
- * guessing.
+ * `toMiniPath` (docs/mini/pages.md §3.4). An event without a route, or a route
+ * that does not render (a missing variable), sends the message without a page
+ * — WeChat then opens the home page — rather than guessing.
  */
-function subscribePage(input: SendContext, legacyPage: string | undefined): string {
-  if (input.event.route) {
-    const route = renderRoute(input.event.route, input.data);
-    return route ? toMiniPath(route) : '';
-  }
-  return render(legacyPage ?? '', input.data);
+function subscribePage(input: SendContext): string {
+  if (!input.event.route) return '';
+  const route = renderRoute(input.event.route, input.data);
+  return route ? toMiniPath(route) : '';
 }
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,15 @@ import * as repo from './system.repo';
 import { wechatMiniConfig } from './wechat-mini.config';
 
 /**
- * `GET /api/v1/site/config` — the shop's own public settings.
+ * The shop's own public settings, and the builders `GET /api/v1/app/config`
+ * (`app-config.service.ts`) is made from: `paymentsOf`, `authOf`, `supportOf`
+ * and the two probe registries.
+ *
+ * `siteConfigGet` served the old `GET /api/v1/site/config`, whose route and
+ * contract were deleted at the cutover (docs/mini/cutover.md §2.4). The
+ * function stays, unexported from the domain, because `system.int.test.ts`
+ * asserts the probe and secret rules through it and `app-config.int.test.ts`
+ * checks the shared values against it.
  *
  * Three rules hold this file together.
  *
@@ -153,7 +161,6 @@ export async function siteConfigGet(ctx: SiteReadCtx): Promise<SitePublicConfig>
 /**
  * A weak validator on `version`: the body is semantically the same settings,
  * but the JSON is regenerated per request, so a byte comparison would be wrong.
- * Same treatment the DIY reads get, so the app polls both the same way.
  */
 function tagged(ctx: SiteReadCtx, payload: SitePublicConfig): SitePublicConfig {
   ctx.setHeader?.('ETag', `W/"${payload.version}"`);
@@ -309,8 +316,8 @@ export function supportOf(
  * A string that moves whenever any source group is saved.
  *
  * The newest `config_values.updated_at` across the source groups, as
- * milliseconds — the same discipline as the DIY `version`, and for the same
- * reason: the app polls cheaply and re-downloads only when the string changed.
+ * milliseconds: the app polls cheaply and re-downloads only when the string
+ * changed.
  * `'0'` for a shop where nothing has ever been saved, which is a real state and
  * must not be mistaken for "unknown, re-fetch every time".
  */

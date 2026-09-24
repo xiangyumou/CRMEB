@@ -33,7 +33,7 @@ import { CreateDecorDocumentModal } from './create-document';
 import { DESIGNATION_LABELS, KIND_LABELS } from './session';
 
 /**
- * 店铺装修（新版） — the page documents.
+ * 店铺装修 — the page documents.
  *
  * One table for every kind. A page is edited as a draft and published as a
  * numbered revision; 首页 and 个人中心 are *designations* a published page of
@@ -149,12 +149,7 @@ export function DecorDocumentList() {
 
   return (
     <PageContainer
-      title={
-        <Space>
-          店铺装修
-          <Tag color="purple">新版</Tag>
-        </Space>
-      }
+      title="店铺装修"
       subTitle="小程序的首页、个人中心与微页面"
       extra={
         <Can permission="decor:page:write">

@@ -10,9 +10,9 @@ import * as repo from './order.repo';
  * 累计订单 / 累计消费 — the order domain's implementation of the user domain's
  * `UserOrderStatsPort`.
  *
- * The user side already pins the *shape* of this on a fake
- * (`user/user-staff.int.test.ts`): one batched call per page, an absent id
- * meaning zero, `null` while nobody has registered the port. What only a real
+ * The shape (one batched call per page, an absent id meaning zero, `null`
+ * while nobody has registered the port) was pinned by the staff 用户 screen's
+ * tests, deleted with it at the cutover. What only a real
  * PostgreSQL can settle is the thing the port exists for — **which orders
  * count** — so every case here is one row of the population rule on
  * `statsForUsers`:
@@ -198,15 +198,14 @@ describe('statsForUsers — 哪些订单算数', () => {
 });
 
 describe('registerOrderDomain — the user order stats port', () => {
-  it('registers UserOrderStatsPort, so the staff screen stops answering null', async () => {
+  it('registers UserOrderStatsPort', async () => {
     const userId = await makeUser();
     await makeOrder(userId, { status: 'completed', paidAmount: '3980.00' });
 
     const port = getUserOrderStatsPort();
     expect(port).toBeDefined();
 
-    // Through the port, on the caller's own handle — the staff list reads
-    // inside its own connection and hands `db` in first.
+    // Through the port, on the caller's own handle.
     const stats = await port!.statsFor(harness.ctx.db, [userId]);
     expect(stats.get(userId)).toEqual({ orderCount: 1, spendTotal: '3980.00' });
   });

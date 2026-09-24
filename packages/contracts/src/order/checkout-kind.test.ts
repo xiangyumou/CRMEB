@@ -4,10 +4,9 @@ import { checkoutCreateBody, checkoutPreviewBody } from './schemas';
 /**
  * `kind` + `kindMeta` as one discriminated union (ORDER-009).
  *
- * The payloads under "what the legacy client sends" are the exact bodies
- * `apps/uni-app/api/mappers/order.js` (`fromPageCheckoutInput`,
- * `fromPageOrderCreateInput`) produces — `apps/uni-app/tests/mappers.order.test.mjs`
- * pins those shapes on its side. Typing the field must not refuse any of them.
+ * The payloads under "what the legacy client sends" are the exact bodies the
+ * old uni-app's order mappers produced (the app was deleted at the cutover).
+ * Typing the field must not refuse any of them.
  */
 
 const BUY_NOW = { source: 'buy-now', item: { skuId: '21', quantity: 1 } } as const;

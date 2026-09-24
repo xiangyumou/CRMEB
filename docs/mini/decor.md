@@ -1,6 +1,6 @@
 # 页面装修 v2（`decor` 域）
 
-计划第 2.1 节的后端部分，由 F1 流完成。v2 以 strangler 方式替代旧的 `diy` 域：旧域、旧接口、旧后台编辑器和 `apps/uni-app` 都保持不动，继续服务 uni-app；新小程序只读 v2。旧装修数据不迁移（pages.md 第 6 节）。
+计划第 2.1 节的后端部分，由 F1 流完成。v2 以 strangler 方式替代了旧的 `diy` 域；旧域、旧接口、旧后台编辑器和 `apps/uni-app` 已在切换时删除（[cutover.md](cutover.md) 2.1、2.3），旧表由迁移 `0008` 删除（2.11）。旧装修数据不迁移（pages.md 第 6 节）。
 
 编辑器 UI（Puck）属于 F2 流（第 9 节），块组件属于 G 流。
 
@@ -13,7 +13,7 @@
 | 领域     | `packages/core/src/decor/`                                         | 文档服务、发布与回滚、指定页面、预览令牌、页面解析器                  |
 | 后台接口 | `apps/web/app/admin-api/decor/**`                                  | 14 个路由，权限 `decor:page:read / write / publish`                   |
 | 商城接口 | `apps/web/app/api/v1/pages/**`                                     | `home`、`user-center`、`:id`                                          |
-| 后台页面 | `apps/web/app/admin/(shell)/decor/**`、`apps/web/src/admin/decor/` | 店铺装修（新版）：页面列表、编辑器、发布记录、预览、模板（第 9 节）   |
+| 后台页面 | `apps/web/app/admin/(shell)/decor/**`、`apps/web/src/admin/decor/` | 店铺装修：页面列表、编辑器、发布记录、预览、模板（第 9 节）           |
 | 渲染     | `packages/storefront-blocks`                                       | 只从契约导入类型和无 zod 的常量；`src/schema/index.ts` 是对契约的转发 |
 | 规则     | `docs/invariants.md` 的 DECOR-001 … DECOR-017                      | 每条规则都列出证明它的测试                                            |
 
@@ -227,7 +227,7 @@ pages.md 第 5 节已改为实际的 id `decor.page*`（早期稿子写的是建
 
 ## 9. 后台编辑器（F2）
 
-菜单「店铺装修（新版）」（`decor.menu.ts`），与旧的 DIY 菜单并存。所有页面和按钮都按 `decor:page:read / write / publish` 控制，只有读权限时编辑器是只读的。
+菜单「店铺装修」（`decor.menu.ts`；切换前叫「店铺装修（新版）」，与旧的 DIY 菜单并存）。所有页面和按钮都按 `decor:page:read / write / publish` 控制，只有读权限时编辑器是只读的。
 
 - **页面列表** `/admin/decor`：按类型筛选；「当前首页」「当前个人中心」卡片；每行显示线上版本和是否有未发布的修改；重命名、复制、删除（正在使用的页面不能删）；「设为首页 / 设为个人中心」要先确认，只对已发布且类型匹配的页面开放，确认框里写明会替换掉哪个页面。
 - **新建页面**：选择类型、填写名称，可以从模板开始。模板是 `src/admin/decor/templates/` 里的代码，作为创建请求的 `document` 发出，数据库里不预置任何页面，所以不存在重复种子的问题。
@@ -248,4 +248,3 @@ pages.md 第 5 节已改为实际的 id `decor.page*`（早期稿子写的是建
 ## 10. 待定事项
 
 - `minClient` 目前是按块类型设置的。如果某个 props 版本需要更高的客户端，目前只能改用新的块类型，没有按版本单独设置的办法。
-- `diyThemeTokens` 不改类型：小程序的主题 token 来自有类型的 `storefront-appearance`（`app/config.appearance`），旧的 token 包留给旧 uni-app，原因见 design.md 第 3.2 节。

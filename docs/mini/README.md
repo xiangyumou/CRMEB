@@ -49,7 +49,7 @@
 - **带真实数据**：起 e2e 全栈（需要 Docker，全是假件，不会访问真实的微信、短信或阿里云）：
 
   ```sh
-  SHOP_E2E_CLIENT=mini pnpm --filter @shop/e2e-storefront serve
+  pnpm --filter @shop/e2e-storefront serve
   ```
 
   它会按需构建「模拟小程序」H5、`next build`，起 web、worker、假网关和 edge；日志里
@@ -74,25 +74,24 @@ AppSecret 和代码上传密钥从不进仓库。
 
 ## 4. 测试
 
-| 层          | 命令                                           | 说明                                                                           |
-| ----------- | ---------------------------------------------- | ------------------------------------------------------------------------------ |
-| 单元        | `pnpm --filter @shop/mini test:unit`           | 组件、平台层、会话、路由场景值；不碰网络                                       |
-| 类型和 lint | `pnpm --filter @shop/mini typecheck`、`lint`   | lint 管平台边界、契约只导入类型                                                |
-| 守卫        | `pnpm guards`                                  | `mini` 检查：页面 ⇄ `app.config.ts` ⇄ 路由目录、平台边界、隐私声明、分享、密钥 |
-| e2e         | `pnpm --filter @shop/e2e-storefront test:mini` | `e2e/storefront/specs-mini/`，页面对象在 `src/mini-pages/`；每次起一套新栈     |
-| e2e（热栈） | 见下                                           | 反复跑一个 spec 时省去起栈的时间                                               |
-| 真机        | [device-check.md](device-check.md)             | e2e 看不到的部分；做不了的项在报告里写明                                       |
+| 层          | 命令                                         | 说明                                                                           |
+| ----------- | -------------------------------------------- | ------------------------------------------------------------------------------ |
+| 单元        | `pnpm --filter @shop/mini test:unit`         | 组件、平台层、会话、路由场景值；不碰网络                                       |
+| 类型和 lint | `pnpm --filter @shop/mini typecheck`、`lint` | lint 管平台边界、契约只导入类型                                                |
+| 守卫        | `pnpm guards`                                | `mini` 检查：页面 ⇄ `app.config.ts` ⇄ 路由目录、平台边界、隐私声明、分享、密钥 |
+| e2e         | `pnpm --filter @shop/e2e-storefront test`    | `e2e/storefront/specs-mini/`，页面对象在 `src/mini-pages/`；每次起一套新栈     |
+| e2e（热栈） | 见下                                         | 反复跑一个 spec 时省去起栈的时间                                               |
+| 真机        | [device-check.md](device-check.md)           | e2e 看不到的部分；做不了的项在报告里写明                                       |
 
 热栈：一个终端里起栈，另一个终端里复用它跑 spec：
 
 ```sh
 cd e2e/storefront
-SHOP_E2E_CLIENT=mini pnpm exec tsx scripts/serve.ts            # 终端 1，保持运行
-SHOP_E2E_REUSE=1 SHOP_E2E_CLIENT=mini pnpm exec playwright test specs-mini/login.spec.ts   # 终端 2
+pnpm exec tsx scripts/serve.ts                                   # 终端 1，保持运行
+SHOP_E2E_REUSE=1 pnpm exec playwright test specs-mini/login.spec.ts   # 终端 2
 ```
 
 热栈的端口和交接文件按工作目录区分，不同 worktree 的热栈互不可见。改了 `apps/mini` 或服务端代码后要重启
-热栈。旧 uni-app 的套件是同一个包的 `test`（`specs/`），切换时删除（[cutover.md](cutover.md)）。
+热栈。旧 uni-app 的套件（`specs/`）已在切换时删除（[cutover.md](cutover.md) 2.2）。
 
-CI（`.github/workflows/ci.yml`）的 `storefront-e2e` 任务跑 `test`，`storefront-e2e-mini` 任务跑 `test:mini`，
-各自跑完整个目录。
+CI（`.github/workflows/ci.yml`）的 `storefront-e2e` 任务跑 `test`，跑完整个目录。

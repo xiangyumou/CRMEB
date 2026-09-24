@@ -67,8 +67,8 @@ const REPRESENTATIVE: readonly RouteId[] = [
   'payment.start',
   'coupon.claimableList',
   'groupbuy.detail',
-  'diy.homePage',
-  'system.siteConfigGet',
+  'decor.pageHome',
+  'system.appConfigGet',
   'user.getProfile',
 ];
 

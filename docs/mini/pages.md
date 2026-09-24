@@ -178,12 +178,12 @@
 
 小程序不调用以下接口，切换时由后端决定删除或保留（计划第 3 节）：
 
-- **计划中列出的旧前端辅助接口：** `catalog.categoryVersion`、`catalog.skuPrice`、`cart.decrementItem`、`system.attachmentDataUrl`、`diy.layout`、`diy.navigation`、`diy.pageVersion`、`diy.theme`（并入 `app/config`）、`diy.productDetailPage`、`diy.homePage`、`diy.userCenterPage`、`diy.page`（由 v2 resolver 取代）、`system.siteConfigGet`（由 `app/config` 取代）。
+- **计划中列出的旧前端辅助接口（切换时已删除，见 [cutover.md](cutover.md) 2.3、2.4）：** `catalog.categoryVersion`、`catalog.skuPrice`、`cart.decrementItem`、`system.attachmentDataUrl`、`diy.layout`、`diy.navigation`、`diy.pageVersion`、`diy.theme`（并入 `app/config`）、`diy.productDetailPage`、`diy.homePage`、`diy.userCenterPage`、`diy.page`（由 v2 resolver 取代）、`system.siteConfigGet`（由 `app/config` 取代）。
 - **公众号和 H5 专用（保留，不调用）：** `auth.oaAuthorizeUrl`、`auth.oaLogin`、`auth.oaPhoneLogin`、`wechatOa.jssdkConfig`、`wechatOa.subscribeTemplates`（场景并入 `app/config`）。
 - **用不上：**
   - `auth.register`：短信登录会自动注册；
   - `storage.scanUpload`：后台扫码上传；
-  - `order.staffMe`、`shipping.staffExpressCompanies`：店员接口；
+  - `order.staffMe`、`shipping.staffExpressCompanies`：店员接口（切换时已随全部店员接口删除，见 [cutover.md](cutover.md) 2.5）；
   - `health.*`。
 - ~~有接口、但本期不做页面：`catalog.myReviews`、`groupbuy.myGroups`~~。2026-09-23 改为本期做：见第 2.5 节的我的拼团、第 2.6 节的我的评价。
 

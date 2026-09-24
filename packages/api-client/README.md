@@ -119,7 +119,7 @@ A transport is `(request: { url, method, headers, body, signal, timeoutMs }) => 
 
 `pnpm gen` (the package's `gen` task, `scripts/gen.ts`) writes `src/routes.gen.ts`. The file is gitignored.
 
-- It includes every route under `/api/v1` whose auth is `public`, `user` or `user-optional`, except those under `/api/v1/staff/`.
+- It includes every route under `/api/v1` whose auth is `public`, `user` or `user-optional`.
 - It holds a runtime `storefrontRouteList` of `{ id, method, path, auth }`.
 - It also holds type-only maps from route id to the contract (`import type`), to the parts the route declares, and to its declared error codes.
 

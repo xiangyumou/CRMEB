@@ -7,7 +7,7 @@ import type { Ctx } from '../kernel/context';
 import { wechatMiniConfig } from '../system';
 import { resetWechatTokenFlight } from './wechat.client';
 import { wechatConfig } from './wechat.config';
-import { miniCodeUrl, shareMiniCodeUrl } from './wechat.mini-code.service';
+import { shareMiniCodeUrl } from './wechat.mini-code.service';
 
 /**
  * 小程序码 against a fake `api.weixin.qq.com`.
@@ -20,16 +20,16 @@ import { miniCodeUrl, shareMiniCodeUrl } from './wechat.mini-code.service';
  * hope.
  *
  * The other two are the failure shapes: a refusal must not be stored as a
- * picture, and a scene WeChat would reject must be refused before it costs a
- * call.
+ * picture, and an unconfigured mini program must not cost a call.
  */
 
 let harness: TestCtx;
 let oa: FakeOaServer;
 
 const NOW = '2026-06-01T00:00:00.000Z';
-const PAGE = 'pages/goods_details/index';
+const PAGE = 'pages/product/index';
 const SCENE = 'id=1024';
+const PRODUCT = { route: 'product', id: '1024' } as const;
 
 function ctx(): Ctx {
   return harness.as({ kind: 'user', id: 1, permissions: [], isSuper: false });
@@ -64,14 +64,14 @@ beforeEach(async () => {
   await harness.ctx.config.set(wechatMiniConfig, { enabled: true });
 });
 
-describe('miniCodeUrl', () => {
+describe('the (page, scene) cache', () => {
   it('asks WeChat once for a pair and serves every later caller from the cache', async () => {
-    const first = await miniCodeUrl(ctx(), { page: PAGE, scene: SCENE });
+    const first = await shareMiniCodeUrl(ctx(), PRODUCT);
     expect(first.url).toMatch(/\.png$/);
     expect(codeCalls()).toBe(1);
     expect(oa.miniCodes).toEqual([{ page: PAGE, scene: SCENE }]);
 
-    const second = await miniCodeUrl(ctx(), { page: PAGE, scene: SCENE });
+    const second = await shareMiniCodeUrl(ctx(), PRODUCT);
     expect(second.url).toBe(first.url);
     expect(codeCalls()).toBe(1);
 
@@ -86,8 +86,8 @@ describe('miniCodeUrl', () => {
     // Two products share a page path and differ only in the scene, which is the
     // common case: a cache keyed on `page` would hand every product the first
     // product's poster.
-    const one = await miniCodeUrl(ctx(), { page: PAGE, scene: 'id=1' });
-    const two = await miniCodeUrl(ctx(), { page: PAGE, scene: 'id=2' });
+    const one = await shareMiniCodeUrl(ctx(), { route: 'product', id: '1' });
+    const two = await shareMiniCodeUrl(ctx(), { route: 'product', id: '2' });
     expect(two.url).not.toBe(one.url);
     expect(codeCalls()).toBe(2);
   });
@@ -98,7 +98,7 @@ describe('miniCodeUrl', () => {
     // ever, and it is exactly what a client that trusted the status line does.
     oa.behaviour.failWxaCode = { errcode: 41030, errmsg: 'invalid page' };
 
-    await expect(miniCodeUrl(ctx(), { page: PAGE, scene: SCENE })).rejects.toMatchObject({
+    await expect(shareMiniCodeUrl(ctx(), PRODUCT)).rejects.toMatchObject({
       code: 'WECHAT_MINI_CODE_FAILED',
       details: { errcode: 41030 },
     });
@@ -107,26 +107,14 @@ describe('miniCodeUrl', () => {
     // And the shop recovers by itself once the mini program is published: the
     // failure left nothing behind to invalidate.
     oa.behaviour.failWxaCode = null;
-    await expect(miniCodeUrl(ctx(), { page: PAGE, scene: SCENE })).resolves.toMatchObject({
+    await expect(shareMiniCodeUrl(ctx(), PRODUCT)).resolves.toMatchObject({
       url: expect.stringMatching(/\.png$/),
     });
   });
 
-  it('refuses a scene over WeChat’s 32 bytes before spending a call', async () => {
-    // Bytes, not characters: eleven Chinese characters are 33 bytes and would
-    // come back as `40097 invalid args`, a number nobody can act on.
-    await expect(miniCodeUrl(ctx(), { page: PAGE, scene: '促'.repeat(11) })).rejects.toMatchObject({
-      code: 'VALIDATION_FAILED',
-    });
-    await expect(miniCodeUrl(ctx(), { page: PAGE, scene: '' })).rejects.toMatchObject({
-      code: 'VALIDATION_FAILED',
-    });
-    expect(codeCalls()).toBe(0);
-  });
-
   it('refuses while the mini program is not configured, without calling WeChat', async () => {
     await harness.ctx.config.set(wechatMiniConfig, { enabled: false });
-    await expect(miniCodeUrl(ctx(), { page: PAGE, scene: SCENE })).rejects.toMatchObject({
+    await expect(shareMiniCodeUrl(ctx(), PRODUCT)).rejects.toMatchObject({
       code: 'AUTH_WECHAT_NOT_CONFIGURED',
     });
     expect(codeCalls()).toBe(0);
@@ -147,13 +135,6 @@ describe('shareMiniCodeUrl', () => {
     // The page reads its params back from the scene it is opened with.
     expect(decodeScene('groupbuyTeam', oa.miniCodes[1]!.scene)).toEqual({ id: '501' });
     expect(new Set([product.url, team.url, home.url]).size).toBe(3);
-  });
-
-  it('shares the (page, scene) cache with the legacy endpoint — SHARE-001', async () => {
-    const legacy = await miniCodeUrl(ctx(), { page: 'pages/index/index', scene: '_' });
-    const shared = await shareMiniCodeUrl(ctx(), { route: 'home' });
-    expect(shared.url).toBe(legacy.url);
-    expect(codeCalls()).toBe(1);
   });
 
   it('refuses params that do not fit the key, without calling WeChat — SHARE-001', async () => {
@@ -205,11 +186,5 @@ describe('SHARE-003 — the version a code opens comes from config', () => {
       'pages/product/index',
       'trial:pages/product/index',
     ]);
-  });
-
-  it('keeps the legacy endpoint on the same rule', async () => {
-    await harness.ctx.config.set(wechatMiniConfig, { enabled: true, codeEnvVersion: 'develop' });
-    await miniCodeUrl(ctx(), { page: PAGE, scene: SCENE });
-    expect(sentEnv()).toEqual(['develop']);
   });
 });

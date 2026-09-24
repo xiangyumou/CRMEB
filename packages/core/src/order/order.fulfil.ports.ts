@@ -1,23 +1,8 @@
-import type {
-  AdminRefundDetail,
-  AdminRefundListItem,
-  AdminRefundListQuery,
-  RefundApproveBody,
-  RefundRejectBody,
-} from '@shop/contracts/refund/schemas';
-import type { StaffRefundRemarkBody } from '@shop/contracts/order/order.fulfil.schemas';
 import type { Ctx } from '../kernel/context';
 
-type PagedAdminRefunds = {
-  items: AdminRefundListItem[];
-  total: number;
-  page: number;
-  pageSize: number;
-};
-
 /**
- * The seams fulfilment needs from other domains: courier tracking, staff
- * after-sales and notifications.
+ * The seams fulfilment needs from other domains: courier tracking and
+ * notifications.
  *
  * They follow the shape `ports.ts` already established — a slot, a registrar
  * and a `resolve*` that returns `undefined` rather than throwing — because the
@@ -65,48 +50,6 @@ export function registerLogisticsPort(impl: LogisticsPort): void {
  */
 export function resolveLogisticsPort(): LogisticsPort | undefined {
   return logistics;
-}
-
-// ---------------------------------------------------------------------------
-// after-sales, for the staff console (the refund domain)
-// ---------------------------------------------------------------------------
-
-/**
- * What `/api/v1/staff/refunds*` forwards to.
- *
- * Fulfilment owns the surface, the refund domain owns the money: the staff
- * console never touches a gateway, a `refunds` row or `orders.refunded_amount`.
- * The shapes are the refund domain's own contract types, passed through
- * untouched, so a field it adds appears on the phone without a second edit
- * here.
- *
- * The implementation must be staff-facing, not the admin services: those demand
- * admin atoms a staff actor never holds. The refund domain registers its
- * `staff*` entry points, which accept only a `staff` actor.
- */
-export interface StaffRefundPort {
-  list(ctx: Ctx, query: AdminRefundListQuery): Promise<PagedAdminRefunds>;
-  detail(ctx: Ctx, params: { id: string }): Promise<AdminRefundDetail>;
-  approve(ctx: Ctx, params: { id: string }, body: RefundApproveBody): Promise<AdminRefundDetail>;
-  reject(ctx: Ctx, params: { id: string }, body: RefundRejectBody): Promise<AdminRefundDetail>;
-  /**
-   * 售后备注, and deliberately not the console's `adminRemark`.
-   *
-   * That one overwrites `refunds.admin_remark`; this one appends to the
-   * refund's log, because the actor is a `user` with no admin row behind it and
-   * `refunds` has no staff remark column to write instead.
-   */
-  remark(ctx: Ctx, params: { id: string }, body: StaffRefundRemarkBody): Promise<AdminRefundDetail>;
-}
-
-let staffRefunds: StaffRefundPort | undefined;
-
-export function registerStaffRefundPort(impl: StaffRefundPort): void {
-  staffRefunds = impl;
-}
-
-export function resolveStaffRefundPort(): StaffRefundPort | undefined {
-  return staffRefunds;
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +147,6 @@ export function resolveWechatReceiptVerifier(): WechatReceiptVerifier | undefine
 /** Test helper. Never call this from app code. */
 export function resetFulfilmentPorts(): void {
   logistics = undefined;
-  staffRefunds = undefined;
   notifier = undefined;
   receiptVerifier = undefined;
 }

@@ -26,9 +26,10 @@ const LinkSourceContext = createContext<LinkSource | null>(null);
  *
  * There is deliberately no fallback: a picker rendered without a provider
  * throws rather than offering links that are not in the shop, because whatever
- * the operator picks is saved and opened by the storefront. The DIY editor
- * mounts `createDiyLinkSource()`; tests mount `createStubLinkSource()` from
- * `@/test/link-source`.
+ * the operator picks is saved and opened by the storefront. The kit demo
+ * mounts its own rows; tests mount `createStubLinkSource()` from
+ * `@/test/link-source`. (The decoration editor has its own link field,
+ * `src/admin/decor/fields/link.tsx`, which stores a `LinkTarget`.)
  */
 export function useLinkSource(): LinkSource {
   const provided = use(LinkSourceContext);

@@ -46,7 +46,6 @@ to it (below). The last line is the count:
 | `permissions`   | every route and menu atom is declared; every declared atom is used                                                                                                                              |
 | `admin-client`  | no hand-built `/admin-api/…` URL and no raw `fetch()` outside the api seam                                                                                                                      |
 | `fixtures`      | a web test that stubs the API answers through `respondWith`, so every fixture is parsed by its contract                                                                                         |
-| `uniapp`        | every storefront call resolves; every page and local import exists for H5 and MP-WEIXIN; the DIY registry matches the contracts                                                                 |
 | `mini`          | the Taro mini-program: pages ⇄ `app.config.ts` ⇄ route catalogue, the platform seam, no NutUI, privacy, committed config, no upload key or AppSecret                                            |
 | `retired`       | no feature the shop does not have comes back as an identifier or a URL token (CORE-002)                                                                                                         |
 | `banned`        | no `eval`, `new Function`, `child_process`, `dangerouslySetInnerHTML`; the core clock lint rule is still an error; `eval` / `new Function` also in the mini-program and its two shared packages |
@@ -76,15 +75,11 @@ baseline and a hiding place.
   `EventSource`. Fails if the URL ever grows a contract.
 - `checks/fixtures.ts` — `RAW_ALLOWED`: `call-route.test.ts`, which tests the
   transport itself and so must build raw responses.
-- `checks/uniapp.ts` — `NOT_RENDERED_BY_PAGE`: DIY components the editor saves
-  that the page renderer does not draw (`bottomMenu`, drawn by the product
-  page's footer).
 - `checks/mini.ts` — `UNBUILT_ROUTES`: storefront route keys whose page the
-  mini-program has not built yet (streams A and B shrink it page by page); an
-  entry fails once its page is registered or its key leaves the catalogue.
-  `UNCATALOGUED_PAGES`: registered pages with no route key, with the reason
-  (the shell's `pages/home/index`, which the catalogue calls
-  `pages/index/index`).
+  mini-program has not built; an entry fails once its page is registered or
+  its key leaves the catalogue. `UNCATALOGUED_PAGES`: registered pages with no
+  route key, with the reason. Both are empty: every catalogue page is built
+  and every page is catalogued.
 - `checks/retired.ts` — `ALLOWED` and `DENY_LISTS`: the files that name a
   retired feature in order to refuse it.
 - `checks/banned.ts` — `FETCH_ALLOW` (one file per entry, with the host it
@@ -97,9 +92,8 @@ baseline and a hiding place.
 ## The `mini` check
 
 `apps/mini` read against `@shop/contracts/system/storefront-routes` and
-[`docs/mini/wechat-compliance.md`](../docs/mini/wechat-compliance.md). It runs
-next to `uniapp` until the cutover, when it replaces it. Every finding is
-tagged with its rule:
+[`docs/mini/wechat-compliance.md`](../docs/mini/wechat-compliance.md). Every
+finding is tagged with its rule:
 
 | rule            | asserts                                                                                                                                                                                                                                                                             |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -158,8 +152,7 @@ before the first release, regenerate it with `--unreleased`.
 
 ## Tests
 
-`pnpm --filter @shop/guards test:unit` covers the readers (uni-app sources,
-test titles, the catalogue, transaction scanning, migrations, the workflow)
+`pnpm --filter @shop/guards test:unit` covers the readers (test titles, the catalogue, transaction scanning, migrations, the workflow)
 against small strings, and runs two checks over the real tree as tests:
 `checks/contracts.test.ts` (ROUTE-001) and `checks/retired.test.ts` (CORE-002).
 

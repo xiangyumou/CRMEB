@@ -82,13 +82,9 @@ export const wechatMiniChannelConfig = z.object({
   templateKey: z.string().max(64).default(''),
   templateId: z.string().max(128).optional(),
   fields: z.record(z.string(), template).optional(),
-  /**
-   * **Deprecated.** The page an event opens is the event's route-catalogue
-   * entry, rendered by `toMiniPath` (docs/mini/pages.md §3.4); this hand-typed
-   * path is read only for an event without a route. Kept so saved templates
-   * still parse.
-   */
-  page: z.string().max(256).optional(),
+  // No `page`: the page a message opens is the event's route-catalogue entry,
+  // rendered by `toMiniPath` (docs/mini/pages.md §3.4). A `page` key left in a
+  // template saved before the cutover is stripped on read.
 });
 export type WechatMiniChannelConfig = z.infer<typeof wechatMiniChannelConfig>;
 
@@ -273,9 +269,10 @@ export const notificationMessage = z.object({
   title: z.string(),
   content: z.string(),
   /**
-   * Whatever the client needs to deep-link, e.g. `{ orderId: '1024' }` plus a
-   * `link` the admin bell can navigate to and, on a customer event, the
-   * mini-program `route` (`{ route, params }` from the route catalogue).
+   * Whatever the client needs to deep-link, e.g. `{ orderId: '1024' }` plus,
+   * on an admin event, a `link` the admin bell can navigate to and, on a
+   * customer event, the mini-program `route` (`{ route, params }` from the
+   * route catalogue).
    */
   data: z.record(z.string(), z.unknown()).nullable(),
   readAt: instant.nullable(),
@@ -306,7 +303,6 @@ export const notificationMessageExample = {
   content: '订单 20260106000000000000001 已由 顺丰速运 发出，运单号 SF1234567890。',
   data: {
     orderId: '1024',
-    link: '/orders/1024',
     route: { route: 'order', params: { id: '1024' } },
   },
   readAt: null,

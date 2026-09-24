@@ -73,7 +73,7 @@ function toColumnPlatform(
  * bothered to randomise it.
  */
 function subjectOf(ctx: Ctx, meta: RequestMeta): string {
-  const userId = ctx.actor.kind === 'user' || ctx.actor.kind === 'staff' ? ctx.actor.id : null;
+  const userId = ctx.actor.kind === 'user' ? ctx.actor.id : null;
   if (userId !== null) return `u:${userId}`;
   return `ip:${meta.ip ?? 'unknown'}`;
 }
@@ -129,7 +129,7 @@ export async function recordVisit(ctx: Ctx, body: VisitBody, meta: RequestMeta):
   });
   if (!ceiling.allowed) return;
 
-  const userId = ctx.actor.kind === 'user' || ctx.actor.kind === 'staff' ? ctx.actor.id : null;
+  const userId = ctx.actor.kind === 'user' ? ctx.actor.id : null;
   const id = await repo.insertVisit(ctx.db, {
     userId,
     path: body.path,

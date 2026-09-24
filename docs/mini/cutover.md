@@ -76,28 +76,28 @@ B：删除加落地页；C：删表）不再采用。
 
 ### 2.1 uni-app
 
-- [ ] `apps/uni-app/` 整个目录。
-- [ ] `pnpm-workspace.yaml` 里的 `'!apps/uni-app'` 和它上面的注释。
-- [ ] 根目录 `README.md`：技术栈表里的 `apps/uni-app` 行（第 35 行）、第 38 行「Everything but the uni-app」、
+- [x] `apps/uni-app/` 整个目录。
+- [x] `pnpm-workspace.yaml` 里的 `'!apps/uni-app'` 和它上面的注释。
+- [x] 根目录 `README.md`：技术栈表里的 `apps/uni-app` 行（第 35 行）、第 38 行「Everything but the uni-app」、
       目录树里的 `uni-app/`（第 48 行）、第 113 行起「`apps/uni-app` is an npm project…」一节、清单里的
       `(cd apps/uni-app && npm test && npm run build:h5)`（第 140 行）。
-- [ ] `docs/contributing.md`：`pnpm guards` 说明里的「the uni-app resolves every call and page」（第 40 行）、
+- [x] `docs/contributing.md`：`pnpm guards` 说明里的「the uni-app resolves every call and page」（第 40 行）、
       storefront e2e 一行的「The H5 storefront」、`apps/uni-app/**` 的检查项（第 46 行）、「the uni-app's `npm test`」
       （第 64 行）、「Adding a route」第 8 步「在 `apps/uni-app/api/` 加调用和 mapper」（第 101 行起）。
-- [ ] `docs/architecture.md`、`docs/conventions.md` 中标为 legacy 的 uni-app 小节，以及 Processes 表、Edge 说明里的
+- [x] `docs/architecture.md`、`docs/conventions.md` 中标为 legacy 的 uni-app 小节，以及 Processes 表、Edge 说明里的
       「uni-app H5」（architecture 第 13、24、375 行附近）。
 
 ### 2.2 旧 uni-app 的 e2e
 
-- [ ] `e2e/storefront/specs/`（10 个 spec），`src/uni.ts`、`src/known-gaps.ts`，`src/h5.ts`、`src/stack-file.ts`、
+- [x] `e2e/storefront/specs/`（10 个 spec），`src/uni.ts`、`src/known-gaps.ts`，`src/h5.ts`、`src/stack-file.ts`、
       `scripts/serve.ts` 中 `uniapp` 的分支（`SHOP_E2E_CLIENT` 只剩 `mini`，或者去掉这个开关）。
-- [ ] `src/seed.ts` 里给旧装修建页面的部分（`@shop/core/diy` 的 `createPage`、`setHomePage`，`diyPages`、
+- [x] `src/seed.ts` 里给旧装修建页面的部分（`@shop/core/diy` 的 `createPage`、`setHomePage`，`diyPages`、
       `diyHomePageId`）和 `stack-file.ts` 的对应字段：2.3 删掉 `core/diy` 后它编译不过。
-- [ ] `playwright.config.ts`：去掉 `mobile-chromium` 项目，`testDir` 固定为 `./specs-mini`；`package.json` 的 `test`
+- [x] `playwright.config.ts`：去掉 `mobile-chromium` 项目，`testDir` 固定为 `./specs-mini`；`package.json` 的 `test`
       改为跑小程序（`test:mini` 并入 `test`）。
-- [ ] `docs/invariants.md`：SMOKE-002…005 删去 `e2e/storefront/specs/` 的引用，陈述只写小程序；其他只引用旧 spec 的行
+- [x] `docs/invariants.md`：SMOKE-002…005 删去 `e2e/storefront/specs/` 的引用，陈述只写小程序；其他只引用旧 spec 的行
       （用 `grep -n "e2e/storefront/specs/" docs/invariants.md` 找）改引小程序的测试。
-- [ ] [e2e-coverage.md](e2e-coverage.md) 标注「旧套件已删除」，第 1 节作为历史保留或删去。
+- [x] [e2e-coverage.md](e2e-coverage.md) 标注「旧套件已删除」，第 1 节作为历史保留或删去。
 
 ### 2.3 旧装修（`diy` 域）和旧后台编辑器
 
@@ -107,20 +107,20 @@ B：删除加落地页；C：删表）不再采用。
       `app/admin/(shell)/decor/**` 引用 `diy`。旧目录里剩下的只是转接：`diy/data-source.tsx` 的 `DiyPicker*` 类型是 decor
       类型的别名，`diy/record-source.ts` 把旧的 `labels`、`combination` 映射到 decor 的实现，`diy/catalog-source.ts` 转导出
       选择器函数、自留旧 uni 路径的 `catalogLinkTargets`。整个目录可直接删除，decor 不受影响。
-- [ ] 后台：`apps/web/app/admin/(shell)/diy/`、`apps/web/src/admin/diy/`（含上面的转接文件及其测试）、只供旧面板测试用的
+- [x] 后台：`apps/web/app/admin/(shell)/diy/`、`apps/web/src/admin/diy/`（含上面的转接文件及其测试）、只供旧面板测试用的
       `apps/web/src/test/diy-data-source.ts`、菜单 `apps/web/src/admin/menu/diy.menu.ts`、`diy:*` 权限原子（`permissions`
       守卫会提示没人用的原子）。`NO_LEGACY_DIY` 规则删不删都可以（目录没了就不会再命中）。删完跑一遍
       `grep -rn "admin/diy\|/diy/" apps/web/src apps/web/app` 确认无残留引用。
-- [ ] 接口：`apps/web/app/api/v1/diy/**`（`diy.layout`、`diy.navigation`、`diy.pageVersion`、`diy.theme`、`diy.homePage`、
+- [x] 接口：`apps/web/app/api/v1/diy/**`（`diy.layout`、`diy.navigation`、`diy.pageVersion`、`diy.theme`、`diy.homePage`、
       `diy.userCenterPage`、`diy.productDetailPage`、`diy.page`）、`apps/web/app/admin-api/diy/**`（页面、主题、链接库）。
-- [ ] 契约 `packages/contracts/src/diy/`（含 `removed.ts` 的 `REMOVED_STOREFRONT_PAGES`、默认 JSON、`__fixtures__`），
+- [x] 契约 `packages/contracts/src/diy/`（含 `removed.ts` 的 `REMOVED_STOREFRONT_PAGES`、默认 JSON、`__fixtures__`），
       领域 `packages/core/src/diy/`（`pnpm gen` 重新生成 `domains.gen.ts`）。表的删除见 2.11。
-- [ ] `packages/api-client` 的测试拿 `diy.homePage`、`system.siteConfigGet` 当例子（`client.test.ts`、`bundle.test.ts`、
+- [x] `packages/api-client` 的测试拿 `diy.homePage`、`system.siteConfigGet` 当例子（`client.test.ts`、`bundle.test.ts`、
       `contract.test.ts`），换成保留的接口。
-- [ ] `e2e/admin/specs/diy.spec.ts`。
-- [ ] `docs/invariants.md` 的 DIY-001…009 行（逐条确认只关于旧装修；编号不再复用），以及 RISK-D-008、RISK-D-009
-      中引用旧装修测试的行；`docs/architecture.md` Domains 表的 `diy` 一行。
-- [ ] 后台菜单「店铺装修（新版）」改回「店铺装修」（用户 2026-09-24 已定要改）（`apps/web/src/admin/menu/decor.menu.ts`、
+- [x] `e2e/admin/specs/diy.spec.ts`。
+- [x] `docs/invariants.md` 的 DIY-001…009 行（逐条确认只关于旧装修；编号不再复用），以及 SMOKE-010
+      （引用旧装修测试的是它；RISK-D-008、RISK-D-009 并不引用，原先写错）；`docs/architecture.md` Domains 表的 `diy` 一行。
+- [x] 后台菜单「店铺装修（新版）」改回「店铺装修」（用户 2026-09-24 已定要改）（`apps/web/src/admin/menu/decor.menu.ts`、
       `apps/web/src/admin/decor/page-list.tsx`、`e2e/admin/specs/decor.spec.ts`、`e2e/admin/README.md`、
       [decor.md](decor.md)）。后台看得到的文案变化，改了要告诉你。
 
@@ -135,47 +135,71 @@ B：删除加落地页；C：删表）不再采用。
 | `system.siteConfigGet`                            | `GET /api/v1/site/config`                |
 | `diy.layout`、`diy.navigation`、`diy.pageVersion` | 随 2.3 一起删                            |
 
-- [ ] 删契约、路由文件、只为它们存在的 service 函数和测试。
-- [ ] `system.siteConfigGet` 已由 `app/config` 取代；小程序、后台都不调用它，没有公众号 H5 页面要照顾。删之前对
+- [x] 删契约、路由文件、只为它们存在的 service 函数和测试。
+- [x] `system.siteConfigGet` 已由 `app/config` 取代；小程序、后台都不调用它，没有公众号 H5 页面要照顾。删之前对
       `packages/core/src/system/site.service.ts` 的 `siteConfigGet` `grep` 一遍调用方（落地页、`app/config` 若复用则
       保留函数，只删路由和契约）；SYS-020 的陈述和测试标题里提到 `site/config`，要一起改。
+      （C1 结果：`app/config` 复用 `site.service.ts` 的 `paymentsOf`、`authOf`、`supportOf` 和两个探针注册表；
+      `siteConfigGet` 本身只剩测试在用——`system.int.test.ts` 通过它断言探针和密钥规则，SYS-016 拿它对照——所以保留函数、
+      不再从 `@shop/core/system` 导出，只删了路由、契约和 `apps/web/app/api/v1/site/config.int.test.ts`。）
 
 ### 2.5 店员接口（计划第 10 节第 3 项：你已同意）
 
-- [ ] `apps/web/app/api/v1/staff/**`（32 个路由文件，共 36 个接口），契约 `order/order.staff.contract.ts`、
+- [x] `apps/web/app/api/v1/staff/**`（32 个路由文件，共 36 个接口），契约 `order/order.staff.contract.ts`、
       `user/user.staff.contract.ts`、`catalog/catalog.staff.contract.ts`、`catalog/catalog.staff.schemas.ts`、
       `shipping/shipping.express.contract.ts` 的 `staffExpressCompanyPicker`（`shipping.staffExpressCompanies`）。
-- [ ] `StaffCheck`（`packages/core/src/auth/user-lookup.ts`）和只被店员接口调用的 service（`order.staff.service.ts`、
+      （C1 补充：清单漏了 `coupon/coupon.staff.contract.ts` 里的三个店员接口 `GET /api/v1/staff/coupons`、
+      `POST /api/v1/staff/coupon-grants`、`GET /api/v1/staff/users/:uid/coupons`，一并删除；同一文件里的
+      `coupon.orderGiftCoupons`（`GET /api/v1/orders/:id/gift-coupons`，顾客自己的订单页在用）保留，文件改名为
+      `coupon/coupon.gift.contract.ts`，对应测试改名为 `apps/web/app/api/v1/gift-coupons.int.test.ts`。）
+- [x] `StaffCheck`（`packages/core/src/auth/user-lookup.ts`）和只被店员接口调用的 service（`order.staff.service.ts`、
       `user-staff.service.ts`）。**后台也在用的 service 保留**：删之前对每个导出 `grep` 一遍调用方。
-- [ ] `order.fulfil.config.ts`、`storage.service.ts` 中与店员相关的分支；`audit_logs.actor_kind = 'staff'` 的约束和已有数据保留。
+      （C1 结果：还删了 `catalog.staff.service.ts`、`refund.admin.ts` 的 `staff*` 函数和 `StaffRefundPort`、
+      `coupon.service.ts` 的店员发券函数、只给店员用的 schema 和错误码；`AuthMode` 和 `ActorKind` 去掉了 `staff`。
+      后台已无调用方但保留的：`UserOrderStatsPort`（和 `order.repo.statsForUsers`）、`refund.admin.ts` 的
+      `Reviewer` 里的 `staff` 分支、`coupon` 的 `activeOnly` 选项、`order.console.service.ts` 的 `operatorOf` 的
+      `user` 分支——都是订单、退款、优惠券逻辑，不在本次改写范围。）
+- [x] `order.fulfil.config.ts`、`storage.service.ts` 中与店员相关的分支；`audit_logs.actor_kind = 'staff'` 的约束和已有数据保留。
+      （C1 结果：配置组「店员与订单提醒」（`order-staff`）和存储设置里的「店员上传大小上限」「每店员每小时上传次数」
+      从后台消失；库里已存的这些配置行没有删。后台操作日志的「店员」筛选保留，用来看历史行。）
 
 ### 2.6 写死的旧小程序路径和旧小程序码接口
 
-- [ ] `MINI_CODE_PAGES` 和 `miniCodePage`（`packages/contracts/src/wechat/schemas.ts`）。
-- [ ] `wechat.miniCode`：`GET /api/v1/wechat/mini-qrcodes`（`wechat.storefront.contract.ts`、
-      `apps/web/app/api/v1/wechat/mini-qrcodes/route.ts`），以及 `system.attachment.contract.ts`、`wechat.share.contract.ts` 注释中的引用。
+- [x] `MINI_CODE_PAGES` 和 `miniCodePage`（`packages/contracts/src/wechat/schemas.ts`）。
+      （C1：连同只为它们存在的 `miniCodeQuery`、`miniCodeScene` 和 core 的 `miniCodeUrl`、`SCENE_MAX_BYTES` 一起删。）
+- [x] `wechat.miniCode`：`GET /api/v1/wechat/mini-qrcodes`（`wechat.storefront.contract.ts`、
+      `apps/web/app/api/v1/wechat/mini-qrcodes/route.ts`），以及 `wechat.share.contract.ts` 注释中的引用
+      （`system.attachment.contract.ts` 已在 2.4 随 `system.attachmentDataUrl` 删除）。
       `wechat_mini_codes` 缓存表保留（新接口 `share/mini-codes` 和落地页也用它）。
-- [ ] `packages/core/src/diy/link.service.ts`、`page_links` 的读取随 2.3 删除；[pages.md](pages.md) 第 4.2、4.3 节列出的
+      （C1：缓存、拒绝、限额、并发四组测试原来走 `miniCodeUrl`，已改走 `shareMiniCodeUrl`；只测旧接口的
+      「scene 超过 32 字节」「与旧接口共用缓存」「旧接口也按版本」三条删除，SHARE-001、SHARE-003 的陈述相应改写。）
+- [x] `packages/core/src/diy/link.service.ts`、`page_links` 的读取随 2.3 删除；[pages.md](pages.md) 第 4.2、4.3 节列出的
       默认数据和契约示例里的旧路径一并清掉。
+      （C1：4.2 的默认数据随 2.3 删除；4.3 的契约示例改为新路径——开屏广告、拼团横幅、`user.recordVisit`。
+      `site.config.ts` 的 `splashLink`、`groupbuy.config.ts` 的 `banners[].link` 改成 `LinkTarget` 不是删除，不在 C1 范围；
+      测试里故意用旧路径的断言（旧值仍能读出、`linkTarget` 拒绝旧路径）保留。）
 
 ### 2.7 通知的旧 `link` 和 `wechatMini.page`
 
-- [ ] 事件定义里的 `link`（`packages/core/src/notification/notification.registry.ts`、
+- [x] 事件定义里的 `link`（`packages/core/src/notification/notification.registry.ts`、
       `packages/core/src/groupbuy/groupbuy.notifications.ts`、`packages/core/src/presale/presale.notifications.ts`），只留 `route`。
-- [ ] `wechatMiniChannelConfig.page`（`packages/contracts/src/notification/schemas.ts`），后台
+- [x] `wechatMiniChannelConfig.page`（`packages/contracts/src/notification/schemas.ts`），后台
       `apps/web/app/admin/(shell)/notification/templates/notification-templates.tsx` 中 `['channels', 'wechatMini', 'page']`
       字段，`packages/core/src/notification/notification.send.ts` 中 `subscribePage` 的旧值回退。已保存的配置里多出的
       `page` 键在读取时忽略即可，不必迁移。
-- [ ] 公众号模板消息（`sendWechatOa`）的链接原来回退到事件的 `link`；删掉之后只剩后台配置的 `linkUrl`。没有公众号，
+- [x] 公众号模板消息（`sendWechatOa`）的链接原来回退到事件的 `link`；删掉之后只剩后台配置的 `linkUrl`。没有公众号，
       这个渠道不会被用到，不另做处理（HANDOFF 第 6 节「不改」）。
+      （C1 结果：用户事件的 `link` 全部删除，后台事件（订单、售后、库存、支付异常、小程序交易）的 `link` 是后台铃铛的
+      跳转路径，保留；注册时对带 `link` 的用户事件直接报错（NOTIF-006 加了一条测试）。站内信 `data` 里不再有 `link`。
+      后台「通知管理」的「小程序页面」输入框删除。）
 
 ### 2.8 守卫
 
-- [ ] `uniapp` 检查：`guards/src/checks/uniapp.ts`、`guards/src/lib/uniapp.ts`（及测试）、`guards/src/cli.ts` 中的注册、
+- [x] `uniapp` 检查：`guards/src/checks/uniapp.ts`、`guards/src/lib/uniapp.ts`（及测试）、`guards/src/cli.ts` 中的注册、
       `guards/src/lib/paths.ts` 的 `uniApp`；`guards/README.md` 的 `uniapp` 一行和 `checks/uniapp.ts` 的说明。
-- [ ] `retired` 检查（`guards/src/checks/retired.ts`）：`ALLOWED` 中的 `apps/uni-app/api/mappers/` 和
+- [x] `retired` 检查（`guards/src/checks/retired.ts`）：`ALLOWED` 中的 `apps/uni-app/api/mappers/` 和
       `apps/uni-app/api/README.md`，检查名称和 RISK 行陈述里的「the uni-app API layer」。
-- [ ] `mini` 检查中为过渡期保留的允许列表（如仍有）清空；`guards/README.md`「next to `uniapp` until the cutover」一句。
+- [x] `mini` 检查中为过渡期保留的允许列表（如仍有）清空；`guards/README.md`「next to `uniapp` until the cutover」一句。
 
 ### 2.9 CI（`.github/workflows/ci.yml`）
 
@@ -297,14 +321,17 @@ B：删除加落地页；C：删表）不再采用。
 现在它们只服务已经下线的 uni-app 和旧装修，生产里没有要保住的数据，推迟只会多留一份死的 schema 定义。代价写在第 4 节：
 部署失败自动回到上一版镜像时，旧 H5 首页和旧后台装修会报错（其余功能照常），要完全回到部署前就用备份恢复。
 
-- [ ] 删 `packages/db/src/schema/diy.ts`（`diy_pages`、`themes`、`page_link_categories`、`page_links` 四张表和
+- [x] 删 `packages/db/src/schema/diy.ts`（`diy_pages`、`themes`、`page_link_categories`、`page_links` 四张表和
       `diy_pages_kind`、`diy_pages_status`、`themes_kind` 三个枚举），再 `pnpm --filter @shop/db db:generate`，
       生成 `packages/db/migrations/0008_*.sql`。删之前确认没有别的表引用它们（2026-09-24 核对：没有外键指向这四张表）。
-- [ ] 每条 `DROP TABLE` 前加一行 `-- destructive: approved — <理由>`（按语句标注，`migrations` 守卫 OPS-007 检查）。
+- [x] 每条 `DROP TABLE` 前加一行 `-- destructive: approved — <理由>`（按语句标注，`migrations` 守卫 OPS-007 检查）。
       理由写明：只有已删除的旧装修代码读这些表，生产没有要保留的数据，自动回退到上一版时旧装修会报错、已接受。
-- [ ] `apps/web/src/server/health.ts` 的 `EXPECTED_MIGRATIONS` 从 8 改为 9（`health.test.ts` 按迁移日志核对它）。
-- [ ] `packages/db/docs/SCHEMA.md`：`diy` 一行（第 37 行）、第 230 行的 `diy_pages_home_uq`、「6.9 `page_links` /
+- [x] `apps/web/src/server/health.ts` 的 `EXPECTED_MIGRATIONS` 从 8 改为 9（`health.test.ts` 按迁移日志核对它）。
+- [x] `packages/db/docs/SCHEMA.md`：`diy` 一行（第 37 行）、第 230 行的 `diy_pages_home_uq`、「6.9 `page_links` /
       `page_link_categories`」一节。
+      （C1 结果：生成的是 `packages/db/migrations/0008_drop_legacy_diy.sql`，四条 `DROP TABLE … CASCADE` 各带标注，
+      三条 `DROP TYPE` 不在守卫的检查范围内、未标注；`scripts/check-constraints.sql` 删了第 15 条「两个 DIY 首页」，
+      `schema/decor.ts` 的注释同步。SCHEMA.md 的表数 86→82，约束表删第 21 行、原第 22 行改为 21，6.9 节删除、原 6.10 改为 6.9。）
 - [ ] 协调者在本地用 `pnpm --filter @shop/db db:migrate` 对一个临时库跑一遍，再跑集成测试（第 1 节第 2 步里一起跑）。
 
 店员没有自己的表：`audit_logs.actor_kind = 'staff'` 的约束和已有的行保留，不迁移。
@@ -414,12 +441,17 @@ B：删除加落地页；C：删表）不再采用。
 
 ### 5.1 什么时候做什么
 
-- [ ] **动手删除之前**：在 `storefront/mini` 上跑 `pnpm guards`，`api-compat` 不应打印任何 `[breaking, report-only]`。
+- [x] **动手删除之前**：在 `storefront/mini` 上跑 `pnpm guards`，`api-compat` 不应打印任何 `[breaking, report-only]`。
       有的话说明基线过时了，先 `api-compat:refresh --unreleased` 单独提交一次，让下一步的清单只含本次的删除。
-- [ ] **第 2 节的删除都做完之后**（第 1 节第 1 步的最后一个提交）：用这次要上传的版本号跑
+- [x] **第 2 节的删除都做完之后**（第 1 节第 1 步的最后一个提交）：用这次要上传的版本号跑
       `api-compat:refresh --release <版本号>`。核对它打印出的「原谅」清单**只包含** 2.3–2.6 节列出的接口（旧装修、
       辅助接口含 `site/config`、店员、`wechat/mini-qrcodes`），没有一条是新小程序调用的；清单写进提交说明。
       你已同意按这个办法处理切换时的删除。
+      （C1：删除前 `api-compat` 为 0 条；删完后以 `--release 1.0.0` 刷新，原谅 51 条：`/api/v1/diy/*` 8 条、
+      辅助接口 5 条（`attachments/base64`、`cart/items/decrements`、`catalog/categories/version`、`catalog/skus/{skuCode}`、
+      `site/config`）、`/api/v1/staff/*` 36 条、`wechat/mini-qrcodes` 1 条，外加 `POST /api/v1/uploads` 的
+      `purpose` 不再接受 `staff`（店员上传分支，2.5）。新小程序不调用其中任何一条（`apps/mini` 类型检查通过）。
+      刷新后 `api-compat` 对 release 1.0.0 为 0 条。）
 - [ ] **审核被拒、修改后重新提交，且 `/api/v1` 有改动**：版本号没有发布过，就用**同一个版本号**再刷一次，清单同样要逐条核对。
 - [ ] **之后每次发布小程序**：先按 device-check 第 9 节改版本号，再 `api-compat:refresh --release <新版本号>`，
       清单应该为空；不为空说明有破坏性改动混了进来，要么改回去，要么确认旧版本已不再使用（微信后台「版本管理」里

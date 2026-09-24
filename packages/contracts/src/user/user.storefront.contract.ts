@@ -298,7 +298,7 @@ export const userRecordVisit = defineRoute({
   response: z.void(),
   status: 204,
   examples: [
-    { name: 'signed-in', body: { path: '/pages/goods_details/index' }, response: undefined },
+    { name: 'signed-in', body: { path: '/pages/product/index' }, response: undefined },
     {
       name: 'anonymous-mini',
       body: { path: '/pages/index/index', platform: 'wechat-mini' },
@@ -306,7 +306,7 @@ export const userRecordVisit = defineRoute({
     },
     {
       name: 'page-hidden',
-      body: { path: '/pages/goods_details/index', stayMs: 42_000 },
+      body: { path: '/pages/product/index', stayMs: 42_000 },
       response: undefined,
     },
   ],

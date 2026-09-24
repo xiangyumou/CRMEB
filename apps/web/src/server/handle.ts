@@ -13,7 +13,7 @@ import '@shop/contracts/locale';
 // which is why it is here and not in the container.
 import '@shop/core/domains';
 import { anonymousActor, createCtx, DomainError, type Actor, type Ctx } from '@shop/core/kernel';
-import { getStaffCheck, hasPermission, insertAudit, readBearer } from '@shop/core/auth';
+import { hasPermission, insertAudit, readBearer } from '@shop/core/auth';
 import { getContainer, type Container } from './container';
 import { isProduction } from './env';
 import { clientIp } from './request-meta';
@@ -78,7 +78,7 @@ export interface RequestCtx extends Ctx {
    * validation, the headers set so far (the `ETag` included) kept.
    */
   notModified(): never;
-  /** Names the thing this admin or staff operation acted on, for the audit log. */
+  /** Names the thing this admin operation acted on, for the audit log. */
   audit(target: string): void;
 }
 
@@ -337,7 +337,7 @@ export function handle<
           sessionId: session.sessionId,
           display: session.account,
         };
-      } else if (anyRoute.auth === 'user' || anyRoute.auth === 'staff') {
+      } else if (anyRoute.auth === 'user') {
         const token = readBearer(request.headers.get('authorization'));
         if (!token) return fail(new DomainError('UNAUTHENTICATED'));
         const session = await container.userSessions.resolve(
@@ -345,18 +345,8 @@ export function handle<
           token,
         );
         if (!session) return fail(new DomainError('UNAUTHENTICATED'));
-        if (anyRoute.auth === 'staff') {
-          const check = getStaffCheck();
-          if (!check) {
-            container.logger.error('StaffCheck 未注册（order 模块未加载）');
-            return fail(new DomainError('FORBIDDEN'));
-          }
-          if (!(await check.isStaff(container.db, session.userId))) {
-            return fail(new DomainError('FORBIDDEN', { details: { reason: 'not staff' } }));
-          }
-        }
         actor = {
-          kind: anyRoute.auth === 'staff' ? 'staff' : 'user',
+          kind: 'user',
           id: session.userId,
           permissions: [],
           isSuper: false,
@@ -460,9 +450,8 @@ export function handle<
       }
 
       // -- 7. audit ----------------------------------------------------------
-      // Every successful write by a console admin, and every successful write
-      // by a 店员 on the staff surface.
-      if (MUTATING.has(request.method) && audited(surface, anyRoute.auth, actor)) {
+      // Every successful write by a console admin.
+      if (MUTATING.has(request.method) && surface === 'admin' && actor.kind === 'admin') {
         await writeAudit(container, {
           actor,
           routeId: anyRoute.id,
@@ -517,12 +506,6 @@ function baseCtx(
   });
 }
 
-/** Which successful writes land in `audit_logs`. */
-function audited(surface: string, auth: string, actor: Actor): boolean {
-  if (surface === 'admin') return actor.kind === 'admin';
-  return auth === 'staff' && actor.kind === 'staff';
-}
-
 async function writeAudit(
   container: Container,
   entry: {
@@ -538,12 +521,11 @@ async function writeAudit(
   },
 ): Promise<void> {
   try {
-    const staff = entry.actor.kind === 'staff';
     await insertAudit(container.db, {
-      actorKind: staff ? 'staff' : 'admin',
-      adminId: staff ? null : entry.actor.id,
-      userId: staff ? entry.actor.id : null,
-      adminAccount: staff ? `staff:${entry.actor.id}` : (entry.actor.display ?? ''),
+      actorKind: 'admin',
+      adminId: entry.actor.id,
+      userId: null,
+      adminAccount: entry.actor.display ?? '',
       routeId: entry.routeId,
       method: entry.method,
       path: entry.path,

@@ -1,15 +1,14 @@
 import { defineMenu } from './types';
 
 /**
- * 店铺装修（新版）: DIY v2, the page documents the mini-program renders.
+ * 店铺装修: the page documents the mini-program renders.
  *
- * Beside the legacy 页面装修 (`diy.menu.ts`), which stays until the storefront
- * no longer reads it. The editor is `hidden`: it is reached from the list and
- * only needs to give the breadcrumb a parent.
+ * The editor is `hidden`: it is reached from the list and only needs to give
+ * the breadcrumb a parent.
  */
 export default defineMenu({
   key: 'decor',
-  label: '店铺装修（新版）',
+  label: '店铺装修',
   icon: 'LayoutOutlined',
   order: 690,
   permission: 'decor:page:read',

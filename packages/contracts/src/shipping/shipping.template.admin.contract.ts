@@ -18,9 +18,8 @@ import {
  * namespaced: "templates", "cities" and "regions" are words several domains
  * would like, and in the App Router the directory *is* the URL, so an
  * unqualified segment is a collision waiting to happen. The express-company
- * pickers (`/admin-api/express-companies` and
- * `/api/v1/staff/express-companies`) are the deliberate exceptions: the order
- * console and the mobile staff console call them by those paths.
+ * picker (`/admin-api/express-companies`) is the deliberate exception: the
+ * order console calls it by that path.
  */
 
 const templateParams = z.object({ id });

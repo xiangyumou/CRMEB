@@ -72,7 +72,7 @@ export const orderErrors = defineErrors({
 export type OrderErrorCode = keyof typeof orderErrors;
 
 /**
- * Fulfilment, invoice and staff-console codes.
+ * Fulfilment, invoice and console-edit codes.
  *
  * A separate `defineErrors` call in the same file: `pnpm gen` collects one
  * `errors.ts` per domain and flattens every registry it exports, so the
@@ -124,14 +124,6 @@ export const orderFulfilErrors = defineErrors({
     status: 409,
     message: '微信尚未确认收货，请稍后重试',
   },
-
-  // --- statistics ---------------------------------------------------------
-  /**
-   * The 统计明细 window is wider than the cap. Refused rather than silently
-   * shortened, so a chart never claims to cover a range it does not.
-   * `details: { maximumDays }`.
-   */
-  ORDER_STATISTICS_RANGE_TOO_WIDE: { status: 422, message: '统计时间跨度过大，请缩短查询范围' },
 
   // --- console edits ------------------------------------------------------
   /** 改价 is only ever allowed while the order is still `pending_payment`. */

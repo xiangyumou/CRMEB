@@ -1,13 +1,10 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-
-import { dep, NEXT_DIR } from './deps';
+import { dep } from './deps';
 
 /**
  * The storefront the load run shops in.
  *
  * Built through the same core services the admin uses (categories, products,
- * the DIY page, the payment config), plus direct inserts only for what no
+ * the 首页, the payment config), plus direct inserts only for what no
  * service creates: shopper accounts with a password. Shoppers then sign in over
  * HTTP (`POST /api/v1/auth/sessions/password`) and add an address over HTTP,
  * exactly as the app does — see `run.ts`.
@@ -49,20 +46,55 @@ export const SHOPPER_PASSWORD = 'LoadTest-Passw0rd';
 const IMAGE =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
-/** The one production home page with `status = 1` (see `core/src/diy/diy.int.test.ts`). */
-function productionHomePage(): Record<string, unknown> {
-  const file = path.join(NEXT_DIR, 'packages/contracts/src/diy/__fixtures__/prod-8.json');
-  const row = JSON.parse(readFileSync(file, 'utf8')) as { value: unknown };
-  return (typeof row.value === 'string' ? JSON.parse(row.value) : row.value) as Record<
-    string,
-    unknown
-  >;
+/**
+ * The 首页 (店铺装修): a search bar and two product grids, so a home request
+ * resolves blocks and reads the catalog like the real page does.
+ */
+function homeDocument(categoryIds: readonly string[]) {
+  const style = { marginY: 'none', paddingX: 'none', radius: 'none' } as const;
+  const visibility = { audience: 'all', platforms: [] } as const;
+  const grid = (categoryId: string, n: number) => ({
+    id: `load-grid-${n}`,
+    type: 'productGrid',
+    v: 2,
+    props: {
+      source: { mode: 'category', categoryId, sort: 'default', limit: 10 },
+      layout: 'grid2',
+      titleLines: 2,
+      showMarketPrice: false,
+      showTag: false,
+      style,
+      visibility,
+    },
+  });
+  return {
+    schemaVersion: 2 as const,
+    root: {
+      props: { title: '商城首页', background: '#f5f5f5', shareEnabled: true, shareTitle: '' },
+    },
+    blocks: [
+      {
+        id: 'load-search',
+        type: 'searchBar',
+        v: 1,
+        props: {
+          placeholder: '搜索商品',
+          hotWords: [],
+          shape: 'round',
+          sticky: false,
+          style,
+          visibility,
+        },
+      },
+      ...categoryIds.slice(0, 2).map((id, n) => grid(id, n)),
+    ],
+  };
 }
 
 export async function seedStorefront(options: SeedOptions): Promise<SeedResult> {
   const { ctxFor } = await import('../../e2e/admin/src/stack');
   const catalog = await dep('@shop/core/catalog');
-  const diy = await dep('@shop/core/diy');
+  const decor = await dep('@shop/core/decor');
   const payment = await dep('@shop/core/payment');
   const wechat = await dep('@shop/core/wechat');
   const auth = await dep('@shop/core/auth');
@@ -201,10 +233,14 @@ export async function seedStorefront(options: SeedOptions): Promise<SeedResult> 
       products.push({ id: String(product.id), skuId: String(sku.id), price, categoryId });
     }
 
-    // -- the DIY home page: a real production page, published and in use -----
-    const home = await diy.createPage(ctx, { name: '压测首页', kind: 'home', title: '商城首页' });
-    await diy.savePageContent(ctx, { id: home.id, content: productionHomePage(), publish: true });
-    await diy.setHomePage(ctx, { id: home.id });
+    // -- the 首页 (店铺装修), published and designated ---------------------------
+    const home = await decor.createDocument(ctx, {
+      kind: 'home',
+      name: '压测首页',
+      document: homeDocument(leafIds),
+    });
+    await decor.publish(ctx, { id: home.id, note: 'load' });
+    await decor.designate(ctx, { designation: 'home', documentId: home.id });
 
     // -- shoppers: an account with a password, nothing else --------------------
     const hash = await auth.hashPassword(SHOPPER_PASSWORD, 4);

@@ -3,7 +3,7 @@ import type { LinkSource, LinkTarget, LinkTargetType } from '@/admin/kit/link/ty
 /**
  * The kit demo's `LinkSource`: a handful of in-memory rows, like the rest of
  * this page's data. `<LinkPicker>` has no fallback source, so the demo mounts
- * this one; the DIY editor mounts the real `createDiyLinkSource()`.
+ * this one.
  */
 
 const PATHS: Record<Exclude<LinkTargetType, 'page' | 'custom'>, [string, string]> = {

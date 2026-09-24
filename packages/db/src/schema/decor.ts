@@ -16,8 +16,8 @@ import {
 import { createdAt, deletedAt, fk, pk, updatedAt } from './_shared';
 
 /**
- * Page decoration v2 (`decor`, plan §2.1). Replaces `diy_pages` by strangling:
- * the legacy tables stay untouched and keep serving the uni-app.
+ * Page decoration v2 (`decor`, plan §2.1). It replaced the legacy `diy_pages`
+ * tables, which were dropped at the cutover (migration `0008_drop_legacy_diy`).
  *
  * A **document** is one decorated page with one editable draft. Publishing
  * copies the draft into an immutable, numbered **revision** and points the

@@ -3,7 +3,7 @@ import type { APIRequestContext, Page } from '@playwright/test';
 import { test, expect, cjk, toast } from '../src/fixtures';
 
 /**
- * 店铺装修（新版）: the admin editor against the real server and the
+ * 店铺装修: the admin editor against the real server and the
  * storefront's own read of what it published.
  *
  * The page document is written by the editor and served by
@@ -58,7 +58,7 @@ test('DECOR-011 DECOR-014: create, save, publish, publish again and roll back �
 }) => {
   const name = `E2E 装修 ${Date.now()}`;
   await page.goto('/admin/decor');
-  await expect(page.getByText('新版', { exact: true })).toBeVisible();
+  await expect(page.getByText('小程序的首页、个人中心与微页面')).toBeVisible();
   await page.getByRole('button', { name: '新建页面' }).click();
   const create = page.getByRole('dialog');
   await create.getByLabel('页面名称').fill(name);

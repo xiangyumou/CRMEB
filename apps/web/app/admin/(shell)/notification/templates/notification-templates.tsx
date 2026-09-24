@@ -243,21 +243,17 @@ function fieldsFor(template: NotificationTemplate): FormField[] {
           />
         ),
       },
-      channel === 'wechatOa'
-        ? {
-            kind: 'text',
-            name: ['channels', 'wechatOa', 'linkUrl'],
-            label: '点击跳转',
-            visibleWhen: enabled('wechatOa'),
-          }
-        : {
-            kind: 'text',
-            name: ['channels', 'wechatMini', 'page'],
-            label: '小程序页面',
-            help: '已废弃：订单、售后、拼团等事件打开的页面由系统决定，此处填写的页面只对没有固定页面的事件生效',
-            visibleWhen: enabled('wechatMini'),
-          },
     );
+    // The mini program's page is the event's own route; only the 公众号
+    // message takes a hand-typed link.
+    if (channel === 'wechatOa') {
+      fields.push({
+        kind: 'text',
+        name: ['channels', 'wechatOa', 'linkUrl'],
+        label: '点击跳转',
+        visibleWhen: enabled('wechatOa'),
+      });
+    }
   }
 
   return fields;

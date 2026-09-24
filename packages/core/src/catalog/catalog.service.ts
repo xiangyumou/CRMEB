@@ -975,7 +975,7 @@ function productValues(body: AdminProductForm): repo.NewProductValues {
  * `exactOptionalPropertyTypes` is on, and the column's declared shape says
  * `options?: string[]` — not `string[] | undefined`. Spreading conditionally is
  * the difference between `{"options": null}` and no key at all in the stored
- * JSON, and the uni-app renderer branches on the key being absent.
+ * JSON, and a storefront renderer may branch on the key being absent.
  */
 function toStoredFormField(field: ProductCustomFormField): {
   key: string;

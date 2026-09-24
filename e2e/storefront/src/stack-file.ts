@@ -33,43 +33,16 @@ import path from 'node:path';
  * - `SHOP_E2E_PORT`, `SHOP_E2E_WEB_PORT`, `SHOP_E2E_GATEWAY_PORT` and
  *   `SHOP_E2E_STOREFRONT_STACK` still override each, e.g. to run the same
  *   checkout twice.
- *
- * ## Which storefront
- *
- * `SHOP_E2E_CLIENT` picks the client the stack serves and the specs drive:
- *
- * - `uniapp` (the default): the uni-app H5 build, `specs/`;
- * - `mini`: the Taro mini-program's H5 build in "模拟小程序" mode
- *   (`apps/mini`, `build:h5:mp-emulation`), `specs-mini/`, with the fake
- *   `api.weixin.qq.com` for `wx.login` / `getPhoneNumber`
- *   (docs/mini/spikes/S4-e2e.md).
- *
- * The two get different default ports, stack files and databases, so both
- * can be up at once in one checkout.
  */
 
 /** The checkout root, resolved from this file. */
 export const CHECKOUT_ROOT = path.resolve(import.meta.dirname, '../../..');
 
-export type E2eClient = 'uniapp' | 'mini';
-
-function clientFromEnv(): E2eClient {
-  const raw = process.env.SHOP_E2E_CLIENT ?? 'uniapp';
-  if (raw === 'uniapp' || raw === 'mini') return raw;
-  throw new Error(`SHOP_E2E_CLIENT must be "uniapp" or "mini", not "${raw}"`);
-}
-
-/** The storefront this run serves and drives. */
-export const CLIENT: E2eClient = clientFromEnv();
-
 /**
- * Eight hex digits of the checkout path's SHA-256 (plus the client, for the
- * mini-program): stable per checkout and client, distinct across them.
+ * Eight hex digits of the checkout path's SHA-256: stable per checkout,
+ * distinct across them.
  */
-export const CHECKOUT_ID = createHash('sha256')
-  .update(CLIENT === 'uniapp' ? CHECKOUT_ROOT : `${CHECKOUT_ROOT}:${CLIENT}`)
-  .digest('hex')
-  .slice(0, 8);
+export const CHECKOUT_ID = createHash('sha256').update(CHECKOUT_ROOT).digest('hex').slice(0, 8);
 
 /**
  * The first of this checkout's three default ports (edge, web, gateway):
@@ -81,18 +54,11 @@ const DEFAULT_BASE_PORT = 25_000 + (Number.parseInt(CHECKOUT_ID, 16) % 2_000) * 
 
 export const STACK_FILE =
   process.env.SHOP_E2E_STOREFRONT_STACK ??
-  path.join(
-    tmpdir(),
-    CLIENT === 'uniapp'
-      ? `shop-e2e-storefront-${CHECKOUT_ID}.json`
-      : `shop-e2e-storefront-${CLIENT}-${CHECKOUT_ID}.json`,
-  );
+  path.join(tmpdir(), `shop-e2e-storefront-${CHECKOUT_ID}.json`);
 
 /**
  * The port the *browser* talks to: the edge, which serves the H5 bundle and
- * proxies `/api` to `next start`. Same origin, because `config/app.js` derives
- * the API origin from `window.location` on H5 — a storefront served from a
- * different origin than its API is not the thing production runs.
+ * proxies `/api` to `next start`, so the page and its API share one origin.
  */
 export const EDGE_PORT = Number(process.env.SHOP_E2E_PORT ?? DEFAULT_BASE_PORT);
 
@@ -130,10 +96,8 @@ export interface StackInfo {
   uploadsDir: string;
   /** The fake WeChat Pay gateway's origin. */
   gatewayUrl: string;
-  /** Which storefront the stack serves. */
-  client: E2eClient;
-  /** The fake mini-program's app id (`client: 'mini'` only): what a `wechat_mini` payment is charged to. */
-  wechatMiniAppId: string | null;
+  /** The fake mini-program's app id: what a `wechat_mini` payment is charged to. */
+  wechatMiniAppId: string;
   /** The gateway control-plane's origin (`src/gateway-control.ts`) — how a
    * spec, running in a different process than the gateway, drives
    * `markPaid`/`postNotify` and `markRefunded`/`postRefundNotify`. */
@@ -164,11 +128,8 @@ export interface StackFixtures {
   primaryAddressId: number;
   secondaryAddressId: number;
   expressCompanyId: number;
-  diyHomePageId: number;
   /** The mini-program's 首页 (页面装修 v2), as the seed designated it. */
   decorHomeId: number;
   /** The one province/city/district path the seed inserted: what any address must point at. */
   division: { provinceId: string; cityId: string; districtId: string };
-  /** Every DIY page the seed published, with the component ids each should render. */
-  diyPages: Array<{ fixture: string; id: number; kind: 'home' | 'micro'; componentIds: string[] }>;
 }

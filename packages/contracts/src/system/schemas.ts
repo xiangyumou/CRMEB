@@ -264,7 +264,11 @@ export type PermissionTree = z.infer<typeof permissionTree>;
 // audit log
 // ---------------------------------------------------------------------------
 
-/** Who wrote an audit row: a console admin, or a 店员 on the staff surface. */
+/**
+ * Who wrote an audit row: a console admin, or — only on rows older than the
+ * cutover, which deleted the mobile staff console — a 店员. New rows are always
+ * `admin`; `staff` stays so the historic rows still read back.
+ */
 export const auditActorKind = z.enum(['admin', 'staff']);
 export type AuditActorKind = z.infer<typeof auditActorKind>;
 
@@ -509,9 +513,9 @@ const siteAsset = z.string().nullable();
 export const sitePublicConfig = z.object({
   name: siteText,
   /**
-   * Four slots, because the app renders four different logos: the header
-   * (`App.vue`), the sign-in form (`pages/users/login`), the square icon a
-   * share card uses, and the browser favicon on H5.
+   * Four slots, because a storefront renders four different logos: the
+   * header, the sign-in form, the square icon a share card uses, and the
+   * browser favicon on H5.
    */
   logo: z.object({
     main: siteAsset,
@@ -573,7 +577,7 @@ export const sitePublicConfig = z.object({
     phone: z.string().nullable(),
     qrcodeUrl: siteAsset,
   }),
-  /** `pages/guide`'s splash. `enabled: false` means go straight to the home page. */
+  /** The launch splash. `enabled: false` means go straight to the home page. */
   splashAd: z.object({
     enabled: z.boolean(),
     imageUrl: siteAsset,
@@ -619,47 +623,10 @@ export const sitePublicConfigExample: SitePublicConfig = {
   splashAd: {
     enabled: true,
     imageUrl: '/uploads/site/2026/09/a91f22.png',
-    link: '/pages/goods_details/index?id=12',
+    link: '/pages/product/index?id=12',
     seconds: 3,
   },
   version: '1758500000000',
-};
-
-// ---------------------------------------------------------------------------
-// 图片转 base64
-// ---------------------------------------------------------------------------
-
-/**
- * One image, by URL, that the server is asked to fetch on the caller's behalf.
- *
- * A relative path is the normal case and the preferred one: `/uploads/…` is
- * unambiguously ours, so there is nothing for the server to adjudicate. An
- * absolute URL is accepted too — the app sometimes holds one — but only when
- * its host is this deployment's, which is what the service checks.
- *
- * 255 characters, the same ceiling every stored asset URL has.
- */
-export const attachmentDataUrlBody = z.object({
-  url: z.string().min(1).max(255),
-});
-export type AttachmentDataUrlBody = z.infer<typeof attachmentDataUrlBody>;
-
-/**
- * `data:image/png;base64,…`.
- *
- * The whole image, inline, which is the point: the canvas that draws a 海报
- * cannot read pixels from a cross-origin `<image>`, so the bytes have to arrive
- * in the document. Capped at 2 MB of source, so the response is about 2.7 MB at
- * worst.
- */
-export const attachmentDataUrl = z.object({
-  dataUrl: z.string(),
-});
-export type AttachmentDataUrl = z.infer<typeof attachmentDataUrl>;
-
-export const attachmentDataUrlExample: AttachmentDataUrl = {
-  dataUrl:
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
 };
 
 // ---------------------------------------------------------------------------

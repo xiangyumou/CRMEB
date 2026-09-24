@@ -3,38 +3,24 @@ import {
   expect,
   type APIRequestContext,
   type BrowserContext,
-  type Page,
 } from '@playwright/test';
 
-import { DEVICE } from './device';
-import { completePayment, completeRefund } from './gateway-control';
-import { BASE_URL, type SeededUser } from './stack-file';
+import { completePayment } from './gateway-control';
+import { BASE_URL } from './stack-file';
 import { stack, closeStack, type Stack } from './stack';
 
 /**
- * The `test` every spec imports.
- *
- * `@shop/e2e-admin` gets by with three fixtures because the admin is one
- * identity behind one cookie. The storefront journeys need more: a shopper
- * that is already logged in for the six journeys that are not *about*
- * logging in, a second shopper only the group-buy journey needs, and an
- * admin session for the two steps (ship, refund-approve) no storefront
- * screen performs.
+ * The base `test`: the stack, the page-health listeners and an admin session
+ * for the steps (ship, refund-approve, arranging data) no storefront screen
+ * performs. `src/mini.ts` extends it with the shopper's phone.
  */
 
 export interface Fixtures {
-  /** A page pre-authenticated as `shop.users.primary`, sitting on `/`. */
-  shopperPage: Page;
-  /** Same identity, for calls a browser cannot make cheaply. */
-  shopperApi: APIRequestContext;
-  /** A second, independently logged-in shopper — the group-buy partner. */
-  secondaryShopperPage: Page;
-  secondaryShopperApi: APIRequestContext;
-  /** The super admin, cookie-authenticated against `/admin-api` — ship and refund-approve. */
+  /** The super admin, cookie-authenticated against `/admin-api`. */
   adminApi: APIRequestContext;
   /**
-   * Every `console.error`/`pageerror` the test's own `page` (which is
-   * `shopperPage`) has seen, in order, from before its first navigation.
+   * Every `console.error`/`pageerror` the test's own `page` has seen, in
+   * order, from before its first navigation.
    * The browser's own "Failed to load resource" echo is left out: the
    * request it echoes is in `failedRequests`, with the URL the console
    * message does not carry.
@@ -42,10 +28,10 @@ export interface Fixtures {
   consoleErrors: string[];
   /**
    * Every request `page` made that failed — `METHOD /path STATUS`, or
-   * `METHOD /path FAILED <reason>` for a transport error. Journey 1's
-   * "renders without console error and without failed requests" and the
-   * per-journey log CI keeps (attached to every test as
-   * `page-health.txt`) both read these two arrays.
+   * `METHOD /path FAILED <reason>` for a transport error. The journeys'
+   * "no console error, no failed request" assertions and the per-test logs
+   * CI keeps (`console-errors.txt`, `failed-requests.txt`) read these two
+   * arrays.
    */
   failedRequests: string[];
 }
@@ -57,9 +43,9 @@ const PIXEL = Buffer.from(
 );
 
 /**
- * Keeps a browser context offline. The DIY fixtures are real production page
- * data and still point their pictures at the production CDN; a run must never
- * reach it, and must not fail because it cannot. Anything not addressed to
+ * Keeps a browser context offline: a run must never reach the internet, and
+ * must not fail because a picture points somewhere it cannot reach. Anything
+ * not addressed to
  * the stack's own origin is answered locally — an image with a pixel,
  * anything else with an empty 204.
  */
@@ -78,19 +64,6 @@ export interface WorkerFixtures {
   shop: Stack;
 }
 
-/** `POST /api/v1/auth/sessions/password` — the storefront analogue of `@shop/e2e-admin`'s `loginCookies`. */
-export async function passwordLogin(request: APIRequestContext, user: SeededUser): Promise<string> {
-  const response = await request.post('/api/v1/auth/sessions/password', {
-    data: { account: user.account, password: user.password },
-  });
-  expect(
-    response.ok(),
-    `login as ${user.account} failed: ${response.status()} ${await response.text()}`,
-  ).toBe(true);
-  const body = (await response.json()) as { token: string };
-  return body.token;
-}
-
 async function loginCookies(
   request: APIRequestContext,
   account: string,
@@ -99,43 +72,6 @@ async function loginCookies(
   const response = await request.post('/admin-api/auth/login', { data: { account, password } });
   expect(response.ok(), `admin login failed: ${response.status()} ${await response.text()}`).toBe(
     true,
-  );
-}
-
-/**
- * The exact localStorage shape a real password login leaves behind — read off
- * a browser after logging in through `pages/users/login`, not reconstructed
- * from the source. `uni.setStorageSync` on H5 stores a string as the raw
- * string and anything else as `{"type": …, "data": …}`, so the token is bare
- * and `utils/cache.js`'s expiry tag list is wrapped. `expire: 0` is how
- * `Cache` spells "never", and `store/modules/app.js` reads the token at
- * module-init time (`Cache.get(LOGIN_STATUS) || false`) — so a page
- * navigated to *after* this script runs boots already logged in, the way a
- * returning shopper's browser would, without paying for the login UI on
- * every spec that is not about login itself (`specs/login.spec.ts` is).
- *
- * `UID` too: every login path commits `SETUID` (`pages/users/login`), and
- * `store/modules/app.js` reads it at init like the token. Pages compare it
- * with an order's `gift_uid` (0 unless the order is a gift) — without it the
- * 订单列表 took every order for a gift received and hid its prices.
- */
-export async function seedToken(page: Page, token: string, userId: number): Promise<void> {
-  await page.addInitScript(
-    ([tokenValue, uid]) => {
-      window.localStorage.setItem('LOGIN_STATUS_TOKEN', tokenValue);
-      window.localStorage.setItem('UID', JSON.stringify({ type: 'number', data: uid }));
-      window.localStorage.setItem(
-        'UNI-APP-CRMEB:TAG',
-        JSON.stringify({
-          type: 'object',
-          data: [
-            { key: 'LOGIN_STATUS_TOKEN', expire: 0 },
-            { key: 'UID', expire: 0 },
-          ],
-        }),
-      );
-    },
-    [token, userId] as const,
   );
 }
 
@@ -158,23 +94,10 @@ export const test = base.extend<Fixtures & { localOnly: undefined }, WorkerFixtu
     { scope: 'worker' },
   ],
 
-  shopperApi: async ({ playwright, shop }, use) => {
-    const request = await playwright.request.newContext({ baseURL: BASE_URL });
-    const token = await passwordLogin(request, shop.users.primary);
-    await request.dispose();
-    const authed = await playwright.request.newContext({
-      baseURL: BASE_URL,
-      extraHTTPHeaders: { Authorization: `Bearer ${token}` },
-    });
-    await use(authed);
-    await authed.dispose();
-  },
-
   consoleErrors: async ({ page }, use, testInfo) => {
     const errors: string[] = [];
     // An unhandled rejection reaches Playwright as a `pageerror` with an
-    // empty message whenever the app rejects with a plain object — which is
-    // what `utils/request.js` rejects with on every non-2xx. Reported here
+    // empty message whenever the app rejects with a plain object. Reported here
     // instead, once, with the reason spelled out; `preventDefault` stops the
     // browser reporting the same rejection a second time, empty.
     await page.addInitScript(() => {
@@ -248,51 +171,6 @@ export const test = base.extend<Fixtures & { localOnly: undefined }, WorkerFixtu
     });
   },
 
-  // Depends on the two health fixtures so their listeners exist before the
-  // first `goto` — journey 1 asserts on what the very first load did.
-  shopperPage: async ({ page, playwright, shop, consoleErrors, failedRequests }, use) => {
-    void consoleErrors;
-    void failedRequests;
-    const request = await playwright.request.newContext({ baseURL: BASE_URL });
-    const token = await passwordLogin(request, shop.users.primary);
-    await request.dispose();
-    await seedToken(page, token, shop.users.primary.id);
-    await page.goto('/');
-    await use(page);
-  },
-
-  secondaryShopperApi: async ({ playwright, shop }, use) => {
-    const request = await playwright.request.newContext({ baseURL: BASE_URL });
-    const token = await passwordLogin(request, shop.users.secondary);
-    await request.dispose();
-    const authed = await playwright.request.newContext({
-      baseURL: BASE_URL,
-      extraHTTPHeaders: { Authorization: `Bearer ${token}` },
-    });
-    await use(authed);
-    await authed.dispose();
-  },
-
-  secondaryShopperPage: async ({ browser, playwright, shop }, use) => {
-    // A second phone, not a desktop: the same device, locale and base URL
-    // the project gives the default `page`.
-    const context = await browser.newContext({
-      ...DEVICE,
-      baseURL: BASE_URL,
-      locale: 'zh-CN',
-      timezoneId: 'Asia/Shanghai',
-    });
-    await keepOffline(context);
-    const page = await context.newPage();
-    const request = await playwright.request.newContext({ baseURL: BASE_URL });
-    const token = await passwordLogin(request, shop.users.secondary);
-    await request.dispose();
-    await seedToken(page, token, shop.users.secondary.id);
-    await page.goto('/');
-    await use(page);
-    await context.close();
-  },
-
   adminApi: async ({ playwright, shop }, use) => {
     const request = await playwright.request.newContext({
       baseURL: BASE_URL,
@@ -315,10 +193,6 @@ export { expect };
  */
 export async function payOrder(shop: Stack, outTradeNo: string): Promise<void> {
   await completePayment(shop.gatewayControlUrl, outTradeNo);
-}
-
-export async function refundOrder(shop: Stack, outRefundNo: string): Promise<void> {
-  await completeRefund(shop.gatewayControlUrl, outRefundNo);
 }
 
 /**

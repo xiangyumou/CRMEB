@@ -25,7 +25,7 @@ import type { FakeOaServer } from '@shop/testing/wechat';
  *  - `complete-refund`: settles a refund's gateway-side state so a spec is
  *    not stuck polling for `reconcileStaleRefunds()`'s sweep interval;
  *
- * With `SHOP_E2E_CLIENT=mini` it also answers the mini-program's "模拟小程序"
+ * It also answers the mini-program's "模拟小程序"
  * build (`apps/mini/src/platform/h5-mp-emulation.tsx`), reached through the
  * edge at `/__e2e/mini/*`. These stand in for what the WeChat client itself
  * does on a phone, and nothing else:

@@ -27,7 +27,6 @@ import { resetRiskyAvatar } from './user-avatar-check';
  * | worker `user.pruneVisits` | `pruneVisits` — the page-view retention sweep |
  * | `/admin-api/users…` | `adminList` / `adminDetail` / `adminUpdate` / `adminSetStatus` / `adminResetPassword` / `adminAddressList` / `adminBatchSetGroups` / `adminBatchSetLabels` |
  * | `/admin-api/user-groups…`, `/admin-api/user-labels…`, `/admin-api/user-label-categories…` | the taxonomy CRUD below |
- * | `/api/v1/staff/users…`, `/api/v1/staff/user-groups` | `staffList` / `staffDetail` / `staffGroupList` / `staffSetGroup` / `staffLabelList` / `staffSetLabels` |
  * | `/admin-api/user-cancellations…` | `adminCancellationList` / `adminApproveCancellation` / `adminRejectCancellation` / `adminRemarkCancellation` |
  *
  * **What importing this module registers**, through `registerUserDomain()`
@@ -167,19 +166,6 @@ export {
   labelList,
   labelUpdate,
 } from './user-admin.service';
-
-// ---------------------------------------------------------------------------
-// staff — 商家管理 → 用户
-// ---------------------------------------------------------------------------
-
-export {
-  staffDetail,
-  staffGroupList,
-  staffLabelList,
-  staffList,
-  staffSetGroup,
-  staffSetLabels,
-} from './user-staff.service';
 
 // ---------------------------------------------------------------------------
 // seams

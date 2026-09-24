@@ -23,7 +23,6 @@ import { defineConfigGroup } from '../kernel/config-registry';
  * | auto-review text          | `catalog.autoReviewContent`                      |
  * | stock warning threshold   | `catalog.stockWarningThreshold`                  |
  * | return contact            | `refund.returnName/Phone/Address`                |
- * | staff console users       | `order-staff.staffUserIds`                       |
  * | refund reasons            | `refund`'s built-in list                         |
  * | new-order notice          | the per-template notification switches          |
  * | 满额包邮                  | `freeShippingThreshold`, here                    |

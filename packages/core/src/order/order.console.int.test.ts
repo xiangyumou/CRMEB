@@ -335,7 +335,8 @@ describe('备注', () => {
     );
     expect((await orderRow(placed.orderId)).adminRemark).toBe('后台备注');
 
-    // The same service reached from the phone, as a shop assistant.
+    // The same service under a user actor — the way the (deleted) staff
+    // console reached it, which the historic log rows still record.
     const staffId = await makeUser();
     await order.orderConsole.adminRemark(
       as(staffId),

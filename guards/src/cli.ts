@@ -24,7 +24,6 @@ import { retiredFeatures } from './checks/retired';
 import { routeHygiene } from './checks/route-hygiene';
 import { secretsNeverLeak } from './checks/secrets';
 import { txPool } from './checks/tx-pool';
-import { uniappCalls } from './checks/uniapp';
 import { count, type Check, type CheckResult } from './framework';
 
 const CHECKS: readonly Check[] = [
@@ -34,7 +33,6 @@ const CHECKS: readonly Check[] = [
   permissions,
   adminClient,
   fixtures,
-  uniappCalls,
   miniCheck,
   retiredFeatures,
   bannedConstructs,

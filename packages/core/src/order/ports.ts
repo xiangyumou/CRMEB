@@ -20,7 +20,7 @@ import { DomainError } from '../kernel/errors';
  * Rules that are not negotiable:
  *  - a transition is a **conditional update**, decided on the affected row
  *    count, never a read-then-write, so two concurrent requests (a
- *    double-tapped 收货, two staff shipping the same order) cannot both win;
+ *    double-tapped 收货, two operators shipping the same order) cannot both win;
  *  - hooks run **inside** the caller's transaction and may only touch the
  *    database — anything that calls a third party records an effect instead
  *    (`docs/conventions.md`: "never inside the transaction");
@@ -194,7 +194,7 @@ class HookRegistry<E extends OrderEvent> {
 }
 
 /**
- * A shipment was dispatched: `shipOrder` (the console, the staff console) or
+ * A shipment was dispatched: `shipOrder` (the console) or
  * the automatic virtual delivery. `deliveryMode` and `allDelivered` are what
  * WeChat's 发货信息管理 needs to know about the parcel, frozen at the moment of
  * dispatch so a later shipment cannot rewrite what this one was.

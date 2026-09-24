@@ -158,4 +158,21 @@ describe('renderRoute', () => {
       ]),
     ).toThrow(/可通知的商城路由/);
   });
+
+  it('refuses at registration a web link on a customer event — NOTIF-006', () => {
+    expect(() =>
+      registerNotificationEvents([
+        {
+          code: 'test_user_link',
+          name: '测试',
+          description: '测试',
+          audience: 'user',
+          variables: [],
+          channels: ['inApp'],
+          defaults: { title: 't', body: 'b' },
+          link: '/orders/1',
+        },
+      ]),
+    ).toThrow(/用 route 而不是 link/);
+  });
 });

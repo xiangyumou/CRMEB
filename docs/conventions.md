@@ -12,7 +12,6 @@ them. [contributing.md](contributing.md) has the merge checklist.
 apps/web             Next.js App Router: admin UI, /admin-api/*, /api/v1/*
 apps/worker          BullMQ worker and repeatable jobs
 apps/mini            the WeChat mini-program (Taro 4, React 18)
-apps/uni-app         the legacy mobile client, removed at the cutover (npm, outside the workspace)
 packages/contracts   route contracts (zod) → OpenAPI; the single source of truth
 packages/core        domain logic; kernel/ holds shared primitives
 packages/db          Drizzle schema, migrations, reference seeds
@@ -176,14 +175,6 @@ tools enforce there:
   in `dist/weapp`.
 - The weapp package has a size budget (`pnpm --filter @shop/mini size`), and the tab bar points
   only at the main package.
-
-## The uni-app (legacy, removed at the cutover)
-
-`apps/uni-app` still ships until [the cutover](mini/cutover.md) deletes it; change it only to keep
-it working. Its pages read the field names its view models have always used; the API layer
-(`api/*.js`) calls `/api/v1`, and the pure functions in `api/mappers/<domain>.js` translate each
-response into those field names. Change a page only where the meaning of a field changed. The
-`uniapp` guard checks that every call in `api/` resolves to a registered route.
 
 ## Out of scope
 

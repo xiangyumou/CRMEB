@@ -46,8 +46,8 @@ export { wechatConfig, type WechatConfig } from './wechat.config';
 /** 公众号 / 小程序 sign-in availability, exported for tests. */
 export { wechatMiniLoginUsable, wechatOaLoginUsable } from './wechat.site-auth';
 
-/** `GET /api/v1/wechat/mini-qrcodes` — 小程序码, generated once and cached. */
-export { miniCodeUrl, SCENE_MAX_BYTES, shareMiniCodeUrl } from './wechat.mini-code.service';
+/** `GET /api/v1/share/mini-codes` — 小程序码, generated once and cached. */
+export { shareMiniCodeUrl } from './wechat.mini-code.service';
 
 /** Read-only; the writes belong to sign-in in the user domain. */
 export { findOpenid } from './wechat.repo';
@@ -162,7 +162,7 @@ export {
  * Wires the domain into the platform; called once per process from the gen'd
  * bootstrap, like `registerPaymentDomain()`.
  *
- * `GET /api/v1/site/config` tells the app which WeChat sign-in to offer.
+ * `GET /api/v1/app/config` tells the app which WeChat sign-in to offer.
  * Announced from here, not read from there: `system` may not import `wechat`.
  * Not run at import, because this module is reached from inside `system`'s own
  * import graph (via `payment`) before `system` has finished evaluating. A

@@ -268,9 +268,9 @@ export async function moveSubtree(
 }
 
 /**
- * A cheap version token for the storefront tree.
+ * A cheap version token for the storefront tree (its `version` and `ETag`).
  *
- * The uni-app caches the tree and refetches only when this moves. It is derived
+ * A client refetches only when this moves. It is derived
  * rather than a key an operator has to remember to bump: newest update plus row
  * count, so any insert, edit or delete changes it and nothing has to be
  * maintained.
@@ -1038,27 +1038,6 @@ export async function listVisibleSkus(db: DbOrTx, productId: number): Promise<Sk
 export async function findSku(db: DbOrTx, id: number): Promise<SkuRow | null> {
   const rows = await db.select().from(productSkus).where(eq(productSkus.id, id)).limit(1);
   return rows[0] ?? null;
-}
-
-/**
- * One product's SKUs with `FOR UPDATE`, in ascending id order.
- *
- * The staff 修改价格/库存 editor writes several rows from one screen and then
- * rolls the product up, so the rows have to agree — `docs/conventions.md`'s
- * "use `lockRow` when several rows must agree". Ordering by id is what keeps
- * two operators editing overlapping rows from deadlocking each other, and
- * holding the lock is what makes a concurrent `reserve` queue behind the edit
- * and decrement the new number instead of racing it. The stock decrement itself
- * is still the single conditional statement in `decStock`; this lock only
- * serialises the roll-up.
- */
-export async function lockSkusOfProduct(tx: Tx, productId: number): Promise<SkuRow[]> {
-  return tx
-    .select()
-    .from(productSkus)
-    .where(eq(productSkus.productId, productId))
-    .orderBy(asc(productSkus.id))
-    .for('update');
 }
 
 export async function findSkuByCode(db: DbOrTx, skuCode: string): Promise<SkuRow | null> {

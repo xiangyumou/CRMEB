@@ -308,16 +308,16 @@ export interface ConsoleOperator {
 }
 
 /**
- * The same console action is reachable from the web admin and from the mobile
- * staff console, and the timeline has to say which. `operator_kind` already
- * distinguishes them, so one helper serves both surfaces and there is no second
- * copy of 备注/改价/修改地址 for the phone to drift away from the web's.
+ * Who the timeline names for a console action. Every route that reaches these
+ * services today is `auth: 'admin'`; the `user` branch is what the mobile staff
+ * console (deleted at the cutover) came in through, kept because `operator_kind`
+ * still distinguishes the two and the historic log rows carry both.
  */
 export function operatorOf(ctx: Ctx): ConsoleOperator {
   if (ctx.actor.kind === 'admin') {
     return { operatorKind: 'admin', operatorAdminId: requireAdminId(ctx) };
   }
-  if (ctx.actor.kind === 'staff' || ctx.actor.kind === 'user') {
+  if (ctx.actor.kind === 'user') {
     return { operatorKind: 'user', operatorUserId: requireActorId(ctx) };
   }
   throw new DomainError('UNAUTHENTICATED');

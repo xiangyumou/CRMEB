@@ -6,7 +6,6 @@ import { installFulfilmentHooks } from './order.fulfil.effects';
 import { orderFacts } from './order.facts.repo';
 import * as orderRepo from './order.repo';
 import { orderStateMachine } from './order.state-machine';
-import { installStaffCheck } from './order.staff.service';
 import { registerOrderFacts, registerOrderStateMachine } from './ports';
 
 /**
@@ -40,8 +39,7 @@ import { registerOrderFacts, registerOrderStateMachine } from './ports';
  * `@shop/core/domains` looks for): the state machine the payment, refund,
  * fulfilment and kind-handler code reach through `getOrderStateMachine()`; the
  * `OrderFactsPort` the catalog asks about purchases and reviewable lines; the
- * staff check `auth: 'staff'` fails closed without; the `UserOrderStatsPort`
- * the staff 用户 screen's 累计订单 / 累计消费 need; and the order-paid hooks —
+ * `UserOrderStatsPort` for 累计订单 / 累计消费; and the order-paid hooks —
  * the stock commit that turns the reservation into a sale, then auto-delivery —
  * that have to be installed before the first payment lands. Importing the
  * domain calls it once; a test that `resetOrderPorts()` calls it again.
@@ -56,7 +54,6 @@ import { registerOrderFacts, registerOrderStateMachine } from './ports';
 export function registerOrderDomain(): void {
   registerOrderStateMachine(orderStateMachine);
   registerOrderFacts(orderFacts);
-  installStaffCheck();
   registerUserOrderStatsPort({
     statsFor: (db, userIds) => orderRepo.statsForUsers(db, userIds),
   });
@@ -106,11 +103,11 @@ export type {
 } from './catalog.port';
 
 // ---------------------------------------------------------------------------
-// fulfilment, the admin console, invoices, the staff console
+// fulfilment, the admin console, invoices
 // ---------------------------------------------------------------------------
 
 export { orderPermissions } from './permissions';
-export { orderFulfilConfig, orderStaffConfig } from './order.fulfil.config';
+export { orderFulfilConfig } from './order.fulfil.config';
 
 export {
   adminShip,
@@ -140,7 +137,6 @@ export type {
 
 export * as orderConsole from './order.console.service';
 export * as orderInvoices from './order.invoice.service';
-export * as orderStaff from './order.staff.service';
 
 // `installFulfilmentHooks` is re-exported for the reason it exists at all: a
 // test in another domain that calls `resetOrderPorts()` clears the order-paid
@@ -148,16 +144,14 @@ export * as orderStaff from './order.staff.service';
 // reach it through this file.
 export { autoDeliver, installFulfilmentHooks } from './order.fulfil.effects';
 
-/** The seams fulfilment needs from other domains (logistics, refund, notification). */
+/** The seams fulfilment needs from other domains (logistics, notification). */
 export {
   registerFulfilmentNotifier,
   registerLogisticsPort,
-  registerStaffRefundPort,
   registerWechatReceiptVerifier,
   resetFulfilmentPorts,
   resolveFulfilmentNotifier,
   resolveLogisticsPort,
-  resolveStaffRefundPort,
   resolveWechatReceiptVerifier,
 } from './order.fulfil.ports';
 export type {
@@ -166,7 +160,6 @@ export type {
   FulfilmentNoticeShipment,
   FulfilmentNotifier,
   LogisticsPort,
-  StaffRefundPort,
   TrackingResult,
   TrackingTrace,
   WechatReceiptVerdict,

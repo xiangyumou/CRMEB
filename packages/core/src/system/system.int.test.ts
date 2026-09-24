@@ -37,7 +37,7 @@ import { fakeSmsSender, registerSmsSender, resetSmsSender } from '../sms';
 import { dashboardHeader } from './dashboard';
 import './index';
 // Side-effect import: the same bootstrap `handle()` performs on every request.
-// Without it no domain has registered anything — and `GET /api/v1/site/config`
+// Without it no domain has registered anything — and the site payload
 // reports the pay buttons that `registerPaymentDomain()` announced, so a test
 // that skipped this would be testing a process no deployment ever runs.
 import '../domains.gen';
@@ -628,7 +628,8 @@ describe('站点公开配置', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * `auth` on `GET /api/v1/site/config`: which sign-in methods the app may offer.
+ * `auth` on the site payload (and so on `GET /api/v1/app/config`): which
+ * sign-in methods the app may offer.
  * Each flag is raised by a probe its owner registers — `wechat` for the two
  * WeChat logins, `sms` for 手机号登录 — so this also proves the registrations
  * are really installed by `domains.gen`.

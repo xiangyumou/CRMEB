@@ -3,10 +3,9 @@ import { wechatMiniConfig, wechatOaConfig } from '../system';
 import { wechatConfig } from './wechat.config';
 
 /**
- * 公众号 and mini-program sign-in on `GET /api/v1/site/config`.
+ * 公众号 and mini-program sign-in on `GET /api/v1/app/config`.
  *
- * The app reads these as `wechat_status` / `wechat_auth_switch` and decides
- * where a signed-out shopper goes. A method is offered only when it can
+ * The app reads these to decide where a signed-out shopper goes. A method is offered only when it can
  * actually sign someone in:
  *
  * - the operator's 启用 switch (`wechat-oa.enabled` / `wechat-mini.enabled`),

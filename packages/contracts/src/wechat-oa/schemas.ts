@@ -446,9 +446,8 @@ export type JssdkConfigQuery = z.infer<typeof jssdkConfigQuery>;
 /**
  * The `wx.config` argument, with WeChat's own key spelling.
  *
- * `appId`, `timestamp`, `nonceStr` and `signature` are forwarded verbatim by
- * `apps/uni-app/libs/wechat.js`, so they keep their names for the same
- * reason the JSAPI pay parameters do.
+ * `appId`, `timestamp`, `nonceStr` and `signature` go to `wx.config` verbatim,
+ * so they keep WeChat's names for the same reason the JSAPI pay parameters do.
  */
 export const jssdkConfig = z.object({
   appId: z.string(),

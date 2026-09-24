@@ -291,8 +291,8 @@ describe('JSAPI pay params', () => {
     nonce: 'nonce0000000000000000000000000001',
   });
 
-  it('carries exactly the keys the uni-app adapter forwards', () => {
-    // The uni-app client's WeChat Pay hand-off test asserts this key set too.
+  it('carries exactly the keys wx.requestPayment takes', () => {
+    // `apps/mini/src/platform/runtime.tsx` forwards these to `Taro.requestPayment`.
     expect(Object.keys(params).sort()).toEqual(
       ['appId', 'nonceStr', 'package', 'paySign', 'signType', 'timeStamp'].sort(),
     );

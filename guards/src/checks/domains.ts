@@ -11,7 +11,7 @@ import { repoRoot } from '../lib/paths';
  * disagrees.
  *
  * esbuild removes a namespace import whose binding is never read
- * (`import * as diy from './diy/index'`), so under tsx and in the worker's tsup
+ * (`import * as cms from './cms/index'`), so under tsx and in the worker's tsup
  * bundle such a domain would silently not be installed — while Vitest (oxc) and
  * Next (SWC) keep it, so every test passes and the bundle is still wrong. The
  * generator therefore emits a bare side-effect import for every domain, and the

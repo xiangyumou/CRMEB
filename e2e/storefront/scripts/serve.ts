@@ -4,11 +4,12 @@
  *   1. PostgreSQL 17 + Redis 7 (Testcontainers), through `@shop/testing`'s own
  *      global setup — the same code the integration suite uses;
  *   2. a database cloned from that template;
- *   3. the fake WeChat Pay gateway and the control-plane bridge to it
+ *   3. the fake `api.weixin.qq.com` the server's mini-program sign-in calls,
+ *      the fake WeChat Pay gateway and the control-plane bridge to both
  *      (`src/gateway-control.ts`) — before the seed, because the seed writes
- *      `paymentConfig` pointed at the gateway's URL;
+ *      `paymentConfig` and `wechatConfig` pointed at them;
  *   4. the seed (`src/seed.ts`);
- *   5. the H5 build, if `dist/dev/h5` is stale (`src/h5.ts`);
+ *   5. the mini-program's "模拟小程序" H5 build, if it is stale (`src/h5.ts`);
  *   6. `next build`, if `web` has not been built yet, then `next start`;
  *   7. the worker (`tsx src/main.ts` in `apps/worker`) — journeys 2–4 need a
  *      real job actually processed, unlike the admin suite, which never runs
@@ -26,15 +27,10 @@
  * checkout's path (`src/stack-file.ts`), so a warm stack in one worktree is
  * invisible to the suite in another.
  *
- * Nothing here talks to a real WeChat, SMS or Aliyun endpoint. The fake
- * gateway is the only thing `paymentConfig`/`wechatConfig` ever point at.
+ * Nothing here talks to a real WeChat, SMS or Aliyun endpoint. The fakes are
+ * the only thing `paymentConfig`/`wechatConfig` ever point at.
  *
- * `SHOP_E2E_CLIENT=mini` (`src/stack-file.ts`) serves the Taro mini-program's
- * "模拟小程序" H5 build instead of the uni-app, and adds the fake
- * `api.weixin.qq.com` (`startFakeOaServer`) that the server's mini sign-in
- * calls, on its own ports, stack file and database.
- *
- * `SHOP_E2E_WECHAT_DEVICE=1` (mini only, never in the suite) turns on that
+ * `SHOP_E2E_WECHAT_DEVICE=1` (never in the suite) turns on the fake WeChat's
  * fake's device mode, so a real phone's `wx.login()` code signs in against
  * the fakes (docs/mini/device-check.md, backend B).
  * `SHOP_E2E_WECHAT_DEVICE_OPENID` / `SHOP_E2E_WECHAT_DEVICE_PHONE` pin the
@@ -47,7 +43,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { generateFakeWechatKeys, startFakeWechatGateway } from '@shop/testing';
-import { startFakeOaServer, type FakeDeviceMode, type FakeOaServer } from '@shop/testing/wechat';
+import { startFakeOaServer, type FakeDeviceMode } from '@shop/testing/wechat';
 import pg from 'pg';
 
 import { startEdge } from '../src/edge';
@@ -56,7 +52,6 @@ import { ensureH5Build, H5_DIST_DIR } from '../src/h5';
 import { seedE2E } from '../src/seed';
 import {
   BASE_URL,
-  CLIENT,
   EDGE_PORT,
   GATEWAY_PORT,
   STACK_FILE,
@@ -69,9 +64,7 @@ const HERE = import.meta.dirname;
 const NEXT_ROOT = path.resolve(HERE, '../../..');
 const WEB_DIR = path.join(NEXT_ROOT, 'apps/web');
 const WORKER_DIR = path.join(NEXT_ROOT, 'apps/worker');
-const E2E_DATABASE =
-  process.env.SHOP_E2E_DATABASE ??
-  (CLIENT === 'mini' ? 'shop_e2e_storefront_mini' : 'shop_e2e_storefront');
+const E2E_DATABASE = process.env.SHOP_E2E_DATABASE ?? 'shop_e2e_storefront';
 
 const children: ChildProcess[] = [];
 let stopTemplate: (() => Promise<void>) | undefined;
@@ -162,23 +155,20 @@ async function main(): Promise<void> {
 
   const uploadsDir = await mkdtemp(path.join(tmpdir(), 'shop-e2e-storefront-uploads-'));
 
-  // The mini-program suite signs in through the fake `api.weixin.qq.com`, and
-  // pays with the mini-program's app id: WeChat Pay charges a `wechat_mini`
-  // payment to the mini app, and the fake gateway refuses any other appid.
-  let wechat: FakeOaServer | undefined;
-  if (CLIENT === 'mini') {
-    log('starting fake api.weixin.qq.com …');
-    wechat = await startFakeOaServer({ deviceMode: deviceModeFromEnv() });
-    if (wechat.deviceMode !== false) {
-      log('fake api.weixin.qq.com in DEVICE MODE: any well-formed wx.login() code signs in');
-    }
-    closeWechat = wechat.close;
+  // The mini-program signs in through the fake `api.weixin.qq.com`, and pays
+  // with the mini-program's app id: WeChat Pay charges a `wechat_mini` payment
+  // to the mini app, and the fake gateway refuses any other appid.
+  log('starting fake api.weixin.qq.com …');
+  const wechat = await startFakeOaServer({ deviceMode: deviceModeFromEnv() });
+  if (wechat.deviceMode !== false) {
+    log('fake api.weixin.qq.com in DEVICE MODE: any well-formed wx.login() code signs in');
   }
+  closeWechat = wechat.close;
 
   log('starting fake WeChat Pay gateway …');
   const gateway = await startFakeWechatGateway({
     port: GATEWAY_PORT,
-    ...(wechat && { keys: { ...generateFakeWechatKeys(), appId: wechat.miniAppId } }),
+    keys: { ...generateFakeWechatKeys(), appId: wechat.miniAppId },
   });
   closeGateway = gateway.close;
   // The gateway settles a refund synchronously once approved, so the refund
@@ -197,9 +187,7 @@ async function main(): Promise<void> {
     gateway,
     gatewayApiUrl: gateway.url,
     baseUrl: BASE_URL,
-    ...(wechat && {
-      miniProgram: { appSecret: wechat.miniAppSecret, apiBaseUrl: wechat.url },
-    }),
+    miniProgram: { appSecret: wechat.miniAppSecret, apiBaseUrl: wechat.url },
   });
 
   log('h5 build …');
@@ -262,8 +250,7 @@ async function main(): Promise<void> {
     root: H5_DIST_DIR,
     uploadsDir,
     upstream: WEB_URL,
-    // Only the mini-program's emulation build has harness endpoints.
-    controlUpstream: CLIENT === 'mini' ? control.url : undefined,
+    controlUpstream: control.url,
   });
   closeEdge = edge.close;
 
@@ -271,8 +258,7 @@ async function main(): Promise<void> {
     databaseUrl,
     redisUrl,
     baseUrl: BASE_URL,
-    client: CLIENT,
-    wechatMiniAppId: wechat?.miniAppId ?? null,
+    wechatMiniAppId: wechat.miniAppId,
     uploadsDir,
     gatewayUrl: gateway.url,
     gatewayControlUrl: control.url,

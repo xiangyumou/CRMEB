@@ -519,7 +519,7 @@ export const orderDetailExample = {
 /**
  * The storefront's 我的订单 tabs. They are not `orders.status` values: 待收货
  * covers `shipped`, and 已完成 covers both `received` and `completed`, exactly
- * as the uni-app tab bar has always shown them.
+ * as the storefront's tab bar has always shown them.
  */
 export const orderListTab = z.enum([
   'all',

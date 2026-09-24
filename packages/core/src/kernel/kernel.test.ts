@@ -284,11 +284,11 @@ describe('Ctx', () => {
     expect(requireAdminId(admin)).toBe(9);
     expect(() => requireUserId(admin)).toThrow(DomainError);
 
-    const staff = createCtx({
+    const user = createCtx({
       ...base,
-      actor: { kind: 'staff', id: 3, permissions: [], isSuper: false },
+      actor: { kind: 'user', id: 3, permissions: [], isSuper: false },
     });
-    expect(requireUserId(staff)).toBe(3);
+    expect(requireUserId(user)).toBe(3);
   });
 
   it('as() swaps the actor and keeps everything else', () => {

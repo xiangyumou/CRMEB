@@ -1551,9 +1551,9 @@ describe('shopper notifications', () => {
     expect(opened).toMatchObject({ code: 'groupbuy_created', title: '开团成功' });
     expect(opened?.content).toContain('3 人成团，请在 2026-06-01 09:00 前邀请好友参团');
     expect(opened?.data).toMatchObject({
-      link: `/pages/activity/goods_combination_status/index?id=${leader.groupId}`,
       route: { route: 'groupbuyTeam', params: { id: String(leader.groupId) } },
     });
+    expect(opened?.data).not.toHaveProperty('link');
 
     const [joined] = await inbox(joinerId);
     expect(await inbox(joinerId)).toHaveLength(1);
@@ -1577,14 +1577,14 @@ describe('shopper notifications', () => {
             templateKey: 'OPENTM1',
             templateId: 'TPL_OA_GROUP_OK',
             fields: { first: '拼团成功', keyword1: '{{orderNo}}', keyword2: '{{activityTitle}}' },
+            // The only link a 公众号 message carries is the one the operator typed.
+            linkUrl: '/groupbuy/teams/{{groupId}}',
           },
           wechatMini: {
             enabled: true,
             templateKey: '1001',
             templateId: 'TPL_MINI_GROUP_OK',
             fields: { character_string1: '{{orderNo}}', thing2: '{{activityTitle}}' },
-            // Deprecated: the event's catalogue route decides the page.
-            page: 'pages/activity/goods_combination_status/index?id={{groupId}}',
           },
           sms: { enabled: true, templateCode: 'SMS_GROUP_OK' },
         },
@@ -1616,7 +1616,7 @@ describe('shopper notifications', () => {
       expect(oaSend?.body).toEqual({
         touser: `oa-openid-${index}`,
         template_id: 'TPL_OA_GROUP_OK',
-        url: `https://shop.example.test/pages/activity/goods_combination_status/index?id=${team.groupId}`,
+        url: `https://shop.example.test/groupbuy/teams/${team.groupId}`,
         data: {
           first: { value: '拼团成功' },
           keyword1: { value: orderNo },

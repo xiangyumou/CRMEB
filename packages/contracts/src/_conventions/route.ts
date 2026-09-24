@@ -5,11 +5,10 @@ import type { z } from 'zod';
  * - `public`        no credentials looked at
  * - `user`          storefront bearer session required
  * - `user-optional` storefront session attached when present, never required
- * - `staff`         storefront session whose user is an order-handling staff member
  * - `admin`         admin cookie session required; `permission` is mandatory
  * - `webhook`       third-party callback; the handler verifies the provider signature itself
  */
-export type AuthMode = 'public' | 'user' | 'user-optional' | 'staff' | 'admin' | 'webhook';
+export type AuthMode = 'public' | 'user' | 'user-optional' | 'admin' | 'webhook';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
