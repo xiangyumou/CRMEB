@@ -97,4 +97,22 @@ describe('h5-mp-emulation platform', () => {
       kind: 'cancelled',
     });
   });
+
+  it('confirms silently: no callback, only the app back in the foreground', async () => {
+    const target = { transactionId: '4200' };
+    const fetchMock = stubControl({ orderState: 3 });
+    window.localStorage.setItem(
+      EMULATION_STORAGE_KEY,
+      JSON.stringify({ openid: 'o_test', phone: '13900000001', receipt: 'confirm-silently' }),
+    );
+    const shown = vi.fn();
+    window.addEventListener('visibilitychange', shown);
+    let settled = false;
+    void emulationPlatform.openOrderConfirm(target).then(() => (settled = true));
+    await vi.waitFor(() => expect(shown).toHaveBeenCalledTimes(1));
+    window.removeEventListener('visibilitychange', shown);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/__e2e/mini/confirm-receipt');
+    await Promise.resolve();
+    expect(settled).toBe(false);
+  });
 });

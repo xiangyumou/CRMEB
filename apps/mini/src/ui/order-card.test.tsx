@@ -1,4 +1,4 @@
-import type { OrderListItem } from '@shop/contracts/order/schemas';
+import type { StorefrontOrderListItem } from '@shop/contracts/order/schemas';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { taroFake } from '@/test/taro-fake/taro';
@@ -24,9 +24,11 @@ const item = (id: string) => ({
   refundedQuantity: 0,
   shippedQuantity: 0,
   adjustments: [],
+  reviewed: false,
+  reviewable: false,
 });
 
-const order: OrderListItem = {
+const order: StorefrontOrderListItem = {
   id: '9001',
   orderNo: '202602011000000010123456',
   kind: 'normal',
@@ -44,14 +46,14 @@ const order: OrderListItem = {
   items: [item('1'), item('2'), item('3'), item('4')],
 };
 
-const keys = (o: Partial<OrderListItem>) =>
+const keys = (o: Partial<StorefrontOrderListItem>) =>
   orderActions({ ...order, ...o }).map((action) => action.key);
 /** Lines as the shopper's own reads carry them, one still to review. */
 const toReview = [
-  { ...item('1'), reviewed: true, reviewable: false },
-  { ...item('2'), reviewed: false, reviewable: true },
+  { ...item('1'), reviewed: true },
+  { ...item('2'), reviewable: true },
 ];
-const reviewed = [{ ...item('1'), reviewed: true, reviewable: false }];
+const reviewed = [{ ...item('1'), reviewed: true }];
 
 describe('orderActions', () => {
   it('gives each status its buttons, the primary one last', () => {

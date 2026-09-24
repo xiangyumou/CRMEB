@@ -51,8 +51,12 @@ export interface EmulatedWechatUser {
   subscribe?: 'accept' | 'reject' | undefined;
   /** What 导入微信地址 returns; `null` = the shopper cancels. Default: a fixed address. */
   address?: ChosenAddress | null | undefined;
-  /** How the 确认收货 component ends. Default `confirm`. */
-  receipt?: 'confirm' | 'cancel' | 'fail' | undefined;
+  /**
+   * How the 确认收货 component ends. Default `confirm`. `confirm-silently`: confirmed in
+   * WeChat, but its callback never reaches the app, which only sees itself come back to the
+   * foreground (the C07 `onShow` fallback).
+   */
+  receipt?: 'confirm' | 'cancel' | 'fail' | 'confirm-silently' | undefined;
   /**
    * What 从微信导入 (`chooseInvoiceTitle`) returns, in WeChat's own shape; `null` = the shopper
    * cancels. Default: a fixed company title (`invoice-title.h5.ts`).
@@ -179,6 +183,11 @@ export const emulationPlatform: MiniPlatform = {
     if (behaviour === 'cancel') return { kind: 'cancelled' };
     if (behaviour === 'fail') return { kind: 'failed', message: 'openBusinessView:fail (模拟)' };
     await control('confirm-receipt', target);
+    if (behaviour === 'confirm-silently') {
+      // WeChat's page closes and the app is in the foreground again (Taro H5's onAppShow).
+      window.dispatchEvent(new Event('visibilitychange'));
+      return new Promise<never>(() => undefined);
+    }
     return { kind: 'confirmed' };
   },
 };

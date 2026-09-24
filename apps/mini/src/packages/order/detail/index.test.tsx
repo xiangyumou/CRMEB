@@ -187,4 +187,40 @@ describe('订单详情', () => {
     await screen.findByText('等待发货');
     expect(screen.queryByText('查看拼团')).toBeNull();
   });
+
+  it("re-reads the order when the shopper is back from WeChat's component without an answer", async () => {
+    taroFake.routerParams = { id: '9001' };
+    taroFake.businessViewStatus = 'hang';
+    const shipped = orderDetail({
+      status: 'shipped',
+      fulfillmentStatus: 'fulfilled',
+      shippedAt: '2026-02-02T09:00:00+08:00',
+    });
+    // WeChat told the server itself (trade_manage_order_settlement) while the app was away.
+    let reads = 0;
+    serveApi({
+      'GET /api/v1/orders/9001': () => {
+        reads += 1;
+        return { body: reads === 1 ? shipped : { ...shipped, status: 'received' } };
+      },
+      'GET /api/v1/orders/9001/shipments': () => ({ body: { items: [shipment('4001')] } }),
+      'GET /api/v1/orders/9001/wechat-receipt': () => ({
+        body: { receipt: { transactionId: '4200' } },
+      }),
+      'POST /api/v1/orders/9001/receipt': () => ({
+        status: 409,
+        body: { code: 'ORDER_NOT_RECEIVABLE', message: '订单当前无法确认收货' },
+      }),
+    });
+    await renderPage(<OrderDetailPage />);
+    fireEvent.click(await screen.findByRole('button', { name: '确认收货' }));
+    await waitFor(() =>
+      expect(taroFake.calls.map((call) => call.api)).toContain('openBusinessView'),
+    );
+
+    taroFake.showApp({});
+    await screen.findByText('已收货', undefined, { timeout: 4000 });
+    // Nothing went wrong from the shopper's side: no error toast.
+    expect(taroFake.calls.some((call) => call.api === 'showToast')).toBe(false);
+  });
 });

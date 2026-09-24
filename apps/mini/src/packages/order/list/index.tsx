@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View } from '@tarojs/components';
-import type { OrderListItem } from '@shop/contracts/order/schemas';
+import type { StorefrontOrderListItem } from '@shop/contracts/order/schemas';
 import { routeKey, useInfiniteRouteQuery, useRouteQuery } from '@shop/api-client/react';
 import { useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { navigate, scrollPageToTop, useRouteParams } from '@/platform';
@@ -72,7 +72,7 @@ function OrderList({ tab }: { tab: ShownTab }) {
 
   return (
     <View className="order-list">
-      <InfiniteList<OrderListItem>
+      <InfiniteList<StorefrontOrderListItem>
         query={list}
         itemKey={(order) => order.id}
         renderItem={(order) => (

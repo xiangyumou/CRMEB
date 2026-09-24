@@ -1,4 +1,4 @@
-import type { OrderListItem } from '@shop/contracts/order/schemas';
+import type { OrderListItem, StorefrontOrderItem } from '@shop/contracts/order/schemas';
 import type { ButtonVariant } from './button';
 
 /**
@@ -30,12 +30,12 @@ type OrderShape = Pick<OrderListItem, 'status' | 'refundStatus' | 'fulfillmentSt
    * The lines' review state (`storefrontOrderItem.reviewable`, ORDER-010): 去评价 and 待评价
    * only while some line can still be reviewed.
    */
-  items?: ReadonlyArray<{ reviewable?: boolean }> | undefined;
+  items: ReadonlyArray<Pick<StorefrontOrderItem, 'reviewable'>>;
 };
 
 /** Some line can be reviewed now (the order was received and the line has no review yet). */
-export function awaitsReview(order: OrderShape): boolean {
-  return (order.items ?? []).some((item) => item.reviewable === true);
+export function awaitsReview(order: Pick<OrderShape, 'items'>): boolean {
+  return order.items.some((item) => item.reviewable);
 }
 
 /** Left to right as shown; the last one is the primary action where there is one. */

@@ -1,4 +1,4 @@
-import type { OrderItem, OrderListItem } from '@shop/contracts/order/schemas';
+import type { OrderItem, StorefrontOrderListItem } from '@shop/contracts/order/schemas';
 import { Text, View } from '@tarojs/components';
 import { cx } from '@/lib/cx';
 import { orderPrices } from '@/lib/order-price';
@@ -59,8 +59,8 @@ export function OrderItemRow({
 }
 
 export interface OrderCardProps {
-  order: OrderListItem;
-  onAction: (key: OrderActionKey, order: OrderListItem) => void;
+  order: StorefrontOrderListItem;
+  onAction: (key: OrderActionKey, order: StorefrontOrderListItem) => void;
   /** Opens the order by default. */
   onClick?: (() => void) | undefined;
   /** Which action is in flight (its button spins). */

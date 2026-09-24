@@ -32,6 +32,11 @@ export interface EmulatedWechatUser {
   /** What the shopper does with the payment sheet. Default `pay`. */
   payment?: 'pay' | 'cancel' | 'fail';
   /**
+   * How WeChat's 确认收货 component ends. Default `confirm`; `confirm-silently` confirms but
+   * never calls back, the app only comes back to the foreground.
+   */
+  receipt?: 'confirm' | 'cancel' | 'fail' | 'confirm-silently';
+  /**
    * What 从微信导入 (`chooseInvoiceTitle`) hands over, in WeChat's shape (`type` '0' is a
    * company, '1' a person); `null` = the shopper cancels. Default: a fixed company title.
    */
