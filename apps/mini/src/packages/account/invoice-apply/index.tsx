@@ -44,7 +44,7 @@ export default function InvoiceApplyPage() {
           <Apply orderId={orderId} />
         </LoginGate>
       ) : (
-        <Empty title="订单不存在" />
+        <Empty image="order" title="没有找到这个订单" />
       )}
     </PageShell>
   );

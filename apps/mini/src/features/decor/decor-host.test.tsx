@@ -134,9 +134,10 @@ describe('DecorPage host (decor.md §2.4)', () => {
       fireEvent.click(ticket());
 
       await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+      // Worded as 领券中心 words it.
       expect(taroFake.calls).toContainEqual({
         api: 'showToast',
-        args: expect.objectContaining({ title: '优惠券已领完' }),
+        args: expect.objectContaining({ title: '来晚了，券已抢光' }),
       });
     });
 

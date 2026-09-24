@@ -393,7 +393,7 @@ test('注销账号 files the request and signs the shopper out', async ({
   expect(request).toEqual({ status: 'pending', reason: '不再使用' });
 
   // 我的 is a guest's again.
-  await shown(page).getByText('返回首页', { exact: true }).click();
+  await shown(page).getByText('回到首页', { exact: true }).click();
   await openFresh(page, miniRoute('pages/me/index'));
   await expect(shown(page).getByText('登录 / 注册', { exact: true })).toBeVisible();
 

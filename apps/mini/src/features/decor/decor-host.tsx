@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, type ReactNode } from 'react';
 import type { StorefrontRoute } from '@shop/api-client/routes';
 import type { BlockHost, BlockIntent } from '@shop/storefront-blocks';
-import { useClaimCoupon } from '@/features/coupon/use-claim';
+import { claimFailureText, useClaimCoupon } from '@/features/coupon/use-claim';
 import { serverNow } from '@/lib/server-clock';
 import { callPhone, officialAccountBar } from '@/platform';
 import { requireLogin, useSignedIn } from '@/session/session';
@@ -91,7 +91,7 @@ export function useDecorHost(route: StorefrontRoute, reload: () => unknown): Dec
               { params: { id: intent.templateId } },
               {
                 onSuccess: () => toast.success('领取成功'),
-                onError: (error) => toast.text(error.message),
+                onError: (error) => toast.text(claimFailureText(error)),
                 onSettled: () => {
                   claiming.current = false;
                   void reload();

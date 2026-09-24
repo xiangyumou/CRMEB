@@ -48,7 +48,7 @@ export default function CancellationPage() {
           description="已为你退出登录。审核通过前，重新登录后可在「设置 - 注销账号」撤回申请。"
           actions={
             <Button variant="outline" onClick={() => void navigate({ route: 'home', params: {} })}>
-              返回首页
+              回到首页
             </Button>
           }
         />

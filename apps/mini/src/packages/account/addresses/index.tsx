@@ -69,7 +69,7 @@ function AddressBook() {
     setImporting(true);
     try {
       await create.mutateAsync({ body: addressBody({ ...draft, region: draft.region }) });
-      toast.success('已导入');
+      toast.success('已导入微信地址');
     } catch (error) {
       toast.text(errorMessage(error));
     } finally {

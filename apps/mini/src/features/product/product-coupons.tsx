@@ -3,7 +3,7 @@ import { Text, View } from '@tarojs/components';
 import type { ResponseOf } from '@shop/api-client';
 import type { StorefrontRoute } from '@shop/api-client/routes';
 import { useRouteQuery } from '@shop/api-client/react';
-import { useClaimCoupon } from '@/features/coupon/use-claim';
+import { claimFailureText, useClaimCoupon } from '@/features/coupon/use-claim';
 import { requireLogin, useSignedIn } from '@/session/session';
 import { Cell } from '@/ui/cell';
 import { CouponCard, couponValidity, type CouponCardState } from '@/ui/coupon-card';
@@ -66,7 +66,7 @@ export function ProductCoupons({
       { params: { id: coupon.templateId } },
       {
         onSuccess: () => toast.success('领取成功'),
-        onError: (error) => toast.text(error.message),
+        onError: (error) => toast.text(claimFailureText(error)),
         onSettled: () => setClaiming(null),
       },
     );

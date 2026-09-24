@@ -48,6 +48,15 @@ login return, guest browsing, copy). Updated at every commit.
    interval at zero, never starts one for a deadline already past, and re-arms on a new
    `endsAt`. Tests in `countdown.test.tsx`.
 
+7. **Copy.**
+   - A refused claim reads the same everywhere: 商品详情 领券 and the decor 优惠券 block now word
+     it as 领券中心 does (`claimFailureText` in `features/coupon/use-claim.ts`, over
+     `claimErrorText`).
+   - 收货地址 导入微信地址 toasts 「已导入微信地址」, as 确认订单 does (旧 「已导入」).
+   - 申请开票 with an unknown order: 「没有找到这个订单」, as the order pages say (旧 「订单不存在」).
+   - 注销账号 result: 「回到首页」, as the error states and 建设中 say (旧 「返回首页」); the
+     `account.spec.ts` step follows.
+
 ## In progress
 
 - The rest of the review.
@@ -68,6 +77,11 @@ login return, guest browsing, copy). Updated at every commit.
 - 确认订单: back from adding the first address, the address is there (旧 「请先添加收货地址」
   for up to 30 s).
 - 搜索: the history includes the last search (旧 up to 30 s behind).
+- 商品详情 领券 / 装修页 优惠券 block, a refused claim: 「来晚了，券已抢光」, 「已达领取上限」,
+  「不在领取时间内」, 「这张券暂不可领取」 as on 领券中心 (旧 the server's words, e.g.
+  「该优惠券已被领完」, 「您已领取过该优惠券」).
+- 收货地址: 「已导入微信地址」 (旧 「已导入」). 申请开票: 「没有找到这个订单」 (旧 「订单不存在」).
+  注销账号 result: 「回到首页」 (旧 「返回首页」).
 
 ## Backend gaps
 
@@ -79,4 +93,4 @@ login return, guest browsing, copy). Updated at every commit.
 
 ## Tests for the orchestrator to run
 
-- None so far (unit tests only, run here).
+- `e2e/storefront/specs-mini/account.spec.ts` (the 注销 journey clicks 「回到首页」 now).

@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Text, View } from '@tarojs/components';
-import { isApiError } from '@shop/api-client';
 import { useInfiniteRouteQuery, useInvalidateRoutes, useRouteQuery } from '@shop/api-client/react';
 import {
   claimCardState,
-  claimErrorText,
   claimState,
   heldText,
   type ClaimableCoupon,
 } from '@/features/coupon/claim-state';
-import { useClaimCoupon } from '@/features/coupon/use-claim';
+import { claimFailureText, useClaimCoupon } from '@/features/coupon/use-claim';
 import { navigate, useShare } from '@/platform';
 import { requireLogin, useSignedIn } from '@/session/session';
 import { Button } from '@/ui/button';
@@ -57,7 +55,7 @@ export default function CouponCenterPage() {
       {
         onSuccess: () => toast.success('领取成功'),
         onError: (error) => {
-          toast.text(claimErrorText(isApiError(error) ? error.code : undefined, error.message));
+          toast.text(claimFailureText(error));
           void invalidate('coupon.claimableList');
         },
         onSettled: () => setClaiming(null),
