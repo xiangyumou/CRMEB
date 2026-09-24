@@ -372,6 +372,18 @@ describe('Video', () => {
     rerender(<Video props={fixtureVideo} host={{ canvas: true }} />);
     expect(container.querySelector('video')).toBeNull();
   });
+
+  it('resolves the video and poster URLs through the host, never asking for a copy', () => {
+    const resolveImage = vi.fn((src: string, width?: number) =>
+      width ? `https://api.test${src}@${width}` : `https://api.test${src}`,
+    );
+    const props = { ...fixtureVideo, src: '/uploads/intro.mp4', poster: '/uploads/poster.jpg' };
+    const { container } = render(<Video props={props} host={{ resolveImage }} />);
+    const video = container.querySelector('video');
+    expect(video?.getAttribute('src')).toBe('https://api.test/uploads/intro.mp4');
+    expect(video?.getAttribute('poster')).toBe('https://api.test/uploads/poster.jpg');
+    expect(resolveImage.mock.calls.every(([, width]) => width === undefined)).toBe(true);
+  });
 });
 
 describe('FloatingContact', () => {

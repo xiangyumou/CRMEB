@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View } from '@tarojs/components';
 import type { StorefrontOrderListItem } from '@shop/contracts/order/schemas';
 import { routeKey, useInfiniteRouteQuery, useRouteQuery } from '@shop/api-client/react';
-import { useRefetchOnShow } from '@/data/use-refetch-on-show';
+import { LIST_FULL_RELOAD_AFTER_MS, useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { navigate, scrollPageToTop, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
@@ -67,7 +67,10 @@ function OrderList({ tab }: { tab: ShownTab }) {
     { query: { tab, pageSize: 10 } },
     { enabled: signedIn },
   );
-  useRefetchOnShow(routeKey('order.list'), { pages: 'first' });
+  useRefetchOnShow(routeKey('order.list'), {
+    pages: 'first',
+    allPagesAfter: LIST_FULL_RELOAD_AFTER_MS,
+  });
   const actions = useOrderActions();
 
   return (

@@ -39,7 +39,7 @@ function Cells({
             <BlockImage
               className={cx(styles.icon, props.iconShape === 'circle' && styles.circle)}
               src={item.icon}
-              width={360}
+              width={480}
               resolve={resolveImage}
               mode="aspectFill"
             />

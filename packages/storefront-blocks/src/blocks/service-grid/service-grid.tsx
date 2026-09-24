@@ -1,7 +1,8 @@
-import { Image, Text, View } from '@tarojs/components';
+import { Text, View } from '@tarojs/components';
 import type { ReactNode } from 'react';
 
 import type { ServiceGridItem, ServiceGridProps } from '@shop/contracts/decor/all-blocks';
+import { BlockImage } from '../shared/block-image';
 import { cx, tapProps } from '../shared/css';
 import { BlockFrame } from '../shared/frame';
 import type { BlockIntent, BlockProps } from '../shared/types';
@@ -14,18 +15,26 @@ const CONTACT: BlockIntent = { kind: 'contact' };
  * asking the host for the `contact` intent. The block never opens 客服
  * itself: in WeChat that takes a native `<button open-type="contact">`,
  * which the host supplies through `renderIntent`; without one the tap is
- * reported through `onIntent`.
+ * reported through `onIntent`. A custom icon loads through the host's
+ * `resolveImage` (its 480 px copy where one exists).
  */
 export function ServiceGrid({
   props,
   onLink,
   onIntent,
   renderIntent,
+  host,
 }: BlockProps<ServiceGridProps>) {
   const face = (item: ServiceGridItem): ReactNode => (
     <>
       {item.icon ? (
-        <Image className={styles.icon} src={item.icon} mode="aspectFit" />
+        <BlockImage
+          className={styles.icon}
+          src={item.icon}
+          width={480}
+          resolve={host?.resolveImage}
+          mode="aspectFit"
+        />
       ) : (
         <View className={styles.glyph}>{[...item.label][0]}</View>
       )}

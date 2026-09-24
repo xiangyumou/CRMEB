@@ -54,7 +54,7 @@ export function CampaignCards({
             <BlockImage
               className={styles.image}
               src={card.imageUrl}
-              width={360}
+              width={480}
               resolve={resolveImage}
               mode="aspectFill"
               lazyLoad

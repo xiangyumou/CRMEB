@@ -564,7 +564,7 @@ async function storeFile(ctx: Ctx, args: StoreArgs): Promise<UploadResult> {
 export const GENERATE_IMAGE_VARIANTS_JOB = 'storage.generateImageVariants';
 
 /**
- * Asks the worker for the 360 / 750 px variants of a freshly stored picture.
+ * Asks the worker for the 480 / 960 px variants of a freshly stored picture.
  * Fail soft: a queue that is down costs the thumbnails (the client falls back
  * to the original, and the backfill can fill them in later), never the upload.
  */
@@ -759,7 +759,7 @@ export async function userUpload(
 export async function isStoredImageUrl(ctx: Ctx, url: string): Promise<boolean> {
   if (url.length === 0 || url.length > 2048) return false;
   if (await repo.liveImageUrlExists(ctx.db, url)) return true;
-  // A thumbnail (`….w360.jpg`) is ours exactly when its original is.
+  // A thumbnail (`….w480.jpg`) is ours exactly when its original is.
   const original = originalImageUrl(url);
   return original !== null && repo.liveImageUrlExists(ctx.db, original);
 }

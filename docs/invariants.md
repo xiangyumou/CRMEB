@@ -416,7 +416,7 @@ The export is one row per SKU, reports truncation honestly rather than silently 
 
 ### CAT-018
 
-A shopper's review pictures must each be a live image our own storage holds — what `POST /api/v1/uploads` returned, or a library image — the same rule as the avatar (USER-019). A link to another server is refused with `CATALOG_REVIEW_IMAGE_NOT_ALLOWED` before anything is checked or written: a review is public, and a foreign picture could change after WeChat checked it or log every shopper who opens the product. One of that image's thumbnails (`….w360.jpg`, `….w750.jpg`, derived by name) counts as the image, the same for REFUND-014 and USER-019, which share the check (`isStoredImageUrl`).
+A shopper's review pictures must each be a live image our own storage holds — what `POST /api/v1/uploads` returned, or a library image — the same rule as the avatar (USER-019). A link to another server is refused with `CATALOG_REVIEW_IMAGE_NOT_ALLOWED` before anything is checked or written: a review is public, and a foreign picture could change after WeChat checked it or log every shopper who opens the product. One of that image's thumbnails (`….w480.jpg`, `….w960.jpg`, derived by name) counts as the image, the same for REFUND-014 and USER-019, which share the check (`isStoredImageUrl`).
 
 - `packages/core/src/catalog/catalog.int.test.ts::reviews > CAT-018 — review pictures come from our own storage > takes a picture our uploads stored`
 - `packages/core/src/catalog/catalog.int.test.ts::reviews > CAT-018 — review pictures come from our own storage > refuses a link to somebody else’s server, and writes nothing`

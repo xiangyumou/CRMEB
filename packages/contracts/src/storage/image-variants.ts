@@ -3,7 +3,7 @@
  * instead of the original.
  *
  * The naming is deterministic, so **nothing in the API carries a variant URL**:
- * the server stores `…/<32 hex>.w360.jpg` next to `…/<32 hex>.jpg`, and the
+ * the server stores `…/<32 hex>.w480.jpg` next to `…/<32 hex>.jpg`, and the
  * client derives one from the other. A variant is written only for a key the
  * server generated itself (`<directory>/<yyyy>/<mm>/<32 hex>.<ext>`, see
  * `buildStorageKey` in `core/src/kernel/storage.ts`), and only for the formats
@@ -18,8 +18,12 @@
  * Zod-free (no imports), so the mini-program can call it at run time.
  */
 
-/** The widths generated, in CSS pixels × device ratio (a 750-wide design). */
-export const IMAGE_VARIANT_WIDTHS = [360, 750] as const;
+/**
+ * The widths generated, in device pixels: 480 covers up to a third of a phone
+ * screen at 3× (a list row, a three-column cell), 960 a half at 3× (a
+ * two-column card) or the full width at about 2.5× (a banner).
+ */
+export const IMAGE_VARIANT_WIDTHS = [480, 960] as const;
 export type ImageVariantWidth = (typeof IMAGE_VARIANT_WIDTHS)[number];
 
 const EXTENSIONS = 'jpg|jpeg|png|webp';
@@ -40,7 +44,7 @@ export function hasImageVariants(key: string): boolean {
   return STORED_KEY.test(key);
 }
 
-/** `product/2026/02/ab…cd.jpg` → `product/2026/02/ab…cd.w360.jpg`; `null` for any other key. */
+/** `product/2026/02/ab…cd.jpg` → `product/2026/02/ab…cd.w480.jpg`; `null` for any other key. */
 export function imageVariantKey(key: string, width: ImageVariantWidth): string | null {
   if (!isVariantWidth(width)) return null;
   const match = STORED_KEY.exec(key);

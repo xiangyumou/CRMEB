@@ -23,11 +23,11 @@ function variantsOf(outcome: RenderOutcome) {
 }
 
 describe('renderImageVariants', () => {
-  it('resizes a large JPEG to 360 and 750 wide, keeping its aspect and format', async () => {
+  it('resizes a large JPEG to 480 and 960 wide, keeping its aspect and format', async () => {
     const original = await photo(1600, 1000);
     const variants = variantsOf(await renderImageVariants(original, 'image/jpeg'));
 
-    expect(variants.map((v) => v.width)).toEqual([360, 750]);
+    expect(variants.map((v) => v.width)).toEqual([480, 960]);
     for (const variant of variants) {
       const meta = await sharp(variant.body).metadata();
       expect(variant.copied).toBe(false);
@@ -52,21 +52,32 @@ describe('renderImageVariants', () => {
     const original = await photo(1200, 600, 6);
     const [small] = variantsOf(await renderImageVariants(original, 'image/jpeg'));
     const meta = await sharp(small!.body).metadata();
-    expect(meta.width).toBe(360);
-    expect(meta.height).toBe(720);
+    expect(meta.width).toBe(480);
+    expect(meta.height).toBe(960);
     expect(meta.orientation ?? 1).toBe(1);
   });
 
   it('keeps a PNG a PNG, transparency included', async () => {
-    const raw = Buffer.alloc(900 * 900 * 4);
-    for (let i = 0; i < raw.length; i += 1) raw[i] = i % 4 === 3 ? 128 : (i * 40503) >>> 8;
-    const original = await sharp(raw, { raw: { width: 900, height: 900, channels: 4 } })
+    // A half-transparent gradient: resampled noise would compress worse than
+    // the original and be stored as a copy, which is not what this checks.
+    const size = 900;
+    const raw = Buffer.alloc(size * size * 4);
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const at = (y * size + x) * 4;
+        raw[at] = (x * 255) / size;
+        raw[at + 1] = (y * 255) / size;
+        raw[at + 2] = ((x + y) * 255) / (2 * size);
+        raw[at + 3] = 128;
+      }
+    }
+    const original = await sharp(raw, { raw: { width: size, height: size, channels: 4 } })
       .png()
       .toBuffer();
     const [small] = variantsOf(await renderImageVariants(original, 'image/png'));
     const meta = await sharp(small!.body).metadata();
     expect(meta.format).toBe('png');
-    expect(meta.width).toBe(360);
+    expect(meta.width).toBe(480);
     expect(meta.channels).toBe(4);
   });
 

@@ -43,7 +43,7 @@ describe('Image', () => {
     const upload = `/uploads/product/2026/09/${HASH}.jpg`;
     const { container } = render(<Image src={upload} size="small" />);
     const img = () => container.querySelector('img');
-    expect(img()?.getAttribute('src')).toBe(upload.replace(/\.jpg$/, '.w360.jpg'));
+    expect(img()?.getAttribute('src')).toBe(upload.replace(/\.jpg$/, '.w480.jpg'));
 
     fireEvent.error(img() as HTMLImageElement);
     expect(img()?.getAttribute('src')).toBe(upload);
@@ -67,7 +67,7 @@ describe('Image', () => {
     expect(container.querySelector('img')?.getAttribute('src')).toBe(upload);
     rerender(<Image src={upload} size="medium" />);
     expect(container.querySelector('img')?.getAttribute('src')).toBe(
-      upload.replace(/\.png$/, '.w750.png'),
+      upload.replace(/\.png$/, '.w960.png'),
     );
   });
 

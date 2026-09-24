@@ -1,10 +1,14 @@
 import type { ReactNode } from 'react';
 import { QueryClientProvider, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { testQueryClient } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
-import { useRefetchOnShow, type RefetchOnShowOptions } from './use-refetch-on-show';
+import {
+  LIST_FULL_RELOAD_AFTER_MS,
+  useRefetchOnShow,
+  type RefetchOnShowOptions,
+} from './use-refetch-on-show';
 
 function setup(staleTime: number, options: RefetchOnShowOptions = {}) {
   let fetches = 0;
@@ -76,7 +80,7 @@ describe('useRefetchOnShow', () => {
 
 describe('useRefetchOnShow, pages: first', () => {
   /** A list of 3 pages of 2; each fetch of a page says which round it was (`p1#2`). */
-  function setupList(staleTime: number) {
+  function setupList(staleTime: number, options: RefetchOnShowOptions = { pages: 'first' }) {
     const asked: number[] = [];
     const rounds = new Map<number, number>();
     // When set, the next fetch waits for it (after taking its round number).
@@ -87,7 +91,7 @@ describe('useRefetchOnShow, pages: first', () => {
     );
     const hook = renderHook(
       () => {
-        useRefetchOnShow(['orders'], { pages: 'first' });
+        useRefetchOnShow(['orders'], options);
         return useInfiniteQuery({
           queryKey: ['orders', {}, 'infinite'],
           initialPageParam: 1,
@@ -176,5 +180,57 @@ describe('useRefetchOnShow, pages: first', () => {
     // The older page 1 (round 2) is not put over the newer copy.
     const cached = client.getQueryData<{ pages: Array<{ items: string[] }> }>(query.queryKey);
     expect(cached?.pages.flatMap((page) => page.items)).toEqual(['p1#3', 'p2#2', 'p3#2']);
+  });
+
+  describe('allPagesAfter (away long enough)', () => {
+    const LONG = { pages: 'first', allPagesAfter: LIST_FULL_RELOAD_AFTER_MS } as const;
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** Hides the page, lets `ms` pass on the clock, and shows it again. */
+    function away(ms: number) {
+      act(() => taroFake.hidePage());
+      vi.setSystemTime(Date.now() + ms);
+      act(() => taroFake.showPage());
+    }
+
+    it('fetches every page again, from page 1, after 5 minutes away', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      const { hook, asked, items } = setupList(0, LONG);
+      await scrollToEnd(hook);
+
+      away(LIST_FULL_RELOAD_AFTER_MS);
+      await waitFor(() => expect(items()).toEqual(['p1#2', 'p2#2', 'p3#2']));
+      expect(asked).toEqual([1, 2, 3, 1, 2, 3]);
+    });
+
+    it('fetches only page 1 after a shorter trip', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      const { hook, asked, items } = setupList(0, LONG);
+      await scrollToEnd(hook);
+
+      away(LIST_FULL_RELOAD_AFTER_MS - 1000);
+      await waitFor(() => expect(items()).toEqual(['p1#2', 'p2#1', 'p3#1']));
+      expect(asked).toEqual([1, 2, 3, 1]);
+
+      // Measured per trip: the time before this hide does not count towards the next one.
+      away(LIST_FULL_RELOAD_AFTER_MS - 1000);
+      await waitFor(() => expect(items()).toEqual(['p1#3', 'p2#1', 'p3#1']));
+      expect(asked).toEqual([1, 2, 3, 1, 1]);
+    });
+
+    it('still leaves a list alone that is fresh when the shopper comes back', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      const { hook, asked } = setupList(2 * LIST_FULL_RELOAD_AFTER_MS, LONG);
+      await scrollToEnd(hook);
+
+      away(LIST_FULL_RELOAD_AFTER_MS);
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(asked).toEqual([1, 2, 3]);
+    });
   });
 });

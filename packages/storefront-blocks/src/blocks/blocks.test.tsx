@@ -116,7 +116,7 @@ describe('Carousel lazy slides', () => {
 });
 
 describe('Block pictures', () => {
-  const resolveImage = (src: string, width?: 360 | 750) =>
+  const resolveImage = (src: string, width?: 480 | 960) =>
     width ? `https://api.test${src}@${width}` : `https://api.test${src}`;
 
   it('load the copy the host resolves, and the original when the copy fails', () => {
@@ -124,7 +124,7 @@ describe('Block pictures', () => {
       <HotspotImage props={{ ...fixtureHotspotImage, image: '/h.jpg' }} host={{ resolveImage }} />,
     );
     const img = () => container.querySelector('img') as HTMLImageElement;
-    expect(img().getAttribute('src')).toBe('https://api.test/h.jpg@750');
+    expect(img().getAttribute('src')).toBe('https://api.test/h.jpg@960');
     act(() => {
       fireEvent.error(img());
     });
@@ -145,9 +145,9 @@ describe('Block pictures', () => {
     );
     const sources = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src'));
     expect(sources).toEqual([
-      'https://api.test/r0.jpg@360',
-      'https://api.test/r1.jpg@360',
-      'https://api.test/r2.jpg@360',
+      'https://api.test/r0.jpg@480',
+      'https://api.test/r1.jpg@480',
+      'https://api.test/r2.jpg@480',
     ]);
   });
 

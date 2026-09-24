@@ -697,7 +697,7 @@ async function storageKeyOf(attachmentId: string): Promise<string> {
   return row!.key;
 }
 
-const variantKey = (key: string, width: 360 | 750) => key.replace(/\.(\w+)$/, `.w${width}.$1`);
+const variantKey = (key: string, width: 480 | 960) => key.replace(/\.(\w+)$/, `.w${width}.$1`);
 
 describe('image variants', () => {
   it('a new image upload asks the worker for its thumbnails, after commit, once', async () => {
@@ -716,14 +716,14 @@ describe('image variants', () => {
     ]);
   });
 
-  it('writes a 360 and a 750 px copy next to the original, and is idempotent', async () => {
+  it('writes a 480 and a 960 px copy next to the original, and is idempotent', async () => {
     const ctx = as(adminActor(adminId));
     const uploaded = await attachmentUpload(ctx, { directory: 'product' }, await jpeg(1200, 800));
     const key = await storageKeyOf(uploaded.attachment.id);
 
     const report = await generateImageVariants(ctx, { attachmentId: uploaded.attachment.id });
-    expect(report.written).toEqual([360, 750]);
-    for (const width of [360, 750] as const) {
+    expect(report.written).toEqual([480, 960]);
+    for (const width of [480, 960] as const) {
       const meta = await sharp(await harness.ctx.storage.get(variantKey(key, width))).metadata();
       expect(meta.width).toBe(width);
       expect(meta.format).toBe('jpeg');
@@ -740,13 +740,13 @@ describe('image variants', () => {
   it('fails soft: bytes it cannot decode leave the upload as it was, with no thumbnail', async () => {
     const ctx = as(adminActor(adminId));
     // A PNG header with nothing behind it: the sniffer accepts it, libvips cannot decode it.
-    const uploaded = await attachmentUpload(ctx, { directory: 'product' }, png(750, 390));
+    const uploaded = await attachmentUpload(ctx, { directory: 'product' }, png(960, 390));
     const key = await storageKeyOf(uploaded.attachment.id);
 
     const report = await generateImageVariants(ctx, { attachmentId: uploaded.attachment.id });
     expect(report).toMatchObject({ written: [], skipped: 'failed' });
     expect(await harness.ctx.storage.exists(key)).toBe(true);
-    expect(await harness.ctx.storage.exists(variantKey(key, 360))).toBe(false);
+    expect(await harness.ctx.storage.exists(variantKey(key, 480))).toBe(false);
   });
 
   it('CAT-018 — a thumbnail of a live image counts as ours, a thumbnail of anything else does not', async () => {
@@ -754,17 +754,19 @@ describe('image variants', () => {
     const uploaded = await attachmentUpload(ctx, { directory: 'review' }, await jpeg(900, 900));
     const url = uploaded.attachment.url;
 
-    expect(await isStoredImageUrl(ctx, url.replace(/\.jpg$/, '.w360.jpg'))).toBe(true);
+    expect(await isStoredImageUrl(ctx, url.replace(/\.jpg$/, '.w480.jpg'))).toBe(true);
     expect(await isStoredImageUrl(ctx, url.replace(/\.jpg$/, '.w500.jpg'))).toBe(false);
+    // The widths before X2 (360 / 750) were never live; their names are nobody's thumbnail.
+    expect(await isStoredImageUrl(ctx, url.replace(/\.jpg$/, '.w360.jpg'))).toBe(false);
     expect(
       await isStoredImageUrl(
         ctx,
-        '/uploads/review/2026/09/ffffffffffffffffffffffffffffffff.w360.jpg',
+        '/uploads/review/2026/09/ffffffffffffffffffffffffffffffff.w480.jpg',
       ),
     ).toBe(false);
 
     await attachmentDeleteMany(ctx, { ids: [uploaded.attachment.id] });
-    expect(await isStoredImageUrl(ctx, url.replace(/\.jpg$/, '.w360.jpg'))).toBe(false);
+    expect(await isStoredImageUrl(ctx, url.replace(/\.jpg$/, '.w480.jpg'))).toBe(false);
   });
 
   it('the orphan sweep removes the thumbnails with their original', async () => {
@@ -776,7 +778,7 @@ describe('image variants', () => {
 
     harness.clock.set('2026-10-05T08:00:00.000Z');
     expect(await cleanOrphanAttachments(ctx)).toMatchObject({ removed: 1, failed: 0 });
-    for (const gone of [key, variantKey(key, 360), variantKey(key, 750)]) {
+    for (const gone of [key, variantKey(key, 480), variantKey(key, 960)]) {
       expect(await harness.ctx.storage.exists(gone)).toBe(false);
     }
   });
@@ -804,7 +806,7 @@ describe('image variants', () => {
     });
 
     const deletedKey = await storageKeyOf(ids[1]!);
-    expect(await harness.ctx.storage.exists(variantKey(deletedKey, 360))).toBe(false);
+    expect(await harness.ctx.storage.exists(variantKey(deletedKey, 480))).toBe(false);
     // Run again over everything: nothing left to write.
     expect(await backfillImageVariants(ctx, { limit: 10 })).toMatchObject({
       examined: 2,

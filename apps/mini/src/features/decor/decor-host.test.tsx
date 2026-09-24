@@ -8,6 +8,7 @@ import {
   fixtureHotspotImage,
   fixtureNewcomerCoupon,
   fixtureNewUserCoupons,
+  fixtureServiceGrid,
   fixtureVideo,
 } from '@shop/storefront-blocks/fixtures';
 import { useAppConfigStore, type AppConfig } from '@/app-config';
@@ -325,7 +326,7 @@ describe('DecorPage host (decor.md §2.4)', () => {
       expect(screen.getByTestId('native-video')).toBeTruthy();
     });
 
-    it("loads a block picture's 750 px copy, and the original when the copy is missing", async () => {
+    it("loads a block picture's 960 px copy, and the original when the copy is missing", async () => {
       const upload = `/uploads/decor/2026/09/${HASH}.jpg`;
       await draw(
         pageOf([
@@ -340,7 +341,28 @@ describe('DecorPage host (decor.md §2.4)', () => {
       );
       const img = () =>
         document.querySelector('[data-block="hotspotImage"] img') as HTMLImageElement;
-      expect(img().getAttribute('src')).toBe(upload.replace(/\.jpg$/, '.w750.jpg'));
+      expect(img().getAttribute('src')).toBe(upload.replace(/\.jpg$/, '.w960.jpg'));
+      fireEvent.error(img());
+      expect(img().getAttribute('src')).toBe(upload);
+    });
+
+    it("loads a custom 服务宫格 icon's 480 px copy, and the original when the copy is missing", async () => {
+      const upload = `/uploads/decor/2026/09/${HASH}.png`;
+      const items = [{ ...fixtureServiceGrid.items[0]!, icon: upload }];
+      await draw(
+        pageOf([
+          {
+            id: 'b-service',
+            type: 'serviceGrid',
+            v: 1,
+            props: { ...fixtureServiceGrid, items },
+            data: {},
+          },
+        ]),
+      );
+      const img = () =>
+        document.querySelector('[data-block="serviceGrid"] img') as HTMLImageElement;
+      expect(img().getAttribute('src')).toBe(upload.replace(/\.png$/, '.w480.png'));
       fireEvent.error(img());
       expect(img().getAttribute('src')).toBe(upload);
     });

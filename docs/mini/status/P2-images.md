@@ -2,7 +2,9 @@
 
 分支 `storefront/mini-P2-images`（自 `storefront/mini` @ 925a2250c）。两件事：
 
-1. 上传时生成 360 / 750 px 缩略图，列表、宫格、卡片用缩略图；
+> X2（`storefront/mini-X2-mini-images`）把缩略图宽度从 360 / 750 改为 480 / 960，下文已同步。服务宫格、订单入口的自定义图标和视频地址也已由 X2 接入 `resolveImage`（见 Pending）。
+
+1. 上传时生成 480 / 960 px 缩略图，列表、宫格、卡片用缩略图；
 2. 装修组件的图片懒加载。
 
 ## Done
@@ -10,7 +12,7 @@
 ### 1. 缩略图：命名规则（`@shop/contracts/storage/image-variants`）
 
 - 服务端生成的原图键：`<dir>/<yyyy>/<mm>/<32 位十六进制>.(jpg|jpeg|png|webp)`。
-- 缩略图就放在原图旁边：`<hash>.w360.<ext>`、`<hash>.w750.<ext>`。
+- 缩略图就放在原图旁边：`<hash>.w480.<ext>`、`<hash>.w960.<ext>`。
 - 客户端按原图 URL 自己推出缩略图 URL（`imageVariantUrl`），所以：
   - **不改任何接口或契约**，也不加字段、不查表；
   - 缩略图加载失败（老图还没补、生成失败、CDN 没同步）时，自动退回原图。原图也失败才显示占位。
@@ -79,7 +81,7 @@
 
 ### 5. 小程序：用哪一档
 
-- `apps/mini/src/lib/asset-url.ts` 新增 `imageUrl(path, size)`，`size` 取 `small`（360）、`medium`（750）或 `original`。
+- `apps/mini/src/lib/asset-url.ts` 新增 `imageUrl(path, size)`，`size` 取 `small`（480）、`medium`（960）或 `original`。
 - 通用组件 `ui/image.tsx` 新增 `size` 属性，默认 `original`。加载顺序是：缩略图 → 失败退回原图 → 再失败显示占位。
 - `small`：
   - 订单卡片、购物车行、售后卡片、售后详情和申请页、物流、确认订单；
@@ -93,7 +95,7 @@
 
 ### 6. 装修组件：缩略图和懒加载（`packages/storefront-blocks`）
 
-- `BlockHost` 新增 `resolveImage?(src, width?: 360 | 750)`。新组件 `shared/block-image.tsx`（`BlockImage`）按 host 的解析结果加载图片，缩略图失败时退回原图。DOM 和 class 不变，盒子尺寸仍由组件自己的样式决定，不会产生布局位移。
+- `BlockHost` 新增 `resolveImage?(src, width?: 480 | 960)`。新组件 `shared/block-image.tsx`（`BlockImage`）按 host 的解析结果加载图片，缩略图失败时退回原图。DOM 和 class 不变，盒子尺寸仍由组件自己的样式决定，不会产生布局位移。
 - 小程序的 host（`features/decor/decor-host.tsx` 的 `resolveDecorImage`）做两件事：
   - 相对路径 `/uploads/…` 拼上 API 域名。**这是顺手修掉的旧问题**：以前装修图片原样渲染，local 驱动的相对路径在小程序里加载不出来；
   - 按宽度推出缩略图 URL。
@@ -102,15 +104,15 @@
 
 | 组件                   | 宽度                           | 懒加载                                                             |
 | ---------------------- | ------------------------------ | ------------------------------------------------------------------ |
-| 轮播                   | 750                            | 只挂载当前页及左右相邻页（环形）的图片，翻到后保留；画布上全部挂载 |
-| 图片魔方：格子布局     | 750                            | `lazy-load`（格子有固定高度）                                      |
-| 图片魔方：一行 2/3/4   | 2 张 750，3/4 张 360           | `lazy-load`                                                        |
-| 热区图                 | 750                            | `lazy-load`                                                        |
-| 商品列表 / 商品选项卡  | 两列 750，三列、列表、横滑 360 | 保持原来的 `lazy-load`                                             |
-| 拼团 / 预售列表        | 360                            | 保持原来的 `lazy-load`                                             |
-| 文章列表               | 大图 750，小图 360             | 保持原来的 `lazy-load`                                             |
-| 导航宫格图标           | 360                            | 不懒加载（通常在首屏）                                             |
-| 用户卡片背景、视频封面 | 750                            | 不懒加载                                                           |
+| 轮播                   | 960                            | 只挂载当前页及左右相邻页（环形）的图片，翻到后保留；画布上全部挂载 |
+| 图片魔方：格子布局     | 960                            | `lazy-load`（格子有固定高度）                                      |
+| 图片魔方：一行 2/3/4   | 2 张 960，3/4 张 480           | `lazy-load`                                                        |
+| 热区图                 | 960                            | `lazy-load`                                                        |
+| 商品列表 / 商品选项卡  | 两列 960，三列、列表、横滑 480 | 保持原来的 `lazy-load`                                             |
+| 拼团 / 预售列表        | 480                            | 保持原来的 `lazy-load`                                             |
+| 文章列表               | 大图 960，小图 480             | 保持原来的 `lazy-load`                                             |
+| 导航宫格图标           | 480                            | 不懒加载（通常在首屏）                                             |
+| 用户卡片背景、视频封面 | 960                            | 不懒加载                                                           |
 
 - 在画布上（`host.canvas`）不开 `lazy-load`：DOM 适配层会把它映射成 `loading="lazy"`，fidelity 截图可能截到还没加载的图。
 - 轮播为什么不用微信的 `lazy-load`：它按纵向距离判断，同一个 swiper 里所有页的高度都一样，所以不起作用。现在改为不渲染远处页的 `<image>`，slide 的盒子照样占位（swiper 高度由组件的 `height` 固定），不产生布局位移。
@@ -134,14 +136,14 @@
 
 ## Pending
 
-- 服务宫格、订单入口的**自定义图标**仍然原样渲染，没有经过 `resolveImage`。它们多是内置图标，运营上传的相对路径在小程序里同样加载不出来。改法很小：`host?.resolveImage?.(icon) ?? icon`。
-- 视频组件的 `src` 也没有经过解析：它不是图片，但是相对路径同样有问题。
+- （X2 已完成）服务宫格、订单入口的**自定义图标**仍然原样渲染，没有经过 `resolveImage`。它们多是内置图标，运营上传的相对路径在小程序里同样加载不出来。改法很小：`host?.resolveImage?.(icon) ?? icon`。
+- （X2 已完成）视频组件的 `src` 也没有经过解析：它不是图片，但是相对路径同样有问题。
 
 ## Page-form changes（旧→新）
 
 顾客看到的变化：
 
-- 列表、购物车、订单、售后、评价等处的商品图：旧为加载原图（常见 1–3 MB）→ 新为加载 360 / 750 px 缩略图（通常几十 KB），画面内容不变。
+- 列表、购物车、订单、售后、评价等处的商品图：旧为加载原图（常见 1–3 MB）→ 新为加载 480 / 960 px 缩略图（通常几十 KB），画面内容不变。
 - 老图还没补缩略图时：旧为原图 → 新为先请求缩略图（404）再换原图，多一次失败请求，最终显示一致。补完就没有这次请求了。
 - 首页轮播：旧为进页面时所有页的图一起下载 → 新为先下当前页和相邻页，其余翻到时再下。
 - 装修图片用相对路径（local 驱动）：旧为小程序里加载不出来（空白）→ 新为正常显示。
@@ -162,7 +164,7 @@
 
 ## Open questions
 
-- 宽度取 360 / 750 是否合适：750 对应 375pt 屏幕的 2 倍图，3 倍屏的两列卡片略软。需要的话可以改成 480 / 960，只需改 `IMAGE_VARIANT_WIDTHS` 并重新补生成。
+- 宽度取 360 / 750 是否合适：已由 X2 改为 480 / 960（`docs/mini/status/X2-mini-images.md`）。本文其余各处的宽度已同步改为 480 / 960。
 - 是否在 web 镜像里也允许生成（例如 worker 不在时同步兜底）。目前不做，生成只在 worker 里跑。
 - 老图补生成什么时候跑（建议低峰期，每批 50 张）。
 
@@ -170,7 +172,7 @@
 
 - `pnpm --filter @shop/core test:int -- src/storage/storage.int.test.ts`（新增 `describe('image variants')`，我没有运行）：
   - 提交后入队且只入队一次（去重命中和 PDF 不入队）；
-  - 写出 360 / 750 且幂等（`skipped: 'present'`）；
+  - 写出 480 / 960 且幂等（`skipped: 'present'`）；
   - 解不了码时软失败；
   - `CAT-018 — a thumbnail of a live image counts as ours, a thumbnail of anything else does not`；
   - 孤儿清理删掉缩略图；
@@ -179,7 +181,7 @@
 - `pnpm --filter @shop/e2e-storefront test:mini`：没改 spec。它覆盖首页装修和列表页的图片。
 - 部署演练：docker/ 没改，可以不跑。但是 worker 的依赖多了 sharp，建议在构建出的 worker 镜像里执行一次 `node -e "import('sharp').then(s=>console.log(s.default.versions))"`。
 - 真机检查：
-  - 新上传一张大图后，列表是否加载 `.w360` / `.w750`（在网络面板里看）；
+  - 新上传一张大图后，列表是否加载 `.w480` / `.w960`（在网络面板里看）；
   - 老图退回原图；
   - 轮播翻页时后面几页的图能及时出现；
   - iOS 和 Android 各看一次。

@@ -1,8 +1,9 @@
-import { Image, Text, View } from '@tarojs/components';
+import { Text, View } from '@tarojs/components';
 
 import type { OrderEntryProps } from '@shop/contracts/decor/all-blocks';
 import type { OrderEntryKey } from '@shop/contracts/decor/constants';
 import type { LinkTarget } from '@shop/contracts/decor/link';
+import { BlockImage } from '../shared/block-image';
 import { tapProps } from '../shared/css';
 import { BlockFrame } from '../shared/frame';
 import { ICONS } from '../shared/icons';
@@ -26,11 +27,14 @@ export function orderEntryLink(key: OrderEntryKey): LinkTarget {
 /**
  * 订单入口: 我的订单 with 全部订单, and a row of status entries, each with the
  * signed-in shopper's count as a badge (from `personal`; none for a guest).
+ * A custom icon loads through the host's `resolveImage` (its 480 px copy where
+ * one exists); the built-in ones are inline data and load as they are.
  */
 export function OrderEntry({
   props,
   personal,
   onLink,
+  host,
 }: BlockProps<OrderEntryProps, undefined, PersonalSlots>) {
   const counts = orderCountsIn(personal);
   const all: LinkTarget = { kind: 'route', to: { route: 'orderList', params: {} } };
@@ -53,9 +57,11 @@ export function OrderEntry({
               {...tapProps(onLink ? () => onLink(orderEntryLink(item.key)) : undefined)}
             >
               <View className={styles.iconBox}>
-                <Image
+                <BlockImage
                   className={styles.icon}
                   src={item.icon ?? ICONS[item.key]}
+                  width={480}
+                  resolve={item.icon ? host?.resolveImage : undefined}
                   mode="aspectFit"
                 />
                 {badge ? <Text className={styles.badge}>{badge}</Text> : null}

@@ -3,7 +3,7 @@ import { GENERATE_IMAGE_VARIANTS_JOB, generateImageVariants } from '@shop/core/s
 import { defineJob } from '../define-job';
 
 /**
- * Writes the 360 / 750 px thumbnails of one uploaded picture.
+ * Writes the 480 / 960 px thumbnails of one uploaded picture.
  *
  * Enqueued by every new image upload once its transaction has committed
  * (`storage.service.ts`). It runs here rather than in the request because

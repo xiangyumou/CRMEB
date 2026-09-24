@@ -62,7 +62,7 @@ export function Carousel({ props, onLink, host }: BlockProps<CarouselProps>) {
                 <BlockImage
                   className={styles.image}
                   src={slide.image}
-                  width={750}
+                  width={960}
                   resolve={host?.resolveImage}
                   mode="aspectFill"
                   ariaLabel={slide.alt || undefined}

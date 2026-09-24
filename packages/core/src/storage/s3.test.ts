@@ -134,8 +134,8 @@ describe('createS3Storage', () => {
     const storage = createS3Storage({ ...baseOptions, addressing: 'virtual', fetchImpl: impl });
     const original = 'product/2026/09/0123456789abcdef0123456789abcdef.jpg';
 
-    const key = await storage.putVariant(original, 360, new Uint8Array([1]), 'image/jpeg');
-    expect(key).toBe('product/2026/09/0123456789abcdef0123456789abcdef.w360.jpg');
+    const key = await storage.putVariant(original, 480, new Uint8Array([1]), 'image/jpeg');
+    expect(key).toBe('product/2026/09/0123456789abcdef0123456789abcdef.w480.jpg');
     expect(calls[0]).toMatchObject({
       method: 'PUT',
       url: `https://shop-assets.oss-cn-hangzhou.aliyuncs.com/${key}`,
@@ -144,10 +144,10 @@ describe('createS3Storage', () => {
 
     // A key the server never generated, or a width it does not make, is refused unsent.
     await expect(
-      storage.putVariant('../../etc/passwd', 360, new Uint8Array([1]), 'image/jpeg'),
+      storage.putVariant('../../etc/passwd', 480, new Uint8Array([1]), 'image/jpeg'),
     ).rejects.toThrow();
     await expect(
-      storage.putVariant(original, 500 as 360, new Uint8Array([1]), 'image/jpeg'),
+      storage.putVariant(original, 500 as 480, new Uint8Array([1]), 'image/jpeg'),
     ).rejects.toThrow();
     expect(calls).toHaveLength(1);
   });

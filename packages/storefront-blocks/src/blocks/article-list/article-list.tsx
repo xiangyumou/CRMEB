@@ -69,7 +69,7 @@ export function ArticleList({
                   <BlockImage
                     className={styles.cover}
                     src={article.coverImageUrl}
-                    width={750}
+                    width={960}
                     resolve={host?.resolveImage}
                     mode="aspectFill"
                     lazyLoad
@@ -86,7 +86,7 @@ export function ArticleList({
                   <BlockImage
                     className={styles.thumb}
                     src={article.coverImageUrl}
-                    width={360}
+                    width={480}
                     resolve={host?.resolveImage}
                     mode="aspectFill"
                     lazyLoad

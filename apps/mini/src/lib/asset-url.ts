@@ -18,16 +18,17 @@ export function assetUrl(path: string | null | undefined): string | null {
 /**
  * Which copy of an uploaded picture a spot loads (docs/mini/status/P2-images.md):
  *
- * - `small` (360 px wide): up to about a third of the screen — a cart, order or after-sale row, a
+ * - `small` (480 px wide): up to about a third of the screen at 3× — a cart, order or after-sale row, a
  *   three-column cell, a review thumbnail, an icon;
- * - `medium` (750 px): up to the full width at 2× — a two-column card, a banner;
+ * - `medium` (960 px): half the screen at 3×, the full width at about 2.5× — a two-column card, a
+ *   banner;
  * - `original`: where the picture is the point — the product gallery, a full-screen preview.
  */
 export type ImageSize = 'small' | 'medium' | 'original';
 
 export const IMAGE_SIZE_WIDTH: Record<Exclude<ImageSize, 'original'>, ImageVariantWidth> = {
-  small: 360,
-  medium: 750,
+  small: 480,
+  medium: 960,
 };
 
 /**

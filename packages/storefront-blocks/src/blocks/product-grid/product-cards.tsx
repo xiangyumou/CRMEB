@@ -49,7 +49,7 @@ export function ProductCards({
 }: ProductCardsProps) {
   if (products.length === 0) return <View className={styles.empty}>暂无商品</View>;
   // Half the screen wide in the two-column grid; a third or less elsewhere.
-  const imageWidth = layout === 'grid2' ? 750 : 360;
+  const imageWidth = layout === 'grid2' ? 960 : 480;
   const cards = products.map((product) => {
     const [yuan, fen] = splitPrice(product.price);
     return (
