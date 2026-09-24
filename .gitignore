@@ -21,10 +21,6 @@ test-results/
 *.gen.ts
 openapi.json
 
-# The uni-app's own build output
-/apps/uni-app/unpackage/
-/apps/uni-app/.hbuilderx/
-
 # Local agent tooling
 .codex/
 .zcode/

@@ -1,7 +1,5 @@
 packages:
   - apps/*
-  # The uni-app is an npm project of its own (the uni-app CLI needs its own tree).
-  - '!apps/uni-app'
   - packages/*
   - e2e/*
   - guards

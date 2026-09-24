@@ -17,6 +17,3 @@ apps/web/next-env.d.ts
 packages/contracts/src/diy/__fixtures__/
 packages/db/seed-data/
 packages/db/migrations/
-
-# The uni-app is its own npm project with its own (HBuilderX) formatting.
-apps/uni-app/
