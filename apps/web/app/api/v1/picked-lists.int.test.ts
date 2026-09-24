@@ -412,6 +412,36 @@ describe('GET /api/v1/groupbuy/activities?ids=', () => {
     expect(await idsOf(paged)).toEqual([last]);
   });
 
+  it('answers, with productId as well, the picked activities that are that product’s', async () => {
+    // 商品详情 asks by productId, a DIY component by ids; both at once is the
+    // intersection, in the picked order — never the product's whole list.
+    const productId = await product();
+    const mine = await groupbuyActivity({ productId: Number(productId) });
+    const other = await groupbuyActivity();
+    const alsoMine = await groupbuyActivity({ productId: Number(productId) });
+    await groupbuyActivity({ productId: Number(productId) }); // that product's, not picked
+
+    const { GET } = await import('./groupbuy/activities/route');
+    const both = await GET(
+      get(`/api/v1/groupbuy/activities?ids=${alsoMine},${other},${mine}&productId=${productId}`),
+    );
+    expect(both.status).toBe(200);
+    const body = (await both.json()) as { total: number };
+    expect(body.total).toBe(2);
+    expect(
+      await idsOf(
+        await GET(
+          get(
+            `/api/v1/groupbuy/activities?ids=${alsoMine},${other},${mine}&productId=${productId}`,
+          ),
+        ),
+      ),
+    ).toEqual([alsoMine, mine]);
+
+    const none = await GET(get(`/api/v1/groupbuy/activities?ids=${other}&productId=${productId}`));
+    expect(await idsOf(none)).toEqual([]);
+  });
+
   it('refuses more than 100 ids', async () => {
     const { GET } = await import('./groupbuy/activities/route');
     const response = await GET(get(`/api/v1/groupbuy/activities?ids=${tooMany}`));
@@ -434,6 +464,34 @@ describe('GET /api/v1/presale/activities?ids=', () => {
 
     const reversed = await GET(get(`/api/v1/presale/activities?ids=${last},${first}`));
     expect(await idsOf(reversed)).toEqual([last, first]);
+  });
+
+  it('answers, with productId as well, the picked activities that are that product’s', async () => {
+    // 商品详情 asks by productId, a DIY component by ids; both at once is the
+    // intersection, in the picked order — never the product's whole list.
+    const productId = await product();
+    const mine = await presaleActivity({ productId: Number(productId) });
+    const other = await presaleActivity();
+    const alsoMine = await presaleActivity({ productId: Number(productId) });
+    await presaleActivity({ productId: Number(productId) }); // that product's, not picked
+
+    const { GET } = await import('./presale/activities/route');
+    const both = await GET(
+      get(`/api/v1/presale/activities?ids=${alsoMine},${other},${mine}&productId=${productId}`),
+    );
+    expect(both.status).toBe(200);
+    const body = (await both.json()) as { total: number };
+    expect(body.total).toBe(2);
+    expect(
+      await idsOf(
+        await GET(
+          get(`/api/v1/presale/activities?ids=${alsoMine},${other},${mine}&productId=${productId}`),
+        ),
+      ),
+    ).toEqual([alsoMine, mine]);
+
+    const none = await GET(get(`/api/v1/presale/activities?ids=${other}&productId=${productId}`));
+    expect(await idsOf(none)).toEqual([]);
   });
 
   it('refuses more than 100 ids', async () => {

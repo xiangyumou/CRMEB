@@ -322,7 +322,9 @@ export const groupbuyListQuery = pageQuery.extend({
   /**
    * Exactly these activities, in this order — what a DIY 拼团 component's
    * 指定数据 saved. An activity the shopper cannot see now (paused, outside its
-   * window, deleted) is skipped, not an error.
+   * window, deleted) is skipped, not an error. With `productId` as well, the
+   * intersection: the picked activities that are that product's, still in the
+   * picked order.
    */
   ids: idList.optional(),
 });

@@ -200,7 +200,23 @@ export async function adminOrderList(
 // storefront
 // ---------------------------------------------------------------------------
 
+/**
+ * `GET /api/v1/presale/activities`: the 预售 channel list, or with `ids` a DIY
+ * 预售 component's 指定数据 — those activities in the order saved, the
+ * invisible skipped (`cardsFor`), then paged. `ids` and `productId` together
+ * are the intersection: the picked activities that are that product's.
+ */
 export async function list(ctx: Ctx, query: PresaleListQuery): Promise<Paged<PresaleCard>> {
+  if (query.ids !== undefined) {
+    const cards = await cardsFor(ctx, query.ids, { productId: query.productId });
+    const from = (query.page - 1) * query.pageSize;
+    return {
+      items: cards.slice(from, from + query.pageSize),
+      total: cards.length,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
+  }
   const now = ctx.clock.now();
   const { rows, total } = await repo.listActivities(ctx.db, {
     visibleAt: now,
@@ -224,13 +240,18 @@ export async function list(ctx: Ctx, query: PresaleListQuery): Promise<Paged<Pre
  * shopper could not see there is skipped here, as is a malformed or repeated
  * one. At most `DECOR_LIMITS.records` ids arrive, so one query answers it.
  */
-export async function cardsFor(ctx: Ctx, ids: readonly string[]): Promise<PresaleCard[]> {
+export async function cardsFor(
+  ctx: Ctx,
+  ids: readonly string[],
+  options: { productId?: string | undefined } = {},
+): Promise<PresaleCard[]> {
   const wanted = [...new Set(ids.filter((id) => /^[1-9]\d{0,14}$/.test(id)))].map(Number);
   if (wanted.length === 0) return [];
   const now = ctx.clock.now();
   const { rows } = await repo.listActivities(ctx.db, {
     visibleAt: now,
     ids: wanted,
+    productId: options.productId === undefined ? undefined : Number(options.productId),
     limit: wanted.length,
     offset: 0,
   });
