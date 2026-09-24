@@ -27,6 +27,9 @@ export interface SheetProps {
 /**
  * A bottom sheet (design.md §1.2: choices come up from the bottom). Slides in over a fading
  * mask; while open the page behind does not scroll. `aria-modal`, and the close button is named.
+ *
+ * Nothing inside it takes a touch until it has slid in: the tap that opened it must not land on
+ * what slides in under the finger (Android put the keyboard up for an input there).
  */
 export function Sheet({
   visible,
@@ -40,7 +43,7 @@ export function Sheet({
   className,
   children,
 }: SheetProps) {
-  const { mounted, shown } = usePresence(visible);
+  const { mounted, shown, settled } = usePresence(visible);
   if (!mounted) return null;
   return (
     <>
@@ -54,6 +57,7 @@ export function Sheet({
         className={cx(
           'shop-sheet',
           shown && 'shop-sheet--shown',
+          !settled && 'shop-sheet--entering',
           height === 'tall' && 'shop-sheet--tall',
           className,
         )}

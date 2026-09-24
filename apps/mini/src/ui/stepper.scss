@@ -31,6 +31,13 @@
     text-align: center;
   }
 
+  // The number before it is tapped: the same box as the input, centred.
+  &__value {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   &--disabled {
     opacity: 0.4;
   }

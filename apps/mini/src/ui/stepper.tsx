@@ -21,6 +21,10 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 /**
  * 减 · 数量 · 加 (design.md §4.3). The buttons disable at the limits; a typed number is
  * clamped when the input loses focus.
+ *
+ * The number is plain text until the shopper taps it; only then is it an input, focused. An
+ * input that is always there takes the tap that opened its sheet: on Android the tap on
+ * 立即购买 fell through to the stepper sliding in under the finger, and up came the keyboard.
  */
 export function Stepper({
   value,
@@ -32,10 +36,16 @@ export function Stepper({
 }: StepperProps) {
   const [draft, setDraft] = useState(String(value));
   const [shown, setShown] = useState(value);
+  const [editing, setEditing] = useState(false);
   if (shown !== value) {
     // The value changed from outside (a button, the server): show it.
     setShown(value);
     setDraft(String(value));
+  }
+  if (editing && disabled) {
+    // Disabled mid-edit (a sold-out spec picked): back to text, or enabling it again would
+    // bring the keyboard back up on its own.
+    setEditing(false);
   }
   const atMin = disabled || value <= min;
   const atMax = disabled || value >= max;
@@ -50,20 +60,33 @@ export function Stepper({
       >
         <Icon name="minus" />
       </Pressable>
-      <Input
-        className="shop-stepper__input"
-        type="number"
-        value={draft}
-        disabled={disabled ?? false}
-        ariaLabel={label}
-        onInput={(event) => setDraft(event.detail.value)}
-        onBlur={(event) => {
-          const typed = Number.parseInt(event.detail.value, 10);
-          const next = Number.isNaN(typed) ? value : clamp(typed, min, max);
-          setDraft(String(next));
-          if (next !== value) onChange(next);
-        }}
-      />
+      {editing ? (
+        <Input
+          className="shop-stepper__input"
+          type="number"
+          focus
+          value={draft}
+          ariaLabel={label}
+          onInput={(event) => setDraft(event.detail.value)}
+          onBlur={(event) => {
+            const typed = Number.parseInt(event.detail.value, 10);
+            const next = Number.isNaN(typed) ? value : clamp(typed, min, max);
+            setDraft(String(next));
+            setEditing(false);
+            if (next !== value) onChange(next);
+          }}
+        />
+      ) : (
+        <Pressable
+          label={`${label} ${value}，点按输入`}
+          disabled={disabled}
+          pressedTint={false}
+          className="shop-stepper__input shop-stepper__value"
+          onClick={() => setEditing(true)}
+        >
+          {draft}
+        </Pressable>
+      )}
       <Pressable
         label={`增加${label}`}
         disabled={atMax}

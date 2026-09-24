@@ -36,6 +36,12 @@
     transition-duration: $duration-in;
   }
 
+  // Sliding in (or out): nothing inside takes a touch (see `Sheet`). The sheet itself still
+  // does, so a quick tap on it does not reach the mask and close it.
+  &--entering > * {
+    pointer-events: none;
+  }
+
   &--tall {
     height: 75vh;
   }
