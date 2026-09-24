@@ -36,3 +36,6 @@ private.*.key
 
 # WeChat mini-program code-upload key (miniprogram-ci); never commit it
 private.*.key
+
+# Claude Code local state (worktrees, settings)
+.claude/
