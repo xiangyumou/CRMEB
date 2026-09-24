@@ -3,7 +3,9 @@
 
 // The built-in icon set: 24 × 24 line icons (2 px stroke, round joins), drawn as a CSS mask so
 // an icon takes `currentColor` like text. Each icon is one class; the SVG travels in the
-// stylesheet once, not in every `setData`.
+// stylesheet once, not in every `setData`. The class only sets `--shop-icon`, and `.shop-icon`
+// hands it to both mask properties: the data URL is written once, not once per prefix (it is
+// most of this file's weight, in the main package).
 
 $stroke: "fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'";
 $solid: "fill='black' fill-rule='evenodd'";
@@ -96,18 +98,18 @@ $fill: (
   mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
+  -webkit-mask-image: var(--shop-icon);
+  mask-image: var(--shop-icon);
 }
 
 @each $name, $d in $line {
   .shop-icon--#{$name} {
-    -webkit-mask-image: svg($d, $stroke);
-    mask-image: svg($d, $stroke);
+    --shop-icon: #{svg($d, $stroke)};
   }
 }
 
 @each $name, $d in $fill {
   .shop-icon--#{$name} {
-    -webkit-mask-image: svg($d, $solid);
-    mask-image: svg($d, $solid);
+    --shop-icon: #{svg($d, $solid)};
   }
 }
