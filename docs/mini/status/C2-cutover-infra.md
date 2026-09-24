@@ -86,6 +86,5 @@ YAML 解析、以及一次临时 nginx 容器（`nginx:alpine` 1.31）里的 `ng
 
 2. 和 C1 合并之后，合并清单里的 `pnpm --filter @shop/e2e-storefront test`（即小程序 e2e）和
    `pnpm --filter @shop/mini build`（体积门禁），按 cutover 第 1 节第 2 步，一次、不并行。
-3. CI 期望（push 到 `master` 之后）：没有 `storefront e2e (playwright, H5)` 任务；`storefront e2e (playwright,
-mini-program emulation)` 的任务 id 是 `storefront-e2e`；`images` 摘要只有 `deploy/ship.sh <commit>` 和三个摘要，
-   没有「storefront in the edge image」。若仓库设置里的必需检查列了旧任务名，要在 GitHub 上同步调整。
+3. CI 期望（push 到 `master` 之后）：没有显示名为「storefront e2e (playwright, H5)」的任务；小程序 e2e 的任务 id
+   是 `storefront-e2e`；`images` 摘要只有 `deploy/ship.sh <commit>` 和三个摘要，没有「storefront in the edge image」。若仓库设置里的必需检查列了旧任务名，要在 GitHub 上同步调整。
