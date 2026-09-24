@@ -52,6 +52,8 @@
 
 **本地复查（2026-09-24，P1、P2、C1、C2 合入之后，即切换代码已完成）：** turbo 45/45（size-report ok）；test:int core 1422、web 248、worker 6、testing 9（删了 diy / 店员的测试，所以变少）；prettier、check:examples（392）、guards（15 项 0 失败；api-compat 对 release 1.0.0 0 破坏）通过；后台 e2e 46/46；storefront e2e（现在就是小程序）46/46；`drill.sh --only edge/` 2/2；演练构建的 worker 镜像里 `sharp` 能加载。全量演练没跑。
 
+**本地复查（2026-09-24，X1、X2、X3 收尾合入之后）：** turbo 45/45（size-report ok）；test:int core 1418、web 248、worker 6、testing 9；prettier、check:examples（392）、guards（15 项 0 失败，api-compat 0 破坏）通过；后台 e2e 46/46；小程序 e2e 46/46；`drill.sh --only edge/` 2/2（含 favicon、robots.txt）。迁移到 0009，`EXPECTED_MIGRATIONS=10`。`master` 没有新提交，`storefront/mini` 领先 385 个。小程序上传密钥在集成目录根部（已 gitignore，`private.*.key`）。
+
 ## 4. 接下来要做的
 
 1. **本地跑一次全套检查**（`docs/contributing.md` 的合并清单），重点是云端没跑的：旧 uni-app 的 storefront e2e、后台 e2e（`master` 并进来的 `fd66e30` 改了后台表单的 422 显示，`55d8796` 删了 uni-app 的 flyio），以及登录页修复之后的全套 `test:mini`。
@@ -119,7 +121,7 @@
 - **生产：** 主机 `ubuntu@43.142.105.205` 默认只读。超出只读的操作、拉生产数据、任何推送到 `master`、开 PR，都要先问用户。
 - **机密：** 不打印 `eb_system_config` 的任何密钥值。仓库、日志、截图里不能出现生产数据或真实凭据。
   - 小程序 AppSecret 用户在聊天里贴过，**绝不存储、复述或提交**；已建议用户重置。
-  - 代码上传密钥用户还没给。以后给的话，只能是仓库外的一个路径，每次预览或上传都要单独批准。
+  - 代码上传密钥：用户放在 `/home/xiangyu/Projects/CRMEB-mini/private.wx4f4b772125e155ed.key`（已 gitignore），上传白名单已关。不读、不打印内容；每次预览或上传都要单独批准。
 - **外部接口：** 开发和测试只用 `@shop/testing` 的假实现，不调用真实的微信、短信、阿里云接口。
 - **不要碰：** 主目录 `/home/xiangyu/Projects/CRMEB`（用户在里面修后端 bug）。
   - 之前 G1 误写的 6 个草稿文件已于 2026-09-24 按用户同意删除。
