@@ -62,12 +62,10 @@
 
     // Two buttons share what the icons leave: they shrink (no min-content floor) and keep a
     // narrower padding, so 「加入购物车」「立即购买」 fit a 375 px phone with three icons.
-    > * {
+    // No `> *`: WXSS rejects the universal selector and the upload fails (scripts/wxss-check.mjs).
+    > .shop-btn {
       flex: 1;
       min-width: 0;
-    }
-
-    > .shop-btn {
       padding-left: $space-3;
       padding-right: $space-3;
     }

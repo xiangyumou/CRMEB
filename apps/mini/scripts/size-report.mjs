@@ -19,6 +19,7 @@
  *   a test fixture or test tooling, or an admin route (`/admin-api`, `*.admin*` route ids);
  * - a module in the main package is reached only from sub-package pages (Taro moves those into
  *   the sub-packages; one left in the main package costs every cold start);
+ * - any stylesheet has a universal selector (`*`; WeChat's WXSS compiler rejects it);
  * - any script contains `new Function(` or `eval(` (WeChat's JSCore on iOS refuses them, and
  *   the review team flags dynamic code);
  * - any script does not parse as ES2018, the target in babel.config.js (the WeChat runtime
@@ -237,6 +238,22 @@ for (const file of files.filter((candidate) => candidate.rel.endsWith('.js'))) {
     failures.push(
       `${file.rel}: not ES2018 (${message}): …${context}… (add the dependency to compile.include)`,
     );
+  }
+}
+
+// --- WXSS the WeChat compiler accepts ------------------------------------------------------
+// WeChat's WXSS compiler rejects the universal selector (`*`, e.g. `> *`) and the upload fails
+// with -80056; the H5 emulation and the simulator accept it, so nothing earlier catches it.
+// Only selectors are checked: the text before each `{` (a `*` in a declaration is `calc()`).
+const UNIVERSAL_SELECTOR = /(^|[\s,>+~(])\*(?=$|[\s,>+~.:#[{)])/;
+for (const file of files.filter((candidate) => candidate.rel.endsWith('.wxss'))) {
+  const source = fs
+    .readFileSync(path.join(dist, file.rel), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const match of source.matchAll(/([^{};]*)\{/g)) {
+    const selector = match[1].trim();
+    if (UNIVERSAL_SELECTOR.test(selector))
+      failures.push(`${file.rel}: universal selector "${selector}" (WXSS rejects \`*\`)`);
   }
 }
 
