@@ -110,6 +110,11 @@ const SAME_NAME_NOT_SECRET: ReadonlyArray<{ route: string; path: string; is: str
   { route: 'auth.register', path: 'token', is: 'the storefront session token' },
   { route: 'auth.smsLogin', path: 'token', is: 'the storefront session token' },
   { route: 'storage.scanTokenCreate', path: 'token', is: 'the single-use 扫码上传 code' },
+  {
+    route: 'auth.apiTokenCreate',
+    path: 'token',
+    is: 'the new API token, shown to its own admin once and stored only as a hash',
+  },
 ];
 
 function isBooleanish(node: z.ZodType): boolean {

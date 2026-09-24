@@ -32,6 +32,8 @@ export interface Actor {
   sessionId?: string;
   /** Login name / nickname, only for the audit log. */
   display?: string;
+  /** Set when an admin acts through an API token (agent, CLI) instead of the console. */
+  apiTokenId?: number;
 }
 
 export const anonymousActor: Actor = Object.freeze({

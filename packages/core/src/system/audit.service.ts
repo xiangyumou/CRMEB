@@ -50,6 +50,8 @@ export async function auditLogList(
       payload: row.payload,
       requestId: row.requestId,
       ip: row.ip,
+      apiTokenId: toIdOrNull(row.apiTokenId),
+      apiTokenName: row.apiTokenName,
       createdAt: row.createdAt.toISOString(),
     })),
     total,

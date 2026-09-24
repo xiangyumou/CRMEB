@@ -110,6 +110,7 @@ describe('RBAC', () => {
     // An account with an empty role must still reach its own profile and
     // password, or the first login is a dead end.
     expect([...IMPLICIT_ADMIN_PERMISSIONS].sort()).toEqual([
+      'auth:api-token:self',
       'auth:profile:read',
       'auth:profile:update',
       'auth:session:delete',
@@ -153,6 +154,7 @@ describe('RBAC', () => {
   it('effectivePermissions unions the implicit atoms and sorts', () => {
     expect(effectivePermissions(['z:z:z', 'a:a:a'])).toEqual([
       'a:a:a',
+      'auth:api-token:self',
       'auth:profile:read',
       'auth:profile:update',
       'auth:session:delete',

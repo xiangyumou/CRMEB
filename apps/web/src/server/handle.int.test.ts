@@ -191,6 +191,7 @@ describe('the admin auth routes', () => {
     );
     expect(profile.status).toBe(200);
     expect((await profile.json()).permissions).toEqual([
+      'auth:api-token:self',
       'auth:profile:read',
       'auth:profile:update',
       'auth:session:delete',

@@ -1,5 +1,12 @@
 import type { DbOrTx, Tx } from '@shop/db';
-import { adminRoles, admins, auditLogs, rolePermissions, roles } from '@shop/db/schema/auth';
+import {
+  adminApiTokens,
+  adminRoles,
+  admins,
+  auditLogs,
+  rolePermissions,
+  roles,
+} from '@shop/db/schema/auth';
 import { configValues } from '@shop/db/schema/system';
 import {
   and,
@@ -7,6 +14,7 @@ import {
   count,
   desc,
   eq,
+  getTableColumns,
   gte,
   ilike,
   inArray,
@@ -464,6 +472,9 @@ export interface AuditRow {
   payload: string | null;
   requestId: string;
   ip: string | null;
+  /** Set when the write came through an API token (an AI assistant, the CLI). */
+  apiTokenId: number | null;
+  apiTokenName: string | null;
   createdAt: Date;
 }
 
@@ -504,8 +515,9 @@ export async function listAuditLogs(
   const direction = args.sortOrder === 'asc' ? asc : desc;
 
   const rows = await db
-    .select()
+    .select({ ...getTableColumns(auditLogs), apiTokenName: adminApiTokens.name })
     .from(auditLogs)
+    .leftJoin(adminApiTokens, eq(adminApiTokens.id, auditLogs.apiTokenId))
     .where(where)
     .orderBy(direction(auditLogs.createdAt), direction(auditLogs.id))
     .limit(args.limit)

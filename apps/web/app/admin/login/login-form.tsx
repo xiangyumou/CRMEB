@@ -17,10 +17,13 @@ interface LoginValues {
   remember?: boolean;
 }
 
-/** Only ever navigate to our own admin paths, never to an attacker's `?next=`. */
+/**
+ * Only ever navigate to our own admin paths — or back to the OAuth consent
+ * screen an MCP client sent the admin to — never to an attacker's `?next=`.
+ */
 function safeNext(raw: string | null): string {
-  if (!raw) return '/admin';
-  if (!raw.startsWith('/admin') || raw.startsWith('//')) return '/admin';
+  if (!raw || raw.startsWith('//')) return '/admin';
+  if (!raw.startsWith('/admin') && !raw.startsWith('/oauth/authorize?')) return '/admin';
   return raw;
 }
 

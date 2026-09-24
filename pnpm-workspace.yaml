@@ -31,6 +31,8 @@ hoistPattern:
 minimumReleaseAgeExclude:
   - '@tanstack/query-core@5.103.2'
   - '@tanstack/react-query@5.103.2'
+  - '@modelcontextprotocol/core@2.1.0'
+  - '@modelcontextprotocol/server@2.1.0'
 overrides:
   # One sass for the workspace (storefront-blocks and apps/mini compile their styles with
   # it); auto-install-peers would otherwise hand next's and vite's optional `sass` peer

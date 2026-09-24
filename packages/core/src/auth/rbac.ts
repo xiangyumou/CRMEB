@@ -29,6 +29,8 @@ export const IMPLICIT_ADMIN_PERMISSIONS: readonly string[] = Object.freeze([
   authPermissions['session:delete'],
   authPermissions['profile:read'],
   authPermissions['profile:update'],
+  // A token acts with its owner's own roles, so minting one grants nothing new.
+  authPermissions['api-token:self'],
 ]);
 
 export function hasPermission(actor: Actor, atom: string): boolean {

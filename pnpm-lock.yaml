@@ -179,6 +179,34 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  apps/cli:
+    dependencies:
+      '@shop/admin-ops':
+        specifier: workspace:*
+        version: link:../../packages/admin-ops
+    devDependencies:
+      '@shop/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.6
+      eslint:
+        specifier: ^10.11.0
+        version: 10.11.0(jiti@2.7.0)(supports-color@8.1.1)
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(@swc/core@1.3.96)(jiti@2.7.0)(postcss@8.5.28)(supports-color@8.1.1)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.15
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.1
+        version: 5.0.1(@types/node@24.13.6)(happy-dom@20.14.5)(jsdom@24.1.3(supports-color@8.1.1))(vite@8.3.0(@types/node@24.13.6)(esbuild@0.27.7)(jiti@2.7.0)(sass@1.104.1)(stylus@0.64.0(supports-color@8.1.1))(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   apps/mini:
     dependencies:
       '@babel/runtime':
@@ -326,9 +354,15 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.3.0)
+      '@modelcontextprotocol/server':
+        specifier: ^2.1.0
+        version: 2.1.0
       '@puckeditor/core':
         specifier: 0.23.0
         version: 0.23.0(@floating-ui/dom@1.8.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.18)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(use-sync-external-store@1.7.0(react@19.3.0))
+      '@shop/admin-ops':
+        specifier: workspace:*
+        version: link:../../packages/admin-ops
       '@shop/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -610,6 +644,31 @@ importers:
       tsx:
         specifier: ^4.20.0
         version: 4.23.15
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.1
+        version: 5.0.1(@types/node@24.13.6)(happy-dom@20.14.5)(jsdom@24.1.3(supports-color@8.1.1))(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(stylus@0.64.0(supports-color@8.1.1))(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/admin-ops:
+    dependencies:
+      '@shop/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@shop/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.6
+      eslint:
+        specifier: ^10.11.0
+        version: 10.11.0(jiti@2.7.0)(supports-color@8.1.1)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -2782,6 +2841,14 @@ packages:
 
   '@leichtgewicht/ip-codec@2.0.5':
     resolution: {integrity: sha512-Vo+PSpZG2/fmgmiNzYK9qWRh8h/CHrwD0mo1h1DzL4yzHNSfWYujGTYsWGreD000gcgmZ7K4Ys6Tx9TxtsKdDw==}
+
+  '@modelcontextprotocol/core@2.1.0':
+    resolution: {integrity: sha512-YdFj5gMRHr0gYNAhTbQDgjLHiEJdIAUYxomhKseUNye7ZGlISQmUoLh2sveFFCiQ7j2YMffT1kgSND0FSfIFjQ==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/server@2.1.0':
+    resolution: {integrity: sha512-FdvwZU5N03O77Suh35JqjAqq5R1ZTEPFtwu6N4BgBq28qrQtrCnpbLL5U2pwYCuE194jAw0xnlOVmIqhfoYuUQ==}
+    engines: {node: '>=20'}
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
     resolution: {integrity: sha512-LCkGo6JDfaBhgST7UpPWgNgLINpcpabaHfyz5OBx75nUYxBsaEPxjnyNjWpeb/xBup/682QnBfRBy2/LvPutZQ==}
@@ -12145,6 +12212,15 @@ snapshots:
       - supports-color
 
   '@leichtgewicht/ip-codec@2.0.5': {}
+
+  '@modelcontextprotocol/core@2.1.0':
+    dependencies:
+      zod: 4.6.5
+
+  '@modelcontextprotocol/server@2.1.0':
+    dependencies:
+      '@modelcontextprotocol/core': 2.1.0
+      zod: 4.6.5
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
     optional: true

@@ -1,7 +1,9 @@
 import js from '@eslint/js';
 import next from 'eslint-config-next';
 
-const SERVER = ['src/server/**', 'app/admin-api/**', 'app/api/**'];
+// `app/oauth` and `app/mcp` are the AI-assistant sign-in and endpoint: route
+// handlers and one server-rendered consent page, no client code.
+const SERVER = ['src/server/**', 'app/admin-api/**', 'app/api/**', 'app/oauth/**', 'app/mcp/**'];
 
 const NO_CORE_OR_DB = {
   group: ['@shop/core', '@shop/core/*', '@shop/db', '@shop/db/*'],

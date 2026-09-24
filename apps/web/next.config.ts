@@ -20,7 +20,23 @@ function buildCpus(value: string | undefined): number {
  */
 const nextConfig: NextConfig = {
   output: 'standalone',
-  transpilePackages: ['@shop/contracts', '@shop/storefront-blocks'],
+  transpilePackages: ['@shop/contracts', '@shop/storefront-blocks', '@shop/admin-ops'],
+  // OAuth discovery for MCP clients (RFC 9728 / RFC 8414) lives at fixed
+  // `/.well-known/` URLs; the handlers live under `/oauth/`.
+  async rewrites() {
+    return [
+      {
+        source: '/.well-known/oauth-protected-resource/:path*',
+        destination: '/oauth/metadata/resource',
+      },
+      { source: '/.well-known/oauth-protected-resource', destination: '/oauth/metadata/resource' },
+      {
+        source: '/.well-known/oauth-authorization-server/:path*',
+        destination: '/oauth/metadata/server',
+      },
+      { source: '/.well-known/oauth-authorization-server', destination: '/oauth/metadata/server' },
+    ];
+  },
   reactStrictMode: true,
   poweredByHeader: false,
   // The workspace root is the repository root, not `apps/web`; tell Next so the standalone

@@ -9,6 +9,9 @@
  */
 export * from './admin-auth.service';
 export * from './admin-session.store';
+export * from './api-token.service';
+export * as apiTokenRepo from './api-token.repo';
+export * as oauth from './oauth.service';
 export * from './captcha';
 export * from './password';
 export * from './permissions';

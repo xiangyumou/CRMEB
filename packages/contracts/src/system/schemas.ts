@@ -290,6 +290,10 @@ export const auditLogItem = z.object({
   payload: z.string().nullable(),
   requestId: z.string(),
   ip: z.string().nullable(),
+  /** Set when the write came through an API token — an AI assistant or the `shop` CLI acting as the admin. */
+  apiTokenId: id.nullable(),
+  /** The token's name; `null` once it is gone, or when there was none. */
+  apiTokenName: z.string().nullable(),
   createdAt: instant,
 });
 export type AuditLogItem = z.infer<typeof auditLogItem>;
@@ -308,6 +312,8 @@ export const auditLogItemExample: AuditLogItem = {
   payload: '{"status":"disabled"}',
   requestId: '6f1f6f0c-2f3a-4f7e-9f2f-0d2f5a1f2c33',
   ip: '203.0.113.7',
+  apiTokenId: null,
+  apiTokenName: null,
   createdAt: '2026-09-21T11:02:00+08:00',
 };
 

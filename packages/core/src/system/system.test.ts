@@ -246,6 +246,7 @@ describe('permissionTree', () => {
     // read and edit their own profile, so the role editor must not offer those
     // as though they were choices.
     expect(permissionTree().implicit).toEqual([
+      'auth:api-token:self',
       'auth:profile:read',
       'auth:profile:update',
       'auth:session:delete',

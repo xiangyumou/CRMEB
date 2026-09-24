@@ -87,6 +87,7 @@ export const authPermissions = definePermissions(
     'session:delete': '退出登录',
     'profile:read': '查看自己的资料',
     'profile:update': '修改自己的资料与密码',
+    'api-token:self': '管理自己的 API 令牌（AI 助手、命令行）',
   },
   { section: '账号' },
 );

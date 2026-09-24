@@ -14,6 +14,8 @@ export interface AuditEntry {
   actorKind?: AuditActorKind;
   adminId: number | null;
   userId?: number | null;
+  /** The API token the admin acted through; absent for the console. */
+  apiTokenId?: number | null;
   adminAccount: string;
   routeId: string;
   method: string;
@@ -100,6 +102,7 @@ export async function insertAudit(db: DbOrTx, entry: AuditEntry): Promise<void> 
     actorKind: entry.actorKind ?? 'admin',
     adminId: entry.adminId,
     userId: entry.userId ?? null,
+    apiTokenId: entry.apiTokenId ?? null,
     adminAccount: entry.adminAccount.slice(0, 64),
     routeId: entry.routeId,
     method: entry.method,

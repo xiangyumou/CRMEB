@@ -71,7 +71,8 @@ export function AuditLogsPage() {
           {
             title: '操作人',
             key: 'adminAccount',
-            width: 180,
+            width: 240,
+            ellipsis: true,
             render: (_value: unknown, row: AuditLogItem) => <ActorText row={row} />,
           },
           {
@@ -161,6 +162,11 @@ function ActorText({ row }: { row: AuditLogItem }) {
         <Typography.Text type="secondary">
           {row.routeId === 'auth.adminLogin' ? ' （未知账号）' : ' （已删除）'}
         </Typography.Text>
+      )}
+      {row.apiTokenId !== null && (
+        <Tag color="blue" style={{ marginLeft: 6 }} title={row.apiTokenName ?? '令牌已删除'}>
+          AI/令牌{row.apiTokenName ? `：${row.apiTokenName}` : ''}
+        </Tag>
       )}
     </>
   );

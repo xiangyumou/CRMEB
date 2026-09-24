@@ -71,6 +71,13 @@
       "when": 1790240000000,
       "tag": "0009_drop_cutover_leftover_config",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790245572676,
+      "tag": "0010_api_tokens",
+      "breakpoints": true
     }
   ]
 }

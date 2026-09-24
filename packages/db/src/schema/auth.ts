@@ -4,6 +4,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   smallint,
@@ -163,6 +164,12 @@ export const auditLogs = pgTable(
     actorKind: varchar({ length: 16 }).notNull().default('admin'),
     /** The 店员's storefront user when `actor_kind = 'staff'`. */
     userId: fk().references(() => users.id, { onDelete: 'set null' }),
+    /**
+     * Set when the admin acted through an API token (an agent over MCP, the
+     * CLI) rather than the console. `admin_id` still names the admin: a token
+     * acts as its owner, never as somebody of its own.
+     */
+    apiTokenId: fk().references((): AnyPgColumn => adminApiTokens.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
   },
   (t) => [
@@ -171,4 +178,77 @@ export const auditLogs = pgTable(
     index('audit_logs_user_idx').on(t.userId, t.createdAt),
     check('audit_logs_actor_kind_known', sql`${t.actorKind} in ('admin', 'staff')`),
   ],
+);
+
+/**
+ * API tokens: an admin acting from somewhere other than the console — an AI
+ * agent over MCP, the `shop` CLI.
+ *
+ * A token acts as its admin, with the admin's *current* roles: nothing about
+ * permissions is stored here, so a role change or a disabled account takes
+ * effect on the next request. A password change kills every token (the row
+ * keeps the `password_version` it was minted under), as it kills every console
+ * session.
+ *
+ * Two kinds:
+ * - `pat`   made by hand on 「API 令牌」, pasted into a client that takes a header;
+ * - `oauth` one row per grant a client obtained through `/oauth/authorize`.
+ *           The access token is short-lived and rotated together with the
+ *           refresh token on every refresh, so the row is the grant — revoking
+ *           it disconnects that client.
+ *
+ * Only `sha256(token)` is stored.
+ */
+export const adminApiTokens = pgTable(
+  'admin_api_tokens',
+  {
+    id: pk(),
+    adminId: fk()
+      .notNull()
+      .references(() => admins.id, { onDelete: 'cascade' }),
+    /** What the admin called it, or the OAuth client's name. */
+    name: varchar({ length: 64 }).notNull(),
+    kind: varchar({ length: 8 }).notNull(),
+    /** Lowercase hex sha256 of the bearer token. */
+    tokenHash: varchar({ length: 64 }).notNull(),
+    /** The first characters of the token, so the list can tell two apart. */
+    hint: varchar({ length: 16 }).notNull(),
+    /** `oauth` only: sha256 of the current refresh token. */
+    refreshHash: varchar({ length: 64 }),
+    /** `oauth` only: the registered client this grant belongs to. */
+    clientId: varchar({ length: 64 }),
+    /** Snapshot of `admins.password_version` when minted. */
+    passwordVersion: integer().notNull(),
+    /** `null` for a PAT that never expires. */
+    expiresAt: instant(),
+    refreshExpiresAt: instant(),
+    lastUsedAt: instant(),
+    lastUsedIp: varchar({ length: 64 }),
+    revokedAt: instant(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('admin_api_tokens_token_hash_key').on(t.tokenHash),
+    uniqueIndex('admin_api_tokens_refresh_hash_key').on(t.refreshHash),
+    index('admin_api_tokens_admin_idx').on(t.adminId),
+    check('admin_api_tokens_kind_known', sql`${t.kind} in ('pat', 'oauth')`),
+  ],
+);
+
+/**
+ * OAuth clients registered through `/oauth/register` (RFC 7591), which is how
+ * an MCP client (Claude, ChatGPT, …) introduces itself before the first
+ * sign-in. Public clients only: no secret, PKCE is mandatory.
+ */
+export const oauthClients = pgTable(
+  'oauth_clients',
+  {
+    id: pk(),
+    clientId: varchar({ length: 64 }).notNull(),
+    name: varchar({ length: 128 }).notNull(),
+    /** Exact-match allow-list, as registered. */
+    redirectUris: jsonb().$type<string[]>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('oauth_clients_client_id_key').on(t.clientId)],
 );

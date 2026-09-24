@@ -10,6 +10,10 @@ export const authErrors = defineErrors({
   AUTH_SESSION_EXPIRED: { status: 401, message: '登录已过期，请重新登录' },
   /** The cookie-auth CSRF guard (Origin / Sec-Fetch-Site) rejected the request. */
   AUTH_CROSS_SITE_BLOCKED: { status: 403, message: '请求来源不可信' },
+  /** A `Bearer shp_…` API token that is unknown, revoked, expired, or whose admin was disabled or changed password. */
+  AUTH_TOKEN_INVALID: { status: 401, message: 'API 令牌无效、已过期或已吊销' },
+  /** Minting or revoking tokens from a token: an agent must not be able to give itself a second life. */
+  AUTH_TOKEN_CONSOLE_ONLY: { status: 403, message: 'API 令牌只能在后台登录后管理' },
 });
 
 export type AuthErrorCode = keyof typeof authErrors;

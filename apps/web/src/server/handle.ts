@@ -13,7 +13,7 @@ import '@shop/contracts/locale';
 // which is why it is here and not in the container.
 import '@shop/core/domains';
 import { anonymousActor, createCtx, DomainError, type Actor, type Ctx } from '@shop/core/kernel';
-import { hasPermission, insertAudit, readBearer } from '@shop/core/auth';
+import { hasPermission, insertAudit, isApiToken, readBearer, resolveApiToken } from '@shop/core/auth';
 import { getContainer, type Container } from './container';
 import { isProduction } from './env';
 import { clientIp } from './request-meta';
@@ -325,6 +325,25 @@ export function handle<
       const platform = platformOf(request);
 
       if (anyRoute.auth === 'admin') {
+        // An API token (agent over MCP, the CLI) acts as its admin. It is never
+        // a cookie, so it is not what CSRF defends against and skips step 3.
+        const bearer = readBearer(request.headers.get('authorization'));
+        if (bearer !== null && isApiToken(bearer)) {
+          const resolved = await resolveApiToken(container, bearer, { ip: clientIp(request) });
+          if (!resolved) return fail(new DomainError('AUTH_TOKEN_INVALID'));
+          actor = {
+            kind: 'admin',
+            id: resolved.adminId,
+            permissions: resolved.permissions,
+            isSuper: resolved.isSuper,
+            sessionId: `token:${resolved.tokenId}`,
+            display: resolved.account,
+            apiTokenId: resolved.tokenId,
+          };
+        }
+      }
+
+      if (anyRoute.auth === 'admin' && actor.kind === 'anonymous') {
         const token = readCookie(request, ADMIN_COOKIE);
         if (!token) return fail(new DomainError('UNAUTHENTICATED'));
         const session = await container.adminAuth.resolve(token);
@@ -372,7 +391,12 @@ export function handle<
       }
 
       // -- 3. CSRF, for cookie auth only ----------------------------------
-      if (surface === 'admin' && actor.kind === 'admin' && MUTATING.has(request.method)) {
+      if (
+        surface === 'admin' &&
+        actor.kind === 'admin' &&
+        actor.apiTokenId === undefined &&
+        MUTATING.has(request.method)
+      ) {
         const allowed = [container.env.APP_ORIGIN, ...container.env.EXTRA_ALLOWED_ORIGINS];
         const csrf = checkCsrf(request, allowed);
         if (!csrf.ok) {
@@ -526,6 +550,7 @@ async function writeAudit(
       adminId: entry.actor.id,
       userId: null,
       adminAccount: entry.actor.display ?? '',
+      apiTokenId: entry.actor.apiTokenId ?? null,
       routeId: entry.routeId,
       method: entry.method,
       path: entry.path,

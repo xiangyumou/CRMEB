@@ -55,6 +55,13 @@ export default defineMenu({
       order: 40,
     },
     {
+      key: 'system.apiTokens',
+      label: 'API 令牌',
+      path: '/admin/system/api-tokens',
+      permission: 'auth:api-token:self',
+      order: 45,
+    },
+    {
       key: 'system.profile',
       label: '个人资料',
       path: '/admin/system/profile',
