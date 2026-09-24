@@ -7,6 +7,7 @@ import { resolvedPageFixture } from '@/test/decor-fixture';
 import { serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
+import { DECOR_PAGE_READS, markStale } from '@/data/stale-reads';
 import Home from './index';
 
 const count = (items: number) => ({
@@ -145,6 +146,31 @@ describe('首页', () => {
       title: '首页好物',
       path: '/pages/index/index',
     });
+  });
+
+  it('is fetched again on show after a claim elsewhere marked it stale, not merely as it ages', async () => {
+    let served = 0;
+    serveApi({
+      ...visits,
+      'GET /api/v1/pages/home': () => {
+        served += 1;
+        return { body: resolvedPageFixture() };
+      },
+    });
+    const { client } = await renderPage(<Home />);
+    await screen.findByText('柔雾丝绒礼盒');
+    expect(served).toBe(1);
+
+    // Back on 首页 with nothing changed (the test client's staleTime is 0): left alone.
+    taroFake.showPage();
+    await Promise.resolve();
+    expect(served).toBe(1);
+
+    // A coupon claimed at 领券中心, then back.
+    markStale(client, ...DECOR_PAGE_READS);
+    expect(served).toBe(1);
+    taroFake.showPage();
+    await waitFor(() => expect(served).toBe(2));
   });
 
   it('records the visit', async () => {

@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { View } from '@tarojs/components';
 import { isApiError } from '@shop/api-client';
-import { useRouteQuery } from '@shop/api-client/react';
+import { routeKey, useRouteQuery } from '@shop/api-client/react';
 import { useTabPage } from '@/app-shell/tab-page';
 import { useAppConfig } from '@/app-config';
+import { useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { useRecordVisit } from '@/data/visits';
 import { DecorPage } from '@/features/decor/decor-page';
 import { DecorSkeleton } from '@/features/decor/decor-states';
@@ -45,6 +46,8 @@ export default function Home() {
     void refetch();
   }, [signedIn, refetch]);
 
+  // A claim made on another page marks it stale: its 优惠券 block says 已领取 once back here.
+  useRefetchOnShow(routeKey('decor.pageHome'), { when: 'invalidated' });
   usePullToRefresh(() => home.refetch());
   useShare(
     { route: 'home', params: {} },

@@ -29,8 +29,8 @@ export default function Me() {
   const unread = useRouteQuery('notification.myUnreadCount', {}, { enabled: signedIn });
   // Every show, fresh or not: the counts on this page move with a payment, a receipt, a
   // refund, a review or a claim made on another page, and the server's own changes (shipped).
-  useRefetchOnShow(routeKey('decor.pageUserCenter'), { always: true });
-  useRefetchOnShow(routeKey('notification.myUnreadCount'), { always: true });
+  useRefetchOnShow(routeKey('decor.pageUserCenter'), { when: 'always' });
+  useRefetchOnShow(routeKey('notification.myUnreadCount'), { when: 'always' });
   usePullToRefresh(() => Promise.all([page.refetch(), signedIn ? unread.refetch() : null]));
 
   // Signing in does not clear the cache (signing out does): the guest's page must go.

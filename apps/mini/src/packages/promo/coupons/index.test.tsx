@@ -4,6 +4,7 @@ import type { ClaimableCoupon } from '@/features/coupon/claim-state';
 import { useSession } from '@/session/session';
 import { serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
+import { routeQueryKey } from '@shop/api-client/react';
 import { taroFake } from '@/test/taro-fake/taro';
 import CouponCenterPage from './index';
 
@@ -53,7 +54,13 @@ describe('领券中心', () => {
       status: 201,
       body: { coupon: {}, remainingCount: 9 },
     }));
-    await renderPage(<CouponCenterPage />);
+    const { client } = await renderPage(<CouponCenterPage />);
+    // What other pages hold: 首页 (its 优惠券 block's states), 我的 (the coupon total), the
+    // cart's coupon hint.
+    const home = routeQueryKey('decor.pageHome');
+    const me = routeQueryKey('decor.pageUserCenter', {});
+    const usable = routeQueryKey('coupon.applicableList', { body: { lines: [] } });
+    for (const key of [home, me, usable]) client.setQueryData(key, { cached: true });
     fireEvent.click(await screen.findByRole('button', { name: '立即领取 券 1' }));
     await waitFor(() =>
       expect(seen.some((r) => r.key === 'POST /api/v1/coupons/1/claims')).toBe(true),
@@ -66,6 +73,11 @@ describe('领券中心', () => {
         }),
       ),
     );
+    for (const key of [home, me, usable]) {
+      expect(client.getQueryState(key)?.isInvalidated, JSON.stringify(key)).toBe(true);
+    }
+    // Marked stale, not fetched while hidden: each page asks again when it is shown.
+    expect(seen.some((r) => r.key === 'GET /api/v1/pages/home')).toBe(false);
   });
 
   it('shows 去使用 at the per-user limit and 已抢光 when none are left', async () => {

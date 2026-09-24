@@ -4,11 +4,15 @@ import { useDidShow } from '@tarojs/taro';
 
 export interface RefetchOnShowOptions {
   /**
-   * Refetch on every show, fresh or not. For a read the server changes behind the app's back
-   * and that is cheap to ask again: 我的's own counts move with every payment, receipt, refund,
-   * review or claim, wherever it happened.
+   * Which of the page's cached reads to fetch again when it is shown:
+   *
+   * - `stale` (default): past their staleTime or invalidated;
+   * - `always`: every time, for a read the server changes behind the app's back that is cheap
+   *   to ask again (我的's counts move with every payment, receipt, refund, review or claim);
+   * - `invalidated`: only a read a change marked stale (`markStale`), for a heavy page that
+   *   should not be fetched again merely because 30 s went by (a decorated 首页).
    */
-  always?: boolean | undefined;
+  when?: 'stale' | 'always' | 'invalidated' | undefined;
 }
 
 /**
@@ -21,12 +25,17 @@ export interface RefetchOnShowOptions {
 export function useRefetchOnShow(queryKey: QueryKey, options: RefetchOnShowOptions = {}): void {
   const client = useQueryClient();
   const firstShow = useRef(true);
-  const always = options.always === true;
+  const when = options.when ?? 'stale';
   useDidShow(() => {
     if (firstShow.current) {
       firstShow.current = false;
       return;
     }
-    void client.refetchQueries({ queryKey, type: 'active', ...(always ? {} : { stale: true }) });
+    void client.refetchQueries({
+      queryKey,
+      type: 'active',
+      ...(when === 'stale' ? { stale: true } : {}),
+      ...(when === 'invalidated' ? { predicate: (query) => query.state.isInvalidated } : {}),
+    });
   });
 }

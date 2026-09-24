@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { isApiError } from '@shop/api-client';
-import {
-  useInfiniteRouteQuery,
-  useInvalidateRoutes,
-  useRouteMutation,
-  useRouteQuery,
-} from '@shop/api-client/react';
+import { useInfiniteRouteQuery, useInvalidateRoutes, useRouteQuery } from '@shop/api-client/react';
 import {
   claimCardState,
   claimErrorText,
@@ -14,6 +9,7 @@ import {
   heldText,
   type ClaimableCoupon,
 } from '@/features/coupon/claim-state';
+import { useClaimCoupon } from '@/features/coupon/use-claim';
 import { navigate, useShare } from '@/platform';
 import { requireLogin, useSignedIn } from '@/session/session';
 import { Button } from '@/ui/button';
@@ -42,9 +38,7 @@ export default function CouponCenterPage() {
   const list = useInfiniteRouteQuery('coupon.claimableList', { query: { pageSize: 20 } });
   const newUser = useRouteQuery('coupon.newUserList', undefined, { enabled: !signedIn });
   const invalidate = useInvalidateRoutes();
-  const claim = useRouteMutation('coupon.claim', {
-    invalidate: ['coupon.claimableList', 'coupon.myList'],
-  });
+  const claim = useClaimCoupon();
   const [claiming, setClaiming] = useState<string | null>(null);
 
   // Signing in turns every `canClaim: null` into an answer.

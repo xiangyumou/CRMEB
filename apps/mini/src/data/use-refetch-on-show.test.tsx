@@ -4,9 +4,9 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { testQueryClient } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
-import { useRefetchOnShow } from './use-refetch-on-show';
+import { useRefetchOnShow, type RefetchOnShowOptions } from './use-refetch-on-show';
 
-function setup(staleTime: number, options: { always?: boolean } = {}) {
+function setup(staleTime: number, options: RefetchOnShowOptions = {}) {
   let fetches = 0;
   const client = testQueryClient();
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -23,7 +23,7 @@ function setup(staleTime: number, options: { always?: boolean } = {}) {
     },
     { wrapper },
   );
-  return { hook, fetches: () => fetches };
+  return { hook, client, fetches: () => fetches };
 }
 
 describe('useRefetchOnShow', () => {
@@ -48,10 +48,27 @@ describe('useRefetchOnShow', () => {
   });
 
   it('refetches a fresh query too when asked to on every show', async () => {
-    const { hook, fetches } = setup(60_000, { always: true });
+    const { hook, fetches } = setup(60_000, { when: 'always' });
     await waitFor(() => expect(hook.result.current.data).toBe('hello 1'));
     expect(fetches()).toBe(1);
 
+    act(() => taroFake.showPage());
+    await waitFor(() => expect(hook.result.current.data).toBe('hello 2'));
+  });
+
+  it('refetches only a read a change marked stale when asked for invalidated ones', async () => {
+    const { hook, fetches, client } = setup(0, { when: 'invalidated' });
+    await waitFor(() => expect(hook.result.current.data).toBe('hello 1'));
+
+    // Past its staleTime, but nothing changed: left alone.
+    act(() => taroFake.showPage());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetches()).toBe(1);
+
+    await act(() => client.invalidateQueries({ queryKey: ['greeting'], refetchType: 'none' }));
+    expect(fetches()).toBe(1);
     act(() => taroFake.showPage());
     await waitFor(() => expect(hook.result.current.data).toBe('hello 2'));
   });
