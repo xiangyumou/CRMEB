@@ -793,3 +793,56 @@ describe('a refusal from the gateway is an answer, silence is not', () => {
     });
   });
 });
+
+describe('the review routes refuse what the console hides', () => {
+  it('复核 does not pay out a 退货退款 whose goods have not come back', async () => {
+    await harness.ctx.config.set(refundConfig, {
+      returnName: '售后部',
+      returnPhone: '13800000000',
+      returnAddress: '浙江省杭州市西湖区文一西路 1 号',
+    });
+    const order = await paidOrder();
+    const applied = await service.apply(racer(userActor(order.userId)), {
+      ...applyBody(order, 1),
+      kind: 'return_and_refund',
+    });
+    const id = Number(applied.id);
+    await admin.adminApprove(racer(adminActor(order.adminId)), { id: String(id) });
+
+    // 同意 on a return means "send the goods back", not "send the money".
+    await expect(
+      admin.adminRetry(racer(adminActor(order.adminId)), { id: String(id) }),
+    ).rejects.toMatchObject({
+      code: 'REFUND_NOT_ACTIONABLE',
+      details: { status: 'approved', returnStage: 'awaiting_shipment' },
+    });
+    const row = await refundRow(id);
+    expect(row.status).toBe('approved');
+    expect(row.requestContext).toBeNull();
+    expect(await flowRows('order_refund')).toHaveLength(0);
+  });
+
+  it('驳回 of an approved 仅退款 gives its units back to the line', async () => {
+    const order = await paidOrder();
+    const id = await approvedRefund(order, 2);
+    const units = async () =>
+      (
+        await harness.ctx.db
+          .select({ refunded: orderItems.refundedQuantity })
+          .from(orderItems)
+          .where(eq(orderItems.id, order.itemIds[0]!))
+      )[0]!.refunded;
+    expect(await units()).toBe(2);
+
+    await admin.adminReject(racer(adminActor(order.adminId)), {
+      id: String(id),
+      rejectReason: '核实后不符合退款条件',
+    });
+
+    expect(await units()).toBe(0);
+    // And the buyer can ask again for the whole line.
+    await expect(
+      service.apply(racer(userActor(order.userId)), applyBody(order, 2)),
+    ).resolves.toMatchObject({ status: 'applied' });
+  });
+});

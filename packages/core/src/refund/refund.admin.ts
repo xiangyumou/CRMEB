@@ -238,6 +238,17 @@ async function reserveUnits(tx: Tx, refundId: number, orderId: number): Promise<
 }
 
 /**
+ * The other direction: a refund that no longer counts drops out of the derived
+ * total. Lowering a count cannot cross fulfilment's bound, so the whole line is
+ * the ceiling and the update always lands.
+ */
+async function releaseUnits(tx: Tx, refundId: number): Promise<void> {
+  for (const line of await repo.listRefundItems(tx, refundId)) {
+    await repo.recomputeItemRefundedQuantity(tx, line.orderItemId, 'whole-line');
+  }
+}
+
+/**
  * The timeline entry says where the goods were asked to go, so the audit trail
  * stands on its own even if somebody later edits the row.
  */
@@ -289,6 +300,11 @@ async function rejectAs(
       message: `商家拒绝：${input.rejectReason}`,
       operatorAdminId: adminId,
     });
+    // An approved 仅退款 had taken its units out of fulfilment (`reserveUnits`);
+    // the count is derived from open refunds, so re-deriving it hands them back.
+    if (row.status === 'approved' && row.kind === 'refund_only') {
+      await releaseUnits(tx, id);
+    }
     await refreshOrderRefundStatus(tx, row.orderId);
 
     // The reason travels with it: a rejection the buyer cannot explain later is

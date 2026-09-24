@@ -495,6 +495,13 @@ export async function executeRefund(ctx: Ctx, refundId: number): Promise<Execute
     const row = await repo.lockRefund(tx, refundId);
     if (!row) throw new DomainError('REFUND_NOT_FOUND');
     if (row.status === 'succeeded') return null;
+    // A return pays out only once the goods are back (`adminReceiveReturn`).
+    // 同意 on a return asks for the parcel; 复核 on that row must not send money.
+    if (row.kind === 'return_and_refund' && row.returnStage !== 'received') {
+      throw new DomainError('REFUND_NOT_ACTIONABLE', {
+        details: { status: row.status, returnStage: row.returnStage },
+      });
+    }
 
     // Frozen on the first submit and never rewritten, so a later config change
     // or a second payment attempt cannot redirect a refund already in flight.
