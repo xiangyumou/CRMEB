@@ -259,6 +259,21 @@ for (const file of files.filter((candidate) => candidate.rel.endsWith('.js'))) {
   }
 }
 
+// --- template attributes the runtime knows ------------------------------------------------
+// config/a11y-plugin.js adds aria-* to the templates and, through config/a11y-runtime.js, to the
+// runtime's component table. Taro numbers attributes on each side separately, so a template with
+// them and a runtime without them shifts every number: blank images, buttons that act disabled.
+const baseWxml = path.join(dist, 'base.wxml');
+if (fs.existsSync(baseWxml) && fs.readFileSync(baseWxml, 'utf8').includes('aria-hidden=')) {
+  const registered = files
+    .filter((candidate) => candidate.rel.endsWith('.js'))
+    .some((file) => fs.readFileSync(path.join(dist, file.rel), 'utf8').includes('"aria-hidden"'));
+  if (!registered)
+    failures.push(
+      'base.wxml binds aria-* but no script registers them with the runtime (config/a11y-runtime.js)',
+    );
+}
+
 // --- WXSS the WeChat compiler accepts ------------------------------------------------------
 // WeChat's WXSS compiler rejects the universal selector (`*`, e.g. `> *`) and the upload fails
 // with -80056; the H5 emulation and the simulator accept it, so nothing earlier catches it.

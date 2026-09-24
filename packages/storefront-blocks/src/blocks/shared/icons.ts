@@ -3,13 +3,33 @@
  * icons as inline SVG data URIs, so they need no upload, no network and no
  * icon font, and render identically in the mini-program, the admin canvas and
  * a test. Neutral ink (`#1A1A1A`, the text colour) — deliberately plain.
+ *
+ * Base64, not a URL-encoded `charset=utf-8` URI: WeChat's `<image>` on a phone
+ * does not reliably draw the latter, and the mini-program runtime has no
+ * `btoa`, hence the encoder below (the markup is ASCII).
  */
+
+const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+export function base64Ascii(text: string): string {
+  let out = '';
+  for (let i = 0; i < text.length; i += 3) {
+    const a = text.charCodeAt(i);
+    const b = i + 1 < text.length ? text.charCodeAt(i + 1) : NaN;
+    const c = i + 2 < text.length ? text.charCodeAt(i + 2) : NaN;
+    const bits = (a << 16) | ((b || 0) << 8) | (c || 0);
+    out += BASE64[(bits >> 18) & 63]! + BASE64[(bits >> 12) & 63]!;
+    out += Number.isNaN(b) ? '=' : BASE64[(bits >> 6) & 63]!;
+    out += Number.isNaN(c) ? '=' : BASE64[bits & 63]!;
+  }
+  return out;
+}
 
 function icon(body: string, stroke = '#1A1A1A'): string {
   const markup =
     `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" ` +
     `stroke="${stroke}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+  return `data:image/svg+xml;base64,${base64Ascii(markup)}`;
 }
 
 export const ICONS = {
