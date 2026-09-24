@@ -1,5 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
@@ -31,5 +31,32 @@ describe('LoginCard · 手机号快速登录', () => {
       status: 'phone-required',
       bindToken: 'bind-1',
     });
+  });
+});
+
+describe('LoginCard · 其他方式登录', () => {
+  it('links the login page after 微信登录 fails, so 密码登录 stays reachable', async () => {
+    useSession.setState({ session: { status: 'failed', message: '微信登录暂未开放' } });
+    await renderPage(
+      <LoginCard reason="登录后即可购买" redirect={{ route: 'cart', params: {} }}>
+        {null}
+      </LoginCard>,
+    );
+
+    expect(await screen.findByText('微信登录暂未开放')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '其他方式登录' }));
+
+    await vi.waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'navigateTo',
+        args: { url: expect.stringMatching(/^\/pages\/login\/index\?redirect=/) },
+      }),
+    );
+  });
+
+  it('links it after a sign-out too', async () => {
+    useSession.setState({ session: { status: 'signed-out' } });
+    await renderPage(<LoginCard reason="登录后即可购买">{null}</LoginCard>);
+    expect(await screen.findByRole('button', { name: '其他方式登录' })).toBeTruthy();
   });
 });

@@ -21,12 +21,19 @@ export interface LoginCardProps {
 /**
  * Renders `children` for a signed-in shopper, and what it takes to get there otherwise: a line
  * while the silent sign-in runs, the phone-number button when the shop needs a number (with the
- * SMS alternative), a retry after a failure, a login button after signing out. Never navigates
- * away by itself (C05): browsing never needs a session.
+ * SMS alternative), a retry after a failure, a login button after signing out. After a failure or
+ * a sign-out it also links the login page, whose 密码登录 is the way in while 微信登录 is off.
+ * Never navigates away by itself (C05): browsing never needs a session.
  */
 export function LoginCard({ children, reason, redirect }: LoginCardProps) {
   const session = useSession((state) => state.session);
   if (session.status === 'signed-in') return <>{children}</>;
+
+  const toLoginPage = () =>
+    void navigate({
+      route: 'login',
+      params: { ...(redirect ? { redirect: JSON.stringify(redirect) } : {}) },
+    });
 
   return (
     <View className="shop-login-card" id="login-card">
@@ -49,16 +56,7 @@ export function LoginCard({ children, reason, redirect }: LoginCardProps) {
           >
             手机号快速登录
           </platform.PhoneNumberButton>
-          <Button
-            variant="text"
-            size="sm"
-            onClick={() =>
-              void navigate({
-                route: 'login',
-                params: { ...(redirect ? { redirect: JSON.stringify(redirect) } : {}) },
-              })
-            }
-          >
+          <Button variant="text" size="sm" onClick={toLoginPage}>
             短信验证码登录
           </Button>
         </>
@@ -68,12 +66,18 @@ export function LoginCard({ children, reason, redirect }: LoginCardProps) {
           <Button variant="primary" size="lg" block onClick={() => void startSession()}>
             重新登录
           </Button>
+          <Button variant="text" size="sm" onClick={toLoginPage}>
+            其他方式登录
+          </Button>
         </>
       ) : session.status === 'signed-out' ? (
         <>
           <Text className="shop-login-card__reason">{reason}</Text>
           <Button variant="primary" size="lg" block onClick={() => void startSession()}>
             登录
+          </Button>
+          <Button variant="text" size="sm" onClick={toLoginPage}>
+            其他方式登录
           </Button>
         </>
       ) : (
