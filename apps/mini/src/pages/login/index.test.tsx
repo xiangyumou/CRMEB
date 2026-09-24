@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { TOKEN_KEY, useSession, useSessionNotice } from '@/session/session';
 import { rejected } from '@/test/account-fixture';
-import { serveApi } from '@/test/fake-api';
+import { holdRequests, serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
 import LoginPage from './index';
@@ -174,6 +174,38 @@ describe('登录 · 手机号快速登录', () => {
       status: 'phone-required',
       bindToken: 'bind-1',
     });
+  });
+});
+
+describe('登录 · 短信验证码', () => {
+  it('opens on the SMS form from a 「短信验证码登录」 link, and keeps it while the code is checked', async () => {
+    useSession.setState({ session: { status: 'phone-required', bindToken: 'bind-1' } });
+    taroFake.routerParams = { mode: 'sms' };
+    const seen = serveApi({
+      'POST /api/v1/auth/sessions/wechat-oa/phone': () => ({
+        status: 201,
+        body: { status: 'signed-in', session },
+      }),
+    });
+    const held = holdRequests('/wechat-oa/phone');
+    await renderPage(<LoginPage />);
+
+    // No second tap on 短信验证码登录: the form is there.
+    fireEvent.click(screen.getByRole('checkbox', { name: '我已阅读并同意用户协议和隐私政策' }));
+    type('手机号', '13800138000');
+    type('验证码', '123456');
+    fireEvent.click(screen.getByRole('button', { name: '登录' }));
+
+    await waitFor(() => expect(useSession.getState().session.status).toBe('signing-in'));
+    // The page does not swap to the WeChat buttons meanwhile.
+    expect(screen.getByLabelText('验证码')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '登录中…' })).toBeNull();
+
+    held.release();
+    await waitFor(() =>
+      expect(useSession.getState().session).toEqual({ status: 'signed-in', token: 'pw-token' }),
+    );
+    expect(seen[0]?.body).toEqual({ bindToken: 'bind-1', phone: '13800138000', code: '123456' });
   });
 });
 

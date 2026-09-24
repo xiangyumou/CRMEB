@@ -15,6 +15,12 @@ export interface PressableProps {
   pressedTint?: boolean | undefined;
   /** A control inside another tappable thing (加购 on a card): the tap stops here. */
   stopPropagation?: boolean | undefined;
+  /**
+   * Out of the way, but still in the tree: no tap, not announced. The caller's class hides it
+   * (`display: none`). For a control that comes and goes beside an input as the shopper types,
+   * where adding or removing a node would send the focused input again (see `Field`).
+   */
+  hidden?: boolean | undefined;
   className?: string | undefined;
   id?: string | undefined;
   children?: ReactNode;
@@ -34,6 +40,7 @@ export function Pressable({
   checked,
   pressedTint = true,
   stopPropagation = false,
+  hidden = false,
   className,
   id,
   children,
@@ -46,10 +53,11 @@ export function Pressable({
       hoverStayTime={100}
       ariaRole={role}
       ariaLabel={label}
+      {...(hidden ? { ariaHidden: true } : {})}
       {...(disabled ? { ariaDisabled: true } : {})}
       {...(selected === undefined ? {} : { ariaSelected: selected })}
       {...(checked === undefined ? {} : { ariaChecked: checked })}
-      {...(disabled || !onClick
+      {...(disabled || hidden || !onClick
         ? {}
         : {
             onClick: (event: { stopPropagation: () => void }) => {

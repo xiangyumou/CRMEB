@@ -105,7 +105,11 @@ export const storefrontRoutes = defineRoutes({
   },
   login: {
     path: 'pages/login/index',
-    params: z.strictObject({ redirect: loginRedirect.optional() }),
+    // `mode: 'sms'`: open on the SMS form (a 「短信验证码登录」 link elsewhere).
+    params: z.strictObject({
+      redirect: loginRedirect.optional(),
+      mode: z.enum(['sms']).optional(),
+    }),
     share: 'none',
   },
   agreement: {

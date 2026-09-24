@@ -43,7 +43,7 @@ const PRIVACY_REFUSED = '未同意隐私保护指引，可改用短信验证码�
  * (`features/auth/password-login`), offered whatever the WeChat sign-in did.
  */
 export default function LoginPage() {
-  const { redirect } = useRouteParams('login');
+  const { redirect, mode: openOn } = useRouteParams('login');
   const session = useSession((state) => state.session);
   // Why the session sent the shopper here (a renewal that reached another account, AUTH-010),
   // until they sign in or leave.
@@ -52,7 +52,9 @@ export default function LoginPage() {
   const config = useAppConfig();
   const [agreed, setAgreed] = useState(false);
   const [shake, setShake] = useState(0);
-  const [mode, setMode] = useState<'wechat' | 'sms' | 'password'>('wechat');
+  const [mode, setMode] = useState<'wechat' | 'sms' | 'password'>(
+    openOn === 'sms' ? 'sms' : 'wechat',
+  );
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState<string | undefined>();
@@ -124,7 +126,9 @@ export default function LoginPage() {
             canSubmit={() => !needAgreement()}
             onCancel={() => setMode('wechat')}
           />
-        ) : session.status === 'phone-required' && mode === 'sms' ? (
+        ) : mode === 'sms' && (session.status === 'phone-required' || submitting) ? (
+          // Kept while the code is checked (`signing-in`): swapping in the 登录中… buttons for
+          // that moment made the page jump.
           <View className="login__form">
             <CellGroup inset={false}>
               <SmsCodeField

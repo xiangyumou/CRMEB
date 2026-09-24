@@ -57,11 +57,16 @@ export function SearchBar(props: SearchEntryProps | SearchInputProps) {
           onInput={(event) => onChange(event.detail.value)}
           onConfirm={(event) => onSearch(event.detail.value.trim())}
         />
-        {value !== '' ? (
-          <Pressable label="清除" className="shop-search__clear" onClick={() => onChange('')}>
-            <Icon name="close-circle" />
-          </Pressable>
-        ) : null}
+        {/* Hidden rather than removed: removing it sends the row again, the focused input
+            with it, and some Android phones drop the keyboard (see `Field`). */}
+        <Pressable
+          label="清除"
+          hidden={value === ''}
+          className={cx('shop-search__clear', value === '' && 'shop-search__clear--hidden')}
+          onClick={() => onChange('')}
+        >
+          <Icon name="close-circle" />
+        </Pressable>
       </View>
       <Pressable
         label="搜索"

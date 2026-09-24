@@ -275,7 +275,7 @@ describe('确认订单 — signing in on the page', () => {
       expect(taroFake.calls).toContainEqual({
         api: 'navigateTo',
         args: {
-          url: `/pages/login/index?redirect=${encodeURIComponent('{"route":"checkout","params":{}}')}`,
+          url: `/pages/login/index?mode=sms&redirect=${encodeURIComponent('{"route":"checkout","params":{}}')}`,
         },
       }),
     );

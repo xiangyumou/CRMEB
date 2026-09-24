@@ -50,6 +50,10 @@
     font-size: 32px;
     color: var(--color-text-disabled);
     @include hit-area;
+
+    &--hidden {
+      display: none;
+    }
   }
 
   &__submit {

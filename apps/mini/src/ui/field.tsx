@@ -112,8 +112,19 @@ export function Field({
           }}
           onConfirm={(event) => onConfirm?.(event.detail.value)}
         />
-        {clearable && !inert && focused && value !== '' ? (
-          <Pressable label="清除" className="shop-field__clear" onClick={() => onChange('')}>
+        {/* Always rendered, hidden by a class: a node inserted or removed in this row makes
+            Taro send the whole row again (`updateChildNodes`), the input with it, and some
+            Android phones then drop the keyboard. Typing the first character would do it. */}
+        {clearable && !inert ? (
+          <Pressable
+            label="清除"
+            hidden={!(focused && value !== '')}
+            className={cx(
+              'shop-field__clear',
+              !(focused && value !== '') && 'shop-field__clear--hidden',
+            )}
+            onClick={() => onChange('')}
+          >
             <Icon name="close-circle" />
           </Pressable>
         ) : null}
@@ -124,7 +135,11 @@ export function Field({
           {value.length}/{limit}
         </Text>
       ) : null}
-      {error ? <Text className="shop-field__error">{error}</Text> : null}
+      {/* Always rendered, like the clear button: clearing the error as the shopper types must
+          not send the row (and the focused input) again. */}
+      <Text className={cx('shop-field__error', !error && 'shop-field__error--hidden')}>
+        {error ?? ''}
+      </Text>
     </View>
   );
 }

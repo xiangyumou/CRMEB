@@ -33,6 +33,21 @@ describe('Field', () => {
     expect(onChange).toHaveBeenLastCalledWith('');
   });
 
+  it('keeps the clear button and the error in the tree, hidden, so typing adds no node', () => {
+    // Adding a node beside a focused input makes Taro send the input again, and some Android
+    // phones then drop the keyboard: the row must look the same before and after typing.
+    const { container } = render(<Controlled />);
+    const input = screen.getByRole('textbox', { name: '收货人' });
+    const nodes = () => container.querySelectorAll('*').length;
+    const before = nodes();
+    const clear = container.querySelector('[aria-label="清除"]');
+    expect(clear?.getAttribute('aria-hidden')).toBe('true');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '张' } });
+    expect(nodes()).toBe(before);
+    expect(clear?.getAttribute('aria-hidden')).toBeNull();
+  });
+
   it('maps tel to a number keyboard of 11 digits, and shows an error', () => {
     render(
       <Field

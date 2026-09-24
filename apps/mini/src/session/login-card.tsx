@@ -29,10 +29,13 @@ export function LoginCard({ children, reason, redirect }: LoginCardProps) {
   const session = useSession((state) => state.session);
   if (session.status === 'signed-in') return <>{children}</>;
 
-  const toLoginPage = () =>
+  const toLoginPage = (mode?: 'sms') =>
     void navigate({
       route: 'login',
-      params: { ...(redirect ? { redirect: JSON.stringify(redirect) } : {}) },
+      params: {
+        ...(redirect ? { redirect: JSON.stringify(redirect) } : {}),
+        ...(mode ? { mode } : {}),
+      },
     });
 
   return (
@@ -56,7 +59,7 @@ export function LoginCard({ children, reason, redirect }: LoginCardProps) {
           >
             手机号快速登录
           </platform.PhoneNumberButton>
-          <Button variant="text" size="sm" onClick={toLoginPage}>
+          <Button variant="text" size="sm" onClick={() => toLoginPage('sms')}>
             短信验证码登录
           </Button>
         </>
@@ -66,7 +69,7 @@ export function LoginCard({ children, reason, redirect }: LoginCardProps) {
           <Button variant="primary" size="lg" block onClick={() => void startSession()}>
             重新登录
           </Button>
-          <Button variant="text" size="sm" onClick={toLoginPage}>
+          <Button variant="text" size="sm" onClick={() => toLoginPage()}>
             其他方式登录
           </Button>
         </>
@@ -76,7 +79,7 @@ export function LoginCard({ children, reason, redirect }: LoginCardProps) {
           <Button variant="primary" size="lg" block onClick={() => void startSession()}>
             登录
           </Button>
-          <Button variant="text" size="sm" onClick={toLoginPage}>
+          <Button variant="text" size="sm" onClick={() => toLoginPage()}>
             其他方式登录
           </Button>
         </>

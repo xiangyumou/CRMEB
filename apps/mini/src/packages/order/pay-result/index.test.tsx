@@ -144,7 +144,7 @@ describe('支付结果 — signing in on the page', () => {
     await waitFor(() =>
       expect(taroFake.calls).toContainEqual({
         api: 'navigateTo',
-        args: { url: `/pages/login/index?redirect=${encodeURIComponent(redirect)}` },
+        args: { url: `/pages/login/index?mode=sms&redirect=${encodeURIComponent(redirect)}` },
       }),
     );
   });
