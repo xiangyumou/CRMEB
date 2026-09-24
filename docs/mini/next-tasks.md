@@ -1,13 +1,8 @@
-# Next tasks (not started)
+# Next tasks (done 2026-09-24)
 
-These five tasks were dispatched on 2026-09-24 and stopped before producing anything. Re-dispatch
-each one as its own executor.
-
-- **Branch:** from `storefront/mini`, named `storefront/mini-<task>`, in its own worktree.
-- **Rules:** every executor first reads `docs/mini/executor-rules.md`. Pay particular attention
-  to the machine-load rule.
-- **Status:** each executor keeps `docs/mini/status/<task>.md`.
-- **Parallelism:** they have disjoint ownership, so they can run in parallel.
+These five tasks were re-dispatched on 2026-09-24, finished, and merged into `storefront/mini`.
+Their results are in `docs/mini/status/<task>.md`; what is left over is in `docs/mini/HANDOFF.md`
+§4 and §6. The briefs below are kept for reference only. Do not dispatch them again.
 
 ## K1-security: security review before cutover
 
