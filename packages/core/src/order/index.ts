@@ -162,6 +162,8 @@ export {
 } from './order.fulfil.ports';
 export type {
   FulfilmentNotice,
+  FulfilmentNoticeOrder,
+  FulfilmentNoticeShipment,
   FulfilmentNotifier,
   LogisticsPort,
   StaffRefundPort,

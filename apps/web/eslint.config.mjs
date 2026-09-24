@@ -20,6 +20,18 @@ const NO_PUCK = {
 };
 
 /**
+ * The legacy DIY editor (`src/admin/diy`) is deleted at the cutover
+ * (docs/mini/cutover.md), so the decor editor must not lean on it: what both
+ * need lives in `src/admin/decor` (or the kit), and legacy imports from there.
+ * A regex rather than a glob so a relative `../diy/…` is caught too.
+ */
+const NO_LEGACY_DIY = {
+  regex: '(^|/)(admin/)?diy(/|$)',
+  message:
+    '装修编辑器（src/admin/decor）不能引用旧版 DIY 编辑器（src/admin/diy），它会在切换时删除。',
+};
+
+/**
  * Admin UI rules. `SERVER` files (the route binder and route handlers) are the one part of
  * this app allowed to import `@shop/core`; they must stay free of business logic instead.
  *
@@ -101,8 +113,8 @@ export default [
     },
   },
   {
-    files: ['src/admin/decor/**'],
-    rules: { 'no-restricted-imports': ['error', { patterns: [NO_CORE_OR_DB] }] },
+    files: ['src/admin/decor/**', 'app/admin/(shell)/decor/**'],
+    rules: { 'no-restricted-imports': ['error', { patterns: [NO_CORE_OR_DB, NO_LEGACY_DIY] }] },
   },
   {
     // The client itself is the one place allowed to call fetch.

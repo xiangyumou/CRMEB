@@ -128,6 +128,8 @@ export interface OrderCancelledEvent extends OrderEvent {
 
 export interface OrderRefundedEvent extends OrderEvent {
   refundId: number;
+  /** The 退款单号 a shopper sees; what 退款到账提醒 names (NOTIF-007). */
+  refundNo?: string | undefined;
   refundedAmount: Money;
   /** A partial refund does not end the order's life. */
   partial: boolean;

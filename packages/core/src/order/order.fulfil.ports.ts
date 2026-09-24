@@ -117,7 +117,34 @@ export interface FulfilmentNotice {
   kind: 'shipment.dispatched' | 'order.received' | 'order.completed' | 'virtual.delivered';
   orderId: number;
   userId: number;
+  /** The effect row's payload as it was recorded; ids only (see `order` and `shipment`). */
   payload: Record<string, unknown>;
+  /**
+   * The order as it stands when the handler runs. Read then rather than frozen
+   * into the effect, so a row recorded before these fields existed is told the
+   * same thing as a new one, and a retry hours later reads what is true now.
+   * `null` when the order is gone.
+   */
+  order: FulfilmentNoticeOrder | null;
+  /** `shipment.dispatched` only: the parcel the effect is about. */
+  shipment: FulfilmentNoticeShipment | null;
+}
+
+export interface FulfilmentNoticeOrder {
+  orderNo: string;
+  /** What the buyer paid, `"12.00"`; `null` before payment. */
+  paidAmount: string | null;
+}
+
+export interface FulfilmentNoticeShipment {
+  id: number;
+  deliveryMode: 'express' | 'merchant_delivery' | 'virtual';
+  /** The carrier's name (`express`), enabled or not. */
+  expressCompanyName: string | null;
+  trackingNo: string | null;
+  /** `merchant_delivery` only. */
+  courierName: string | null;
+  courierPhone: string | null;
 }
 
 /**

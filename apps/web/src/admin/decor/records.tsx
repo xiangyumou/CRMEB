@@ -8,10 +8,29 @@ import {
 import type { PresaleActivityListItem } from '@shop/contracts/presale/schemas';
 import { createContext, useContext, type ReactNode } from 'react';
 
-import { ApiError, callRoute } from '../api';
-import type { DiyPickerKind } from '../diy/data-source';
-import { createDiyDataSource } from '../diy/record-source';
+import { callRoute } from '../api';
 import { formatMoney } from '../kit';
+import {
+  listLabels,
+  listProducts,
+  productCategoryTree,
+  resolveLabels,
+  resolveProducts,
+} from './catalog-records';
+import {
+  articleCategoryTree,
+  listArticles,
+  listCoupons,
+  listGroupbuys,
+  pageFiltered,
+  resolveArticles,
+  resolveCoupons,
+  resolveEach,
+  resolveGroupbuys,
+} from './record-kinds';
+import type { DecorRecord, DecorRecordPage, DecorRecordQuery, DecorTreeNode } from './record-types';
+
+export type { DecorRecord, DecorRecordPage, DecorRecordQuery, DecorTreeNode } from './record-types';
 
 /**
  * The records a decorated page can point at, for the editor's pickers.
@@ -26,19 +45,19 @@ import { formatMoney } from '../kit';
  * | `presale`  | presale campaigns          | active and not yet ended                 |
  * | `page`     | decor documents (微页面)    | every 微页面 (published or not: see below) |
  *
- * The first five reuse the legacy editor's data source (`admin/diy`, which
- * already answers them from each owning domain's admin contracts) rather
- * than growing a second copy; when the legacy editor is removed at the
- * cutover, `catalog-source.ts` and `record-source.ts` move here. 预售 and 微页面
- * are new with v2 and live here.
+ * Each kind is answered from the owning domain's admin contracts:
+ * `catalog-records.ts` (商品, 商品标签, 商品分类), `record-kinds.ts` (文章,
+ * 优惠券, 拼团) and this file (预售, 微页面). The first five used to live in the
+ * legacy editor (`admin/diy`), which now borrows them from here; nothing in
+ * this folder imports `admin/diy` (lint enforces it), so the cutover can
+ * delete it whole.
  *
  * A 微页面 link may point at a page that is not published yet: operators build
  * the landing page and the banner that links to it together. The server warns
  * about a link to an unpublished page when the linking page is saved
  * (DECOR-004); the storefront skips it until the page goes live.
  *
- * Like `DiyDataSource`, this is a port the pickers call inside a query, and
- * there is no default: a picker outside `<DecorRecordSourceProvider>` throws,
+ * This is a port the pickers call inside a query, and there is no default: a picker outside `<DecorRecordSourceProvider>` throws,
  * so nothing outside the shop can be picked into a stored page.
  */
 
@@ -55,30 +74,6 @@ export const RECORD_KIND_LABELS: Record<DecorRecordKind, string> = {
   page: '微页面',
 };
 
-export interface DecorRecord {
-  id: string;
-  name: string;
-  image?: string | undefined;
-  subtitle?: string | undefined;
-}
-
-export interface DecorRecordQuery {
-  keyword?: string | undefined;
-  page: number;
-  pageSize: number;
-}
-
-export interface DecorRecordPage {
-  items: DecorRecord[];
-  total: number;
-}
-
-export interface DecorTreeNode {
-  id: string;
-  name: string;
-  children?: DecorTreeNode[] | undefined;
-}
-
 export interface DecorRecordSource {
   list(kind: DecorRecordKind, query: DecorRecordQuery): Promise<DecorRecordPage>;
   /**
@@ -90,13 +85,10 @@ export interface DecorRecordSource {
   categories(kind: 'product' | 'article'): Promise<DecorTreeNode[]>;
 }
 
-const DIY_KIND: Partial<Record<DecorRecordKind, DiyPickerKind>> = {
-  product: 'product',
-  label: 'labels',
-  article: 'article',
-  coupon: 'coupon',
-  groupbuy: 'combination',
-};
+interface KindSource {
+  list(query: DecorRecordQuery): Promise<DecorRecordPage>;
+  resolve(ids: readonly string[]): Promise<DecorRecord[]>;
+}
 
 export interface DecorRecordSourceOptions {
   /** The clock the time-window filters read. Tests pin it. */
@@ -105,41 +97,26 @@ export interface DecorRecordSourceOptions {
 
 export function createDecorRecordSource(options: DecorRecordSourceOptions = {}): DecorRecordSource {
   const now = options.now ?? (() => new Date());
-  const diy = createDiyDataSource({ now });
+  // A `Record` over every kind, so a new kind does not compile until it has a
+  // real list and resolve.
+  const kinds: Record<DecorRecordKind, KindSource> = {
+    product: { list: listProducts, resolve: resolveProducts },
+    label: { list: listLabels, resolve: resolveLabels },
+    article: { list: listArticles, resolve: resolveArticles },
+    coupon: { list: (query) => listCoupons(query, now()), resolve: resolveCoupons },
+    groupbuy: { list: (query) => listGroupbuys(query, now()), resolve: resolveGroupbuys },
+    presale: { list: (query) => listPresales(query, now()), resolve: resolvePresales },
+    page: { list: listPages, resolve: resolvePages },
+  };
   return {
-    list(kind, query) {
-      const legacy = DIY_KIND[kind];
-      if (legacy) return diy.list(legacy, query);
-      return kind === 'presale' ? listPresales(query, now()) : listPages(query);
-    },
-    resolve(kind, ids) {
-      const legacy = DIY_KIND[kind];
-      if (ids.length === 0) return Promise.resolve([]);
-      if (legacy) return diy.resolve(legacy, ids);
-      return kind === 'presale' ? resolvePresales(ids) : resolvePages(ids);
-    },
-    categories: (kind) => diy.categories(kind),
+    list: (kind, query) => kinds[kind].list(query),
+    resolve: (kind, ids) => (ids.length === 0 ? Promise.resolve([]) : kinds[kind].resolve(ids)),
+    categories: (kind): Promise<DecorTreeNode[]> =>
+      kind === 'product' ? productCategoryTree() : articleCategoryTree(),
   };
 }
 
 // ---------------------------------------------------------------------------
-
-async function resolveEach(
-  ids: readonly string[],
-  load: (id: string) => Promise<DecorRecord>,
-): Promise<DecorRecord[]> {
-  const rows = await Promise.all(
-    ids.map(async (id) => {
-      try {
-        return [await load(id)];
-      } catch (error) {
-        if (ApiError.is(error) && error.status === 404) return [];
-        throw error;
-      }
-    }),
-  );
-  return rows.flat();
-}
 
 function toPresaleRecord(row: {
   id: string;
@@ -164,24 +141,20 @@ export function isPresaleShowable(row: PresaleActivityListItem, now: Date): bool
 async function listPresales(query: DecorRecordQuery, now: Date): Promise<DecorRecordPage> {
   // The list cannot filter on the clock, so read it whole (it is small) and
   // page the survivors here — the same approach as the 拼团 picker.
-  const kept: PresaleActivityListItem[] = [];
-  for (let page = 1; page <= 50; page += 1) {
-    const batch = await callRoute(presaleAdminActivityList, {
-      query: {
-        page,
-        pageSize: 100,
-        status: 'active',
-        ...(query.keyword ? { keyword: query.keyword } : {}),
-      },
-    });
-    kept.push(...batch.items.filter((row) => isPresaleShowable(row, now)));
-    if (batch.items.length < 100 || page * 100 >= batch.total) break;
-  }
-  const start = (query.page - 1) * query.pageSize;
-  return {
-    items: kept.slice(start, start + query.pageSize).map(toPresaleRecord),
-    total: kept.length,
-  };
+  const result = await pageFiltered(
+    (page, pageSize) =>
+      callRoute(presaleAdminActivityList, {
+        query: {
+          page,
+          pageSize,
+          status: 'active',
+          ...(query.keyword ? { keyword: query.keyword } : {}),
+        },
+      }),
+    (row) => isPresaleShowable(row, now),
+    query,
+  );
+  return { items: result.items.map(toPresaleRecord), total: result.total };
 }
 
 function resolvePresales(ids: readonly string[]): Promise<DecorRecord[]> {
