@@ -126,7 +126,12 @@ export const groupbuyAdminActivityUpdate = defineRoute({
   params: activityParams,
   body: groupbuyActivityForm,
   response: groupbuyActivityDetail,
-  errors: ['GROUPBUY_ACTIVITY_NOT_FOUND', 'GROUPBUY_SKU_NOT_IN_ACTIVITY'],
+  errors: [
+    'GROUPBUY_ACTIVITY_NOT_FOUND',
+    'GROUPBUY_SKU_NOT_IN_ACTIVITY',
+    'GROUPBUY_STOCK_CHANGED',
+    'GROUPBUY_ACTIVITY_ENDED',
+  ],
   examples: [
     {
       name: 'reprice',

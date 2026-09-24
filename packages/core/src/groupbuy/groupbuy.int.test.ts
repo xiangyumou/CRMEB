@@ -1366,6 +1366,94 @@ describe('the admin surface', () => {
     expect(edited.title).toBe('改过名字的活动');
   });
 
+  describe('editing while orders move the stock', () => {
+    // The form was opened at 10; a team leader paid since, so the rows say 9.
+    async function soldOneSinceTheFormOpened() {
+      const fixture = await makeActivity({ stock: 10 });
+      await pay((await placeOrder({ userId: await makeUser(), fixture })).orderId);
+      expect((await readActivityCounters(fixture)).activity).toEqual({ stock: 9, sales: 1 });
+      return fixture;
+    }
+    async function edit(
+      fixture: ActivityFixture,
+      stock: { activity: number; sku: number; expected: number },
+      status: 'active' | 'ended' = 'active',
+    ) {
+      const admin = asAdmin(['groupbuy:activity:read', 'groupbuy:activity:write']);
+      const before = await service.adminActivityDetail(admin, { id: String(fixture.activityId) });
+      return service.adminActivityUpdate(
+        admin,
+        { id: String(fixture.activityId) },
+        {
+          productId: String(fixture.productId),
+          title: '改过名字的活动',
+          sliderImages: [],
+          status,
+          price: '59.00',
+          seatsRequired: before.seatsRequired,
+          groupTtlSeconds: before.groupTtlSeconds,
+          stock: stock.activity,
+          expectedStock: stock.expected,
+          perOrderQuantity: 2,
+          startAt: before.startAt,
+          endAt: before.endAt,
+          sortOrder: 0,
+          skus: [
+            {
+              skuId: String(fixture.skuId),
+              price: '59.00',
+              stock: stock.sku,
+              expectedStock: stock.expected,
+              isEnabled: true,
+            },
+          ],
+        },
+      );
+    }
+
+    it('keeps the live stock when the operator only fixed the title', async () => {
+      const fixture = await soldOneSinceTheFormOpened();
+      await edit(fixture, { activity: 10, sku: 10, expected: 10 });
+      const after = await readActivityCounters(fixture);
+      expect(after.activity).toEqual({ stock: 9, sales: 1 });
+      expect(after.sku).toEqual({ stock: 9, sales: 1 });
+    });
+
+    it('refuses a changed stock the form saw before the sale', async () => {
+      const fixture = await soldOneSinceTheFormOpened();
+      await expect(edit(fixture, { activity: 50, sku: 10, expected: 10 })).rejects.toMatchObject({
+        code: 'GROUPBUY_STOCK_CHANGED',
+        details: { expected: 10, current: 9 },
+      });
+      await expect(edit(fixture, { activity: 10, sku: 50, expected: 10 })).rejects.toMatchObject({
+        code: 'GROUPBUY_STOCK_CHANGED',
+        details: { skuId: fixture.skuId, expected: 10, current: 9 },
+      });
+      expect((await readActivityCounters(fixture)).activity).toEqual({ stock: 9, sales: 1 });
+    });
+
+    it('writes a changed stock over the number the form saw', async () => {
+      const fixture = await soldOneSinceTheFormOpened();
+      await edit(fixture, { activity: 50, sku: 40, expected: 9 });
+      const after = await readActivityCounters(fixture);
+      expect(after.activity).toEqual({ stock: 50, sales: 1 });
+      expect(after.sku).toEqual({ stock: 40, sales: 1 });
+    });
+
+    it('does not re-open an ended campaign', async () => {
+      const fixture = await makeActivity({ stock: 10 });
+      await harness.ctx.db
+        .update(groupbuyActivities)
+        .set({ status: 'ended' })
+        .where(eq(groupbuyActivities.id, fixture.activityId));
+      await expect(edit(fixture, { activity: 10, sku: 10, expected: 10 })).rejects.toMatchObject({
+        code: 'GROUPBUY_ACTIVITY_ENDED',
+      });
+      const kept = await edit(fixture, { activity: 10, sku: 10, expected: 10 }, 'ended');
+      expect(kept.status).toBe('ended');
+    });
+  });
+
   it('reports what a campaign did', async () => {
     const fixture = await makeActivity({ seatsRequired: 2, stock: 10 });
     const leader = await makeUser();

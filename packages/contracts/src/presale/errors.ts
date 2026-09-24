@@ -12,6 +12,16 @@ export const presaleErrors = defineErrors({
   /** The activity id does not exist, is soft-deleted, or is not visible to shoppers. */
   PRESALE_ACTIVITY_NOT_FOUND: { status: 404, message: '预售活动不存在或已下架' },
   /** The activity exists but is `draft` / `paused` / `ended`, or `now` is outside its sale window. */
+  /**
+   * An edit changed a stock that orders moved since the form was opened.
+   * `details` carries `{ skuId?, expected, current }` (no `skuId`: the activity's own stock).
+   */
+  PRESALE_STOCK_CHANGED: {
+    status: 409,
+    message: '库存在你编辑期间已被订单改动，请刷新后重新填写库存',
+  },
+  /** Editing an `ended` 预售 activity back to life. It is copied, not re-opened. */
+  PRESALE_ACTIVITY_ENDED: { status: 409, message: '已结束的活动不能重新开启，请复制一个新活动' },
   PRESALE_ACTIVITY_NOT_OPEN: { status: 409, message: '该预售活动当前不可购买' },
   /** The order's lines are not the activity's product, or name a SKU the activity does not sell. */
   PRESALE_SKU_NOT_IN_ACTIVITY: { status: 422, message: '所选规格不参与该预售活动' },

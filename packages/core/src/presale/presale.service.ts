@@ -13,6 +13,7 @@ import type {
 } from '@shop/contracts/presale/schemas';
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
+import { resolveActivityStocks } from '../kernel/stock-edit';
 import { toId, toIdOrNull } from '../kernel/ids';
 import * as repo from './presale.repo';
 import { assertFullPayment, canBuy } from './presale.rules';
@@ -93,12 +94,31 @@ export async function adminActivityUpdate(
   const id = Number(input.id);
   return ctx.withTx(async (tx) => {
     assertFullPayment(body);
-    await mustFindActivity(ctx, id, tx);
+    const locked = await repo.lockActivityStock(tx, id);
+    if (!locked) throw new DomainError('PRESALE_ACTIVITY_NOT_FOUND');
+    // `ended` is terminal (see `adminActivitySetStatus`): the form cannot re-open it either.
+    if (locked.status === 'ended' && body.status !== 'ended') {
+      throw new DomainError('PRESALE_ACTIVITY_ENDED');
+    }
     await assertSkusBelongToProduct(tx, body);
+    const skus = skuValues(body);
+    // Orders moved these counters while the form was open; see `resolveStockEdit`.
+    const stocks = resolveActivityStocks(
+      locked,
+      { stock: body.stock, expectedStock: body.expectedStock, skus: expectedOf(body, skus) },
+      'PRESALE_STOCK_CHANGED',
+    );
     const now = ctx.clock.now();
-    const moved = await repo.updateActivity(tx, id, { ...activityValues(body), updatedAt: now });
+    const moved = await repo.updateActivity(tx, id, {
+      ...activityValues(body),
+      stock: stocks.stock,
+      updatedAt: now,
+    });
     if (!moved.won) throw new DomainError('PRESALE_ACTIVITY_NOT_FOUND');
-    await repo.replaceActivitySkus(tx, { activityId: id, skus: skuValues(body) });
+    await repo.replaceActivitySkus(tx, {
+      activityId: id,
+      skus: skus.map((sku) => ({ ...sku, stock: stocks.skuStocks.get(sku.skuId) ?? sku.stock })),
+    });
     return toDetail(ctx, await mustFindActivity(ctx, id, tx), tx);
   });
 }
@@ -381,6 +401,11 @@ function skuValues(body: PresaleActivityForm): repo.ActivitySkuInput[] {
     quota: sku.quota ?? null,
     isEnabled: sku.isEnabled,
   }));
+}
+
+/** The form's SKUs with the stock each was showing when it loaded. */
+function expectedOf(body: PresaleActivityForm, skus: readonly repo.ActivitySkuInput[]) {
+  return skus.map((sku, index) => ({ ...sku, expectedStock: body.skus[index]?.expectedStock }));
 }
 
 function toListItem(row: repo.ActivityRow): PresaleActivityListItem {

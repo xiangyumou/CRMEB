@@ -166,6 +166,9 @@ export const presaleFields: FieldSpec<Extract<keyof PresaleActivityForm, string>
   { kind: 'money', name: 'price', label: '预售价', span: 6 },
   { kind: 'money', name: 'originalPrice', label: '原价', span: 6, help: '划线价，留空不展示' },
   { kind: 'number', name: 'stock', label: '活动库存', span: 6, min: 0 },
+  // What the form loaded with; the server keeps an untouched stock and refuses
+  // a changed one that orders moved meanwhile.
+  { kind: 'hidden', name: 'expectedStock' },
   {
     kind: 'number',
     name: 'totalQuota',

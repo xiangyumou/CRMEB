@@ -380,6 +380,29 @@ export interface ActivitySkuInput {
 }
 
 /**
+ * The activity's status and stock and every SKU's stock, locked for the rest
+ * of the edit's transaction: an order decrementing either waits, so what the
+ * edit compares against is what it overwrites.
+ */
+export async function lockActivityStock(
+  tx: Tx,
+  id: number,
+): Promise<{ status: string; stock: number; skus: Map<number, number> } | null> {
+  const [activity] = await tx
+    .select({ status: groupbuyActivities.status, stock: groupbuyActivities.stock })
+    .from(groupbuyActivities)
+    .where(and(eq(groupbuyActivities.id, id), isNull(groupbuyActivities.deletedAt)))
+    .for('update');
+  if (!activity) return null;
+  const skus = await tx
+    .select({ skuId: groupbuyActivitySkus.skuId, stock: groupbuyActivitySkus.stock })
+    .from(groupbuyActivitySkus)
+    .where(eq(groupbuyActivitySkus.activityId, id))
+    .for('update');
+  return { ...activity, skus: new Map(skus.map((row) => [row.skuId, row.stock])) };
+}
+
+/**
  * Upserts the rows the form names and deletes the rest.
  *
  * `sales` is never in the `set`: it is the server's running total and an edit

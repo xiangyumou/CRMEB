@@ -53,6 +53,8 @@ export const presaleActivitySkuInput = z.object({
   skuId: id,
   price: money,
   stock: z.number().int().min(0).max(1_000_000),
+  /** The stock the form loaded with; see `expectedStock` on the product SKU input. */
+  expectedStock: z.number().int().min(0).optional(),
   quota: z.number().int().min(0).max(1_000_000).optional(),
   isEnabled: z.boolean().default(true),
 });
@@ -102,6 +104,11 @@ export const presaleActivityForm = z
     price: money,
     originalPrice: money.optional(),
     stock: z.number().int().min(0).max(1_000_000),
+    /**
+     * The stock the form loaded with. Unchanged, the live number is kept;
+     * changed while orders moved it, the save is refused with `*_STOCK_CHANGED`.
+     */
+    expectedStock: z.number().int().min(0).optional(),
     totalQuota: z.number().int().min(0).max(1_000_000).optional(),
     perOrderQuantity: z.number().int().min(1).max(999).default(1),
     startAt: instant,

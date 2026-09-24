@@ -228,6 +228,9 @@ export const groupbuyActivityFields: FieldSpec<Extract<keyof GroupbuyActivityFor
     help: '开团后多久未满员即失败退款；86400 = 24 小时',
   },
   { kind: 'number', name: 'stock', label: '活动库存', span: 6, min: 0 },
+  // What the form loaded with; the server keeps an untouched stock and refuses
+  // a changed one that orders moved meanwhile.
+  { kind: 'hidden', name: 'expectedStock' },
   {
     kind: 'number',
     name: 'totalQuota',

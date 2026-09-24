@@ -57,6 +57,8 @@ export const groupbuyActivitySkuInput = z.object({
   skuId: id,
   price: money,
   stock: z.number().int().min(0).max(1_000_000),
+  /** The stock the form loaded with; see `expectedStock` on the product SKU input. */
+  expectedStock: z.number().int().min(0).optional(),
   quota: z.number().int().min(0).max(1_000_000).optional(),
   isEnabled: z.boolean().default(true),
 });
@@ -127,6 +129,11 @@ export const groupbuyActivityForm = z
       .min(60)
       .max(30 * 24 * 3600),
     stock: z.number().int().min(0).max(1_000_000),
+    /**
+     * The stock the form loaded with. Unchanged, the live number is kept;
+     * changed while orders moved it, the save is refused with `*_STOCK_CHANGED`.
+     */
+    expectedStock: z.number().int().min(0).optional(),
     totalQuota: z.number().int().min(0).max(1_000_000).optional(),
     /** 每单限购份数. */
     perOrderQuantity: z.number().int().min(1).max(999).default(1),
