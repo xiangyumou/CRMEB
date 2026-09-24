@@ -115,6 +115,9 @@ token 默认 30 天有效（后台「登录保持天数」`sessionTtlDays`）。
 这两种情况密码本身是对的，客户端（`signInWithPassword`）去掉 `bindToken` 再提交一次，照常登录但不关联 openid：token 在
 `sessionTtlDays` 内照常使用，到期后的续期回到 `phone-required`（登录页）；续期碰到这个 openid 已绑定的另一个账号时，
 不登录到那个账号，回到登录页（AUTH-010）。
+`AUTH_WECHAT_ALREADY_BOUND` 这样重登成功后，登录页离开、到了要去的页面之后，toast（3 秒）「此微信已关联其他账号，本账号需用密码登录」
+（`takeSignInHint`，只提示一次）：下次打开小程序会静默登录到那个账号，要用本账号得退出后再用密码登录。`AUTH_WECHAT_BIND_EXPIRED`
+不提示（什么都没绑，下次打开还会问手机号）。提示放在跳转之后：放在登录页上会随登录页一起消失，跳转途中弹出微信可能不显示。
 不在 `phone-required` 时（例如退出后）没有 `bindToken`，同样不关联。
 
 ## 隐私保护指引
