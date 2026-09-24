@@ -108,15 +108,9 @@ test('a presale with a stacked coupon still shows the presale price on the order
   shop,
   playwright,
 }) => {
-  // Known failure, found by this test (I2): 订单详情 prints the line at its catalogue
-  // `unitPrice` (¥88.00) and the whole order discount — the ¥10 presale activity plus the ¥5
-  // coupon — as 优惠券 -¥15.00; the uni-app reads the line adjustments and prints ¥78.00 and
-  // 优惠券抵扣 ¥5.00. `test.fail` keeps the suite green until the order pages are fixed, and turns
-  // red the day they are, so this line is removed with the fix.
-  test.fail(
-    true,
-    'mini order pages print the catalogue price and lump the presale discount into 优惠券',
-  );
+  // Found by this test (I2), fixed in J1: the order pages read the line's adjustments
+  // (`apps/mini/src/lib/order-price.ts`) rather than print `unitPrice` and lump the activity
+  // into 优惠券.
   const shopper = await returningShopper(page, wechatUser, shop, playwright);
   await withTemplate(
     shop,

@@ -10,24 +10,33 @@ presale price defect, 我的评价 status, the receipt foreground fallback.
    line's `adjustments`; the line prints at the activity price, 商品金额 after the activity,
    优惠券 the coupon alone (as the uni-app). Older lines without adjustments: the uni-app's
    fallback (single-line activity order, `userCouponId === null`). `lib/money.ts` now holds
-   `toCents`/`fromCents` (aftersale re-exports them).
+   `toCents`/`fromCents` (aftersale re-exports them). `coupons.spec.ts`'s `test.fail` removed,
+   e2e-coverage.md rows updated. 确认订单 (J2's) itemises the activity as its own row and 支付结果 /
+   收银台 show no line prices: nothing to fix there.
 2. 订单详情: 拼团 → 查看拼团 cell (`groupbuyTeam { id: groupbuyTeamId }`) when non-null.
 3. 评价 page shows `reviewable` lines to write and `reviewed` lines as done up front;
    `CATALOG_REVIEW_ALREADY_WRITTEN` still counts as done. 去评价 only while a line is
-   `reviewable` (received or completed).
+   `reviewable` (received or completed). `OrderCard` / `orderActions` take storefront lines.
+4. 我的订单 待评价 tab (`counts.unreviewed` badge).
+5. 订单入口 `unreviewed` → `orderList { tab: 'unreviewed' }` (block, `ORDER_ENTRY_KEYS`
+   comment, `user-center.test.tsx`, decor.md 角标 note).
+6. 填写退货物流: server search (`keyword` debounced 300 ms, `limit: 30`), fetched when the sheet
+   opens; `PICKER_LIMIT` / `matchCompanies` gone. Unit tests assert the requests.
+7. 我的评价 status: already delivered by stream E (fc28c351f: `status` on `catalog.myReviews`,
+   service read, badges 「审核后展示」/「仅自己可见」). Added a `held-and-hidden` contract example
+   (parses) and the hidden badge to the page test. Copy kept (see Open questions).
+8. Receipt foreground fallback (C07): `platform/receipt.ts` listens to `onAppShow`
+   (`platform/lifecycle.ts` `onAppShown`) only while the component is open;
+   `referrerInfo.extraData.status` settles it, a bare return waits `RETURN_GRACE_MS` (1.5 s)
+   then posts `{ via: 'wechat-component' }` (server checks `get_order`); a refusal then is the
+   quiet outcome `returned`, and `useOrderActions` re-reads the order. Unit tests (receipt,
+   订单详情), Taro fake gained `showApp(options)` and `businessViewStatus: 'hang'`; the emulation
+   gained `receipt: 'confirm-silently'` (+ the e2e type), and `orders.spec.ts` a journey for it.
+9. Docs: pages.md rows (我的订单, 订单详情, 评价, 填写退货物流), wechat-compliance.md C07 client note.
 
 ## In progress
 
-- 待评价 tab.
-
-## Pending
-
-- 订单入口 block → `orderList { tab: 'unreviewed' }`; decor.md note.
-- 填写退货物流 server search.
-- 我的评价 status (contract + service + page).
-- Receipt foreground fallback.
-- e2e: remove the `test.fail` in `coupons.spec.ts`; e2e-coverage.md row.
-- Checklist.
+- Merge checklist.
 
 ## Page-form changes (旧 → 新)
 
@@ -40,6 +49,10 @@ presale price defect, 我的评价 status, the receipt foreground fallback.
 - 订单详情 received note: 「感谢购买」 once nothing is left to review (旧 always 「…欢迎评价」).
 - 评价 page: lines already reviewed show as 「已评价」 up front; everything reviewed → 「已经评价过了」
   result page (旧 the form, refused line by line on submit).
+- 我的订单: a 待评价 tab between 待收货 and 已完成, with a count (旧 none; 已完成 covered it).
+- 个人中心 订单入口 待评价 opens 我的订单's 待评价 tab (旧 我的评价).
+- 填写退货物流: the courier list comes from a server search as the shopper types (旧 one list of
+  everything, filtered on the phone). Same sheet, same 30 shown.
 
 ## Backend gaps
 
@@ -47,4 +60,6 @@ presale price defect, 我的评价 status, the receipt foreground fallback.
 
 ## Open questions
 
-- None so far.
+- 我的评价 badge copy: the brief says 审核中 / 已隐藏; E shipped 「审核后展示」 / 「仅自己可见」 (same
+  words as the 评价 page's 「评价已提交，审核后展示」, and 仅自己可见 does not say the shop took it
+  down). Kept E's; a one-line change in `REVIEW_STATE_TEXT` if the user prefers the brief's.
