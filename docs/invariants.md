@@ -414,8 +414,6 @@ The export is one row per SKU, reports truncation honestly rather than silently 
 - `apps/web/app/admin/(shell)/catalog/products/product-list.test.tsx::商品列表 > exports the current tab as a CSV the browser writes`
 - `apps/web/app/admin/(shell)/catalog/products/product-list.test.tsx::hides every write action from a read-only admin`
 
-## Cart and order creation
-
 ### RISK-B1-001
 
 An off-shelf or deleted product refuses the order instead of being quietly dropped from the lines, and its cart row stays visible with a reason so the shopper can act on it.
@@ -593,6 +591,11 @@ Over real HTTP, submitting an order with an already spent coupon is refused befo
 - `packages/contracts/src/order/checkout-kind.test.ts::ORDER-009 — typed kindMeta > what the union tightens > strips a key the kind does not declare, above all a smuggled kind`
 - `packages/contracts/src/order/checkout-kind.test.ts::ORDER-009 — typed kindMeta > what the union tightens > discards whatever kindMeta an ordinary order carries`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::ORDER-009 — a kind smuggled into kindMeta never reprices an ordinary order`
+- `packages/contracts/src/order/checkout-kind.test.ts::ORDER-009 — typed kindMeta > what the union tightens > discards a presale kind smuggled into an ordinary order, on create too`
+- `packages/contracts/src/order/checkout-kind.test.ts::ORDER-009 — typed kindMeta > what the union tightens > refuses a kind the union does not know, however kindMeta is dressed`
+- `packages/core/src/presale/presale.checkout.int.test.ts::ORDER-009 — a presale kind smuggled into kindMeta > never quotes 预售价 on an ordinary order`
+- `packages/core/src/presale/presale.checkout.int.test.ts::ORDER-009 — a presale kind smuggled into kindMeta > places it as an ordinary order at the catalogue price, and leaves the campaign alone`
+- `packages/core/src/presale/presale.checkout.int.test.ts::ORDER-009 — a presale kind smuggled into kindMeta > keeps a real presale order at 预售价 whatever else its kindMeta carries`
 
 ## Orders, ownership and the cashier
 
