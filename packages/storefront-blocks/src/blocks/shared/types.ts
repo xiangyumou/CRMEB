@@ -46,7 +46,8 @@ export type BlockIntent =
  *   and shows the poster until the overlay closes (design.md §2.6).
  * - `resolveImage`: turns a stored picture URL into the one to load. `width`
  *   asks for the server's smaller copy (480 or 960 px wide) where one exists;
- *   without it, the original. The mini-program resolves `/uploads/…` against
+ *   without it, the original — which is also how the 视频 block resolves its
+ *   video URL (never with a width). The mini-program resolves `/uploads/…` against
  *   the API origin and derives the copy's URL; without it (the editor) a block
  *   loads the stored URL as it is. A block always falls back to the original
  *   when a copy fails to load (`BlockImage`).

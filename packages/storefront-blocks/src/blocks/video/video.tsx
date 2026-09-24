@@ -21,10 +21,14 @@ const RATIO_CLASS: Record<VideoRatio, string | undefined> = {
  * is not mounted in the editor (the poster and a play mark stand in), nor
  * while the host reports an overlay open: a native `<video>` draws above
  * every view, so it is unmounted — which stops it — and the poster shows
- * until the overlay closes (design.md §2.6).
+ * until the overlay closes (design.md §2.6). The video's URL goes through
+ * the host's `resolveImage` without a width: the original, resolved.
  */
 export function Video({ props, host }: BlockProps<VideoProps>) {
   const still = host?.canvas === true || host?.overlayOpen === true;
+  // The video and its poster as stored URLs resolved like any picture's
+  // original (a relative `/uploads/…` against the API origin); never a copy.
+  const resolve = (src: string) => (host?.resolveImage ? host.resolveImage(src) : src);
   return (
     <BlockFrame type="video" frame={props.style}>
       <View className={cx(styles.frame, RATIO_CLASS[props.ratio])}>
@@ -47,10 +51,8 @@ export function Video({ props, host }: BlockProps<VideoProps>) {
         ) : (
           <NativeVideo
             className={styles.player}
-            src={props.src}
-            {...(props.poster
-              ? { poster: host?.resolveImage ? host.resolveImage(props.poster) : props.poster }
-              : {})}
+            src={resolve(props.src)}
+            {...(props.poster ? { poster: resolve(props.poster) } : {})}
             controls
             autoplay={props.autoplay}
             muted={props.muted}

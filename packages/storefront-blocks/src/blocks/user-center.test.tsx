@@ -1,5 +1,5 @@
 import { fireEvent, screen } from '@testing-library/dom';
-import type { ReactNode } from 'react';
+import { act, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -19,6 +19,12 @@ afterEach(cleanup);
  * The 个人中心 blocks, through the DOM shim, on React 19 and React 18. Their
  * per-shopper state arrives as `personal` (DECOR-015); a guest has none.
  */
+
+/** A host resolver that shows what it was asked for. */
+const resolveImage = (src: string, width?: 480 | 960) =>
+  width ? `https://api.test${src}@${width}` : `https://api.test${src}`;
+const sources = (container: Element) =>
+  [...container.querySelectorAll('img')].map((img) => img.getAttribute('src'));
 
 const route = (to: string, params: Record<string, string> = {}) => ({
   kind: 'route',
@@ -94,6 +100,30 @@ describe('OrderEntry', () => {
     expect(onLink).toHaveBeenLastCalledWith(route('orderList'));
     expect(orderEntryLink('unreviewed')).toEqual(route('orderList', { tab: 'unreviewed' }));
   });
+
+  it('loads a custom icon through the host (its 480 px copy), the built-in ones as they are', () => {
+    const items = fixtureOrderEntry.items.map((item, n) =>
+      n === 0 ? { ...item, icon: '/uploads/unpaid.png' } : item,
+    );
+    const { container } = render(
+      <OrderEntry props={{ ...fixtureOrderEntry, items }} host={{ resolveImage }} />,
+    );
+    const [custom, ...builtIn] = sources(container);
+    expect(custom).toBe('https://api.test/uploads/unpaid.png@480');
+    expect(builtIn).toHaveLength(4);
+    for (const src of builtIn) expect(src).toMatch(/^data:image\/svg\+xml/);
+
+    act(() => {
+      fireEvent.error(container.querySelector('img') as Element);
+    });
+    expect(sources(container)[0]).toBe('https://api.test/uploads/unpaid.png');
+  });
+
+  it('loads a custom icon as stored without a resolver (the editor canvas)', () => {
+    const items = [{ ...fixtureOrderEntry.items[0]!, icon: '/uploads/unpaid.png' }];
+    const { container } = render(<OrderEntry props={{ ...fixtureOrderEntry, items }} />);
+    expect(sources(container)).toEqual(['/uploads/unpaid.png']);
+  });
 });
 
 describe('ServiceGrid', () => {
@@ -129,6 +159,26 @@ describe('ServiceGrid', () => {
   it('draws the label’s first character when an entry has no icon', () => {
     render(<ServiceGrid props={fixtureServiceGrid} />);
     expect(screen.getByText('联')).toBeTruthy();
+  });
+
+  it('loads a custom icon through the host (its 480 px copy), the original when that fails', () => {
+    const items = fixtureServiceGrid.items.map((item, n) =>
+      n === 0 ? { ...item, icon: '/uploads/coupon.png' } : item,
+    );
+    const { container } = render(
+      <ServiceGrid props={{ ...fixtureServiceGrid, items }} host={{ resolveImage }} />,
+    );
+    expect(sources(container)).toEqual(['https://api.test/uploads/coupon.png@480']);
+    act(() => {
+      fireEvent.error(container.querySelector('img') as Element);
+    });
+    expect(sources(container)).toEqual(['https://api.test/uploads/coupon.png']);
+  });
+
+  it('loads a custom icon as stored without a resolver (the editor canvas)', () => {
+    const items = [{ ...fixtureServiceGrid.items[0]!, icon: '/uploads/coupon.png' }];
+    const { container } = render(<ServiceGrid props={{ ...fixtureServiceGrid, items }} />);
+    expect(sources(container)).toEqual(['/uploads/coupon.png']);
   });
 });
 
