@@ -135,22 +135,108 @@
 - [ ] 文件头注释里的「the uni-app storefront」。
 - [ ] `storefront-e2e` 任务（uni-app 的 `npm ci`、`uni-app unit tests`、`test`）删除；`storefront-e2e-mini` 改名为
       `storefront-e2e`，跑合并后的 `test`。
-- [ ] 镜像任务的「Build the H5 storefront」「Resolve the H5 bundle」两步，改为使用落地页目录（见 2.10）；edge 步骤的
-      `build-args` 和「the storefront from `apps/uni-app/`」注释。
+- [ ] 镜像任务的「Build the H5 storefront」「Resolve the H5 bundle」两步删除：落地页由 `web` 回答（见 2.10），
+      edge 镜像不再带任何前端产物；edge 步骤的 `build-args: H5_DIST=…` 和「the storefront from `apps/uni-app/`」注释一并删除。
 - [ ] `REL-*` 规则和 `pipeline` 守卫若提到这两步，同步修改（改完跑 `pnpm guards`）。
 
 ### 2.10 edge：`/` 改为落地页
 
-- [ ] 新增静态落地页（例如 `docker/edge/landing/index.html`）：店名、小程序码图片、一句「请在微信中扫码打开」。
-      小程序码用公众平台「设置 → 基本设置」下载的正式版小程序码，作为静态图片放进同一目录（它是公开信息）；
-      `GET /api/v1/share/mini-codes` 需要登录，不能给落地页用。
-- [ ] `docker/edge/Dockerfile`：`H5_DIST` 参数改为落地页目录（或去掉参数，直接 `COPY docker/edge/landing/`）；
-      删除 `docker/edge/h5-placeholder/`；`*.dockerignore` 里关于 uni-app 的条目。
-- [ ] `docker/edge/nginx.conf`：`location /` 的回退仍指向 `index.html`（旧 H5 链接、旧分享链接都落到落地页）；
-      哈希静态资源的长缓存规则可以保留或删去；注释改为落地页。
-- [ ] `deploy/rehearsal/drill.sh` 第 655 行起的检查把「storefront 的 `index.html`」改为落地页，逻辑不变（它证明每个应用路径都由 web 回答，
-      而不是被回退页吞掉）；`deploy/README.md` 相应段落。
-- [ ] `e2e/storefront` 不受影响（它自己起 edge，根目录是小程序的模拟构建）。
+落地页已经写好（R1）：`apps/web/app/page.tsx`，由 `web` 容器回答，**还没有接到 edge 上**——在切换之前，edge 的 `/`
+仍是 uni-app H5，落地页只在直接访问 `web:3000/` 时看得到。它显示店名（「站点设置 → 商城名称」）、首页的小程序码和
+「请使用微信扫码打开」；小程序未启用或 AppID、AppSecret 没填时，显示「请在微信中搜索「<小程序名称>」小程序」的文字；
+页脚是「站点设置 → 备案」里填了的 ICP 备案号和公安备案号。小程序码走 `shareMiniCodeUrl`（与分享海报同一个缓存表），
+结果在 Redis 缓存一天；微信拒绝时显示文字并暂停十分钟再试，匿名访问最多每十分钟触发一次微信调用
+（`apps/web/src/server/landing.ts`）。所以原计划里「从公众平台下载小程序码放进静态目录」不再需要。
+
+- [ ] **发布前确认**：生产上后台「小程序设置」已启用、AppID 和 AppSecret 已填、「小程序码打开的版本」是「正式版」；
+      直接请求 `web` 的 `/`（`docker compose exec edge wget -qO- http://web:3000/`）能看到小程序码的 `<img>`。
+      小程序码只在正式版发布之后才扫得开（3.3）。
+- [ ] `docker/edge/nginx.conf`，一处不多一处不少：
+
+  ```diff
+   # The `edge` server block: static H5, the shared uploads volume, and a proxy to
+   # the Next standalone server.
+   #
+   # Three surfaces behind one port:
+  -#   /                the uni-app H5 build, a history-mode SPA
+  +#   /                the landing page, answered by `web` (apps/web/app/page.tsx)
+   #   /admin, /admin-api, /api, /scan-upload    the `web` container
+   #   /uploads/        the shared volume, as inert bytes
+  @@ server {
+       listen 80;
+       server_name _;
+  -    root /srv/h5;
+  -    index index.html;
+       charset utf-8;
+  @@
+  -    # Every Next route needs its prefix here, or a location of its own: a
+  -    # path nothing above matches falls through to the storefront's
+  -    # history-mode fallback and is answered with its `index.html`, not a 404.
+  +    # Every Next route needs its prefix here, or a location of its own: a
+  +    # path nothing above matches is redirected to the landing page at `/`,
+  +    # not a 404.
+  @@
+  -    # --- the H5 storefront --------------------------------------------------
+  -
+  -    location = /index.html {
+  -        add_header Cache-Control "no-cache, must-revalidate" always;
+  -        add_header X-Content-Type-Options nosniff always;
+  -    }
+  -
+  -    location ~* "\.[a-f0-9]{8,}\.(js|css|woff2?|ttf|svg|jpe?g|png|webp)$" {
+  -        try_files $uri =404;
+  -        expires 1y;
+  -        add_header Cache-Control "public, immutable";
+  -        add_header X-Content-Type-Options nosniff always;
+  -        access_log off;
+  -    }
+  +    # --- the landing page ---------------------------------------------------
+  +
+  +    # `/` is the web app's landing page: the shop's name and the 小程序码.
+  +    location = / {
+  +        proxy_pass http://web;
+  +        proxy_http_version 1.1;
+  +        proxy_set_header Host $host;
+  +        proxy_set_header X-Real-IP $remote_addr;
+  +        proxy_set_header X-Forwarded-For $remote_addr;
+  +        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+  +        proxy_set_header Connection "";
+  +        proxy_connect_timeout 5s;
+  +        proxy_read_timeout 30s;
+  +    }
+
+       location ~ /\. {
+           deny all;
+           access_log off;
+           log_not_found off;
+       }
+
+  -    # History-mode fallback, last so every rule above wins over it.
+  -    location / {
+  -        try_files $uri $uri/ /index.html;
+  -        add_header X-Content-Type-Options nosniff always;
+  -    }
+  +    # Anything else — an old H5 link, an old share link — goes to the landing
+  +    # page. Last, so every rule above wins over it.
+  +    location / {
+  +        return 302 /;
+  +    }
+   }
+  ```
+
+  `location = /` 是精确匹配，所以 `/api/…`、`/admin/…` 等前缀规则不受影响。它不写 `add_header`，好继承 server 级的
+  `nosniff`、`X-Frame-Options`、`Referrer-Policy`（写了任何一条 `add_header` 就要把这三条重抄一遍）；缓存头由 Next 给
+  （页面是 `force-dynamic`）。落地页不需要别的静态文件：样式内联，Next 的运行时在已经代理的 `/_next/static/` 下，
+  小程序码图片在 `/uploads/` 下。
+
+- [ ] `docker/edge/Dockerfile`：删除 `ARG H5_DIST=docker/edge/h5-placeholder`、`FROM` 下面的 `ARG H5_DIST`、
+      `COPY ${H5_DIST}/ /srv/h5/` 和文件头关于 H5 的说明（镜像只剩 nginx 配置）；删除 `docker/edge/h5-placeholder/`；
+      `Dockerfile.dockerignore` 删去 `!apps/uni-app/dist` 和关于 uni-app 的注释。
+- [ ] `deploy/rehearsal/drill.sh` 的 `case_edge_proxies_every_page`（第 655 行起）：「没有被代理」的判据从「回答等于
+      storefront 的 `index.html`」改为「回答是 302、`Location` 为 `/`」；去掉跳过 `/` 的那一行
+      （`[ "$url" != '/' ] || continue`）和「`/` is the storefront's on purpose」的注释——`/` 现在也必须由 `web` 回答；
+      开头取 `index.html` 的那段删除。`deploy/README.md` 相应段落。（`deploy/` 由切换那次的提交改，R1 没有动。）
+- [ ] `e2e/storefront` 不受影响（它用自己的 Node 版 edge，`src/edge.ts`，根目录是小程序的模拟构建）。
 
 ### 2.11 这次**不删**的东西
 
@@ -200,6 +286,7 @@
 - [ ] 上传体验版（需要你批准），对着生产按 device-check 第 6 节做一遍真机检查。
 - [ ] 20 提交审核；通过后**发布**。发布后确认已纳入发货管理（`is_trade_managed`），用 0.01 元商品走一次真实的支付、
       发货、确认收货和结算（C06、C07）。
+- [ ] 发布当天：刷新接口兼容基线并打开开关（第 5 节）。
 
 ### 3.3 发布 B 前后
 
@@ -233,3 +320,38 @@
 
 - [ ] 记录原因和时间点；如果回退的是发布 B，公众号菜单和模板消息的链接改回 H5（若已按 3.3 改过）。
 - [ ] 修复后重新走第 0 节的条件，再做一次发布 B。
+
+---
+
+## 5. 商城接口兼容守卫（`api-compat`）
+
+小程序一旦发布，旧版本会在用户手机上留很久（微信择机更新，不重启就一直是旧版）。所以从第一个版本发布起，
+`/api/v1/**` 只能增加，不能删除或收窄。R1 加了这个守卫，说明见 [guards/README.md](../../guards/README.md#the-api-compat-check)。
+
+- **比较什么**：`pnpm gen` 生成的 OpenAPI 里 `/api/v1/**` 那部分，与 `guards/baselines/storefront-api.json`（上一个已发布
+  版本看到的接口）比较。删除路径或方法、响应字段被删除或变为可选或可为 null、响应枚举值被删除、请求字段变为必填或被收窄，
+  都算破坏；新增的一律通过。
+- **开关**：`guards/src/checks/api-compat.ts` 顶部的 `export const ENFORCED = false`。`false` 时破坏性改动只作为
+  note 打印（`[breaking, report-only]`），`pnpm guards` 仍通过；`true` 时让 `pnpm guards` 失败。开关打开而基线还是
+  未发布的快照（`"release": null`）时，守卫本身报错。
+- **刷新命令**，只在小程序发布时运行：
+
+  ```sh
+  pnpm --filter @shop/guards api-compat:refresh --release <版本号>   # apps/mini/package.json 的 version
+  pnpm --filter @shop/guards api-compat:refresh --unreleased        # 仅限第一次发布之前
+  ```
+
+  它先重新生成 OpenAPI，再打印新基线「原谅」了哪些破坏性改动（写进提交说明），最后重写基线文件。基线记录了发布版本号之后，
+  `--unreleased` 会被拒绝。基线是生成的文件，不手改。
+
+### 5.1 什么时候做什么
+
+- [ ] **第一次发布之前**：守卫只报告。各分支改了 `/api/v1` 合并后，用 `--unreleased` 重新生成基线并提交。
+- [ ] **第一个小程序版本发布的当天**（3.2 第 20 项之后），在生产所运行的那个提交上：
+      `api-compat:refresh --release <版本号>`，同一个提交里把 `ENFORCED` 改成 `true`，跑一遍 `pnpm guards`。
+      此时基线里还有旧前端的接口（店员、旧装修、2.4 节那些），它们照样受保护，直到发布 B。
+- [ ] **发布 B（切换）的删除提交**：2.3–2.6 节的删除会被守卫报为破坏。删完之后用**同一个已发布版本号**再跑一次
+      `api-compat:refresh --release <版本号>`，核对它打印出的「原谅」清单只包含 2.3–2.6 节列出的接口（没有一条是
+      新小程序调用的），清单写进提交说明。这是「只在发布时刷新」的唯一例外。
+- [ ] **之后每次发布小程序**：`api-compat:refresh --release <新版本号>`，清单应该为空；不为空说明有破坏性改动混了进来，
+      要么改回去，要么确认旧版本已不再使用（微信后台「版本管理」里旧版本的使用占比）后再接受。
