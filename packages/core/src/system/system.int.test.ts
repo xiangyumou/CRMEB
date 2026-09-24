@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { admins } from '@shop/db/schema/auth';
+import { notificationTemplates, type NotificationChannels } from '@shop/db/schema/notification';
 import { configValues } from '@shop/db/schema/system';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { createAdminSessionStore } from '../auth/admin-session.store';
@@ -825,5 +828,88 @@ describe('audit log', () => {
     expect(page.items[0]?.routeId).toBe('system.adminDelete');
     // The writer redacts; the reader must not undo that.
     expect(JSON.stringify(page.items)).not.toContain('crmeb-123456');
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Migration `0009_drop_cutover_leftover_config`: the stored values the code
+ * stopped reading at the cutover go, and nothing next to them does. The
+ * harness has already applied it to an empty database; this runs it again over
+ * rows that carry the leftovers, twice, to show it is idempotent.
+ */
+describe('migration 0009 — config the cutover left behind', () => {
+  const MIGRATION = fileURLToPath(
+    new URL('../../../db/migrations/0009_drop_cutover_leftover_config.sql', import.meta.url),
+  );
+  const runMigration = () => harness.db.handle.pool.query(readFileSync(MIGRATION, 'utf8'));
+
+  it('deletes the staff config rows and keeps every other one', async () => {
+    const at = harness.ctx.clock.now();
+    await harness.ctx.db.insert(configValues).values(
+      [
+        ['order-staff', 'staffUserIds', [1, 2]],
+        ['order-staff', 'allowStaffRepricing', true],
+        ['order-staff', 'allowStaffRefundReview', true],
+        ['storage', 'maxStaffUploadBytes', 1_048_576],
+        ['storage', 'staffUploadsPerHour', 60],
+        ['storage', 'userUploadsPerHour', 30],
+        ['site', 'siteName', '示例商城'],
+      ].map(([group, key, value]) => ({
+        group: group as string,
+        key: key as string,
+        value,
+        updatedAt: at,
+      })),
+    );
+
+    await runMigration();
+    await runMigration();
+
+    const left = await harness.ctx.db.select().from(configValues);
+    expect(left.map((row) => `${row.group}.${row.key}`).sort()).toEqual([
+      'site.siteName',
+      'storage.userUploadsPerHour',
+    ]);
+  });
+
+  it('strips a saved wechatMini.page and leaves the rest of the channels as saved', async () => {
+    const withPage = {
+      inApp: { enabled: true, title: '已发货', body: '订单 {orderNo} 已发货' },
+      wechatMini: {
+        enabled: true,
+        templateKey: 'order_ship',
+        templateId: 'tmpl-ship',
+        fields: { thing1: '{orderNo}' },
+        page: '/pages/order_details/index?order_id={orderId}',
+      },
+    } as unknown as NotificationChannels;
+    const withoutPage: NotificationChannels = {
+      wechatMini: { enabled: false, templateKey: '' },
+    };
+    const noMini: NotificationChannels = { sms: { enabled: false, templateCode: '' } };
+    await harness.ctx.db.insert(notificationTemplates).values([
+      { code: 'x1_with_page', name: '带页面', channels: withPage },
+      { code: 'x1_without_page', name: '不带页面', channels: withoutPage },
+      { code: 'x1_no_mini', name: '无小程序', channels: noMini },
+    ]);
+
+    await runMigration();
+    await runMigration();
+
+    const rows = await harness.ctx.db.select().from(notificationTemplates);
+    const channelsOf = (code: string) => rows.find((row) => row.code === code)?.channels;
+    expect(channelsOf('x1_with_page')).toEqual({
+      inApp: { enabled: true, title: '已发货', body: '订单 {orderNo} 已发货' },
+      wechatMini: {
+        enabled: true,
+        templateKey: 'order_ship',
+        templateId: 'tmpl-ship',
+        fields: { thing1: '{orderNo}' },
+      },
+    });
+    expect(channelsOf('x1_without_page')).toEqual(withoutPage);
+    expect(channelsOf('x1_no_mini')).toEqual(noMini);
   });
 });

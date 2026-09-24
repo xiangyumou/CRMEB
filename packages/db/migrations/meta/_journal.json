@@ -64,6 +64,13 @@
       "when": 1790226617361,
       "tag": "0008_drop_legacy_diy",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790240000000,
+      "tag": "0009_drop_cutover_leftover_config",
+      "breakpoints": true
     }
   ]
 }

@@ -50,13 +50,15 @@ export interface NotificationChannels {
     fields?: Record<string, string>;
     linkUrl?: string;
   };
-  /** Mini-program subscribe message. */
+  /**
+   * Mini-program subscribe message. It opens its event's catalogue route; the
+   * old hand-typed `page` was deleted by migration `0009`.
+   */
   wechatMini?: {
     enabled: boolean;
     templateKey: string;
     templateId?: string;
     fields?: Record<string, string>;
-    page?: string;
   };
   sms?: { enabled: boolean; templateCode: string; signName?: string; body?: string };
 }
