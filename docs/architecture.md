@@ -269,7 +269,7 @@ apps/mini/src/
   app-config/       the shop's app config, cached and revalidated
   theme/            tokens derived from the config's appearance
   data/             the api-client instance, query client, uploads
-  ui/               the component kit; the only importer of NutUI
+  ui/               the component kit (our own; no third-party component library)
 ```
 
 **The platform seam.** `src/platform/types.ts` declares one `MiniPlatform` interface

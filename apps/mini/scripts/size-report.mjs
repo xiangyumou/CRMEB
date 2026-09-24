@@ -3,7 +3,7 @@
  * Size and safety gate for the WeChat build (`dist/weapp`). Run after `build:weapp`:
  *
  *   node scripts/size-report.mjs [--dist dist/weapp] [--main-kb 1536] [--total-kb 8192]
- *                                [--subpackage-kb 2048] [--json]
+ *                                [--subpackage-kb 1024] [--json]
  *
  * Budgets also come from MINI_BUDGET_MAIN_KB / MINI_BUDGET_TOTAL_KB / MINI_BUDGET_SUBPACKAGE_KB.
  * WeChat's own hard limits are 2 MB for the main package and for each sub-package, and 20 MB in
@@ -16,8 +16,7 @@
  * - the main package, a sub-package or the total is over budget;
  * - the output holds a source map (`*.map` or a `sourceMappingURL` comment), the dev-only
  *   `subpackages/` tree (the UI gallery; `TARO_APP_DEMO=1` accepts it for a phone-only build),
- *   a test fixture or test tooling, an admin route (`/admin-api`, `*.admin*` route ids), or
- *   NutUI's whole-library entry (the kit imports NutUI per component);
+ *   a test fixture or test tooling, or an admin route (`/admin-api`, `*.admin*` route ids);
  * - a module in the main package is reached only from sub-package pages (Taro moves those into
  *   the sub-packages; one left in the main package costs every cold start);
  * - any script contains `new Function(` or `eval(` (WeChat's JSCore on iOS refuses them, and
@@ -68,7 +67,7 @@ function budget(flag, envName, fallback) {
 const budgets = {
   main: budget('main-kb', 'MINI_BUDGET_MAIN_KB', 1536),
   total: budget('total-kb', 'MINI_BUDGET_TOTAL_KB', 8192),
-  subpackage: budget('subpackage-kb', 'MINI_BUDGET_SUBPACKAGE_KB', 2048),
+  subpackage: budget('subpackage-kb', 'MINI_BUDGET_SUBPACKAGE_KB', 1024),
 };
 
 const dist = path.resolve(appRoot, args.dist);
@@ -262,10 +261,6 @@ let mainBreakdown;
 const TEST_CODE =
   /\/src\/test\/|\.(test|spec)\.[cm]?[jt]sx?$|fixtures?\.[cm]?[jt]sx?$|\/packages\/testing\/|\/node_modules\/(@testing-library|happy-dom|vitest|@vitest|msw)\//;
 const DEV_ONLY_MODULES = /\/apps\/mini\/src\/subpackages\//;
-// NutUI per component: `@nutui/nutui-react-taro/dist/es/packages/<name>`. The package entry and
-// the whole stylesheet pull in every component.
-const NUTUI_WHOLE =
-  /\/@nutui\/nutui-react-taro\/dist\/((es|cjs)\/packages\/nutui\.react|nutui\.react\.umd|style(-jmapp|-jrkf)?\.s?css$)/;
 
 /** `react`, `@tarojs/runtime`, `packages/storefront-blocks/src/blocks`, `apps/mini/src/ui`… */
 function ownerOf(normalized) {
@@ -294,8 +289,6 @@ if (statsFresh) {
     if (TEST_CODE.test(normalized)) failures.push(`test code in the WeChat build: ${shown}`);
     if (DEV_ONLY_MODULES.test(normalized) && !demoAccepted)
       failures.push(`dev-only module in the WeChat build: ${shown}`);
-    if (NUTUI_WHOLE.test(normalized))
-      failures.push(`NutUI's whole-library entry in the WeChat build: ${shown}`);
     // Taro emits a chunk several sub-packages share as `sub-common/<hash>` and copies it into
     // each of them (the root copy is not in the output).
     const inMain = module.files.some(

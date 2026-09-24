@@ -231,7 +231,7 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
   {
     id: 'nutui-in-feature',
     rule: 'nutui',
-    summary: 'a feature imports NutUI instead of src/ui',
+    summary: 'a feature imports NutUI (removed)',
     edits: [
       {
         file: 'src/features/mutant.tsx',
@@ -239,19 +239,19 @@ export const MINI_MUTATIONS: readonly MiniMutation[] = [
           "import NutToast from '@nutui/nutui-react-taro/dist/es/packages/toast';\n\nexport { NutToast };\n",
       },
     ],
-    expect: /imports @nutui\/nutui-react-taro\/dist\/es\/packages\/toast outside src\/ui\//,
+    expect: /imports @nutui\/nutui-react-taro\/dist\/es\/packages\/toast; NutUI is not used/,
   },
   {
-    id: 'nutui-in-stylesheet',
+    id: 'nutui-in-kit',
     rule: 'nutui',
-    summary: "a shell stylesheet pulls in NutUI's variables",
+    summary: "the kit's stylesheet pulls in NutUI's variables (NutUI was removed)",
     edits: [
       {
-        file: 'src/app-shell/mutant.scss',
+        file: 'src/ui/mutant.scss',
         create: "@import '~@nutui/nutui-react-taro/dist/styles/variables';\n",
       },
     ],
-    expect: /imports ~@nutui\/nutui-react-taro\/dist\/styles\/variables outside src\/ui\//,
+    expect: /imports ~@nutui\/nutui-react-taro\/dist\/styles\/variables; NutUI is not used/,
   },
 
   // --- [privacy] -----------------------------------------------------------

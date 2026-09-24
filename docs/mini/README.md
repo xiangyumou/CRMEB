@@ -34,8 +34,8 @@
 
 `size`（`scripts/size-report.mjs`）检查 `dist/weapp`：
 
-- **预算：** 主包 ≤ 1.5 MB，每个分包 ≤ 2 MB，总计 ≤ 8 MB；
-- **不能出现：** `eval`、`new Function`、ES2018 以上的语法、zod、source map、开发用的 `subpackages/`（演示页）、测试代码和夹具、后台路由、NutUI 整包入口、e2e 模拟层、疑似密钥；
+- **预算：** 主包 ≤ 1.5 MB，每个分包 ≤ 1 MB，总计 ≤ 8 MB（与 `wechat-compliance.md` C13、`pages.md` §1 一致；微信的上限是主包、分包各 2 MB，总计 20 MB）；
+- **不能出现：** `eval`、`new Function`、ES2018 以上的语法、zod、source map、开发用的 `subpackages/`（演示页）、测试代码和夹具、后台路由、e2e 模拟层、疑似密钥；
 - **只有分包用到的模块不能留在主包：** 依据 `config/bundle-stats.ts` 记下的每个模块被哪些包的页面引用。
 
 报告最后列出主包按来源分的体积，主包变大时先看这里。基线（K2，2026-09-24）：主包 682.0 KB，总计 1064.7 KB，最大的分包 `account` 120.1 KB；明细见 [status/K2-size-perf.md](status/K2-size-perf.md)。
@@ -77,7 +77,7 @@ AppSecret 和代码上传密钥从不进仓库。
 | 层          | 命令                                           | 说明                                                                           |
 | ----------- | ---------------------------------------------- | ------------------------------------------------------------------------------ |
 | 单元        | `pnpm --filter @shop/mini test:unit`           | 组件、平台层、会话、路由场景值；不碰网络                                       |
-| 类型和 lint | `pnpm --filter @shop/mini typecheck`、`lint`   | lint 管平台边界、NutUI 只在 `ui/`、契约只导入类型                              |
+| 类型和 lint | `pnpm --filter @shop/mini typecheck`、`lint`   | lint 管平台边界、契约只导入类型                                                |
 | 守卫        | `pnpm guards`                                  | `mini` 检查：页面 ⇄ `app.config.ts` ⇄ 路由目录、平台边界、隐私声明、分享、密钥 |
 | e2e         | `pnpm --filter @shop/e2e-storefront test:mini` | `e2e/storefront/specs-mini/`，页面对象在 `src/mini-pages/`；每次起一套新栈     |
 | e2e（热栈） | 见下                                           | 反复跑一个 spec 时省去起栈的时间                                               |

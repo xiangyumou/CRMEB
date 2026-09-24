@@ -163,11 +163,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@nutui/nutui-react-taro>codesandbox': '-'
-  '@nutui/nutui-react-taro>rehype-highlight': '-'
   sass: 1.104.1
-
-packageExtensionsChecksum: sha256-tgO12H650aCmPq7Rft0J5oTyXEe2zNp4roy64FNiAx8=
 
 importers:
 
@@ -188,9 +184,6 @@ importers:
       '@babel/runtime':
         specifier: ^7.24.4
         version: 7.29.7
-      '@nutui/nutui-react-taro':
-        specifier: 3.0.19
-        version: 3.0.19(@tarojs/components@4.2.1(@tarojs/helper@4.2.1(@swc/helpers@0.5.23)(supports-color@8.1.1))(@types/react@19.3.0)(html-webpack-plugin@5.6.8(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(postcss@8.5.28)(rollup@3.30.0)(webpack-chain@6.5.1)(webpack-dev-server@4.15.2(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@shop/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
@@ -2905,26 +2898,6 @@ packages:
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
 
-  '@nutui/icons-react-taro@3.0.2':
-    resolution: {integrity: sha512-yQgN1eOXVDQuJ9RLmQelo01LoDvRn81UsDdQf2Yct35qDeqEcc7yuBhnwCRrj6mc2Z8KFvzbGysbazmvP4g2VA==}
-    peerDependencies:
-      '@tarojs/components': '*'
-      react: '*'
-
-  '@nutui/jdesign-icons-react-taro@1.0.6-beta.2':
-    resolution: {integrity: sha512-2Scz5c9o14gA7Mw5JdiEkc/KEbNlNWMcJMuqVyFVipYeeYN/118N/fvHVpocmJviN0Gc4P+u3ZB3dIQSA2j4Fw==}
-
-  '@nutui/lottie-miniprogram@1.0.2':
-    resolution: {integrity: sha512-6xV+uW8VK1hT8QfjqfNlURTiQijb/dEEl/AeOudMwOB55Fr2+TdxoOAks5d8vnYBTYDZyOUlcsGNgoAkXKz8Qg==}
-
-  '@nutui/nutui-react-taro@3.0.19':
-    resolution: {integrity: sha512-aytkbxFxqQ8dOtizjKMsDMqkFi2+pYX1GkJOS1GP4g6dnCyLaSXONZ7easIiX0oVYfGvcHt0i9l+f7yXB6XXnw==}
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0
-
-  '@nutui/touch-emulator@1.0.0':
-    resolution: {integrity: sha512-k2hvI/9LlRA7Ph1Chni27pTuvPmKPt+/I10sWWd2sWzqiCOYRerD79eIwCMRGUF/q6WVDEKVnv00t9CEUL4sPA==}
-
   '@oxc-project/types@0.150.0':
     resolution: {integrity: sha512-rDS5/31E9HfPl/CIzGrn0DOlvBbXFseQ5URJ9sYMfstbKLD/c6Gm9vmRzRGDdAXyOIL4zmO37lc9RIwYqVruZw==}
 
@@ -3575,33 +3548,6 @@ packages:
     peerDependencies:
       react: '>=18.0.0'
       react-dom: '>=18.0.0'
-
-  '@react-spring/animated@9.6.1':
-    resolution: {integrity: sha512-ls/rJBrAqiAYozjLo5EPPLLOb1LM0lNVQcXODTC1SMtS6DbuBCPaKco5svFUQFMP2dso3O+qcC4k9FsKc0KxMQ==}
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0
-
-  '@react-spring/core@9.6.1':
-    resolution: {integrity: sha512-3HAAinAyCPessyQNNXe5W0OHzRfa8Yo5P748paPcmMowZ/4sMfaZ2ZB6e5x5khQI8NusOHj8nquoutd6FRY5WQ==}
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0
-
-  '@react-spring/rafz@9.6.1':
-    resolution: {integrity: sha512-v6qbgNRpztJFFfSE3e2W1Uz+g8KnIBs6SmzCzcVVF61GdGfGOuBrbjIcp+nUz301awVmREKi4eMQb2Ab2gGgyQ==}
-
-  '@react-spring/shared@9.6.1':
-    resolution: {integrity: sha512-PBFBXabxFEuF8enNLkVqMC9h5uLRBo6GQhRMQT/nRTnemVENimgRd+0ZT4yFnAQ0AxWNiJfX3qux+bW2LbG6Bw==}
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0
-
-  '@react-spring/types@9.6.1':
-    resolution: {integrity: sha512-POu8Mk0hIU3lRXB3bGIGe4VHIwwDsQyoD1F394OK7STTiX9w4dG3cTLljjYswkQN+hDSHRrj4O36kuVa7KPU8Q==}
-
-  '@react-spring/web@9.6.1':
-    resolution: {integrity: sha512-X2zR6q2Z+FjsWfGAmAXlQaoUHbPmfuCaXpuM6TcwXPpLE1ZD4A1eys/wpXboFQmDkjnrlTmKvpVna1MjWpZ5Hw==}
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0
-      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0
 
   '@reduxjs/toolkit@2.12.0':
     resolution: {integrity: sha512-KiT+RzZbp6mQET+Mg+h2c97+9j1sNflUxQkIHI7Yuzf6Peu+OYpmkn6nbHWmLLWj+1ZODUJFwGZ7gx3L9R9EOw==}
@@ -5053,14 +4999,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@use-gesture/core@10.2.20':
-    resolution: {integrity: sha512-4lFhHc8so4yIHkBEs641DnEsBxPyhJ5GEjB4PURFDH4p/FcZriH6w99knZgI63zN/MBFfylMyb8+PDuj6RIXKQ==}
-
-  '@use-gesture/react@10.2.20':
-    resolution: {integrity: sha512-KnJq9ZSqprWA6uNhWTUHZqTCh+rfa0j8ehTzqeBhktUPrmTj7yVOBvEQ/vSFU/7d72cGgWSsJ0f5T6GQCHXnvg==}
-    peerDependencies:
-      react: '>= 16.8.0'
-
   '@vitest/mocker@5.0.1':
     resolution: {integrity: sha512-6K1DoBNAPGvuOcSsGA4D6x+5zEEff/KmOOP3uetT2TrGpVfI+HRHRnJJfKi5ib/g1vx8IYHQD8s0pbJz8WQI7Q==}
     peerDependencies:
@@ -5328,9 +5266,6 @@ packages:
 
   async-lock@1.4.1:
     resolution: {integrity: sha512-Az2ZTpuytrtqENulXwO3GGv1Bztugx6TT37NIo7imr/Qo0gsYiGtSdBa2B6fsXhTpVZDNfu1Qn3pk531e3q+nQ==}
-
-  async-validator@4.2.5:
-    resolution: {integrity: sha512-7HhHjtERjqlNbZtqNqy2rckN/SpOOlmDliet+lP7k+eKZEjPk3DgyeU9lIXLdeLz0uBbbVp+9Qdow9wJWgwwfg==}
 
   async@3.2.6:
     resolution: {integrity: sha512-htCUDlxyyCLMgaM3xXg0C0LW2xqfuQ6p05pCEIsXuyQ+a1koYKTuBMzRNwmybfLgvJDMd0r1LTn4+E0Ti6C2AA==}
@@ -6268,9 +6203,6 @@ packages:
 
   dom-converter@0.2.0:
     resolution: {integrity: sha512-gd3ypIPfOMr9h5jIKq8E3sHOTCjeirnl0WK5ZdS1AW0Odt0b1PaWaHdJ4Qk4klv+YB9aJBS7mESXjFoDQPu6DA==}
-
-  dom-helpers@5.2.1:
-    resolution: {integrity: sha512-nRCa7CK3VTrM2NmGkIy4cbK7IZlgBE/PYMn55rrXefr5xXDP0LdtfPnblFDoVdcAfslJ7or6iqAUnx0CCGIWQA==}
 
   dom-serializer@1.4.1:
     resolution: {integrity: sha512-VHwB3KfrcOOkelEG2ZOfxqLZdfkil8PtJi4P8N2MMXucZq2yLp75ClViUlOVwyoHEDjYU433Aq+5zWP61+RGag==}
@@ -7849,9 +7781,6 @@ packages:
   lodash.debounce@4.0.8:
     resolution: {integrity: sha512-FT1yDzDYEoYWhnSGnpE/4Kj1fLZkDFyqRb7fNt6FdYOSxlUWAtp42Eh6Wb0rGIv/m9Bgo7x4GhQbm5Ys4SG5ow==}
 
-  lodash.kebabcase@4.1.1:
-    resolution: {integrity: sha512-N8XRTIMMqqDgSy4VLKPnJ/+hpGZN+PHQiJnSenYqPaVV/NCqEogTnAdZLQiGKhxX+JCs8waWq2t1XHWKOmlY8g==}
-
   lodash.memoize@4.1.2:
     resolution: {integrity: sha512-t7j+NzmgnQzTAYXcsHYLgimltOV1MXHtlOWf6GjL9Kj8GK5FInw5JotxvbOs+IvV1/Dzo04/fCGfLVs7aXb4Ag==}
 
@@ -7881,15 +7810,6 @@ packages:
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
-
-  lottie-react@2.4.2:
-    resolution: {integrity: sha512-YkEEKN4E2Y2cFpPEwcvAXTAiRGy/P+0mJKYp9aDP1+r42xZgeXTZCf6No1csWRGmh4YQc3kbYtTq/b4c3IRCYg==}
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-
-  lottie-web@5.13.0:
-    resolution: {integrity: sha512-+gfBXl6sxXMPe8tKQm7qzLnUy5DUPJPKIyRHwtpCpyUEYjHYRJC/5gjUvdkuO2c3JllrPtHXH5UJJK8LRYl5yQ==}
 
   lower-case@1.1.4:
     resolution: {integrity: sha512-2Fgx1Ycm599x+WGpIYwJOvsjmXFzTSc34IwDWALRA/8AopUKAVPwfJ+h5+f85BCp0PWmmJcWzEpxOpoXycMpdA==}
@@ -9013,9 +8933,6 @@ packages:
     peerDependencies:
       react: ^19.3.0
 
-  react-fast-compare@3.2.2:
-    resolution: {integrity: sha512-nsO+KSNgo1SbJqJEYRE9ERzo7YtYbou/OqjSQKxV7jcKox7+usiUVZOAC+XnDOABXggQTno0Y1CpVnuWEc1boQ==}
-
   react-hotkeys-hook@4.6.2:
     resolution: {integrity: sha512-FmP+ZriY3EG59Ug/lxNfrObCnW9xQShgk7Nb83+CkpfkcCpfS95ydv+E9JuXA5cp8KtskU7LGlIARpkc92X22Q==}
     peerDependencies:
@@ -9082,12 +8999,6 @@ packages:
     peerDependenciesMeta:
       '@types/react':
         optional: true
-
-  react-transition-group@4.4.5:
-    resolution: {integrity: sha512-pZcd1MCJoiKiBR2NRxeCRg13uCXbydPnmB4EOeRrY7480qNWO8IIgQG6zlDkm6uRMsURXPuKq0GWtiM59a5Q6g==}
-    peerDependencies:
-      react: '>=16.6.0'
-      react-dom: '>=16.6.0'
 
   react@18.3.1:
     resolution: {integrity: sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==}
@@ -12307,38 +12218,6 @@ snapshots:
 
   '@nolyfill/is-core-module@1.0.39': {}
 
-  '@nutui/icons-react-taro@3.0.2(@tarojs/components@4.2.1(@tarojs/helper@4.2.1(@swc/helpers@0.5.23)(supports-color@8.1.1))(@types/react@19.3.0)(html-webpack-plugin@5.6.8(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(postcss@8.5.28)(rollup@3.30.0)(webpack-chain@6.5.1)(webpack-dev-server@4.15.2(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(react@18.3.1)':
-    dependencies:
-      '@tarojs/components': 4.2.1(@tarojs/helper@4.2.1(@swc/helpers@0.5.23)(supports-color@8.1.1))(@types/react@19.3.0)(html-webpack-plugin@5.6.8(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(postcss@8.5.28)(rollup@3.30.0)(webpack-chain@6.5.1)(webpack-dev-server@4.15.2(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3))
-      react: 18.3.1
-
-  '@nutui/jdesign-icons-react-taro@1.0.6-beta.2': {}
-
-  '@nutui/lottie-miniprogram@1.0.2': {}
-
-  '@nutui/nutui-react-taro@3.0.19(@tarojs/components@4.2.1(@tarojs/helper@4.2.1(@swc/helpers@0.5.23)(supports-color@8.1.1))(@types/react@19.3.0)(html-webpack-plugin@5.6.8(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(postcss@8.5.28)(rollup@3.30.0)(webpack-chain@6.5.1)(webpack-dev-server@4.15.2(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
-    dependencies:
-      '@babel/runtime': 7.29.7
-      '@nutui/icons-react-taro': 3.0.2(@tarojs/components@4.2.1(@tarojs/helper@4.2.1(@swc/helpers@0.5.23)(supports-color@8.1.1))(@types/react@19.3.0)(html-webpack-plugin@5.6.8(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(postcss@8.5.28)(rollup@3.30.0)(webpack-chain@6.5.1)(webpack-dev-server@4.15.2(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(webpack@5.91.0(@swc/core@1.3.96(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(react@18.3.1)
-      '@nutui/jdesign-icons-react-taro': 1.0.6-beta.2
-      '@nutui/lottie-miniprogram': 1.0.2
-      '@nutui/touch-emulator': 1.0.0
-      '@react-spring/web': 9.6.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@swc/helpers': 0.5.23
-      '@use-gesture/react': 10.2.20(react@18.3.1)
-      async-validator: 4.2.5
-      classnames: 2.5.1
-      lodash.kebabcase: 4.1.1
-      lottie-react: 2.4.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      react: 18.3.1
-      react-fast-compare: 3.2.2
-      react-transition-group: 4.4.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-    transitivePeerDependencies:
-      - '@tarojs/components'
-      - react-dom
-
-  '@nutui/touch-emulator@1.0.0': {}
-
   '@oxc-project/types@0.150.0': {}
 
   '@parcel/watcher-android-arm64@2.6.0':
@@ -13021,39 +12900,6 @@ snapshots:
       clsx: 2.1.1
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
-
-  '@react-spring/animated@9.6.1(react@18.3.1)':
-    dependencies:
-      '@react-spring/shared': 9.6.1(react@18.3.1)
-      '@react-spring/types': 9.6.1
-      react: 18.3.1
-
-  '@react-spring/core@9.6.1(react@18.3.1)':
-    dependencies:
-      '@react-spring/animated': 9.6.1(react@18.3.1)
-      '@react-spring/rafz': 9.6.1
-      '@react-spring/shared': 9.6.1(react@18.3.1)
-      '@react-spring/types': 9.6.1
-      react: 18.3.1
-
-  '@react-spring/rafz@9.6.1': {}
-
-  '@react-spring/shared@9.6.1(react@18.3.1)':
-    dependencies:
-      '@react-spring/rafz': 9.6.1
-      '@react-spring/types': 9.6.1
-      react: 18.3.1
-
-  '@react-spring/types@9.6.1': {}
-
-  '@react-spring/web@9.6.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
-    dependencies:
-      '@react-spring/animated': 9.6.1(react@18.3.1)
-      '@react-spring/core': 9.6.1(react@18.3.1)
-      '@react-spring/shared': 9.6.1(react@18.3.1)
-      '@react-spring/types': 9.6.1
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
 
   '@reduxjs/toolkit@2.12.0(react-redux@9.3.0(@types/react@19.3.0)(react@19.3.0)(redux@5.0.1))(react@19.3.0)':
     dependencies:
@@ -14589,13 +14435,6 @@ snapshots:
   '@unrs/resolver-binding-win32-x64-msvc@1.12.2':
     optional: true
 
-  '@use-gesture/core@10.2.20': {}
-
-  '@use-gesture/react@10.2.20(react@18.3.1)':
-    dependencies:
-      '@use-gesture/core': 10.2.20
-      react: 18.3.1
-
   '@vitest/mocker@5.0.1(vite@8.3.0(@types/node@24.13.6)(esbuild@0.21.5)(jiti@2.7.0)(less@3.13.1)(sass@1.104.1)(stylus@0.64.0(supports-color@8.1.1))(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
@@ -14980,8 +14819,6 @@ snapshots:
   async-function@1.0.0: {}
 
   async-lock@1.4.1: {}
-
-  async-validator@4.2.5: {}
 
   async@3.2.6: {}
 
@@ -15992,11 +15829,6 @@ snapshots:
   dom-converter@0.2.0:
     dependencies:
       utila: 0.4.0
-
-  dom-helpers@5.2.1:
-    dependencies:
-      '@babel/runtime': 7.29.7
-      csstype: 3.2.3
 
   dom-serializer@1.4.1:
     dependencies:
@@ -17914,8 +17746,6 @@ snapshots:
 
   lodash.debounce@4.0.8: {}
 
-  lodash.kebabcase@4.1.1: {}
-
   lodash.memoize@4.1.2: {}
 
   lodash.merge@4.6.2: {}
@@ -17938,14 +17768,6 @@ snapshots:
   loose-envify@1.4.0:
     dependencies:
       js-tokens: 4.0.0
-
-  lottie-react@2.4.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
-    dependencies:
-      lottie-web: 5.13.0
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
-
-  lottie-web@5.13.0: {}
 
   lower-case@1.1.4: {}
 
@@ -19067,8 +18889,6 @@ snapshots:
       react: 19.3.0
       scheduler: 0.28.0
 
-  react-fast-compare@3.2.2: {}
-
   react-hotkeys-hook@4.6.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
       react: 19.3.0
@@ -19123,15 +18943,6 @@ snapshots:
       tslib: 2.8.1
     optionalDependencies:
       '@types/react': 19.3.0
-
-  react-transition-group@4.4.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
-    dependencies:
-      '@babel/runtime': 7.29.7
-      dom-helpers: 5.2.1
-      loose-envify: 1.4.0
-      prop-types: 15.8.1
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
 
   react@18.3.1:
     dependencies:

@@ -9,7 +9,6 @@ import reactHooks from 'eslint-plugin-react-hooks';
  *
  * - nothing server-side (`@shop/core`, `@shop/db`, `@shop/testing`) and no zod at runtime;
  * - `@shop/contracts` for types only, except the zod-free modules listed below;
- * - NutUI only inside `src/ui/`;
  * - `Taro.*` platform APIs only inside `src/platform/` (pages may use Taro's hooks).
  */
 
@@ -61,16 +60,6 @@ export default [
         source: '^zod($|/)',
         exceptFrom: '\\.test\\.tsx?$',
         message: '小程序运行时不带 zod（包体积；契约只 import 类型）',
-      },
-      {
-        source: '^@nutui/',
-        exceptFrom: '/src/ui/',
-        message: '页面不直接用 NutUI，经过 src/ui 的组件',
-      },
-      {
-        source: '^@nutui/nutui-react-taro$',
-        message:
-          'NutUI 按组件引入（@nutui/nutui-react-taro/dist/es/packages/<组件>）：整包入口会把全部组件带进主包',
       },
     ],
   }),

@@ -30,22 +30,10 @@ hoistPattern:
   - '*'
   - '!react'
   - '!react-dom'
-# NutUI's icon package imports react and @tarojs/components without declaring either; with
-# react out of the hoist it must say so.
-packageExtensions:
-  '@nutui/icons-react-taro':
-    peerDependencies:
-      '@tarojs/components': '*'
-      react: '*'
 minimumReleaseAgeExclude:
   - '@tanstack/query-core@5.103.2'
   - '@tanstack/react-query@5.103.2'
-# @nutui/nutui-react-taro (apps/mini) lists its documentation site's tooling as runtime
-# dependencies. Nothing in its dist imports them, and `codesandbox` drags in axios 0.18,
-# inquirer and pacote. See docs/mini/spikes/S1-taro.md.
 overrides:
-  '@nutui/nutui-react-taro>codesandbox': '-'
-  '@nutui/nutui-react-taro>rehype-highlight': '-'
   # One sass for the workspace (storefront-blocks and apps/mini compile their styles with
   # it); auto-install-peers would otherwise hand next's and vite's optional `sass` peer
   # the newest release, which is inside minimumReleaseAge. See docs/mini/spikes/S3-decor.md.

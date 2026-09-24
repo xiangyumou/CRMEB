@@ -50,8 +50,9 @@ import { retiredInUrl } from './retired';
  *   `openType` button, anywhere else in `src`, `@shop/api-client` or
  *   `@shop/storefront-blocks`. Pages navigate, pay, sign in and copy through
  *   the platform. `getUserProfile` / `getUserInfo` appear nowhere (C05).
- * - **[nutui]** NutUI is imported only under `src/ui/`, and never by the
- *   blocks, which the admin canvas renders without Taro.
+ * - **[nutui]** NutUI is not used: no `@nutui/*` import, script or
+ *   stylesheet, anywhere in the app (`src/ui/` included) or the shared
+ *   packages. The kit is our own; NutUI was removed as a dependency (L2).
  * - **[privacy]** Every `requiredPrivateInfos` API the app calls is declared,
  *   and only the ones this shop uses may be (C04: `chooseAddress`). Once
  *   `platform/privacy.ts` exists, every privacy-guarded API the platform calls
@@ -501,14 +502,14 @@ function checkNutUi(
   packages: readonly string[],
 ): void {
   for (const file of sources) {
-    if (file.relative.startsWith('ui/') || isTest(file.relative)) continue;
+    if (isTest(file.relative)) continue;
     for (const { specifier, line } of specifiersOf(file.text)) {
       if (isNutUi(specifier)) {
         findings.push(
           tagged(
             'nutui',
             `${shown(`src/${file.relative}`)}:${line}`,
-            `imports ${specifier} outside src/ui/ — use the kit`,
+            `imports ${specifier}; NutUI is not used — use the kit (src/ui)`,
           ),
         );
       }
@@ -519,11 +520,7 @@ function checkNutUi(
       for (const { specifier, line } of specifiersOf(file.text)) {
         if (isNutUi(specifier)) {
           findings.push(
-            tagged(
-              'nutui',
-              `${rel(file.file)}:${line}`,
-              `imports ${specifier}; NutUI belongs to apps/mini/src/ui`,
-            ),
+            tagged('nutui', `${rel(file.file)}:${line}`, `imports ${specifier}; NutUI is not used`),
           );
         }
       }
@@ -794,7 +791,7 @@ function checkCredentials(
 
 export const miniCheck = defineCheck(
   'mini',
-  'the mini-program: pages, route catalogue, platform seam, NutUI, privacy, retired URLs, committed config, credentials',
+  'the mini-program: pages, route catalogue, platform seam, no NutUI, privacy, retired URLs, committed config, credentials',
   async () => {
     const { findings, summary } = await checkMini({ app: miniApp });
     return result('mini', 'mini-program', summary, findings);
