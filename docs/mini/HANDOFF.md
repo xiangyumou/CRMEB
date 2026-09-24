@@ -1,15 +1,18 @@
-# 小程序重写：进度交接（2026-09-24，第二版）
+# 小程序重写：进度交接（2026-09-24，第三版：已切换）
 
 给接手的会话（本地或云端）看的。读完这一页，再按「先读」列表看其他文档，就能接着干。
 
 ## 1. 一句话现状
 
-写代码的部分约完成 **90%**：阶段 0–3 和收尾批（K1 安全审查、H6 密码登录绑定、K2 体积性能、K3 客户端复查、R1 兼容守卫 + 落地页）都已合入，`master` 也已并入。剩下的是：修 e2e（见第 3 节）、处理 K1/K3 写出来的问题、用户决定的几件事，然后切换。切换的每一步都要用户单独批准。
+**代码写完，已切换上线，体验版已上传。** uni-app、旧装修、辅助接口、店员接口都已删除；线上 `/` 是落地页。剩下的都在公众平台和真机上：配域名、真机检查、提交审核、发布（第 4 节）。
 
-- 集成分支：`storefront/mini`，**已推送到 `origin/storefront/mini`**。本地要先 `git fetch && git checkout storefront/mini && git pull`（本地旧的 `storefront/mini` 停在 `247a8f220` 或 `f0a0b50`，快进即可）。
-- `master` 等于线上，只修线上紧急问题。开发不在 `master` 上做。
-- **线上还没开始运营，目前只是内部测试**（用户 2026-09-24 确认）。K1 标成 PRODUCTION 的问题（P1–P5）没有真实顾客受影响，不需要热修或赶着部署，随切换上线即可。`master` 到 `508f009` 为止的提交都已并入 `storefront/mini`。
-- 这一批的执行者分支（`storefront/mini-K1-security` 等）只在云端容器里，内容全部已合入，无需找回。
+- 线上 = `f3311f89a`（2026-09-24 14:45 用 `deploy/ship.sh` 部署，停机迁移到 0009）。升级前的备份：主机上 `data/backups/pre-upgrade-20260924T064442Z-2381635.sql.gz`，回退见 `cutover.md` 第 4 节。
+- `master` = `storefront/mini` = `cf779f01a`，比线上多一个只改小程序的提交（去掉 WXSS 不支持的 `*` 选择器，`size-report` 以后会拦）。服务器不用为它重新部署。
+- 体验版 1.0.0（备注「首个体验版」）用 miniprogram-ci 上传，用户已在「版本管理」设为体验版。包是 `cf779f01a` 构建的，`TARO_APP_API_ORIGIN=https://x-zoo.vip`，约 900 KB。
+- 公众平台的服务器域名**还没配**（用户说先不管），所以体验时要在右上角「…」打开「开发调试」。
+- 缩略图补跑过：98 张全是 CRMEB 迁来的旧图，按设计不生成（0 张），新上传的图自动生成 480/960。
+- 线上还是内部测试，只有一个测试用户。
+- 所有执行者分支和 worktree 已删；远端只剩 `master` 和 `storefront/mini`。
 
 ## 2. 这一批做了什么
 
@@ -56,14 +59,19 @@
 
 ## 4. 接下来要做的
 
-1. **本地跑一次全套检查**（`docs/contributing.md` 的合并清单），重点是云端没跑的：旧 uni-app 的 storefront e2e、后台 e2e（`master` 并进来的 `fd66e30` 改了后台表单的 422 显示，`55d8796` 删了 uni-app 的 flyio），以及登录页修复之后的全套 `test:mini`。
-2. ~~**K1 的 B1（会话续期换了账号还重放请求）。**~~ **已修（B1-renew-account，AUTH-010）**：续期落到别的账号时不重放、不保留新会话、回到登录页，登录页顶部显示「登录已过期，请重新登录」。见 `status/B1-renew-account.md`。
-3. **K1 其他写出来的问题**，按用户决定处理（第 6 节第 1–4 条）；P4（售后凭证图可填外链）要单开一个售后方向的任务。
-4. **K3 写出来的：** 连点「结算」「立即购买」会开两次页面（不会重复下单）；在 `navigate` 里加防连点会改所有跳转，需要决定后再做，并跑全部小程序单测和 `test:mini`。另有两处重复代码可清理（`cart-view.ts` 的金额函数、`aftersale/apply` 的 `REFUND_READS`）。
-5. **K2 写出来的**（改了顾客看得到的东西，所以没改）：分类页两次串行请求、商品详情的附属请求等主请求返回才发、订单/售后列表 30 秒后回来会把所有翻过的页重载、装修图片块没有懒加载、没有缩略图（后端缺口）。详见 `status/K2-size-perf.md`。
-6. **文档对齐：** 分包预算是 1 MB 还是 2 MB（任务说明和构建门禁用 2 MB；`wechat-compliance.md` C13、`pages.md` §1、`app.config.ts` 注释写 1 MB，现在每个分包都 ≤ 120 KB）。`pages.md` 第 425 行那条计划（`smsLogin`/`passwordLogin` 契约）里 `passwordLogin` 已完成。
-7. **切换：一次发布**，按 `docs/mini/cutover.md` 第 1 节的顺序：在 `storefront/mini` 上删除 uni-app、旧装修、辅助接口、店员接口，改 CI、edge、守卫和文档，迁移里删掉旧装修的四张表，刷新兼容基线；然后构建检查 → 合并到 `master` → 部署 → 上传小程序、提交审核。合并到 `master`、push、部署、上传、提交审核、发布，**每一步都要用户单独批准**。
-8. **真机检查**，清单见 `docs/mini/device-check.md`，由人执行。本批新增要看的：D12 体积；图标和空状态插画在 iOS、Android 上（现在用 CSS 自定义属性画）；从订单详情返回后，订单列表里未付款订单的倒计时。
+`cutover.md` 第 1 节第 1–5、7、8 步已完成（第 5 步的只读检查：`/` 是落地页且 `noindex`，旧 H5 路径 302 到 `/`，`/admin` 200，`/api/v1/app/config` 200，已删接口 404，`REVISION` 正确，容器都 healthy）。剩下的：
+
+1. **公众平台和后台配置**（`cutover.md` 3.2，用户或运营做）：服务器域名 request / uploadFile / downloadFile 填 `https://x-zoo.vip`；消息推送；订阅模板；快递编码和同步；内容安全开关；店铺装修发布首页和个人中心；体验成员。配好域名后就不用再开「开发调试」。
+2. **真机检查**：`device-check.md` 第 6 节，对着生产，由人做。隐私弹窗（D03）必须在真机上过。
+3. **提交审核、发布**：每步单独问用户。审核准备见 `cutover.md` 3.2 第 19 项；发布后按 3.3 做。
+4. **改了代码要再发版时：** 只改 `apps/mini` 就重新构建（`TARO_APP_API_ORIGIN=https://x-zoo.vip pnpm --filter @shop/mini build:weapp`，先在该目录跑一次 `pnpm turbo run gen --filter=@shop/mini...`），然后上传：
+   `miniprogram-ci upload --appid wx4f4b772125e155ed --pp apps/mini/dist/weapp --pkp <密钥路径> --uv <版本> --ud "<说明>" -r 1`。
+   `scripts/preview.mjs` 要求密钥在仓库外，现在的位置它会拒绝，所以直接用 miniprogram-ci。每次上传都要问用户。
+5. **遗留小项（不急）：**
+   - K3：连点「结算」「立即购买」会开两次页面（不会重复下单）；两处重复代码（`cart-view.ts` 的金额函数、`aftersale/apply` 的 `REFUND_READS`）。
+   - K1 P4：售后凭证图可填外链，要单开售后方向的任务。
+   - Dependabot：`apps/mini` 的 webpack，1 个中危、2 个低危，只在构建时用，不进包。
+   - `apps/mini` 构建有 mini-css-extract-plugin 的 CSS 顺序警告（不影响产物）。
 
 ## 5. 顾客看得到的变化（这一批，要告诉用户）
 
@@ -121,7 +129,7 @@
 - **生产：** 主机 `ubuntu@43.142.105.205` 默认只读。超出只读的操作、拉生产数据、任何推送到 `master`、开 PR，都要先问用户。
 - **机密：** 不打印 `eb_system_config` 的任何密钥值。仓库、日志、截图里不能出现生产数据或真实凭据。
   - 小程序 AppSecret 用户在聊天里贴过，**绝不存储、复述或提交**；已建议用户重置。
-  - 代码上传密钥：用户放在 `/home/xiangyu/Projects/CRMEB-mini/private.wx4f4b772125e155ed.key`（已 gitignore），上传白名单已关。不读、不打印内容；每次预览或上传都要单独批准。
+  - 代码上传密钥：用户放在 `/home/xiangyu/Projects/CRMEB-mini/private.wx4f4b772125e155ed.key`（已 gitignore），上传 IP 白名单已关（2026-09-24 用户关的）。不读、不打印内容；每次预览或上传都要单独批准。
 - **外部接口：** 开发和测试只用 `@shop/testing` 的假实现，不调用真实的微信、短信、阿里云接口。
 - **不要碰：** 主目录 `/home/xiangyu/Projects/CRMEB`（用户在里面修后端 bug）。
   - 之前 G1 误写的 6 个草稿文件已于 2026-09-24 按用户同意删除。
