@@ -1,6 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setServerTime } from '@/lib/server-clock';
+import { taroFake } from '@/test/taro-fake/taro';
 import { Countdown, remainingUntil } from './countdown';
 
 const NOW = Date.parse('2026-09-23T10:00:00+08:00');
@@ -49,5 +50,35 @@ describe('Countdown', () => {
     const timer = screen.getByRole('timer');
     expect(timer.textContent).toBe('2天01:00:00');
     expect(timer.className).toContain('shop-countdown--boxed');
+  });
+
+  it('shares one timer between countdowns, so a list of them renders once a second', () => {
+    render(
+      <>
+        <Countdown endsAt="2026-09-23T10:00:30+08:00" />
+        <Countdown endsAt="2026-09-23T10:01:00+08:00" />
+        <Countdown endsAt="2026-09-23T10:02:00+08:00" />
+      </>,
+    );
+    expect(vi.getTimerCount()).toBe(1);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.getAllByRole('timer').map((timer) => timer.textContent)).toEqual([
+      '00:00:29',
+      '00:00:59',
+      '00:01:59',
+    ]);
+  });
+
+  it('stops ticking while its page is hidden and catches up when it shows again', () => {
+    const { unmount } = render(<Countdown endsAt="2026-09-23T10:01:00+08:00" />);
+    act(() => taroFake.hidePage());
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(screen.getByRole('timer').textContent).toBe('00:01:00');
+    act(() => taroFake.showPage());
+    expect(screen.getByRole('timer').textContent).toBe('00:00:50');
+    expect(vi.getTimerCount()).toBe(1);
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

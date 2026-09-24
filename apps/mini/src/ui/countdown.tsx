@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { cx } from '@/lib/cx';
 import { serverNow } from '@/lib/server-clock';
+import { onEverySecond, usePageShown } from './second-ticker';
 import './countdown.scss';
 
 export interface CountdownProps {
@@ -41,7 +42,8 @@ const two = (value: number) => String(value).padStart(2, '0');
 
 /**
  * Time left to a real deadline (C02, C16: no fake urgency), on the server's clock, not the
- * phone's (`lib/server-clock`). Ticks once a second; says 「已结束」 at zero.
+ * phone's (`lib/server-clock`). Ticks once a second on the shared ticker, only while its page is
+ * showing (it catches up on show); says 「已结束」 at zero.
  */
 export function Countdown({
   endsAt,
@@ -58,8 +60,10 @@ export function Countdown({
   useEffect(() => {
     onEndRef.current = onEnd;
   });
+  const shown = usePageShown();
 
   useEffect(() => {
+    if (!shown) return;
     const tick = () => {
       const next = remainingUntil(end, serverNow());
       setLeft(next);
@@ -69,9 +73,8 @@ export function Countdown({
       }
     };
     tick();
-    const timer = setInterval(tick, 1000);
-    return () => clearInterval(timer);
-  }, [end]);
+    return onEverySecond(tick);
+  }, [end, shown]);
 
   if (left.total === 0) {
     return (
