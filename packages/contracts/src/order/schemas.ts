@@ -260,6 +260,12 @@ export const checkoutPreview = z.object({
   userCouponId: id.nullable(),
   /** Minutes the shopper will have to pay once the order exists. */
   payWindowMinutes: z.number().int().min(1),
+  /**
+   * 预售: the order ships within this many days of being paid in full (付款后 N 天内发货;
+   * `0` = as soon as it can). The campaign's current setting — the promise is stamped at
+   * payment. `null` for every other kind.
+   */
+  shipAfterDays: z.number().int().min(0).nullable(),
   /** Answers the buyer must fill in, copied from `products.custom_form`. */
   customFormFields: z
     .array(
@@ -297,6 +303,7 @@ export const checkoutPreviewExample = {
   payableAmount: '118.00',
   userCouponId: '9001',
   payWindowMinutes: 30,
+  shipAfterDays: null,
   customFormFields: [],
 } satisfies CheckoutPreview;
 
@@ -436,7 +443,45 @@ export const orderListItemExample = {
   items: [orderItemExample],
 } satisfies OrderListItem;
 
-export const orderDetail = orderListItem.extend({
+/**
+ * A line as the shopper's own 我的订单 and 订单详情 show it: `orderItem` plus its review state,
+ * so the 评价 page and the 去评价 button need not learn it from a refusal. The console reads
+ * the plain `orderItem`.
+ *
+ * `reviewable` is exactly what `catalog.reviewSubmit` accepts (ORDER-010): the order is
+ * `received` or `completed`, the line is not refunded in full, and it has no review yet.
+ * There is no deadline: `autoReviewDays` after completion the auto-review job writes the
+ * default review, and from then on the line is `reviewed`.
+ */
+export const storefrontOrderItem = orderItem.extend({
+  /**
+   * The line has a review — published, 待审核 (held for moderation) or removed by the shop.
+   * A second one is refused (`CATALOG_REVIEW_ALREADY_WRITTEN`) in every case.
+   */
+  reviewed: z.boolean(),
+  /** A review can be written for this line now. */
+  reviewable: z.boolean(),
+});
+export type StorefrontOrderItem = z.infer<typeof storefrontOrderItem>;
+
+export const storefrontOrderItemExample = {
+  ...orderItemExample,
+  reviewed: false,
+  reviewable: false,
+} satisfies StorefrontOrderItem;
+
+/** The shopper's list row: `orderListItem` with `storefrontOrderItem` lines. */
+export const storefrontOrderListItem = orderListItem.extend({
+  items: z.array(storefrontOrderItem),
+});
+export type StorefrontOrderListItem = z.infer<typeof storefrontOrderListItem>;
+
+export const storefrontOrderListItemExample = {
+  ...orderListItemExample,
+  items: [storefrontOrderItemExample],
+} satisfies StorefrontOrderListItem;
+
+export const orderDetail = storefrontOrderListItem.extend({
   receiver: orderReceiver,
   buyerRemark: z.string().nullable(),
   customForm: z.record(z.string(), z.unknown()).nullable(),
@@ -447,11 +492,17 @@ export const orderDetail = orderListItem.extend({
   completedAt: instant.nullable(),
   cancelledAt: instant.nullable(),
   cancelReason: z.string().nullable(),
+  /**
+   * 拼团: the team this order sits in, for 查看拼团 (`groupbuyTeam { id }`). Set from the
+   * moment the order exists — 开团 creates the team with the order, 参团 names it — and kept
+   * after a cancel or refund (the team page shows how it ended). `null` for any other kind.
+   */
+  groupbuyTeamId: id.nullable(),
 });
 export type OrderDetail = z.infer<typeof orderDetail>;
 
 export const orderDetailExample = {
-  ...orderListItemExample,
+  ...storefrontOrderListItemExample,
   receiver: orderReceiverExample,
   buyerRemark: '请在工作日送达',
   customForm: null,
@@ -462,6 +513,7 @@ export const orderDetailExample = {
   completedAt: null,
   cancelledAt: null,
   cancelReason: null,
+  groupbuyTeamId: null,
 } satisfies OrderDetail;
 
 /**
@@ -478,6 +530,13 @@ export const orderListTab = z.enum([
   'finished',
   'cancelled',
   'refunding',
+  /**
+   * 待评价: a `received` or `completed` order with at least one `reviewable` line
+   * (`storefrontOrderItem`, ORDER-010). A subset of 已完成; the order leaves it when its last
+   * line is reviewed — by the shopper, or by the auto-review job `autoReviewDays` after
+   * completion.
+   */
+  'unreviewed',
 ]);
 export type OrderListTab = z.infer<typeof orderListTab>;
 
@@ -490,9 +549,9 @@ export const orderListQuery = pageQuery
   .extend(sortQuery(['createdAt', 'payableAmount']).shape);
 export type OrderListQuery = z.infer<typeof orderListQuery>;
 
-export const pagedOrders = paged(orderListItem);
+export const pagedOrders = paged(storefrontOrderListItem);
 
-/** The badge numbers on the tab bar. One query, not eight. */
+/** The badge numbers on the tab bar. One query, not nine. */
 export const orderCounts = z.object({
   all: z.number().int().min(0),
   unpaid: z.number().int().min(0),
@@ -501,6 +560,8 @@ export const orderCounts = z.object({
   finished: z.number().int().min(0),
   cancelled: z.number().int().min(0),
   refunding: z.number().int().min(0),
+  /** 待评价, the `unreviewed` tab's orders (ORDER-010). Also counted in `finished`. */
+  unreviewed: z.number().int().min(0),
 });
 export type OrderCounts = z.infer<typeof orderCounts>;
 
@@ -512,6 +573,7 @@ export const orderCountsExample = {
   finished: 5,
   cancelled: 1,
   refunding: 0,
+  unreviewed: 2,
 } satisfies OrderCounts;
 
 export const orderCancelBody = z.object({

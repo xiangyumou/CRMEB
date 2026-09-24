@@ -1131,7 +1131,7 @@ describe('the batch-1 blocks (G1)', () => {
         orders: {
           counts: {
             kind: 'orderCounts',
-            counts: { unpaid: 2, unshipped: 1, unreceived: 1, aftersale: 1 },
+            counts: { unpaid: 2, unshipped: 1, unreceived: 1, aftersale: 1, unreviewed: 0 },
           },
         },
       });

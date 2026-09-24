@@ -245,6 +245,16 @@ export const groupbuyKindHandler: OrderKindHandler = {
       throw error;
     }
   },
+
+  /**
+   * 查看拼团 on the order detail: the team of the order's membership row. `afterCreate`
+   * writes that row with the order (UNIQUE on `order_id`), so every group-buy order has one;
+   * a cancel or refund changes its status, never its team.
+   */
+  async detailLinks(db, orderId) {
+    const member = await repo.findMemberByOrder(db, orderId);
+    return { groupbuyTeamId: member?.groupId ?? null };
+  },
 };
 
 // ---------------------------------------------------------------------------

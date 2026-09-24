@@ -10,6 +10,7 @@ import type {
   StorefrontSku,
 } from '@shop/contracts/catalog/schemas';
 
+import * as coupon from '../coupon';
 import { DomainError } from '../kernel/errors';
 import { requireUserId, type Ctx } from '../kernel/context';
 import { catalogConfig } from './catalog.config';
@@ -118,6 +119,18 @@ export async function productList(
 ): Promise<{ items: ProductCard[]; total: number; page: number; pageSize: number }> {
   const keyword = query.keyword ? normaliseKeyword(query.keyword) : undefined;
 
+  let couponScope: repo.StorefrontProductFilter['couponScope'];
+  if (query.couponId !== undefined) {
+    const scope = await coupon.productScope(ctx, Number(query.couponId));
+    if (scope === null) return { items: [], total: 0, page: query.page, pageSize: query.pageSize };
+    couponScope =
+      scope.scope === 'products'
+        ? { productIds: scope.productIds }
+        : scope.scope === 'categories'
+          ? { categoryIds: scope.categoryIds }
+          : undefined;
+  }
+
   const { rows, total } = await repo.listSellableProducts(ctx.db, {
     keyword: keyword || undefined,
     categoryId: query.categoryId === undefined ? undefined : Number(query.categoryId),
@@ -128,6 +141,7 @@ export async function productList(
     priceFrom: query.priceFrom,
     priceTo: query.priceTo,
     feature: query.feature,
+    couponScope,
     sortBy: query.sortBy,
     sortOrder: query.sortOrder,
     ...pageBounds(query),

@@ -51,6 +51,12 @@ export const groupbuyList = defineRoute({
       query: { page: 1, pageSize: 20 },
       response: { items: [groupbuyCardExample], total: 1, page: 1, pageSize: 20 },
     },
+    {
+      // 商品详情: is this product in a live activity?
+      name: 'for-a-product',
+      query: { page: 1, pageSize: 1, productId: '11' },
+      response: { items: [groupbuyCardExample], total: 1, page: 1, pageSize: 1 },
+    },
   ],
 });
 

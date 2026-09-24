@@ -472,6 +472,12 @@ export interface StorefrontProductFilter {
   priceFrom?: string | undefined;
   priceTo?: string | undefined;
   feature?: 'hot' | 'new' | 'best' | 'benefit' | 'recommended' | undefined;
+  /**
+   * A coupon's 指定商品 or 品类 scope (a shop-wide coupon passes none): named, or
+   * filed directly under one of the categories — the rows the checkout reads.
+   * Unlike `ids`, it does not set the order.
+   */
+  couponScope?: { productIds: readonly number[] } | { categoryIds: readonly number[] } | undefined;
 }
 
 const FEATURE_COLUMN = {
@@ -529,6 +535,11 @@ export async function listSellableProducts(
     args.labelIds !== undefined
       ? sql`exists (select 1 from ${productLabelsMap} l where l.product_id = ${products.id} and l.label_id = any(${sql.param([...args.labelIds])}::bigint[]))`
       : undefined,
+    args.couponScope === undefined
+      ? undefined
+      : 'productIds' in args.couponScope
+        ? sql`${products.id} = any(${sql.param([...args.couponScope.productIds])}::bigint[])`
+        : sql`exists (select 1 from ${productCategoriesMap} m where m.product_id = ${products.id} and m.category_id = any(${sql.param([...args.couponScope.categoryIds])}::bigint[]))`,
   );
 
   const column =

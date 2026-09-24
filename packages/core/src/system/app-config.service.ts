@@ -184,6 +184,12 @@ async function buildAppConfig(ctx: Ctx): Promise<CachedAppConfig> {
       (domain) => webviewDomain.safeParse(domain).success,
     ),
     appearance: appearanceOf(appearance),
+    display: {
+      categorySubcategories: appearance.showCategorySubcategories,
+      productReviews: appearance.showProductReviews,
+      productRecommendations: appearance.showProductRecommendations,
+      productServiceTags: appearance.showProductServiceTags,
+    },
     version,
   };
 }

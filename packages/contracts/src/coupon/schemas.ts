@@ -295,6 +295,13 @@ export const claimableCouponListQuery = pageQuery.extend({
    * — is skipped, not an error.
    */
   ids: idList.optional(),
+  /**
+   * Only the templates usable on this product — the 商品详情 领券 sheet: shop-wide
+   * (`all_products`), naming the product, or naming one of its categories. The
+   * same scope rule the checkout applies, so a coupon listed here covers the
+   * product once claimed (its threshold and validity are still checked then).
+   */
+  productId: id.optional(),
 });
 export type ClaimableCouponListQuery = z.infer<typeof claimableCouponListQuery>;
 export const pagedClaimableCoupons = paged(claimableCoupon);

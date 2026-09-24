@@ -75,6 +75,30 @@ export const appAppearance = z.object({
 });
 export type AppAppearance = z.infer<typeof appAppearance>;
 
+/**
+ * Which optional parts of two fixed pages show (the `storefront-appearance`
+ * group's 页面显示 switches). Every one defaults to `true`, which is what those
+ * pages showed before the switches existed.
+ */
+export const appDisplay = z.object({
+  /** 分类: the second-level categories under the selected top-level one. */
+  categorySubcategories: z.boolean(),
+  /** 商品详情: the review summary and first reviews. */
+  productReviews: z.boolean(),
+  /** 商品详情: 为你推荐. */
+  productRecommendations: z.boolean(),
+  /** 商品详情: the 服务 row and its sheet. */
+  productServiceTags: z.boolean(),
+});
+export type AppDisplay = z.infer<typeof appDisplay>;
+
+export const appDisplayDefaults: AppDisplay = {
+  categorySubcategories: true,
+  productReviews: true,
+  productRecommendations: true,
+  productServiceTags: true,
+};
+
 /** Template ids, deduplicated, in the operator's order; `[]` when none are set. */
 const templateIds = z.array(z.string());
 
@@ -166,6 +190,7 @@ export const appPublicConfig = z.object({
    */
   webviewDomains: z.array(webviewDomain),
   appearance: appAppearance,
+  display: appDisplay,
   /** Moves whenever any source group is saved; also the weak `ETag`. */
   version: z.string(),
   /**
@@ -263,6 +288,7 @@ export const appPublicConfigExample: AppPublicConfig = {
       ],
     },
   },
+  display: { ...appDisplayDefaults, productRecommendations: false },
   version: '1758500000000',
   serverTime: '2026-09-24T08:00:00.000+08:00',
 };

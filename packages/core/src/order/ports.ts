@@ -416,6 +416,32 @@ export interface OrderKindHandler {
   afterCreate(ctx: Ctx, tx: Tx, orderId: number, meta: Record<string, unknown>): Promise<void>;
   /** May refuse a transition the base machine would allow. */
   canTransition?(from: OrderStatus, to: OrderStatus): boolean;
+  /**
+   * Read-only: what the shopper's 订单详情 links to for this kind (the 拼团 team). Optional —
+   * a kind without it adds nothing. Never writes, never throws for a missing row.
+   */
+  detailLinks?(db: DbOrTx, orderId: number): Promise<OrderKindDetailLinks>;
+  /**
+   * Read-only, for 确认订单: what this kind promises before the order exists (the presale
+   * ship time). Optional — a kind without it adds nothing. `selections` are the checkout
+   * body's `kindMeta`, unvalidated: answer nothing for an activity it cannot find rather
+   * than throw — the refusal is `beforeCreate`'s, and the pricing pass already made it.
+   */
+  previewTerms?(
+    db: DbOrTx,
+    selections: Readonly<Record<string, string | undefined>>,
+  ): Promise<OrderKindPreviewTerms>;
+}
+
+/** What `OrderKindHandler.detailLinks` answers; every key is optional. */
+export interface OrderKindPreviewTerms {
+  /** Days after the order is paid in full that it ships (预售: 付款后 N 天内发货). */
+  shipAfterDays?: number | null;
+}
+
+export interface OrderKindDetailLinks {
+  /** The `groupbuy_groups.id` the order holds its membership in. */
+  groupbuyTeamId?: number | null;
 }
 
 /**

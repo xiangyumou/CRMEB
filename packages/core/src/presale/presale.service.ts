@@ -7,6 +7,7 @@ import type {
   PresaleActivityStatusBody,
   PresaleCard,
   PresaleDetail,
+  PresaleListQuery,
   PresaleOrderItem,
   PresaleOrderListQuery,
 } from '@shop/contracts/presale/schemas';
@@ -199,10 +200,11 @@ export async function adminOrderList(
 // storefront
 // ---------------------------------------------------------------------------
 
-export async function list(ctx: Ctx, query: PageQuery): Promise<Paged<PresaleCard>> {
+export async function list(ctx: Ctx, query: PresaleListQuery): Promise<Paged<PresaleCard>> {
   const now = ctx.clock.now();
   const { rows, total } = await repo.listActivities(ctx.db, {
     visibleAt: now,
+    productId: query.productId === undefined ? undefined : Number(query.productId),
     sortBy: 'sortOrder',
     sortOrder: 'desc',
     ...pageBounds(query),

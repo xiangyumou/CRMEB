@@ -6,6 +6,7 @@ import {
   expressCompanyList,
   expressCompanyListExample,
   expressCompanyListQuery,
+  expressCompanyOptionsQuery,
   expressCompanyRow,
   expressCompanyRowExample,
   expressCompanyStatusBody,
@@ -23,9 +24,9 @@ import {
  *    the `order:order:read` permission on the admin one, because the console's
  *    发货 form and the mobile staff console are its callers. Enabled companies
  *    only, ordered `sortOrder DESC, id ASC`.
- *    The storefront reads the same list at `GET /api/v1/express-companies`
+ *    The storefront reads the same body at `GET /api/v1/express-companies`
  *    (public reference data) for the 退货物流 form, whose legacy page had no
- *    list to pick from.
+ *    list to pick from — searched and capped there (`expressCompanyOptionsQuery`).
  * 2. **The management screen** — `/admin-api/shipping/express-companies`, paged,
  *    including disabled rows, with its own `shipping:express:*` atoms.
  *
@@ -65,6 +66,11 @@ export const staffExpressCompanyPicker = defineRoute({
   examples: [{ name: 'ok', response: expressCompanyListExample }],
 });
 
+/**
+ * The shopper's 退货物流 picker: searched on the server and capped (`expressCompanyOptionsQuery`),
+ * carriers with a WeChat courier code first. Its one caller is the mini-program; the legacy
+ * uni-app never had this list (the staff console reads its own path, uncapped).
+ */
 export const expressCompanyOptions = defineRoute({
   id: 'shipping.expressCompanyOptions',
   method: 'GET',
@@ -72,8 +78,16 @@ export const expressCompanyOptions = defineRoute({
   auth: 'public',
   summary: '快递公司列表（退货物流）',
   tags: ['shipping'],
+  query: expressCompanyOptionsQuery,
   response: expressCompanyList,
-  examples: [{ name: 'ok', response: expressCompanyListExample }],
+  examples: [
+    { name: 'ok', response: expressCompanyListExample },
+    {
+      name: 'search',
+      query: { keyword: '顺丰', limit: 20 },
+      response: { items: [expressCompanyListExample.items[0]!] },
+    },
+  ],
 });
 
 // ---------------------------------------------------------------------------

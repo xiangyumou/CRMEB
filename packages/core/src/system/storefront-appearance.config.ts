@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   appAppearanceDefaults,
+  appDisplayDefaults,
   hexColor,
   radiusScale,
   type AppTabKey,
@@ -8,8 +9,9 @@ import {
 import { defineConfigGroup, type ConfigFieldUi } from '../kernel/config-registry';
 
 /**
- * `storefront-appearance` — how the mini-program looks: theme tokens and the
- * tab bar. Read by `GET /api/v1/app/config` and nothing else.
+ * `storefront-appearance` — how the mini-program looks: theme tokens, the tab
+ * bar, and the 页面显示 switches (`display`). Read by `GET /api/v1/app/config`
+ * and nothing else.
  *
  * Named with a hyphen because a group name is `[a-z][a-z0-9-]` (it is also the
  * `config_values.group` value and a URL segment on the settings screen).
@@ -69,6 +71,11 @@ export const storefrontAppearanceConfig = defineConfigGroup({
     tabMeLabel: tabLabel('me'),
     tabMeIcon: tabIcon(),
     tabMeSelectedIcon: tabIcon(),
+
+    showCategorySubcategories: z.boolean().default(appDisplayDefaults.categorySubcategories),
+    showProductReviews: z.boolean().default(appDisplayDefaults.productReviews),
+    showProductRecommendations: z.boolean().default(appDisplayDefaults.productRecommendations),
+    showProductServiceTags: z.boolean().default(appDisplayDefaults.productServiceTags),
   }),
   ui: {
     primaryColor: {
@@ -145,6 +152,32 @@ export const storefrontAppearanceConfig = defineConfigGroup({
     ...tabUi('tabCategory', '分类', 30),
     ...tabUi('tabCart', '购物车', 40),
     ...tabUi('tabMe', '我的', 50),
+
+    showCategorySubcategories: {
+      label: '分类页显示二级类目',
+      type: 'switch',
+      help: '关闭后分类页只列所选一级分类下的商品',
+      section: '页面显示',
+      order: 60,
+    },
+    showProductReviews: {
+      label: '商品详情显示评价',
+      type: 'switch',
+      section: '页面显示',
+      order: 61,
+    },
+    showProductRecommendations: {
+      label: '商品详情显示「为你推荐」',
+      type: 'switch',
+      section: '页面显示',
+      order: 62,
+    },
+    showProductServiceTags: {
+      label: '商品详情显示服务标签',
+      type: 'switch',
+      section: '页面显示',
+      order: 63,
+    },
   },
 });
 

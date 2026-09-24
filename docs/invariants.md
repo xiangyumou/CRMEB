@@ -626,6 +626,22 @@ An order whose second stock deduction fails rolls back completely: no order row,
 - `packages/core/src/order/order.concurrency.int.test.ts::two checkouts for the last unit > hands back every line it already took when a later line is short`
 - `packages/core/src/order/order.int.test.ts::the stock port > takes nothing when one line of several is short, and names that line`
 
+### ORDER-010
+
+A line on the shopper's own order is `reviewable` exactly when `catalog.reviewSubmit` accepts it: the order is `received` or `completed`, the line is not refunded in full, and it has no review yet. `reviewed` is any review row for the line — published, held for moderation or removed by the shop — because each of them makes a second review `CATALOG_REVIEW_ALREADY_WRITTEN`. The list and the detail say the same. 待评价 (`order.counts.unreviewed`, the `unreviewed` tab, the 订单入口 badge) is the shopper's live orders with at least one such line; it has no deadline of its own — the auto-review job's default review, `autoReviewDays` after completion, is what takes a line out.
+
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > counts 待评价 as the orders with a reviewable line, and the tab lists exactly those`
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > leaves out an order not yet received, one refunded line by line, and another shopper’s`
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > stops counting a line once the auto-review job has written its default review`
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > marks a line reviewable only once received, and reviewed once written — held or not`
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > agrees with what reviewSubmit accepts: a fully refunded line is not reviewable`
+
+### ORDER-011
+
+The shopper's order detail names the 拼团 team a group-buy order opened or joined (`groupbuyTeamId`, for 查看拼团 → `groupbuyTeam { id }`), from the moment the order exists and after it is cancelled; any other order names none. The order domain reads it through `OrderKindHandler.detailLinks`, never from a `groupbuy_*` table.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > ORDER-011 — the order detail names the team an order opened or joined, and nothing for an ordinary order`
+
 ### COUPON-007
 
 The last coupon cannot be claimed twice: one concurrent claim wins, the other is refused, `remain_count` never goes negative and exactly one user holds it.
@@ -638,6 +654,13 @@ The last coupon cannot be claimed twice: one concurrent claim wins, the other is
 Two simultaneous claims by one user leave exactly one success, the loser refused by the per-user limit, and one claim record.
 
 - `packages/core/src/coupon/coupon.concurrency.int.test.ts::COUPON-008 — one user tapping 领取 twice > holds the per-user limit, and the unique violation surfaces as a 409`
+
+### COUPON-009
+
+The storefront's coupon-to-product links agree with the checkout's scope rule (`eligibleLineIndexes`: shop-wide, naming the product, or naming one of the categories it is filed under — its direct `product_categories_map` rows, the ones the checkout reads). `coupon.claimableList` narrowed by `productId` lists, among the claimable templates, exactly those that cover the product; `catalog.productList` narrowed by `couponId` (a template id) lists exactly the sellable products the template covers — nothing for an unknown or draft template, and still the scope of a disabled one, whose coupons stay spendable.
+
+- `packages/core/src/coupon/coupon.int.test.ts::listClaimable > COUPON-009 — narrowed to a product, lists exactly the coupons the checkout would apply to it`
+- `packages/core/src/coupon/coupon.int.test.ts::listClaimable > COUPON-009 — the 商品列表 for a coupon lists exactly the products the checkout would apply it to`
 
 ### AUTH-005
 
@@ -1749,9 +1772,10 @@ A save is refused whole when the schema rejects a value or the group does not de
 
 ### SYS-015
 
-The `storefront-appearance` group answers a fresh install with every field defaulted (the contract's `appAppearanceDefaults`), always yields exactly the four fixed tabs — 首页, 分类, 购物车, 我的 — in that order, falls back to the default label when one is blanked, serves a blank accent colour as `null` (the client then uses the primary colour), and refuses any colour that is not `#RRGGBB` (and a radius off the scale, and an over-long label) whole, writing nothing.
+The `storefront-appearance` group answers a fresh install with every field defaulted (the contract's `appAppearanceDefaults`), always yields exactly the four fixed tabs — 首页, 分类, 购物车, 我的 — in that order, falls back to the default label when one is blanked, serves a blank accent colour as `null` (the client then uses the primary colour), and refuses any colour that is not `#RRGGBB` (and a radius off the scale, and an over-long label) whole, writing nothing. Its 页面显示 switches (`display`: 分类 second-level categories, 商品详情 reviews, 为你推荐 and service tags) all default to shown — what those pages showed before the switches — and each turns off alone.
 
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > answers a fresh install with every appearance default`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > shows every optional part of 分类 and 商品详情 until the operator switches one off`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the theme and the tab bar the operator saved`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the accent colour, and a blanked one as none`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > falls back to the default label when the operator blanks one`
@@ -2055,6 +2079,12 @@ A courier code identifies one company: a duplicate is refused by the unique inde
 
 - `packages/core/src/shipping/shipping.concurrency.int.test.ts::creating the same courier code twice at once > keeps one row and refuses the rest by their code`
 - `apps/web/app/admin-api/shipping/shipping.int.test.ts::/admin-api/shipping/express-companies > refuses a duplicate code as 409 with its Chinese message`
+
+### SHIP-003
+
+The shopper's carrier picker (`GET /api/v1/express-companies`) offers enabled carriers only, at most `limit` (default 50, at most 100), those with a WeChat courier code first and then by `sortOrder`; `keyword` matches the name or the code, case-insensitively, with `%` and `_` taken literally. The operators' pickers stay uncapped.
+
+- `packages/core/src/shipping/shipping.int.test.ts::快递公司 > SHIP-003 — the shopper’s picker: enabled only, a WeChat courier code first, searched and capped`
 
 ### CMS-004
 

@@ -443,6 +443,42 @@ describe('the group-buy price through the real checkout', () => {
     expect((await readGroup(member!.groupId)).activityId).toBe(fixture.activityId);
   });
 
+  it('ORDER-011 — the order detail names the team an order opened or joined, and nothing for an ordinary order', async () => {
+    const fixture = await makeActivity();
+    const leader = await shopper();
+    const opened = await checkout.create(leader.ctx, {
+      ...buyNow(fixture, { activityId: String(fixture.activityId) }),
+      idempotencyKey: `open-${fixture.activityId}`,
+    });
+    const team = await repo.findMemberByOrder(harness.ctx.db, Number(opened.id));
+    // 开团: the team exists with the unpaid order, so the link is there from the start.
+    expect(opened.groupbuyTeamId).toBe(String(team!.groupId));
+    await pay(Number(opened.id));
+
+    const joiner = await shopper();
+    const joined = await checkout.create(joiner.ctx, {
+      ...buyNow(fixture, {
+        activityId: String(fixture.activityId),
+        groupId: String(team!.groupId),
+      }),
+      idempotencyKey: `join-${fixture.activityId}`,
+    });
+    const read = await checkout.detail(joiner.ctx, { id: joined.id });
+    expect(read.groupbuyTeamId).toBe(String(team!.groupId));
+
+    // A cancelled join keeps the link: the team page shows how it went on without them.
+    await cancel(Number(joined.id));
+    expect((await checkout.detail(joiner.ctx, { id: joined.id })).groupbuyTeamId).toBe(
+      String(team!.groupId),
+    );
+
+    const ordinary = await checkout.create(joiner.ctx, {
+      ...buyNow(fixture),
+      idempotencyKey: `plain-${fixture.activityId}`,
+    });
+    expect(ordinary.groupbuyTeamId).toBeNull();
+  });
+
   it('leaves the same SKU at its ordinary price on an ordinary order', async () => {
     const fixture = await makeActivity();
     const { ctx } = await shopper();
@@ -965,6 +1001,29 @@ describe('the system refund for a failed team', () => {
 });
 
 describe('the storefront surface', () => {
+  it('narrows the list to one product: its live activities only, none for a product with none', async () => {
+    const shown = await makeActivity();
+    await makeActivity();
+    const draft = await makeActivity({ status: 'draft' });
+
+    const forProduct = await service.list(harness.ctx, {
+      page: 1,
+      pageSize: 20,
+      productId: String(shown.productId),
+    });
+    expect(forProduct.total).toBe(1);
+    expect(forProduct.items.map((item) => item.activityId)).toEqual([String(shown.activityId)]);
+    expect(forProduct.items[0]?.productId).toBe(String(shown.productId));
+
+    // A product whose only activity is not live is in none, as far as the shopper can tell.
+    const hidden = await service.list(harness.ctx, {
+      page: 1,
+      pageSize: 20,
+      productId: String(draft.productId),
+    });
+    expect(hidden).toMatchObject({ total: 0, items: [] });
+  });
+
   it('offers a team only once its leader has paid', async () => {
     const fixture = await makeActivity({ stock: 10 });
     const leader = await makeUser();

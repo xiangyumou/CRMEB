@@ -185,6 +185,28 @@ describe('确认订单', () => {
     expect(preview.adjustments).toEqual([]);
   });
 
+  it('says when a presale order ships — the campaign’s days after payment — and nothing for an ordinary one', async () => {
+    const fixture = await seed();
+    const presale = await checkout.preview(asUser(fixture.userId), buyNow(fixture, 1));
+    expect(presale.shipAfterDays).toBe(15);
+
+    await harness.ctx.db
+      .update(presaleActivities)
+      .set({ shipAfterDays: 0 })
+      .where(eq(presaleActivities.id, fixture.activityId));
+    expect((await checkout.preview(asUser(fixture.userId), buyNow(fixture, 1))).shipAfterDays).toBe(
+      0,
+    );
+
+    const ordinary = await checkout.preview(asUser(fixture.userId), {
+      source: 'buy-now',
+      cartItemIds: [],
+      item: { skuId: String(fixture.skuId), quantity: 1 },
+      kind: 'normal',
+    });
+    expect(ordinary.shipAfterDays).toBeNull();
+  });
+
   it('quotes the catalogue price once the window has closed', async () => {
     const fixture = await seed();
     harness.clock.set('2026-08-01T00:00:00.000Z');

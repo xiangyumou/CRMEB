@@ -1,6 +1,7 @@
 import type { OrderListTab } from '@shop/contracts/order/schemas';
 
-export type ShownTab = Exclude<OrderListTab, 'shipping' | 'refunding'>;
+/** `unreviewed` (待评价, H4) has no tab here yet: 已完成 still covers it. */
+export type ShownTab = Exclude<OrderListTab, 'shipping' | 'refunding' | 'unreviewed'>;
 
 /**
  * The tabs, in the order the old page had them. 已完成 covers 待评价 too (the server's

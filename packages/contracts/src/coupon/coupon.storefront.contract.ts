@@ -52,6 +52,12 @@ export const couponClaimableList = defineRoute({
       query: { page: 1, pageSize: 2, ids: '1,5' },
       response: { items: [claimableCouponExample], total: 1, page: 1, pageSize: 2 },
     },
+    {
+      // The 商品详情 领券 sheet: shop-wide coupons plus those naming the product or its category.
+      name: 'for-a-product',
+      query: { page: 1, pageSize: 20, productId: '11' },
+      response: { items: [claimableCouponExample], total: 1, page: 1, pageSize: 20 },
+    },
   ],
 });
 

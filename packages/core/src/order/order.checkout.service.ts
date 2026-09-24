@@ -414,7 +414,7 @@ function checkoutLineOf(line: DraftLine, index: number, discount: DiscountSplit)
   };
 }
 
-function toPreview(draft: Draft): CheckoutPreview {
+function toPreview(draft: Draft): Omit<CheckoutPreview, 'shipAfterDays'> {
   return {
     lines: draft.lines.map((line, index) => checkoutLineOf(line, index, draft.discount)),
     receiver: receiverOf(draft.address),
@@ -445,7 +445,10 @@ function toPreview(draft: Draft): CheckoutPreview {
 /** 确认订单. Writes nothing, so the client may call it on every change. */
 export async function preview(ctx: Ctx, body: CheckoutPreviewBody): Promise<CheckoutPreview> {
   const userId = requireUserId(ctx);
-  return toPreview(await buildDraft(ctx, ctx.db, userId, body));
+  const draft = await buildDraft(ctx, ctx.db, userId, body);
+  const terms =
+    (await getOrderKindHandler(body.kind)?.previewTerms?.(ctx.db, kindSelections(body))) ?? {};
+  return { ...toPreview(draft), shipAfterDays: terms.shipAfterDays ?? null };
 }
 
 // ---------------------------------------------------------------------------

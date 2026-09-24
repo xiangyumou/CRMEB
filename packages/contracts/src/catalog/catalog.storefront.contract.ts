@@ -144,6 +144,12 @@ export const catalogProductList = defineRoute({
       query: { page: 1, pageSize: 6, categoryIds: '17,18', sortBy: 'sales', sortOrder: 'desc' },
       response: { items: [productCardExample], total: 1, page: 1, pageSize: 6 },
     },
+    {
+      // 我的优惠券「去使用」: the products coupon template 3 covers.
+      name: 'for-a-coupon',
+      query: { page: 1, pageSize: 20, couponId: '3' },
+      response: { items: [productCardExample], total: 1, page: 1, pageSize: 20 },
+    },
   ],
 });
 

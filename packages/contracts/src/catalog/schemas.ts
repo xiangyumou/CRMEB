@@ -1027,6 +1027,13 @@ export const storefrontProductListQuery = pageQuery
     priceTo: money.optional(),
     /** The 精品/热卖/最新/促销 flags, as one key. */
     feature: z.enum(['hot', 'new', 'best', 'benefit', 'recommended']).optional(),
+    /**
+     * Only the products this coupon **template** covers (`userCoupon.templateId`,
+     * `claimableCoupon.templateId`) — 我的优惠券「去使用」. Shop-wide: every product;
+     * 指定商品: those; 品类券: the products filed under its categories. The scope the
+     * checkout applies. An unknown template, or a draft, lists nothing.
+     */
+    couponId: id.optional(),
   })
   .extend(sortQuery(['price', 'sales', 'createdAt']).shape);
 export type StorefrontProductListQuery = z.infer<typeof storefrontProductListQuery>;

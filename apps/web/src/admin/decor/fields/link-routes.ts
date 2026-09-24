@@ -99,6 +99,7 @@ export const LINK_ROUTES = {
           finished: '已完成',
           cancelled: '已取消',
           refunding: '售后中',
+          unreviewed: '待评价',
         },
       },
     },

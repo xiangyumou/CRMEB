@@ -13,8 +13,8 @@ import {
   orderDetailExample,
   orderHidden,
   orderListQuery,
-  orderListItemExample,
   pagedOrders,
+  storefrontOrderListItemExample,
 } from './schemas';
 
 /**
@@ -158,6 +158,7 @@ export const checkoutPreviewRoute = defineRoute({
           { source: 'presale:activity-price', label: '预售价（秋季新品）', amount: '-10.00' },
         ],
         payableAmount: '50.00',
+        shipAfterDays: 15,
         userCouponId: null,
       },
     },
@@ -229,7 +230,7 @@ export const orderCreate = defineRoute({
         idempotencyKey: 'ck-20260201-gb000001',
         expectedPayableAmount: '49.00',
       },
-      response: { ...orderDetailExample, kind: 'groupbuy' },
+      response: { ...orderDetailExample, kind: 'groupbuy', groupbuyTeamId: '501' },
     },
   ],
 });
@@ -247,7 +248,7 @@ export const orderList = defineRoute({
     {
       name: 'unpaid-tab',
       query: { page: 1, pageSize: 20, tab: 'unpaid' },
-      response: { items: [orderListItemExample], total: 1, page: 1, pageSize: 20 },
+      response: { items: [storefrontOrderListItemExample], total: 1, page: 1, pageSize: 20 },
     },
     {
       name: 'empty',

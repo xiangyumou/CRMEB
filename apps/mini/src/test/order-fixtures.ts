@@ -2,7 +2,11 @@
  * Orders, shipments and refunds as the API returns them, for the order and after-sales page
  * tests. Plain objects typed by the contracts (which the app may only import as types).
  */
-import type { OrderDetail, OrderItem, OrderListItem } from '@shop/contracts/order/schemas';
+import type {
+  OrderDetail,
+  StorefrontOrderItem,
+  StorefrontOrderListItem,
+} from '@shop/contracts/order/schemas';
 import type { Shipment, ShipmentTracking } from '@shop/contracts/order/order.fulfil.schemas';
 import type {
   RefundableItem,
@@ -11,7 +15,10 @@ import type {
   RefundListItem,
 } from '@shop/contracts/refund/schemas';
 
-export function orderItem(id: string, overrides: Partial<OrderItem> = {}): OrderItem {
+export function orderItem(
+  id: string,
+  overrides: Partial<StorefrontOrderItem> = {},
+): StorefrontOrderItem {
   return {
     id,
     itemKey: `sku-${id}`,
@@ -31,11 +38,15 @@ export function orderItem(id: string, overrides: Partial<OrderItem> = {}): Order
     refundedQuantity: 0,
     shippedQuantity: 0,
     adjustments: [],
+    reviewed: false,
+    reviewable: false,
     ...overrides,
   };
 }
 
-export function orderListItem(overrides: Partial<OrderListItem> = {}): OrderListItem {
+export function orderListItem(
+  overrides: Partial<StorefrontOrderListItem> = {},
+): StorefrontOrderListItem {
   return {
     id: '9001',
     orderNo: '202602011000000010123456',
@@ -78,6 +89,7 @@ export function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
     completedAt: null,
     cancelledAt: null,
     cancelReason: null,
+    groupbuyTeamId: null,
     ...overrides,
   };
 }

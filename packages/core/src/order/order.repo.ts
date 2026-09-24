@@ -1,5 +1,6 @@
 import type { DbOrTx, Tx } from '@shop/db';
 import { cartItems } from '@shop/db/schema/cart';
+import { productReviews } from '@shop/db/schema/catalog';
 import { orderItems, orderStatusLogs, orders } from '@shop/db/schema/order';
 import { userAddresses } from '@shop/db/schema/user';
 import { and, asc, desc, eq, inArray, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm';
@@ -103,6 +104,26 @@ export async function stockLinesOf(
 }
 
 /**
+ * Which of these order lines already have a review: any `product_reviews` row, published,
+ * 待审核 or soft-deleted by the shop, because `product_reviews_order_item_uq` refuses a
+ * second review in every one of those cases.
+ *
+ * A named cross-domain read, like the auto-review sweep's join in `order.facts.repo.ts`: the
+ * alternative is a round trip through the catalog for a set of ids this domain already has.
+ */
+export async function reviewedItemIds(
+  db: DbOrTx,
+  itemIds: readonly number[],
+): Promise<Set<number>> {
+  if (itemIds.length === 0) return new Set();
+  const rows = await db
+    .select({ orderItemId: productReviews.orderItemId })
+    .from(productReviews)
+    .where(inArray(productReviews.orderItemId, [...new Set(itemIds)]));
+  return new Set(rows.flatMap((row) => (row.orderItemId === null ? [] : [row.orderItemId])));
+}
+
+/**
  * Units of each product this buyer has already committed to, for a `lifetime`
  * purchase limit. Cancelled orders do not count — a shopper who abandoned a
  * checkout has not used up their allowance.
@@ -154,9 +175,25 @@ export function tabFilter(tab: OrderListTab): SQL | undefined {
       return eq(orders.status, 'cancelled');
     case 'refunding':
       return ne(orders.refundStatus, 'none');
+    case 'unreviewed':
+      return awaitingReview();
     default:
       return undefined;
   }
+}
+
+/**
+ * 待评价 (ORDER-010): `received` or `completed`, with a line not refunded in full and not yet
+ * reviewed — `isReviewable` in `order.query.service.ts`, in SQL, and what `catalog.reviewSubmit`
+ * accepts. Reads `product_reviews` for the same reason as `reviewedItemIds`.
+ */
+export function awaitingReview(): SQL {
+  return sql`(${orders.status} in ('received', 'completed') and exists (
+    select 1 from order_items oi
+    where oi.order_id = ${orders.id}
+      and oi.refunded_quantity < oi.quantity
+      and not exists (select 1 from product_reviews pr where pr.order_item_id = oi.id)
+  ))`;
 }
 
 export interface OrderListFilter {
@@ -205,22 +242,34 @@ export async function listOrders(
   return { rows, total: Number(counted[0]?.total ?? 0) };
 }
 
-/** One grouped query behind all seven badges, rather than seven `count(*)`s. */
+/**
+ * One grouped query behind all the badges, rather than a `count(*)` each. `unreviewed` is
+ * the group's 待评价 orders (`awaitingReview`).
+ */
 export async function countByStatus(
   db: DbOrTx,
   userId: number,
-): Promise<{ status: OrderStatus; fulfillmentStatus: string; refunding: boolean; n: number }[]> {
+): Promise<
+  {
+    status: OrderStatus;
+    fulfillmentStatus: string;
+    refunding: boolean;
+    n: number;
+    unreviewed: number;
+  }[]
+> {
   const rows = await db
     .select({
       status: orders.status,
       fulfillmentStatus: orders.fulfillmentStatus,
       refunding: sql<boolean>`${orders.refundStatus} <> 'none'`,
       n: sql<number>`count(*)::int`,
+      unreviewed: sql<number>`(count(*) filter (where ${awaitingReview()}))::int`,
     })
     .from(orders)
     .where(and(eq(orders.userId, userId), liveForUser()))
     .groupBy(orders.status, orders.fulfillmentStatus, sql`${orders.refundStatus} <> 'none'`);
-  return rows.map((row) => ({ ...row, n: Number(row.n) }));
+  return rows.map((row) => ({ ...row, n: Number(row.n), unreviewed: Number(row.unreviewed) }));
 }
 
 /**

@@ -64,6 +64,23 @@ export async function findTemplate(db: DbOrTx, id: number): Promise<TemplateRow 
   return rows[0] ?? null;
 }
 
+/**
+ * A template's status whatever its deletion state, or null if there is no such
+ * row. A soft-deleted template's wallet coupons are still spendable, and their
+ * scope is still read from it (`templateTerms`), so a scope lookup must see it.
+ */
+export async function templateStatus(
+  db: DbOrTx,
+  id: number,
+): Promise<'draft' | 'active' | 'disabled' | null> {
+  const rows = await db
+    .select({ status: couponTemplates.status })
+    .from(couponTemplates)
+    .where(eq(couponTemplates.id, id))
+    .limit(1);
+  return rows[0]?.status ?? null;
+}
+
 export interface TemplateListFilter {
   keyword?: string | undefined;
   status?: readonly ('draft' | 'active' | 'disabled')[] | undefined;
@@ -253,16 +270,47 @@ export async function productCategoryIds(
 }
 
 /**
+ * The template's scope covers `productId` — `eligibleLineIndexes` (coupon.rules.ts)
+ * as SQL, over the same rows the checkout reads: `all_products`; `products`
+ * naming it; or `categories` sharing a category with its direct
+ * `product_categories_map` rows (what `productCategoryIds` and the catalog's
+ * `categoryIdsFor` hand the checkout). The two must agree, or a coupon offered on
+ * a product page would be refused at checkout.
+ */
+function coversProduct(productId: number): SQL {
+  return sql`(
+    ${couponTemplates.scope} = 'all_products'
+    or (${couponTemplates.scope} = 'products' and exists (
+      select 1 from ${couponTemplateProducts}
+      where ${couponTemplateProducts.templateId} = ${couponTemplates.id}
+        and ${couponTemplateProducts.productId} = ${productId}))
+    or (${couponTemplates.scope} = 'categories' and exists (
+      select 1 from ${couponTemplateCategories}
+      join ${productCategoriesMap}
+        on ${productCategoriesMap.categoryId} = ${couponTemplateCategories.categoryId}
+      where ${couponTemplateCategories.templateId} = ${couponTemplates.id}
+        and ${productCategoriesMap.productId} = ${productId}))
+  )`;
+}
+
+/**
  * Templates a shopper may claim by hand right now, ignoring their own limit.
  * With `ids`, only those templates, in that order.
  */
 export async function listClaimable(
   db: DbOrTx,
-  args: { now: Date; ids?: readonly number[] | undefined; offset: number; limit: number },
+  args: {
+    now: Date;
+    ids?: readonly number[] | undefined;
+    productId?: number | undefined;
+    offset: number;
+    limit: number;
+  },
 ): Promise<{ rows: TemplateRow[]; total: number }> {
   const where = and(
     liveTemplate(),
     args.ids === undefined ? undefined : inArray(couponTemplates.id, [...args.ids]),
+    args.productId === undefined ? undefined : coversProduct(args.productId),
     eq(couponTemplates.status, 'active'),
     eq(couponTemplates.claimMode, 'manual'),
     or(isNull(couponTemplates.claimFrom), lte(couponTemplates.claimFrom, args.now)),
