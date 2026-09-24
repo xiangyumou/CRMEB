@@ -181,7 +181,7 @@ export const orderAdminAdjustPrice = defineRoute({
   method: 'POST',
   path: '/admin-api/orders/:id/price',
   auth: 'admin',
-  permission: 'order:order:write',
+  permission: 'order:order:reprice',
   summary: '订单改价',
   tags: ['order'],
   params: orderIdParams,

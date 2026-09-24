@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
-import { admins } from '@shop/db/schema/auth';
+import { admins, rolePermissions, roles } from '@shop/db/schema/auth';
 import { notificationTemplates, type NotificationChannels } from '@shop/db/schema/notification';
 import { configValues } from '@shop/db/schema/system';
 import { createTestCtx, type TestCtx } from '@shop/testing';
@@ -1002,6 +1002,45 @@ describe('audit log', () => {
  * harness has already applied it to an empty database; this runs it again over
  * rows that carry the leftovers, twice, to show it is idempotent.
  */
+describe('migration 0012 — 改价 becomes its own atom', () => {
+  const MIGRATION = fileURLToPath(
+    new URL('../../../db/migrations/0012_order_reprice_permission.sql', import.meta.url),
+  );
+  const runMigration = () => harness.db.handle.pool.query(readFileSync(MIGRATION, 'utf8'));
+
+  it('gives it to every role that could re-price before, and to nobody else', async () => {
+    const [support, warehouse] = await harness.ctx.db
+      .insert(roles)
+      .values([{ name: '客服' }, { name: '仓库' }])
+      .returning({ id: roles.id });
+    await harness.ctx.db.insert(rolePermissions).values([
+      { roleId: support!.id, permission: 'order:order:read' },
+      { roleId: support!.id, permission: 'order:order:write' },
+      { roleId: warehouse!.id, permission: 'order:order:read' },
+      { roleId: warehouse!.id, permission: 'order:shipment:write' },
+    ]);
+
+    await runMigration();
+    await runMigration();
+
+    const granted = async (roleId: number) =>
+      (
+        await harness.ctx.db
+          .select()
+          .from(rolePermissions)
+          .where(eq(rolePermissions.roleId, roleId))
+      )
+        .map((row) => row.permission)
+        .sort();
+    expect(await granted(support!.id)).toEqual([
+      'order:order:read',
+      'order:order:reprice',
+      'order:order:write',
+    ]);
+    expect(await granted(warehouse!.id)).toEqual(['order:order:read', 'order:shipment:write']);
+  });
+});
+
 describe('migration 0009 — config the cutover left behind', () => {
   const MIGRATION = fileURLToPath(
     new URL('../../../db/migrations/0009_drop_cutover_leftover_config.sql', import.meta.url),

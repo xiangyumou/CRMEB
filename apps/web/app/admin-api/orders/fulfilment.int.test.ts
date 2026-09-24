@@ -404,6 +404,32 @@ describe('POST /admin-api/orders/:id/shipments', () => {
   });
 });
 
+describe('POST /admin-api/orders/:id/price', () => {
+  const reprice = async (headers: Record<string, string>) => {
+    const { POST } = await import('./[id]/price/route');
+    return POST(
+      json(
+        'POST',
+        '/admin-api/orders/999999/price',
+        { operatorDiscount: '10.00', freightAmount: '0.00', reason: '老客户' },
+        headers,
+      ),
+      { params: Promise.resolve({ id: '999999' }) },
+    );
+  };
+
+  it('is money, so it has its own atom: 备注 and 修改地址 do not carry it', async () => {
+    const response = await reprice(await adminCookie(['order:order:read', 'order:order:write']));
+    expect(response.status).toBe(403);
+    expect((await response.json()).details).toMatchObject({ permission: 'order:order:reprice' });
+  });
+
+  it('lets an operator holding 改价 through to the order', async () => {
+    const response = await reprice(await adminCookie(['order:order:read', 'order:order:reprice']));
+    expect(response.status).toBe(404);
+  });
+});
+
 describe('GET /admin-api/orders/exports', () => {
   it('needs its own permission, and answers CSV text inside the envelope', async () => {
     await paidOrder();

@@ -85,6 +85,13 @@
       "when": 1790249647497,
       "tag": "0011_order_operator_discount",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790249823674,
+      "tag": "0012_order_reprice_permission",
+      "breakpoints": true
     }
   ]
 }

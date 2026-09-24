@@ -79,7 +79,7 @@ export function OrderDetailPage({ id }: { id: string }) {
               <Button onClick={() => remarkModal.show(data)}>备注</Button>
             </Can>
             {data.status === 'pending_payment' ? (
-              <Can permission="order:order:write">
+              <Can permission="order:order:reprice">
                 <Button onClick={() => priceModal.show(data)}>改价</Button>
               </Can>
             ) : null}
