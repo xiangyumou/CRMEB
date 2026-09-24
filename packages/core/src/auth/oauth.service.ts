@@ -28,7 +28,8 @@ export interface RegisterClientInput {
   redirectUris: string[];
 }
 
-export type OAuthResult<T> = { ok: true; value: T } | { ok: false; error: string; description: string };
+export type OAuthResult<T> =
+  { ok: true; value: T } | { ok: false; error: string; description: string };
 
 const CODE_TTL_MS = 60_000;
 const codeKey = (code: string) => `oauth:code:${sha256Hex(code)}`;
@@ -51,8 +52,10 @@ export function isAcceptableRedirectUri(raw: string): boolean {
     return url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
   }
   // A private-use scheme (`cursor:`, `vscode:`); `javascript:`, `data:` and friends are not that.
-  return /^[a-z][a-z0-9+.-]*:$/.test(url.protocol) &&
-    !['javascript:', 'data:', 'file:', 'vbscript:', 'blob:'].includes(url.protocol);
+  return (
+    /^[a-z][a-z0-9+.-]*:$/.test(url.protocol) &&
+    !['javascript:', 'data:', 'file:', 'vbscript:', 'blob:'].includes(url.protocol)
+  );
 }
 
 export async function registerClient(
@@ -61,7 +64,11 @@ export async function registerClient(
 ): Promise<OAuthResult<{ clientId: string; clientName: string; redirectUris: string[] }>> {
   const redirectUris = [...new Set(input.redirectUris)];
   if (redirectUris.length === 0 || redirectUris.length > 10) {
-    return { ok: false, error: 'invalid_redirect_uri', description: 'redirect_uris: 1 to 10 required' };
+    return {
+      ok: false,
+      error: 'invalid_redirect_uri',
+      description: 'redirect_uris: 1 to 10 required',
+    };
   }
   const bad = redirectUris.find((uri) => uri.length > 512 || !isAcceptableRedirectUri(uri));
   if (bad) return { ok: false, error: 'invalid_redirect_uri', description: `not allowed: ${bad}` };
@@ -98,16 +105,39 @@ export async function validateAuthorizeRequest(
 > {
   const client = await tokenRepo.findClient(db, input.clientId);
   if (!client) {
-    return { ok: false, redirectTrusted: false, error: 'invalid_client', description: '未知的客户端' };
+    return {
+      ok: false,
+      redirectTrusted: false,
+      error: 'invalid_client',
+      description: '未知的客户端',
+    };
   }
   if (!client.redirectUris.includes(input.redirectUri)) {
-    return { ok: false, redirectTrusted: false, error: 'invalid_request', description: '回调地址未登记' };
+    return {
+      ok: false,
+      redirectTrusted: false,
+      error: 'invalid_request',
+      description: '回调地址未登记',
+    };
   }
   if (input.responseType !== 'code') {
-    return { ok: false, redirectTrusted: true, error: 'unsupported_response_type', description: 'code only' };
+    return {
+      ok: false,
+      redirectTrusted: true,
+      error: 'unsupported_response_type',
+      description: 'code only',
+    };
   }
-  if (input.codeChallengeMethod !== 'S256' || !/^[A-Za-z0-9_-]{43,128}$/.test(input.codeChallenge)) {
-    return { ok: false, redirectTrusted: true, error: 'invalid_request', description: 'PKCE S256 required' };
+  if (
+    input.codeChallengeMethod !== 'S256' ||
+    !/^[A-Za-z0-9_-]{43,128}$/.test(input.codeChallenge)
+  ) {
+    return {
+      ok: false,
+      redirectTrusted: true,
+      error: 'invalid_request',
+      description: 'PKCE S256 required',
+    };
   }
   return { ok: true, clientName: client.name };
 }
@@ -143,7 +173,8 @@ export async function redeemAuthorizationCode(
     redirectUri: string;
     codeChallenge: string;
   };
-  if (stored.clientId !== input.clientId || stored.redirectUri !== input.redirectUri) return invalid;
+  if (stored.clientId !== input.clientId || stored.redirectUri !== input.redirectUri)
+    return invalid;
   if (!/^[A-Za-z0-9._~-]{43,128}$/.test(input.codeVerifier)) return invalid;
   if (s256(input.codeVerifier) !== stored.codeChallenge) return invalid;
   const client = await tokenRepo.findClient(deps.db, stored.clientId);

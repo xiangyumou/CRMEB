@@ -57,7 +57,9 @@ export async function readParams(request: Request): Promise<Record<string, strin
       const parsed = JSON.parse(text) as unknown;
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         return Object.fromEntries(
-          Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+          Object.entries(parsed).filter(
+            (entry): entry is [string, string] => typeof entry[1] === 'string',
+          ),
         );
       }
     } catch {

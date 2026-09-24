@@ -130,7 +130,8 @@ async function run(argv: string[]): Promise<number> {
     }
     case 'call': {
       const [id] = rest;
-      if (!id) throw new UsageError('用法：shop call <操作id> [--param k=v] [--query k=v] [--body JSON]');
+      if (!id)
+        throw new UsageError('用法：shop call <操作id> [--param k=v] [--query k=v] [--body JSON]');
       const body = await parseBody(values.body, readSource);
       return finish(
         await callOperation(await client(), id, {

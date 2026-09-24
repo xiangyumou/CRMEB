@@ -22,7 +22,10 @@ function refuse(message: string, status = 400): Response {
 
 export async function POST(request: Request): Promise<Response> {
   const container = getContainer();
-  const csrf = checkCsrf(request, [container.env.APP_ORIGIN, ...container.env.EXTRA_ALLOWED_ORIGINS]);
+  const csrf = checkCsrf(request, [
+    container.env.APP_ORIGIN,
+    ...container.env.EXTRA_ALLOWED_ORIGINS,
+  ]);
   if (!csrf.ok) return refuse('请求来源不可信', 403);
 
   const form = new URLSearchParams(await request.text());

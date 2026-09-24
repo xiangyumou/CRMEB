@@ -121,7 +121,11 @@ export async function uploadFile(client: OpsClient, input: UploadInput): Promise
   })}`;
   const response = await (client.fetch ?? fetch)(url, {
     method: 'POST',
-    headers: { authorization: `Bearer ${client.token}`, accept: 'application/json', ...client.headers },
+    headers: {
+      authorization: `Bearer ${client.token}`,
+      accept: 'application/json',
+      ...client.headers,
+    },
     body: form,
   });
   return { ok: response.ok, status: response.status, data: await readBody(response) };
@@ -137,5 +141,7 @@ export async function readBody(response: Response): Promise<unknown> {
       // fall through to text
     }
   }
-  return text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}…（已截断，共 ${text.length} 字符）` : text;
+  return text.length > MAX_TEXT
+    ? `${text.slice(0, MAX_TEXT)}…（已截断，共 ${text.length} 字符）`
+    : text;
 }

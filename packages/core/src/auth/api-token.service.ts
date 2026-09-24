@@ -1,5 +1,8 @@
 import type { DbOrTx } from '@shop/db';
-import type { ApiTokenCreateBody, ApiTokenItem } from '@shop/contracts/auth/auth.api-token.contract';
+import type {
+  ApiTokenCreateBody,
+  ApiTokenItem,
+} from '@shop/contracts/auth/auth.api-token.contract';
 import type { Clock } from '../kernel/clock';
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';

@@ -43,7 +43,10 @@ const domainList = Object.entries(DOMAIN_LABELS)
 function text(value: unknown, isError = false) {
   return {
     content: [
-      { type: 'text' as const, text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) },
+      {
+        type: 'text' as const,
+        text: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
+      },
     ],
     ...(isError ? { isError: true } : {}),
   };
@@ -103,7 +106,9 @@ export function buildShopMcpServer(caller: Caller, deps: McpDeps): McpServer {
     },
     async ({ id }) => {
       const detail = describeOperation(id);
-      return detail ? text(detail) : text(`没有这个操作：${id}。请先用 search_operations 搜索。`, true);
+      return detail
+        ? text(detail)
+        : text(`没有这个操作：${id}。请先用 search_operations 搜索。`, true);
     },
   );
 
@@ -213,7 +218,8 @@ export function createShopMcpEndpoint(
   const handler: McpHttpHandler = createMcpHandler(
     (ctx) => {
       const caller = ctx.authInfo?.extra?.caller as Caller | undefined;
-      if (!caller) throw new Error('mcp: request reached the server without an authenticated caller');
+      if (!caller)
+        throw new Error('mcp: request reached the server without an authenticated caller');
       return buildShopMcpServer(caller, deps);
     },
     {

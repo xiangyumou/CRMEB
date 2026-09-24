@@ -74,8 +74,9 @@ export function ApiTokensPage() {
           </Typography.Text>
         </Typography.Paragraph>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          Claude、ChatGPT 等支持「添加连接器」的应用：直接填这个地址，按提示登录授权即可，无需新建令牌。
-          Cherry Studio、Cursor 等可以填请求头的客户端：新建一个个人令牌，请求头填{' '}
+          Claude、ChatGPT
+          等支持「添加连接器」的应用：直接填这个地址，按提示登录授权即可，无需新建令牌。 Cherry
+          Studio、Cursor 等可以填请求头的客户端：新建一个个人令牌，请求头填{' '}
           <Typography.Text code>Authorization: Bearer shp_…</Typography.Text>。
         </Typography.Paragraph>
       </Card>
@@ -207,7 +208,11 @@ export function ApiTokensPage() {
           style={{ marginBottom: 12 }}
           message="这是唯一一次显示完整令牌，关闭后无法再次查看。请立即复制保存。"
         />
-        <Typography.Paragraph copyable={{ text: issued ?? '' }} code style={{ wordBreak: 'break-all' }}>
+        <Typography.Paragraph
+          copyable={{ text: issued ?? '' }}
+          code
+          style={{ wordBreak: 'break-all' }}
+        >
           {issued}
         </Typography.Paragraph>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>

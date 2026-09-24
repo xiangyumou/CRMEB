@@ -1,7 +1,4 @@
-import {
-  authApiTokenCreate,
-  authApiTokenList,
-} from '@shop/contracts/auth/auth.api-token.contract';
+import { authApiTokenCreate, authApiTokenList } from '@shop/contracts/auth/auth.api-token.contract';
 import { createPersonalToken, listTokens } from '@shop/core/auth';
 import { handle } from '../../../src/server';
 

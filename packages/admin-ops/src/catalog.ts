@@ -86,7 +86,8 @@ function toOperation(route: AnyRouteDef): Operation {
 }
 
 const adminRoutes: readonly AnyRouteDef[] = allRoutes.filter(
-  (route) => route.path.startsWith('/admin-api/') && route.auth === 'admin' && !EXCLUDED.has(route.id),
+  (route) =>
+    route.path.startsWith('/admin-api/') && route.auth === 'admin' && !EXCLUDED.has(route.id),
 );
 const byId = new Map(adminRoutes.map((route) => [route.id, route]));
 

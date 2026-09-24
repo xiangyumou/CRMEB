@@ -13,7 +13,13 @@ import '@shop/contracts/locale';
 // which is why it is here and not in the container.
 import '@shop/core/domains';
 import { anonymousActor, createCtx, DomainError, type Actor, type Ctx } from '@shop/core/kernel';
-import { hasPermission, insertAudit, isApiToken, readBearer, resolveApiToken } from '@shop/core/auth';
+import {
+  hasPermission,
+  insertAudit,
+  isApiToken,
+  readBearer,
+  resolveApiToken,
+} from '@shop/core/auth';
 import { getContainer, type Container } from './container';
 import { isProduction } from './env';
 import { clientIp } from './request-meta';

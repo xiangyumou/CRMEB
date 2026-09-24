@@ -1,11 +1,6 @@
 import { oauth } from '@shop/core/auth';
 import { getContainer } from '../../../src/server/container';
-import {
-  oauthError,
-  oauthJson,
-  preflight,
-  withinBudget,
-} from '../../../src/server/oauth-http';
+import { oauthError, oauthJson, preflight, withinBudget } from '../../../src/server/oauth-http';
 
 /**
  * Dynamic client registration (RFC 7591). An MCP client calls this once,
@@ -28,7 +23,11 @@ export async function POST(request: Request): Promise<Response> {
     : [];
   const authMethod = metadata.token_endpoint_auth_method;
   if (authMethod !== undefined && authMethod !== 'none') {
-    return oauthError(400, 'invalid_client_metadata', 'only public clients (token_endpoint_auth_method "none")');
+    return oauthError(
+      400,
+      'invalid_client_metadata',
+      'only public clients (token_endpoint_auth_method "none")',
+    );
   }
   const result = await oauth.registerClient(container, {
     clientName: typeof metadata.client_name === 'string' ? metadata.client_name : '',

@@ -86,7 +86,9 @@ async function consoleHeaders(account = 'admin'): Promise<Record<string, string>
   const response = await login(
     request('POST', '/admin-api/auth/login', { account, password: PASSWORD }, SAME_ORIGIN),
   );
-  const cookie = new RegExp(`${ADMIN_COOKIE}=([^;]+)`).exec(response.headers.get('set-cookie') ?? '')?.[1];
+  const cookie = new RegExp(`${ADMIN_COOKIE}=([^;]+)`).exec(
+    response.headers.get('set-cookie') ?? '',
+  )?.[1];
   if (!cookie) throw new Error(`login failed: ${response.status}`);
   return { ...SAME_ORIGIN, cookie: `${ADMIN_COOKIE}=${cookie}` };
 }
@@ -141,11 +143,16 @@ describe('a personal API token', () => {
     const { POST } = await import('../../app/admin-api/roles/route');
 
     const response = await POST(
-      request('POST', '/admin-api/roles', { name: '客服' }, {
-        ...bearer(token),
-        'sec-fetch-site': 'cross-site',
-        origin: 'https://elsewhere.example',
-      }),
+      request(
+        'POST',
+        '/admin-api/roles',
+        { name: '客服' },
+        {
+          ...bearer(token),
+          'sec-fetch-site': 'cross-site',
+          origin: 'https://elsewhere.example',
+        },
+      ),
     );
     expect(response.status).toBe(201);
 
@@ -158,7 +165,12 @@ describe('a personal API token', () => {
 
     const { GET: list } = await import('../../app/admin-api/audit-logs/route');
     const logs = await list(
-      request('GET', '/admin-api/audit-logs?routeId=system.roleCreate', undefined, await consoleHeaders()),
+      request(
+        'GET',
+        '/admin-api/audit-logs?routeId=system.roleCreate',
+        undefined,
+        await consoleHeaders(),
+      ),
     );
     expect((await logs.json()).items[0]).toMatchObject({ apiTokenName: '老板的助手' });
   });
@@ -169,11 +181,18 @@ describe('a personal API token', () => {
     const { GET, POST } = await import('../../app/admin-api/api-tokens/route');
 
     const minted = await POST(
-      request('POST', '/admin-api/api-tokens', { name: 'spare', expiresInDays: null }, bearer(token)),
+      request(
+        'POST',
+        '/admin-api/api-tokens',
+        { name: 'spare', expiresInDays: null },
+        bearer(token),
+      ),
     );
     expect(minted.status).toBe(403);
     expect((await minted.json()).code).toBe('AUTH_TOKEN_CONSOLE_ONLY');
-    expect((await GET(request('GET', '/admin-api/api-tokens', undefined, bearer(token)))).status).toBe(403);
+    expect(
+      (await GET(request('GET', '/admin-api/api-tokens', undefined, bearer(token)))).status,
+    ).toBe(403);
   });
 
   it('answers 401 for a token that is unknown, revoked, or outlived a password change', async () => {
@@ -184,7 +203,9 @@ describe('a personal API token', () => {
     const revoked = await mintToken(headers, 'a');
     const { GET: list } = await import('../../app/admin-api/api-tokens/route');
     const { DELETE: revoke } = await import('../../app/admin-api/api-tokens/[id]/route');
-    const { items } = (await (await list(request('GET', '/admin-api/api-tokens', undefined, headers))).json()) as {
+    const { items } = (await (
+      await list(request('GET', '/admin-api/api-tokens', undefined, headers))
+    ).json()) as {
       items: { id: string; name: string }[];
     };
     const target = items.find((item) => item.name === 'a')!;
@@ -204,7 +225,11 @@ describe('a personal API token', () => {
       request(
         'POST',
         '/admin-api/profile/password',
-        { currentPassword: PASSWORD, newPassword: 'another-pass-1', confirmPassword: 'another-pass-1' },
+        {
+          currentPassword: PASSWORD,
+          newPassword: 'another-pass-1',
+          confirmPassword: 'another-pass-1',
+        },
         headers,
       ),
     );
@@ -222,9 +247,13 @@ describe('a personal API token', () => {
     const { GET } = await import('../../app/admin-api/api-tokens/route');
 
     const names = async (headers: Record<string, string>) =>
-      ((await (await GET(request('GET', '/admin-api/api-tokens', undefined, headers))).json()) as {
-        items: { name: string }[];
-      }).items.map((item) => item.name).sort();
+      (
+        (await (await GET(request('GET', '/admin-api/api-tokens', undefined, headers))).json()) as {
+          items: { name: string }[];
+        }
+      ).items
+        .map((item) => item.name)
+        .sort();
     expect(await names(clerk)).toEqual(['clerk-token']);
     expect(await names(boss)).toEqual(['boss-token', 'clerk-token']);
   });
@@ -339,7 +368,10 @@ describe('the OAuth flow an MCP client walks', () => {
     const response = await POST(
       new Request(`${ORIGIN}/oauth/authorize/decision`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded', ...(await consoleHeaders()) },
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          ...(await consoleHeaders()),
+        },
         body: form.toString(),
       }),
     );
@@ -432,7 +464,10 @@ describe('the OAuth flow an MCP client walks', () => {
   it('refuses to register a client that would redirect somewhere unsafe', async () => {
     const { POST } = await import('../../app/oauth/register/route');
     const response = await POST(
-      request('POST', '/oauth/register', { client_name: 'x', redirect_uris: ['javascript:alert(1)'] }),
+      request('POST', '/oauth/register', {
+        client_name: 'x',
+        redirect_uris: ['javascript:alert(1)'],
+      }),
     );
     expect(response.status).toBe(400);
   });

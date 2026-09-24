@@ -39,7 +39,9 @@ export async function POST(request: Request): Promise<Response> {
       redirectUri: params.redirect_uri ?? '',
       codeVerifier: params.code_verifier ?? '',
     });
-    return result.ok ? tokenResponse(result.value) : oauthError(400, result.error, result.description);
+    return result.ok
+      ? tokenResponse(result.value)
+      : oauthError(400, result.error, result.description);
   }
 
   if (params.grant_type === 'refresh_token') {

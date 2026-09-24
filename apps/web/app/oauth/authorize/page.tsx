@@ -28,7 +28,8 @@ export default async function AuthorizePage({
 
   const checked = await oauth.validateAuthorizeRequest(container.db, asAuthorizeRequest(params));
   if (!checked.ok) {
-    if (checked.redirectTrusted) redirect(errorRedirect(params, checked.error, checked.description));
+    if (checked.redirectTrusted)
+      redirect(errorRedirect(params, checked.error, checked.description));
     return <ConsentError description={checked.description} />;
   }
 

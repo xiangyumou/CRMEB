@@ -16,7 +16,11 @@ describe('the operation catalogue', () => {
     const admin = allRoutes.filter((r) => r.path.startsWith('/admin-api/') && r.auth === 'admin');
     expect(ids.size).toBeGreaterThan(150);
     expect(ids.size).toBeLessThan(admin.length);
-    for (const excluded of ['auth.apiTokenCreate', 'auth.adminLogin', 'system.profileChangePassword']) {
+    for (const excluded of [
+      'auth.apiTokenCreate',
+      'auth.adminLogin',
+      'system.profileChangePassword',
+    ]) {
       expect(ids.has(excluded)).toBe(false);
     }
     expect([...ids].every((id) => !id.startsWith('health.'))).toBe(true);
