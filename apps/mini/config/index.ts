@@ -81,15 +81,6 @@ const modernDependencies =
 
 const compileInclude = [...workspaceSources, modernDependencies];
 
-/**
- * NutUI's styles are written for a 375 px design, ours for 750 px. Taro's pxtransform asks per
- * file, so NutUI keeps its own scale. https://nutui.jd.com/taro/react/3x/#/zh-CN/guide/start-react
- */
-function designWidth(input?: string | number | { file?: string | undefined }): number {
-  const file = typeof input === 'object' ? (input.file ?? '') : '';
-  return file.replace(/\\+/g, '/').includes('@nutui') ? 375 : 750;
-}
-
 interface ChainSet {
   add: (value: string) => ChainSet;
 }
@@ -118,7 +109,7 @@ export default defineConfig<'webpack5'>(async (merge) => {
   const baseConfig: UserConfigExport<'webpack5'> = {
     projectName: 'shop-mini',
     date: '2026-9-23',
-    designWidth,
+    designWidth: 750,
     deviceRatio: {
       375: 2,
       640: 2.34 / 2,

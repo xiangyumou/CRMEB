@@ -1,5 +1,4 @@
 @use './ui/tokens' as *;
-@use './ui/tokens/nutui-bridge';
 
 // Design tokens (docs/mini/design.md §2–3). `page` is the root of a mini-program page;
 // `.taro_page` is the same node in the H5 build. The shop's theme is written over the colour

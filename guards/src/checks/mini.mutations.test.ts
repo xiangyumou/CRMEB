@@ -135,7 +135,7 @@ describe('the mini guard, by mutation', () => {
     );
     for (const [rule, pattern] of [
       ['platform', /Taro\.navigateTo outside src\/platform\//],
-      ['nutui', /imports @nutui\/nutui-react-taro\/dist\/es\/packages\/button; NutUI belongs/],
+      ['nutui', /imports @nutui\/nutui-react-taro\/dist\/es\/packages\/button; NutUI is not used/],
       ['retired', /bargain\/index is a URL for the retired 砍价/],
     ] as const) {
       expect(

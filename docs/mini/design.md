@@ -25,7 +25,7 @@
 
 ### 1.2 WeUI 风格
 
-WeUI 是微信官方的基础样式库：https://github.com/Tencent/weui 。我们**不直接使用 WeUI 的组件**（组件来自 NutUI-React-Taro，经 `ui/` 封装），但以下几点向 WeUI 看齐，让用户觉得「像微信」：
+WeUI 是微信官方的基础样式库：https://github.com/Tencent/weui 。我们**不直接使用 WeUI 的组件**（组件都是自建的 `ui/` 组件库；原计划的 NutUI-React-Taro 已删除，见 status/L2-mini.md），但以下几点向 WeUI 看齐，让用户觉得「像微信」：
 
 - **灰底白卡：** 页面底色为浅灰，内容放在白色卡片或 cell 组里；cell 高度 ≥ 96px，分割线用 1 物理像素（hairline）。
 - **中性色克制：** 大面积只用黑、白、灰；品牌色只出现在主按钮、选中态、价格、角标上。
@@ -204,7 +204,6 @@ DIY 块的圆角由装修属性控制（例如商品块的「圆角 / 直角」�
 - **运行时覆盖：** 每个页面最外层是 `ui/PageShell`，第一个节点是 `<PageMeta pageStyle={themeStyle} pageFontSize="system" rootFontSize="system" />`。`themeStyle` 是 `theme/store.ts`（`useThemeStore`）从 `app/config.appearance.theme` 算出的一串 `--color-*: …;`。
 - 用 `page-meta` 而不是在某个 `View` 上写 style，是因为 `page-style` 作用于页面根节点，**底部弹层、Toast 等挂在根下的节点也能继承**，不会出现「弹层还是默认红色」的问题。
 - `app/config` 带 ETag，本地缓存。冷启动先用缓存的主题渲染，再在后台刷新，避免主色从默认值闪变为店铺的颜色。
-- **NutUI：** `ui/tokens/nutui-bridge.scss` 输出 NutUI 的 CSS 变量，指向我们的 token，例如 `--nutui-color-primary: var(--color-primary)`，`--nutui-color-primary-stop-1` 和 `-stop-2` 都指向主色，不使用它的渐变。完整的对应表放在 `ui/tokens/nutui-bridge.scss`。页面代码**不直接使用** `--nutui-*` 变量。NutUI 变量的具体名称以 S1 锁定的 NutUI-React-Taro 版本为准。
 - **原生区域**不受 CSS 影响，由 `platform/tab-bar.ts` 在启动时和主题变化后调用 API：
   - `setTabBarStyle({ color, selectedColor, backgroundColor, borderStyle })`：选中色等于 `--color-primary-text`，未选中色 `#666666`，背景 `#FFFFFF`，`borderStyle: 'white'`；
   - `setTabBarItem`：只改文字；图标用打包在主包里的 4 组 PNG（81 × 81，每个 ≤ 40 KB），不从网络加载；
@@ -252,7 +251,7 @@ DIY 块的圆角由装修属性控制（例如商品块的「圆角 / 直角」�
 
 规则：
 
-- 页面只从 `@/ui` 导入组件，不直接导入 `@nutui/nutui-react-taro`；ESLint 的 `no-restricted-imports` 检查。NutUI 只在 `ui/` 内部使用，以后替换或升级只影响这一层。
+- 页面只从 `@/ui` 导入组件。不用第三方组件库：NutUI 已删除（L2），`mini` 守卫的 `[nutui]` 规则拒绝任何 `@nutui/*` 引用。
 - 每个组件都要有 Storybook 式的演示页 `ui/__demo__/`（仅开发构建），列出下表中的**全部状态**。评审时逐个状态截图对比。
 
 **通用状态：**
@@ -430,7 +429,7 @@ DIY 块（`apps/mini/src/blocks/`）不在 `ui/` 里。块由 S3 共享的 `pack
 
 | 检查                                                                                            | 形式                                                                              |
 | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| 页面和 `blocks/` 不直接导入 `@nutui/nutui-react-taro`                                           | [守卫] ESLint `no-restricted-imports`                                             |
+| 不引用 `@nutui/*`（NutUI 已删除）                                                               | [守卫] `mini` 守卫 `[nutui]`                                                      |
 | `ui/tokens/` 以外不出现十六进制或 `rgb()` 颜色字面量；间距只用 `$space-*`                       | [守卫] stylelint（`color-no-hex`、`scale-unlimited/declaration-strict-value`）    |
 | 行内 `style` 中的尺寸经过 `Taro.pxTransform`                                                    | [守卫] ESLint 自定义规则（行内 `style` 中出现数字加 px 的字符串即报错）           |
 | 每个 `ui/` 组件在 `__demo__` 中覆盖第 4 节列出的全部状态                                        | [测试] 演示页快照，由 I1 在开发者工具自动化中截图                                 |

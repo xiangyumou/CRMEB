@@ -3,7 +3,8 @@ import { TAB_PAGES } from './platform/tab-pages';
 
 /**
  * The app manifest (`app.json`). Pages and packages come from `app.pages.ts`
- * (docs/mini/pages.md): main ≤ 1.5 MB, each sub-package ≤ 1 MB, total ≤ 8 MB.
+ * (docs/mini/pages.md): main ≤ 1.5 MB, each sub-package ≤ 1 MB, total ≤ 8 MB, which
+ * `scripts/size-report.mjs` enforces after every production weapp build.
  *
  * The dev-only demo package (UI kit gallery, S3 block fixture) is left out of a production
  * weapp build (`taro build --type weapp` without `--watch`, which is what gets uploaded) and

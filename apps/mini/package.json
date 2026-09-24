@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "@babel/runtime": "^7.24.4",
-    "@nutui/nutui-react-taro": "3.0.19",
     "@shop/api-client": "workspace:*",
     "@shop/contracts": "workspace:*",
     "@shop/storefront-blocks": "workspace:*",

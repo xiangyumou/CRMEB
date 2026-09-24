@@ -276,7 +276,7 @@ describe('session', () => {
   it.each(['AUTH_WECHAT_ALREADY_BOUND', 'AUTH_WECHAT_BIND_EXPIRED'])(
     'signs in once more without the bindToken when only the link is refused (%s)',
     async (code) => {
-      const { serveApi, signInWithPassword, useSession } = await load();
+      const { serveApi, signInWithPassword, takeSignInHint, useSession } = await load();
       const seen = serveApi({
         'POST /api/v1/auth/sessions/password': (body) =>
           (body as { bindToken?: string }).bindToken
@@ -295,8 +295,33 @@ describe('session', () => {
         { account: 'u7', password: 'secret-1' },
       ]);
       expect(useSession.getState().session).toEqual({ status: 'signed-in', token: 'pw1' });
+      // The shopper hears why only when the WeChat belongs elsewhere (next launch signs in
+      // there); an expired bindToken bound nothing, and the next launch asks again. Once.
+      expect(takeSignInHint()).toBe(
+        code === 'AUTH_WECHAT_ALREADY_BOUND' ? '此微信已关联其他账号，本账号需用密码登录' : null,
+      );
+      expect(takeSignInHint()).toBeNull();
     },
   );
+
+  it('leaves no hint after a linked password sign-in, and drops an untaken one on the next sign-in', async () => {
+    const { serveApi, signInWithPassword, takeSignInHint, useSession } = await load();
+    let refuse = true;
+    serveApi({
+      'POST /api/v1/auth/sessions/password': (body) =>
+        refuse && (body as { bindToken?: string }).bindToken
+          ? { status: 409, body: { code: 'AUTH_WECHAT_ALREADY_BOUND', message: '-' } }
+          : { status: 201, body: passwordSession },
+    });
+    useSession.setState({ session: { status: 'phone-required', bindToken: 'bind-1' } });
+    await signInWithPassword('u7', 'secret-1');
+
+    refuse = false;
+    useSession.setState({ session: { status: 'phone-required', bindToken: 'bind-2' } });
+    await signInWithPassword('u7', 'secret-1');
+
+    expect(takeSignInHint()).toBeNull();
+  });
 
   it('does not retry a wrong password, and keeps the parked sign-in', async () => {
     const { serveApi, signInWithPassword, useSession } = await load();

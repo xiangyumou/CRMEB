@@ -149,8 +149,8 @@ Every endpoint is a `defineRoute({...})` (see `packages/contracts/src/_conventio
 tools enforce there:
 
 - Pages and features call WeChat only through `@/platform` (navigation, sign-in, payment,
-  clipboard, the tab bar…), and import from `@tarojs/taro` only the lifecycle hooks. NutUI is
-  imported only by `src/ui/`. Lint and the `mini` guard both say so; the guard also sees `wx.*`.
+  clipboard, the tab bar…), and import from `@tarojs/taro` only the lifecycle hooks. Components come from our own kit,
+  `src/ui/` (no NutUI). Lint and the `mini` guard both say so; the guard also sees `wx.*`.
 - `@shop/contracts` is imported as types only (a zod-free module is the exception, listed in
   `apps/mini/eslint.config.mjs`); the mini-program carries no zod. Data goes through
   `useRouteQuery`, `useInfiniteRouteQuery` and `useRouteMutation` from `@shop/api-client/react`;

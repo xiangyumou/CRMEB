@@ -16,6 +16,7 @@ import {
   clearSessionNotice,
   sendLoginSms,
   startSession,
+  takeSignInHint,
   useSession,
   useSessionNotice,
 } from '@/session/session';
@@ -64,7 +65,14 @@ export default function LoginPage() {
     if (session.status !== 'signed-in' || left.current) return;
     left.current = true;
     const target = parseLoginRedirect(redirect) ?? { route: 'home' as const, params: {} };
-    void returnFromLogin(target);
+    // A hint from the sign-in (a password sign-in whose WeChat link was refused) is shown once
+    // the shopper is on the page they were going to: here it would leave with this page.
+    void returnFromLogin(target)
+      .catch(() => undefined)
+      .then(() => {
+        const hint = takeSignInHint();
+        if (hint) toast.long(hint);
+      });
   }, [session.status, redirect]);
 
   function needAgreement(): boolean {

@@ -81,7 +81,65 @@ export interface NavigateOptions {
   replace?: boolean;
 }
 
-/** Opens a page by route. Never throws for an unknown key: that opens the home page. */
+function stackDepth(): number {
+  return typeof Taro.getCurrentPages === 'function' ? Taro.getCurrentPages().length : 0;
+}
+
+/**
+ * How long after a page opened the same page is not opened again, while the shopper is still on
+ * it. A second tap on the old page can arrive just after the push has landed.
+ */
+const REPEAT_MS = 500;
+
+/** The last page push or replace: its target, and once landed, when and at what stack depth. */
+interface LastOpen {
+  key: string;
+  run: Promise<void>;
+  landed: { at: number; depth: number } | null;
+}
+
+let lastOpen: LastOpen | null = null;
+
+/**
+ * Opens a page (`navigateTo` / `redirectTo`) unless this very open is already under way or has
+ * just landed: a double tap on 结算, 立即购买 or a card must not stack the page twice. Narrow on
+ * purpose: only the same method and the same URL (params included); the second call shares the
+ * first one's outcome while it runs, and is dropped for `REPEAT_MS` after it landed only while
+ * the stack is as that open left it (going back, or anything else, lets it through). A failed
+ * open is forgotten at once, so a retry goes through.
+ */
+function openOnce(key: string, open: () => Promise<unknown>): Promise<void> {
+  const last = lastOpen;
+  if (last && last.key === key) {
+    if (!last.landed) return last.run;
+    if (Date.now() - last.landed.at < REPEAT_MS && stackDepth() === last.landed.depth) {
+      return Promise.resolve();
+    }
+  }
+  const entry: LastOpen = { key, run: Promise.resolve(), landed: null };
+  entry.run = open().then(
+    () => {
+      entry.landed = { at: Date.now(), depth: stackDepth() };
+    },
+    (error: unknown) => {
+      if (lastOpen === entry) lastOpen = null;
+      throw error;
+    },
+  );
+  lastOpen = entry;
+  return entry.run;
+}
+
+/** Forget the last open (tests: each starts with nothing under way). */
+export function resetOpenGuard(): void {
+  lastOpen = null;
+}
+
+/**
+ * Opens a page by route. Never throws for an unknown key: that opens the home page. The same
+ * page asked for twice in a row (a double tap) opens once (`openOnce`); tab switches are not
+ * guarded, a second `switchTab` to the same tab being harmless.
+ */
 export async function navigate(
   route: StorefrontRoute | { route: string; params?: object },
   { replace = false }: NavigateOptions = {},
@@ -95,15 +153,16 @@ export async function navigate(
     return;
   }
   const url = toPath(route);
-  const depth = typeof Taro.getCurrentPages === 'function' ? Taro.getCurrentPages().length : 0;
-  if (replace || depth >= MAX_STACK) await Taro.redirectTo({ url });
-  else await Taro.navigateTo({ url });
+  if (replace || stackDepth() >= MAX_STACK) {
+    await openOnce(`redirectTo ${url}`, () => Taro.redirectTo({ url }));
+  } else {
+    await openOnce(`navigateTo ${url}`, () => Taro.navigateTo({ url }));
+  }
 }
 
 /** Back one page, or home when this is the first page (opened from a share or a code). */
 export async function goBack(): Promise<void> {
-  const depth = typeof Taro.getCurrentPages === 'function' ? Taro.getCurrentPages().length : 0;
-  if (depth > 1) await Taro.navigateBack({ delta: 1 });
+  if (stackDepth() > 1) await Taro.navigateBack({ delta: 1 });
   else await navigate({ route: 'home', params: {} });
 }
 

@@ -302,6 +302,8 @@ test("AUTH-010: a write that meets an ended password session is not replayed as 
     .getByRole('button', { name: '登录', exact: true })
     .click();
   await expect(page).toHaveURL(/pages\/index\/index/);
+  // Where the login page went, the shopper is told this WeChat stays with the other account (H6).
+  await expect(shown(page).getByText('此微信已关联其他账号，本账号需用密码登录')).toBeVisible();
   const api = await playwright.request.newContext({
     baseURL: shop.baseUrl,
     extraHTTPHeaders: {

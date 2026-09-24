@@ -1,5 +1,6 @@
 import type { ResponseOf } from '@shop/api-client';
 import { couponShort } from '@/features/product/product-coupons';
+import { fromCents, toCents } from '@/lib/money';
 
 export type CartList = ResponseOf<'cart.list'>;
 export type CartItem = CartList['items'][number];
@@ -7,21 +8,6 @@ export type ApplicableCoupons = ResponseOf<'coupon.applicableList'>;
 
 /** The cart page reads the whole cart at once: the contract's page-size ceiling. */
 export const CART_QUERY = { query: { pageSize: 100 } } as const;
-
-/** `"12.30"` → `1230`. Money stays out of floating point. */
-export function centsOf(money: string): number {
-  const [whole = '0', fraction = ''] = money.trim().split('.');
-  const sign = whole.startsWith('-') ? -1 : 1;
-  const cents = Math.abs(Number(whole)) * 100 + Number(fraction.padEnd(2, '0').slice(0, 2));
-  return Number.isFinite(cents) ? sign * cents : 0;
-}
-
-/** `1230` → `"12.30"`. */
-export function moneyFromCents(cents: number): string {
-  const sign = cents < 0 ? '-' : '';
-  const abs = Math.abs(Math.round(cents));
-  return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
-}
 
 /** The rows that can be checked out, and the greyed-out rest (失效商品). */
 export function splitCart(items: readonly CartItem[]): {
@@ -104,14 +90,14 @@ export function couponHint(
   for (const row of result.items) {
     if (row.reason !== 'COUPON_MIN_SPEND_NOT_MET' || row.eligibleLineIndexes.length === 0) continue;
     const eligible = row.eligibleLineIndexes.reduce(
-      (sum, index) => sum + centsOf(lines[index]?.amount ?? '0'),
+      (sum, index) => sum + toCents(lines[index]?.amount ?? '0'),
       0,
     );
-    const need = centsOf(row.coupon.minSpend) - eligible;
+    const need = toCents(row.coupon.minSpend) - eligible;
     if (need > 0 && (!nearest || need < nearest.need)) {
       nearest = { need, label: couponShort(row.coupon) };
     }
   }
   if (!nearest) return null;
-  return { text: `再买 ¥${moneyFromCents(nearest.need)} 可用「${nearest.label}」`, ready: false };
+  return { text: `再买 ¥${fromCents(nearest.need)} 可用「${nearest.label}」`, ready: false };
 }

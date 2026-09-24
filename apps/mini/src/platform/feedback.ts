@@ -4,8 +4,8 @@ import Taro from '@tarojs/taro';
  * WeChat's native toast, loading and modal (design.md §4.2: one toast at a time, 1.5 s,
  * success is text only). Pages use `@/ui`'s `toast` / `confirm`, which call these.
  */
-export function showToast(title: string): void {
-  void Taro.showToast({ title, icon: 'none', duration: 1500 }).catch(() => undefined);
+export function showToast(title: string, durationMs = 1500): void {
+  void Taro.showToast({ title, icon: 'none', duration: durationMs }).catch(() => undefined);
 }
 
 export function showLoading(title = '加载中'): void {

@@ -82,8 +82,12 @@ function ownerOf(token: string): string | null {
   return storage.get(TOKEN_KEY) === token ? storage.get(USER_KEY) : null;
 }
 
-function signedIn(token: string, userId: string): void {
+/** What the last sign-in left to tell the shopper (`takeSignInHint`). */
+let signInHint: string | null = null;
+
+function signedIn(token: string, userId: string, hint: string | null = null): void {
   clearSessionNotice();
+  signInHint = hint;
   storage.set(TOKEN_KEY, token);
   if (userId) {
     owners.set(token, userId);
@@ -333,6 +337,25 @@ export async function bindPhoneWithSms(phone: string, code: string): Promise<voi
 const LINK_REFUSED = new Set(['AUTH_WECHAT_BIND_EXPIRED', 'AUTH_WECHAT_ALREADY_BOUND']);
 
 /**
+ * What the shopper is told after a password sign-in whose link was refused because this phone's
+ * WeChat already belongs to another account (or this account to another WeChat): the next
+ * launch signs in silently to that other account, so this one takes 密码登录 again. Not said for
+ * an expired `bindToken`: nothing is bound yet, and the next launch asks again.
+ */
+export const LINK_REFUSED_HINT = '此微信已关联其他账号，本账号需用密码登录';
+
+/**
+ * The hint the last sign-in left for the shopper, once (then `null`). The login page shows it
+ * after it has left for the page the shopper was going to: shown on the login page it would go
+ * with the page, and shown during the navigation WeChat may drop it.
+ */
+export function takeSignInHint(): string | null {
+  const hint = signInHint;
+  signInHint = null;
+  return hint;
+}
+
+/**
  * 密码登录 (the login page's 其他方式, auth.md「密码登录」). Signs in to the account the
  * password belongs to. From a parked `phone-required` sign-in the `bindToken` goes along, and the
  * server links the mini-program openid to that account once the password is right (AUTH-009), so
@@ -347,6 +370,7 @@ export async function signInWithPassword(account: string, password: string): Pro
   const state = current();
   const bindToken = state.status === 'phone-required' ? state.bindToken : undefined;
   let result: ResponseOf<'auth.passwordLogin'>;
+  let hint: string | null = null;
   try {
     result = await api.call('auth.passwordLogin', {
       body: bindToken ? { account, password, bindToken } : { account, password },
@@ -354,8 +378,9 @@ export async function signInWithPassword(account: string, password: string): Pro
   } catch (error) {
     if (!bindToken || !isApiError(error) || !LINK_REFUSED.has(error.code)) throw error;
     result = await api.call('auth.passwordLogin', { body: { account, password } });
+    if (error.code === 'AUTH_WECHAT_ALREADY_BOUND') hint = LINK_REFUSED_HINT;
   }
-  signedIn(result.token, result.user.id);
+  signedIn(result.token, result.user.id, hint);
 }
 
 /** Codes after which the parked sign-in is still good and the shopper can try again. */
@@ -418,5 +443,6 @@ export async function logout({ everywhere = false }: { everywhere?: boolean } = 
   }
   forgetStored();
   clearSessionNotice();
+  signInHint = null;
   set({ status: 'signed-out' });
 }
