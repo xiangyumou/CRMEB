@@ -10,10 +10,10 @@
   "scripts": {
     "dev:weapp": "taro build --type weapp --watch --no-check",
     "dev:h5": "taro build --type h5 --watch --no-check",
-    "build:weapp": "taro build --type weapp --no-check",
+    "build:weapp": "taro build --type weapp --no-check && node scripts/size-report.mjs",
     "build:h5": "taro build --type h5 --no-check",
     "build:h5:mp-emulation": "TARO_APP_PLATFORM_EMULATION=mp taro build --type h5 --no-check",
-    "build": "pnpm run build:weapp && pnpm run build:h5 && pnpm run size",
+    "build": "pnpm run build:weapp && pnpm run build:h5",
     "size": "node scripts/size-report.mjs",
     "tab-icons": "node scripts/tab-icons.mjs",
     "typecheck": "tsc -p tsconfig.json",

@@ -2,7 +2,8 @@
 
 // Empty-state illustrations (design.md §4.2), 200 × 160, in three layers so they follow the
 // theme: a soft fill (skeleton grey), the line drawing (disabled grey) and one accent stroke
-// in the shop's primary colour. Each layer is a CSS mask, like the icons.
+// in the shop's primary colour. Each layer is a CSS mask, like the icons, and like them the
+// drawing's class sets only a custom property per layer, so each data URL is written once.
 
 $fill-attrs: "fill='black'";
 $line-attrs: "fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'";
@@ -76,28 +77,25 @@ $art: (
 
   &__layer--fill {
     background: var(--color-skeleton);
+    -webkit-mask-image: var(--shop-art-fill);
+    mask-image: var(--shop-art-fill);
   }
   &__layer--line {
     background: var(--color-text-disabled);
+    -webkit-mask-image: var(--shop-art-line);
+    mask-image: var(--shop-art-line);
   }
   &__layer--accent {
     background: var(--color-primary);
+    -webkit-mask-image: var(--shop-art-accent);
+    mask-image: var(--shop-art-accent);
   }
 }
 
 @each $name, $layers in $art {
   .shop-art--#{$name} {
-    .shop-art__layer--fill {
-      -webkit-mask-image: art(nth($layers, 1), $fill-attrs);
-      mask-image: art(nth($layers, 1), $fill-attrs);
-    }
-    .shop-art__layer--line {
-      -webkit-mask-image: art(nth($layers, 2), $line-attrs);
-      mask-image: art(nth($layers, 2), $line-attrs);
-    }
-    .shop-art__layer--accent {
-      -webkit-mask-image: art(nth($layers, 3), $line-attrs);
-      mask-image: art(nth($layers, 3), $line-attrs);
-    }
+    --shop-art-fill: #{art(nth($layers, 1), $fill-attrs)};
+    --shop-art-line: #{art(nth($layers, 2), $line-attrs)};
+    --shop-art-accent: #{art(nth($layers, 3), $line-attrs)};
   }
 }

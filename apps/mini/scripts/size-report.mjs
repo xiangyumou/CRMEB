@@ -9,9 +9,17 @@
  * WeChat's own hard limits are 2 MB for the main package and for each sub-package, and 20 MB in
  * total; the defaults leave headroom (docs/mini/spikes/S1-taro.md).
  *
+ * `build:weapp` runs it after every production weapp build, so a build over budget fails.
+ *
  * It fails (exit 1) when:
  *
  * - the main package, a sub-package or the total is over budget;
+ * - the output holds a source map (`*.map` or a `sourceMappingURL` comment), the dev-only
+ *   `subpackages/` tree (the UI gallery; `TARO_APP_DEMO=1` accepts it for a phone-only build),
+ *   a test fixture or test tooling, an admin route (`/admin-api`, `*.admin*` route ids), or
+ *   NutUI's whole-library entry (the kit imports NutUI per component);
+ * - a module in the main package is reached only from sub-package pages (Taro moves those into
+ *   the sub-packages; one left in the main package costs every cold start);
  * - any script contains `new Function(` or `eval(` (WeChat's JSCore on iOS refuses them, and
  *   the review team flags dynamic code);
  * - any script does not parse as ES2018, the target in babel.config.js (the WeChat runtime
@@ -27,8 +35,9 @@
  *   missing or older than the build, or shows more than one copy of react, react-dom,
  *   react-reconciler, @tarojs/runtime or TanStack Query, or any zod at all.
  *
- * Package sizes count every file WeChat uploads: everything except source maps and the
- * developer-tool project files.
+ * Package sizes count every file WeChat uploads: everything except the developer-tool project
+ * files. The report ends with the main package's breakdown by owner (raw module bytes, before
+ * minification): what to look at first when the main package grows.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -82,7 +91,7 @@ function listFiles(dir) {
       .relative(dist, path.join(entry.parentPath, entry.name))
       .split(path.sep)
       .join('/');
-    if (rel.endsWith('.map') || NOT_UPLOADED.has(rel)) return [];
+    if (NOT_UPLOADED.has(rel)) return [];
     return [{ rel, size: fs.statSync(path.join(dist, rel)).size }];
   });
 }
@@ -122,6 +131,29 @@ for (const [root, entry] of packages) {
   }
 }
 if (total > budgets.total) failures.push(`total ${kb(total)} > budget ${kb(budgets.total)}`);
+
+// --- nothing that is not the product -------------------------------------------------------
+// The dev-only tree (`src/subpackages/`: the UI kit gallery, spike S3's block fixture) is left
+// out of a production weapp build by app.config.ts; `TARO_APP_DEMO=1` builds it in on purpose.
+const DEV_ONLY_ROOT = /^subpackages\//;
+const demoAccepted = process.env.TARO_APP_DEMO === '1';
+for (const pkg of subPackages.filter((candidate) => DEV_ONLY_ROOT.test(candidate.root))) {
+  if (demoAccepted) console.warn(`size-report: dev-only ${pkg.root} accepted (TARO_APP_DEMO=1)`);
+  else failures.push(`app.json lists the dev-only ${pkg.root} (set TARO_APP_DEMO=1 to accept)`);
+}
+for (const file of files) {
+  if (file.rel.endsWith('.map')) failures.push(`${file.rel}: a source map in the package`);
+}
+// Admin routes: the api-client's catalogue is the storefront's only; an admin path or route id
+// in the package means a contract barrel or the admin client leaked in.
+const ADMIN_ROUTE = /\/admin-api\b|\b[a-z][A-Za-z]*\.admin[A-Z]\w*/;
+for (const file of files.filter((candidate) => /\.(js|json|wxml|wxss)$/.test(candidate.rel))) {
+  const source = fs.readFileSync(path.join(dist, file.rel), 'utf8');
+  if (/[#@]\s*sourceMappingURL=/.test(source))
+    failures.push(`${file.rel}: a sourceMappingURL comment`);
+  const admin = ADMIN_ROUTE.exec(source);
+  if (admin) failures.push(`${file.rel}: an admin route ("${admin[0]}")`);
+}
 
 // --- app.json points at real pages ----------------------------------------------------------
 const pageFiles = [
@@ -222,6 +254,27 @@ const statsFile = path.join(appRoot, '.bundle-stats', 'weapp.json');
 let copies;
 /** Raw (pre-minification) module bytes per npm package, to explain where the size goes. */
 let heaviest;
+/** The same for the main package only, by npm package or source directory. */
+let mainBreakdown;
+
+// Test code and tooling (`src/test/` fixtures and fakes, `*.test.*`, the storefront-blocks
+// fixtures, @shop/testing, the test runners): the package is the product only.
+const TEST_CODE =
+  /\/src\/test\/|\.(test|spec)\.[cm]?[jt]sx?$|fixtures?\.[cm]?[jt]sx?$|\/packages\/testing\/|\/node_modules\/(@testing-library|happy-dom|vitest|@vitest|msw)\//;
+const DEV_ONLY_MODULES = /\/apps\/mini\/src\/subpackages\//;
+// NutUI per component: `@nutui/nutui-react-taro/dist/es/packages/<name>`. The package entry and
+// the whole stylesheet pull in every component.
+const NUTUI_WHOLE =
+  /\/@nutui\/nutui-react-taro\/dist\/((es|cjs)\/packages\/nutui\.react|nutui\.react\.umd|style(-jmapp|-jrkf)?\.s?css$)/;
+
+/** `react`, `@tarojs/runtime`, `packages/storefront-blocks/src/blocks`, `apps/mini/src/ui`… */
+function ownerOf(normalized) {
+  const npm = /.*\/node_modules\/((?:@[^/]+\/)?[^/]+)\//.exec(normalized);
+  if (npm) return npm[1];
+  // A directory under a workspace package's `src` (`src/ui`), or a file at its top.
+  const source = /\/((?:apps|packages)\/[^/]+\/src\/[^/]+)/.exec(normalized);
+  return source ? source[1] : '(other)';
+}
 // The stats are written after the build emits, so stats older than app.json are from an
 // earlier build.
 const statsFresh =
@@ -231,10 +284,30 @@ if (statsFresh) {
   const { modules } = JSON.parse(fs.readFileSync(statsFile, 'utf8'));
   const dirsByPackage = new Map();
   const bytesByPackage = new Map();
+  const mainBytesByOwner = new Map();
+  const onlySubPackages = [];
   for (const module of modules) {
     const normalized = module.path.split(path.sep).join('/');
+    const shown = path.relative(appRoot, module.path);
     if (TEST_ONLY_MODULES.test(normalized))
-      failures.push(`test-only module in the WeChat build: ${path.relative(appRoot, module.path)}`);
+      failures.push(`test-only module in the WeChat build: ${shown}`);
+    if (TEST_CODE.test(normalized)) failures.push(`test code in the WeChat build: ${shown}`);
+    if (DEV_ONLY_MODULES.test(normalized) && !demoAccepted)
+      failures.push(`dev-only module in the WeChat build: ${shown}`);
+    if (NUTUI_WHOLE.test(normalized))
+      failures.push(`NutUI's whole-library entry in the WeChat build: ${shown}`);
+    // Taro emits a chunk several sub-packages share as `sub-common/<hash>` and copies it into
+    // each of them (the root copy is not in the output).
+    const inMain = module.files.some(
+      (file) => packageOf(file) === 'main' && !file.startsWith('sub-common/'),
+    );
+    if (inMain) {
+      const owner = ownerOf(normalized);
+      mainBytesByOwner.set(owner, (mainBytesByOwner.get(owner) ?? 0) + module.size);
+      // `usedBy` is empty only if the walk in config/bundle-stats.ts missed a module; that is a
+      // bug there, and it would hide this check, so it fails too.
+      if (!module.usedBy?.includes('main')) onlySubPackages.push({ shown, module });
+    }
     const match = /^(.*\/node_modules\/((?:@[^/]+\/)?[^/]+))\//.exec(normalized);
     const owner = match ? match[2] : normalized.includes('/packages/') ? '(workspace)' : '(app)';
     bytesByPackage.set(owner, (bytesByPackage.get(owner) ?? 0) + module.size);
@@ -253,6 +326,11 @@ if (statsFresh) {
       );
   }
   heaviest = [...bytesByPackage].sort((a, b) => b[1] - a[1]).slice(0, 10);
+  mainBreakdown = [...mainBytesByOwner].sort((a, b) => b[1] - a[1]).slice(0, 15);
+  for (const { shown, module } of onlySubPackages) {
+    const users = module.usedBy?.length ? module.usedBy.join(', ') : 'no entry';
+    failures.push(`${shown} is in the main package but only ${users} use it`);
+  }
   if (dirsByPackage.has('zod'))
     failures.push('zod is in the bundle (contracts must be imported as types)');
 } else {
@@ -267,6 +345,7 @@ const report = {
   total,
   copies: copies ?? null,
   heaviest: heaviest ?? null,
+  mainBreakdown: mainBreakdown ?? null,
   failures,
 };
 
@@ -293,6 +372,9 @@ if (args.json) {
     );
     const list = heaviest.map(([name, bytes]) => `${name} ${kb(bytes)}`).join(', ');
     console.log(`  heaviest (raw module bytes): ${list}`);
+    console.log('  main package by owner (raw module bytes):');
+    for (const [owner, bytes] of mainBreakdown)
+      console.log(`    ${kb(bytes).padStart(10)}  ${owner}`);
   } else {
     console.log('  copies: not checked');
   }

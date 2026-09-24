@@ -23,14 +23,22 @@
 
 ## 2. 构建
 
-| 命令（`pnpm --filter @shop/mini …`） | 产物                       | 用途                                                                                  |
-| ------------------------------------ | -------------------------- | ------------------------------------------------------------------------------------- |
-| `build:weapp`、`dev:weapp`（监听）   | `dist/weapp`               | 真正发布的微信小程序包，用微信开发者工具打开                                          |
-| `build:h5`、`dev:h5`（监听）         | `dist/h5`                  | 浏览器预览：没有微信能力（登录、支付提示「不可用」），接口走同源 `/api/v1`            |
-| `build:h5:mp-emulation`              | `dist/h5-mp-emulation`     | 只给 e2e 用：以 `wechat-mini` 身份调用接口，微信能力由假件回答                        |
-| `build`                              | weapp + H5 预览 + 体积检查 | CI 和检查清单跑的就是它；`size` 检查包体积预算、ES2018，以及 H5 实现没有混进 weapp 包 |
+| 命令（`pnpm --filter @shop/mini …`） | 产物                         | 用途                                                                                      |
+| ------------------------------------ | ---------------------------- | ----------------------------------------------------------------------------------------- |
+| `build:weapp`、`dev:weapp`（监听）   | `dist/weapp`                 | 真正发布的微信小程序包，用微信开发者工具打开；`build:weapp` 构建完就跑 `size`，不过就失败 |
+| `build:h5`、`dev:h5`（监听）         | `dist/h5`                    | 浏览器预览：没有微信能力（登录、支付提示「不可用」），接口走同源 `/api/v1`                |
+| `build:h5:mp-emulation`              | `dist/h5-mp-emulation`       | 只给 e2e 用：以 `wechat-mini` 身份调用接口，微信能力由假件回答                            |
+| `build`                              | weapp（含体积检查）+ H5 预览 | CI 和检查清单跑的就是它                                                                   |
 
 每个 `taro build` 都带 `--no-check`（[S1 workaround 1](spikes/S1-taro.md)）。
+
+`size`（`scripts/size-report.mjs`）检查 `dist/weapp`：
+
+- **预算：** 主包 ≤ 1.5 MB，每个分包 ≤ 2 MB，总计 ≤ 8 MB；
+- **不能出现：** `eval`、`new Function`、ES2018 以上的语法、zod、source map、开发用的 `subpackages/`（演示页）、测试代码和夹具、后台路由、NutUI 整包入口、e2e 模拟层、疑似密钥；
+- **只有分包用到的模块不能留在主包：** 依据 `config/bundle-stats.ts` 记下的每个模块被哪些包的页面引用。
+
+报告最后列出主包按来源分的体积，主包变大时先看这里。基线（K2，2026-09-24）：主包 682.0 KB，总计 1064.7 KB，最大的分包 `account` 120.1 KB；明细见 [status/K2-size-perf.md](status/K2-size-perf.md)。
 
 ## 3. 本地开发
 
