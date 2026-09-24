@@ -473,7 +473,12 @@ export async function settleException(
   },
 ): Promise<ConditionalUpdateResult> {
   return conditionalUpdate(tx, paymentExceptions, {
-    where: and(eq(paymentExceptions.id, id), eq(paymentExceptions.status, 'refunding')),
+    // `refund_unknown` too: WeChat's usual first answer is PROCESSING, and the
+    // real one (a callback, a recheck, a retried submit) must still land.
+    where: and(
+      eq(paymentExceptions.id, id),
+      inArray(paymentExceptions.status, ['refunding', 'refund_unknown']),
+    ),
     set: {
       status: patch.status,
       ...(patch.status === 'refunded' ? { refundedAt: patch.at, resolvedAt: patch.at } : {}),

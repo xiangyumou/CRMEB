@@ -1108,7 +1108,7 @@ export async function refundException(
 
     const settled = refund.status === 'SUCCESS';
     return await ctx.withTx(async (tx) => {
-      await repo.settleException(tx, row.id, {
+      const { won } = await repo.settleException(tx, row.id, {
         status: settled ? 'refunded' : 'refund_unknown',
         at: ctx.clock.now(),
         refundRequest: {
@@ -1118,7 +1118,9 @@ export async function refundException(
           refundFen: refund.refundFen,
         },
       });
-      if (settled) await writeExceptionFlow(tx, ctx, row, refund.refundId);
+      // Only the caller that moved the row books the money: a settled row
+      // (somebody else got there) already has its flow.
+      if (settled && won) await writeExceptionFlow(tx, ctx, row, refund.refundId);
       const fresh = await repo.findException(tx, row.id);
       return fresh ?? row;
     });
@@ -1188,12 +1190,12 @@ export async function recheckException(ctx: Ctx, exceptionId: number): Promise<r
         : refund.status === 'PROCESSING'
           ? ('refund_unknown' as const)
           : ('refund_failed' as const);
-    await repo.settleException(tx, row.id, {
+    const { won } = await repo.settleException(tx, row.id, {
       status,
       at: ctx.clock.now(),
       refundRequest: { outRefundNo: refund.outRefundNo, status: refund.status },
     });
-    if (status === 'refunded') await writeExceptionFlow(tx, ctx, row, refund.refundId);
+    if (status === 'refunded' && won) await writeExceptionFlow(tx, ctx, row, refund.refundId);
     const fresh = await repo.findException(tx, row.id);
     return fresh ?? row;
   });

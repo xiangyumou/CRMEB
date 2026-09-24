@@ -33,6 +33,7 @@ import { registerPaymentEffects } from './payment.effects';
 import { reconcileStalePayments } from './payment.jobs';
 import * as repo from './payment.repo';
 import * as service from './payment.service';
+import { adminRecheckException, adminRefundException } from './payment.admin';
 
 /**
  * The payment races.
@@ -512,6 +513,86 @@ describe('PAY-011 — a late callback after the payment was closed', () => {
     expect(exception.refundNo).toMatch(/^X\d+$/);
     expect(gateway.refunds.size).toBe(1);
     expect(await flowRows('exception_refund')).toHaveLength(1);
+  });
+
+  /**
+   * WeChat's usual first answer to a refund is PROCESSING. The row then sits in
+   * `refund_unknown`, and both ways the real answer can arrive — the operator's
+   * 查询结果 and the refund callback — must be able to settle it.
+   */
+  async function refundLeftProcessing() {
+    const started = await startedPayment();
+    await cancelOrder(racer(started.userId), started.orderId);
+    gateway.setTradeState(started.outTradeNo, 'SUCCESS');
+    gateway.behaviour.refundStatus = 'PROCESSING';
+    await notify(gateway.signTransactionNotification({ outTradeNo: started.outTradeNo }));
+    const exception = (await exceptionRows())[0]!;
+    await service.refundException(racer(), exception.id);
+    const pending = (await exceptionRows())[0]!;
+    expect(pending.status).toBe('refund_unknown');
+    expect(await flowRows('exception_refund')).toEqual([]);
+    return pending;
+  }
+
+  const handler = (): Ctx =>
+    harness.ctx.as({
+      kind: 'admin',
+      id: 1,
+      permissions: ['payment:exception:handle'],
+      isSuper: false,
+    });
+
+  it('settles a refund left PROCESSING when the operator asks again', async () => {
+    const pending = await refundLeftProcessing();
+    gateway.markRefunded(pending.refundNo!, 'SUCCESS');
+
+    const detail = await adminRecheckException(handler(), { id: String(pending.id) });
+    expect(detail.status).toBe('refunded');
+    expect(await flowRows('exception_refund')).toHaveLength(1);
+
+    // Asking once more changes nothing and books nothing twice.
+    await adminRecheckException(handler(), { id: String(pending.id) });
+    expect(await flowRows('exception_refund')).toHaveLength(1);
+  });
+
+  it('settles a refund left PROCESSING when the refund callback arrives', async () => {
+    const pending = await refundLeftProcessing();
+    const outcome = await harness.ctx.withTx((tx) =>
+      service.applyExceptionRefundNotification(tx, harness.ctx, {
+        refundNo: pending.refundNo!,
+        status: 'SUCCESS',
+        gatewayRefundId: '50000abc',
+      }),
+    );
+    expect(outcome).toBe(`exception ${pending.id}: refunded`);
+    expect((await exceptionRows())[0]!.status).toBe('refunded');
+    expect(await flowRows('exception_refund')).toHaveLength(1);
+  });
+
+  it('books no money going out while the gateway still says PROCESSING', async () => {
+    const pending = await refundLeftProcessing();
+    const detail = await adminRecheckException(handler(), { id: String(pending.id) });
+    expect(detail.status).toBe('refund_unknown');
+    expect(await flowRows('exception_refund')).toEqual([]);
+  });
+
+  it('lets the operator retry 退款 on an unknown result without refunding twice', async () => {
+    const pending = await refundLeftProcessing();
+    gateway.markRefunded(pending.refundNo!, 'SUCCESS');
+    const detail = await adminRefundException(handler(), { id: String(pending.id) });
+    // The same frozen refund number: the gateway answers for the refund it has.
+    expect(gateway.refunds.size).toBe(1);
+    expect(detail.refundNo).toBe(pending.refundNo);
+    expect(detail.status).toBe('refunded');
+    expect(await flowRows('exception_refund')).toHaveLength(1);
+  });
+
+  it('refuses a caller without exception:handle', async () => {
+    const pending = await refundLeftProcessing();
+    const clerk = harness.ctx.as({ kind: 'admin', id: 1, permissions: [], isSuper: false });
+    await expect(adminRecheckException(clerk, { id: String(pending.id) })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
   });
 });
 
