@@ -81,7 +81,7 @@ YAML 解析、以及一次临时 nginx 容器（`nginx:alpine` 1.31）里的 `ng
    deploy/rehearsal/drill.sh
    ```
 
-   只想先看 edge 两个用例（仍需构建镜像）：`deploy/rehearsal/drill.sh --only edge --keep`（看完手动清理）。
+   只想先看 edge 两个用例（仍需构建镜像）：`deploy/rehearsal/drill.sh --only edge/`。
    重点：`edge/proxies-every-page-route`、`edge/serves-verification-files`、`ship/*`。
 
 2. 和 C1 合并之后，合并清单里的 `pnpm --filter @shop/e2e-storefront test`（即小程序 e2e）和
