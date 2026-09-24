@@ -432,6 +432,24 @@ export async function startFakeOaServer(
       return;
     }
 
+    /**
+     * The stable token, which 设置 → 「测试 AppSecret」 probes with: a POST with
+     * the pair in a JSON body. The real one hands out the *same* token until it
+     * expires; the probe only reads whether one came back.
+     */
+    if (url.pathname === '/cgi-bin/stable_token' && req.method === 'POST') {
+      const body = (parsed ?? {}) as Record<string, unknown>;
+      const known =
+        (body['appid'] === APP_ID && body['secret'] === APP_SECRET) ||
+        (body['appid'] === MINI_APP_ID && body['secret'] === MINI_APP_SECRET);
+      if (!known) {
+        json(res, { errcode: 40013, errmsg: 'invalid appid' });
+        return;
+      }
+      json(res, { access_token: 'FAKE_STABLE_TOKEN', expires_in: 7200 });
+      return;
+    }
+
     if (url.pathname === '/cgi-bin/token') {
       const app =
         query['appid'] === APP_ID && query['secret'] === APP_SECRET
