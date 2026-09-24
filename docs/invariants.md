@@ -860,12 +860,6 @@ A shop out of card keys leaves the order in 待发货 with nothing half-written,
 - `packages/core/src/order/order.console.int.test.ts::修改收货地址 > is refused once the order has been dispatched`
 - `packages/core/src/order/order.fulfil.concurrency.int.test.ts::the console under concurrency > lets 修改地址 lose to a dispatch that commits first`
 
-### CONSOLE-004
-
-A console action reachable from both the web admin and the phone records _which_ surface acted, through `order_status_logs.operator_kind`.
-
-- `packages/core/src/order/order.console.int.test.ts::备注 > records who wrote it, whichever console they used`
-
 ### INVOICE-001
 
 One open invoice per order, enforced by the partial unique index rather than by asking first: five simultaneous requests leave exactly one row, and a cancelled or rejected one frees the slot.
@@ -1838,14 +1832,14 @@ The `storefront-appearance` group answers a fresh install with every field defau
 
 ### SYS-016
 
-A save to any group `GET /api/v1/app/config` is built from drops its cache and moves its `version` (the weak `ETag`) at once, a save to any other group does not, and a caller holding the current version gets a bodyless 304. The values it shares with `siteConfigGet` (`system/site.service.ts`; its route `GET /api/v1/site/config` was deleted at the cutover) and with `GET /api/v1/wechat/subscribe-templates` are built by the same code and agree with them.
+A save to any group `GET /api/v1/app/config` is built from drops its cache and moves its `version` (the weak `ETag`) at once, a save to any other group does not, and a caller holding the current version gets a bodyless 304. It serves the site values the operator saved, and the subscribe ids it shares with `GET /api/v1/wechat/subscribe-templates` are built by the same code and agree with them.
 
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > is built from exactly the groups that drop its cache`
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > drops the cache and moves the version when <label> is saved`
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > leaves the cache alone when a group it does not read is saved`
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > carries the same subscribe ids as GET /wechat/subscribe-templates, all four scenes`
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > says whether a first WeChat sign-in will ask for a phone`
-- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > agrees with siteConfigGet on every value the two share`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > serves the site values the operator saved`
 - `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > answers a caller holding the current version with a bodyless 304`
 - `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > sends the new settings once the <label> group is saved`
 

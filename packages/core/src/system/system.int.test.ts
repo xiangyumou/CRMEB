@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { admins } from '@shop/db/schema/auth';
+import { notificationTemplates, type NotificationChannels } from '@shop/db/schema/notification';
 import { configValues } from '@shop/db/schema/system';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { createAdminSessionStore } from '../auth/admin-session.store';
@@ -32,12 +35,13 @@ import { auditLogList } from './audit.service';
 import { configGet, configGroupList, configSave, describeGroup } from './config.service';
 import { allConfigGroups } from '../kernel/config-registry';
 import { agreementGet } from './agreement.service';
-import { siteConfigGet, siteConfigSourceGroups } from './site.service';
+import { appConfigGet } from './app-config.service';
+import { siteConfigSourceGroups } from './site.service';
 import { fakeSmsSender, registerSmsSender, resetSmsSender } from '../sms';
 import { dashboardHeader } from './dashboard';
 import './index';
 // Side-effect import: the same bootstrap `handle()` performs on every request.
-// Without it no domain has registered anything — and the site payload
+// Without it no domain has registered anything — and the app payload
 // reports the pay buttons that `registerPaymentDomain()` announced, so a test
 // that skipped this would be testing a process no deployment ever runs.
 import '../domains.gen';
@@ -488,12 +492,12 @@ describe('站点公开配置', () => {
     // The app reads it before there is one: on launch, above the sign-in form
     // and on the splash screen.
     expect(anonymous().actor.kind).toBe('anonymous');
-    const payload = await siteConfigGet(anonymous());
+    const payload = await appConfigGet(anonymous());
     expect(payload.name).toBe('CRMEB 商城');
     expect(payload.version).toBe('0');
   });
 
-  it('serves what the operator typed, across three config groups', async () => {
+  it('serves what the operator typed, across its config groups', async () => {
     const ctx = as(superId);
     await configSave(
       ctx,
@@ -504,9 +508,6 @@ describe('站点公开配置', () => {
           logo: '/uploads/a.png',
           loginLogo: '/uploads/b.png',
           shareTitle: '好货不贵',
-          copyrightText: '© 2026 示例',
-          copyrightLink: 'https://example.test',
-          icpNumber: '京ICP备00000000号',
           contactPhone: '400-000-0000',
           contactQrcode: '/uploads/support-qrcode.png',
           splashEnabled: true,
@@ -517,13 +518,11 @@ describe('站点公开配置', () => {
     );
     await configSave(ctx, { group: 'wechat-mini' }, { values: { enabled: false } });
 
-    const payload = await siteConfigGet(anonymous());
+    const payload = await appConfigGet(anonymous());
     expect(payload).toMatchObject({
       name: '示例商城',
       logo: { main: '/uploads/a.png', login: '/uploads/b.png', square: null },
-      copyright: { text: '© 2026 示例', link: 'https://example.test', imageUrl: null },
       share: { title: '好货不贵', synopsis: '', image: null },
-      filing: { icpNumber: '京ICP备00000000号' },
       // No merchant credentials stored, so the cashier shows no pay button.
       payments: { wechat: false },
       support: { kind: 'phone', phone: '400-000-0000', qrcodeUrl: '/uploads/support-qrcode.png' },
@@ -536,7 +535,7 @@ describe('站点公开配置', () => {
     // An operator preparing next week's campaign turns the switch on before
     // the artwork exists; `pages/guide` must not render an empty splash.
     await configSave(as(superId), { group: 'site' }, { values: { splashEnabled: true } });
-    expect((await siteConfigGet(anonymous())).splashAd.enabled).toBe(false);
+    expect((await appConfigGet(anonymous())).splashAd.enabled).toBe(false);
   });
 
   it('prefers the mini-program 客服 window when the mini-program is on', async () => {
@@ -545,13 +544,13 @@ describe('站点公开配置', () => {
       { group: 'wechat-mini' },
       { values: { enabled: true, contactType: 'mini-program' } },
     );
-    expect((await siteConfigGet(anonymous())).support.kind).toBe('mini-program');
+    expect((await appConfigGet(anonymous())).support.kind).toBe('mini-program');
   });
 
   it('caches for a minute and drops the cache the moment a source group is saved', async () => {
     const ctx = as(superId);
     await configSave(ctx, { group: 'site' }, { values: { siteName: '第一版' } });
-    expect((await siteConfigGet(anonymous())).name).toBe('第一版');
+    expect((await appConfigGet(anonymous())).name).toBe('第一版');
 
     // Writing behind the service's back proves the second read was cached…
     await harness.ctx.db
@@ -559,16 +558,17 @@ describe('站点公开配置', () => {
       .set({ value: '第二版' })
       .where(and(eq(configValues.group, 'site'), eq(configValues.key, 'siteName')));
     await harness.ctx.config.invalidate('site');
-    expect((await siteConfigGet(anonymous())).name).toBe('第一版');
+    expect((await appConfigGet(anonymous())).name).toBe('第一版');
 
     // …and that a save through the real path drops it.
     await configSave(ctx, { group: 'site' }, { values: { siteName: '第三版' } });
-    expect((await siteConfigGet(anonymous())).name).toBe('第三版');
+    expect((await appConfigGet(anonymous())).name).toBe('第三版');
   });
 
-  it('is built from exactly the groups that drop its cache', async () => {
+  it('reads the site values from exactly these groups', async () => {
     // `payment` registers the pay button; `sms`, `wechat` and `wechat-oa`
-    // arrive with the sign-in methods.
+    // arrive with the sign-in methods. `appConfigSourceGroups` (SYS-016)
+    // adds the app's own groups to these.
     expect([...siteConfigSourceGroups()].sort()).toEqual([
       'payment',
       'site',
@@ -610,33 +610,36 @@ describe('站点公开配置', () => {
     await harness.ctx.db.insert(configValues).values(rows);
     for (const group of allConfigGroups()) await harness.ctx.config.invalidate(group.group);
 
-    const serialised = JSON.stringify(await siteConfigGet(anonymous()));
+    const serialised = JSON.stringify(await appConfigGet(anonymous()));
     for (const marker of markers) expect(serialised).not.toContain(marker);
   });
 
   it('says WeChat Pay is available only once the credentials are complete', async () => {
     const ctx = as(superId);
-    expect((await siteConfigGet(anonymous())).payments.wechat).toBe(false);
+    expect((await appConfigGet(anonymous())).payments.wechat).toBe(false);
 
     // Half a credential is not a payment method: the button would fail at the
     // till rather than be absent.
     await configSave(ctx, { group: 'payment' }, { values: { mchId: '1900000109' } });
-    expect((await siteConfigGet(anonymous())).payments.wechat).toBe(false);
+    expect((await appConfigGet(anonymous())).payments.wechat).toBe(false);
   });
 });
 
 // ---------------------------------------------------------------------------
 
 /**
- * `auth` on the site payload (and so on `GET /api/v1/app/config`): which
- * sign-in methods the app may offer.
+ * `auth` on `GET /api/v1/app/config`: which sign-in methods the app may offer.
  * Each flag is raised by a probe its owner registers — `wechat` for the two
  * WeChat logins, `sms` for 手机号登录 — so this also proves the registrations
  * are really installed by `domains.gen`.
  */
 describe('站点公开配置 — 登录方式', () => {
   const anonymous = (): Ctx => harness.ctx.as(anonymousActor);
-  const auth = async () => (await siteConfigGet(anonymous())).auth;
+  /** The three sign-in flags; `wechatRequiresPhone` is SYS-016's, from another group. */
+  const auth = async () => {
+    const { wechatRequiresPhone: _ignored, ...methods } = (await appConfigGet(anonymous())).auth;
+    return methods;
+  };
 
   const OA_APP_ID = 'wx-oa-appid-7f3c1e';
   const OA_SECRET = 'oa-secret-c0ffee-9d41';
@@ -746,8 +749,8 @@ describe('站点公开配置 — 登录方式', () => {
       },
     );
 
-    const payload = await siteConfigGet(anonymous());
-    expect(payload.auth).toEqual({ wechatOa: true, wechatMini: true, phone: true });
+    const payload = await appConfigGet(anonymous());
+    expect(payload.auth).toMatchObject({ wechatOa: true, wechatMini: true, phone: true });
     // The app ids and the SMS key id are not `secret: true`, so the registry
     // property test above does not cover them; they must not appear either.
     const serialised = JSON.stringify(payload);
@@ -825,5 +828,88 @@ describe('audit log', () => {
     expect(page.items[0]?.routeId).toBe('system.adminDelete');
     // The writer redacts; the reader must not undo that.
     expect(JSON.stringify(page.items)).not.toContain('crmeb-123456');
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Migration `0009_drop_cutover_leftover_config`: the stored values the code
+ * stopped reading at the cutover go, and nothing next to them does. The
+ * harness has already applied it to an empty database; this runs it again over
+ * rows that carry the leftovers, twice, to show it is idempotent.
+ */
+describe('migration 0009 — config the cutover left behind', () => {
+  const MIGRATION = fileURLToPath(
+    new URL('../../../db/migrations/0009_drop_cutover_leftover_config.sql', import.meta.url),
+  );
+  const runMigration = () => harness.db.handle.pool.query(readFileSync(MIGRATION, 'utf8'));
+
+  it('deletes the staff config rows and keeps every other one', async () => {
+    const at = harness.ctx.clock.now();
+    await harness.ctx.db.insert(configValues).values(
+      [
+        ['order-staff', 'staffUserIds', [1, 2]],
+        ['order-staff', 'allowStaffRepricing', true],
+        ['order-staff', 'allowStaffRefundReview', true],
+        ['storage', 'maxStaffUploadBytes', 1_048_576],
+        ['storage', 'staffUploadsPerHour', 60],
+        ['storage', 'userUploadsPerHour', 30],
+        ['site', 'siteName', '示例商城'],
+      ].map(([group, key, value]) => ({
+        group: group as string,
+        key: key as string,
+        value,
+        updatedAt: at,
+      })),
+    );
+
+    await runMigration();
+    await runMigration();
+
+    const left = await harness.ctx.db.select().from(configValues);
+    expect(left.map((row) => `${row.group}.${row.key}`).sort()).toEqual([
+      'site.siteName',
+      'storage.userUploadsPerHour',
+    ]);
+  });
+
+  it('strips a saved wechatMini.page and leaves the rest of the channels as saved', async () => {
+    const withPage = {
+      inApp: { enabled: true, title: '已发货', body: '订单 {orderNo} 已发货' },
+      wechatMini: {
+        enabled: true,
+        templateKey: 'order_ship',
+        templateId: 'tmpl-ship',
+        fields: { thing1: '{orderNo}' },
+        page: '/pages/order_details/index?order_id={orderId}',
+      },
+    } as unknown as NotificationChannels;
+    const withoutPage: NotificationChannels = {
+      wechatMini: { enabled: false, templateKey: '' },
+    };
+    const noMini: NotificationChannels = { sms: { enabled: false, templateCode: '' } };
+    await harness.ctx.db.insert(notificationTemplates).values([
+      { code: 'x1_with_page', name: '带页面', channels: withPage },
+      { code: 'x1_without_page', name: '不带页面', channels: withoutPage },
+      { code: 'x1_no_mini', name: '无小程序', channels: noMini },
+    ]);
+
+    await runMigration();
+    await runMigration();
+
+    const rows = await harness.ctx.db.select().from(notificationTemplates);
+    const channelsOf = (code: string) => rows.find((row) => row.code === code)?.channels;
+    expect(channelsOf('x1_with_page')).toEqual({
+      inApp: { enabled: true, title: '已发货', body: '订单 {orderNo} 已发货' },
+      wechatMini: {
+        enabled: true,
+        templateKey: 'order_ship',
+        templateId: 'tmpl-ship',
+        fields: { thing1: '{orderNo}' },
+      },
+    });
+    expect(channelsOf('x1_without_page')).toEqual(withoutPage);
+    expect(channelsOf('x1_no_mini')).toEqual(noMini);
   });
 });

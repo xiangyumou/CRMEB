@@ -202,28 +202,17 @@ export async function adminGrant(
   input: { id: string },
   body: CouponGrantBody,
 ): Promise<CouponGrantResult> {
-  return grant(ctx, Number(input.id), body.userIds.map(Number), { activeOnly: false });
+  return grant(ctx, Number(input.id), body.userIds.map(Number));
 }
 
 /**
- * The grant path. The console may hand a draft to a test account, so
- * `adminGrant` passes `activeOnly: false`; the option was the removed staff
- * console's (a 店员 could only hand out what marketing had released). The
- * status is read inside the grant's transaction, so the answer is the one the
- * grant used.
+ * The grant path. The console may hand any template, a draft included, to a
+ * test account, so the template's status is not checked here.
  */
-async function grant(
-  ctx: Ctx,
-  templateId: number,
-  userIds: number[],
-  options: { activeOnly: boolean },
-): Promise<CouponGrantResult> {
+async function grant(ctx: Ctx, templateId: number, userIds: number[]): Promise<CouponGrantResult> {
   return ctx.withTx(async (tx) => {
     const template = await repo.findTemplate(tx, templateId);
     if (!template) throw new DomainError('COUPON_TEMPLATE_NOT_FOUND');
-    if (options.activeOnly && template.status !== 'active') {
-      throw new DomainError('COUPON_TEMPLATE_NOT_FOUND');
-    }
 
     const known = await repo.existingUserIds(tx, userIds);
     const unknown = userIds.filter((userId) => !known.has(userId));

@@ -4,7 +4,6 @@ import { productReviews } from '@shop/db/schema/catalog';
 import { orderItems, orderStatusLogs, orders } from '@shop/db/schema/order';
 import { userAddresses } from '@shop/db/schema/user';
 import { and, asc, desc, eq, inArray, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm';
-import { Money } from '../kernel/money';
 import {
   allOf,
   conditionalDelete,
@@ -270,71 +269,6 @@ export async function countByStatus(
     .where(and(eq(orders.userId, userId), liveForUser()))
     .groupBy(orders.status, orders.fulfillmentStatus, sql`${orders.refundStatus} <> 'none'`);
   return rows.map((row) => ({ ...row, n: Number(row.n), unreviewed: Number(row.unreviewed) }));
-}
-
-/**
- * 累计订单 / 累计消费 for a page of customers — the order domain's answer to
- * `UserOrderStatsPort`.
- *
- * **The counting rule, once.** A qualifying order is a *paid order* as
- * `stats/DEFINITIONS.md` §2 defines one — `paid_at is not null and deleted_at
- * is null`, so an admin-deleted order is out of every figure and a buyer
- * hiding the order from their own list changes nothing — **minus the fully
- * refunded ones** (`refund_status = 'refunded'`). That last clause is this
- * figure's own, and it is the one the 店员 screen asks for: a customer whose
- * only order came back in full is not a returning customer.
- *
- * `spend_total` sums **`orders.paid_amount`**, the same column the console's
- * 营业额 sums (`order.console.service.ts::adminStatistics` →
- * `order.fulfil.repo.ts::rangeTotals`, and `stats/DEFINITIONS.md` §3
- * `revenue`). Deliberately not `paid_amount - refunded_amount`: a partial
- * refund is money that moved on its own day and the console reports it as its
- * own figure, so netting it here would make the 店员's number a third
- * definition of 消费总额 — the exact drift the port exists to prevent. A
- * *fully* refunded order contributes nothing because it is not in the
- * population at all, which is the case an operator would actually notice.
- *
- * One grouped query for the whole page (the list route asks about twenty), so
- * a customer list stays one query rather than twenty-one. A user with no
- * qualifying orders is simply absent from the map; the caller reads that as
- * `0` / `"0.00"`.
- */
-export async function statsForUsers(
-  db: DbOrTx,
-  userIds: readonly number[],
-): Promise<Map<number, { orderCount: number; spendTotal: string }>> {
-  const out = new Map<number, { orderCount: number; spendTotal: string }>();
-  const ids = [...new Set(userIds)];
-  if (ids.length === 0) return out;
-
-  const rows = await db
-    .select({
-      userId: orders.userId,
-      orderCount: sql<number>`count(*)::int`,
-      // `numeric(12, 2)` is `money()`'s own precision, so the cast cannot lose
-      // a fen; it is here only because `sum()` of numeric comes back unpadded
-      // (`"0"`, `"5320.0"`) and `Money` is the one thing that guarantees the
-      // two fraction digits the contract spells `"3980.00"`.
-      spendTotal: sql<string>`coalesce(sum(${orders.paidAmount}), 0)::numeric(12, 2)::text`,
-    })
-    .from(orders)
-    .where(
-      and(
-        inArray(orders.userId, ids),
-        isNull(orders.deletedAt),
-        sql`${orders.paidAt} is not null`,
-        ne(orders.refundStatus, 'refunded'),
-      ),
-    )
-    .groupBy(orders.userId);
-
-  for (const row of rows) {
-    out.set(row.userId, {
-      orderCount: Number(row.orderCount),
-      spendTotal: Money.parse(row.spendTotal).toString(),
-    });
-  }
-  return out;
 }
 
 /**

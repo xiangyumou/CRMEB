@@ -32,10 +32,9 @@ import { wechatMiniConfig, webviewDomainsOf } from './wechat-mini.config';
 /**
  * `GET /api/v1/app/config` — the mini-program's launch payload.
  *
- * Built on the same rules as `site.service.ts`, and on its builders:
- * `supportOf`, `paymentsOf` and `authOf` are called, not copied, so the values
- * the two payloads share can never disagree. (The old `site/config` route was
- * deleted at the cutover; `siteConfigGet` remains as the tests' reference.)
+ * Built on the rules and the builders in `site.service.ts`: `supportOf`,
+ * `paymentsOf` and `authOf` are called there, not copied here. (The old
+ * `site/config` payload was deleted at the cutover.)
  *
  * Two things the payload carries belong to domains `system` may not import,
  * and they arrive the way the payment and sign-in flags do: the owner

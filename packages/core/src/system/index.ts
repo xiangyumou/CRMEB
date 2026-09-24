@@ -98,7 +98,6 @@ export { isTrustedHost, publicOrigin, siteConfig } from './site.config';
  * seam for the sign-in methods; `wechat` and `sms` register them.
  */
 export {
-  invalidateSiteConfigCache,
   registerSiteAuthMethod,
   registerSitePaymentMethod,
   resetSiteAuthMethods,

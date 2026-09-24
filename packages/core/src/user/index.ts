@@ -187,16 +187,6 @@ export {
 } from './wechat-identity.port';
 
 export {
-  fakeUserOrderStatsPort,
-  getUserOrderStatsPort,
-  registerUserOrderStatsPort,
-  resetUserOrderStatsPort,
-  type FakeUserOrderStatsPort,
-  type UserOrderStats,
-  type UserOrderStatsPort,
-} from './user-order-stats.port';
-
-export {
   AVATAR_REJECTED_EVENT,
   onAvatarRejected,
   type AvatarRejectedEvent,
