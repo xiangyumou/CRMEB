@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { productCategories, productCategoriesMap, products } from '@shop/db/schema/catalog';
 import { couponTemplates, productGiftCoupons, userCoupons } from '@shop/db/schema/coupon';
 import { orders } from '@shop/db/schema/order';
@@ -260,6 +260,38 @@ describe('admin templates', () => {
       form({ totalCount: 1050 }),
     );
     expect(lowered.remainingCount).toBe(53);
+  });
+
+  it('applies the delta to the supply a claim just took, not to what the edit read before it', async () => {
+    // A shopper's claim is mid-transaction when the operator saves. Computing
+    // the delta from an unlocked read would write the pre-claim 3 back over
+    // the claim's 2 and hand the coupon out twice.
+    const id = await makeTemplate({ totalCount: 1000, remainingCount: 3 });
+    let tookOne!: () => void;
+    const claimHeld = new Promise<void>((resolve) => (tookOne = resolve));
+    let commit!: () => void;
+    const released = new Promise<void>((resolve) => (commit = resolve));
+    const claim = harness.ctx.db.transaction(async (tx) => {
+      await tx
+        .update(couponTemplates)
+        .set({ remainingCount: sql`${couponTemplates.remainingCount} - 1` })
+        .where(eq(couponTemplates.id, id));
+      tookOne();
+      await released;
+    });
+    await claimHeld;
+
+    const edit = service.adminUpdate(
+      harness.ctx,
+      { id: String(id) },
+      form({ name: '改个名字', totalCount: 1000 }),
+    );
+    // Give the edit time to reach its read before the claim commits.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    commit();
+    await claim;
+
+    expect((await edit).remainingCount).toBe(2);
   });
 
   it('floors the remaining supply at zero when the total is cut below what is gone', async () => {

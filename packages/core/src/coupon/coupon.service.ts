@@ -111,7 +111,8 @@ export async function adminCreate(
  * `remain_count = total_count` on every edit would let renaming a 1000-coupon
  * campaign that had 3 left hand out 997 more. So the *delta* is applied — raise
  * the total by 100 and 100 more become claimable; lower it and the remainder
- * shrinks, floored at zero.
+ * shrinks, floored at zero. The row is locked first, so the delta lands on
+ * what claims actually left.
  */
 export async function adminUpdate(
   ctx: Ctx,
@@ -120,7 +121,7 @@ export async function adminUpdate(
 ): Promise<CouponTemplateDetail> {
   const id = Number(input.id);
   return ctx.withTx(async (tx) => {
-    const current = await repo.findTemplate(tx, id);
+    const current = await repo.lockTemplate(tx, id);
     if (!current) throw new DomainError('COUPON_TEMPLATE_NOT_FOUND');
 
     const values = templateValues(body);

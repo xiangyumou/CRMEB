@@ -65,6 +65,20 @@ export async function findTemplate(db: DbOrTx, id: number): Promise<TemplateRow 
 }
 
 /**
+ * The template, locked for the rest of the transaction. An edit derives the
+ * new `remaining_count` from the current one; a claim committing between an
+ * unlocked read and the write would be overwritten.
+ */
+export async function lockTemplate(tx: Tx, id: number): Promise<TemplateRow | null> {
+  const rows = await tx
+    .select()
+    .from(couponTemplates)
+    .where(and(eq(couponTemplates.id, id), liveTemplate()))
+    .for('update');
+  return rows[0] ?? null;
+}
+
+/**
  * A template's status whatever its deletion state, or null if there is no such
  * row. A soft-deleted template's wallet coupons are still spendable, and their
  * scope is still read from it (`templateTerms`), so a scope lookup must see it.
