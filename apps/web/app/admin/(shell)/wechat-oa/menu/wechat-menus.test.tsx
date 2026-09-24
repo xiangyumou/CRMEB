@@ -10,11 +10,13 @@ import {
   wechatOaMenuPublish,
   wechatOaMenuUpdate,
 } from '@shop/contracts/wechat-oa/wechat-oa.menu.contract';
+import { wechatOaReplySimulate } from '@shop/contracts/wechat-oa/wechat-oa.reply.contract';
 
 import { resetApiConfig } from '@/admin/api/config';
 import { on, respondWithError, stubRoutes, type ErrorStatus, type StubCall } from '@/test/api';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
+import { menuWarnings, shownLabel } from './menu-phone-preview';
 import { WechatMenusPage } from './wechat-menus';
 
 /**
@@ -61,6 +63,23 @@ function stubApi(
     ),
     on(wechatOaMenuCreate, menu),
     on(wechatOaMenuUpdate, menu),
+    on(wechatOaReplySimulate, {
+      source: 'keyword',
+      reply: {
+        id: '7',
+        triggerKind: 'keyword',
+        keyword: 'CONTACT',
+        matchMode: 'exact',
+        replyType: 'text',
+        payload: { text: '客服在线时间 9:00-18:00' },
+        isEnabled: true,
+        sortOrder: 0,
+        createdAt: '2026-01-04T10:00:00+08:00',
+        updatedAt: '2026-01-04T10:00:00+08:00',
+      },
+      shadowed: [],
+      explanation: '命中关键词「CONTACT」（完全匹配）',
+    }),
   ]);
 }
 
@@ -70,7 +89,12 @@ afterEach(() => {
 
 const allPermissions = {
   ...testIdentity,
-  permissions: ['wechat-oa:menu:read', 'wechat-oa:menu:write', 'wechat-oa:menu:publish'],
+  permissions: [
+    'wechat-oa:menu:read',
+    'wechat-oa:menu:write',
+    'wechat-oa:menu:publish',
+    'wechat-oa:reply:read',
+  ],
 };
 
 describe('公众号自定义菜单', () => {
@@ -229,5 +253,48 @@ describe('公众号自定义菜单', () => {
     // …and the child it just gained has one of its own.
     expect(within(dialog).getByLabelText('二级按钮 1-1 网页地址')).toBeInTheDocument();
     expect(within(dialog).getByText(/有子菜单的按钮本身不触发动作/)).toBeInTheDocument();
+  });
+
+  it(
+    'previews the menu on a phone, and a click button answers with its auto-reply',
+    {
+      timeout: 20_000,
+    },
+    async () => {
+      const calls = stubApi();
+      renderAdmin(<WechatMenusPage />, { identity: allPermissions });
+      await screen.findByText('默认菜单');
+
+      await userEvent.click(screen.getByRole('button', { name: zhName('编辑') }));
+      const phone = within(await screen.findByTestId('menu-phone-preview'));
+
+      await userEvent.click(phone.getByRole('button', { name: /商城/ }));
+      expect(phone.getByRole('button', { name: '首页' })).toBeInTheDocument();
+
+      await userEvent.click(phone.getByRole('button', { name: '联系客服' }));
+      expect(await phone.findByText('客服在线时间 9:00-18:00')).toBeInTheDocument();
+      expect(calls.find((call) => call.url.endsWith('/simulate'))?.body).toEqual({
+        kind: 'click',
+        text: 'CONTACT',
+      });
+    },
+  );
+});
+
+describe('menu phone preview', () => {
+  it('cuts labels where WeChat does and names the buttons that do nothing', () => {
+    expect(shownLabel('联系客服', 8)).toBe('联系客服');
+    expect(shownLabel('联系在线客服', 8)).toBe('联系在线…');
+    expect(shownLabel('Contact', 8)).toBe('Contact');
+    expect(
+      menuWarnings([
+        { name: '联系在线客服', type: 'click', key: '' },
+        { name: '商城', sub_button: [{ name: '首页', type: 'view', url: '' }] },
+      ]),
+    ).toEqual([
+      '按钮「联系在线客服」太长，手机上显示为「联系在线…」',
+      '按钮「联系在线客服」还没填 key',
+      '子菜单「首页」还没填网址',
+    ]);
   });
 });

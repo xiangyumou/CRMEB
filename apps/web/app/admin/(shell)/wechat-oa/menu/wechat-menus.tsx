@@ -20,6 +20,8 @@ import { CrudTable } from '@/admin/kit/table/crud-table';
 import { Can } from '@/admin/session/can';
 import { MenuTreeEditor } from '@/admin/wechat-oa/menu-tree-editor';
 
+import { MenuPhonePreview } from './menu-phone-preview';
+
 /**
  * 自定义菜单 — the bottom menu of the Official Account.
  *
@@ -112,7 +114,7 @@ export function WechatMenusPage() {
       <ModalForm
         {...modal.props}
         title={modal.record ? `编辑：${modal.record.name}` : '新建菜单'}
-        width={860}
+        width={1180}
         schema={wechatMenuForm}
         fields={[
           { kind: 'text', name: 'name', label: '名称', placeholder: '例如「春节菜单」' },
@@ -120,14 +122,18 @@ export function WechatMenusPage() {
             kind: 'custom',
             name: 'buttons',
             label: '按钮',
-            help: '最多 3 个一级按钮，每个下面最多 5 个子菜单。',
-            render: ({ value, onChange, disabled }) => (
-              <MenuTreeEditor
-                value={Array.isArray(value) ? value : []}
-                onChange={onChange}
-                disabled={disabled}
-              />
-            ),
+            help: '最多 3 个一级按钮，每个下面最多 5 个子菜单。右边是关注者手机上的样子，可以点。',
+            render: ({ value, onChange, disabled }) => {
+              const buttons = Array.isArray(value) ? value : [];
+              return (
+                <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <MenuTreeEditor value={buttons} onChange={onChange} disabled={disabled} />
+                  </div>
+                  <MenuPhonePreview buttons={buttons} />
+                </div>
+              );
+            },
           },
         ]}
         initialValues={

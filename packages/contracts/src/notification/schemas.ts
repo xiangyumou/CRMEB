@@ -157,6 +157,96 @@ export type NotificationTemplateForm = z.infer<typeof notificationTemplateForm>;
 export const notificationChannelToggleBody = z.object({ enabled: z.boolean() });
 export type NotificationChannelToggleBody = z.infer<typeof notificationChannelToggleBody>;
 
+// ---------------------------------------------------------------------------
+// admin: preview and test send
+// ---------------------------------------------------------------------------
+
+/** Sample values for the event's placeholders, as the operator typed them. */
+const sampleData = z.record(z.string().max(64), z.string().max(500));
+
+/**
+ * The form as it stands — saved or not — and the sample values to fill it
+ * with. The same shape the save takes, so a preview never disagrees with what
+ * 保存 would store.
+ */
+export const notificationTemplatePreviewBody = z.object({
+  channels: notificationChannels,
+  data: sampleData.default({}),
+});
+export type NotificationTemplatePreviewBody = z.infer<typeof notificationTemplatePreviewBody>;
+
+const renderedField = z.object({ key: z.string(), value: z.string() });
+
+/**
+ * What each supported channel would send, rendered by the send path's own
+ * functions. A channel the event does not support is `null`; one it supports
+ * but that is switched off is still rendered, with `enabled: false`, so the
+ * operator can check the wording before turning it on.
+ *
+ * `warnings` are the problems the send path would hide: an unknown
+ * placeholder rendering empty, a field WeChat would reject or that would be
+ * dropped, a link that would be removed.
+ */
+export const notificationTemplatePreview = z.object({
+  inApp: z
+    .object({
+      enabled: z.boolean(),
+      title: z.string(),
+      content: z.string(),
+      /** Where tapping it goes: a mini-program path, or the admin path for an admin event. */
+      opens: z.string().nullable(),
+    })
+    .nullable(),
+  wechatOa: z
+    .object({
+      enabled: z.boolean(),
+      templateId: z.string(),
+      url: z.string().nullable(),
+      fields: z.array(renderedField),
+    })
+    .nullable(),
+  wechatMini: z
+    .object({
+      enabled: z.boolean(),
+      templateId: z.string(),
+      page: z.string().nullable(),
+      fields: z.array(renderedField),
+    })
+    .nullable(),
+  sms: z
+    .object({
+      enabled: z.boolean(),
+      templateCode: z.string(),
+      signName: z.string().nullable(),
+      params: z.array(renderedField),
+    })
+    .nullable(),
+  warnings: z.array(z.string()),
+});
+export type NotificationTemplatePreview = z.infer<typeof notificationTemplatePreview>;
+
+/** The channels a test send can reach: the ones that leave the shop. */
+export const notificationTestChannel = z.enum(['wechatOa', 'wechatMini', 'sms']);
+export type NotificationTestChannel = z.infer<typeof notificationTestChannel>;
+
+/**
+ * One real message to one member, from the form as it stands. The channel is
+ * sent even if its switch is off — that is what testing before 启用 means.
+ */
+export const notificationTestSendBody = notificationTemplatePreviewBody.extend({
+  channel: notificationTestChannel,
+  /** The member who receives it — normally the operator's own member account. */
+  userId: id,
+});
+export type NotificationTestSendBody = z.infer<typeof notificationTestSendBody>;
+
+export const notificationTestSendResult = z.object({
+  outcome: z.enum(['sent', 'skipped', 'failed']),
+  /** In the operator's words, with WeChat's or the provider's code when there is one. */
+  message: z.string(),
+});
+export type NotificationTestSendResult = z.infer<typeof notificationTestSendResult>;
+
 export const notificationTemplateExample = {
   code: 'order_shipped',
   name: '订单发货通知',

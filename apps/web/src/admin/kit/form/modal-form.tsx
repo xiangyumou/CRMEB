@@ -90,6 +90,12 @@ export interface EntityFormProps<
   cancelText?: string | undefined;
   /** Extra content above the fields, e.g. a summary of the record being edited. */
   header?: ReactNode | undefined;
+  /**
+   * A tool at the left of the footer that works on the form as it stands —
+   * 运费试算 and 通知预览 read the unsaved values from `form`. Shown once the
+   * form is.
+   */
+  footerExtra?: ((form: FormInstance) => ReactNode) | undefined;
 }
 
 export interface ModalFormProps<
@@ -107,11 +113,6 @@ export interface DrawerFormProps<
 > extends EntityFormProps<S, R, D> {
   width?: number | string | undefined;
   placement?: 'right' | 'left' | undefined;
-  /**
-   * A tool at the left of the footer that works on the form as it stands —
-   * 运费试算 reads the unsaved template from `form`. Shown once the form is.
-   */
-  footerExtra?: ((form: FormInstance) => ReactNode) | undefined;
 }
 
 /**
@@ -262,6 +263,7 @@ function ModalFormChrome<S extends AnyObjectSchema, R extends AnyRouteDef, D ext
     cancelText = '取消',
     width = 640,
     header,
+    footerExtra,
   } = props;
 
   return (
@@ -273,19 +275,22 @@ function ModalFormChrome<S extends AnyObjectSchema, R extends AnyRouteDef, D ext
       destroyOnHidden
       maskClosable={false}
       footer={
-        <Space>
-          <Button onClick={onClose} disabled={mutation.isPending}>
-            {cancelText}
-          </Button>
-          {/* No 保存 until there is something to save: a submit from a form
-              that never received the record is the bug this whole path exists
-              to prevent. */}
-          {loaded.ready ? (
-            <Button type="primary" loading={mutation.isPending} onClick={() => form.submit()}>
-              {okText}
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+          <div>{loaded.ready && footerExtra ? footerExtra(form) : null}</div>
+          <Space>
+            <Button onClick={onClose} disabled={mutation.isPending}>
+              {cancelText}
             </Button>
-          ) : null}
-        </Space>
+            {/* No 保存 until there is something to save: a submit from a form
+                that never received the record is the bug this whole path exists
+                to prevent. */}
+            {loaded.ready ? (
+              <Button type="primary" loading={mutation.isPending} onClick={() => form.submit()}>
+                {okText}
+              </Button>
+            ) : null}
+          </Space>
+        </div>
       }
     >
       {header}

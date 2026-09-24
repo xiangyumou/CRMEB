@@ -58,6 +58,11 @@ const AUDIT_EXEMPT: readonly Exemption[] = [
     method: 'POST',
     why: '回复模拟 — a POST-shaped read: the message goes in the body and nothing is written or sent',
   },
+  {
+    url: '/admin-api/notification-templates/:code/preview',
+    method: 'POST',
+    why: '通知预览 — a POST-shaped read: the unsaved template goes in the body and nothing is written or sent',
+  },
 
   // The notification inbox: a decision, not a defect.
   {

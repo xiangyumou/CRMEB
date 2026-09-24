@@ -58,8 +58,9 @@ export {
   type AdminStreamEvent,
 } from './notification.stream';
 
-// The two read surfaces the route files call.
+// The surfaces the route files call.
 export * as notificationAdmin from './notification.admin.service';
+export * as notificationPreview from './notification.preview';
 export * as notificationInbox from './notification.inbox.service';
 
 import { registerBuiltInNotificationEvents } from './notification.registry';

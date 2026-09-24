@@ -20,6 +20,7 @@ import { CrudTable } from '@/admin/kit/table/crud-table';
 
 import { NOTIFICATION_AUDIENCE, NOTIFICATION_CHANNEL } from '../notification-enums';
 import { FieldMapField } from './field-map-field';
+import { NotificationPreviewButton } from './notification-preview';
 
 /**
  * 通知模板 — which events the shop sends, and down which channels.
@@ -38,7 +39,7 @@ export function NotificationTemplatesPage() {
   const modal = useFormModal<NotificationTemplate>();
 
   return (
-    <PageContainer subTitle="事件由代码定义，这里只决定发哪些渠道、用什么措辞">
+    <PageContainer subTitle="事件由代码定义，这里只决定发哪些渠道、用什么措辞。改完在配置窗口里「预览」看实际效果">
       <CrudTable
         route={notificationAdminTemplateList}
         scrollX={1200}
@@ -114,6 +115,7 @@ export function NotificationTemplatesPage() {
           invalidate={[notificationAdminTemplateList]}
           successMessage="已保存"
           header={<Placeholders variables={modal.record.variables} />}
+          footerExtra={(form) => <NotificationPreviewButton template={modal.record!} form={form} />}
         />
       ) : null}
     </PageContainer>

@@ -14,6 +14,10 @@ import {
   notificationTemplateExample,
   notificationTemplateForm,
   notificationTemplateListQuery,
+  notificationTemplatePreview,
+  notificationTemplatePreviewBody,
+  notificationTestSendBody,
+  notificationTestSendResult,
   pagedNotificationLogs,
   pagedNotificationMessages,
   pagedNotificationTemplates,
@@ -145,6 +149,114 @@ export const notificationAdminTemplateToggleChannel = defineRoute({
           ...notificationTemplateExample.channels,
           wechatOa: { ...notificationTemplateExample.channels.wechatOa, enabled: false },
         },
+      },
+    },
+  ],
+});
+
+/**
+ * 预览: the form as it stands, filled with sample values, through the send
+ * path's own render functions. Writes nothing and sends nothing — a POST only
+ * because the unsaved template is the body.
+ */
+export const notificationAdminTemplatePreview = defineRoute({
+  id: 'notification.adminTemplatePreview',
+  method: 'POST',
+  path: '/admin-api/notification-templates/:code/preview',
+  auth: 'admin',
+  permission: 'notification:template:read',
+  summary: '预览通知模板',
+  tags: ['notification'],
+  params: codeParams,
+  body: notificationTemplatePreviewBody,
+  response: notificationTemplatePreview,
+  errors: ['NOTIFICATION_TEMPLATE_NOT_FOUND'],
+  examples: [
+    {
+      name: 'order-shipped',
+      params: { code: 'order_shipped' },
+      body: {
+        channels: notificationTemplateExample.channels,
+        data: { orderId: '1001', orderNo: 'SO20260106001', company: '顺丰速运' },
+      },
+      response: {
+        inApp: {
+          enabled: true,
+          title: '您的订单已发货',
+          content: '订单 SO20260106001 已由 顺丰速运 发出，运单号 。',
+          opens: 'packages/order/detail/index?id=1001',
+        },
+        wechatOa: {
+          enabled: true,
+          templateId: 'ZCQ1oT0cD2mYy1Q-kLJbo2kQ3s6cxJ5Zx9pLb-7xQ1A',
+          url: 'https://shop.example.com/orders/1001',
+          fields: [
+            { key: 'first', value: '您的订单已发货' },
+            { key: 'keyword1', value: 'SO20260106001' },
+            { key: 'keyword2', value: '顺丰速运' },
+          ],
+        },
+        wechatMini: {
+          enabled: false,
+          templateId: '',
+          page: 'packages/order/detail/index?id=1001',
+          fields: [
+            { key: 'character_string1', value: 'SO20260106001' },
+            { key: 'thing2', value: '顺丰速运' },
+          ],
+        },
+        sms: { enabled: false, templateCode: '', signName: null, params: [] },
+        warnings: ['站内信正文：示例数据里 {{trackingNo}} 为空，这一处会显示为空'],
+      },
+    },
+  ],
+});
+
+/**
+ * 测试发送: one real message to one member, from the form as it stands, even
+ * with the channel switched off. Rate-limited per admin and audited, because
+ * it reaches a real phone and costs a real SMS.
+ */
+export const notificationAdminTemplateTestSend = defineRoute({
+  id: 'notification.adminTemplateTestSend',
+  method: 'POST',
+  path: '/admin-api/notification-templates/:code/test-send',
+  auth: 'admin',
+  permission: 'notification:template:write',
+  summary: '测试发送通知',
+  tags: ['notification'],
+  params: codeParams,
+  body: notificationTestSendBody,
+  response: notificationTestSendResult,
+  errors: [
+    'NOTIFICATION_TEMPLATE_NOT_FOUND',
+    'NOTIFICATION_CHANNEL_NOT_APPLICABLE',
+    'RATE_LIMITED',
+  ],
+  examples: [
+    {
+      name: 'sent',
+      params: { code: 'order_shipped' },
+      body: {
+        channels: notificationTemplateExample.channels,
+        data: { orderNo: 'SO20260106001', company: '顺丰速运' },
+        channel: 'wechatOa',
+        userId: '10001',
+      },
+      response: { outcome: 'sent', message: '已发送，请在微信里查收' },
+    },
+    {
+      name: 'no-openid',
+      params: { code: 'order_shipped' },
+      body: {
+        channels: notificationTemplateExample.channels,
+        data: {},
+        channel: 'wechatOa',
+        userId: '10001',
+      },
+      response: {
+        outcome: 'skipped',
+        message: '没有发出：该会员没有关注公众号或没有公众号授权记录',
       },
     },
   ],
