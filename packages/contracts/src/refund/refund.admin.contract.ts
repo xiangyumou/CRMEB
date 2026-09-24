@@ -77,6 +77,7 @@ export const refundAdminApprove = defineRoute({
     'REFUND_EXCEEDS_PAID',
     'REFUND_NO_ORIGINAL_PAYMENT',
     'REFUND_LINE_ALREADY_SHIPPED',
+    'REFUND_RETURN_ADDRESS_MISSING',
   ],
   examples: [
     {

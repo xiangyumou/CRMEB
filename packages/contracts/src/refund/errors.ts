@@ -46,6 +46,15 @@ export const refundErrors = defineErrors({
   /** Return shipment info on a `refund_only`, or before the request was approved. */
   REFUND_RETURN_NOT_EXPECTED: { status: 409, message: '该售后单无需填写退货物流' },
   /**
+   * Approving a 退货退款 with nowhere to send the parcel: 售后设置 has no
+   * complete return address and the operator typed none. Approving anyway
+   * would leave the buyer holding goods and no address.
+   */
+  REFUND_RETURN_ADDRESS_MISSING: {
+    status: 409,
+    message: '请先在「售后设置」中填写退货收件人、电话和地址',
+  },
+  /**
    * Approving a 仅退款 lost the race with the warehouse: the units shipped
    * first. `details` carries `orderItemId`. The request is not dead — it is a
    * return now, and the operator says so rather than the system guessing.

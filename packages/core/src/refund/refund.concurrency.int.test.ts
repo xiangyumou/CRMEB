@@ -29,6 +29,7 @@ import {
 import { installFulfilmentHooks, shipOrder } from '../order';
 import { handleTransactionNotify, paymentConfig, startPayment } from '../payment';
 import { wechatConfig } from '../wechat';
+import { refundConfig } from './refund.config';
 import { registerRefundEffects } from './refund.effects';
 import * as repo from './refund.repo';
 import * as admin from './refund.admin';
@@ -691,6 +692,11 @@ describe('REFUND-006 — reconciliation racing a refund callback', () => {
   });
 
   it('does not restock a line that has already shipped', async () => {
+    await harness.ctx.config.set(refundConfig, {
+      returnName: '售后部',
+      returnPhone: '13800000000',
+      returnAddress: '浙江省杭州市西湖区文一西路 1 号',
+    });
     const order = await paidOrder([{ quantity: 1, unitPrice: '100.00', totalAmount: '100.00' }], {
       shippedQuantities: [1],
     });

@@ -487,11 +487,26 @@ describe('the return address a buyer is shown', () => {
     expect(approved.logs.some((log) => (log.message ?? '').includes(typed.address))).toBe(true);
   });
 
-  it('shows nothing rather than half an address when the shop has configured none', async () => {
+  it('refuses the approval when the shop has configured none and the operator typed none', async () => {
+    // Half an address is no address: the phone is missing here.
+    await harness.ctx.config.set(refundConfig, { ...CONFIGURED, returnPhone: '' });
     const order = await paidOrder();
     const id = await returnRequest(order);
-    const approved = await admin.adminApprove(racer(adminActor(order.adminId)), { id: String(id) });
-    expect(approved.returnAddress).toBeNull();
+
+    await expect(
+      admin.adminApprove(racer(adminActor(order.adminId)), { id: String(id) }),
+    ).rejects.toMatchObject({ code: 'REFUND_RETURN_ADDRESS_MISSING' });
+    const row = await refundRow(id);
+    expect(row.status).toBe('applied');
+    expect(row.returnAddress).toBeNull();
+
+    // The operator can still approve it by typing where the goods go.
+    const typed = { name: '王五', phone: '13700000000', address: '上海市浦东新区 3 号' };
+    const approved = await admin.adminApprove(racer(adminActor(order.adminId)), {
+      id: String(id),
+      returnAddress: typed,
+    });
+    expect(approved.returnAddress).toEqual(typed);
   });
 
   it('never shows one on a refund that needs no parcel', async () => {

@@ -192,6 +192,15 @@ async function scene(kind: 'refund_only' | 'return_and_refund'): Promise<Scene> 
     })
     .returning({ id: orderItems.id });
 
+  // A return is only approved with somewhere to send the goods.
+  if (kind === 'return_and_refund') {
+    await harness.ctx.config.set(refundConfig, {
+      returnName: '售后部',
+      returnPhone: '13800000000',
+      returnAddress: '浙江省杭州市西湖区文一西路 1 号',
+    });
+  }
+
   const applied = await service.apply(as(userActor(owner!.id)), {
     orderId: String(order!.id),
     kind,

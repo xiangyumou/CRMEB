@@ -14,6 +14,7 @@ import { registerNotificationDomain } from '../notification';
 import { installFulfilmentHooks } from '../order';
 import { registerStockPort, resetOrderPorts } from '../order/ports';
 import * as admin from './refund.admin';
+import { refundConfig } from './refund.config';
 import * as service from './refund.service';
 
 /**
@@ -185,6 +186,13 @@ async function scene(): Promise<Scene> {
       snapshot: snapshot(),
     })
     .returning({ id: orderItems.id });
+
+  // A return is only approved with somewhere to send the goods.
+  await harness.ctx.config.set(refundConfig, {
+    returnName: '售后部',
+    returnPhone: '13800000000',
+    returnAddress: '浙江省杭州市西湖区文一西路 1 号',
+  });
 
   const applied = await service.apply(as(userActor(owner!.id)), {
     orderId: String(order!.id),

@@ -262,7 +262,8 @@ export function RefundRequestsPage() {
                 ) : (
                   <>
                     同意后买家按「售后设置」里的退货地址寄回，确认收货时才退款
-                    <MoneyText value={approveModal.record.amount} />。
+                    <MoneyText value={approveModal.record.amount} />
+                    。退货地址未填写时无法同意。
                   </>
                 )
               }

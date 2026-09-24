@@ -102,6 +102,8 @@ export async function adminDetail(ctx: Ctx, input: { id: string }): Promise<Admi
  * a fact. The operator's own address wins, the configured one is the fallback,
  * and whichever it is gets written to `refunds.return_address` — so editing
  * 售后设置 next month cannot re-address a parcel that is already in the post.
+ * With neither, a return is refused (`REFUND_RETURN_ADDRESS_MISSING`): an
+ * approved return with no address leaves the buyer nowhere to send the goods.
  * The config is read *before* the transaction opens, because it can touch Redis
  * and a row lock is being held inside.
  */
@@ -133,6 +135,9 @@ async function approveAs(
 
     // Only a return needs an address, and only if one was never frozen: a
     // re-approval after 驳回 must not quietly move the parcel.
+    if (row.kind === 'return_and_refund' && row.returnAddress === null && address === null) {
+      throw new DomainError('REFUND_RETURN_ADDRESS_MISSING');
+    }
     const freeze =
       row.kind === 'return_and_refund' && row.returnAddress === null && address !== null
         ? { returnAddress: address }
