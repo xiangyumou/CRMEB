@@ -398,6 +398,13 @@ export const productSkuInput = z.object({
   originalPrice: money.optional(),
   cost: money.optional(),
   stock: z.number().int().min(0).max(1_000_000_000),
+  /**
+   * The stock the editor was showing when it loaded this SKU. With it, an
+   * untouched stock is left alone (orders may have moved it meanwhile), and a
+   * changed one is written only if the row still holds this number —
+   * otherwise `CATALOG_SKU_STOCK_CHANGED`. Without it, `stock` is set as sent.
+   */
+  expectedStock: z.number().int().min(0).optional(),
   barCode: z.string().max(50).optional(),
   weight: weight.optional(),
   volume: volume.optional(),

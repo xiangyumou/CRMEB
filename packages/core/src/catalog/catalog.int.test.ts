@@ -332,6 +332,124 @@ describe('products', () => {
     expect(edited.skus[0]!.sales).toBe(4);
   });
 
+  describe('editing while orders move the stock', () => {
+    const sizes = (skus: Array<{ value: string; stock: number; expectedStock?: number }>) =>
+      productForm({
+        specMode: true,
+        specs: [{ name: '尺码', values: skus.map((s) => ({ value: s.value })) }],
+        skus: skus.map((s, index) => ({
+          specValues: { 尺码: s.value },
+          price: '99.00',
+          stock: s.stock,
+          ...(s.expectedStock === undefined ? {} : { expectedStock: s.expectedStock }),
+          isDefault: index === 0,
+          isVisible: true,
+          sortOrder: index,
+        })),
+      });
+
+    async function soldThree() {
+      const product = await makeProduct(asAdmin(), sizes([{ value: 'M', stock: 10 }]));
+      const skuId = Number(product.skus[0]!.id);
+      // The editor is open showing 10; meanwhile an order takes 3.
+      await harness.ctx.withTx((tx) => catalogStockPort.reserve(tx, 1, [{ skuId, quantity: 3 }]));
+      return { product, skuId };
+    }
+
+    it('leaves an untouched stock alone rather than writing the stale number back', async () => {
+      const { product, skuId } = await soldThree();
+      const edited = await service.adminProductUpdate(
+        asAdmin(),
+        { id: product.id },
+        {
+          ...sizes([{ value: 'M', stock: 10, expectedStock: 10 }]),
+          name: '改了名字',
+          categoryIds: product.categoryIds,
+        },
+      );
+      expect(edited.name).toBe('改了名字');
+      expect((await repo.findSku(harness.ctx.db, skuId))!.stock).toBe(7);
+    });
+
+    it('refuses a changed stock when orders moved it since the form was opened', async () => {
+      const { product, skuId } = await soldThree();
+      await expect(
+        service.adminProductUpdate(
+          asAdmin(),
+          { id: product.id },
+          {
+            ...sizes([{ value: 'M', stock: 50, expectedStock: 10 }]),
+            categoryIds: product.categoryIds,
+          },
+        ),
+      ).rejects.toMatchObject({
+        code: 'CATALOG_SKU_STOCK_CHANGED',
+        details: { expected: 10, current: 7 },
+      });
+      expect((await repo.findSku(harness.ctx.db, skuId))!.stock).toBe(7);
+    });
+
+    it('writes a changed stock over the number the operator saw', async () => {
+      const { product, skuId } = await soldThree();
+      await service.adminProductUpdate(
+        asAdmin(),
+        { id: product.id },
+        {
+          ...sizes([{ value: 'M', stock: 50, expectedStock: 7 }]),
+          categoryIds: product.categoryIds,
+        },
+      );
+      expect((await repo.findSku(harness.ctx.db, skuId))!.stock).toBe(50);
+    });
+  });
+
+  it('refuses to drop a spec combination somebody bought, instead of a 500', async () => {
+    const product = await makeProduct(
+      asAdmin(),
+      productForm({
+        specMode: true,
+        specs: [{ name: '尺码', values: [{ value: 'M' }, { value: 'XL' }] }],
+        skus: ['M', 'XL'].map((value, index) => ({
+          specValues: { 尺码: value },
+          price: '99.00',
+          stock: 5,
+          isDefault: index === 0,
+          isVisible: true,
+          sortOrder: index,
+        })),
+      }),
+    );
+    const xl = product.skus.find((sku) => sku.specValues['尺码'] === 'XL')!;
+    await makeOrderLine(harness, {
+      userId: await makeUser(harness),
+      productId: Number(product.id),
+      skuId: Number(xl.id),
+      status: 'received',
+    });
+
+    await expect(
+      service.adminProductUpdate(
+        asAdmin(),
+        { id: product.id },
+        productForm({
+          categoryIds: product.categoryIds,
+          specMode: true,
+          specs: [{ name: '尺码', values: [{ value: 'M' }] }],
+          skus: [
+            {
+              specValues: { 尺码: 'M' },
+              price: '99.00',
+              stock: 5,
+              isDefault: true,
+              isVisible: true,
+              sortOrder: 0,
+            },
+          ],
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'CATALOG_SKU_IN_USE' });
+  });
+
   it('refuses a duplicate SPU', async () => {
     await makeProduct(asAdmin(), { spu: 'SPU-1' });
     await expect(makeProduct(asAdmin(), { spu: 'SPU-1' })).rejects.toMatchObject({

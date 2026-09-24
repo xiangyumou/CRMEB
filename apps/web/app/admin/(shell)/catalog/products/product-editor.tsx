@@ -507,6 +507,9 @@ export function formValuesOf(record: AdminProductDetail): Partial<AdminProductFo
     ...(sku.originalPrice === null ? {} : { originalPrice: sku.originalPrice }),
     ...(sku.cost === null ? {} : { cost: sku.cost }),
     stock: sku.stock,
+    // What the operator is looking at: the server leaves an untouched stock
+    // alone and refuses a changed one if orders moved it meanwhile.
+    expectedStock: sku.stock,
     ...(sku.barCode === null ? {} : { barCode: sku.barCode }),
     ...(sku.weight === null ? {} : { weight: sku.weight }),
     ...(sku.volume === null ? {} : { volume: sku.volume }),

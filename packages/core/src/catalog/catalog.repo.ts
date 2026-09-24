@@ -1069,6 +1069,17 @@ export async function updateSku(
   return conditionalUpdate(tx, productSkus, { where: eq(productSkus.id, id), set: values });
 }
 
+/** Sets `stock` only if the row still holds `expected`. */
+export async function setSkuStockIf(
+  tx: Tx,
+  args: { id: number; expected: number; next: number },
+): Promise<ConditionalUpdateResult> {
+  return conditionalUpdate(tx, productSkus, {
+    where: and(eq(productSkus.id, args.id), eq(productSkus.stock, args.expected)),
+    set: { stock: args.next },
+  });
+}
+
 export async function deleteSkus(tx: Tx, ids: readonly number[]): Promise<number> {
   if (ids.length === 0) return 0;
   const deleted = await tx

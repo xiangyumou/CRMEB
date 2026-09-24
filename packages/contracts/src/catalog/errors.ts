@@ -40,6 +40,23 @@ export const catalogErrors = defineErrors({
   CATALOG_SKU_NOT_FOUND: { status: 404, message: '所选规格不存在' },
   /** Reserved for the buyer: not enough left, or none at all. */
   CATALOG_SKU_OUT_OF_STOCK: { status: 409, message: '库存不足' },
+  /**
+   * The editor changed a SKU's stock, but orders moved it since the form was
+   * opened (`expectedStock` no longer matches). `details` carries
+   * `{ specText, expected, current }`.
+   */
+  CATALOG_SKU_STOCK_CHANGED: {
+    status: 409,
+    message: '库存在你编辑期间已被订单改动，请刷新后重新填写库存',
+  },
+  /**
+   * The editor dropped a spec combination that orders, group buys or presales
+   * still point at. `details` carries `{ specTexts }`. Hide it instead.
+   */
+  CATALOG_SKU_IN_USE: {
+    status: 409,
+    message: '该规格已有订单或活动引用，不能删除；可以把它设为不显示',
+  },
   /** `products_purchase_limit_mode`. `details` carries `{ limit, mode }`. */
   CATALOG_PURCHASE_LIMIT_REACHED: { status: 409, message: '已达到该商品的限购数量' },
   /** Below `min_purchase_quantity`. `details` carries `{ minQuantity }`. */

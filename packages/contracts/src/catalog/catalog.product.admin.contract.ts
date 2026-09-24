@@ -207,6 +207,8 @@ export const catalogAdminProductUpdate = defineRoute({
     'CATALOG_LABEL_NOT_FOUND',
     'CATALOG_PROTECTION_NOT_FOUND',
     'CATALOG_PRODUCT_SPU_TAKEN',
+    'CATALOG_SKU_STOCK_CHANGED',
+    'CATALOG_SKU_IN_USE',
   ],
   examples: [
     {

@@ -1093,11 +1093,33 @@ async function reconcileSkus(
 
     if (match) {
       keptIds.add(match.id);
+      // A card SKU's stock is the pool, never the form's.
+      const absolute = body.kind !== 'virtual_card' && input.expectedStock === undefined;
       await repo.updateSku(tx, match.id, {
         ...shared,
-        // A card SKU's stock is the pool; anything else takes the operator's number.
-        ...(body.kind === 'virtual_card' ? {} : { stock: input.stock }),
+        ...(absolute ? { stock: input.stock } : {}),
       });
+      // The editor says what it was showing. Unchanged: leave the row alone —
+      // orders may have moved it since, and writing the old number back would
+      // hand those units out a second time. Changed: only over the number the
+      // operator actually saw.
+      if (
+        body.kind !== 'virtual_card' &&
+        input.expectedStock !== undefined &&
+        input.stock !== input.expectedStock
+      ) {
+        const { won } = await repo.setSkuStockIf(tx, {
+          id: match.id,
+          expected: input.expectedStock,
+          next: input.stock,
+        });
+        if (!won) {
+          const current = (await repo.listSkus(tx, productId)).find((s) => s.id === match.id);
+          throw new DomainError('CATALOG_SKU_STOCK_CHANGED', {
+            details: { specText, expected: input.expectedStock, current: current?.stock ?? null },
+          });
+        }
+      }
     } else {
       const inserted = await repo.insertSku(tx, {
         ...shared,
@@ -1111,10 +1133,28 @@ async function reconcileSkus(
     }
   }
 
-  await repo.deleteSkus(
-    tx,
-    existing.filter((sku) => !keptIds.has(sku.id)).map((sku) => sku.id),
-  );
+  const dropped = existing.filter((sku) => !keptIds.has(sku.id));
+  try {
+    await repo.deleteSkus(
+      tx,
+      dropped.map((sku) => sku.id),
+    );
+  } catch (error) {
+    // `order_items`, group-buy and presale SKUs all RESTRICT: a combination
+    // somebody bought stays, and the operator is told to hide it instead.
+    if (isForeignKeyViolation(error)) {
+      throw new DomainError('CATALOG_SKU_IN_USE', {
+        details: { specTexts: dropped.map((sku) => sku.specText) },
+      });
+    }
+    throw error;
+  }
+}
+
+function isForeignKeyViolation(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  const causeCode = (error as { cause?: { code?: unknown } } | null)?.cause?.code;
+  return code === '23503' || causeCode === '23503';
 }
 
 /**
