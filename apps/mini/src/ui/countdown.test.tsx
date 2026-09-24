@@ -38,6 +38,28 @@ describe('Countdown', () => {
     expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
+  it('stops ticking at zero, and starts again when the deadline moves', () => {
+    const onEnd = vi.fn();
+    const view = render(<Countdown endsAt="2026-09-23T10:00:02+08:00" onEnd={onEnd} />);
+    act(() => vi.advanceTimersByTime(3000));
+    expect(screen.getByText('已结束')).toBeTruthy();
+    expect(vi.getTimerCount()).toBe(0);
+
+    view.rerender(<Countdown endsAt="2026-09-23T10:00:05+08:00" onEnd={onEnd} />);
+    expect(screen.getByRole('timer').textContent).toBe('00:00:02');
+    act(() => vi.advanceTimersByTime(3000));
+    expect(onEnd).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('shown after the deadline: 已结束 at once, no ticking, no onEnd', () => {
+    const onEnd = vi.fn();
+    render(<Countdown endsAt="2026-09-23T09:59:00+08:00" onEnd={onEnd} />);
+    expect(screen.getByText('已结束')).toBeTruthy();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(onEnd).not.toHaveBeenCalled();
+  });
+
   it('counts on the server clock, not the phone', () => {
     // The phone is 10 minutes fast.
     setServerTime(NOW - 600_000, NOW);

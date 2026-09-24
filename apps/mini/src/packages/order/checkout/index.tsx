@@ -72,7 +72,8 @@ export default function CheckoutPage() {
   }
   return (
     <PageShell title="确认订单" withBar>
-      <LoginCard reason="登录后即可结算">
+      {/* 登录 comes back here: the draft is still in memory. */}
+      <LoginCard reason="登录后即可结算" redirect={{ route: 'checkout', params: {} }}>
         <Checkout draft={draft} />
       </LoginCard>
     </PageShell>
@@ -127,7 +128,8 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
     invalidate: ['user.addressList', 'user.defaultAddress'],
   });
   const create = useRouteMutation('order.create', {
-    invalidate: ['cart.list', 'cart.count', 'order.list', 'order.counts'],
+    // The coupon now sits on the order: out of the wallet's 可使用.
+    invalidate: ['cart.list', 'cart.count', 'order.list', 'order.counts', 'coupon.myList'],
   });
 
   const importAddress = (chosen: ChosenAddress) => {

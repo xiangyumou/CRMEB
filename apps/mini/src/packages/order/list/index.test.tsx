@@ -4,6 +4,7 @@ import { useSession } from '@/session/session';
 import { serveApi } from '@/test/fake-api';
 import { orderItem, orderListItem, paged } from '@/test/order-fixtures';
 import { renderPage } from '@/test/render';
+import { routeQueryKey } from '@shop/api-client/react';
 import { taroFake } from '@/test/taro-fake/taro';
 import OrderListPage from './index';
 
@@ -100,7 +101,9 @@ describe('我的订单', () => {
       'GET /api/v1/orders': () => ({ body: paged([unpaid]) }),
       'POST /api/v1/orders/9001/cancel': () => ({ body: { ...unpaid, status: 'cancelled' } }),
     });
-    await renderPage(<OrderListPage />);
+    const { client } = await renderPage(<OrderListPage />);
+    const wallet = routeQueryKey('coupon.myList', { query: { state: 'unused' } });
+    client.setQueryData(wallet, { items: [], page: 1, pageSize: 20, total: 0 });
 
     fireEvent.click(await screen.findByRole('button', { name: '取消订单' }));
     await waitFor(() =>
@@ -112,6 +115,8 @@ describe('我的订单', () => {
     await waitFor(() =>
       expect(seen.filter((r) => r.key === 'GET /api/v1/orders').length).toBeGreaterThan(1),
     );
+    // Its coupon is back in the wallet.
+    expect(client.getQueryState(wallet)?.isInvalidated).toBe(true);
   });
 
   it('keeps the order when the shopper backs out of cancelling', async () => {

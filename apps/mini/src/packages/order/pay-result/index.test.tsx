@@ -62,15 +62,34 @@ describe('支付结果', () => {
     );
   });
 
+  it('goes back to 订单详情 when 收银台 was opened from it, not to a second copy', async () => {
+    serve('paid');
+    taroFake.pageStack = [
+      { route: 'packages/order/list/index', options: {} },
+      { route: 'packages/order/detail/index', options: { id: '9' } },
+      { route: 'packages/order/pay-result/index', options: { orderId: '9', outTradeNo: 'P9' } },
+    ];
+    await renderPage(<PayResultPage />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看订单' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({ api: 'navigateBack', args: { delta: 1 } }),
+    );
+    expect(taroFake.calls.some((call) => call.api === 'redirectTo')).toBe(false);
+  });
+
   it('drops the order reads cached while the order was unpaid', async () => {
     serve('paid');
     const client = testQueryClient();
     const listKey = routeQueryKey('order.list', { query: {} });
+    const teamsKey = routeQueryKey('groupbuy.myGroups', { query: {} });
     client.setQueryData(listKey, { items: [], page: 1, pageSize: 20, total: 0 });
+    client.setQueryData(teamsKey, { items: [], page: 1, pageSize: 20, total: 0 });
     await renderPage(<PayResultPage />, client);
 
     expect(await screen.findByText('支付成功')).toBeTruthy();
     await waitFor(() => expect(client.getQueryState(listKey)?.isInvalidated).toBe(true));
+    // A 拼团 seat is taken once paid.
+    expect(client.getQueryState(teamsKey)?.isInvalidated).toBe(true);
   });
 
   it('sends a group buyer to invite friends', async () => {
@@ -111,5 +130,22 @@ describe('支付结果', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '刷新' }));
     expect(await screen.findByText('正在确认支付结果，请稍候')).toBeTruthy();
+  });
+});
+
+describe('支付结果 — signing in on the page', () => {
+  it('sends the SMS login back to this payment’s result', async () => {
+    taroFake.routerParams = { orderId: '9', outTradeNo: 'P9' };
+    useSession.setState({ session: { status: 'phone-required', bindToken: 'b' } });
+    serve('paid');
+    await renderPage(<PayResultPage />);
+    fireEvent.click(screen.getByRole('button', { name: '短信验证码登录' }));
+    const redirect = '{"route":"payResult","params":{"orderId":"9","outTradeNo":"P9"}}';
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'navigateTo',
+        args: { url: `/pages/login/index?redirect=${encodeURIComponent(redirect)}` },
+      }),
+    );
   });
 });

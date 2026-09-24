@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, type ReactNode } from 'react';
 import type { StorefrontRoute } from '@shop/api-client/routes';
-import { useRouteMutation } from '@shop/api-client/react';
 import type { BlockHost, BlockIntent } from '@shop/storefront-blocks';
+import { claimFailureText, useClaimCoupon } from '@/features/coupon/use-claim';
 import { serverNow } from '@/lib/server-clock';
 import { callPhone, officialAccountBar } from '@/platform';
 import { requireLogin, useSignedIn } from '@/session/session';
@@ -67,9 +67,7 @@ export function useDecorHost(route: StorefrontRoute, reload: () => unknown): Dec
   const overlayOpen = useOverlayStore((state) => state.open > 0);
   const { kind: supportKind, phone } = useSupport();
   const renderIntent = useDecorRenderIntent(decorSessionFrom(route));
-  const { mutate: claim } = useRouteMutation('coupon.claim', {
-    invalidate: ['coupon.claimableList', 'coupon.myList'],
-  });
+  const { mutate: claim } = useClaimCoupon();
   const claiming = useRef(false);
 
   const onIntent = useCallback(
@@ -93,7 +91,7 @@ export function useDecorHost(route: StorefrontRoute, reload: () => unknown): Dec
               { params: { id: intent.templateId } },
               {
                 onSuccess: () => toast.success('领取成功'),
-                onError: (error) => toast.text(error.message),
+                onError: (error) => toast.text(claimFailureText(error)),
                 onSettled: () => {
                   claiming.current = false;
                   void reload();

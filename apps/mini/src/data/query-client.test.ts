@@ -1,7 +1,8 @@
 import { environmentManager, focusManager, onlineManager } from '@tanstack/react-query';
 import { afterEach, describe, expect, it } from 'vitest';
 import { taroFake } from '@/test/taro-fake/taro';
-import { installQueryAdapters } from './query-client';
+import { ApiError } from '@shop/api-client';
+import { installQueryAdapters, retryRead } from './query-client';
 
 describe('installQueryAdapters', () => {
   let uninstall: (() => void) | undefined;
@@ -33,5 +34,22 @@ describe('installQueryAdapters', () => {
   it('removes its platform listeners on uninstall', () => {
     installQueryAdapters()();
     expect(taroFake.listenerCounts()).toEqual({ appShow: 0, appHide: 0, network: 0 });
+  });
+});
+
+describe('retryRead', () => {
+  const failed = (status: number) => new ApiError({ status, code: 'X', message: '失败' });
+
+  it('tries a read once more after a network failure or a server error', () => {
+    expect(retryRead(0, failed(0))).toBe(true);
+    expect(retryRead(0, failed(503))).toBe(true);
+    expect(retryRead(0, new Error('timeout'))).toBe(true);
+    expect(retryRead(1, failed(503))).toBe(false);
+  });
+
+  it('does not ask again for an answer that will not change (404 and other 4xx)', () => {
+    expect(retryRead(0, failed(404))).toBe(false);
+    expect(retryRead(0, failed(409))).toBe(false);
+    expect(retryRead(0, failed(422))).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { useInvalidateRoutes, useRouteQuery } from '@shop/api-client/react';
-import { navigate, useRouteParams } from '@/platform';
+import { leaveFor, navigate, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
 import { Button } from '@/ui/button';
@@ -25,7 +25,10 @@ export default function PayResultPage() {
   const { orderId = '', outTradeNo = '' } = useRouteParams('payResult');
   return (
     <PageShell title="支付结果">
-      <LoginCard reason="登录后查看支付结果">
+      <LoginCard
+        reason="登录后查看支付结果"
+        redirect={{ route: 'payResult', params: { orderId, outTradeNo } }}
+      >
         {outTradeNo === '' ? (
           <Empty title="没有支付单号" />
         ) : (
@@ -63,10 +66,19 @@ function PaymentStatus({ orderId, outTradeNo }: { orderId: string; outTradeNo: s
   const id = orderId || status.data?.orderId || '';
   const paid = status.data?.paid === true;
   // Every order read cached before the payment (订单详情 under 收银台, 我的订单, the 我的 counts)
-  // still says 待付款: drop them once the server says paid.
+  // still says 待付款, and a 拼团 still shows the seat as open: drop them once the server says
+  // paid.
   const invalidate = useInvalidateRoutes();
   useEffect(() => {
-    if (paid) void invalidate('order.detail', 'order.list', 'order.counts');
+    if (paid) {
+      void invalidate(
+        'order.detail',
+        'order.list',
+        'order.counts',
+        'groupbuy.groupDetail',
+        'groupbuy.myGroups',
+      );
+    }
   }, [paid, invalidate]);
   const order = useRouteQuery(
     'order.detail',
@@ -74,10 +86,11 @@ function PaymentStatus({ orderId, outTradeNo }: { orderId: string; outTradeNo: s
     { enabled: signedIn && paid && id !== '' },
   );
 
+  // Back to 订单详情 when 收银台 was opened from it (支付结果 replaced 收银台), rather than a
+  // second copy of the same order on the stack.
   const toOrder = () =>
-    void navigate(
+    void leaveFor(
       id ? { route: 'order', params: { id } } : { route: 'order', params: { outTradeNo } },
-      { replace: true },
     );
   const orderButton = (
     <Button variant="outline" onClick={toOrder}>

@@ -7,6 +7,7 @@ import { appConfigFixture } from '@/test/app-config-fixture';
 import { cardFixture, pageOf, productDetailFixture, reviewFixture } from '@/test/catalog-fixture';
 import { serveApi, type FakeReply } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
+import { routeQueryKey } from '@shop/api-client/react';
 import { taroFake } from '@/test/taro-fake/taro';
 import ProductPage from './index';
 
@@ -285,7 +286,10 @@ describe('商品详情', () => {
       'DELETE /api/v1/me/favorites/12': () => ({ status: 204, body: null }),
     });
     await signIn();
-    await renderPage(<ProductPage />);
+    const { client } = await renderPage(<ProductPage />);
+    // 我的收藏, under this page when the product was opened from it.
+    const favorites = routeQueryKey('catalog.favoriteList', { query: { pageSize: 20 } });
+    client.setQueryData(favorites, { items: [], page: 1, pageSize: 20, total: 0 });
 
     fireEvent.click(await screen.findByRole('button', { name: '收藏' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '已收藏' })).toBeTruthy());
@@ -295,6 +299,7 @@ describe('商品详情', () => {
         expect.arrayContaining(['POST /api/v1/me/favorites', 'DELETE /api/v1/me/favorites/12']),
       ),
     );
+    await waitFor(() => expect(client.getQueryState(favorites)?.isInvalidated).toBe(true));
   });
 
   it('shows a sold-out product with one disabled button', async () => {

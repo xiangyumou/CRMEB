@@ -114,8 +114,13 @@ function Detail({ product }: { product: Product }) {
   const display = useDisplay();
   const posterEnabled = useProductPosterEnabled();
   const addItem = useRouteMutation('cart.addItem', { invalidate: ['cart.list', 'cart.count'] });
-  const favoriteAdd = useRouteMutation('catalog.favoriteAdd');
-  const favoriteRemove = useRouteMutation('catalog.favoriteRemove');
+  // 我的收藏 may sit under this page (opened from it).
+  const favoriteAdd = useRouteMutation('catalog.favoriteAdd', {
+    invalidate: ['catalog.favoriteList'],
+  });
+  const favoriteRemove = useRouteMutation('catalog.favoriteRemove', {
+    invalidate: ['catalog.favoriteList'],
+  });
 
   const [sheet, setSheet] = useState<'sku' | 'service' | 'params' | 'share' | null>(null);
   const [actions, setActions] = useState<readonly SkuAction[]>(['cart', 'buy']);

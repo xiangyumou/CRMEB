@@ -4,6 +4,7 @@ import { useSession } from '@/session/session';
 import { serveApi } from '@/test/fake-api';
 import { orderDetail, orderItem } from '@/test/order-fixtures';
 import { renderPage } from '@/test/render';
+import { routeQueryKey } from '@shop/api-client/react';
 import { taroFake } from '@/test/taro-fake/taro';
 import ReviewPage from './index';
 
@@ -48,7 +49,9 @@ describe('评价商品', () => {
       'GET /api/v1/orders/9001': () => ({ body: received }),
       'POST /api/v1/catalog/reviews': () => answer('published'),
     });
-    await renderPage(<ReviewPage />);
+    const { client } = await renderPage(<ReviewPage />);
+    const productReviews = routeQueryKey('catalog.productReviews', { params: { id: '12' } });
+    client.setQueryData(productReviews, { items: [], page: 1, pageSize: 10, total: 0 });
     await screen.findByText('商品甲');
     expect(screen.queryByText('已退商品')).toBeNull();
 
@@ -63,6 +66,7 @@ describe('评价商品', () => {
       { orderItemId: '7001', productScore: 3, serviceScore: 4, content: '很好', images: [] },
       { orderItemId: '7002', productScore: 5, serviceScore: 4, images: [] },
     ]);
+    await waitFor(() => expect(client.getQueryState(productReviews)?.isInvalidated).toBe(true));
   });
 
   it('says 审核后展示, never an error, when the shop holds a review', async () => {
@@ -134,9 +138,19 @@ describe('评价商品', () => {
         body: { ...received, items: [orderItem('7001', { reviewed: true })] },
       }),
     });
+    taroFake.pageStack = [
+      { route: 'packages/order/detail/index', options: { id: '9001' } },
+      { route: 'packages/order/review/index', options: { orderId: '9001' } },
+    ];
     await renderPage(<ReviewPage />);
     await screen.findByText('已经评价过了');
     expect(screen.queryByRole('button', { name: '提交评价' })).toBeNull();
+
+    // 返回订单 goes back to the 订单详情 underneath rather than stacking a copy of it.
+    fireEvent.click(screen.getByRole('button', { name: '返回订单' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({ api: 'navigateBack', args: { delta: 1 } }),
+    );
   });
 
   it('writes only the line it was sent for', async () => {

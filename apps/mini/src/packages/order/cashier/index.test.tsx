@@ -114,6 +114,19 @@ describe('收银台', () => {
     expect(taroFake.calls.some((call) => call.api === 'requestPayment')).toBe(false);
   });
 
+  it('goes back to the 订单详情 it was opened from for 查看订单', async () => {
+    taroFake.pageStack = [
+      { route: 'packages/order/detail/index', options: { id: '9' } },
+      { route: 'packages/order/cashier/index', options: { orderId: '9' } },
+    ];
+    await renderCashier();
+    fireEvent.click(await screen.findByRole('link', { name: '查看订单详情' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({ api: 'navigateBack', args: { delta: 1 } }),
+    );
+    expect(taroFake.calls.some((call) => call.api === 'redirectTo')).toBe(false);
+  });
+
   it('says a closed order is closed', async () => {
     await renderCashier(false, {
       'GET /api/v1/orders/9': () => ({
@@ -137,5 +150,21 @@ describe('收银台', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: '微信支付' }));
     expect(await screen.findByText('订单已关闭')).toBeTruthy();
+  });
+});
+
+describe('收银台 — signing in on the page', () => {
+  it('sends the SMS login back to this order’s 收银台', async () => {
+    taroFake.routerParams = { orderId: '9' };
+    useSession.setState({ session: { status: 'phone-required', bindToken: 'b' } });
+    await renderPage(<CashierPage />);
+    fireEvent.click(screen.getByRole('button', { name: '短信验证码登录' }));
+    const redirect = '{"route":"cashier","params":{"orderId":"9"}}';
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'navigateTo',
+        args: { url: `/pages/login/index?redirect=${encodeURIComponent(redirect)}` },
+      }),
+    );
   });
 });

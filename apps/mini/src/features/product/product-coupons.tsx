@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import type { ResponseOf } from '@shop/api-client';
 import type { StorefrontRoute } from '@shop/api-client/routes';
-import { useRouteMutation, useRouteQuery } from '@shop/api-client/react';
+import { useRouteQuery } from '@shop/api-client/react';
+import { claimFailureText, useClaimCoupon } from '@/features/coupon/use-claim';
 import { requireLogin, useSignedIn } from '@/session/session';
 import { Cell } from '@/ui/cell';
 import { CouponCard, couponValidity, type CouponCardState } from '@/ui/coupon-card';
@@ -42,9 +43,7 @@ export function ProductCoupons({
 }) {
   const signedIn = useSignedIn();
   const list = useRouteQuery('coupon.claimableList', { query: { productId, pageSize: 20 } });
-  const claim = useRouteMutation('coupon.claim', {
-    invalidate: ['coupon.claimableList', 'coupon.myList'],
-  });
+  const claim = useClaimCoupon();
   const [open, setOpen] = useState(false);
   const [claiming, setClaiming] = useState<string | null>(null);
 
@@ -67,7 +66,7 @@ export function ProductCoupons({
       { params: { id: coupon.templateId } },
       {
         onSuccess: () => toast.success('领取成功'),
-        onError: (error) => toast.text(error.message),
+        onError: (error) => toast.text(claimFailureText(error)),
         onSettled: () => setClaiming(null),
       },
     );

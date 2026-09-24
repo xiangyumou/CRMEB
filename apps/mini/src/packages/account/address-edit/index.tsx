@@ -3,6 +3,7 @@ import { Text, View } from '@tarojs/components';
 import { isApiError } from '@shop/api-client';
 import { useRouteMutation, useRouteQuery } from '@shop/api-client/react';
 import { useCityTree } from '@/data/cities';
+import { ADDRESS_READS } from '@/data/stale-reads';
 import { goBack, platform, useRouteParams } from '@/platform';
 import { LoginGate } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
@@ -72,9 +73,8 @@ function AddressForm({ id, initial }: { id?: string; initial: AddressDraft | nul
   );
   const [focus, setFocus] = useState<keyof AddressErrors | null>(null);
   const tree = useCityTree();
-  const invalidate = ['user.addressList', 'user.defaultAddress', 'user.addressDetail'] as const;
-  const create = useRouteMutation('user.addressCreate', { invalidate });
-  const update = useRouteMutation('user.addressUpdate', { invalidate });
+  const create = useRouteMutation('user.addressCreate', { invalidate: ADDRESS_READS });
+  const update = useRouteMutation('user.addressUpdate', { invalidate: ADDRESS_READS });
 
   const change = <K extends keyof AddressDraft>(key: K, value: AddressDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));

@@ -43,7 +43,8 @@ const two = (value: number) => String(value).padStart(2, '0');
 /**
  * Time left to a real deadline (C02, C16: no fake urgency), on the server's clock, not the
  * phone's (`lib/server-clock`). Ticks once a second on the shared ticker, only while its page is
- * showing (it catches up on show); says 「已结束」 at zero.
+ * showing (it catches up on show); says 「已结束」 at zero and stops ticking. A new `endsAt` (the
+ * deadline moved) starts it again.
  */
 export function Countdown({
   endsAt,
@@ -55,25 +56,39 @@ export function Countdown({
 }: CountdownProps) {
   const end = Date.parse(endsAt);
   const [left, setLeft] = useState(() => remainingUntil(end, serverNow()));
-  const ended = useRef(left.total === 0);
   const onEndRef = useRef(onEnd);
   useEffect(() => {
     onEndRef.current = onEnd;
   });
   const shown = usePageShown();
+  // Whether `onEnd` is settled for this deadline. Kept across hide/show so a countdown that
+  // reached zero while its page was hidden still says so on show; reset when `endsAt` moves.
+  const settled = useRef<{ end: number; ended: boolean } | undefined>(undefined);
 
   useEffect(() => {
+    if (settled.current?.end !== end) {
+      // Already over when shown: nothing to count, and no `onEnd` (it did not reach zero here).
+      settled.current = { end, ended: remainingUntil(end, serverNow()).total === 0 };
+    }
+    const state = settled.current;
     if (!shown) return;
+    let stop: (() => void) | undefined;
     const tick = () => {
       const next = remainingUntil(end, serverNow());
       setLeft(next);
-      if (next.total === 0 && !ended.current) {
-        ended.current = true;
+      if (next.total > 0) return;
+      // At zero: stop ticking (a list of order cards would otherwise re-render every second
+      // for as long as the page lives), and say so once.
+      stop?.();
+      stop = undefined;
+      if (!state.ended) {
+        state.ended = true;
         onEndRef.current?.();
       }
     };
     tick();
-    return onEverySecond(tick);
+    if (!state.ended) stop = onEverySecond(tick);
+    return () => stop?.();
   }, [end, shown]);
 
   if (left.total === 0) {

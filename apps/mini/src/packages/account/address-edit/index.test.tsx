@@ -4,6 +4,7 @@ import { signIn } from '@/test/account-fixture';
 import { addressFixture, cityTreeFixture } from '@/test/address-fixture';
 import { serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
+import { routeQueryKey } from '@shop/api-client/react';
 import { taroFake } from '@/test/taro-fake/taro';
 import { useImportedAddress } from '../shared/address';
 import AddressEditPage from './index';
@@ -45,6 +46,25 @@ describe('新增 / 编辑地址', () => {
       }),
     );
     await waitFor(() => expect(taroFake.calls.some((c) => c.api === 'navigateBack')).toBe(true));
+  });
+
+  it('makes 确认订单’s price stale: it prices against the default address underneath', async () => {
+    taroFake.routerParams = { id: '31' };
+    serveApi({
+      'GET /api/v1/addresses/31': () => ({ body: addressFixture }),
+      'GET /api/v1/cities': () => ({ body: cityTreeFixture }),
+      'PUT /api/v1/addresses/31': (body) => ({ body: { ...addressFixture, ...(body as object) } }),
+    });
+    const { client } = await renderPage(<AddressEditPage />);
+    const preview = routeQueryKey('order.checkoutPreview', {
+      body: { source: 'buy-now', item: { skuId: '1', quantity: 1 }, kind: 'normal' },
+    });
+    client.setQueryData(preview, { cached: true });
+    await screen.findByDisplayValue('李四');
+
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    await waitFor(() => expect(taroFake.calls.some((c) => c.api === 'navigateBack')).toBe(true));
+    expect(client.getQueryState(preview)?.isInvalidated).toBe(true);
   });
 
   it('says what is missing and sends nothing', async () => {

@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { startSession, useSession } from '@/session/session';
@@ -66,5 +67,30 @@ describe('搜索', () => {
 
     await waitFor(() => expect(screen.queryByText('搜索历史')).toBeNull());
     expect(seen.some((request) => request.key === 'DELETE /api/v1/me/search-history')).toBe(true);
+  });
+
+  it('asks for the history again on every visit: the last search added to it', async () => {
+    taroFake.storage.set('shop.session.token', 't1');
+    const seen = serveApi({
+      ...hot,
+      'GET /api/v1/cart/count': () => ({
+        body: { items: 0, quantity: 0, availableCount: 0, unavailableCount: 0 },
+      }),
+      'GET /api/v1/me/search-history': () => ({
+        body: { items: [{ keyword: '柔雾', searchedAt: '2026-09-20T10:00:00+08:00' }] },
+      }),
+    });
+    await startSession();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: 30_000 } },
+    });
+    const first = await renderPage(<Search />, client);
+    expect(await screen.findByRole('button', { name: '柔雾' })).toBeTruthy();
+    first.unmount();
+
+    await renderPage(<Search />, client);
+    await waitFor(() =>
+      expect(seen.filter((r) => r.key === 'GET /api/v1/me/search-history')).toHaveLength(2),
+    );
   });
 });

@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { Text } from '@tarojs/components';
 import { isApiError } from '@shop/api-client';
-import { useRouteQuery } from '@shop/api-client/react';
+import { routeKey, useRouteQuery } from '@shop/api-client/react';
+import { useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { DecorPage } from '@/features/decor/decor-page';
 import { DecorSkeleton } from '@/features/decor/decor-states';
 import { assetUrl } from '@/lib/asset-url';
@@ -39,6 +40,8 @@ export default function MicroPage() {
     void refetch();
   }, [signedIn, refetch, id]);
 
+  // A claim made on another page marks it stale: 已领取 shows once back here.
+  useRefetchOnShow(routeKey('decor.pageResolve'), { when: 'invalidated' });
   usePullToRefresh(() => page.refetch());
   const shareable = id !== '' && !previewToken && root?.shareEnabled !== false;
   useShare(
