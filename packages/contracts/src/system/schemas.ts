@@ -442,9 +442,7 @@ export const configGroupSummary = configGroupDescriptor.omit({ fields: true, tes
   testable: z.boolean().optional(),
   lastTest: configTestSummary.nullable().optional(),
   /** What the saved values amount to, e.g. 腾讯云 / 未启用 / 缺查询密钥. */
-  status: z
-    .object({ tone: z.enum(['on', 'off', 'incomplete']), text: z.string() })
-    .optional(),
+  status: z.object({ tone: z.enum(['on', 'off', 'incomplete']), text: z.string() }).optional(),
   /** Every field's label and section, so the index can search inside groups. */
   fieldIndex: z
     .array(z.object({ key: z.string(), label: z.string(), section: z.string().optional() }))

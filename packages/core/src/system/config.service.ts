@@ -223,10 +223,7 @@ export async function configGroupList(ctx: Ctx): Promise<{ groups: ConfigGroupSu
  * value no longer parses (say, after a schema change). So a failure means the
  * card shows no status, not that the page fails.
  */
-async function groupStatus(
-  ctx: Ctx,
-  def: ConfigGroupDef,
-): Promise<ConfigGroupStatus | undefined> {
+async function groupStatus(ctx: Ctx, def: ConfigGroupDef): Promise<ConfigGroupStatus | undefined> {
   if (def.status === undefined) return undefined;
   try {
     return def.status(await ctx.config.get(def));

@@ -50,7 +50,8 @@ export const smsConfig = defineConfigGroup({
       c.provider === 'aliyun'
         ? [c.aliyunAccessKeyId, c.aliyunAccessKeySecret, c.aliyunSignName]
         : [c.tencentAppId, c.tencentSecretId, c.tencentSecretKey, c.tencentSignName];
-    if (keys.some((value) => value === '')) return { tone: 'incomplete', text: `${name} · 密钥或签名未填` };
+    if (keys.some((value) => value === ''))
+      return { tone: 'incomplete', text: `${name} · 密钥或签名未填` };
     if (c.templateVerifyCode === '') return { tone: 'incomplete', text: `${name} · 缺验证码模板` };
     return { tone: 'on', text: name };
   },
