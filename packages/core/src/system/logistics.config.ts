@@ -36,6 +36,12 @@ export const logisticsConfig = defineConfigGroup({
     senderPhone: z.string().max(32).default(''),
     senderAddress: z.string().max(255).default(''),
   }),
+  status: (c) =>
+    c.provider === 'none'
+      ? { tone: 'off', text: '未启用' }
+      : c.appCode === ''
+        ? { tone: 'incomplete', text: '缺查询密钥' }
+        : { tone: 'on', text: '阿里云云市场' },
   ui: {
     provider: {
       label: '物流查询服务',

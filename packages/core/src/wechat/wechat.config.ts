@@ -77,6 +77,18 @@ export const wechatConfig = defineConfigGroup({
      */
     apiBaseUrl: z.string().max(255).default('https://api.weixin.qq.com'),
   }),
+  status: (c) => {
+    const apps = [
+      { name: '公众号', id: c.oaAppId, secret: c.oaAppSecret },
+      { name: '小程序', id: c.miniAppId, secret: c.miniAppSecret },
+    ];
+    const half = apps.find((app) => (app.id === '') !== (app.secret === ''));
+    if (half) return { tone: 'incomplete', text: `${half.name} AppID 与 AppSecret 缺一` };
+    const done = apps.filter((app) => app.id !== '').map((app) => app.name);
+    return done.length === 0
+      ? { tone: 'off', text: '未配置' }
+      : { tone: 'on', text: done.join('、') };
+  },
   ui: {
     oaAppId: { label: '公众号 AppID', type: 'text', section: '公众号', order: 10 },
     oaAppSecret: {

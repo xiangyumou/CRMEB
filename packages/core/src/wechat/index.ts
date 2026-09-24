@@ -21,6 +21,7 @@
 
 import { registerSiteAuthMethod, wechatMiniConfig, wechatOaConfig } from '../system';
 import { wechatConfig } from './wechat.config';
+import { registerWechatConfigTest } from './wechat.config-test';
 import { registerContentSecurityEffects } from './wechat.sec-check';
 import { wechatMiniLoginUsable, wechatOaLoginUsable } from './wechat.site-auth';
 
@@ -169,6 +170,7 @@ export {
  * boolean crosses the seam, never a credential.
  */
 export function registerWechatDomain(): void {
+  registerWechatConfigTest();
   // 内容安全 (C09): submit pictures to mediaCheckAsync, act on wxa_media_check.
   registerContentSecurityEffects();
   registerSiteAuthMethod('wechatOa', {

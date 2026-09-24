@@ -2,7 +2,7 @@
 
 import { CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
 import { Alert, Button, Form, List, Modal, Space, Typography, theme } from 'antd';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import type { ConfigFieldDescriptor, ConfigTestDescriptor, ConfigValues } from './types';
 
@@ -56,9 +56,11 @@ export function ConfigTestModal({
   const [confirming, setConfirming] = useState(false);
   const { token } = theme.useToken();
 
-  useEffect(() => {
-    if (!open) setConfirming(false);
-  }, [open]);
+  // Closing drops a pending confirmation, so the next open asks again.
+  const close = (): void => {
+    setConfirming(false);
+    onClose();
+  };
 
   const start = async (): Promise<void> => {
     const input = (await form.validateFields()) as ConfigValues;
@@ -74,11 +76,11 @@ export function ConfigTestModal({
     <Modal
       open={open}
       title={test.label}
-      onCancel={onClose}
+      onCancel={close}
       destroyOnHidden
       footer={
         <Space>
-          <Button onClick={onClose}>关闭</Button>
+          <Button onClick={close}>关闭</Button>
           <Button type="primary" danger={confirming} loading={running} onClick={() => void start()}>
             {confirming ? '确定，开始测试' : outcome ? '再测一次' : '开始测试'}
           </Button>
@@ -100,7 +102,11 @@ export function ConfigTestModal({
               name={field.key}
               label={field.label}
               extra={field.help}
-              rules={[{ required: true, message: `请填写${field.label}` }]}
+              rules={
+                test.optional?.includes(field.key)
+                  ? []
+                  : [{ required: true, message: `请填写${field.label}` }]
+              }
             >
               {renderControl(field)}
             </Form.Item>

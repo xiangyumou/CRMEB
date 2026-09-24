@@ -79,6 +79,8 @@ export interface ConfigTestDescriptor {
   confirm?: string | undefined;
   /** Filled in by the operator before running, e.g. the phone to text. */
   inputs: ConfigFieldDescriptor[];
+  /** Keys of `inputs` the operator may leave blank. */
+  optional?: string[] | undefined;
 }
 
 export interface ConfigGroupDescriptor {

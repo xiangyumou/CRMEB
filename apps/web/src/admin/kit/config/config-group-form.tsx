@@ -3,6 +3,7 @@
 import { ExperimentOutlined } from '@ant-design/icons';
 import {
   Anchor,
+  App,
   Badge,
   Button,
   Card,
@@ -74,6 +75,11 @@ export interface ConfigGroupFormProps<R extends AnyRouteDef, T extends AnyRouteD
    * Receives the values on the screen, saved or not.
    */
   aside?: ((values: ConfigValues) => ReactNode) | undefined;
+  /**
+   * A field to scroll to and flash once the form has loaded. The settings
+   * search links here with `?field=<key>`.
+   */
+  focusKey?: string | undefined;
 }
 
 /**
@@ -118,6 +124,7 @@ export function ConfigGroupForm<R extends AnyRouteDef, T extends AnyRouteDef = A
   testRoute,
   testInvalidate,
   aside,
+  focusKey,
 }: ConfigGroupFormProps<R, T>) {
   const [form] = Form.useForm();
   // Typed secrets live outside the form value so they can never be round-tripped.
@@ -202,6 +209,34 @@ export function ConfigGroupForm<R extends AnyRouteDef, T extends AnyRouteDef = A
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [dirty]);
 
+  // `?field=<key>`: bring the field into view and flash it once. The flash is
+  // a Web Animation on the element, not React state: it is over in two seconds
+  // and nothing else depends on it.
+  const flashColor = token.colorPrimaryBg;
+  const { message } = App.useApp();
+  useEffect(() => {
+    if (loading || focusKey === undefined) return;
+    const element = document.getElementById(`config-field-${focusKey}`);
+    if (element === null) {
+      // Hidden by `visibleWhen`: say which choice brings it up, or the link
+      // looks broken.
+      const field = descriptor.fields.find((candidate) => candidate.key === focusKey);
+      const when = field?.visibleWhen;
+      const dependsOn = typeof when === 'object' ? when.key : undefined;
+      const dependency = descriptor.fields.find((candidate) => candidate.key === dependsOn);
+      if (field && dependency) {
+        void message.info(`「${field.label}」要先在「${dependency.label}」里选择对应选项才会显示`);
+      }
+      return;
+    }
+    element.scrollIntoView({ block: 'center' });
+    element.querySelector<HTMLElement>('input, textarea')?.focus({ preventScroll: true });
+    element.firstElementChild?.animate?.(
+      [{ backgroundColor: flashColor }, { backgroundColor: 'transparent' }],
+      { duration: 2400, easing: 'ease-in' },
+    );
+  }, [loading, focusKey, flashColor, descriptor.fields, message]);
+
   // 「测试」
   const [testOpen, setTestOpen] = useState(false);
   const [outcome, setOutcome] = useState<ConfigTestOutcome | null>(null);
@@ -280,6 +315,7 @@ export function ConfigGroupForm<R extends AnyRouteDef, T extends AnyRouteDef = A
     return (
       <Col
         key={field.key}
+        id={`config-field-${field.key}`}
         xs={24}
         md={field.kind === 'richtext' ? 24 : (field.span ?? defaultSpan)}
         data-changed={isChanged ? 'true' : undefined}
@@ -289,6 +325,7 @@ export function ConfigGroupForm<R extends AnyRouteDef, T extends AnyRouteDef = A
             borderInlineStart: `3px solid ${isChanged ? token.colorWarning : 'transparent'}`,
             paddingInlineStart: 10,
             marginInlineStart: -13,
+            borderRadius: token.borderRadiusSM,
             transition: 'border-color 0.2s',
           }}
         >

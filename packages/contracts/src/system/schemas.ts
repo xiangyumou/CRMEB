@@ -413,6 +413,8 @@ export const configTestDescriptor = z.object({
   confirm: z.string().optional(),
   /** Filled in by the operator before running, e.g. the phone to text. */
   inputs: z.array(configFieldDescriptor),
+  /** Keys of `inputs` the operator may leave blank. */
+  optional: z.array(z.string()).optional(),
 });
 export type ConfigTestDescriptor = z.infer<typeof configTestDescriptor>;
 
@@ -439,6 +441,14 @@ export const configGroupSummary = configGroupDescriptor.omit({ fields: true, tes
   /** Whether the group has a 「测试」 button at all. */
   testable: z.boolean().optional(),
   lastTest: configTestSummary.nullable().optional(),
+  /** What the saved values amount to, e.g. 腾讯云 / 未启用 / 缺查询密钥. */
+  status: z
+    .object({ tone: z.enum(['on', 'off', 'incomplete']), text: z.string() })
+    .optional(),
+  /** Every field's label and section, so the index can search inside groups. */
+  fieldIndex: z
+    .array(z.object({ key: z.string(), label: z.string(), section: z.string().optional() }))
+    .optional(),
 });
 export type ConfigGroupSummary = z.infer<typeof configGroupSummary>;
 

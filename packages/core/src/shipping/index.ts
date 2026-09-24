@@ -18,12 +18,22 @@
  * every 运费模板 line costs zero.
  */
 import { registerShippingFreightPort } from './shipping.freight.port';
+import { registerShippingConfigTest } from './shipping.config-test';
 import { registerShippingLogisticsPort } from './shipping.logistics.port';
 
 registerShippingFreightPort();
 registerShippingLogisticsPort();
 
 export { shippingPermissions } from './permissions';
+
+/**
+ * Wires what cannot run at import time; called once per process from the gen'd
+ * bootstrap. The 「测试查询」 hook reads `logisticsConfig`, and `system` is
+ * still evaluating when this file is first imported.
+ */
+export function registerShippingDomain(): void {
+  registerShippingConfigTest();
+}
 
 export * as expressCompanies from './shipping.express.service';
 export * as templates from './shipping.template.service';

@@ -19,6 +19,7 @@
 
 import { registerAppConfigSource } from '../system';
 import { wechatOaRuntimeConfig } from './wechat-oa.config';
+import { registerWechatOaConfigTest } from './wechat-oa.config-test';
 import { allSubscribeTemplates } from './wechat-oa.storefront.service';
 
 export { wechatOaPermissions } from './permissions';
@@ -56,6 +57,7 @@ export * as wechatOaStorefront from './wechat-oa.storefront.service';
  * loading.
  */
 export function registerWechatOaDomain(): void {
+  registerWechatOaConfigTest();
   registerAppConfigSource('subscribeTemplates', {
     groups: [wechatOaRuntimeConfig.group],
     read: allSubscribeTemplates,

@@ -43,6 +43,17 @@ export const smsConfig = defineConfigGroup({
     perPhonePerHour: z.number().int().min(1).max(50).default(5),
     perPhonePerDay: z.number().int().min(1).max(200).default(20),
   }),
+  status: (c) => {
+    if (c.provider === 'none') return { tone: 'off', text: '未启用' };
+    const name = c.provider === 'aliyun' ? '阿里云' : '腾讯云';
+    const keys =
+      c.provider === 'aliyun'
+        ? [c.aliyunAccessKeyId, c.aliyunAccessKeySecret, c.aliyunSignName]
+        : [c.tencentAppId, c.tencentSecretId, c.tencentSecretKey, c.tencentSignName];
+    if (keys.some((value) => value === '')) return { tone: 'incomplete', text: `${name} · 密钥或签名未填` };
+    if (c.templateVerifyCode === '') return { tone: 'incomplete', text: `${name} · 缺验证码模板` };
+    return { tone: 'on', text: name };
+  },
   ui: {
     provider: {
       label: '短信服务商',

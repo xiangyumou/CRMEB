@@ -82,6 +82,12 @@ export const storageConfig = defineConfigGroup({
      */
     orphanRetentionDays: z.number().int().min(0).max(365).default(7),
   }),
+  status: (c) => {
+    if (c.driver === 'local') return { tone: 'on', text: '本地存储' };
+    return c.s3Bucket === '' || c.s3AccessKeyId === '' || c.s3SecretAccessKey === ''
+      ? { tone: 'incomplete', text: 'S3 · 未填完' }
+      : { tone: 'on', text: `S3 · ${c.s3Bucket}` };
+  },
   ui: {
     driver: {
       label: '存储驱动',

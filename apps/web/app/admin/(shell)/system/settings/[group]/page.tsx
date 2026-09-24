@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
 import { SettingsGroupPage } from './settings-group';
 
@@ -10,5 +11,11 @@ export const metadata: Metadata = { title: '配置分组' };
  */
 export default async function Page({ params }: { params: Promise<{ group: string }> }) {
   const { group } = await params;
-  return <SettingsGroupPage group={group} />;
+  // `useSearchParams` (for `?field=`, from the settings search) needs a
+  // Suspense boundary above it.
+  return (
+    <Suspense fallback={null}>
+      <SettingsGroupPage group={group} />
+    </Suspense>
+  );
 }

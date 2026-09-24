@@ -15,6 +15,7 @@ import {
   type ConfigFieldType,
   type ConfigFieldUi,
   type ConfigGroupDef,
+  type ConfigGroupStatus,
 } from '../kernel/config-registry';
 import { getConfigTest } from '../kernel/config-test';
 import { DomainError } from '../kernel/errors';
@@ -124,6 +125,9 @@ export function describeGroup(def: ConfigGroupDef): ConfigGroupDescriptor {
             label: test.label,
             ...(test.confirm === undefined ? {} : { confirm: test.confirm }),
             inputs: Object.entries(test.inputUi ?? {}).map(([key, ui]) => fieldDescriptor(key, ui)),
+            optional: Object.keys(test.inputUi ?? {}).filter(
+              (key) => test.input?.shape[key]?.safeParse(undefined).success === true,
+            ),
           },
         }),
   };
@@ -181,6 +185,11 @@ export async function configGroupList(ctx: Ctx): Promise<{ groups: ConfigGroupSu
         fieldCount: descriptor.fields.length,
         writable: hasPermission(ctx.actor, writePermissionFor(descriptor.permission)),
         testable: descriptor.test !== undefined,
+        fieldIndex: descriptor.fields.map((field) => ({
+          key: field.key,
+          label: field.label,
+          ...(field.section === undefined ? {} : { section: field.section }),
+        })),
       };
     })
     // A group the caller may not read is not listed at all: a settings index
@@ -192,11 +201,39 @@ export async function configGroupList(ctx: Ctx): Promise<{ groups: ConfigGroupSu
       ? []
       : await ctx.redis.mget(...testable.map((summary) => lastTestKey(summary.group)));
   const lastByGroup = new Map(testable.map((summary, i) => [summary.group, last[i] ?? null]));
-  const groups = summaries.map((summary) => {
+  const statuses = await Promise.all(
+    summaries.map((summary) => groupStatus(ctx, requireGroup(summary.group))),
+  );
+  const groups = summaries.map((summary, i) => {
     const raw = lastByGroup.get(summary.group);
-    return raw ? { ...summary, lastTest: parseLastTest(raw) } : summary;
+    const status = statuses[i];
+    return {
+      ...summary,
+      ...(raw ? { lastTest: parseLastTest(raw) } : {}),
+      ...(status === undefined ? {} : { status }),
+    };
   });
   return { groups };
+}
+
+/**
+ * The group's own status line, from its saved values.
+ *
+ * Only the index calls this, and the index still has to render when a stored
+ * value no longer parses (say, after a schema change). So a failure means the
+ * card shows no status, not that the page fails.
+ */
+async function groupStatus(
+  ctx: Ctx,
+  def: ConfigGroupDef,
+): Promise<ConfigGroupStatus | undefined> {
+  if (def.status === undefined) return undefined;
+  try {
+    return def.status(await ctx.config.get(def));
+  } catch (error) {
+    ctx.logger.warn({ err: error, group: def.group }, 'config group status failed');
+    return undefined;
+  }
 }
 
 /**

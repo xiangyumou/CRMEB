@@ -74,6 +74,7 @@ export const wechatMiniConfig = defineConfigGroup({
      */
     codeEnvVersion: miniCodeEnvVersion.default('release'),
   }),
+  status: (c) => (c.enabled ? { tone: 'on', text: '已启用' } : { tone: 'off', text: '未启用' }),
   ui: {
     enabled: {
       label: '启用小程序',

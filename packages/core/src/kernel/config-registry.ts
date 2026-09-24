@@ -118,6 +118,21 @@ export interface ConfigGroupDef<S extends z.ZodObject = z.ZodObject> {
   ui: Partial<Record<keyof z.infer<S> & string, ConfigFieldUi>>;
   /** Permission atom required to read/write this group in the admin UI. */
   permission?: string;
+  /**
+   * The state of the saved values in a few words, for the index card: which
+   * provider is in use, 「未启用」, or what is still missing. Reads nothing
+   * but the group's own values.
+   */
+  status?: (config: z.infer<S>) => ConfigGroupStatus;
+}
+
+/**
+ * `on`: in use. `off`: switched off on purpose. `incomplete`: switched on,
+ * but something it needs is blank, so it cannot work.
+ */
+export interface ConfigGroupStatus {
+  tone: 'on' | 'off' | 'incomplete';
+  text: string;
 }
 
 const registry = new Map<string, ConfigGroupDef>();

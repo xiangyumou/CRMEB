@@ -20,6 +20,7 @@ export const contentSecurityConfig = defineConfigGroup({
   schema: z.object({
     enabled: z.boolean().default(true),
   }),
+  status: (c) => (c.enabled ? { tone: 'on', text: '检测中' } : { tone: 'off', text: '未开启' }),
   ui: {
     enabled: {
       label: '启用微信内容安全检测',

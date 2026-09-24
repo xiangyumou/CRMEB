@@ -177,3 +177,62 @@ async function readCache(ctx: Ctx, key: string): Promise<TrackingResult | null> 
 function empty(): TrackingResult {
   return { state: 'unknown', traces: [] };
 }
+
+// ---------------------------------------------------------------------------
+// 「测试」
+// ---------------------------------------------------------------------------
+
+export type TrackingProbe =
+  | { reached: false; reason: string }
+  | { reached: true; status: string; message: string; result: TrackingResult };
+
+/**
+ * One uncached lookup, for 物流设置 → 「测试查询」.
+ *
+ * `track` hides every failure as an empty result, because an order page has no
+ * use for the reason. The test is only asking for the reason, so this returns
+ * it. `reached` means the credential was accepted, even when the carrier has
+ * never heard of the number. An empty `companyCode` lets the vendor guess the
+ * carrier from the number.
+ */
+export async function probeAliyunTracking(
+  appCode: string,
+  input: { companyCode: string; trackingNo: string; phone: string },
+): Promise<TrackingProbe> {
+  const no = input.phone === '' ? input.trackingNo : `${input.trackingNo}:${input.phone.slice(-4)}`;
+  const query = new URLSearchParams({ no });
+  if (input.companyCode !== '') query.set('type', input.companyCode.toLowerCase());
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await fetchImpl(`${ALIYUN_HOST}?${query.toString()}`, {
+      method: 'GET',
+      headers: { Authorization: `APPCODE ${appCode}` },
+      signal: controller.signal,
+    });
+    if (response.status === 401) return { reached: false, reason: '查询密钥（AppCode）无效' };
+    if (response.status === 403) {
+      return { reached: false, reason: '没有可用的调用次数：云市场套餐未购买或已用完' };
+    }
+    if (!response.ok) return { reached: false, reason: `接口返回 HTTP ${response.status}` };
+    const payload = (await response.json()) as { status?: unknown; msg?: unknown };
+    return {
+      reached: true,
+      status: String(payload.status ?? ''),
+      message: String(payload.msg ?? ''),
+      result: parseAliyun(payload),
+    };
+  } catch (error) {
+    return {
+      reached: false,
+      reason: controller.signal.aborted
+        ? `${TIMEOUT_MS / 1000} 秒内没有响应`
+        : error instanceof Error
+          ? error.message
+          : String(error),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}

@@ -38,6 +38,8 @@
  * which imports the gen'd `config-groups.gen.ts` bucket; the dashboard
  * contributors `system` owns are below.
  */
+import { registerMapConfigTest } from './map.config-test';
+
 import './dashboard-tiles';
 
 export {
@@ -138,3 +140,11 @@ export { smsConfig } from './sms.config';
 export { wechatMiniConfig, type MiniCodeEnvVersion } from './wechat-mini.config';
 export { wechatOaConfig } from './wechat-oa.config';
 export * as systemRepo from './system.repo';
+
+/**
+ * Wires the tests on this domain's settings screens; called once per process
+ * from the gen'd bootstrap.
+ */
+export function registerSystemDomain(): void {
+  registerMapConfigTest();
+}

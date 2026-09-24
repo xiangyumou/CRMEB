@@ -32,6 +32,9 @@ export const wechatOaConfig = defineConfigGroup({
     /** Verification file WeChat asks to be served at the site root. */
     verificationFile: z.string().max(128).default(''),
   }),
+  // No Token check: an install that filled in only the older 「微信公众号 /
+  // 小程序」 screen keeps its Token there, and `oaCredentials` falls back to it.
+  status: (c) => (c.enabled ? { tone: 'on', text: '已启用' } : { tone: 'off', text: '未启用' }),
   ui: {
     enabled: {
       label: '启用公众号',

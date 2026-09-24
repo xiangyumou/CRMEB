@@ -26,6 +26,12 @@ export const mapConfig = defineConfigGroup({
     serverKey: z.string().max(128).default(''),
     defaultCity: z.string().max(32).default(''),
   }),
+  status: (c) =>
+    c.provider === 'none'
+      ? { tone: 'off', text: '未启用' }
+      : c.serverKey === ''
+        ? { tone: 'incomplete', text: '缺服务端 Key' }
+        : { tone: 'on', text: c.provider === 'tencent' ? '腾讯地图' : '高德地图' },
   ui: {
     provider: {
       label: '地图服务商',

@@ -463,6 +463,43 @@ describe('<ConfigGroupForm> save bar', () => {
     await user.keyboard('{Control>}s{/Control}');
     await waitFor(() => expect(bodies).toHaveLength(1));
   });
+
+  it('scrolls to and focuses the field the settings search linked to', async () => {
+    const scrolled: Element[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    try {
+      renderAdmin(
+        <ConfigGroupForm
+          descriptor={descriptor}
+          values={values}
+          route={saveRoute}
+          focusKey="siteName"
+        />,
+      );
+      await waitFor(() => expect(scrolled).toHaveLength(1));
+      expect(scrolled[0]).toHaveAttribute('id', 'config-field-siteName');
+      expect(screen.getByLabelText('站点名称')).toHaveFocus();
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  it('says which choice shows a linked field that is hidden', async () => {
+    renderAdmin(
+      <ConfigGroupForm
+        descriptor={descriptor}
+        values={{ ...values, mode: 'pickup' }}
+        route={saveRoute}
+        focusKey="threshold"
+      />,
+    );
+    expect(
+      await screen.findByText('「门槛」要先在「模式」里选择对应选项才会显示'),
+    ).toBeInTheDocument();
+  });
 });
 
 describe('<ConfigGroupForm> units', () => {

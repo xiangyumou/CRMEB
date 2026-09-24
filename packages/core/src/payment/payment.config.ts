@@ -72,6 +72,11 @@ export const paymentConfig = defineConfigGroup({
      */
     apiBaseUrl: z.string().max(255).default('https://api.mch.weixin.qq.com'),
   }),
+  status: (c) => {
+    if (isPaymentConfigured(paymentCredentials(c))) return { tone: 'on', text: `商户号 ${c.mchId}` };
+    const touched = [c.mchId, c.apiV3Key, c.certSerial, c.merchantPrivateKey].some((v) => v !== '');
+    return touched ? { tone: 'incomplete', text: '未填完' } : { tone: 'off', text: '未配置' };
+  },
   ui: {
     mchId: { label: '商户号', type: 'text', section: '微信支付', order: 10 },
     apiV3Key: {

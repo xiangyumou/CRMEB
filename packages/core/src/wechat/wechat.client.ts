@@ -581,3 +581,40 @@ export function createWechatClient(ctx: Ctx): WechatCoreClient {
 export function getWechatClient(ctx: Ctx): WechatCoreClient {
   return createWechatClient(ctx);
 }
+
+/**
+ * Whether an AppID and AppSecret can get a token, for 「测试」 on the settings
+ * screen. The answer is WeChat's own errcode and errmsg.
+ *
+ * This calls `stable_token` without `force_refresh`, not `/cgi-bin/token`.
+ * Asking `/cgi-bin/token` for a token invalidates the one the shop has cached
+ * (see point 1 at the top of this file), so a test run would break the live
+ * token. A stable token is issued separately and leaves that one alone.
+ */
+export async function probeWechatCredentials(args: {
+  apiBaseUrl: string;
+  appId: string;
+  secret: string;
+}): Promise<{ ok: true; expiresIn: number } | { ok: false; errcode: number; errmsg: string }> {
+  const response = await fetch(new URL('/cgi-bin/stable_token', args.apiBaseUrl), {
+    method: 'POST',
+    headers: { accept: 'application/json', 'content-type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({
+      grant_type: 'client_credential',
+      appid: args.appId,
+      secret: args.secret,
+      force_refresh: false,
+    }),
+  });
+  if (!response.ok) {
+    return { ok: false, errcode: -1, errmsg: `HTTP ${response.status}` };
+  }
+  const body = (await response.json().catch(() => ({}))) as {
+    access_token?: string;
+    expires_in?: number;
+    errcode?: number;
+    errmsg?: string;
+  };
+  if (body.access_token) return { ok: true, expiresIn: body.expires_in ?? 7200 };
+  return { ok: false, errcode: body.errcode ?? -1, errmsg: body.errmsg ?? '' };
+}

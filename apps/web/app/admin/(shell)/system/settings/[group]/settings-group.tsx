@@ -1,6 +1,7 @@
 'use client';
 
 import { Alert, Skeleton, Space, Typography } from 'antd';
+import { useSearchParams } from 'next/navigation';
 import {
   systemConfigGet,
   systemConfigGroupList,
@@ -40,6 +41,8 @@ const PREVIEWS: Record<string, (values: ConfigValues) => React.ReactNode> = {
  */
 export function SettingsGroupPage({ group }: { group: string }) {
   const input = { params: { group } };
+  // Set by the settings search: which field to scroll to.
+  const focusKey = useSearchParams().get('field') ?? undefined;
   const { data, isPending, error } = useRouteQuery(systemConfigGet, input, {
     presentError: false,
   });
@@ -100,6 +103,7 @@ export function SettingsGroupPage({ group }: { group: string }) {
                       ? {}
                       : { confirm: data.descriptor.test.confirm }),
                     inputs: data.descriptor.test.inputs.map(toKitField),
+                    optional: data.descriptor.test.optional ?? [],
                   },
                 }),
           }}
@@ -112,6 +116,7 @@ export function SettingsGroupPage({ group }: { group: string }) {
           testRoute={systemConfigTest}
           testInvalidate={[systemConfigGroupList]}
           aside={PREVIEWS[group]}
+          focusKey={focusKey}
         />
         {PANELS[group]?.() ?? null}
       </Space>

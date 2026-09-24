@@ -218,7 +218,6 @@ export function AppearancePreview({ values }: { values: ConfigValues }) {
                     }}
                   >
                     {icon ? (
-                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={icon}
                         alt=""

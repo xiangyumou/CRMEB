@@ -1,6 +1,7 @@
 import { registerPaymentPort } from '../order/ports';
 import { registerSitePaymentMethod } from '../system';
 import { isPaymentEnabled, paymentConfig } from './payment.config';
+import { registerPaymentConfigTest } from './payment.config-test';
 import {
   installMiniTradeHooks,
   registerMiniTradeEffects,
@@ -134,6 +135,7 @@ export {
  * global port, and so `resetOrderPorts()` in a test can put it back.
  */
 export function registerPaymentDomain(): void {
+  registerPaymentConfigTest();
   registerPaymentPort({ ensureNoOpenAttempts, closeOrderPayments });
   registerPaymentEffects();
   // 小程序发货信息管理 (C07): report shipments of mini-program payments, and
