@@ -120,7 +120,7 @@ B：删除加落地页；C：删表）不再采用。
 - [ ] `e2e/admin/specs/diy.spec.ts`。
 - [ ] `docs/invariants.md` 的 DIY-001…009 行（逐条确认只关于旧装修；编号不再复用），以及 RISK-D-008、RISK-D-009
       中引用旧装修测试的行；`docs/architecture.md` Domains 表的 `diy` 一行。
-- [ ] 可选：后台菜单「店铺装修（新版）」改回「店铺装修」（`apps/web/src/admin/menu/decor.menu.ts`、
+- [ ] 后台菜单「店铺装修（新版）」改回「店铺装修」（用户 2026-09-24 已定要改）（`apps/web/src/admin/menu/decor.menu.ts`、
       `apps/web/src/admin/decor/page-list.tsx`、`e2e/admin/specs/decor.spec.ts`、`e2e/admin/README.md`、
       [decor.md](decor.md)）。后台看得到的文案变化，改了要告诉你。
 
@@ -277,10 +277,9 @@ B：删除加落地页；C：删表）不再采用。
   （页面是 `force-dynamic`）。落地页不需要别的静态文件：样式内联，Next 的运行时在已经代理的 `/_next/static/` 下，
   小程序码图片在 `/uploads/` 下。
 
-- [ ] **只在店铺域名本身要配成「业务域名」时**（C12，web-view 打开本店网页）：改完之后根目录的任何文件都会 302，
+- [ ] **店铺域名本身要配成「业务域名」**（C12，web-view 打开本店网页；用户 2026-09-24 已定要加）：改完之后根目录的任何文件都会 302，
       微信的校验文件 `/<文件名>.txt` 放不上去。那就在同一个提交里按 wechat-compliance.md C12 的建议加一段
       `location ~ ^/[A-Za-z0-9_-]+\.txt$`，从一个只读挂载目录提供，并在 `deploy/README.md` 写明放置方法。
-      不需要就不加。
 - [ ] `docker/edge/Dockerfile`：删除 `ARG H5_DIST=docker/edge/h5-placeholder`、`FROM` 下面的 `ARG H5_DIST`、
       `COPY ${H5_DIST}/ /srv/h5/` 和文件头关于 H5 的说明（镜像只剩 nginx 配置）；删除 `docker/edge/h5-placeholder/`；
       `Dockerfile.dockerignore` 删去 `!apps/uni-app/dist` 和关于 uni-app 的注释。
@@ -314,7 +313,7 @@ B：删除加落地页；C：删表）不再采用。
 
 - **公众号和 H5 专用接口**（计划「保留不动」）：`auth.oaAuthorizeUrl`、`auth.oaLogin`、`auth.oaPhoneLogin`、
   `wechatOa.jssdkConfig`、`wechatOa.subscribeTemplates`、`wechat_h5` 支付通道、公众号后台功能。现在没有公众号，
-  它们没人调用；本次不动，要删另开任务。
+  它们没人调用；用户 2026-09-24 定为**一直保留**（以后可能开公众号），不删。
 - `auth.sendSmsCode`、`auth.smsLogin`、密码登录接口：后端保留，小程序在用。
 - `wechat_mini_codes` 表、`content_security_checks`、`wechat_trade_orders` 等新表。
 
@@ -351,7 +350,7 @@ B：删除加落地页；C：删表）不再采用。
 - [ ] 12 订阅消息模板：按 C08 的场景表选模板，模板 ID 填入后台（C08）。
 - [ ] 18 后台「快递公司」逐个填写微信快递编码（C07）；「系统设置 → 小程序发货信息管理」打开「录入发货信息」并点一次「同步」。
 - [ ] 后台「内容安全」开关打开；安排人每天处理评价管理中的「待审核」（CONTENT-001）。
-- [ ] 后台「店铺装修（新版）」发布首页和个人中心（旧装修数据不迁移，用预置模板）。
+- [ ] 后台「店铺装修」发布首页和个人中心（旧装修数据不迁移，用预置模板）。
 - [ ] 19 审核准备：测试账号、清理测试数据、审核备注（C16）。
 - [ ] 上传体验版 **【需批准】**，对着生产按 device-check 第 6 节做一遍真机检查（第 1 节第 8 步）。
 - [ ] 20 提交审核 **【需批准】**；通过后发布 **【需批准】**。
