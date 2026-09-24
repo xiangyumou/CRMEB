@@ -1,17 +1,7 @@
+import { toCents } from '@/lib/money';
 import type { RefundableItem, RefundKind, RefundListItem } from '@shop/contracts/refund/schemas';
 
-/** `"12.30"` → 1230. Money strings from the API always have at most two decimals. */
-export function toCents(money: string): number {
-  const [whole = '0', fraction = ''] = money.trim().split('.');
-  const sign = whole.startsWith('-') ? -1 : 1;
-  return sign * (Math.abs(Number(whole)) * 100 + Number(fraction.padEnd(2, '0').slice(0, 2)));
-}
-
-export function fromCents(cents: number): string {
-  const sign = cents < 0 ? '-' : '';
-  const abs = Math.abs(Math.round(cents));
-  return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
-}
+export { fromCents, toCents } from '@/lib/money';
 
 /**
  * What one line would give back for `quantity` units: all of its `refundableAmount` when every

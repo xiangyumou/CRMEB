@@ -10,8 +10,8 @@ import ReviewPage from './index';
 const received = orderDetail({
   status: 'received',
   items: [
-    orderItem('7001', { productName: '商品甲' }),
-    orderItem('7002', { productName: '商品乙' }),
+    orderItem('7001', { productName: '商品甲', reviewable: true }),
+    orderItem('7002', { productName: '商品乙', reviewable: true }),
     orderItem('7003', { productName: '已退商品', refundedQuantity: 1 }),
   ],
 });
@@ -43,7 +43,7 @@ describe('评价商品', () => {
     taroFake.routerParams = { orderId: '9001' };
   });
 
-  it('offers every line not refunded, and sends each with its stars and words', async () => {
+  it('offers every reviewable line, and sends each with its stars and words', async () => {
     const seen = serveApi({
       'GET /api/v1/orders/9001': () => ({ body: received }),
       'POST /api/v1/catalog/reviews': () => answer('published'),
@@ -67,7 +67,9 @@ describe('评价商品', () => {
 
   it('says 审核后展示, never an error, when the shop holds a review', async () => {
     serveApi({
-      'GET /api/v1/orders/9001': () => ({ body: { ...received, items: [orderItem('7001')] } }),
+      'GET /api/v1/orders/9001': () => ({
+        body: { ...received, items: [orderItem('7001', { reviewable: true })] },
+      }),
       'POST /api/v1/catalog/reviews': () => answer('pending'),
     });
     await renderPage(<ReviewPage />);
@@ -102,6 +104,39 @@ describe('评价商品', () => {
     );
     // 商品乙 is still there to try again.
     expect(screen.getAllByLabelText('评价内容')).toHaveLength(1);
+  });
+
+  it('shows a line reviewed before as done up front and sends only the others', async () => {
+    const seen = serveApi({
+      'GET /api/v1/orders/9001': () => ({
+        body: {
+          ...received,
+          items: [
+            orderItem('7001', { productName: '商品甲', reviewed: true }),
+            orderItem('7002', { productName: '商品乙', reviewable: true }),
+          ],
+        },
+      }),
+      'POST /api/v1/catalog/reviews': () => answer('published'),
+    });
+    await renderPage(<ReviewPage />);
+    await screen.findByText('已评价');
+    expect(screen.getAllByLabelText('评价内容')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: '提交评价' }));
+    await screen.findByText('评价成功');
+    const bodies = seen.filter((r) => r.key === 'POST /api/v1/catalog/reviews').map((r) => r.body);
+    expect(bodies).toEqual([{ orderItemId: '7002', productScore: 5, serviceScore: 5, images: [] }]);
+  });
+
+  it('says so when every line was reviewed already', async () => {
+    serveApi({
+      'GET /api/v1/orders/9001': () => ({
+        body: { ...received, items: [orderItem('7001', { reviewed: true })] },
+      }),
+    });
+    await renderPage(<ReviewPage />);
+    await screen.findByText('已经评价过了');
+    expect(screen.queryByRole('button', { name: '提交评价' })).toBeNull();
   });
 
   it('writes only the line it was sent for', async () => {

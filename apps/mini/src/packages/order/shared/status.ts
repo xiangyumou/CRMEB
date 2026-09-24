@@ -1,8 +1,12 @@
 import type { OrderDetail } from '@shop/contracts/order/schemas';
+import { awaitsReview } from '@/ui/order-actions';
 
 /** The status header's title and the line under it on 订单详情. */
 export function statusHeadline(
-  order: Pick<OrderDetail, 'status' | 'fulfillmentStatus' | 'refundStatus' | 'cancelReason'>,
+  order: Pick<
+    OrderDetail,
+    'status' | 'fulfillmentStatus' | 'refundStatus' | 'cancelReason' | 'items'
+  >,
 ): { title: string; note: string | null } {
   const refunding = order.refundStatus === 'requested' ? '售后处理中' : null;
   switch (order.status) {
@@ -15,7 +19,10 @@ export function statusHeadline(
     case 'shipped':
       return { title: '已发货', note: refunding ?? '收到商品后请确认收货' };
     case 'received':
-      return { title: '已收货', note: refunding ?? '感谢购买，欢迎评价' };
+      return {
+        title: '已收货',
+        note: refunding ?? (awaitsReview(order) ? '感谢购买，欢迎评价' : '感谢购买'),
+      };
     case 'completed':
       return { title: '交易完成', note: refunding };
     case 'cancelled':

@@ -4,6 +4,7 @@ import type { Shipment } from '@shop/contracts/order/order.fulfil.schemas';
 import { routeKey, useRouteQuery } from '@shop/api-client/react';
 import { useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { formatDateTime, maskPhone } from '@/lib/format';
+import { orderPrices } from '@/lib/order-price';
 import { copyText, goBack, navigate, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
@@ -111,11 +112,13 @@ function OrderBody({ id }: { id: string }) {
   const canAftersale = all.some((a) => a.key === 'aftersale');
   const icons: ActionBarIcon[] = contact ? [contact] : [];
   const run = (key: OrderActionKey) => actions.run(key, order);
+  const prices = orderPrices(order);
 
   return (
     <View className="order-detail" id="order-detail">
       <StatusHeader order={order} onExpired={() => void detail.refetch()} />
       <View className="order-detail__body">
+        {order.groupbuyTeamId !== null ? <TeamCell teamId={order.groupbuyTeamId} /> : null}
         {parcels.length > 0 ? <ParcelCard orderId={order.id} parcels={parcels} /> : null}
         <ReceiverCard order={order} />
         <Card
@@ -137,6 +140,7 @@ function OrderBody({ id }: { id: string }) {
             <OrderItemRow
               key={item.id}
               item={item}
+              price={prices.unitPrices[item.id]}
               note={item.refundedQuantity > 0 ? `已退 ${item.refundedQuantity} 件` : undefined}
             />
           ))}
@@ -191,6 +195,21 @@ function StatusHeader({ order, onExpired }: { order: OrderDetail; onExpired: () 
         <Text className="order-detail__note">{note}</Text>
       ) : null}
     </View>
+  );
+}
+
+/** 拼团: the team this order opened or joined, however it ended. */
+function TeamCell({ teamId }: { teamId: string }) {
+  return (
+    <CellGroup>
+      <Cell
+        icon="group"
+        title="拼团"
+        value="查看拼团"
+        label="查看拼团"
+        onClick={() => void navigate({ route: 'groupbuyTeam', params: { id: teamId } })}
+      />
+    </CellGroup>
   );
 }
 
