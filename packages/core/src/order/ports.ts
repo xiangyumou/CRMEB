@@ -301,6 +301,14 @@ export interface PaymentPort {
   ensureNoOpenAttempts(tx: Tx, orderId: number): Promise<PaymentState>;
   /** Closes every open attempt at the gateway. Call outside a transaction. */
   closeOrderPayments(ctx: Ctx, orderId: number): Promise<PaymentState>;
+  /**
+   * `pending_payment → paid` for an order whose payable amount is zero (a coupon
+   * covered all of it): there is nothing to collect, and WeChat Pay cannot take
+   * 0. Checkout calls it in the order's own transaction. Optional so the fakes
+   * need not care; without it a zero-amount order waits for the cashier, whose
+   * `payment.start` settles it the same way.
+   */
+  settleZeroAmountOrder?(tx: Tx, ctx: Ctx, orderId: number): Promise<void>;
 }
 
 /**

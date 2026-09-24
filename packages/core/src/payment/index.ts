@@ -9,7 +9,7 @@ import {
 } from './payment.mini-trade';
 import { registerPaymentEffects } from './payment.effects';
 import { registerPaymentNotificationEvents } from './payment.notifications';
-import { closeOrderPayments, ensureNoOpenAttempts } from './payment.service';
+import { closeOrderPayments, ensureNoOpenAttempts, settleZeroAmountOrder } from './payment.service';
 
 /**
  * The payment domain's public surface.
@@ -136,7 +136,7 @@ export {
  */
 export function registerPaymentDomain(): void {
   registerPaymentConfigTest();
-  registerPaymentPort({ ensureNoOpenAttempts, closeOrderPayments });
+  registerPaymentPort({ ensureNoOpenAttempts, closeOrderPayments, settleZeroAmountOrder });
   registerPaymentEffects();
   // 小程序发货信息管理 (C07): report shipments of mini-program payments, and
   // act on WeChat's settlement pushes.

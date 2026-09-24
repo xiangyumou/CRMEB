@@ -165,6 +165,12 @@ export async function startPayment(ctx: Ctx, input: StartPaymentInput): Promise<
     if (order.payExpiresAt !== null && order.payExpiresAt.getTime() <= now.getTime()) {
       throw new DomainError('PAYMENT_ORDER_EXPIRED');
     }
+    if (Money.parse(order.payableAmount).isZero()) {
+      // Checkout settles these itself; one placed before it did lands here.
+      // There is no attempt to hand back, so it answers like any paid order.
+      await settleZeroAmountOrder(tx, ctx, order.id);
+      return { alreadyPaid: true as const, order };
+    }
 
     const context: PaymentContext = {
       tradeType: input.channel === 'wechat_h5' ? 'MWEB' : 'JSAPI',
@@ -556,6 +562,55 @@ export async function settlePayment(
   });
 
   return { kind: 'paid', orderId: order.id };
+}
+
+/**
+ * `pending_payment → paid` for an order a coupon paid for in full.
+ *
+ * WeChat Pay cannot collect 0 (and `payment_attempts_amount_positive` refuses
+ * the row), so there is no attempt, no transaction id and no capital flow —
+ * nothing moved. Everything else is what `settlePayment` does for money that
+ * arrived: the same conditional transition, the same `onOrderPaid` hooks (stock
+ * commit, group-buy seat, auto-delivery, 支付成功 notice) and the same
+ * `order.paid` ledger row, so the order goes on exactly as a paid one.
+ *
+ * A no-op for an order that is not a pending zero-amount one: checkout and the
+ * cashier may both reach here for the same order.
+ */
+export async function settleZeroAmountOrder(tx: Tx, ctx: Ctx, orderId: number): Promise<void> {
+  const order = await repo.lockOrderForPayment(tx, orderId);
+  if (!order || order.status !== 'pending_payment') return;
+  if (!Money.parse(order.payableAmount).isZero()) return;
+
+  const now = ctx.clock.now();
+  const paid = await repo.markOrderPaid(tx, order.id, {
+    paidAmount: order.payableAmount,
+    paidAt: now,
+    transactionNo: null,
+  });
+  if (!paid.won) return;
+
+  await onOrderPaid.dispatch(tx, ctx, {
+    orderId: order.id,
+    orderNo: order.orderNo,
+    userId: order.userId,
+    at: now,
+    paidAmount: Money.ZERO,
+  });
+
+  await recordEffect(tx, ctx, {
+    scope: 'order',
+    scopeId: String(order.id),
+    eventType: 'order.paid',
+    payload: {
+      orderId: toId(order.id),
+      orderNo: order.orderNo,
+      userId: toId(order.userId),
+      amount: order.payableAmount,
+      transactionId: null,
+      paidAt: now.toISOString(),
+    },
+  });
 }
 
 /**

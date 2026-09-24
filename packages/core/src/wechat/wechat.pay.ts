@@ -203,16 +203,27 @@ export function createWechatPayClient(ctx: Ctx, config: WechatPayCredentials): W
     const timestamp = String(Math.floor(ctx.clock.now().getTime() / 1000));
     const nonce = nonceStr();
 
-    const authorization = buildAuthorization({
-      mchId: config.mchId,
-      certSerial: config.certSerial,
-      merchantPrivateKeyPem: config.merchantPrivateKey,
-      method: args.method,
-      urlPath: args.urlPath,
-      body,
-      timestamp,
-      nonce,
-    });
+    let authorization: string;
+    try {
+      authorization = buildAuthorization({
+        mchId: config.mchId,
+        certSerial: config.certSerial,
+        merchantPrivateKeyPem: config.merchantPrivateKey,
+        method: args.method,
+        urlPath: args.urlPath,
+        body,
+        timestamp,
+        nonce,
+      });
+    } catch (error) {
+      // A 商户私钥 that will not parse is a settings mistake, not a crash: nothing
+      // was sent, and the shopper is told payment is not set up (the operator's
+      // 测试 button names the key). Without this it surfaced as a bare 500.
+      ctx.logger.error({ err: error, urlPath: args.urlPath }, 'wechat pay merchant key unusable');
+      throw new DomainError('PAYMENT_NOT_CONFIGURED', {
+        details: { reason: 'merchant-key-invalid' },
+      });
+    }
 
     let response: Response;
     let text: string;

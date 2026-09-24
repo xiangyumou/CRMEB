@@ -17,6 +17,7 @@ import { notify } from '../notification';
 import {
   resolveCatalogPort,
   resolveFreightPort,
+  resolvePaymentPort,
   resolveStockPort,
   type CustomFormField,
   type SkuForSale,
@@ -691,6 +692,14 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
         data: announcement,
       });
 
+      // A coupon that covered the whole order leaves nothing to collect, and
+      // WeChat Pay cannot take 0: the order is paid now, in this transaction.
+      const payment = resolvePaymentPort();
+      if (draft.payableAmount.isZero() && payment?.settleZeroAmountOrder) {
+        await payment.settleZeroAmountOrder(tx, ctx, order.id);
+        return { orderId: order.id, replayed: false, payWindowMinutes: 0 };
+      }
+
       return { orderId: order.id, replayed: false, payWindowMinutes: draft.payWindowMinutes };
     });
 
@@ -715,7 +724,9 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
 
   // After the commit: a queue is not transactional, and an enqueue inside the
   // transaction can be delivered before — or without — the row it refers to.
-  if (!outcome.replayed) {
+  // A replay, or a zero-amount order checkout already paid (window 0), has
+  // nothing to cancel.
+  if (!outcome.replayed && outcome.payWindowMinutes > 0) {
     const delay = outcome.payWindowMinutes * 60_000;
     await ctx.queue.enqueue(
       AUTO_CANCEL_JOB,

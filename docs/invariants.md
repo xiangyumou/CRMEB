@@ -189,6 +189,14 @@ Money that arrives after its order was cancelled is never booked against the ord
 - `packages/core/src/payment/payment.concurrency.int.test.ts::PAY-011 — a late callback after the payment was closed > records one exception and one automatic refund, and leaves the order cancelled`
 - `packages/core/src/payment/payment.concurrency.int.test.ts::PAY-011 — a late callback after the payment was closed > sends the money back once when the effect ledger runs`
 
+### PAY-012
+
+An order a coupon paid for in full (payable ¥0) is paid the moment it is placed: no payment attempt, no gateway call, no transaction number, and the same `onOrderPaid` hooks as money that arrived. One that is still 待支付 at ¥0 is settled the same way when the cashier asks to pay it, instead of failing on the attempt insert; an order with money left to pay still goes to the gateway.
+
+- `packages/core/src/order/order.zero-amount.int.test.ts::PAY-012 — an order a coupon paid for in full > is paid when it is placed, with no attempt and no gateway call`
+- `packages/core/src/order/order.zero-amount.int.test.ts::PAY-012 — an order a coupon paid for in full > settles one still waiting at the cashier instead of failing the insert`
+- `packages/core/src/order/order.zero-amount.int.test.ts::PAY-012 — an order a coupon paid for in full > still sends an order with money left to pay to the gateway`
+
 ### GATEWAY-001
 
 A signed WeChat Pay callback whose paid amount is short, over or malformed is refused before any payment effect. A body with no usable amount at all (absent, zero or unparseable) is acknowledged and parked as `ignored: invalid amount` instead: there is nothing to book and nothing to refund, and a 500 would ask WeChat to redeliver the same bytes forever.

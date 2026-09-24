@@ -850,7 +850,8 @@ export async function lockOrderForPayment(
 export async function markOrderPaid(
   tx: DbOrTx,
   orderId: number,
-  patch: { paidAmount: string; paidAt: Date; transactionNo: string },
+  /** `transactionNo` is `null` for a zero-amount order, which no gateway saw. */
+  patch: { paidAmount: string; paidAt: Date; transactionNo: string | null },
 ): Promise<ConditionalUpdateResult> {
   return conditionalUpdate(tx, orders, {
     where: and(eq(orders.id, orderId), eq(orders.status, 'pending_payment')),
