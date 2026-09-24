@@ -107,6 +107,9 @@ function succeededRefundsIn(from: Date, to: Date): SQL {
     isNull(refunds.deletedAt),
     gte(refunds.succeededAt, from),
     lt(refunds.succeededAt, to),
+    // A deleted order is out of every figure, its refunds included — counting
+    // them alone would drive 营业额 below zero for money that was never in it.
+    sql`exists (select 1 from ${orders} where ${orders.id} = ${refunds.orderId} and ${orders.deletedAt} is null)`,
   ) as SQL;
 }
 

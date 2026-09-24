@@ -480,8 +480,10 @@ describe('trade', () => {
   it('excludes an order an operator deleted', async () => {
     await harness.ctx.db.update(orders).set({ deletedAt: at(NOW) });
     const page = await stats.tradeStats(harness.ctx, WINDOW);
-    expect(tile(page, 'revenue').value).toBe(-145);
+    // Its refunds go with it: a deleted order's money is neither in nor out.
+    expect(tile(page, 'revenue').value).toBe(0);
     expect(tile(page, 'paidOrderCount').value).toBe(0);
+    expect(line(page, '商品退款金额')).toEqual([0, 0, 0]);
   });
 });
 
@@ -650,6 +652,22 @@ describe('exports', () => {
         '2026-02-02,5.00,45.00,45.00,5.00,1\n' +
         '2026-02-03,200.00,300.00,100.00,0.00,1\n',
     );
+  });
+
+  it('writes a day that refunded more than it took as a number, not as text', async () => {
+    // O6 was paid before the window; refunding 100.00 of it on the 2nd takes
+    // that day below zero. The formula guard is for text: `'-95.00` would sum
+    // as nothing in a spreadsheet.
+    await refund('r4', {
+      order: 'o6',
+      user: 'u2',
+      item: 'o6',
+      quantity: 1,
+      amount: '100.00',
+      succeededAt: '2026-02-02T10:00:00+08:00',
+    });
+    const file = await stats.tradeExport(harness.ctx, WINDOW);
+    expect(file.content.split('\n')[2]).toBe('2026-02-02,-95.00,45.00,145.00,5.00,1');
   });
 
   it('refuses a time series that does not fit the cap rather than truncating it', async () => {

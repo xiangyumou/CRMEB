@@ -630,13 +630,14 @@ async function rankingRows(
  * One CSV cell.
  *
  * Quoted whenever it contains a separator, a quote or a newline — product
- * names contain all three — and a leading `=`, `+`, `-` or `@` is prefixed
- * with a `'` so a spreadsheet treats it as text. A product called
- * `=1+1` is a formula injection in every CSV reader that follows Excel.
+ * names contain all three — and a text cell with a leading `=`, `+`, `-` or
+ * `@` is prefixed with a `'` so a spreadsheet treats it as text. A product
+ * called `=1+1` is a formula injection in every CSV reader that follows Excel.
+ * Numbers are ours and are left alone: a guarded `-95.00` would not sum.
  */
 function cell(value: string | number): string {
-  const text = typeof value === 'number' ? value.toFixed(2) : value;
-  const guarded = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  if (typeof value === 'number') return value.toFixed(2);
+  const guarded = /^[=+\-@]/.test(value) ? `'${value}` : value;
   return /[",\n\r]/.test(guarded) ? `"${guarded.replaceAll('"', '""')}"` : guarded;
 }
 
