@@ -43,6 +43,7 @@ describe('uploadImage', () => {
       url: '/uploads/b.png',
     });
     expect(renew).toHaveBeenCalledTimes(1);
+    expect(renew).toHaveBeenCalledWith('old'); // the session replays only as its sender (AUTH-010)
     const headers = taroFake.calls.map(
       (call) => (call.args as { header: Record<string, string> }).header['Authorization'],
     );

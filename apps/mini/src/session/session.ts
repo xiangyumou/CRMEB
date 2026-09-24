@@ -31,6 +31,8 @@ export type Session =
   | { status: 'signed-out' };
 
 export const TOKEN_KEY = 'shop.session.token';
+/** The account the stored token belongs to (its user id), kept beside it (AUTH-010). */
+export const USER_KEY = 'shop.session.user';
 
 export const useSession = create<{ session: Session }>()(() => ({
   session: { status: 'idle' },
@@ -66,12 +68,42 @@ export function useSignedIn(): boolean {
   return useSession((state) => state.session.status === 'signed-in');
 }
 
+/**
+ * Which account each token this launch has held belongs to, so a request that met a 401 is
+ * replayed only as the account that sent it (AUTH-010). A handful of entries per launch.
+ */
+const owners = new Map<string, string>();
+
+/** The account `token` was issued to, or `null` when this launch cannot tell. */
+function ownerOf(token: string): string | null {
+  const known = owners.get(token);
+  if (known) return known;
+  // Not seen by `signedIn` this launch: a stored token's account is stored beside it.
+  return storage.get(TOKEN_KEY) === token ? storage.get(USER_KEY) : null;
+}
+
+function signedIn(token: string, userId: string): void {
+  storage.set(TOKEN_KEY, token);
+  if (userId) {
+    owners.set(token, userId);
+    storage.set(USER_KEY, userId);
+  } else {
+    storage.remove(USER_KEY);
+  }
+  set({ status: 'signed-in', token });
+}
+
+/** Forget the stored session (the in-memory state is the caller's to set). */
+function forgetStored(): void {
+  storage.remove(TOKEN_KEY);
+  storage.remove(USER_KEY);
+}
+
 type WechatLoginResult = ResponseOf<'auth.miniLogin'>;
 
 function apply(result: WechatLoginResult): void {
   if (result.status === 'signed-in' && result.session) {
-    storage.set(TOKEN_KEY, result.session.token);
-    set({ status: 'signed-in', token: result.session.token });
+    signedIn(result.session.token, result.session.user.id);
   } else if (result.status === 'phone-required' && result.bindToken) {
     set({ status: 'phone-required', bindToken: result.bindToken });
   } else {
@@ -99,6 +131,10 @@ async function signIn(): Promise<void> {
   if (state.status === 'signed-in' || state.status === 'phone-required') return;
   const stored = storage.get(TOKEN_KEY);
   if (stored) {
+    // A token stored before AUTH-010 has no account beside it: `ownerOf` says `null`, and its
+    // first renewal replays nothing (see `renew`).
+    const owner = storage.get(USER_KEY);
+    if (owner) owners.set(stored, owner);
     set({ status: 'signed-in', token: stored });
     return;
   }
@@ -115,33 +151,122 @@ async function wechatSignIn(): Promise<void> {
   }
 }
 
-let renewing: Promise<string | null> | null = null;
+interface Renewal {
+  /** The renewed session's token, or `null`: nothing is replayed. */
+  token: string | null;
+  /** WeChat signed in to another account (or one this launch could not match), and was undone. */
+  accountChanged: boolean;
+  /** The login page was opened for it; once per renewal, however many requests shared it. */
+  sentToLogin?: boolean;
+}
+
+let renewing: Promise<Renewal> | null = null;
 
 /**
- * A 401 on a request that carried a token (auth.md「401：续期」): drop the token, sign in again
- * with a fresh `wx.login` code, and hand back the new token for the one replay, or `null`
- * (phone-required, or the renewal failed; the original 401 stands). Requests that 401 together
- * share one renewal. Renewal calls only public routes, so it cannot recurse.
+ * Sign in again with a fresh `wx.login` code after the session's token stopped working. Calls
+ * made meanwhile share the one run. Renewal calls only public routes, so it cannot recurse.
+ *
+ * `wx.login` signs in to whichever account holds this phone's openid, which need not be the one
+ * whose session ended: a password sign-in whose link was refused, an openid bound to another
+ * account since (AUTH-010). When the account is not the same one — or the ended session's
+ * account is unknown (a token stored before AUTH-010) — the new session is not kept: it is
+ * revoked, nothing is stored, and the shopper is signed out, so no request runs as the other
+ * account and its data never reaches the screen.
  */
-export function renewSession(): Promise<string | null> {
-  renewing ??= (async () => {
-    storage.remove(TOKEN_KEY);
-    await wechatSignIn();
-    return currentToken();
+function renew(): Promise<Renewal> {
+  renewing ??= (async (): Promise<Renewal> => {
+    const before = currentToken();
+    const owner = before ? ownerOf(before) : null;
+    forgetStored();
+    set({ status: 'signing-in' });
+    let result: WechatLoginResult;
+    try {
+      const code = await platform.login();
+      result = await api.call('auth.miniLogin', { body: { code } });
+    } catch (error) {
+      set({ status: 'failed', message: messageOf(error) });
+      return { token: null, accountChanged: false };
+    }
+    const session = result.status === 'signed-in' ? result.session : null;
+    if (session && (owner === null || session.user.id !== owner)) {
+      revoke(session.token);
+      set({ status: 'signed-out' });
+      return { token: null, accountChanged: true };
+    }
+    apply(result);
+    return { token: currentToken(), accountChanged: false };
   })().finally(() => {
     renewing = null;
   });
   return renewing;
 }
 
+/** End a session this client will not use. Best effort: unused, it expires on its own. */
+function revoke(token: string): void {
+  api
+    .call('auth.logout', undefined, { headers: { Authorization: `Bearer ${token}` } })
+    .catch(() => undefined);
+}
+
+/**
+ * Renew the session (auth.md「401：续期」): drop the token and sign in again with `wx.login`.
+ * The new token, or `null` (phone-required, the renewal failed, or it reached another account
+ * and was undone: signed out). For a caller that knows the session just ended (修改密码).
+ */
+export async function renewSession(): Promise<string | null> {
+  return (await renew()).token;
+}
+
+/** Where the shopper goes when a renewal reached another account (AUTH-010). */
+const SESSION_ENDED = '登录已过期，请重新登录';
+
+function sendToLogin(renewal: Renewal): void {
+  if (renewal.sentToLogin) return;
+  renewal.sentToLogin = true;
+  // Not awaited: the failed request's 401 reaches its caller first, and the hint shows last,
+  // on the login page.
+  void navigate({ route: 'login', params: {} })
+    .then(() => showToast(SESSION_ENDED))
+    .catch(() => undefined);
+}
+
+/**
+ * The transport's renewal hook (`renewing-transport`): the token to send again a request that
+ * went out with `sent` and met a 401, or `null` to let the 401 stand. Replays only as the
+ * account that sent it (AUTH-010):
+ *
+ * - `sent` is the session's token (or a renewal is under way): renew, sharing one renewal with
+ *   every request that failed alongside; they all get its one answer.
+ * - The session moved on meanwhile: its token, if it is the same account's; else `null`.
+ * - Not signed in (signed out, or a renewal already ended without a session): `null`, no
+ *   second `wx.login`.
+ *
+ * When the renewal reached another account the shopper is signed out and sent to the login
+ * page, once, with「登录已过期，请重新登录」; the request is not replayed.
+ */
+export async function renewFor(sent: string): Promise<string | null> {
+  // Before renewing: the renewal forgets the stored token, and with it a stored token's account.
+  const owner = ownerOf(sent);
+  let token: string | null;
+  if (renewing || currentToken() === sent) {
+    const renewal = await renew();
+    if (renewal.accountChanged) sendToLogin(renewal);
+    token = renewal.token;
+  } else {
+    token = currentToken();
+  }
+  if (!token) return null;
+  return owner !== null && ownerOf(token) === owner ? token : null;
+}
+
 installAuth({
   getToken: currentToken,
-  renew: renewSession,
+  renew: renewFor,
   onUnauthorized: () => {
     // Renewal already ran (or there was no token to renew): do not loop. The next action that
     // needs a session starts again through `requireLogin`.
     if (current().status === 'signed-in') {
-      storage.remove(TOKEN_KEY);
+      forgetStored();
       set({ status: 'idle' });
     }
   },
@@ -219,8 +344,7 @@ export async function signInWithPassword(account: string, password: string): Pro
     if (!bindToken || !isApiError(error) || !LINK_REFUSED.has(error.code)) throw error;
     result = await api.call('auth.passwordLogin', { body: { account, password } });
   }
-  storage.set(TOKEN_KEY, result.token);
-  set({ status: 'signed-in', token: result.token });
+  signedIn(result.token, result.user.id);
 }
 
 /** Codes after which the parked sign-in is still good and the shopper can try again. */
@@ -281,6 +405,6 @@ export async function logout({ everywhere = false }: { everywhere?: boolean } = 
       // The token may already be dead; signing out locally is what the shopper asked for.
     }
   }
-  storage.remove(TOKEN_KEY);
+  forgetStored();
   set({ status: 'signed-out' });
 }
