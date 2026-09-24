@@ -47,7 +47,7 @@ const activity = (patch: Partial<Activity> = {}): Activity => ({
 
 const openTeam: OpenTeam = {
   groupId: '501',
-  leaderNickname: '小明',
+  leaderNickname: '小*',
   leaderAvatarUrl: 'leader.png',
   seatsTotal: 2,
   seatsTaken: 1,

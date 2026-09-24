@@ -93,7 +93,7 @@ describe('groupbuy — 详情（活动 + 正在拼单）', () => {
       {
         id: 501,
         uid: 0,
-        nickname: '小明',
+        nickname: '小*',
         avatar: 'https://cdn.example.com/u/101.jpg',
         count: 1,
         people: 3,
@@ -150,9 +150,9 @@ describe('groupbuy — 团单状态页', () => {
 
   it('splits the members into the leader (pinkT) and everybody else (pinkAll)', () => {
     const g = build();
-    expect(g.pinkT).toMatchObject({ id: 501, uid: 101, nickname: '小明', stop_time: 1790128800, people: 3 });
+    expect(g.pinkT).toMatchObject({ id: 501, uid: 0, nickname: '小*', stop_time: 1790128800, people: 3 });
     expect(g.pinkAll).toEqual([
-      { uid: 102, nickname: '小红', avatar: 'https://cdn.example.com/u/102.jpg' },
+      { uid: 0, nickname: '小*', avatar: 'https://cdn.example.com/u/102.jpg' },
     ]);
     expect(g.count).toBe(1);
     assertRenderable(g);
@@ -165,10 +165,10 @@ describe('groupbuy — 团单状态页', () => {
     expect(toPageGroupbuyGroup({ status: 'cancelled' }).pinkBool).toBe(-1);
   });
 
-  it('only offers 取消开团 to the leader, via userInfo.uid matching pinkT.uid', () => {
+  it('only offers 取消开团 to the leader, via pinkT.isMine (the view carries no ids)', () => {
     const view = example(VIEW);
     const asMember = toPageGroupbuyGroup(view, null, null);
-    expect(asMember.userInfo.uid).toBe(0);
+    expect(asMember.pinkT.isMine).toBe(false);
     expect(asMember.order_pid).toBe(1);
 
     const asLeader = toPageGroupbuyGroup(
@@ -176,8 +176,7 @@ describe('groupbuy — 团单状态页', () => {
       null,
       null,
     );
-    expect(asLeader.userInfo.uid).toBe(101);
-    expect(asLeader.userInfo.uid).toBe(asLeader.pinkT.uid);
+    expect(asLeader.pinkT.isMine).toBe(true);
     expect(asLeader.order_pid).toBe(0);
   });
 
@@ -212,7 +211,7 @@ describe('groupbuy — 海报', () => {
       count: 1,
       label: '拼团',
       msg: '还差1人成团',
-      nickname: '小明',
+      nickname: '小*',
     });
     // the contract hands over the QR payload, not a rendered image
     expect(poster.url).toBe('');

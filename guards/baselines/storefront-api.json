@@ -10028,16 +10028,12 @@
             "items": {
               "type": "object",
               "required": [
-                "userId",
                 "nickname",
                 "avatarUrl",
-                "role"
+                "role",
+                "isMe"
               ],
               "properties": {
-                "userId": {
-                  "type": "string",
-                  "pattern": "^[1-9]\\d*$"
-                },
                 "nickname": {
                   "type": [
                     "string",
@@ -10056,6 +10052,9 @@
                     "leader",
                     "member"
                   ]
+                },
+                "isMe": {
+                  "type": "boolean"
                 }
               }
             }
@@ -11662,16 +11661,12 @@
             "items": {
               "type": "object",
               "required": [
-                "userId",
                 "nickname",
                 "avatarUrl",
-                "role"
+                "role",
+                "isMe"
               ],
               "properties": {
-                "userId": {
-                  "type": "string",
-                  "pattern": "^[1-9]\\d*$"
-                },
                 "nickname": {
                   "type": [
                     "string",
@@ -11690,6 +11685,9 @@
                     "leader",
                     "member"
                   ]
+                },
+                "isMe": {
+                  "type": "boolean"
                 }
               }
             }

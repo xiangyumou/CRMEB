@@ -22,7 +22,7 @@ import { getEffectHandler } from '../effects/index';
 import { notificationAdmin, registerSmsPort, type SmsPort } from '../notification';
 import { resetWechatTokenFlight, wechatConfig } from '../wechat';
 import { registerShippingFreightPort } from '../shipping';
-import type { Actor, Ctx } from '../kernel/context';
+import { anonymousActor, type Actor, type Ctx } from '../kernel/context';
 import { Money } from '../kernel/money';
 import { withTx } from '../kernel/tx';
 import * as checkout from '../order';
@@ -1093,9 +1093,43 @@ describe('the storefront surface', () => {
     await placeOrder({ userId: joiner, fixture, groupId: opened.groupId });
 
     const view = await service.groupDetail(asUser(joiner), { id: String(opened.groupId) });
-    expect(view.members.map((m) => m.nickname)).toEqual(['小明']);
+    expect(view.members.map((m) => m.nickname)).toEqual(['小*']);
     expect(view.me).toMatchObject({ role: 'member', status: 'joined', paid: false });
     expect(view.canJoin).toBe(false);
+  });
+
+  it('RISK-D-010 — shows a team to anybody with masked names, no account ids, and isMe from the session', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser('小明明');
+    const joiner = await makeUser('😀开心');
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    const joined = await placeOrder({ userId: joiner, fixture, groupId: opened.groupId });
+    await pay(joined.orderId);
+    const id = { id: String(opened.groupId) };
+
+    const anonymous = await service.groupDetail(harness.as(anonymousActor), id);
+    expect(anonymous.members).toEqual([
+      { nickname: '小*', avatarUrl: expect.anything(), role: 'leader', isMe: false },
+      { nickname: '😀*', avatarUrl: expect.anything(), role: 'member', isMe: false },
+    ]);
+    // No account id anywhere in what a stranger reads.
+    const text = JSON.stringify(anonymous);
+    expect(text).not.toContain('userId');
+    expect(text).not.toContain('小明明');
+
+    const asJoiner = await service.groupDetail(asUser(joiner), id);
+    expect(asJoiner.members.map((m) => m.isMe)).toEqual([false, true]);
+    const asLeader = await service.groupDetail(asUser(leader), id);
+    expect(asLeader.members.map((m) => m.isMe)).toEqual([true, false]);
+
+    const open = await service.openGroups(
+      harness.as(anonymousActor),
+      { id: String(fixture.activityId) },
+      { page: 1, pageSize: 20 },
+    );
+    expect(open.items.map((team) => team.leaderNickname)).toEqual(['小*']);
+    expect(JSON.stringify(open)).not.toContain('userId');
   });
 
   it('lets a leader withdraw a team nobody paid into, and not one they did', async () => {
@@ -1125,7 +1159,8 @@ describe('the storefront surface', () => {
     expect(poster.page).toBe(`packages/promo/groupbuy-team/index?id=${opened.groupId}`);
     expect(poster.qrPayload).toBe(poster.page);
     expect(poster.seatsLeft).toBe(2);
-    expect(poster.leaderNickname).toBe('小明');
+    // Masked even for the leader: a poster is made to be passed on (RISK-D-010).
+    expect(poster.leaderNickname).toBe('小*');
   });
 });
 

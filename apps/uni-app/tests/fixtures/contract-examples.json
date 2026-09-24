@@ -6929,16 +6929,16 @@
       "succeededAt": null,
       "members": [
         {
-          "userId": "101",
-          "nickname": "小明",
+          "nickname": "小*",
           "avatarUrl": "https://cdn.example.com/u/101.jpg",
-          "role": "leader"
+          "role": "leader",
+          "isMe": false
         },
         {
-          "userId": "102",
-          "nickname": "小红",
+          "nickname": "小*",
           "avatarUrl": "https://cdn.example.com/u/102.jpg",
-          "role": "member"
+          "role": "member",
+          "isMe": true
         }
       ],
       "me": {
@@ -7022,7 +7022,7 @@
       "items": [
         {
           "groupId": "501",
-          "leaderNickname": "小明",
+          "leaderNickname": "小*",
           "leaderAvatarUrl": "https://cdn.example.com/u/101.jpg",
           "seatsTotal": 3,
           "seatsTaken": 2,
@@ -7048,7 +7048,7 @@
       "originalPrice": "88.00",
       "seatsLeft": 1,
       "expiresAt": "2026-09-23T10:00:00+08:00",
-      "leaderNickname": "小明",
+      "leaderNickname": "小*",
       "leaderAvatarUrl": "https://cdn.example.com/u/101.jpg",
       "qrPayload": "https://shop.example.com/pages/activity/groupbuy_status/index?groupId=501",
       "page": "pages/activity/groupbuy_status/index?groupId=501"

@@ -21,7 +21,7 @@ const view = (patch: Partial<TeamView> = {}): TeamView => ({
   seatsLeft: 1,
   expiresAt: '2099-01-01T00:00:00Z',
   succeededAt: null,
-  members: [{ userId: '101', nickname: '小明', avatarUrl: 'leader.png', role: 'leader' }],
+  members: [{ nickname: '小*', avatarUrl: 'leader.png', role: 'leader', isMe: false }],
   me: null,
   canJoin: true,
   ...patch,

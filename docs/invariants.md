@@ -1384,6 +1384,16 @@ The 拼团价 is what a group-buy order charges, and an ordinary order for the s
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > prices a shopper joining an open team the same way`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::beforeCreate > refuses an order whose draft is not at the activity price`
 
+### RISK-D-010
+
+A team shows strangers only a masked nickname and never an account id (decided 2026-09-24: in this shop a team says who bought what). `groupbuy.groupDetail` (anybody with the link, signed in or not), `groupbuy.openGroups` (public) and `groupbuy.poster` answer each nickname as its first character and one star (`小明明` → `小*`), counting whole graphemes so an emoji is never split; a one-character name is all star and a blank one is `null`. Avatars stay. A member row carries no `userId`; whether a seat is the caller's own is `isMe`, computed on the server from the session.
+
+- `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > keeps the first character and one star, whatever the length`
+- `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > keeps a whole emoji rather than half a surrogate pair`
+- `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > stars out a one-character name entirely`
+- `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > answers null for no name at all`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the storefront surface > RISK-D-010 — shows a team to anybody with masked names, no account ids, and isMe from the session`
+
 ## 页面装修 (DIY)
 
 ### DIY-001

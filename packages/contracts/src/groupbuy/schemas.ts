@@ -357,6 +357,7 @@ export type GroupbuyDetail = z.infer<typeof groupbuyDetail>;
 /** A group a shopper may join, on the activity page or the 拼单 list. */
 export const groupbuyOpenGroup = z.object({
   groupId: id,
+  /** Masked, `小*` — this route is public (RISK-D-010). */
   leaderNickname: z.string().nullable(),
   leaderAvatarUrl: z.string().nullable(),
   seatsTotal: z.number().int().min(2),
@@ -381,13 +382,19 @@ export const groupbuyGroupView = z.object({
   seatsLeft: z.number().int().min(0),
   expiresAt: instant,
   succeededAt: instant.nullable(),
-  /** Paid, unrefunded members only — an unpaid order is not a participant. */
+  /**
+   * Paid, unrefunded members only — an unpaid order is not a participant.
+   *
+   * Anybody holding the team link reads this, signed in or not, so a member
+   * carries no account id and a masked nickname (`小*`, RISK-D-010). Whether a
+   * seat is the caller's own is `isMe`, decided from the session on the server.
+   */
   members: z.array(
     z.object({
-      userId: id,
       nickname: z.string().nullable(),
       avatarUrl: z.string().nullable(),
       role: groupbuyMemberRole,
+      isMe: z.boolean(),
     }),
   ),
   /** The caller's own place in this group, or `null` (including anonymous). */
@@ -440,6 +447,7 @@ export const groupbuyPoster = z.object({
   originalPrice: money.nullable(),
   seatsLeft: z.number().int().min(0),
   expiresAt: instant,
+  /** Masked, `小*`: the poster is drawn to be passed around (RISK-D-010). */
   leaderNickname: z.string().nullable(),
   leaderAvatarUrl: z.string().nullable(),
   /**
@@ -595,7 +603,7 @@ export const groupbuyDetailExample: GroupbuyDetail = {
 
 export const groupbuyOpenGroupExample: GroupbuyOpenGroup = {
   groupId: '501',
-  leaderNickname: '小明',
+  leaderNickname: '小*',
   leaderAvatarUrl: 'https://cdn.example.com/u/101.jpg',
   seatsTotal: 3,
   seatsTaken: 2,
@@ -617,16 +625,16 @@ export const groupbuyGroupViewExample: GroupbuyGroupView = {
   succeededAt: null,
   members: [
     {
-      userId: '101',
-      nickname: '小明',
+      nickname: '小*',
       avatarUrl: 'https://cdn.example.com/u/101.jpg',
       role: 'leader',
+      isMe: false,
     },
     {
-      userId: '102',
-      nickname: '小红',
+      nickname: '小*',
       avatarUrl: 'https://cdn.example.com/u/102.jpg',
       role: 'member',
+      isMe: true,
     },
   ],
   me: { role: 'member', status: 'joined', orderId: '7002', paid: true },
@@ -656,7 +664,7 @@ export const groupbuyPosterExample: GroupbuyPoster = {
   originalPrice: '88.00',
   seatsLeft: 1,
   expiresAt: '2026-09-23T10:00:00+08:00',
-  leaderNickname: '小明',
+  leaderNickname: '小*',
   leaderAvatarUrl: 'https://cdn.example.com/u/101.jpg',
   qrPayload: 'packages/promo/groupbuy-team/index?id=501',
   page: 'packages/promo/groupbuy-team/index?id=501',
