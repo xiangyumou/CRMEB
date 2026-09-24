@@ -81,12 +81,6 @@ export function AppearancePreview({ values }: { values: ConfigValues }) {
   if (isHex(primaryInput) && theme.primaryText.toUpperCase() !== primaryInput.toUpperCase()) {
     notes.push(`主题色用作小字时不够清晰，小程序会自动加深为 ${theme.primaryText}。`);
   }
-  const contrastInput = str(values, 'primaryContrastColor', '');
-  if (isHex(contrastInput) && contrastInput.toUpperCase() !== theme.onPrimary.toUpperCase()) {
-    notes.push(
-      `主题色按钮上的文字，小程序按对比度自动取 ${theme.onPrimary}，「主题色上的文字颜色」目前不生效。`,
-    );
-  }
 
   const pill: CSSProperties = { borderRadius: 999, padding: '0 14px', lineHeight: '30px' };
 

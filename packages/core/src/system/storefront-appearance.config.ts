@@ -51,7 +51,6 @@ export const storefrontAppearanceConfig = defineConfigGroup({
   permission: 'system:config:read',
   schema: z.object({
     primaryColor: hexColor.default(theme.primaryColor),
-    primaryContrastColor: hexColor.default(theme.primaryContrastColor),
     /** Blank = no accent: the client uses the primary colour (one-colour scheme). */
     accentColor: z.union([hexColor, z.literal('')]).default(theme.accentColor ?? ''),
     priceColor: hexColor.default(theme.priceColor),
@@ -88,14 +87,6 @@ export const storefrontAppearanceConfig = defineConfigGroup({
       help: '按钮、选中态等',
       section: '主题',
       order: 1,
-    },
-    primaryContrastColor: {
-      label: '主题色上的文字颜色',
-      type: 'color',
-      placeholder: theme.primaryContrastColor,
-      help: '主题色按钮上的文字和图标',
-      section: '主题',
-      order: 2,
     },
     accentColor: {
       label: '辅助色',

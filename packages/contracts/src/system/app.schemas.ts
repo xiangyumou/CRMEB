@@ -53,7 +53,11 @@ export type AppTabBarItem = z.infer<typeof appTabBarItem>;
 export const appAppearance = z.object({
   theme: z.object({
     primaryColor: hexColor,
-    /** Text and icons drawn on top of `primaryColor` (buttons, badges). */
+    /**
+     * Text and icons drawn on top of `primaryColor` (buttons, badges). Derived
+     * from `primaryColor` by `deriveTheme`, the same as the mini computes it;
+     * no longer an operator setting.
+     */
     primaryContrastColor: hexColor,
     /**
      * 辅助色 (design.md §3.2): gradient starts, the 加入购物车 button beside the

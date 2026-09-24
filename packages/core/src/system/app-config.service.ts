@@ -11,6 +11,7 @@ import {
   MAX_SUBSCRIBE_TEMPLATES,
   webviewDomain,
 } from '@shop/contracts/system/app.schemas';
+import { deriveTheme } from '@shop/contracts/system/theme';
 
 import type { Ctx } from '../kernel/context';
 import {
@@ -300,7 +301,10 @@ export function appearanceOf(values: StorefrontAppearanceConfig): AppAppearance 
   return {
     theme: {
       primaryColor: values.primaryColor,
-      primaryContrastColor: values.primaryContrastColor,
+      // Derived, not a setting: the mini picks the readable text colour for
+      // the primary itself (`deriveTheme`), so a stored one was never used.
+      // Still sent, because clients already in review parse it.
+      primaryContrastColor: deriveTheme({ primary: values.primaryColor }).onPrimary,
       accentColor: orNull(values.accentColor),
       priceColor: values.priceColor,
       radius: values.radius,

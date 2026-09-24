@@ -115,7 +115,6 @@ describe('SYS-015 — 小程序外观', () => {
   it('serves the theme and the tab bar the operator saved', async () => {
     await save('storefront-appearance', {
       primaryColor: '#1677ff',
-      primaryContrastColor: '#000000',
       priceColor: '#FF4D4F',
       radius: 'large',
       tabBarColor: '#666666',
@@ -130,7 +129,8 @@ describe('SYS-015 — 小程序外观', () => {
     const { appearance } = await appConfigGet(anonymous());
     expect(appearance.theme).toEqual({
       primaryColor: '#1677ff',
-      primaryContrastColor: '#000000',
+      // Derived from the primary: dark text on this light blue.
+      primaryContrastColor: '#1A1A1A',
       accentColor: null,
       priceColor: '#FF4D4F',
       radius: 'large',
