@@ -50,6 +50,8 @@
 **本地复查（2026-09-24，B1、L1、L2、L3 合入之后）：** 全套通过。turbo 45/45；test:int core 1563、web 331；prettier、check:examples（461）、guards（16 项 0 失败，api-compat 0 破坏）通过；后台 e2e 50/50；uni-app `npm test` 477 通过（32 跳过）、重新 `build:h5` 后旧 storefront e2e 34/34；`test:mini` 46/46。
 注意：e2e 判断 uni-app H5 是否过期只看源码时间，只改 `package.json` / lock 时不会重建，要手动 `npm ci && npm run build:h5`。
 
+**本地复查（2026-09-24，P1、P2、C1、C2 合入之后，即切换代码已完成）：** turbo 45/45（size-report ok）；test:int core 1422、web 248、worker 6、testing 9（删了 diy / 店员的测试，所以变少）；prettier、check:examples（392）、guards（15 项 0 失败；api-compat 对 release 1.0.0 0 破坏）通过；后台 e2e 46/46；storefront e2e（现在就是小程序）46/46；`drill.sh --only edge/` 2/2；演练构建的 worker 镜像里 `sharp` 能加载。全量演练没跑。
+
 ## 4. 接下来要做的
 
 1. **本地跑一次全套检查**（`docs/contributing.md` 的合并清单），重点是云端没跑的：旧 uni-app 的 storefront e2e、后台 e2e（`master` 并进来的 `fd66e30` 改了后台表单的 422 显示，`55d8796` 删了 uni-app 的 flyio），以及登录页修复之后的全套 `test:mini`。
