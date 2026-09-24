@@ -4,6 +4,9 @@
 里的 `apps/web/app`、`apps/web/src/admin/decor`、`packages/core`、`packages/contracts`、`apps/mini`、
 `packages/storefront-blocks`、`packages/api-client`。`master` 等于线上。行号以本分支为准（master 上的另注）。
 
+> 2026-09-24 用户确认：线上还没开始运营，只是内部测试。下面标 PRODUCTION 的只表示 `master` 上也有，
+> 没有真实顾客受影响，随切换上线即可，不需要热修。
+
 ## 发现（PRODUCTION 在前）
 
 严重度：高 = 能直接拿到钱或别人的数据；中 = 可被利用但影响有限，或合规问题；低 = 需要额外条件；信息 = 设计取舍，写下来备查。
