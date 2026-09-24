@@ -2,6 +2,13 @@
 
 import { createContext, useContext, type ReactNode } from 'react';
 
+import type {
+  DecorRecord,
+  DecorRecordPage,
+  DecorRecordQuery,
+  DecorTreeNode,
+} from '../decor/record-types';
+
 /**
  * Everything a config panel needs from other domains.
  *
@@ -12,33 +19,12 @@ import { createContext, useContext, type ReactNode } from 'react';
  * arrangement the kit uses for `AssetSource` and `LinkSource`.
  */
 
-export interface DiyPickerItem {
-  id: string;
-  name: string;
-  /** Thumbnail URL, when the record has one. */
-  image?: string | undefined;
-  /** Second line: price for a product, article date, coupon face value. */
-  subtitle?: string | undefined;
-}
-
-export interface DiyPickerQuery {
-  keyword?: string | undefined;
-  /** Restricts to one category, where the record type has categories. */
-  categoryId?: string | undefined;
-  page: number;
-  pageSize: number;
-}
-
-export interface DiyPickerResult {
-  items: DiyPickerItem[];
-  total: number;
-}
-
-export interface DiyTreeNode {
-  id: string;
-  name: string;
-  children?: DiyTreeNode[] | undefined;
-}
+// The row shapes are the decor editor's (`admin/decor/record-types.ts`), which
+// outlives this one; the legacy names stay for the legacy panels.
+export type DiyPickerItem = DecorRecord;
+export type DiyPickerQuery = DecorRecordQuery;
+export type DiyPickerResult = DecorRecordPage;
+export type DiyTreeNode = DecorTreeNode;
 
 /**
  * The record types a DIY component can point at or embed.

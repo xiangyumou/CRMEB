@@ -62,11 +62,16 @@
 
 ### 2.3 旧装修（`diy` 域）和旧后台编辑器
 
-- [ ] **先搬走被新编辑器复用的代码**：`apps/web/src/admin/decor/records.tsx` 从 `../diy/data-source`、`../diy/record-source`
-      导入选择器数据源，`apps/web/src/test/diy-data-source.ts` 也依赖 `data-source`。把这两个文件移到 `src/admin/decor/`（或 kit）
-      再删目录。
-- [ ] 后台：`apps/web/app/admin/(shell)/diy/`、`apps/web/src/admin/diy/`、菜单 `apps/web/src/admin/menu/diy.menu.ts`、
-      `diy:*` 权限原子（`permissions` 守卫会提示没人用的原子）。
+- [x] **先搬走被新编辑器复用的代码**（已完成，H5-backend）：选择器数据源已在 `apps/web/src/admin/decor/`
+      （`record-types.ts`、`catalog-records.ts`、`record-kinds.ts`，测试随之搬来），`records.tsx` 不再引用 `admin/diy`；
+      ESLint 的 `no-restricted-imports`（`eslint.config.mjs` 的 `NO_LEGACY_DIY`）禁止 `src/admin/decor/**` 与
+      `app/admin/(shell)/decor/**` 引用 `diy`。旧目录里剩下的只是转接：`diy/data-source.tsx` 的 `DiyPicker*` 类型是 decor
+      类型的别名，`diy/record-source.ts` 把旧的 `labels`、`combination` 映射到 decor 的实现，`diy/catalog-source.ts` 转导出
+      选择器函数、自留旧 uni 路径的 `catalogLinkTargets`。整个目录可直接删除，decor 不受影响。
+- [ ] 后台：`apps/web/app/admin/(shell)/diy/`、`apps/web/src/admin/diy/`（含上面的转接文件及其测试）、只供旧面板测试用的
+      `apps/web/src/test/diy-data-source.ts`、菜单 `apps/web/src/admin/menu/diy.menu.ts`、`diy:*` 权限原子（`permissions`
+      守卫会提示没人用的原子）。`NO_LEGACY_DIY` 规则删不删都可以（目录没了就不会再命中）。删完跑一遍
+      `grep -rn "admin/diy\|/diy/" apps/web/src apps/web/app` 确认无残留引用。
 - [ ] 接口：`apps/web/app/api/v1/diy/**`（`diy.layout`、`diy.navigation`、`diy.pageVersion`、`diy.theme`、`diy.homePage`、
       `diy.userCenterPage`、`diy.productDetailPage`、`diy.page`）、`apps/web/app/admin-api/diy/**`（页面、主题、链接库）。
 - [ ] 契约 `packages/contracts/src/diy/`（含 `removed.ts` 的 `REMOVED_STOREFRONT_PAGES`、默认 JSON、`__fixtures__`），
