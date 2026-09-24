@@ -28,9 +28,12 @@ import {
   roleDelete,
   roleDetail,
   roleList,
+  permissionTree,
   roleSetStatus,
   roleUpdate,
 } from './role.service';
+import { PERMISSION_REQUIREMENTS, withRequirements } from './permission-requirements';
+import { isKnownPermission } from '../auth/permissions';
 import { auditLogList } from './audit.service';
 import { configGet, configGroupList, configSave, describeGroup } from './config.service';
 import { allConfigGroups } from '../kernel/config-registry';
@@ -293,6 +296,44 @@ describe('roles', () => {
 
     expect((await roleList(ctx, { page: 1, pageSize: 20 })).total).toBe(1);
     expect(await roleDetail(ctx, { id: created.id })).toMatchObject({ name: '内容编辑' });
+  });
+
+  it('gives an editor what its editor reads, so 商品编辑 is not a page of 403s', async () => {
+    const created = await roleCreate(as(superId), {
+      name: '商品编辑',
+      enabled: true,
+      permissions: ['catalog:product:write'],
+    });
+    expect(created.permissions).toEqual(
+      expect.arrayContaining([
+        'catalog:product:write',
+        'catalog:product:read',
+        'catalog:category:read',
+        'catalog:label:read',
+        'catalog:protection:read',
+        'catalog:param:read',
+        'shipping:template:read',
+        'storage:attachment:write',
+      ]),
+    );
+    expect(created.permissions).not.toContain('catalog:category:write');
+  });
+
+  it('requires only atoms the build declares, and nothing that requires more', () => {
+    const table = Object.entries(PERMISSION_REQUIREMENTS);
+    const named = table.flatMap(([atom, needs]) => [atom, ...needs]);
+    expect(named.filter((atom) => !isKnownPermission(atom))).toEqual([]);
+    // One pass is the closure only while no requirement has requirements.
+    expect(
+      table.flatMap(([, needs]) => needs).filter((need) => need in PERMISSION_REQUIREMENTS),
+    ).toEqual([]);
+  });
+
+  it('lists what each atom brings with it, for the role editor', () => {
+    const product = permissionTree()
+      .sections.flatMap((section) => section.items)
+      .find((item) => item.atom === 'catalog:product:write');
+    expect(product?.requires).toContain('catalog:category:read');
   });
 
   it('refuses an atom the running build does not declare', async () => {
@@ -1038,6 +1079,51 @@ describe('migration 0012 — 改价 becomes its own atom', () => {
       'order:order:write',
     ]);
     expect(await granted(warehouse!.id)).toEqual(['order:order:read', 'order:shipment:write']);
+  });
+});
+
+describe('migration 0013 — editors get what their editor reads', () => {
+  const MIGRATION = fileURLToPath(
+    new URL('../../../db/migrations/0013_editor_permission_requirements.sql', import.meta.url),
+  );
+  const sql = () => readFileSync(MIGRATION, 'utf8');
+  const runMigration = () => harness.db.handle.pool.query(sql());
+
+  it('is the requirements table, pair for pair', () => {
+    const pairs = [...sql().matchAll(/\('([a-z:-]+)', '([a-z:-]+)'\)/g)].map(
+      ([, atom, needs]) => `${atom} -> ${needs}`,
+    );
+    const table = Object.entries(PERMISSION_REQUIREMENTS).flatMap(([atom, needs]) =>
+      needs.map((need) => `${atom} -> ${need}`),
+    );
+    expect(pairs.sort()).toEqual(table.sort());
+  });
+
+  it('completes the roles that hold an editor atom and leaves the rest alone', async () => {
+    const [editor, support] = await harness.ctx.db
+      .insert(roles)
+      .values([{ name: '商品编辑' }, { name: '客服' }])
+      .returning({ id: roles.id });
+    await harness.ctx.db.insert(rolePermissions).values([
+      { roleId: editor!.id, permission: 'catalog:product:write' },
+      { roleId: editor!.id, permission: 'catalog:category:read' },
+      { roleId: support!.id, permission: 'order:order:read' },
+    ]);
+
+    await runMigration();
+    await runMigration();
+
+    const granted = async (roleId: number) =>
+      (
+        await harness.ctx.db
+          .select()
+          .from(rolePermissions)
+          .where(eq(rolePermissions.roleId, roleId))
+      )
+        .map((row) => row.permission)
+        .sort();
+    expect(await granted(editor!.id)).toEqual(withRequirements(['catalog:product:write']));
+    expect(await granted(support!.id)).toEqual(['order:order:read']);
   });
 });
 

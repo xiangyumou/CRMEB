@@ -243,6 +243,8 @@ export const permissionNode = z.object({
   atom: z.string(),
   label: z.string(),
   domain: z.string(),
+  /** What a role given this atom is given with it: the reads its editor makes. */
+  requires: z.array(z.string()),
 });
 export type PermissionNode = z.infer<typeof permissionNode>;
 

@@ -188,17 +188,32 @@ export const systemPermissionTree = defineRoute({
           {
             section: '账号',
             items: [
-              { atom: 'auth:profile:read', label: '查看自己的资料', domain: 'auth' },
-              { atom: 'auth:profile:update', label: '修改自己的资料与密码', domain: 'auth' },
-              { atom: 'auth:session:delete', label: '退出登录', domain: 'auth' },
-              { atom: 'auth:session:read', label: '读取自己的登录信息', domain: 'auth' },
+              { atom: 'auth:profile:read', label: '查看自己的资料', domain: 'auth', requires: [] },
+              {
+                atom: 'auth:profile:update',
+                label: '修改自己的资料与密码',
+                domain: 'auth',
+                requires: [],
+              },
+              { atom: 'auth:session:delete', label: '退出登录', domain: 'auth', requires: [] },
+              {
+                atom: 'auth:session:read',
+                label: '读取自己的登录信息',
+                domain: 'auth',
+                requires: [],
+              },
             ],
           },
           {
             section: '营销',
             items: [
-              { atom: 'coupon:template:read', label: '查看优惠券', domain: 'coupon' },
-              { atom: 'coupon:template:write', label: '新建/编辑优惠券', domain: 'coupon' },
+              { atom: 'coupon:template:read', label: '查看优惠券', domain: 'coupon', requires: [] },
+              {
+                atom: 'coupon:template:write',
+                label: '新建/编辑优惠券',
+                domain: 'coupon',
+                requires: [],
+              },
             ],
           },
         ],

@@ -14,6 +14,7 @@ import * as authAdminRepo from '../auth/admin.repo';
 import { allPermissionAtoms, isKnownPermission } from '../auth/permissions';
 import { IMPLICIT_ADMIN_PERMISSIONS } from '../auth/rbac';
 import { assertWithinOwnGrants } from './grant-guard';
+import { requirementsOf, withRequirements } from './permission-requirements';
 import * as repo from './system.repo';
 
 /**
@@ -26,6 +27,9 @@ import * as repo from './system.repo';
  * nothing; here an atom that is not declared cannot be granted, and one that is
  * granted but no longer declared is reported back as `unknownPermissions` so an
  * operator can clear it.
+ *
+ * **A role is saved with what its editors read** (`permission-requirements.ts`):
+ * ticking 商品编辑 also ticks 商品分类, 素材 and the rest the editor loads.
  *
  * **Changing a role's grants ends the sessions of everybody holding it.**
  * Permissions are cached in the session, so without that, removing an atom
@@ -102,7 +106,8 @@ function assertPermissionsKnown(permissions: readonly string[]): void {
   }
 }
 
-export async function roleCreate(ctx: Ctx, body: RoleForm): Promise<RoleDetail> {
+export async function roleCreate(ctx: Ctx, form: RoleForm): Promise<RoleDetail> {
+  const body = { ...form, permissions: withRequirements(form.permissions) };
   assertPermissionsKnown(body.permissions);
   assertWithinOwnGrants(ctx, body.permissions);
   if (await repo.roleNameTaken(ctx.db, body.name)) {
@@ -131,9 +136,10 @@ export async function roleCreate(ctx: Ctx, body: RoleForm): Promise<RoleDetail> 
 export async function roleUpdate(
   ctx: Ctx,
   params: { id: string },
-  body: RoleForm,
+  form: RoleForm,
 ): Promise<RoleDetail> {
   const id = fromId(params.id);
+  const body = { ...form, permissions: withRequirements(form.permissions) };
   assertPermissionsKnown(body.permissions);
   const existing = await repo.findRole(ctx.db, id);
   if (!existing) throw new DomainError('SYSTEM_ROLE_NOT_FOUND');
@@ -225,7 +231,12 @@ export function permissionTree(): PermissionTree {
   for (const atom of allPermissionAtoms()) {
     const section = atom.section ?? atom.domain;
     const items = bySection.get(section) ?? [];
-    items.push({ atom: atom.atom, label: atom.label, domain: atom.domain });
+    items.push({
+      atom: atom.atom,
+      label: atom.label,
+      domain: atom.domain,
+      requires: [...requirementsOf(atom.atom)],
+    });
     bySection.set(section, items);
   }
   const sections = [...bySection.entries()]

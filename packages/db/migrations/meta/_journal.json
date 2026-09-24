@@ -92,6 +92,13 @@
       "when": 1790249823674,
       "tag": "0012_order_reprice_permission",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790250202754,
+      "tag": "0013_editor_permission_requirements",
+      "breakpoints": true
     }
   ]
 }
